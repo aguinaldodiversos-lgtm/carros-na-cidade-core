@@ -1,18 +1,16 @@
-require("dotenv").config(); // ✅ OBRIGATÓRIO NO TOPO
+require("dotenv").config(); // ✅ sempre no topo
 
+/* =========================
+   IMPORTS
+========================= */
 const express = require("express");
 const axios = require("axios");
 const { Pool } = require("pg");
-
-const app = express();
-app.use(express.json());
-
-require("dotenv").config();
-const express = require("express");
-const { Pool } = require("pg");
-const axios = require("axios");
 const crypto = require("crypto");
 
+/* =========================
+   APP
+========================= */
 const app = express();
 app.use(express.json());
 
@@ -29,7 +27,7 @@ const AD_PLANS = {
   free: {
     name: "Gratuito",
     priority: 1,
-    limit: "unlimited" // 🔹 ILIMITADO NO INÍCIO DO PORTAL
+    limit: "unlimited" // ILIMITADO NO INÍCIO DO PORTAL
   },
   professional: {
     name: "Plano Profissional",
@@ -186,7 +184,6 @@ app.post("/ads", async (req, res) => {
     highlightUntil.setDate(highlightUntil.getDate() + HIGHLIGHT_DAYS);
   }
 
-  // 🚫 SEM BLOQUEIO PARA GRATUITOS (estratégia inicial)
   await pool.query(
     `
     INSERT INTO ads
@@ -220,6 +217,7 @@ app.get("/ads/by-city", async (req, res) => {
     `SELECT * FROM cities WHERE id = $1`,
     [city_id]
   );
+
   if (cityRes.rows.length === 0) {
     return res.status(404).json({ error: "Cidade não encontrada" });
   }
@@ -253,11 +251,7 @@ app.get("/ads/by-city", async (req, res) => {
   const gratuitos = [];
 
   for (const ad of adsRes.rows) {
-    if (
-      ad.priority === 3 &&
-      ad.highlight_until &&
-      new Date(ad.highlight_until) > now
-    ) {
+    if (ad.priority === 3 && ad.highlight_until && new Date(ad.highlight_until) > now) {
       destaque.push(ad);
     } else if (ad.priority === 2) {
       profissionais.push(ad);
