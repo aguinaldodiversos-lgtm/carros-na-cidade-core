@@ -1,3 +1,12 @@
+require("dotenv").config(); // ✅ OBRIGATÓRIO NO TOPO
+
+const express = require("express");
+const axios = require("axios");
+const { Pool } = require("pg");
+
+const app = express();
+app.use(express.json());
+
 require("dotenv").config();
 const express = require("express");
 const { Pool } = require("pg");
