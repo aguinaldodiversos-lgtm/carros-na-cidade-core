@@ -1,0 +1,13 @@
+{
+  "name": "carros-na-cidade-core",
+  "version": "1.0.0",
+  "description": "Backend do portal Carros na Cidade",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "express": "^4.19.2"
+  }
+}
