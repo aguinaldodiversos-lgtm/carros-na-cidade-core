@@ -19,11 +19,18 @@ const pool = new Pool({
 });
 
 /* =====================================================
-   MERCADO PAGO
+   MERCADO PAGO (SAFE INIT)
 ===================================================== */
-mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN,
-});
+const MP_ENABLED = !!process.env.MP_ACCESS_TOKEN;
+
+if (MP_ENABLED) {
+  mercadopago.configure({
+    access_token: process.env.MP_ACCESS_TOKEN,
+  });
+  console.log('💰 Mercado Pago habilitado');
+} else {
+  console.warn('⚠️ Mercado Pago desabilitado (MP_ACCESS_TOKEN ausente)');
+}
 
 const PLAN_PRICES = {
   professional: 49.9,
@@ -209,6 +216,10 @@ app.get('/ads/me', mochaAuth, async (req, res) => {
    PAYMENTS — CHECKOUT
 ===================================================== */
 app.post('/payments/checkout', mochaAuth, async (req, res) => {
+  if (!MP_ENABLED) {
+    return res.status(503).json({ error: 'Payments temporarily unavailable' });
+  }
+
   try {
     const { adId, plan } = req.body;
     if (!PLAN_PRICES[plan]) {
@@ -288,6 +299,8 @@ app.get('/payments/status/:adId', mochaAuth, async (req, res) => {
    WEBHOOK — MERCADO PAGO
 ===================================================== */
 app.post('/webhooks/mercadopago', async (req, res) => {
+  if (!MP_ENABLED) return res.sendStatus(200);
+
   try {
     if (req.body.type !== 'payment') return res.sendStatus(200);
 
@@ -295,6 +308,7 @@ app.post('/webhooks/mercadopago', async (req, res) => {
     if (mpPayment.body.status !== 'approved') return res.sendStatus(200);
 
     const adId = mpPayment.body.external_reference;
+
     const payment = await pool.query(
       `SELECT * FROM payments WHERE ad_id = $1 AND status = 'pending'`,
       [adId]
