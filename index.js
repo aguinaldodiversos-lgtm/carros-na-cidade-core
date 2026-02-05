@@ -168,11 +168,10 @@ app.post("/ads", mochaAuth(true), async (req, res) => {
 
     const adPlan = AD_PLANS[plan] || AD_PLANS.free;
 
-    // ✅ fonte da verdade: EMAIL do Mocha
+    // 🔗 fonte da verdade: usuário Mocha (email)
     const advertiserEmail = req.user.email;
 
-    // cria ou recupera anunciante
-    const advertiserResult = await pool.query(
+    const advertiserRes = await pool.query(
       `
       INSERT INTO advertisers (email, plan)
       VALUES ($1, $2)
@@ -183,7 +182,7 @@ app.post("/ads", mochaAuth(true), async (req, res) => {
       [advertiserEmail, plan]
     );
 
-    const advertiserId = advertiserResult.rows[0].id;
+    const advertiserId = advertiserRes.rows[0].id;
 
     let highlightUntil = null;
     if (plan === "highlight") {
@@ -212,8 +211,8 @@ app.post("/ads", mochaAuth(true), async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erro ao criar anúncio" });
+    console.error("Erro ao criar anúncio:", err);
+    res.status(500).json({ error: "Erro interno ao criar anúncio" });
   }
 });
 
