@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const jwksRsa = require('jwks-rsa');
 const { Pool } = require('pg');
 const mercadopago = require('mercadopago');
+const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
@@ -99,6 +100,29 @@ async function getOrCreateAdvertiser(email) {
   );
 
   return insert.rows[0].id;
+}
+
+/* =====================================================
+   MERCADO PAGO — WEBHOOK SIGNATURE VALIDATION
+===================================================== */
+function isValidMercadoPagoSignature(req) {
+  const signature = req.headers['x-signature'];
+  const requestId = req.headers['x-request-id'];
+  const timestamp = req.headers['x-timestamp'];
+
+  if (!signature || !requestId || !timestamp) return false;
+
+  const payload = `${timestamp}.${requestId}`;
+
+  const expectedSignature = crypto
+    .createHmac('sha256', process.env.MP_ACCESS_TOKEN)
+    .update(payload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
 }
 
 /* =====================================================
@@ -270,41 +294,23 @@ app.post('/payments/checkout', mochaAuth, async (req, res) => {
 });
 
 /* =====================================================
-   PAYMENTS — STATUS
-===================================================== */
-app.get('/payments/status/:adId', mochaAuth, async (req, res) => {
-  const advertiserId = await getOrCreateAdvertiser(req.user.email);
-  const { adId } = req.params;
-
-  const { rows } = await pool.query(
-    `
-    SELECT a.plan, a.expires_at, p.status, p.paid_at
-    FROM ads a
-    LEFT JOIN payments p ON p.ad_id = a.id
-    WHERE a.id = $1 AND a.advertiser_id = $2
-    ORDER BY p.created_at DESC
-    LIMIT 1
-    `,
-    [adId, advertiserId]
-  );
-
-  if (!rows.length) {
-    return res.status(404).json({ error: 'Ad not found' });
-  }
-
-  res.json(rows[0]);
-});
-
-/* =====================================================
-   WEBHOOK — MERCADO PAGO
+   WEBHOOK — MERCADO PAGO (VALIDATED)
 ===================================================== */
 app.post('/webhooks/mercadopago', async (req, res) => {
   if (!MP_ENABLED) return res.sendStatus(200);
 
+  if (!isValidMercadoPagoSignature(req)) {
+    console.warn('🚫 Webhook MP inválido');
+    return res.sendStatus(401);
+  }
+
   try {
     if (req.body.type !== 'payment') return res.sendStatus(200);
 
-    const mpPayment = await mercadopago.payment.findById(req.body.data.id);
+    const paymentId = req.body.data?.id;
+    if (!paymentId) return res.sendStatus(200);
+
+    const mpPayment = await mercadopago.payment.findById(paymentId);
     if (mpPayment.body.status !== 'approved') return res.sendStatus(200);
 
     const adId = mpPayment.body.external_reference;
@@ -344,10 +350,12 @@ app.post('/webhooks/mercadopago', async (req, res) => {
     );
 
     await pool.query('COMMIT');
+
+    console.log(`✅ Pagamento aprovado — anúncio ${adId}`);
     res.sendStatus(200);
   } catch (err) {
     await pool.query('ROLLBACK');
-    console.error(err);
+    console.error('Webhook MP error:', err);
     res.sendStatus(500);
   }
 });
