@@ -1,225 +1,370 @@
-require("dotenv").config(); // ✅ sempre no topo
+require('dotenv').config();
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const jwksRsa = require('jwks-rsa');
+const { Pool } = require('pg');
+const mercadopago = require('mercadopago');
 
-/* =========================
-   IMPORTS
-========================= */
-const express = require("express");
-const axios = require("axios");
-const { Pool } = require("pg");
-const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
-const jwksClient = require("jwks-rsa");
-
-/* =========================
-   MOCHA AUTH (MIDDLEWARE)
-========================= */
-const mochaClient = jwksClient({
-  jwksUri: process.env.MOCHA_JWKS_URL,
-  cache: true,
-  rateLimit: true
-});
-
-function getKey(header, callback) {
-  mochaClient.getSigningKey(header.kid, function (err, key) {
-    if (err) return callback(err);
-    const signingKey = key.getPublicKey();
-    callback(null, signingKey);
-  });
-}
-
-function mochaAuth(required = true) {
-  return (req, res, next) => {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      if (!required) return next();
-      return res.status(401).json({ error: "Token não informado" });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-
-    jwt.verify(
-      token,
-      getKey,
-      {
-        issuer: process.env.MOCHA_ISSUER,
-        audience: process.env.MOCHA_AUDIENCE
-      },
-      (err, decoded) => {
-        if (err) {
-          return res.status(401).json({ error: "Token inválido" });
-        }
-
-        req.user = {
-          id: decoded.sub,
-          email: decoded.email,
-          role: decoded.role || "user"
-        };
-
-        next();
-      }
-    );
-  };
-}
-
-/* =========================
-   APP
-========================= */
 const app = express();
 app.use(express.json());
 
-/* =========================
-   CONFIGURAÇÕES GERAIS
-========================= */
-const HIGHLIGHT_DAYS = 15;
-const MAX_RADIUS_KM = 100;
-
-/* =========================
-   PLANOS DE ANÚNCIO
-========================= */
-const AD_PLANS = {
-  free: { name: "Gratuito", priority: 1, limit: "unlimited" },
-  professional: { name: "Plano Profissional", priority: 2, limit: 10 },
-  professional_plus: { name: "Plano Profissional Plus", priority: 2, limit: "unlimited" },
-  highlight: { name: "Destaque Avulso", priority: 3, durationDays: HIGHLIGHT_DAYS }
-};
-
-/* =========================
+/* =====================================================
    DATABASE
-========================= */
+===================================================== */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
-/* =========================
-   INIT DATABASE
-========================= */
-async function initDB() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS cities (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      state TEXT NOT NULL,
-      latitude NUMERIC,
-      longitude NUMERIC
-    );
+/* =====================================================
+   MERCADO PAGO
+===================================================== */
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN,
+});
 
-    CREATE TABLE IF NOT EXISTS advertisers (
-      id SERIAL PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      plan TEXT NOT NULL,
-      mp_subscription_id TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
+const PLAN_PRICES = {
+  professional: 49.9,
+  highlight: 99.9,
+};
 
-    CREATE TABLE IF NOT EXISTS ads (
-      id SERIAL PRIMARY KEY,
-      advertiser_id INTEGER REFERENCES advertisers(id),
-      title TEXT,
-      price NUMERIC,
-      city_id INTEGER,
-      latitude NUMERIC,
-      longitude NUMERIC,
-      radius_km INTEGER DEFAULT 0,
-      priority INTEGER DEFAULT 1,
-      highlight_until TIMESTAMP,
-      status TEXT CHECK (status IN ('active','reserved','sold')) DEFAULT 'active',
-      created_at TIMESTAMP DEFAULT NOW()
-    );
+const PLAN_DURATION_DAYS = {
+  professional: 30,
+  highlight: 30,
+};
 
-    CREATE TABLE IF NOT EXISTS fipe_cache (
-      id SERIAL PRIMARY KEY,
-      hash TEXT UNIQUE,
-      response JSONB,
-      valid_until DATE
-    );
-  `);
+/* =====================================================
+   MOCHA AUTH (JWT + JWKS)
+===================================================== */
+const jwksClient = jwksRsa({
+  jwksUri: process.env.MOCHA_JWKS_URI,
+  cache: true,
+  rateLimit: true,
+});
 
-  console.log("Banco inicializado");
+function getKey(header, callback) {
+  jwksClient.getSigningKey(header.kid, (err, key) => {
+    if (err) return callback(err);
+    callback(null, key.getPublicKey());
+  });
 }
-initDB();
 
-/* =========================
-   HEALTH
-========================= */
-app.get("/", (req, res) => {
-  res.send("Carros na Cidade API OK");
-});
+function mochaAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth) return res.status(401).json({ error: 'Token missing' });
 
-/* =========================
-   CRIAÇÃO DE ANÚNCIO (PROTEGIDO)
-========================= */
-app.post("/ads", mochaAuth(true), async (req, res) => {
+  const token = auth.split(' ')[1];
+
+  jwt.verify(
+    token,
+    getKey,
+    {
+      audience: process.env.MOCHA_AUDIENCE,
+      issuer: process.env.MOCHA_ISSUER,
+      algorithms: ['RS256'],
+    },
+    (err, decoded) => {
+      if (err || !decoded.email) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+      req.user = { email: decoded.email };
+      next();
+    }
+  );
+}
+
+/* =====================================================
+   HELPERS
+===================================================== */
+async function getOrCreateAdvertiser(email) {
+  const { rows } = await pool.query(
+    `SELECT id FROM advertisers WHERE email = $1`,
+    [email]
+  );
+
+  if (rows.length) return rows[0].id;
+
+  const insert = await pool.query(
+    `INSERT INTO advertisers (email) VALUES ($1) RETURNING id`,
+    [email]
+  );
+
+  return insert.rows[0].id;
+}
+
+/* =====================================================
+   ADS — CREATE
+===================================================== */
+app.post('/ads', mochaAuth, async (req, res) => {
   try {
     const {
-      title,
-      price,
-      city_id,
-      latitude,
-      longitude,
-      radius_km = 0,
-      plan = "free"
+      title, description, price,
+      brand, model, year,
+      city, state, latitude, longitude,
+      plan = 'free',
     } = req.body;
 
-    if (radius_km > MAX_RADIUS_KM) {
-      return res.status(400).json({ error: "Raio máximo permitido: 100km" });
+    if (!title || !city || !state || latitude == null || longitude == null) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const adPlan = AD_PLANS[plan] || AD_PLANS.free;
+    const advertiserId = await getOrCreateAdvertiser(req.user.email);
 
-    // 🔗 fonte da verdade: usuário Mocha (email)
-    const advertiserEmail = req.user.email;
-
-    const advertiserRes = await pool.query(
+    const { rows } = await pool.query(
       `
-      INSERT INTO advertisers (email, plan)
-      VALUES ($1, $2)
-      ON CONFLICT (email)
-      DO UPDATE SET plan = EXCLUDED.plan
-      RETURNING id
-      `,
-      [advertiserEmail, plan]
-    );
-
-    const advertiserId = advertiserRes.rows[0].id;
-
-    let highlightUntil = null;
-    if (plan === "highlight") {
-      highlightUntil = new Date();
-      highlightUntil.setDate(highlightUntil.getDate() + HIGHLIGHT_DAYS);
-    }
-
-    await pool.query(
-      `
-      INSERT INTO ads
-      (advertiser_id, title, price, city_id, latitude, longitude, radius_km, priority, highlight_until)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      INSERT INTO ads (
+        advertiser_id, title, description, price,
+        brand, model, year,
+        city, state, latitude, longitude, plan
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      RETURNING *
       `,
       [
-        advertiserId,
-        title,
-        price,
-        city_id,
-        latitude,
-        longitude,
-        radius_km,
-        adPlan.priority,
-        highlightUntil
+        advertiserId, title, description, price,
+        brand, model, year,
+        city, state, latitude, longitude, plan,
       ]
     );
 
-    res.json({ success: true });
+    res.status(201).json(rows[0]);
   } catch (err) {
-    console.error("Erro ao criar anúncio:", err);
-    res.status(500).json({ error: "Erro interno ao criar anúncio" });
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create ad' });
   }
 });
 
-/* =========================
+/* =====================================================
+   ADS — LIST (RAIO + RANKING)
+===================================================== */
+app.get('/ads', async (req, res) => {
+  try {
+    const { lat, lng, radius = 20, page = 1, limit = 20 } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'lat and lng required' });
+    }
+
+    const safeRadius = Math.min(Number(radius), 100);
+    const safeLimit = Math.min(Number(limit), 50);
+    const offset = (page - 1) * safeLimit;
+
+    const { rows } = await pool.query(
+      `
+      SELECT *,
+        (
+          6371 * acos(
+            cos(radians($1)) *
+            cos(radians(latitude)) *
+            cos(radians(longitude) - radians($2)) +
+            sin(radians($1)) *
+            sin(radians(latitude))
+          )
+        ) AS distance
+      FROM ads
+      WHERE status = 'active'
+      AND (
+        6371 * acos(
+          cos(radians($1)) *
+          cos(radians(latitude)) *
+          cos(radians(longitude) - radians($2)) +
+          sin(radians($1)) *
+          sin(radians(latitude))
+        )
+      ) <= $3
+      ORDER BY
+        CASE plan
+          WHEN 'highlight' THEN 1
+          WHEN 'professional' THEN 2
+          ELSE 3
+        END,
+        COALESCE(expires_at, created_at) DESC
+      LIMIT $4 OFFSET $5
+      `,
+      [lat, lng, safeRadius, safeLimit, offset]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to list ads' });
+  }
+});
+
+/* =====================================================
+   ADS — ME
+===================================================== */
+app.get('/ads/me', mochaAuth, async (req, res) => {
+  const advertiserId = await getOrCreateAdvertiser(req.user.email);
+  const { rows } = await pool.query(
+    `SELECT * FROM ads WHERE advertiser_id = $1 ORDER BY created_at DESC`,
+    [advertiserId]
+  );
+  res.json(rows);
+});
+
+/* =====================================================
+   PAYMENTS — CHECKOUT
+===================================================== */
+app.post('/payments/checkout', mochaAuth, async (req, res) => {
+  try {
+    const { adId, plan } = req.body;
+    if (!PLAN_PRICES[plan]) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    const advertiserId = await getOrCreateAdvertiser(req.user.email);
+
+    const ad = await pool.query(
+      `SELECT id FROM ads WHERE id = $1 AND advertiser_id = $2`,
+      [adId, advertiserId]
+    );
+
+    if (!ad.rowCount) {
+      return res.status(403).json({ error: 'Ad not found' });
+    }
+
+    const preference = {
+      items: [{
+        title: `Plano ${plan} - Carros na Cidade`,
+        quantity: 1,
+        currency_id: 'BRL',
+        unit_price: PLAN_PRICES[plan],
+      }],
+      external_reference: adId,
+      notification_url: `${process.env.APP_BASE_URL}/webhooks/mercadopago`,
+      auto_return: 'approved',
+    };
+
+    const mp = await mercadopago.preferences.create(preference);
+
+    await pool.query(
+      `
+      INSERT INTO payments (
+        ad_id, advertiser_id,
+        mp_preference_id, amount, plan
+      )
+      VALUES ($1,$2,$3,$4,$5)
+      `,
+      [adId, advertiserId, mp.body.id, PLAN_PRICES[plan], plan]
+    );
+
+    res.json({ init_point: mp.body.init_point });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Checkout failed' });
+  }
+});
+
+/* =====================================================
+   PAYMENTS — STATUS
+===================================================== */
+app.get('/payments/status/:adId', mochaAuth, async (req, res) => {
+  const advertiserId = await getOrCreateAdvertiser(req.user.email);
+  const { adId } = req.params;
+
+  const { rows } = await pool.query(
+    `
+    SELECT a.plan, a.expires_at, p.status, p.paid_at
+    FROM ads a
+    LEFT JOIN payments p ON p.ad_id = a.id
+    WHERE a.id = $1 AND a.advertiser_id = $2
+    ORDER BY p.created_at DESC
+    LIMIT 1
+    `,
+    [adId, advertiserId]
+  );
+
+  if (!rows.length) {
+    return res.status(404).json({ error: 'Ad not found' });
+  }
+
+  res.json(rows[0]);
+});
+
+/* =====================================================
+   WEBHOOK — MERCADO PAGO
+===================================================== */
+app.post('/webhooks/mercadopago', async (req, res) => {
+  try {
+    if (req.body.type !== 'payment') return res.sendStatus(200);
+
+    const mpPayment = await mercadopago.payment.findById(req.body.data.id);
+    if (mpPayment.body.status !== 'approved') return res.sendStatus(200);
+
+    const adId = mpPayment.body.external_reference;
+    const payment = await pool.query(
+      `SELECT * FROM payments WHERE ad_id = $1 AND status = 'pending'`,
+      [adId]
+    );
+
+    if (!payment.rowCount) return res.sendStatus(200);
+
+    const plan = payment.rows[0].plan;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + PLAN_DURATION_DAYS[plan]);
+
+    await pool.query('BEGIN');
+
+    await pool.query(
+      `
+      UPDATE payments
+      SET status = 'approved',
+          mp_payment_id = $1,
+          paid_at = NOW()
+      WHERE id = $2
+      `,
+      [mpPayment.body.id, payment.rows[0].id]
+    );
+
+    await pool.query(
+      `
+      UPDATE ads
+      SET plan = $1,
+          expires_at = $2
+      WHERE id = $3
+      `,
+      [plan, expiresAt, adId]
+    );
+
+    await pool.query('COMMIT');
+    res.sendStatus(200);
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+/* =====================================================
+   JOB — EXPIRE ADS
+===================================================== */
+setInterval(async () => {
+  try {
+    const result = await pool.query(
+      `
+      UPDATE ads
+      SET plan = 'free',
+          expires_at = NULL
+      WHERE expires_at IS NOT NULL
+        AND expires_at < NOW()
+      `
+    );
+
+    if (result.rowCount > 0) {
+      console.log(`⏳ ${result.rowCount} anúncios expirados`);
+    }
+  } catch (err) {
+    console.error('Expire job failed', err);
+  }
+}, 10 * 60 * 1000);
+
+/* =====================================================
    SERVER
-========================= */
+===================================================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("Carros na Cidade rodando na porta", PORT);
+  console.log(`🚗 Carros na Cidade API running on port ${PORT}`);
 });
