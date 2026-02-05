@@ -7,6 +7,60 @@ const express = require("express");
 const axios = require("axios");
 const { Pool } = require("pg");
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+const jwksClient = require("jwks-rsa");
+
+/* =========================
+   MOCHA AUTH (MIDDLEWARE)
+========================= */
+const mochaClient = jwksClient({
+  jwksUri: process.env.MOCHA_JWKS_URL,
+  cache: true,
+  rateLimit: true
+});
+
+function getKey(header, callback) {
+  mochaClient.getSigningKey(header.kid, function (err, key) {
+    if (err) return callback(err);
+    const signingKey = key.getPublicKey();
+    callback(null, signingKey);
+  });
+}
+
+function mochaAuth(required = true) {
+  return (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      if (!required) return next();
+      return res.status(401).json({ error: "Token não informado" });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+
+    jwt.verify(
+      token,
+      getKey,
+      {
+        issuer: process.env.MOCHA_ISSUER,
+        audience: process.env.MOCHA_AUDIENCE
+      },
+      (err, decoded) => {
+        if (err) {
+          return res.status(401).json({ error: "Token inválido" });
+        }
+
+        req.user = {
+          id: decoded.sub,
+          email: decoded.email,
+          role: decoded.role || "user"
+        };
+
+        next();
+      }
+    );
+  };
+}
 
 /* =========================
    APP
@@ -17,7 +71,7 @@ app.use(express.json());
 /* =========================
    CONFIGURAÇÕES GERAIS
 ========================= */
-const HIGHLIGHT_DAYS = 15; // 🔧 editável
+const HIGHLIGHT_DAYS = 15;
 const MAX_RADIUS_KM = 100;
 
 /* =========================
@@ -27,7 +81,7 @@ const AD_PLANS = {
   free: {
     name: "Gratuito",
     priority: 1,
-    limit: "unlimited" // ILIMITADO NO INÍCIO DO PORTAL
+    limit: "unlimited"
   },
   professional: {
     name: "Plano Profissional",
@@ -158,11 +212,10 @@ app.get("/api/fipe", async (req, res) => {
 });
 
 /* =========================
-   CRIAÇÃO DE ANÚNCIO
+   CRIAÇÃO DE ANÚNCIO (PROTEGIDO)
 ========================= */
-app.post("/ads", async (req, res) => {
+app.post("/ads", mochaAuth(true), async (req, res) => {
   const {
-    advertiser_id,
     title,
     price,
     city_id,
@@ -191,7 +244,7 @@ app.post("/ads", async (req, res) => {
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     `,
     [
-      advertiser_id,
+      req.user.id,
       title,
       price,
       city_id,
