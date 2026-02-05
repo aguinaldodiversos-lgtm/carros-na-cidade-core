@@ -9,41 +9,32 @@ const mercadopago = require('mercadopago');
 const app = express();
 
 /* =====================================================
-   BODY PARSERS
+   RAW BODY (WEBHOOK)
 ===================================================== */
-app.use('/webhooks/mercadopago', express.raw({ type: '*/*' }));
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    }
+  })
+);
 
 /* =====================================================
    DATABASE
 ===================================================== */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false
 });
 
 /* =====================================================
    MERCADO PAGO
 ===================================================== */
 mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN,
+  access_token: process.env.MP_ACCESS_TOKEN
 });
-
-/* =====================================================
-   CONSTANTS
-===================================================== */
-const PLAN_LIMITS = {
-  free: Infinity,
-  professional: 10,
-  highlight: Infinity,
-};
-
-const UPSELL_HINTS = {
-  professional: 'highlight',
-};
 
 /* =====================================================
    MOCHA AUTH
@@ -51,7 +42,7 @@ const UPSELL_HINTS = {
 const jwksClient = jwksRsa({
   jwksUri: process.env.MOCHA_JWKS_URI,
   cache: true,
-  rateLimit: true,
+  rateLimit: true
 });
 
 function getKey(header, callback) {
@@ -65,22 +56,34 @@ function mochaAuth(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ error: 'Token missing' });
 
+  const token = auth.split(' ')[1];
+
   jwt.verify(
-    auth.split(' ')[1],
+    token,
     getKey,
     {
       audience: process.env.MOCHA_AUDIENCE,
       issuer: process.env.MOCHA_ISSUER,
-      algorithms: ['RS256'],
+      algorithms: ['RS256']
     },
     (err, decoded) => {
       if (err || !decoded.email) {
         return res.status(401).json({ error: 'Invalid token' });
       }
-      req.user = { email: decoded.email };
+      req.user = decoded;
       next();
     }
   );
+}
+
+/* =====================================================
+   ADMIN AUTH
+===================================================== */
+function adminAuth(req, res, next) {
+  if (!req.user?.roles?.includes('admin')) {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  next();
 }
 
 /* =====================================================
@@ -88,129 +91,116 @@ function mochaAuth(req, res, next) {
 ===================================================== */
 async function getOrCreateAdvertiser(email) {
   const { rows } = await pool.query(
-    `SELECT id FROM advertisers WHERE email = $1`,
+    'SELECT id FROM advertisers WHERE email = $1',
     [email]
   );
   if (rows.length) return rows[0].id;
 
   const insert = await pool.query(
-    `INSERT INTO advertisers (email) VALUES ($1) RETURNING id`,
+    'INSERT INTO advertisers (email) VALUES ($1) RETURNING id',
     [email]
   );
   return insert.rows[0].id;
 }
 
-async function getSubscription(advertiserId) {
-  const { rows } = await pool.query(
+/* =====================================================
+   SUBSCRIPTION MIDDLEWARE
+===================================================== */
+async function loadSubscription(req, res, next) {
+  const advertiserId = await getOrCreateAdvertiser(req.user.email);
+
+  const sub = await pool.query(
     `
-    SELECT s.status, p.name AS plan
+    SELECT s.*, p.code AS plan_code, p.ad_limit, p.ranking_weight
     FROM subscriptions s
-    JOIN subscription_plans p ON p.id = s.plan_id
+    JOIN plans p ON p.id = s.plan_id
     WHERE s.advertiser_id = $1
+      AND s.status IN ('trial','active')
     ORDER BY s.created_at DESC
     LIMIT 1
     `,
     [advertiserId]
   );
-  return rows.length ? rows[0] : null;
+
+  req.advertiserId = advertiserId;
+  req.subscription = sub.rows[0] || null;
+  next();
+}
+
+async function checkAdLimit(req, res, next) {
+  if (!req.subscription) return next();
+  if (req.subscription.ad_limit === null) return next();
+
+  const count = await pool.query(
+    'SELECT COUNT(*) FROM ads WHERE advertiser_id = $1',
+    [req.advertiserId]
+  );
+
+  if (Number(count.rows[0].count) >= req.subscription.ad_limit) {
+    return res.status(403).json({
+      error: 'ad_limit_reached',
+      upsell: true
+    });
+  }
+  next();
 }
 
 /* =====================================================
-   ADS — CREATE (COM BLOQUEIO + UPSELL)
+   ADS — CREATE
 ===================================================== */
-app.post('/ads', mochaAuth, async (req, res) => {
-  try {
-    const advertiserId = await getOrCreateAdvertiser(req.user.email);
-    const subscription = await getSubscription(advertiserId);
-
-    if (
-      subscription &&
-      ['cancelled', 'paused'].includes(subscription.status)
-    ) {
-      return res.status(403).json({
-        error: 'Assinatura inativa',
-        cta: 'Reative sua assinatura para publicar anúncios',
-      });
-    }
-
-    const effectivePlan = subscription?.plan || 'free';
-
-    const { rows: count } = await pool.query(
-      `
-      SELECT COUNT(*)::int AS total
-      FROM ads
-      WHERE advertiser_id = $1
-        AND status = 'active'
-      `,
-      [advertiserId]
-    );
-
-    if (count[0].total >= PLAN_LIMITS[effectivePlan]) {
-      return res.status(403).json({
-        error: 'Limite de anúncios atingido',
-        current_plan: effectivePlan,
-        suggested_upgrade: UPSELL_HINTS[effectivePlan] || null,
-        cta: 'Faça upgrade para continuar publicando',
-      });
-    }
-
+app.post(
+  '/ads',
+  mochaAuth,
+  loadSubscription,
+  checkAdLimit,
+  async (req, res) => {
     const {
-      title,
-      description,
-      price,
-      brand,
-      model,
-      year,
-      city,
-      state,
-      latitude,
-      longitude,
+      title, description, price,
+      brand, model, year,
+      city, state, latitude, longitude
     } = req.body;
+
+    if (!title || latitude == null || longitude == null) {
+      return res.status(400).json({ error: 'Missing fields' });
+    }
+
+    const planCode = req.subscription?.plan_code || 'free';
+    const subscriptionId = req.subscription?.id || null;
 
     const { rows } = await pool.query(
       `
       INSERT INTO ads (
-        advertiser_id, title, description, price,
+        advertiser_id, subscription_id,
+        title, description, price,
         brand, model, year,
         city, state, latitude, longitude, plan
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       RETURNING *
       `,
       [
-        advertiserId,
-        title,
-        description,
-        price,
-        brand,
-        model,
-        year,
-        city,
-        state,
-        latitude,
-        longitude,
-        effectivePlan,
+        req.advertiserId, subscriptionId,
+        title, description, price,
+        brand, model, year,
+        city, state, latitude, longitude, planCode
       ]
     );
 
     res.status(201).json(rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create ad' });
   }
-});
+);
 
 /* =====================================================
-   ADS — LIST (RANKING POR ASSINATURA)
+   ADS — LIST (RANKING + RAIO)
 ===================================================== */
 app.get('/ads', async (req, res) => {
-  try {
-    const { lat, lng, radius = 20 } = req.query;
-    const safeRadius = Math.min(Number(radius), 100);
+  const { lat, lng, radius = 20 } = req.query;
+  const safeRadius = Math.min(Number(radius), 100);
 
-    const { rows } = await pool.query(
-      `
-      SELECT a.*,
+  const { rows } = await pool.query(
+    `
+    SELECT ads.*,
+      COALESCE(p.ranking_weight, 999) AS ranking_weight,
       (
         6371 * acos(
           cos(radians($1)) *
@@ -220,139 +210,138 @@ app.get('/ads', async (req, res) => {
           sin(radians(latitude))
         )
       ) AS distance
-      FROM ads a
-      LEFT JOIN subscriptions s ON s.advertiser_id = a.advertiser_id
-      WHERE a.status = 'active'
-      AND (
-        6371 * acos(
-          cos(radians($1)) *
-          cos(radians(latitude)) *
-          cos(radians(longitude) - radians($2)) +
-          sin(radians($1)) *
-          sin(radians(latitude))
-        )
-      ) <= $3
-      ORDER BY
-        CASE
-          WHEN s.status = 'authorized' AND a.plan = 'highlight' THEN 1
-          WHEN s.status = 'authorized' AND a.plan = 'professional' THEN 2
-          ELSE 3
-        END,
-        a.created_at DESC
-      `,
-      [lat, lng, safeRadius]
-    );
+    FROM ads
+    LEFT JOIN subscriptions s ON s.id = ads.subscription_id
+    LEFT JOIN plans p ON p.id = s.plan_id
+    WHERE (
+      6371 * acos(
+        cos(radians($1)) *
+        cos(radians(latitude)) *
+        cos(radians(longitude) - radians($2)) +
+        sin(radians($1)) *
+        sin(radians(latitude))
+      )
+    ) <= $3
+    ORDER BY ranking_weight ASC, ads.created_at DESC
+    `,
+    [lat, lng, safeRadius]
+  );
 
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to list ads' });
-  }
+  res.json(rows);
 });
 
 /* =====================================================
-   SUBSCRIPTIONS — CANCEL
+   SUBSCRIPTIONS — CREATE (PREAPPROVAL)
 ===================================================== */
-app.post('/subscriptions/cancel', mochaAuth, async (req, res) => {
-  try {
-    const advertiserId = await getOrCreateAdvertiser(req.user.email);
+app.post('/subscriptions/start', mochaAuth, loadSubscription, async (req, res) => {
+  const { planCode } = req.body;
 
-    const { rows } = await pool.query(
-      `
-      SELECT mp_subscription_id
-      FROM subscriptions
-      WHERE advertiser_id = $1 AND status = 'authorized'
-      `,
-      [advertiserId]
-    );
-
-    if (!rows.length) {
-      return res.status(400).json({ error: 'No active subscription' });
-    }
-
-    await mercadopago.preapproval.update(rows[0].mp_subscription_id, {
-      status: 'cancelled',
-    });
-
-    await pool.query(
-      `
-      UPDATE subscriptions
-      SET status = 'cancelled', updated_at = NOW()
-      WHERE advertiser_id = $1
-      `,
-      [advertiserId]
-    );
-
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Cancel failed' });
+  const plan = await pool.query(
+    'SELECT * FROM plans WHERE code = $1 AND active = true',
+    [planCode]
+  );
+  if (!plan.rowCount) {
+    return res.status(400).json({ error: 'Invalid plan' });
   }
-});
 
-/* =====================================================
-   DASHBOARD — FINANCE
-===================================================== */
-app.get('/dashboard/finance', mochaAuth, async (req, res) => {
-  try {
-    const advertiserId = await getOrCreateAdvertiser(req.user.email);
+  const preference = {
+    reason: `Plano ${plan.rows[0].name} - Carros na Cidade`,
+    auto_recurring: {
+      frequency: 1,
+      frequency_type: 'months',
+      transaction_amount: Number(plan.rows[0].price),
+      currency_id: 'BRL'
+    },
+    back_url: `${process.env.APP_BASE_URL}/dashboard`,
+    external_reference: `${req.advertiserId}:${planCode}`,
+    payer_email: req.user.email
+  };
 
-    const subscription = await getSubscription(advertiserId);
+  const mp = await mercadopago.preapproval.create(preference);
 
-    const payments = await pool.query(
-      `
-      SELECT amount, status, paid_at
-      FROM payments
-      WHERE advertiser_id = $1
-      ORDER BY created_at DESC
-      `,
-      [advertiserId]
-    );
+  await pool.query(
+    `
+    INSERT INTO subscriptions (
+      advertiser_id, plan_id,
+      status, mp_preapproval_id,
+      started_at
+    )
+    VALUES ($1,$2,'trial',$3,NOW())
+    `,
+    [req.advertiserId, plan.rows[0].id, mp.body.id]
+  );
 
-    res.json({
-      subscription,
-      payments: payments.rows,
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Dashboard failed' });
-  }
+  res.json({ init_point: mp.body.init_point });
 });
 
 /* =====================================================
    WEBHOOK — MERCADO PAGO (VALIDADO)
 ===================================================== */
-app.post('/webhooks/mercadopago', async (req, res) => {
-  try {
-    const signature = req.headers['x-signature'];
-    const requestId = req.headers['x-request-id'];
+app.post('/webhook/mercadopago', async (req, res) => {
+  const signature = req.headers['x-signature'];
+  const requestId = req.headers['x-request-id'];
 
-    const expected = crypto
-      .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
-      .update(requestId + req.body.toString())
-      .digest('hex');
+  if (!signature || !requestId) return res.sendStatus(401);
 
-    if (signature !== expected) {
-      return res.status(401).send('Invalid signature');
-    }
+  const payload = `${requestId}.${req.rawBody}`;
+  const expected = crypto
+    .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
+    .update(payload)
+    .digest('hex');
 
-    const payload = JSON.parse(req.body.toString());
+  if (expected !== signature) return res.sendStatus(401);
 
-    if (payload.type === 'preapproval') {
-      const sub = await mercadopago.preapproval.get(payload.data.id);
+  if (req.body.type === 'preapproval') {
+    const mpId = req.body.data.id;
+    const mpSub = await mercadopago.preapproval.get(mpId);
 
+    if (mpSub.body.status === 'authorized') {
       await pool.query(
         `
         UPDATE subscriptions
-        SET status = $1, updated_at = NOW()
-        WHERE mp_subscription_id = $2
+        SET status = 'active'
+        WHERE mp_preapproval_id = $1
         `,
-        [sub.body.status, sub.body.id]
+        [mpId]
       );
     }
 
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Webhook error', err);
-    res.sendStatus(500);
+    if (mpSub.body.status === 'cancelled') {
+      await pool.query(
+        `
+        UPDATE subscriptions
+        SET status = 'cancelled'
+        WHERE mp_preapproval_id = $1
+        `,
+        [mpId]
+      );
+    }
   }
+
+  res.sendStatus(200);
+});
+
+/* =====================================================
+   ADMIN — DASHBOARD
+===================================================== */
+app.get('/admin/dashboard', mochaAuth, adminAuth, async (req, res) => {
+  const revenue = await pool.query(
+    `
+    SELECT SUM(p.price) AS mrr
+    FROM subscriptions s
+    JOIN plans p ON p.id = s.plan_id
+    WHERE s.status = 'active'
+    `
+  );
+
+  const users = await pool.query(
+    'SELECT COUNT(*) FROM advertisers'
+  );
+
+  res.json({
+    mrr: revenue.rows[0].mrr || 0,
+    advertisers: users.rows[0].count
+  });
 });
 
 /* =====================================================
