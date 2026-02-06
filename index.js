@@ -191,7 +191,7 @@ app.post(
 );
 
 /* =====================================================
-   ADS — LIST (RANKING + RAIO)
+   ADS — LIST
 ===================================================== */
 app.get('/ads', async (req, res) => {
   const { lat, lng, radius = 20 } = req.query;
@@ -231,7 +231,7 @@ app.get('/ads', async (req, res) => {
 });
 
 /* =====================================================
-   SUBSCRIPTIONS — CREATE (PREAPPROVAL)
+   SUBSCRIPTIONS — START
 ===================================================== */
 app.post('/subscriptions/start', mochaAuth, loadSubscription, async (req, res) => {
   const { planCode } = req.body;
@@ -262,8 +262,10 @@ app.post('/subscriptions/start', mochaAuth, loadSubscription, async (req, res) =
   await pool.query(
     `
     INSERT INTO subscriptions (
-      advertiser_id, plan_id,
-      status, mp_preapproval_id,
+      advertiser_id,
+      plan_id,
+      status,
+      mp_preapproval_id,
       started_at
     )
     VALUES ($1,$2,'trial',$3,NOW())
@@ -275,50 +277,51 @@ app.post('/subscriptions/start', mochaAuth, loadSubscription, async (req, res) =
 });
 
 /* =====================================================
-   WEBHOOK — MERCADO PAGO (VALIDADO)
+   WEBHOOK — MERCADO PAGO (FINAL)
 ===================================================== */
 app.post('/webhook/mercadopago', async (req, res) => {
-  const signature = req.headers['x-signature'];
-  const requestId = req.headers['x-request-id'];
+  try {
+    const signature = req.headers['x-signature'];
+    const requestId = req.headers['x-request-id'];
 
-  if (!signature || !requestId) return res.sendStatus(401);
+    if (!signature || !requestId) return res.sendStatus(401);
 
-  const payload = `${requestId}.${req.rawBody}`;
-  const expected = crypto
-    .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
-    .update(payload)
-    .digest('hex');
+    const payload = `${requestId}.${req.rawBody}`;
+    const expected = crypto
+      .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
+      .update(payload)
+      .digest('hex');
 
-  if (expected !== signature) return res.sendStatus(401);
+    if (expected !== signature) return res.sendStatus(401);
 
-  if (req.body.type === 'preapproval') {
-    const mpId = req.body.data.id;
-    const mpSub = await mercadopago.preapproval.get(mpId);
+    if (req.body.type === 'preapproval') {
+      const preapprovalId = req.body.data.id;
+      const mpSub = await mercadopago.preapproval.get(preapprovalId);
 
-    if (mpSub.body.status === 'authorized') {
-      await pool.query(
-        `
-        UPDATE subscriptions
-        SET status = 'active'
-        WHERE mp_preapproval_id = $1
-        `,
-        [mpId]
-      );
+      const statusMap = {
+        authorized: 'active',
+        paused: 'paused',
+        cancelled: 'cancelled'
+      };
+
+      const newStatus = statusMap[mpSub.body.status];
+      if (newStatus) {
+        await pool.query(
+          `
+          UPDATE subscriptions
+          SET status = $1
+          WHERE mp_preapproval_id = $2
+          `,
+          [newStatus, preapprovalId]
+        );
+      }
     }
 
-    if (mpSub.body.status === 'cancelled') {
-      await pool.query(
-        `
-        UPDATE subscriptions
-        SET status = 'cancelled'
-        WHERE mp_preapproval_id = $1
-        `,
-        [mpId]
-      );
-    }
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.sendStatus(500);
   }
-
-  res.sendStatus(200);
 });
 
 /* =====================================================
