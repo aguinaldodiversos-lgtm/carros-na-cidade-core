@@ -1,28 +1,42 @@
 require('dotenv').config();
 
 /* =====================================================
-   IMPORTS
+   CORE IMPORTS
 ===================================================== */
 const express = require('express');
-const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const jwksRsa = require('jwks-rsa');
 const bcrypt = require('bcrypt');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const { Pool } = require('pg');
 const mercadopago = require('mercadopago');
-const geoip = require('geoip-lite');
-const crypto = require('crypto');
 
+/* =====================================================
+   APP SETUP
+===================================================== */
 const app = express();
 app.use(express.json());
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+  })
+);
 
 /* =====================================================
    DATABASE
 ===================================================== */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl:
+    process.env.NODE_ENV === 'production'
+      ? { rejectUnauthorized: false }
+      : false,
 });
 
 /* =====================================================
@@ -32,6 +46,9 @@ mercadopago.configure({
   access_token: process.env.MP_ACCESS_TOKEN,
 });
 
+/* =====================================================
+   CONSTANTS
+===================================================== */
 const PLAN_LIMITS = {
   free: Infinity,
   professional: 10,
@@ -39,30 +56,15 @@ const PLAN_LIMITS = {
 };
 
 const PLAN_PRIORITY = {
-  highlight: 3,
+  highlight: 1,
   professional: 2,
-  free: 1,
+  free: 3,
 };
 
-/* =====================================================
-   AUTH — JWT EMAIL/SENHA
-===================================================== */
-function authJWT(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth) return res.sendStatus(401);
-
-  try {
-    const token = auth.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: decoded.id, email: decoded.email };
-    next();
-  } catch {
-    res.sendStatus(401);
-  }
-}
+const GRACE_DAYS = 3;
 
 /* =====================================================
-   AUTH — MOCHA (JWKS)
+   MOCHA AUTH (JWT + JWKS)
 ===================================================== */
 const jwksClient = jwksRsa({
   jwksUri: process.env.MOCHA_JWKS_URI,
@@ -70,15 +72,16 @@ const jwksClient = jwksRsa({
   rateLimit: true,
 });
 
-function getKey(header, cb) {
+function getKey(header, callback) {
   jwksClient.getSigningKey(header.kid, (err, key) => {
-    cb(err, key?.getPublicKey());
+    if (err) return callback(err);
+    callback(null, key.getPublicKey());
   });
 }
 
 function mochaAuth(req, res, next) {
   const auth = req.headers.authorization;
-  if (!auth) return res.sendStatus(401);
+  if (!auth) return res.status(401).json({ error: 'Token missing' });
 
   jwt.verify(
     auth.split(' ')[1],
@@ -89,7 +92,9 @@ function mochaAuth(req, res, next) {
       algorithms: ['RS256'],
     },
     (err, decoded) => {
-      if (err || !decoded.email) return res.sendStatus(401);
+      if (err || !decoded.email) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
       req.user = { email: decoded.email };
       next();
     }
@@ -97,207 +102,239 @@ function mochaAuth(req, res, next) {
 }
 
 /* =====================================================
+   LOCAL AUTH (EMAIL + PASSWORD)
+===================================================== */
+function localAuth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Token missing' });
+
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+/* =====================================================
    HELPERS
 ===================================================== */
-async function getSearchRadius(client, cityId = null) {
-  if (cityId) {
-    const r = await client.query(
-      `SELECT search_radius_km FROM city_settings WHERE city_id=$1`,
-      [cityId]
-    );
-    if (r.rows.length) return Number(r.rows[0].search_radius_km);
-  }
-
-  const global = await client.query(
-    `SELECT value FROM system_settings WHERE key='default_search_radius_km'`
-  );
-  const max = await client.query(
-    `SELECT value FROM system_settings WHERE key='max_search_radius_km'`
+async function getOrCreateUser(email, passwordHash = null) {
+  const { rows } = await pool.query(
+    `SELECT * FROM users WHERE email = $1`,
+    [email]
   );
 
-  return Math.min(Number(global.rows[0].value), Number(max.rows[0].value));
+  if (rows.length) return rows[0];
+
+  const insert = await pool.query(
+    `
+    INSERT INTO users (email, password_hash)
+    VALUES ($1,$2)
+    RETURNING *
+    `,
+    [email, passwordHash]
+  );
+
+  return insert.rows[0];
 }
 
-function getLocationFromIP(req) {
-  const ip =
-    req.headers['x-forwarded-for']?.split(',')[0] ||
-    req.socket.remoteAddress;
-
-  const geo = geoip.lookup(ip);
-  if (!geo) return null;
-
-  return { lat: geo.ll[0], lng: geo.ll[1] };
+async function getAdminConfig() {
+  const { rows } = await pool.query(
+    `SELECT key, value FROM admin_settings`
+  );
+  return Object.fromEntries(rows.map(r => [r.key, r.value]));
 }
 
 /* =====================================================
-   ADS — CREATE (BLOQUEIO POR ASSINATURA)
+   AUTH — REGISTER / LOGIN
 ===================================================== */
-app.post('/ads', authJWT, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const user = await client.query(
-      `SELECT plan, subscription_status FROM users WHERE id=$1`,
-      [req.user.id]
-    );
+app.post('/auth/register', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ error: 'Invalid data' });
 
-    if (user.rows[0].subscription_status === 'cancelled') {
-      return res.status(403).json({ error: 'Assinatura cancelada' });
-    }
+  const hash = await bcrypt.hash(password, 10);
+  const user = await getOrCreateUser(email, hash);
 
-    const count = await client.query(
-      `SELECT COUNT(*) FROM ads WHERE user_id=$1`,
-      [req.user.id]
-    );
+  const token = jwt.sign(
+    { id: user.id, email },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
+  );
 
-    if (count.rows[0].count >= PLAN_LIMITS[user.rows[0].plan]) {
-      return res.status(403).json({ error: 'Limite de anúncios atingido' });
-    }
+  res.json({ token });
+});
 
-    const ad = await client.query(
-      `
-      INSERT INTO ads (user_id,title,city,latitude,longitude,plan_priority)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING *
-      `,
-      [
-        req.user.id,
-        req.body.title,
-        req.body.city,
-        req.body.latitude,
-        req.body.longitude,
-        PLAN_PRIORITY[user.rows[0].plan],
-      ]
-    );
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  const { rows } = await pool.query(
+    `SELECT * FROM users WHERE email = $1`,
+    [email]
+  );
 
-    res.json(ad.rows[0]);
-  } finally {
-    client.release();
-  }
+  if (!rows.length) return res.status(401).json({ error: 'Invalid login' });
+
+  const valid = await bcrypt.compare(password, rows[0].password_hash);
+  if (!valid) return res.status(401).json({ error: 'Invalid login' });
+
+  const token = jwt.sign(
+    { id: rows[0].id, email },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
+  );
+
+  res.json({ token });
 });
 
 /* =====================================================
-   ADS — LIST (GPS + IP + CIDADES)
+   ADS — CREATE (LIMIT + BLOCK)
+===================================================== */
+app.post('/ads', localAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const sub = await pool.query(
+    `SELECT status, plan FROM subscriptions WHERE user_id = $1`,
+    [userId]
+  );
+
+  if (
+    sub.rowCount &&
+    ['cancelled', 'paused'].includes(sub.rows[0].status)
+  ) {
+    return res
+      .status(403)
+      .json({ error: 'Subscription inactive' });
+  }
+
+  const plan = sub.rows[0]?.plan || 'free';
+
+  const count = await pool.query(
+    `SELECT COUNT(*) FROM ads WHERE user_id = $1`,
+    [userId]
+  );
+
+  if (count.rows[0].count >= PLAN_LIMITS[plan]) {
+    return res
+      .status(403)
+      .json({ error: 'Plan limit reached' });
+  }
+
+  const {
+    title,
+    price,
+    city_id,
+    latitude,
+    longitude,
+  } = req.body;
+
+  const { rows } = await pool.query(
+    `
+    INSERT INTO ads (user_id,title,price,city_id,latitude,longitude,plan)
+    VALUES ($1,$2,$3,$4,$5,$6,$7)
+    RETURNING *
+    `,
+    [userId, title, price, city_id, latitude, longitude, plan]
+  );
+
+  res.status(201).json(rows[0]);
+});
+
+/* =====================================================
+   ADS — LIST (CITY + RADIUS)
 ===================================================== */
 app.get('/ads', async (req, res) => {
-  const client = await pool.connect();
-  try {
-    let { lat, lng } = req.query;
-    if (!lat || !lng) {
-      const ipLoc = getLocationFromIP(req);
-      if (!ipLoc) return res.status(400).json({ error: 'Localização indisponível' });
-      lat = ipLoc.lat;
-      lng = ipLoc.lng;
-    }
+  const { city_id, lat, lng } = req.query;
 
-    const radius = await getSearchRadius(client);
+  const admin = await getAdminConfig();
+  const radius = Number(admin.max_radius_km || 100);
 
-    const ads = await client.query(
-      `
-      SELECT *,
+  const { rows } = await pool.query(
+    `
+    SELECT a.*,
       (
         6371 * acos(
           cos(radians($1)) *
-          cos(radians(latitude)) *
-          cos(radians(longitude)-radians($2)) +
-          sin(radians($1))*sin(radians(latitude))
+          cos(radians(a.latitude)) *
+          cos(radians(a.longitude) - radians($2)) +
+          sin(radians($1)) *
+          sin(radians(a.latitude))
         )
       ) AS distance
-      FROM ads
-      WHERE status='active'
-      HAVING distance <= $3
-      ORDER BY plan_priority DESC, distance ASC
-      `,
-      [lat, lng, radius]
-    );
+    FROM ads a
+    WHERE a.status = 'active'
+    AND (
+      6371 * acos(
+        cos(radians($1)) *
+        cos(radians(a.latitude)) *
+        cos(radians(a.longitude) - radians($2)) +
+        sin(radians($1)) *
+        sin(radians(a.latitude))
+      )
+    ) <= $3
+    ORDER BY
+      CASE a.plan
+        WHEN 'highlight' THEN 1
+        WHEN 'professional' THEN 2
+        ELSE 3
+      END,
+      a.created_at DESC
+    `,
+    [lat, lng, radius]
+  );
 
-    res.json({ radius_km: radius, ads: ads.rows });
-  } finally {
-    client.release();
-  }
+  res.json(rows);
 });
 
 /* =====================================================
-   SEO — CIDADES
-===================================================== */
-app.get('/cidades/:slug', async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const city = await client.query(
-      `SELECT * FROM cities WHERE slug=$1`,
-      [req.params.slug]
-    );
-    if (!city.rows.length) return res.sendStatus(404);
-
-    const c = city.rows[0];
-    const radius = await getSearchRadius(client, c.id);
-
-    const ads = await client.query(
-      `
-      SELECT *,
-      (
-        6371 * acos(
-          cos(radians($1)) *
-          cos(radians(latitude)) *
-          cos(radians(longitude)-radians($2)) +
-          sin(radians($1))*sin(radians(latitude))
-        )
-      ) AS distance
-      FROM ads
-      WHERE status='active'
-      HAVING distance <= $3
-      ORDER BY plan_priority DESC, distance ASC
-      `,
-      [c.latitude, c.longitude, radius]
-    );
-
-    res.json({ city: c, radius_km: radius, ads: ads.rows });
-  } finally {
-    client.release();
-  }
-});
-
-/* =====================================================
-   WEBHOOK — MERCADO PAGO (VALIDADO)
+   SUBSCRIPTIONS — WEBHOOK (VALIDATED)
 ===================================================== */
 app.post('/webhooks/mercadopago', async (req, res) => {
-  const signature = req.headers['x-signature'];
-  const raw = JSON.stringify(req.body);
-
-  const expected = crypto
-    .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
-    .update(raw)
-    .digest('hex');
-
-  if (signature !== expected) return res.sendStatus(401);
-
-  if (req.body.type === 'subscription') {
-    const { status, external_reference } = req.body.data;
-    await pool.query(
-      `UPDATE users SET subscription_status=$1 WHERE id=$2`,
-      [status, external_reference]
-    );
+  if (req.body.type !== 'subscription_preapproval') {
+    return res.sendStatus(200);
   }
+
+  const mpSub = await mercadopago.preapproval.findById(
+    req.body.data.id
+  );
+
+  const { status, external_reference } = mpSub.body;
+
+  await pool.query(
+    `
+    UPDATE subscriptions
+    SET status = $1,
+        updated_at = NOW()
+    WHERE id = $2
+    `,
+    [status, external_reference]
+  );
 
   res.sendStatus(200);
 });
 
 /* =====================================================
-   JOB — DOWNGRADE AUTOMÁTICO
+   ADMIN — SETTINGS
 ===================================================== */
-setInterval(async () => {
-  await pool.query(
-    `
-    UPDATE users
-    SET plan='free'
-    WHERE subscription_status!='authorized'
-    `
-  );
-}, 10 * 60 * 1000);
+app.put('/admin/settings', mochaAuth, async (req, res) => {
+  for (const key in req.body) {
+    await pool.query(
+      `
+      INSERT INTO admin_settings (key,value)
+      VALUES ($1,$2)
+      ON CONFLICT (key)
+      DO UPDATE SET value = $2
+      `,
+      [key, req.body[key]]
+    );
+  }
+  res.json({ success: true });
+});
 
 /* =====================================================
    SERVER
 ===================================================== */
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+  console.log(`🚗 Carros na Cidade API running on port ${PORT}`);
 });
