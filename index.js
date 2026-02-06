@@ -1,191 +1,237 @@
 require('dotenv').config();
 const express = require('express');
-const jwt = require('jsonwebtoken');
+const axios = require('axios');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
-const mercadopago = require('mercadopago');
 
 const app = express();
 app.use(express.json());
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+/* =========================
+   CONFIGURAÇÕES GERAIS
+========================= */
 
-mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-/* =====================================================
-   AUTH
-===================================================== */
-function auth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.sendStatus(401);
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.sendStatus(401);
-  }
-}
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 
-function adminOnly(req, res, next) {
-  if (req.user.role !== 'admin') return res.sendStatus(403);
-  next();
-}
+/* =========================
+   HELPERS
+========================= */
 
-/* =====================================================
-   ADMIN METRICS
-===================================================== */
-app.get('/admin/metrics', auth, adminOnly, async (req, res) => {
-  const users = await pool.query('SELECT COUNT(*) FROM users');
-  const ads = await pool.query('SELECT COUNT(*) FROM ads');
-  const activeSubs = await pool.query(
-    `SELECT COUNT(*) FROM subscriptions WHERE status='active'`
+function generateToken(user) {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
   );
-  const revenue = await pool.query(`
-    SELECT COALESCE(SUM(p.price),0)
-    FROM subscriptions s
-    JOIN plans p ON p.id=s.plan_id
-    WHERE s.status='active'
-  `);
+}
 
-  res.json({
-    users: users.rows[0].count,
-    ads: ads.rows[0].count,
-    active_subscriptions: activeSubs.rows[0].count,
-    mrr: revenue.rows[0].sum
-  });
+function auth(requiredRole = null) {
+  return (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token ausente' });
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+
+      if (requiredRole && decoded.role !== requiredRole) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+
+      next();
+    } catch {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+  };
+}
+
+const PLAN_LIMITS = {
+  free: Infinity,
+  professional: 10,
+  highlight: Infinity
+};
+
+/* =========================
+   AUTH — EMAIL + SENHA
+========================= */
+
+app.post('/auth/register', async (req, res) => {
+  const { email, password } = req.body;
+
+  const hash = await bcrypt.hash(password, 10);
+
+  const { rows } = await pool.query(
+    `INSERT INTO users (email, password_hash, role, plan, subscription_status)
+     VALUES ($1,$2,'user','free','active') RETURNING id,email,role`,
+    [email, hash]
+  );
+
+  res.json({ token: generateToken(rows[0]) });
 });
 
-/* =====================================================
-   ADMIN LISTS
-===================================================== */
-app.get('/admin/users', auth, adminOnly, async (_, res) => {
-  const r = await pool.query('SELECT id,email,created_at FROM users');
-  res.json(r.rows);
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  const { rows } = await pool.query(
+    `SELECT * FROM users WHERE email=$1`,
+    [email]
+  );
+
+  if (!rows.length) return res.status(401).json({ error: 'Credenciais inválidas' });
+
+  const user = rows[0];
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' });
+
+  res.json({ token: generateToken(user) });
 });
 
-app.get('/admin/ads', auth, adminOnly, async (_, res) => {
-  const r = await pool.query(`
-    SELECT a.*, u.email
-    FROM ads a JOIN users u ON u.id=a.user_id
-  `);
-  res.json(r.rows);
+/* =========================
+   ASSINATURA — MERCADO PAGO
+========================= */
+
+app.post('/subscription/create', auth(), async (req, res) => {
+  const { plan } = req.body;
+
+  const response = await axios.post(
+    'https://api.mercadopago.com/preapproval',
+    {
+      reason: `Plano ${plan} - Carros na Cidade`,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: 'months',
+        transaction_amount: plan === 'professional' ? 99 : 149,
+        currency_id: 'BRL'
+      },
+      back_url: 'https://carrosnacidade.com/assinatura/sucesso',
+      payer_email: req.user.email
+    },
+    { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } }
+  );
+
+  res.json({ init_point: response.data.init_point });
 });
 
-app.get('/admin/subscriptions', auth, adminOnly, async (_, res) => {
-  const r = await pool.query(`
-    SELECT s.*, u.email, p.name
-    FROM subscriptions s
-    JOIN users u ON u.id=s.user_id
-    JOIN plans p ON p.id=s.plan_id
-  `);
-  res.json(r.rows);
-});
+/* =========================
+   WEBHOOK MERCADO PAGO
+========================= */
 
-/* =====================================================
-   ADMIN ACTIONS
-===================================================== */
-app.post('/admin/subscription/cancel', auth, adminOnly, async (req, res) => {
-  const { subscription_id } = req.body;
+app.post('/webhook/mercadopago', async (req, res) => {
+  const { type, data } = req.body;
+  if (type !== 'preapproval') return res.sendStatus(200);
 
-  await mercadopago.preapproval.cancel(subscription_id);
+  const mpRes = await axios.get(
+    `https://api.mercadopago.com/preapproval/${data.id}`,
+    { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } }
+  );
+
+  const sub = mpRes.data;
+
   await pool.query(
-    `UPDATE subscriptions SET status='cancelled' WHERE mp_subscription_id=$1`,
-    [subscription_id]
+    `UPDATE users
+     SET subscription_status=$1, plan=$2
+     WHERE email=$3`,
+    [sub.status, sub.reason.includes('highlight') ? 'highlight' : 'professional', sub.payer_email]
+  );
+
+  res.sendStatus(200);
+});
+
+/* =========================
+   ANÚNCIOS — REGRAS DE NEGÓCIO
+========================= */
+
+app.post('/ads', auth(), async (req, res) => {
+  const { rows: userRows } = await pool.query(
+    `SELECT plan, subscription_status FROM users WHERE id=$1`,
+    [req.user.id]
+  );
+
+  const user = userRows[0];
+
+  if (user.subscription_status !== 'active') {
+    return res.status(403).json({ error: 'Assinatura inativa' });
+  }
+
+  const { rows: ads } = await pool.query(
+    `SELECT count(*) FROM ads WHERE user_id=$1`,
+    [req.user.id]
+  );
+
+  if (ads[0].count >= PLAN_LIMITS[user.plan]) {
+    return res.status(403).json({ error: 'Limite de anúncios atingido' });
+  }
+
+  await pool.query(
+    `INSERT INTO ads (user_id,title,created_at)
+     VALUES ($1,$2,NOW())`,
+    [req.user.id, req.body.title]
+  );
+
+  res.json({ success: true });
+});
+
+/* =========================
+   RANKING DE ANÚNCIOS
+========================= */
+
+app.get('/ads', async (_, res) => {
+  const { rows } = await pool.query(`
+    SELECT ads.*
+    FROM ads
+    JOIN users ON users.id = ads.user_id
+    ORDER BY
+      CASE users.plan
+        WHEN 'highlight' THEN 1
+        WHEN 'professional' THEN 2
+        ELSE 3
+      END,
+      ads.created_at DESC
+  `);
+
+  res.json(rows);
+});
+
+/* =========================
+   CANCELAMENTO
+========================= */
+
+app.post('/subscription/cancel', auth(), async (req, res) => {
+  await pool.query(
+    `UPDATE users SET subscription_status='cancelled' WHERE id=$1`,
+    [req.user.id]
   );
 
   res.json({ cancelled: true });
 });
 
-app.post('/admin/subscription/change-plan', auth, adminOnly, async (req, res) => {
-  const { subscription_id, new_plan_id } = req.body;
+/* =========================
+   ADMIN — DASHBOARD
+========================= */
 
-  await pool.query(`
-    UPDATE subscriptions
-    SET plan_id=$1
-    WHERE mp_subscription_id=$2
-  `, [new_plan_id, subscription_id]);
+app.get('/admin/metrics', auth('admin'), async (_, res) => {
+  const users = await pool.query(`SELECT count(*) FROM users`);
+  const revenue = await pool.query(`
+    SELECT count(*) FILTER (WHERE plan!='free') as paid_users FROM users
+  `);
 
-  res.json({ updated: true });
-});
-
-/* =====================================================
-   SUBSCRIBE (SPLIT PAYMENT)
-===================================================== */
-app.post('/subscriptions', auth, async (req, res) => {
-  const { plan_id } = req.body;
-  const plan = await pool.query('SELECT * FROM plans WHERE id=$1', [plan_id]);
-
-  const mpSub = await mercadopago.preapproval.create({
-    preapproval_plan_id: plan.rows[0].mp_preapproval_plan_id,
-    payer_email: req.user.email,
-    back_url: process.env.APP_BASE_URL,
-    marketplace_fee: Number(process.env.MP_MARKETPLACE_FEE)
+  res.json({
+    users: users.rows[0].count,
+    paid_users: revenue.rows[0].paid_users
   });
-
-  await pool.query(`
-    INSERT INTO subscriptions
-    (user_id, plan_id, status, mp_subscription_id)
-    VALUES ($1,$2,'trial',$3)
-  `, [req.user.id, plan_id, mpSub.body.id]);
-
-  res.json({ init_point: mpSub.body.init_point });
 });
 
-/* =====================================================
-   WEBHOOK MP (SUBSCRIPTIONS)
-===================================================== */
-app.post('/webhook/mercadopago', async (req, res) => {
-  try {
-    const { type, data } = req.body;
-
-    if (!type || !data?.id) {
-      return res.sendStatus(200);
-    }
-
-    // 🔐 Confirma com o Mercado Pago (NUNCA confie só no payload)
-    const payment = await mercadopago.payment.findById(data.id);
-
-    if (!payment || !payment.body) {
-      return res.sendStatus(200);
-    }
-
-    // Apenas pagamentos aprovados
-    if (payment.body.status !== 'approved') {
-      return res.sendStatus(200);
-    }
-
-    const externalRef = payment.body.external_reference;
-    if (!externalRef) {
-      return res.sendStatus(200);
-    }
-
-    // Atualiza pagamento no banco
-    await pool.query(`
-      UPDATE payments
-      SET status='approved',
-          mp_payment_id=$1,
-          paid_at=NOW()
-      WHERE ad_id=$2
-    `, [payment.body.id, externalRef]);
-
-    // Aqui você pode:
-    // - ativar plano
-    // - estender assinatura
-    // - renovar validade
-    // - liberar anúncios
-
-    return res.sendStatus(200);
-  } catch (err) {
-    console.error('Webhook MP error:', err);
-    return res.sendStatus(500);
-  }
-});
-
-/* =====================================================
+/* =========================
    SERVER
-===================================================== */
-app.listen(3000, () => {
-  console.log('🚗 Carros na Cidade API — ADMIN + SPLIT READY');
-});
+========================= */
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log('🚀 API rodando na porta', PORT));
