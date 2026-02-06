@@ -137,22 +137,50 @@ app.post('/subscriptions', auth, async (req, res) => {
    WEBHOOK MP (SUBSCRIPTIONS)
 ===================================================== */
 app.post('/webhook/mercadopago', async (req, res) => {
-  const event = req.body;
+  try {
+    const { type, data } = req.body;
 
-  if (event.type === 'preapproval') {
-    const statusMap = {
-      authorized: 'active',
-      paused: 'paused',
-      cancelled: 'cancelled'
-    };
+    if (!type || !data?.id) {
+      return res.sendStatus(200);
+    }
 
-    await pool.query(
-      `UPDATE subscriptions SET status=$1 WHERE mp_subscription_id=$2`,
-      [statusMap[event.data.status], event.data.id]
-    );
+    // 🔐 Confirma com o Mercado Pago (NUNCA confie só no payload)
+    const payment = await mercadopago.payment.findById(data.id);
+
+    if (!payment || !payment.body) {
+      return res.sendStatus(200);
+    }
+
+    // Apenas pagamentos aprovados
+    if (payment.body.status !== 'approved') {
+      return res.sendStatus(200);
+    }
+
+    const externalRef = payment.body.external_reference;
+    if (!externalRef) {
+      return res.sendStatus(200);
+    }
+
+    // Atualiza pagamento no banco
+    await pool.query(`
+      UPDATE payments
+      SET status='approved',
+          mp_payment_id=$1,
+          paid_at=NOW()
+      WHERE ad_id=$2
+    `, [payment.body.id, externalRef]);
+
+    // Aqui você pode:
+    // - ativar plano
+    // - estender assinatura
+    // - renovar validade
+    // - liberar anúncios
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook MP error:', err);
+    return res.sendStatus(500);
   }
-
-  res.sendStatus(200);
 });
 
 /* =====================================================
