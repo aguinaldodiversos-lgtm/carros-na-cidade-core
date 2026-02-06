@@ -9,7 +9,7 @@ const mercadopago = require('mercadopago');
 const app = express();
 
 /* =====================================================
-   RAW BODY (OBRIGATÓRIO PARA WEBHOOK MP)
+   RAW BODY (WEBHOOK MP)
 ===================================================== */
 app.use(
   express.json({
@@ -155,56 +155,50 @@ app.post('/subscriptions/start', mochaAuth, async (req, res) => {
 });
 
 /* =====================================================
-   WEBHOOK — MERCADO PAGO (DEFINITIVO)
+   WEBHOOK — MERCADO PAGO (ACEITA TUDO)
 ===================================================== */
-app.post('/webhooks/mercadopago', async (req, res) => {
-  try {
-    const signature = req.headers['x-signature'];
-    const requestId = req.headers['x-request-id'];
+app.all(
+  ['/webhook/mercadopago', '/webhooks/mercadopago'],
+  async (req, res) => {
+    try {
+      const signature = req.headers['x-signature'];
+      const requestId = req.headers['x-request-id'];
 
-    const hasSignature = signature && requestId;
+      // 🔐 Só valida assinatura se existir
+      if (signature && requestId) {
+        const expected = crypto
+          .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
+          .update(`${requestId}.${req.rawBody}`)
+          .digest('hex');
 
-    // 🔐 Só valida assinatura se ela EXISTIR
-    if (hasSignature) {
-      const expected = crypto
-        .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
-        .update(`${requestId}.${req.rawBody}`)
-        .digest('hex');
-
-      if (expected !== signature) {
-        return res.sendStatus(401);
+        if (expected !== signature) {
+          return res.sendStatus(401);
+        }
       }
+
+      if (req.body?.type === 'preapproval') {
+        await pool.query(
+          `
+          UPDATE subscriptions
+          SET status=$1
+          WHERE mp_preapproval_id=$2
+          `,
+          [req.body.data.status, req.body.data.id]
+        );
+      }
+
+      if (req.body?.type === 'payment') {
+        const payment = await mercadopago.payment.get(req.body.data.id);
+        console.log('Pagamento:', payment.body.status);
+      }
+
+      return res.sendStatus(200);
+    } catch (err) {
+      console.error('Erro webhook MP:', err);
+      return res.sendStatus(500);
     }
-
-    /* ================= PREAPPROVAL ================= */
-    if (req.body.type === 'preapproval') {
-      await pool.query(
-        `
-        UPDATE subscriptions
-        SET status = $1
-        WHERE mp_preapproval_id = $2
-        `,
-        [req.body.data.status, req.body.data.id]
-      );
-    }
-
-    /* ================= PAYMENTS ================= */
-    if (req.body.type === 'payment') {
-      const payment = await mercadopago.payment.get(req.body.data.id);
-
-      console.log('Pagamento recebido:', {
-        id: payment.body.id,
-        status: payment.body.status,
-        value: payment.body.transaction_amount
-      });
-    }
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Erro no webhook Mercado Pago:', err);
-    res.sendStatus(500);
   }
-});
+);
 
 /* =====================================================
    SERVER
