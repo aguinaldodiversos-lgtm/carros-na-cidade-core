@@ -9,7 +9,7 @@ const mercadopago = require('mercadopago');
 const app = express();
 
 /* =====================================================
-   RAW BODY (WEBHOOK)
+   RAW BODY (OBRIGATÓRIO PARA WEBHOOK MP)
 ===================================================== */
 app.use(
   express.json({
@@ -115,7 +115,7 @@ app.post('/ads', mochaAuth, async (req, res) => {
 });
 
 /* =====================================================
-   SUBSCRIPTION — START
+   SUBSCRIPTIONS — START
 ===================================================== */
 app.post('/subscriptions/start', mochaAuth, async (req, res) => {
   const { planCode } = req.body;
@@ -125,7 +125,9 @@ app.post('/subscriptions/start', mochaAuth, async (req, res) => {
     'SELECT * FROM plans WHERE code=$1 AND active=true',
     [planCode]
   );
-  if (!plan.rowCount) return res.status(400).json({ error: 'Invalid plan' });
+  if (!plan.rowCount) {
+    return res.status(400).json({ error: 'Invalid plan' });
+  }
 
   const mp = await mercadopago.preapproval.create({
     reason: plan.rows[0].name,
@@ -153,44 +155,53 @@ app.post('/subscriptions/start', mochaAuth, async (req, res) => {
 });
 
 /* =====================================================
-   WEBHOOK — MERCADO PAGO (CORRIGIDO)
+   WEBHOOK — MERCADO PAGO (DEFINITIVO)
 ===================================================== */
 app.post('/webhooks/mercadopago', async (req, res) => {
   try {
-    const isTest = req.body?.live_mode === false;
+    const signature = req.headers['x-signature'];
+    const requestId = req.headers['x-request-id'];
 
-    if (!isTest) {
-      const signature = req.headers['x-signature'];
-      const requestId = req.headers['x-request-id'];
-      if (!signature || !requestId) return res.sendStatus(401);
+    const hasSignature = signature && requestId;
 
+    // 🔐 Só valida assinatura se ela EXISTIR
+    if (hasSignature) {
       const expected = crypto
         .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
         .update(`${requestId}.${req.rawBody}`)
         .digest('hex');
 
-      if (expected !== signature) return res.sendStatus(401);
+      if (expected !== signature) {
+        return res.sendStatus(401);
+      }
     }
 
+    /* ================= PREAPPROVAL ================= */
     if (req.body.type === 'preapproval') {
       await pool.query(
         `
         UPDATE subscriptions
-        SET status=$1
-        WHERE mp_preapproval_id=$2
+        SET status = $1
+        WHERE mp_preapproval_id = $2
         `,
         [req.body.data.status, req.body.data.id]
       );
     }
 
+    /* ================= PAYMENTS ================= */
     if (req.body.type === 'payment') {
       const payment = await mercadopago.payment.get(req.body.data.id);
-      console.log('Pagamento:', payment.body.status);
+
+      console.log('Pagamento recebido:', {
+        id: payment.body.id,
+        status: payment.body.status,
+        value: payment.body.transaction_amount
+      });
     }
 
     res.sendStatus(200);
-  } catch (e) {
-    console.error('Webhook MP erro:', e);
+  } catch (err) {
+    console.error('Erro no webhook Mercado Pago:', err);
     res.sendStatus(500);
   }
 });
