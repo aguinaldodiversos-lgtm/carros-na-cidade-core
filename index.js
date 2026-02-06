@@ -87,6 +87,16 @@ function adminAuth(req, res, next) {
 }
 
 /* =====================================================
+   HEALTH CHECK (RENDER / BROWSER)
+===================================================== */
+app.get('/webhook/mercadopago', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'mercado-pago-webhook'
+  });
+});
+
+/* =====================================================
    HELPERS
 ===================================================== */
 async function getOrCreateAdvertiser(email) {
@@ -191,46 +201,6 @@ app.post(
 );
 
 /* =====================================================
-   ADS — LIST
-===================================================== */
-app.get('/ads', async (req, res) => {
-  const { lat, lng, radius = 20 } = req.query;
-  const safeRadius = Math.min(Number(radius), 100);
-
-  const { rows } = await pool.query(
-    `
-    SELECT ads.*,
-      COALESCE(p.ranking_weight, 999) AS ranking_weight,
-      (
-        6371 * acos(
-          cos(radians($1)) *
-          cos(radians(latitude)) *
-          cos(radians(longitude) - radians($2)) +
-          sin(radians($1)) *
-          sin(radians(latitude))
-        )
-      ) AS distance
-    FROM ads
-    LEFT JOIN subscriptions s ON s.id = ads.subscription_id
-    LEFT JOIN plans p ON p.id = s.plan_id
-    WHERE (
-      6371 * acos(
-        cos(radians($1)) *
-        cos(radians(latitude)) *
-        cos(radians(longitude) - radians($2)) +
-        sin(radians($1)) *
-        sin(radians(latitude))
-      )
-    ) <= $3
-    ORDER BY ranking_weight ASC, ads.created_at DESC
-    `,
-    [lat, lng, safeRadius]
-  );
-
-  res.json(rows);
-});
-
-/* =====================================================
    SUBSCRIPTIONS — START
 ===================================================== */
 app.post('/subscriptions/start', mochaAuth, loadSubscription, async (req, res) => {
@@ -277,7 +247,7 @@ app.post('/subscriptions/start', mochaAuth, loadSubscription, async (req, res) =
 });
 
 /* =====================================================
-   WEBHOOK — MERCADO PAGO (FINAL)
+   WEBHOOK — MERCADO PAGO (POST OFICIAL)
 ===================================================== */
 app.post('/webhook/mercadopago', async (req, res) => {
   try {
@@ -322,29 +292,6 @@ app.post('/webhook/mercadopago', async (req, res) => {
     console.error('Webhook error:', err);
     res.sendStatus(500);
   }
-});
-
-/* =====================================================
-   ADMIN — DASHBOARD
-===================================================== */
-app.get('/admin/dashboard', mochaAuth, adminAuth, async (req, res) => {
-  const revenue = await pool.query(
-    `
-    SELECT SUM(p.price) AS mrr
-    FROM subscriptions s
-    JOIN plans p ON p.id = s.plan_id
-    WHERE s.status = 'active'
-    `
-  );
-
-  const users = await pool.query(
-    'SELECT COUNT(*) FROM advertisers'
-  );
-
-  res.json({
-    mrr: revenue.rows[0].mrr || 0,
-    advertisers: users.rows[0].count
-  });
 });
 
 /* =====================================================
