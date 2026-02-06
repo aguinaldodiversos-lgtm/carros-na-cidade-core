@@ -1,237 +1,303 @@
 require('dotenv').config();
+
+/* =====================================================
+   IMPORTS
+===================================================== */
 const express = require('express');
-const axios = require('axios');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
+const jwksRsa = require('jwks-rsa');
+const bcrypt = require('bcrypt');
+const mercadopago = require('mercadopago');
+const geoip = require('geoip-lite');
+const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
 
-/* =========================
-   CONFIGURAÇÕES GERAIS
-========================= */
-
+/* =====================================================
+   DATABASE
+===================================================== */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
-
-/* =========================
-   HELPERS
-========================= */
-
-function generateToken(user) {
-  return jwt.sign(
-    { id: user.id, role: user.role },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
-}
-
-function auth(requiredRole = null) {
-  return (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Token ausente' });
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
-
-      if (requiredRole && decoded.role !== requiredRole) {
-        return res.status(403).json({ error: 'Acesso negado' });
-      }
-
-      next();
-    } catch {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-  };
-}
+/* =====================================================
+   MERCADO PAGO
+===================================================== */
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN,
+});
 
 const PLAN_LIMITS = {
   free: Infinity,
   professional: 10,
-  highlight: Infinity
+  highlight: Infinity,
 };
 
-/* =========================
-   AUTH — EMAIL + SENHA
-========================= */
+const PLAN_PRIORITY = {
+  highlight: 3,
+  professional: 2,
+  free: 1,
+};
 
-app.post('/auth/register', async (req, res) => {
-  const { email, password } = req.body;
+/* =====================================================
+   AUTH — JWT EMAIL/SENHA
+===================================================== */
+function authJWT(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth) return res.sendStatus(401);
 
-  const hash = await bcrypt.hash(password, 10);
+  try {
+    const token = auth.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { id: decoded.id, email: decoded.email };
+    next();
+  } catch {
+    res.sendStatus(401);
+  }
+}
 
-  const { rows } = await pool.query(
-    `INSERT INTO users (email, password_hash, role, plan, subscription_status)
-     VALUES ($1,$2,'user','free','active') RETURNING id,email,role`,
-    [email, hash]
-  );
-
-  res.json({ token: generateToken(rows[0]) });
+/* =====================================================
+   AUTH — MOCHA (JWKS)
+===================================================== */
+const jwksClient = jwksRsa({
+  jwksUri: process.env.MOCHA_JWKS_URI,
+  cache: true,
+  rateLimit: true,
 });
 
-app.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+function getKey(header, cb) {
+  jwksClient.getSigningKey(header.kid, (err, key) => {
+    cb(err, key?.getPublicKey());
+  });
+}
 
-  const { rows } = await pool.query(
-    `SELECT * FROM users WHERE email=$1`,
-    [email]
-  );
+function mochaAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth) return res.sendStatus(401);
 
-  if (!rows.length) return res.status(401).json({ error: 'Credenciais inválidas' });
-
-  const user = rows[0];
-  const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' });
-
-  res.json({ token: generateToken(user) });
-});
-
-/* =========================
-   ASSINATURA — MERCADO PAGO
-========================= */
-
-app.post('/subscription/create', auth(), async (req, res) => {
-  const { plan } = req.body;
-
-  const response = await axios.post(
-    'https://api.mercadopago.com/preapproval',
+  jwt.verify(
+    auth.split(' ')[1],
+    getKey,
     {
-      reason: `Plano ${plan} - Carros na Cidade`,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: 'months',
-        transaction_amount: plan === 'professional' ? 99 : 149,
-        currency_id: 'BRL'
-      },
-      back_url: 'https://carrosnacidade.com/assinatura/sucesso',
-      payer_email: req.user.email
+      audience: process.env.MOCHA_AUDIENCE,
+      issuer: process.env.MOCHA_ISSUER,
+      algorithms: ['RS256'],
     },
-    { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } }
+    (err, decoded) => {
+      if (err || !decoded.email) return res.sendStatus(401);
+      req.user = { email: decoded.email };
+      next();
+    }
+  );
+}
+
+/* =====================================================
+   HELPERS
+===================================================== */
+async function getSearchRadius(client, cityId = null) {
+  if (cityId) {
+    const r = await client.query(
+      `SELECT search_radius_km FROM city_settings WHERE city_id=$1`,
+      [cityId]
+    );
+    if (r.rows.length) return Number(r.rows[0].search_radius_km);
+  }
+
+  const global = await client.query(
+    `SELECT value FROM system_settings WHERE key='default_search_radius_km'`
+  );
+  const max = await client.query(
+    `SELECT value FROM system_settings WHERE key='max_search_radius_km'`
   );
 
-  res.json({ init_point: response.data.init_point });
+  return Math.min(Number(global.rows[0].value), Number(max.rows[0].value));
+}
+
+function getLocationFromIP(req) {
+  const ip =
+    req.headers['x-forwarded-for']?.split(',')[0] ||
+    req.socket.remoteAddress;
+
+  const geo = geoip.lookup(ip);
+  if (!geo) return null;
+
+  return { lat: geo.ll[0], lng: geo.ll[1] };
+}
+
+/* =====================================================
+   ADS — CREATE (BLOQUEIO POR ASSINATURA)
+===================================================== */
+app.post('/ads', authJWT, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const user = await client.query(
+      `SELECT plan, subscription_status FROM users WHERE id=$1`,
+      [req.user.id]
+    );
+
+    if (user.rows[0].subscription_status === 'cancelled') {
+      return res.status(403).json({ error: 'Assinatura cancelada' });
+    }
+
+    const count = await client.query(
+      `SELECT COUNT(*) FROM ads WHERE user_id=$1`,
+      [req.user.id]
+    );
+
+    if (count.rows[0].count >= PLAN_LIMITS[user.rows[0].plan]) {
+      return res.status(403).json({ error: 'Limite de anúncios atingido' });
+    }
+
+    const ad = await client.query(
+      `
+      INSERT INTO ads (user_id,title,city,latitude,longitude,plan_priority)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING *
+      `,
+      [
+        req.user.id,
+        req.body.title,
+        req.body.city,
+        req.body.latitude,
+        req.body.longitude,
+        PLAN_PRIORITY[user.rows[0].plan],
+      ]
+    );
+
+    res.json(ad.rows[0]);
+  } finally {
+    client.release();
+  }
 });
 
-/* =========================
-   WEBHOOK MERCADO PAGO
-========================= */
+/* =====================================================
+   ADS — LIST (GPS + IP + CIDADES)
+===================================================== */
+app.get('/ads', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    let { lat, lng } = req.query;
+    if (!lat || !lng) {
+      const ipLoc = getLocationFromIP(req);
+      if (!ipLoc) return res.status(400).json({ error: 'Localização indisponível' });
+      lat = ipLoc.lat;
+      lng = ipLoc.lng;
+    }
 
-app.post('/webhook/mercadopago', async (req, res) => {
-  const { type, data } = req.body;
-  if (type !== 'preapproval') return res.sendStatus(200);
+    const radius = await getSearchRadius(client);
 
-  const mpRes = await axios.get(
-    `https://api.mercadopago.com/preapproval/${data.id}`,
-    { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } }
-  );
+    const ads = await client.query(
+      `
+      SELECT *,
+      (
+        6371 * acos(
+          cos(radians($1)) *
+          cos(radians(latitude)) *
+          cos(radians(longitude)-radians($2)) +
+          sin(radians($1))*sin(radians(latitude))
+        )
+      ) AS distance
+      FROM ads
+      WHERE status='active'
+      HAVING distance <= $3
+      ORDER BY plan_priority DESC, distance ASC
+      `,
+      [lat, lng, radius]
+    );
 
-  const sub = mpRes.data;
+    res.json({ radius_km: radius, ads: ads.rows });
+  } finally {
+    client.release();
+  }
+});
 
-  await pool.query(
-    `UPDATE users
-     SET subscription_status=$1, plan=$2
-     WHERE email=$3`,
-    [sub.status, sub.reason.includes('highlight') ? 'highlight' : 'professional', sub.payer_email]
-  );
+/* =====================================================
+   SEO — CIDADES
+===================================================== */
+app.get('/cidades/:slug', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const city = await client.query(
+      `SELECT * FROM cities WHERE slug=$1`,
+      [req.params.slug]
+    );
+    if (!city.rows.length) return res.sendStatus(404);
+
+    const c = city.rows[0];
+    const radius = await getSearchRadius(client, c.id);
+
+    const ads = await client.query(
+      `
+      SELECT *,
+      (
+        6371 * acos(
+          cos(radians($1)) *
+          cos(radians(latitude)) *
+          cos(radians(longitude)-radians($2)) +
+          sin(radians($1))*sin(radians(latitude))
+        )
+      ) AS distance
+      FROM ads
+      WHERE status='active'
+      HAVING distance <= $3
+      ORDER BY plan_priority DESC, distance ASC
+      `,
+      [c.latitude, c.longitude, radius]
+    );
+
+    res.json({ city: c, radius_km: radius, ads: ads.rows });
+  } finally {
+    client.release();
+  }
+});
+
+/* =====================================================
+   WEBHOOK — MERCADO PAGO (VALIDADO)
+===================================================== */
+app.post('/webhooks/mercadopago', async (req, res) => {
+  const signature = req.headers['x-signature'];
+  const raw = JSON.stringify(req.body);
+
+  const expected = crypto
+    .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
+    .update(raw)
+    .digest('hex');
+
+  if (signature !== expected) return res.sendStatus(401);
+
+  if (req.body.type === 'subscription') {
+    const { status, external_reference } = req.body.data;
+    await pool.query(
+      `UPDATE users SET subscription_status=$1 WHERE id=$2`,
+      [status, external_reference]
+    );
+  }
 
   res.sendStatus(200);
 });
 
-/* =========================
-   ANÚNCIOS — REGRAS DE NEGÓCIO
-========================= */
-
-app.post('/ads', auth(), async (req, res) => {
-  const { rows: userRows } = await pool.query(
-    `SELECT plan, subscription_status FROM users WHERE id=$1`,
-    [req.user.id]
-  );
-
-  const user = userRows[0];
-
-  if (user.subscription_status !== 'active') {
-    return res.status(403).json({ error: 'Assinatura inativa' });
-  }
-
-  const { rows: ads } = await pool.query(
-    `SELECT count(*) FROM ads WHERE user_id=$1`,
-    [req.user.id]
-  );
-
-  if (ads[0].count >= PLAN_LIMITS[user.plan]) {
-    return res.status(403).json({ error: 'Limite de anúncios atingido' });
-  }
-
+/* =====================================================
+   JOB — DOWNGRADE AUTOMÁTICO
+===================================================== */
+setInterval(async () => {
   await pool.query(
-    `INSERT INTO ads (user_id,title,created_at)
-     VALUES ($1,$2,NOW())`,
-    [req.user.id, req.body.title]
+    `
+    UPDATE users
+    SET plan='free'
+    WHERE subscription_status!='authorized'
+    `
   );
+}, 10 * 60 * 1000);
 
-  res.json({ success: true });
-});
-
-/* =========================
-   RANKING DE ANÚNCIOS
-========================= */
-
-app.get('/ads', async (_, res) => {
-  const { rows } = await pool.query(`
-    SELECT ads.*
-    FROM ads
-    JOIN users ON users.id = ads.user_id
-    ORDER BY
-      CASE users.plan
-        WHEN 'highlight' THEN 1
-        WHEN 'professional' THEN 2
-        ELSE 3
-      END,
-      ads.created_at DESC
-  `);
-
-  res.json(rows);
-});
-
-/* =========================
-   CANCELAMENTO
-========================= */
-
-app.post('/subscription/cancel', auth(), async (req, res) => {
-  await pool.query(
-    `UPDATE users SET subscription_status='cancelled' WHERE id=$1`,
-    [req.user.id]
-  );
-
-  res.json({ cancelled: true });
-});
-
-/* =========================
-   ADMIN — DASHBOARD
-========================= */
-
-app.get('/admin/metrics', auth('admin'), async (_, res) => {
-  const users = await pool.query(`SELECT count(*) FROM users`);
-  const revenue = await pool.query(`
-    SELECT count(*) FILTER (WHERE plan!='free') as paid_users FROM users
-  `);
-
-  res.json({
-    users: users.rows[0].count,
-    paid_users: revenue.rows[0].paid_users
-  });
-});
-
-/* =========================
+/* =====================================================
    SERVER
-========================= */
-
+===================================================== */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('🚀 API rodando na porta', PORT));
+app.listen(PORT, () => {
+  console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+});
