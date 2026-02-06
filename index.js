@@ -1,209 +1,163 @@
 require('dotenv').config();
 const express = require('express');
-const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const jwksRsa = require('jwks-rsa');
+const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
 const mercadopago = require('mercadopago');
 
 const app = express();
+app.use(express.json());
 
-/* =====================================================
-   RAW BODY (WEBHOOK MP)
-===================================================== */
-app.use(
-  express.json({
-    verify: (req, res, buf) => {
-      req.rawBody = buf.toString();
-    }
-  })
-);
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-/* =====================================================
-   DATABASE
-===================================================== */
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false
-});
-
-/* =====================================================
-   MERCADO PAGO
-===================================================== */
 mercadopago.configure({
   access_token: process.env.MP_ACCESS_TOKEN
 });
 
 /* =====================================================
-   MOCHA AUTH
+   AUTH
 ===================================================== */
-const jwksClient = jwksRsa({
-  jwksUri: process.env.MOCHA_JWKS_URL,
-  cache: true,
-  rateLimit: true
-});
-
-function getKey(header, callback) {
-  jwksClient.getSigningKey(header.kid, (err, key) => {
-    if (err) return callback(err);
-    callback(null, key.getPublicKey());
-  });
-}
-
-function mochaAuth(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth) return res.status(401).json({ error: 'Token missing' });
-
-  jwt.verify(
-    auth.split(' ')[1],
-    getKey,
-    {
-      audience: process.env.MOCHA_AUDIENCE,
-      issuer: process.env.MOCHA_ISSUER,
-      algorithms: ['RS256']
-    },
-    (err, decoded) => {
-      if (err || !decoded?.email) {
-        return res.status(401).json({ error: 'Invalid token' });
-      }
-      req.user = decoded;
-      next();
-    }
-  );
-}
-
-/* =====================================================
-   HELPERS
-===================================================== */
-async function getOrCreateAdvertiser(email) {
-  const { rows } = await pool.query(
-    'SELECT id FROM advertisers WHERE email=$1',
-    [email]
-  );
-  if (rows.length) return rows[0].id;
-
-  const r = await pool.query(
-    'INSERT INTO advertisers (email) VALUES ($1) RETURNING id',
-    [email]
-  );
-  return r.rows[0].id;
-}
-
-/* =====================================================
-   ADS — CREATE
-===================================================== */
-app.post('/ads', mochaAuth, async (req, res) => {
-  const advertiserId = await getOrCreateAdvertiser(req.user.email);
-  const { title, latitude, longitude } = req.body;
-
-  if (!title || latitude == null || longitude == null) {
-    return res.status(400).json({ error: 'Missing fields' });
+function auth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.sendStatus(401);
   }
+}
 
-  const { rows } = await pool.query(
-    `
-    INSERT INTO ads (advertiser_id, title, latitude, longitude)
-    VALUES ($1,$2,$3,$4)
-    RETURNING *
-    `,
-    [advertiserId, title, latitude, longitude]
+function adminOnly(req, res, next) {
+  if (req.user.role !== 'admin') return res.sendStatus(403);
+  next();
+}
+
+/* =====================================================
+   ADMIN METRICS
+===================================================== */
+app.get('/admin/metrics', auth, adminOnly, async (req, res) => {
+  const users = await pool.query('SELECT COUNT(*) FROM users');
+  const ads = await pool.query('SELECT COUNT(*) FROM ads');
+  const activeSubs = await pool.query(
+    `SELECT COUNT(*) FROM subscriptions WHERE status='active'`
   );
+  const revenue = await pool.query(`
+    SELECT COALESCE(SUM(p.price),0)
+    FROM subscriptions s
+    JOIN plans p ON p.id=s.plan_id
+    WHERE s.status='active'
+  `);
 
-  res.status(201).json(rows[0]);
+  res.json({
+    users: users.rows[0].count,
+    ads: ads.rows[0].count,
+    active_subscriptions: activeSubs.rows[0].count,
+    mrr: revenue.rows[0].sum
+  });
 });
 
 /* =====================================================
-   SUBSCRIPTIONS — START
+   ADMIN LISTS
 ===================================================== */
-app.post('/subscriptions/start', mochaAuth, async (req, res) => {
-  const { planCode } = req.body;
-  const advertiserId = await getOrCreateAdvertiser(req.user.email);
+app.get('/admin/users', auth, adminOnly, async (_, res) => {
+  const r = await pool.query('SELECT id,email,created_at FROM users');
+  res.json(r.rows);
+});
 
-  const plan = await pool.query(
-    'SELECT * FROM plans WHERE code=$1 AND active=true',
-    [planCode]
-  );
-  if (!plan.rowCount) {
-    return res.status(400).json({ error: 'Invalid plan' });
-  }
+app.get('/admin/ads', auth, adminOnly, async (_, res) => {
+  const r = await pool.query(`
+    SELECT a.*, u.email
+    FROM ads a JOIN users u ON u.id=a.user_id
+  `);
+  res.json(r.rows);
+});
 
-  const mp = await mercadopago.preapproval.create({
-    reason: plan.rows[0].name,
-    auto_recurring: {
-      frequency: 1,
-      frequency_type: 'months',
-      transaction_amount: Number(plan.rows[0].price),
-      currency_id: 'BRL'
-    },
-    back_url: `${process.env.APP_BASE_URL}/dashboard`,
-    external_reference: `${advertiserId}:${planCode}`,
-    payer_email: req.user.email
-  });
+app.get('/admin/subscriptions', auth, adminOnly, async (_, res) => {
+  const r = await pool.query(`
+    SELECT s.*, u.email, p.name
+    FROM subscriptions s
+    JOIN users u ON u.id=s.user_id
+    JOIN plans p ON p.id=s.plan_id
+  `);
+  res.json(r.rows);
+});
 
+/* =====================================================
+   ADMIN ACTIONS
+===================================================== */
+app.post('/admin/subscription/cancel', auth, adminOnly, async (req, res) => {
+  const { subscription_id } = req.body;
+
+  await mercadopago.preapproval.cancel(subscription_id);
   await pool.query(
-    `
-    INSERT INTO subscriptions
-    (advertiser_id, plan_id, status, mp_preapproval_id)
-    VALUES ($1,$2,'trial',$3)
-    `,
-    [advertiserId, plan.rows[0].id, mp.body.id]
+    `UPDATE subscriptions SET status='cancelled' WHERE mp_subscription_id=$1`,
+    [subscription_id]
   );
 
-  res.json({ init_point: mp.body.init_point });
+  res.json({ cancelled: true });
+});
+
+app.post('/admin/subscription/change-plan', auth, adminOnly, async (req, res) => {
+  const { subscription_id, new_plan_id } = req.body;
+
+  await pool.query(`
+    UPDATE subscriptions
+    SET plan_id=$1
+    WHERE mp_subscription_id=$2
+  `, [new_plan_id, subscription_id]);
+
+  res.json({ updated: true });
 });
 
 /* =====================================================
-   WEBHOOK — MERCADO PAGO (ACEITA TUDO)
+   SUBSCRIBE (SPLIT PAYMENT)
 ===================================================== */
-app.all(
-  ['/webhook/mercadopago', '/webhooks/mercadopago'],
-  async (req, res) => {
-    try {
-      const signature = req.headers['x-signature'];
-      const requestId = req.headers['x-request-id'];
+app.post('/subscriptions', auth, async (req, res) => {
+  const { plan_id } = req.body;
+  const plan = await pool.query('SELECT * FROM plans WHERE id=$1', [plan_id]);
 
-      // 🔐 Só valida assinatura se existir
-      if (signature && requestId) {
-        const expected = crypto
-          .createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
-          .update(`${requestId}.${req.rawBody}`)
-          .digest('hex');
+  const mpSub = await mercadopago.preapproval.create({
+    preapproval_plan_id: plan.rows[0].mp_preapproval_plan_id,
+    payer_email: req.user.email,
+    back_url: process.env.APP_BASE_URL,
+    marketplace_fee: Number(process.env.MP_MARKETPLACE_FEE)
+  });
 
-        if (expected !== signature) {
-          return res.sendStatus(401);
-        }
-      }
+  await pool.query(`
+    INSERT INTO subscriptions
+    (user_id, plan_id, status, mp_subscription_id)
+    VALUES ($1,$2,'trial',$3)
+  `, [req.user.id, plan_id, mpSub.body.id]);
 
-      if (req.body?.type === 'preapproval') {
-        await pool.query(
-          `
-          UPDATE subscriptions
-          SET status=$1
-          WHERE mp_preapproval_id=$2
-          `,
-          [req.body.data.status, req.body.data.id]
-        );
-      }
+  res.json({ init_point: mpSub.body.init_point });
+});
 
-      if (req.body?.type === 'payment') {
-        const payment = await mercadopago.payment.get(req.body.data.id);
-        console.log('Pagamento:', payment.body.status);
-      }
+/* =====================================================
+   WEBHOOK MP (SUBSCRIPTIONS)
+===================================================== */
+app.post('/webhook/mercadopago', async (req, res) => {
+  const event = req.body;
 
-      return res.sendStatus(200);
-    } catch (err) {
-      console.error('Erro webhook MP:', err);
-      return res.sendStatus(500);
-    }
+  if (event.type === 'preapproval') {
+    const statusMap = {
+      authorized: 'active',
+      paused: 'paused',
+      cancelled: 'cancelled'
+    };
+
+    await pool.query(
+      `UPDATE subscriptions SET status=$1 WHERE mp_subscription_id=$2`,
+      [statusMap[event.data.status], event.data.id]
+    );
   }
-);
+
+  res.sendStatus(200);
+});
 
 /* =====================================================
    SERVER
 ===================================================== */
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚗 Carros na Cidade API rodando na porta ${PORT}`);
+app.listen(3000, () => {
+  console.log('🚗 Carros na Cidade API — ADMIN + SPLIT READY');
 });
