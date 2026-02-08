@@ -140,6 +140,7 @@ router.post("/register", async (req, res) => {
 /* =====================================================
    LOGIN COM EMAIL E SENHA
 ===================================================== */
+
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -169,7 +170,15 @@ router.post("/login", async (req, res) => {
 
     const token = generateToken(user);
 
-    res.json({ token, user });
+    // usuário seguro (sem password_hash)
+    const safeUser = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatar_url: user.avatar_url,
+    };
+
+    res.json({ token, user: safeUser });
   } catch (err) {
     console.error("Erro login:", err);
     res.status(500).json({ error: "Erro no login" });
@@ -177,3 +186,4 @@ router.post("/login", async (req, res) => {
 });
 
 module.exports = router;
+
