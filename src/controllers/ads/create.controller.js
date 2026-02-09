@@ -1,42 +1,105 @@
-const { getOrCreateAdvertiser } = require('../../services/advertiser.service');
-const { checkAdLimit } = require('../../services/ads/limit.service');
-const { createAd } = require('../../services/ads/create.service');
+const { Pool } = require("pg");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
 module.exports = async (req, res) => {
   try {
-    const userId = req.user.user_id;
+    const userId = req.user.id;
 
-    await checkAdLimit(userId, req.user.email);
+    const {
+      title,
+      price,
+      city,
+      state,
+      latitude,
+      longitude,
+      plan,
+      slug,
+      year,
+      body_type,
+      fuel_type,
+    } = req.body;
 
-    const advertiser = await getOrCreateAdvertiser(req.user.email);
+    /* =====================================================
+       VALIDAÇÕES BÁSICAS
+    ===================================================== */
 
-    if (advertiser.status !== 'active') {
-      return res.status(403).json({ error: 'Conta bloqueada' });
-    }
-
-    const ad = await createAd(advertiser, req.body);
-
-    res.status(201).json(ad);
-  } catch (err) {
-    if (err.message === 'DOCUMENT_REQUIRED') {
-      return res.status(403).json({
-        error: 'Você precisa verificar seu CPF ou CNPJ antes de anunciar'
-      });
-    }
-
-    if (err.message === 'AD_LIMIT_REACHED') {
-      return res.status(403).json({
-        error: 'Limite de anúncios ativos atingido'
-      });
-    }
-
-    if (err.message === 'INVALID_DATA') {
+    if (!title || !price || !city || !state || !slug) {
       return res.status(400).json({
-        error: 'Dados obrigatórios ausentes'
+        error: "Campos obrigatórios: title, price, city, state, slug",
       });
     }
 
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao criar anúncio' });
+    // validação de ano (se enviado)
+    if (year) {
+      const currentYear = new Date().getFullYear() + 1;
+
+      if (year < 1950 || year > currentYear) {
+        return res.status(400).json({
+          error: "Ano do veículo inválido",
+        });
+      }
+    }
+
+    /* =====================================================
+       VALORES PADRÃO
+    ===================================================== */
+
+    const bodyType = body_type || "outro";
+    const fuelType = fuel_type || "flex";
+
+    /* =====================================================
+       INSERÇÃO NO BANCO
+    ===================================================== */
+
+    const query = `
+      INSERT INTO ads (
+        advertiser_id,
+        title,
+        price,
+        city,
+        state,
+        latitude,
+        longitude,
+        plan,
+        slug,
+        year,
+        body_type,
+        fuel_type
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+      )
+      RETURNING *
+    `;
+
+    const values = [
+      userId,
+      title,
+      price,
+      city,
+      state,
+      latitude,
+      longitude,
+      plan || "free",
+      slug,
+      year || null,
+      bodyType,
+      fuelType,
+    ];
+
+    const result = await pool.query(query, values);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Erro ao criar anúncio:", err);
+    res.status(500).json({
+      error: "Erro ao criar anúncio",
+    });
   }
 };
