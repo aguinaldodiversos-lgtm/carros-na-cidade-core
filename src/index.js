@@ -21,18 +21,43 @@ app.use(cors({
   credentials: true
 }));
 
+/* =====================================================
+   MIDDLEWARES
+===================================================== */
 app.use(express.json());
 
 /* =====================================================
-   ROTAS
+   ROTAS DA API
 ===================================================== */
+
+// Anúncios
 app.use('/api/ads', adsRoutes);
-app.use('/auth', authRoutes);
-app.use('/payments', paymentRoutes);
+
+// Autenticação
+app.use('/api/auth', authRoutes);
+
+// Pagamentos
+app.use('/api/payments', paymentRoutes);
+
+// Sitemap SEO
 app.use('/sitemap.xml', sitemapRoute);
 
+// Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
+/* =====================================================
+   HANDLER DE ERROS GLOBAL
+===================================================== */
+app.use((err, req, res, next) => {
+  console.error('Erro na aplicação:', err);
+  res.status(500).json({
+    error: 'Erro interno no servidor'
+  });
+});
+
+/* =====================================================
+   START DO SERVIDOR
+===================================================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
