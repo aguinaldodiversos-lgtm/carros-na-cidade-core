@@ -14,7 +14,7 @@ const PLAN_PRICE = {
 };
 
 /* =====================================================
-   CRIAR CHECKOUT
+   CRIAR CHECKOUT DE ASSINATURA
 ===================================================== */
 router.post('/checkout', auth, async (req, res) => {
   try {
@@ -35,6 +35,7 @@ router.post('/checkout', auth, async (req, res) => {
         },
       ],
       external_reference: JSON.stringify({
+        type: 'subscription',
         user_id: userId,
         plan: plan,
       }),
@@ -51,13 +52,69 @@ router.post('/checkout', auth, async (req, res) => {
 });
 
 /* =====================================================
-   WEBHOOK MERCADO PAGO (ROBUSTO)
+   COMPRAR DESTAQUE PARA ANÚNCIO
+===================================================== */
+router.post('/highlight', auth, async (req, res) => {
+  try {
+    const { ad_id } = req.body;
+    const userId = req.user.user_id;
+
+    if (!ad_id) {
+      return res.status(400).json({ error: 'ad_id obrigatório' });
+    }
+
+    // verificar se o anúncio pertence ao usuário
+    const adResult = await pool.query(
+      `
+      SELECT a.id
+      FROM ads a
+      JOIN advertisers adv ON adv.id = a.advertiser_id
+      JOIN users u ON u.email = adv.email
+      WHERE a.id = $1
+      AND u.id = $2
+      `,
+      [ad_id, userId]
+    );
+
+    if (adResult.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Anúncio não encontrado ou não pertence ao usuário'
+      });
+    }
+
+    const preference = {
+      items: [
+        {
+          title: 'Destaque Premium (15 dias)',
+          quantity: 1,
+          currency_id: 'BRL',
+          unit_price: PLAN_PRICE.highlight,
+        },
+      ],
+      external_reference: JSON.stringify({
+        type: 'highlight',
+        ad_id: ad_id,
+        user_id: userId,
+      }),
+      notification_url: `${process.env.APP_BASE_URL}/payments/webhook`,
+    };
+
+    const mp = await mercadopago.preferences.create(preference);
+
+    res.json({ init_point: mp.body.init_point });
+  } catch (err) {
+    console.error('Erro ao criar destaque:', err);
+    res.status(500).json({ error: 'Erro ao criar pagamento' });
+  }
+});
+
+/* =====================================================
+   WEBHOOK MERCADO PAGO (ROBUSTO E IDÊMPOTENTE)
 ===================================================== */
 router.post('/webhook', async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // Mercado Pago pode enviar vários tipos de notificação
     if (req.body.type !== 'payment' || !req.body.data?.id) {
       return res.sendStatus(200);
     }
@@ -90,49 +147,56 @@ router.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    const userId = ref.user_id;
-    const plan = ref.plan;
-
-    if (!userId || !plan) {
-      console.error('Dados de referência inválidos');
-      return res.sendStatus(200);
-    }
-
-    /* ===============================
-       TRANSAÇÃO SEGURA
-    =============================== */
     await client.query('BEGIN');
 
-    // salvar pagamento (idempotente)
+    /* ===============================
+       SALVAR PAGAMENTO (IDÊMPOTENTE)
+    =============================== */
     await client.query(
       `INSERT INTO payments
        (user_id, mp_payment_id, status, amount)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (mp_payment_id) DO UPDATE
        SET status = EXCLUDED.status`,
-      [userId, mpPaymentId, status, amount]
+      [ref.user_id, mpPaymentId, status, amount]
     );
 
-    // ativar assinatura apenas se aprovado
+    /* ===============================
+       TRATAMENTO POR TIPO
+    =============================== */
     if (status === 'approved') {
-      // desativar assinaturas antigas
-      await client.query(
-        `UPDATE subscriptions
-         SET status = 'canceled', expires_at = now()
-         WHERE user_id = $1 AND status = 'active'`,
-        [userId]
-      );
+      // destaque pago
+      if (ref.type === 'highlight' && ref.ad_id) {
+        await client.query(
+          `
+          UPDATE ads
+          SET highlight_until = NOW() + INTERVAL '15 days'
+          WHERE id = $1
+          `,
+          [ref.ad_id]
+        );
+      }
 
-      // criar nova assinatura
-      await client.query(
-        `INSERT INTO subscriptions (user_id, plan, status, started_at)
-         VALUES ($1, $2, 'active', now())`,
-        [userId, plan]
-      );
+      // assinatura
+      if (ref.type === 'subscription' && ref.plan) {
+        // cancelar antigas
+        await client.query(
+          `UPDATE subscriptions
+           SET status = 'canceled', expires_at = now()
+           WHERE user_id = $1 AND status = 'active'`,
+          [ref.user_id]
+        );
+
+        // criar nova
+        await client.query(
+          `INSERT INTO subscriptions (user_id, plan, status, started_at)
+           VALUES ($1, $2, 'active', now())`,
+          [ref.user_id, ref.plan]
+        );
+      }
     }
 
     await client.query('COMMIT');
-
     res.sendStatus(200);
   } catch (err) {
     await client.query('ROLLBACK');
