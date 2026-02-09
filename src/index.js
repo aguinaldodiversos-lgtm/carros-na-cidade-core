@@ -10,9 +10,7 @@ const alertRoutes = require('./routes/alerts');
 
 const app = express();
 
-/* =====================================================
-   CORS CONFIGURADO PARA O SITE
-===================================================== */
+// CORS
 app.use(cors({
   origin: [
     'https://carrosnacidade.com',
@@ -22,11 +20,29 @@ app.use(cors({
   credentials: true
 }));
 
-/* =====================================================
-   MIDDLEWARES
-===================================================== */
+// Middlewares
 app.use(express.json());
 
-/* =====================================================
-   ROTAS DA API
-==================
+// Rotas
+app.use('/api/ads', adsRoutes);
+app.use('/api/alerts', alertRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/sitemap.xml', sitemapRoute);
+
+// Health check
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+// Handler de erro global
+app.use((err, req, res, next) => {
+  console.error('Erro na aplicação:', err);
+  res.status(500).json({
+    error: 'Erro interno no servidor'
+  });
+});
+
+// Start do servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+});
