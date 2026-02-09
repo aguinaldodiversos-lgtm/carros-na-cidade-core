@@ -5,8 +5,25 @@ const { getOrCreateAdvertiser } = require('../services/advertiser.service');
 
 const router = express.Router();
 
+/* =====================================================
+   CRIAR ANÚNCIO
+===================================================== */
 router.post('/', auth, async (req, res) => {
   try {
+    const userId = req.user.user_id;
+
+    // verificar se usuário tem CPF/CNPJ validado
+    const userResult = await pool.query(
+      "SELECT document_verified FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (!userResult.rows[0]?.document_verified) {
+      return res.status(403).json({
+        error: "Você precisa verificar seu CPF antes de anunciar"
+      });
+    }
+
     const advertiser = await getOrCreateAdvertiser(req.user.email);
 
     if (advertiser.status !== 'active') {
@@ -14,7 +31,12 @@ router.post('/', auth, async (req, res) => {
     }
 
     const {
-      title, price, city, state, latitude, longitude
+      title,
+      price,
+      city,
+      state,
+      latitude,
+      longitude
     } = req.body;
 
     const { rows } = await pool.query(
@@ -43,6 +65,9 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+/* =====================================================
+   LISTAR ANÚNCIOS POR RAIO
+===================================================== */
 router.get('/', async (req, res) => {
   try {
     const { lat, lng, radius = 100 } = req.query;
@@ -81,4 +106,3 @@ router.get('/', async (req, res) => {
 });
 
 module.exports = router;
-
