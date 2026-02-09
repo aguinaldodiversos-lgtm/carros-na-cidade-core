@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.get('/sitemap.xml', async (req, res) => {
   try {
-    const baseUrl = process.env.APP_BASE_URL;
+    const baseUrl = (process.env.APP_BASE_URL || '').trim();
 
     /* =========================
        ANÚNCIOS INDIVIDUAIS
