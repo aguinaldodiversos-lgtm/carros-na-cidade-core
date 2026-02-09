@@ -1,3 +1,5 @@
+const registerController = require("../controllers/auth/register.controller");
+const loginController = require("../controllers/auth/login.controller");
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -29,6 +31,9 @@ function generateToken(user) {
    LOGIN COM GOOGLE
    Frontend envia: { id_token }
 ===================================================== */
+router.post("/register", registerController);
+router.post("/login", loginController);
+
 router.post("/google", async (req, res) => {
   try {
     const { id_token } = req.body;
