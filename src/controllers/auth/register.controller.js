@@ -17,7 +17,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // verifica se usuário já existe
     const existing = await pool.query(
       "SELECT id FROM users WHERE email = $1",
       [email]
@@ -29,7 +28,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // criptografa a senha
     const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
@@ -41,7 +39,6 @@ module.exports = async (req, res) => {
 
     const user = result.rows[0];
 
-    // gera token
     const token = jwt.sign(
       { id: user.id },
       process.env.JWT_SECRET,
