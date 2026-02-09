@@ -83,16 +83,24 @@ router.get('/', async (req, res) => {
           sin(radians($1)) *
           sin(radians(latitude))
         )
-      ) AS distance
+      ) AS distance,
+
+      CASE
+        WHEN highlight_until IS NOT NULL
+          AND highlight_until > NOW()
+          THEN 4
+        WHEN plan = 'pro'
+          THEN 3
+        WHEN plan = 'start'
+          THEN 2
+        ELSE 1
+      END AS relevance
+
       FROM ads
       WHERE status = 'active'
       HAVING distance <= $3
       ORDER BY
-        CASE plan
-          WHEN 'highlight' THEN 1
-          WHEN 'professional' THEN 2
-          ELSE 3
-        END,
+        relevance DESC,
         created_at DESC
       `,
       [lat, lng, radius]
@@ -104,5 +112,6 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Erro ao listar anúncios' });
   }
 });
+
 
 module.exports = router;
