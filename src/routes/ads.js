@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../config/db');
 const auth = require('../middlewares/auth');
 const { getOrCreateAdvertiser } = require('../services/advertiser.service');
+const slugify = require('../utils/slugify');
 
 const router = express.Router();
 
@@ -86,11 +87,16 @@ router.post('/', auth, async (req, res) => {
       adPlan = 'pro';
     }
 
+    /* ===============================
+       GERAR SLUG SEO
+    =============================== */
+    const slugBase = slugify(`${title}-${city}-${state}`);
+
     const { rows } = await pool.query(
       `
       INSERT INTO ads
-      (advertiser_id, title, price, city, state, latitude, longitude, plan)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      (advertiser_id, title, price, city, state, latitude, longitude, plan, slug)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
       `,
       [
@@ -101,7 +107,8 @@ router.post('/', auth, async (req, res) => {
         state,
         latitude || null,
         longitude || null,
-        adPlan
+        adPlan,
+        slugBase
       ]
     );
 
@@ -163,6 +170,37 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('Erro ao listar anúncios:', err);
     res.status(500).json({ error: 'Erro ao listar anúncios' });
+  }
+});
+
+/* =====================================================
+   VER ANÚNCIO POR SLUG (SEO)
+===================================================== */
+router.get('/carro/:slug', async (req, res) => {
+  try {
+    const slugParam = req.params.slug;
+
+    // extrair id do final da URL
+    const parts = slugParam.split('-');
+    const id = parts[parts.length - 1];
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ error: 'Slug inválido' });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT * FROM ads WHERE id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Anúncio não encontrado' });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Erro ao buscar anúncio:', err);
+    res.status(500).json({ error: 'Erro interno' });
   }
 });
 
