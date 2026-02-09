@@ -12,15 +12,42 @@ router.post('/', auth, async (req, res) => {
   try {
     const userId = req.user.user_id;
 
-    // verificar se usuário tem CPF/CNPJ validado
+    // buscar dados do usuário
     const userResult = await pool.query(
-      "SELECT document_verified FROM users WHERE id = $1",
+      `SELECT document_type, document_verified
+       FROM users
+       WHERE id = $1`,
       [userId]
     );
 
-    if (!userResult.rows[0]?.document_verified) {
+    const user = userResult.rows[0];
+
+    if (!user || !user.document_verified) {
       return res.status(403).json({
-        error: "Você precisa verificar seu CPF antes de anunciar"
+        error: "Você precisa verificar seu CPF ou CNPJ antes de anunciar"
+      });
+    }
+
+    // definir limite conforme tipo de conta
+    const adLimit = user.document_type === 'cnpj' ? 20 : 3;
+
+    // contar anúncios ativos do usuário
+    const countResult = await pool.query(
+      `
+      SELECT COUNT(a.id) as total
+      FROM ads a
+      JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE adv.email = $1
+      AND a.status = 'active'
+      `,
+      [req.user.email]
+    );
+
+    const totalAds = parseInt(countResult.rows[0].total, 10);
+
+    if (totalAds >= adLimit) {
+      return res.status(403).json({
+        error: `Limite de ${adLimit} anúncios ativos atingido`
       });
     }
 
@@ -39,6 +66,26 @@ router.post('/', auth, async (req, res) => {
       longitude
     } = req.body;
 
+    // validações básicas
+    if (!title || !price || !city || !state) {
+      return res.status(400).json({
+        error: 'Campos obrigatórios: title, price, city, state'
+      });
+    }
+
+    /* ===============================
+       DEFINIR PLANO DO ANÚNCIO
+    =============================== */
+    let adPlan = 'essential';
+
+    if (advertiser.plan === 'start') {
+      adPlan = 'start';
+    }
+
+    if (advertiser.plan === 'pro') {
+      adPlan = 'pro';
+    }
+
     const { rows } = await pool.query(
       `
       INSERT INTO ads
@@ -52,25 +99,32 @@ router.post('/', auth, async (req, res) => {
         price,
         city,
         state,
-        latitude,
-        longitude,
-        advertiser.plan
+        latitude || null,
+        longitude || null,
+        adPlan
       ]
     );
 
     res.status(201).json(rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error('Erro ao criar anúncio:', err);
     res.status(500).json({ error: 'Erro ao criar anúncio' });
   }
 });
 
 /* =====================================================
-   LISTAR ANÚNCIOS POR RAIO
+   LISTAR ANÚNCIOS POR RAIO COM RELEVÂNCIA DINÂMICA
 ===================================================== */
 router.get('/', async (req, res) => {
   try {
     const { lat, lng, radius = 100 } = req.query;
+
+    // validação básica
+    if (!lat || !lng) {
+      return res.status(400).json({
+        error: 'Parâmetros lat e lng são obrigatórios'
+      });
+    }
 
     const { rows } = await pool.query(
       `
@@ -90,28 +144,3 @@ router.get('/', async (req, res) => {
           AND highlight_until > NOW()
           THEN 4
         WHEN plan = 'pro'
-          THEN 3
-        WHEN plan = 'start'
-          THEN 2
-        ELSE 1
-      END AS relevance
-
-      FROM ads
-      WHERE status = 'active'
-      HAVING distance <= $3
-      ORDER BY
-        relevance DESC,
-        created_at DESC
-      `,
-      [lat, lng, radius]
-    );
-
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao listar anúncios' });
-  }
-});
-
-
-module.exports = router;
