@@ -1,3 +1,4 @@
+const runMigrations = require("./database/migrate");
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -42,6 +43,9 @@ app.use((err, req, res, next) => {
 
 // Start do servidor
 const PORT = process.env.PORT || 3000;
+
+runMigrations();
+
 app.listen(PORT, () => {
   console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
 });
