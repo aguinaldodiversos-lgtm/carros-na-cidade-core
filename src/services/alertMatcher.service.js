@@ -1,3 +1,6 @@
+async function notifyMatchingAlerts(ad) {
+  console.log("🚨 Matcher executado para anúncio:", ad.id);
+
 const { Pool } = require("pg");
 
 const pool = new Pool({
