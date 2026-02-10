@@ -1,5 +1,6 @@
 const { notifyMatchingAlerts } = require("../../services/alertMatcher.service");
 const { Pool } = require("pg");
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -97,37 +98,10 @@ module.exports = async (req, res) => {
     const newAd = result.rows[0];
 
     /* ============================================
-       VERIFICAR ALERTAS COMPATÍVEIS
+       CHAMAR MATCHER DE ALERTAS (CORRETO)
     ============================================ */
 
-    const alertsQuery = `
-      SELECT a.*, u.email
-      FROM alerts a
-      JOIN users u ON u.id = a.user_id
-      WHERE
-        LOWER(a.city) = LOWER($1)
-        AND (a.brand IS NULL OR LOWER(a.brand) = LOWER($2))
-        AND (a.model IS NULL OR LOWER(a.model) = LOWER($3))
-        AND (a.price_max IS NULL OR $4 <= a.price_max)
-        AND (a.year_min IS NULL OR $5 >= a.year_min)
-    `;
-
-    const alertsValues = [
-      newAd.city,
-      newAd.brand,
-      newAd.model,
-      newAd.price,
-      newAd.year,
-    ];
-
-    const alertsResult = await pool.query(alertsQuery, alertsValues);
-
-    // futura integração com serviço de email
-    for (const alert of alertsResult.rows) {
-      console.log(
-        `Enviar alerta para ${alert.email} sobre o carro ${newAd.title}`
-      );
-    }
+    await notifyMatchingAlerts(newAd);
 
     /* ============================================
        RESPOSTA FINAL
