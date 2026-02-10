@@ -7,13 +7,8 @@ const resetPasswordController = require("../../controllers/auth/resetPassword.co
 
 const router = express.Router();
 
-// registro
 router.post("/register", registerController);
-
-// login
 router.post("/login", loginController);
-
-// recuperação de senha
 router.post("/forgot-password", forgotPasswordController);
 router.post("/reset-password", resetPasswordController);
 
