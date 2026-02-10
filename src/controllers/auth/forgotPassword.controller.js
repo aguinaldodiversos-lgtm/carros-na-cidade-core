@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 1000 * 60 * 60);
+    const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
 
     await pool.query(
       `UPDATE users
@@ -33,9 +33,8 @@ module.exports = async (req, res) => {
       [resetToken, expires, user.id]
     );
 
-    console.log(
-      `Reset link: https://carrosnacidade.com/reset-password?token=${resetToken}`
-    );
+    // envio do email real
+    await sendResetPasswordEmail(email, resetToken);
 
     res.json({ success: true });
   } catch (err) {
