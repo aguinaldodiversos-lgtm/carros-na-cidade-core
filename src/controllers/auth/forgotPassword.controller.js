@@ -1,3 +1,4 @@
+const { sendResetPasswordEmail } = require("../../services/email.service");
 const { Pool } = require("pg");
 const crypto = require("crypto");
 
