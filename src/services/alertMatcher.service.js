@@ -1,6 +1,3 @@
-async function notifyMatchingAlerts(ad) {
-  console.log("🚨 Matcher executado para anúncio:", ad.id);
-
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -8,11 +5,22 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+/* =====================================================
+   LIMITES
+===================================================== */
+
+const MAX_EMAILS_PER_DAY = 1;
+const MAX_WHATSAPP_PER_DAY = 1;
+
+/* =====================================================
+   FUNÇÃO PRINCIPAL
+===================================================== */
+
 async function notifyMatchingAlerts(ad) {
   try {
     const result = await pool.query(
       `
-      SELECT a.*, u.phone
+      SELECT a.*, u.email
       FROM alerts a
       JOIN users u ON u.id = a.user_id
       WHERE
@@ -27,105 +35,87 @@ async function notifyMatchingAlerts(ad) {
         ad.brand,
         ad.model,
         ad.price,
-        ad.year
+        ad.year,
       ]
     );
 
     const alerts = result.rows;
-    const now = new Date();
 
     for (const alert of alerts) {
-      try {
-        // ================================
-        // RESET DIÁRIO DO WHATSAPP
-        // ================================
-        if (
-          !alert.whatsapp_last_reset ||
-          new Date(alert.whatsapp_last_reset).toDateString() !==
-            now.toDateString()
-        ) {
-          await pool.query(
-            `
-            UPDATE alerts
-            SET whatsapp_sent_today = 0,
-                whatsapp_last_reset = CURRENT_DATE
-            WHERE id = $1
-            `,
-            [alert.id]
-          );
-
-          alert.whatsapp_sent_today = 0;
-        }
-
-        // ================================
-        // VERIFICAR LIMITE WHATSAPP
-        // ================================
-        let canSendWhatsApp = false;
-
-        if (alert.phone && alert.whatsapp_sent_today < 3) {
-          if (alert.last_whatsapp_sent_at) {
-            const last = new Date(alert.last_whatsapp_sent_at);
-            const diffHours = (now - last) / (1000 * 60 * 60);
-
-            if (diffHours >= 2) {
-              canSendWhatsApp = true;
-            }
-          } else {
-            canSendWhatsApp = true;
-          }
-        }
-
-        // ================================
-        // INSERIR NA FILA
-        // ================================
-        if (canSendWhatsApp) {
-          await pool.query(
-            `
-            INSERT INTO notification_queue
-            (user_id, alert_id, ad_id, channel)
-            VALUES ($1, $2, $3, 'whatsapp')
-            `,
-            [alert.user_id, alert.id, ad.id]
-          );
-
-          continue;
-        }
-
-        // ================================
-        // FALLBACK PARA EMAIL (1 POR DIA)
-        // ================================
-        let canSendEmail = false;
-
-        if (alert.last_email_sent_at) {
-          const last = new Date(alert.last_email_sent_at);
-          const diffHours = (now - last) / (1000 * 60 * 60);
-
-          if (diffHours >= 24) {
-            canSendEmail = true;
-          }
-        } else {
-          canSendEmail = true;
-        }
-
-        if (canSendEmail) {
-          await pool.query(
-            `
-            INSERT INTO notification_queue
-            (user_id, alert_id, ad_id, channel)
-            VALUES ($1, $2, $3, 'email')
-            `,
-            [alert.user_id, alert.id, ad.id]
-          );
-        }
-      } catch (err) {
-        console.error(`Erro ao processar alerta ${alert.id}:`, err);
-      }
+      await queueNotification(alert, ad, "email", MAX_EMAILS_PER_DAY);
+      await queueNotification(alert, ad, "whatsapp", MAX_WHATSAPP_PER_DAY);
     }
 
     console.log(`📢 ${alerts.length} alertas processados`);
   } catch (err) {
-    console.error("Erro geral no alertMatcher:", err);
+    console.error("Erro ao verificar alertas:", err);
   }
 }
 
-module.exports = { notifyMatchingAlerts };
+/* =====================================================
+   FILA DE NOTIFICAÇÃO
+===================================================== */
+
+async function queueNotification(alert, ad, channel, dailyLimit) {
+  try {
+    // verificar quantos envios hoje
+    const todayResult = await pool.query(
+      `
+      SELECT COUNT(*) AS count
+      FROM notification_queue
+      WHERE user_id = $1
+        AND channel = $2
+        AND created_at >= CURRENT_DATE
+      `,
+      [alert.user_id, channel]
+    );
+
+    const todayCount = parseInt(todayResult.rows[0].count, 10);
+
+    if (todayCount >= dailyLimit) {
+      console.log(
+        `⛔ Limite diário atingido para user ${alert.user_id} (${channel})`
+      );
+      return;
+    }
+
+    // evitar duplicação
+    const duplicateCheck = await pool.query(
+      `
+      SELECT id
+      FROM notification_queue
+      WHERE alert_id = $1
+        AND ad_id = $2
+        AND channel = $3
+      `,
+      [alert.id, ad.id, channel]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      console.log(
+        `⚠️ Notificação duplicada ignorada (alert ${alert.id}, ad ${ad.id}, ${channel})`
+      );
+      return;
+    }
+
+    // inserir na fila
+    await pool.query(
+      `
+      INSERT INTO notification_queue
+      (user_id, alert_id, ad_id, channel, status)
+      VALUES ($1, $2, $3, $4, 'pending')
+      `,
+      [alert.user_id, alert.id, ad.id, channel]
+    );
+
+    console.log(
+      `📨 Notificação enfileirada: user ${alert.user_id} (${channel})`
+    );
+  } catch (err) {
+    console.error("Erro ao enfileirar notificação:", err);
+  }
+}
+
+module.exports = {
+  notifyMatchingAlerts,
+};
