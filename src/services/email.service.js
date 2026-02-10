@@ -1,35 +1,47 @@
-async function sendResetPasswordEmail(to, token) {
-  try {
-    const url = `https://carrosnacidade.com/reset-password?token=${token}`;
+const { Resend } = require("resend");
 
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject: "Redefinir sua senha",
-      html: `
-        <div style="font-family: Arial, sans-serif;">
-          <h2>Redefinição de senha</h2>
-          <p>Recebemos uma solicitação para redefinir sua senha.</p>
-          <p>Clique no botão abaixo para criar uma nova senha:</p>
-          <br>
-          <a href="${url}" 
-             style="background:#0d6efd;color:#fff;padding:10px 16px;
-                    text-decoration:none;border-radius:6px;">
-            Redefinir senha
-          </a>
-          <br><br>
-          <small>
-            Este link expira em 1 hora.
-          </small>
-        </div>
-      `,
-    });
-  } catch (err) {
-    console.error("Erro ao enviar email de reset:", err);
-  }
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/* =====================================================
+   EMAIL: RESET DE SENHA
+===================================================== */
+async function sendResetPasswordEmail(to, token) {
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  await resend.emails.send({
+    from: "Carros na Cidade <no-reply@carrosnacidade.com>",
+    to,
+    subject: "Redefinição de senha",
+    html: `
+      <h2>Redefinição de senha</h2>
+      <p>Você solicitou a redefinição da sua senha.</p>
+      <p>Clique no link abaixo para criar uma nova senha:</p>
+      <a href="${resetUrl}">${resetUrl}</a>
+      <p>Este link expira em 1 hora.</p>
+    `,
+  });
+}
+
+/* =====================================================
+   EMAIL: ALERTA DE NOVO ANÚNCIO
+===================================================== */
+async function sendNewAdAlert(to, ad) {
+  const adUrl = `${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
+
+  await resend.emails.send({
+    from: "Carros na Cidade <no-reply@carrosnacidade.com>",
+    to,
+    subject: "Novo carro encontrado para você",
+    html: `
+      <h2>Novo veículo disponível</h2>
+      <p><strong>${ad.title}</strong></p>
+      <p>Preço: R$ ${ad.price}</p>
+      <a href="${adUrl}">Ver anúncio</a>
+    `,
+  });
 }
 
 module.exports = {
-  sendNewAdAlert,
   sendResetPasswordEmail,
+  sendNewAdAlert,
 };
