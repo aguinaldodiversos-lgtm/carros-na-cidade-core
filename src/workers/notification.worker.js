@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const { sendNewAdAlert } = require("../services/email.service");
+const { sendWhatsAppAlert } = require("../services/whatsapp.service");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,53 +12,51 @@ async function processQueue() {
     console.log("🔄 Processando fila de notificações...");
 
     const result = await pool.query(`
-      SELECT q.*, u.email, a.title, a.price
+      SELECT q.*, u.email, u.phone, a.title, a.price, a.city, a.slug, a.brand, a.model, a.year
       FROM notification_queue q
       JOIN users u ON u.id = q.user_id
       JOIN ads a ON a.id = q.ad_id
       WHERE q.status = 'pending'
-      ORDER BY q.created_at
-      LIMIT 10
+      ORDER BY q.created_at ASC
+      LIMIT 20
     `);
 
     console.log(`📦 ${result.rows.length} itens na fila`);
 
-    for (const job of result.rows) {
+    for (const item of result.rows) {
       try {
-        if (job.channel === "email" && job.email) {
-          await sendNewAdAlert(job.email, {
-            id: job.ad_id,
-            title: job.title,
-            price: job.price,
-          });
+        let success = false;
+
+        if (item.channel === "email") {
+          success = await sendNewAdAlert(item.email, item);
         }
 
-        await pool.query(
-          `
-          UPDATE notification_queue
-          SET status = 'sent'
-          WHERE id = $1
-          `,
-          [job.id]
-        );
+        if (item.channel === "whatsapp") {
+          success = await sendWhatsAppAlert(item.phone, item);
+        }
 
-        console.log(`✅ Notificação enviada (job ${job.id})`);
+        if (success) {
+          await pool.query(
+            `UPDATE notification_queue
+             SET status = 'sent'
+             WHERE id = $1`,
+            [item.id]
+          );
+        } else {
+          await pool.query(
+            `UPDATE notification_queue
+             SET attempts = attempts + 1,
+                 status = 'failed'
+             WHERE id = $1`,
+            [item.id]
+          );
+        }
       } catch (err) {
-        await pool.query(
-          `
-          UPDATE notification_queue
-          SET attempts = attempts + 1,
-              last_error = $2
-          WHERE id = $1
-          `,
-          [job.id, err.message]
-        );
-
-        console.error(`❌ Erro no job ${job.id}:`, err.message);
+        console.error("Erro ao enviar item:", err.message);
       }
     }
   } catch (err) {
-    console.error("❌ Erro geral no worker:", err);
+    console.error("Erro no worker:", err.message);
   }
 }
 
@@ -66,4 +65,4 @@ function startWorker() {
   setInterval(processQueue, 10000);
 }
 
-startWorker();
+module.exports = { startWorker };
