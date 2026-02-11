@@ -3,12 +3,14 @@ require("dotenv").config();
 const runMigrations = require("./database/migrate");
 const app = require("./app");
 
-// Workers
+// Workers principais
 const { startStrategyWorker } = require("./workers/strategy.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
 const { startOpportunityWorker } = require("./workers/opportunity_engine");
 const { startCampaignExecutorWorker } = require("./workers/campaign_executor.worker");
+const { startDealerCollectorWorker } = require("./workers/dealer_collector.worker");
 
+// Worker opcional de SEO
 let startSeoWorker;
 try {
   ({ startSeoWorker } = require("./workers/seo.worker"));
@@ -28,13 +30,13 @@ async function startServer() {
       console.log(`🚗 API rodando na porta ${PORT}`);
 
       try {
-        // Workers principais
+        // Inicialização dos workers
         startStrategyWorker();
         startAutopilotWorker();
         startOpportunityWorker();
         startCampaignExecutorWorker();
+        startDealerCollectorWorker();
 
-        // Worker opcional
         if (startSeoWorker) {
           startSeoWorker();
         }
