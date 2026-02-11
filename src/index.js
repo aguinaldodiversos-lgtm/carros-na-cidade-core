@@ -11,6 +11,7 @@ const { startCampaignExecutorWorker } = require("./workers/campaign_executor.wor
 const { startDealerCollectorWorker } = require("./workers/dealer_collector.worker");
 const { startLocalDominationWorker } = require("./workers/local_domination.worker");
 const { startSocialPresenceWorker } = require("./workers/social_presence.worker");
+const { startSocialPublisherWorker } = require("./workers/social_publisher.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -40,6 +41,7 @@ async function startServer() {
         startDealerCollectorWorker();
         startLocalDominationWorker();
         startSocialPresenceWorker();
+        startSocialPublisherWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
