@@ -3,9 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-const runMigrations = require("./database/migrate");
-
-// Rotas
+/* =====================================================
+   ROUTES
+===================================================== */
 const adsRoutes = require("./routes/ads");
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payments");
@@ -13,11 +13,18 @@ const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
 
-// Workers
+/* =====================================================
+   WORKERS
+===================================================== */
 const { startNotificationWorker } = require("./workers/notification.worker");
 const { startStrategyWorker } = require("./workers/strategy.worker");
-const { startCompetitorWorker } = require("./workers/competitor.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
+const { startSeoWorker } = require("./workers/seo.worker");
+
+/* =====================================================
+   DATABASE MIGRATIONS
+===================================================== */
+const runMigrations = require("./database/migrate");
 
 const app = express();
 
@@ -41,7 +48,7 @@ app.use(
 app.use(express.json());
 
 /* =====================================================
-   ROTAS
+   ROUTES
 ===================================================== */
 app.use("/api/ads", adsRoutes);
 app.use("/api/alerts", alertRoutes);
@@ -58,7 +65,7 @@ app.get("/health", (_, res) => {
 });
 
 /* =====================================================
-   HANDLER DE ERRO GLOBAL
+   GLOBAL ERROR HANDLER
 ===================================================== */
 app.use((err, req, res, next) => {
   console.error("Erro na aplicação:", err);
@@ -68,7 +75,7 @@ app.use((err, req, res, next) => {
 });
 
 /* =====================================================
-   START DO SERVIDOR
+   START SERVER + WORKERS
 ===================================================== */
 const PORT = process.env.PORT || 3000;
 
@@ -78,22 +85,25 @@ async function startServer() {
     await runMigrations();
     console.log("✅ Migrations concluídas.");
 
-    // Workers
-    console.log("🚀 Iniciando worker de notificações...");
+    app.listen(PORT, () => {
+      console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+    });
+
+    /* =============================================
+       START WORKERS
+    ============================================= */
+
+    console.log("🚀 Iniciando notification worker...");
     startNotificationWorker();
 
-    console.log("🧠 Iniciando strategy worker...");
+    console.log("📊 Iniciando strategy worker...");
     startStrategyWorker();
-
-    console.log("📡 Iniciando competitor worker...");
-    startCompetitorWorker();
 
     console.log("🤖 Iniciando autopilot worker...");
     startAutopilotWorker();
 
-    app.listen(PORT, () => {
-      console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
-    });
+    console.log("📝 Iniciando SEO worker...");
+    startSeoWorker();
   } catch (err) {
     console.error("Erro ao iniciar servidor:", err);
     process.exit(1);
