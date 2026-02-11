@@ -5,52 +5,81 @@ const cors = require("cors");
 const runMigrations = require("./database/migrate");
 const { startWorker } = require("./workers/notification.worker");
 
+// Rotas principais
 const adsRoutes = require("./routes/ads");
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payments");
 const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
+const analyticsRoutes = require("./routes/analytics");
 
 const app = express();
 
-// CORS
-app.use(cors({
-  origin: [
-    "https://carrosnacidade.com",
-    "http://localhost:3000"
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
+/* =====================================================
+   CORS
+===================================================== */
+app.use(
+  cors({
+    origin: [
+      "https://carrosnacidade.com",
+      "http://localhost:3000",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 
+/* =====================================================
+   MIDDLEWARES
+===================================================== */
 app.use(express.json());
 
-// Rotas
+/* =====================================================
+   ROTAS
+===================================================== */
 app.use("/api/ads", adsRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/analytics", analyticsRoutes);
 app.use("/sitemap.xml", sitemapRoute);
 
-// Health
+/* =====================================================
+   HEALTH CHECK
+===================================================== */
 app.get("/health", (_, res) => res.json({ status: "ok" }));
 
-// Erro global
+/* =====================================================
+   HANDLER GLOBAL DE ERROS
+===================================================== */
 app.use((err, req, res, next) => {
-  console.error("Erro:", err);
-  res.status(500).json({ error: "Erro interno" });
+  console.error("Erro na aplicação:", err);
+  res.status(500).json({
+    error: "Erro interno no servidor",
+  });
 });
 
-// Start
+/* =====================================================
+   START DO SERVIDOR
+===================================================== */
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
-  await runMigrations();
-  startWorker();
+  try {
+    console.log("🔧 Rodando migrations...");
+    await runMigrations();
+    console.log("✅ Migrations concluídas.");
 
-  app.listen(PORT, () => {
-    console.log(`🚗 API rodando na porta ${PORT}`);
-  });
+    console.log("🚀 Iniciando worker de notificações...");
+    startWorker();
+
+    app.listen(PORT, () => {
+      console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Erro ao iniciar servidor:", err);
+    process.exit(1);
+  }
 }
 
 startServer();
