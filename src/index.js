@@ -13,11 +13,16 @@ const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
 
-// Workers
-const { startNotificationWorker } = require("./services/notification.worker");
+// Workers (apenas os que sabemos que existem)
 const { startStrategyWorker } = require("./workers/strategy.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
-const { startSeoWorker } = require("./workers/seo.worker");
+
+let startSeoWorker;
+try {
+  ({ startSeoWorker } = require("./workers/seo.worker"));
+} catch {
+  console.warn("⚠️ SEO worker não encontrado, ignorando...");
+}
 
 const app = express();
 
@@ -77,15 +82,18 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
 
-      // Iniciar workers
+      // Workers
       try {
-        startNotificationWorker();
         startStrategyWorker();
         startAutopilotWorker();
-        startSeoWorker();
-        console.log("🚀 Workers iniciados com sucesso");
-      } catch (workerErr) {
-        console.error("Erro ao iniciar workers:", workerErr);
+
+        if (startSeoWorker) {
+          startSeoWorker();
+        }
+
+        console.log("🚀 Workers iniciados");
+      } catch (err) {
+        console.error("Erro ao iniciar workers:", err);
       }
     });
   } catch (err) {
