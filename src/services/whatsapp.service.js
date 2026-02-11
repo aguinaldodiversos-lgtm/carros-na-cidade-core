@@ -48,9 +48,9 @@ function normalizePhone(phone) {
 }
 
 /* =====================================================
-   SEND WHATSAPP ALERT
+   BASE SENDER
 ===================================================== */
-async function sendWhatsAppAlert(phone, ad) {
+async function sendWhatsAppMessage(phone, message) {
   try {
     validateEnv();
 
@@ -60,20 +60,6 @@ async function sendWhatsAppAlert(phone, ad) {
       console.warn("⚠️ Telefone inválido, envio cancelado");
       return false;
     }
-
-    const adUrl = ad.slug
-      ? `${process.env.FRONTEND_URL}/anuncio/${ad.slug}`
-      : `${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
-
-    const message = `🚗 Novo carro para você:
-
-${ad.brand || ""} ${ad.model || ""}
-Ano: ${ad.year || "-"}
-Preço: R$ ${ad.price}
-Cidade: ${ad.city}
-
-Veja o anúncio:
-${adUrl}`;
 
     const url = `${ZAPI_BASE_URL}/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_INSTANCE_TOKEN}/send-text`;
 
@@ -114,4 +100,33 @@ ${adUrl}`;
   }
 }
 
-module.exports = { sendWhatsAppAlert };
+/* =====================================================
+   SEND ALERTA DE ANÚNCIO
+===================================================== */
+async function sendWhatsAppAlert(phone, ad) {
+  try {
+    const adUrl = ad.slug
+      ? `${process.env.FRONTEND_URL}/anuncio/${ad.slug}`
+      : `${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
+
+    const message = `🚗 Novo carro para você:
+
+${ad.brand || ""} ${ad.model || ""}
+Ano: ${ad.year || "-"}
+Preço: R$ ${ad.price}
+Cidade: ${ad.city}
+
+Veja o anúncio:
+${adUrl}`;
+
+    return await sendWhatsAppMessage(phone, message);
+  } catch (err) {
+    console.error("❌ Erro ao enviar alerta WhatsApp:", err.message);
+    return false;
+  }
+}
+
+module.exports = {
+  sendWhatsAppAlert,
+  sendWhatsAppMessage,
+};
