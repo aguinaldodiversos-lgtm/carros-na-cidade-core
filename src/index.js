@@ -16,6 +16,8 @@ const analyticsRoutes = require("./routes/analytics");
 // Workers
 const { startNotificationWorker } = require("./workers/notification.worker");
 const { startStrategyWorker } = require("./workers/strategy.worker");
+const { startCompetitorWorker } = require("./workers/competitor.worker");
+const { startAutopilotWorker } = require("./workers/autopilot.worker");
 
 const app = express();
 
@@ -76,12 +78,18 @@ async function startServer() {
     await runMigrations();
     console.log("✅ Migrations concluídas.");
 
-    // inicia workers
+    // Workers
     console.log("🚀 Iniciando worker de notificações...");
     startNotificationWorker();
 
     console.log("🧠 Iniciando strategy worker...");
     startStrategyWorker();
+
+    console.log("📡 Iniciando competitor worker...");
+    startCompetitorWorker();
+
+    console.log("🤖 Iniciando autopilot worker...");
+    startAutopilotWorker();
 
     app.listen(PORT, () => {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
