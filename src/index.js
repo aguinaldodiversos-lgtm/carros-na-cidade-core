@@ -1,17 +1,18 @@
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 
 const runMigrations = require("./database/migrate");
-const { startWorker } = require("./workers/notification.worker");
-
-// Rotas principais
 const adsRoutes = require("./routes/ads");
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payments");
 const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
+
+const { startWorker } = require("./workers/notification.worker");
+const { startStrategyWorker } = require("./workers/strategy.worker");
 
 const app = express();
 
@@ -44,9 +45,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/sitemap.xml", sitemapRoute);
 
-/* =====================================================
-   HEALTH CHECK
-===================================================== */
+// Health check
 app.get("/health", (_, res) => res.json({ status: "ok" }));
 
 /* =====================================================
@@ -72,6 +71,9 @@ async function startServer() {
 
     console.log("🚀 Iniciando worker de notificações...");
     startWorker();
+
+    console.log("🧠 Iniciando strategy worker...");
+    startStrategyWorker();
 
     app.listen(PORT, () => {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
