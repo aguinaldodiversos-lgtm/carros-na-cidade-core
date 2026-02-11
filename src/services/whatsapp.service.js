@@ -29,9 +29,19 @@ function normalizePhone(phone) {
 
   let digits = phone.replace(/\D/g, "");
 
-  // se não começar com 55, adiciona
+  // remove zero inicial comum (ex: 011999999999)
+  if (digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+
+  // adiciona DDI Brasil se necessário
   if (!digits.startsWith("55")) {
     digits = "55" + digits;
+  }
+
+  // valida tamanho mínimo (DDI + DDD + número)
+  if (digits.length < 12) {
+    return null;
   }
 
   return digits;
@@ -51,6 +61,10 @@ async function sendWhatsAppAlert(phone, ad) {
       return false;
     }
 
+    const adUrl = ad.slug
+      ? `${process.env.FRONTEND_URL}/anuncio/${ad.slug}`
+      : `${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
+
     const message = `🚗 Novo carro para você:
 
 ${ad.brand || ""} ${ad.model || ""}
@@ -59,7 +73,7 @@ Preço: R$ ${ad.price}
 Cidade: ${ad.city}
 
 Veja o anúncio:
-${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
+${adUrl}`;
 
     const url = `${ZAPI_BASE_URL}/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_INSTANCE_TOKEN}/send-text`;
 
@@ -77,6 +91,11 @@ ${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
         timeout: 10000,
       }
     );
+
+    if (response.data?.error) {
+      console.error("❌ Z-API respondeu com erro:", response.data);
+      return false;
+    }
 
     console.log(`📲 WhatsApp enviado para ${formattedPhone}`);
     return true;
