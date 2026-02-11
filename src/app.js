@@ -8,6 +8,7 @@ const paymentRoutes = require("./routes/payments");
 const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
+const autopilotRoutes = require("./routes/autopilot"); // NOVA ROTA
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use("/api/alerts", alertRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/autopilot", autopilotRoutes); // NOVO ENDPOINT
 app.use("/sitemap.xml", sitemapRoute);
 
 // Health check
