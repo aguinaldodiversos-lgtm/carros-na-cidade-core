@@ -1,129 +1,60 @@
-require("dotenv").config();
-const { Pool } = require("pg");
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-
-async function executeCampaign(campaign) {
-  const { id, city_id, campaign_type } = campaign;
-
-  try {
-    console.log(`🚀 Executando campanha ${campaign_type} (ID: ${id})`);
-
-    // Marcar como running
-    await pool.query(
-      `
-      UPDATE autopilot_campaigns
-      SET status = 'running',
-          started_at = NOW()
-      WHERE id = $1
-    `,
-      [id]
-    );
-
-    // Executar conforme tipo
-    if (campaign_type === "seo_city") {
-      await executeSeoCampaign(city_id);
-    }
-
-    if (campaign_type === "dealer_acquisition") {
-      await executeDealerAcquisition(city_id);
-    }
-
-    // Marcar como concluída
-    await pool.query(
-      `
-      UPDATE autopilot_campaigns
-      SET status = 'completed',
-          finished_at = NOW(),
-          result_score = 1
-      WHERE id = $1
-    `,
-      [id]
-    );
-
-    console.log(`✅ Campanha ${id} finalizada`);
-  } catch (err) {
-    console.error(`❌ Erro na campanha ${id}:`, err);
-
-    await pool.query(
-      `
-      UPDATE autopilot_campaigns
-      SET status = 'failed',
-          finished_at = NOW()
-      WHERE id = $1
-    `,
-      [id]
-    );
-  }
-}
-
-async function executeSeoCampaign(cityId) {
-  console.log(`🔎 Executando SEO para cidade ${cityId}`);
-
-  // Aqui você pode integrar com seu seoEngine.service
-  await pool.query(
-    `
-    INSERT INTO autopilot_actions (
-      city_id,
-      action_type,
-      status,
-      created_at
-    )
-    VALUES ($1, 'seo_city', 'done', NOW())
-  `,
-    [cityId]
-  );
-}
+const { sendWhatsAppMessage } = require("../services/whatsapp.service");
 
 async function executeDealerAcquisition(cityId) {
-  console.log(`📞 Executando aquisição de lojistas para cidade ${cityId}`);
+  console.log(`📞 Aquisição de lojistas para cidade ${cityId}`);
 
-  // Ação inicial: registrar tentativa
-  await pool.query(
+  // 1) Buscar lojistas da cidade
+  const dealersResult = await pool.query(
     `
-    INSERT INTO autopilot_actions (
-      city_id,
-      action_type,
-      status,
-      created_at
-    )
-    VALUES ($1, 'dealer_acquisition', 'done', NOW())
+    SELECT id, name, phone
+    FROM advertisers
+    WHERE city_id = $1
+    AND phone IS NOT NULL
+    LIMIT 10
   `,
     [cityId]
   );
-}
 
-async function runCampaignExecutor() {
-  try {
-    console.log("⚙️ Rodando Campaign Executor...");
+  const dealers = dealersResult.rows;
 
-    const campaigns = await pool.query(
-      `
-      SELECT *
-      FROM autopilot_campaigns
-      WHERE status = 'pending'
-      ORDER BY created_at ASC
-      LIMIT 5
-    `
-    );
+  if (dealers.length === 0) {
+    console.log("⚠️ Nenhum lojista encontrado para essa cidade");
+    return;
+  }
 
-    for (const campaign of campaigns.rows) {
-      await executeCampaign(campaign);
+  for (const dealer of dealers) {
+    try {
+      const message = `Olá ${dealer.name}! 👋
+
+Aqui é do portal *Carros na Cidade*.
+
+Percebemos alta procura por veículos na sua cidade e poucos anúncios disponíveis.
+
+Você pode anunciar gratuitamente e receber contatos diretos de compradores locais.
+
+Cadastre seus veículos:
+https://carrosnacidade.com/painel`;
+
+      await sendWhatsAppMessage(dealer.phone, message);
+
+      // Registrar ação
+      await pool.query(
+        `
+        INSERT INTO autopilot_actions (
+          city_id,
+          action_type,
+          status,
+          metadata,
+          created_at
+        )
+        VALUES ($1, 'dealer_whatsapp', 'sent', $2, NOW())
+      `,
+        [cityId, JSON.stringify({ advertiser_id: dealer.id })]
+      );
+
+      console.log(`✅ WhatsApp enviado para ${dealer.name}`);
+    } catch (err) {
+      console.error(`❌ Erro ao enviar para ${dealer.name}:`, err);
     }
-  } catch (err) {
-    console.error("❌ Erro no Campaign Executor:", err);
   }
 }
-
-function startCampaignExecutorWorker() {
-  // Executa a cada 5 minutos
-  setInterval(runCampaignExecutor, 5 * 60 * 1000);
-
-  // Executa ao iniciar
-  runCampaignExecutor();
-}
-
-module.exports = { startCampaignExecutor
