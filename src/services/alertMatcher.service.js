@@ -1,6 +1,3 @@
-async function notifyMatchingAlerts(ad) {
-  console.log("🚨 Matcher executado para anúncio:", ad.id, ad.city);
-
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -20,6 +17,8 @@ const MAX_WHATSAPP_PER_DAY = 1;
 ===================================================== */
 
 async function notifyMatchingAlerts(ad) {
+  console.log("🚨 Matcher executado para anúncio:", ad.id, ad.city);
+
   try {
     const result = await pool.query(
       `
