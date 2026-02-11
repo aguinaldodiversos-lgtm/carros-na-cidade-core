@@ -3,9 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-/* =====================================================
-   ROUTES
-===================================================== */
+const runMigrations = require("./database/migrate");
+
+// Rotas
 const adsRoutes = require("./routes/ads");
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payments");
@@ -13,18 +13,11 @@ const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
 
-/* =====================================================
-   WORKERS
-===================================================== */
-const { startNotificationWorker } = require("./workers/notification.worker");
+// Workers
+const { startNotificationWorker } = require("./services/notification.worker");
 const { startStrategyWorker } = require("./workers/strategy.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
 const { startSeoWorker } = require("./workers/seo.worker");
-
-/* =====================================================
-   DATABASE MIGRATIONS
-===================================================== */
-const runMigrations = require("./database/migrate");
 
 const app = express();
 
@@ -48,7 +41,7 @@ app.use(
 app.use(express.json());
 
 /* =====================================================
-   ROUTES
+   ROTAS
 ===================================================== */
 app.use("/api/ads", adsRoutes);
 app.use("/api/alerts", alertRoutes);
@@ -57,15 +50,11 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/sitemap.xml", sitemapRoute);
 
-/* =====================================================
-   HEALTH CHECK
-===================================================== */
-app.get("/health", (_, res) => {
-  res.json({ status: "ok" });
-});
+// Health check
+app.get("/health", (_, res) => res.json({ status: "ok" }));
 
 /* =====================================================
-   GLOBAL ERROR HANDLER
+   ERRO GLOBAL
 ===================================================== */
 app.use((err, req, res, next) => {
   console.error("Erro na aplicação:", err);
@@ -75,7 +64,7 @@ app.use((err, req, res, next) => {
 });
 
 /* =====================================================
-   START SERVER + WORKERS
+   START DO SERVIDOR
 ===================================================== */
 const PORT = process.env.PORT || 3000;
 
@@ -87,23 +76,18 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+
+      // Iniciar workers
+      try {
+        startNotificationWorker();
+        startStrategyWorker();
+        startAutopilotWorker();
+        startSeoWorker();
+        console.log("🚀 Workers iniciados com sucesso");
+      } catch (workerErr) {
+        console.error("Erro ao iniciar workers:", workerErr);
+      }
     });
-
-    /* =============================================
-       START WORKERS
-    ============================================= */
-
-    console.log("🚀 Iniciando notification worker...");
-    startNotificationWorker();
-
-    console.log("📊 Iniciando strategy worker...");
-    startStrategyWorker();
-
-    console.log("🤖 Iniciando autopilot worker...");
-    startAutopilotWorker();
-
-    console.log("📝 Iniciando SEO worker...");
-    startSeoWorker();
   } catch (err) {
     console.error("Erro ao iniciar servidor:", err);
     process.exit(1);
