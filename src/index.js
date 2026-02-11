@@ -7,6 +7,7 @@ const app = require("./app");
 const { startStrategyWorker } = require("./workers/strategy.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
 const { startOpportunityWorker } = require("./workers/opportunity_engine");
+const { startCampaignExecutorWorker } = require("./workers/campaign_executor.worker");
 
 let startSeoWorker;
 try {
@@ -27,10 +28,13 @@ async function startServer() {
       console.log(`🚗 API rodando na porta ${PORT}`);
 
       try {
+        // Workers principais
         startStrategyWorker();
         startAutopilotWorker();
         startOpportunityWorker();
+        startCampaignExecutorWorker();
 
+        // Worker opcional
         if (startSeoWorker) {
           startSeoWorker();
         }
