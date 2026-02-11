@@ -1,3 +1,4 @@
+require("./workers/strategy_worker");
 require("dotenv").config();
 require("./workers/opportunity_engine");
 const express = require("express");
