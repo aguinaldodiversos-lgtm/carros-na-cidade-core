@@ -4,6 +4,8 @@ const express = require("express");
 const cors = require("cors");
 
 const runMigrations = require("./database/migrate");
+
+// Rotas
 const adsRoutes = require("./routes/ads");
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payments");
@@ -11,7 +13,8 @@ const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
 
-const { startWorker } = require("./workers/notification.worker");
+// Workers
+const { startNotificationWorker } = require("./workers/notification.worker");
 const { startStrategyWorker } = require("./workers/strategy.worker");
 
 const app = express();
@@ -45,11 +48,15 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/sitemap.xml", sitemapRoute);
 
-// Health check
-app.get("/health", (_, res) => res.json({ status: "ok" }));
+/* =====================================================
+   HEALTH CHECK
+===================================================== */
+app.get("/health", (_, res) => {
+  res.json({ status: "ok" });
+});
 
 /* =====================================================
-   HANDLER GLOBAL DE ERROS
+   HANDLER DE ERRO GLOBAL
 ===================================================== */
 app.use((err, req, res, next) => {
   console.error("Erro na aplicação:", err);
@@ -69,8 +76,9 @@ async function startServer() {
     await runMigrations();
     console.log("✅ Migrations concluídas.");
 
+    // inicia workers
     console.log("🚀 Iniciando worker de notificações...");
-    startWorker();
+    startNotificationWorker();
 
     console.log("🧠 Iniciando strategy worker...");
     startStrategyWorker();
