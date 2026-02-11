@@ -11,12 +11,13 @@ const pool = new Pool({
 async function getCityRadar() {
   const result = await pool.query(`
     SELECT
-      COALESCE(a.city, al.city) AS city,
-      COUNT(DISTINCT a.id) FILTER (WHERE a.status = 'active') AS ads_count,
-      COUNT(DISTINCT al.id) AS alerts_count
-    FROM ads a
-    FULL JOIN alerts al ON al.city = a.city
-    GROUP BY city
+      c.name AS city,
+      COUNT(a.id) FILTER (WHERE a.status = 'active') AS ads_count,
+      COUNT(al.id) AS alerts_count
+    FROM cities c
+    LEFT JOIN ads a ON a.city = c.name
+    LEFT JOIN alerts al ON al.city = c.name
+    GROUP BY c.name
   `);
 
   return result.rows.map((row) => {
@@ -42,7 +43,7 @@ async function registerAction(city, type, description) {
     `
     INSERT INTO autopilot_actions (city, action_type, description)
     VALUES ($1, $2, $3)
-    `,
+  `,
     [city, type, description]
   );
 }
@@ -62,9 +63,9 @@ async function runAutopilot() {
       .slice(0, 3);
 
     for (const city of strategicCities) {
-      const description = `Cidade estratégica detectada: ${city.city} (score ${city.score.toFixed(
-        2
-      )})`;
+      const description = `Cidade estratégica detectada: ${
+        city.city
+      } (score ${city.score.toFixed(2)})`;
 
       await registerAction(city.city, "city_campaign", description);
 
