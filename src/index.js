@@ -24,6 +24,8 @@ const { startCityIntelligenceWorker } = require("./workers/city_intelligence.wor
 const { startCityAlertsWorker } = require("./workers/city_alerts.worker");
 const { startAlertActionWorker } = require("./workers/alert_action.worker");
 const { startMessageOptimizerWorker } = require("./workers/message_optimizer.worker");
+const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
+const { startCityPredictionWorker } = require("./workers/city_prediction.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -65,6 +67,8 @@ async function startServer() {
         startCityAlertsWorker();
         startAlertActionWorker();
         startMessageOptimizerWorker();
+        startMessageGeneratorWorker();
+        startCityPredictionWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
