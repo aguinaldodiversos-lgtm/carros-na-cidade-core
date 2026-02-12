@@ -18,6 +18,7 @@ const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
 const { startDealerFollowupWorker } = require("./workers/dealer_followup.worker");
 const { startDealerConversionWorker } = require("./workers/dealer_conversion.worker");
 const { startRegionalExpansionWorker } = require("./workers/regional_expansion.worker");
+const { startRegionalClusterWorker } = require("./workers/regional_cluster.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -53,6 +54,7 @@ async function startServer() {
         startDealerFollowupWorker();
         startDealerConversionWorker();
         startRegionalExpansionWorker();
+        startRegionalClusterWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
