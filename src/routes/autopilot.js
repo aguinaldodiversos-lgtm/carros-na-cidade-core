@@ -84,6 +84,38 @@ router.get("/dealers", async (req, res) => {
 });
 
 /* =====================================================
+   FUNNEL (NOVO)
+===================================================== */
+router.get("/funnel", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.name AS city,
+        COUNT(dl.id) AS leads_total,
+        SUM(CASE WHEN dl.contacted THEN 1 ELSE 0 END) AS contacted,
+        SUM(CASE WHEN dl.converted THEN 1 ELSE 0 END) AS converted,
+        ROUND(
+          (
+            SUM(CASE WHEN dl.converted THEN 1 ELSE 0 END)::numeric /
+            NULLIF(SUM(CASE WHEN dl.contacted THEN 1 ELSE 0 END), 0)
+          ) * 100,
+          2
+        ) AS conversion_rate
+      FROM dealer_leads dl
+      JOIN cities c ON c.id = dl.city_id
+      GROUP BY c.name
+      ORDER BY conversion_rate DESC NULLS LAST
+      LIMIT 50
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erro no funil" });
+  }
+});
+
+/* =====================================================
    SUMMARY
 ===================================================== */
 router.get("/summary", async (req, res) => {
