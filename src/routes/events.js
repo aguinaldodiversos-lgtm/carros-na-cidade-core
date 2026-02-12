@@ -156,4 +156,80 @@ router.post("/", async (req, res) => {
   }
 });
 
+/* =====================================================
+   APPROVE BANNER
+===================================================== */
+router.post("/:id/approve-banner", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const event = await pool.query(
+      `SELECT * FROM events WHERE id = $1`,
+      [id]
+    );
+
+    if (!event.rows.length) {
+      return res.status(404).json({ error: "Evento não encontrado" });
+    }
+
+    const e = event.rows[0];
+
+    // buscar slots ocupados
+    const slots = await pool.query(
+      `
+      SELECT slot
+      FROM event_queue
+      WHERE city_id = $1
+      AND week_start = $2
+      `,
+      [e.city_id, e.week_start]
+    );
+
+    const used = slots.rows.map((s) => s.slot);
+
+    let slot = null;
+    for (let i = 1; i <= 3; i++) {
+      if (!used.includes(i)) {
+        slot = i;
+        break;
+      }
+    }
+
+    if (!slot) {
+      return res.status(400).json({
+        error: "Semana cheia",
+      });
+    }
+
+    // inserir na fila
+    await pool.query(
+      `
+      INSERT INTO event_queue (event_id, city_id, week_start, slot)
+      VALUES ($1,$2,$3,$4)
+      `,
+      [e.id, e.city_id, e.week_start, slot]
+    );
+
+    // atualizar evento
+    await pool.query(
+      `
+      UPDATE events
+      SET
+        banner_status = 'approved',
+        status = 'queued'
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      slot,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erro ao aprovar banner" });
+  }
+});
+
 module.exports = router;
