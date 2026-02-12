@@ -16,6 +16,7 @@ const { startCnpjCollectorWorker } = require("./workers/cnpj_collector.worker");
 const { startOpenCnpjCollectorWorker } = require("./workers/open_cnpj_collector.worker");
 const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
 const { startDealerFollowupWorker } = require("./workers/dealer_followup.worker");
+const { startDealerConversionWorker } = require("./workers/dealer_conversion.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -37,7 +38,6 @@ async function startServer() {
       console.log(`🚗 API rodando na porta ${PORT}`);
 
       try {
-        // Inicialização dos workers
         startStrategyWorker();
         startAutopilotWorker();
         startOpportunityWorker();
@@ -50,6 +50,7 @@ async function startServer() {
         startOpenCnpjCollectorWorker();
         startLeadScoringWorker();
         startDealerFollowupWorker();
+        startDealerConversionWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
