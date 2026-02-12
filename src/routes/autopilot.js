@@ -84,7 +84,7 @@ router.get("/dealers", async (req, res) => {
 });
 
 /* =====================================================
-   FUNNEL (NOVO)
+   FUNNEL
 ===================================================== */
 router.get("/funnel", async (req, res) => {
   try {
@@ -112,6 +112,56 @@ router.get("/funnel", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Erro no funil" });
+  }
+});
+
+/* =====================================================
+   CITY STRATEGY (PAINEL ESTRATÉGICO)
+===================================================== */
+router.get("/city-strategy", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.id,
+        c.name,
+        c.state,
+        css.city_type,
+        css.status,
+        css.effort_level,
+        css.confidence_score,
+        css.growth_score,
+        css.last_evaluated_at
+      FROM city_strategy_state css
+      JOIN cities c ON c.id = css.city_id
+      ORDER BY
+        css.status,
+        css.growth_score DESC
+      LIMIT 200
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erro ao buscar estratégia de cidades" });
+  }
+});
+
+/* =====================================================
+   CITY STRATEGY SUMMARY
+===================================================== */
+router.get("/city-strategy-summary", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        status,
+        COUNT(*) AS total
+      FROM city_strategy_state
+      GROUP BY status
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Erro no resumo estratégico" });
   }
 });
 
