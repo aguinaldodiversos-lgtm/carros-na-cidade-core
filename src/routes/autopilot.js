@@ -1,4 +1,4 @@
-feitoconst express = require("express");
+const express = require("express");
 const router = express.Router();
 const { Pool } = require("pg");
 
@@ -195,6 +195,31 @@ router.get("/city-alerts", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: "Erro ao buscar alertas" });
+  }
+});
+
+/* =====================================================
+   CITY PREDICTIONS
+===================================================== */
+router.get("/city-predictions", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.name,
+        c.state,
+        cp.prediction_label,
+        cp.prediction_score,
+        cp.ads_growth,
+        cp.dealer_growth
+      FROM city_predictions cp
+      JOIN cities c ON c.id = cp.city_id
+      ORDER BY cp.prediction_score DESC
+      LIMIT 50
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Erro nas previsões" });
   }
 });
 
