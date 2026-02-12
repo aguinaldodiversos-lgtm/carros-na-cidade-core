@@ -24,6 +24,15 @@ function getNextMonday(date = new Date()) {
   return d;
 }
 
+function getNextSundayEnd(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (7 - day) % 7;
+  d.setDate(d.getDate() + diff);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 /* =====================================================
    CREATE EVENT
 ===================================================== */
@@ -35,6 +44,7 @@ router.post("/", async (req, res) => {
       title,
       event_type,
       location,
+      week_start, // opcional
     } = req.body;
 
     // 1) verificar lojista
@@ -49,47 +59,81 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // 2) encontrar próxima semana disponível
-    let weekStart = getNextMonday();
+    // 2) verificar eventos ativos na cidade
+    const activeCheck = await pool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM events
+      WHERE city_id = $1
+      AND status = 'active'
+      `,
+      [city_id]
+    );
+
+    const activeCount = Number(activeCheck.rows[0].total);
+
+    let eventStatus = "pending_payment";
+    let startDate = null;
+    let endDate = null;
+    let weekStart = null;
     let slot = null;
-    let found = false;
 
-    for (let i = 0; i < 4; i++) {
-      const result = await pool.query(
-        `
-        SELECT slot
-        FROM event_queue
-        WHERE city_id = $1
-        AND week_start = $2
-        `,
-        [city_id, weekStart]
-      );
+    // =====================================================
+    // CASO 1: vaga disponível agora
+    // =====================================================
+    if (activeCount < 3 && !week_start) {
+      const now = new Date();
+      startDate = now;
+      endDate = getNextSundayEnd(now);
 
-      const usedSlots = result.rows.map((r) => r.slot);
+      eventStatus = "pending_payment";
+    } else {
+      // =====================================================
+      // CASO 2: agendamento semanal
+      // =====================================================
+      weekStart = week_start
+        ? new Date(week_start)
+        : getNextMonday();
 
-      for (let s = 1; s <= 3; s++) {
-        if (!usedSlots.includes(s)) {
-          slot = s;
-          found = true;
-          break;
+      let found = false;
+
+      for (let i = 0; i < 4; i++) {
+        const result = await pool.query(
+          `
+          SELECT slot
+          FROM event_queue
+          WHERE city_id = $1
+          AND week_start = $2
+          `,
+          [city_id, weekStart]
+        );
+
+        const usedSlots = result.rows.map((r) => r.slot);
+
+        for (let s = 1; s <= 3; s++) {
+          if (!usedSlots.includes(s)) {
+            slot = s;
+            found = true;
+            break;
+          }
         }
+
+        if (found) break;
+
+        weekStart.setDate(weekStart.getDate() + 7);
       }
 
-      if (found) break;
+      if (!found) {
+        return res.status(400).json({
+          error: "Agenda cheia para os próximos 30 dias",
+        });
+      }
 
-      weekStart.setDate(weekStart.getDate() + 7);
+      startDate = new Date(weekStart);
+      endDate = new Date(weekStart);
+      endDate.setDate(endDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
     }
-
-    if (!found) {
-      return res.status(400).json({
-        error: "Agenda cheia para os próximos 30 dias",
-      });
-    }
-
-    const startDate = new Date(weekStart);
-    const endDate = new Date(weekStart);
-    endDate.setDate(endDate.getDate() + 6);
-    endDate.setHours(23, 59, 59, 999);
 
     // 3) criar evento
     const eventInsert = await pool.query(
@@ -106,7 +150,7 @@ router.post("/", async (req, res) => {
         status,
         price
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',499)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,499)
       RETURNING *
       `,
       [
@@ -118,6 +162,7 @@ router.post("/", async (req, res) => {
         weekStart,
         startDate,
         endDate,
+        eventStatus,
       ]
     );
 
@@ -138,7 +183,6 @@ router.post("/", async (req, res) => {
 
     const payment = await mercadopago.preferences.create(preference);
 
-    // salvar id do pagamento
     await pool.query(
       `UPDATE events SET payment_id = $1 WHERE id = $2`,
       [payment.body.id, event.id]
@@ -147,7 +191,8 @@ router.post("/", async (req, res) => {
     res.json({
       event_id: event.id,
       payment_url: payment.body.init_point,
-      week_start: weekStart,
+      start_date: startDate,
+      end_date: endDate,
       slot,
     });
   } catch (err) {
@@ -173,6 +218,25 @@ router.post("/:id/approve-banner", async (req, res) => {
     }
 
     const e = event.rows[0];
+
+    // se evento é imediato, só aprova
+    if (!e.week_start) {
+      await pool.query(
+        `
+        UPDATE events
+        SET
+          banner_status = 'approved',
+          status = 'active'
+        WHERE id = $1
+        `,
+        [id]
+      );
+
+      return res.json({
+        success: true,
+        immediate: true,
+      });
+    }
 
     // buscar slots ocupados
     const slots = await pool.query(
@@ -201,7 +265,6 @@ router.post("/:id/approve-banner", async (req, res) => {
       });
     }
 
-    // inserir na fila
     await pool.query(
       `
       INSERT INTO event_queue (event_id, city_id, week_start, slot)
@@ -210,7 +273,6 @@ router.post("/:id/approve-banner", async (req, res) => {
       [e.id, e.city_id, e.week_start, slot]
     );
 
-    // atualizar evento
     await pool.query(
       `
       UPDATE events
