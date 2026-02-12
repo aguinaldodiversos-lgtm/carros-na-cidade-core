@@ -27,6 +27,9 @@ const { startMessageOptimizerWorker } = require("./workers/message_optimizer.wor
 const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
 const { startCityPredictionWorker } = require("./workers/city_prediction.worker");
 
+// NOVO WORKER DE EVENTOS
+const { startEventSchedulerWorker } = require("./workers/event_scheduler.worker");
+
 // Worker opcional de SEO
 let startSeoWorker;
 try {
@@ -47,6 +50,7 @@ async function startServer() {
       console.log(`🚗 API rodando na porta ${PORT}`);
 
       try {
+        // Workers principais
         startStrategyWorker();
         startAutopilotWorker();
         startOpportunityWorker();
@@ -69,6 +73,9 @@ async function startServer() {
         startMessageOptimizerWorker();
         startMessageGeneratorWorker();
         startCityPredictionWorker();
+
+        // Worker de eventos
+        startEventSchedulerWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
