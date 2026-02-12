@@ -27,8 +27,10 @@ const { startMessageOptimizerWorker } = require("./workers/message_optimizer.wor
 const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
 const { startCityPredictionWorker } = require("./workers/city_prediction.worker");
 
-// NOVO WORKER DE EVENTOS
+// Workers de eventos
 const { startEventSchedulerWorker } = require("./workers/event_scheduler.worker");
+const { startEventBannerWorker } = require("./workers/event_banner.worker");
+const { startEventBroadcastWorker } = require("./workers/event_broadcast.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -74,8 +76,10 @@ async function startServer() {
         startMessageGeneratorWorker();
         startCityPredictionWorker();
 
-        // Worker de eventos
+        // Eventos
         startEventSchedulerWorker();
+        startEventBannerWorker();
+        startEventBroadcastWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
