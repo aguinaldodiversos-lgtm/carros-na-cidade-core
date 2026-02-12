@@ -23,6 +23,7 @@ const { startCityMilestoneWorker } = require("./workers/city_milestone.worker");
 const { startCityIntelligenceWorker } = require("./workers/city_intelligence.worker");
 const { startCityAlertsWorker } = require("./workers/city_alerts.worker");
 const { startAlertActionWorker } = require("./workers/alert_action.worker");
+const { startMessageOptimizerWorker } = require("./workers/message_optimizer.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -63,6 +64,7 @@ async function startServer() {
         startCityIntelligenceWorker();
         startCityAlertsWorker();
         startAlertActionWorker();
+        startMessageOptimizerWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
