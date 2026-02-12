@@ -17,6 +17,7 @@ const { startOpenCnpjCollectorWorker } = require("./workers/open_cnpj_collector.
 const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
 const { startDealerFollowupWorker } = require("./workers/dealer_followup.worker");
 const { startDealerConversionWorker } = require("./workers/dealer_conversion.worker");
+const { startRegionalExpansionWorker } = require("./workers/regional_expansion.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -51,6 +52,7 @@ async function startServer() {
         startLeadScoringWorker();
         startDealerFollowupWorker();
         startDealerConversionWorker();
+        startRegionalExpansionWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
