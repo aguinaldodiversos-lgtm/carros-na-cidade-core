@@ -20,6 +20,7 @@ const { startDealerConversionWorker } = require("./workers/dealer_conversion.wor
 const { startRegionalExpansionWorker } = require("./workers/regional_expansion.worker");
 const { startRegionalClusterWorker } = require("./workers/regional_cluster.worker");
 const { startCityMilestoneWorker } = require("./workers/city_milestone.worker");
+const { startCityIntelligenceWorker } = require("./workers/city_intelligence.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -57,6 +58,7 @@ async function startServer() {
         startRegionalExpansionWorker();
         startRegionalClusterWorker();
         startCityMilestoneWorker();
+        startCityIntelligenceWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
