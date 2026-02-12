@@ -166,6 +166,39 @@ router.get("/city-strategy-summary", async (req, res) => {
 });
 
 /* =====================================================
+   CITY ALERTS
+===================================================== */
+router.get("/city-alerts", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        ca.id,
+        c.name,
+        c.state,
+        ca.alert_type,
+        ca.severity,
+        ca.message,
+        ca.created_at
+      FROM city_alerts ca
+      JOIN cities c ON c.id = ca.city_id
+      WHERE ca.resolved = false
+      ORDER BY
+        CASE ca.severity
+          WHEN 'high' THEN 1
+          WHEN 'medium' THEN 2
+          ELSE 3
+        END,
+        ca.created_at DESC
+      LIMIT 100
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao buscar alertas" });
+  }
+});
+
+/* =====================================================
    SUMMARY
 ===================================================== */
 router.get("/summary", async (req, res) => {
