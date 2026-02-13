@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cors = require("cors");
 
@@ -12,7 +11,8 @@ const analyticsRoutes = require("./routes/analytics");
 const autopilotRoutes = require("./routes/autopilot");
 const eventsRoutes = require("./routes/events");
 const adminEventsRoutes = require("./routes/admin.events");
-const advertisersRoutes = require("./routes/advertisers"); // NOVA ROTA DE LOJAS
+const advertisersRoutes = require("./routes/advertisers");
+const metricsRoutes = require("./routes/metrics"); // NOVA ROTA DE MÉTRICAS
 
 const app = express();
 
@@ -46,7 +46,8 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/autopilot", autopilotRoutes);
 app.use("/api/events", eventsRoutes);
 app.use("/api/admin/events", adminEventsRoutes);
-app.use("/api/advertisers", advertisersRoutes); // ROTA PÚBLICA DA LOJA
+app.use("/api/advertisers", advertisersRoutes);
+app.use("/api/metrics", metricsRoutes); // ENDPOINT DE TRACKING
 app.use("/sitemap.xml", sitemapRoute);
 
 // Health check
