@@ -3,7 +3,9 @@ require("dotenv").config();
 const runMigrations = require("./database/migrate");
 const app = require("./app");
 
-// Workers principais
+/* =====================================================
+   WORKERS PRINCIPAIS
+===================================================== */
 const { startStrategyWorker } = require("./workers/strategy.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
 const { startOpportunityWorker } = require("./workers/opportunity_engine");
@@ -27,13 +29,17 @@ const { startMessageOptimizerWorker } = require("./workers/message_optimizer.wor
 const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
 const { startCityPredictionWorker } = require("./workers/city_prediction.worker");
 
-// Workers de eventos
+/* =====================================================
+   WORKERS DE EVENTOS
+===================================================== */
 const { startEventSchedulerWorker } = require("./workers/event_scheduler.worker");
 const { startEventBannerWorker } = require("./workers/event_banner.worker");
 const { startEventBroadcastWorker } = require("./workers/event_broadcast.worker");
 const { startEventFailSafeWorker } = require("./workers/event_fail_safe.worker");
 
-// Worker opcional de SEO
+/* =====================================================
+   WORKER OPCIONAL DE SEO
+===================================================== */
 let startSeoWorker;
 try {
   ({ startSeoWorker } = require("./workers/seo.worker"));
@@ -43,6 +49,9 @@ try {
 
 const PORT = process.env.PORT || 3000;
 
+/* =====================================================
+   START DO SERVIDOR
+===================================================== */
 async function startServer() {
   try {
     console.log("🔧 Rodando migrations...");
@@ -53,7 +62,9 @@ async function startServer() {
       console.log(`🚗 API rodando na porta ${PORT}`);
 
       try {
-        // Workers principais
+        /* =============================
+           WORKERS PRINCIPAIS
+        ============================== */
         startStrategyWorker();
         startAutopilotWorker();
         startOpportunityWorker();
@@ -77,17 +88,22 @@ async function startServer() {
         startMessageGeneratorWorker();
         startCityPredictionWorker();
 
-        // Eventos
+        /* =============================
+           WORKERS DE EVENTOS
+        ============================== */
         startEventSchedulerWorker();
         startEventBannerWorker();
         startEventBroadcastWorker();
         startEventFailSafeWorker();
 
+        /* =============================
+           SEO (opcional)
+        ============================== */
         if (startSeoWorker) {
           startSeoWorker();
         }
 
-        console.log("🚀 Workers iniciados");
+        console.log("🚀 Todos os workers iniciados");
       } catch (err) {
         console.error("Erro ao iniciar workers:", err);
       }
