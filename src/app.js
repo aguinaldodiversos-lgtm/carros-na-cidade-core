@@ -12,7 +12,8 @@ const autopilotRoutes = require("./routes/autopilot");
 const eventsRoutes = require("./routes/events");
 const adminEventsRoutes = require("./routes/admin.events");
 const advertisersRoutes = require("./routes/advertisers");
-const metricsRoutes = require("./routes/metrics"); // NOVA ROTA DE MÉTRICAS
+const metricsRoutes = require("./routes/metrics");
+const fipeRoutes = require("./routes/fipe"); // NOVA ROTA FIPE
 
 const app = express();
 
@@ -47,7 +48,8 @@ app.use("/api/autopilot", autopilotRoutes);
 app.use("/api/events", eventsRoutes);
 app.use("/api/admin/events", adminEventsRoutes);
 app.use("/api/advertisers", advertisersRoutes);
-app.use("/api/metrics", metricsRoutes); // ENDPOINT DE TRACKING
+app.use("/api/metrics", metricsRoutes);
+app.use("/api/fipe", fipeRoutes); // ENDPOINT FIPE
 app.use("/sitemap.xml", sitemapRoute);
 
 // Health check
