@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 
@@ -10,7 +11,8 @@ const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
 const autopilotRoutes = require("./routes/autopilot");
 const eventsRoutes = require("./routes/events");
-const adminEventsRoutes = require("./routes/admin.events"); // NOVA ROTA ADMIN
+const adminEventsRoutes = require("./routes/admin.events");
+const advertisersRoutes = require("./routes/advertisers"); // NOVA ROTA DE LOJAS
 
 const app = express();
 
@@ -43,7 +45,8 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/autopilot", autopilotRoutes);
 app.use("/api/events", eventsRoutes);
-app.use("/api/admin/events", adminEventsRoutes); // ROTA ADMINISTRATIVA
+app.use("/api/admin/events", adminEventsRoutes);
+app.use("/api/advertisers", advertisersRoutes); // ROTA PÚBLICA DA LOJA
 app.use("/sitemap.xml", sitemapRoute);
 
 // Health check
