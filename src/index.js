@@ -31,6 +31,7 @@ const { startCityPredictionWorker } = require("./workers/city_prediction.worker"
 const { startEventSchedulerWorker } = require("./workers/event_scheduler.worker");
 const { startEventBannerWorker } = require("./workers/event_banner.worker");
 const { startEventBroadcastWorker } = require("./workers/event_broadcast.worker");
+const { startEventFailSafeWorker } = require("./workers/event_fail_safe.worker");
 
 // Worker opcional de SEO
 let startSeoWorker;
@@ -80,6 +81,7 @@ async function startServer() {
         startEventSchedulerWorker();
         startEventBannerWorker();
         startEventBroadcastWorker();
+        startEventFailSafeWorker();
 
         if (startSeoWorker) {
           startSeoWorker();
