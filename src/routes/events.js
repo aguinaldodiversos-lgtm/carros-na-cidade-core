@@ -1,8 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const { Pool } = require("pg");
-
-// ajuste do middleware
 const auth = require("../middlewares/auth");
 
 const pool = new Pool({
@@ -42,13 +40,14 @@ router.get("/my-events", auth, async (req, res) => {
 });
 
 /* =====================================================
-   APROVAR BANNER
+   RELATÓRIO DO EVENTO
 ===================================================== */
-router.post("/:id/approve-banner", auth, async (req, res) => {
+router.get("/:id/report", auth, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
 
+    // validar se o evento pertence ao lojista
     const check = await pool.query(`
       SELECT e.id
       FROM events e
@@ -61,50 +60,32 @@ router.post("/:id/approve-banner", auth, async (req, res) => {
       return res.status(403).json({ error: "Evento não autorizado" });
     }
 
-    await pool.query(`
-      UPDATE events
-      SET banner_status = 'approved'
-      WHERE id = $1
+    // métricas agregadas
+    const metrics = await pool.query(`
+      SELECT
+        metric_type,
+        SUM(value) AS total
+      FROM event_metrics
+      WHERE event_id = $1
+      GROUP BY metric_type
     `, [id]);
 
-    res.json({ success: true });
+    const data = {
+      views: 0,
+      clicks: 0,
+      whatsapp: 0,
+    };
+
+    metrics.rows.forEach((m) => {
+      if (m.metric_type === "event_view") data.views = Number(m.total);
+      if (m.metric_type === "event_click") data.clicks = Number(m.total);
+      if (m.metric_type === "event_whatsapp") data.whatsapp = Number(m.total);
+    });
+
+    res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erro ao aprovar banner" });
-  }
-});
-
-/* =====================================================
-   REJEITAR BANNER
-===================================================== */
-router.post("/:id/reject-banner", auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-
-    const check = await pool.query(`
-      SELECT e.id
-      FROM events e
-      JOIN advertisers a ON a.id = e.advertiser_id
-      WHERE e.id = $1
-      AND a.user_id = $2
-    `, [id, userId]);
-
-    if (check.rowCount === 0) {
-      return res.status(403).json({ error: "Evento não autorizado" });
-    }
-
-    await pool.query(`
-      UPDATE events
-      SET banner_status = 'rejected',
-          banner_url = NULL
-      WHERE id = $1
-    `, [id]);
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erro ao rejeitar banner" });
+    res.status(500).json({ error: "Erro ao gerar relatório" });
   }
 });
 
