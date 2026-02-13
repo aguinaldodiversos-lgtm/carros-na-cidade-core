@@ -1,7 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { Pool } = require("pg");
-const { authenticate } = require("../middlewares/auth");
+
+// ajuste do middleware
+const auth = require("../middlewares/auth");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,7 +13,7 @@ const pool = new Pool({
 /* =====================================================
    LISTAR EVENTOS DO LOJISTA
 ===================================================== */
-router.get("/my-events", authenticate, async (req, res) => {
+router.get("/my-events", auth, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -42,12 +44,11 @@ router.get("/my-events", authenticate, async (req, res) => {
 /* =====================================================
    APROVAR BANNER
 ===================================================== */
-router.post("/:id/approve-banner", authenticate, async (req, res) => {
+router.post("/:id/approve-banner", auth, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // garantir que o evento pertence ao usuário
     const check = await pool.query(`
       SELECT e.id
       FROM events e
@@ -76,7 +77,7 @@ router.post("/:id/approve-banner", authenticate, async (req, res) => {
 /* =====================================================
    REJEITAR BANNER
 ===================================================== */
-router.post("/:id/reject-banner", authenticate, async (req, res) => {
+router.post("/:id/reject-banner", auth, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
