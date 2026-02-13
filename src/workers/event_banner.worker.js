@@ -11,77 +11,131 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function generateBannerText(event) {
-  const prompt = `
-Crie um texto curto para banner de evento automotivo.
+/* =====================================================
+   PROMPT PADRÃO DE BANNER
+===================================================== */
+function buildBannerPrompt(event) {
+  return `
+Crie um banner profissional para um evento automotivo.
 
-Dados:
-Loja: ${event.advertiser_name}
+Regras obrigatórias:
+
+- Texto em português do Brasil
+- Nunca usar mais de 3 cores
+- Nunca usar fontes decorativas
+- Texto sempre alinhado à esquerda
+- Sempre aplicar overlay escuro
+- Nunca usar textos pequenos
+- Sempre usar os dados reais do lojista
+- O nome da loja deve ser o destaque principal
+- Nunca alterar o nome da loja
+- Banner estilo profissional de concessionária
+- Layout limpo e moderno
+
+Dados do evento:
+
+Nome da loja: ${event.advertiser_name}
 Evento: ${event.title}
-Cidade: ${event.city_name}-${event.state}
-Datas: ${event.start_date} a ${event.end_date}
+Cidade: ${event.city_name}
+Datas: ${event.start_date} até ${event.end_date}
 
-Regras:
-- máximo 12 palavras
-- tom comercial
-- objetivo: atrair clientes
+Layout desejado:
+
+- Formato 16:9
+- Fundo com carro ou concessionária
+- Texto à esquerda
+- Hierarquia:
+  1) Etiqueta do evento
+  2) Nome da loja em destaque
+  3) Subtítulo do evento
+  4) Datas
+  5) Botão visual "Ver ofertas"
+
+Estilo:
+
+- moderno
+- limpo
+- profissional
+- automotivo
+- alto contraste
 `;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.6,
-  });
-
-  return response.choices[0].message.content.trim();
 }
 
+/* =====================================================
+   GERAÇÃO DE BANNER
+===================================================== */
+async function generateBanner(event) {
+  try {
+    const prompt = buildBannerPrompt(event);
+
+    const response = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size: "1792x1024",
+    });
+
+    const imageUrl = response.data[0].url;
+    return imageUrl;
+  } catch (err) {
+    console.error("Erro ao gerar banner:", err.message);
+    return null;
+  }
+}
+
+/* =====================================================
+   WORKER PRINCIPAL
+===================================================== */
 async function runEventBannerWorker() {
   try {
     console.log("🖼️ Rodando Event Banner Worker...");
 
-    const events = await pool.query(`
+    const result = await pool.query(`
       SELECT
         e.id,
         e.title,
         e.start_date,
         e.end_date,
+        e.banner_status,
         a.name AS advertiser_name,
-        c.name AS city_name,
-        c.state
+        c.name AS city_name
       FROM events e
       JOIN advertisers a ON a.id = e.advertiser_id
       JOIN cities c ON c.id = e.city_id
-      WHERE e.status = 'waiting_banner'
-      AND e.banner_status = 'pending'
-      LIMIT 10
+      WHERE e.status = 'paid'
+      AND (e.banner_url IS NULL OR e.banner_status = 'pending')
+      LIMIT 5
     `);
 
-    for (const event of events.rows) {
-      const text = await generateBannerText(event);
+    for (const event of result.rows) {
+      console.log(`🎨 Gerando banner para evento ${event.id}`);
+
+      const bannerUrl = await generateBanner(event);
+
+      if (!bannerUrl) continue;
 
       await pool.query(
         `
         UPDATE events
         SET
-          banner_text = $1,
+          banner_url = $1,
           banner_status = 'generated'
         WHERE id = $2
         `,
-        [text, event.id]
+        [bannerUrl, event.id]
       );
 
-      console.log(`Banner gerado para evento ${event.id}`);
+      console.log(`✅ Banner gerado para evento ${event.id}`);
     }
-
-    console.log("✅ Event Banner Worker finalizado");
   } catch (err) {
-    console.error("Erro no event banner worker:", err);
+    console.error("Erro no Event Banner Worker:", err);
   }
 }
 
+/* =====================================================
+   START
+===================================================== */
 function startEventBannerWorker() {
-  setInterval(runEventBannerWorker, 60 * 1000);
+  setInterval(runEventBannerWorker, 5 * 60 * 1000);
   runEventBannerWorker();
 }
 
