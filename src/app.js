@@ -8,7 +8,9 @@ const paymentRoutes = require("./routes/payments");
 const sitemapRoute = require("./routes/sitemap");
 const alertRoutes = require("./routes/alerts");
 const analyticsRoutes = require("./routes/analytics");
-const autopilotRoutes = require("./routes/autopilot"); // NOVA ROTA
+const autopilotRoutes = require("./routes/autopilot");
+const eventsRoutes = require("./routes/events");
+const adminEventsRoutes = require("./routes/admin.events"); // NOVA ROTA ADMIN
 
 const app = express();
 
@@ -39,7 +41,9 @@ app.use("/api/alerts", alertRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use("/api/autopilot", autopilotRoutes); // NOVO ENDPOINT
+app.use("/api/autopilot", autopilotRoutes);
+app.use("/api/events", eventsRoutes);
+app.use("/api/admin/events", adminEventsRoutes); // ROTA ADMINISTRATIVA
 app.use("/sitemap.xml", sitemapRoute);
 
 // Health check
