@@ -9,7 +9,14 @@ const brandController = require('../../controllers/ads/brand.controller');
 const modelController = require('../../controllers/ads/model.controller');
 const searchController = require('../../controllers/ads/search.controller');
 
+const { Pool } = require("pg");
+
 const router = express.Router();
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 /* =====================================================
    ROTAS DE BUSCA
@@ -27,16 +34,12 @@ router.get('/', listController);
 router.get('/carro/:slug', showController);
 
 /* =====================================================
-   ROTAS SEO
+   MELHORES OFERTAS DA CIDADE
 ===================================================== */
 
-// SEO por cidade
-router.get('/cidade/:city-:state', cityController);
+router.get('/best-deals', async (req, res) => {
+  try {
+    const { city, limit = 10 } = req.query;
 
-// SEO por marca
-router.get('/cidade/:city-:state/:brand', brandController);
-
-// SEO por modelo
-router.get('/cidade/:city-:state/:brand/:model', modelController);
-
-module.exports = router;
+    if (!city) {
+      return res.status(400).json({ er
