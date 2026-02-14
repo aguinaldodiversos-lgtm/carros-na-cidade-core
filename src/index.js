@@ -1,55 +1,96 @@
-const express = require("express");
-const router = express.Router();
-const { Pool } = require("pg");
+require("dotenv").config();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+const app = require("./app");
+const runMigrations = require("./database/migrate");
 
 /* =====================================================
-   LISTAGEM DE ANÚNCIOS COM SELO FIPE
+   WORKERS
 ===================================================== */
-router.get("/", async (req, res) => {
+
+// Estratégia e inteligência
+const { startStrategyWorker } = require("./workers/strategy.worker");
+const { startAutopilotWorker } = require("./workers/autopilot.worker");
+const { startOpportunityEngine } = require("./workers/opportunity_engine");
+
+// Aquisição e crescimento
+const { startDealerAcquisitionWorker } = require("./workers/dealer_acquisition.worker");
+const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
+
+// Social e campanhas
+const { startSocialPresenceWorker } = require("./workers/social_presence.worker");
+const { startSocialPublisherWorker } = require("./workers/social_publisher.worker");
+
+// Mensagens e notificações
+const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
+const { startNotificationWorker } = require("./workers/notification.worker");
+
+// SEO
+let startSeoWorker;
+try {
+  ({ startSeoWorker } = require("./workers/seo.worker"));
+} catch {
+  console.warn("⚠️ SEO worker não encontrado, ignorando...");
+}
+
+// Banner de eventos
+let startBannerWorker;
+try {
+  ({ startBannerWorker } = require("./workers/banner_generator.worker"));
+} catch {
+  console.warn("⚠️ Banner worker não encontrado, ignorando...");
+}
+
+/* =====================================================
+   START DO SERVIDOR
+===================================================== */
+const PORT = process.env.PORT || 3000;
+
+async function startServer() {
   try {
-    const { city, limit = 20 } = req.query;
+    console.log("🔧 Rodando migrations...");
+    await runMigrations();
+    console.log("✅ Migrations concluídas.");
 
-    let query = `
-      SELECT
-        a.*,
-        fc.price AS fipe_price,
-        CASE
-          WHEN fc.price IS NOT NULL
-           AND a.price <= fc.price * 0.95
-          THEN true
-          ELSE false
-        END AS below_fipe
-      FROM ads a
-      LEFT JOIN fipe_cache fc
-        ON fc.brand = a.brand
-       AND fc.model = a.model
-       AND fc.year = a.year
-    `;
+    app.listen(PORT, () => {
+      console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
 
-    const values = [];
+      try {
+        // Inteligência central
+        startStrategyWorker();
+        startAutopilotWorker();
+        startOpportunityEngine();
 
-    if (city) {
-      values.push(city);
-      query += ` WHERE a.city = $1 `;
-    }
+        // Aquisição
+        startDealerAcquisitionWorker();
+        startLeadScoringWorker();
 
-    query += `
-      ORDER BY a.created_at DESC
-      LIMIT ${Number(limit)}
-    `;
+        // Social
+        startSocialPresenceWorker();
+        startSocialPublisherWorker();
 
-    const result = await pool.query(query, values);
+        // Mensagens
+        startMessageGeneratorWorker();
+        startNotificationWorker();
 
-    res.json(result.rows);
+        // SEO
+        if (startSeoWorker) {
+          startSeoWorker();
+        }
+
+        // Banner de eventos
+        if (startBannerWorker) {
+          startBannerWorker();
+        }
+
+        console.log("🚀 Todos os workers iniciados");
+      } catch (err) {
+        console.error("Erro ao iniciar workers:", err);
+      }
+    });
   } catch (err) {
-    console.error("Erro ao listar anúncios:", err);
-    res.status(500).json({ error: "Erro ao listar anúncios" });
+    console.error("Erro ao iniciar servidor:", err);
+    process.exit(1);
   }
-});
+}
 
-module.exports = router;
+startServer();
