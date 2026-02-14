@@ -4,48 +4,83 @@ const app = require("./app");
 const runMigrations = require("./database/migrate");
 
 /* =====================================================
-   WORKERS
+   WORKERS COM LOAD SEGURO
 ===================================================== */
 
-// Estratégia e inteligência
-const { startStrategyWorker } = require("./workers/strategy.worker");
-const { startAutopilotWorker } = require("./workers/autopilot.worker");
-const { startOpportunityEngine } = require("./workers/opportunity_engine");
-
-// Aquisição e crescimento
-const { startDealerAcquisitionWorker } = require("./workers/dealer_acquisition.worker");
-const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
-
-// Social e campanhas
-const { startSocialPresenceWorker } = require("./workers/social_presence.worker");
-const { startSocialPublisherWorker } = require("./workers/social_publisher.worker");
-
-// Mensagens e notificações
-const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
-const { startNotificationWorker } = require("./workers/notification.worker");
-
-// Eventos
-let startBannerWorker;
-try {
-  ({ startBannerWorker } = require("./workers/banner_generator.worker"));
-} catch {
-  console.warn("⚠️ Banner worker não encontrado, ignorando...");
+function safeRequire(path, label) {
+  try {
+    return require(path);
+  } catch (err) {
+    console.warn(`⚠️ ${label} não encontrado, ignorando...`);
+    return {};
+  }
 }
 
-let startEventDispatchWorker;
-try {
-  ({ startEventDispatchWorker } = require("./workers/event_dispatch.worker"));
-} catch {
-  console.warn("⚠️ Event dispatch worker não encontrado, ignorando...");
-}
+// Inteligência
+const { startStrategyWorker } = safeRequire(
+  "./workers/strategy.worker",
+  "Strategy worker"
+);
+
+const { startAutopilotWorker } = safeRequire(
+  "./workers/autopilot.worker",
+  "Autopilot worker"
+);
+
+const { startOpportunityEngine } = safeRequire(
+  "./workers/opportunity_engine",
+  "Opportunity engine"
+);
+
+// Aquisição
+const { startDealerAcquisitionWorker } = safeRequire(
+  "./workers/dealer_acquisition.worker",
+  "Dealer acquisition worker"
+);
+
+const { startLeadScoringWorker } = safeRequire(
+  "./workers/lead_scoring.worker",
+  "Lead scoring worker"
+);
+
+// Social
+const { startSocialPresenceWorker } = safeRequire(
+  "./workers/social_presence.worker",
+  "Social presence worker"
+);
+
+const { startSocialPublisherWorker } = safeRequire(
+  "./workers/social_publisher.worker",
+  "Social publisher worker"
+);
+
+// Mensagens
+const { startMessageGeneratorWorker } = safeRequire(
+  "./workers/message_generator.worker",
+  "Message generator worker"
+);
+
+const { startNotificationWorker } = safeRequire(
+  "./workers/notification.worker",
+  "Notification worker"
+);
 
 // SEO
-let startSeoWorker;
-try {
-  ({ startSeoWorker } = require("./workers/seo.worker"));
-} catch {
-  console.warn("⚠️ SEO worker não encontrado, ignorando...");
-}
+const { startSeoWorker } = safeRequire(
+  "./workers/seo.worker",
+  "SEO worker"
+);
+
+// Eventos
+const { startBannerWorker } = safeRequire(
+  "./workers/banner_generator.worker",
+  "Banner worker"
+);
+
+const { startEventDispatchWorker } = safeRequire(
+  "./workers/event_dispatch.worker",
+  "Event dispatch worker"
+);
 
 /* =====================================================
    START DO SERVIDOR
@@ -62,38 +97,25 @@ async function startServer() {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
 
       try {
-        // Inteligência central
-        startStrategyWorker();
-        startAutopilotWorker();
-        startOpportunityEngine();
+        startStrategyWorker && startStrategyWorker();
+        startAutopilotWorker && startAutopilotWorker();
+        startOpportunityEngine && startOpportunityEngine();
 
-        // Aquisição
-        startDealerAcquisitionWorker();
-        startLeadScoringWorker();
+        startDealerAcquisitionWorker && startDealerAcquisitionWorker();
+        startLeadScoringWorker && startLeadScoringWorker();
 
-        // Social
-        startSocialPresenceWorker();
-        startSocialPublisherWorker();
+        startSocialPresenceWorker && startSocialPresenceWorker();
+        startSocialPublisherWorker && startSocialPublisherWorker();
 
-        // Mensagens
-        startMessageGeneratorWorker();
-        startNotificationWorker();
+        startMessageGeneratorWorker && startMessageGeneratorWorker();
+        startNotificationWorker && startNotificationWorker();
 
-        // SEO
-        if (startSeoWorker) {
-          startSeoWorker();
-        }
+        startSeoWorker && startSeoWorker();
 
-        // Eventos
-        if (startBannerWorker) {
-          startBannerWorker();
-        }
+        startBannerWorker && startBannerWorker();
+        startEventDispatchWorker && startEventDispatchWorker();
 
-        if (startEventDispatchWorker) {
-          startEventDispatchWorker();
-        }
-
-        console.log("🚀 Todos os workers iniciados");
+        console.log("🚀 Workers iniciados");
       } catch (err) {
         console.error("Erro ao iniciar workers:", err);
       }
