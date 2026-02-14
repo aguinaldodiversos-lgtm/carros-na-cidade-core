@@ -24,20 +24,27 @@ const { startSocialPublisherWorker } = require("./workers/social_publisher.worke
 const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
 const { startNotificationWorker } = require("./workers/notification.worker");
 
+// Eventos
+let startBannerWorker;
+try {
+  ({ startBannerWorker } = require("./workers/banner_generator.worker"));
+} catch {
+  console.warn("⚠️ Banner worker não encontrado, ignorando...");
+}
+
+let startEventDispatchWorker;
+try {
+  ({ startEventDispatchWorker } = require("./workers/event_dispatch.worker"));
+} catch {
+  console.warn("⚠️ Event dispatch worker não encontrado, ignorando...");
+}
+
 // SEO
 let startSeoWorker;
 try {
   ({ startSeoWorker } = require("./workers/seo.worker"));
 } catch {
   console.warn("⚠️ SEO worker não encontrado, ignorando...");
-}
-
-// Banner de eventos
-let startBannerWorker;
-try {
-  ({ startBannerWorker } = require("./workers/banner_generator.worker"));
-} catch {
-  console.warn("⚠️ Banner worker não encontrado, ignorando...");
 }
 
 /* =====================================================
@@ -77,9 +84,13 @@ async function startServer() {
           startSeoWorker();
         }
 
-        // Banner de eventos
+        // Eventos
         if (startBannerWorker) {
           startBannerWorker();
+        }
+
+        if (startEventDispatchWorker) {
+          startEventDispatchWorker();
         }
 
         console.log("🚀 Todos os workers iniciados");
