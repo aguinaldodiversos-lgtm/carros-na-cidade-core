@@ -4,89 +4,24 @@ const app = require("./app");
 const runMigrations = require("./database/migrate");
 
 /* =====================================================
-   WORKERS COM LOAD SEGURO
+   IMPORTAÇÃO DOS WORKERS
 ===================================================== */
+const { startStrategyWorker } = require("./workers/strategy.worker");
+const { startAutopilotWorker } = require("./workers/autopilot.worker");
+const { startSeoWorker } = require("./workers/seo.worker");
+const { startOpportunityEngine } = require("./workers/opportunity_engine");
+const { startDealerAcquisitionWorker } = require("./workers/dealer_acquisition.worker");
+const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
+const { startSocialPublisherWorker } = require("./workers/social_publisher.worker");
+const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
+const { startEventBannerWorker } = require("./workers/event_banner.worker");
+const { startEventDispatchWorker } = require("./workers/event_dispatch.worker");
 
-function safeRequire(path, label) {
-  try {
-    return require(path);
-  } catch (err) {
-    console.warn(`⚠️ ${label} não encontrado, ignorando...`);
-    return {};
-  }
-}
-
-// Inteligência
-const { startStrategyWorker } = safeRequire(
-  "./workers/strategy.worker",
-  "Strategy worker"
-);
-
-const { startAutopilotWorker } = safeRequire(
-  "./workers/autopilot.worker",
-  "Autopilot worker"
-);
-
-const { startOpportunityEngine } = safeRequire(
-  "./workers/opportunity_engine",
-  "Opportunity engine"
-);
-
-// Aquisição
-const { startDealerAcquisitionWorker } = safeRequire(
-  "./workers/dealer_acquisition.worker",
-  "Dealer acquisition worker"
-);
-
-const { startLeadScoringWorker } = safeRequire(
-  "./workers/lead_scoring.worker",
-  "Lead scoring worker"
-);
-
-// Social
-const { startSocialPresenceWorker } = safeRequire(
-  "./workers/social_presence.worker",
-  "Social presence worker"
-);
-
-const { startSocialPublisherWorker } = safeRequire(
-  "./workers/social_publisher.worker",
-  "Social publisher worker"
-);
-
-// Mensagens
-const { startMessageGeneratorWorker } = safeRequire(
-  "./workers/message_generator.worker",
-  "Message generator worker"
-);
-
-const { startNotificationWorker } = safeRequire(
-  "./workers/notification.worker",
-  "Notification worker"
-);
-
-// SEO
-const { startSeoWorker } = safeRequire(
-  "./workers/seo.worker",
-  "SEO worker"
-);
-
-// Eventos
-const { startBannerWorker } = safeRequire(
-  "./workers/banner_generator.worker",
-  "Banner worker"
-);
-
-const { startEventDispatchWorker } = safeRequire(
-  "./workers/event_dispatch.worker",
-  "Event dispatch worker"
-);
+const PORT = process.env.PORT || 3000;
 
 /* =====================================================
    START DO SERVIDOR
 ===================================================== */
-const PORT = process.env.PORT || 3000;
-
 async function startServer() {
   try {
     console.log("🔧 Rodando migrations...");
@@ -96,32 +31,30 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
 
+      /* =====================================================
+         INICIALIZAÇÃO DOS WORKERS
+      ===================================================== */
       try {
-        startStrategyWorker && startStrategyWorker();
-        startAutopilotWorker && startAutopilotWorker();
-        startOpportunityEngine && startOpportunityEngine();
+        console.log("🚀 Iniciando workers...");
 
-        startDealerAcquisitionWorker && startDealerAcquisitionWorker();
-        startLeadScoringWorker && startLeadScoringWorker();
+        startStrategyWorker();
+        startAutopilotWorker();
+        startSeoWorker();
+        startOpportunityEngine();
+        startDealerAcquisitionWorker();
+        startLeadScoringWorker();
+        startSocialPublisherWorker();
+        startMessageGeneratorWorker();
+        startEventBannerWorker();     // Geração de banner de eventos
+        startEventDispatchWorker();   // Disparo automático
 
-        startSocialPresenceWorker && startSocialPresenceWorker();
-        startSocialPublisherWorker && startSocialPublisherWorker();
-
-        startMessageGeneratorWorker && startMessageGeneratorWorker();
-        startNotificationWorker && startNotificationWorker();
-
-        startSeoWorker && startSeoWorker();
-
-        startBannerWorker && startBannerWorker();
-        startEventDispatchWorker && startEventDispatchWorker();
-
-        console.log("🚀 Workers iniciados");
+        console.log("✅ Todos os workers iniciados");
       } catch (err) {
-        console.error("Erro ao iniciar workers:", err);
+        console.error("❌ Erro ao iniciar workers:", err);
       }
     });
   } catch (err) {
-    console.error("Erro ao iniciar servidor:", err);
+    console.error("❌ Erro ao iniciar servidor:", err);
     process.exit(1);
   }
 }
