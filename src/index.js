@@ -3,14 +3,33 @@ require("dotenv").config();
 const app = require("./app");
 const runMigrations = require("./database/migrate");
 
-/* =====================================================
-   IMPORTAÇÃO DOS WORKERS
-===================================================== */
-const { startStrategyWorker } = require("./workers/strategy.worker");
-const { startAutopilotWorker } = require("./workers/autopilot.worker");
-const { startSeoWorker } = require("./workers/seo.worker");
+const PORT = process.env.PORT || 3000;
 
-// Opportunity engine pode ter nome diferente
+/* =====================================================
+   IMPORTAÇÃO SEGURA DOS WORKERS
+===================================================== */
+
+let startStrategyWorker;
+try {
+  ({ startStrategyWorker } = require("./workers/strategy.worker"));
+} catch {
+  console.warn("⚠️ Strategy worker não encontrado, ignorando...");
+}
+
+let startAutopilotWorker;
+try {
+  ({ startAutopilotWorker } = require("./workers/autopilot.worker"));
+} catch {
+  console.warn("⚠️ Autopilot worker não encontrado, ignorando...");
+}
+
+let startSeoWorker;
+try {
+  ({ startSeoWorker } = require("./workers/seo.worker"));
+} catch {
+  console.warn("⚠️ SEO worker não encontrado, ignorando...");
+}
+
 let startOpportunityEngine;
 try {
   ({ startOpportunityEngine } = require("./workers/opportunity_engine"));
@@ -18,23 +37,19 @@ try {
   console.warn("⚠️ Opportunity engine não encontrado, ignorando...");
 }
 
-// Event workers
 let startEventBannerWorker;
-let startEventDispatchWorker;
-
 try {
   ({ startEventBannerWorker } = require("./workers/event_banner.worker"));
 } catch {
   console.warn("⚠️ Event banner worker não encontrado, ignorando...");
 }
 
+let startEventDispatchWorker;
 try {
   ({ startEventDispatchWorker } = require("./workers/event_dispatch.worker"));
 } catch {
   console.warn("⚠️ Event dispatch worker não encontrado, ignorando...");
 }
-
-const PORT = process.env.PORT || 3000;
 
 /* =====================================================
    START DO SERVIDOR
@@ -51,21 +66,12 @@ async function startServer() {
       try {
         console.log("🚀 Iniciando workers...");
 
-        startStrategyWorker();
-        startAutopilotWorker();
-        startSeoWorker();
-
-        if (startOpportunityEngine) {
-          startOpportunityEngine();
-        }
-
-        if (startEventBannerWorker) {
-          startEventBannerWorker();
-        }
-
-        if (startEventDispatchWorker) {
-          startEventDispatchWorker();
-        }
+        if (startStrategyWorker) startStrategyWorker();
+        if (startAutopilotWorker) startAutopilotWorker();
+        if (startSeoWorker) startSeoWorker();
+        if (startOpportunityEngine) startOpportunityEngine();
+        if (startEventBannerWorker) startEventBannerWorker();
+        if (startEventDispatchWorker) startEventDispatchWorker();
 
         console.log("✅ Workers iniciados");
       } catch (err) {
