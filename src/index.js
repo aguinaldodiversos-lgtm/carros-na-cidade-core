@@ -9,13 +9,30 @@ const runMigrations = require("./database/migrate");
 const { startStrategyWorker } = require("./workers/strategy.worker");
 const { startAutopilotWorker } = require("./workers/autopilot.worker");
 const { startSeoWorker } = require("./workers/seo.worker");
-const { startOpportunityEngine } = require("./workers/opportunity_engine");
-const { startDealerAcquisitionWorker } = require("./workers/dealer_acquisition.worker");
-const { startLeadScoringWorker } = require("./workers/lead_scoring.worker");
-const { startSocialPublisherWorker } = require("./workers/social_publisher.worker");
-const { startMessageGeneratorWorker } = require("./workers/message_generator.worker");
-const { startEventBannerWorker } = require("./workers/event_banner.worker");
-const { startEventDispatchWorker } = require("./workers/event_dispatch.worker");
+
+// Opportunity engine pode ter nome diferente
+let startOpportunityEngine;
+try {
+  ({ startOpportunityEngine } = require("./workers/opportunity_engine"));
+} catch {
+  console.warn("⚠️ Opportunity engine não encontrado, ignorando...");
+}
+
+// Event workers
+let startEventBannerWorker;
+let startEventDispatchWorker;
+
+try {
+  ({ startEventBannerWorker } = require("./workers/event_banner.worker"));
+} catch {
+  console.warn("⚠️ Event banner worker não encontrado, ignorando...");
+}
+
+try {
+  ({ startEventDispatchWorker } = require("./workers/event_dispatch.worker"));
+} catch {
+  console.warn("⚠️ Event dispatch worker não encontrado, ignorando...");
+}
 
 const PORT = process.env.PORT || 3000;
 
@@ -31,24 +48,26 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
 
-      /* =====================================================
-         INICIALIZAÇÃO DOS WORKERS
-      ===================================================== */
       try {
         console.log("🚀 Iniciando workers...");
 
         startStrategyWorker();
         startAutopilotWorker();
         startSeoWorker();
-        startOpportunityEngine();
-        startDealerAcquisitionWorker();
-        startLeadScoringWorker();
-        startSocialPublisherWorker();
-        startMessageGeneratorWorker();
-        startEventBannerWorker();     // Geração de banner de eventos
-        startEventDispatchWorker();   // Disparo automático
 
-        console.log("✅ Todos os workers iniciados");
+        if (startOpportunityEngine) {
+          startOpportunityEngine();
+        }
+
+        if (startEventBannerWorker) {
+          startEventBannerWorker();
+        }
+
+        if (startEventDispatchWorker) {
+          startEventDispatchWorker();
+        }
+
+        console.log("✅ Workers iniciados");
       } catch (err) {
         console.error("❌ Erro ao iniciar workers:", err);
       }
