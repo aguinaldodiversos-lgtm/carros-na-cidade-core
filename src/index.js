@@ -69,4 +69,73 @@ try {
 
 let startDealerReportWorker;
 try {
+  ({ startDealerReportWorker } = require("./workers/dealer_report.worker"));
+} catch {
+  console.warn("⚠️ Dealer report worker não encontrado, ignorando...");
+}
+
+let startCityRadarWorker;
+try {
+  ({ startCityRadarWorker } = require("./workers/city_radar.worker"));
+} catch {
+  console.warn("⚠️ City radar worker não encontrado, ignorando...");
+}
+
+let startGoogleDealerCollectorWorker;
+try {
   ({
+    startGoogleDealerCollectorWorker,
+  } = require("./workers/google_dealer_collector.worker"));
+} catch {
+  console.warn("⚠️ Google dealer collector não encontrado, ignorando...");
+}
+
+/* =====================================================
+   START DO SERVIDOR
+===================================================== */
+async function startServer() {
+  try {
+    console.log("🔧 Rodando migrations...");
+    await runMigrations();
+    console.log("✅ Migrations concluídas.");
+
+    app.listen(PORT, () => {
+      console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
+
+      try {
+        console.log("🚀 Iniciando workers...");
+
+        if (startStrategyWorker) startStrategyWorker();
+        if (startAutopilotWorker) startAutopilotWorker();
+        if (startSeoWorker) startSeoWorker();
+        if (startOpportunityEngine) startOpportunityEngine();
+        if (startEventBannerWorker) startEventBannerWorker();
+        if (startEventDispatchWorker) startEventDispatchWorker();
+        if (startDealerAcquisitionWorker)
+          startDealerAcquisitionWorker();
+        if (startCityMetricsWorker) startCityMetricsWorker();
+        if (startDealerReportWorker) startDealerReportWorker();
+        if (startCityRadarWorker) startCityRadarWorker();
+        if (startGoogleDealerCollectorWorker)
+          startGoogleDealerCollectorWorker();
+
+        // Worker de WhatsApp (fila)
+        try {
+          require("./workers/whatsapp.worker");
+          console.log("📲 WhatsApp worker carregado");
+        } catch {
+          console.warn("⚠️ WhatsApp worker não encontrado, ignorando...");
+        }
+
+        console.log("✅ Workers iniciados");
+      } catch (err) {
+        console.error("❌ Erro ao iniciar workers:", err);
+      }
+    });
+  } catch (err) {
+    console.error("❌ Erro ao iniciar servidor:", err);
+    process.exit(1);
+  }
+}
+
+startServer();
