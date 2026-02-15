@@ -73,6 +73,14 @@ async function startServer() {
         if (startEventBannerWorker) startEventBannerWorker();
         if (startEventDispatchWorker) startEventDispatchWorker();
 
+        // Novo worker de WhatsApp (fila)
+        try {
+          require("./workers/whatsapp.worker");
+          console.log("📲 WhatsApp worker carregado");
+        } catch {
+          console.warn("⚠️ WhatsApp worker não encontrado, ignorando...");
+        }
+
         console.log("✅ Workers iniciados");
       } catch (err) {
         console.error("❌ Erro ao iniciar workers:", err);
