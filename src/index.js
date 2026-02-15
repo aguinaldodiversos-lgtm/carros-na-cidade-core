@@ -51,6 +51,15 @@ try {
   console.warn("⚠️ Event dispatch worker não encontrado, ignorando...");
 }
 
+let startDealerAcquisitionWorker;
+try {
+  ({
+    startDealerAcquisitionWorker,
+  } = require("./workers/dealer_acquisition.worker"));
+} catch {
+  console.warn("⚠️ Dealer acquisition worker não encontrado, ignorando...");
+}
+
 /* =====================================================
    START DO SERVIDOR
 ===================================================== */
@@ -72,8 +81,9 @@ async function startServer() {
         if (startOpportunityEngine) startOpportunityEngine();
         if (startEventBannerWorker) startEventBannerWorker();
         if (startEventDispatchWorker) startEventDispatchWorker();
+        if (startDealerAcquisitionWorker) startDealerAcquisitionWorker();
 
-        // Novo worker de WhatsApp (fila)
+        // Worker de WhatsApp (fila)
         try {
           require("./workers/whatsapp.worker");
           console.log("📲 WhatsApp worker carregado");
