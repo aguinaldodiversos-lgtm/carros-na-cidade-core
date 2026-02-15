@@ -1,6 +1,11 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
+const {
+  calcularOportunidade,
+  classificarOportunidade,
+} = require("../services/strategy/opportunity.service");
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -20,7 +25,7 @@ async function runOpportunityEngine() {
     for (const city of cities) {
       const cityId = city.id;
 
-      // 2) Calcular demanda (alertas ativos)
+      // 2) Calcular alertas (demanda)
       const demandResult = await pool.query(
         `
         SELECT COUNT(*)::int AS demand
@@ -30,9 +35,9 @@ async function runOpportunityEngine() {
         [cityId]
       );
 
-      const demand = demandResult.rows[0].demand || 0;
+      const alertDemand = demandResult.rows[0].demand || 0;
 
-      // 3) Calcular oferta (anúncios ativos)
+      // 3) Calcular anúncios ativos (oferta)
       const supplyResult = await pool.query(
         `
         SELECT COUNT(*)::int AS supply
@@ -45,17 +50,21 @@ async function runOpportunityEngine() {
 
       const supply = supplyResult.rows[0].supply || 0;
 
-      // 4) Calcular score
-      const opportunityScore = demand - supply;
+      // 4) Simular concorrência (por enquanto fixo)
+      // Depois pode vir de scraping ou API externa
+      const concorrenciaEstimado = 10;
 
-      // 5) Definir prioridade
-      let priority = "low";
+      // 5) Calcular score com lógica estratégica
+      const score = calcularOportunidade({
+        buscas: 0,
+        alertas: alertDemand,
+        total_anuncios: supply,
+        concorrentes_estimados: concorrenciaEstimado,
+      });
 
-      if (opportunityScore >= 50) priority = "critical";
-      else if (opportunityScore >= 20) priority = "high";
-      else if (opportunityScore >= 5) priority = "medium";
+      const priority = classificarOportunidade(score);
 
-      // 6) Inserir registro
+      // 6) Upsert na tabela
       await pool.query(
         `
         INSERT INTO city_opportunities (
@@ -63,11 +72,25 @@ async function runOpportunityEngine() {
           demand_index,
           supply_index,
           opportunity_score,
-          priority_level
+          priority_level,
+          updated_at
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        ON CONFLICT (city_id)
+        DO UPDATE SET
+          demand_index = EXCLUDED.demand_index,
+          supply_index = EXCLUDED.supply_index,
+          opportunity_score = EXCLUDED.opportunity_score,
+          priority_level = EXCLUDED.priority_level,
+          updated_at = NOW()
       `,
-        [cityId, demand, supply, opportunityScore, priority]
+        [cityId, alertDemand, supply, score, priority]
+      );
+
+      console.log(
+        `📊 Cidade ${cityId} → score: ${score.toFixed(
+          2
+        )} | prioridade: ${priority}`
       );
     }
 
