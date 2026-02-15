@@ -6,6 +6,10 @@ const {
   ativarAquisicaoDeLojistas,
 } = require("../services/acquisition/dealerAcquisition.service");
 
+const {
+  criarCampanhaLocal,
+} = require("../services/campaigns/localCampaign.service");
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -13,22 +17,6 @@ const pool = new Pool({
 
 const LEAD_META = 20;
 const ESTOQUE_MINIMO = 30;
-
-/* =====================================================
-   CRIAR CAMPANHA LOCAL
-===================================================== */
-async function criarCampanhaLocal(cidade) {
-  console.log(`📢 Criando campanha local para ${cidade.name}`);
-
-  await pool.query(
-    `
-    INSERT INTO autopilot_campaigns
-    (city_id, type, status, created_at)
-    VALUES ($1, 'local_growth', 'active', NOW())
-    `,
-    [cidade.id]
-  );
-}
 
 /* =====================================================
    PROCESSAR CIDADE
@@ -50,6 +38,7 @@ async function processarCidade(cidade) {
 
     const oportunidade = oppResult.rows[0].priority_level;
 
+    // Só agir em cidades estratégicas
     if (!["critical", "high"].includes(oportunidade)) {
       return;
     }
@@ -59,7 +48,7 @@ async function processarCidade(cidade) {
     // 2) Garantir SEO
     await garantirSEO(cidade, pool);
 
-    // 3) Contar leads
+    // 3) Contar leads (alertas)
     const leadsResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
@@ -71,11 +60,12 @@ async function processarCidade(cidade) {
 
     const totalLeads = leadsResult.rows[0].total || 0;
 
+    // 4) Criar campanha se necessário
     if (totalLeads < LEAD_META) {
-      await criarCampanhaLocal(cidade);
+      await criarCampanhaLocal(cidade, pool);
     }
 
-    // 4) Contar estoque (anúncios)
+    // 5) Contar estoque (anúncios ativos)
     const stockResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
@@ -88,11 +78,12 @@ async function processarCidade(cidade) {
 
     const estoque = stockResult.rows[0].total || 0;
 
+    // 6) Ativar aquisição se estoque baixo
     if (estoque < ESTOQUE_MINIMO) {
       await ativarAquisicaoDeLojistas(cidade, pool);
     }
   } catch (err) {
-    console.error("Erro ao processar cidade:", cidade.name, err);
+    console.error("❌ Erro ao processar cidade:", cidade.name, err);
   }
 }
 
