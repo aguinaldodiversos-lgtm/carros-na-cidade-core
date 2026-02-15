@@ -3,14 +3,13 @@ const axios = require("axios");
 const ZAPI_BASE_URL = "https://api.z-api.io";
 
 /* =====================================================
-   ENV VALIDATION
+   ENV VALIDATION (executada uma vez)
 ===================================================== */
 function validateEnv() {
   const required = [
     "ZAPI_CLIENT_TOKEN",
     "ZAPI_INSTANCE_ID",
     "ZAPI_INSTANCE_TOKEN",
-    "FRONTEND_URL",
   ];
 
   for (const key of required) {
@@ -19,6 +18,9 @@ function validateEnv() {
     }
   }
 }
+
+// Executa validação ao carregar o serviço
+validateEnv();
 
 /* =====================================================
    FORMAT PHONE
@@ -29,17 +31,14 @@ function normalizePhone(phone) {
 
   let digits = phone.replace(/\D/g, "");
 
-  // remove zero inicial comum (ex: 011999999999)
   if (digits.startsWith("0")) {
     digits = digits.slice(1);
   }
 
-  // adiciona DDI Brasil se necessário
   if (!digits.startsWith("55")) {
     digits = "55" + digits;
   }
 
-  // valida tamanho mínimo (DDI + DDD + número)
   if (digits.length < 12) {
     return null;
   }
@@ -48,36 +47,16 @@ function normalizePhone(phone) {
 }
 
 /* =====================================================
-   SEND WHATSAPP ALERT
+   FUNÇÃO BASE DE ENVIO
 ===================================================== */
-async function sendWhatsAppAlert(phone, ad) {
+async function sendWhatsAppMessage(phone, message) {
   try {
-    validateEnv();
-
     const formattedPhone = normalizePhone(phone);
 
     if (!formattedPhone) {
       console.warn("⚠️ Telefone inválido, envio cancelado");
       return false;
     }
-
-    // URL padrão do anúncio
-    const adUrl = ad.slug
-      ? `${process.env.FRONTEND_URL}/anuncio/${ad.slug}`
-      : `${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
-
-    // suporte a mensagem customizada
-    const message =
-      ad.message_override ||
-      `🚗 Novo carro para você:
-
-${ad.brand || ""} ${ad.model || ""}
-Ano: ${ad.year || "-"}
-Preço: R$ ${ad.price}
-Cidade: ${ad.city}
-
-Veja o anúncio:
-${adUrl}`;
 
     const url = `${ZAPI_BASE_URL}/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_INSTANCE_TOKEN}/send-text`;
 
@@ -118,4 +97,48 @@ ${adUrl}`;
   }
 }
 
-module.exports = { sendWhatsAppAlert };
+/* =====================================================
+   ALERTA DE ANÚNCIO (USUÁRIO FINAL)
+===================================================== */
+async function sendWhatsAppAlert(phone, ad) {
+  const adUrl = ad.slug
+    ? `${process.env.FRONTEND_URL}/anuncio/${ad.slug}`
+    : `${process.env.FRONTEND_URL}/anuncio/${ad.id}`;
+
+  const message =
+    ad.message_override ||
+    `🚗 Novo carro para você:
+
+${ad.brand || ""} ${ad.model || ""}
+Ano: ${ad.year || "-"}
+Preço: R$ ${ad.price}
+Cidade: ${ad.city}
+
+Veja o anúncio:
+${adUrl}`;
+
+  return sendWhatsAppMessage(phone, message);
+}
+
+/* =====================================================
+   NOVO: LEAD PARA LOJISTA
+===================================================== */
+async function sendWhatsAppLead(phone, lead) {
+  const message = `
+🚗 Novo comprador interessado!
+
+Nome: ${lead.name}
+Telefone: ${lead.phone}
+Faixa de preço: ${lead.price_range || "não informada"}
+
+Entre em contato o quanto antes.
+`;
+
+  return sendWhatsAppMessage(phone, message);
+}
+
+module.exports = {
+  sendWhatsAppMessage,
+  sendWhatsAppAlert,
+  sendWhatsAppLead,
+};
