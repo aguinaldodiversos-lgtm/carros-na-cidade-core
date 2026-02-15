@@ -15,9 +15,14 @@ async function createAlert(req, res) {
       brand,
       model,
       price_range,
+      urgency,
+      payment_type,
+      usage_type,
+      trade_in,
+      preferred_brand,
+      preferred_model,
     } = req.body;
 
-    // Validação básica
     if (!name || !phone || !city_id) {
       return res.status(400).json({
         error: "Campos obrigatórios: name, phone, city_id",
@@ -28,30 +33,62 @@ async function createAlert(req, res) {
     const result = await pool.query(
       `
       INSERT INTO alerts
-      (name, phone, city_id, brand, model, price_range, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      (
+        name,
+        phone,
+        city_id,
+        brand,
+        model,
+        price_range,
+        urgency,
+        payment_type,
+        usage_type,
+        trade_in,
+        preferred_brand,
+        preferred_model,
+        created_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
       RETURNING *
       `,
-      [name, phone, city_id, brand || null, model || null, price_range || null]
+      [
+        name,
+        phone,
+        city_id,
+        brand || null,
+        model || null,
+        price_range || null,
+        urgency || null,
+        payment_type || null,
+        usage_type || null,
+        trade_in || false,
+        preferred_brand || null,
+        preferred_model || null,
+      ]
     );
 
     const alert = result.rows[0];
 
-    // 2) Distribuir lead automaticamente
+    // 2) Distribuir lead inteligente
     await distribuirLead(
       {
         name: alert.name,
         phone: alert.phone,
         price_range: alert.price_range,
         city_id: alert.city_id,
+        urgency: alert.urgency,
+        payment_type: alert.payment_type,
+        usage_type: alert.usage_type,
+        trade_in: alert.trade_in,
+        preferred_brand: alert.preferred_brand,
+        preferred_model: alert.preferred_model,
       },
       pool
     );
 
-    // 3) Resposta da API
     return res.json({
       success: true,
-      message: "Alerta criado e lead distribuído",
+      message: "Lead criado com sucesso",
       alert,
     });
   } catch (err) {
