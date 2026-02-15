@@ -60,6 +60,13 @@ try {
   console.warn("⚠️ Dealer acquisition worker não encontrado, ignorando...");
 }
 
+let startCityMetricsWorker;
+try {
+  ({ startCityMetricsWorker } = require("./workers/city_metrics.worker"));
+} catch {
+  console.warn("⚠️ City metrics worker não encontrado, ignorando...");
+}
+
 /* =====================================================
    START DO SERVIDOR
 ===================================================== */
@@ -81,7 +88,9 @@ async function startServer() {
         if (startOpportunityEngine) startOpportunityEngine();
         if (startEventBannerWorker) startEventBannerWorker();
         if (startEventDispatchWorker) startEventDispatchWorker();
-        if (startDealerAcquisitionWorker) startDealerAcquisitionWorker();
+        if (startDealerAcquisitionWorker)
+          startDealerAcquisitionWorker();
+        if (startCityMetricsWorker) startCityMetricsWorker();
 
         // Worker de WhatsApp (fila)
         try {
