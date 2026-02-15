@@ -102,19 +102,12 @@ async function startServer() {
       console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
       console.log("🚀 Iniciando workers...");
 
-      // Estratégia
       startWorkerSafe("Strategy Worker", startStrategyWorker);
       startWorkerSafe("Autopilot Worker", startAutopilotWorker);
       startWorkerSafe("Opportunity Engine", startOpportunityEngine);
-
-      // Tráfego
       startWorkerSafe("SEO Worker", startSeoWorker);
-
-      // Eventos
       startWorkerSafe("Event Banner Worker", startEventBannerWorker);
       startWorkerSafe("Event Dispatch Worker", startEventDispatchWorker);
-
-      // Aquisição
       startWorkerSafe(
         "Dealer Acquisition Worker",
         startDealerAcquisitionWorker
@@ -123,16 +116,12 @@ async function startServer() {
         "Google Dealer Collector",
         startGoogleDealerCollectorWorker
       );
-
-      // Métricas
       startWorkerSafe("City Metrics Worker", startCityMetricsWorker);
       startWorkerSafe("Dealer Report Worker", startDealerReportWorker);
       startWorkerSafe("City Radar Worker", startCityRadarWorker);
-
-      // Leads
       startWorkerSafe("Alert Match Worker", startAlertMatchWorker);
 
-      // Worker de WhatsApp (fila)
+      // Worker de WhatsApp
       try {
         require("./workers/whatsapp.worker");
         console.log("✅ WhatsApp Worker iniciado");
@@ -140,7 +129,7 @@ async function startServer() {
         console.warn("⚠️ WhatsApp Worker não encontrado");
       }
 
-      console.log("🏁 Todos os workers processados");
+      console.log("🏁 Workers inicializados");
     });
   } catch (err) {
     console.error("❌ Erro ao iniciar servidor:", err);
