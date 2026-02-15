@@ -121,7 +121,6 @@ async function startServer() {
       startWorkerSafe("City Radar Worker", startCityRadarWorker);
       startWorkerSafe("Alert Match Worker", startAlertMatchWorker);
 
-      // Worker de WhatsApp
       try {
         require("./workers/whatsapp.worker");
         console.log("✅ WhatsApp Worker iniciado");
