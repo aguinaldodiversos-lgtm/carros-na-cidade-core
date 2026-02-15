@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const OpenAI = require("openai");
+const fs = require("fs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,49 +12,41 @@ const openai = new OpenAI({
 });
 
 /* =====================================================
-   PROMPT DO BANNER
+   PROMPT DO BANNER (VERSÃO BARATA E OTIMIZADA)
 ===================================================== */
 function buildBannerPrompt(event) {
   return `
-Gerar um banner publicitário profissional para evento automotivo.
+Crie um banner promocional automotivo.
 
-DADOS DO EVENTO:
-Nome da loja: ${event.store_name}
-Tipo de evento: ${event.event_type}
-Data do evento: ${event.start_date} até ${event.end_date}
-Endereço: ${event.address}
+DADOS:
+Loja: ${event.store_name}
+Evento: ${event.event_type}
 Cidade: ${event.city}
+Data: ${event.start_date} a ${event.end_date}
 
-REGRAS DE DESIGN:
+REGRAS OBRIGATÓRIAS:
 
-- Usar no máximo 3 cores
-- Tipografia moderna e legível
-- Texto alinhado à esquerda
-- Overlay escuro para legibilidade
-- Nome da loja em destaque
-- Textos em português do Brasil
+- Estilo gráfico moderno
+- Flat design
+- Sem efeitos 3D
+- Sem carros realistas
+- Usar silhueta simples de carro
+- No máximo 3 cores
+- Fundo com cor sólida ou gradiente simples
+- Tipografia grande e legível
 - Layout limpo e profissional
+- Texto em português
 
-IMAGEM:
+TEXTO DO BANNER:
 
-Adicionar veículo moderno em destaque.
-Pode ser:
-Mercedes, BMW, Audi, Porsche, Jaguar, Land Rover
-ou veículos populares novos.
+${event.event_type.toUpperCase()}
+${event.store_name}
+${event.city}
+${event.start_date} a ${event.end_date}
 
-ESTRUTURA:
-
-Título grande baseado no tipo de evento
-Subtítulo comercial
-Nome da loja em destaque
-Datas do evento
-Cidade
-
-FORMATO:
-
+Formato:
 Banner 16:9
-Estilo publicitário profissional
-Alta resolução
+Estilo minimalista e barato de gerar
 `;
 }
 
@@ -62,6 +55,22 @@ Alta resolução
 ===================================================== */
 async function generateBanner(event) {
   try {
+    // Limite de gerações
+    if (event.banner_generated_count >= 3) {
+      console.log(
+        `⛔ Evento ${event.id} atingiu limite de banners`
+      );
+      return;
+    }
+
+    // Se já aprovado, não gerar
+    if (event.banner_status === "approved") {
+      console.log(
+        `✅ Evento ${event.id} já aprovado, ignorando`
+      );
+      return;
+    }
+
     const prompt = buildBannerPrompt(event);
 
     const response = await openai.images.generate({
@@ -73,74 +82,23 @@ async function generateBanner(event) {
     const imageBase64 = response.data[0].b64_json;
     const imageBuffer = Buffer.from(imageBase64, "base64");
 
-    // Simples: salvar localmente ou subir para storage
     const fileName = `banner_event_${event.id}.png`;
     const filePath = `/tmp/${fileName}`;
 
-    require("fs").writeFileSync(filePath, imageBuffer);
+    fs.writeFileSync(filePath, imageBuffer);
 
-    // Aqui você pode integrar com:
-    // - S3
-    // - Cloudinary
-    // - Storage do Render
-
-    // Simulando URL pública
     const publicUrl = `${process.env.FRONTEND_URL}/banners/${fileName}`;
 
     await pool.query(
       `
       UPDATE events
       SET banner_url = $1,
-          banner_generated = true
+          banner_generated = true,
+          banner_generated_count = banner_generated_count + 1,
+          banner_status = 'pending'
       WHERE id = $2
       `,
       [publicUrl, event.id]
     );
 
-    console.log(`🎨 Banner gerado para evento ${event.id}`);
-  } catch (err) {
-    console.error("Erro ao gerar banner:", err.message);
-  }
-}
-
-/* =====================================================
-   WORKER PRINCIPAL
-===================================================== */
-async function bannerWorker() {
-  try {
-    const result = await pool.query(`
-      SELECT
-        e.id,
-        e.event_type,
-        e.start_date,
-        e.end_date,
-        e.address,
-        c.name AS city,
-        a.name AS store_name
-      FROM events e
-      JOIN cities c ON c.id = e.city_id
-      JOIN advertisers a ON a.id = e.advertiser_id
-      WHERE e.payment_status = 'paid'
-        AND e.banner_generated = false
-      LIMIT 5
-    `);
-
-    for (const event of result.rows) {
-      await generateBanner(event);
-    }
-  } catch (err) {
-    console.error("Erro no banner worker:", err.message);
-  }
-}
-
-/* =====================================================
-   START DO WORKER
-===================================================== */
-function startBannerWorker() {
-  console.log("🎨 Banner Generator Worker iniciado...");
-
-  // roda a cada 2 minutos
-  setInterval(bannerWorker, 2 * 60 * 1000);
-}
-
-module.exports = { startBannerWorker };
+    console.
