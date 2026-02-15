@@ -90,6 +90,13 @@ try {
   console.warn("⚠️ Google dealer collector não encontrado, ignorando...");
 }
 
+let startAlertMatchWorker;
+try {
+  ({ startAlertMatchWorker } = require("./workers/alert_match.worker"));
+} catch {
+  console.warn("⚠️ Alert match worker não encontrado, ignorando...");
+}
+
 /* =====================================================
    START DO SERVIDOR
 ===================================================== */
@@ -118,6 +125,7 @@ async function startServer() {
         if (startCityRadarWorker) startCityRadarWorker();
         if (startGoogleDealerCollectorWorker)
           startGoogleDealerCollectorWorker();
+        if (startAlertMatchWorker) startAlertMatchWorker();
 
         // Worker de WhatsApp (fila)
         try {
