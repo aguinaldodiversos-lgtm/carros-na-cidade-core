@@ -1,12 +1,11 @@
 const axios = require("axios");
 
-const ZAPI_BASE_URL = "https://api.z-api.io";
-
 /* =====================================================
-   ENV VALIDATION (executada uma vez)
+   ENV VALIDATION
 ===================================================== */
 function validateEnv() {
   const required = [
+    "ZAPI_API",
     "ZAPI_CLIENT_TOKEN",
     "ZAPI_INSTANCE_ID",
     "ZAPI_INSTANCE_TOKEN",
@@ -19,7 +18,6 @@ function validateEnv() {
   }
 }
 
-// Executa validação ao carregar o serviço
 validateEnv();
 
 /* =====================================================
@@ -58,10 +56,8 @@ async function sendWhatsAppMessage(phone, message) {
       return false;
     }
 
-    const url = `${ZAPI_BASE_URL}/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_INSTANCE_TOKEN}/send-text`;
-
     const response = await axios.post(
-      url,
+      process.env.ZAPI_API,
       {
         phone: formattedPhone,
         message,
@@ -121,7 +117,7 @@ ${adUrl}`;
 }
 
 /* =====================================================
-   NOVO: LEAD PARA LOJISTA
+   LEAD PARA LOJISTA
 ===================================================== */
 async function sendWhatsAppLead(phone, lead) {
   const message = `
