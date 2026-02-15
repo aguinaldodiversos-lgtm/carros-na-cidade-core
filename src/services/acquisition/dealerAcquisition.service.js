@@ -1,98 +1,69 @@
-const { addWhatsAppJob } = require("../../queues/whatsapp.queue");
+const axios = require("axios");
+
+const GOOGLE_TEXT_SEARCH =
+  "https://maps.googleapis.com/maps/api/place/textsearch/json";
+
+const GOOGLE_PLACE_DETAILS =
+  "https://maps.googleapis.com/maps/api/place/details/json";
 
 /* =====================================================
-   SIMULA BUSCA DE LOJAS
-   (Depois pode integrar Google Maps API)
+   BUSCAR LOJAS NA CIDADE
 ===================================================== */
-async function buscarLojasCidade(cidade) {
-  // Simulação inicial
-  // Depois: integração com Google Places API
-  return [
-    {
-      name: `Auto ${cidade.name} Veículos`,
-      phone: "11999999999",
-    },
-    {
-      name: `Top Carros ${cidade.name}`,
-      phone: "11888888888",
-    },
-  ];
-}
-
-/* =====================================================
-   GERA MENSAGEM DE AQUISIÇÃO
-===================================================== */
-function gerarMensagemAquisicao(cidade) {
-  return `🚗 Olá!
-
-Estamos conectando compradores de carros diretamente com lojistas de ${cidade.name}.
-
-Já temos pessoas procurando veículos na sua região e sua loja pode receber esses contatos.
-
-Quer receber compradores interessados diretamente no seu WhatsApp?`;
-}
-
-/* =====================================================
-   FUNÇÃO PRINCIPAL
-===================================================== */
-async function ativarAquisicaoDeLojistas(cidade, db) {
+async function buscarLojasGoogle(cidade) {
   try {
-    console.log(`🏪 Aquisição de lojistas em ${cidade.name}`);
+    const query = `revenda de carros em ${cidade.name}`;
 
-    const leads = await buscarLojasCidade(cidade);
+    const response = await axios.get(GOOGLE_TEXT_SEARCH, {
+      params: {
+        query,
+        key: process.env.GOOGLE_PLACES_API_KEY,
+      },
+    });
 
-    for (const loja of leads) {
-      // 1) Verificar se já existe no banco
-      const exists = await db.query(
-        `
-        SELECT id FROM dealer_leads
-        WHERE lead_phone = $1
-        LIMIT 1
-        `,
-        [loja.phone]
-      );
+    const results = response.data.results || [];
 
-      if (exists.rows.length > 0) {
-        continue;
-      }
-
-      // 2) Gerar mensagem
-      const mensagem = gerarMensagemAquisicao(cidade);
-
-      // 3) Enviar via fila de WhatsApp
-      await addWhatsAppJob({
-        phone: loja.phone,
-        lead: {
-          name: loja.name,
-          phone: loja.phone,
-          price_range: "lead comercial",
-        },
-      });
-
-      // 4) Salvar no banco
-      await db.query(
-        `
-        INSERT INTO dealer_leads
-        (
-          advertiser_id,
-          lead_name,
-          lead_phone,
-          lead_price_range,
-          city_id,
-          created_at
-        )
-        VALUES (NULL, $1, $2, $3, $4, NOW())
-        `,
-        [loja.name, loja.phone, "aquisição", cidade.id]
-      );
-
-      console.log(`📩 Contato enviado para ${loja.name}`);
-    }
+    return results.map((place) => ({
+      name: place.name,
+      address: place.formatted_address,
+      place_id: place.place_id,
+    }));
   } catch (err) {
-    console.error("❌ Erro na aquisição de lojistas:", err);
+    console.error("Erro ao buscar lojas no Google:", err.message);
+    return [];
+  }
+}
+
+/* =====================================================
+   BUSCAR DETALHES DA LOJA (TELEFONE)
+===================================================== */
+async function buscarDetalhesLoja(place_id) {
+  try {
+    const response = await axios.get(GOOGLE_PLACE_DETAILS, {
+      params: {
+        place_id,
+        fields: "name,formatted_phone_number,international_phone_number",
+        key: process.env.GOOGLE_PLACES_API_KEY,
+      },
+    });
+
+    const result = response.data.result;
+
+    if (!result) return null;
+
+    return {
+      name: result.name,
+      phone:
+        result.international_phone_number ||
+        result.formatted_phone_number ||
+        null,
+    };
+  } catch (err) {
+    console.error("Erro ao buscar detalhes da loja:", err.message);
+    return null;
   }
 }
 
 module.exports = {
-  ativarAquisicaoDeLojistas,
+  buscarLojasGoogle,
+  buscarDetalhesLoja,
 };
