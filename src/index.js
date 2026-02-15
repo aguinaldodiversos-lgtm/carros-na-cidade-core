@@ -28,66 +28,74 @@ function startWorkerSafe(name, fn) {
 let startStrategyWorker;
 try {
   ({ startStrategyWorker } = require("./workers/strategy.worker"));
-} catch (err) {}
+} catch {}
 
 let startAutopilotWorker;
 try {
   ({ startAutopilotWorker } = require("./workers/autopilot.worker"));
-} catch (err) {}
+} catch {}
 
 let startSeoWorker;
 try {
   ({ startSeoWorker } = require("./workers/seo.worker"));
-} catch (err) {}
+} catch {}
 
 let startOpportunityEngine;
 try {
   ({ startOpportunityEngine } = require("./workers/opportunity_engine"));
-} catch (err) {}
+} catch {}
 
 let startEventBannerWorker;
 try {
   ({ startEventBannerWorker } = require("./workers/event_banner.worker"));
-} catch (err) {}
+} catch {}
 
 let startEventDispatchWorker;
 try {
   ({ startEventDispatchWorker } = require("./workers/event_dispatch.worker"));
-} catch (err) {}
+} catch {}
 
 let startDealerAcquisitionWorker;
 try {
   ({
     startDealerAcquisitionWorker,
   } = require("./workers/dealer_acquisition.worker"));
-} catch (err) {}
+} catch {}
 
 let startCityMetricsWorker;
 try {
   ({ startCityMetricsWorker } = require("./workers/city_metrics.worker"));
-} catch (err) {}
+} catch {}
 
 let startDealerReportWorker;
 try {
   ({ startDealerReportWorker } = require("./workers/dealer_report.worker"));
-} catch (err) {}
+} catch {}
 
 let startCityRadarWorker;
 try {
   ({ startCityRadarWorker } = require("./workers/city_radar.worker"));
-} catch (err) {}
+} catch {}
 
 let startGoogleDealerCollectorWorker;
 try {
   ({
     startGoogleDealerCollectorWorker,
   } = require("./workers/google_dealer_collector.worker"));
-} catch (err) {}
+} catch {}
 
 let startAlertMatchWorker;
 try {
   ({ startAlertMatchWorker } = require("./workers/alert_match.worker"));
-} catch (err) {}
+} catch {}
+
+/* NOVO: autoaprovação de banner */
+let startBannerAutoApproveWorker;
+try {
+  ({
+    startBannerAutoApproveWorker,
+  } = require("./workers/banner_auto_approve.worker"));
+} catch {}
 
 /* =====================================================
    START DO SERVIDOR
@@ -99,41 +107,4 @@ async function startServer() {
     console.log("✅ Migrations concluídas.");
 
     app.listen(PORT, () => {
-      console.log(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
-      console.log("🚀 Iniciando workers...");
-
-      startWorkerSafe("Strategy Worker", startStrategyWorker);
-      startWorkerSafe("Autopilot Worker", startAutopilotWorker);
-      startWorkerSafe("Opportunity Engine", startOpportunityEngine);
-      startWorkerSafe("SEO Worker", startSeoWorker);
-      startWorkerSafe("Event Banner Worker", startEventBannerWorker);
-      startWorkerSafe("Event Dispatch Worker", startEventDispatchWorker);
-      startWorkerSafe(
-        "Dealer Acquisition Worker",
-        startDealerAcquisitionWorker
-      );
-      startWorkerSafe(
-        "Google Dealer Collector",
-        startGoogleDealerCollectorWorker
-      );
-      startWorkerSafe("City Metrics Worker", startCityMetricsWorker);
-      startWorkerSafe("Dealer Report Worker", startDealerReportWorker);
-      startWorkerSafe("City Radar Worker", startCityRadarWorker);
-      startWorkerSafe("Alert Match Worker", startAlertMatchWorker);
-
-      try {
-        require("./workers/whatsapp.worker");
-        console.log("✅ WhatsApp Worker iniciado");
-      } catch (err) {
-        console.warn("⚠️ WhatsApp Worker não encontrado");
-      }
-
-      console.log("🏁 Workers inicializados");
-    });
-  } catch (err) {
-    console.error("❌ Erro ao iniciar servidor:", err);
-    process.exit(1);
-  }
-}
-
-startServer();
+      console.log(`🚗 API Carros na Cidade rodando na porta ${PO
