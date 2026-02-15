@@ -19,11 +19,31 @@ const LEAD_META = 20;
 const ESTOQUE_MINIMO = 30;
 
 /* =====================================================
+   BUSCAR CIDADE FOCO
+===================================================== */
+async function getCidadeFoco() {
+  const result = await pool.query(
+    `
+    SELECT value
+    FROM system_settings
+    WHERE key = 'cidade_foco'
+    LIMIT 1
+    `
+  );
+
+  if (result.rows.length === 0) return null;
+
+  return parseInt(result.rows[0].value);
+}
+
+/* =====================================================
    PROCESSAR CIDADE
 ===================================================== */
-async function processarCidade(cidade) {
+async function processarCidade(cidade, cidadeFocoId) {
   try {
-    // 1) Buscar oportunidade
+    const isCidadeFoco = cidade.id === cidadeFocoId;
+
+    // buscar oportunidade
     const oppResult = await pool.query(
       `
       SELECT priority_level
@@ -38,17 +58,21 @@ async function processarCidade(cidade) {
 
     const oportunidade = oppResult.rows[0].priority_level;
 
-    // Só agir em cidades estratégicas
-    if (!["critical", "high"].includes(oportunidade)) {
+    // cidades que não são foco → apenas monitoramento
+    if (!isCidadeFoco && !["critical"].includes(oportunidade)) {
       return;
     }
 
-    console.log(`🚀 Cidade estratégica: ${cidade.name}`);
+    console.log(
+      `🤖 Processando cidade: ${cidade.name} ${
+        isCidadeFoco ? "(FOCO)" : ""
+      }`
+    );
 
-    // 2) Garantir SEO
+    // 1) Garantir SEO
     await garantirSEO(cidade, pool);
 
-    // 3) Contar leads (alertas)
+    // 2) Contar leads
     const leadsResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
@@ -60,12 +84,14 @@ async function processarCidade(cidade) {
 
     const totalLeads = leadsResult.rows[0].total || 0;
 
-    // 4) Criar campanha se necessário
-    if (totalLeads < LEAD_META) {
+    // Cidade foco: meta maior
+    const metaLeads = isCidadeFoco ? LEAD_META * 2 : LEAD_META;
+
+    if (totalLeads < metaLeads) {
       await criarCampanhaLocal(cidade, pool);
     }
 
-    // 5) Contar estoque (anúncios ativos)
+    // 3) Contar estoque
     const stockResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
@@ -78,12 +104,15 @@ async function processarCidade(cidade) {
 
     const estoque = stockResult.rows[0].total || 0;
 
-    // 6) Ativar aquisição se estoque baixo
-    if (estoque < ESTOQUE_MINIMO) {
+    const metaEstoque = isCidadeFoco
+      ? ESTOQUE_MINIMO * 2
+      : ESTOQUE_MINIMO;
+
+    if (estoque < metaEstoque) {
       await ativarAquisicaoDeLojistas(cidade, pool);
     }
   } catch (err) {
-    console.error("❌ Erro ao processar cidade:", cidade.name, err);
+    console.error("Erro ao processar cidade:", cidade.name, err);
   }
 }
 
@@ -94,6 +123,12 @@ async function runAutopilotWorker() {
   try {
     console.log("🤖 Rodando Autopilot Worker...");
 
+    const cidadeFocoId = await getCidadeFoco();
+
+    if (!cidadeFocoId) {
+      console.warn("⚠️ Nenhuma cidade foco definida");
+    }
+
     const citiesResult = await pool.query(`
       SELECT id, name, slug
       FROM cities
@@ -102,7 +137,7 @@ async function runAutopilotWorker() {
     const cities = citiesResult.rows;
 
     for (const cidade of cities) {
-      await processarCidade(cidade);
+      await processarCidade(cidade, cidadeFocoId);
     }
 
     console.log("✅ Autopilot finalizado");
