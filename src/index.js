@@ -67,6 +67,13 @@ try {
   console.warn("⚠️ City metrics worker não encontrado, ignorando...");
 }
 
+let startDealerReportWorker;
+try {
+  ({ startDealerReportWorker } = require("./workers/dealer_report.worker"));
+} catch {
+  console.warn("⚠️ Dealer report worker não encontrado, ignorando...");
+}
+
 /* =====================================================
    START DO SERVIDOR
 ===================================================== */
@@ -91,6 +98,7 @@ async function startServer() {
         if (startDealerAcquisitionWorker)
           startDealerAcquisitionWorker();
         if (startCityMetricsWorker) startCityMetricsWorker();
+        if (startDealerReportWorker) startDealerReportWorker();
 
         // Worker de WhatsApp (fila)
         try {
