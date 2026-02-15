@@ -28,66 +28,66 @@ function startWorkerSafe(name, fn) {
 let startStrategyWorker;
 try {
   ({ startStrategyWorker } = require("./workers/strategy.worker"));
-} catch {}
+} catch (err) {}
 
 let startAutopilotWorker;
 try {
   ({ startAutopilotWorker } = require("./workers/autopilot.worker"));
-} catch {}
+} catch (err) {}
 
 let startSeoWorker;
 try {
   ({ startSeoWorker } = require("./workers/seo.worker"));
-} catch {}
+} catch (err) {}
 
 let startOpportunityEngine;
 try {
   ({ startOpportunityEngine } = require("./workers/opportunity_engine"));
-} catch {}
+} catch (err) {}
 
 let startEventBannerWorker;
 try {
   ({ startEventBannerWorker } = require("./workers/event_banner.worker"));
-} catch {}
+} catch (err) {}
 
 let startEventDispatchWorker;
 try {
   ({ startEventDispatchWorker } = require("./workers/event_dispatch.worker"));
-} catch {}
+} catch (err) {}
 
 let startDealerAcquisitionWorker;
 try {
   ({
     startDealerAcquisitionWorker,
   } = require("./workers/dealer_acquisition.worker"));
-} catch {}
+} catch (err) {}
 
 let startCityMetricsWorker;
 try {
   ({ startCityMetricsWorker } = require("./workers/city_metrics.worker"));
-} catch {}
+} catch (err) {}
 
 let startDealerReportWorker;
 try {
   ({ startDealerReportWorker } = require("./workers/dealer_report.worker"));
-} catch {}
+} catch (err) {}
 
 let startCityRadarWorker;
 try {
   ({ startCityRadarWorker } = require("./workers/city_radar.worker"));
-} catch {}
+} catch (err) {}
 
 let startGoogleDealerCollectorWorker;
 try {
   ({
     startGoogleDealerCollectorWorker,
   } = require("./workers/google_dealer_collector.worker"));
-} catch {}
+} catch (err) {}
 
 let startAlertMatchWorker;
 try {
   ({ startAlertMatchWorker } = require("./workers/alert_match.worker"));
-} catch {}
+} catch (err) {}
 
 /* =====================================================
    START DO SERVIDOR
@@ -124,7 +124,7 @@ async function startServer() {
       try {
         require("./workers/whatsapp.worker");
         console.log("✅ WhatsApp Worker iniciado");
-      } catch {
+      } catch (err) {
         console.warn("⚠️ WhatsApp Worker não encontrado");
       }
 
