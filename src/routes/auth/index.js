@@ -1,15 +1,32 @@
 const express = require("express");
+const authMiddleware = require("../../middlewares/auth");
 
-const loginController = require("../../controllers/auth/login.controller");
+// Controllers de autenticação
 const registerController = require("../../controllers/auth/register.controller");
-const forgotPasswordController = require("../../controllers/auth/forgotPassword.controller");
-const resetPasswordController = require("../../controllers/auth/resetPassword.controller");
+const loginController = require("../../controllers/auth/login.controller");
+
+// Controller de verificação de documento
+const {
+  verifyUserDocument,
+} = require("../../controllers/auth/verifyDocument.controller");
 
 const router = express.Router();
 
+/* =====================================================
+   ROTAS PÚBLICAS
+===================================================== */
+
+// Cadastro
 router.post("/register", registerController);
+
+// Login
 router.post("/login", loginController);
-router.post("/forgot-password", forgotPasswordController);
-router.post("/reset-password", resetPasswordController);
+
+/* =====================================================
+   ROTAS PROTEGIDAS
+===================================================== */
+
+// Verificação de CPF/CNPJ
+router.post("/verify-document", authMiddleware, verifyUserDocument);
 
 module.exports = router;
