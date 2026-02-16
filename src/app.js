@@ -23,58 +23,58 @@ app.use(
 app.use(express.json());
 
 /* =====================================================
-   IMPORTAÇÃO SEGURA DE ROTAS
+   FUNÇÃO SEGURA PARA CARREGAR ROTAS
 ===================================================== */
-function loadRouteSafe(path) {
+function loadRoute(path, basePath) {
   try {
-    return require(path);
+    const route = require(path);
+    app.use(basePath, route);
+    console.log(`✅ Rota carregada: ${basePath}`);
   } catch (err) {
     console.warn(`⚠️ Rota não encontrada: ${path}`);
-    return null;
   }
 }
 
-const adsRoutes = loadRouteSafe("./routes/ads");
-const alertsRoutes = loadRouteSafe("./routes/alerts");
-const authRoutes = loadRouteSafe("./routes/auth");
-const paymentRoutes = loadRouteSafe("./routes/payments");
-const sitemapRoute = loadRouteSafe("./routes/sitemap");
-const analyticsRoutes = loadRouteSafe("./routes/analytics");
-const autopilotRoutes = loadRouteSafe("./routes/autopilot");
-const eventsRoutes = loadRouteSafe("./routes/events");
-const adminEventsRoutes = loadRouteSafe("./routes/admin.events");
-const advertisersRoutes = loadRouteSafe("./routes/advertisers");
-const metricsRoutes = loadRouteSafe("./routes/metrics");
-const fipeRoutes = loadRouteSafe("./routes/fipe");
-const bannerApprovalRoutes = loadRouteSafe(
-  "./routes/events/bannerApproval.routes"
+/* =====================================================
+   ROTAS PRINCIPAIS
+===================================================== */
+loadRoute("./routes/ads", "/api/ads");
+loadRoute("./routes/auth", "/api/auth");
+loadRoute("./routes/payments", "/api/payments");
+loadRoute("./routes/analytics", "/api/analytics");
+loadRoute("./routes/autopilot", "/api/autopilot");
+loadRoute("./routes/events", "/api/events");
+loadRoute("./routes/admin.events", "/api/admin/events");
+loadRoute("./routes/advertisers", "/api/advertisers");
+loadRoute("./routes/metrics", "/api/metrics");
+loadRoute("./routes/fipe", "/api/fipe");
+loadRoute("./routes/alerts", "/api/alerts");
+
+/* =====================================================
+   ROTA DE APROVAÇÃO DE BANNER
+===================================================== */
+loadRoute(
+  "./routes/events/bannerApproval.routes",
+  "/api/events/banner"
 );
 
 /* =====================================================
-   REGISTRO DAS ROTAS
+   SITEMAP
 ===================================================== */
-if (adsRoutes) app.use("/api/ads", adsRoutes);
-if (alertsRoutes) app.use("/api/alerts", alertsRoutes);
-if (authRoutes) app.use("/api/auth", authRoutes);
-if (paymentRoutes) app.use("/api/payments", paymentRoutes);
-if (analyticsRoutes) app.use("/api/analytics", analyticsRoutes);
-if (autopilotRoutes) app.use("/api/autopilot", autopilotRoutes);
-if (eventsRoutes) app.use("/api/events", eventsRoutes);
-if (adminEventsRoutes) app.use("/api/admin/events", adminEventsRoutes);
-if (advertisersRoutes) app.use("/api/advertisers", advertisersRoutes);
-if (metricsRoutes) app.use("/api/metrics", metricsRoutes);
-if (fipeRoutes) app.use("/api/fipe", fipeRoutes);
-if (bannerApprovalRoutes)
-  app.use("/api/events/banner", bannerApprovalRoutes);
-
-if (sitemapRoute) app.use("/sitemap.xml", sitemapRoute);
+try {
+  const sitemapRoute = require("./routes/sitemap");
+  app.use("/sitemap.xml", sitemapRoute);
+  console.log("✅ Rota carregada: /sitemap.xml");
+} catch {
+  console.warn("⚠️ Rota sitemap não encontrada");
+}
 
 /* =====================================================
    HEALTH CHECK
 ===================================================== */
-app.get("/health", (_, res) => {
-  res.json({ status: "ok" });
-});
+app.get("/health", (_, res) =>
+  res.json({ status: "ok" })
+);
 
 /* =====================================================
    ERRO GLOBAL
