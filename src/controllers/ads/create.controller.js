@@ -70,11 +70,11 @@ async function createAd(req, res) {
     }
 
     /* =====================================================
-       BUSCAR PLANO DO USUÁRIO
+       BUSCAR USUÁRIO
     ===================================================== */
     const userResult = await pool.query(
       `
-      SELECT id, plan, document_type
+      SELECT id, plan, document_type, document_verified
       FROM users
       WHERE id = $1
       LIMIT 1
@@ -91,12 +91,38 @@ async function createAd(req, res) {
     }
 
     /* =====================================================
+       VERIFICAÇÃO DE DOCUMENTO NO PRIMEIRO ANÚNCIO
+    ===================================================== */
+    const adsCountResult = await pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM ads
+      WHERE user_id = $1
+      `,
+      [userId]
+    );
+
+    const totalAds = adsCountResult.rows[0].total;
+
+    if (totalAds === 0) {
+      if (!user.document_verified) {
+        return res.status(400).json({
+          error: "Documento não verificado",
+          message:
+            user.document_type === "cnpj"
+              ? "Para anunciar como lojista, é necessário verificar o CNPJ."
+              : "Para anunciar, é necessário verificar o CPF.",
+        });
+      }
+    }
+
+    /* =====================================================
        LIMITES DO PLANO GRÁTIS
     ===================================================== */
     if (!user.plan || user.plan === "free") {
       const limit = user.document_type === "cnpj" ? 20 : 3;
 
-      const countResult = await pool.query(
+      const activeAdsResult = await pool.query(
         `
         SELECT COUNT(*)::int AS total
         FROM ads
@@ -106,9 +132,9 @@ async function createAd(req, res) {
         [userId]
       );
 
-      const totalAds = countResult.rows[0].total;
+      const activeAds = activeAdsResult.rows[0].total;
 
-      if (totalAds >= limit) {
+      if (activeAds >= limit) {
         return res.status(400).json({
           error: "Limite do plano grátis atingido",
           message:
