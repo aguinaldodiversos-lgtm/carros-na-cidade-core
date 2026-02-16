@@ -23,58 +23,79 @@ app.use(
 app.use(express.json());
 
 /* =====================================================
-   FUNÇÃO SEGURA PARA CARREGAR ROTAS
+   IMPORTAÇÃO SEGURA DAS ROTAS
 ===================================================== */
-function loadRoute(path, basePath) {
+function loadRouteSafe(path, name) {
   try {
-    const route = require(path);
-    app.use(basePath, route);
-    console.log(`✅ Rota carregada: ${basePath}`);
+    return require(path);
   } catch (err) {
     console.warn(`⚠️ Rota não encontrada: ${path}`);
+    return null;
   }
 }
 
-/* =====================================================
-   ROTAS PRINCIPAIS
-===================================================== */
-loadRoute("./routes/ads", "/api/ads");
-loadRoute("./routes/auth", "/api/auth");
-loadRoute("./routes/payments", "/api/payments");
-loadRoute("./routes/analytics", "/api/analytics");
-loadRoute("./routes/autopilot", "/api/autopilot");
-loadRoute("./routes/events", "/api/events");
-loadRoute("./routes/admin.events", "/api/admin/events");
-loadRoute("./routes/advertisers", "/api/advertisers");
-loadRoute("./routes/metrics", "/api/metrics");
-loadRoute("./routes/fipe", "/api/fipe");
-loadRoute("./routes/alerts", "/api/alerts");
+// Rotas principais
+const adsRoutes = loadRouteSafe("./routes/ads", "ads");
+const authRoutes = loadRouteSafe("./routes/auth", "auth");
+const paymentRoutes = loadRouteSafe("./routes/payments", "payments");
+const sitemapRoute = loadRouteSafe("./routes/sitemap", "sitemap");
+const alertRoutes = loadRouteSafe("./routes/alerts", "alerts");
+const analyticsRoutes = loadRouteSafe("./routes/analytics", "analytics");
+const autopilotRoutes = loadRouteSafe("./routes/autopilot", "autopilot");
+const eventsRoutes = loadRouteSafe("./routes/events", "events");
+const adminEventsRoutes = loadRouteSafe(
+  "./routes/admin.events",
+  "admin events"
+);
+const advertisersRoutes = loadRouteSafe(
+  "./routes/advertisers",
+  "advertisers"
+);
+const metricsRoutes = loadRouteSafe("./routes/metrics", "metrics");
+const fipeRoutes = loadRouteSafe("./routes/fipe", "fipe");
 
-/* =====================================================
-   ROTA DE APROVAÇÃO DE BANNER
-===================================================== */
-loadRoute(
+// Nova rota de integrações (AutoDriv)
+const integrationsRoutes = loadRouteSafe(
+  "./routes/integrations",
+  "integrations"
+);
+
+// Banner approval
+const bannerApprovalRoutes = loadRouteSafe(
   "./routes/events/bannerApproval.routes",
-  "/api/events/banner"
+  "banner approval"
 );
 
 /* =====================================================
-   SITEMAP
+   REGISTRO DAS ROTAS
 ===================================================== */
-try {
-  const sitemapRoute = require("./routes/sitemap");
-  app.use("/sitemap.xml", sitemapRoute);
-  console.log("✅ Rota carregada: /sitemap.xml");
-} catch {
-  console.warn("⚠️ Rota sitemap não encontrada");
-}
+if (adsRoutes) app.use("/api/ads", adsRoutes);
+if (authRoutes) app.use("/api/auth", authRoutes);
+if (paymentRoutes) app.use("/api/payments", paymentRoutes);
+if (alertRoutes) app.use("/api/alerts", alertRoutes);
+if (analyticsRoutes) app.use("/api/analytics", analyticsRoutes);
+if (autopilotRoutes) app.use("/api/autopilot", autopilotRoutes);
+if (eventsRoutes) app.use("/api/events", eventsRoutes);
+if (adminEventsRoutes)
+  app.use("/api/admin/events", adminEventsRoutes);
+if (advertisersRoutes)
+  app.use("/api/advertisers", advertisersRoutes);
+if (metricsRoutes) app.use("/api/metrics", metricsRoutes);
+if (fipeRoutes) app.use("/api/fipe", fipeRoutes);
+if (integrationsRoutes)
+  app.use("/api/integrations", integrationsRoutes);
+
+if (bannerApprovalRoutes)
+  app.use("/api/events/banner", bannerApprovalRoutes);
+
+if (sitemapRoute) app.use("/sitemap.xml", sitemapRoute);
 
 /* =====================================================
    HEALTH CHECK
 ===================================================== */
-app.get("/health", (_, res) =>
-  res.json({ status: "ok" })
-);
+app.get("/health", (_, res) => {
+  res.json({ status: "ok" });
+});
 
 /* =====================================================
    ERRO GLOBAL
