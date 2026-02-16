@@ -7,61 +7,65 @@ const pool = new Pool({
 });
 
 /* =====================================================
+   FUNÇÃO SEGURA PARA CONTAR REGISTROS
+===================================================== */
+async function safeCount(query, params = []) {
+  try {
+    const result = await pool.query(query, params);
+    return result.rows[0].total || 0;
+  } catch (err) {
+    console.warn("⚠️ Erro em contagem segura:", err.message);
+    return 0;
+  }
+}
+
+/* =====================================================
    PROCESSAR MÉTRICAS DE UMA CIDADE
 ===================================================== */
 async function processarMetricasCidade(cidade) {
   try {
-    // 1) Visitas (analytics)
-    const visitsResult = await pool.query(
+    const cityId = cidade.id;
+
+    // 1) Visitas
+    const visits = await safeCount(
       `
       SELECT COUNT(*)::int AS total
       FROM analytics
       WHERE city_id = $1
-        AND created_at >= NOW() - INTERVAL '30 days'
       `,
-      [cidade.id]
+      [cityId]
     );
 
-    const visits = visitsResult.rows[0].total || 0;
-
     // 2) Leads
-    const leadsResult = await pool.query(
+    const leads = await safeCount(
       `
       SELECT COUNT(*)::int AS total
       FROM alerts
       WHERE city_id = $1
-        AND created_at >= NOW() - INTERVAL '30 days'
       `,
-      [cidade.id]
+      [cityId]
     );
 
-    const leads = leadsResult.rows[0].total || 0;
-
     // 3) Anúncios ativos
-    const adsResult = await pool.query(
+    const adsCount = await safeCount(
       `
       SELECT COUNT(*)::int AS total
       FROM ads
       WHERE city_id = $1
-        AND status = 'active'
+      AND status = 'active'
       `,
-      [cidade.id]
+      [cityId]
     );
 
-    const adsCount = adsResult.rows[0].total || 0;
-
-    // 4) Lojistas ativos
-    const advertisersResult = await pool.query(
+    // 4) Lojistas (sem depender de status)
+    const advertisersCount = await safeCount(
       `
       SELECT COUNT(*)::int AS total
       FROM advertisers
       WHERE city_id = $1
-        AND status = 'active'
       `,
-      [cidade.id]
+      [cityId]
     );
-
-    const advertisersCount = advertisersResult.rows[0].total || 0;
 
     // 5) Taxa de conversão
     let conversionRate = 0;
@@ -69,7 +73,7 @@ async function processarMetricasCidade(cidade) {
       conversionRate = (leads / visits) * 100;
     }
 
-    // 6) Upsert na tabela
+    // 6) Upsert na tabela city_metrics
     await pool.query(
       `
       INSERT INTO city_metrics (
@@ -92,7 +96,7 @@ async function processarMetricasCidade(cidade) {
         updated_at = NOW()
       `,
       [
-        cidade.id,
+        cityId,
         visits,
         leads,
         adsCount,
@@ -102,13 +106,13 @@ async function processarMetricasCidade(cidade) {
     );
 
     console.log(
-      `📊 Métricas atualizadas: ${cidade.name} | visitas: ${visits} | leads: ${leads}`
+      `📊 Métricas: ${cidade.name} | visitas: ${visits} | leads: ${leads}`
     );
   } catch (err) {
     console.error(
       "❌ Erro ao processar métricas da cidade:",
       cidade.name,
-      err
+      err.message
     );
   }
 }
@@ -133,10 +137,13 @@ async function runCityMetricsWorker() {
 
     console.log("✅ Métricas atualizadas com sucesso");
   } catch (err) {
-    console.error("❌ Erro no city metrics worker:", err);
+    console.error("❌ Erro no city metrics worker:", err.message);
   }
 }
 
+/* =====================================================
+   START DO WORKER
+===================================================== */
 function startCityMetricsWorker() {
   runCityMetricsWorker();
 
