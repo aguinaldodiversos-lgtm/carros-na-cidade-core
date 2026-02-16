@@ -1,117 +1,128 @@
-const { notifyMatchingAlerts } = require("../../services/alertMatcher.service");
 const { Pool } = require("pg");
+const slugify = require("../../utils/slugify");
+const { improveAdText } = require("../../services/ads/adAI.service");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: { rejectUnauthorized: false },
 });
 
-module.exports = async (req, res) => {
+async function createAd(req, res) {
   try {
     const userId = req.user.id;
 
     const {
-      title,
-      price,
-      city,
-      state,
-      latitude,
-      longitude,
-      plan,
-      slug,
+      brand,
+      model,
       year,
-      body_type,
-      fuel_type,
+      price,
+      city_id,
+      description,
+      highlighted,
     } = req.body;
 
     /* =====================================================
        VALIDAÇÕES BÁSICAS
     ===================================================== */
-
-    if (!title || !price || !city || !state || !slug) {
+    if (!brand || !model || !year || !price || !city_id) {
       return res.status(400).json({
-        error: "Campos obrigatórios: title, price, city, state, slug",
+        error: "Dados obrigatórios ausentes",
       });
     }
 
-    // validação de ano (se enviado)
-    if (year) {
-      const currentYear = new Date().getFullYear() + 1;
+    /* =====================================================
+       BUSCAR PLANO DO USUÁRIO
+    ===================================================== */
+    const userResult = await pool.query(
+      `
+      SELECT id, plan
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [userId]
+    );
 
-      if (year < 1950 || year > currentYear) {
-        return res.status(400).json({
-          error: "Ano do veículo inválido",
-        });
-      }
+    const user = userResult.rows[0];
+
+    let weight = 1;
+
+    if (user?.plan === "start") weight = 2;
+    if (user?.plan === "pro") weight = 3;
+    if (highlighted) weight = 4;
+
+    /* =====================================================
+       MELHORAR DESCRIÇÃO COM IA
+    ===================================================== */
+    let improvedDescription = description;
+
+    try {
+      improvedDescription = await improveAdText({
+        brand,
+        model,
+        year,
+        price,
+        description,
+        weight,
+      });
+    } catch (err) {
+      console.warn("IA não respondeu, usando texto original");
     }
 
     /* =====================================================
-       VALORES PADRÃO
+       GERAR SLUG
     ===================================================== */
-
-    const bodyType = body_type || "outro";
-    const fuelType = fuel_type || "flex";
+    const slugBase = `${brand}-${model}-${year}`;
+    const slug = slugify(slugBase + "-" + Date.now());
 
     /* =====================================================
-       INSERÇÃO NO BANCO
+       INSERIR ANÚNCIO
     ===================================================== */
-
-    const query = `
+    const insertResult = await pool.query(
+      `
       INSERT INTO ads (
-        advertiser_id,
-        title,
-        price,
-        city,
-        state,
-        latitude,
-        longitude,
-        plan,
-        slug,
+        user_id,
+        brand,
+        model,
         year,
-        body_type,
-        fuel_type
+        price,
+        city_id,
+        description,
+        slug,
+        weight,
+        status,
+        created_at
       )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
-      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',NOW())
       RETURNING *
-    `;
+      `,
+      [
+        userId,
+        brand,
+        model,
+        year,
+        price,
+        city_id,
+        improvedDescription,
+        slug,
+        weight,
+      ]
+    );
 
-    const values = [
-      userId,
-      title,
-      price,
-      city,
-      state,
-      latitude,
-      longitude,
-      plan || "free",
-      slug,
-      year || null,
-      bodyType,
-      fuelType,
-    ];
+    const ad = insertResult.rows[0];
 
-    const result = await pool.query(query, values);
-    const newAd = result.rows[0];
+    console.log(`🚗 Anúncio criado: ${ad.id} | peso: ${weight}`);
 
-    /* ============================================
-       CHAMAR MATCHER DE ALERTAS (CORRETO)
-    ============================================ */
-
-    await notifyMatchingAlerts(newAd);
-
-    /* ============================================
-       RESPOSTA FINAL
-    ============================================ */
-
-    res.status(201).json(newAd);
+    return res.json({
+      success: true,
+      ad,
+    });
   } catch (err) {
     console.error("Erro ao criar anúncio:", err);
-    res.status(500).json({
-      error: "Erro ao criar anúncio",
+    return res.status(500).json({
+      error: "Erro interno no servidor",
     });
   }
-};
+}
+
+module.exports = createAd;
