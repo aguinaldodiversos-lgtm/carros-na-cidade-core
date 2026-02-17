@@ -10,10 +10,10 @@
     "migrate": "node src/database/migrate.js",
     "lint": "echo \"No lint configured\"",
     "test": "echo \"No tests configured\""
-  },
+  }
   "engines": {
     "node": "18.x"
-  },
+  }
   "dependencies": {
     "axios": "^1.6.7",
     "bcryptjs": "^2.4.3",
@@ -27,7 +27,7 @@
     "openai": "^4.56.0",
     "pg": "^8.11.5",
     "resend": "^3.2.0"
-  },
+  }
   "devDependencies": {
     "nodemon": "^3.0.3"
   }
