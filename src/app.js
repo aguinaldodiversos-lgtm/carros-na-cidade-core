@@ -6,6 +6,7 @@ import cors from "cors";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler } from "./shared/middlewares/error.middleware.js";
+
 import authRoutes from "./modules/auth/auth.routes.js";
 
 const app = express();
@@ -13,11 +14,12 @@ const app = express();
 /* =====================================================
    CORS
 ===================================================== */
+
 const allowedOrigins = [
   "https://carrosnacidade.com",
   "http://localhost:3000",
 ];
-app.use("/api/auth", authRoutes);
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -39,6 +41,12 @@ app.use(
 app.use(express.json());
 app.use(requestIdMiddleware);
 app.use(httpLoggerMiddleware);
+
+/* =====================================================
+   ROTAS
+===================================================== */
+
+app.use("/api/auth", authRoutes);
 
 /* =====================================================
    HEALTH CHECK
