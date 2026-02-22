@@ -5,6 +5,7 @@ import { pool } from "../../infrastructure/database/db.js";
 import {
   generateAccessToken,
   generateRefreshToken,
+  verifyRefreshToken,
 } from "./jwt.strategy.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
@@ -36,4 +37,26 @@ export async function login(email, password) {
     accessToken: generateAccessToken(payload),
     refreshToken: generateRefreshToken(payload),
   };
+}
+
+export async function refresh(refreshToken) {
+  if (!refreshToken) {
+    throw new AppError("Refresh token não fornecido", 401);
+  }
+
+  try {
+    const decoded = verifyRefreshToken(refreshToken);
+
+    const payload = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+    };
+
+    return {
+      accessToken: generateAccessToken(payload),
+    };
+  } catch (err) {
+    throw new AppError("Refresh token inválido ou expirado", 401);
+  }
 }
