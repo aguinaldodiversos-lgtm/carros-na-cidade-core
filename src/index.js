@@ -2,13 +2,13 @@
 
 import dotenv from "dotenv";
 dotenv.config();
-
+import { collectExternalData } from "./workers/dataCollector.worker.js";
 import app from "./app.js";
 import runMigrations from "./infrastructure/database/migrate.js";
 import { logger } from "./shared/logger.js";
 
 const PORT = process.env.PORT || 3000;
-
+setInterval(collectExternalData, 30 * 60 * 1000);
 /* =====================================================
    FUNÇÃO SEGURA PARA INICIAR WORKERS
 ===================================================== */
