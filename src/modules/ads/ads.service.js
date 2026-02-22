@@ -3,9 +3,10 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { checkAdLimit } from "./ads.plan-limit.service.js";
+import { generateText } from "../ai/ai.service.js";
 
 /* =====================================================
-   PESO DE RANKING POR PLANO
+   CONFIGURAÇÕES DE RANKING
 ===================================================== */
 
 const PLAN_WEIGHT = {
@@ -14,22 +15,39 @@ const PLAN_WEIGHT = {
   pro: 3,
 };
 
-function calculateRankingScore(plan, isHighlighted) {
+function calculatePlanScore(plan, highlighted) {
   let score = PLAN_WEIGHT[plan] || 1;
 
-  if (isHighlighted) {
-    score += 4; // destaque paga mais peso
+  if (highlighted) {
+    score += 4;
   }
 
   return score;
 }
 
+async function getCityDemand(cityId) {
+  const result = await pool.query(
+    `SELECT demand_score FROM city_metrics WHERE city_id = $1`,
+    [cityId]
+  );
+
+  return result.rows[0]?.demand_score || 1;
+}
+
+async function recalculateRanking(ad, userPlan, highlighted) {
+  const demand = await getCityDemand(ad.city_id);
+
+  const baseScore = calculatePlanScore(userPlan, highlighted);
+
+  return baseScore * demand;
+}
+
 /* =====================================================
-   LISTAR ANÚNCIOS (COM RANKING)
+   LISTAR ANÚNCIOS (RANKING OTIMIZADO)
 ===================================================== */
 
 export async function list(filters = {}) {
-  const { city_id } = filters;
+  const { city_id, min_price, max_price } = filters;
 
   let query = `
     SELECT *
@@ -44,8 +62,19 @@ export async function list(filters = {}) {
     query += ` AND city_id = $${params.length}`;
   }
 
+  if (min_price) {
+    params.push(min_price);
+    query += ` AND price >= $${params.length}`;
+  }
+
+  if (max_price) {
+    params.push(max_price);
+    query += ` AND price <= $${params.length}`;
+  }
+
   query += `
     ORDER BY ranking_score DESC, created_at DESC
+    LIMIT 100
   `;
 
   const result = await pool.query(query, params);
@@ -65,7 +94,7 @@ export async function show(id) {
 
   const ad = result.rows[0];
 
-  if (!ad) {
+  if (!ad || ad.status === "deleted") {
     throw new AppError("Anúncio não encontrado", 404);
   }
 
@@ -79,7 +108,12 @@ export async function show(id) {
 export async function create(data, user) {
   await checkAdLimit(user.id, user.plan);
 
-  const rankingScore = calculateRankingScore(
+  const fakeAd = {
+    city_id: data.city_id,
+  };
+
+  const rankingScore = await recalculateRanking(
+    fakeAd,
     user.plan,
     false
   );
@@ -95,9 +129,10 @@ export async function create(data, user) {
       status,
       highlighted,
       ranking_score,
-      created_at
+      created_at,
+      updated_at
     )
-    VALUES ($1,$2,$3,$4,$5,'active',false,$6,NOW())
+    VALUES ($1,$2,$3,$4,$5,'active',false,$6,NOW(),NOW())
     RETURNING *
     `,
     [
@@ -124,6 +159,19 @@ export async function update(id, data, user) {
     throw new AppError("Sem permissão", 403);
   }
 
+  const updatedFields = {
+    title: data.title ?? ad.title,
+    description: data.description ?? ad.description,
+    price: data.price ?? ad.price,
+    city_id: data.city_id ?? ad.city_id,
+  };
+
+  const rankingScore = await recalculateRanking(
+    updatedFields,
+    user.plan,
+    ad.highlighted
+  );
+
   const result = await pool.query(
     `
     UPDATE ads
@@ -131,15 +179,17 @@ export async function update(id, data, user) {
         description = $2,
         price = $3,
         city_id = $4,
+        ranking_score = $5,
         updated_at = NOW()
-    WHERE id = $5
+    WHERE id = $6
     RETURNING *
     `,
     [
-      data.title,
-      data.description,
-      data.price,
-      data.city_id,
+      updatedFields.title,
+      updatedFields.description,
+      updatedFields.price,
+      updatedFields.city_id,
+      rankingScore,
       id,
     ]
   );
@@ -161,17 +211,18 @@ export async function remove(id, user) {
   await pool.query(
     `
     UPDATE ads
-    SET status = 'deleted'
+    SET status = 'deleted',
+        updated_at = NOW()
     WHERE id = $1
     `,
     [id]
   );
 
-  return { message: "Anúncio removido" };
+  return { message: "Anúncio removido com sucesso" };
 }
 
 /* =====================================================
-   DESTACAR ANÚNCIO (PLANO PRO)
+   DESTACAR ANÚNCIO
 ===================================================== */
 
 export async function highlight(id, user) {
@@ -181,7 +232,8 @@ export async function highlight(id, user) {
     throw new AppError("Sem permissão", 403);
   }
 
-  const newScore = calculateRankingScore(
+  const rankingScore = await recalculateRanking(
+    ad,
     user.plan,
     true
   );
@@ -190,18 +242,19 @@ export async function highlight(id, user) {
     `
     UPDATE ads
     SET highlighted = true,
-        ranking_score = $1
+        ranking_score = $1,
+        updated_at = NOW()
     WHERE id = $2
     RETURNING *
     `,
-    [newScore, id]
+    [rankingScore, id]
   );
 
   return result.rows[0];
 }
 
 /* =====================================================
-   ANÁLISE DE PREÇO (placeholder futuro IA)
+   ANÁLISE DE PREÇO (estrutura futura IA)
 ===================================================== */
 
 export async function priceAnalysis(id, user) {
@@ -212,13 +265,14 @@ export async function priceAnalysis(id, user) {
   }
 
   return {
+    current_price: ad.price,
     suggested_price: ad.price,
-    message: "Análise futura com IA",
+    message: "Análise dinâmica futura via IA",
   };
 }
 
 /* =====================================================
-   MELHORIA DE DESCRIÇÃO IA (placeholder)
+   MELHORIA DE DESCRIÇÃO COM IA LOCAL
 ===================================================== */
 
 export async function aiImprove(id, user) {
@@ -228,8 +282,16 @@ export async function aiImprove(id, user) {
     throw new AppError("Sem permissão", 403);
   }
 
+  const prompt = `
+Melhore a descrição abaixo para venda automotiva,
+de forma persuasiva e profissional:
+
+${ad.description}
+`;
+
+  const improved = await generateText(prompt);
+
   return {
-    improved_description: ad.description,
-    message: "Integração futura com IA local",
+    improved_description: improved,
   };
 }
