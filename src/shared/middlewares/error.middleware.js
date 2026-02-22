@@ -1,6 +1,6 @@
 // src/shared/middlewares/error.middleware.js
 
-import { logger } from "../logger.js";
+import { getLogger } from "../logger.js";
 
 export class AppError extends Error {
   constructor(message, statusCode = 400, isOperational = true) {
@@ -42,20 +42,21 @@ export function errorHandler(err, req, res, next) {
     }
   }
 
+  const logger = getLogger(req);
+
   logger.error({
     message: error.message,
     statusCode: error.statusCode,
-    path: req.originalUrl,
-    method: req.method,
     stack:
-      process.env.NODE_ENV === "development" ? error.stack : undefined
+      process.env.NODE_ENV === "development" ? error.stack : undefined,
   });
 
   return res.status(error.statusCode).json({
     error: true,
     message: error.message,
+    requestId: req.requestId,
     ...(process.env.NODE_ENV === "development" && {
-      stack: error.stack
-    })
+      stack: error.stack,
+    }),
   });
 }
