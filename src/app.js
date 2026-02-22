@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import { logger } from "./shared/logger.js";
 import { errorHandler } from "./shared/middlewares/error.middleware.js";
+import adsRoutes from "./modules/ads/ads.routes.js";
 
 const app = express();
 
@@ -14,7 +15,7 @@ const allowedOrigins = [
   "https://carrosnacidade.com",
   "http://localhost:3000",
 ];
-
+app.use("/api/ads", adsRoutes);
 app.use(
   cors({
     origin: function (origin, callback) {
