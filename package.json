@@ -1,12 +1,13 @@
 {
   "name": "carros-na-cidade-core",
-  "version": "1.0.0",
-  "description": "Backend do portal Carros na Cidade",
+  "version": "2.0.0",
+  "description": "Backend do portal Carros na Cidade - Arquitetura SaaS",
   "main": "src/index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
+    "workers": "node src/workers/bootstrap.js",
     "lint": "echo \"No lint configured\"",
     "test": "echo \"No tests configured\""
   },
@@ -23,10 +24,11 @@
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",
     "mercadopago": "^1.5.17",
-    "openai": "^4.56.0",
     "pg": "^8.11.5",
-    "resend": "^3.2.0",
     "pino": "^9.2.0",
-    "pino-pretty": "^11.2.0"
+    "pino-pretty": "^11.2.0",
+    "resend": "^3.2.0",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
   }
 }
