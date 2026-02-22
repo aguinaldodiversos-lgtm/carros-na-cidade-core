@@ -25,7 +25,7 @@ function addDays(days) {
 
 export async function login(email, password) {
   const result = await pool.query(
-    "SELECT * FROM users WHERE email = $1",
+    "SELECT id, email, password, role, plan FROM users WHERE email = $1",
     [email]
   );
 
@@ -66,7 +66,7 @@ export async function login(email, password) {
 }
 
 /* =====================================================
-   REFRESH (COM ROTAÇÃO + BLACKLIST)
+   REFRESH COM ROTAÇÃO AUTOMÁTICA
 ===================================================== */
 
 export async function refresh(oldRefreshToken) {
@@ -74,7 +74,7 @@ export async function refresh(oldRefreshToken) {
     throw new AppError("Refresh token não fornecido", 401);
   }
 
-  const stored = await pool.query(
+  const storedToken = await pool.query(
     `
     SELECT * FROM refresh_tokens
     WHERE token = $1
@@ -82,7 +82,7 @@ export async function refresh(oldRefreshToken) {
     [oldRefreshToken]
   );
 
-  const tokenRow = stored.rows[0];
+  const tokenRow = storedToken.rows[0];
 
   if (!tokenRow) {
     throw new AppError("Refresh token inválido", 401);
@@ -104,10 +104,7 @@ export async function refresh(oldRefreshToken) {
     throw new AppError("Refresh token inválido", 401);
   }
 
-  /* ===============================
-     ROTAÇÃO
-  =============================== */
-
+  // Revoga token antigo (BLACKLIST + ROTAÇÃO)
   await pool.query(
     `
     UPDATE refresh_tokens
@@ -159,11 +156,13 @@ export async function logout(refreshToken) {
     [refreshToken]
   );
 
-  return { message: "Logout realizado com sucesso" };
+  return {
+    message: "Logout realizado com sucesso",
+  };
 }
 
 /* =====================================================
-   LIMPEZA DE TOKENS EXPIRADOS
+   LIMPEZA DE TOKENS EXPIRADOS (manutenção futura)
 ===================================================== */
 
 export async function cleanupExpiredTokens() {
