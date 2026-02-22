@@ -9,11 +9,19 @@ import {
 } from "./jwt.strategy.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
+/* =====================================================
+   UTIL
+===================================================== */
+
 function addDays(days) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date;
 }
+
+/* =====================================================
+   LOGIN
+===================================================== */
 
 export async function login(email, password) {
   const result = await pool.query(
@@ -22,10 +30,16 @@ export async function login(email, password) {
   );
 
   const user = result.rows[0];
-  if (!user) throw new AppError("Usuário não encontrado", 401);
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw new AppError("Senha inválida", 401);
+  if (!user) {
+    throw new AppError("Usuário não encontrado", 401);
+  }
+
+  const validPassword = await bcrypt.compare(password, user.password);
+
+  if (!validPassword) {
+    throw new AppError("Senha inválida", 401);
+  }
 
   const payload = {
     id: user.id,
@@ -38,38 +52,69 @@ export async function login(email, password) {
   const refreshToken = generateRefreshToken(payload);
 
   await pool.query(
-    `INSERT INTO refresh_tokens (user_id, token, expires_at)
-     VALUES ($1, $2, $3)`,
+    `
+    INSERT INTO refresh_tokens (user_id, token, expires_at)
+    VALUES ($1, $2, $3)
+    `,
     [user.id, refreshToken, addDays(7)]
   );
 
-  return { accessToken, refreshToken };
+  return {
+    accessToken,
+    refreshToken,
+  };
 }
 
-export async function refresh(oldToken) {
-  if (!oldToken)
+/* =====================================================
+   REFRESH (COM ROTAÇÃO + BLACKLIST)
+===================================================== */
+
+export async function refresh(oldRefreshToken) {
+  if (!oldRefreshToken) {
     throw new AppError("Refresh token não fornecido", 401);
-
-  const dbToken = await pool.query(
-    `SELECT * FROM refresh_tokens
-     WHERE token = $1 AND revoked = false`,
-    [oldToken]
-  );
-
-  if (!dbToken.rows.length)
-    throw new AppError("Refresh inválido", 401);
-
-  let decoded;
-  try {
-    decoded = verifyRefreshToken(oldToken);
-  } catch {
-    throw new AppError("Refresh expirado", 401);
   }
 
-  // Revoga o token antigo (rotação)
+  const stored = await pool.query(
+    `
+    SELECT * FROM refresh_tokens
+    WHERE token = $1
+    `,
+    [oldRefreshToken]
+  );
+
+  const tokenRow = stored.rows[0];
+
+  if (!tokenRow) {
+    throw new AppError("Refresh token inválido", 401);
+  }
+
+  if (tokenRow.revoked) {
+    throw new AppError("Refresh token revogado", 401);
+  }
+
+  if (new Date(tokenRow.expires_at) < new Date()) {
+    throw new AppError("Refresh token expirado", 401);
+  }
+
+  let decoded;
+
+  try {
+    decoded = verifyRefreshToken(oldRefreshToken);
+  } catch {
+    throw new AppError("Refresh token inválido", 401);
+  }
+
+  /* ===============================
+     ROTAÇÃO
+  =============================== */
+
   await pool.query(
-    `UPDATE refresh_tokens SET revoked = true WHERE token = $1`,
-    [oldToken]
+    `
+    UPDATE refresh_tokens
+    SET revoked = true
+    WHERE token = $1
+    `,
+    [oldRefreshToken]
   );
 
   const payload = {
@@ -79,24 +124,53 @@ export async function refresh(oldToken) {
     plan: decoded.plan,
   };
 
-  const newAccess = generateAccessToken(payload);
-  const newRefresh = generateRefreshToken(payload);
+  const newAccessToken = generateAccessToken(payload);
+  const newRefreshToken = generateRefreshToken(payload);
 
   await pool.query(
-    `INSERT INTO refresh_tokens (user_id, token, expires_at)
-     VALUES ($1, $2, $3)`,
-    [decoded.id, newRefresh, addDays(7)]
+    `
+    INSERT INTO refresh_tokens (user_id, token, expires_at)
+    VALUES ($1, $2, $3)
+    `,
+    [decoded.id, newRefreshToken, addDays(7)]
   );
 
   return {
-    accessToken: newAccess,
-    refreshToken: newRefresh,
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
   };
 }
 
+/* =====================================================
+   LOGOUT
+===================================================== */
+
 export async function logout(refreshToken) {
+  if (!refreshToken) {
+    throw new AppError("Refresh token não fornecido", 400);
+  }
+
   await pool.query(
-    `UPDATE refresh_tokens SET revoked = true WHERE token = $1`,
+    `
+    UPDATE refresh_tokens
+    SET revoked = true
+    WHERE token = $1
+    `,
     [refreshToken]
+  );
+
+  return { message: "Logout realizado com sucesso" };
+}
+
+/* =====================================================
+   LIMPEZA DE TOKENS EXPIRADOS
+===================================================== */
+
+export async function cleanupExpiredTokens() {
+  await pool.query(
+    `
+    DELETE FROM refresh_tokens
+    WHERE expires_at < NOW()
+    `
   );
 }
