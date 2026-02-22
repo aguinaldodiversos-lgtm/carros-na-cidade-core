@@ -1,17 +1,30 @@
-const express = require("express");
-const cors = require("cors");
+// src/app.js
+
+import express from "express";
+import cors from "cors";
+import { logger } from "./shared/logger.js";
+import { errorHandler } from "./shared/middlewares/error.middleware.js";
 
 const app = express();
 
 /* =====================================================
    CORS
 ===================================================== */
+const allowedOrigins = [
+  "https://carrosnacidade.com",
+  "http://localhost:3000",
+];
+
 app.use(
   cors({
-    origin: [
-      "https://carrosnacidade.com",
-      "http://localhost:3000",
-    ],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn({ origin }, "CORS bloqueado");
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
@@ -23,72 +36,47 @@ app.use(
 app.use(express.json());
 
 /* =====================================================
-   IMPORTAÇÃO SEGURA DAS ROTAS
+   FUNÇÃO SEGURA PARA CARREGAR ROTAS (ESM)
 ===================================================== */
-function loadRouteSafe(path, name) {
+async function loadRouteSafe(path, name) {
   try {
-    return require(path);
+    const module = await import(path);
+    logger.info(`✅ Rota carregada: ${name}`);
+    return module.default;
   } catch (err) {
-    console.warn(`⚠️ Rota não encontrada: ${path}`);
+    logger.warn(`⚠️ Rota não encontrada: ${path}`);
     return null;
   }
 }
 
-// Rotas principais
-const adsRoutes = loadRouteSafe("./routes/ads", "ads");
-const authRoutes = loadRouteSafe("./routes/auth", "auth");
-const paymentRoutes = loadRouteSafe("./routes/payments", "payments");
-const sitemapRoute = loadRouteSafe("./routes/sitemap", "sitemap");
-const alertRoutes = loadRouteSafe("./routes/alerts", "alerts");
-const analyticsRoutes = loadRouteSafe("./routes/analytics", "analytics");
-const autopilotRoutes = loadRouteSafe("./routes/autopilot", "autopilot");
-const eventsRoutes = loadRouteSafe("./routes/events", "events");
-const adminEventsRoutes = loadRouteSafe(
-  "./routes/admin.events",
-  "admin events"
-);
-const advertisersRoutes = loadRouteSafe(
-  "./routes/advertisers",
-  "advertisers"
-);
-const metricsRoutes = loadRouteSafe("./routes/metrics", "metrics");
-const fipeRoutes = loadRouteSafe("./routes/fipe", "fipe");
-
-// Nova rota de integrações (AutoDriv)
-const integrationsRoutes = loadRouteSafe(
-  "./routes/integrations",
-  "integrations"
-);
-
-// Banner approval
-const bannerApprovalRoutes = loadRouteSafe(
-  "./routes/events/bannerApproval.routes",
-  "banner approval"
-);
-
 /* =====================================================
-   REGISTRO DAS ROTAS
+   REGISTRO DINÂMICO DE ROTAS
 ===================================================== */
-if (adsRoutes) app.use("/api/ads", adsRoutes);
-if (authRoutes) app.use("/api/auth", authRoutes);
-if (paymentRoutes) app.use("/api/payments", paymentRoutes);
-if (alertRoutes) app.use("/api/alerts", alertRoutes);
-if (analyticsRoutes) app.use("/api/analytics", analyticsRoutes);
-if (autopilotRoutes) app.use("/api/autopilot", autopilotRoutes);
-if (eventsRoutes) app.use("/api/events", eventsRoutes);
-if (adminEventsRoutes)
-  app.use("/api/admin/events", adminEventsRoutes);
-if (advertisersRoutes)
-  app.use("/api/advertisers", advertisersRoutes);
-if (metricsRoutes) app.use("/api/metrics", metricsRoutes);
-if (fipeRoutes) app.use("/api/fipe", fipeRoutes);
-if (integrationsRoutes)
-  app.use("/api/integrations", integrationsRoutes);
+async function registerRoutes() {
+  const routes = [
+    { path: "./routes/ads/index.js", mount: "/api/ads", name: "ads" },
+    { path: "./routes/auth/index.js", mount: "/api/auth", name: "auth" },
+    { path: "./routes/payments/index.js", mount: "/api/payments", name: "payments" },
+    { path: "./routes/sitemap/index.js", mount: "/sitemap.xml", name: "sitemap" },
+    { path: "./routes/alerts/index.js", mount: "/api/alerts", name: "alerts" },
+    { path: "./routes/analytics/index.js", mount: "/api/analytics", name: "analytics" },
+    { path: "./routes/autopilot/index.js", mount: "/api/autopilot", name: "autopilot" },
+    { path: "./routes/events/index.js", mount: "/api/events", name: "events" },
+    { path: "./routes/admin.events/index.js", mount: "/api/admin/events", name: "admin events" },
+    { path: "./routes/advertisers/index.js", mount: "/api/advertisers", name: "advertisers" },
+    { path: "./routes/metrics/index.js", mount: "/api/metrics", name: "metrics" },
+    { path: "./routes/fipe/index.js", mount: "/api/fipe", name: "fipe" },
+    { path: "./routes/integrations/index.js", mount: "/api/integrations", name: "integrations" },
+    { path: "./routes/events/bannerApproval.routes.js", mount: "/api/events/banner", name: "banner approval" },
+  ];
 
-if (bannerApprovalRoutes)
-  app.use("/api/events/banner", bannerApprovalRoutes);
-
-if (sitemapRoute) app.use("/sitemap.xml", sitemapRoute);
+  for (const route of routes) {
+    const loadedRoute = await loadRouteSafe(route.path, route.name);
+    if (loadedRoute) {
+      app.use(route.mount, loadedRoute);
+    }
+  }
+}
 
 /* =====================================================
    HEALTH CHECK
@@ -98,13 +86,13 @@ app.get("/health", (_, res) => {
 });
 
 /* =====================================================
-   ERRO GLOBAL
+   INICIALIZAÇÃO
 ===================================================== */
-app.use((err, req, res, next) => {
-  console.error("Erro na aplicação:", err);
-  res.status(500).json({
-    error: "Erro interno no servidor",
-  });
-});
+await registerRoutes();
 
-module.exports = app;
+/* =====================================================
+   ERRO GLOBAL (SEMPRE ÚLTIMO)
+===================================================== */
+app.use(errorHandler);
+
+export default app;
