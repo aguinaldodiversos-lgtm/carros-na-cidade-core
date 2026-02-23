@@ -6,6 +6,36 @@ import { checkAdLimit } from "./ads.plan-limit.service.js";
 import { generateText } from "../ai/ai.service.js";
 
 /* =====================================================
+   UTIL — NORMALIZAÇÃO SEGURA WHATSAPP (NÃO ALTERA DDD)
+===================================================== */
+
+function normalizeWhatsAppNumber(input) {
+  if (!input) return null;
+
+  const digits = input.replace(/\D/g, "");
+
+  if (digits.length < 10) {
+    throw new AppError("Número de WhatsApp inválido", 400);
+  }
+
+  // Se já começa com 55, mantém
+  if (digits.startsWith("55")) {
+    return digits;
+  }
+
+  // Caso contrário, adiciona 55 (Brasil)
+  return `55${digits}`;
+}
+
+function generateWhatsAppLink(number, ad) {
+  if (!number) return null;
+
+  const message = `Olá! Tenho interesse no ${ad.title} anunciado no Carros na Cidade. Ainda está disponível?`;
+
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
+/* =====================================================
    CONFIGURAÇÕES DE RANKING
 ===================================================== */
 
@@ -18,9 +48,7 @@ const PLAN_WEIGHT = {
 function calculatePlanScore(plan, highlighted) {
   let score = PLAN_WEIGHT[plan] || 1;
 
-  if (highlighted) {
-    score += 4;
-  }
+  if (highlighted) score += 4;
 
   return score;
 }
@@ -36,14 +64,12 @@ async function getCityDemand(cityId) {
 
 async function recalculateRanking(ad, userPlan, highlighted) {
   const demand = await getCityDemand(ad.city_id);
-
   const baseScore = calculatePlanScore(userPlan, highlighted);
-
   return baseScore * demand;
 }
 
 /* =====================================================
-   LISTAR ANÚNCIOS (RANKING OTIMIZADO)
+   LISTAR ANÚNCIOS
 ===================================================== */
 
 export async function list(filters = {}) {
@@ -79,7 +105,10 @@ export async function list(filters = {}) {
 
   const result = await pool.query(query, params);
 
-  return result.rows;
+  return result.rows.map((ad) => ({
+    ...ad,
+    whatsapp_link: generateWhatsAppLink(ad.whatsapp_number, ad),
+  }));
 }
 
 /* =====================================================
@@ -98,7 +127,10 @@ export async function show(id) {
     throw new AppError("Anúncio não encontrado", 404);
   }
 
-  return ad;
+  return {
+    ...ad,
+    whatsapp_link: generateWhatsAppLink(ad.whatsapp_number, ad),
+  };
 }
 
 /* =====================================================
@@ -108,12 +140,10 @@ export async function show(id) {
 export async function create(data, user) {
   await checkAdLimit(user.id, user.plan);
 
-  const fakeAd = {
-    city_id: data.city_id,
-  };
+  const whatsapp_number = normalizeWhatsAppNumber(data.whatsapp_number);
 
   const rankingScore = await recalculateRanking(
-    fakeAd,
+    { city_id: data.city_id },
     user.plan,
     false
   );
@@ -126,13 +156,14 @@ export async function create(data, user) {
       description,
       price,
       city_id,
+      whatsapp_number,
       status,
       highlighted,
       ranking_score,
       created_at,
       updated_at
     )
-    VALUES ($1,$2,$3,$4,$5,'active',false,$6,NOW(),NOW())
+    VALUES ($1,$2,$3,$4,$5,$6,'active',false,$7,NOW(),NOW())
     RETURNING *
     `,
     [
@@ -141,11 +172,18 @@ export async function create(data, user) {
       data.description || "",
       data.price,
       data.city_id,
+      whatsapp_number,
       rankingScore,
     ]
   );
 
-  return result.rows[0];
+  return {
+    ...result.rows[0],
+    whatsapp_link: generateWhatsAppLink(
+      whatsapp_number,
+      result.rows[0]
+    ),
+  };
 }
 
 /* =====================================================
@@ -158,6 +196,10 @@ export async function update(id, data, user) {
   if (ad.user_id !== user.id) {
     throw new AppError("Sem permissão", 403);
   }
+
+  const whatsapp_number = data.whatsapp_number
+    ? normalizeWhatsAppNumber(data.whatsapp_number)
+    : ad.whatsapp_number;
 
   const updatedFields = {
     title: data.title ?? ad.title,
@@ -179,9 +221,10 @@ export async function update(id, data, user) {
         description = $2,
         price = $3,
         city_id = $4,
-        ranking_score = $5,
+        whatsapp_number = $5,
+        ranking_score = $6,
         updated_at = NOW()
-    WHERE id = $6
+    WHERE id = $7
     RETURNING *
     `,
     [
@@ -189,12 +232,19 @@ export async function update(id, data, user) {
       updatedFields.description,
       updatedFields.price,
       updatedFields.city_id,
+      whatsapp_number,
       rankingScore,
       id,
     ]
   );
 
-  return result.rows[0];
+  return {
+    ...result.rows[0],
+    whatsapp_link: generateWhatsAppLink(
+      whatsapp_number,
+      result.rows[0]
+    ),
+  };
 }
 
 /* =====================================================
@@ -254,25 +304,7 @@ export async function highlight(id, user) {
 }
 
 /* =====================================================
-   ANÁLISE DE PREÇO (estrutura futura IA)
-===================================================== */
-
-export async function priceAnalysis(id, user) {
-  const ad = await show(id);
-
-  if (ad.user_id !== user.id) {
-    throw new AppError("Sem permissão", 403);
-  }
-
-  return {
-    current_price: ad.price,
-    suggested_price: ad.price,
-    message: "Análise dinâmica futura via IA",
-  };
-}
-
-/* =====================================================
-   MELHORIA DE DESCRIÇÃO COM IA LOCAL
+   IA — MELHORAR DESCRIÇÃO
 ===================================================== */
 
 export async function aiImprove(id, user) {
