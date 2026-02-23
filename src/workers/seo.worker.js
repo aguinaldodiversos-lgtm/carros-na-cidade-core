@@ -1,5 +1,8 @@
 require("dotenv").config();
 const { Pool } = require("pg");
+const path = require("path");
+const { google } = require("googleapis");
+const { BetaAnalyticsDataClient } = require("@google-analytics/data");
 
 const {
   generateSeoArticle,
@@ -14,11 +17,135 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+/* =====================================================
+   CONFIG GOOGLE
+===================================================== */
+
+const keyPath = path.join(
+  __dirname,
+  "../credentials/google-service-account.json"
+);
+
+const analyticsClient = new BetaAnalyticsDataClient({
+  keyFilename: keyPath,
+});
+
+async function collectSearchConsoleData(startDate, endDate) {
+  const auth = new google.auth.GoogleAuth({
+    keyFile: keyPath,
+    scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
+  });
+
+  const authClient = await auth.getClient();
+
+  const searchconsole = google.searchconsole({
+    version: "v1",
+    auth: authClient,
+  });
+
+  const response = await searchconsole.searchanalytics.query({
+    siteUrl: "https://carrosnacidade.com/",
+    requestBody: {
+      startDate,
+      endDate,
+      dimensions: ["query"],
+      rowLimit: 1000,
+    },
+  });
+
+  if (!response.data.rows) return;
+
+  for (const row of response.data.rows) {
+    await pool.query(
+      `
+      INSERT INTO seo_city_metrics
+      (date, city, impressions, clicks, ctr, avg_position, source)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT (date, city)
+      DO UPDATE SET
+        impressions = EXCLUDED.impressions,
+        clicks = EXCLUDED.clicks,
+        ctr = EXCLUDED.ctr,
+        avg_position = EXCLUDED.avg_position
+      `,
+      [
+        startDate,
+        "global",
+        row.impressions,
+        row.clicks,
+        row.ctr,
+        row.position,
+        "google",
+      ]
+    );
+  }
+
+  console.log("📊 Search Console coletado");
+}
+
+async function collectGA4Data(startDate, endDate) {
+  const propertyId = process.env.GA4_PROPERTY_ID;
+
+  if (!propertyId) {
+    console.log("⚠ GA4_PROPERTY_ID não definido");
+    return;
+  }
+
+  const [response] = await analyticsClient.runReport({
+    property: `properties/${propertyId}`,
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: "city" }],
+    metrics: [
+      { name: "sessions" },
+      { name: "totalUsers" },
+      { name: "conversions" },
+    ],
+  });
+
+  for (const row of response.rows || []) {
+    const city = row.dimensionValues[0].value;
+
+    await pool.query(
+      `
+      INSERT INTO seo_city_metrics
+      (date, city, sessions, users_count, conversions, source)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      ON CONFLICT (date, city)
+      DO UPDATE SET
+        sessions = EXCLUDED.sessions,
+        users_count = EXCLUDED.users_count,
+        conversions = EXCLUDED.conversions
+      `,
+      [
+        startDate,
+        city,
+        row.metricValues[0].value,
+        row.metricValues[1].value,
+        row.metricValues[2].value,
+        "google",
+      ]
+    );
+  }
+
+  console.log("📈 GA4 coletado");
+}
+
+/* =====================================================
+   WORKER PRINCIPAL
+===================================================== */
+
 async function runSeoWorker() {
   try {
     console.log("🌐 Rodando SEO Worker inteligente...");
 
-    // 1) Buscar cidades com maior oportunidade
+    const today = new Date().toISOString().split("T")[0];
+
+    /* ===== 1️⃣ Coleta externa ===== */
+    await collectSearchConsoleData(today, today);
+    await collectGA4Data(today, today);
+
+    /* ===== 2️⃣ Growth SEO interno ===== */
+
     const citiesResult = await pool.query(`
       SELECT c.id, c.name, c.slug, o.priority_level
       FROM cities c
@@ -39,10 +166,8 @@ async function runSeoWorker() {
     for (const cidade of cities) {
       console.log(`📍 Processando cidade: ${cidade.name}`);
 
-      // 2) Garantir páginas principais da cidade
       await garantirSEO(cidade, pool);
 
-      // 3) Buscar modelos mais procurados na cidade
       const modelsResult = await pool.query(
         `
         SELECT brand, model, COUNT(*) as total
@@ -60,7 +185,6 @@ async function runSeoWorker() {
       for (const row of modelsResult.rows) {
         const { brand, model } = row;
 
-        // 4) Verificar se artigo já existe
         const exists = await pool.query(
           `
           SELECT id FROM blog_posts
@@ -103,7 +227,7 @@ async function runSeoWorker() {
       }
     }
 
-    console.log("✅ SEO Worker finalizado");
+    console.log("🔥 SEO Worker finalizado com coleta + IA + Growth");
   } catch (err) {
     console.error("❌ Erro no SEO Worker:", err);
   }
