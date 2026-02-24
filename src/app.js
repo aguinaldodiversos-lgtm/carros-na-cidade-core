@@ -9,6 +9,7 @@ import { errorHandler } from "./shared/middlewares/error.middleware.js";
 
 import leadsRoutes from "./modules/leads/leads.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import publicRoutes from "./modules/public/public.routes.js";
 
 const app = express();
 
@@ -46,7 +47,7 @@ app.use(httpLoggerMiddleware);
 /* =====================================================
    ROTAS
 ===================================================== */
-
+app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadsRoutes);
 
