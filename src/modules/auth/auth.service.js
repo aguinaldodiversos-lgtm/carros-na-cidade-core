@@ -14,7 +14,13 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 ===================================================== */
 
 const REFRESH_TOKEN_DAYS = 7;
-const MAX_ACTIVE_SESSIONS = 5; // limite por usuário
+const MAX_ACTIVE_SESSIONS = 5;
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_TIME_MINUTES = 15;
+
+/* =====================================================
+   UTILS
+===================================================== */
 
 function addDays(days) {
   const date = new Date();
@@ -27,7 +33,7 @@ function normalizeEmail(email) {
 }
 
 /* =====================================================
-   LOGIN
+   LOGIN (COM BLOQUEIO POR TENTATIVA)
 ===================================================== */
 
 export async function login(email, password) {
@@ -38,22 +44,59 @@ export async function login(email, password) {
   const normalizedEmail = normalizeEmail(email);
 
   const result = await pool.query(
-    "SELECT id, email, password, role, plan FROM users WHERE email = $1",
+    "SELECT * FROM users WHERE email = $1",
     [normalizedEmail]
   );
 
   const user = result.rows[0];
 
-  // Mensagem genérica para evitar enumeração
+  // Proteção contra enumeração
   if (!user) {
     throw new AppError("Credenciais inválidas", 401);
+  }
+
+  // Verifica bloqueio
+  if (user.locked_until && new Date(user.locked_until) > new Date()) {
+    throw new AppError(
+      "Conta temporariamente bloqueada. Tente novamente mais tarde.",
+      403
+    );
   }
 
   const validPassword = await bcrypt.compare(password, user.password);
 
   if (!validPassword) {
+    const attempts = (user.failed_attempts || 0) + 1;
+
+    let lockTime = null;
+
+    if (attempts >= MAX_FAILED_ATTEMPTS) {
+      lockTime = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
+    }
+
+    await pool.query(
+      `
+      UPDATE users
+      SET failed_attempts = $1,
+          locked_until = $2
+      WHERE id = $3
+      `,
+      [attempts, lockTime, user.id]
+    );
+
     throw new AppError("Credenciais inválidas", 401);
   }
+
+  // Reset tentativas se login bem-sucedido
+  await pool.query(
+    `
+    UPDATE users
+    SET failed_attempts = 0,
+        locked_until = NULL
+    WHERE id = $1
+    `,
+    [user.id]
+  );
 
   const payload = {
     id: user.id,
@@ -66,7 +109,7 @@ export async function login(email, password) {
   const refreshToken = generateRefreshToken(payload);
 
   /* ===============================
-     Controle de sessões simultâneas
+     CONTROLE DE SESSÕES
   =============================== */
 
   const activeSessions = await pool.query(
@@ -186,7 +229,7 @@ export async function refresh(oldRefreshToken) {
 }
 
 /* =====================================================
-   LOGOUT (REVOGAÇÃO INDIVIDUAL)
+   LOGOUT INDIVIDUAL
 ===================================================== */
 
 export async function logout(refreshToken) {
@@ -209,7 +252,7 @@ export async function logout(refreshToken) {
 }
 
 /* =====================================================
-   LOGOUT GLOBAL (TODAS SESSÕES)
+   LOGOUT GLOBAL
 ===================================================== */
 
 export async function logoutAll(userId) {
