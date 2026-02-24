@@ -6,6 +6,7 @@ import cors from "cors";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler } from "./shared/middlewares/error.middleware.js";
+
 import leadsRoutes from "./modules/leads/leads.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 
@@ -35,9 +36,9 @@ app.use(
 );
 
 /* =====================================================
-   MIDDLEWARES GLOBAIS
+   MIDDLEWARES GLOBAIS (ANTES DAS ROTAS)
 ===================================================== */
-app.use("/api/leads", leadsRoutes);
+
 app.use(express.json());
 app.use(requestIdMiddleware);
 app.use(httpLoggerMiddleware);
@@ -47,6 +48,7 @@ app.use(httpLoggerMiddleware);
 ===================================================== */
 
 app.use("/api/auth", authRoutes);
+app.use("/api/leads", leadsRoutes);
 
 /* =====================================================
    HEALTH CHECK
