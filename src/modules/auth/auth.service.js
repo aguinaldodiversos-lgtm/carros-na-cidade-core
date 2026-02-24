@@ -10,8 +10,11 @@ import {
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 /* =====================================================
-   UTIL
+   CONFIGURAÇÕES
 ===================================================== */
+
+const REFRESH_TOKEN_DAYS = 7;
+const MAX_ACTIVE_SESSIONS = 5; // limite por usuário
 
 function addDays(days) {
   const date = new Date();
@@ -19,26 +22,37 @@ function addDays(days) {
   return date;
 }
 
+function normalizeEmail(email) {
+  return email.trim().toLowerCase();
+}
+
 /* =====================================================
    LOGIN
 ===================================================== */
 
 export async function login(email, password) {
+  if (!email || !password) {
+    throw new AppError("Credenciais inválidas", 401);
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+
   const result = await pool.query(
     "SELECT id, email, password, role, plan FROM users WHERE email = $1",
-    [email]
+    [normalizedEmail]
   );
 
   const user = result.rows[0];
 
+  // Mensagem genérica para evitar enumeração
   if (!user) {
-    throw new AppError("Usuário não encontrado", 401);
+    throw new AppError("Credenciais inválidas", 401);
   }
 
   const validPassword = await bcrypt.compare(password, user.password);
 
   if (!validPassword) {
-    throw new AppError("Senha inválida", 401);
+    throw new AppError("Credenciais inválidas", 401);
   }
 
   const payload = {
@@ -51,12 +65,42 @@ export async function login(email, password) {
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
+  /* ===============================
+     Controle de sessões simultâneas
+  =============================== */
+
+  const activeSessions = await pool.query(
+    `
+    SELECT COUNT(*) 
+    FROM refresh_tokens
+    WHERE user_id = $1
+      AND revoked = false
+    `,
+    [user.id]
+  );
+
+  if (Number(activeSessions.rows[0].count) >= MAX_ACTIVE_SESSIONS) {
+    await pool.query(
+      `
+      DELETE FROM refresh_tokens
+      WHERE user_id = $1
+      AND id IN (
+        SELECT id FROM refresh_tokens
+        WHERE user_id = $1
+        ORDER BY created_at ASC
+        LIMIT 1
+      )
+      `,
+      [user.id]
+    );
+  }
+
   await pool.query(
     `
     INSERT INTO refresh_tokens (user_id, token, expires_at)
     VALUES ($1, $2, $3)
     `,
-    [user.id, refreshToken, addDays(7)]
+    [user.id, refreshToken, addDays(REFRESH_TOKEN_DAYS)]
   );
 
   return {
@@ -66,7 +110,7 @@ export async function login(email, password) {
 }
 
 /* =====================================================
-   REFRESH COM ROTAÇÃO AUTOMÁTICA
+   REFRESH COM ROTAÇÃO SEGURA
 ===================================================== */
 
 export async function refresh(oldRefreshToken) {
@@ -104,7 +148,10 @@ export async function refresh(oldRefreshToken) {
     throw new AppError("Refresh token inválido", 401);
   }
 
-  // Revoga token antigo (BLACKLIST + ROTAÇÃO)
+  /* ===============================
+     ROTAÇÃO (ANTI REPLAY)
+  =============================== */
+
   await pool.query(
     `
     UPDATE refresh_tokens
@@ -129,7 +176,7 @@ export async function refresh(oldRefreshToken) {
     INSERT INTO refresh_tokens (user_id, token, expires_at)
     VALUES ($1, $2, $3)
     `,
-    [decoded.id, newRefreshToken, addDays(7)]
+    [decoded.id, newRefreshToken, addDays(REFRESH_TOKEN_DAYS)]
   );
 
   return {
@@ -139,7 +186,7 @@ export async function refresh(oldRefreshToken) {
 }
 
 /* =====================================================
-   LOGOUT
+   LOGOUT (REVOGAÇÃO INDIVIDUAL)
 ===================================================== */
 
 export async function logout(refreshToken) {
@@ -162,7 +209,26 @@ export async function logout(refreshToken) {
 }
 
 /* =====================================================
-   LIMPEZA DE TOKENS EXPIRADOS (manutenção futura)
+   LOGOUT GLOBAL (TODAS SESSÕES)
+===================================================== */
+
+export async function logoutAll(userId) {
+  await pool.query(
+    `
+    UPDATE refresh_tokens
+    SET revoked = true
+    WHERE user_id = $1
+    `,
+    [userId]
+  );
+
+  return {
+    message: "Todas as sessões foram encerradas",
+  };
+}
+
+/* =====================================================
+   LIMPEZA DE TOKENS EXPIRADOS
 ===================================================== */
 
 export async function cleanupExpiredTokens() {
