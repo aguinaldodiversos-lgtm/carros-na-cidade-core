@@ -9,7 +9,7 @@ import rateLimit from "express-rate-limit";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler } from "./shared/middlewares/error.middleware.js";
-
+import adsEventsRoutes from "./modules/ads/ads.events.routes.js";
 import adsRoutes from "./modules/ads/ads.routes.js";
 import leadsRoutes from "./modules/leads/leads.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -113,7 +113,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadsRoutes);
 app.use("/api/ads", adsRoutes);
-
+app.use("/api/ads", adsEventsRoutes);
 /* =====================================================
    404 HANDLER
 ===================================================== */
