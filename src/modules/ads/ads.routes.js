@@ -6,38 +6,38 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 const router = express.Router();
 
 /* =====================================================
+   UTILITÁRIO SEGURO PARA NÚMEROS
+===================================================== */
+
+function toNumber(value) {
+  const n = Number(value);
+  return isNaN(n) ? undefined : n;
+}
+
+/* =====================================================
    ROTAS PÚBLICAS
 ===================================================== */
 
 /**
  * GET /api/ads
- * Listar anúncios com filtros opcionais
- * Query params:
- *  - city_id
- *  - brand
- *  - min_price
- *  - max_price
+ * Listagem padrão paginada
  */
 router.get("/", async (req, res, next) => {
   try {
     const filters = {
-      city_id: req.query.city_id
-        ? Number(req.query.city_id)
-        : undefined,
-      brand: req.query.brand || undefined,
-      min_price: req.query.min_price
-        ? Number(req.query.min_price)
-        : undefined,
-      max_price: req.query.max_price
-        ? Number(req.query.max_price)
-        : undefined,
+      city_id: toNumber(req.query.city_id),
+      brand: req.query.brand,
+      min_price: toNumber(req.query.min_price),
+      max_price: toNumber(req.query.max_price),
+      page: toNumber(req.query.page) || 1,
+      limit: toNumber(req.query.limit) || 20
     };
 
-    const ads = await adsService.list(filters);
+    const result = await adsService.search(filters);
 
     res.json({
       success: true,
-      data: ads,
+      ...result
     });
   } catch (err) {
     next(err);
@@ -45,22 +45,57 @@ router.get("/", async (req, res, next) => {
 });
 
 /**
- * GET /api/ads/:id
- * Detalhe do anúncio
+ * GET /api/ads/search
+ * Busca full-text profissional
+ * Query params:
+ *   q
+ *   city_id
+ *   brand
+ *   min_price
+ *   max_price
+ *   page
+ *   limit
  */
-router.get("/:id", async (req, res, next) => {
+router.get("/search", async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
+    const filters = {
+      q: req.query.q,
+      city_id: toNumber(req.query.city_id),
+      brand: req.query.brand,
+      min_price: toNumber(req.query.min_price),
+      max_price: toNumber(req.query.max_price),
+      page: toNumber(req.query.page) || 1,
+      limit: toNumber(req.query.limit) || 20
+    };
 
-    if (!id) {
-      throw new AppError("ID inválido", 400);
-    }
-
-    const ad = await adsService.show(id);
+    const result = await adsService.search(filters);
 
     res.json({
       success: true,
-      data: ad,
+      ...result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/ads/:identifier
+ * Pode buscar por ID ou SLUG
+ */
+router.get("/:identifier", async (req, res, next) => {
+  try {
+    const { identifier } = req.params;
+
+    if (!identifier) {
+      throw new AppError("Identificador inválido", 400);
+    }
+
+    const ad = await adsService.show(identifier);
+
+    res.json({
+      success: true,
+      data: ad
     });
   } catch (err) {
     next(err);
@@ -85,6 +120,8 @@ router.post("/", authMiddleware, async (req, res, next) => {
       "model",
       "year",
       "mileage",
+      "city",
+      "state"
     ];
 
     for (const field of requiredFields) {
@@ -97,7 +134,30 @@ router.post("/", authMiddleware, async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      data: ad,
+      data: ad
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/ads/:id
+ * Soft delete
+ */
+router.delete("/:id", authMiddleware, async (req, res, next) => {
+  try {
+    const id = toNumber(req.params.id);
+
+    if (!id) {
+      throw new AppError("ID inválido", 400);
+    }
+
+    await adsService.remove(id, req.user);
+
+    res.json({
+      success: true,
+      message: "Anúncio removido com sucesso"
     });
   } catch (err) {
     next(err);
