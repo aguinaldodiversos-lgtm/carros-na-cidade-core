@@ -19,78 +19,111 @@ export async function search(filters = {}) {
     q,
     city_id,
     brand,
+    model,
     min_price,
     max_price,
+    below_fipe,
+    body_type,
+    fuel_type,
+    year_min,
+    year_max,
     page = 1,
-    limit = 20
+    limit = 20,
   } = filters;
 
-  const offset = (page - 1) * limit;
-  let where = ["status = 'active'"];
-  let params = [];
-  let index = 1;
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
+  const offset = (safePage - 1) * safeLimit;
 
-  if (q) {
-    where.push(`search_vector @@ plainto_tsquery('portuguese', $${index++})`);
-    params.push(q);
+  const where = ["a.status = 'active'"];
+  const params = [];
+  let i = 1;
+
+  // Full-text (quando q existe)
+  let useTextRank = false;
+  if (q && String(q).trim().length >= 2) {
+    useTextRank = true;
+    where.push(`a.search_vector @@ plainto_tsquery('portuguese', $${i++})`);
+    params.push(String(q).trim());
   }
 
-  if (city_id) {
-    where.push(`city_id = $${index++}`);
-    params.push(city_id);
+  if (city_id) { where.push(`a.city_id = $${i++}`); params.push(Number(city_id)); }
+  if (brand)   { where.push(`a.brand ILIKE $${i++}`); params.push(`%${brand}%`); }
+  if (model)   { where.push(`a.model ILIKE $${i++}`); params.push(`%${model}%`); }
+
+  if (min_price) { where.push(`a.price >= $${i++}`); params.push(Number(min_price)); }
+  if (max_price) { where.push(`a.price <= $${i++}`); params.push(Number(max_price)); }
+
+  if (below_fipe !== undefined) {
+    const bf = below_fipe === true || below_fipe === "true";
+    where.push(`a.below_fipe = $${i++}`);
+    params.push(bf);
   }
 
-  if (brand) {
-    where.push(`brand ILIKE $${index++}`);
-    params.push(`%${brand}%`);
-  }
+  if (body_type) { where.push(`a.body_type = $${i++}`); params.push(body_type); }
+  if (fuel_type) { where.push(`a.fuel_type = $${i++}`); params.push(fuel_type); }
 
-  if (min_price) {
-    where.push(`price >= $${index++}`);
-    params.push(min_price);
-  }
+  if (year_min) { where.push(`a.year >= $${i++}`); params.push(Number(year_min)); }
+  if (year_max) { where.push(`a.year <= $${i++}`); params.push(Number(year_max)); }
 
-  if (max_price) {
-    where.push(`price <= $${index++}`);
-    params.push(max_price);
-  }
+  const whereClause = `WHERE ${where.join(" AND ")}`;
 
-  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
+  // SCORE híbrido:
+  // - destaque ativo: +100
+  // - prioridade: +priority*10
+  // - ctr: +ctr*60
+  // - leads: +leads*2
+  // - recência (decay por dias): + 30 / (1 + ageDays)
+  // - relevância textual (quando q): + ts_rank*50
   const query = `
-    SELECT *,
-      ts_rank(search_vector, plainto_tsquery('portuguese', $1)) AS rank
-    FROM ads
+    SELECT
+      a.*,
+      COALESCE(m.views, 0)  AS views,
+      COALESCE(m.clicks, 0) AS clicks,
+      COALESCE(m.leads, 0)  AS leads,
+      COALESCE(m.ctr, 0)    AS ctr,
+      ${
+        useTextRank
+          ? "ts_rank(a.search_vector, plainto_tsquery('portuguese', $1))"
+          : "0"
+      } AS text_rank,
+      (
+        (CASE WHEN a.highlight_until > NOW() THEN 100 ELSE 0 END)
+        + (COALESCE(a.priority, 1) * 10)
+        + (COALESCE(m.ctr, 0) * 60)
+        + (COALESCE(m.leads, 0) * 2)
+        + (30.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))
+        + (${useTextRank ? "ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50" : "0"})
+      ) AS hybrid_score
+    FROM ads a
+    LEFT JOIN ad_metrics m ON m.ad_id = a.id
     ${whereClause}
     ORDER BY
-      (highlight_until > NOW()) DESC,
-      rank DESC,
-      created_at DESC
-    LIMIT $${index++}
-    OFFSET $${index}
+      hybrid_score DESC,
+      a.created_at DESC
+    LIMIT $${i++}
+    OFFSET $${i++}
   `;
 
-  params.push(limit);
-  params.push(offset);
+  const dataParams = [...params, safeLimit, offset];
 
-  const result = await pool.query(query, params);
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(query, dataParams),
+    pool.query(`SELECT COUNT(*) FROM ads a ${whereClause}`, params),
+  ]);
 
-  const countResult = await pool.query(
-    `SELECT COUNT(*) FROM ads ${whereClause}`,
-    params.slice(0, index - 2)
-  );
+  const total = Number(countResult.rows[0].count || 0);
 
   return {
-    data: result.rows,
+    data: dataResult.rows,
     pagination: {
-      page: Number(page),
-      limit: Number(limit),
-      total: Number(countResult.rows[0].count),
-      totalPages: Math.ceil(countResult.rows[0].count / limit)
-    }
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+    },
   };
 }
-
 /* =====================================================
    DETALHE POR ID OU SLUG
 ===================================================== */
