@@ -1,80 +1,37 @@
-// src/modules/ads/ads.service.js
-
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
-import { checkAdLimit } from "./ads.plan-limit.service.js";
-import { generateText } from "../ai/ai.service.js";
 
-/* =====================================================
-   CONFIGURAÇÕES DE RANKING
-===================================================== */
+/* =========================================
+   CALCULO DE RANKING PROFISSIONAL
+========================================= */
 
-const PLAN_WEIGHT = {
-  free: 1,
-  start: 2,
-  pro: 3,
-};
+function calculateRanking(ad) {
+  let score = 1;
 
-/* =====================================================
-   FUNÇÕES AUXILIARES DE RANKING
-===================================================== */
+  // prioridade manual
+  score += ad.priority || 1;
 
-function calculatePlanScore(plan, highlighted) {
-  let score = PLAN_WEIGHT[plan] || 1;
+  // plano
+  if (ad.plan === "pro") score += 5;
+  if (ad.plan === "start") score += 3;
 
-  if (highlighted) {
-    score += 4; // peso fixo para destaque
+  // destaque ativo
+  if (ad.highlight_until && new Date(ad.highlight_until) > new Date()) {
+    score += 8;
   }
+
+  // abaixo da FIPE
+  if (ad.below_fipe) score += 4;
 
   return score;
 }
 
-async function getCityDemand(cityId) {
-  const result = await pool.query(
-    `SELECT demand_score FROM city_metrics WHERE city_id = $1`,
-    [cityId]
-  );
-
-  return Number(result.rows[0]?.demand_score || 1);
-}
-
-async function getSellerScore(sellerId) {
-  const result = await pool.query(
-    `SELECT score FROM seller_scores WHERE seller_id = $1`,
-    [sellerId]
-  );
-
-  return Number(result.rows[0]?.score || 0);
-}
-
-/* =====================================================
-   RECALCULAR RANKING COMPLETO
-===================================================== */
-
-export async function recalculateRanking(
-  ad,
-  userPlan,
-  highlighted,
-  sellerId
-) {
-  const demand = await getCityDemand(ad.city_id);
-  const baseScore = calculatePlanScore(userPlan, highlighted);
-  const sellerScore = await getSellerScore(sellerId);
-
-  // vendedor com score alto sobe mais
-  const sellerWeight = 1 + sellerScore / 100;
-
-  const finalScore = baseScore * demand * sellerWeight;
-
-  return Number(finalScore.toFixed(4));
-}
-
-/* =====================================================
-   LISTAR ANÚNCIOS (RANKING OTIMIZADO)
-===================================================== */
+/* =========================================
+   LISTAR ANÚNCIOS
+========================================= */
 
 export async function list(filters = {}) {
-  const { city_id, min_price, max_price } = filters;
+  const { city_id, brand, min_price, max_price } = filters;
 
   let query = `
     SELECT *
@@ -83,244 +40,95 @@ export async function list(filters = {}) {
   `;
 
   const params = [];
+  let index = 1;
 
   if (city_id) {
+    query += ` AND city_id = $${index++}`;
     params.push(city_id);
-    query += ` AND city_id = $${params.length}`;
+  }
+
+  if (brand) {
+    query += ` AND brand ILIKE $${index++}`;
+    params.push(`%${brand}%`);
   }
 
   if (min_price) {
+    query += ` AND price >= $${index++}`;
     params.push(min_price);
-    query += ` AND price >= $${params.length}`;
   }
 
   if (max_price) {
+    query += ` AND price <= $${index++}`;
     params.push(max_price);
-    query += ` AND price <= $${params.length}`;
   }
 
   query += `
-    ORDER BY ranking_score DESC, created_at DESC
-    LIMIT 100
+    ORDER BY
+      (CASE
+        WHEN highlight_until > NOW() THEN 1
+        ELSE 0
+      END) DESC,
+      priority DESC,
+      created_at DESC
+    LIMIT 50
   `;
 
   const result = await pool.query(query, params);
   return result.rows;
 }
 
-/* =====================================================
-   BUSCAR POR ID
-===================================================== */
+/* =========================================
+   DETALHE DO ANÚNCIO
+========================================= */
 
 export async function show(id) {
   const result = await pool.query(
-    `SELECT * FROM ads WHERE id = $1`,
+    `SELECT * FROM ads WHERE id = $1 AND status = 'active'`,
     [id]
   );
 
-  const ad = result.rows[0];
-
-  if (!ad || ad.status === "deleted") {
+  if (!result.rows.length) {
     throw new AppError("Anúncio não encontrado", 404);
   }
 
-  return ad;
+  return result.rows[0];
 }
 
-/* =====================================================
+/* =========================================
    CRIAR ANÚNCIO
-===================================================== */
+========================================= */
 
 export async function create(data, user) {
-  await checkAdLimit(user.id, user.plan);
-
-  const fakeAd = {
-    city_id: data.city_id,
-  };
-
-  const rankingScore = await recalculateRanking(
-    fakeAd,
-    user.plan,
-    false,
-    user.id
+  const advertiserResult = await pool.query(
+    `SELECT id FROM advertisers WHERE user_id = $1`,
+    [user.id]
   );
+
+  if (!advertiserResult.rows.length) {
+    throw new AppError("Advertiser não encontrado", 400);
+  }
+
+  const advertiser_id = advertiserResult.rows[0].id;
 
   const result = await pool.query(
     `
-    INSERT INTO ads (
-      user_id,
-      title,
-      description,
-      price,
-      city_id,
-      status,
-      highlighted,
-      ranking_score,
-      created_at,
-      updated_at
-    )
-    VALUES ($1,$2,$3,$4,$5,'active',false,$6,NOW(),NOW())
+    INSERT INTO ads
+    (advertiser_id, title, price, city_id, brand, model, year, mileage, plan)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING *
     `,
     [
-      user.id,
+      advertiser_id,
       data.title,
-      data.description || "",
       data.price,
       data.city_id,
-      rankingScore,
+      data.brand,
+      data.model,
+      data.year,
+      data.mileage,
+      user.plan
     ]
   );
 
   return result.rows[0];
-}
-
-/* =====================================================
-   ATUALIZAR ANÚNCIO
-===================================================== */
-
-export async function update(id, data, user) {
-  const ad = await show(id);
-
-  if (ad.user_id !== user.id) {
-    throw new AppError("Sem permissão", 403);
-  }
-
-  const updatedFields = {
-    title: data.title ?? ad.title,
-    description: data.description ?? ad.description,
-    price: data.price ?? ad.price,
-    city_id: data.city_id ?? ad.city_id,
-  };
-
-  const rankingScore = await recalculateRanking(
-    updatedFields,
-    user.plan,
-    ad.highlighted,
-    user.id
-  );
-
-  const result = await pool.query(
-    `
-    UPDATE ads
-    SET title = $1,
-        description = $2,
-        price = $3,
-        city_id = $4,
-        ranking_score = $5,
-        updated_at = NOW()
-    WHERE id = $6
-    RETURNING *
-    `,
-    [
-      updatedFields.title,
-      updatedFields.description,
-      updatedFields.price,
-      updatedFields.city_id,
-      rankingScore,
-      id,
-    ]
-  );
-
-  return result.rows[0];
-}
-
-/* =====================================================
-   REMOVER ANÚNCIO (SOFT DELETE)
-===================================================== */
-
-export async function remove(id, user) {
-  const ad = await show(id);
-
-  if (ad.user_id !== user.id) {
-    throw new AppError("Sem permissão", 403);
-  }
-
-  await pool.query(
-    `
-    UPDATE ads
-    SET status = 'deleted',
-        updated_at = NOW()
-    WHERE id = $1
-    `,
-    [id]
-  );
-
-  return { message: "Anúncio removido com sucesso" };
-}
-
-/* =====================================================
-   DESTACAR ANÚNCIO
-===================================================== */
-
-export async function highlight(id, user) {
-  const ad = await show(id);
-
-  if (ad.user_id !== user.id) {
-    throw new AppError("Sem permissão", 403);
-  }
-
-  const rankingScore = await recalculateRanking(
-    ad,
-    user.plan,
-    true,
-    user.id
-  );
-
-  const result = await pool.query(
-    `
-    UPDATE ads
-    SET highlighted = true,
-        ranking_score = $1,
-        updated_at = NOW()
-    WHERE id = $2
-    RETURNING *
-    `,
-    [rankingScore, id]
-  );
-
-  return result.rows[0];
-}
-
-/* =====================================================
-   ANÁLISE DE PREÇO (IA futura)
-===================================================== */
-
-export async function priceAnalysis(id, user) {
-  const ad = await show(id);
-
-  if (ad.user_id !== user.id) {
-    throw new AppError("Sem permissão", 403);
-  }
-
-  return {
-    current_price: ad.price,
-    suggested_price: ad.price,
-    message: "Análise dinâmica futura via IA",
-  };
-}
-
-/* =====================================================
-   MELHORIA DE DESCRIÇÃO COM IA LOCAL
-===================================================== */
-
-export async function aiImprove(id, user) {
-  const ad = await show(id);
-
-  if (ad.user_id !== user.id) {
-    throw new AppError("Sem permissão", 403);
-  }
-
-  const prompt = `
-Melhore a descrição abaixo para venda automotiva,
-de forma persuasiva e profissional:
-
-${ad.description}
-`;
-
-  const improved = await generateText(prompt);
-
-  return {
-    improved_description: improved,
-  };
 }
