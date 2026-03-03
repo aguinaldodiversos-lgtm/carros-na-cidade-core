@@ -5,7 +5,7 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-
+import adEventsRoutes from "./modules/ads/events.routes.js";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler } from "./shared/middlewares/error.middleware.js";
@@ -108,7 +108,7 @@ app.get("/health", (req, res) => {
 /* =====================================================
    ROTAS API
 ===================================================== */
-
+app.use("/api/events", adEventsRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadsRoutes);
