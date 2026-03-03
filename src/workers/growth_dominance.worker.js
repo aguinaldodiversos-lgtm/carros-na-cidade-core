@@ -17,7 +17,74 @@ async function refreshMetrics() {
     `);
   }
 }
+// ✅ UPGRADE (NUNCA AUTOMÁTICO) — apenas oferta/notificação com consentimento
+// Objetivo: inserir notificações para o lojista decidir e dar OK.
+// Requer: tabela notification_queue com colunas mínimas:
+// (id, user_id, type, payload jsonb, status, created_at)
+//
+// - Idempotente: não cria spam (evita duplicar a mesma oferta em janela de 7 dias)
+// - Seguro: só notifica lojistas (advertisers com user_id válido)
 
+import { pool } from "../infrastructure/database/db.js";
+import { logger } from "../shared/logger.js";
+
+/**
+ * Enfileira notificações de oferta de upgrade para lojistas
+ * SEMPRE com consentimento explícito do lojista.
+ */
+export async function enqueueUpgradeOffers() {
+  try {
+    const result = await pool.query(`
+      INSERT INTO notification_queue (user_id, type, payload, status, created_at)
+      SELECT
+        a.user_id,
+        'upgrade_offer',
+        jsonb_build_object(
+          'city_id', a.city_id,
+          'reason', 'Cidade com alta dominância/alta demanda',
+          'dominance_score', cd.dominance_score,
+          'message',
+            'Sua cidade está aquecida. Quer impulsionar seus anúncios e aparecer em destaque? Toque para ver os planos.'
+        ),
+        'pending',
+        NOW()
+      FROM advertisers a
+      JOIN city_dominance cd ON cd.city_id = a.city_id
+      WHERE
+        a.user_id IS NOT NULL
+        AND cd.dominance_score >= 80
+        AND NOT EXISTS (
+          SELECT 1
+          FROM notification_queue n
+          WHERE n.user_id = a.user_id
+            AND n.type = 'upgrade_offer'
+            AND n.created_at > NOW() - INTERVAL '7 days'
+            AND n.status IN ('pending','sent','opened')
+        )
+      RETURNING id, user_id
+    `);
+
+    logger.info({
+      message: "📩 Notificações de oferta de upgrade enfileiradas (consentimento obrigatório)",
+      total: result.rowCount,
+    });
+
+    return { inserted: result.rowCount };
+  } catch (err) {
+    logger.error({
+      message: "❌ Falha ao enfileirar ofertas de upgrade",
+      error: err.message,
+    });
+    throw err;
+  }
+}
+
+/**
+ * Exemplo de uso em worker:
+ *
+ * import { enqueueUpgradeOffers } from "../workers/upgrade_offer.worker.js";
+ * await enqueueUpgradeOffers();
+ */
 /* =====================================================
    COMPUTAR DOMINÂNCIA POR CIDADE
 ===================================================== */
