@@ -1,3 +1,4 @@
+import { pool } from "../../infrastructure/database/db.js";
 import express from "express";
 import * as adsService from "./ads.service.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
@@ -14,6 +15,62 @@ function toNumber(value) {
   return isNaN(n) ? undefined : n;
 }
 
+/* =====================================================
+   AUTOCOMPLETE INTELIGENTE
+   GET /api/ads/autocomplete?q=...
+===================================================== */
+
+router.get("/autocomplete", async (req, res, next) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res.json({
+        success: true,
+        suggestions: []
+      });
+    }
+
+    const queryText = q.trim();
+
+    const result = await pool.query(
+      `
+      SELECT
+        brand,
+        model,
+        city,
+        COUNT(*) as total,
+        ts_rank(search_vector, plainto_tsquery('portuguese', $1)) AS rank
+      FROM ads
+      WHERE
+        status = 'active'
+        AND search_vector @@ plainto_tsquery('portuguese', $1)
+      GROUP BY brand, model, city, search_vector
+      ORDER BY
+        rank DESC,
+        total DESC
+      LIMIT 8
+      `,
+      [queryText]
+    );
+
+    const suggestions = result.rows.map(row => ({
+      label: `${row.brand} ${row.model} - ${row.city}`,
+      brand: row.brand,
+      model: row.model,
+      city: row.city,
+      total: Number(row.total)
+    }));
+
+    res.json({
+      success: true,
+      suggestions
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
 /* =====================================================
    ROTAS PÚBLICAS
 ===================================================== */
