@@ -1,17 +1,70 @@
-// src/index.js
-
 import dotenv from "dotenv";
 dotenv.config();
-import { collectExternalData } from "./workers/dataCollector.worker.js";
+
+import http from "http";
 import app from "./app.js";
 import runMigrations from "./infrastructure/database/migrate.js";
 import { logger } from "./shared/logger.js";
+import { collectExternalData } from "./workers/dataCollector.worker.js";
+
+/* =====================================================
+   CONFIG
+===================================================== */
 
 const PORT = process.env.PORT || 4000;
-setInterval(collectExternalData, 30 * 60 * 1000);
+const NODE_ENV = process.env.NODE_ENV || "development";
+const server = http.createServer(app);
+
+let isShuttingDown = false;
+
 /* =====================================================
-   FUNÇÃO SEGURA PARA INICIAR WORKERS
+   TRATAMENTO GLOBAL DE ERROS NÃO CAPTURADOS
 ===================================================== */
+
+process.on("unhandledRejection", (reason) => {
+  logger.error({
+    message: "Unhandled Rejection",
+    reason,
+  });
+});
+
+process.on("uncaughtException", (err) => {
+  logger.error({
+    message: "Uncaught Exception",
+    err,
+  });
+  process.exit(1);
+});
+
+/* =====================================================
+   SHUTDOWN GRACIOSO
+===================================================== */
+
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger.warn(`🛑 Recebido ${signal}. Encerrando servidor...`);
+
+  server.close(() => {
+    logger.info("🔒 Servidor HTTP encerrado.");
+    process.exit(0);
+  });
+
+  // Timeout máximo de segurança
+  setTimeout(() => {
+    logger.error("❌ Forçando encerramento.");
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+/* =====================================================
+   WORKER LOADER SEGURO
+===================================================== */
+
 async function startWorkerSafe(name, path, exportName) {
   try {
     const module = await import(path);
@@ -21,7 +74,7 @@ async function startWorkerSafe(name, path, exportName) {
       workerFn();
       logger.info(`✅ ${name} iniciado`);
     } else {
-      logger.warn(`⚠️ ${name} não encontrado`);
+      logger.warn(`⚠️ ${name} exportação não encontrada`);
     }
   } catch (err) {
     logger.warn(`⚠️ ${name} não carregado`);
@@ -29,109 +82,99 @@ async function startWorkerSafe(name, path, exportName) {
 }
 
 /* =====================================================
+   INICIAR WORKERS
+===================================================== */
+
+async function startWorkers() {
+  logger.info("🚀 Iniciando Workers...");
+
+  await startWorkerSafe(
+    "Strategy Worker",
+    "./workers/strategy.worker.js",
+    "startStrategyWorker"
+  );
+
+  await startWorkerSafe(
+    "Autopilot Worker",
+    "./workers/autopilot.worker.js",
+    "startAutopilotWorker"
+  );
+
+  await startWorkerSafe(
+    "Opportunity Engine",
+    "./workers/opportunity_engine.js",
+    "startOpportunityEngine"
+  );
+
+  await startWorkerSafe(
+    "SEO Worker",
+    "./workers/seo.worker.js",
+    "startSeoWorker"
+  );
+
+  await startWorkerSafe(
+    "Growth Dominance Worker",
+    "./workers/growth_dominance.worker.js",
+    "startGrowthDominanceWorker"
+  );
+
+  await startWorkerSafe(
+    "Growth Jobs Worker",
+    "./workers/growth_jobs.worker.js",
+    "startGrowthJobsWorker"
+  );
+
+  await startWorkerSafe(
+    "City Metrics Worker",
+    "./workers/city_metrics.worker.js",
+    "startCityMetricsWorker"
+  );
+
+  await startWorkerSafe(
+    "Alert Match Worker",
+    "./workers/alert_match.worker.js",
+    "startAlertMatchWorker"
+  );
+
+  // WhatsApp Worker opcional
+  try {
+    const whatsapp = await import("./workers/whatsapp.worker.js");
+    if (typeof whatsapp.startWhatsappWorker === "function") {
+      whatsapp.startWhatsappWorker();
+      logger.info("📲 WhatsApp Worker iniciado");
+    }
+  } catch {
+    logger.warn("⚠️ WhatsApp Worker não encontrado");
+  }
+
+  logger.info("🏁 Todos os workers processados");
+}
+
+/* =====================================================
    START DO SERVIDOR
 ===================================================== */
+
 async function startServer() {
   try {
-    logger.info("🔧 Rodando migrations...");
+    logger.info("🔧 Executando migrations...");
     await runMigrations();
-    logger.info("✅ Migrations concluídas.");
+    logger.info("✅ Migrations concluídas");
 
-    app.listen(PORT, async () => {
-      logger.info(`🚗 API Carros na Cidade rodando na porta ${PORT}`);
-      logger.info("🚀 Iniciando workers...");
-
-      await startWorkerSafe(
-        "Strategy Worker",
-        "./workers/strategy.worker.js",
-        "startStrategyWorker"
+    server.listen(PORT, () => {
+      logger.info(
+        `🚗 API Carros na Cidade rodando na porta ${PORT} [${NODE_ENV}]`
       );
-
-      await startWorkerSafe(
-        "Autopilot Worker",
-        "./workers/autopilot.worker.js",
-        "startAutopilotWorker"
-      );
-
-      await startWorkerSafe(
-        "Opportunity Engine",
-        "./workers/opportunity_engine.js",
-        "startOpportunityEngine"
-      );
-
-      await startWorkerSafe(
-        "SEO Worker",
-        "./workers/seo.worker.js",
-        "startSeoWorker"
-      );
-
-      await startWorkerSafe(
-        "Event Banner Worker",
-        "./workers/event_banner.worker.js",
-        "startEventBannerWorker"
-      );
-
-      await startWorkerSafe(
-        "Event Dispatch Worker",
-        "./workers/event_dispatch.worker.js",
-        "startEventDispatchWorker"
-      );
-
-      await startWorkerSafe(
-        "Dealer Acquisition Worker",
-        "./workers/dealer_acquisition.worker.js",
-        "startDealerAcquisitionWorker"
-      );
-
-      await startWorkerSafe(
-        "Google Dealer Collector",
-        "./workers/google_dealer_collector.worker.js",
-        "startGoogleDealerCollectorWorker"
-      );
-
-      await startWorkerSafe(
-        "City Metrics Worker",
-        "./workers/city_metrics.worker.js",
-        "startCityMetricsWorker"
-      );
-
-      await startWorkerSafe(
-        "Dealer Report Worker",
-        "./workers/dealer_report.worker.js",
-        "startDealerReportWorker"
-      );
-
-      await startWorkerSafe(
-        "City Radar Worker",
-        "./workers/city_radar.worker.js",
-        "startCityRadarWorker"
-      );
-
-      await startWorkerSafe(
-        "Alert Match Worker",
-        "./workers/alert_match.worker.js",
-        "startAlertMatchWorker"
-      );
-
-      await startWorkerSafe(
-        "Banner Auto Approve Worker",
-        "./workers/banner_auto_approve.worker.js",
-        "startBannerAutoApproveWorker"
-      );
-
-      // WhatsApp Worker opcional
-      try {
-        await import("./workers/whatsapp.worker.js");
-        logger.info("📲 WhatsApp Worker iniciado");
-      } catch {
-        logger.warn("⚠️ WhatsApp Worker não encontrado");
-      }
-
-      logger.info("🏁 Workers inicializados");
     });
+
+    // Worker de coleta externa periódica
+    setInterval(collectExternalData, 30 * 60 * 1000);
+
+    // Inicializa workers
+    await startWorkers();
+
   } catch (err) {
     logger.error({
-      message: "Erro ao iniciar servidor",
+      message: "❌ Erro ao iniciar servidor",
       err,
     });
     process.exit(1);
