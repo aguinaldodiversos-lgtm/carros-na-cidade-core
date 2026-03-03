@@ -1,9 +1,14 @@
+// src/modules/ads/ads.routes.js
 import express from "express";
 import { pool } from "../../infrastructure/database/db.js";
 import * as adsService from "./ads.service.js";
+import { getFacets } from "./facets.service.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
-import { cacheGet, cacheInvalidatePrefix } from "../../shared/cache/cache.middleware.js";
+import {
+  cacheGet,
+  cacheInvalidatePrefix,
+} from "../../shared/cache/cache.middleware.js";
 
 const router = express.Router();
 
@@ -13,12 +18,22 @@ const router = express.Router();
 
 function toNumber(value) {
   const n = Number(value);
-  return isNaN(n) ? undefined : n;
+  return Number.isFinite(n) ? n : undefined;
 }
 
 function sanitizeString(value) {
-  if (!value) return undefined;
-  return String(value).trim();
+  if (value === undefined || value === null) return undefined;
+  const s = String(value).trim();
+  return s.length ? s : undefined;
+}
+
+function toBool(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "boolean") return value;
+  const v = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "y"].includes(v)) return true;
+  if (["false", "0", "no", "n"].includes(v)) return false;
+  return undefined;
 }
 
 /* =====================================================
@@ -37,6 +52,9 @@ router.get(
         return res.json({ success: true, suggestions: [] });
       }
 
+      // proteção básica contra query enorme
+      const queryText = q.slice(0, 80);
+
       const result = await pool.query(
         `
         SELECT
@@ -53,7 +71,7 @@ router.get(
         ORDER BY rank DESC, total DESC
         LIMIT 8
         `,
-        [q]
+        [queryText]
       );
 
       const suggestions = result.rows.map((row) => ({
@@ -72,7 +90,36 @@ router.get(
 );
 
 /* =====================================================
+   FACETS DINÂMICOS
+   GET /api/ads/facets?city_id=...
+===================================================== */
+
+router.get(
+  "/facets",
+  cacheGet({ prefix: "ads:facets", ttlSeconds: 60, varyBy: ["query"] }),
+  async (req, res, next) => {
+    try {
+      const filters = {
+        city_id: toNumber(req.query.city_id),
+        brand: sanitizeString(req.query.brand),
+        model: sanitizeString(req.query.model),
+      };
+
+      const facets = await getFacets(filters);
+
+      res.json({
+        success: true,
+        facets,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/* =====================================================
    LISTAGEM PADRÃO
+   GET /api/ads
 ===================================================== */
 
 router.get(
@@ -86,7 +133,7 @@ router.get(
         model: sanitizeString(req.query.model),
         min_price: toNumber(req.query.min_price),
         max_price: toNumber(req.query.max_price),
-        below_fipe: req.query.below_fipe,
+        below_fipe: toBool(req.query.below_fipe),
         page: toNumber(req.query.page) || 1,
         limit: toNumber(req.query.limit) || 20,
       };
@@ -105,6 +152,7 @@ router.get(
 
 /* =====================================================
    BUSCA FULL-TEXT
+   GET /api/ads/search
 ===================================================== */
 
 router.get(
@@ -123,6 +171,7 @@ router.get(
         year_max: toNumber(req.query.year_max),
         body_type: sanitizeString(req.query.body_type),
         fuel_type: sanitizeString(req.query.fuel_type),
+        below_fipe: toBool(req.query.below_fipe),
         page: toNumber(req.query.page) || 1,
         limit: toNumber(req.query.limit) || 20,
       };
@@ -141,6 +190,7 @@ router.get(
 
 /* =====================================================
    DETALHE POR ID OU SLUG
+   GET /api/ads/:identifier
 ===================================================== */
 
 router.get("/:identifier", async (req, res, next) => {
@@ -164,6 +214,7 @@ router.get("/:identifier", async (req, res, next) => {
 
 /* =====================================================
    CRIAR ANÚNCIO
+   POST /api/ads
 ===================================================== */
 
 router.post("/", authMiddleware, async (req, res, next) => {
@@ -188,11 +239,12 @@ router.post("/", authMiddleware, async (req, res, next) => {
 
     const ad = await adsService.create(req.body, req.user);
 
-    // Invalida cache
+    // Invalida cache (rotas públicas)
     await cacheInvalidatePrefix("home");
     await cacheInvalidatePrefix("ads:list");
     await cacheInvalidatePrefix("ads:search");
     await cacheInvalidatePrefix("ads:auto");
+    await cacheInvalidatePrefix("ads:facets");
 
     res.status(201).json({
       success: true,
@@ -205,6 +257,7 @@ router.post("/", authMiddleware, async (req, res, next) => {
 
 /* =====================================================
    ATUALIZAR ANÚNCIO
+   PUT /api/ads/:id
 ===================================================== */
 
 router.put("/:id", authMiddleware, async (req, res, next) => {
@@ -220,6 +273,7 @@ router.put("/:id", authMiddleware, async (req, res, next) => {
     await cacheInvalidatePrefix("ads:list");
     await cacheInvalidatePrefix("ads:search");
     await cacheInvalidatePrefix("ads:auto");
+    await cacheInvalidatePrefix("ads:facets");
 
     res.json({
       success: true,
@@ -232,6 +286,7 @@ router.put("/:id", authMiddleware, async (req, res, next) => {
 
 /* =====================================================
    REMOVER (SOFT DELETE)
+   DELETE /api/ads/:id
 ===================================================== */
 
 router.delete("/:id", authMiddleware, async (req, res, next) => {
@@ -248,6 +303,7 @@ router.delete("/:id", authMiddleware, async (req, res, next) => {
     await cacheInvalidatePrefix("ads:list");
     await cacheInvalidatePrefix("ads:search");
     await cacheInvalidatePrefix("ads:auto");
+    await cacheInvalidatePrefix("ads:facets");
 
     res.json({
       success: true,
