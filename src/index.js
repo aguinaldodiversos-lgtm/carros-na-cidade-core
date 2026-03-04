@@ -4,7 +4,7 @@ dotenv.config();
 
 import http from "http";
 import app from "./app.js";
-import runMigrations from "./infrastructure/database/migrate.js";
+import runMigrations from "./database/migrate.js";
 import { logger } from "./shared/logger.js";
 
 const PORT = process.env.PORT || 4000;
@@ -49,22 +49,37 @@ async function startWorkerSafe(name, path, exportName) {
     const fn = mod[exportName];
 
     if (typeof fn === "function") {
-      fn();
+      await fn();
       logger.info(`✅ ${name} iniciado`);
     } else {
-      logger.warn(`⚠️ ${name} export inválido`);
+      logger.warn(`⚠️ ${name} export inválido (esperado função: ${exportName})`);
     }
-  } catch {
-    logger.warn(`⚠️ ${name} não carregado`);
+  } catch (err) {
+    logger.warn({
+      message: `⚠️ ${name} não carregado`,
+      error: err?.message || String(err),
+    });
   }
 }
 
 async function startWorkers() {
   logger.info("🚀 Inicializando workers...");
 
-  await startWorkerSafe("Metrics Worker", "./workers/metrics.worker.js", "startMetricsWorker");
-  await startWorkerSafe("Growth Brain Worker", "./workers/growthBrain.worker.js", "startGrowthBrainWorker");
-  await startWorkerSafe("Growth Jobs Worker", "./workers/growth_jobs.worker.js", "startGrowthJobsWorker");
+  await startWorkerSafe(
+    "Metrics Worker",
+    "./workers/metrics.worker.js",
+    "startMetricsWorker"
+  );
+  await startWorkerSafe(
+    "Growth Brain Worker",
+    "./workers/growthBrain.worker.js",
+    "startGrowthBrainWorker"
+  );
+  await startWorkerSafe(
+    "Growth Jobs Worker",
+    "./workers/growth_jobs.worker.js",
+    "startGrowthJobsWorker"
+  );
 
   logger.info("🏁 Workers inicializados");
 }
@@ -83,7 +98,7 @@ async function startServer() {
 
     await startWorkers();
   } catch (err) {
-    logger.error({ message: "❌ Falha ao iniciar servidor", error: err.message });
+    logger.error({ message: "❌ Falha ao iniciar servidor", error: err?.message || String(err) });
     process.exit(1);
   }
 }
