@@ -22,4 +22,12 @@ export const logger = pino({
       },
 });
 
+/**
+ * API oficial para módulos que precisam de logger contextual
+ * (mantém compatibilidade com imports antigos do tipo { getLogger }).
+ */
+export function getLogger(bindings = {}) {
+  return logger.child(bindings);
+}
+
 export default logger;
