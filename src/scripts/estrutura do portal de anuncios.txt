@@ -1,0 +1,507 @@
+Estou desenvolvendo um portal automotivo chamado Carros na Cidade.
+
+Arquitetura atual:
+
+BACKEND:
+
+Node.js + Express
+
+PostgreSQL
+
+Redis + BullMQ
+
+Sistema de Workers (SEO, WhatsApp, Growth, Analytics etc.)
+
+Autenticação JWT com refresh token e rotação segura
+
+Controle de sessões
+
+Bloqueio por tentativas de login
+
+Estrutura modular (modules/ads, modules/auth, modules/analytics, modules/ai, modules/finance, etc.)
+
+Sistema de ranking por plano + demanda da cidade
+
+ROI por cidade
+
+AutoBid por conversão
+
+Heatmap dinâmico
+
+Workers inteligentes
+
+FRONTEND (novo projeto):
+
+Next.js 16 (App Router)
+
+Estrutura criada dentro da pasta /frontend
+
+Rodando via npm run dev
+
+Página padrão do Next foi apagada
+
+Estamos reconstruindo a Home 100% personalizada
+
+Objetivo: substituir frontend no-code por frontend próprio
+
+Backend continuará o mesmo
+
+Migração gradual mantendo SEO e domínio
+
+STATUS ATUAL:
+
+Projeto Next criado
+
+Estrutura de componentes criada:
+
+Header
+
+HeroCarousel
+
+FiltersBar
+
+AdsSection
+
+CarCard
+
+BenefitsSection
+
+page.tsx foi substituído
+
+Mas localhost:3000 apresentou ERR_CONNECTION_REFUSED
+
+Precisamos validar se o Next está rodando corretamente
+
+Depois conectar Home ao backend via /api/public
+
+ARQUITETURA PROFISSIONAL — FRONTEND (Next.js App Router)
+frontend/
+│
+├── app/                         # App Router (rotas principais)
+│   ├── layout.tsx               # Layout global
+│   ├── page.tsx                 # Home
+│   │
+│   ├── cidade/
+│   │   └── [slug]/
+│   │       ├── page.tsx         # Página de cidade
+│   │       └── loading.tsx
+│   │
+│   ├── anuncio/
+│   │   └── [slug]/
+│   │       ├── page.tsx         # Página individual do anúncio
+│   │       └── loading.tsx
+│   │
+│   ├── buscar/
+│   │   └── page.tsx             # Página de resultados com filtros
+│   │
+│   ├── anunciar/
+│   │   └── page.tsx             # Criar anúncio
+│   │
+│   ├── entrar/
+│   │   └── page.tsx             # Login
+│   │
+│   └── api/                     # Rotas internas (se necessário)
+│
+│
+├── components/                  # Componentes reutilizáveis
+│   ├── layout/
+│   │   ├── Header.tsx
+│   │   ├── Footer.tsx
+│   │   └── Container.tsx
+│   │
+│   ├── home/
+│   │   ├── HeroCarousel.tsx
+│   │   ├── FiltersBar.tsx
+│   │   ├── AdsSection.tsx
+│   │   ├── BenefitsSection.tsx
+│   │   └── CityHighlights.tsx
+│   │
+│   ├── ads/
+│   │   ├── CarCard.tsx
+│   │   ├── PriceBadge.tsx
+│   │   ├── HighlightBadge.tsx
+│   │   ├── FavoriteButton.tsx
+│   │   └── WhatsAppButton.tsx
+│   │
+│   ├── filters/
+│   │   ├── BrandSelect.tsx
+│   │   ├── ModelSelect.tsx
+│   │   ├── YearSelect.tsx
+│   │   └── PriceRange.tsx
+│   │
+│   └── ui/                      # Componentes base
+│       ├── Button.tsx
+│       ├── Input.tsx
+│       ├── Select.tsx
+│       ├── Badge.tsx
+│       └── Skeleton.tsx
+│
+│
+├── lib/                         # Integrações e helpers
+│   ├── api.ts                   # Conexão com backend
+│   ├── seo.ts                   # Helpers de metadata
+│   ├── fetcher.ts               # Wrapper fetch com tratamento
+│   ├── format.ts                # Formatação (moeda, data)
+│   └── constants.ts
+│
+│
+├── services/                    # Comunicação estruturada com backend
+│   ├── home.service.ts
+│   ├── ads.service.ts
+│   ├── city.service.ts
+│   ├── auth.service.ts
+│   └── lead.service.ts
+│
+│
+├── hooks/                       # Hooks customizados
+│   ├── useAuth.ts
+│   ├── useCity.ts
+│   ├── useFavorites.ts
+│   └── useFilters.ts
+│
+│
+├── types/                       # Tipagens globais
+│   ├── ad.types.ts
+│   ├── city.types.ts
+│   ├── user.types.ts
+│   └── api.types.ts
+│
+│
+├── styles/
+│   └── globals.css
+│
+│
+├── public/
+│   ├── images/
+│   ├── icons/
+│   └── banners/
+│
+│
+├── middleware.ts                # Proteção de rotas
+├── next.config.ts
+├── tsconfig.json
+├── package.json
+└── .env.local
+
+
+sistema
+
+ARQUITETURA PROFISSIONAL — FRONTEND (Next.js App Router)
+frontend/
+│
+├── app/                         # App Router (rotas principais)
+│   ├── layout.tsx               # Layout global
+│   ├── page.tsx                 # Home
+│   │
+│   ├── cidade/
+│   │   └── [slug]/
+│   │       ├── page.tsx         # Página de cidade
+│   │       └── loading.tsx
+│   │
+│   ├── anuncio/
+│   │   └── [slug]/
+│   │       ├── page.tsx         # Página individual do anúncio
+│   │       └── loading.tsx
+│   │
+│   ├── buscar/
+│   │   └── page.tsx             # Página de resultados com filtros
+│   │
+│   ├── anunciar/
+│   │   └── page.tsx             # Criar anúncio
+│   │
+│   ├── entrar/
+│   │   └── page.tsx             # Login
+│   │
+│   └── api/                     # Rotas internas (se necessário)
+│
+│
+├── components/                  # Componentes reutilizáveis
+│   ├── layout/
+│   │   ├── Header.tsx
+│   │   ├── Footer.tsx
+│   │   └── Container.tsx
+│   │
+│   ├── home/
+│   │   ├── HeroCarousel.tsx
+│   │   ├── FiltersBar.tsx
+│   │   ├── AdsSection.tsx
+│   │   ├── BenefitsSection.tsx
+│   │   └── CityHighlights.tsx
+│   │
+│   ├── ads/
+│   │   ├── CarCard.tsx
+│   │   ├── PriceBadge.tsx
+│   │   ├── HighlightBadge.tsx
+│   │   ├── FavoriteButton.tsx
+│   │   └── WhatsAppButton.tsx
+│   │
+│   ├── filters/
+│   │   ├── BrandSelect.tsx
+│   │   ├── ModelSelect.tsx
+│   │   ├── YearSelect.tsx
+│   │   └── PriceRange.tsx
+│   │
+│   └── ui/                      # Componentes base
+│       ├── Button.tsx
+│       ├── Input.tsx
+│       ├── Select.tsx
+│       ├── Badge.tsx
+│       └── Skeleton.tsx
+│
+│
+├── lib/                         # Integrações e helpers
+│   ├── api.ts                   # Conexão com backend
+│   ├── seo.ts                   # Helpers de metadata
+│   ├── fetcher.ts               # Wrapper fetch com tratamento
+│   ├── format.ts                # Formatação (moeda, data)
+│   └── constants.ts
+│
+│
+├── services/                    # Comunicação estruturada com backend
+│   ├── home.service.ts
+│   ├── ads.service.ts
+│   ├── city.service.ts
+│   ├── auth.service.ts
+│   └── lead.service.ts
+│
+│
+├── hooks/                       # Hooks customizados
+│   ├── useAuth.ts
+│   ├── useCity.ts
+│   ├── useFavorites.ts
+│   └── useFilters.ts
+│
+│
+├── types/                       # Tipagens globais
+│   ├── ad.types.ts
+│   ├── city.types.ts
+│   ├── user.types.ts
+│   └── api.types.ts
+│
+│
+├── styles/
+│   └── globals.css
+│
+│
+├── public/
+│   ├── images/
+│   ├── icons/
+│   └── banners/
+│
+│
+├── middleware.ts                # Proteção de rotas
+├── next.config.ts
+├── tsconfig.json
+├── package.json
+└── .env.local
+
+
+ARQUITETURA LÓGICA (NÍVEL SISTEMA)
+
+Seu backend está dividido em 5 grandes camadas:
+
+1️⃣ CAMADA DE ENTRADA (HTTP)
+
+app.js
+
+routes/
+
+controllers/
+
+middlewares
+
+Responsável por:
+
+Receber requisições
+
+Validar
+
+Autenticar
+
+Encaminhar para services
+
+2️⃣ CAMADA DE DOMÍNIO (modules/)
+
+Aqui está a inteligência do sistema.
+
+Domínios principais:
+
+Auth
+
+Ads
+
+Leads
+
+SEO
+
+AI
+
+Analytics
+
+Finance
+
+Integrations
+
+Cada módulo contém:
+
+routes
+
+controller
+
+service
+
+repository (quando necessário)
+
+Isso é arquitetura modular orientada a domínio (DDD simplificado).
+
+3️⃣ CAMADA DE IA / INTELIGÊNCIA
+
+Você já tem um motor avançado:
+
+Growth Brain
+
+AutoBid
+
+City Score
+
+Forecast
+
+Prediction
+
+Market Intelligence
+
+Strategy Engine
+
+Isso transforma seu sistema em:
+
+Marketplace com cérebro próprio
+
+4️⃣ CAMADA ASSÍNCRONA (Workers)
+
+Você não depende só de requisições HTTP.
+
+Você tem:
+
+BullMQ
+
+Redis
+
+Workers especializados
+
+Exemplos:
+
+seo.worker
+
+whatsapp.worker
+
+city_prediction.worker
+
+lead_scoring.worker
+
+growthExecutor.worker
+
+Isso é arquitetura orientada a eventos.
+
+5️⃣ CAMADA DE DADOS
+
+Banco principal:
+
+PostgreSQL
+
+Tabelas estratégicas:
+
+users
+
+ads
+
+city_metrics
+
+city_growth_metrics
+
+city_roi_metrics
+
+refresh_tokens
+
+blog_posts
+
+leads
+
+payments
+
+alerts
+
+Redis:
+
+filas
+
+jobs
+
+rate limit futuro
+
+🎯 O QUE VOCÊ CONSTRUIU (Nível real)
+
+Você não tem apenas um backend.
+
+Você tem:
+
+CRM interno
+
+Marketplace
+
+Motor de Growth
+
+Sistema de BI
+
+Sistema de previsão
+
+Motor de SEO automático
+
+Sistema de AutoBid
+
+Sistema de scoring
+
+Pipeline de coleta Google
+
+Isso é arquitetura de plataforma, não só API
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
