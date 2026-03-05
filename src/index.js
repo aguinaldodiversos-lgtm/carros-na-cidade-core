@@ -1,4 +1,5 @@
 // src/index.js
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -10,26 +11,60 @@ import { logger } from "./shared/logger.js";
 const PORT = process.env.PORT || 4000;
 const NODE_ENV = process.env.NODE_ENV || "development";
 
-// ✅ Por padrão: NÃO iniciar workers dentro do web-service
-// Ative explicitamente com: RUN_WORKERS=true
-const RUN_WORKERS = String(process.env.RUN_WORKERS || "false").toLowerCase() === "true";
+/*
+-----------------------------------------------------
+CONFIGURAÇÃO DE WORKERS
+-----------------------------------------------------
+
+RUN_WORKERS controla se o servidor vai iniciar workers.
+
+Web Service (Render / produção API):
+RUN_WORKERS=false
+
+Worker Service (processamento):
+RUN_WORKERS=true
+*/
+
+const RUN_WORKERS =
+  String(process.env.RUN_WORKERS || "false").toLowerCase() === "true";
 
 let server;
 let shuttingDown = false;
 
+/*
+-----------------------------------------------------
+TRATAMENTO DE ERROS GLOBAIS
+-----------------------------------------------------
+*/
+
 process.on("unhandledRejection", (reason) => {
-  logger.error({ message: "Unhandled Rejection", reason });
+  logger.error({
+    message: "Unhandled Rejection",
+    reason,
+  });
 });
+
 process.on("uncaughtException", (err) => {
-  logger.error({ message: "Uncaught Exception", error: err?.message || String(err) });
+  logger.error({
+    message: "Uncaught Exception",
+    error: err?.message || String(err),
+  });
+
   process.exit(1);
 });
 
+/*
+-----------------------------------------------------
+GRACEFUL SHUTDOWN
+-----------------------------------------------------
+*/
+
 async function gracefulShutdown(signal) {
   if (shuttingDown) return;
+
   shuttingDown = true;
 
-  logger.warn(`🛑 ${signal} recebido. Encerrando...`);
+  logger.warn(`🛑 ${signal} recebido. Encerrando servidor...`);
 
   if (server) {
     server.close(() => {
@@ -47,16 +82,24 @@ async function gracefulShutdown(signal) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
+/*
+-----------------------------------------------------
+CARREGAMENTO SEGURO DE WORKERS
+-----------------------------------------------------
+*/
+
 async function startWorkerSafe(name, path, exportName) {
   try {
-    const mod = await import(path);
-    const fn = mod[exportName];
+    const module = await import(path);
+    const fn = module[exportName];
 
     if (typeof fn === "function") {
       await fn();
       logger.info(`✅ ${name} iniciado`);
     } else {
-      logger.warn(`⚠️ ${name} export inválido (esperado função: ${exportName})`);
+      logger.warn(
+        `⚠️ ${name} export inválido (esperado função: ${exportName})`
+      );
     }
   } catch (err) {
     logger.warn({
@@ -66,50 +109,106 @@ async function startWorkerSafe(name, path, exportName) {
   }
 }
 
+/*
+-----------------------------------------------------
+INICIALIZAÇÃO DE WORKERS
+-----------------------------------------------------
+*/
+
 async function startWorkers() {
   logger.info("🚀 Inicializando workers...");
 
-  // ✅ Flags por worker (você controla no Render sem mexer no código)
-  const ENABLE_METRICS = String(process.env.ENABLE_METRICS_WORKER || "true").toLowerCase() === "true";
-  const ENABLE_GROWTH_BRAIN = String(process.env.ENABLE_GROWTH_BRAIN_WORKER || "true").toLowerCase() === "true";
-  const ENABLE_GROWTH_JOBS = String(process.env.ENABLE_GROWTH_JOBS_WORKER || "true").toLowerCase() === "true";
+  /*
+  Flags individuais para cada worker.
+  Você pode controlar tudo via ENV no Render.
+  */
 
-  // ❌ BANNERS DESLIGADOS POR PADRÃO (pra não gastar IA em deploy/test)
-  const ENABLE_EVENT_BANNER = String(process.env.ENABLE_EVENT_BANNER_WORKER || "false").toLowerCase() === "true";
-  const ENABLE_BANNER_GENERATOR = String(process.env.ENABLE_BANNER_GENERATOR_WORKER || "false").toLowerCase() === "true";
+  const ENABLE_METRICS =
+    String(process.env.ENABLE_METRICS_WORKER || "true") === "true";
+
+  const ENABLE_GROWTH_BRAIN =
+    String(process.env.ENABLE_GROWTH_BRAIN_WORKER || "true") === "true";
+
+  const ENABLE_GROWTH_JOBS =
+    String(process.env.ENABLE_GROWTH_JOBS_WORKER || "true") === "true";
+
+  const ENABLE_EVENT_BANNER =
+    String(process.env.ENABLE_EVENT_BANNER_WORKER || "false") === "true";
+
+  const ENABLE_BANNER_GENERATOR =
+    String(process.env.ENABLE_BANNER_GENERATOR_WORKER || "false") === "true";
+
+  /*
+  --------------------------------------------------
+  WORKERS
+  --------------------------------------------------
+  */
 
   if (ENABLE_METRICS) {
-    await startWorkerSafe("Metrics Worker", "./workers/metrics.worker.js", "startMetricsWorker");
+    await startWorkerSafe(
+      "Metrics Worker",
+      "./workers/metrics.worker.js",
+      "startMetricsWorker"
+    );
   } else {
-    logger.warn("⏸️ Metrics Worker desativado por ENV");
+    logger.warn("⏸️ Metrics Worker desativado");
   }
 
   if (ENABLE_GROWTH_BRAIN) {
-    await startWorkerSafe("Growth Brain Worker", "./workers/growthBrain.worker.js", "startGrowthBrainWorker");
+    await startWorkerSafe(
+      "Growth Brain Worker",
+      "./workers/growthBrain.worker.js",
+      "startGrowthBrainWorker"
+    );
   } else {
-    logger.warn("⏸️ Growth Brain Worker desativado por ENV");
+    logger.warn("⏸️ Growth Brain Worker desativado");
   }
 
   if (ENABLE_GROWTH_JOBS) {
-    await startWorkerSafe("Growth Jobs Worker", "./workers/growth_jobs.worker.js", "startGrowthJobsWorker");
+    await startWorkerSafe(
+      "Growth Jobs Worker",
+      "./workers/growth_jobs.worker.js",
+      "startGrowthJobsWorker"
+    );
   } else {
-    logger.warn("⏸️ Growth Jobs Worker desativado por ENV");
+    logger.warn("⏸️ Growth Jobs Worker desativado");
   }
 
-  // ✅ Mantemos os banners disponíveis, mas desligados por padrão.
-  // (se você quiser ligar depois, basta setar ENV=true)
+  /*
+  --------------------------------------------------
+  BANNER WORKERS
+  (DESATIVADOS POR PADRÃO PARA EVITAR CUSTO DE IA)
+  --------------------------------------------------
+  */
+
   if (ENABLE_EVENT_BANNER) {
-    // Se seu worker for CommonJS (require/module.exports), não carregue via import aqui.
-    // O ideal é rodar em um worker-service separado (npm run workers).
-    logger.warn("⚠️ ENABLE_EVENT_BANNER_WORKER=true, mas recomendado rodar via worker-service separado.");
+    await startWorkerSafe(
+      "Event Banner Worker",
+      "./workers/event_banner.worker.js",
+      "startEventBannerWorker"
+    );
+  } else {
+    logger.warn("⏸️ Event Banner Worker desativado");
   }
 
   if (ENABLE_BANNER_GENERATOR) {
-    logger.warn("⚠️ ENABLE_BANNER_GENERATOR_WORKER=true, mas recomendado rodar via worker-service separado.");
+    await startWorkerSafe(
+      "Banner Generator Worker",
+      "./workers/banner_generator.worker.js",
+      "startBannerGeneratorWorker"
+    );
+  } else {
+    logger.warn("⏸️ Banner Generator Worker desativado");
   }
 
   logger.info("🏁 Workers inicializados");
 }
+
+/*
+-----------------------------------------------------
+START DO SERVIDOR
+-----------------------------------------------------
+*/
 
 async function startServer() {
   try {
@@ -121,20 +220,36 @@ async function startServer() {
 
     server.listen(PORT, () => {
       logger.info(`🚗 API rodando na porta ${PORT} [${NODE_ENV}]`);
-      logger.info(`🧩 Workers no web-service: ${RUN_WORKERS ? "ATIVADOS" : "DESATIVADOS"}`);
+      logger.info(
+        `🧠 Workers: ${RUN_WORKERS ? "ATIVADOS" : "DESATIVADOS"}`
+      );
     });
 
-    // ✅ Somente se você ativar explicitamente
+    /*
+    Só inicia workers se RUN_WORKERS=true
+    */
+
     if (RUN_WORKERS) {
       await startWorkers();
+    } else {
+      logger.warn(
+        "🟡 Workers desabilitados (RUN_WORKERS=false). Apenas API iniciada."
+      );
     }
   } catch (err) {
     logger.error({
       message: "❌ Falha ao iniciar servidor",
       error: err?.message || String(err),
     });
+
     process.exit(1);
   }
 }
+
+/*
+-----------------------------------------------------
+BOOT
+-----------------------------------------------------
+*/
 
 startServer();
