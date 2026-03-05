@@ -10,24 +10,27 @@ export const logger = pino({
     env: process.env.NODE_ENV || "development",
   },
   timestamp: pino.stdTimeFunctions.isoTime,
-  transport: isProd
-    ? undefined
+  ...(isProd
+    ? {}
     : {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "SYS:standard",
-          ignore: "pid,hostname",
+        transport: {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+          },
         },
-      },
+      }),
 });
 
 /**
- * API oficial para módulos que precisam de logger contextual
- * (mantém compatibilidade com imports antigos do tipo { getLogger }).
+ * Retorna um child logger com contexto do módulo.
+ * Mantém logs padronizados e facilita rastreabilidade.
  */
-export function getLogger(bindings = {}) {
-  return logger.child(bindings);
+export function getLogger(context = {}) {
+  if (typeof context === "string") return logger.child({ scope: context });
+  return logger.child(context);
 }
 
 export default logger;
