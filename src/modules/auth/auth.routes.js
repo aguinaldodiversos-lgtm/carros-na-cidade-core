@@ -1,13 +1,11 @@
+// src/modules/auth/auth.routes.js
 import express from "express";
 import { login, refresh, logout } from "./auth.service.js";
 import {
   requestPasswordReset,
-  resetPassword,
+  resetPasswordWithToken,
 } from "./password.service.js";
-import {
-  generateEmailVerification,
-  verifyEmail,
-} from "./emailVerification.service.js";
+import { verifyEmail } from "./emailVerification.service.js";
 import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 
 const router = express.Router();
@@ -72,7 +70,12 @@ router.post("/forgot-password", async (req, res, next) => {
 router.post("/reset-password", async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
-    const result = await resetPassword(token, newPassword);
+
+    const result = await resetPasswordWithToken({
+      token,
+      newPassword,
+    });
+
     res.json(result);
   } catch (err) {
     next(err);
