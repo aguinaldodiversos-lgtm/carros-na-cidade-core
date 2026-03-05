@@ -1,8 +1,6 @@
 // src/modules/auth/auth.service.js
-
 import bcrypt from "bcryptjs";
 import { pool } from "../../infrastructure/database/db.js";
-import { verifyRefreshToken } from "./jwt.strategy.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 import { logLoginAttempt } from "./auth.audit.service.js";
@@ -11,29 +9,30 @@ import {
   handleFailedLogin,
   resetLoginAttempts,
 } from "./auth.security.service.js";
-import { createSession } from "./auth.session.service.js";
+
+import { issueSession } from "./sessions/session.issuer.js";
+import {
+  rotateRefreshToken,
+  revokeRefreshToken,
+  revokeAllUserRefreshTokens,
+} from "./sessions/refreshToken.repository.js";
 
 /* =====================================================
    LOGIN
 ===================================================== */
-
 export async function login(email, password, reqMeta = {}) {
-  if (!email || !password) {
-    throw new AppError("Credenciais inválidas", 401);
-  }
+  if (!email || !password) throw new AppError("Credenciais inválidas", 401);
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = String(email).trim().toLowerCase();
 
-  const result = await pool.query(
-    "SELECT * FROM users WHERE email = $1",
-    [normalizedEmail]
-  );
-
+  const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+    normalizedEmail,
+  ]);
   const user = result.rows[0];
 
   await validateUserForLogin(user);
 
-  const passwordValid = await bcrypt.compare(password, user.password);
+  const passwordValid = await bcrypt.compare(String(password), user.password);
 
   if (!passwordValid) {
     await handleFailedLogin(user);
@@ -57,72 +56,40 @@ export async function login(email, password, reqMeta = {}) {
     success: true,
   });
 
-  return await createSession(user);
+  return issueSession(user, reqMeta);
 }
 
 /* =====================================================
-   REFRESH
+   REFRESH (ROTATION)
 ===================================================== */
-
-export async function refresh(oldRefreshToken) {
-  if (!oldRefreshToken) {
-    throw new AppError("Refresh token não fornecido", 401);
-  }
-
-  const stored = await pool.query(
-    "SELECT * FROM refresh_tokens WHERE token = $1",
-    [oldRefreshToken]
-  );
-
-  const tokenRow = stored.rows[0];
-
-  if (!tokenRow || tokenRow.revoked) {
-    throw new AppError("Refresh token inválido", 401);
-  }
-
-  if (new Date(tokenRow.expires_at) < new Date()) {
-    throw new AppError("Refresh token expirado", 401);
-  }
-
-  let decoded;
+export async function refresh(oldRefreshToken, reqMeta = {}) {
+  if (!oldRefreshToken) throw new AppError("Refresh token não fornecido", 401);
 
   try {
-    decoded = verifyRefreshToken(oldRefreshToken);
-  } catch {
-    throw new AppError("Refresh token inválido", 401);
+    return await rotateRefreshToken(oldRefreshToken, reqMeta);
+  } catch (err) {
+    // Se detectar reuse attack, encerra tudo
+    if (err?.code === "REFRESH_REUSE") {
+      await revokeAllUserRefreshTokens(err.userId);
+      throw new AppError("Sessão comprometida. Faça login novamente.", 401);
+    }
+    throw err;
   }
-
-  await pool.query(
-    `UPDATE refresh_tokens SET revoked = true WHERE token = $1`,
-    [oldRefreshToken]
-  );
-
-  const userResult = await pool.query(
-    "SELECT * FROM users WHERE id = $1",
-    [decoded.id]
-  );
-
-  return await createSession(userResult.rows[0]);
 }
 
 /* =====================================================
    LOGOUT
 ===================================================== */
-
 export async function logout(refreshToken) {
-  await pool.query(
-    `UPDATE refresh_tokens SET revoked = true WHERE token = $1`,
-    [refreshToken]
-  );
+  if (!refreshToken) return { message: "Logout realizado com sucesso" };
 
+  await revokeRefreshToken(refreshToken);
   return { message: "Logout realizado com sucesso" };
 }
 
 export async function logoutAll(userId) {
-  await pool.query(
-    `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1`,
-    [userId]
-  );
+  if (!userId) throw new AppError("userId obrigatório", 400);
 
+  await revokeAllUserRefreshTokens(userId);
   return { message: "Todas as sessões foram encerradas" };
 }
