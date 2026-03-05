@@ -44,11 +44,16 @@ router.post("/refresh", async (req, res, next) => {
 /* =====================================================
    LOGOUT
 ===================================================== */
-router.post("/logout", async (req, res, next) => {
+router.post("/refresh", async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
-    const result = await logout(refreshToken);
-    res.json(result);
+
+    const tokens = await refresh(refreshToken, {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json(tokens);
   } catch (err) {
     next(err);
   }
