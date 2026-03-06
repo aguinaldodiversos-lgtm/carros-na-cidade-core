@@ -12,7 +12,7 @@ import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js
 
 // Rotas
 import adEventsRoutes from "./modules/ads/events.routes.js";
-import adsEventsRoutes from "./modules/ads/ads.events_routes.js";
+import adsEventsRoutes from "./modules/ads/ads.events.routes.js";
 import adsRoutes from "./modules/ads/ads.routes.js";
 import leadsRoutes from "./modules/leads/leads.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
