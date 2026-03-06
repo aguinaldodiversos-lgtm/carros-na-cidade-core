@@ -1,39 +1,92 @@
 import { Worker } from "bullmq";
 import { logger } from "../shared/logger.js";
-import { createRedisClient, createCache } from "../modules/ai/orchestrator/ai.cache.js";
+import {
+  createRedisClient,
+  createCache,
+} from "../modules/ai/orchestrator/ai.cache.js";
 import { AiOrchestrator } from "../modules/ai/orchestrator/ai.orchestrator.js";
 
+let aiWorkerInstance = null;
+let aiRedisInstance = null;
+let aiOrchestratorInstance = null;
+
 export async function startAiWorker() {
-  const redis = createRedisClient({ logger });
-  const cache = createCache({ redis });
+  if (aiWorkerInstance) {
+    logger.warn("[ai.worker] Worker já inicializado");
+    return aiWorkerInstance;
+  }
 
-  const orchestrator = new AiOrchestrator({ logger, cache, aiQueue: null });
+  aiRedisInstance = createRedisClient({ logger });
+  const cache = createCache({ redis: aiRedisInstance });
 
-  const worker = new Worker(
+  aiOrchestratorInstance = new AiOrchestrator({
+    logger,
+    cache,
+    aiQueue: null,
+  });
+
+  aiWorkerInstance = new Worker(
     "ai-jobs",
     async (job) => {
       const payload = job.data;
-      const res = await orchestrator.generate(payload);
-      return res;
+      return aiOrchestratorInstance.generate(payload);
     },
     {
-      connection: redis,
+      connection: aiRedisInstance,
       concurrency: Number(process.env.AI_WORKER_CONCURRENCY || 5),
+      autorun: true,
     }
   );
 
-  worker.on("completed", (job) => {
-    logger.info({ message: "AI job completed", jobId: job.id, name: job.name });
+  aiWorkerInstance.on("ready", () => {
+    logger.info("[ai.worker] Worker pronto (ai-jobs)");
   });
 
-  worker.on("failed", (job, err) => {
-    logger.error({
-      message: "AI job failed",
-      jobId: job?.id,
-      name: job?.name,
-      error: err?.message || String(err),
-    });
+  aiWorkerInstance.on("completed", (job) => {
+    logger.info(
+      {
+        jobId: job.id,
+        name: job.name,
+      },
+      "[ai.worker] Job concluído"
+    );
   });
 
-  logger.info("✅ AI Worker online (ai-jobs)");
+  aiWorkerInstance.on("failed", (job, err) => {
+    logger.error(
+      {
+        jobId: job?.id,
+        name: job?.name,
+        error: err?.message || String(err),
+      },
+      "[ai.worker] Job falhou"
+    );
+  });
+
+  aiWorkerInstance.on("error", (error) => {
+    logger.error({ error }, "[ai.worker] Erro no worker");
+  });
+
+  logger.info("[ai.worker] Inicialização concluída");
+
+  return aiWorkerInstance;
+}
+
+export async function stopAiWorker() {
+  if (!aiWorkerInstance) {
+    logger.info("[ai.worker] Nenhum worker ativo para encerrar");
+    return;
+  }
+
+  await aiWorkerInstance.close();
+  aiWorkerInstance = null;
+
+  if (aiRedisInstance) {
+    await aiRedisInstance.quit();
+    aiRedisInstance = null;
+  }
+
+  aiOrchestratorInstance = null;
+
+  logger.info("[ai.worker] Worker encerrado com sucesso");
 }
