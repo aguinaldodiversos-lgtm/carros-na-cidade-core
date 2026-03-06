@@ -1,39 +1,85 @@
-require("dotenv").config();
-const { Worker } = require("bullmq");
-const IORedis = require("ioredis");
+import { Worker } from "bullmq";
+import { logger } from "../shared/logger.js";
+import { getQueueRedisConnection } from "../infrastructure/queue/redis.connection.js";
+import { WHATSAPP_QUEUE_NAME } from "../queues/whatsapp.queue.js";
+import { processWhatsAppJob } from "../modules/whatsapp/whatsapp.service.js";
 
-const { sendWhatsAppLead } = require("../services/whatsapp.service");
+const redisConnection = getQueueRedisConnection();
 
-const connection = new IORedis(process.env.REDIS_URL);
+let whatsappWorkerInstance = null;
 
-const worker = new Worker(
-  "whatsapp",
-  async (job) => {
-    try {
-      const { phone, lead } = job.data;
+export async function startWhatsAppWorker() {
+  if (whatsappWorkerInstance) {
+    logger.warn("[whatsapp.worker] Worker já inicializado");
+    return whatsappWorkerInstance;
+  }
 
-      if (!phone || !lead) {
-        console.warn("⚠️ Job inválido, ignorando...");
-        return;
-      }
+  const concurrency = Number(process.env.WHATSAPP_WORKER_CONCURRENCY || 5);
 
-      console.log("📤 Enviando WhatsApp para", phone);
-
-      await sendWhatsAppLead(phone, lead);
-    } catch (err) {
-      console.error("❌ Erro no worker de WhatsApp:", err.message);
-      throw err;
+  whatsappWorkerInstance = new Worker(
+    WHATSAPP_QUEUE_NAME,
+    async (job) => processWhatsAppJob(job),
+    {
+      connection: redisConnection,
+      concurrency,
+      autorun: true,
     }
-  },
-  { connection }
-);
+  );
 
-worker.on("completed", (job) => {
-  console.log(`✅ Mensagem enviada (job ${job.id})`);
-});
+  whatsappWorkerInstance.on("ready", () => {
+    logger.info(
+      { queue: WHATSAPP_QUEUE_NAME, concurrency },
+      "[whatsapp.worker] Worker pronto"
+    );
+  });
 
-worker.on("failed", (job, err) => {
-  console.error(`❌ Falha no job ${job.id}:`, err.message);
-});
+  whatsappWorkerInstance.on("active", (job) => {
+    logger.info(
+      {
+        jobId: job.id,
+        jobName: job.name,
+      },
+      "[whatsapp.worker] Job ativo"
+    );
+  });
 
-console.log("📲 WhatsApp worker iniciado");
+  whatsappWorkerInstance.on("completed", (job, result) => {
+    logger.info(
+      {
+        jobId: job.id,
+        jobName: job.name,
+        result,
+      },
+      "[whatsapp.worker] Job concluído"
+    );
+  });
+
+  whatsappWorkerInstance.on("failed", (job, error) => {
+    logger.error(
+      {
+        jobId: job?.id,
+        jobName: job?.name,
+        attemptsMade: job?.attemptsMade,
+        error,
+      },
+      "[whatsapp.worker] Job falhou"
+    );
+  });
+
+  whatsappWorkerInstance.on("error", (error) => {
+    logger.error({ error }, "[whatsapp.worker] Erro no worker");
+  });
+
+  logger.info("[whatsapp.worker] Inicialização concluída");
+
+  return whatsappWorkerInstance;
+}
+
+export async function stopWhatsAppWorker() {
+  if (!whatsappWorkerInstance) return;
+
+  await whatsappWorkerInstance.close();
+  whatsappWorkerInstance = null;
+
+  logger.info("[whatsapp.worker] Worker encerrado com sucesso");
+}
