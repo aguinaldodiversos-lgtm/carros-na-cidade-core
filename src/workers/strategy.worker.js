@@ -1,16 +1,29 @@
-require("dotenv").config();
-const { Pool } = require("pg");
+import "dotenv/config";
+import pg from "pg";
+import { logger } from "../shared/logger.js";
+
+const { Pool } = pg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-async function runStrategyWorker() {
-  try {
-    console.log("🧠 Rodando Strategy Worker...");
+let strategyInterval = null;
+let strategyRunning = false;
+let strategyStarted = false;
 
-    // 1) Buscar últimas oportunidades por cidade
+async function runStrategyWorker() {
+  if (strategyRunning) {
+    logger.warn("[strategy.worker] Execução já em andamento; nova rodada ignorada");
+    return;
+  }
+
+  strategyRunning = true;
+
+  try {
+    logger.info("[strategy.worker] Iniciando processamento");
+
     const opportunities = await pool.query(`
       SELECT DISTINCT ON (co.city_id)
         co.city_id,
@@ -23,13 +36,12 @@ async function runStrategyWorker() {
     for (const opp of opportunities.rows) {
       const { city_id, opportunity_score, priority_level } = opp;
 
-      // 2) Verificar se já existe campanha ativa para a cidade
       const existing = await pool.query(
         `
         SELECT id
         FROM autopilot_campaigns
         WHERE city_id = $1
-        AND status IN ('pending', 'running')
+          AND status IN ('pending', 'running')
         LIMIT 1
         `,
         [city_id]
@@ -39,7 +51,6 @@ async function runStrategyWorker() {
         continue;
       }
 
-      // 3) Definir campanhas conforme prioridade
       let campaigns = [];
 
       if (priority_level === "critical") {
@@ -50,7 +61,6 @@ async function runStrategyWorker() {
         campaigns = ["seo_city"];
       }
 
-      // 4) Criar campanhas
       for (const type of campaigns) {
         await pool.query(
           `
@@ -61,24 +71,67 @@ async function runStrategyWorker() {
             status
           )
           VALUES ($1, $2, $3, 'pending')
-        `,
+          `,
           [city_id, type, opportunity_score]
         );
 
-        console.log(
-          `📢 Campanha criada: ${type} para cidade ${city_id}`
+        logger.info(
+          {
+            cityId: city_id,
+            campaignType: type,
+            opportunityScore: opportunity_score,
+            priorityLevel: priority_level,
+          },
+          "[strategy.worker] Campanha criada"
         );
       }
     }
 
-    console.log("✅ Strategy Worker finalizado");
-  } catch (err) {
-    console.error("❌ Erro no Strategy Worker:", err);
+    logger.info("[strategy.worker] Processamento finalizado com sucesso");
+  } catch (error) {
+    logger.error({ error }, "[strategy.worker] Erro no processamento");
+  } finally {
+    strategyRunning = false;
   }
 }
 
-// Executa a cada 4 horas
-setInterval(runStrategyWorker, 4 * 60 * 60 * 1000);
+export async function startStrategyWorker() {
+  if (strategyStarted) {
+    logger.warn("[strategy.worker] Worker já inicializado");
+    return;
+  }
 
-// Executa ao iniciar
-runStrategyWorker();
+  strategyStarted = true;
+
+  const intervalMs = Number(
+    process.env.STRATEGY_WORKER_INTERVAL_MS || 4 * 60 * 60 * 1000
+  );
+
+  logger.info({ intervalMs }, "[strategy.worker] Inicializando worker");
+
+  await runStrategyWorker();
+
+  strategyInterval = setInterval(() => {
+    runStrategyWorker().catch((error) => {
+      logger.error({ error }, "[strategy.worker] Erro na execução agendada");
+    });
+  }, intervalMs);
+
+  logger.info("[strategy.worker] Agendamento configurado");
+}
+
+export async function stopStrategyWorker() {
+  if (!strategyStarted) {
+    logger.info("[strategy.worker] Nenhum worker ativo para encerrar");
+    return;
+  }
+
+  if (strategyInterval) {
+    clearInterval(strategyInterval);
+    strategyInterval = null;
+  }
+
+  strategyStarted = false;
+
+  logger.info("[strategy.worker] Worker encerrado com sucesso");
+}
