@@ -1,26 +1,28 @@
-require("dotenv").config();
-const { Pool } = require("pg");
+import "dotenv/config";
+import pg from "pg";
+import { logger } from "../shared/logger.js";
 
-const { garantirSEO } = require("../services/seo/seoPages.service");
-const {
-  ativarAquisicaoDeLojistas,
-} = require("../services/acquisition/dealerAcquisition.service");
+import seoPagesService from "../services/seo/seoPages.service.js";
+import dealerAcquisitionService from "../services/acquisition/dealerAcquisition.service.js";
+import localCampaignService from "../services/campaigns/localCampaign.service.js";
 
-const {
-  criarCampanhaLocal,
-} = require("../services/campaigns/localCampaign.service");
+const { Pool } = pg;
+const { garantirSEO } = seoPagesService;
+const { ativarAquisicaoDeLojistas } = dealerAcquisitionService;
+const { criarCampanhaLocal } = localCampaignService;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-const LEAD_META = 20;
-const ESTOQUE_MINIMO = 30;
+const LEAD_META = Number(process.env.AUTOPILOT_LEAD_META || 20);
+const ESTOQUE_MINIMO = Number(process.env.AUTOPILOT_ESTOQUE_MINIMO || 30);
 
-/* =====================================================
-   BUSCAR CIDADE FOCO
-===================================================== */
+let autopilotInterval = null;
+let autopilotRunning = false;
+let autopilotStarted = false;
+
 async function getCidadeFoco() {
   const result = await pool.query(
     `
@@ -33,17 +35,13 @@ async function getCidadeFoco() {
 
   if (result.rows.length === 0) return null;
 
-  return parseInt(result.rows[0].value);
+  return Number.parseInt(result.rows[0].value, 10);
 }
 
-/* =====================================================
-   PROCESSAR CIDADE
-===================================================== */
 async function processarCidade(cidade, cidadeFocoId) {
   try {
     const isCidadeFoco = cidade.id === cidadeFocoId;
 
-    // buscar oportunidade
     const oppResult = await pool.query(
       `
       SELECT priority_level
@@ -58,21 +56,22 @@ async function processarCidade(cidade, cidadeFocoId) {
 
     const oportunidade = oppResult.rows[0].priority_level;
 
-    // cidades que não são foco → apenas monitoramento
     if (!isCidadeFoco && !["critical"].includes(oportunidade)) {
       return;
     }
 
-    console.log(
-      `🤖 Processando cidade: ${cidade.name} ${
-        isCidadeFoco ? "(FOCO)" : ""
-      }`
+    logger.info(
+      {
+        cityId: cidade.id,
+        cityName: cidade.name,
+        isCidadeFoco,
+        prioridade: oportunidade,
+      },
+      "[autopilot.worker] Processando cidade"
     );
 
-    // 1) Garantir SEO
     await garantirSEO(cidade, pool);
 
-    // 2) Contar leads
     const leadsResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
@@ -82,16 +81,22 @@ async function processarCidade(cidade, cidadeFocoId) {
       [cidade.id]
     );
 
-    const totalLeads = leadsResult.rows[0].total || 0;
-
-    // Cidade foco: meta maior
+    const totalLeads = leadsResult.rows[0]?.total || 0;
     const metaLeads = isCidadeFoco ? LEAD_META * 2 : LEAD_META;
 
     if (totalLeads < metaLeads) {
       await criarCampanhaLocal(cidade, pool);
+
+      logger.info(
+        {
+          cityId: cidade.id,
+          totalLeads,
+          metaLeads,
+        },
+        "[autopilot.worker] Campanha local acionada"
+      );
     }
 
-    // 3) Contar estoque
     const stockResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
@@ -102,31 +107,48 @@ async function processarCidade(cidade, cidadeFocoId) {
       [cidade.id]
     );
 
-    const estoque = stockResult.rows[0].total || 0;
-
-    const metaEstoque = isCidadeFoco
-      ? ESTOQUE_MINIMO * 2
-      : ESTOQUE_MINIMO;
+    const estoque = stockResult.rows[0]?.total || 0;
+    const metaEstoque = isCidadeFoco ? ESTOQUE_MINIMO * 2 : ESTOQUE_MINIMO;
 
     if (estoque < metaEstoque) {
       await ativarAquisicaoDeLojistas(cidade, pool);
+
+      logger.info(
+        {
+          cityId: cidade.id,
+          estoque,
+          metaEstoque,
+        },
+        "[autopilot.worker] Aquisição de lojistas acionada"
+      );
     }
-  } catch (err) {
-    console.error("Erro ao processar cidade:", cidade.name, err);
+  } catch (error) {
+    logger.error(
+      {
+        error,
+        cityId: cidade?.id,
+        cityName: cidade?.name,
+      },
+      "[autopilot.worker] Erro ao processar cidade"
+    );
   }
 }
 
-/* =====================================================
-   WORKER PRINCIPAL
-===================================================== */
 async function runAutopilotWorker() {
+  if (autopilotRunning) {
+    logger.warn("[autopilot.worker] Execução já em andamento; nova rodada ignorada");
+    return;
+  }
+
+  autopilotRunning = true;
+
   try {
-    console.log("🤖 Rodando Autopilot Worker...");
+    logger.info("[autopilot.worker] Iniciando processamento");
 
     const cidadeFocoId = await getCidadeFoco();
 
     if (!cidadeFocoId) {
-      console.warn("⚠️ Nenhuma cidade foco definida");
+      logger.warn("[autopilot.worker] Nenhuma cidade foco definida");
     }
 
     const citiesResult = await pool.query(`
@@ -134,23 +156,55 @@ async function runAutopilotWorker() {
       FROM cities
     `);
 
-    const cities = citiesResult.rows;
-
-    for (const cidade of cities) {
+    for (const cidade of citiesResult.rows) {
       await processarCidade(cidade, cidadeFocoId);
     }
 
-    console.log("✅ Autopilot finalizado");
-  } catch (err) {
-    console.error("❌ Erro no Autopilot:", err);
+    logger.info("[autopilot.worker] Processamento finalizado com sucesso");
+  } catch (error) {
+    logger.error({ error }, "[autopilot.worker] Erro no processamento");
+  } finally {
+    autopilotRunning = false;
   }
 }
 
-function startAutopilotWorker() {
-  runAutopilotWorker();
-  setInterval(runAutopilotWorker, 6 * 60 * 60 * 1000);
+export async function startAutopilotWorker() {
+  if (autopilotStarted) {
+    logger.warn("[autopilot.worker] Worker já inicializado");
+    return;
+  }
+
+  autopilotStarted = true;
+
+  const intervalMs = Number(
+    process.env.AUTOPILOT_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
+  );
+
+  logger.info({ intervalMs }, "[autopilot.worker] Inicializando worker");
+
+  await runAutopilotWorker();
+
+  autopilotInterval = setInterval(() => {
+    runAutopilotWorker().catch((error) => {
+      logger.error({ error }, "[autopilot.worker] Erro na execução agendada");
+    });
+  }, intervalMs);
+
+  logger.info("[autopilot.worker] Agendamento configurado");
 }
 
-module.exports = {
-  startAutopilotWorker,
-};
+export async function stopAutopilotWorker() {
+  if (!autopilotStarted) {
+    logger.info("[autopilot.worker] Nenhum worker ativo para encerrar");
+    return;
+  }
+
+  if (autopilotInterval) {
+    clearInterval(autopilotInterval);
+    autopilotInterval = null;
+  }
+
+  autopilotStarted = false;
+
+  logger.info("[autopilot.worker] Worker encerrado com sucesso");
+}
