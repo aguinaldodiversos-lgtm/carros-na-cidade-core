@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-
+import citiesRoutes from "./modules/cities/cities.routes.js";
 import healthRoutes from "./routes/health.js";
 
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
@@ -157,7 +157,7 @@ app.get("/health/meta", (req, res) => {
 /* =====================================================
    ROTAS API
 ===================================================== */
-
+app.use("/api/cities", citiesRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadsRoutes);
