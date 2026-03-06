@@ -1,11 +1,4 @@
-// src/workers/bootstrap.js
-
 import { logger } from "../shared/logger.js";
-import { startAiWorker, stopAiWorker } from "./ai.worker.js";
-import { startStrategyWorker, stopStrategyWorker } from "./strategy.worker.js";
-import { startAutopilotWorker, stopAutopilotWorker } from "./autopilot.worker.js";
-import { startSeoWorker, stopSeoWorker } from "./seo.worker.js";
-import { startWhatsAppWorker, stopWhatsAppWorker } from "./whatsapp.worker.js";
 
 /* =====================================================
    HELPERS
@@ -15,8 +8,19 @@ function isEnabled(envName, defaultValue = "false") {
   return String(process.env[envName] ?? defaultValue).toLowerCase() === "true";
 }
 
+async function resolveWorkerModule(loader) {
+  const mod = await loader();
+  return mod;
+}
+
 async function startWorkerSafe(workerConfig) {
-  const { name, env, defaultValue = "false", start } = workerConfig;
+  const {
+    name,
+    env,
+    defaultValue = "false",
+    load,
+    startExport,
+  } = workerConfig;
 
   const enabled = isEnabled(env, defaultValue);
 
@@ -30,23 +34,37 @@ async function startWorkerSafe(workerConfig) {
       success: true,
       stopAvailable: false,
       error: null,
-    };
-  }
-
-  if (typeof start !== "function") {
-    logger.warn({ worker: name }, "⚠️ Worker não iniciado: export de start inválido");
-    return {
-      name,
-      env,
-      enabled: true,
-      started: false,
-      success: false,
-      stopAvailable: false,
-      error: "Export de start inválido",
+      load,
+      startExport,
+      stopExport: workerConfig.stopExport,
     };
   }
 
   try {
+    const mod = await resolveWorkerModule(load);
+    const start = mod?.[startExport];
+    const stop = mod?.[workerConfig.stopExport];
+
+    if (typeof start !== "function") {
+      logger.warn(
+        { worker: name, exportName: startExport },
+        "⚠️ Worker não iniciado: export de start inválido"
+      );
+
+      return {
+        name,
+        env,
+        enabled: true,
+        started: false,
+        success: false,
+        stopAvailable: false,
+        error: `Export inválido: ${startExport}`,
+        load,
+        startExport,
+        stopExport: workerConfig.stopExport,
+      };
+    }
+
     await start();
 
     logger.info({ worker: name }, "✅ Worker iniciado com sucesso");
@@ -57,8 +75,11 @@ async function startWorkerSafe(workerConfig) {
       enabled: true,
       started: true,
       success: true,
-      stopAvailable: true,
+      stopAvailable: typeof stop === "function",
       error: null,
+      load,
+      startExport,
+      stopExport: workerConfig.stopExport,
     };
   } catch (error) {
     logger.error(
@@ -77,24 +98,34 @@ async function startWorkerSafe(workerConfig) {
       success: false,
       stopAvailable: false,
       error: error?.message || String(error),
+      load,
+      startExport,
+      stopExport: workerConfig.stopExport,
     };
   }
 }
 
 async function stopWorkerSafe(workerConfig) {
-  const { name, stop } = workerConfig;
-
-  if (typeof stop !== "function") {
-    logger.warn({ worker: name }, "⚠️ Worker sem rotina de shutdown");
-    return {
-      name,
-      stopped: false,
-      success: false,
-      error: "Export de stop inválido",
-    };
-  }
+  const { name, load, stopExport } = workerConfig;
 
   try {
+    const mod = await resolveWorkerModule(load);
+    const stop = mod?.[stopExport];
+
+    if (typeof stop !== "function") {
+      logger.warn(
+        { worker: name, exportName: stopExport },
+        "⚠️ Worker sem rotina de shutdown"
+      );
+
+      return {
+        name,
+        stopped: false,
+        success: false,
+        error: `Export inválido: ${stopExport}`,
+      };
+    }
+
     await stop();
 
     logger.info({ worker: name }, "🛑 Worker encerrado com sucesso");
@@ -132,36 +163,41 @@ const WORKERS_REGISTRY = [
     name: "AI Worker",
     env: "RUN_WORKER_AI",
     defaultValue: "true",
-    start: startAiWorker,
-    stop: stopAiWorker,
+    load: () => import("./ai.worker.js"),
+    startExport: "startAiWorker",
+    stopExport: "stopAiWorker",
   },
   {
     name: "Strategy Worker",
     env: "RUN_WORKER_STRATEGY",
     defaultValue: "false",
-    start: startStrategyWorker,
-    stop: stopStrategyWorker,
+    load: () => import("./strategy.worker.js"),
+    startExport: "startStrategyWorker",
+    stopExport: "stopStrategyWorker",
   },
   {
     name: "Autopilot Worker",
     env: "RUN_WORKER_AUTOPILOT",
     defaultValue: "false",
-    start: startAutopilotWorker,
-    stop: stopAutopilotWorker,
+    load: () => import("./autopilot.worker.js"),
+    startExport: "startAutopilotWorker",
+    stopExport: "stopAutopilotWorker",
   },
   {
     name: "SEO Worker",
     env: "RUN_WORKER_SEO",
     defaultValue: "false",
-    start: startSeoWorker,
-    stop: stopSeoWorker,
+    load: () => import("./seo.worker.js"),
+    startExport: "startSeoWorker",
+    stopExport: "stopSeoWorker",
   },
   {
     name: "WhatsApp Worker",
     env: "RUN_WORKER_WHATSAPP",
     defaultValue: "true",
-    start: startWhatsAppWorker,
-    stop: stopWhatsAppWorker,
+    load: () => import("./whatsapp.worker.js"),
+    startExport: "startWhatsAppWorker",
+    stopExport: "stopWhatsAppWorker",
   },
 ];
 
@@ -195,18 +231,11 @@ export async function startWorkersBootstrap() {
     logger.warn("[workers.bootstrap] Bootstrap já executado; ignorando nova inicialização");
     return {
       started: true,
-      total: WORKERS_REGISTRY.length,
+      total: startedWorkers.length,
       enabled: startedWorkers.length,
       successful: startedWorkers.length,
       failed: 0,
-      results: startedWorkers.map((worker) => ({
-        name: worker.name,
-        enabled: true,
-        started: true,
-        success: true,
-        stopAvailable: typeof worker.stop === "function",
-        error: null,
-      })),
+      results: startedWorkers,
     };
   }
 
@@ -219,10 +248,9 @@ export async function startWorkersBootstrap() {
     WORKERS_REGISTRY.map((worker) => startWorkerSafe(worker))
   );
 
-  startedWorkers = WORKERS_REGISTRY.filter((worker, index) => {
-    const result = results[index];
-    return result.enabled && result.started && result.success;
-  });
+  startedWorkers = results.filter(
+    (result) => result.enabled && result.started && result.success
+  );
 
   bootstrapStarted = true;
 
@@ -342,4 +370,15 @@ export async function stopWorkersBootstrap() {
   }
 
   return summary;
+}
+
+/* =====================================================
+   EXECUÇÃO DIRETA (opcional)
+===================================================== */
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startWorkersBootstrap().catch((error) => {
+    logger.error({ error }, "❌ Falha fatal ao iniciar bootstrap diretamente");
+    process.exit(1);
+  });
 }
