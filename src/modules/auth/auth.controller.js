@@ -1,11 +1,14 @@
-// src/modules/auth/auth.controller.js
-
 import * as authService from "./auth.service.js";
 
 export async function login(req, res, next) {
   try {
     const { email, password } = req.body;
-    const tokens = await authService.login(email, password);
+
+    const tokens = await authService.login(email, password, {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
     res.json(tokens);
   } catch (err) {
     next(err);
@@ -15,7 +18,12 @@ export async function login(req, res, next) {
 export async function refresh(req, res, next) {
   try {
     const { refreshToken } = req.body;
-    const tokens = await authService.refresh(refreshToken);
+
+    const tokens = await authService.refresh(refreshToken, {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
     res.json(tokens);
   } catch (err) {
     next(err);
