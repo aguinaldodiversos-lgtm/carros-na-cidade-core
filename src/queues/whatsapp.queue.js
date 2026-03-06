@@ -1,37 +1,21 @@
 import { Queue, QueueEvents } from "bullmq";
-import IORedis from "ioredis";
 import { logger } from "../shared/logger.js";
+import { getQueueRedisConnection } from "../infrastructure/queue/redis.connection.js";
+import {
+  QUEUE_NAMES,
+  QUEUE_DEFAULT_JOB_OPTIONS,
+} from "../infrastructure/queue/queue.constants.js";
 
-const QUEUE_NAME = "whatsapp";
+const redisConnection = getQueueRedisConnection();
 
-const redisConnection = new IORedis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-  lazyConnect: true,
-});
+export const WHATSAPP_QUEUE_NAME = QUEUE_NAMES.WHATSAPP;
 
-redisConnection.on("connect", () => {
-  logger.info("[whatsapp.queue] Redis conectado");
-});
-
-redisConnection.on("error", (error) => {
-  logger.error({ error }, "[whatsapp.queue] Erro na conexão Redis");
-});
-
-export const whatsappQueue = new Queue(QUEUE_NAME, {
+export const whatsappQueue = new Queue(WHATSAPP_QUEUE_NAME, {
   connection: redisConnection,
-  defaultJobOptions: {
-    removeOnComplete: 100,
-    removeOnFail: 1000,
-    attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 3000,
-    },
-  },
+  defaultJobOptions: QUEUE_DEFAULT_JOB_OPTIONS,
 });
 
-export const whatsappQueueEvents = new QueueEvents(QUEUE_NAME, {
+export const whatsappQueueEvents = new QueueEvents(WHATSAPP_QUEUE_NAME, {
   connection: redisConnection,
 });
 
@@ -46,13 +30,6 @@ whatsappQueueEvents.on("failed", ({ jobId, failedReason }) => {
   );
 });
 
-/**
- * Adiciona job na fila de WhatsApp.
- *
- * Assinaturas suportadas:
- * 1) addWhatsAppJob("send-message", { ...data }, { ...opts })
- * 2) addWhatsAppJob({ ...data }, { ...opts }) -> usa name padrão "send-message"
- */
 export async function addWhatsAppJob(nameOrData, dataOrOptions = {}, maybeOptions = {}) {
   let jobName = "send-message";
   let jobData = {};
@@ -71,7 +48,7 @@ export async function addWhatsAppJob(nameOrData, dataOrOptions = {}, maybeOption
 
   logger.info(
     {
-      queue: QUEUE_NAME,
+      queue: WHATSAPP_QUEUE_NAME,
       jobId: job.id,
       jobName,
     },
@@ -85,10 +62,7 @@ export async function closeWhatsAppQueue() {
   await Promise.all([
     whatsappQueue.close(),
     whatsappQueueEvents.close(),
-    redisConnection.quit(),
   ]);
 
   logger.info("[whatsapp.queue] Fila encerrada com sucesso");
 }
-
-export { QUEUE_NAME as WHATSAPP_QUEUE_NAME };
