@@ -3,8 +3,8 @@ import { logger } from "../shared/logger.js";
 import {
   createRedisClient,
   createCache,
-} from "../modules/ai/orchestrator/ai.cache.js";
-import { AiOrchestrator } from "../modules/ai/orchestrator/ai.orchestrator.js";
+} from "../brain/cache/ai.cache.js";
+import { AiOrchestrator } from "../brain/orchestrator/ai.orchestrator.js";
 
 let aiWorkerInstance = null;
 let aiRedisInstance = null;
