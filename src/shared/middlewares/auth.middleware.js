@@ -11,10 +11,8 @@ export async function authMiddleware(req, res, next) {
     }
 
     const token = authHeader.split(" ")[1];
-
     const decoded = verifyAccessToken(token);
 
-    // Verifica se usuário ainda existe
     const result = await pool.query(
       "SELECT id, role, plan FROM users WHERE id = $1",
       [decoded.id]
@@ -25,9 +23,15 @@ export async function authMiddleware(req, res, next) {
     }
 
     req.user = result.rows[0];
-
     next();
   } catch (err) {
+    req.log?.warn?.(
+      {
+        error: err?.message || String(err),
+      },
+      "[auth.middleware] Falha de autenticação"
+    );
+
     next(new AppError("Acesso não autorizado", 401));
   }
 }
