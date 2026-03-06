@@ -1,80 +1,210 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { addWhatsAppJob } from "../../queues/whatsapp.queue.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { logger } from "../../shared/logger.js";
 
-export async function createLead({ adId, buyerName, buyerPhone }) {
-  const adResult = await pool.query(
-    `SELECT id, user_id, city_id, title, whatsapp_number
-     FROM ads
-     WHERE id = $1 AND status = 'active'`,
-    [adId]
-  );
+function normalizePhone(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, "");
+  return digits || null;
+}
 
-  if (adResult.rows.length === 0) {
-    throw new AppError("Anúncio não encontrado", 404);
+function validateCreateLeadInput({ adId, buyerName, buyerPhone }) {
+  if (!adId || Number.isNaN(Number(adId))) {
+    throw new AppError("ID do anúncio inválido", 400);
   }
 
-  const ad = adResult.rows[0];
+  if (!buyerName || String(buyerName).trim().length < 2) {
+    throw new AppError("Nome do comprador é obrigatório", 400);
+  }
 
-  /* ===============================
-     1️⃣ Salvar Lead
-  =============================== */
+  const normalizedPhone = normalizePhone(buyerPhone);
 
-  const leadResult = await pool.query(
-    `
-    INSERT INTO leads
-    (ad_id, seller_id, city_id, buyer_name, buyer_phone)
-    VALUES ($1,$2,$3,$4,$5)
-    RETURNING *
-    `,
-    [
-      ad.id,
-      ad.user_id,
-      ad.city_id,
-      buyerName,
-      buyerPhone || null,
-    ]
-  );
+  return {
+    adId: Number(adId),
+    buyerName: String(buyerName).trim(),
+    buyerPhone: normalizedPhone,
+  };
+}
 
-  /* ===============================
-     2️⃣ Atualizar Métrica Cidade
-  =============================== */
-
-  await pool.query(
-    `
-    UPDATE city_metrics
-    SET total_leads = COALESCE(total_leads,0) + 1
-    WHERE city_id = $1
-    `,
-    [ad.city_id]
-  );
-
-  /* ===============================
-     3️⃣ Atualizar Score Vendedor
-  =============================== */
-
-  await pool.query(
-    `
-    INSERT INTO seller_scores (seller_id, total_leads)
-    VALUES ($1, 1)
-    ON CONFLICT (seller_id)
-    DO UPDATE SET
-      total_leads = seller_scores.total_leads + 1,
-      updated_at = NOW()
-    `,
-    [ad.user_id]
-  );
-
-  /* ===============================
-     4️⃣ Enviar WhatsApp via Queue
-  =============================== */
+async function enqueueLeadNotification({ ad, lead }) {
+  if (!ad?.whatsapp_number) {
+    logger.warn(
+      {
+        adId: ad?.id,
+        sellerId: ad?.user_id,
+        leadId: lead?.id,
+      },
+      "[leads.service] Anúncio sem whatsapp_number; notificação não enfileirada"
+    );
+    return null;
+  }
 
   const message = `Olá! Tenho interesse no ${ad.title} anunciado no Carros na Cidade. Ainda está disponível?`;
 
-  await addWhatsAppJob({
-    phone: ad.whatsapp_number,
-    lead: message,
-  });
+  const normalizedSellerPhone = normalizePhone(ad.whatsapp_number);
 
-  return leadResult.rows[0];
+  if (!normalizedSellerPhone) {
+    logger.warn(
+      {
+        adId: ad?.id,
+        sellerId: ad?.user_id,
+        leadId: lead?.id,
+      },
+      "[leads.service] whatsapp_number inválido; notificação não enfileirada"
+    );
+    return null;
+  }
+
+  try {
+    const job = await addWhatsAppJob(
+      "send-message",
+      {
+        leadId: lead.id,
+        adId: ad.id,
+        sellerId: ad.user_id,
+        cityId: ad.city_id,
+        phone: normalizedSellerPhone,
+        message,
+        channel: "whatsapp",
+        origin: "leads.service",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        jobId: `lead:${lead.id}:ad:${ad.id}:seller:${ad.user_id}`,
+      }
+    );
+
+    logger.info(
+      {
+        leadId: lead.id,
+        adId: ad.id,
+        sellerId: ad.user_id,
+        jobId: job?.id,
+      },
+      "[leads.service] Notificação WhatsApp enfileirada com sucesso"
+    );
+
+    return job;
+  } catch (error) {
+    logger.error(
+      {
+        error,
+        leadId: lead.id,
+        adId: ad.id,
+        sellerId: ad.user_id,
+      },
+      "[leads.service] Falha ao enfileirar notificação WhatsApp"
+    );
+
+    return null;
+  }
+}
+
+export async function createLead(input) {
+  const { adId, buyerName, buyerPhone } = validateCreateLeadInput(input);
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const adResult = await client.query(
+      `
+      SELECT
+        id,
+        user_id,
+        city_id,
+        title,
+        whatsapp_number,
+        status
+      FROM ads
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [adId]
+    );
+
+    if (adResult.rows.length === 0) {
+      throw new AppError("Anúncio não encontrado", 404);
+    }
+
+    const ad = adResult.rows[0];
+
+    if (ad.status !== "active") {
+      throw new AppError("Anúncio não está ativo", 400);
+    }
+
+    const leadResult = await client.query(
+      `
+      INSERT INTO leads (
+        ad_id,
+        seller_id,
+        city_id,
+        buyer_name,
+        buyer_phone
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+      `,
+      [ad.id, ad.user_id, ad.city_id, buyerName, buyerPhone]
+    );
+
+    const lead = leadResult.rows[0];
+
+    await client.query(
+      `
+      INSERT INTO city_metrics (city_id, total_leads, updated_at)
+      VALUES ($1, 1, NOW())
+      ON CONFLICT (city_id)
+      DO UPDATE SET
+        total_leads = COALESCE(city_metrics.total_leads, 0) + 1,
+        updated_at = NOW()
+      `,
+      [ad.city_id]
+    );
+
+    await client.query(
+      `
+      INSERT INTO seller_scores (seller_id, total_leads, updated_at)
+      VALUES ($1, 1, NOW())
+      ON CONFLICT (seller_id)
+      DO UPDATE SET
+        total_leads = seller_scores.total_leads + 1,
+        updated_at = NOW()
+      `,
+      [ad.user_id]
+    );
+
+    await client.query("COMMIT");
+
+    logger.info(
+      {
+        leadId: lead.id,
+        adId: ad.id,
+        sellerId: ad.user_id,
+        cityId: ad.city_id,
+      },
+      "[leads.service] Lead criado com sucesso"
+    );
+
+    await enqueueLeadNotification({ ad, lead });
+
+    return lead;
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    logger.error(
+      { error, adId, buyerName },
+      "[leads.service] Erro ao criar lead"
+    );
+
+    throw new AppError("Erro ao criar lead", 500);
+  } finally {
+    client.release();
+  }
 }
