@@ -1,6 +1,5 @@
-// src/modules/auth/auth.routes.js
 import express from "express";
-import { login, refresh, logout } from "./auth.service.js";
+import * as authController from "./auth.controller.js";
 import {
   requestPasswordReset,
   resetPasswordWithToken,
@@ -10,58 +9,10 @@ import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js
 
 const router = express.Router();
 
-/* =====================================================
-   LOGIN (COM RATE LIMIT)
-===================================================== */
-router.post("/login", loginRateLimit, async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
+router.post("/login", loginRateLimit, authController.login);
+router.post("/refresh", authController.refresh);
+router.post("/logout", authController.logout);
 
-    const tokens = await login(email, password, {
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-    });
-
-    res.json(tokens);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/* =====================================================
-   REFRESH
-===================================================== */
-router.post("/refresh", async (req, res, next) => {
-  try {
-    const { refreshToken } = req.body;
-    const tokens = await refresh(refreshToken);
-    res.json(tokens);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/* =====================================================
-   LOGOUT
-===================================================== */
-router.post("/refresh", async (req, res, next) => {
-  try {
-    const { refreshToken } = req.body;
-
-    const tokens = await refresh(refreshToken, {
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-    });
-
-    res.json(tokens);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/* =====================================================
-   RECUPERAÇÃO DE SENHA
-===================================================== */
 router.post("/forgot-password", async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -87,9 +38,6 @@ router.post("/reset-password", async (req, res, next) => {
   }
 });
 
-/* =====================================================
-   VERIFICAÇÃO DE EMAIL
-===================================================== */
 router.post("/verify-email", async (req, res, next) => {
   try {
     const { token } = req.body;
