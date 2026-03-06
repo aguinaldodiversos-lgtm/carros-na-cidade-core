@@ -1,36 +1,17 @@
 import { pool } from "../../infrastructure/database/db.js";
-
-/* =====================================================
-   HOME DATA CONTROLLER (VERSÃO ROBUSTA)
-===================================================== */
+import * as citiesService from "../cities/cities.service.js";
 
 export async function getHomeData(req, res, next) {
   try {
-    /* =====================================================
-       EXECUTA CONSULTAS EM PARALELO (PERFORMANCE)
-    ===================================================== */
     const [
-      citiesResult,
+      featuredCities,
       highlightAdsResult,
       opportunityAdsResult,
       recentAdsResult,
-      statsResult
+      statsResult,
     ] = await Promise.all([
+      citiesService.getTopCitiesByDemand(8),
 
-      /* ===== CIDADES COM MAIOR DEMANDA ===== */
-      pool.query(`
-        SELECT 
-          c.id,
-          c.name,
-          c.slug,
-          COALESCE(cm.demand_score, 0) AS demand_score
-        FROM cities c
-        LEFT JOIN city_metrics cm ON cm.city_id = c.id
-        ORDER BY cm.demand_score DESC NULLS LAST
-        LIMIT 8
-      `),
-
-      /* ===== ANÚNCIOS EM DESTAQUE ===== */
       pool.query(`
         SELECT 
           a.id,
@@ -53,7 +34,6 @@ export async function getHomeData(req, res, next) {
         LIMIT 12
       `),
 
-      /* ===== OPORTUNIDADES (ABAIXO DA FIPE) ===== */
       pool.query(`
         SELECT 
           a.id,
@@ -74,7 +54,6 @@ export async function getHomeData(req, res, next) {
         LIMIT 12
       `),
 
-      /* ===== ANÚNCIOS RECENTES ===== */
       pool.query(`
         SELECT 
           a.id,
@@ -94,31 +73,25 @@ export async function getHomeData(req, res, next) {
         LIMIT 12
       `),
 
-      /* ===== ESTATÍSTICAS GERAIS ===== */
       pool.query(`
         SELECT 
           (SELECT COUNT(*) FROM ads WHERE status = 'active') AS total_ads,
           (SELECT COUNT(*) FROM cities) AS total_cities,
           (SELECT COUNT(*) FROM advertisers) AS total_advertisers,
           (SELECT COUNT(*) FROM users) AS total_users
-      `)
+      `),
     ]);
-
-    /* =====================================================
-       RESPOSTA FINAL
-    ===================================================== */
 
     res.json({
       success: true,
       data: {
-        featuredCities: citiesResult.rows,
+        featuredCities,
         highlightAds: highlightAdsResult.rows,
         opportunityAds: opportunityAdsResult.rows,
         recentAds: recentAdsResult.rows,
-        stats: statsResult.rows[0]
-      }
+        stats: statsResult.rows[0],
+      },
     });
-
   } catch (err) {
     next(err);
   }
