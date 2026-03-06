@@ -1,25 +1,25 @@
-require("dotenv").config();
-const { Pool } = require("pg");
-const path = require("path");
-const { google } = require("googleapis");
-const { BetaAnalyticsDataClient } = require("@google-analytics/data");
+import "dotenv/config";
+import path from "path";
+import { fileURLToPath } from "url";
+import pg from "pg";
+import { google } from "googleapis";
+import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { logger } from "../shared/logger.js";
 
-const {
-  generateSeoArticle,
-} = require("../services/seoAI.service");
+import seoAiService from "../services/seoAI.service.js";
+import seoPagesService from "../services/seo/seoPages.service.js";
 
-const {
-  garantirSEO,
-} = require("../services/seo/seoPages.service");
+const { Pool } = pg;
+const { generateSeoArticle } = seoAiService;
+const { garantirSEO } = seoPagesService;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
-
-/* =====================================================
-   CONFIG GOOGLE
-===================================================== */
 
 const keyPath = path.join(
   __dirname,
@@ -29,6 +29,10 @@ const keyPath = path.join(
 const analyticsClient = new BetaAnalyticsDataClient({
   keyFilename: keyPath,
 });
+
+let seoInterval = null;
+let seoRunning = false;
+let seoStarted = false;
 
 async function collectSearchConsoleData(startDate, endDate) {
   const auth = new google.auth.GoogleAuth({
@@ -53,7 +57,10 @@ async function collectSearchConsoleData(startDate, endDate) {
     },
   });
 
-  if (!response.data.rows) return;
+  if (!response.data.rows?.length) {
+    logger.info("[seo.worker] Nenhum dado do Search Console encontrado");
+    return;
+  }
 
   for (const row of response.data.rows) {
     await pool.query(
@@ -80,14 +87,14 @@ async function collectSearchConsoleData(startDate, endDate) {
     );
   }
 
-  console.log("📊 Search Console coletado");
+  logger.info("[seo.worker] Search Console coletado com sucesso");
 }
 
 async function collectGA4Data(startDate, endDate) {
   const propertyId = process.env.GA4_PROPERTY_ID;
 
   if (!propertyId) {
-    console.log("⚠ GA4_PROPERTY_ID não definido");
+    logger.warn("[seo.worker] GA4_PROPERTY_ID não definido");
     return;
   }
 
@@ -103,7 +110,7 @@ async function collectGA4Data(startDate, endDate) {
   });
 
   for (const row of response.rows || []) {
-    const city = row.dimensionValues[0].value;
+    const city = row.dimensionValues?.[0]?.value || "unknown";
 
     await pool.query(
       `
@@ -119,32 +126,32 @@ async function collectGA4Data(startDate, endDate) {
       [
         startDate,
         city,
-        row.metricValues[0].value,
-        row.metricValues[1].value,
-        row.metricValues[2].value,
+        row.metricValues?.[0]?.value || 0,
+        row.metricValues?.[1]?.value || 0,
+        row.metricValues?.[2]?.value || 0,
         "google",
       ]
     );
   }
 
-  console.log("📈 GA4 coletado");
+  logger.info("[seo.worker] GA4 coletado com sucesso");
 }
 
-/* =====================================================
-   WORKER PRINCIPAL
-===================================================== */
-
 async function runSeoWorker() {
+  if (seoRunning) {
+    logger.warn("[seo.worker] Execução já em andamento; nova rodada ignorada");
+    return;
+  }
+
+  seoRunning = true;
+
   try {
-    console.log("🌐 Rodando SEO Worker inteligente...");
+    logger.info("[seo.worker] Iniciando processamento");
 
     const today = new Date().toISOString().split("T")[0];
 
-    /* ===== 1️⃣ Coleta externa ===== */
     await collectSearchConsoleData(today, today);
     await collectGA4Data(today, today);
-
-    /* ===== 2️⃣ Growth SEO interno ===== */
 
     const citiesResult = await pool.query(`
       SELECT c.id, c.name, c.slug, o.priority_level
@@ -161,10 +168,15 @@ async function runSeoWorker() {
       LIMIT 5
     `);
 
-    const cities = citiesResult.rows;
-
-    for (const cidade of cities) {
-      console.log(`📍 Processando cidade: ${cidade.name}`);
+    for (const cidade of citiesResult.rows) {
+      logger.info(
+        {
+          cityId: cidade.id,
+          cityName: cidade.name,
+          priorityLevel: cidade.priority_level,
+        },
+        "[seo.worker] Processando cidade"
+      );
 
       await garantirSEO(cidade, pool);
 
@@ -178,7 +190,7 @@ async function runSeoWorker() {
         GROUP BY brand, model
         ORDER BY total DESC
         LIMIT 2
-      `,
+        `,
         [cidade.id]
       );
 
@@ -187,17 +199,27 @@ async function runSeoWorker() {
 
         const exists = await pool.query(
           `
-          SELECT id FROM blog_posts
-          WHERE city = $1 AND brand = $2 AND model = $3
+          SELECT id
+          FROM blog_posts
+          WHERE city = $1
+            AND brand = $2
+            AND model = $3
           LIMIT 1
           `,
           [cidade.name, brand, model]
         );
 
-        if (exists.rows.length > 0) continue;
+        if (exists.rows.length > 0) {
+          continue;
+        }
 
-        console.log(
-          `✍️ Gerando artigo: ${brand} ${model} em ${cidade.name}`
+        logger.info(
+          {
+            cityName: cidade.name,
+            brand,
+            model,
+          },
+          "[seo.worker] Gerando artigo SEO"
         );
 
         const article = await generateSeoArticle({
@@ -206,7 +228,17 @@ async function runSeoWorker() {
           model,
         });
 
-        if (!article) continue;
+        if (!article) {
+          logger.warn(
+            {
+              cityName: cidade.name,
+              brand,
+              model,
+            },
+            "[seo.worker] Geração de artigo retornou vazio"
+          );
+          continue;
+        }
 
         await pool.query(
           `
@@ -223,21 +255,61 @@ async function runSeoWorker() {
           ]
         );
 
-        console.log(`✅ Artigo criado: ${article.title}`);
+        logger.info(
+          {
+            title: article.title,
+            cityName: cidade.name,
+          },
+          "[seo.worker] Artigo criado com sucesso"
+        );
       }
     }
 
-    console.log("🔥 SEO Worker finalizado com coleta + IA + Growth");
-  } catch (err) {
-    console.error("❌ Erro no SEO Worker:", err);
+    logger.info("[seo.worker] Processamento finalizado com sucesso");
+  } catch (error) {
+    logger.error({ error }, "[seo.worker] Erro no processamento");
+  } finally {
+    seoRunning = false;
   }
 }
 
-function startSeoWorker() {
-  runSeoWorker();
-  setInterval(runSeoWorker, 6 * 60 * 60 * 1000);
+export async function startSeoWorker() {
+  if (seoStarted) {
+    logger.warn("[seo.worker] Worker já inicializado");
+    return;
+  }
+
+  seoStarted = true;
+
+  const intervalMs = Number(
+    process.env.SEO_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
+  );
+
+  logger.info({ intervalMs }, "[seo.worker] Inicializando worker");
+
+  await runSeoWorker();
+
+  seoInterval = setInterval(() => {
+    runSeoWorker().catch((error) => {
+      logger.error({ error }, "[seo.worker] Erro na execução agendada");
+    });
+  }, intervalMs);
+
+  logger.info("[seo.worker] Agendamento configurado");
 }
 
-module.exports = {
-  startSeoWorker,
-};
+export async function stopSeoWorker() {
+  if (!seoStarted) {
+    logger.info("[seo.worker] Nenhum worker ativo para encerrar");
+    return;
+  }
+
+  if (seoInterval) {
+    clearInterval(seoInterval);
+    seoInterval = null;
+  }
+
+  seoStarted = false;
+
+  logger.info("[seo.worker] Worker encerrado com sucesso");
+}
