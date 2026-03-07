@@ -5,10 +5,6 @@ import { parseAdsFacetFilters, parseAdsFilters } from "./ads-filter.parser.js";
 import { buildAdsSearchQuery } from "./ads-filter.builder.js";
 import { getAdsFacets } from "./ads-filter.facets.js";
 
-/* =====================================================
-   HELPERS
-===================================================== */
-
 function buildSafeSearchFallback(error, rawFilters = {}) {
   return {
     ok: false,
@@ -18,6 +14,11 @@ function buildSafeSearchFallback(error, rawFilters = {}) {
       page: 1,
       limit: 20,
       sort: "relevance",
+      free_query_meta: {
+        original_q: rawFilters?.q || null,
+        parsed: false,
+        safe: true,
+      },
     },
     data: [],
     pagination: {
@@ -29,10 +30,6 @@ function buildSafeSearchFallback(error, rawFilters = {}) {
   };
 }
 
-/* =====================================================
-   SEARCH
-===================================================== */
-
 export async function searchAdsWithFilters(
   rawFilters = {},
   scope = "public_global",
@@ -41,7 +38,7 @@ export async function searchAdsWithFilters(
   const safeMode = options.safeMode !== false;
 
   try {
-    const filters = parseAdsFilters(rawFilters, scope);
+    const filters = await parseAdsFilters(rawFilters, scope);
     const query = buildAdsSearchQuery(filters);
 
     const [dataResult, countResult] = await Promise.all([
@@ -71,15 +68,11 @@ export async function searchAdsWithFilters(
   }
 }
 
-/* =====================================================
-   FACETS
-===================================================== */
-
 export async function getFacetsWithFilters(rawFilters = {}, options = {}) {
   const safeMode = options.safeMode !== false;
 
   try {
-    const filters = parseAdsFacetFilters(rawFilters);
+    const filters = await parseAdsFacetFilters(rawFilters);
     const facets = await getAdsFacets(filters);
 
     return {
