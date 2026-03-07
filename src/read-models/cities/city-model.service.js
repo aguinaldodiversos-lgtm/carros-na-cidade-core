@@ -7,7 +7,11 @@ function normalizeSlugPart(value) {
 }
 
 export async function getCityModelPage(citySlug, brand, model) {
-  const snapshot = await cityModelRepository.getCityModelSnapshot(citySlug, brand, model);
+  const snapshot = await cityModelRepository.getCityModelSnapshot(
+    citySlug,
+    brand,
+    model
+  );
 
   if (!snapshot || !snapshot.city_id) {
     throw new AppError("Página de modelo da cidade não encontrada", 404);
