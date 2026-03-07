@@ -7,6 +7,7 @@ import citiesRoutes from "./modules/cities/cities.routes.js";
 import dealersRoutes from "./modules/dealers/dealers.routes.js";
 import campaignsRoutes from "./modules/campaigns/campaigns.routes.js";
 import healthRoutes from "./routes/health.js";
+import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import marketIntelligenceRoutes from "./modules/market-intelligence/market-intelligence.routes.js";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
@@ -167,7 +168,7 @@ app.use("/api/leads", leadsRoutes);
 app.use("/api/ads", adsRoutes);
 app.use("/api/market-intelligence", marketIntelligenceRoutes);
 app.use("/api/cities", cityScoreRoutes);
-
+app.use("/api/public/seo", publicSeoRoutes);
 /**
  * Eventos / tracking
  */
