@@ -1,18 +1,19 @@
 import * as adsService from "./ads.service.js";
 import { getFacets } from "./facets.service.js";
 import {
-  normalizeFacetFilters,
-  normalizeSearchFilters,
+  parseAdsFacetFilters,
+  parseAdsFilters,
+} from "./filters/ads-filter.parser.js";
+import {
   validateAdIdentifier,
   validateAdId,
   validateCreateAdPayload,
-  sanitizeString,
 } from "./ads.validators.js";
 import { pool } from "../../infrastructure/database/db.js";
 
 export async function autocomplete(req, res, next) {
   try {
-    const q = sanitizeString(req.query.q);
+    const q = String(req.query.q || "").trim();
 
     if (!q || q.length < 2) {
       return res.json({ success: true, suggestions: [] });
@@ -23,16 +24,15 @@ export async function autocomplete(req, res, next) {
     const result = await pool.query(
       `
       SELECT
-        brand,
-        model,
-        city,
-        COUNT(*) as total,
-        ts_rank(search_vector, plainto_tsquery('portuguese', $1)) AS rank
-      FROM ads
-      WHERE
-        status = 'active'
-        AND search_vector @@ plainto_tsquery('portuguese', $1)
-      GROUP BY brand, model, city, search_vector
+        a.brand,
+        a.model,
+        a.city,
+        COUNT(*)::int AS total,
+        ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS rank
+      FROM ads a
+      WHERE a.status = 'active'
+        AND a.search_vector @@ plainto_tsquery('portuguese', $1)
+      GROUP BY a.brand, a.model, a.city, a.search_vector
       ORDER BY rank DESC, total DESC
       LIMIT 8
       `,
@@ -55,7 +55,7 @@ export async function autocomplete(req, res, next) {
 
 export async function facets(req, res, next) {
   try {
-    const filters = normalizeFacetFilters(req.query);
+    const filters = parseAdsFacetFilters(req.query);
     const facets = await getFacets(filters);
 
     res.json({
@@ -69,8 +69,8 @@ export async function facets(req, res, next) {
 
 export async function list(req, res, next) {
   try {
-    const filters = normalizeSearchFilters(req.query);
-    const result = await adsService.list(filters);
+    const filters = parseAdsFilters(req.query, "public_global");
+    const result = await adsService.list(filters, "public_global");
 
     res.json({
       success: true,
@@ -83,8 +83,8 @@ export async function list(req, res, next) {
 
 export async function search(req, res, next) {
   try {
-    const filters = normalizeSearchFilters(req.query);
-    const result = await adsService.search(filters);
+    const filters = parseAdsFilters(req.query, "public_global");
+    const result = await adsService.search(filters, "public_global");
 
     res.json({
       success: true,
