@@ -1,12 +1,16 @@
+// src/read-models/cities/city-model.service.js
+
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as cityModelRepository from "./city-model.repository.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
+import * as adsService from "../../modules/ads/ads.service.js";
+import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
 
 function normalizeSlugPart(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-export async function getCityModelPage(citySlug, brand, model) {
+export async function getCityModelPage(citySlug, brand, model, query = {}) {
   const snapshot = await cityModelRepository.getCityModelSnapshot(
     citySlug,
     brand,
@@ -17,10 +21,35 @@ export async function getCityModelPage(citySlug, brand, model) {
     throw new AppError("Página de modelo da cidade não encontrada", 404);
   }
 
-  const [ads, relatedModels] = await Promise.all([
-    cityModelRepository.listModelAds(citySlug, brand, model, 24),
-    cityModelRepository.listRelatedModelsByBrand(citySlug, brand, 12),
+  const scopedFilters = {
+    ...query,
+    city_slug: citySlug,
+    brand,
+    model,
+  };
+
+  const [adsResult, facetsResult] = await Promise.all([
+    adsService.search(
+      {
+        ...scopedFilters,
+        limit: 24,
+        sort: "relevance",
+      },
+      "public_city_brand_model",
+      { safeMode: true }
+    ),
+    getFacetsWithFilters(
+      {
+        city_slug: citySlug,
+        brand,
+      },
+      { safeMode: true }
+    ),
   ]);
+
+  const relatedModels = (facetsResult?.facets?.models || []).filter(
+    (item) => String(item.brand || "").toLowerCase() === String(brand).toLowerCase()
+  );
 
   return {
     city: {
@@ -54,9 +83,13 @@ export async function getCityModelPage(citySlug, brand, model) {
       canonicalPath: `/cidade/${snapshot.city_slug}/marca/${normalizeSlugPart(snapshot.brand)}/modelo/${normalizeSlugPart(snapshot.model)}`,
       robots: "index,follow",
     },
+    filters: adsResult.filters || {},
     sections: {
-      ads,
+      ads: adsResult.data || [],
       relatedModels,
+    },
+    pagination: {
+      ads: adsResult.pagination,
     },
     internalLinks: buildCityTerritorialLinks({
       citySlug: snapshot.city_slug,
