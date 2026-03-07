@@ -1,23 +1,46 @@
+// src/read-models/cities/city-brand.service.js
+
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as cityBrandRepository from "./city-brand.repository.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
+import * as adsService from "../../modules/ads/ads.service.js";
+import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
 
 function normalizeBrandSlug(brand) {
   return String(brand || "").trim().toLowerCase();
 }
 
-export async function getCityBrandPage(citySlug, brand) {
+export async function getCityBrandPage(citySlug, brand, query = {}) {
   const snapshot = await cityBrandRepository.getCityBrandSnapshot(citySlug, brand);
 
   if (!snapshot || !snapshot.city_id) {
     throw new AppError("Página de marca da cidade não encontrada", 404);
   }
 
-  const [ads, models, relatedBrands] = await Promise.all([
-    cityBrandRepository.listBrandAds(citySlug, brand, 24),
-    cityBrandRepository.listBrandModels(citySlug, brand, 20),
-    cityBrandRepository.listRelatedBrands(citySlug, 12),
+  const scopedFilters = {
+    ...query,
+    city_slug: citySlug,
+    brand,
+  };
+
+  const [adsResult, facetsResult] = await Promise.all([
+    adsService.search(
+      {
+        ...scopedFilters,
+        limit: 24,
+        sort: "relevance",
+      },
+      "public_city_brand",
+      { safeMode: true }
+    ),
+    getFacetsWithFilters(scopedFilters, { safeMode: true }),
   ]);
+
+  const models = (facetsResult?.facets?.models || []).filter(
+    (item) => String(item.brand || "").toLowerCase() === String(brand).toLowerCase()
+  );
+
+  const relatedBrands = facetsResult?.facets?.brands || [];
 
   return {
     city: {
@@ -45,10 +68,14 @@ export async function getCityBrandPage(citySlug, brand) {
       canonicalPath: `/cidade/${snapshot.city_slug}/marca/${normalizeBrandSlug(snapshot.brand)}`,
       robots: "index,follow",
     },
+    filters: adsResult.filters || {},
     sections: {
-      ads,
+      ads: adsResult.data || [],
       models,
       relatedBrands,
+    },
+    pagination: {
+      ads: adsResult.pagination,
     },
     internalLinks: buildCityTerritorialLinks({
       citySlug: snapshot.city_slug,
