@@ -1,26 +1,15 @@
 import { logger } from "../shared/logger.js";
 
-/* =====================================================
-   HELPERS
-===================================================== */
-
 function isEnabled(envName, defaultValue = "false") {
   return String(process.env[envName] ?? defaultValue).toLowerCase() === "true";
 }
 
 async function resolveWorkerModule(loader) {
-  const mod = await loader();
-  return mod;
+  return loader();
 }
 
 async function startWorkerSafe(workerConfig) {
-  const {
-    name,
-    env,
-    defaultValue = "false",
-    load,
-    startExport,
-  } = workerConfig;
+  const { name, env, defaultValue = "false", load, startExport } = workerConfig;
 
   const enabled = isEnabled(env, defaultValue);
 
@@ -154,10 +143,6 @@ async function stopWorkerSafe(workerConfig) {
   }
 }
 
-/* =====================================================
-   REGISTRY DE WORKERS
-===================================================== */
-
 const WORKERS_REGISTRY = [
   {
     name: "AI Worker",
@@ -168,26 +153,10 @@ const WORKERS_REGISTRY = [
     stopExport: "stopAiWorker",
   },
   {
-    name: "Strategy Worker",
-    env: "RUN_WORKER_STRATEGY",
-    defaultValue: "false",
-    load: () => import("./strategy.worker.js"),
-    startExport: "startStrategyWorker",
-    stopExport: "stopStrategyWorker",
-  },
-  {
-    name: "Autopilot Worker",
-    env: "RUN_WORKER_AUTOPILOT",
-    defaultValue: "false",
-    load: () => import("./autopilot.worker.js"),
-    startExport: "startAutopilotWorker",
-    stopExport: "stopAutopilotWorker",
-  },
-  {
     name: "SEO Worker",
     env: "RUN_WORKER_SEO",
     defaultValue: "false",
-    load: () => import("./seo.worker.js"),
+    load: () => import("./seo/seo.worker.js"),
     startExport: "startSeoWorker",
     stopExport: "stopSeoWorker",
   },
@@ -199,18 +168,42 @@ const WORKERS_REGISTRY = [
     startExport: "startWhatsAppWorker",
     stopExport: "stopWhatsAppWorker",
   },
+  {
+    name: "Growth Brain Worker",
+    env: "RUN_WORKER_GROWTH_BRAIN",
+    defaultValue: "false",
+    load: () => import("./growth/growth-brain.worker.js"),
+    startExport: "startGrowthBrainWorker",
+    stopExport: "stopGrowthBrainWorker",
+  },
+  {
+    name: "Market Worker",
+    env: "RUN_WORKER_MARKET",
+    defaultValue: "false",
+    load: () => import("./growth/market.worker.js"),
+    startExport: "startMarketWorker",
+    stopExport: "stopMarketWorker",
+  },
+  {
+    name: "Opportunity Worker",
+    env: "RUN_WORKER_OPPORTUNITY",
+    defaultValue: "false",
+    load: () => import("./growth/opportunity.worker.js"),
+    startExport: "startOpportunityWorker",
+    stopExport: "stopOpportunityWorker",
+  },
+  {
+    name: "City Prediction Worker",
+    env: "RUN_WORKER_CITY_PREDICTION",
+    defaultValue: "false",
+    load: () => import("./cities/city-prediction.worker.js"),
+    startExport: "startCityPredictionWorker",
+    stopExport: "stopCityPredictionWorker",
+  },
 ];
-
-/* =====================================================
-   ESTADO INTERNO DO BOOTSTRAP
-===================================================== */
 
 let startedWorkers = [];
 let bootstrapStarted = false;
-
-/* =====================================================
-   STARTUP
-===================================================== */
 
 export async function startWorkersBootstrap() {
   const runWorkers = isEnabled("RUN_WORKERS", "false");
@@ -292,10 +285,6 @@ export async function startWorkersBootstrap() {
   return summary;
 }
 
-/* =====================================================
-   SHUTDOWN
-===================================================== */
-
 export async function stopWorkersBootstrap() {
   if (!bootstrapStarted) {
     logger.info("[workers.bootstrap] Nenhum bootstrap ativo para encerrar");
@@ -371,10 +360,6 @@ export async function stopWorkersBootstrap() {
 
   return summary;
 }
-
-/* =====================================================
-   EXECUÇÃO DIRETA (opcional)
-===================================================== */
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   startWorkersBootstrap().catch((error) => {
