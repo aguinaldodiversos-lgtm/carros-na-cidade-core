@@ -1,10 +1,6 @@
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as cityPublicRepository from "./city-public.repository.js";
 
-/* =====================================================
-   HELPERS
-===================================================== */
-
 function buildCitySeoMeta(snapshot) {
   return {
     title: `Carros em ${snapshot.name}${snapshot.state ? ` - ${snapshot.state}` : ""} | Carros na Cidade`,
@@ -20,23 +16,18 @@ function buildCityStats(snapshot) {
     dominanceScore: Number(snapshot.dominance_score || 0),
     opportunityScore: Number(snapshot.opportunity_score || 0),
     predictionScore: Number(snapshot.prediction_score || 0),
-
     totalAds:
       Number(snapshot.live_ads_count || 0) ||
       Number(snapshot.dominance_total_ads || 0) ||
       Number(snapshot.total_ads_metric || 0),
-
     totalHighlightedAds: Number(snapshot.highlighted_ads_count || 0),
     totalBelowFipeAds: Number(snapshot.below_fipe_ads_count || 0),
-
     totalLeads:
       Number(snapshot.dominance_total_leads || 0) ||
       Number(snapshot.total_leads_metric || 0),
-
     totalDealers:
       Number(snapshot.advertisers_count || 0) ||
       Number(snapshot.total_dealers_metric || 0),
-
     avgCtr: Number(snapshot.avg_ctr || 0),
     publishedCityPages: Number(snapshot.published_city_pages_count || 0),
   };
@@ -87,10 +78,6 @@ function buildInternalLinks(snapshot, brandFacets = [], modelFacets = []) {
   };
 }
 
-/* =====================================================
-   READ MODEL PRINCIPAL DA PÁGINA PÚBLICA DA CIDADE
-===================================================== */
-
 export async function getCityPublicPage(slug) {
   const snapshot = await cityPublicRepository.getCityPublicSnapshot(slug);
 
@@ -98,19 +85,14 @@ export async function getCityPublicPage(slug) {
     throw new AppError("Cidade não encontrada", 404);
   }
 
-  const [
-    highlightAds,
-    opportunityAds,
-    recentAds,
-    brandFacets,
-    modelFacets,
-  ] = await Promise.all([
-    cityPublicRepository.listCityHighlightAds(slug, 12),
-    cityPublicRepository.listCityOpportunityAds(slug, 12),
-    cityPublicRepository.listRecentCityAds(slug, 12),
-    cityPublicRepository.listCityBrandFacets(slug, 20),
-    cityPublicRepository.listCityModelFacets(slug, 20),
-  ]);
+  const [highlightAds, opportunityAds, recentAds, brandFacets, modelFacets] =
+    await Promise.all([
+      cityPublicRepository.listCityHighlightAds(slug, 12),
+      cityPublicRepository.listCityOpportunityAds(slug, 12),
+      cityPublicRepository.listRecentCityAds(slug, 12),
+      cityPublicRepository.listCityBrandFacets(slug, 20),
+      cityPublicRepository.listCityModelFacets(slug, 20),
+    ]);
 
   return {
     city: buildCityIdentity(snapshot),
