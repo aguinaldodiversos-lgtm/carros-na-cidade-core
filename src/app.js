@@ -5,7 +5,7 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import citiesRoutes from "./modules/cities/cities.routes.js";
 import healthRoutes from "./routes/health.js";
-
+import marketIntelligenceRoutes from "./modules/market-intelligence/market-intelligence.routes.js";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js";
@@ -162,6 +162,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadsRoutes);
 app.use("/api/ads", adsRoutes);
+app.use("/api/market-intelligence", marketIntelligenceRoutes);
 
 /**
  * Eventos / tracking
