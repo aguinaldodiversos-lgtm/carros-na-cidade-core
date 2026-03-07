@@ -1,18 +1,9 @@
 import * as adsRepository from "./ads.repository.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { searchAdsWithFilters } from "./filters/ads-filter.service.js";
 
-export async function searchAds(filters = {}) {
-  const result = await adsRepository.searchAds(filters);
-
-  return {
-    data: result.data,
-    pagination: {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: Math.max(1, Math.ceil(result.total / result.limit)),
-    },
-  };
+export async function searchAds(filters = {}, scope = "public_global") {
+  return searchAdsWithFilters(filters, scope);
 }
 
 export async function showAd(identifier) {
