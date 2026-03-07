@@ -1,3 +1,5 @@
+// src/workers/bootstrap/bootstrap.registry.js
+
 export const WORKERS_REGISTRY = [
   {
     name: "AI Worker",
@@ -14,6 +16,14 @@ export const WORKERS_REGISTRY = [
     load: () => import("../seo/seo.worker.js"),
     startExport: "startSeoWorker",
     stopExport: "stopSeoWorker",
+  },
+  {
+    name: "Cluster Planner Worker",
+    env: "RUN_WORKER_CLUSTER_PLANNER",
+    defaultValue: "false",
+    load: () => import("../seo/cluster-planner.worker.js"),
+    startExport: "startClusterPlannerWorker",
+    stopExport: "stopClusterPlannerWorker",
   },
   {
     name: "WhatsApp Worker",
@@ -62,6 +72,14 @@ export const WORKERS_REGISTRY = [
     load: () => import("../cities/city-stage.worker.js"),
     startExport: "startCityStageWorker",
     stopExport: "stopCityStageWorker",
+  },
+  {
+    name: "City Score Worker",
+    env: "RUN_WORKER_CITY_SCORE",
+    defaultValue: "false",
+    load: () => import("../cities/city-score.worker.js"),
+    startExport: "startCityScoreWorker",
+    stopExport: "stopCityScoreWorker",
   },
   {
     name: "Dealer Acquisition Worker",
