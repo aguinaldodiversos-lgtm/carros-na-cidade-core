@@ -1,12 +1,12 @@
 import * as adsPublicService from "./ads.public.service.js";
 import * as adsPanelService from "./ads.panel.service.js";
 
-export async function list(filters = {}) {
-  return adsPublicService.searchAds(filters);
+export async function list(filters = {}, scope = "public_global") {
+  return adsPublicService.searchAds(filters, scope);
 }
 
-export async function search(filters = {}) {
-  return adsPublicService.searchAds(filters);
+export async function search(filters = {}, scope = "public_global") {
+  return adsPublicService.searchAds(filters, scope);
 }
 
 export async function show(identifier) {
