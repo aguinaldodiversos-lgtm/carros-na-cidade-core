@@ -1,8 +1,16 @@
+// src/modules/ads/filters/ads-filter.builder.js
+
 import { buildSortClause } from "./ads-filter.sort.js";
 
-function pushFilter(where, params, expression, value) {
-  params.push(value);
-  where.push(expression.replace("?", `$${params.length}`));
+function pushFilter(where, params, expression, ...values) {
+  let sql = expression;
+
+  for (const value of values) {
+    params.push(value);
+    sql = sql.replace("?", `$${params.length}`);
+  }
+
+  where.push(sql);
 }
 
 export function buildAdsSearchQuery(filters = {}) {
@@ -38,7 +46,7 @@ export function buildAdsSearchQuery(filters = {}) {
   let useTextRank = false;
   let textRankExpression = "0";
 
-  if (q) {
+  if (q && String(q).trim().length >= 2) {
     useTextRank = true;
     params.push(q);
     const textIndex = params.length;
@@ -57,12 +65,16 @@ export function buildAdsSearchQuery(filters = {}) {
   if (year_min !== undefined) pushFilter(where, params, `a.year >= ?`, Number(year_min));
   if (year_max !== undefined) pushFilter(where, params, `a.year <= ?`, Number(year_max));
   if (mileage_max !== undefined) pushFilter(where, params, `a.mileage <= ?`, Number(mileage_max));
-  if (fuel_type) pushFilter(where, params, `a.fuel_type ILIKE ?`, fuel_type);
-  if (transmission) pushFilter(where, params, `(a.transmission ILIKE ? OR a.gearbox ILIKE ? OR a.cambio ILIKE ?)`, transmission);
+  if (fuel_type) pushFilter(where, params, `a.fuel_type ILIKE ?`, `%${fuel_type}%`);
   if (transmission) {
-    params.push(transmission, transmission);
+    pushFilter(
+      where,
+      params,
+      `(COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE ?)`,
+      `%${transmission}%`
+    );
   }
-  if (body_type) pushFilter(where, params, `a.body_type ILIKE ?`, body_type);
+  if (body_type) pushFilter(where, params, `a.body_type ILIKE ?`, `%${body_type}%`);
   if (below_fipe !== undefined) pushFilter(where, params, `a.below_fipe = ?`, Boolean(below_fipe));
   if (highlight_only === true) where.push(`a.highlight_until > NOW()`);
 
@@ -132,12 +144,16 @@ export function buildAdsFacetWhere(filters = {}) {
   if (filters.brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${filters.brand}%`);
   if (filters.model) pushFilter(where, params, `a.model ILIKE ?`, `%${filters.model}%`);
   if (filters.below_fipe !== undefined) pushFilter(where, params, `a.below_fipe = ?`, Boolean(filters.below_fipe));
-  if (filters.fuel_type) pushFilter(where, params, `a.fuel_type ILIKE ?`, filters.fuel_type);
-  if (filters.transmission) pushFilter(where, params, `(a.transmission ILIKE ? OR a.gearbox ILIKE ? OR a.cambio ILIKE ?)`, filters.transmission);
+  if (filters.fuel_type) pushFilter(where, params, `a.fuel_type ILIKE ?`, `%${filters.fuel_type}%`);
   if (filters.transmission) {
-    params.push(filters.transmission, filters.transmission);
+    pushFilter(
+      where,
+      params,
+      `(COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE ?)`,
+      `%${filters.transmission}%`
+    );
   }
-  if (filters.body_type) pushFilter(where, params, `a.body_type ILIKE ?`, filters.body_type);
+  if (filters.body_type) pushFilter(where, params, `a.body_type ILIKE ?`, `%${filters.body_type}%`);
 
   return {
     whereClause: `WHERE ${where.join(" AND ")}`,
