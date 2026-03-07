@@ -3,7 +3,7 @@ dotenv.config();
 
 import http from "http";
 import app from "./app.js";
-import runMigrations from "./database/migrate.js";
+import runMigrations from "./infrastructure/database/migrate.js";
 import { logger } from "./shared/logger.js";
 import {
   startWorkersBootstrap,
