@@ -1,3 +1,5 @@
+// src/modules/ads/ads.controller.js
+
 import * as adsService from "./ads.service.js";
 import { getFacets } from "./facets.service.js";
 import {
@@ -55,7 +57,7 @@ export async function autocomplete(req, res, next) {
 
 export async function facets(req, res, next) {
   try {
-    const filters = parseAdsFacetFilters(req.query);
+    const filters = await parseAdsFacetFilters(req.query);
     const facets = await getFacets(filters);
 
     res.json({
@@ -69,8 +71,10 @@ export async function facets(req, res, next) {
 
 export async function list(req, res, next) {
   try {
-    const filters = parseAdsFilters(req.query, "public_global");
-    const result = await adsService.list(filters, "public_global");
+    const filters = await parseAdsFilters(req.query, "public_global");
+    const result = await adsService.list(filters, "public_global", {
+      safeMode: true,
+    });
 
     res.json({
       success: true,
@@ -83,8 +87,10 @@ export async function list(req, res, next) {
 
 export async function search(req, res, next) {
   try {
-    const filters = parseAdsFilters(req.query, "public_global");
-    const result = await adsService.search(filters, "public_global");
+    const filters = await parseAdsFilters(req.query, "public_global");
+    const result = await adsService.search(filters, "public_global", {
+      safeMode: true,
+    });
 
     res.json({
       success: true,
