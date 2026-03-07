@@ -1,16 +1,19 @@
 import { pool } from "../../infrastructure/database/db.js";
 import * as citiesService from "../cities/cities.service.js";
+import * as marketIntelligenceService from "../market-intelligence/market-intelligence.service.js";
 
 export async function getHomeData(req, res, next) {
   try {
     const [
       featuredCities,
+      topOpportunities,
       highlightAdsResult,
       opportunityAdsResult,
       recentAdsResult,
       statsResult,
     ] = await Promise.all([
       citiesService.getTopCitiesByDemand(8),
+      marketIntelligenceService.getTopOpportunities(8),
 
       pool.query(`
         SELECT 
@@ -86,6 +89,7 @@ export async function getHomeData(req, res, next) {
       success: true,
       data: {
         featuredCities,
+        topOpportunities,
         highlightAds: highlightAdsResult.rows,
         opportunityAds: opportunityAdsResult.rows,
         recentAds: recentAdsResult.rows,
