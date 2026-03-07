@@ -1,6 +1,9 @@
+// src/modules/ads/filters/ads-filter.parser.js
+
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { AdsFacetFilterSchema, AdsFilterSchema } from "./ads-filter.schema.js";
 import { ADS_SCOPE_CONFIG } from "./ads-filter.constants.js";
+import { inferAdsFiltersFromFreeQuery } from "./ads-free-query.parser.js";
 
 function compactObject(input) {
   return Object.fromEntries(
@@ -21,7 +24,27 @@ function applyScope(scope, parsed) {
   };
 }
 
-export function parseAdsFilters(raw = {}, scope = "public_global") {
+function validateNormalizedRanges(data) {
+  if (
+    data.min_price !== undefined &&
+    data.max_price !== undefined &&
+    data.min_price > data.max_price
+  ) {
+    throw new AppError("Faixa de preço inválida", 400);
+  }
+
+  if (
+    data.year_min !== undefined &&
+    data.year_max !== undefined &&
+    data.year_min > data.year_max
+  ) {
+    throw new AppError("Faixa de ano inválida", 400);
+  }
+
+  return data;
+}
+
+export async function parseAdsFilters(raw = {}, scope = "public_global") {
   const candidate = compactObject(raw);
   const parsed = AdsFilterSchema.safeParse(candidate);
 
@@ -29,20 +52,13 @@ export function parseAdsFilters(raw = {}, scope = "public_global") {
     throw new AppError("Filtros de busca inválidos", 400);
   }
 
-  const data = applyScope(scope, parsed.data);
+  const scoped = applyScope(scope, parsed.data);
+  const inferred = await inferAdsFiltersFromFreeQuery(scoped);
 
-  if (data.min_price !== undefined && data.max_price !== undefined && data.min_price > data.max_price) {
-    throw new AppError("Faixa de preço inválida", 400);
-  }
-
-  if (data.year_min !== undefined && data.year_max !== undefined && data.year_min > data.year_max) {
-    throw new AppError("Faixa de ano inválida", 400);
-  }
-
-  return data;
+  return validateNormalizedRanges(inferred);
 }
 
-export function parseAdsFacetFilters(raw = {}) {
+export async function parseAdsFacetFilters(raw = {}) {
   const candidate = compactObject(raw);
   const parsed = AdsFacetFilterSchema.safeParse(candidate);
 
@@ -50,5 +66,6 @@ export function parseAdsFacetFilters(raw = {}) {
     throw new AppError("Filtros de facet inválidos", 400);
   }
 
-  return parsed.data;
+  const inferred = await inferAdsFiltersFromFreeQuery(parsed.data);
+  return inferred;
 }
