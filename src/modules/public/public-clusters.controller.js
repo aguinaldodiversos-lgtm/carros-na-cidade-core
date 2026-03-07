@@ -1,3 +1,5 @@
+// src/modules/public/public-clusters.controller.js
+
 import { getCityPublicPage } from "../../read-models/cities/city-public.service.js";
 import { getCityBrandPage } from "../../read-models/cities/city-brand.service.js";
 import { getCityModelPage } from "../../read-models/cities/city-model.service.js";
@@ -8,7 +10,7 @@ import {
 
 export async function getCityPage(req, res, next) {
   try {
-    const data = await getCityPublicPage(req.params.slug);
+    const data = await getCityPublicPage(req.params.slug, req.query);
 
     res.json({
       success: true,
@@ -21,7 +23,11 @@ export async function getCityPage(req, res, next) {
 
 export async function getCityBrandClusterPage(req, res, next) {
   try {
-    const data = await getCityBrandPage(req.params.slug, req.params.brand);
+    const data = await getCityBrandPage(
+      req.params.slug,
+      req.params.brand,
+      req.query
+    );
 
     res.json({
       success: true,
@@ -37,7 +43,8 @@ export async function getCityModelClusterPage(req, res, next) {
     const data = await getCityModelPage(
       req.params.slug,
       req.params.brand,
-      req.params.model
+      req.params.model,
+      req.query
     );
 
     res.json({
@@ -51,7 +58,7 @@ export async function getCityModelClusterPage(req, res, next) {
 
 export async function getCityOpportunityClusterPage(req, res, next) {
   try {
-    const data = await getCityOpportunityPage(req.params.slug);
+    const data = await getCityOpportunityPage(req.params.slug, req.query);
 
     res.json({
       success: true,
@@ -64,7 +71,7 @@ export async function getCityOpportunityClusterPage(req, res, next) {
 
 export async function getCityBelowFipeClusterPage(req, res, next) {
   try {
-    const data = await getCityBelowFipePage(req.params.slug);
+    const data = await getCityBelowFipePage(req.params.slug, req.query);
 
     res.json({
       success: true,
