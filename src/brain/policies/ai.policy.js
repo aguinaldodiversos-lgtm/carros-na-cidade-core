@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { resolveAiStagePolicy } from "./ai-stage.policy.js";
 
 function parseCsv(value) {
   return String(value || "")
@@ -30,6 +31,14 @@ export class AiPolicy {
     return Number.isFinite(n) ? n : 0;
   }
 
+  stagePolicy({ task, context }) {
+    return resolveAiStagePolicy({
+      stage: context?.stage,
+      task,
+      forcePremium: context?.forcePremium,
+    });
+  }
+
   async canUsePremium({ task, context }) {
     if (!this.isEnabled()) return false;
 
@@ -37,8 +46,11 @@ export class AiPolicy {
     if (mode === "local") return false;
     if (mode === "premium") return true;
 
+    const stagePolicy = this.stagePolicy({ task, context });
+
     if (context?.forcePremium) return true;
     if (this.requirePremiumFor().has(task)) return true;
+    if (stagePolicy.allowPremium === false) return false;
 
     const budget = this.budgetDailyUsd();
     if (!budget || budget <= 0) return true;
@@ -48,6 +60,17 @@ export class AiPolicy {
     const spent = Number((await this.cache.get(spendKey)) || 0);
 
     return spent < budget;
+  }
+
+  resolveExecutionMode({ task, context }) {
+    const globalMode = this.mode();
+
+    if (globalMode === "local" || globalMode === "premium") {
+      return globalMode;
+    }
+
+    const stagePolicy = this.stagePolicy({ task, context });
+    return stagePolicy.preferredMode || "local";
   }
 
   async notePremiumSpend(costUsdEstimate = 0) {
@@ -91,6 +114,7 @@ export class AiPolicy {
       context: {
         tenantId: context?.tenantId || null,
         city: context?.city || null,
+        stage: context?.stage || "discovery",
         locale: context?.locale || "pt-BR",
         quality: context?.quality || "medium",
       },
