@@ -11,6 +11,7 @@ import marketIntelligenceRoutes from "./modules/market-intelligence/market-intel
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js";
+import cityScoreRoutes from "./modules/cities/cities-score.routes.js";
 
 // Rotas
 import adEventsRoutes from "./modules/ads/events.routes.js";
@@ -165,6 +166,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadsRoutes);
 app.use("/api/ads", adsRoutes);
 app.use("/api/market-intelligence", marketIntelligenceRoutes);
+app.use("/api/cities", cityScoreRoutes);
 
 /**
  * Eventos / tracking
