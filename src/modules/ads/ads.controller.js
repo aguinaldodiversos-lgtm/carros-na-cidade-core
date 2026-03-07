@@ -11,49 +11,6 @@ import {
   validateAdId,
   validateCreateAdPayload,
 } from "./ads.validators.js";
-import { pool } from "../../infrastructure/database/db.js";
-
-export async function autocomplete(req, res, next) {
-  try {
-    const q = String(req.query.q || "").trim();
-
-    if (!q || q.length < 2) {
-      return res.json({ success: true, suggestions: [] });
-    }
-
-    const queryText = q.slice(0, 80);
-
-    const result = await pool.query(
-      `
-      SELECT
-        a.brand,
-        a.model,
-        a.city,
-        COUNT(*)::int AS total,
-        ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS rank
-      FROM ads a
-      WHERE a.status = 'active'
-        AND a.search_vector @@ plainto_tsquery('portuguese', $1)
-      GROUP BY a.brand, a.model, a.city, a.search_vector
-      ORDER BY rank DESC, total DESC
-      LIMIT 8
-      `,
-      [queryText]
-    );
-
-    const suggestions = result.rows.map((row) => ({
-      label: `${row.brand} ${row.model} - ${row.city}`,
-      brand: row.brand,
-      model: row.model,
-      city: row.city,
-      total: Number(row.total),
-    }));
-
-    res.json({ success: true, suggestions });
-  } catch (err) {
-    next(err);
-  }
-}
 
 export async function facets(req, res, next) {
   try {
