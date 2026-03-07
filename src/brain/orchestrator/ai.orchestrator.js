@@ -1,3 +1,5 @@
+// src/brain/orchestrator/ai.orchestrator.js
+
 import {
   OrchestratorInputSchema,
   OrchestratorResultSchema,
@@ -40,6 +42,7 @@ export class AiOrchestrator {
 
     if (shouldCache) {
       const cached = await this.cache.get(cacheKey);
+
       if (cached) {
         return OrchestratorResultSchema.parse({
           ok: true,
@@ -47,20 +50,22 @@ export class AiOrchestrator {
           provider: "cache",
           cached: true,
           output: JSON.parse(cached),
+          meta: { reason: "CACHE_HIT" },
         });
       }
     }
 
     const prompt = buildPrompt({ task, input, context });
-
     const canPremium = await this.policy.canUsePremium({ task, context });
-    const mode = this.policy.mode();
+    const executionMode = this.policy.resolveExecutionMode({ task, context });
 
     const order =
-      mode === "premium"
+      executionMode === "premium"
         ? ["premium", "local"]
-        : mode === "local"
-          ? ["local"]
+        : executionMode === "local"
+          ? canPremium
+            ? ["local", "premium"]
+            : ["local"]
           : canPremium
             ? ["local", "premium"]
             : ["local"];
@@ -110,14 +115,20 @@ export class AiOrchestrator {
           cached: false,
           costUsdEstimate: res.costUsdEstimate || 0,
           output: res.output,
-          meta: res.meta || {},
+          meta: {
+            ...(res.meta || {}),
+            executionMode,
+            stage: context?.stage || "discovery",
+          },
         });
       } catch (err) {
         lastErr = err;
+
         this.logger.warn(
           {
             task,
             provider,
+            stage: context?.stage || "discovery",
             error: err?.message || String(err),
           },
           "[brain.ai] Provider failed"
@@ -149,7 +160,11 @@ export class AiOrchestrator {
       cached: false,
       output: fallback,
       error: lastErr?.message || "AI_FAILED",
-      meta: { reason: "FALLBACK_TEMPLATE" },
+      meta: {
+        reason: "FALLBACK_TEMPLATE",
+        executionMode,
+        stage: context?.stage || "discovery",
+      },
     });
   }
 
