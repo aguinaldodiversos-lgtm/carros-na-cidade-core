@@ -1,3 +1,5 @@
+// src/modules/public/public.routes.js
+
 import express from "express";
 import { getHomeData } from "./public.controller.js";
 import {
