@@ -4,6 +4,8 @@ import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import citiesRoutes from "./modules/cities/cities.routes.js";
+import dealersRoutes from "./modules/dealers/dealers.routes.js";
+import campaignsRoutes from "./modules/campaigns/campaigns.routes.js";
 import healthRoutes from "./routes/health.js";
 import marketIntelligenceRoutes from "./modules/market-intelligence/market-intelligence.routes.js";
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
