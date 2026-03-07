@@ -1,5 +1,13 @@
+// src/read-models/cities/city-public.service.js
+
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as cityPublicRepository from "./city-public.repository.js";
+import * as adsService from "../../modules/ads/ads.service.js";
+import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
+
+/* =====================================================
+   HELPERS
+===================================================== */
 
 function buildCitySeoMeta(snapshot) {
   return {
@@ -78,37 +86,86 @@ function buildInternalLinks(snapshot, brandFacets = [], modelFacets = []) {
   };
 }
 
-export async function getCityPublicPage(slug) {
+function normalizeCityFilters(citySlug, query = {}) {
+  return {
+    ...query,
+    city_slug: citySlug,
+  };
+}
+
+/* =====================================================
+   READ MODEL
+===================================================== */
+
+export async function getCityPublicPage(slug, query = {}) {
   const snapshot = await cityPublicRepository.getCityPublicSnapshot(slug);
 
   if (!snapshot) {
     throw new AppError("Cidade não encontrada", 404);
   }
 
-  const [highlightAds, opportunityAds, recentAds, brandFacets, modelFacets] =
+  const cityFilters = normalizeCityFilters(slug, query);
+
+  const [highlightAds, opportunityAds, recentAds, facetsResult] =
     await Promise.all([
-      cityPublicRepository.listCityHighlightAds(slug, 12),
-      cityPublicRepository.listCityOpportunityAds(slug, 12),
-      cityPublicRepository.listRecentCityAds(slug, 12),
-      cityPublicRepository.listCityBrandFacets(slug, 20),
-      cityPublicRepository.listCityModelFacets(slug, 20),
+      adsService.search(
+        {
+          ...cityFilters,
+          highlight_only: true,
+          sort: "highlight",
+          limit: 12,
+        },
+        "public_city",
+        { safeMode: true }
+      ),
+      adsService.search(
+        {
+          ...cityFilters,
+          below_fipe: true,
+          sort: "recent",
+          limit: 12,
+        },
+        "public_city_below_fipe",
+        { safeMode: true }
+      ),
+      adsService.search(
+        {
+          ...cityFilters,
+          sort: "recent",
+          limit: 12,
+        },
+        "public_city",
+        { safeMode: true }
+      ),
+      getFacetsWithFilters(cityFilters, { safeMode: true }),
     ]);
+
+  const brands = facetsResult?.facets?.brands || [];
+  const models = facetsResult?.facets?.models || [];
 
   return {
     city: buildCityIdentity(snapshot),
     stats: buildCityStats(snapshot),
     signals: buildCitySignals(snapshot),
     seo: buildCitySeoMeta(snapshot),
+    filters: highlightAds.filters || recentAds.filters || {},
     sections: {
-      highlightAds,
-      opportunityAds,
-      recentAds,
+      highlightAds: highlightAds.data || [],
+      opportunityAds: opportunityAds.data || [],
+      recentAds: recentAds.data || [],
+    },
+    pagination: {
+      highlightAds: highlightAds.pagination,
+      opportunityAds: opportunityAds.pagination,
+      recentAds: recentAds.pagination,
     },
     facets: {
-      brands: brandFacets,
-      models: modelFacets,
+      brands,
+      models,
+      fuelTypes: facetsResult?.facets?.fuelTypes || [],
+      bodyTypes: facetsResult?.facets?.bodyTypes || [],
     },
-    internalLinks: buildInternalLinks(snapshot, brandFacets, modelFacets),
+    internalLinks: buildInternalLinks(snapshot, brands, models),
     generatedAt: new Date().toISOString(),
   };
 }
