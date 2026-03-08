@@ -1,5 +1,3 @@
-// src/modules/ads/ads.service.js
-
 import * as adsPublicService from "./ads.public.service.js";
 import * as adsPanelService from "./ads.panel.service.js";
 
