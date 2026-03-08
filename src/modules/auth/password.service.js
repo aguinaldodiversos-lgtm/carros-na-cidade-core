@@ -9,6 +9,7 @@ export async function requestPasswordReset(email) {
 export async function requestPasswordReset(email) {
   return createPasswordResetToken(email);
 }  
+  
   if (!normalizedEmail) {
     throw new AppError("Email inválido", 400);
   }
