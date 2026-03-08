@@ -1,4 +1,3 @@
-// src/modules/auth/auth.routes.js
 import express from "express";
 import * as authService from "./auth.service.js";
 import * as passwordService from "./password.service.js";
@@ -7,10 +6,6 @@ import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 const router = express.Router();
-
-/* =====================================================
-   HELPERS
-===================================================== */
 
 function ensureMethod(service, candidates, serviceName) {
   for (const name of candidates) {
@@ -36,10 +31,6 @@ function requireString(value, fieldName, { lowercase = false } = {}) {
   return lowercase ? normalized.toLowerCase() : normalized;
 }
 
-/* =====================================================
-   LOGIN
-===================================================== */
-
 router.post("/login", loginRateLimit, async (req, res, next) => {
   try {
     const email = requireString(req.body?.email, "email", { lowercase: true });
@@ -58,10 +49,6 @@ router.post("/login", loginRateLimit, async (req, res, next) => {
   }
 });
 
-/* =====================================================
-   REFRESH
-===================================================== */
-
 router.post("/refresh", async (req, res, next) => {
   try {
     const refreshToken = requireString(req.body?.refreshToken, "refreshToken");
@@ -79,10 +66,6 @@ router.post("/refresh", async (req, res, next) => {
   }
 });
 
-/* =====================================================
-   LOGOUT
-===================================================== */
-
 router.post("/logout", async (req, res, next) => {
   try {
     const refreshToken = String(req.body?.refreshToken ?? "").trim();
@@ -96,11 +79,6 @@ router.post("/logout", async (req, res, next) => {
     return next(err);
   }
 });
-
-/* =====================================================
-   RECUPERAÇÃO DE SENHA
-   Compatível com implementações diferentes
-===================================================== */
 
 router.post("/forgot-password", async (req, res, next) => {
   try {
@@ -144,10 +122,6 @@ router.post("/reset-password", async (req, res, next) => {
     return next(err);
   }
 });
-
-/* =====================================================
-   VERIFICAÇÃO DE EMAIL
-===================================================== */
 
 router.post("/verify-email", async (req, res, next) => {
   try {
