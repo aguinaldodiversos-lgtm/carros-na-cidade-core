@@ -1,3 +1,5 @@
+// frontend/components/search/TerritorialResultsPageClient.tsx
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,6 +24,9 @@ import { SearchPagination } from "./SearchPagination";
 import { SearchResultsList } from "./SearchResultsList";
 import { SearchSortSelect } from "./SearchSortSelect";
 import { SmartVehicleSearch } from "./SmartVehicleSearch";
+import { TerritorialBreadcrumbs } from "./TerritorialBreadcrumbs";
+import { TerritorialHeroLinks } from "./TerritorialHeroLinks";
+import { TerritorialInternalLinksSection } from "./TerritorialInternalLinksSection";
 
 type TerritorialMode =
   | "city"
@@ -248,6 +253,8 @@ export function TerritorialResultsPageClient({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6">
+      <TerritorialBreadcrumbs data={data} mode={mode} />
+
       <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
@@ -296,6 +303,8 @@ export function TerritorialResultsPageClient({
               </span>
             )}
           </div>
+
+          <TerritorialHeroLinks data={data} />
         </div>
       </div>
 
@@ -305,6 +314,10 @@ export function TerritorialResultsPageClient({
           resultsBasePath={pathname}
           currentCitySlug={slug}
         />
+      </div>
+
+      <div className="mt-6">
+        <TerritorialInternalLinksSection data={data} />
       </div>
 
       <div className="mt-5 flex flex-col gap-3">
@@ -374,6 +387,10 @@ export function TerritorialResultsPageClient({
             </>
           )}
         </div>
+      </div>
+
+      <div className="mt-8">
+        <TerritorialInternalLinksSection data={data} />
       </div>
     </div>
   );
