@@ -1,25 +1,12 @@
-// src/modules/ads/filters/ads-filter.constants.js
-
-export const ADS_FILTER_LIMITS = Object.freeze({
-  /* =====================================================
-     PAGINAÇÃO
-  ===================================================== */
+﻿export const ADS_FILTER_LIMITS = Object.freeze({
   PAGE_MIN: 1,
   PAGE_MAX: 1000,
   LIMIT_MIN: 1,
   LIMIT_MAX: 50,
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 20,
-
-  /* =====================================================
-     BUSCA LIVRE
-  ===================================================== */
   QUERY_MIN_LENGTH: 2,
   QUERY_MAX_LENGTH: 120,
-
-  /* =====================================================
-     CAMPOS TEXTUAIS
-  ===================================================== */
   BRAND_MAX_LENGTH: 80,
   MODEL_MAX_LENGTH: 80,
   CITY_MAX_LENGTH: 120,
@@ -27,20 +14,12 @@ export const ADS_FILTER_LIMITS = Object.freeze({
   FUEL_TYPE_MAX_LENGTH: 40,
   TRANSMISSION_MAX_LENGTH: 40,
   SORT_MAX_LENGTH: 40,
-
-  /* =====================================================
-     CAMPOS NUMÉRICOS
-  ===================================================== */
   PRICE_MIN: 0,
   PRICE_MAX: 999999999,
   YEAR_MIN: 1900,
   YEAR_MAX: 2100,
   MILEAGE_MIN: 0,
   MILEAGE_MAX: 9999999,
-
-  /* =====================================================
-     CAMPOS FIXOS
-  ===================================================== */
   STATE_LENGTH: 2,
 });
 
@@ -63,37 +42,13 @@ export const ADS_ALLOWED_SORTS = new Set([
 ]);
 
 export const ADS_SCOPE_CONFIG = Object.freeze({
-  public_global: Object.freeze({
-    force: Object.freeze({}),
-  }),
-
-  public_city: Object.freeze({
-    force: Object.freeze({}),
-  }),
-
-  public_city_brand: Object.freeze({
-    force: Object.freeze({}),
-  }),
-
-  public_city_brand_model: Object.freeze({
-    force: Object.freeze({}),
-  }),
-
-  public_city_opportunities: Object.freeze({
-    force: Object.freeze({
-      below_fipe: true,
-    }),
-  }),
-
-  public_city_below_fipe: Object.freeze({
-    force: Object.freeze({
-      below_fipe: true,
-    }),
-  }),
-
-  panel_inventory: Object.freeze({
-    force: Object.freeze({}),
-  }),
+  public_global: Object.freeze({ force: Object.freeze({}) }),
+  public_city: Object.freeze({ force: Object.freeze({}) }),
+  public_city_brand: Object.freeze({ force: Object.freeze({}) }),
+  public_city_brand_model: Object.freeze({ force: Object.freeze({}) }),
+  public_city_opportunities: Object.freeze({ force: Object.freeze({ below_fipe: true }) }),
+  public_city_below_fipe: Object.freeze({ force: Object.freeze({ below_fipe: true }) }),
+  panel_inventory: Object.freeze({ force: Object.freeze({}) }),
 });
 
 export function isAllowedAdsSort(sort) {
