@@ -1,4 +1,3 @@
-// src/infrastructure/database/db.js
 import { Pool } from "pg";
 import { logger } from "../../shared/logger.js";
 
@@ -6,7 +5,6 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 if (!DATABASE_URL) {
-  logger.error("❌ DATABASE_URL não definido. Configure no ambiente (Render/Local).");
   throw new Error("DATABASE_URL is required");
 }
 
@@ -15,54 +13,89 @@ const isProduction = NODE_ENV === "production";
 export const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: isProduction ? { rejectUnauthorized: false } : false,
-  max: Number(process.env.PG_POOL_MAX || 10),
-  idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30_000),
-  connectionTimeoutMillis: Number(process.env.PG_CONN_TIMEOUT_MS || 10_000),
+  max: Number(process.env.PG_POOL_MAX || 20),
+  idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
+  connectionTimeoutMillis: Number(process.env.PG_CONN_TIMEOUT_MS || 10000),
   keepAlive: true,
+  application_name: process.env.SERVICE_NAME || "carros-na-cidade-core",
 });
 
-pool.on("error", (err) => {
-  logger.error({
-    message: "❌ Erro inesperado no pool do Postgres",
-    error: err?.message || String(err),
-  });
+pool.on("error", (error) => {
+  logger.error(
+    { error: error?.message || String(error) },
+    "[db] erro inesperado no pool"
+  );
 });
 
-export async function query(text, params) {
-  const start = Date.now();
+export async function query(text, params = []) {
+  const startedAt = Date.now();
+
   try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-
+    const result = await pool.query(text, params);
+    const durationMs = Date.now() - startedAt;
     const slowMs = Number(process.env.PG_SLOW_QUERY_MS || 800);
-    if (duration > slowMs) {
-      logger.warn({
-        message: "🐢 Query lenta detectada",
-        duration_ms: duration,
-        text: text?.slice?.(0, 200),
-      });
+
+    if (durationMs >= slowMs) {
+      logger.warn(
+        {
+          durationMs,
+          text: text.slice(0, 240),
+        },
+        "[db] slow query"
+      );
     }
 
-    return res;
-  } catch (err) {
-    logger.error({
-      message: "❌ Erro ao executar query",
-      error: err?.message || String(err),
-      text: text?.slice?.(0, 200),
-    });
-    throw err;
+    return result;
+  } catch (error) {
+    logger.error(
+      {
+        error: error?.message || String(error),
+        text: text.slice(0, 240),
+      },
+      "[db] query falhou"
+    );
+    throw error;
+  }
+}
+
+export async function withTransaction(callback) {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    const result = await callback(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
 export async function healthcheck() {
   try {
-    const res = await pool.query("SELECT 1 as ok");
-    return res.rows?.[0]?.ok === 1;
-  } catch (err) {
-    logger.error({
-      message: "❌ Healthcheck do banco falhou",
-      error: err?.message || String(err),
-    });
+    const result = await pool.query("SELECT 1 AS ok");
+    return result.rows?.[0]?.ok === 1;
+  } catch (error) {
+    logger.error(
+      { error: error?.message || String(error) },
+      "[db] healthcheck falhou"
+    );
     return false;
   }
 }
+
+export async function closeDatabasePool() {
+  await pool.end();
+  logger.info("[db] pool encerrado");
+}
+
+export default {
+  pool,
+  query,
+  withTransaction,
+  healthcheck,
+  closeDatabasePool,
+};
