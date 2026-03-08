@@ -12,31 +12,28 @@ const router = express.Router();
    HELPERS
 ===================================================== */
 
-function ensureServiceMethod(service, methodName, serviceName) {
-  if (typeof service?.[methodName] !== "function") {
-    throw new AppError(
-      `Método ${methodName} não disponível em ${serviceName}`,
-      500,
-      false
-    );
+function ensureMethod(service, candidates, serviceName) {
+  for (const name of candidates) {
+    if (typeof service?.[name] === "function") {
+      return service[name];
+    }
   }
 
-  return service[methodName];
+  throw new AppError(
+    `Método esperado não encontrado em ${serviceName}: ${candidates.join(" | ")}`,
+    500,
+    false
+  );
 }
 
-function normalizeString(value) {
-  if (value === undefined || value === null) return "";
-  return String(value).trim();
-}
-
-function requireNonEmpty(value, fieldName) {
-  const normalized = normalizeString(value);
+function requireString(value, fieldName, { lowercase = false } = {}) {
+  const normalized = String(value ?? "").trim();
 
   if (!normalized) {
     throw new AppError(`Campo obrigatório: ${fieldName}`, 400);
   }
 
-  return normalized;
+  return lowercase ? normalized.toLowerCase() : normalized;
 }
 
 /* =====================================================
@@ -45,10 +42,10 @@ function requireNonEmpty(value, fieldName) {
 
 router.post("/login", loginRateLimit, async (req, res, next) => {
   try {
-    const email = requireNonEmpty(req.body?.email, "email").toLowerCase();
-    const password = requireNonEmpty(req.body?.password, "password");
+    const email = requireString(req.body?.email, "email", { lowercase: true });
+    const password = requireString(req.body?.password, "password");
 
-    const login = ensureServiceMethod(authService, "login", "auth.service.js");
+    const login = ensureMethod(authService, ["login"], "auth.service.js");
 
     const tokens = await login(email, password, {
       ip: req.ip,
@@ -67,13 +64,9 @@ router.post("/login", loginRateLimit, async (req, res, next) => {
 
 router.post("/refresh", async (req, res, next) => {
   try {
-    const refreshToken = requireNonEmpty(req.body?.refreshToken, "refreshToken");
+    const refreshToken = requireString(req.body?.refreshToken, "refreshToken");
 
-    const refresh = ensureServiceMethod(
-      authService,
-      "refresh",
-      "auth.service.js"
-    );
+    const refresh = ensureMethod(authService, ["refresh"], "auth.service.js");
 
     const tokens = await refresh(refreshToken, {
       ip: req.ip,
@@ -92,13 +85,9 @@ router.post("/refresh", async (req, res, next) => {
 
 router.post("/logout", async (req, res, next) => {
   try {
-    const refreshToken = normalizeString(req.body?.refreshToken);
+    const refreshToken = String(req.body?.refreshToken ?? "").trim();
 
-    const logout = ensureServiceMethod(
-      authService,
-      "logout",
-      "auth.service.js"
-    );
+    const logout = ensureMethod(authService, ["logout"], "auth.service.js");
 
     const result = await logout(refreshToken || null);
 
@@ -109,53 +98,46 @@ router.post("/logout", async (req, res, next) => {
 });
 
 /* =====================================================
-   FORGOT PASSWORD
-   Compatível com createPasswordResetToken ou requestPasswordReset
+   RECUPERAÇÃO DE SENHA
+   Compatível com implementações diferentes
 ===================================================== */
 
 router.post("/forgot-password", async (req, res, next) => {
   try {
-    const email = requireNonEmpty(req.body?.email, "email").toLowerCase();
+    const email = requireString(req.body?.email, "email", { lowercase: true });
 
-    const forgotPasswordHandler =
-      passwordService?.createPasswordResetToken ||
-      passwordService?.requestPasswordReset;
-
-    if (typeof forgotPasswordHandler !== "function") {
-      throw new AppError(
-        "Nenhum método de recuperação de senha disponível em password.service.js",
-        500,
-        false
-      );
-    }
-
-    const result = await forgotPasswordHandler(email);
-
-    return res.status(200).json(result);
-  } catch (err) {
-    return next(err);
-  }
-});
-
-/* =====================================================
-   RESET PASSWORD
-===================================================== */
-
-router.post("/reset-password", async (req, res, next) => {
-  try {
-    const token = requireNonEmpty(req.body?.token, "token");
-    const newPassword = requireNonEmpty(req.body?.newPassword, "newPassword");
-
-    const resetPasswordWithToken = ensureServiceMethod(
+    const requestPasswordReset = ensureMethod(
       passwordService,
-      "resetPasswordWithToken",
+      ["requestPasswordReset", "createPasswordResetToken"],
       "password.service.js"
     );
 
-    const result = await resetPasswordWithToken({
-      token,
-      newPassword,
-    });
+    const result = await requestPasswordReset(email);
+
+    return res.status(200).json(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post("/reset-password", async (req, res, next) => {
+  try {
+    const token = requireString(req.body?.token, "token");
+    const newPassword = requireString(req.body?.newPassword, "newPassword");
+
+    const resetPassword = ensureMethod(
+      passwordService,
+      ["resetPasswordWithToken", "resetPassword"],
+      "password.service.js"
+    );
+
+    let result;
+
+    if (resetPassword.length >= 2) {
+      result = await resetPassword(token, newPassword);
+    } else {
+      result = await resetPassword({ token, newPassword });
+    }
 
     return res.status(200).json(result);
   } catch (err) {
@@ -164,16 +146,16 @@ router.post("/reset-password", async (req, res, next) => {
 });
 
 /* =====================================================
-   VERIFY EMAIL
+   VERIFICAÇÃO DE EMAIL
 ===================================================== */
 
 router.post("/verify-email", async (req, res, next) => {
   try {
-    const token = requireNonEmpty(req.body?.token, "token");
+    const token = requireString(req.body?.token, "token");
 
-    const verifyEmail = ensureServiceMethod(
+    const verifyEmail = ensureMethod(
       emailVerificationService,
-      "verifyEmail",
+      ["verifyEmail"],
       "emailVerification.service.js"
     );
 
