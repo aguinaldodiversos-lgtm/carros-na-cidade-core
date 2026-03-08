@@ -1,104 +1,132 @@
+// src/modules/auth/password.service.js
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { logger } from "../../shared/logger.js";
+import * as DbNS from "../../infrastructure/database/db.js";
 
-export async function requestPasswordReset(email) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+const RESET_TOKEN_BYTES = Number(process.env.PASSWORD_RESET_TOKEN_BYTES || 32);
+const RESET_TOKEN_TTL_MIN = Number(process.env.PASSWORD_RESET_TOKEN_TTL_MIN || 60);
 
-export async function requestPasswordReset(email) {
-  return createPasswordResetToken(email);
-}  
-  
-  if (!normalizedEmail) {
-    throw new AppError("Email inválido", 400);
-  }
+// Resolve pool/query de forma tolerante a exports diferentes
+const pool = DbNS.pool || DbNS.default || DbNS.db || DbNS.pgPool || null;
+const query =
+  typeof DbNS.query === "function"
+    ? DbNS.query.bind(DbNS)
+    : typeof pool?.query === "function"
+      ? pool.query.bind(pool)
+      : null;
 
-  const result = await pool.query(
-    `SELECT id, email FROM users WHERE email = $1 LIMIT 1`,
-    [normalizedEmail]
+if (!query) {
+  throw new Error(
+    "[password.service] Database export não encontrado. Esperado DbNS.query() ou pool.query()."
   );
-
-  if (!result.rows.length) {
-    return {
-      success: true,
-      message: "Se o email existir, o processo de recuperação foi iniciado.",
-    };
-  }
-
-  const user = result.rows[0];
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
-
-  await pool.query(
-    `
-    UPDATE users
-    SET
-      reset_token = $2,
-      reset_token_expires = $3,
-      updated_at = NOW()
-    WHERE id = $1
-    `,
-    [user.id, token, expiresAt]
-  );
-
-  return {
-    success: true,
-    message: "Token de recuperação gerado com sucesso.",
-    token,
-    expiresAt,
-  };
 }
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function sha256(input) {
+  return crypto.createHash("sha256").update(String(input)).digest("hex");
+}
+
+function generateToken() {
+  return crypto.randomBytes(RESET_TOKEN_BYTES).toString("hex");
+}
+
+/**
+ * NOVO (principal): cria token e persiste em users.reset_token / users.reset_token_expires
+ * - não vaza se o email existe
+ * - guarda HASH do token no banco (seguro)
+ */
+export async function createPasswordResetToken(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) throw new AppError("Email é obrigatório.", 400);
+
+  try {
+    const { rows } = await query(
+      `SELECT id, email FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      [normalized]
+    );
+
+    // Não vazar enumeração
+    if (!rows?.length) {
+      return { ok: true };
+    }
+
+    const token = generateToken();
+    const tokenHash = sha256(token);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);
+
+    await query(
+      `UPDATE users
+         SET reset_token = $1,
+             reset_token_expires = $2
+       WHERE id = $3`,
+      [tokenHash, expiresAt, rows[0].id]
+    );
+
+    // Retorna token para uso interno (rota pode ignorar)
+    return { ok: true, token, expiresAt };
+  } catch (err) {
+    logger?.error?.({ err }, "[password.service] createPasswordResetToken failed");
+    // Não expor detalhes
+    return { ok: true };
+  }
+}
+
+/**
+ * NOVO (principal): reseta senha via token
+ * - aceita token "cru" (vai hashear e comparar com reset_token)
+ */
 export async function resetPasswordWithToken({ token, newPassword }) {
-  const safeToken = String(token || "").trim();
-  const safePassword = String(newPassword || "").trim();
+  const t = String(token || "").trim();
+  const pwd = String(newPassword || "").trim();
 
-  if (!safeToken || !safePassword) {
-    throw new AppError("Token e nova senha são obrigatórios", 400);
-  }
+  if (!t) throw new AppError("token é obrigatório.", 400);
+  if (!pwd) throw new AppError("newPassword é obrigatório.", 400);
+  if (pwd.length < 8) throw new AppError("Senha muito curta (mínimo 8).", 400);
 
-  if (safePassword.length < 6) {
-    throw new AppError("A senha deve ter pelo menos 6 caracteres", 400);
-  }
+  const tokenHash = sha256(t);
+  const passwordHash = await bcrypt.hash(pwd, SALT_ROUNDS);
 
-  const result = await pool.query(
-    `
-    SELECT id, reset_token_expires
-    FROM users
-    WHERE reset_token = $1
-    LIMIT 1
-    `,
-    [safeToken]
+  const { rows } = await query(
+    `UPDATE users
+        SET password = $1,
+            reset_token = NULL,
+            reset_token_expires = NULL
+      WHERE reset_token = $2
+        AND reset_token_expires IS NOT NULL
+        AND reset_token_expires > NOW()
+      RETURNING id, email`,
+    [passwordHash, tokenHash]
   );
 
-  if (!result.rows.length) {
-    throw new AppError("Token inválido ou expirado", 400);
+  if (!rows?.length) {
+    throw new AppError("Token inválido ou expirado.", 400);
   }
 
-  const user = result.rows[0];
+  return { ok: true };
+}
 
-  if (!user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
-    throw new AppError("Token inválido ou expirado", 400);
+/**
+ * COMPAT (antigo): requestPasswordReset(email)
+ */
+export async function requestPasswordReset(email) {
+  return createPasswordResetToken(email);
+}
+
+/**
+ * COMPAT (antigo): resetPassword(token, newPassword) OU resetPassword({token,newPassword})
+ */
+export async function resetPassword(tokenOrObj, newPassword) {
+  if (typeof tokenOrObj === "object" && tokenOrObj) {
+    return resetPasswordWithToken({
+      token: tokenOrObj.token,
+      newPassword: tokenOrObj.newPassword,
+    });
   }
-
-  const passwordHash = await bcrypt.hash(safePassword, 10);
-
-  await pool.query(
-    `
-    UPDATE users
-    SET
-      password = $2,
-      reset_token = NULL,
-      reset_token_expires = NULL,
-      updated_at = NOW()
-    WHERE id = $1
-    `,
-    [user.id, passwordHash]
-  );
-
-  return {
-    success: true,
-    message: "Senha redefinida com sucesso.",
-  };
+  return resetPasswordWithToken({ token: tokenOrObj, newPassword });
 }
