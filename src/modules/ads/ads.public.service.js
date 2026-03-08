@@ -1,7 +1,5 @@
-// src/modules/ads/ads.public.service.js
-
-import * as adsRepository from "./ads.repository.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import * as adsRepository from "./ads.repository.js";
 import { searchAdsWithFilters } from "./filters/ads-filter.service.js";
 
 export async function searchAds(filters = {}, scope = "public_global", options = {}) {
