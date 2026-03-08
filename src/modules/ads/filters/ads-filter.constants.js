@@ -1,12 +1,16 @@
-﻿export const ADS_FILTER_LIMITS = Object.freeze({
+// src/modules/ads/filters/ads-filter.constants.js
+
+export const ADS_FILTER_LIMITS = Object.freeze({
   PAGE_MIN: 1,
   PAGE_MAX: 1000,
   LIMIT_MIN: 1,
   LIMIT_MAX: 50,
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 20,
+
   QUERY_MIN_LENGTH: 2,
   QUERY_MAX_LENGTH: 120,
+
   BRAND_MAX_LENGTH: 80,
   MODEL_MAX_LENGTH: 80,
   CITY_MAX_LENGTH: 120,
@@ -14,12 +18,14 @@
   FUEL_TYPE_MAX_LENGTH: 40,
   TRANSMISSION_MAX_LENGTH: 40,
   SORT_MAX_LENGTH: 40,
+
   PRICE_MIN: 0,
   PRICE_MAX: 999999999,
   YEAR_MIN: 1900,
   YEAR_MAX: 2100,
   MILEAGE_MIN: 0,
   MILEAGE_MAX: 9999999,
+
   STATE_LENGTH: 2,
 });
 
