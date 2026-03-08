@@ -1,4 +1,6 @@
-﻿import express from "express";
+import express from "express";
+import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
+import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 import * as AuthServiceNS from "./auth.service.js";
 import * as PasswordServiceNS from "./password.service.js";
@@ -24,129 +26,142 @@ function pickFn(mod, candidates) {
   return null;
 }
 
+function ensureFn(mod, candidates, serviceName) {
+  const fn = pickFn(mod, candidates);
+  if (fn) return fn;
+  throw new AppError(`Método esperado não encontrado em ${serviceName}: ${candidates.join(" | ")}`, 500, false);
+}
+
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
 
-function badRequest(res, message, details) {
-  return res.status(400).json({ error: message, ...(details ? { details } : {}) });
+function requireString(value, fieldName, { lowercase = false } = {}) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) throw new AppError(`Campo obrigatório: ${fieldName}`, 400);
+  return lowercase ? normalized.toLowerCase() : normalized;
 }
 
-function serviceMissing(res, serviceName, expected) {
-  return res.status(500).json({
-    error: `Service misconfigured: ${serviceName}`,
-    missing: expected,
-  });
-}
+/** LOGIN (mantém /login) */
+router.post(
+  "/login",
+  loginRateLimit,
+  asyncHandler(async (req, res) => {
+    const email = requireString(req.body?.email, "email", { lowercase: true });
+    const password = requireString(req.body?.password, "password");
 
+    const login = ensureFn(AuthService, ["login", "signIn", "signin", "authenticate"], "auth.service.js");
+
+    const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+
+    // suporta assinatura antiga (email, pass, meta) e nova ({email,password})
+    let result;
+    try {
+      result = login.length >= 2 ? await login(email, password, meta) : await login({ email, password, ...meta });
+    } catch (e) {
+      // fallback
+      result = await login({ email, password, ...meta });
+    }
+
+    return res.status(200).json(result);
+  })
+);
+
+/** REFRESH + LOGOUT (se existir no service) */
+router.post(
+  "/refresh",
+  asyncHandler(async (req, res) => {
+    const refreshToken = requireString(req.body?.refreshToken, "refreshToken");
+    const refresh = ensureFn(AuthService, ["refresh"], "auth.service.js");
+    const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+
+    let result;
+    try {
+      result = refresh.length >= 2 ? await refresh(refreshToken, meta) : await refresh({ refreshToken, ...meta });
+    } catch {
+      result = await refresh({ refreshToken, ...meta });
+    }
+
+    return res.status(200).json(result);
+  })
+);
+
+router.post(
+  "/logout",
+  asyncHandler(async (req, res) => {
+    const refreshToken = String(req.body?.refreshToken ?? "").trim() || null;
+    const logout = ensureFn(AuthService, ["logout"], "auth.service.js");
+    const result = await logout(refreshToken);
+    return res.status(200).json(result ?? { ok: true });
+  })
+);
+
+/** REGISTER (se existir) */
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { name, email, password } = req.body || {};
-    if (!email || !password) return badRequest(res, "Email e password são obrigatórios.");
+    const email = requireString(req.body?.email, "email", { lowercase: true });
+    const password = requireString(req.body?.password, "password");
+    const name = String(req.body?.name ?? "").trim() || null;
 
-    const register = pickFn(AuthService, ["register", "signUp", "signup", "createUser", "createAccount"]);
-    if (!register) {
-      return serviceMissing(res, "auth.service.js", ["register | signUp | signup | createUser | createAccount"]);
-    }
-
+    const register = ensureFn(AuthService, ["register", "signUp", "signup", "createUser", "createAccount"], "auth.service.js");
     const result = await register({ name, email, password });
     return res.status(201).json(result ?? { ok: true });
   })
 );
 
-router.post(
-  "/login",
-  asyncHandler(async (req, res) => {
-    const { email, password } = req.body || {};
-    if (!email || !password) return badRequest(res, "Email e password são obrigatórios.");
+/** PASSWORD RESET (mantém rotas antigas E novas) */
+async function handleForgotPassword(req, res) {
+  const email = requireString(req.body?.email, "email", { lowercase: true });
+  const fn = ensureFn(PasswordService, ["createPasswordResetToken", "requestPasswordReset"], "password.service.js");
 
-    const login = pickFn(AuthService, ["login", "signIn", "signin", "authenticate"]);
-    if (!login) {
-      return serviceMissing(res, "auth.service.js", ["login | signIn | signin | authenticate"]);
-    }
+  try {
+    await fn(email);
+  } catch {
+    // não vazar enumeração
+  }
 
-    const result = await login({ email, password });
-    return res.status(200).json(result ?? { ok: true });
-  })
-);
+  return res.status(200).json({ ok: true, message: "Se o email existir, enviaremos instruções para redefinir a senha." });
+}
 
-// password.service.js REAL:
-// - createPasswordResetToken(email)
-// - resetPasswordWithToken({ token, newPassword })
+router.post("/forgot-password", asyncHandler(handleForgotPassword));
+router.post("/password/forgot", asyncHandler(handleForgotPassword));
 
-router.post(
-  "/password/forgot",
-  asyncHandler(async (req, res) => {
-    const { email } = req.body || {};
-    if (!email) return badRequest(res, "Email é obrigatório.");
+async function handleResetPassword(req, res) {
+  const token = requireString(req.body?.token, "token");
+  const newPassword = requireString(req.body?.newPassword, "newPassword");
 
-    const createToken = pickFn(PasswordService, ["createPasswordResetToken"]);
-    if (!createToken) {
-      return serviceMissing(res, "password.service.js", ["createPasswordResetToken(email)"]);
-    }
+  const fn = ensureFn(PasswordService, ["resetPasswordWithToken", "resetPassword"], "password.service.js");
 
-    try { await createToken(email); } catch {}
-    return res.status(200).json({
-      ok: true,
-      message: "Se o email existir, enviaremos instruções para redefinir a senha.",
-    });
-  })
-);
+  let result;
+  try {
+    result = fn.length >= 2 ? await fn(token, newPassword) : await fn({ token, newPassword });
+  } catch {
+    result = await fn({ token, newPassword });
+  }
 
-router.post(
-  "/password/reset",
-  asyncHandler(async (req, res) => {
-    const { token, newPassword } = req.body || {};
-    if (!token || !newPassword) return badRequest(res, "token e newPassword são obrigatórios.");
+  return res.status(200).json(result ?? { ok: true });
+}
 
-    const resetWithToken = pickFn(PasswordService, ["resetPasswordWithToken"]);
-    if (!resetWithToken) {
-      return serviceMissing(res, "password.service.js", ["resetPasswordWithToken({ token, newPassword })"]);
-    }
+router.post("/reset-password", asyncHandler(handleResetPassword));
+router.post("/password/reset", asyncHandler(handleResetPassword));
 
-    const result = await resetWithToken({ token, newPassword });
-    return res.status(200).json(result ?? { ok: true });
-  })
-);
+/** EMAIL VERIFY (mantém rotas antigas E novas) */
+async function handleVerifyEmail(req, res) {
+  const token = requireString(req.body?.token ?? req.query?.token, "token");
+  const verify = ensureFn(EmailVerificationService, ["verifyEmailWithToken", "verifyEmailToken", "verifyEmail", "confirmEmail"], "emailVerification.service.js");
 
-router.all(
-  "/email/verify",
-  asyncHandler(async (req, res) => {
-    const token = (req.query?.token ?? req.body?.token ?? "").toString().trim();
-    if (!token) return badRequest(res, "token é obrigatório.");
+  let result;
+  try {
+    result = await verify(token);
+  } catch {
+    result = await verify({ token });
+  }
+  return res.status(200).json(result ?? { ok: true });
+}
 
-    const verify = pickFn(EmailVerificationService, ["verifyEmailWithToken", "verifyEmailToken", "verifyEmail", "confirmEmail"]);
-    if (!verify) {
-      return serviceMissing(res, "emailVerification.service.js", ["verifyEmailWithToken | verifyEmailToken | verifyEmail | confirmEmail"]);
-    }
-
-    let result;
-    try { result = await verify(token); }
-    catch { result = await verify({ token }); }
-
-    return res.status(200).json(result ?? { ok: true });
-  })
-);
-
-router.post(
-  "/email/resend",
-  asyncHandler(async (req, res) => {
-    const { email, userId } = req.body || {};
-    if (!email && !userId) return badRequest(res, "Informe email ou userId.");
-
-    const resend = pickFn(EmailVerificationService, ["resendVerificationEmail", "resendEmailVerification", "sendVerificationEmail"]);
-    if (!resend) {
-      return serviceMissing(res, "emailVerification.service.js", ["resendVerificationEmail | resendEmailVerification | sendVerificationEmail"]);
-    }
-
-    let result;
-    try { result = await resend({ email, userId }); }
-    catch { result = email ? await resend(email) : await resend(userId); }
-
-    return res.status(200).json(result ?? { ok: true });
-  })
-);
+router.post("/verify-email", asyncHandler(handleVerifyEmail));
+router.all("/email/verify", asyncHandler(handleVerifyEmail));
 
 export const authRouter = router;
 export default router;
