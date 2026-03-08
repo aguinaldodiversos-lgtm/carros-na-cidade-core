@@ -1,35 +1,57 @@
-import IORedis from "ioredis";
+// src/infrastructure/queue/redis.connection.js
+import Redis from "ioredis";
 import { logger } from "../../shared/logger.js";
 
-let queueRedisConnectionInstance = null;
+let redis = null;
 
-export function getQueueRedisConnection() {
-  if (queueRedisConnectionInstance) {
-    return queueRedisConnectionInstance;
+function shouldEnableRedis() {
+  const disabled = String(process.env.DISABLE_REDIS || "false").toLowerCase() === "true";
+  if (disabled) return false;
+
+  const url = String(process.env.REDIS_URL || "").trim();
+  if (!url) return false;
+
+  return true;
+}
+
+export function getRedis() {
+  if (!redis) throw new Error("Redis not initialized");
+  return redis;
+}
+
+export async function initQueueRedisConnection() {
+  if (redis) return redis;
+
+  if (!shouldEnableRedis()) {
+    logger.warn("[queue.redis] Redis desativado (DISABLE_REDIS=true ou REDIS_URL vazio)");
+    return null;
   }
 
-  queueRedisConnectionInstance = new IORedis(process.env.REDIS_URL, {
+  const url = String(process.env.REDIS_URL).trim();
+
+  redis = new Redis(url, {
     maxRetriesPerRequest: null,
-    enableReadyCheck: false,
+    enableReadyCheck: true,
     lazyConnect: true,
   });
 
-  queueRedisConnectionInstance.on("connect", () => {
-    logger.info("[queue.redis] Redis conectado");
+  redis.on("error", (err) => {
+    logger.error({ error: { code: err?.code, message: err?.message } }, "[queue.redis] Erro na conexão Redis");
   });
 
-  queueRedisConnectionInstance.on("error", (error) => {
-    logger.error({ error }, "[queue.redis] Erro na conexão Redis");
-  });
-
-  return queueRedisConnectionInstance;
+  await redis.connect();
+  logger.info("[queue.redis] Redis conectado");
+  return redis;
 }
 
 export async function closeQueueRedisConnection() {
-  if (!queueRedisConnectionInstance) return;
-
-  await queueRedisConnectionInstance.quit();
-  queueRedisConnectionInstance = null;
-
-  logger.info("[queue.redis] Conexão Redis encerrada");
+  if (!redis) return;
+  try {
+    await redis.quit();
+  } catch {
+    try { redis.disconnect(); } catch {}
+  } finally {
+    redis = null;
+    logger.info("[queue.redis] Conexão Redis encerrada");
+  }
 }
