@@ -6,6 +6,9 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 export async function requestPasswordReset(email) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
 
+export async function requestPasswordReset(email) {
+  return createPasswordResetToken(email);
+}  
   if (!normalizedEmail) {
     throw new AppError("Email inválido", 400);
   }
