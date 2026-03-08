@@ -1,4 +1,4 @@
-import { pool } from "../../../infrastructure/database/db.js";
+import { query } from "../../../infrastructure/database/db.js";
 
 export async function upsertSeoPublication({
   clusterPlanId,
@@ -14,8 +14,10 @@ export async function upsertSeoPublication({
   contentStage = "discovery",
   isMoneyPage = false,
   status = "published",
+  isIndexable = true,
+  healthStatus = "healthy",
 }) {
-  const result = await pool.query(
+  const result = await query(
     `
     INSERT INTO seo_publications (
       cluster_plan_id,
@@ -30,11 +32,13 @@ export async function upsertSeoPublication({
       content_provider,
       content_stage,
       is_money_page,
+      is_indexable,
+      health_status,
       status,
       published_at,
       updated_at
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())
     ON CONFLICT (path)
     DO UPDATE SET
       cluster_plan_id = EXCLUDED.cluster_plan_id,
@@ -48,6 +52,8 @@ export async function upsertSeoPublication({
       content_provider = EXCLUDED.content_provider,
       content_stage = EXCLUDED.content_stage,
       is_money_page = EXCLUDED.is_money_page,
+      is_indexable = EXCLUDED.is_indexable,
+      health_status = EXCLUDED.health_status,
       status = EXCLUDED.status,
       updated_at = NOW()
     RETURNING *
@@ -65,6 +71,8 @@ export async function upsertSeoPublication({
       contentProvider,
       contentStage,
       Boolean(isMoneyPage),
+      Boolean(isIndexable),
+      healthStatus,
       status,
     ]
   );
@@ -73,7 +81,7 @@ export async function upsertSeoPublication({
 }
 
 export async function markClusterPublished(clusterPlanId) {
-  await pool.query(
+  await query(
     `
     UPDATE seo_cluster_plans
     SET
