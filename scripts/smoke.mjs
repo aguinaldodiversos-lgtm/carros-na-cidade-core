@@ -4,22 +4,23 @@
 const BASE = (process.env.BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 8000);
 const RETRIES = Number(process.env.SMOKE_RETRIES || 1);
+const MAX_LATENCY_MS = Number(process.env.SMOKE_MAX_LATENCY_MS || 1200);
+const BURST_COUNT = Number(process.env.SMOKE_BURST_COUNT || 10);
+const BURST_CONCURRENCY = Number(process.env.SMOKE_BURST_CONCURRENCY || 5);
 
-// Opcional: testar CORS (envia Origin)
-const ORIGIN = process.env.SMOKE_ORIGIN || "";
-
-// Opcional: testar Auth sem criar usuário
-// (Só valida que endpoints respondem corretamente e não dão 500)
+const ORIGIN = process.env.SMOKE_ORIGIN || ""; // ex: https://carrosnacidade.com
 const ENABLE_AUTH = String(process.env.SMOKE_AUTH || "true").toLowerCase() === "true";
+const ENABLE_METRICS = String(process.env.SMOKE_METRICS || "true").toLowerCase() === "true";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
-
 function fmtMs(ms) {
   return `${Math.round(ms)}ms`;
 }
-
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
@@ -27,7 +28,6 @@ function assert(cond, msg) {
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -38,7 +38,6 @@ async function fetchWithTimeout(url, options = {}) {
 async function request(path, { method = "GET", headers = {}, body } = {}) {
   const url = `${BASE}${path}`;
   const reqHeaders = { ...headers };
-
   if (ORIGIN) reqHeaders.origin = ORIGIN;
   if (body !== undefined) reqHeaders["content-type"] = "application/json";
 
@@ -51,8 +50,9 @@ async function request(path, { method = "GET", headers = {}, body } = {}) {
 
   const durationMs = Date.now() - started;
   const contentType = String(res.headers.get("content-type") || "");
-
+  const cacheControl = String(res.headers.get("cache-control") || "");
   const text = await res.text();
+
   let json = null;
   if (contentType.includes("application/json")) {
     try {
@@ -62,7 +62,17 @@ async function request(path, { method = "GET", headers = {}, body } = {}) {
     }
   }
 
-  return { ok: res.ok, status: res.status, path, durationMs, contentType, text, json };
+  return {
+    ok: res.ok,
+    status: res.status,
+    path,
+    durationMs,
+    headers: res.headers,
+    contentType,
+    cacheControl,
+    text,
+    json,
+  };
 }
 
 async function withRetries(fn) {
@@ -78,181 +88,402 @@ async function withRetries(fn) {
   throw lastErr;
 }
 
-function okLine(r) {
-  return `${r.ok ? "✅" : "❌"} ${r.status} ${r.path} (${fmtMs(r.durationMs)})`;
+/* =========================
+   Output helpers
+========================= */
+
+function lineOk(res, extra = "") {
+  const slow = res.durationMs > MAX_LATENCY_MS ? " ⚠️SLOW" : "";
+  return `✅ ${res.status} ${res.path} (${fmtMs(res.durationMs)})${slow}${extra ? " " + extra : ""}`;
 }
 
-function warnLine(msg) {
+function lineExpected(res, expected) {
+  const slow = res.durationMs > MAX_LATENCY_MS ? " ⚠️SLOW" : "";
+  return `✅ EXPECTED ${res.status} ${res.path} (${fmtMs(res.durationMs)})${slow} [expected ${expected.join("/")}]`;
+}
+
+function lineWarn(msg) {
   return `⚠️  ${msg}`;
 }
 
-async function expectStatus(res, allowed, label) {
-  const ok = allowed.includes(res.status);
-  assert(ok, `${label}: esperado status ${allowed.join("/")} e veio ${res.status}`);
+function briefText(text) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  return t.length > 220 ? `${t.slice(0, 220)}…` : t;
 }
 
-async function expectNot5xx(res, label) {
+/* =========================
+   Assertions
+========================= */
+
+function expectStatus(res, allowed, label) {
+  assert(allowed.includes(res.status), `${label}: esperado ${allowed.join("/")} e veio ${res.status}`);
+}
+
+function expectNot5xx(res, label) {
   assert(res.status < 500, `${label}: não pode ser 5xx (veio ${res.status})`);
 }
 
-async function expectJson(res, label) {
-  assert(
-    res.contentType.includes("application/json"),
-    `${label}: esperado JSON (content-type: ${res.contentType || "n/a"})`
-  );
-  assert(res.json !== null, `${label}: JSON inválido (parse falhou)`);
+function expectJson(res, label) {
+  assert(res.contentType.includes("application/json"), `${label}: esperado JSON (content-type: ${res.contentType || "n/a"})`);
+  assert(res.json !== null, `${label}: JSON inválido (parse falhou). Body: ${briefText(res.text)}`);
 }
 
-async function expectXml(res, label) {
-  assert(
-    res.contentType.includes("xml") || res.text.trim().startsWith("<?xml"),
-    `${label}: esperado XML (content-type: ${res.contentType || "n/a"})`
-  );
+function expectXml(res, label) {
+  const looksXml = res.contentType.includes("xml") || res.text.trim().startsWith("<?xml");
+  assert(looksXml, `${label}: esperado XML (content-type: ${res.contentType || "n/a"})`);
   assert(res.text.includes("<urlset") || res.text.includes("<sitemapindex"), `${label}: XML sem urlset/sitemapindex`);
 }
 
-function briefBody(res) {
-  const t = (res.text || "").replace(/\s+/g, " ").trim();
-  return t.length > 160 ? `${t.slice(0, 160)}…` : t;
+function extractArrayFromJson(json) {
+  if (!json) return null;
+  if (Array.isArray(json)) return json;
+
+  // tenta padrões comuns
+  const candidates = ["items", "data", "results", "ads", "rows", "list"];
+  for (const key of candidates) {
+    if (Array.isArray(json[key])) return json[key];
+  }
+
+  // tenta achar o primeiro array em 1 nível
+  for (const v of Object.values(json)) {
+    if (Array.isArray(v)) return v;
+  }
+  return null;
 }
+
+function extractIds(list) {
+  if (!Array.isArray(list)) return [];
+  // tenta achar campos de id comuns
+  const keys = ["id", "ad_id", "adId", "uuid"];
+  const ids = [];
+  for (const item of list) {
+    if (item && typeof item === "object") {
+      for (const k of keys) {
+        if (item[k] !== undefined && item[k] !== null) {
+          ids.push(String(item[k]));
+          break;
+        }
+      }
+    }
+  }
+  return ids;
+}
+
+function findDuplicates(arr) {
+  const seen = new Set();
+  const dup = new Set();
+  for (const v of arr) {
+    if (seen.has(v)) dup.add(v);
+    else seen.add(v);
+  }
+  return [...dup];
+}
+
+function parseSitemapLocs(xmlText) {
+  // simples e suficiente para smoke
+  const locs = [];
+  const re = /<loc>\s*([^<]+)\s*<\/loc>/gim;
+  let m;
+  while ((m = re.exec(xmlText))) {
+    locs.push(m[1].trim());
+  }
+  return locs;
+}
+
+/* =========================
+   Test runner
+========================= */
 
 async function run() {
   console.log(`\nSMOKE @ ${BASE}`);
+  console.log(`Timeout: ${TIMEOUT_MS}ms | Retries: ${RETRIES}`);
+  console.log(`Max latency warn: ${MAX_LATENCY_MS}ms`);
   if (ORIGIN) console.log(`Origin header: ${ORIGIN}`);
-  console.log(`Timeout: ${TIMEOUT_MS}ms | Retries: ${RETRIES}\n`);
+  console.log("");
 
   const results = [];
-  const required = [];
+  const warnings = [];
 
-  async function test(name, fn, { isRequired = true } = {}) {
+  async function test(name, fn, { required = true, expectedStatuses = null, validate } = {}) {
     try {
       const res = await withRetries(fn);
-      results.push({ name, res, ok: true, required: isRequired });
-      console.log(okLine(res));
+
+      if (Array.isArray(expectedStatuses)) {
+        expectStatus(res, expectedStatuses, name);
+        expectNot5xx(res, name);
+        if (validate) await validate(res);
+        results.push({ name, required, ok: true, expected: expectedStatuses, res });
+        console.log(lineExpected(res, expectedStatuses));
+        return res;
+      }
+
+      if (validate) await validate(res);
+
+      results.push({ name, required, ok: true, expected: null, res });
+      console.log(lineOk(res));
       return res;
     } catch (err) {
-      results.push({ name, res: null, ok: false, required: isRequired, error: err });
+      results.push({ name, required, ok: false, error: err, res: null });
       console.log(`❌ ERR ${name}: ${err.message}`);
       return null;
     }
   }
 
-  // ---------------------------
-  // 1) Health / root
-  // ---------------------------
-  required.push(
-    await test("HEAD /", () => request("/", { method: "HEAD" })),
-    await test("GET /", async () => {
-      const r = await request("/", { method: "GET" });
-      await expectStatus(r, [200], "GET /");
-      await expectJson(r, "GET /");
-      return r;
-    }),
-    await test("GET /health/meta", async () => {
-      const r = await request("/health/meta");
-      await expectStatus(r, [200], "/health/meta");
-      await expectJson(r, "/health/meta");
-      return r;
-    })
-  );
+  /* =========================
+     1) Root / Health
+  ========================= */
 
-  // ---------------------------
-  // 2) SEO sitemap (não pode 500)
-  // ---------------------------
-  required.push(
-    await test("GET /api/public/seo/sitemap", async () => {
-      const r = await request("/api/public/seo/sitemap");
-      await expectStatus(r, [200], "sitemap");
-      await expectXml(r, "sitemap");
-      return r;
-    })
-  );
+  await test("HEAD /", () => request("/", { method: "HEAD" }), {
+    validate: (r) => expectStatus(r, [200], "HEAD /"),
+  });
 
-  // ---------------------------
-  // 3) Ads list + filtros (core)
-  // ---------------------------
-  required.push(
-    await test("GET /api/ads?page=1&limit=10", async () => {
-      const r = await request("/api/ads?page=1&limit=10");
-      await expectStatus(r, [200], "ads list");
-      await expectJson(r, "ads list");
-      return r;
-    }),
-    await test("GET /api/ads?q=civic&city=atibaia&sort=recent", async () => {
-      const r = await request("/api/ads?q=civic&city=atibaia&page=1&limit=10&sort=recent");
-      await expectStatus(r, [200], "ads search");
-      await expectJson(r, "ads search");
-      return r;
-    })
-  );
+  await test("GET /", () => request("/", { method: "GET" }), {
+    validate: (r) => {
+      expectStatus(r, [200], "GET /");
+      expectJson(r, "GET /");
+      // opcional: valida shape mínimo, sem ser rígido
+      if (r.json && typeof r.json === "object") {
+        if (!("success" in r.json)) warnings.push("GET /: JSON sem campo 'success' (não bloqueia).");
+      }
+    },
+  });
 
-  // ---------------------------
-  // 4) Validações negativas (garantir que schema não explode)
-  //    Aqui o esperado é 400/422, mas nunca 500.
-  // ---------------------------
-  required.push(
-    await test("BAD range year_min>year_max", async () => {
-      const r = await request("/api/ads?year_min=2025&year_max=2010&page=1&limit=10");
-      await expectStatus(r, [400, 422], "bad year range");
-      await expectNot5xx(r, "bad year range");
-      return r;
-    }),
-    await test("BAD sort invalid", async () => {
-      const r = await request("/api/ads?sort=__invalid__&page=1&limit=10");
-      await expectStatus(r, [400, 422], "bad sort");
-      await expectNot5xx(r, "bad sort");
-      return r;
-    }),
-    await test("BAD limit too high", async () => {
-      const r = await request("/api/ads?page=1&limit=9999");
-      await expectStatus(r, [400, 422], "bad limit");
-      await expectNot5xx(r, "bad limit");
-      return r;
-    })
-  );
+  await test("GET /health/meta", () => request("/health/meta"), {
+    validate: (r) => {
+      expectStatus(r, [200], "/health/meta");
+      expectJson(r, "/health/meta");
+      const rid = r.json?.requestId;
+      if (rid && !UUID_RE.test(String(rid))) {
+        warnings.push(`/health/meta: requestId não parece UUID: ${rid}`);
+      }
+    },
+  });
 
-  // ---------------------------
-  // 5) Auth sanity (não cria usuário; só garante que não dá 500)
-  // ---------------------------
-  if (ENABLE_AUTH) {
-    await test(
-      "POST /api/auth/login (missing fields -> 400/422)",
-      async () => {
-        const r = await request("/api/auth/login", { method: "POST", body: {} });
-        await expectStatus(r, [400, 401, 422], "auth login empty");
-        await expectNot5xx(r, "auth login empty");
-        return r;
-      },
-      { isRequired: false }
-    );
-
-    await test(
-      "POST /api/auth/forgot-password (should be 200, no enumeration)",
-      async () => {
-        const r = await request("/api/auth/forgot-password", {
-          method: "POST",
-          body: { email: "smoke+notexists@carrosnacidade.com" },
-        });
-        // muitas implementações retornam 200 sempre
-        await expectStatus(r, [200, 400, 422], "forgot password");
-        await expectNot5xx(r, "forgot password");
-        return r;
-      },
-      { isRequired: false }
+  // CORS Preflight (só faz sentido se ORIGIN estiver setado)
+  if (ORIGIN) {
+    await test("OPTIONS /health/meta (CORS preflight)", () =>
+      request("/health/meta", {
+        method: "OPTIONS",
+        headers: {
+          "access-control-request-method": "GET",
+          "access-control-request-headers": "content-type",
+        },
+      }), {
+        required: true,
+        validate: (r) => {
+          // normalmente 204, mas 200 ok também
+          expectStatus(r, [200, 204], "CORS preflight");
+          const acao = String(r.headers.get("access-control-allow-origin") || "");
+          if (!acao) warnings.push("CORS: sem access-control-allow-origin no preflight.");
+        },
+      }
     );
   } else {
-    console.log(warnLine("SMOKE_AUTH=false (pulando Auth sanity)"));
+    warnings.push("SMOKE_ORIGIN não definido: pulando teste de CORS preflight.");
   }
 
-  // ---------------------------
-  // Summary
-  // ---------------------------
-  console.log("\n---- SUMMARY ----");
-  const reqFails = results.filter((t) => t.required && !t.ok);
-  const optFails = results.filter((t) => !t.required && !t.ok);
+  /* =========================
+     2) SEO Sitemap
+  ========================= */
 
-  console.log(`Required: ${results.filter((t) => t.required).length} | Failed: ${reqFails.length}`);
-  console.log(`Optional: ${results.filter((t) => !t.required).length} | Failed: ${optFails.length}`);
+  const sitemapRes = await test("GET /api/public/seo/sitemap", () => request("/api/public/seo/sitemap"), {
+    validate: (r) => {
+      expectStatus(r, [200], "sitemap");
+      expectXml(r, "sitemap");
+      // duplicidade de URLs
+      const locs = parseSitemapLocs(r.text);
+      if (!locs.length) warnings.push("sitemap: nenhum <loc> encontrado (estranho).");
+      const dup = findDuplicates(locs);
+      if (dup.length) warnings.push(`sitemap: URLs duplicadas detectadas (ex.: ${dup.slice(0, 3).join(", ")})`);
+      // sanity size
+      if (r.text.length > 5_000_000) warnings.push("sitemap: XML maior que 5MB (pode ser problema).");
+    },
+  });
+
+  /* =========================
+     3) Ads (core)
+  ========================= */
+
+  const adsListRes = await test("GET /api/ads?page=1&limit=10", () => request("/api/ads?page=1&limit=10"), {
+    validate: (r) => {
+      expectStatus(r, [200], "ads list");
+      expectJson(r, "ads list");
+
+      const arr = extractArrayFromJson(r.json);
+      if (!arr) warnings.push("ads list: resposta JSON não contém array (items/data/results/ads).");
+      else {
+        const ids = extractIds(arr);
+        const dups = findDuplicates(ids);
+        if (dups.length) warnings.push(`ads list: IDs duplicados detectados (ex.: ${dups.slice(0, 3).join(", ")})`);
+      }
+    },
+  });
+
+  await test(
+    "GET /api/ads?q=civic&city=atibaia&sort=recent",
+    () => request("/api/ads?q=civic&city=atibaia&page=1&limit=10&sort=recent"),
+    {
+      validate: (r) => {
+        expectStatus(r, [200], "ads search");
+        expectJson(r, "ads search");
+      },
+    }
+  );
+
+  /* =========================
+     4) Negative validation (expected)
+  ========================= */
+
+  await test(
+    "BAD year_min>year_max",
+    () => request("/api/ads?year_min=2025&year_max=2010&page=1&limit=10"),
+    { expectedStatuses: [400, 422] }
+  );
+
+  await test(
+    "BAD sort invalid",
+    () => request("/api/ads?sort=__invalid__&page=1&limit=10"),
+    { expectedStatuses: [400, 422] }
+  );
+
+  await test(
+    "BAD limit too high",
+    () => request("/api/ads?page=1&limit=9999"),
+    { expectedStatuses: [400, 422] }
+  );
+
+  /* =========================
+     5) Not found must be 404 (never 500)
+  ========================= */
+
+  await test(
+    "GET /__smoke_not_found__ (should be 404)",
+    () => request("/__smoke_not_found__"),
+    { expectedStatuses: [404] }
+  );
+
+  /* =========================
+     6) Burst/concurrency stability
+     - pega erros intermitentes e requestId duplicado
+  ========================= */
+
+  await test("BURST /health/meta (stability)", async () => {
+    const total = BURST_COUNT;
+    const conc = Math.max(1, Math.min(BURST_CONCURRENCY, total));
+
+    const reqs = Array.from({ length: total }, (_, i) => i);
+    const ids = [];
+    let failures = 0;
+    let any5xx = 0;
+
+    const worker = async () => {
+      while (reqs.length) {
+        const idx = reqs.pop();
+        if (idx === undefined) break;
+        try {
+          const r = await request("/health/meta");
+          if (r.status >= 500) any5xx++;
+          if (r.status !== 200) failures++;
+          if (r.json?.requestId) ids.push(String(r.json.requestId));
+        } catch {
+          failures++;
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: conc }, () => worker()));
+
+    assert(any5xx === 0, `burst: detectado ${any5xx} respostas 5xx`);
+    assert(failures === 0, `burst: falhas=${failures}/${total}`);
+    const dup = findDuplicates(ids);
+    if (dup.length) warnings.push(`burst: requestId duplicado detectado (ex.: ${dup.slice(0, 3).join(", ")})`);
+
+    // retorna um res "fake" pra log padronizado
+    return {
+      ok: true,
+      status: 200,
+      path: `/health/meta x${total} (conc ${conc})`,
+      durationMs: 0,
+      contentType: "application/json",
+      headers: new Headers(),
+      text: "",
+      json: null,
+    };
+  });
+
+  /* =========================
+     7) Auth sanity (optional)
+  ========================= */
+
+  if (ENABLE_AUTH) {
+    await test(
+      "POST /api/auth/login (missing fields)",
+      () => request("/api/auth/login", { method: "POST", body: {} }),
+      { required: false, expectedStatuses: [400, 401, 422] }
+    );
+
+    await test(
+      "POST /api/auth/forgot-password",
+      () =>
+        request("/api/auth/forgot-password", {
+          method: "POST",
+          body: { email: "smoke+notexists@carrosnacidade.com" },
+        }),
+      { required: false, expectedStatuses: [200, 400, 422] }
+    );
+  } else {
+    warnings.push("SMOKE_AUTH=false: pulando sanity de Auth.");
+  }
+
+  /* =========================
+     8) Metrics endpoint (optional)
+     - não força 200 (pode ser 403/404), mas nunca 5xx
+  ========================= */
+
+  if (ENABLE_METRICS) {
+    await test(
+      "GET /metrics (optional)",
+      () => request("/metrics"),
+      {
+        required: false,
+        validate: (r) => {
+          // aceita 200/403/404, mas nunca 5xx
+          expectNot5xx(r, "/metrics");
+          if (![200, 403, 404].includes(r.status)) warnings.push(`/metrics: status incomum ${r.status}`);
+        },
+      }
+    );
+  } else {
+    warnings.push("SMOKE_METRICS=false: pulando /metrics.");
+  }
+
+  /* =========================
+     Summary
+  ========================= */
+
+  console.log("\n---- SUMMARY ----");
+  const required = results.filter((t) => t.required);
+  const optional = results.filter((t) => !t.required);
+
+  const reqFails = required.filter((t) => !t.ok);
+  const optFails = optional.filter((t) => !t.ok);
+
+  console.log(`Required: ${required.length} | Failed: ${reqFails.length}`);
+  console.log(`Optional: ${optional.length} | Failed: ${optFails.length}`);
+
+  // Top slow endpoints
+  const withRes = results.filter((r) => r.res && typeof r.res.durationMs === "number");
+  withRes.sort((a, b) => (b.res.durationMs || 0) - (a.res.durationMs || 0));
+  const topSlow = withRes.slice(0, 5);
+  console.log("\nTop slow:");
+  for (const t of topSlow) {
+    if (t.res.durationMs > 0) console.log(`- ${t.res.path}: ${fmtMs(t.res.durationMs)}`);
+  }
+
+  if (warnings.length) {
+    console.log("\nWarnings:");
+    for (const w of warnings) console.log(lineWarn(w));
+  }
 
   if (reqFails.length) {
     console.log("\nRequired failures:");
@@ -260,15 +491,18 @@ async function run() {
     process.exit(1);
   }
 
-  // Se optional falhar, só alerta
   if (optFails.length) {
     console.log("\nOptional failures (não bloqueiam):");
     for (const f of optFails) console.log(`- ${f.name}: ${f.error?.message || "unknown error"}`);
   }
 
-  // Pequeno “info” para debug rápido quando algo der errado
-  const lastBad = results.findLast?.((t) => t.ok === false) || null;
-  if (lastBad?.res) console.log("Last bad response:", briefBody(lastBad.res));
+  // Debug extra quando sitemap/ads retornam algo suspeito
+  if (sitemapRes?.text && sitemapRes.text.length < 50) {
+    console.log(lineWarn("sitemap: body muito pequeno, revise endpoint."));
+  }
+  if (adsListRes?.json && !extractArrayFromJson(adsListRes.json)) {
+    console.log(lineWarn("ads list: não achei array na resposta; smoke está flexível, mas revise o formato."));
+  }
 
   console.log("\n✅ SMOKE PASSED");
   process.exit(0);
