@@ -29,7 +29,11 @@ function pickFn(mod, candidates) {
 function ensureFn(mod, candidates, serviceName) {
   const fn = pickFn(mod, candidates);
   if (fn) return fn;
-  throw new AppError(`Método esperado não encontrado em ${serviceName}: ${candidates.join(" | ")}`, 500, false);
+  throw new AppError(
+    `Método esperado não encontrado em ${serviceName}: ${candidates.join(" | ")}`,
+    500,
+    false
+  );
 }
 
 function asyncHandler(fn) {
@@ -42,7 +46,7 @@ function requireString(value, fieldName, { lowercase = false } = {}) {
   return lowercase ? normalized.toLowerCase() : normalized;
 }
 
-/** LOGIN (mantém /login) */
+/** LOGIN */
 router.post(
   "/login",
   loginRateLimit,
@@ -50,16 +54,23 @@ router.post(
     const email = requireString(req.body?.email, "email", { lowercase: true });
     const password = requireString(req.body?.password, "password");
 
-    const login = ensureFn(AuthService, ["login", "signIn", "signin", "authenticate"], "auth.service.js");
+    const login = ensureFn(
+      AuthService,
+      ["login", "signIn", "signin", "authenticate"],
+      "auth.service.js"
+    );
 
     const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
 
-    // suporta assinatura antiga (email, pass, meta) e nova ({email,password})
     let result;
     try {
-      result = login.length >= 2 ? await login(email, password, meta) : await login({ email, password, ...meta });
-    } catch (e) {
-      // fallback
+      // assinatura antiga: (email, password, meta)
+      result =
+        login.length >= 2
+          ? await login(email, password, meta)
+          : await login({ email, password, ...meta });
+    } catch {
+      // assinatura nova: ({email,password,...})
       result = await login({ email, password, ...meta });
     }
 
@@ -67,7 +78,7 @@ router.post(
   })
 );
 
-/** REFRESH + LOGOUT (se existir no service) */
+/** REFRESH */
 router.post(
   "/refresh",
   asyncHandler(async (req, res) => {
@@ -77,7 +88,10 @@ router.post(
 
     let result;
     try {
-      result = refresh.length >= 2 ? await refresh(refreshToken, meta) : await refresh({ refreshToken, ...meta });
+      result =
+        refresh.length >= 2
+          ? await refresh(refreshToken, meta)
+          : await refresh({ refreshToken, ...meta });
     } catch {
       result = await refresh({ refreshToken, ...meta });
     }
@@ -86,6 +100,7 @@ router.post(
   })
 );
 
+/** LOGOUT */
 router.post(
   "/logout",
   asyncHandler(async (req, res) => {
@@ -96,7 +111,7 @@ router.post(
   })
 );
 
-/** REGISTER (se existir) */
+/** REGISTER */
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
@@ -104,24 +119,36 @@ router.post(
     const password = requireString(req.body?.password, "password");
     const name = String(req.body?.name ?? "").trim() || null;
 
-    const register = ensureFn(AuthService, ["register", "signUp", "signup", "createUser", "createAccount"], "auth.service.js");
+    const register = ensureFn(
+      AuthService,
+      ["register", "signUp", "signup", "createUser", "createAccount"],
+      "auth.service.js"
+    );
+
     const result = await register({ name, email, password });
     return res.status(201).json(result ?? { ok: true });
   })
 );
 
-/** PASSWORD RESET (mantém rotas antigas E novas) */
+/** PASSWORD RESET (compatível com o seu service real) */
 async function handleForgotPassword(req, res) {
   const email = requireString(req.body?.email, "email", { lowercase: true });
-  const fn = ensureFn(PasswordService, ["createPasswordResetToken", "requestPasswordReset"], "password.service.js");
+  const fn = ensureFn(
+    PasswordService,
+    ["createPasswordResetToken", "requestPasswordReset"],
+    "password.service.js"
+  );
 
   try {
     await fn(email);
   } catch {
-    // não vazar enumeração
+    // não enumerar usuários
   }
 
-  return res.status(200).json({ ok: true, message: "Se o email existir, enviaremos instruções para redefinir a senha." });
+  return res.status(200).json({
+    ok: true,
+    message: "Se o email existir, enviaremos instruções para redefinir a senha.",
+  });
 }
 
 router.post("/forgot-password", asyncHandler(handleForgotPassword));
@@ -131,11 +158,17 @@ async function handleResetPassword(req, res) {
   const token = requireString(req.body?.token, "token");
   const newPassword = requireString(req.body?.newPassword, "newPassword");
 
-  const fn = ensureFn(PasswordService, ["resetPasswordWithToken", "resetPassword"], "password.service.js");
+  const fn = ensureFn(
+    PasswordService,
+    ["resetPasswordWithToken", "resetPassword"],
+    "password.service.js"
+  );
 
   let result;
   try {
-    result = fn.length >= 2 ? await fn(token, newPassword) : await fn({ token, newPassword });
+    // assinatura antiga: (token, newPassword) ou nova: ({token,newPassword})
+    result =
+      fn.length >= 2 ? await fn(token, newPassword) : await fn({ token, newPassword });
   } catch {
     result = await fn({ token, newPassword });
   }
@@ -146,10 +179,15 @@ async function handleResetPassword(req, res) {
 router.post("/reset-password", asyncHandler(handleResetPassword));
 router.post("/password/reset", asyncHandler(handleResetPassword));
 
-/** EMAIL VERIFY (mantém rotas antigas E novas) */
+/** EMAIL VERIFY */
 async function handleVerifyEmail(req, res) {
   const token = requireString(req.body?.token ?? req.query?.token, "token");
-  const verify = ensureFn(EmailVerificationService, ["verifyEmailWithToken", "verifyEmailToken", "verifyEmail", "confirmEmail"], "emailVerification.service.js");
+
+  const verify = ensureFn(
+    EmailVerificationService,
+    ["verifyEmailWithToken", "verifyEmailToken", "verifyEmail", "confirmEmail"],
+    "emailVerification.service.js"
+  );
 
   let result;
   try {
@@ -157,11 +195,40 @@ async function handleVerifyEmail(req, res) {
   } catch {
     result = await verify({ token });
   }
+
   return res.status(200).json(result ?? { ok: true });
 }
 
 router.post("/verify-email", asyncHandler(handleVerifyEmail));
 router.all("/email/verify", asyncHandler(handleVerifyEmail));
+
+/** EMAIL RESEND (se existir no service) */
+router.post(
+  "/email/resend",
+  asyncHandler(async (req, res) => {
+    const resend = pickFn(EmailVerificationService, [
+      "resendVerificationEmail",
+      "resendEmailVerification",
+      "sendVerificationEmail",
+    ]);
+
+    if (!resend) {
+      return res.status(501).json({ ok: false, error: "Resend não implementado no service." });
+    }
+
+    const { email, userId } = req.body || {};
+    if (!email && !userId) throw new AppError("Informe email ou userId.", 400);
+
+    let result;
+    try {
+      result = await resend({ email, userId });
+    } catch {
+      result = email ? await resend(email) : await resend(userId);
+    }
+
+    return res.status(200).json(result ?? { ok: true });
+  })
+);
 
 export const authRouter = router;
 export default router;
