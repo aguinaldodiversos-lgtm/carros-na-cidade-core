@@ -1,3 +1,4 @@
+// src/modules/auth/auth.routes.js
 import express from "express";
 import * as authService from "./auth.service.js";
 import * as passwordService from "./password.service.js";
@@ -49,12 +50,7 @@ router.post("/logout", async (req, res, next) => {
 router.post("/forgot-password", async (req, res, next) => {
   try {
     const { email } = req.body;
-
-    if (typeof passwordService.requestPasswordReset !== "function") {
-      throw new Error("requestPasswordReset não exportado em password.service.js");
-    }
-
-    const result = await passwordService.requestPasswordReset(email);
+    const result = await passwordService.createPasswordResetToken(email);
     res.json(result);
   } catch (err) {
     next(err);
@@ -64,16 +60,10 @@ router.post("/forgot-password", async (req, res, next) => {
 router.post("/reset-password", async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
-
-    if (typeof passwordService.resetPasswordWithToken !== "function") {
-      throw new Error("resetPasswordWithToken não exportado em password.service.js");
-    }
-
     const result = await passwordService.resetPasswordWithToken({
       token,
       newPassword,
     });
-
     res.json(result);
   } catch (err) {
     next(err);
@@ -83,11 +73,6 @@ router.post("/reset-password", async (req, res, next) => {
 router.post("/verify-email", async (req, res, next) => {
   try {
     const { token } = req.body;
-
-    if (typeof emailVerificationService.verifyEmail !== "function") {
-      throw new Error("verifyEmail não exportado em emailVerification.service.js");
-    }
-
     const result = await emailVerificationService.verifyEmail(token);
     res.json(result);
   } catch (err) {
