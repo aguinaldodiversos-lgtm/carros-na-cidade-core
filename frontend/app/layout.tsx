@@ -39,38 +39,28 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-
   applicationName: SITE_NAME,
-
   title: {
     default: DEFAULT_TITLE,
     template: TITLE_TEMPLATE,
   },
-
   description: DEFAULT_DESCRIPTION,
-
   keywords: DEFAULT_KEYWORDS,
-
   category: "automotive",
-
   alternates: {
     canonical: "/",
   },
-
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
-
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-
   robots: {
     index: true,
     follow: true,
-    nocache: false,
     googleBot: {
       index: true,
       follow: true,
@@ -79,7 +69,6 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-
   openGraph: {
     type: "website",
     locale: "pt_BR",
@@ -92,18 +81,16 @@ export const metadata: Metadata = {
         url: DEFAULT_OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: "Carros na Cidade",
+        alt: SITE_NAME,
       },
     ],
   },
-
   twitter: {
     card: "summary_large_image",
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
     images: [DEFAULT_OG_IMAGE],
   },
-
   icons: {
     icon: [
       { url: "/images/favicon.ico" },
@@ -112,15 +99,12 @@ export const metadata: Metadata = {
     shortcut: ["/images/favicon.ico", "/favicon.ico"],
     apple: ["/images/favicon.png"],
   },
-
   manifest: "/site.webmanifest",
-
   appleWebApp: {
     capable: true,
     title: SITE_NAME,
     statusBarStyle: "default",
   },
-
   other: {
     "apple-mobile-web-app-title": SITE_NAME,
     "mobile-web-app-capable": "yes",
