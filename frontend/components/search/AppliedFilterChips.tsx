@@ -6,6 +6,7 @@ interface AppliedFilterChipsProps {
   filters: AdsSearchFilters;
   onRemove: (patch: Partial<AdsSearchFilters>) => void;
   onClearAll: () => void;
+  lockedKeys?: Array<keyof AdsSearchFilters>;
 }
 
 function formatCurrency(value?: number) {
@@ -21,11 +22,15 @@ export function AppliedFilterChips({
   filters,
   onRemove,
   onClearAll,
+  lockedKeys = [],
 }: AppliedFilterChipsProps) {
+  const locked = new Set<keyof AdsSearchFilters>(lockedKeys);
+
   const chips: Array<{
     key: string;
     label: string;
     remove: () => void;
+    locked?: boolean;
   }> = [];
 
   if (filters.q) {
@@ -33,6 +38,7 @@ export function AppliedFilterChips({
       key: "q",
       label: `Busca: ${filters.q}`,
       remove: () => onRemove({ q: undefined, page: 1 }),
+      locked: locked.has("q"),
     });
   }
 
@@ -41,6 +47,7 @@ export function AppliedFilterChips({
       key: "brand",
       label: `Marca: ${filters.brand}`,
       remove: () => onRemove({ brand: undefined, model: undefined, page: 1 }),
+      locked: locked.has("brand"),
     });
   }
 
@@ -49,6 +56,7 @@ export function AppliedFilterChips({
       key: "model",
       label: `Modelo: ${filters.model}`,
       remove: () => onRemove({ model: undefined, page: 1 }),
+      locked: locked.has("model"),
     });
   }
 
@@ -64,6 +72,7 @@ export function AppliedFilterChips({
           state: undefined,
           page: 1,
         }),
+      locked: locked.has("city") || locked.has("city_slug") || locked.has("city_id"),
     });
   }
 
@@ -87,7 +96,7 @@ export function AppliedFilterChips({
   if (filters.year_min !== undefined || filters.year_max !== undefined) {
     chips.push({
       key: "year",
-      label: `Ano: ${filters.year_min || "..." } até ${filters.year_max || "..."}`,
+      label: `Ano: ${filters.year_min || "..."} até ${filters.year_max || "..."}`,
       remove: () =>
         onRemove({
           year_min: undefined,
@@ -110,6 +119,7 @@ export function AppliedFilterChips({
       key: "fuel_type",
       label: `Combustível: ${filters.fuel_type}`,
       remove: () => onRemove({ fuel_type: undefined, page: 1 }),
+      locked: locked.has("fuel_type"),
     });
   }
 
@@ -118,6 +128,7 @@ export function AppliedFilterChips({
       key: "transmission",
       label: `Câmbio: ${filters.transmission}`,
       remove: () => onRemove({ transmission: undefined, page: 1 }),
+      locked: locked.has("transmission"),
     });
   }
 
@@ -126,6 +137,7 @@ export function AppliedFilterChips({
       key: "body_type",
       label: `Carroceria: ${filters.body_type}`,
       remove: () => onRemove({ body_type: undefined, page: 1 }),
+      locked: locked.has("body_type"),
     });
   }
 
@@ -134,31 +146,45 @@ export function AppliedFilterChips({
       key: "below_fipe",
       label: "Abaixo da FIPE",
       remove: () => onRemove({ below_fipe: undefined, page: 1 }),
+      locked: locked.has("below_fipe"),
     });
   }
+
+  const removableChips = chips.filter((chip) => !chip.locked);
 
   if (chips.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {chips.map((chip) => (
-        <button
-          key={chip.key}
-          type="button"
-          onClick={chip.remove}
-          className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
-        >
-          {chip.label} ×
-        </button>
-      ))}
+      {chips.map((chip) =>
+        chip.locked ? (
+          <span
+            key={chip.key}
+            className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700"
+          >
+            {chip.label}
+          </span>
+        ) : (
+          <button
+            key={chip.key}
+            type="button"
+            onClick={chip.remove}
+            className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
+          >
+            {chip.label} ×
+          </button>
+        )
+      )}
 
-      <button
-        type="button"
-        onClick={onClearAll}
-        className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-800"
-      >
-        Limpar tudo
-      </button>
+      {removableChips.length > 0 && (
+        <button
+          type="button"
+          onClick={onClearAll}
+          className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-800"
+        >
+          Limpar filtros
+        </button>
+      )}
     </div>
   );
 }
