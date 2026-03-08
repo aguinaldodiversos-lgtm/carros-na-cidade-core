@@ -1,107 +1,50 @@
+import { z } from "zod";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
-export function toNumber(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : undefined;
-}
+const CreateAdSchema = z.object({
+  title: z.string().min(3),
+  description: z.string().optional().nullable(),
+  price: z.coerce.number().positive(),
+  city_id: z.coerce.number().int().positive(),
+  city: z.string().min(2),
+  state: z.string().min(2).max(2),
+  brand: z.string().min(1),
+  model: z.string().min(1),
+  year: z.coerce.number().int().min(1900).max(2100),
+  mileage: z.coerce.number().int().min(0).default(0),
+  category: z.string().optional().nullable(),
+  body_type: z.string().optional().nullable(),
+  fuel_type: z.string().optional().nullable(),
+  transmission: z.string().optional().nullable(),
+  below_fipe: z.coerce.boolean().optional().default(false),
+});
 
-export function sanitizeString(value) {
-  if (value === undefined || value === null) return undefined;
-  const s = String(value).trim();
-  return s.length ? s : undefined;
-}
+export function validateAdIdentifier(value) {
+  const identifier = String(value || "").trim();
 
-export function toBool(value) {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === "boolean") return value;
-
-  const v = String(value).trim().toLowerCase();
-
-  if (["true", "1", "yes", "y"].includes(v)) return true;
-  if (["false", "0", "no", "n"].includes(v)) return false;
-
-  return undefined;
-}
-
-export function normalizeSearchFilters(query = {}) {
-  return {
-    q: sanitizeString(query.q),
-    city_id: toNumber(query.city_id),
-    brand: sanitizeString(query.brand),
-    model: sanitizeString(query.model),
-    min_price: toNumber(query.min_price),
-    max_price: toNumber(query.max_price),
-    year_min: toNumber(query.year_min),
-    year_max: toNumber(query.year_max),
-    body_type: sanitizeString(query.body_type),
-    fuel_type: sanitizeString(query.fuel_type),
-    below_fipe: toBool(query.below_fipe),
-    page: toNumber(query.page) || 1,
-    limit: toNumber(query.limit) || 20,
-  };
-}
-
-export function normalizeFacetFilters(query = {}) {
-  return {
-    city_id: toNumber(query.city_id),
-    brand: sanitizeString(query.brand),
-    model: sanitizeString(query.model),
-  };
-}
-
-export function validateAdIdentifier(identifier) {
-  const normalized = sanitizeString(identifier);
-
-  if (!normalized) {
+  if (!identifier) {
     throw new AppError("Identificador inválido", 400);
   }
 
-  return normalized;
+  return identifier;
 }
 
-export function validateAdId(id) {
-  const normalized = toNumber(id);
+export function validateAdId(value) {
+  const id = Number(value);
 
-  if (!normalized) {
+  if (!Number.isInteger(id) || id <= 0) {
     throw new AppError("ID inválido", 400);
   }
 
-  return normalized;
+  return id;
 }
 
-export function validateCreateAdPayload(body = {}) {
-  const requiredFields = [
-    "title",
-    "price",
-    "city_id",
-    "brand",
-    "model",
-    "year",
-    "mileage",
-    "city",
-    "state",
-  ];
+export function validateCreateAdPayload(payload) {
+  const result = CreateAdSchema.safeParse(payload);
 
-  for (const field of requiredFields) {
-    if (!body[field]) {
-      throw new AppError(`Campo obrigatório: ${field}`, 400);
-    }
+  if (!result.success) {
+    throw new AppError("Payload de anúncio inválido", 400, true, result.error.flatten());
   }
 
-  return {
-    ...body,
-    title: sanitizeString(body.title),
-    price: Number(body.price),
-    city_id: Number(body.city_id),
-    city: sanitizeString(body.city),
-    state: sanitizeString(body.state),
-    brand: sanitizeString(body.brand),
-    model: sanitizeString(body.model),
-    year: Number(body.year),
-    mileage: Number(body.mileage),
-    description: sanitizeString(body.description),
-    category: sanitizeString(body.category),
-    body_type: sanitizeString(body.body_type),
-    fuel_type: sanitizeString(body.fuel_type),
-  };
+  return result.data;
 }
