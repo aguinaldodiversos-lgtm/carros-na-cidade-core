@@ -1,55 +1,30 @@
-import { pool } from "../../infrastructure/database/db.js";
-import { buildAdsSearchQuery } from "./filters/ads-filter.builder.js";
+import db from "../../infrastructure/database/db.js";
 
-export async function searchAds(filters = {}) {
-  const query = buildAdsSearchQuery(filters);
+const UPDATE_FIELDS = [
+  "title",
+  "description",
+  "price",
+  "city_id",
+  "city",
+  "state",
+  "category",
+  "brand",
+  "model",
+  "year",
+  "mileage",
+  "body_type",
+  "fuel_type",
+  "transmission",
+  "below_fipe",
+  "highlight_until",
+  "plan",
+  "status",
+];
 
-  const [dataResult, countResult] = await Promise.all([
-    pool.query(query.dataQuery, query.params),
-    pool.query(query.countQuery, query.countParams),
-  ]);
-
-  return {
-    data: dataResult.rows,
-    total: Number(countResult.rows[0]?.total || 0),
-    page: query.pagination.page,
-    limit: query.pagination.limit,
-  };
-}
-
-export async function findAdByIdentifier(identifier) {
-  const isNumber = !Number.isNaN(Number(identifier));
-
-  const result = await pool.query(
-    isNumber
-      ? `SELECT a.*, c.slug AS city_slug
-         FROM ads a
-         LEFT JOIN cities c ON c.id = a.city_id
-         WHERE a.id = $1 AND a.status = 'active'`
-      : `SELECT a.*, c.slug AS city_slug
-         FROM ads a
-         LEFT JOIN cities c ON c.id = a.city_id
-         WHERE a.slug = $1 AND a.status = 'active'`,
-    [identifier]
-  );
-
-  return result.rows[0] || null;
-}
-
-export async function findAdvertiserByUserId(userId) {
-  const result = await pool.query(
-    `SELECT id, user_id, city_id FROM advertisers WHERE user_id = $1 LIMIT 1`,
-    [userId]
-  );
-
-  return result.rows[0] || null;
-}
-
-export async function insertAd(payload) {
-  const result = await pool.query(
-    `
-    INSERT INTO ads
-    (
+export async function createAd(data) {
+  const query = `
+    INSERT INTO ads (
+      user_id,
       advertiser_id,
       title,
       description,
@@ -64,119 +39,130 @@ export async function insertAd(payload) {
       mileage,
       body_type,
       fuel_type,
+      transmission,
+      below_fipe,
+      status,
       plan,
       slug,
-      status,
       created_at,
       updated_at
     )
-    VALUES
-    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'active',NOW(),NOW())
-    RETURNING *
-    `,
-    [
-      payload.advertiser_id,
-      payload.title,
-      payload.description || null,
-      payload.price,
-      payload.city_id,
-      payload.city,
-      payload.state,
-      payload.category || null,
-      payload.brand,
-      payload.model,
-      payload.year,
-      payload.mileage,
-      payload.body_type || null,
-      payload.fuel_type || null,
-      payload.plan || null,
-      payload.slug,
-    ]
-  );
+    VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),NOW()
+    )
+    RETURNING *;
+  `;
 
-  return result.rows[0];
-}
-
-export async function updateAdById(id, payload) {
-  const allowedFields = [
-    "title",
-    "description",
-    "price",
-    "city_id",
-    "city",
-    "state",
-    "category",
-    "brand",
-    "model",
-    "year",
-    "mileage",
-    "body_type",
-    "fuel_type",
-    "below_fipe",
-    "priority",
-    "highlight_until",
-    "status",
+  const values = [
+    data.user_id || null,
+    data.advertiser_id || null,
+    data.title,
+    data.description || null,
+    data.price,
+    data.city_id,
+    data.city,
+    data.state,
+    data.category || null,
+    data.brand,
+    data.model,
+    data.year,
+    data.mileage ?? 0,
+    data.body_type || null,
+    data.fuel_type || null,
+    data.transmission || null,
+    Boolean(data.below_fipe),
+    data.status || "active",
+    data.plan || "free",
+    data.slug,
   ];
 
-  const entries = Object.entries(payload).filter(
-    ([key, value]) => allowedFields.includes(key) && value !== undefined
-  );
-
-  if (!entries.length) {
-    const current = await pool.query(`SELECT * FROM ads WHERE id = $1 LIMIT 1`, [id]);
-    return current.rows[0] || null;
-  }
-
-  const sets = [];
-  const values = [];
-  let i = 1;
-
-  for (const [key, value] of entries) {
-    sets.push(`${key} = $${i++}`);
-    values.push(value);
-  }
-
-  values.push(id);
-
-  const result = await pool.query(
-    `
-    UPDATE ads
-    SET ${sets.join(", ")}, updated_at = NOW()
-    WHERE id = $${i}
-    RETURNING *
-    `,
-    values
-  );
-
-  return result.rows[0] || null;
+  const { rows } = await db.query(query, values);
+  return rows[0];
 }
 
-export async function softDeleteAdById(id) {
-  const result = await pool.query(
+export async function findById(id) {
+  const { rows } = await db.query(
+    `SELECT * FROM ads WHERE id = $1 AND status != 'deleted'`,
+    [id]
+  );
+
+  return rows[0] || null;
+}
+
+export async function findAdByIdentifier(identifier) {
+  const isNumeric = /^\d+$/.test(String(identifier));
+
+  const { rows } = await db.query(
+    isNumeric
+      ? `SELECT * FROM ads WHERE id = $1 AND status = 'active' LIMIT 1`
+      : `SELECT * FROM ads WHERE slug = $1 AND status = 'active' LIMIT 1`,
+    [identifier]
+  );
+
+  return rows[0] || null;
+}
+
+export async function findOwnerContextById(id) {
+  const { rows } = await db.query(
     `
-    UPDATE ads
-    SET status = 'deleted', updated_at = NOW()
-    WHERE id = $1
-    RETURNING *
+    SELECT
+      a.id,
+      a.user_id,
+      a.advertiser_id,
+      a.status,
+      adv.user_id AS advertiser_user_id
+    FROM ads a
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    WHERE a.id = $1
+    LIMIT 1
     `,
     [id]
   );
 
-  return result.rows[0] || null;
+  return rows[0] || null;
 }
 
-export async function findOwnedAdById(id, userId) {
-  const result = await pool.query(
+export async function updateAd(id, data) {
+  const fields = [];
+  const values = [];
+  let index = 1;
+
+  for (const field of UPDATE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(data, field)) {
+      fields.push(`${field} = $${index++}`);
+      values.push(data[field]);
+    }
+  }
+
+  if (!fields.length) {
+    return findById(id);
+  }
+
+  const query = `
+    UPDATE ads
+    SET ${fields.join(", ")},
+        updated_at = NOW()
+    WHERE id = $${index}
+    RETURNING *;
+  `;
+
+  values.push(id);
+
+  const { rows } = await db.query(query, values);
+  return rows[0] || null;
+}
+
+export async function softDeleteAd(id) {
+  const { rows } = await db.query(
     `
-    SELECT a.*
-    FROM ads a
-    JOIN advertisers adv ON adv.id = a.advertiser_id
-    WHERE a.id = $1
-      AND adv.user_id = $2
-    LIMIT 1
+    UPDATE ads
+    SET status = 'deleted',
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING *;
     `,
-    [id, userId]
+    [id]
   );
 
-  return result.rows[0] || null;
+  return rows[0] || null;
 }
