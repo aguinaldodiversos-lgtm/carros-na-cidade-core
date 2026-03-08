@@ -1,5 +1,3 @@
-// frontend/app/sitemap.xml/route.ts
-
 import { NextResponse } from "next/server";
 import { buildSitemapIndexXml } from "../../lib/seo/sitemap-xml";
 import { detectAvailableStates } from "../../lib/seo/sitemap-client";
@@ -8,8 +6,8 @@ export const revalidate = 3600;
 
 export async function GET() {
   const now = new Date().toISOString();
+  let states = [];
 
-  let states: string[] = [];
   try {
     states = await detectAvailableStates(100000);
   } catch {
