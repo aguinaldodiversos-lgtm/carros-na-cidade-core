@@ -1,184 +1,100 @@
-// src/modules/auth/password.service.js
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { pool } from "../../infrastructure/database/db.js";
-import { logger } from "../../shared/logger.js";
-
-/**
- * Segurança:
- * - Token nunca é salvo em texto puro no banco (hash SHA-256)
- * - Expiração curta e tentativa única
- *
- * Requisitos no DB (tabela sugerida):
- * password_resets (
- *   id SERIAL PK,
- *   user_id INT NOT NULL,
- *   token_hash TEXT NOT NULL,
- *   expires_at TIMESTAMP NOT NULL,
- *   used_at TIMESTAMP NULL,
- *   created_at TIMESTAMP DEFAULT NOW()
- * )
- */
-async function ensurePasswordResetTable(client) {
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS password_resets (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      token_hash TEXT NOT NULL,
-      expires_at TIMESTAMP NOT NULL,
-      used_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-
-  await client.query(`
-    CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id);
-  `);
-
-  await client.query(`
-    CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash);
-  `);
-}
-
-function sha256(input) {
-  return crypto.createHash("sha256").update(String(input)).digest("hex");
-}
-
-function generateToken() {
-  return crypto.randomBytes(32).toString("hex"); // 64 chars
-}
-
-/**
- * Export esperado pelo auth.routes.js:
- * - requestPasswordReset(email)
- * - resetPasswordWithToken({ token, newPassword })
- */
+import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 export async function requestPasswordReset(email) {
-  const safeEmail = String(email || "").trim().toLowerCase();
-  if (!safeEmail) {
-    return { ok: true }; // não vaza existência do usuário
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new AppError("Email inválido", 400);
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await ensurePasswordResetTable(client);
+  const result = await pool.query(
+    `SELECT id, email FROM users WHERE email = $1 LIMIT 1`,
+    [normalizedEmail]
+  );
 
-    const userRes = await client.query(
-      `SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [safeEmail]
-    );
-
-    if (userRes.rowCount === 0) {
-      await client.query("COMMIT");
-      return { ok: true }; // resposta idêntica
-    }
-
-    const user = userRes.rows[0];
-
-    // opcional: invalidar tokens anteriores ainda válidos
-    await client.query(
-      `UPDATE password_resets SET used_at = NOW()
-       WHERE user_id = $1 AND used_at IS NULL AND expires_at > NOW()`,
-      [user.id]
-    );
-
-    const token = generateToken();
-    const tokenHash = sha256(token);
-
-    const expiresMinutes = Number(process.env.PASSWORD_RESET_EXPIRES_MIN || 60);
-    const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000);
-
-    await client.query(
-      `INSERT INTO password_resets (user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [user.id, tokenHash, expiresAt]
-    );
-
-    await client.query("COMMIT");
-
-    // aqui você dispara email (Resend) em outro service/camada.
-    // retornamos token APENAS para ambiente dev/test local se quiser.
-    const exposeToken = String(process.env.EXPOSE_RESET_TOKEN || "false").toLowerCase() === "true";
-
-    logger.info({
-      msg: "Password reset solicitado",
-      userId: user.id,
-      email: user.email,
-      expiresMinutes,
-    });
-
-    return exposeToken ? { ok: true, token } : { ok: true };
-  } catch (err) {
-    await client.query("ROLLBACK");
-    logger.error({ msg: "Erro requestPasswordReset", error: err?.message || String(err) });
-    // resposta segura
-    return { ok: true };
-  } finally {
-    client.release();
+  if (!result.rows.length) {
+    return {
+      success: true,
+      message: "Se o email existir, o processo de recuperação foi iniciado.",
+    };
   }
+
+  const user = result.rows[0];
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
+
+  await pool.query(
+    `
+    UPDATE users
+    SET
+      reset_token = $2,
+      reset_token_expires = $3,
+      updated_at = NOW()
+    WHERE id = $1
+    `,
+    [user.id, token, expiresAt]
+  );
+
+  return {
+    success: true,
+    message: "Token de recuperação gerado com sucesso.",
+    token,
+    expiresAt,
+  };
 }
 
 export async function resetPasswordWithToken({ token, newPassword }) {
-  const rawToken = String(token || "").trim();
-  const pwd = String(newPassword || "");
+  const safeToken = String(token || "").trim();
+  const safePassword = String(newPassword || "").trim();
 
-  if (!rawToken || pwd.length < 6) {
-    return { ok: false, error: "Token ou senha inválidos" };
+  if (!safeToken || !safePassword) {
+    throw new AppError("Token e nova senha são obrigatórios", 400);
   }
 
-  const tokenHash = sha256(rawToken);
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await ensurePasswordResetTable(client);
-
-    const resetRes = await client.query(
-      `SELECT id, user_id, expires_at, used_at
-       FROM password_resets
-       WHERE token_hash = $1
-       LIMIT 1`,
-      [tokenHash]
-    );
-
-    if (resetRes.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return { ok: false, error: "Token inválido ou expirado" };
-    }
-
-    const row = resetRes.rows[0];
-
-    const expired = new Date(row.expires_at).getTime() < Date.now();
-    const used = !!row.used_at;
-
-    if (expired || used) {
-      await client.query("ROLLBACK");
-      return { ok: false, error: "Token inválido ou expirado" };
-    }
-
-    const passwordHash = await bcrypt.hash(pwd, 10);
-
-    await client.query(`UPDATE users SET password = $1 WHERE id = $2`, [
-      passwordHash,
-      row.user_id,
-    ]);
-
-    await client.query(
-      `UPDATE password_resets SET used_at = NOW() WHERE id = $1`,
-      [row.id]
-    );
-
-    await client.query("COMMIT");
-
-    logger.info({ msg: "Senha redefinida com sucesso", userId: row.user_id });
-    return { ok: true };
-  } catch (err) {
-    await client.query("ROLLBACK");
-    logger.error({ msg: "Erro resetPasswordWithToken", error: err?.message || String(err) });
-    return { ok: false, error: "Falha ao redefinir senha" };
-  } finally {
-    client.release();
+  if (safePassword.length < 6) {
+    throw new AppError("A senha deve ter pelo menos 6 caracteres", 400);
   }
+
+  const result = await pool.query(
+    `
+    SELECT id, reset_token_expires
+    FROM users
+    WHERE reset_token = $1
+    LIMIT 1
+    `,
+    [safeToken]
+  );
+
+  if (!result.rows.length) {
+    throw new AppError("Token inválido ou expirado", 400);
+  }
+
+  const user = result.rows[0];
+
+  if (!user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+    throw new AppError("Token inválido ou expirado", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(safePassword, 10);
+
+  await pool.query(
+    `
+    UPDATE users
+    SET
+      password = $2,
+      reset_token = NULL,
+      reset_token_expires = NULL,
+      updated_at = NOW()
+    WHERE id = $1
+    `,
+    [user.id, passwordHash]
+  );
+
+  return {
+    success: true,
+    message: "Senha redefinida com sucesso.",
+  };
 }
