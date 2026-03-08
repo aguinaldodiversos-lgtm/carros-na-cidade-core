@@ -1,5 +1,3 @@
-// frontend/lib/search/territorial-public.ts
-
 import type { AdItem } from "./ads-search";
 
 export interface TerritorialFacetBrand {
@@ -47,52 +45,24 @@ export interface TerritorialCityIdentity {
   region?: string | null;
 }
 
-export interface TerritorialCityStats {
-  [key: string]: number | string | null | undefined;
-}
-
-export interface TerritorialCitySignals {
-  [key: string]: number | string | null | undefined;
-}
-
-export interface TerritorialInternalLinks {
-  city?: string;
-  highlights?: string;
-  opportunities?: string;
-  belowFipe?: string;
-  recent?: string;
-  brands?: Array<{ brand: string; total: number; path: string }>;
-  models?: Array<{ brand?: string; model: string; total: number; path: string }>;
-  brand?: string;
-  model?: string;
-}
-
-export interface TerritorialSections {
-  ads?: AdItem[];
-  recentAds?: AdItem[];
-  highlightAds?: AdItem[];
-  opportunityAds?: AdItem[];
-  belowFipeAds?: AdItem[];
-  models?: TerritorialFacetModel[];
-  relatedModels?: TerritorialFacetModel[];
-  relatedBrands?: TerritorialFacetBrand[];
-}
-
 export interface TerritorialPagePayload {
   city?: TerritorialCityIdentity;
-  brand?: {
-    name?: string;
-    slug?: string;
-  };
-  model?: {
-    name?: string;
-    slug?: string;
-  };
-  stats?: TerritorialCityStats;
-  signals?: TerritorialCitySignals;
+  brand?: { name?: string; slug?: string };
+  model?: { name?: string; slug?: string };
+  stats?: Record<string, number | string | null | undefined>;
+  signals?: Record<string, number | string | null | undefined>;
   seo?: TerritorialSeo;
   filters?: Record<string, unknown>;
-  sections?: TerritorialSections;
+  sections?: {
+    ads?: AdItem[];
+    recentAds?: AdItem[];
+    highlightAds?: AdItem[];
+    opportunityAds?: AdItem[];
+    belowFipeAds?: AdItem[];
+    models?: TerritorialFacetModel[];
+    relatedModels?: TerritorialFacetModel[];
+    relatedBrands?: TerritorialFacetBrand[];
+  };
   pagination?: {
     ads?: TerritorialPagination;
     recentAds?: TerritorialPagination;
@@ -106,7 +76,15 @@ export interface TerritorialPagePayload {
     fuelTypes?: TerritorialFacetFuelType[];
     bodyTypes?: TerritorialFacetBodyType[];
   };
-  internalLinks?: TerritorialInternalLinks;
+  internalLinks?: {
+    city?: string;
+    highlights?: string;
+    opportunities?: string;
+    belowFipe?: string;
+    recent?: string;
+    brands?: Array<{ brand: string; total: number; path: string }>;
+    models?: Array<{ brand?: string; model: string; total: number; path: string }>;
+  };
   generatedAt?: string;
 }
 
@@ -114,6 +92,11 @@ export interface TerritorialApiResponse {
   success: boolean;
   data: TerritorialPagePayload;
 }
+
+type QueryInput =
+  | URLSearchParams
+  | Record<string, string | string[] | undefined>
+  | { toString(): string };
 
 function getApiBaseUrl(): string {
   return (
@@ -123,35 +106,32 @@ function getApiBaseUrl(): string {
   );
 }
 
-function toQueryString(
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams
-) {
+function toQueryString(searchParams?: QueryInput) {
   if (!searchParams) return "";
 
   if (searchParams instanceof URLSearchParams) {
     return searchParams.toString();
   }
 
+  if (typeof searchParams.toString === "function" && !("q" in searchParams)) {
+    return searchParams.toString();
+  }
+
   const params = new URLSearchParams();
 
-  for (const [key, value] of Object.entries(searchParams)) {
+  for (const [key, value] of Object.entries(
+    searchParams as Record<string, string | string[] | undefined>
+  )) {
     if (value === undefined) continue;
 
     if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item !== undefined && item !== null && item !== "") {
-          params.append(key, item);
-        }
-      }
+      value.forEach((item) => {
+        if (item) params.append(key, item);
+      });
       continue;
     }
 
-    if (value !== "") {
-      params.set(key, value);
-    }
+    if (value) params.set(key, value);
   }
 
   return params.toString();
@@ -159,10 +139,7 @@ function toQueryString(
 
 async function requestTerritorialPage(
   path: string,
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams,
+  searchParams?: QueryInput,
   init?: RequestInit
 ): Promise<TerritorialPagePayload> {
   const apiBase = getApiBaseUrl();
@@ -193,10 +170,7 @@ async function requestTerritorialPage(
 
 export async function fetchCityTerritorialPage(
   slug: string,
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams,
+  searchParams?: QueryInput,
   init?: RequestInit
 ) {
   return requestTerritorialPage(`/api/public/cities/${slug}`, searchParams, init);
@@ -205,10 +179,7 @@ export async function fetchCityTerritorialPage(
 export async function fetchCityBrandTerritorialPage(
   slug: string,
   brand: string,
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams,
+  searchParams?: QueryInput,
   init?: RequestInit
 ) {
   return requestTerritorialPage(
@@ -222,10 +193,7 @@ export async function fetchCityModelTerritorialPage(
   slug: string,
   brand: string,
   model: string,
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams,
+  searchParams?: QueryInput,
   init?: RequestInit
 ) {
   return requestTerritorialPage(
@@ -237,10 +205,7 @@ export async function fetchCityModelTerritorialPage(
 
 export async function fetchCityOpportunitiesTerritorialPage(
   slug: string,
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams,
+  searchParams?: QueryInput,
   init?: RequestInit
 ) {
   return requestTerritorialPage(
@@ -252,10 +217,7 @@ export async function fetchCityOpportunitiesTerritorialPage(
 
 export async function fetchCityBelowFipeTerritorialPage(
   slug: string,
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | URLSearchParams
-    | ReadonlyURLSearchParams,
+  searchParams?: QueryInput,
   init?: RequestInit
 ) {
   return requestTerritorialPage(
