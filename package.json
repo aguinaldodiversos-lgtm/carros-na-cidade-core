@@ -5,11 +5,14 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
+   "start": "node src/index.js",
     "dev": "node src/index.js",
     "workers": "node src/workers/bootstrap.js",
     "lint": "echo \"No lint configured\"",
-    "test": "echo \"No tests configured\""
+    "test": "echo \"No tests configured\"",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:prod": "node scripts/smoke.mjs",
+    "smoke:local": "node scripts/smoke.mjs"
   },
   "engines": {
     "node": ">=20 <21"
