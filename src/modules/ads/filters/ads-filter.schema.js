@@ -74,7 +74,7 @@ const boolParam = () =>
     if (["false", "0", "no", "n", "off", "nao", "não"].includes(s))
       return false;
 
-    return v; // força falha de validação (z.boolean)
+    return v; // força falha (z.boolean)
   }, z.boolean());
 
 const sortParam = () =>
@@ -91,68 +91,73 @@ const sortParam = () =>
     .default(ADS_DEFAULTS.sort);
 
 /* =========================================================
-   Schema principal (query)
+   Base object (ZodObject) — serve para .pick() / .shape
 ========================================================= */
 
-export const adsFilterQuerySchema = z
-  .object({
-    // paginação
-    page: intParam(ADS_FILTER_LIMITS.PAGE_MIN, ADS_FILTER_LIMITS.PAGE_MAX).default(
-      ADS_DEFAULTS.page
-    ),
-    limit: intParam(
-      ADS_FILTER_LIMITS.LIMIT_MIN,
-      ADS_FILTER_LIMITS.LIMIT_MAX
-    ).default(ADS_DEFAULTS.limit),
-    sort: sortParam(),
+const adsFilterQueryBase = z.object({
+  // paginação
+  page: intParam(ADS_FILTER_LIMITS.PAGE_MIN, ADS_FILTER_LIMITS.PAGE_MAX).default(
+    ADS_DEFAULTS.page
+  ),
+  limit: intParam(
+    ADS_FILTER_LIMITS.LIMIT_MIN,
+    ADS_FILTER_LIMITS.LIMIT_MAX
+  ).default(ADS_DEFAULTS.limit),
+  sort: sortParam(),
 
-    // busca livre
-    q: optionalTrimmedString(
-      ADS_FILTER_LIMITS.QUERY_MIN_LENGTH,
-      ADS_FILTER_LIMITS.QUERY_MAX_LENGTH
-    ),
+  // busca livre
+  q: optionalTrimmedString(
+    ADS_FILTER_LIMITS.QUERY_MIN_LENGTH,
+    ADS_FILTER_LIMITS.QUERY_MAX_LENGTH
+  ),
 
-    // território
-    city: optionalTrimmedStringMax(ADS_FILTER_LIMITS.CITY_MAX_LENGTH),
-    state: z
-      .preprocess(
-        emptyToUndef,
-        z
-          .string()
-          .trim()
-          .length(ADS_FILTER_LIMITS.STATE_LENGTH, { message: "UF inválida." })
-          .transform((v) => v.toUpperCase())
-      )
-      .optional(),
+  // território
+  city: optionalTrimmedStringMax(ADS_FILTER_LIMITS.CITY_MAX_LENGTH),
+  state: z
+    .preprocess(
+      emptyToUndef,
+      z
+        .string()
+        .trim()
+        .length(ADS_FILTER_LIMITS.STATE_LENGTH, { message: "UF inválida." })
+        .transform((v) => v.toUpperCase())
+    )
+    .optional(),
 
-    // veículo
-    brand: optionalTrimmedStringMax(ADS_FILTER_LIMITS.BRAND_MAX_LENGTH),
-    model: optionalTrimmedStringMax(ADS_FILTER_LIMITS.MODEL_MAX_LENGTH),
-    body_type: optionalTrimmedStringMax(ADS_FILTER_LIMITS.BODY_TYPE_MAX_LENGTH),
-    fuel_type: optionalTrimmedStringMax(ADS_FILTER_LIMITS.FUEL_TYPE_MAX_LENGTH),
-    transmission: optionalTrimmedStringMax(ADS_FILTER_LIMITS.TRANSMISSION_MAX_LENGTH),
+  // veículo
+  brand: optionalTrimmedStringMax(ADS_FILTER_LIMITS.BRAND_MAX_LENGTH),
+  model: optionalTrimmedStringMax(ADS_FILTER_LIMITS.MODEL_MAX_LENGTH),
+  body_type: optionalTrimmedStringMax(ADS_FILTER_LIMITS.BODY_TYPE_MAX_LENGTH),
+  fuel_type: optionalTrimmedStringMax(ADS_FILTER_LIMITS.FUEL_TYPE_MAX_LENGTH),
+  transmission: optionalTrimmedStringMax(ADS_FILTER_LIMITS.TRANSMISSION_MAX_LENGTH),
 
-    // ranges
-    year_min: intParam(ADS_FILTER_LIMITS.YEAR_MIN, ADS_FILTER_LIMITS.YEAR_MAX).optional(),
-    year_max: intParam(ADS_FILTER_LIMITS.YEAR_MIN, ADS_FILTER_LIMITS.YEAR_MAX).optional(),
+  // ranges
+  year_min: intParam(ADS_FILTER_LIMITS.YEAR_MIN, ADS_FILTER_LIMITS.YEAR_MAX).optional(),
+  year_max: intParam(ADS_FILTER_LIMITS.YEAR_MIN, ADS_FILTER_LIMITS.YEAR_MAX).optional(),
 
-    price_min: numberParam(ADS_FILTER_LIMITS.PRICE_MIN, ADS_FILTER_LIMITS.PRICE_MAX).optional(),
-    price_max: numberParam(ADS_FILTER_LIMITS.PRICE_MIN, ADS_FILTER_LIMITS.PRICE_MAX).optional(),
+  price_min: numberParam(ADS_FILTER_LIMITS.PRICE_MIN, ADS_FILTER_LIMITS.PRICE_MAX).optional(),
+  price_max: numberParam(ADS_FILTER_LIMITS.PRICE_MIN, ADS_FILTER_LIMITS.PRICE_MAX).optional(),
 
-    mileage_min: intParam(
-      ADS_FILTER_LIMITS.MILEAGE_MIN,
-      ADS_FILTER_LIMITS.MILEAGE_MAX
-    ).optional(),
-    mileage_max: intParam(
-      ADS_FILTER_LIMITS.MILEAGE_MIN,
-      ADS_FILTER_LIMITS.MILEAGE_MAX
-    ).optional(),
+  mileage_min: intParam(
+    ADS_FILTER_LIMITS.MILEAGE_MIN,
+    ADS_FILTER_LIMITS.MILEAGE_MAX
+  ).optional(),
+  mileage_max: intParam(
+    ADS_FILTER_LIMITS.MILEAGE_MIN,
+    ADS_FILTER_LIMITS.MILEAGE_MAX
+  ).optional(),
 
-    // flags
-    below_fipe: boolParam().optional(),
-    highlight: boolParam().optional(),
-  })
-  .passthrough() // tolera parâmetros extras no querystring (não quebra)
+  // flags
+  below_fipe: boolParam().optional(),
+  highlight: boolParam().optional(),
+});
+
+/* =========================================================
+   Schema principal (query) — ZodEffects (por causa do superRefine)
+========================================================= */
+
+export const adsFilterQuerySchema = adsFilterQueryBase
+  .passthrough() // tolera parâmetros extras no querystring
   .superRefine((d, ctx) => {
     if (d.year_min !== undefined && d.year_max !== undefined && d.year_min > d.year_max) {
       ctx.addIssue({
@@ -185,33 +190,32 @@ export const adsFilterQuerySchema = z
 
 /* =========================================================
    Facet schema (compat com parser antigo)
-   - subset seguro do schema principal
-   - passthrough para não quebrar se vier page/limit/sort etc.
+   - usa o BASE (ZodObject), não o Effects
 ========================================================= */
 
-export const AdsFacetFilterSchema = z
-  .object({
-    q: adsFilterQuerySchema.shape.q,
-    city: adsFilterQuerySchema.shape.city,
-    state: adsFilterQuerySchema.shape.state,
-    brand: adsFilterQuerySchema.shape.brand,
-    model: adsFilterQuerySchema.shape.model,
-    body_type: adsFilterQuerySchema.shape.body_type,
-    fuel_type: adsFilterQuerySchema.shape.fuel_type,
-    transmission: adsFilterQuerySchema.shape.transmission,
-    year_min: adsFilterQuerySchema.shape.year_min,
-    year_max: adsFilterQuerySchema.shape.year_max,
-    price_min: adsFilterQuerySchema.shape.price_min,
-    price_max: adsFilterQuerySchema.shape.price_max,
-    mileage_min: adsFilterQuerySchema.shape.mileage_min,
-    mileage_max: adsFilterQuerySchema.shape.mileage_max,
-    below_fipe: adsFilterQuerySchema.shape.below_fipe,
-    highlight: adsFilterQuerySchema.shape.highlight,
+export const AdsFacetFilterSchema = adsFilterQueryBase
+  .pick({
+    q: true,
+    city: true,
+    state: true,
+    brand: true,
+    model: true,
+    body_type: true,
+    fuel_type: true,
+    transmission: true,
+    year_min: true,
+    year_max: true,
+    price_min: true,
+    price_max: true,
+    mileage_min: true,
+    mileage_max: true,
+    below_fipe: true,
+    highlight: true,
   })
   .passthrough();
 
 /* =========================================================
-   Compat exports (nomes antigos/novos usados em outros arquivos)
+   Compat exports (nomes usados em outros arquivos)
 ========================================================= */
 
 export const AdsFilterQuerySchema = adsFilterQuerySchema; // compat
@@ -220,7 +224,7 @@ export const adsFilterSchema = adsFilterQuerySchema; // compat
 
 /**
  * Parse + aplica "scope force"
- * - scope vem do código (ex: rota territorial), não do querystring.
+ * - scope vem do código (ex: rota territorial)
  */
 export function parseAdsFilterQuery(rawQuery, scope = "public_global") {
   const parsed = adsFilterQuerySchema.parse(rawQuery);
