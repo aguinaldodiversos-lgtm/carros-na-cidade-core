@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { cache } from "react";
-import { TerritorialResultsPageClient } from "../../../../../../../components/search/TerritorialResultsPageClient";
-import { TerritorialSeoJsonLd } from "../../../../../../../components/seo/TerritorialSeoJsonLd";
-import { fetchCityModelTerritorialPage } from "../../../../../../../lib/search/territorial-public";
-import { buildTerritorialMetadata } from "../../../../../../../lib/seo/territorial-seo";
+import { TerritorialResultsPageClient } from "@/components/search/TerritorialResultsPageClient";
+import { TerritorialSeoJsonLd } from "@/components/seo/TerritorialSeoJsonLd";
+import { fetchCityModelTerritorialPage } from "@/lib/search/territorial-public";
+import { buildTerritorialMetadata } from "@/lib/seo/territorial-seo";
 
 interface CityModelPageProps {
-  params: Promise<{ slug: string; brand: string; model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  params: { slug: string; brand: string; model: string };
+  searchParams: Record<string, string | string[] | undefined>;
 }
 
 const getCityModelPageData = cache(
@@ -16,22 +16,18 @@ const getCityModelPageData = cache(
     brand: string,
     model: string,
     searchParams: Record<string, string | string[] | undefined>
-  ) => {
-    return fetchCityModelTerritorialPage(slug, brand, model, searchParams);
-  }
+  ) => fetchCityModelTerritorialPage(slug, brand, model, searchParams)
 );
 
 export async function generateMetadata({
   params,
   searchParams,
 }: CityModelPageProps): Promise<Metadata> {
-  const { slug, brand, model } = await params;
-  const resolvedSearchParams = await searchParams;
   const data = await getCityModelPageData(
-    slug,
-    brand,
-    model,
-    resolvedSearchParams
+    params.slug,
+    params.brand,
+    params.model,
+    searchParams
   );
 
   return buildTerritorialMetadata(data, "model");
@@ -41,14 +37,11 @@ export default async function CityModelPage({
   params,
   searchParams,
 }: CityModelPageProps) {
-  const { slug, brand, model } = await params;
-  const resolvedSearchParams = await searchParams;
-
   const initialData = await getCityModelPageData(
-    slug,
-    brand,
-    model,
-    resolvedSearchParams
+    params.slug,
+    params.brand,
+    params.model,
+    searchParams
   );
 
   return (
@@ -56,9 +49,9 @@ export default async function CityModelPage({
       <TerritorialSeoJsonLd data={initialData} mode="model" />
       <TerritorialResultsPageClient
         mode="model"
-        slug={slug}
-        brand={brand}
-        model={model}
+        slug={params.slug}
+        brand={params.brand}
+        model={params.model}
         initialData={initialData}
       />
     </>
