@@ -1,6 +1,8 @@
-// frontend/lib/search/ads-search-url.ts
-
 import type { AdsSearchFilters } from "./ads-search";
+
+type SearchParamsReader = {
+  get(name: string): string | null;
+};
 
 function toNumber(value: string | null): number | undefined {
   if (!value) return undefined;
@@ -10,6 +12,7 @@ function toNumber(value: string | null): number | undefined {
 
 function toBoolean(value: string | null): boolean | undefined {
   if (!value) return undefined;
+
   const normalized = value.trim().toLowerCase();
 
   if (["true", "1", "yes", "y", "sim"].includes(normalized)) return true;
@@ -25,7 +28,7 @@ function toStringOrUndefined(value: string | null): string | undefined {
 }
 
 export function parseAdsSearchFiltersFromSearchParams(
-  searchParams: URLSearchParams | ReadonlyURLSearchParams
+  searchParams: SearchParamsReader
 ): AdsSearchFilters {
   return {
     q: toStringOrUndefined(searchParams.get("q")),
@@ -62,7 +65,11 @@ export function mergeSearchFilters(
 
   Object.keys(merged).forEach((key) => {
     const typedKey = key as keyof AdsSearchFilters;
-    if (merged[typedKey] === undefined || merged[typedKey] === null || merged[typedKey] === "") {
+    if (
+      merged[typedKey] === undefined ||
+      merged[typedKey] === null ||
+      merged[typedKey] === ""
+    ) {
       delete merged[typedKey];
     }
   });
