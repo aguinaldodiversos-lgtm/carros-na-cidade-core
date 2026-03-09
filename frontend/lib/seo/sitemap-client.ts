@@ -16,30 +16,41 @@ interface PublicSitemapResponse {
   data: PublicSitemapEntry[];
 }
 
-function getApiBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
-    process.env.API_URL?.replace(/\/+$/, "") ||
-    "http://localhost:4000"
-  );
+function stripTrailingSlash(url: string) {
+  return url.replace(/\/+$/, "");
 }
 
-async function fetchJson<T>(url: string, revalidateSeconds = 3600): Promise<T> {
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    next: {
-      revalidate: revalidateSeconds,
-    },
-  });
+function getApiBaseUrl(): string {
+  // prioridade: API_URL (server) > NEXT_PUBLIC_API_URL (client) > vazio
+  const api =
+    process.env.API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    "";
 
-  if (!response.ok) {
-    throw new Error(`Sitemap API failed: ${response.status}`);
+  return api ? stripTrailingSlash(api) : "";
+}
+
+async function fetchJsonSafe<T>(
+  url: string,
+  revalidateSeconds = 3600,
+  timeoutMs = 8000
+): Promise<T | null> {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      next: { revalidate: revalidateSeconds },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(t));
+
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
   }
-
-  return response.json() as Promise<T>;
 }
 
 function normalizeEntry(entry: PublicSitemapEntry): PublicSitemapEntry {
@@ -66,7 +77,6 @@ function dedupeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {
     if (!entry.loc) continue;
 
     const current = map.get(entry.loc);
-
     if (!current) {
       map.set(entry.loc, entry);
       continue;
@@ -75,27 +85,22 @@ function dedupeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {
     const currentPriority = Number(current.priority || 0);
     const nextPriority = Number(entry.priority || 0);
 
-    if (nextPriority >= currentPriority) {
-      map.set(entry.loc, entry);
-    }
+    if (nextPriority >= currentPriority) map.set(entry.loc, entry);
   }
 
   return [...map.values()];
 }
 
-export async function fetchPublicSitemap(
-  limit = 50000
-): Promise<PublicSitemapEntry[]> {
+export async function fetchPublicSitemap(limit = 50000): Promise<PublicSitemapEntry[]> {
   const apiBase = getApiBaseUrl();
-  const json = await fetchJson<PublicSitemapResponse>(
+  if (!apiBase) return []; // não força localhost em build
+
+  const json = await fetchJsonSafe<PublicSitemapResponse>(
     `${apiBase}/api/public/seo/sitemap?limit=${limit}`,
     3600
   );
 
-  if (!json.success || !Array.isArray(json.data)) {
-    return [];
-  }
-
+  if (!json?.success || !Array.isArray(json.data)) return [];
   return dedupeEntries(json.data.map(normalizeEntry));
 }
 
@@ -104,15 +109,14 @@ export async function fetchPublicSitemapByType(
   limit = 50000
 ): Promise<PublicSitemapEntry[]> {
   const apiBase = getApiBaseUrl();
-  const json = await fetchJson<PublicSitemapResponse>(
+  if (!apiBase) return [];
+
+  const json = await fetchJsonSafe<PublicSitemapResponse>(
     `${apiBase}/api/public/seo/sitemap/type/${encodeURIComponent(type)}?limit=${limit}`,
     3600
   );
 
-  if (!json.success || !Array.isArray(json.data)) {
-    return [];
-  }
-
+  if (!json?.success || !Array.isArray(json.data)) return [];
   return dedupeEntries(json.data.map(normalizeEntry));
 }
 
@@ -121,15 +125,14 @@ export async function fetchPublicSitemapByRegion(
   limit = 50000
 ): Promise<PublicSitemapEntry[]> {
   const apiBase = getApiBaseUrl();
-  const json = await fetchJson<PublicSitemapResponse>(
+  if (!apiBase) return [];
+
+  const json = await fetchJsonSafe<PublicSitemapResponse>(
     `${apiBase}/api/public/seo/sitemap/region/${encodeURIComponent(state)}?limit=${limit}`,
     3600
   );
 
-  if (!json.success || !Array.isArray(json.data)) {
-    return [];
-  }
-
+  if (!json?.success || !Array.isArray(json.data)) return [];
   return dedupeEntries(json.data.map(normalizeEntry));
 }
 
@@ -137,23 +140,16 @@ export async function fetchPublicSitemapByTypes(
   types: string[],
   limit = 50000
 ): Promise<PublicSitemapEntry[]> {
-  const results = await Promise.all(
-    types.map((type) => fetchPublicSitemapByType(type, limit))
-  );
-
+  const results = await Promise.all(types.map((t) => fetchPublicSitemapByType(t, limit)));
   return dedupeEntries(results.flat());
 }
 
-export async function detectAvailableStates(
-  limit = 100000
-): Promise<string[]> {
+export async function detectAvailableStates(limit = 100000): Promise<string[]> {
   const entries = await fetchPublicSitemap(limit);
   const states = new Set<string>();
 
   for (const entry of entries) {
-    if (entry.state) {
-      states.add(String(entry.state).trim().toUpperCase());
-    }
+    if (entry.state) states.add(String(entry.state).trim().toUpperCase());
   }
 
   return [...states].sort((a, b) => a.localeCompare(b));
