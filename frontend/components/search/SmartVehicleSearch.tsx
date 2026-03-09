@@ -1,18 +1,19 @@
 // frontend/components/search/SmartVehicleSearch.tsx
-
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useSemanticAutocomplete } from "../../hooks/useSemanticAutocomplete";
 import { buildSearchUrl } from "../../lib/search/build-search-url";
-import { FlatAutocompleteSuggestion } from "../../lib/search/semantic-autocomplete";
+import type { FlatAutocompleteSuggestion } from "../../lib/search/semantic-autocomplete";
 
 export interface SmartVehicleSearchProps {
   placeholder?: string;
   resultsBasePath?: string;
   currentCitySlug?: string | null;
   className?: string;
+  minLength?: number;
 }
 
 function getSuggestionIcon(type: FlatAutocompleteSuggestion["type"]) {
@@ -29,11 +30,19 @@ function getSuggestionIcon(type: FlatAutocompleteSuggestion["type"]) {
   }
 }
 
+function clampIndex(index: number, len: number) {
+  if (len <= 0) return -1;
+  if (index < 0) return 0;
+  if (index > len - 1) return len - 1;
+  return index;
+}
+
 export function SmartVehicleSearch({
   placeholder = "Digite marca, modelo, cidade ou o que você procura",
   resultsBasePath = "/anuncios",
   currentCitySlug = null,
   className = "",
+  minLength = 2,
 }: SmartVehicleSearchProps) {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -55,95 +64,29 @@ export function SmartVehicleSearch({
     currentCitySlug,
     limit: 8,
     debounceMs: 220,
-    minLength: 2,
+    minLength,
   });
+
+  const queryTrimmed = useMemo(() => String(query || "").trim(), [query]);
 
   const applicableFilters = useMemo(
     () => semanticData?.semantic?.applicableFilters || {},
     [semanticData]
   );
 
-  function goToSearch(rawQuery: string) {
-    const url = buildSearchUrl({
-      basePath: resultsBasePath,
-      q: rawQuery,
-      filters: applicableFilters,
-    });
-
-    router.push(url);
-    close();
-  }
-
-  function handleSuggestionSelect(suggestion: FlatAutocompleteSuggestion) {
-    if (suggestion.path) {
-      router.push(suggestion.path);
-      close();
+  // Mantém o índice sempre válido quando a lista muda (evita "index fora do range")
+  useEffect(() => {
+    if (!isOpen) return;
+    const len = flatSuggestions.length;
+    if (len === 0) {
+      if (activeIndex !== -1) setActiveIndex(-1);
       return;
     }
+    const next = clampIndex(activeIndex, len);
+    if (next !== activeIndex) setActiveIndex(next);
+  }, [isOpen, flatSuggestions.length, activeIndex, setActiveIndex]);
 
-    const mergedFilters = {
-      ...applicableFilters,
-      ...(suggestion.brand ? { brand: suggestion.brand } : {}),
-      ...(suggestion.model ? { model: suggestion.model } : {}),
-      ...(suggestion.slug ? { city_slug: suggestion.slug } : {}),
-      ...(suggestion.city ? { city: suggestion.city } : {}),
-    };
-
-    const url = buildSearchUrl({
-      basePath: resultsBasePath,
-      q: query,
-      filters: mergedFilters,
-    });
-
-    router.push(url);
-    close();
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const activeSuggestion =
-      activeIndex >= 0 ? flatSuggestions[activeIndex] : null;
-
-    if (activeSuggestion) {
-      handleSuggestionSelect(activeSuggestion);
-      return;
-    }
-
-    goToSearch(query);
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (!isOpen || !flatSuggestions.length) {
-      if (event.key === "ArrowDown" && query.trim().length >= 2) {
-        open();
-      }
-      return;
-    }
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveIndex((prev) =>
-        prev >= flatSuggestions.length - 1 ? 0 : prev + 1
-      );
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex((prev) =>
-        prev <= 0 ? flatSuggestions.length - 1 : prev - 1
-      );
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-      return;
-    }
-  }
-
+  // Fecha ao clicar fora (robusto em desktop/mobile)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (!wrapperRef.current) return;
@@ -155,9 +98,132 @@ export function SmartVehicleSearch({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [close]);
 
+  const goToSearch = useCallback(
+    (rawQuery: string) => {
+      const url = buildSearchUrl({
+        basePath: resultsBasePath,
+        q: rawQuery,
+        filters: applicableFilters,
+      });
+
+      router.push(url);
+      close();
+    },
+    [router, close, resultsBasePath, applicableFilters]
+  );
+
+  const handleSuggestionSelect = useCallback(
+    (suggestion: FlatAutocompleteSuggestion) => {
+      if (suggestion.path) {
+        router.push(suggestion.path);
+        close();
+        return;
+      }
+
+      const mergedFilters = {
+        ...applicableFilters,
+        ...(suggestion.brand ? { brand: suggestion.brand } : {}),
+        ...(suggestion.model ? { model: suggestion.model } : {}),
+        ...(suggestion.slug ? { city_slug: suggestion.slug } : {}),
+        ...(suggestion.city ? { city: suggestion.city } : {}),
+      };
+
+      const url = buildSearchUrl({
+        basePath: resultsBasePath,
+        q: queryTrimmed,
+        filters: mergedFilters,
+      });
+
+      router.push(url);
+      close();
+    },
+    [router, close, resultsBasePath, applicableFilters, queryTrimmed]
+  );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      const activeSuggestion =
+        activeIndex >= 0 ? flatSuggestions[activeIndex] : null;
+
+      if (activeSuggestion) {
+        handleSuggestionSelect(activeSuggestion);
+        return;
+      }
+
+      goToSearch(queryTrimmed);
+    },
+    [
+      activeIndex,
+      flatSuggestions,
+      handleSuggestionSelect,
+      goToSearch,
+      queryTrimmed,
+    ]
+  );
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      const len = flatSuggestions.length;
+
+      // abre ao navegar se já tem texto mínimo
+      if (!isOpen || len === 0) {
+        if (event.key === "ArrowDown" && queryTrimmed.length >= minLength) {
+          event.preventDefault();
+          open();
+          // quando abrir, começa sem item selecionado
+          setActiveIndex(-1);
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          close();
+        }
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        // NOTE: setter pode não aceitar callback, então calcula com valor atual
+        const next =
+          activeIndex >= len - 1 ? 0 : Math.max(activeIndex, -1) + 1;
+        setActiveIndex(next);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const next =
+          activeIndex <= 0 ? len - 1 : Math.max(activeIndex, 0) - 1;
+        setActiveIndex(next);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+
+      // Enter já é tratado pelo submit do form.
+    },
+    [
+      activeIndex,
+      close,
+      flatSuggestions.length,
+      isOpen,
+      minLength,
+      open,
+      queryTrimmed,
+      setActiveIndex,
+    ]
+  );
+
+  const shouldShowDropdown = isOpen && queryTrimmed.length >= minLength;
+
   return (
     <div ref={wrapperRef} className={`relative w-full ${className}`}>
-      <form onSubmit={handleSubmit} className="w-full">
+      <form onSubmit={handleSubmit} className="w-full" role="search">
         <div className="flex w-full items-center rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <input
             ref={inputRef}
@@ -165,16 +231,22 @@ export function SmartVehicleSearch({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
+              // abre automaticamente quando o usuário digita
               setIsOpen(true);
+              // reseta seleção ao digitar (evita selecionar sugestão errada)
+              setActiveIndex(-1);
             }}
             onFocus={() => {
-              if (query.trim().length >= 2) open();
+              if (queryTrimmed.length >= minLength) open();
             }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className="h-14 w-full rounded-l-2xl border-0 px-5 text-base outline-none"
             autoComplete="off"
             spellCheck={false}
+            aria-expanded={shouldShowDropdown}
+            aria-controls="smart-vehicle-search-listbox"
+            aria-autocomplete="list"
           />
 
           <button
@@ -186,7 +258,7 @@ export function SmartVehicleSearch({
         </div>
       </form>
 
-      {isOpen && query.trim().length >= 2 && (
+      {shouldShowDropdown && (
         <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl">
           {isLoading && (
             <div className="px-4 py-4 text-sm text-zinc-500">
@@ -257,12 +329,20 @@ export function SmartVehicleSearch({
                 </div>
               )}
 
-              <ul className="max-h-[420px] overflow-y-auto py-2">
+              <ul
+                id="smart-vehicle-search-listbox"
+                className="max-h-[420px] overflow-y-auto py-2"
+                role="listbox"
+              >
                 {flatSuggestions.map((suggestion, index) => {
                   const isActive = index === activeIndex;
 
                   return (
-                    <li key={`${suggestion.type}-${suggestion.label}-${index}`}>
+                    <li
+                      key={`${suggestion.type}-${suggestion.label}-${index}`}
+                      role="option"
+                      aria-selected={isActive}
+                    >
                       <button
                         type="button"
                         onMouseEnter={() => setActiveIndex(index)}
@@ -284,8 +364,11 @@ export function SmartVehicleSearch({
                             {suggestion.type === "brand" && "Marca"}
                             {suggestion.type === "model" && "Modelo"}
                             {suggestion.type === "city" && "Cidade"}
-                            {suggestion.type === "composed" && "Sugestão inteligente"}
-                            {suggestion.total > 0 ? ` • ${suggestion.total} anúncios` : ""}
+                            {suggestion.type === "composed" &&
+                              "Sugestão inteligente"}
+                            {suggestion.total > 0
+                              ? ` • ${suggestion.total} anúncios`
+                              : ""}
                           </span>
                         </span>
                       </button>
