@@ -4,13 +4,14 @@ import { NextResponse } from "next/server";
 import { buildSitemapXml } from "../../../../lib/seo/sitemap-xml";
 import { fetchPublicSitemapByRegion } from "../../../../lib/seo/sitemap-client";
 
+// ✅ força runtime (não tenta “pré-gerar” isso no build/export)
+export const dynamic = "force-dynamic";
 export const revalidate = 3600; // 1h
 
-type RouteContext = {
-  params: { state: string };
+type Ctx = {
+  params?: { state?: string };
 };
 
-// Pequeno helper para retornar XML sempre (inclusive em erro)
 function xmlResponse(xml: string, status = 200) {
   return new NextResponse(xml, {
     status,
@@ -21,23 +22,20 @@ function xmlResponse(xml: string, status = 200) {
   });
 }
 
-export async function GET(_req: Request, ctx: RouteContext) {
+export async function GET(_req: Request, ctx: Ctx) {
   const stateRaw = ctx?.params?.state ?? "";
   const normalizedState = String(stateRaw).trim().toUpperCase();
 
-  // Se vier inválido, não explode build/prerender: responde um sitemap vazio (200)
-  // (evita o erro: "Cannot destructure property 'state' ... undefined")
+  // Se vier inválido/não informado, devolve sitemap vazio (não explode)
   if (!normalizedState || normalizedState.length !== 2) {
-    return xmlResponse(buildSitemapXml([]));
+    return xmlResponse(buildSitemapXml([]), 200);
   }
 
   try {
     const entries = await fetchPublicSitemapByRegion(normalizedState, 50000);
-    const xml = buildSitemapXml(entries);
-    return xmlResponse(xml, 200);
+    return xmlResponse(buildSitemapXml(entries), 200);
   } catch {
-    // Falha de fetch (ex: API offline durante build) → não quebra build
-    // Retornamos sitemap vazio (200) para manter o deploy saudável.
+    // Se API cair durante request/build, não derruba o deploy
     return xmlResponse(buildSitemapXml([]), 200);
   }
 }
