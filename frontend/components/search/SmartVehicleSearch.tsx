@@ -32,9 +32,27 @@ function getSuggestionIcon(type: FlatAutocompleteSuggestion["type"]) {
 
 function clampIndex(index: number, len: number) {
   if (len <= 0) return -1;
-  if (index < 0) return 0;
+  if (index < -1) return -1;
   if (index > len - 1) return len - 1;
   return index;
+}
+
+function wrapDown(current: number, len: number) {
+  if (len <= 0) return -1;
+  // -1 -> 0
+  if (current < 0) return 0;
+  // last -> 0
+  if (current >= len - 1) return 0;
+  return current + 1;
+}
+
+function wrapUp(current: number, len: number) {
+  if (len <= 0) return -1;
+  // -1 -> last
+  if (current < 0) return len - 1;
+  // 0 -> last
+  if (current <= 0) return len - 1;
+  return current - 1;
 }
 
 export function SmartVehicleSearch({
@@ -55,7 +73,7 @@ export function SmartVehicleSearch({
     setIsOpen,
     isLoading,
     activeIndex,
-    setActiveIndex, // IMPORTANT: tratado como setter que recebe number (sem callback)
+    setActiveIndex, // IMPORTANT: setter recebe number (sem callback)
     semanticData,
     flatSuggestions,
     close,
@@ -74,17 +92,27 @@ export function SmartVehicleSearch({
     [semanticData]
   );
 
-  // Mantém o índice sempre válido quando a lista muda (evita "index fora do range")
+  const recognized = semanticData?.semantic?.recognized;
+  const hasRecognized =
+    !!recognized?.brand ||
+    !!recognized?.model ||
+    !!recognized?.city ||
+    !!recognized?.priceRange ||
+    recognized?.belowFipe === true;
+
+  const shouldShowDropdown = isOpen && queryTrimmed.length >= minLength;
+  const suggestionsLen = flatSuggestions.length;
+
+  // Mantém activeIndex válido quando a lista muda (evita index fora do range)
   useEffect(() => {
-    if (!isOpen) return;
-    const len = flatSuggestions.length;
-    if (len === 0) {
+    if (!shouldShowDropdown) {
       if (activeIndex !== -1) setActiveIndex(-1);
       return;
     }
-    const next = clampIndex(activeIndex, len);
+    const next = clampIndex(activeIndex, suggestionsLen);
     if (next !== activeIndex) setActiveIndex(next);
-  }, [isOpen, flatSuggestions.length, activeIndex, setActiveIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldShowDropdown, suggestionsLen, activeIndex, setActiveIndex]);
 
   // Fecha ao clicar fora
   useEffect(() => {
@@ -144,35 +172,28 @@ export function SmartVehicleSearch({
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      const activeSuggestion =
-        activeIndex >= 0 ? flatSuggestions[activeIndex] : null;
-
-      if (activeSuggestion) {
-        handleSuggestionSelect(activeSuggestion);
-        return;
+      if (activeIndex >= 0 && activeIndex < flatSuggestions.length) {
+        const activeSuggestion = flatSuggestions[activeIndex];
+        if (activeSuggestion) {
+          handleSuggestionSelect(activeSuggestion);
+          return;
+        }
       }
 
       goToSearch(queryTrimmed);
     },
-    [
-      activeIndex,
-      flatSuggestions,
-      handleSuggestionSelect,
-      goToSearch,
-      queryTrimmed,
-    ]
+    [activeIndex, flatSuggestions, handleSuggestionSelect, goToSearch, queryTrimmed]
   );
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
       const len = flatSuggestions.length;
 
-      // abre ao navegar se já tem texto mínimo
-      if (!isOpen || len === 0) {
+      // Se dropdown ainda não está pronto, apenas abre/fecha
+      if (!shouldShowDropdown || len === 0) {
         if (event.key === "ArrowDown" && queryTrimmed.length >= minLength) {
           event.preventDefault();
           open();
-          // quando abrir, começa sem item selecionado
           setActiveIndex(-1);
         }
         if (event.key === "Escape") {
@@ -184,16 +205,14 @@ export function SmartVehicleSearch({
 
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        // setter tipado como (n: number) => void, então calcula com valor atual
-        const next =
-          activeIndex >= len - 1 ? 0 : Math.max(activeIndex, -1) + 1;
+        const next = wrapDown(activeIndex, len);
         setActiveIndex(next);
         return;
       }
 
       if (event.key === "ArrowUp") {
         event.preventDefault();
-        const next = activeIndex <= 0 ? len - 1 : Math.max(activeIndex, 0) - 1;
+        const next = wrapUp(activeIndex, len);
         setActiveIndex(next);
         return;
       }
@@ -204,21 +223,19 @@ export function SmartVehicleSearch({
         return;
       }
 
-      // Enter é tratado pelo submit do form.
+      // Enter é tratado no submit do form
     },
     [
       activeIndex,
       close,
-      flatSuggestions.length,
-      isOpen,
+      flatSuggestions,
       minLength,
       open,
       queryTrimmed,
       setActiveIndex,
+      shouldShowDropdown,
     ]
   );
-
-  const shouldShowDropdown = isOpen && queryTrimmed.length >= minLength;
 
   return (
     <div ref={wrapperRef} className={`relative w-full ${className}`}>
@@ -231,7 +248,6 @@ export function SmartVehicleSearch({
             onChange={(event) => {
               setQuery(event.target.value);
               setIsOpen(true);
-              // reseta seleção ao digitar
               setActiveIndex(-1);
             }}
             onFocus={() => {
@@ -272,53 +288,47 @@ export function SmartVehicleSearch({
 
           {!isLoading && semanticData && (
             <>
-              {(semanticData.semantic.recognized.brand ||
-                semanticData.semantic.recognized.model ||
-                semanticData.semantic.recognized.city ||
-                semanticData.semantic.recognized.priceRange ||
-                semanticData.semantic.recognized.belowFipe) && (
+              {hasRecognized && (
                 <div className="border-b border-zinc-100 px-4 py-3">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
                     Reconhecido na busca
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {semanticData.semantic.recognized.brand && (
+                    {recognized?.brand && (
                       <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700">
-                        Marca: {semanticData.semantic.recognized.brand}
+                        Marca: {recognized.brand}
                       </span>
                     )}
 
-                    {semanticData.semantic.recognized.model && (
+                    {recognized?.model && (
                       <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700">
-                        Modelo: {semanticData.semantic.recognized.model}
+                        Modelo: {recognized.model}
                       </span>
                     )}
 
-                    {semanticData.semantic.recognized.city?.name && (
+                    {recognized?.city?.name && (
                       <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700">
-                        Cidade: {semanticData.semantic.recognized.city.name}
-                        {semanticData.semantic.recognized.city.state
-                          ? ` - ${semanticData.semantic.recognized.city.state}`
-                          : ""}
+                        Cidade: {recognized.city.name}
+                        {recognized.city.state ? ` - ${recognized.city.state}` : ""}
                       </span>
                     )}
 
-                    {semanticData.semantic.recognized.priceRange &&
-                      (semanticData.semantic.recognized.priceRange.min !== null ||
-                        semanticData.semantic.recognized.priceRange.max !== null) && (
+                    {recognized?.priceRange &&
+                      (recognized.priceRange.min !== null ||
+                        recognized.priceRange.max !== null) && (
                         <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700">
                           Preço:
-                          {semanticData.semantic.recognized.priceRange.min !== null
-                            ? ` de R$ ${semanticData.semantic.recognized.priceRange.min}`
+                          {recognized.priceRange.min !== null
+                            ? ` de R$ ${recognized.priceRange.min}`
                             : ""}
-                          {semanticData.semantic.recognized.priceRange.max !== null
-                            ? ` até R$ ${semanticData.semantic.recognized.priceRange.max}`
+                          {recognized.priceRange.max !== null
+                            ? ` até R$ ${recognized.priceRange.max}`
                             : ""}
                         </span>
                       )}
 
-                    {semanticData.semantic.recognized.belowFipe === true && (
+                    {recognized?.belowFipe === true && (
                       <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700">
                         Abaixo da FIPE
                       </span>
@@ -362,11 +372,8 @@ export function SmartVehicleSearch({
                             {suggestion.type === "brand" && "Marca"}
                             {suggestion.type === "model" && "Modelo"}
                             {suggestion.type === "city" && "Cidade"}
-                            {suggestion.type === "composed" &&
-                              "Sugestão inteligente"}
-                            {suggestion.total > 0
-                              ? ` • ${suggestion.total} anúncios`
-                              : ""}
+                            {suggestion.type === "composed" && "Sugestão inteligente"}
+                            {suggestion.total > 0 ? ` • ${suggestion.total} anúncios` : ""}
                           </span>
                         </span>
                       </button>
