@@ -3,8 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
 
-  // ✅ Render-friendly (gera .next/standalone)
-  // ❌ NÃO use "export" (static export), porque suas rotas precisam de runtime (sitemaps + fetch)
+  // IMPORTANT: não use output: "export" enquanto você tem rotas dinâmicas e sitemaps com fetch.
+  // output: "standalone" ajuda no deploy (Render/Docker) e NÃO tenta exportar tudo como HTML estático.
   output: "standalone",
 
   images: {
@@ -14,4 +14,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
