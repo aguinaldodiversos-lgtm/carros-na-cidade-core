@@ -55,7 +55,7 @@ export function SmartVehicleSearch({
     setIsOpen,
     isLoading,
     activeIndex,
-    setActiveIndex,
+    setActiveIndex, // IMPORTANT: tratado como setter que recebe number (sem callback)
     semanticData,
     flatSuggestions,
     close,
@@ -86,7 +86,7 @@ export function SmartVehicleSearch({
     if (next !== activeIndex) setActiveIndex(next);
   }, [isOpen, flatSuggestions.length, activeIndex, setActiveIndex]);
 
-  // Fecha ao clicar fora (robusto em desktop/mobile)
+  // Fecha ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (!wrapperRef.current) return;
@@ -184,7 +184,7 @@ export function SmartVehicleSearch({
 
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        // NOTE: setter pode não aceitar callback, então calcula com valor atual
+        // setter tipado como (n: number) => void, então calcula com valor atual
         const next =
           activeIndex >= len - 1 ? 0 : Math.max(activeIndex, -1) + 1;
         setActiveIndex(next);
@@ -193,8 +193,7 @@ export function SmartVehicleSearch({
 
       if (event.key === "ArrowUp") {
         event.preventDefault();
-        const next =
-          activeIndex <= 0 ? len - 1 : Math.max(activeIndex, 0) - 1;
+        const next = activeIndex <= 0 ? len - 1 : Math.max(activeIndex, 0) - 1;
         setActiveIndex(next);
         return;
       }
@@ -205,7 +204,7 @@ export function SmartVehicleSearch({
         return;
       }
 
-      // Enter já é tratado pelo submit do form.
+      // Enter é tratado pelo submit do form.
     },
     [
       activeIndex,
@@ -231,9 +230,8 @@ export function SmartVehicleSearch({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              // abre automaticamente quando o usuário digita
               setIsOpen(true);
-              // reseta seleção ao digitar (evita selecionar sugestão errada)
+              // reseta seleção ao digitar
               setActiveIndex(-1);
             }}
             onFocus={() => {
