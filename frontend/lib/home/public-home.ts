@@ -2,15 +2,10 @@
 export interface HomeDataResponse {
   success: boolean;
   data: {
-    featuredCities: Array<{
-      id: number;
-      name: string;
-      slug: string;
-      demand_score?: number;
-    }>;
-    highlightAds: Array<unknown>;
-    opportunityAds: Array<unknown>;
-    recentAds: Array<unknown>;
+    featuredCities: Array<{ id: number; name: string; slug: string; demand_score?: number }>;
+    highlightAds: Array<any>;
+    opportunityAds: Array<any>;
+    recentAds: Array<any>;
     stats: {
       total_ads?: number | string;
       total_cities?: number | string;
@@ -20,60 +15,50 @@ export interface HomeDataResponse {
   };
 }
 
-function normalizeBaseUrl(url?: string | null) {
-  const u = String(url ?? "").trim();
-  return u ? u.replace(/\/+$/, "") : "";
+function stripTrailingSlash(url: string) {
+  return url.replace(/\/+$/, "");
 }
 
-/**
- * Prioridade:
- * - NEXT_PUBLIC_API_URL (quando você quer apontar explicitamente)
- * - API_URL (server-only)
- * - dev fallback: http://localhost:4000
- *
- * Em produção, evite depender de localhost.
- */
 function getApiBaseUrl(): string {
-  const fromPublic = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL);
-  if (fromPublic) return fromPublic;
-
-  const fromServer = normalizeBaseUrl(process.env.API_URL);
-  if (fromServer) return fromServer;
-
-  // fallback somente para dev/local
-  return "http://localhost:4000";
+  const api =
+    process.env.API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    "";
+  return api ? stripTrailingSlash(api) : "";
 }
 
-async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 6000): Promise<T> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      // cache/revalidate ficam a cargo da página (page.tsx)
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${res.statusText} - ${text.slice(0, 200)}`);
-    }
-
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(t);
-  }
+function fallbackHome(): HomeDataResponse["data"] {
+  return {
+    featuredCities: [],
+    highlightAds: [],
+    opportunityAds: [],
+    recentAds: [],
+    stats: { total_ads: 0, total_cities: 0, total_advertisers: 0, total_users: 0 },
+  };
 }
 
 export async function fetchPublicHomeData(): Promise<HomeDataResponse["data"]> {
   const apiBase = getApiBaseUrl();
-  const payload = await fetchJsonWithTimeout<HomeDataResponse>(`${apiBase}/api/public/home`, 8000);
+  if (!apiBase) return fallbackHome();
 
-  if (!payload?.success || !payload?.data) {
-    throw new Error("Payload inválido da home pública");
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(`${apiBase}/api/public/home`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      next: { revalidate: 300 },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(t));
+
+    if (!response.ok) return fallbackHome();
+
+    const json = (await response.json()) as HomeDataResponse;
+    if (!json?.success || !json?.data) return fallbackHome();
+
+    return json.data;
+  } catch {
+    return fallbackHome();
   }
-
-  return payload.data;
 }
