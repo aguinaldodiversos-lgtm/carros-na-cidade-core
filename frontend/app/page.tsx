@@ -1,15 +1,11 @@
 // frontend/app/page.tsx
 import { HomePageClient } from "../components/home/HomePageClient";
 import { fetchPublicHomeData } from "../lib/home/public-home";
-import type { HomeDataResponse } from "../lib/home/public-home";
 
-// ✅ Evita o Next tentar gerar HTML estático no build (onde fetch pode falhar)
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const dynamic = "force-dynamic"; // não prerender no build
+export const revalidate = 300; // cache no runtime (ISR-like)
 
-type HomeData = HomeDataResponse["data"];
-
-function getFallbackHomeData(): HomeData {
+function fallbackHomeData() {
   return {
     featuredCities: [],
     highlightAds: [],
@@ -25,15 +21,11 @@ function getFallbackHomeData(): HomeData {
 }
 
 export default async function HomePage() {
-  let data: HomeData;
-
   try {
-    data = await fetchPublicHomeData();
-  } catch (err) {
-    // Não derruba build/deploy se API estiver off
-    console.error("[home] fetchPublicHomeData failed:", err);
-    data = getFallbackHomeData();
+    const data = await fetchPublicHomeData();
+    return <HomePageClient data={data} />;
+  } catch {
+    // fallback para não quebrar build nem runtime se API oscilar
+    return <HomePageClient data={fallbackHomeData()} />;
   }
-
-  return <HomePageClient data={data} />;
 }
