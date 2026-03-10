@@ -2,8 +2,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-import { PublicHeader } from "../components/shell/PublicHeader";
-import { PublicFooter } from "../components/shell/PublicFooter";
+import PublicHeader from "../components/shell/PublicHeader";
+import PublicFooter from "../components/shell/PublicFooter";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://carrosnacidade.com";
