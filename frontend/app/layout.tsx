@@ -1,5 +1,9 @@
+// frontend/app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+import { PublicHeader } from "../components/shell/PublicHeader";
+import { PublicFooter } from "../components/shell/PublicFooter";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://carrosnacidade.com";
@@ -92,10 +96,7 @@ export const metadata: Metadata = {
     images: [DEFAULT_OG_IMAGE],
   },
   icons: {
-    icon: [
-      { url: "/images/favicon.ico" },
-      { url: "/favicon.ico" },
-    ],
+    icon: [{ url: "/images/favicon.ico" }, { url: "/favicon.ico" }],
     shortcut: ["/images/favicon.ico", "/favicon.ico"],
     apple: ["/images/favicon.png"],
   },
@@ -119,7 +120,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="min-h-screen bg-[#f2f3f7] font-sans text-slate-900 antialiased">
+        <PublicHeader />
         {children}
+        <PublicFooter />
       </body>
     </html>
   );
