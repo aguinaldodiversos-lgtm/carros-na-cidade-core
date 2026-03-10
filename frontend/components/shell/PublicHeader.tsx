@@ -1,68 +1,76 @@
-// frontend/components/shell/PublicHeader.tsx
-import Link from "next/link";
+"use client";
 
-const NAV_LINKS = [
-  { href: "/comprar", label: "Comprar" },
-  { href: "/vender", label: "Vender" },
-  { href: "/planos", label: "Planos" },
-  { href: "/tabela-fipe", label: "Tabela FIPE" },
-  { href: "/simulador-financiamento", label: "Financiar" },
-  { href: "/blog", label: "Notícias" },
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+const links = [
+  { label: "Comprar", href: "/anuncios" },
+  { label: "Vender", href: "/vender" },
+  { label: "Planos", href: "/planos" },
+  { label: "Tabela FIPE", href: "/tabela-fipe" },
+  { label: "Financiar", href: "/financiar" },
+  { label: "Notícias", href: "/noticias" },
 ];
 
-export function PublicHeader() {
+export default function PublicHeader() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 md:px-6">
-        {/* Logo + marca */}
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
-            🚗
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-extrabold text-zinc-900">
-              Carros na Cidade
-            </div>
-            <div className="text-xs text-zinc-500">Portal automotivo</div>
-          </div>
-        </Link>
-
-        {/* “Cidade” (por enquanto simples) */}
-        <div className="hidden items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 md:flex">
-          <span className="text-zinc-500">📍</span>
-          <span className="font-medium">São Paulo</span>
-          <span className="text-zinc-400">▾</span>
-        </div>
-
-        {/* Links */}
-        <nav className="ml-auto hidden items-center gap-6 lg:flex">
-          {NAV_LINKS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="text-sm font-medium text-zinc-700 transition hover:text-zinc-900"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Ações */}
-        <div className="ml-auto flex items-center gap-2 lg:ml-6">
-          <Link
-            href="/favoritos"
-            className="hidden rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 md:inline-flex"
-          >
-            ♥ Favoritos
+    <header className="sticky top-0 z-50 border-b border-[#e4e7f0] bg-white/95 backdrop-blur">
+      <div className="mx-auto w-full max-w-7xl px-4">
+        <div className="flex h-[74px] items-center justify-between gap-4">
+          <Link href="/" className="relative block h-10 w-[170px] shrink-0 sm:w-[190px]">
+            <Image src="/images/logo.png" alt="Carros na Cidade" fill priority className="object-contain object-left" />
           </Link>
 
-          <Link
-            href="/login"
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+          <nav className="hidden items-center gap-5 lg:flex">
+            {links.map((link) => {
+              const active = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-sm font-bold transition ${active ? "text-[#0e62d8]" : "text-[#33405d] hover:text-[#0e62d8]"}`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="hidden items-center gap-2 sm:flex">
+            <Link href="/entrar" className="rounded-xl border border-[#d7ddeb] px-4 py-2 text-sm font-bold text-[#28344f]">Entrar</Link>
+            <Link href="/entrar?next=/painel" className="rounded-xl border border-[#d7ddeb] px-4 py-2 text-sm font-bold text-[#28344f]">Sou lojista</Link>
+            <Link href="/vender" className="rounded-xl bg-[#0e62d8] px-4 py-2 text-sm font-extrabold text-white">Anunciar</Link>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Menu"
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d7ddeb] lg:hidden"
           >
-            Entrar
-          </Link>
+            <span className="text-xl text-[#33405d]">☰</span>
+          </button>
         </div>
+
+        {open && (
+          <div className="pb-4 lg:hidden">
+            <nav className="grid gap-2 rounded-2xl border border-[#dfe4ef] bg-white p-3">
+              {links.map((link) => (
+                <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className="rounded-xl px-3 py-2 text-sm font-bold text-[#33405d] hover:bg-[#f3f7ff]">
+                  {link.label}
+                </Link>
+              ))}
+              <Link href="/entrar" onClick={() => setOpen(false)} className="rounded-xl border border-[#d7ddeb] px-3 py-2 text-center text-sm font-bold text-[#28344f]">Entrar</Link>
+              <Link href="/entrar?next=/painel" onClick={() => setOpen(false)} className="rounded-xl border border-[#d7ddeb] px-3 py-2 text-center text-sm font-bold text-[#28344f]">Sou lojista</Link>
+              <Link href="/vender" onClick={() => setOpen(false)} className="rounded-xl bg-[#0e62d8] px-3 py-2 text-center text-sm font-extrabold text-white">Anunciar</Link>
+            </nav>
+          </div>
+        )}
       </div>
     </header>
   );
