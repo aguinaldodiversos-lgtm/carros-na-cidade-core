@@ -3,17 +3,17 @@ import Redis from "ioredis";
 import { logger } from "../../shared/logger.js";
 
 /**
- * Conexão Redis única para filas (BullMQ etc).
- * - Só inicializa se DISABLE_REDIS !== true e REDIS_URL estiver definido.
- * - Suporta compatibilidade com imports antigos (getQueueRedisConnection).
- * - Não derruba a aplicação quando Redis estiver desabilitado; retorna null no init.
+ * Redis connection (queues).
+ * - Compatível com módulos que chamam getQueueRedisConnection() no import-time.
+ * - Evita crash: getQueueRedisConnection() nunca dá "Redis not initialized".
+ * - initQueueRedisConnection() pode ser usado no bootstrap para conectar de forma explícita.
  */
 
 let redis = null;
 let initPromise = null;
 
-function isTrue(value) {
-  return String(value || "").trim().toLowerCase() === "true";
+function isTrue(v) {
+  return String(v || "").trim().toLowerCase() === "true";
 }
 
 function getRedisUrl() {
@@ -25,9 +25,71 @@ function shouldEnableRedis() {
   return Boolean(getRedisUrl());
 }
 
+function buildRedisOptions() {
+  return {
+    // recomendado para BullMQ
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+
+    // evita travar o processo ao criar a instância
+    lazyConnect: true,
+
+    // em ambientes sem redis, evita fila offline acumulando memória
+    enableOfflineQueue: false,
+
+    retryStrategy(times) {
+      // backoff simples até 5s
+      return Math.min(50 * Math.max(1, times), 5000);
+    },
+  };
+}
+
+function attachRedisListeners(client) {
+  client.on("error", (err) => {
+    logger.error(
+      { error: { code: err?.code, message: err?.message } },
+      "[queue.redis] Erro na conexão Redis"
+    );
+  });
+
+  client.on("ready", () => {
+    logger.info("[queue.redis] Redis pronto");
+  });
+
+  client.on("end", () => {
+    logger.info("[queue.redis] Redis desconectado");
+  });
+}
+
+function ensureRedisInstanceForQueues() {
+  if (redis) return redis;
+
+  const url = getRedisUrl();
+
+  // Se estiver desabilitado ou sem URL, NÃO vamos crashar o app.
+  // Mas alguns módulos (ex: whatsapp.queue.js) precisam de um objeto "connection" no import-time.
+  // Então devolvemos um client lazy apontando para localhost apenas para manter compatibilidade.
+  if (!url || !shouldEnableRedis()) {
+    logger.warn(
+      "[queue.redis] Redis não configurado/disabled. Mantendo client lazy (compat) — filas podem não funcionar até configurar REDIS_URL."
+    );
+
+    const fallbackUrl = "redis://127.0.0.1:6379";
+    const client = new Redis(fallbackUrl, buildRedisOptions());
+    attachRedisListeners(client);
+    redis = client;
+    return redis;
+  }
+
+  const client = new Redis(url, buildRedisOptions());
+  attachRedisListeners(client);
+  redis = client;
+  return redis;
+}
+
 /**
- * Retorna a instância Redis já inicializada.
- * Use após initQueueRedisConnection().
+ * Uso estrito (se não tiver instância, lança).
+ * Use quando você TEM certeza que initQueueRedisConnection já rodou.
  */
 export function getRedis() {
   if (!redis) throw new Error("Redis not initialized");
@@ -35,16 +97,16 @@ export function getRedis() {
 }
 
 /**
- * COMPAT: alguns módulos antigos esperam este nome.
- * Mantém o comportamento estrito (se não inicializado, lança).
+ * COMPAT: usado por módulos que esperam esse export.
+ * Importante: NÃO pode lançar no import-time.
  */
 export function getQueueRedisConnection() {
-  return getRedis();
+  return ensureRedisInstanceForQueues();
 }
 
 /**
- * Inicializa (se aplicável) e retorna a conexão Redis.
- * Se Redis estiver desabilitado por env, retorna null.
+ * Inicializa e tenta conectar (quando habilitado).
+ * Se DISABLE_REDIS=true ou REDIS_URL vazio, retorna null (sem tentar conectar).
  */
 export async function initQueueRedisConnection() {
   if (redis) return redis;
@@ -57,56 +119,14 @@ export async function initQueueRedisConnection() {
     return null;
   }
 
-  const url = getRedisUrl();
-
   initPromise = (async () => {
-    const client = new Redis(url, {
-      // BullMQ recomenda: maxRetriesPerRequest = null para evitar falhas em jobs longos
-      maxRetriesPerRequest: null,
-      enableReadyCheck: true,
-      lazyConnect: true,
-      // Evita flood de logs / reconexões agressivas (ajusta conforme necessidade)
-      retryStrategy(times) {
-        // backoff simples até ~5s
-        return Math.min(50 * Math.max(1, times), 5000);
-      },
-    });
-
-    client.on("error", (err) => {
-      logger.error(
-        { error: { code: err?.code, message: err?.message } },
-        "[queue.redis] Erro na conexão Redis"
-      );
-    });
-
-    client.on("ready", () => {
-      logger.info("[queue.redis] Redis pronto");
-    });
-
-    client.on("end", () => {
-      logger.info("[queue.redis] Redis desconectado");
-    });
+    const client = ensureRedisInstanceForQueues();
 
     try {
+      // conecta explicitamente
       await client.connect();
-      redis = client;
       logger.info("[queue.redis] Redis conectado");
-      return redis;
-    } catch (err) {
-      // Importante: não deixar initPromise pendurado para sempre
-      try {
-        client.disconnect();
-      } catch {}
-      redis = null;
-
-      logger.error(
-        { error: { code: err?.code, message: err?.message } },
-        "[queue.redis] Falha ao conectar no Redis"
-      );
-
-      // Mantém comportamento seguro: derruba apenas se Redis era obrigatório
-      // (aqui, só tentamos conectar se estava habilitado)
-      throw err;
+      return client;
     } finally {
       initPromise = null;
     }
@@ -123,10 +143,8 @@ export async function closeQueueRedisConnection() {
   initPromise = null;
 
   try {
-    // quit = encerra de forma limpa
     await client.quit();
   } catch {
-    // fallback: encerra imediatamente
     try {
       client.disconnect();
     } catch {}
