@@ -1,33 +1,18 @@
-import React from "react";
+import { buildTerritorialJsonLd } from "@/lib/seo/territorial-seo";
+import type { TerritorialPagePayload } from "@/lib/search/territorial-public";
 
 export type TerritorialSeoJsonLdProps = {
-  data: any;
-  mode?: string;
+  data: TerritorialPagePayload;
+  mode?: "city" | "brand" | "model" | "opportunities" | "below_fipe";
 };
 
 export function TerritorialSeoJsonLd({
   data,
-  mode,
+  mode = "city",
 }: TerritorialSeoJsonLdProps) {
   if (!data) return null;
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://carrosnacidade.com";
-
-  const pageUrl =
-    typeof window === "undefined"
-      ? baseUrl
-      : `${baseUrl}${window.location.pathname}`;
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: data?.seo?.title || "Carros na Cidade",
-    description:
-      data?.seo?.description ||
-      "Carros usados e seminovos na sua cidade.",
-    url: pageUrl,
-  };
+  const jsonLd = buildTerritorialJsonLd(data, mode);
 
   return (
     <script
