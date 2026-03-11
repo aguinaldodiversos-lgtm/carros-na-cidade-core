@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { buildTerritorialJsonLd } from "@/lib/seo/territorial-seo";
 import type { TerritorialPagePayload } from "@/lib/search/territorial-public";
+=======
+<<<<<<< HEAD
+import React from "react";
+>>>>>>> dd86845 (Fix TerritorialSeoJsonLd module export)
 
 export type TerritorialSeoJsonLdProps = {
   data: TerritorialPagePayload;
@@ -23,3 +28,5 @@ export function TerritorialSeoJsonLd({
 }
 
 export default TerritorialSeoJsonLd;
+=======
+>>>>>>> 735f82b (Fix TerritorialSeoJsonLd module export)
