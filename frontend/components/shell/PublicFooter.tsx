@@ -1,37 +1,133 @@
+import Image from "next/image";
 import Link from "next/link";
+
+type FooterGroup = {
+  title: string;
+  links: Array<{ label: string; href: string }>;
+};
+
+const groups: FooterGroup[] = [
+  {
+    title: "Comprar",
+    links: [
+      { label: "Ver anúncios", href: "/anuncios" },
+      { label: "Oportunidades", href: "/cidade/sao-paulo-sp/oportunidades" },
+      { label: "Abaixo da FIPE", href: "/cidade/sao-paulo-sp/abaixo-da-fipe" },
+      { label: "Simulador de financiamento", href: "/simulador-financiamento" },
+    ],
+  },
+  {
+    title: "Vender",
+    links: [
+      { label: "Anunciar no portal", href: "/planos" },
+      { label: "Planos para lojistas", href: "/planos" },
+      { label: "Impulsionar anúncio", href: "/dashboard-loja" },
+      { label: "Área do lojista", href: "/dashboard-loja" },
+    ],
+  },
+  {
+    title: "Conteúdo",
+    links: [
+      { label: "Tabela FIPE", href: "/tabela-fipe" },
+      { label: "Blog automotivo", href: "/blog" },
+      { label: "Cidades em foco", href: "/cidade/sao-paulo-sp" },
+      { label: "Notícias", href: "/blog/sao-paulo-sp" },
+    ],
+  },
+  {
+    title: "Institucional",
+    links: [
+      { label: "Entrar", href: "/login" },
+      { label: "Recuperar senha", href: "/recuperar-senha" },
+      { label: "Painel", href: "/dashboard" },
+      { label: "Planos", href: "/planos" },
+    ],
+  },
+];
+
+const socials = [
+  { label: "Instagram", href: "https://instagram.com" },
+  { label: "Facebook", href: "https://facebook.com" },
+  { label: "LinkedIn", href: "https://linkedin.com" },
+];
 
 export function PublicFooter() {
   return (
-    <footer className="border-t border-zinc-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 md:grid-cols-3 md:px-6">
-        <div>
-          <div className="text-lg font-extrabold text-zinc-900">Carros na Cidade</div>
-          <p className="mt-2 text-sm text-zinc-500">
-            Portal automotivo territorial com busca inteligente e páginas locais.
-          </p>
-        </div>
+    <footer className="mt-16 bg-[linear-gradient(135deg,#16326a_0%,#0d1a38_100%)] text-white">
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
+        <div className="grid gap-10 border-b border-white/15 pb-10 lg:grid-cols-[1.15fr_1fr]">
+          <div>
+            <Link
+              href="/"
+              className="relative block h-11 w-[195px]"
+              aria-label="Carros na Cidade"
+            >
+              <Image
+                src="/images/logo.png"
+                alt="Carros na Cidade"
+                fill
+                className="object-contain object-left brightness-0 invert"
+              />
+            </Link>
 
-        <div className="text-sm">
-          <div className="font-semibold text-zinc-900">Portal</div>
-          <div className="mt-3 grid gap-2 text-zinc-600">
-            <Link href="/anuncios" className="hover:text-zinc-900">Anúncios</Link>
-            <Link href="/planos" className="hover:text-zinc-900">Planos</Link>
-            <Link href="/tabela-fipe" className="hover:text-zinc-900">Tabela FIPE</Link>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-white/75">
+              Portal automotivo regional com foco em performance, autoridade local,
+              busca inteligente e estrutura preparada para crescer cidade por cidade.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {socials.map((social) => (
+                <Link
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-10 items-center rounded-full border border-white/15 px-4 text-sm font-medium text-white/85 transition hover:border-white/35 hover:text-white"
+                >
+                  {social.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {groups.map((group) => (
+              <div key={group.title}>
+                <h3 className="text-sm font-extrabold uppercase tracking-[0.16em] text-white/90">
+                  {group.title}
+                </h3>
+
+                <ul className="mt-4 space-y-2.5 text-sm text-white/70">
+                  {group.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="inline-flex min-h-10 items-center transition hover:text-white"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="text-sm">
-          <div className="font-semibold text-zinc-900">Conta</div>
-          <div className="mt-3 grid gap-2 text-zinc-600">
-            <Link href="/login" className="hover:text-zinc-900">Entrar</Link>
-            <Link href="/recuperar-senha" className="hover:text-zinc-900">Recuperar senha</Link>
-            <Link href="/dashboard" className="hover:text-zinc-900">Painel</Link>
+        <div className="flex flex-col gap-3 pt-6 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
+          <p>© {new Date().getFullYear()} Carros na Cidade. Todos os direitos reservados.</p>
+          <div className="flex flex-wrap gap-4">
+            <Link href="/politica-de-privacidade" className="transition hover:text-white">
+              Política de privacidade
+            </Link>
+            <Link href="/termos-de-uso" className="transition hover:text-white">
+              Termos de uso
+            </Link>
+            <Link href="/lgpd" className="transition hover:text-white">
+              LGPD
+            </Link>
           </div>
         </div>
-      </div>
-
-      <div className="border-t border-zinc-200 py-4 text-center text-xs text-zinc-500">
-        © {new Date().getFullYear()} Carros na Cidade. Todos os direitos reservados.
       </div>
     </footer>
   );
