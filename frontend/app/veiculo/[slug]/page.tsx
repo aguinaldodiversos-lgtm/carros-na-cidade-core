@@ -6,8 +6,6 @@ import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
-import Footer from "@/components/layout/Footer";
-import Header from "@/components/layout/Header";
 import {
   getAISimilarVehicles,
   getAIVehicleInsights,
@@ -36,13 +34,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const [cityName] = vehicle.city.split(" (");
 
   return {
-    title: `${vehicle.model} ${vehicle.year.split("/")[0]} a venda em ${cityName}`,
-    description: `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulacao de financiamento.`,
+    title: `${vehicle.model} ${vehicle.year.split("/")[0]} à venda em ${cityName}`,
+    description: `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulação de financiamento.`,
     alternates: {
       canonical: `/veiculo/${vehicle.slug}`,
     },
     openGraph: {
-      title: `${vehicle.model} ${vehicle.year.split("/")[0]} a venda em ${cityName}`,
+      title: `${vehicle.model} ${vehicle.year.split("/")[0]} à venda em ${cityName}`,
       description: `${vehicle.fullName} anunciado por ${vehicle.price} em ${vehicle.city}.`,
       url: `/veiculo/${vehicle.slug}`,
       images: [
@@ -59,7 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     keywords: [
       `${vehicle.model.toLowerCase()} ${cityName.toLowerCase()}`,
       `comprar ${vehicle.model.toLowerCase()} ${cityName.toLowerCase()}`,
-      `veiculo ${cityName.toLowerCase()}`,
+      `veículo ${cityName.toLowerCase()}`,
     ],
   };
 }
@@ -67,13 +65,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function VehicleDetailPage({ params }: PageProps) {
   const vehicle = await getVehicleBySlug(params.slug);
 
-  const [priceSignal, aiInsights, sellerVehicles, cityVehicles, similarVehicles] = await Promise.all([
-    getAIVehiclePriceSignal(vehicle),
-    getAIVehicleInsights(vehicle),
-    getSellerVehicles(vehicle),
-    getCityVehicles(vehicle),
-    getAISimilarVehicles(vehicle),
-  ]);
+  const [priceSignal, aiInsights, sellerVehicles, cityVehicles, similarVehicles] =
+    await Promise.all([
+      getAIVehiclePriceSignal(vehicle),
+      getAIVehicleInsights(vehicle),
+      getSellerVehicles(vehicle),
+      getCityVehicles(vehicle),
+      getAISimilarVehicles(vehicle),
+    ]);
 
   const schemaVehicle = {
     "@context": "https://schema.org",
@@ -89,7 +88,7 @@ export default async function VehicleDetailPage({ params }: PageProps) {
       value: vehicle.km.replace(/\D/g, ""),
       unitCode: "KMT",
     },
-    image: vehicle.images.map((image) => `https://carrosnacidade.com${image}`),
+    image: vehicle.images,
     offers: {
       "@type": "Offer",
       priceCurrency: "BRL",
@@ -112,8 +111,8 @@ export default async function VehicleDetailPage({ params }: PageProps) {
       {
         "@type": "ListItem",
         position: 2,
-        name: "Comprar",
-        item: "https://carrosnacidade.com/comprar",
+        name: "Anúncios",
+        item: "https://carrosnacidade.com/anuncios",
       },
       {
         "@type": "ListItem",
@@ -130,20 +129,20 @@ export default async function VehicleDetailPage({ params }: PageProps) {
     mainEntity: [
       {
         "@type": "Question",
-        name: "Como simular financiamento deste veiculo?",
+        name: "Como simular financiamento deste veículo?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Use o botao Simular financiamento para abrir o simulador com os dados do anuncio.",
+          text: "Use o botão Simular financiamento para abrir o simulador com os dados do anúncio.",
         },
       },
       {
         "@type": "Question",
-        name: "Este anuncio esta abaixo da FIPE?",
+        name: "Este anúncio está abaixo da FIPE?",
         acceptedAnswer: {
           "@type": "Answer",
           text: vehicle.isBelowFipe
-            ? "Sim. O valor anunciado esta abaixo da referencia FIPE atual."
-            : "O valor esta alinhado com a referencia FIPE para este modelo.",
+            ? "Sim. O valor anunciado está abaixo da referência FIPE atual."
+            : "O valor está alinhado com a referência FIPE para este modelo.",
         },
       },
     ],
@@ -153,10 +152,11 @@ export default async function VehicleDetailPage({ params }: PageProps) {
 
   return (
     <>
-      <Header />
-
       <main className="mx-auto w-full max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pb-8 md:pt-8">
-        <nav aria-label="Breadcrumb" className="mb-4 overflow-x-auto whitespace-nowrap text-sm text-[#5f6982]">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 overflow-x-auto whitespace-nowrap text-sm text-[#5f6982]"
+        >
           <ol className="flex flex-wrap items-center gap-2">
             <li>
               <Link href="/" className="hover:text-[#0e62d8]">
@@ -165,8 +165,8 @@ export default async function VehicleDetailPage({ params }: PageProps) {
             </li>
             <li>/</li>
             <li>
-              <Link href="/comprar" className="hover:text-[#0e62d8]">
-                Comprar
+              <Link href="/anuncios" className="hover:text-[#0e62d8]">
+                Anúncios
               </Link>
             </li>
             <li>/</li>
@@ -178,7 +178,11 @@ export default async function VehicleDetailPage({ params }: PageProps) {
           <VehicleGallery images={vehicle.images} alt={vehicle.fullName} />
           <div className="space-y-5">
             <VehicleInfo vehicle={vehicle} priceSignal={priceSignal} />
-            <VehicleActions vehicleId={vehicle.id} vehicleName={vehicle.fullName} whatsappPhone={sellerPhone} />
+            <VehicleActions
+              vehicleId={vehicle.id}
+              vehicleName={vehicle.fullName}
+              whatsappPhone={sellerPhone}
+            />
           </div>
         </div>
 
@@ -187,21 +191,32 @@ export default async function VehicleDetailPage({ params }: PageProps) {
         </div>
 
         <div className="mt-5">
-          <SellerSection vehicle={vehicle} sellerVehicles={sellerVehicles} cityVehicles={cityVehicles} />
+          <SellerSection
+            vehicle={vehicle}
+            sellerVehicles={sellerVehicles}
+            cityVehicles={cityVehicles}
+          />
         </div>
 
         <VehicleCarousel
-          title="Veiculos semelhantes sugeridos pelo Cerebro IA"
-          subtitle="Modelos com perfil de preco, liquidez e procura parecidos com este anuncio."
+          title="Veículos semelhantes sugeridos pelo Cérebro IA"
+          subtitle="Modelos com perfil de preço, liquidez e procura parecidos com este anúncio."
           vehicles={similarVehicles}
         />
       </main>
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaBreadcrumb) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaFaq) }} />
-
-      <Footer />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaBreadcrumb) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaFaq) }}
+      />
     </>
   );
 }
