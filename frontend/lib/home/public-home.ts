@@ -1,11 +1,12 @@
-// frontend/lib/home/public-home.ts
+import type { AdItem } from "@/lib/search/ads-search";
+
 export interface HomeDataResponse {
   success: boolean;
   data: {
     featuredCities: Array<{ id: number; name: string; slug: string; demand_score?: number }>;
-    highlightAds: Array<any>;
-    opportunityAds: Array<any>;
-    recentAds: Array<any>;
+    highlightAds: AdItem[];
+    opportunityAds: AdItem[];
+    recentAds: AdItem[];
     stats: {
       total_ads?: number | string;
       total_cities?: number | string;
