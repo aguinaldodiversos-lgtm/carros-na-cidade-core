@@ -1,4 +1,3 @@
-// frontend/app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
@@ -6,7 +5,9 @@ import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://carrosnacidade.com";
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.API_URL ||
+  "https://carrosnacidade.com";
 
 const SITE_NAME = "Carros na Cidade";
 const DEFAULT_TITLE = "Carros na Cidade | Portal de carros da sua cidade";
@@ -22,14 +23,12 @@ const DEFAULT_KEYWORDS = [
   "portal de carros",
   "comprar carro",
   "carros abaixo da fipe",
-  "carros em são paulo",
   "carros por cidade",
   "anúncios de veículos",
   "veículos usados",
   "veículos seminovos",
-  "carros com busca inteligente",
   "portal automotivo",
-  "carros no brasil",
+  "marketplace automotivo",
 ];
 
 const DEFAULT_OG_IMAGE = "/images/hero.jpeg";
@@ -37,7 +36,7 @@ const DEFAULT_OG_IMAGE = "/images/hero.jpeg";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#2563eb",
+  themeColor: "#0e62d8",
   colorScheme: "light",
 };
 
@@ -120,9 +119,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="min-h-screen bg-[#f2f3f7] font-sans text-slate-900 antialiased">
-        <PublicHeader />
-        {children}
-        <PublicFooter />
+        <div className="flex min-h-screen flex-col">
+          <PublicHeader />
+          <div className="flex-1">{children}</div>
+          <PublicFooter />
+        </div>
       </body>
     </html>
   );
