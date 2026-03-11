@@ -1,5 +1,3 @@
-// frontend/lib/seo/territorial-seo.ts
-
 import type { Metadata } from "next";
 import type { TerritorialPagePayload } from "../search/territorial-public";
 import { getSiteUrl, toAbsoluteUrl } from "./site";
@@ -146,9 +144,9 @@ function buildListItemUrl(
   item?: { slug?: string; id?: number | string }
 ): string | undefined {
   if (!item) return undefined;
-  if (item.slug) return toAbsoluteUrl(`/anuncios/${item.slug}`);
+  if (item.slug) return toAbsoluteUrl(`/veiculo/${item.slug}`);
   if (item.id !== undefined && item.id !== null) {
-    return toAbsoluteUrl(`/anuncios/${item.id}`);
+    return slug ? toAbsoluteUrl(`/cidade/${slug}`) : undefined;
   }
   return slug ? toAbsoluteUrl(`/cidade/${slug}`) : undefined;
 }
