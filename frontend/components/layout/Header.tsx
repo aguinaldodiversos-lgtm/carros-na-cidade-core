@@ -8,6 +8,7 @@ type HeaderProps = {
   boxed?: boolean;
 };
 
+
 const navItems = [
   { label: "Anunciar", href: "/anunciar" },
   { label: "Favoritos", href: "/favoritos" },
