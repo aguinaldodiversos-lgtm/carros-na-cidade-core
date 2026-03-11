@@ -1,5 +1,3 @@
-// frontend/components/search/TerritorialResultsPageClient.tsx
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -168,6 +166,7 @@ export function TerritorialResultsPageClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasHydratedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const filters = useMemo<AdsSearchFilters>(() => {
@@ -199,6 +198,11 @@ export function TerritorialResultsPageClient({
   }
 
   useEffect(() => {
+    if (!hasHydratedRef.current) {
+      hasHydratedRef.current = true;
+      return;
+    }
+
     if (abortRef.current) {
       abortRef.current.abort();
     }
@@ -252,53 +256,53 @@ export function TerritorialResultsPageClient({
   }, [data.facets]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6">
+    <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
       <TerritorialBreadcrumbs data={data} mode={mode} />
 
-      <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[28px] border border-[#e2e8f0] bg-white p-6 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-3">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0e62d8]">
             SEO territorial
           </span>
 
-          <h1 className="text-2xl font-bold text-zinc-900 md:text-3xl">
+          <h1 className="text-2xl font-extrabold text-[#0f172a] md:text-3xl">
             {data.seo?.title || "Resultados da cidade"}
           </h1>
 
           {data.seo?.description ? (
-            <p className="max-w-4xl text-sm leading-6 text-zinc-600 md:text-base">
+            <p className="max-w-4xl text-sm leading-6 text-[#64748b] md:text-base">
               {data.seo.description}
             </p>
           ) : null}
 
           <div className="flex flex-wrap gap-2 pt-1">
             {data.city?.name && (
-              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+              <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-medium text-[#475569]">
                 {data.city.name}
                 {data.city.state ? ` - ${data.city.state}` : ""}
               </span>
             )}
 
             {data.brand?.name && (
-              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+              <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-medium text-[#475569]">
                 Marca: {data.brand.name}
               </span>
             )}
 
             {data.model?.name && (
-              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+              <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-medium text-[#475569]">
                 Modelo: {data.model.name}
               </span>
             )}
 
             {typeof data.stats?.totalAds === "number" && (
-              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+              <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-medium text-[#475569]">
                 {data.stats.totalAds} anúncios
               </span>
             )}
 
             {typeof data.stats?.totalBelowFipeAds === "number" && (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              <span className="rounded-full bg-[#e9fff5] px-3 py-1 text-xs font-medium text-[#0f9f5f]">
                 {data.stats.totalBelowFipeAds} abaixo da FIPE
               </span>
             )}
@@ -306,7 +310,7 @@ export function TerritorialResultsPageClient({
 
           <TerritorialHeroLinks data={data} />
         </div>
-      </div>
+      </section>
 
       <div className="mt-6">
         <SmartVehicleSearch
@@ -329,7 +333,7 @@ export function TerritorialResultsPageClient({
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-zinc-600">
+          <div className="text-sm text-[#64748b]">
             {loading
               ? "Atualizando resultados..."
               : `${primaryPagination?.total || primaryItems.length || 0} resultados`}
@@ -364,13 +368,13 @@ export function TerritorialResultsPageClient({
               {Array.from({ length: 9 }).map((_, index) => (
                 <div
                   key={index}
-                  className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
+                  className="overflow-hidden rounded-[24px] border border-[#e2e8f0] bg-white"
                 >
-                  <div className="aspect-[16/10] animate-pulse bg-zinc-100" />
+                  <div className="aspect-[16/10] animate-pulse bg-[#eef2f7]" />
                   <div className="space-y-3 p-4">
-                    <div className="h-4 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-6 w-1/2 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-4 animate-pulse rounded bg-[#eef2f7]" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-[#eef2f7]" />
+                    <div className="h-6 w-1/2 animate-pulse rounded bg-[#eef2f7]" />
                   </div>
                 </div>
               ))}
@@ -392,6 +396,6 @@ export function TerritorialResultsPageClient({
       <div className="mt-8">
         <TerritorialInternalLinksSection data={data} />
       </div>
-    </div>
+    </main>
   );
 }
