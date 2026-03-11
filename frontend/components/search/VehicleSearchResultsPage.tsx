@@ -21,7 +21,15 @@ import { SearchResultsList } from "./SearchResultsList";
 import { SearchSortSelect } from "./SearchSortSelect";
 import { SmartVehicleSearch } from "./SmartVehicleSearch";
 
-export function VehicleSearchResultsPage() {
+interface VehicleSearchResultsPageProps {
+  initialResults: AdsSearchResponse;
+  initialFacets: AdsFacetsResponse["facets"] | null;
+}
+
+export function VehicleSearchResultsPage({
+  initialResults,
+  initialFacets,
+}: VehicleSearchResultsPageProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -30,12 +38,13 @@ export function VehicleSearchResultsPage() {
     return parseAdsSearchFiltersFromSearchParams(searchParams);
   }, [searchParams]);
 
-  const [results, setResults] = useState<AdsSearchResponse | null>(null);
-  const [facets, setFacets] = useState<AdsFacetsResponse["facets"] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [facetsLoading, setFacetsLoading] = useState(true);
+  const [results, setResults] = useState<AdsSearchResponse | null>(initialResults);
+  const [facets, setFacets] = useState<AdsFacetsResponse["facets"] | null>(initialFacets);
+  const [loading, setLoading] = useState(false);
+  const [facetsLoading, setFacetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasHydratedRef = useRef(false);
   const resultsAbortRef = useRef<AbortController | null>(null);
   const facetsAbortRef = useRef<AbortController | null>(null);
 
@@ -50,6 +59,11 @@ export function VehicleSearchResultsPage() {
   }
 
   useEffect(() => {
+    if (!hasHydratedRef.current) {
+      hasHydratedRef.current = true;
+      return;
+    }
+
     if (resultsAbortRef.current) {
       resultsAbortRef.current.abort();
     }
@@ -75,12 +89,12 @@ export function VehicleSearchResultsPage() {
         }
       });
 
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [filters]);
 
   useEffect(() => {
+    if (!hasHydratedRef.current) return;
+
     if (facetsAbortRef.current) {
       facetsAbortRef.current.abort();
     }
@@ -104,9 +118,7 @@ export function VehicleSearchResultsPage() {
         }
       });
 
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [
     filters.brand,
     filters.model,
@@ -119,16 +131,31 @@ export function VehicleSearchResultsPage() {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6">
-      <div className="mb-6">
-        <SmartVehicleSearch
-          placeholder="Ex.: Hilux diesel em Campinas até 220 mil"
-          resultsBasePath="/anuncios"
-          currentCitySlug={filters.city_slug || null}
-        />
-      </div>
+    <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
+      <section className="rounded-[28px] border border-[#e2e8f0] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] md:p-6">
+        <div className="flex flex-col gap-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0e62d8]">
+            Busca inteligente
+          </span>
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#0f172a] md:text-3xl">
+            Encontre o veículo certo na sua cidade
+          </h1>
+          <p className="max-w-3xl text-sm leading-6 text-[#64748b] md:text-base">
+            Explore anúncios com filtros avançados, ordenação, busca semântica e
+            resultados pensados para navegação rápida e conversão.
+          </p>
+        </div>
 
-      <div className="mb-4 flex flex-col gap-3">
+        <div className="mt-5">
+          <SmartVehicleSearch
+            placeholder="Ex.: Hilux diesel em Campinas até 220 mil"
+            resultsBasePath="/anuncios"
+            currentCitySlug={filters.city_slug || null}
+          />
+        </div>
+      </section>
+
+      <div className="mt-6 flex flex-col gap-3">
         <AppliedFilterChips
           filters={filters}
           onRemove={pushFilters}
@@ -136,14 +163,8 @@ export function VehicleSearchResultsPage() {
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            {loading ? (
-              <span className="text-sm text-zinc-500">Carregando resultados...</span>
-            ) : (
-              <span className="text-sm text-zinc-600">
-                {results?.pagination?.total || 0} anúncios encontrados
-              </span>
-            )}
+          <div className="text-sm text-[#64748b]">
+            {loading ? "Atualizando resultados..." : `${results?.pagination?.total || 0} anúncios encontrados`}
           </div>
 
           <SearchSortSelect
@@ -153,10 +174,10 @@ export function VehicleSearchResultsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div>
           <SearchFacetsSidebar
-            facets={facetsLoading ? null : facets}
+            facets={facetsLoading ? facets : facets}
             filters={filters}
             onChange={pushFilters}
           />
@@ -174,13 +195,13 @@ export function VehicleSearchResultsPage() {
               {Array.from({ length: 9 }).map((_, index) => (
                 <div
                   key={index}
-                  className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
+                  className="overflow-hidden rounded-[24px] border border-[#e2e8f0] bg-white"
                 >
-                  <div className="aspect-[16/10] animate-pulse bg-zinc-100" />
+                  <div className="aspect-[16/10] animate-pulse bg-[#eef2f7]" />
                   <div className="space-y-3 p-4">
-                    <div className="h-4 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-6 w-1/2 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-4 animate-pulse rounded bg-[#eef2f7]" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-[#eef2f7]" />
+                    <div className="h-6 w-1/2 animate-pulse rounded bg-[#eef2f7]" />
                   </div>
                 </div>
               ))}
@@ -198,6 +219,6 @@ export function VehicleSearchResultsPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
