@@ -44,7 +44,7 @@ export default async function PlanosPage() {
           Planos para particulares
         </h2>
         <p className="mt-1 text-sm text-[#5f6982]">
-          CPF validado no backend. Limite gratuito de 3 anuncios ativos com upgrade automatico para mais volume.
+          CPF validado no backend. Limite gratuito de 3 anúncios ativos com upgrade automático para mais volume.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {cpfPlans.map((plan) => (
@@ -58,7 +58,7 @@ export default async function PlanosPage() {
           Planos para lojistas
         </h2>
         <p className="mt-1 text-sm text-[#5f6982]">
-          CNPJ verificado no backend. Limite gratuito de 20 anuncios ativos e planos pagos com destaque e prioridade.
+          CNPJ verificado no backend. Limite gratuito de 20 anúncios ativos e planos pagos com destaque e prioridade.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {cnpjPlans.map((plan) => (
@@ -69,7 +69,7 @@ export default async function PlanosPage() {
 
       <section className="mt-8 rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)]">
         <h2 className="text-2xl font-extrabold text-[#1d2538]">
-          Como funciona a cobranca via Mercado Pago
+          Como funciona a cobrança via Mercado Pago
         </h2>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -78,10 +78,10 @@ export default async function PlanosPage() {
               Plano Destaque (avulso)
             </h3>
             <ul className="mt-2 space-y-1 text-sm text-[#4d5872]">
-              <li>Pagamento unico via checkout do Mercado Pago.</li>
+              <li>Pagamento único via checkout do Mercado Pago.</li>
               <li>Validade do destaque definida por plano (ex.: 7 ou 30 dias).</li>
-              <li>Apos aprovacao no webhook, destaque e prioridade sao ativados automaticamente.</li>
-              <li>Ao vencer, prioridade e badge premium sao removidos sem acao manual.</li>
+              <li>Após aprovação no webhook, destaque e prioridade são ativados automaticamente.</li>
+              <li>Ao vencer, prioridade e badge premium são removidos sem ação manual.</li>
             </ul>
           </article>
 
@@ -92,16 +92,17 @@ export default async function PlanosPage() {
             <ul className="mt-2 space-y-1 text-sm text-[#4d5872]">
               <li>Assinatura mensal via preapproval do Mercado Pago.</li>
               <li>Status atualizado automaticamente por webhook validado.</li>
-              <li>Se houver inadimplencia, beneficios premium sao suspensos.</li>
-              <li>Anuncios podem permanecer ativos conforme politica da conta.</li>
+              <li>Se houver inadimplência, benefícios premium são suspensos.</li>
+              <li>Anúncios podem permanecer ativos conforme política da conta.</li>
             </ul>
           </article>
         </div>
 
         <div className="mt-4 rounded-xl border border-[#d9e5ff] bg-[#edf4ff] p-4">
           <p className="text-sm text-[#435372]">
-            Seguranca aplicada no backend: validacao de assinatura do webhook, verificacao de valor e plan_id,
-            idempotencia para evitar ativacao duplicada e confirmacao server-to-server do status no Mercado Pago.
+            Segurança aplicada no backend: validação de assinatura do webhook,
+            verificação de valor e plan_id, idempotência para evitar ativação duplicada
+            e confirmação server-to-server do status no Mercado Pago.
           </p>
         </div>
       </section>
