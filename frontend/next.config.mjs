@@ -2,12 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-
-  // NÃO exportar estático (se alguém estiver tentando, isso impede muita dor)
   output: "standalone",
-
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "**" },
+      { protocol: "http", hostname: "localhost" },
+    ],
   },
 };
 
