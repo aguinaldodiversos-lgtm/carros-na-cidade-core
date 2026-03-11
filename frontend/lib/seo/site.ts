@@ -1,18 +1,19 @@
-// frontend/lib/seo/site.ts
+function stripTrailingSlash(url: string) {
+  return url.replace(/\/+$/, "");
+}
 
-export function getSiteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
-    process.env.SITE_URL?.replace(/\/+$/, "") ||
-    "https://carrosnacidade.com"
+export function getSiteUrl() {
+  return stripTrailingSlash(
+    process.env.NEXT_PUBLIC_SITE_URL ||
+      "https://carrosnacidade.com"
   );
 }
 
-export function toAbsoluteUrl(path?: string | null): string {
+export function toAbsoluteUrl(path: string) {
   const siteUrl = getSiteUrl();
 
   if (!path) return siteUrl;
-  if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${siteUrl}${normalizedPath}`;
