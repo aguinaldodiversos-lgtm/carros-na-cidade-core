@@ -1,7 +1,5 @@
-// frontend/lib/search/territorial-navigation.ts
-
 import type { TerritorialPagePayload } from "./territorial-public";
-export * from "../territorial-navigation";
+
 export type TerritorialMode =
   | "city"
   | "brand"
