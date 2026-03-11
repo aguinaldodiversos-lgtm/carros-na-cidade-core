@@ -1,32 +1,40 @@
-import type { Metadata } from "next";
-import BuyCarsGrid from "@/components/buy/BuyCarsGrid";
-import BuyFiltersSidebar from "@/components/buy/BuyFiltersSidebar";
-import BuyHeaderPanel from "@/components/buy/BuyHeaderPanel";
-import BuyResultsToolbar from "@/components/buy/BuyResultsToolbar";
-import Footer from "@/components/layout/Footer";
-import Header from "@/components/layout/Header";
-import { buyCars } from "@/lib/car-data";
+import {
+  fetchAdsFacets,
+  fetchAdsSearch,
+} from "@/lib/search/ads-search";
+import { parseAdsSearchFiltersFromSearchParams } from "@/lib/search/ads-search-url";
+import { VehicleSearchResultsPage } from "../../components/search/VehicleSearchResultsPage";
 
-export const metadata: Metadata = {
-  title: "Comprar",
-  description: "Pagina de busca com filtros rapidos e listagem de carros em Sao Paulo.",
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function toReader(searchParams: SearchParams) {
+  return {
+    get(name: string) {
+      const value = searchParams[name];
+      if (Array.isArray(value)) return value[0] ?? null;
+      return value ?? null;
+    },
+  };
+}
+
+type ComprarPageProps = {
+  searchParams: SearchParams;
 };
 
-export default function ComprarPage() {
+export const revalidate = 60;
+
+export default async function ComprarPage({ searchParams }: ComprarPageProps) {
+  const filters = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
+
+  const [initialResults, initialFacetsResponse] = await Promise.all([
+    fetchAdsSearch(filters),
+    fetchAdsFacets(filters).catch(() => null),
+  ]);
+
   return (
-    <>
-      <Header />
-      <BuyHeaderPanel />
-
-      <main className="mx-auto grid w-full max-w-[1240px] gap-4 px-6 py-6 lg:grid-cols-[308px_1fr]">
-        <BuyFiltersSidebar />
-        <section className="space-y-4">
-          <BuyResultsToolbar />
-          <BuyCarsGrid cars={buyCars} />
-        </section>
-      </main>
-
-      <Footer />
-    </>
+    <VehicleSearchResultsPage
+      initialResults={initialResults}
+      initialFacets={initialFacetsResponse?.facets || null}
+    />
   );
 }
