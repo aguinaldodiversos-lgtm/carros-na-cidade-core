@@ -1,5 +1,5 @@
 import type { AdItem } from "./ads-search";
-export * from "../territorial-public";
+
 export interface TerritorialFacetBrand {
   brand: string;
   total: number;
@@ -100,8 +100,8 @@ type QueryInput =
 
 function getApiBaseUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
     process.env.API_URL?.replace(/\/+$/, "") ||
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
     "http://localhost:4000"
   );
 }
