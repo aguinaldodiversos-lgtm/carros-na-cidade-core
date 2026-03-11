@@ -8,32 +8,26 @@ interface SearchSortSelectProps {
 }
 
 const SORT_OPTIONS = [
+  { value: "recent", label: "Últimos" },
   { value: "relevance", label: "Mais relevantes" },
-  { value: "recent", label: "Mais recentes" },
   { value: "price_asc", label: "Menor preço" },
   { value: "price_desc", label: "Maior preço" },
   { value: "year_desc", label: "Mais novos" },
-  { value: "year_asc", label: "Mais antigos" },
   { value: "mileage_asc", label: "Menor km" },
-  { value: "mileage_desc", label: "Maior km" },
   { value: "highlight", label: "Em destaque" },
 ];
 
 export function SearchSortSelect({
-  value = "relevance",
+  value = "recent",
   onChange,
 }: SearchSortSelectProps) {
   return (
     <div className="flex items-center gap-2">
-      <label
-        htmlFor="search-sort"
-        className="text-sm font-medium text-zinc-600"
-      >
-        Ordenar por
-      </label>
+      <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#6b7488]" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M6 6h15M6 12h10M6 18h6M3 6h.01M3 12h.01M3 18h.01" />
+      </svg>
 
       <select
-        id="search-sort"
         value={value}
         onChange={(event) =>
           onChange({
@@ -41,7 +35,7 @@ export function SearchSortSelect({
             page: 1,
           })
         }
-        className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-blue-500"
+        className="h-11 rounded-xl border border-[#d8dee9] bg-white px-4 text-sm font-semibold text-[#2f3a54] outline-none transition focus:border-[#0e62d8]"
       >
         {SORT_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
