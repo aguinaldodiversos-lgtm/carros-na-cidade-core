@@ -1,5 +1,3 @@
-// frontend/lib/search/ads-search.ts
-
 export interface AdsSearchFilters {
   q?: string;
   brand?: string;
@@ -78,7 +76,9 @@ export interface AdsFacetsResponse {
 
 function getApiBaseUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "http://localhost:4000"
+    process.env.API_URL?.replace(/\/+$/, "") ||
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
+    "http://localhost:4000"
   );
 }
 
@@ -134,6 +134,7 @@ export async function fetchAdsSearch(
     },
     signal,
     cache: "no-store",
+    next: { revalidate: 60 },
   });
 
   if (!response.ok) {
@@ -172,6 +173,7 @@ export async function fetchAdsFacets(
     },
     signal,
     cache: "no-store",
+    next: { revalidate: 60 },
   });
 
   if (!response.ok) {
