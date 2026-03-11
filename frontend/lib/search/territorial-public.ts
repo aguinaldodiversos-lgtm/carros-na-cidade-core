@@ -1,5 +1,5 @@
 import type { AdItem } from "./ads-search";
-
+export * from "../territorial-public";
 export interface TerritorialFacetBrand {
   brand: string;
   total: number;
