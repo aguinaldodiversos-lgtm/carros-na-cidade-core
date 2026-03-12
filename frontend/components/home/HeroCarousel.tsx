@@ -17,7 +17,7 @@ type HomeBanner = {
 const homeBanners: HomeBanner[] = [
   {
     id: "home-principal",
-    image: "/images/Hero.png",
+    image: "/images/hero.jpeg",
     alt: "Banner principal com carro em destaque para compra na cidade",
     title: "Encontre seu próximo carro em São Paulo",
     subtitle: "Milhares de ofertas esperando por você",
@@ -104,7 +104,7 @@ export function HeroCarousel() {
             aria-label="Slide anterior"
             className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/24 text-white backdrop-blur transition hover:bg-black/34"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <svg viewBox="0 0 24 24" width="24" height="24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2">
               <path d="m15 18-6-6 6-6" />
             </svg>
           </button>
@@ -117,7 +117,7 @@ export function HeroCarousel() {
             aria-label="Próximo slide"
             className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/24 text-white backdrop-blur transition hover:bg-black/34"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <svg viewBox="0 0 24 24" width="24" height="24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2">
               <path d="m9 18 6-6-6-6" />
             </svg>
           </button>

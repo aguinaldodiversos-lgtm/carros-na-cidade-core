@@ -1,0 +1,10 @@
+# Render Blueprint - Portal Frontend (Next.js)
+# IMPORTANTE: Root Directory = frontend (obrigatorio para build correto)
+# Next.js usa PORT automaticamente quando definido pelo Render
+services:
+  - type: web
+    name: carros-na-cidade-portal
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start

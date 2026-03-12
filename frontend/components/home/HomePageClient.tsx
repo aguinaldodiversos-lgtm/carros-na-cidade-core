@@ -45,7 +45,7 @@ const benefits = [
     title: "Compra segura",
     text: "Negocie direto com vendedores verificados",
     icon: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 3l7 3v6c0 4.5-2.8 7.4-7 9-4.2-1.6-7-4.5-7-9V6l7-3Z" />
         <path d="m9 12 2 2 4-4" />
       </svg>
@@ -55,7 +55,7 @@ const benefits = [
     title: "Foco na sua cidade",
     text: "Ofertas locais, praticidade e relevância regional",
     icon: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z" />
         <circle cx="12" cy="10" r="2.5" />
       </svg>
@@ -65,7 +65,7 @@ const benefits = [
     title: "Transparência de preço",
     text: "Planos e leitura de valor com base na FIPE",
     icon: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 3v18" />
         <path d="M17 7.5c0-2-2-3.5-5-3.5s-5 1.5-5 3.5 2 3.5 5 3.5 5 1.5 5 3.5-2 3.5-5 3.5-5-1.5-5-3.5" />
       </svg>
@@ -75,7 +75,7 @@ const benefits = [
     title: "Venda rápida",
     text: "Anuncie em minutos e aumente sua visibilidade",
     icon: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
       </svg>
     ),

@@ -177,7 +177,7 @@ export function HomeSearchSection() {
           className="md:col-span-2 inline-flex h-[58px] w-full items-center justify-center gap-2 rounded-[10px] bg-[#0e62d8] px-6 text-[19px] font-extrabold text-white shadow-[0_12px_24px_rgba(14,98,216,0.24)] transition hover:bg-[#0c4fb0]"
         >
           Pesquisar
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+          <svg viewBox="0 0 20 20" width="20" height="20" className="h-4 w-4 shrink-0" fill="currentColor">
             <path d="M7 4 13 10 7 16" />
           </svg>
         </button>
