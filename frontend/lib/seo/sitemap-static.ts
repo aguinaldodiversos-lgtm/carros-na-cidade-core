@@ -19,6 +19,12 @@ export function getStaticSitemapEntries(): PublicSitemapEntry[] {
       priority: 0.9,
     },
     {
+      loc: "/comprar",
+      lastmod: now,
+      changefreq: "daily",
+      priority: 0.9,
+    },
+    {
       loc: "/blog",
       lastmod: now,
       changefreq: "weekly",

@@ -11,6 +11,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           "/",
           "/anuncios",
+          "/comprar",
           "/cidade/",
           "/veiculo/",
           "/blog/",
@@ -19,7 +20,7 @@ export default function robots(): MetadataRoute.Robots {
           "/sitemap.xml",
           "/sitemaps/",
         ],
-        disallow: ["/api/", "/comprar", "/dashboard", "/dashboard-loja", "/login", "/pagamento", "/impulsionar"],
+        disallow: ["/api/", "/dashboard", "/dashboard-loja", "/login", "/pagamento", "/impulsionar"],
       },
     ],
     sitemap: [`${siteUrl}/sitemap.xml`],
