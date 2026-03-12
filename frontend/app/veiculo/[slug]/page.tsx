@@ -1,22 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
 import VehicleActions from "@/components/vehicle/VehicleActions";
 import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
+import { fetchAdDetail } from "@/lib/ads/ad-detail";
+import {
+  adaptAdDetailToVehicle,
+  buildCityVehicles,
+  buildSellerVehicles,
+} from "@/lib/vehicle/public-vehicle";
 import {
   getAISimilarVehicles,
   getAIVehicleInsights,
   getAIVehiclePriceSignal,
 } from "@/services/aiService";
-import {
-  getCityVehicles,
-  getSellerVehicles,
-  getVehicleBySlug,
-  getVehicleSlugs,
-} from "@/services/vehicleService";
 
 type PageProps = {
   params: { slug: string };
@@ -25,12 +26,12 @@ type PageProps = {
 export const revalidate = 1800;
 export const dynamicParams = true;
 
-export async function generateStaticParams() {
-  return getVehicleSlugs(120).map((slug) => ({ slug }));
-}
+const getPublicVehicleDetail = cache(async (slug: string) => {
+  return adaptAdDetailToVehicle(await fetchAdDetail(slug));
+});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const vehicle = await getVehicleBySlug(params.slug);
+  const vehicle = await getPublicVehicleDetail(params.slug);
   const [cityName] = vehicle.city.split(" (");
 
   return {
@@ -63,14 +64,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function VehicleDetailPage({ params }: PageProps) {
-  const vehicle = await getVehicleBySlug(params.slug);
+  const vehicle = await getPublicVehicleDetail(params.slug);
 
   const [priceSignal, aiInsights, sellerVehicles, cityVehicles, similarVehicles] =
     await Promise.all([
       getAIVehiclePriceSignal(vehicle),
       getAIVehicleInsights(vehicle),
-      getSellerVehicles(vehicle),
-      getCityVehicles(vehicle),
+      Promise.resolve(buildSellerVehicles(vehicle)),
+      Promise.resolve(buildCityVehicles(vehicle)),
       getAISimilarVehicles(vehicle),
     ]);
 

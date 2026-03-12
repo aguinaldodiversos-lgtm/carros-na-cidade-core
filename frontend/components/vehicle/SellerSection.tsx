@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
 import type { ListingCar } from "@/lib/car-data";
-import type { VehicleDetail } from "@/services/vehicleService";
+import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 type SellerSectionProps = {
   vehicle: VehicleDetail;

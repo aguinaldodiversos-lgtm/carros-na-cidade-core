@@ -1,4 +1,4 @@
-import type { VehicleDetail } from "@/services/vehicleService";
+import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import type { VehiclePriceSignal } from "@/services/aiService";
 
 type VehicleInfoProps = {

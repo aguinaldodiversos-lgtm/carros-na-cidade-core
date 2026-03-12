@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   fetchAdsFacets,
   fetchAdsSearch,
@@ -22,6 +23,57 @@ type AnunciosPageProps = {
 };
 
 export const revalidate = 60;
+
+function hasActiveFilters(searchParams: SearchParams) {
+  return Object.values(searchParams).some((value) => {
+    if (Array.isArray(value)) {
+      return value.some((item) => Boolean(item));
+    }
+
+    return Boolean(value);
+  });
+}
+
+export async function generateMetadata({
+  searchParams,
+}: AnunciosPageProps): Promise<Metadata> {
+  const filteredView = hasActiveFilters(searchParams);
+
+  return {
+    title: filteredView
+      ? "Resultados de busca de carros | Carros na Cidade"
+      : "Anúncios de carros usados e seminovos | Carros na Cidade",
+    description: filteredView
+      ? "Compare anúncios de carros usados e seminovos com filtros por marca, modelo, preço, quilometragem e localização no Carros na Cidade."
+      : "Explore anúncios de carros usados e seminovos com filtros inteligentes, ofertas abaixo da FIPE e resultados organizados para encontrar o veículo ideal.",
+    alternates: {
+      canonical: "/anuncios",
+    },
+    robots: filteredView
+      ? {
+          index: false,
+          follow: true,
+          googleBot: {
+            index: false,
+            follow: true,
+            "max-image-preview": "large",
+            "max-snippet": -1,
+            "max-video-preview": -1,
+          },
+        }
+      : {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            "max-image-preview": "large",
+            "max-snippet": -1,
+            "max-video-preview": -1,
+          },
+        },
+  };
+}
 
 export default async function AnunciosPage({ searchParams }: AnunciosPageProps) {
   const filters = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));

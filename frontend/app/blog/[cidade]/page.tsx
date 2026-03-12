@@ -3,8 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import CTASection from "@/components/common/CTASection";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
-import Footer from "@/components/layout/Footer";
-import Header from "@/components/layout/Header";
 import { getAIBlogInsights } from "@/services/aiService";
 import {
   getBlogArticlesByCity,
@@ -112,8 +110,6 @@ export default async function BlogCityPage({ params }: PageProps) {
 
   return (
     <>
-      <Header />
-
       <main className="mx-auto w-full max-w-7xl px-6 py-8">
         <nav aria-label="Breadcrumb" className="mb-4 text-sm text-[#5f6982]">
           <ol className="flex items-center gap-2">
@@ -206,15 +202,13 @@ export default async function BlogCityPage({ params }: PageProps) {
           title="Quer transformar leitura em oportunidade de compra?"
           description="Veja anuncios selecionados com potencial de valorizacao e recomendacoes do Cerebro IA por cidade."
           primaryLabel="Explorar veiculos"
-          primaryHref="/comprar"
+          primaryHref="/anuncios"
           secondaryLabel="Consultar FIPE local"
           secondaryHref={`/tabela-fipe/${city.slug}`}
         />
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
-
-      <Footer />
     </>
   );
 }

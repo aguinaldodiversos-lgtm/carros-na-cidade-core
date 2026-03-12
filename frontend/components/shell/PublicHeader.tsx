@@ -11,17 +11,9 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
+  { label: "Comprar", href: "/anuncios" },
   { label: "Anunciar", href: "/planos" },
-  { label: "Favoritos", href: "/favoritos" },
 ];
-
-function HeartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-    </svg>
-  );
-}
 
 function MenuIcon({ open }: { open: boolean }) {
   return (
@@ -89,14 +81,6 @@ export function PublicHeader() {
                   {item.label}
                 </Link>
               ))}
-
-              <Link
-                href="/favoritos"
-                aria-label="Favoritos"
-                className="text-[#5b667c] transition hover:text-[#0e62d8]"
-              >
-                <HeartIcon />
-              </Link>
             </nav>
 
             <div className="h-10 w-px bg-[#e2e8f0]" />
@@ -142,15 +126,6 @@ export function PublicHeader() {
                   {item.label}
                 </Link>
               ))}
-
-              <Link
-                href="/favoritos"
-                onClick={() => setMobileOpen(false)}
-                className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[#334155] transition hover:bg-[#f7f9fc]"
-              >
-                <HeartIcon />
-                Favoritos
-              </Link>
 
               {rightButtons.map((button) => (
                 <Link

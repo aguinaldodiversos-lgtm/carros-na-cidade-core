@@ -1,40 +1,31 @@
-import {
-  fetchAdsFacets,
-  fetchAdsSearch,
-} from "@/lib/search/ads-search";
-import { parseAdsSearchFiltersFromSearchParams } from "@/lib/search/ads-search-url";
-import { VehicleSearchResultsPage } from "../../components/search/VehicleSearchResultsPage";
+import { redirect } from "next/navigation";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
-function toReader(searchParams: SearchParams) {
-  return {
-    get(name: string) {
-      const value = searchParams[name];
-      if (Array.isArray(value)) return value[0] ?? null;
-      return value ?? null;
-    },
-  };
+function buildQueryString(searchParams: SearchParams) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value === undefined) continue;
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined) params.append(key, item);
+      }
+      continue;
+    }
+
+    params.set(key, value);
+  }
+
+  return params.toString();
 }
 
 type ComprarPageProps = {
   searchParams: SearchParams;
 };
 
-export const revalidate = 60;
-
 export default async function ComprarPage({ searchParams }: ComprarPageProps) {
-  const filters = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
-
-  const [initialResults, initialFacetsResponse] = await Promise.all([
-    fetchAdsSearch(filters),
-    fetchAdsFacets(filters).catch(() => null),
-  ]);
-
-  return (
-    <VehicleSearchResultsPage
-      initialResults={initialResults}
-      initialFacets={initialFacetsResponse?.facets || null}
-    />
-  );
+  const queryString = buildQueryString(searchParams);
+  redirect(queryString ? `/anuncios?${queryString}` : "/anuncios");
 }

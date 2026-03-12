@@ -1,6 +1,30 @@
+export interface PublicAdDetail {
+  id: number | string;
+  slug?: string | null;
+  title?: string | null;
+  description?: string | null;
+  price?: number | string | null;
+  city?: string | null;
+  state?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  year?: number | string | null;
+  mileage?: number | string | null;
+  body_type?: string | null;
+  fuel_type?: string | null;
+  transmission?: string | null;
+  below_fipe?: boolean | null;
+  highlight_until?: string | null;
+  plan?: string | null;
+  image_url?: string | null;
+  images?: string[] | string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface AdDetailResponse {
   success: boolean;
-  data: any;
+  data: PublicAdDetail;
 }
 
 function getApiBaseUrl(): string {
@@ -11,7 +35,7 @@ function getApiBaseUrl(): string {
   );
 }
 
-export async function fetchAdDetail(identifier: string) {
+export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail> {
   const apiBase = getApiBaseUrl();
 
   const response = await fetch(

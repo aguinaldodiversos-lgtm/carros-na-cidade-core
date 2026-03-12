@@ -3,8 +3,6 @@ import CTASection from "@/components/common/CTASection";
 import FinancingSimulator from "@/components/common/FinancingSimulator";
 import StatsSection from "@/components/common/StatsSection";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
-import Footer from "@/components/layout/Footer";
-import Header from "@/components/layout/Header";
 import { getAIFinancingInsights, getAIFinancingStats } from "@/services/aiService";
 import { getCityProfile, getStaticCitySlugs, getVehiclesByCity } from "@/services/marketService";
 
@@ -68,8 +66,6 @@ export default async function SimuladorFinanciamentoCityPage({ params }: PagePro
 
   return (
     <>
-      <Header />
-
       <main className="mx-auto w-full max-w-7xl px-6 py-8">
         <section className="overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0c4fb2_0%,#1382e7_100%)] p-8 text-white shadow-[0_12px_30px_rgba(15,74,168,0.35)]">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/80">SEO Programatico - Financiamento</p>
@@ -111,15 +107,13 @@ export default async function SimuladorFinanciamentoCityPage({ params }: PagePro
           title="Receba condicoes inteligentes do Cerebro IA"
           description="Combine preco, taxa e prazo ideais para sua realidade e veja anuncios com maior chance de aprovacao."
           primaryLabel="Ver anuncios para financiar"
-          primaryHref="/comprar"
+          primaryHref="/anuncios"
           secondaryLabel="Consultar FIPE local"
           secondaryHref={`/tabela-fipe/${city.slug}`}
         />
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(financialSchema) }} />
-
-      <Footer />
     </>
   );
 }

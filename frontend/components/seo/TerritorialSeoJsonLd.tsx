@@ -1,15 +1,17 @@
-<<<<<<< HEAD
 import { buildTerritorialJsonLd } from "@/lib/seo/territorial-seo";
 import type { TerritorialPagePayload } from "@/lib/search/territorial-public";
-=======
-<<<<<<< HEAD
-import React from "react";
->>>>>>> dd86845 (Fix TerritorialSeoJsonLd module export)
 
-export type TerritorialSeoJsonLdProps = {
+export type TerritorialSeoMode =
+  | "city"
+  | "brand"
+  | "model"
+  | "opportunities"
+  | "below_fipe";
+
+export interface TerritorialSeoJsonLdProps {
   data: TerritorialPagePayload;
-  mode?: "city" | "brand" | "model" | "opportunities" | "below_fipe";
-};
+  mode?: TerritorialSeoMode;
+}
 
 export function TerritorialSeoJsonLd({
   data,
@@ -28,5 +30,3 @@ export function TerritorialSeoJsonLd({
 }
 
 export default TerritorialSeoJsonLd;
-=======
->>>>>>> 735f82b (Fix TerritorialSeoJsonLd module export)

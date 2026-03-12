@@ -3,12 +3,16 @@ import Link from "next/link";
 type VehicleActionsProps = {
   vehicleId: string;
   vehicleName: string;
-  whatsappPhone: string;
+  whatsappPhone?: string;
 };
 
 export default function VehicleActions({ vehicleId, vehicleName, whatsappPhone }: VehicleActionsProps) {
+  const sanitizedPhone = whatsappPhone?.replace(/\D/g, "") || "";
+  const hasWhatsapp = sanitizedPhone.length >= 10;
   const waText = encodeURIComponent(`Ola, tenho interesse no veiculo ${vehicleName}`);
-  const waLink = `https://wa.me/${whatsappPhone}?text=${waText}`;
+  const waLink = hasWhatsapp
+    ? `https://wa.me/${sanitizedPhone}?text=${waText}`
+    : null;
   const financeLink = `/simulador-financiamento?veiculo=${vehicleId}`;
 
   return (
@@ -22,14 +26,20 @@ export default function VehicleActions({ vehicleId, vehicleName, whatsappPhone }
           >
             Simular financiamento
           </Link>
-          <Link
-            href={waLink}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1fa855] px-4 text-[15px] font-bold text-white shadow-[0_10px_20px_rgba(31,168,85,0.25)] transition hover:brightness-110"
-          >
-            Falar no WhatsApp
-          </Link>
+          {waLink ? (
+            <Link
+              href={waLink}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1fa855] px-4 text-[15px] font-bold text-white shadow-[0_10px_20px_rgba(31,168,85,0.25)] transition hover:brightness-110"
+            >
+              Falar no WhatsApp
+            </Link>
+          ) : (
+            <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d8dfeb] bg-[#f8fafc] px-4 text-[15px] font-bold text-[#64748b]">
+              Contato em atualização
+            </span>
+          )}
         </div>
       </section>
 
@@ -41,14 +51,20 @@ export default function VehicleActions({ vehicleId, vehicleName, whatsappPhone }
           >
             Simular
           </Link>
-          <Link
-            href={waLink}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1fa855] px-3 text-[15px] font-bold text-white shadow-[0_10px_20px_rgba(31,168,85,0.2)]"
-          >
-            WhatsApp
-          </Link>
+          {waLink ? (
+            <Link
+              href={waLink}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1fa855] px-3 text-[15px] font-bold text-white shadow-[0_10px_20px_rgba(31,168,85,0.2)]"
+            >
+              WhatsApp
+            </Link>
+          ) : (
+            <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d8dfeb] bg-[#f8fafc] px-3 text-[14px] font-bold text-[#64748b]">
+              Contato
+            </span>
+          )}
         </div>
       </div>
     </>

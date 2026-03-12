@@ -3,8 +3,6 @@ import CTASection from "@/components/common/CTASection";
 import FAQSection from "@/components/common/FAQSection";
 import StatsSection from "@/components/common/StatsSection";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
-import Footer from "@/components/layout/Footer";
-import Header from "@/components/layout/Header";
 import { getAIFipeInsights, getAIFipeStats } from "@/services/aiService";
 import {
   getCityProfile,
@@ -83,8 +81,6 @@ export default async function TabelaFipeCityPage({ params }: PageProps) {
 
   return (
     <>
-      <Header />
-
       <main className="mx-auto w-full max-w-7xl px-6 py-8">
         <section className="overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0c4fb2_0%,#1382e7_100%)] p-8 text-white shadow-[0_12px_30px_rgba(15,74,168,0.35)]">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/80">SEO Programatico - FIPE</p>
@@ -171,7 +167,7 @@ export default async function TabelaFipeCityPage({ params }: PageProps) {
           title={`Quer vender ou comprar com mais margem em ${city.name}?`}
           description="Ative recomendacoes do Cerebro IA para encontrar anuncios com alta liquidez e preco competitivo."
           primaryLabel="Buscar veiculos agora"
-          primaryHref="/comprar"
+          primaryHref="/anuncios"
           secondaryLabel="Abrir simulador"
           secondaryHref={`/simulador-financiamento/${city.slug}`}
         />
@@ -179,8 +175,6 @@ export default async function TabelaFipeCityPage({ params }: PageProps) {
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(automotiveSchema) }} />
-
-      <Footer />
     </>
   );
 }

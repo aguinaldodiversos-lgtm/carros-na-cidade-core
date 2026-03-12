@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/dashboard/DashboardClient";
-import Footer from "@/components/layout/Footer";
-import Header from "@/components/layout/Header";
 import { getDashboardPayload } from "@/services/dashboardService";
 import { AUTH_COOKIE_NAME, getSessionUserFromCookieValue } from "@/services/sessionService";
 
@@ -34,19 +32,13 @@ export default function DashboardLojaPage() {
   }
 
   return (
-    <>
-      <Header />
-
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <DashboardClient
-          initialData={payload}
-          heading="Dashboard Lojista (CNPJ)"
-          subheading="Gestao de anuncios da loja, limite, plano e impulsionamento."
-          createLabel="Criar anuncio"
-        />
-      </main>
-
-      <Footer />
-    </>
+    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <DashboardClient
+        initialData={payload}
+        heading="Dashboard Lojista (CNPJ)"
+        subheading="Gestao de anuncios da loja, limite, plano e impulsionamento."
+        createLabel="Criar anuncio"
+      />
+    </main>
   );
 }
