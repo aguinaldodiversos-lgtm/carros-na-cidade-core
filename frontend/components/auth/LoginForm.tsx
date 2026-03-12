@@ -9,7 +9,11 @@ type LoginResponse = {
   redirect_to?: string;
 };
 
-export default function LoginForm() {
+type LoginFormProps = {
+  next?: string;
+};
+
+export default function LoginForm({ next }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +36,7 @@ export default function LoginForm() {
         body: JSON.stringify({
           email,
           password,
+          next,
         }),
       });
 

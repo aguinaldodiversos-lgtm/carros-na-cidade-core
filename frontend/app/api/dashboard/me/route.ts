@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDashboardPayload } from "@/services/dashboardService";
-import { getSessionUserFromRequest } from "@/services/sessionService";
+import { fetchDashboard } from "@/lib/account/backend-account";
+import { getSessionDataFromRequest } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const session = getSessionUserFromRequest(request);
-  if (!session) {
+  const session = getSessionDataFromRequest(request);
+  if (!session?.accessToken) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const payload = getDashboardPayload(session.id, session.email);
-  if (!payload) {
-    return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404 });
-  }
-
+  const payload = await fetchDashboard(session);
   return NextResponse.json(payload);
 }

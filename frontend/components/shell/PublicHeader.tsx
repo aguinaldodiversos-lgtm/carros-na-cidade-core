@@ -11,8 +11,8 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { label: "Comprar", href: "/anuncios" },
   { label: "Anunciar", href: "/planos" },
+  { label: "Favoritos", href: "/login" },
 ];
 
 function MenuIcon({ open }: { open: boolean }) {
@@ -45,13 +45,13 @@ export function PublicHeader() {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#e4e8f1] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className="sticky top-0 z-50 border-b border-[#e4e8f1] bg-white/96 shadow-[0_1px_0_rgba(255,255,255,0.55)] backdrop-blur supports-[backdrop-filter]:bg-white/88">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
-        <div className="flex h-[78px] items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4 md:gap-8">
+        <div className="flex h-[76px] items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3 md:gap-6">
             <Link
               href="/"
-              className="relative block h-11 w-[170px] shrink-0 md:h-12 md:w-[182px]"
+              className="relative block h-10 w-[160px] shrink-0 md:h-11 md:w-[176px]"
               aria-label="Carros na Cidade"
             >
               <Image src="/images/logo.png" alt="Carros na Cidade" fill priority className="object-contain object-left" />
@@ -59,7 +59,7 @@ export function PublicHeader() {
 
             <button
               type="button"
-              className="hidden items-center gap-2 rounded-xl px-2 py-2 text-[15px] font-bold text-[#263248] transition hover:bg-[#f6f8fc] md:inline-flex"
+              className="hidden items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[14px] font-bold text-[#263248] transition hover:border-[#e3e8f1] hover:bg-[#f7f9fc] md:inline-flex"
             >
               São Paulo
               <svg viewBox="0 0 20 20" className="h-4 w-4 text-[#0e62d8]" fill="currentColor">
@@ -68,22 +68,25 @@ export function PublicHeader() {
             </button>
           </div>
 
-          <div className="hidden items-center gap-7 md:flex">
-            <nav className="flex items-center gap-7 text-[15px] font-medium text-[#5b667c]">
+          <div className="hidden items-center gap-5 md:flex">
+            <nav className="flex items-center gap-6 text-[14px] font-semibold text-[#5b667c]">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`transition hover:text-[#0e62d8] ${
+                  className={`inline-flex items-center gap-1.5 transition hover:text-[#0e62d8] ${
                     isActive(pathname, item.href) ? "text-[#0e62d8]" : ""
                   }`}
                 >
+                  {item.label === "Favoritos" ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
+                    </svg>
+                  ) : null}
                   {item.label}
                 </Link>
               ))}
             </nav>
-
-            <div className="h-10 w-px bg-[#e2e8f0]" />
 
             {rightButtons.map((button) => (
               <Link key={button.href} href={button.href} className={button.className}>
@@ -92,7 +95,14 @@ export function PublicHeader() {
             ))}
           </div>
 
-          <button
+          <div className="flex items-center gap-2 md:hidden">
+            <Link
+              href="/login"
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-bold text-white"
+            >
+              Entrar
+            </Link>
+            <button
             type="button"
             onClick={() => setMobileOpen((state) => !state)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#dfe4ef] text-[#34405a] md:hidden"
@@ -100,7 +110,8 @@ export function PublicHeader() {
             aria-expanded={mobileOpen}
           >
             <MenuIcon open={mobileOpen} />
-          </button>
+            </button>
+          </div>
         </div>
 
         {mobileOpen && (

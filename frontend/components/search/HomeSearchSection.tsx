@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const cityOptions = [
-  { label: "São Paulo", value: "sao-paulo-sp" },
-  { label: "Campinas", value: "campinas-sp" },
-  { label: "Atibaia", value: "atibaia-sp" },
-  { label: "Sorocaba", value: "sorocaba-sp" },
-  { label: "Belo Horizonte", value: "belo-horizonte-mg" },
+  { label: "São Paulo (SP)", value: "sao-paulo-sp" },
+  { label: "Rio de Janeiro (RJ)", value: "rio-de-janeiro-rj" },
+  { label: "Belo Horizonte (MG)", value: "belo-horizonte-mg" },
+  { label: "Campinas (SP)", value: "campinas-sp" },
+  { label: "Curitiba (PR)", value: "curitiba-pr" },
+  { label: "Porto Alegre (RS)", value: "porto-alegre-rs" },
+  { label: "Goiânia (GO)", value: "goiania-go" },
+  { label: "Florianópolis (SC)", value: "florianopolis-sc" },
 ];
 
 const brandOptions = [
@@ -53,15 +56,12 @@ const categoryOptions = [
 ];
 
 function SearchField({
-  label,
   children,
 }: {
-  label: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0">
-      <label className="mb-2 block text-sm font-semibold text-[#53607a]">{label}</label>
+    <div className="min-w-0 rounded-xl border border-[#d9e0ea] bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
       {children}
     </div>
   );
@@ -71,7 +71,7 @@ function BaseSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`h-[56px] w-full rounded-xl border border-[#d8dee9] bg-white px-4 text-[16px] font-medium text-[#2f3a54] outline-none transition focus:border-[#0e62d8] ${props.className || ""}`}
+      className={`h-[52px] w-full rounded-xl bg-transparent px-4 text-[15px] font-semibold text-[#2f3a54] outline-none transition focus:text-[#163467] ${props.className || ""}`}
     />
   );
 }
@@ -102,94 +102,115 @@ export function HomeSearchSection() {
     if (maxPrice) params.set("max_price", maxPrice);
     if (bodyType) params.set("body_type", bodyType);
 
-    router.push(`/comprar?${params.toString()}`);
+    router.push(`/anuncios?${params.toString()}`);
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[28px] border border-[#e2e8f0] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] md:p-6"
+      className="rounded-[18px] border border-[#e0e6ef] bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)] md:p-5"
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <SearchField label="Cidade">
-          <BaseSelect value={citySlug} onChange={(e) => setCitySlug(e.target.value)}>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12">
+        <div className="xl:col-span-3">
+          <SearchField>
+            <BaseSelect value={citySlug} onChange={(e) => setCitySlug(e.target.value)} aria-label="Cidade">
             {cityOptions.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
             ))}
           </BaseSelect>
-        </SearchField>
+          </SearchField>
+        </div>
 
-        <SearchField label="Marca">
-          <BaseSelect
-            value={brand}
-            onChange={(e) => {
-              setBrand(e.target.value);
-              setModel("");
-            }}
+        <div className="xl:col-span-3">
+          <SearchField>
+            <BaseSelect
+              value={brand}
+              aria-label="Marca"
+              onChange={(e) => {
+                setBrand(e.target.value);
+                setModel("");
+              }}
+            >
+              <option value="">Marca</option>
+              {brandOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </BaseSelect>
+          </SearchField>
+        </div>
+
+        <div className="xl:col-span-3">
+          <SearchField>
+            <BaseSelect
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={!brand}
+              aria-label="Modelo"
+            >
+              <option value="">Modelo</option>
+              {modelOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </BaseSelect>
+          </SearchField>
+        </div>
+
+        <div className="xl:col-span-3">
+          <SearchField>
+            <BaseSelect value={yearMin} onChange={(e) => setYearMin(e.target.value)} aria-label="Ano">
+              <option value="">Ano</option>
+              {yearOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </BaseSelect>
+          </SearchField>
+        </div>
+
+        <div className="xl:col-span-3">
+          <SearchField>
+            <BaseSelect value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} aria-label="Preço até">
+              <option value="">Preço até</option>
+              {priceOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </BaseSelect>
+          </SearchField>
+        </div>
+
+        <div className="xl:col-span-3">
+          <SearchField>
+            <BaseSelect value={bodyType} onChange={(e) => setBodyType(e.target.value)} aria-label="Categoria">
+              <option value="">Categoria</option>
+              {categoryOptions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </BaseSelect>
+          </SearchField>
+        </div>
+
+        <div className="xl:col-span-6">
+          <button
+            type="submit"
+            className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#0e62d8] px-6 text-[17px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.26)] transition hover:bg-[#0c4fb0]"
           >
-            <option value="">- Selecionar -</option>
-            {brandOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Modelo">
-          <BaseSelect value={model} onChange={(e) => setModel(e.target.value)} disabled={!brand}>
-            <option value="">Modelo</option>
-            {modelOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Ano">
-          <BaseSelect value={yearMin} onChange={(e) => setYearMin(e.target.value)}>
-            <option value="">Ano</option>
-            {yearOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Preço até">
-          <BaseSelect value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)}>
-            <option value="">Preço até</option>
-            {priceOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Categoria">
-          <BaseSelect value={bodyType} onChange={(e) => setBodyType(e.target.value)}>
-            <option value="">Categoria</option>
-            {categoryOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-      </div>
-
-      <div className="mt-5 flex justify-end">
-        <button
-          type="submit"
-          className="inline-flex h-[56px] min-w-[220px] items-center justify-center rounded-xl bg-[#0e62d8] px-6 text-[18px] font-bold text-white shadow-[0_10px_26px_rgba(14,98,216,0.22)] transition hover:bg-[#0c4fb0]"
-        >
-          Pesquisar
-        </button>
+            Pesquisar
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+              <path d="M7 4 13 10 7 16" />
+            </svg>
+          </button>
+        </div>
       </div>
     </form>
   );

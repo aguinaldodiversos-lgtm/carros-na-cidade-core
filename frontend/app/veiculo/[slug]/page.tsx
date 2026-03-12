@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache } from "react";
+import AdEventTracker from "@/components/analytics/AdEventTracker";
+import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import VehicleActions from "@/components/vehicle/VehicleActions";
 import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
+import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import {
   adaptAdDetailToVehicle,
   buildCityVehicles,
@@ -99,31 +103,6 @@ export default async function VehicleDetailPage({ params }: PageProps) {
     },
   };
 
-  const schemaBreadcrumb = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Home",
-        item: "https://carrosnacidade.com/",
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "Anúncios",
-        item: "https://carrosnacidade.com/anuncios",
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: vehicle.model,
-        item: `https://carrosnacidade.com/veiculo/${vehicle.slug}`,
-      },
-    ],
-  };
-
   const schemaFaq = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -148,32 +127,28 @@ export default async function VehicleDetailPage({ params }: PageProps) {
       },
     ],
   };
+  const breadcrumbItems = [
+    { name: "Home", href: "/" },
+    { name: "Anúncios", href: "/anuncios" },
+    { name: vehicle.model },
+  ];
+  const pageSchema = buildWebPageJsonLd({
+    title: `${vehicle.model} ${vehicle.year.split("/")[0]} à venda`,
+    description: `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulação de financiamento.`,
+    path: `/veiculo/${vehicle.slug}`,
+    type: "WebPage",
+    about: vehicle.fullName,
+  });
 
   const sellerPhone = vehicle.seller.phone;
 
   return (
     <>
       <main className="mx-auto w-full max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pb-8 md:pt-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-4 overflow-x-auto whitespace-nowrap text-sm text-[#5f6982]"
-        >
-          <ol className="flex flex-wrap items-center gap-2">
-            <li>
-              <Link href="/" className="hover:text-[#0e62d8]">
-                Home
-              </Link>
-            </li>
-            <li>/</li>
-            <li>
-              <Link href="/anuncios" className="hover:text-[#0e62d8]">
-                Anúncios
-              </Link>
-            </li>
-            <li>/</li>
-            <li className="font-semibold text-[#2b3650]">{vehicle.model}</li>
-          </ol>
-        </nav>
+        <PageBreadcrumbs
+          items={breadcrumbItems}
+          className="mb-4 overflow-x-auto whitespace-nowrap"
+        />
 
         <div className="grid gap-4 md:gap-5 xl:grid-cols-[1.45fr_1fr]">
           <VehicleGallery images={vehicle.images} alt={vehicle.fullName} />
@@ -206,13 +181,15 @@ export default async function VehicleDetailPage({ params }: PageProps) {
         />
       </main>
 
+      <AdEventTracker adId={vehicle.id} eventType="view" />
+      <BreadcrumbJsonLd items={breadcrumbItems} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }}
       />
       <script
         type="application/ld+json"

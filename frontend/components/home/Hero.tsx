@@ -48,13 +48,13 @@ export default function Hero() {
 
               <div className="absolute inset-0 flex flex-col justify-center px-8 text-white md:px-14">
                 <h1 className="max-w-[530px] text-[38px] font-extrabold leading-tight md:text-[56px]">
-                  Encontre seu proximo carro em Sao Paulo
+                  Encontre seu proximo carro na sua regiao
                 </h1>
                 <p className="mt-3 max-w-[420px] text-[21px] text-white/90 md:text-[31px]">
-                  Milhares de ofertas esperando por voce
+                  Catalogo regional com filtros inteligentes e descoberta local
                 </p>
                 <Link
-                  href="/comprar"
+                  href="/anuncios"
                   className="mt-7 inline-flex h-14 w-fit items-center rounded-xl bg-[#0e62d8] px-8 text-[17px] font-bold text-white transition hover:bg-[#0c4fb0]"
                 >
                   Pesquisar agora

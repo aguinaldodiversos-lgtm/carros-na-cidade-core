@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/dashboard/DashboardClient";
-import { getDashboardPayload } from "@/services/dashboardService";
-import { AUTH_COOKIE_NAME, getSessionUserFromCookieValue } from "@/services/sessionService";
+import { fetchDashboard } from "@/lib/account/backend-account";
+import { AUTH_COOKIE_NAME, getSessionDataFromCookieValue } from "@/services/sessionService";
 
 export const metadata: Metadata = {
   title: "Dashboard do anunciante",
@@ -15,9 +15,9 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const cookieStore = cookies();
-  const session = getSessionUserFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const session = getSessionDataFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
   if (!session) {
     redirect("/login");
@@ -26,7 +26,16 @@ export default function DashboardPage() {
     redirect("/dashboard-loja");
   }
 
-  const payload = getDashboardPayload(session.id, session.email);
+  if (!session.accessToken) {
+    redirect("/login");
+  }
+
+  let payload: Awaited<ReturnType<typeof fetchDashboard>> | null = null;
+  try {
+    payload = await fetchDashboard(session);
+  } catch {
+    redirect("/login");
+  }
   if (!payload) {
     redirect("/login");
   }

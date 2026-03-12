@@ -18,9 +18,9 @@ const groups: FooterGroup[] = [
   {
     title: "Comprar",
     links: [
-      { label: "Buscar veiculos", href: "/comprar" },
-      { label: "Veiculos abaixo da FIPE", href: "/comprar?filtro=abaixo-fipe" },
-      { label: "Simulador", href: "/simulador-financiamento/sao-paulo-sp" },
+      { label: "Buscar veiculos", href: "/anuncios" },
+      { label: "Veiculos abaixo da FIPE", href: "/anuncios?below_fipe=true" },
+      { label: "Simulador", href: "/simulador-financiamento" },
     ],
   },
   {
@@ -28,15 +28,15 @@ const groups: FooterGroup[] = [
     links: [
       { label: "Criar anuncio", href: "/anunciar" },
       { label: "Planos", href: "/planos" },
-      { label: "Tabela FIPE", href: "/tabela-fipe/sao-paulo-sp" },
+      { label: "Tabela FIPE", href: "/tabela-fipe" },
     ],
   },
   {
     title: "Conteudo",
     links: [
-      { label: "Blog", href: "/blog/sao-paulo-sp" },
-      { label: "Noticias", href: "/blog/sao-paulo-sp?categoria=noticias" },
-      { label: "Dicas", href: "/blog/sao-paulo-sp?categoria=dicas" },
+      { label: "Blog", href: "/blog" },
+      { label: "Noticias", href: "/blog" },
+      { label: "Dicas", href: "/blog" },
     ],
   },
   {

@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPlans, validatePublishEligibility } from "@/services/planStore";
+import { fetchPlanEligibility } from "@/lib/account/backend-account";
+import { getSessionDataFromRequest } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const body = (await request.json()) as { user_id?: string };
-  const userId = body.user_id?.trim();
-
-  if (!userId) {
-    return NextResponse.json({ error: "user_id e obrigatorio" }, { status: 400 });
+  const session = getSessionDataFromRequest(request);
+  if (!session?.accessToken) {
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const validation = validatePublishEligibility(userId);
-  const suggestedPlans = validation.suggested_plan_type
-    ? getPlans({ type: validation.suggested_plan_type, onlyActive: true })
-    : [];
+  const payload = await fetchPlanEligibility(session);
 
-  return NextResponse.json({
-    ...validation,
-    suggested_plans: suggestedPlans,
-  });
+  return NextResponse.json(payload);
 }

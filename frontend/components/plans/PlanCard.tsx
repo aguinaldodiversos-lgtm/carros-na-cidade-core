@@ -57,21 +57,33 @@ export default function PlanCard({ plan, userType }: PlanCardProps) {
         <p>Validade: {plan.validity_days ? `${plan.validity_days} dias` : "Sem expirar"}</p>
       </div>
 
+      <div className="mt-4 rounded-xl border border-[#e2e6f0] bg-[#f8fafe] p-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6980]">Resultado operacional</p>
+        <p className="mt-1 text-sm text-[#4e5973]">
+          {plan.has_store_profile
+            ? "Mais capacidade para estoque, vitrine de loja e ativação de anúncios prioritários."
+            : "Mais alcance para anúncio individual, com evolução simples para destaque quando houver intenção."}
+        </p>
+      </div>
+
       {plan.billing_model === "free" ? (
         <Link
-          href="/anunciar"
+          href="/login"
           className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white transition hover:brightness-110"
         >
-          Comecar gratis
+          Entrar para começar
         </Link>
       ) : (
         <PlanCheckoutButton
           endpoint={plan.billing_model === "monthly" ? "/api/payments/subscription" : "/api/payments/create"}
           planId={plan.id}
-          userId={userType === "CPF" ? "user-cpf-demo" : "user-cnpj-demo"}
           label={plan.billing_model === "monthly" ? "Assinar plano" : "Comprar destaque"}
         />
       )}
+
+      <p className="mt-3 text-xs leading-5 text-[#66728a]">
+        Após a ativação, o plano ou impulso passa a sustentar limite, exibição e gestão dentro do painel.
+      </p>
     </article>
   );
 }

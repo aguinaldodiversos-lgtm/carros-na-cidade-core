@@ -1,23 +1,37 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import CTASection from "@/components/common/CTASection";
 import FinancingSimulator from "@/components/common/FinancingSimulator";
+import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import StatsSection from "@/components/common/StatsSection";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import { getAIFinancingInsights, getAIFinancingStats } from "@/services/aiService";
-import { getCityProfile, getStaticCitySlugs, getVehiclesByCity } from "@/services/marketService";
+import {
+  getCityProfile,
+  getStaticCitySlugs,
+  getVehiclesByCity,
+  isSupportedCitySlug,
+} from "@/services/marketService";
 
 type PageProps = {
   params: { cidade: string };
 };
 
 export const revalidate = 3600;
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return getStaticCitySlugs(120).map((cidade) => ({ cidade }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  if (!isSupportedCitySlug(params.cidade)) {
+    notFound();
+  }
+
   const city = getCityProfile(params.cidade);
 
   return {
@@ -42,6 +56,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function SimuladorFinanciamentoCityPage({ params }: PageProps) {
+  if (!isSupportedCitySlug(params.cidade)) {
+    notFound();
+  }
+
   const city = getCityProfile(params.cidade);
   const [stats, insights] = await Promise.all([
     getAIFinancingStats(city.slug),
@@ -63,10 +81,23 @@ export default async function SimuladorFinanciamentoCityPage({ params }: PagePro
     description:
       "Ferramenta para simular parcela, custo efetivo e total pago no financiamento de carros por cidade.",
   };
+  const breadcrumbItems = [
+    { name: "Home", href: "/" },
+    { name: "Simulador", href: "/simulador-financiamento" },
+    { name: city.displayName },
+  ];
+  const pageSchema = buildWebPageJsonLd({
+    title: `Simulador de financiamento em ${city.name}`,
+    description: `Calcule parcela, juros, entrada e custo efetivo para comprar veículos em ${city.name}.`,
+    path: `/simulador-financiamento/${city.slug}`,
+    type: "WebPage",
+    about: `Financiamento automotivo em ${city.name}`,
+  });
 
   return (
     <>
       <main className="mx-auto w-full max-w-7xl px-6 py-8">
+        <PageBreadcrumbs items={breadcrumbItems} className="mb-4" />
         <section className="overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0c4fb2_0%,#1382e7_100%)] p-8 text-white shadow-[0_12px_30px_rgba(15,74,168,0.35)]">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/80">SEO Programatico - Financiamento</p>
           <h1 className="mt-2 text-3xl font-extrabold leading-tight md:text-5xl">
@@ -79,6 +110,40 @@ export default async function SimuladorFinanciamentoCityPage({ params }: PagePro
         </section>
 
         <FinancingSimulator cityLabel={city.name} />
+
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              title: `Ver anúncios em ${city.name}`,
+              description: "Leve a simulação para o catálogo local com filtros por cidade e intenção de compra.",
+              href: `/anuncios?city_slug=${city.slug}`,
+            },
+            {
+              title: "Comparar com a FIPE",
+              description: "Cruze parcela, entrada e referência de preço antes de fechar negócio.",
+              href: `/tabela-fipe/${city.slug}`,
+            },
+            {
+              title: "Ler o blog local",
+              description: "Aprofunde o contexto regional antes de decidir o melhor momento de compra.",
+              href: `/blog/${city.slug}`,
+            },
+            {
+              title: "Oportunidades da cidade",
+              description: "Explore páginas territoriais com ofertas abaixo da FIPE e maior aderência local.",
+              href: `/cidade/${city.slug}/oportunidades`,
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(10,20,40,0.08)]"
+            >
+              <h3 className="text-lg font-extrabold text-[#1d2538]">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#52607b]">{item.description}</p>
+            </Link>
+          ))}
+        </section>
 
         <StatsSection
           title={`Panorama de financiamento em ${city.name}`}
@@ -107,12 +172,14 @@ export default async function SimuladorFinanciamentoCityPage({ params }: PagePro
           title="Receba condicoes inteligentes do Cerebro IA"
           description="Combine preco, taxa e prazo ideais para sua realidade e veja anuncios com maior chance de aprovacao."
           primaryLabel="Ver anuncios para financiar"
-          primaryHref="/anuncios"
+          primaryHref={`/anuncios?city_slug=${city.slug}`}
           secondaryLabel="Consultar FIPE local"
           secondaryHref={`/tabela-fipe/${city.slug}`}
         />
       </main>
 
+      <BreadcrumbJsonLd items={breadcrumbItems} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(financialSchema) }} />
     </>
   );

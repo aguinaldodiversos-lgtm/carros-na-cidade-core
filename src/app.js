@@ -21,6 +21,8 @@ import adsEventsRoutes from "./modules/ads/ads.events.routes.js";
 import adsRoutes from "./modules/ads/ads.routes.js";
 import leadsRoutes from "./modules/leads/leads.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import accountRoutes from "./modules/account/account.routes.js";
+import paymentsRoutes from "./modules/payments/payments.routes.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 
@@ -86,7 +88,14 @@ app.use(
 );
 
 app.use(compression());
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "1mb" }));
+app.use(
+  express.json({
+    limit: process.env.JSON_BODY_LIMIT || "1mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf.toString("utf8");
+    },
+  })
+);
 app.use(
   express.urlencoded({
     extended: true,
@@ -134,6 +143,8 @@ app.get("/health/meta", (req, res) => {
 app.use("/api/public", publicRoutes);
 app.use("/api/public/seo", publicSeoRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/account", accountRoutes);
+app.use("/api/payments", paymentsRoutes);
 app.use("/api/leads", leadsRoutes);
 app.use("/api/ads", adsRoutes);
 app.use("/api/ads", adsEventsRoutes);

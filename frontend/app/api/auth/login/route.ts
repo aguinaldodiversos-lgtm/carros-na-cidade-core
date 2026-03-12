@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { authenticateUser } from "@/services/authService";
 import { AUTH_COOKIE_NAME, createSessionToken, getSessionCookieOptions } from "@/services/sessionService";
 
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 type Payload = {
   email?: string;
   password?: string;
+  next?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -18,21 +20,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
   }
 
-  const user = await authenticateUser(email, password);
-  if (!user) {
+  const authSession = await authenticateUser(email, password);
+  if (!authSession) {
     return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
   }
 
   const sessionToken = createSessionToken({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    type: user.type,
+    id: authSession.user.id,
+    name: authSession.user.name,
+    email: authSession.user.email,
+    type: authSession.user.type,
+    accessToken: authSession.accessToken,
+    refreshToken: authSession.refreshToken,
   });
 
   const response = NextResponse.json({
-    user,
-    redirect_to: "/dashboard",
+    user: authSession.user,
+    redirect_to: resolvePostLoginRedirect(authSession.user.type, body.next),
   });
 
   response.cookies.set(AUTH_COOKIE_NAME, sessionToken, getSessionCookieOptions());

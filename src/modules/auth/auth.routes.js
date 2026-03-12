@@ -1,6 +1,8 @@
 import express from "express";
 import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
+import { pool } from "../../infrastructure/database/db.js";
 
 import * as AuthServiceNS from "./auth.service.js";
 import * as PasswordServiceNS from "./password.service.js";
@@ -227,6 +229,50 @@ router.post(
     }
 
     return res.status(200).json(result ?? { ok: true });
+  })
+);
+
+router.get(
+  "/me",
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        email,
+        COALESCE(document_type, 'cpf') AS document_type,
+        COALESCE(document_verified, false) AS document_verified,
+        COALESCE(plan, 'free') AS plan,
+        role
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [req.user.id]
+    );
+
+    const user = result.rows[0];
+    if (!user) {
+      throw new AppError("Usuario nao encontrado", 404);
+    }
+
+    const accountType = String(user.document_type || "").trim().toUpperCase() === "CNPJ" ? "CNPJ" : "CPF";
+
+    res.json({
+      success: true,
+      user: {
+        id: String(user.id),
+        name: user.name?.trim() || "Usuario",
+        email: user.email?.trim() || "",
+        type: accountType,
+        document_type: accountType,
+        cnpj_verified: accountType === "CNPJ" ? Boolean(user.document_verified) : false,
+        role: user.role || "user",
+        plan: user.plan || "free",
+      },
+    });
   })
 );
 

@@ -4,9 +4,18 @@ import { AdCard } from "./AdCard";
 interface AdGridProps {
   items: AdItem[];
   priorityFirstRow?: boolean;
+  priorityCount?: number;
+  variant?: "default" | "home";
+  className?: string;
 }
 
-export function AdGrid({ items, priorityFirstRow = false }: AdGridProps) {
+export function AdGrid({
+  items,
+  priorityFirstRow = false,
+  priorityCount = 3,
+  variant = "default",
+  className = "",
+}: AdGridProps) {
   if (!items.length) {
     return (
       <div className="rounded-[24px] border border-dashed border-[#cbd5e1] bg-white px-6 py-12 text-center shadow-sm">
@@ -21,12 +30,20 @@ export function AdGrid({ items, priorityFirstRow = false }: AdGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      className={
+        className ||
+        `grid gap-4 ${
+          variant === "home" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+        }`
+      }
+    >
       {items.map((item, index) => (
         <AdCard
           key={`${item.id}-${item.slug || index}`}
           item={item}
-          priority={priorityFirstRow && index < 3}
+          priority={priorityFirstRow && index < priorityCount}
+          variant={variant}
         />
       ))}
     </div>

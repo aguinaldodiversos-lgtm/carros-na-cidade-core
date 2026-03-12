@@ -11,8 +11,9 @@ const groups: FooterGroup[] = [
     title: "Comprar",
     links: [
       { label: "Ver anúncios", href: "/anuncios" },
-      { label: "Oportunidades", href: "/cidade/sao-paulo-sp/oportunidades" },
-      { label: "Abaixo da FIPE", href: "/cidade/sao-paulo-sp/abaixo-da-fipe" },
+      { label: "Comprar", href: "/comprar" },
+      { label: "Oportunidades", href: "/anuncios" },
+      { label: "Abaixo da FIPE", href: "/anuncios?below_fipe=true" },
       { label: "Simulador de financiamento", href: "/simulador-financiamento" },
     ],
   },
@@ -21,8 +22,8 @@ const groups: FooterGroup[] = [
     links: [
       { label: "Anunciar no portal", href: "/planos" },
       { label: "Planos para lojistas", href: "/planos" },
-      { label: "Impulsionar anúncio", href: "/dashboard-loja" },
-      { label: "Área do lojista", href: "/dashboard-loja" },
+      { label: "Impulsionar anúncio", href: "/login?next=/dashboard-loja" },
+      { label: "Área do lojista", href: "/login?next=/dashboard-loja" },
     ],
   },
   {
@@ -30,16 +31,16 @@ const groups: FooterGroup[] = [
     links: [
       { label: "Tabela FIPE", href: "/tabela-fipe" },
       { label: "Blog automotivo", href: "/blog" },
-      { label: "Cidades em foco", href: "/cidade/sao-paulo-sp" },
-      { label: "Notícias", href: "/blog/sao-paulo-sp" },
+      { label: "Cidades em foco", href: "/anuncios" },
+      { label: "Notícias", href: "/blog" },
     ],
   },
   {
     title: "Institucional",
     links: [
+      { label: "Sobre", href: "/sobre" },
+      { label: "Contato", href: "/contato" },
       { label: "Entrar", href: "/login" },
-      { label: "Recuperar senha", href: "/recuperar-senha" },
-      { label: "Painel", href: "/dashboard" },
       { label: "Planos", href: "/planos" },
     ],
   },
@@ -74,6 +75,15 @@ export function PublicFooter() {
               Portal automotivo regional com foco em performance, autoridade local,
               busca inteligente e estrutura preparada para crescer cidade por cidade.
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-2 text-sm text-white/75">
+              <span className="inline-flex items-center rounded-full border border-white/15 px-3 py-1">
+                contato@carrosnacidade.com
+              </span>
+              <span className="inline-flex items-center rounded-full border border-white/15 px-3 py-1">
+                (11) 98768-4221
+              </span>
+            </div>
 
             <div className="mt-5 flex flex-wrap gap-2">
               {socials.map((social) => (

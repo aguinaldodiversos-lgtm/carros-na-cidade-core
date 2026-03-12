@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { activateAd, deleteAd, getAdByIdForUser, getBoostOptions, pauseAd } from "@/services/adService";
-import { getSessionUserFromRequest } from "@/services/sessionService";
+import { deleteOwnedAd, fetchOwnedAd, patchOwnedAdStatus } from "@/lib/account/backend-account";
+import { getSessionDataFromRequest } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
@@ -15,25 +15,18 @@ type PatchPayload = {
 };
 
 export async function GET(request: NextRequest, { params }: Params) {
-  const session = getSessionUserFromRequest(request);
-  if (!session) {
+  const session = getSessionDataFromRequest(request);
+  if (!session?.accessToken) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const ad = getAdByIdForUser(params.id, session.id);
-  if (!ad) {
-    return NextResponse.json({ error: "Anuncio nao encontrado" }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    ad,
-    boost_options: getBoostOptions(),
-  });
+  const payload = await fetchOwnedAd(session, params.id);
+  return NextResponse.json(payload);
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const session = getSessionUserFromRequest(request);
-  if (!session) {
+  const session = getSessionDataFromRequest(request);
+  if (!session?.accessToken) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
@@ -44,28 +37,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Acao invalida" }, { status: 400 });
   }
 
-  const updated = action === "pause" ? pauseAd(session.id, params.id) : activateAd(session.id, params.id);
-  if (!updated) {
-    return NextResponse.json({ error: "Anuncio nao encontrado" }, { status: 404 });
-  }
+  const updated = await patchOwnedAdStatus(session, params.id, action);
 
   return NextResponse.json({
-    ad: updated,
+    ad: updated.ad,
   });
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const session = getSessionUserFromRequest(request);
-  if (!session) {
+  const session = getSessionDataFromRequest(request);
+  if (!session?.accessToken) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const removed = deleteAd(session.id, params.id);
-  if (!removed) {
-    return NextResponse.json({ error: "Anuncio nao encontrado" }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    ok: true,
-  });
+  const removed = await deleteOwnedAd(session, params.id);
+  return NextResponse.json(removed);
 }

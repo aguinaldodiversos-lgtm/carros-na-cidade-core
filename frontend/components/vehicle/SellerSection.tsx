@@ -28,10 +28,10 @@ export default function SellerSection({ vehicle, sellerVehicles, cityVehicles }:
             </div>
 
             <Link
-              href={`/comprar?loja=${vehicle.seller.storeSlug}`}
+              href={`/anuncios?city_slug=${vehicle.citySlug}`}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0e62d8] px-5 text-[15px] font-bold text-white transition hover:bg-[#0b54be]"
             >
-              Ver todos os anuncios da loja
+              Explorar anuncios na regiao
             </Link>
           </div>
         </section>

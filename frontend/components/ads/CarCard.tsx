@@ -1,6 +1,7 @@
 import { AdCard } from "@/components/ads/AdCard";
 import { legacyCarCardToAdItem } from "@/lib/ads/ad-card-adapter";
 
+// Transitional compatibility wrapper: route all legacy card shapes to the official AdCard.
 type CarData = {
   slug?: string;
   title: string;

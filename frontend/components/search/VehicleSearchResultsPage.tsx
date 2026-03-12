@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -23,6 +24,24 @@ import { SearchSortSelect } from "./SearchSortSelect";
 interface VehicleSearchResultsPageProps {
   initialResults: AdsSearchResponse;
   initialFacets: AdsFacetsResponse["facets"] | null;
+}
+
+function getCityProfileFromSlug(slug?: string | null) {
+  if (!slug) return null;
+
+  const parts = slug.split("-").filter(Boolean);
+  const ufCandidate = parts.at(-1)?.toUpperCase();
+  const hasUf = Boolean(ufCandidate && ufCandidate.length === 2);
+  const cityName = parts
+    .slice(0, hasUf ? -1 : undefined)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+  return {
+    slug,
+    name: cityName || "Sua cidade",
+    uf: hasUf ? ufCandidate : "",
+  };
 }
 
 function ToolbarButton({
@@ -143,6 +162,32 @@ export function VehicleSearchResultsPage({
   ]);
 
   const totalResults = results?.pagination?.total || 0;
+  const cityProfile = getCityProfileFromSlug(filters.city_slug);
+
+  const hero = useMemo(() => {
+    const cityLabel = cityProfile?.name ? ` em ${cityProfile.name}` : "";
+    const term =
+      filters.brand && filters.model
+        ? `${filters.brand} ${filters.model}`
+        : filters.brand
+          ? `carros ${filters.brand}`
+          : "carros usados e seminovos";
+
+    return {
+      title: `${term}${cityLabel}`,
+      subtitle: cityProfile
+        ? `Compare anúncios, valor de mercado e contexto local para comprar melhor em ${cityProfile.name}.`
+        : "Compare ofertas, refinie filtros e descubra o melhor contexto para comprar ou vender seu próximo veículo.",
+      quickLinks: cityProfile
+        ? [
+            { label: `Cidade ${cityProfile.name}`, href: `/cidade/${cityProfile.slug}` },
+            { label: "FIPE local", href: `/tabela-fipe/${cityProfile.slug}` },
+            { label: "Simulador", href: `/simulador-financiamento/${cityProfile.slug}` },
+            { label: "Blog local", href: `/blog/${cityProfile.slug}` },
+          ]
+        : [],
+    };
+  }, [cityProfile, filters.brand, filters.model]);
 
   return (
     <main className="min-h-screen bg-[#f3f4f7]">
@@ -150,32 +195,50 @@ export function VehicleSearchResultsPage({
         <section className="grid gap-5 lg:grid-cols-[1fr_1.05fr]">
           <div className="rounded-[28px] border border-[#e1e7f0] bg-white px-6 py-8 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
             <h1 className="max-w-xl text-[32px] font-extrabold leading-tight tracking-tight text-[#1d2538] md:text-[44px]">
-              Carros usados e seminovos em São Paulo
+              {hero.title}
             </h1>
+
+            <p className="mt-4 max-w-2xl text-[17px] leading-7 text-[#6b7488]">
+              {hero.subtitle}
+            </p>
 
             <p className="mt-5 text-[20px] font-medium text-[#6b7488]">
               {totalResults.toLocaleString("pt-BR")} anúncios encontrados
             </p>
+
+            {hero.quickLinks.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {hero.quickLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="inline-flex h-10 items-center rounded-xl border border-[#d9e1ef] bg-[#f8fafe] px-4 text-sm font-semibold text-[#33405d] transition hover:border-[#c7d5f0] hover:bg-[#eef4ff]"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-[28px] border border-[#e1e7f0] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
             <div className="flex h-full flex-col justify-between gap-5 rounded-[24px] border border-[#edf1f6] bg-[linear-gradient(135deg,#ffffff_0%,#fbfcff_100%)] px-6 py-6 md:flex-row md:items-center">
               <div>
                 <h2 className="text-[24px] font-black leading-tight text-[#1d2538] md:text-[36px]">
-                  Venda mais rápido
+                  Ganhe visibilidade no momento certo
                 </h2>
                 <p className="mt-2 text-[18px] text-[#4f5a74]">
-                  com anúncios em <span className="font-bold text-[#0e62d8]">destaque</span>
+                  Ative plano, publique com limite correto e impulsione anúncios com maior intenção local.
                 </p>
               </div>
 
               <div className="flex flex-col items-start gap-4 md:items-end">
-                <button
-                  type="button"
+                <Link
+                  href="/planos"
                   className="inline-flex h-12 items-center justify-center rounded-xl bg-[#0e62d8] px-6 text-[16px] font-bold text-white transition hover:bg-[#0c4fb0]"
                 >
-                  Patrocinar anúncio
-                </button>
+                  Ver planos e impulsionamento
+                </Link>
 
                 <div className="h-14 w-14 rounded-full bg-[conic-gradient(from_180deg_at_50%_50%,#0e62d8_0deg,#28a8ff_120deg,#7c4dff_220deg,#ffb400_320deg,#0e62d8_360deg)] opacity-90" />
               </div>
@@ -196,12 +259,21 @@ export function VehicleSearchResultsPage({
             <section className="rounded-[24px] border border-[#e1e7f0] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                  <ToolbarButton active>51 Últimos</ToolbarButton>
+                  <ToolbarButton active>
+                    {cityProfile ? `Busca em ${cityProfile.name}` : "Busca nacional"}
+                  </ToolbarButton>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <SearchSortSelect value={filters.sort || "recent"} onChange={pushFilters} />
-                  <ToolbarButton>Ver no mapa</ToolbarButton>
+                  {cityProfile ? (
+                    <Link
+                      href={`/cidade/${cityProfile.slug}`}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#f5f7fb] px-4 text-sm font-semibold text-[#6b7488] transition hover:bg-[#edf1f7]"
+                    >
+                      Ver hub da cidade
+                    </Link>
+                  ) : null}
                 </div>
               </div>
 

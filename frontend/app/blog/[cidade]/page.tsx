@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import CTASection from "@/components/common/CTASection";
+import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { getAIBlogInsights } from "@/services/aiService";
+import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import {
   getBlogArticlesByCity,
   getCityProfile,
+  isSupportedCitySlug,
   getStaticCitySlugs,
   getVehiclesByCity,
   type BlogArticle,
@@ -17,13 +22,17 @@ type PageProps = {
 };
 
 export const revalidate = 3600;
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return getStaticCitySlugs(120).map((cidade) => ({ cidade }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  if (!isSupportedCitySlug(params.cidade)) {
+    notFound();
+  }
+
   const city = getCityProfile(params.cidade);
   return {
     title: `Blog automotivo em ${city.name} ${city.uf}`,
@@ -78,6 +87,10 @@ function ArticleCard({ article, citySlug }: { article: BlogArticle; citySlug: st
 }
 
 export default async function BlogCityPage({ params }: PageProps) {
+  if (!isSupportedCitySlug(params.cidade)) {
+    notFound();
+  }
+
   const city = getCityProfile(params.cidade);
   const [insights, articles] = await Promise.all([
     getAIBlogInsights(city.slug),
@@ -107,27 +120,23 @@ export default async function BlogCityPage({ params }: PageProps) {
       about: `Mercado automotivo em ${city.name}`,
     })),
   };
+  const breadcrumbItems = [
+    { name: "Home", href: "/" },
+    { name: "Blog", href: "/blog" },
+    { name: city.displayName },
+  ];
+  const pageSchema = buildWebPageJsonLd({
+    title: `Noticias automotivas em ${city.name}`,
+    description: `Conteúdo regional sobre mercado automotivo, FIPE, financiamento e intenção de compra em ${city.name}.`,
+    path: `/blog/${city.slug}`,
+    type: "CollectionPage",
+    about: `Mercado automotivo em ${city.name}`,
+  });
 
   return (
     <>
       <main className="mx-auto w-full max-w-7xl px-6 py-8">
-        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-[#5f6982]">
-          <ol className="flex items-center gap-2">
-            <li>
-              <Link href="/" className="hover:text-[#0e62d8]">
-                Home
-              </Link>
-            </li>
-            <li>/</li>
-            <li>
-              <Link href="/blog/sao-paulo-sp" className="hover:text-[#0e62d8]">
-                Blog
-              </Link>
-            </li>
-            <li>/</li>
-            <li className="font-semibold text-[#2b3650]">{city.displayName}</li>
-          </ol>
-        </nav>
+        <PageBreadcrumbs items={breadcrumbItems} className="mb-4" />
 
         <section className="overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0c4fb2_0%,#1382e7_100%)] p-8 text-white shadow-[0_12px_30px_rgba(15,74,168,0.35)]">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/80">SEO Programatico - Conteudo Local</p>
@@ -183,6 +192,26 @@ export default async function BlogCityPage({ params }: PageProps) {
                 ))}
               </ul>
             </section>
+
+            <section className="rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)]">
+              <h3 className="text-lg font-extrabold text-[#1d2538]">Continue explorando {city.name}</h3>
+              <div className="mt-3 grid gap-2">
+                {[
+                  { label: "Ver catálogo local", href: `/anuncios?city_slug=${city.slug}` },
+                  { label: "Consultar FIPE da cidade", href: `/tabela-fipe/${city.slug}` },
+                  { label: "Simular financiamento local", href: `/simulador-financiamento/${city.slug}` },
+                  { label: "Ver oportunidades da cidade", href: `/cidade/${city.slug}/oportunidades` },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="inline-flex min-h-11 items-center rounded-xl border border-[#dfe4ef] bg-[#f8fafe] px-4 text-sm font-bold text-[#33405d] transition hover:bg-[#eef4ff]"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </section>
           </aside>
         </section>
 
@@ -198,16 +227,52 @@ export default async function BlogCityPage({ params }: PageProps) {
           vehicles={vehicles}
         />
 
+        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              title: `Comprar em ${city.name}`,
+              description: "Catálogo local com filtros por cidade, marca, modelo e intenção de compra.",
+              href: `/anuncios?city_slug=${city.slug}`,
+            },
+            {
+              title: "Hub territorial",
+              description: "Página regional com contexto local, breadcrumbs e caminhos para marcas e modelos.",
+              href: `/cidade/${city.slug}`,
+            },
+            {
+              title: "Tabela FIPE local",
+              description: "Compare o conteúdo editorial com referência de preço e oportunidades abaixo da tabela.",
+              href: `/tabela-fipe/${city.slug}`,
+            },
+            {
+              title: "Simulador da cidade",
+              description: "Leve a intenção de leitura para decisão de compra com parcela e custo efetivo.",
+              href: `/simulador-financiamento/${city.slug}`,
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(10,20,40,0.08)]"
+            >
+              <h3 className="text-lg font-extrabold text-[#1d2538]">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#53607b]">{item.description}</p>
+            </Link>
+          ))}
+        </section>
+
         <CTASection
           title="Quer transformar leitura em oportunidade de compra?"
           description="Veja anuncios selecionados com potencial de valorizacao e recomendacoes do Cerebro IA por cidade."
           primaryLabel="Explorar veiculos"
-          primaryHref="/anuncios"
+          primaryHref={`/anuncios?city_slug=${city.slug}`}
           secondaryLabel="Consultar FIPE local"
           secondaryHref={`/tabela-fipe/${city.slug}`}
         />
       </main>
 
+      <BreadcrumbJsonLd items={breadcrumbItems} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
     </>
   );

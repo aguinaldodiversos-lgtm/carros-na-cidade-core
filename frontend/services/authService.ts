@@ -9,6 +9,12 @@ export type AuthUser = {
   cnpj_verified: boolean;
 };
 
+export type AuthSession = {
+  user: AuthUser;
+  accessToken?: string;
+  refreshToken?: string;
+};
+
 const localCredentials = [
   {
     user_id: "user-cpf-demo",
@@ -48,8 +54,19 @@ type BackendLoginResponse = {
   };
 };
 
+type BackendMeResponse = {
+  success?: boolean;
+  user?: BackendUserPayload;
+};
+
 function resolveAuthApiBase() {
-  return process.env.AUTH_API_BASE_URL ?? process.env.BACKEND_API_URL ?? "";
+  return (
+    process.env.AUTH_API_BASE_URL ??
+    process.env.BACKEND_API_URL ??
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    ""
+  );
 }
 
 function resolveAuthEndpoint(baseUrl: string, endpoint: string) {
@@ -104,7 +121,47 @@ export function getLocalEmailByUserId(userId: string) {
   return found?.email ?? `${userId}@carrosnacidade.com`;
 }
 
-async function authenticateAgainstBackend(email: string, password: string): Promise<AuthUser | null> {
+function extractAccessToken(payload: BackendLoginResponse) {
+  return (
+    payload.accessToken ??
+    payload.access_token ??
+    payload.token ??
+    payload.jwt ??
+    payload.data?.accessToken ??
+    payload.data?.access_token ??
+    payload.data?.token
+  );
+}
+
+function extractRefreshToken(payload: BackendLoginResponse) {
+  const data = payload.data as { refreshToken?: string; refresh_token?: string } | undefined;
+  const root = payload as BackendLoginResponse & { refreshToken?: string; refresh_token?: string };
+  return root.refreshToken ?? root.refresh_token ?? data?.refreshToken ?? data?.refresh_token;
+}
+
+async function fetchCurrentUserFromBackend(baseUrl: string, accessToken: string, fallbackEmail: string) {
+  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/me");
+  if (!endpoint) return null;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as BackendMeResponse;
+    return payload.user ? toAuthUserFromBackend(payload.user, fallbackEmail) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function authenticateAgainstBackend(email: string, password: string): Promise<AuthSession | null> {
   const baseUrl = resolveAuthApiBase();
   if (!baseUrl) return null;
 
@@ -124,23 +181,34 @@ async function authenticateAgainstBackend(email: string, password: string): Prom
     if (!response.ok) return null;
 
     const payload = (await response.json()) as BackendLoginResponse;
+    const accessToken = extractAccessToken(payload);
+    const refreshToken = extractRefreshToken(payload);
     const backendUser = payload.user ?? payload.data?.user;
-    if (!backendUser) return null;
+    const resolvedUser =
+      (backendUser ? toAuthUserFromBackend(backendUser, email) : null) ??
+      (accessToken ? await fetchCurrentUserFromBackend(baseUrl, accessToken, email) : null);
 
-    return toAuthUserFromBackend(backendUser, email);
+    if (!resolvedUser) return null;
+
+    return {
+      user: resolvedUser,
+      accessToken: accessToken ? String(accessToken) : undefined,
+      refreshToken: refreshToken ? String(refreshToken) : undefined,
+    };
   } catch {
     return null;
   }
 }
 
-function authenticateLocally(email: string, password: string): AuthUser | null {
+function authenticateLocally(email: string, password: string): AuthSession | null {
   const credential = findLocalCredentialByEmail(email);
   if (!credential) return null;
   if (credential.password !== password) return null;
-  return toAuthUserFromStore(credential.user_id, credential.email);
+  const user = toAuthUserFromStore(credential.user_id, credential.email);
+  return user ? { user } : null;
 }
 
-export async function authenticateUser(email: string, password: string): Promise<AuthUser | null> {
+export async function authenticateUser(email: string, password: string): Promise<AuthSession | null> {
   const backendUser = await authenticateAgainstBackend(email, password);
   if (backendUser) return backendUser;
   return authenticateLocally(email, password);

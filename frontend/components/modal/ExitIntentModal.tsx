@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 type ExitIntentModalProps = {
@@ -34,12 +35,12 @@ export default function ExitIntentModal({ city, onClose }: ExitIntentModalProps)
           >
             Fechar
           </button>
-          <a
-            href="/comprar"
+          <Link
+            href="/anuncios"
             className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-[15px] font-bold text-white"
           >
             Ver anuncios
-          </a>
+          </Link>
         </div>
       </div>
     </div>

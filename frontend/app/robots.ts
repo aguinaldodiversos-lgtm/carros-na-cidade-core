@@ -8,8 +8,18 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/anuncios", "/cidade/", "/blog/", "/comprar", "/sitemap.xml", "/sitemaps/"],
-        disallow: ["/api/", "/dashboard", "/dashboard-loja", "/login", "/pagamento", "/impulsionar"],
+        allow: [
+          "/",
+          "/anuncios",
+          "/cidade/",
+          "/veiculo/",
+          "/blog/",
+          "/tabela-fipe/",
+          "/simulador-financiamento/",
+          "/sitemap.xml",
+          "/sitemaps/",
+        ],
+        disallow: ["/api/", "/comprar", "/dashboard", "/dashboard-loja", "/login", "/pagamento", "/impulsionar"],
       },
     ],
     sitemap: [`${siteUrl}/sitemap.xml`],

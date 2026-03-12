@@ -165,6 +165,11 @@ export function getStaticCitySlugs(limit = 120) {
   return citySeeds.slice(0, limit).map((city) => city.slug);
 }
 
+export function isSupportedCitySlug(slug: string) {
+  const normalized = String(slug ?? "").trim().toLowerCase();
+  return citySeeds.some((city) => city.slug === normalized);
+}
+
 export function getVehiclesByCity(cidade: string, limit = 8): ListingCar[] {
   const city = getCityProfile(cidade);
   return buyCars.slice(0, limit).map((car, index) => ({

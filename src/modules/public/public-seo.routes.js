@@ -1,6 +1,14 @@
-// src/modules/public/public-seo.routes.js
 import express from "express";
 import { logger } from "../../shared/logger.js";
+import {
+  getInternalLinks,
+  getPublicSitemap,
+  getPublicSitemapByRegion,
+  getPublicSitemapByType,
+} from "./public-seo.controller.js";
+import {
+  listPublicSitemapEntries,
+} from "./public-seo.service.js";
 
 const router = express.Router();
 
@@ -27,6 +35,13 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function toAbsoluteUrl(path) {
+  const value = String(path ?? "").trim();
+  if (!value) return getSiteUrl();
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${getSiteUrl()}${value.startsWith("/") ? value : `/${value}`}`;
+}
+
 function buildUrlEntry(loc, { lastmod, changefreq, priority } = {}) {
   const parts = [];
   parts.push("<url>");
@@ -45,19 +60,30 @@ function buildSitemapXml(urls) {
     `</urlset>\n`;
 }
 
-// GET /api/public/seo/sitemap  e  /api/public/seo/sitemap.xml
-router.get(["/sitemap", "/sitemap.xml"], async (_req, res) => {
-  try {
-    const siteUrl = getSiteUrl();
-    const ts = nowIso();
+router.get("/sitemap", getPublicSitemap);
+router.get("/sitemap/type/:type", getPublicSitemapByType);
+router.get("/sitemap/region/:state", getPublicSitemapByRegion);
+router.get("/internal-links", getInternalLinks);
 
-    // Sitemap mínimo (não quebra)
-    const urls = [
-      buildUrlEntry(`${siteUrl}/`, { lastmod: ts, changefreq: "hourly", priority: 1.0 }),
-      buildUrlEntry(`${siteUrl}/anuncios`, { lastmod: ts, changefreq: "hourly", priority: 0.9 }),
-      // páginas territoriais podem ser adicionadas aqui depois:
-      // buildUrlEntry(`${siteUrl}/cidade/atibaia-sp`, { lastmod: ts, changefreq: "daily", priority: 0.8 }),
-    ];
+router.get("/sitemap.xml", async (req, res) => {
+  try {
+    const limit = Number(req.query.limit || 50000);
+    const entries = await listPublicSitemapEntries({ limit });
+    const urls = entries.map((entry) =>
+      buildUrlEntry(toAbsoluteUrl(entry.loc), {
+        lastmod: entry.lastmod,
+        changefreq: entry.changefreq,
+        priority: entry.priority,
+      })
+    );
+
+    if (urls.length === 0) {
+      const ts = nowIso();
+      urls.push(
+        buildUrlEntry(`${getSiteUrl()}/`, { lastmod: ts, changefreq: "daily", priority: 1.0 }),
+        buildUrlEntry(`${getSiteUrl()}/anuncios`, { lastmod: ts, changefreq: "daily", priority: 0.9 })
+      );
+    }
 
     const xml = buildSitemapXml(urls);
 
@@ -69,10 +95,9 @@ router.get(["/sitemap", "/sitemap.xml"], async (_req, res) => {
   } catch (error) {
     logger.error({ error }, "[public-seo] falha ao gerar sitemap");
 
-    // Fallback extremo: nunca retornar 500 sem corpo útil
-    const siteUrl = getSiteUrl();
     const xml = buildSitemapXml([
-      buildUrlEntry(`${siteUrl}/`, { lastmod: nowIso(), changefreq: "daily", priority: 1.0 }),
+      buildUrlEntry(`${getSiteUrl()}/`, { lastmod: nowIso(), changefreq: "daily", priority: 1.0 }),
+      buildUrlEntry(`${getSiteUrl()}/anuncios`, { lastmod: nowIso(), changefreq: "daily", priority: 0.9 }),
     ]);
 
     res

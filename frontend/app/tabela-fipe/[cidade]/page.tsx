@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import CTASection from "@/components/common/CTASection";
 import FAQSection from "@/components/common/FAQSection";
+import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import StatsSection from "@/components/common/StatsSection";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import { getAIFipeInsights, getAIFipeStats } from "@/services/aiService";
 import {
   getCityProfile,
   getFipeFaqByCity,
+  isSupportedCitySlug,
   getStaticCitySlugs,
   getVehiclesByCity,
 } from "@/services/marketService";
@@ -16,13 +22,17 @@ type PageProps = {
 };
 
 export const revalidate = 3600;
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return getStaticCitySlugs(120).map((cidade) => ({ cidade }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  if (!isSupportedCitySlug(params.cidade)) {
+    notFound();
+  }
+
   const city = getCityProfile(params.cidade);
 
   return {
@@ -47,6 +57,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function TabelaFipeCityPage({ params }: PageProps) {
+  if (!isSupportedCitySlug(params.cidade)) {
+    notFound();
+  }
+
   const city = getCityProfile(params.cidade);
   const [stats, insights] = await Promise.all([
     getAIFipeStats(city.slug),
@@ -78,10 +92,23 @@ export default async function TabelaFipeCityPage({ params }: PageProps) {
     priceRange: "$$",
     serviceType: "Consulta Tabela FIPE",
   };
+  const breadcrumbItems = [
+    { name: "Home", href: "/" },
+    { name: "Tabela FIPE", href: "/tabela-fipe" },
+    { name: city.displayName },
+  ];
+  const pageSchema = buildWebPageJsonLd({
+    title: `Tabela FIPE em ${city.name}`,
+    description: `Consulte valor de referência, compare com anúncios locais e encontre oportunidades abaixo da FIPE em ${city.name}.`,
+    path: `/tabela-fipe/${city.slug}`,
+    type: "CollectionPage",
+    about: `Tabela FIPE e oportunidades em ${city.name}`,
+  });
 
   return (
     <>
       <main className="mx-auto w-full max-w-7xl px-6 py-8">
+        <PageBreadcrumbs items={breadcrumbItems} className="mb-4" />
         <section className="overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0c4fb2_0%,#1382e7_100%)] p-8 text-white shadow-[0_12px_30px_rgba(15,74,168,0.35)]">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/80">SEO Programatico - FIPE</p>
           <h1 className="mt-2 text-3xl font-extrabold leading-tight md:text-5xl">Tabela FIPE em {city.name}</h1>
@@ -121,6 +148,40 @@ export default async function TabelaFipeCityPage({ params }: PageProps) {
               Consultar FIPE
             </button>
           </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              title: `Anúncios em ${city.name}`,
+              description: "Compare o valor de referência com o catálogo local e refine a busca por cidade.",
+              href: `/anuncios?city_slug=${city.slug}`,
+            },
+            {
+              title: "Abaixo da FIPE",
+              description: "Vá direto para oportunidades com preço competitivo na malha territorial.",
+              href: `/cidade/${city.slug}/abaixo-da-fipe`,
+            },
+            {
+              title: "Simular financiamento",
+              description: "Cruze valor FIPE com parcela, prazo e custo efetivo da compra.",
+              href: `/simulador-financiamento/${city.slug}`,
+            },
+            {
+              title: "Blog automotivo local",
+              description: "Conteúdo editorial da cidade para apoiar negociação e timing de compra.",
+              href: `/blog/${city.slug}`,
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(10,20,40,0.08)]"
+            >
+              <h3 className="text-lg font-extrabold text-[#1d2538]">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#52607b]">{item.description}</p>
+            </Link>
+          ))}
         </section>
 
         <StatsSection
@@ -167,12 +228,14 @@ export default async function TabelaFipeCityPage({ params }: PageProps) {
           title={`Quer vender ou comprar com mais margem em ${city.name}?`}
           description="Ative recomendacoes do Cerebro IA para encontrar anuncios com alta liquidez e preco competitivo."
           primaryLabel="Buscar veiculos agora"
-          primaryHref="/anuncios"
+          primaryHref={`/anuncios?city_slug=${city.slug}&below_fipe=true`}
           secondaryLabel="Abrir simulador"
           secondaryHref={`/simulador-financiamento/${city.slug}`}
         />
       </main>
 
+      <BreadcrumbJsonLd items={breadcrumbItems} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(automotiveSchema) }} />
     </>

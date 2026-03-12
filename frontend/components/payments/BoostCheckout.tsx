@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { trackAdEvent } from "@/lib/analytics/public-events";
 import type { BoostOption } from "@/lib/dashboard-types";
 
 type BoostCheckoutProps = {
@@ -40,6 +41,7 @@ export default function BoostCheckout({ adId, options, defaultOptionId }: BoostC
     setError("");
 
     try {
+      trackAdEvent(adId, "boost_start");
       const response = await fetch("/api/payments/create", {
         method: "POST",
         headers: {

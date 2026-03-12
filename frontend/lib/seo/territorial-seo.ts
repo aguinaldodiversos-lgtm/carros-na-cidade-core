@@ -83,6 +83,72 @@ function buildKeywords(data: TerritorialPagePayload, mode: TerritorialSeoMode): 
   return [...keywords];
 }
 
+function hasMeaningfulFilterValue(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return !Number.isNaN(value);
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.some((item) => hasMeaningfulFilterValue(item));
+  return true;
+}
+
+function shouldIndexTerritorialPage(
+  data: TerritorialPagePayload,
+  mode: TerritorialSeoMode
+): boolean {
+  if (data.seo?.robots === "noindex,nofollow") {
+    return false;
+  }
+
+  const filters = data.filters ?? {};
+  const routeOwnedKeys = new Set<string>([
+    "city",
+    "city_id",
+    "city_slug",
+    "slug",
+    "brand",
+    "brand_slug",
+    "model",
+    "model_slug",
+    "mode",
+    "cluster",
+    "type",
+  ]);
+
+  if (mode === "opportunities") {
+    routeOwnedKeys.add("opportunities");
+  }
+
+  if (mode === "below_fipe") {
+    routeOwnedKeys.add("below_fipe");
+  }
+
+  for (const [key, rawValue] of Object.entries(filters)) {
+    if (!hasMeaningfulFilterValue(rawValue)) {
+      continue;
+    }
+
+    const normalizedKey = key.trim().toLowerCase();
+
+    if (normalizedKey === "page") {
+      if (Number(rawValue) > 1) {
+        return false;
+      }
+      continue;
+    }
+
+    if (normalizedKey === "sort" || normalizedKey === "order") {
+      return false;
+    }
+
+    if (!routeOwnedKeys.has(normalizedKey)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function buildTerritorialMetadata(
   data: TerritorialPagePayload,
   mode: TerritorialSeoMode
@@ -92,6 +158,8 @@ export function buildTerritorialMetadata(
   const description = buildMetadataDescription(data);
   const canonical = toAbsoluteUrl(data.seo?.canonicalPath || "/");
   const ogImage = resolveOgImage(data);
+  const indexable = shouldIndexTerritorialPage(data, mode);
+  const followable = data.seo?.robots !== "noindex,nofollow";
 
   return {
     metadataBase: new URL(siteUrl),
@@ -126,11 +194,11 @@ export function buildTerritorialMetadata(
       images: ogImage ? [ogImage] : undefined,
     },
     robots: {
-      index: data.seo?.robots !== "noindex,nofollow",
-      follow: data.seo?.robots !== "noindex,nofollow",
+      index: indexable,
+      follow: followable,
       googleBot: {
-        index: data.seo?.robots !== "noindex,nofollow",
-        follow: data.seo?.robots !== "noindex,nofollow",
+        index: indexable,
+        follow: followable,
         "max-image-preview": "large",
         "max-snippet": -1,
         "max-video-preview": -1,

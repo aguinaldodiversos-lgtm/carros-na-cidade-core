@@ -1,10 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import type { AdItem } from "@/lib/search/ads-search";
+import { trackAdEvent } from "@/lib/analytics/public-events";
 
 interface AdCardProps {
   item: AdItem;
   priority?: boolean;
+  variant?: "default" | "home";
 }
 
 function formatPrice(price?: number) {
@@ -99,7 +103,7 @@ function GaugeIcon() {
   );
 }
 
-export function AdCard({ item, priority = false }: AdCardProps) {
+export function AdCard({ item, priority = false, variant = "default" }: AdCardProps) {
   const image = resolveImage(item);
   const href = resolveAdHref(item);
   const title = buildTitle(item);
@@ -107,6 +111,7 @@ export function AdCard({ item, priority = false }: AdCardProps) {
   const hasBelowFipe = item.below_fipe === true;
   const hasHighlight = Boolean(item.highlight_until);
   const detailSlug = resolveDetailSlug(item);
+  const isHome = variant === "home";
   const infoItems = [
     item.year
       ? {
@@ -134,13 +139,20 @@ export function AdCard({ item, priority = false }: AdCardProps) {
   }>;
 
   return (
-    <article className="h-full overflow-hidden rounded-[24px] border border-[#dbe4f0] bg-white shadow-[0_14px_36px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(15,23,42,0.14)]">
+    <article
+      className={`h-full overflow-hidden border bg-white transition duration-300 hover:-translate-y-1 ${
+        isHome
+          ? "rounded-[18px] border-[#dfe4ef] shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:shadow-[0_16px_30px_rgba(15,23,42,0.12)]"
+          : "rounded-[24px] border-[#dbe4f0] shadow-[0_14px_36px_rgba(15,23,42,0.08)] hover:shadow-[0_22px_48px_rgba(15,23,42,0.14)]"
+      }`}
+    >
       <Link
         href={href}
         aria-label={`Ver detalhes de ${title}`}
+        onClick={() => trackAdEvent(item.id, "click")}
         className="group flex h-full flex-col"
       >
-        <div className="relative aspect-[16/10] overflow-hidden bg-[#edf2f8]">
+        <div className={`relative overflow-hidden bg-[#edf2f8] ${isHome ? "aspect-[1.35/1]" : "aspect-[16/10]"}`}>
           <Image
             src={image}
             alt={title}
@@ -154,8 +166,12 @@ export function AdCard({ item, priority = false }: AdCardProps) {
 
           <div className="absolute left-3 top-3 flex flex-wrap gap-2">
             {hasHighlight ? (
-              <span className="rounded-full bg-[#0a7c83] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-sm">
-                Destaque
+              <span
+                className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-sm ${
+                  isHome ? "bg-[#1570ef]" : "bg-[#0a7c83]"
+                }`}
+              >
+                {isHome ? "Patrocinado" : "Destaque"}
               </span>
             ) : null}
 
@@ -170,69 +186,111 @@ export function AdCard({ item, priority = false }: AdCardProps) {
             <FavoriteIcon />
           </span>
 
-          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
-            <div className="rounded-full bg-white/92 px-3 py-1 text-[11px] font-bold text-[#1d2538] shadow-sm backdrop-blur">
-              ID {detailSlug}
+          {isHome ? null : (
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
+              <div className="rounded-full bg-white/92 px-3 py-1 text-[11px] font-bold text-[#1d2538] shadow-sm backdrop-blur">
+                ID {detailSlug}
+              </div>
+              <div className="rounded-full bg-[#081120]/72 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                Ver veículo
+              </div>
             </div>
-            <div className="rounded-full bg-[#081120]/72 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
-              Ver veículo
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="flex flex-1 flex-col p-5">
-          <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#0e62d8]">
-            Anúncio premium
-          </div>
+        <div className={`flex flex-1 flex-col ${isHome ? "p-3.5" : "p-5"}`}>
+          {isHome ? null : (
+            <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#0e62d8]">
+              Anúncio premium
+            </div>
+          )}
 
-          <h3 className="mt-2 line-clamp-2 min-h-[3.25rem] text-[19px] font-black leading-6 text-[#162033]">
+          <h3
+            className={`line-clamp-2 font-black text-[#162033] ${
+              isHome ? "min-h-[2.9rem] text-[19px] leading-6" : "mt-2 min-h-[3.25rem] text-[19px] leading-6"
+            }`}
+          >
             {title}
           </h3>
 
-          <div className="mt-3 inline-flex items-center gap-2 text-sm text-[#5f6982]">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+          <div className={`inline-flex items-center gap-2 text-sm text-[#5f6982] ${isHome ? "mt-2" : "mt-3"}`}>
+            <span className={`inline-flex items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8] ${isHome ? "h-7 w-7" : "h-8 w-8"}`}>
               <LocationIcon />
             </span>
             <span>{location || "Localização não informada"}</span>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {infoItems.map((info) => (
-              <span
-                key={info.key}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#d9e3f0] bg-[#f8fbff] px-3 py-1.5 text-[12px] font-semibold text-[#42506a]"
-              >
-                {info.icon}
-                {info.label}
+          {isHome ? (
+            <>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {infoItems.slice(0, 2).map((info) => (
+                  <span
+                    key={info.key}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#d9e3f0] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#42506a]"
+                  >
+                    {info.icon}
+                    {info.label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-3 flex items-end justify-between gap-3 border-t border-[#edf1f6] pt-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7b8496]">
+                    Valor do anúncio
+                  </div>
+                  <div className="mt-1 text-[30px] font-black leading-none tracking-[-0.04em] text-[#0e62d8]">
+                    {formatPrice(item.price)}
+                  </div>
+                </div>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f2f6fd] text-[#0e62d8] transition group-hover:bg-[#0e62d8] group-hover:text-white">
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+                    <path d="M7 4 13 10 7 16" />
+                  </svg>
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {infoItems.map((info) => (
+                  <span
+                    key={info.key}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#d9e3f0] bg-[#f8fbff] px-3 py-1.5 text-[12px] font-semibold text-[#42506a]"
+                  >
+                    {info.icon}
+                    {info.label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-[20px] border border-[#e3ebf5] bg-[#f8fbff] p-4">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#6a7488]">
+                  Valor do anúncio
+                </div>
+                <div className="mt-1 text-[28px] font-black tracking-[-0.03em] text-[#0e62d8]">
+                  {formatPrice(item.price)}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {hasBelowFipe ? (
+                    <span className="rounded-full bg-[#eaf2ff] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#0e62d8]">
+                      Oferta
+                    </span>
+                  ) : null}
+                  {hasHighlight ? (
+                    <span className="rounded-full bg-[#e8fbfb] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#0a7c83]">
+                      Visibilidade alta
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <span className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-[16px] font-bold text-white transition group-hover:bg-[#0c54bc]">
+                Ver detalhes do veículo
               </span>
-            ))}
-          </div>
-
-          <div className="mt-5 rounded-[20px] border border-[#e3ebf5] bg-[#f8fbff] p-4">
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#6a7488]">
-              Valor do anúncio
-            </div>
-            <div className="mt-1 text-[28px] font-black tracking-[-0.03em] text-[#0e62d8]">
-              {formatPrice(item.price)}
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {hasBelowFipe ? (
-                <span className="rounded-full bg-[#eaf2ff] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#0e62d8]">
-                  Oferta
-                </span>
-              ) : null}
-              {hasHighlight ? (
-                <span className="rounded-full bg-[#e8fbfb] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#0a7c83]">
-                  Visibilidade alta
-                </span>
-              ) : null}
-            </div>
-          </div>
-
-          <span className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-[16px] font-bold text-white transition group-hover:bg-[#0c54bc]">
-            Ver detalhes do veículo
-          </span>
+            </>
+          )}
         </div>
       </Link>
     </article>

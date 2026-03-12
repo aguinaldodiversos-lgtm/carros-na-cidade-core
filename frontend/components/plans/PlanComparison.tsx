@@ -1,28 +1,28 @@
 const rows = [
   {
-    feature: "Comissao sobre venda",
-    carrosNaCidade: "Nao cobramos",
-    outras: "2% a 8% por venda",
+    feature: "Modelo de monetização",
+    carrosNaCidade: "Plano e impulsionamento com valor previsível",
+    outras: "Custos difusos ou comissão sobre venda",
   },
   {
-    feature: "Limite gratuito",
-    carrosNaCidade: "CPF: 3 | CNPJ: 20",
-    outras: "Baixo ou inexistente",
+    feature: "Capacidade de publicação",
+    carrosNaCidade: "CPF: 3 grátis | CNPJ: 20 grátis + upgrades",
+    outras: "Menos clareza de limite e progressão",
   },
   {
-    feature: "Destaque pago",
-    carrosNaCidade: "Configuravel por plano",
-    outras: "Pacotes caros e rigidos",
+    feature: "Impulsionamento",
+    carrosNaCidade: "Ativação pontual para anúncio ou plano mensal de loja",
+    outras: "Pacotes rígidos e pouco conectados ao painel",
   },
   {
-    feature: "Contato direto",
-    carrosNaCidade: "WhatsApp sem intermediacao",
-    outras: "Muitas vezes bloqueado",
+    feature: "Leads e contato",
+    carrosNaCidade: "Contato direto + fluxo oficial do portal",
+    outras: "Contato muitas vezes intermediado ou opaco",
   },
   {
-    feature: "Taxas ocultas",
-    carrosNaCidade: "Transparencia total",
-    outras: "Comuns em renegociacoes",
+    feature: "Ativação do lojista",
+    carrosNaCidade: "Plano, dashboard e impulso no mesmo funil",
+    outras: "Fluxos quebrados entre catálogo, cobrança e operação",
   },
 ];
 
@@ -30,7 +30,7 @@ export default function PlanComparison() {
   return (
     <section className="mt-8 rounded-2xl border border-[#dfe4ef] bg-white p-4 shadow-[0_2px_16px_rgba(10,20,40,0.05)] sm:p-5">
       <h2 className="text-[24px] font-extrabold leading-tight text-[#1d2538] sm:text-2xl">
-        Outras plataformas cobram caro. Aqui nao.
+        O plano precisa liberar operação, não só cobrar assinatura.
       </h2>
 
       <div className="mt-4 space-y-3 md:hidden">

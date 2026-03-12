@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import BoostCheckout from "@/components/payments/BoostCheckout";
-import { getAdByIdForUser, getBoostOptions } from "@/services/adService";
-import { AUTH_COOKIE_NAME, getSessionUserFromCookieValue } from "@/services/sessionService";
+import { fetchOwnedAd } from "@/lib/account/backend-account";
+import { AUTH_COOKIE_NAME, getSessionDataFromCookieValue } from "@/services/sessionService";
 
 type ImpulsionarPageProps = {
   params: {
@@ -34,19 +34,28 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString("pt-BR");
 }
 
-export default function ImpulsionarPage({ params, searchParams }: ImpulsionarPageProps) {
+export default async function ImpulsionarPage({ params, searchParams }: ImpulsionarPageProps) {
   const cookieStore = cookies();
-  const session = getSessionUserFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const session = getSessionDataFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value);
   if (!session) {
     redirect("/login");
   }
 
-  const ad = getAdByIdForUser(params.adId, session.id);
-  if (!ad) {
+  if (!session.accessToken) {
     redirect(session.type === "CNPJ" ? "/dashboard-loja" : "/dashboard");
   }
 
-  const options = getBoostOptions();
+  let payload: Awaited<ReturnType<typeof fetchOwnedAd>> | null = null;
+  try {
+    payload = await fetchOwnedAd(session, params.adId);
+  } catch {
+    redirect(session.type === "CNPJ" ? "/dashboard-loja" : "/dashboard");
+  }
+  if (!payload) {
+    redirect(session.type === "CNPJ" ? "/dashboard-loja" : "/dashboard");
+  }
+
+  const { ad, boost_options: options } = payload;
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">

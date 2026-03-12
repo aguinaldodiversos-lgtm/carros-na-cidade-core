@@ -11,7 +11,12 @@ export type SessionUser = {
   type: AccountType;
 };
 
-type SessionPayload = SessionUser & {
+export type SessionData = SessionUser & {
+  accessToken?: string;
+  refreshToken?: string;
+};
+
+type SessionPayload = SessionData & {
   iat: number;
   exp: number;
 };
@@ -34,7 +39,7 @@ function signTokenBody(body: string) {
   return crypto.createHmac("sha256", getSessionSecret()).update(body).digest("base64url");
 }
 
-export function createSessionToken(user: SessionUser, maxAgeSeconds = DEFAULT_DURATION_SECONDS) {
+export function createSessionToken(user: SessionData, maxAgeSeconds = DEFAULT_DURATION_SECONDS) {
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionPayload = {
     ...user,
@@ -46,7 +51,7 @@ export function createSessionToken(user: SessionUser, maxAgeSeconds = DEFAULT_DU
   return `${body}.${signature}`;
 }
 
-export function getSessionUserFromCookieValue(tokenValue: string | undefined | null): SessionUser | null {
+export function getSessionDataFromCookieValue(tokenValue: string | undefined | null): SessionData | null {
   if (!tokenValue) return null;
 
   const [body, signature] = tokenValue.split(".");
@@ -69,15 +74,34 @@ export function getSessionUserFromCookieValue(tokenValue: string | undefined | n
       name: payload.name,
       email: payload.email,
       type: payload.type,
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken,
     };
   } catch {
     return null;
   }
 }
 
+export function getSessionUserFromCookieValue(tokenValue: string | undefined | null): SessionUser | null {
+  const session = getSessionDataFromCookieValue(tokenValue);
+  if (!session) return null;
+
+  return {
+    id: session.id,
+    name: session.name,
+    email: session.email,
+    type: session.type,
+  };
+}
+
 export function getSessionUserFromRequest(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   return getSessionUserFromCookieValue(cookie);
+}
+
+export function getSessionDataFromRequest(request: NextRequest) {
+  const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  return getSessionDataFromCookieValue(cookie);
 }
 
 export function getSessionCookieOptions(maxAgeSeconds = DEFAULT_DURATION_SECONDS) {

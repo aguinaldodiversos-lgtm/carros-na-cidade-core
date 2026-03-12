@@ -40,3 +40,20 @@ create table if not exists payments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists payment_intents (
+  id text primary key,
+  user_id text not null,
+  context text not null check (context in ('plan', 'boost')),
+  plan_id text references subscription_plans(id),
+  ad_id text,
+  boost_option_id text,
+  amount numeric(12,2) not null default 0,
+  checkout_resource_id text,
+  checkout_resource_type text check (checkout_resource_type in ('preference', 'preapproval')),
+  payment_resource_id text unique,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'canceled')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
