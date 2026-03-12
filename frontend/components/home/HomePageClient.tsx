@@ -110,14 +110,14 @@ export function HomePageClient({ data }: HomePageClientProps) {
 
   return (
     <main className="min-h-screen bg-[#f4f4f6]">
-      <div className="mx-auto max-w-7xl px-4 pb-8 md:px-6 md:pb-10">
+      <div className="mx-auto -mt-px max-w-7xl px-4 pb-8 sm:px-6 md:pb-10">
         <HeroCarousel />
 
-        <div className="mt-4">
+        <div className="mt-5 md:mt-6">
           <HomeSearchSection />
         </div>
 
-        <section className="mt-5">
+        <section className="mt-8">
           <div className="mb-3">
             <h2 className="text-[18px] font-extrabold leading-tight text-[#1d2538] md:text-[20px]">
               Destaques em {regionalFocus}
@@ -130,7 +130,7 @@ export function HomePageClient({ data }: HomePageClientProps) {
           <AdGrid items={highlightAds} priorityFirstRow priorityCount={4} variant="home" />
         </section>
 
-        <section className="mt-5">
+        <section className="mt-7">
           <div className="mb-3">
             <h2 className="text-[18px] font-extrabold leading-tight text-[#1d2538] md:text-[20px]">
               Oportunidades abaixo da FIPE
@@ -143,7 +143,7 @@ export function HomePageClient({ data }: HomePageClientProps) {
           <AdGrid items={opportunityAds} priorityCount={4} variant="home" />
         </section>
 
-        <section className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-7 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {benefits.map((item) => (
             <div
               key={item.title}
