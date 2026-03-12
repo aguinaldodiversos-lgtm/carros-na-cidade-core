@@ -229,7 +229,7 @@ export default function BuyMarketplacePageClient({
   ]);
 
   return (
-    <main className="min-h-screen bg-[#f3f4f7]">
+    <main className="min-h-screen bg-[#f1f2f6]">
       <BuyHeaderPanel
         title={title}
         totalResults={totalResults}
@@ -237,9 +237,9 @@ export default function BuyMarketplacePageClient({
         quickLinks={quickLinks}
       />
 
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <div>
+      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="xl:sticky xl:top-24 xl:self-start">
             <BuyFiltersSidebar
               facets={facets}
               filters={filters}
@@ -258,23 +258,23 @@ export default function BuyMarketplacePageClient({
               onChange={pushFilters}
             />
 
-            <section className="rounded-[24px] border border-[#dbe4f0] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[18px] border border-[#dbe4f0] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="space-y-1">
                   <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#0e62d8]">
-                    Estoque vivo da cidade
+                    Inventario vivo da cidade
                   </p>
                   <p className="text-sm text-[#5c6981]">
-                    Estrutura preparada para cidade ativa, filtros regionais e leitura
-                    direta da API oficial.
+                    Pagina pronta para contexto local, filtros por URL e dados reais da
+                    API oficial.
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                   {city.slug ? (
                     <Link
                       href={`/cidade/${city.slug}`}
-                      className="inline-flex h-11 items-center rounded-xl border border-[#dce4f0] bg-[#f8fbff] px-4 text-sm font-semibold text-[#334155] transition hover:border-[#c5d4eb] hover:text-[#0e62d8]"
+                      className="inline-flex h-11 items-center justify-center rounded-xl border border-[#dce4f0] bg-[#f8fbff] px-4 text-sm font-semibold text-[#334155] transition hover:border-[#c5d4eb] hover:text-[#0e62d8]"
                     >
                       Hub local
                     </Link>
@@ -282,7 +282,7 @@ export default function BuyMarketplacePageClient({
 
                   <Link
                     href="/planos"
-                    className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-4 text-sm font-bold text-white shadow-[0_10px_20px_rgba(14,98,216,0.18)] transition hover:bg-[#0c54bc]"
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-bold text-white shadow-[0_10px_20px_rgba(14,98,216,0.18)] transition hover:bg-[#0c54bc]"
                   >
                     Patrocinar anuncio
                   </Link>
@@ -335,31 +335,31 @@ export default function BuyMarketplacePageClient({
               </>
             )}
 
-            <section className="rounded-[28px] border border-[#dbe4f0] bg-[linear-gradient(135deg,#10234a_0%,#173974_55%,#0e62d8_100%)] p-6 text-white shadow-[0_18px_38px_rgba(10,20,40,0.18)]">
+            <section className="rounded-[20px] border border-[#dbe4f0] bg-[linear-gradient(135deg,#10234a_0%,#173974_55%,#0e62d8_100%)] p-5 text-white shadow-[0_18px_38px_rgba(10,20,40,0.18)] sm:p-6">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">
                     Conversao comercial
                   </p>
-                  <h2 className="mt-2 text-[28px] font-black leading-tight tracking-[-0.03em]">
+                  <h2 className="mt-2 text-[24px] font-black leading-tight tracking-[-0.03em] sm:text-[28px]">
                     Destaque seu estoque ou simule a proxima compra com contexto local.
                   </h2>
-                  <p className="mt-3 text-sm leading-7 text-white/78">
+                  <p className="mt-3 text-[14px] leading-7 text-white/78 sm:text-sm">
                     A pagina Comprar foi estruturada para navegar por cidade, comparar
                     estoque vivo e acelerar visita, lead e decisao comercial.
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link
                     href="/planos"
-                    className="inline-flex h-12 items-center rounded-xl bg-white px-5 text-sm font-bold text-[#123162] transition hover:bg-[#eef4ff]"
+                    className="inline-flex h-12 items-center justify-center rounded-xl bg-white px-5 text-sm font-bold text-[#123162] transition hover:bg-[#eef4ff]"
                   >
                     Anunciar gratis
                   </Link>
                   <Link
                     href={city.slug ? `/simulador-financiamento/${city.slug}` : "/simulador-financiamento"}
-                    className="inline-flex h-12 items-center rounded-xl border border-white/20 px-5 text-sm font-bold text-white transition hover:bg-white/10"
+                    className="inline-flex h-12 items-center justify-center rounded-xl border border-white/20 px-5 text-sm font-bold text-white transition hover:bg-white/10"
                   >
                     Simular financiamento
                   </Link>

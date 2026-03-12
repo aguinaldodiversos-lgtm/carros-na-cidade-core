@@ -13,7 +13,7 @@ type BuyFiltersSidebarProps = {
 };
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h3 className="text-[18px] font-extrabold text-[#1f2739]">{children}</h3>;
+  return <h3 className="text-[16px] font-extrabold text-[#1f2739] sm:text-[18px]">{children}</h3>;
 }
 
 function CountPill({ children }: { children: ReactNode }) {
@@ -197,7 +197,21 @@ export default function BuyFiltersSidebar({
   }
 
   return (
-    <aside className="overflow-hidden rounded-[24px] border border-[#dbe4f0] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+    <aside className="overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <div className="border-b border-[#e6ebf3] bg-[#fbfcfe] px-5 py-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#0e62d8]">
+              Filtros
+            </p>
+            <p className="mt-1 text-sm text-[#5f6c84]">
+              Refinar estoque local com foco em {cityLabel}.
+            </p>
+          </div>
+          <CountPill>{totalResults.toLocaleString("pt-BR")}</CountPill>
+        </div>
+      </div>
+
       <Section title="Filtros rapidos">
         <div className="space-y-3">
           <SelectField
@@ -251,7 +265,7 @@ export default function BuyFiltersSidebar({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => setHighlightOnly((current) => !current)}
@@ -279,19 +293,26 @@ export default function BuyFiltersSidebar({
       </Section>
 
       <Section title="Localizacao">
-        <SelectField
-          label="Cidade ativa"
-          value={locationValue}
-          onChange={setLocationValue}
-          options={[
-            { label: cityLabel, value: cityLabel },
-            { label: "Sao Paulo - SP", value: "Sao Paulo - SP" },
-            { label: "Campinas - SP", value: "Campinas - SP" },
-            { label: "Santos - SP", value: "Santos - SP" },
-            { label: "Sorocaba - SP", value: "Sorocaba - SP" },
-          ]}
-          placeholder="Selecione a cidade"
-        />
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-[#e4eaf2] bg-[#f8fafc] p-3 text-sm leading-6 text-[#5f6c84]">
+            Identificamos a sua localizacao para mostrar melhores oportunidades perto
+            de voce.
+          </div>
+
+          <SelectField
+            label="Cidade ativa"
+            value={locationValue}
+            onChange={setLocationValue}
+            options={[
+              { label: cityLabel, value: cityLabel },
+              { label: "Sao Paulo - SP", value: "Sao Paulo - SP" },
+              { label: "Campinas - SP", value: "Campinas - SP" },
+              { label: "Santos - SP", value: "Santos - SP" },
+              { label: "Sorocaba - SP", value: "Sorocaba - SP" },
+            ]}
+            placeholder="Selecione a cidade"
+          />
+        </div>
       </Section>
 
       <Section title="O que te interessa ver hoje?">
@@ -339,7 +360,7 @@ export default function BuyFiltersSidebar({
       </Section>
 
       <Section title="Marcas populares">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {popularBrandGrid.map((item) => (
             <button
               key={item.brand}
@@ -356,9 +377,20 @@ export default function BuyFiltersSidebar({
                   {item.brand.slice(0, 2).toUpperCase()}
                 </span>
               </div>
-              <div className="mt-2 text-xs font-bold text-[#334155]">{item.brand}</div>
+              <div className="mt-2 text-[11px] font-bold text-[#334155] sm:text-xs">{item.brand}</div>
             </button>
           ))}
+        </div>
+      </Section>
+
+      <Section title="Contexto regional">
+        <div className="space-y-2 text-sm text-[#4f5d75]">
+          <div className="rounded-2xl border border-[#e4eaf2] bg-[#fafbfd] p-3">
+            Estoque preparado para variacoes territoriais e navegacao local por cidade.
+          </div>
+          <div className="rounded-2xl border border-[#e4eaf2] bg-[#fafbfd] p-3">
+            Estrutura pronta para marcas, modelos e oportunidades regionais.
+          </div>
         </div>
       </Section>
 

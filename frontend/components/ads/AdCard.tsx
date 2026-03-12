@@ -122,6 +122,9 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
   const detailSlug = resolveDetailSlug(item);
   const isHome = variant === "home";
   const cleanPlanLabel = normalizePlanLabel(item.plan);
+  const quickInfo = [item.year ? String(item.year) : null, formatMileage(item.mileage), cleanPlanLabel]
+    .filter(Boolean)
+    .join(" · ");
   const infoItems = [
     item.year
       ? {
@@ -153,7 +156,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
       className={`h-full overflow-hidden border bg-white transition duration-300 hover:-translate-y-1 ${
         isHome
           ? "rounded-[10px] border-[#e1e5ef] shadow-[0_2px_18px_rgba(20,30,60,0.06)] hover:shadow-[0_8px_22px_rgba(20,30,60,0.10)]"
-          : "rounded-[24px] border-[#dbe4f0] shadow-[0_14px_36px_rgba(15,23,42,0.08)] hover:shadow-[0_22px_48px_rgba(15,23,42,0.14)]"
+          : "rounded-[18px] border-[#dbe4f0] shadow-[0_10px_26px_rgba(15,23,42,0.08)] hover:shadow-[0_16px_34px_rgba(15,23,42,0.14)]"
       }`}
     >
       <Link
@@ -162,7 +165,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
         onClick={() => trackAdEvent(item.id, "click")}
         className="group flex h-full flex-col"
       >
-        <div className={`relative overflow-hidden bg-[#edf2f8] ${isHome ? "aspect-[1.36/1]" : "aspect-[16/10]"}`}>
+        <div className={`relative overflow-hidden bg-[#edf2f8] ${isHome ? "aspect-[1.36/1]" : "aspect-[16/10] sm:aspect-[16/10]"}`}>
           <Image
             src={image}
             alt={title}
@@ -172,9 +175,9 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
             className="object-cover transition duration-500 group-hover:scale-[1.04]"
           />
 
-          <div className="absolute inset-0 bg-gradient-to-t from-[#09111f]/58 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#09111f]/36 via-transparent to-transparent" />
 
-          <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+          <div className="absolute left-3 top-3 flex max-w-[75%] flex-wrap gap-2">
             {isHome && hasBelowFipe ? (
               <span className="rounded-[7px] bg-[#1f74e8] px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
                 {formatPrice(item.price)}
@@ -182,7 +185,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
             ) : hasHighlight ? (
               <span
                 className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm ${
-                  isHome ? "rounded-[7px] bg-[#1f74e8]" : "rounded-full bg-[#0a7c83]"
+                  isHome ? "rounded-[7px] bg-[#1f74e8]" : "rounded-[8px] bg-[#0a7c83]"
                 }`}
               >
                 {isHome ? "Patrocinado" : "Destaque"}
@@ -192,7 +195,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
             {hasBelowFipe && !isHome ? (
               <span
                 className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm ${
-                  isHome ? "rounded-[7px] bg-[#0e62d8]" : "rounded-full bg-[#0e62d8]"
+                  isHome ? "rounded-[7px] bg-[#0e62d8]" : "rounded-[8px] bg-[#0e62d8]"
                 }`}
               >
                 {isHome ? "Oferta" : "Abaixo da FIPE"}
@@ -202,46 +205,49 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
 
           <span
             className={`absolute right-3 top-3 inline-flex items-center justify-center bg-white/92 text-[#455066] shadow-sm backdrop-blur ${
-              isHome ? "h-7 w-7 rounded-full" : "h-9 w-9 rounded-full"
+              isHome ? "h-7 w-7 rounded-full" : "h-8 w-8 rounded-full sm:h-9 sm:w-9"
             }`}
           >
             <FavoriteIcon />
           </span>
 
           {isHome ? null : (
-            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
-              <div className="rounded-full bg-white/92 px-3 py-1 text-[11px] font-bold text-[#1d2538] shadow-sm backdrop-blur">
+            <div className="absolute inset-x-0 bottom-0 px-4 pb-4">
+              <div className="inline-flex rounded-full bg-white/92 px-3 py-1 text-[11px] font-bold text-[#1d2538] shadow-sm backdrop-blur">
                 ID {detailSlug}
-              </div>
-              <div className="rounded-full bg-[#081120]/72 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                Ver veículo
               </div>
             </div>
           )}
         </div>
 
-        <div className={`flex flex-1 flex-col ${isHome ? "p-2.5" : "p-5"}`}>
+        <div className={`flex flex-1 flex-col ${isHome ? "p-2.5" : "p-4 sm:p-4.5"}`}>
           {isHome ? null : (
             <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#0e62d8]">
-              Anúncio premium
+              Anuncio premium
             </div>
           )}
 
           <h3
             className={`line-clamp-2 font-black text-[#162033] ${
-              isHome ? "min-h-[2.6rem] text-[16px] leading-5" : "mt-2 min-h-[3.25rem] text-[19px] leading-6"
+              isHome ? "min-h-[2.6rem] text-[16px] leading-5" : "mt-2 min-h-[2.8rem] text-[17px] leading-5 sm:min-h-[3rem] sm:text-[18px] sm:leading-6"
             }`}
           >
             {title}
           </h3>
 
           {isHome ? null : (
-            <div className="mt-3 inline-flex items-center gap-2 text-sm text-[#5f6982]">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-                <LocationIcon />
-              </span>
-              <span>{location || "Localização não informada"}</span>
-            </div>
+            <>
+              <div className="mt-2 text-[12px] text-[#5f6982] sm:text-[13px]">
+                {quickInfo || "Detalhes principais nao informados"}
+              </div>
+
+              <div className="mt-3 inline-flex items-center gap-2 text-[13px] text-[#5f6982] sm:text-sm">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+                  <LocationIcon />
+                </span>
+                <span>{location || "Localizacao nao informada"}</span>
+              </div>
+            </>
           )}
 
           {isHome ? (
@@ -276,7 +282,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
           ) : (
             <>
               <div className="mt-4 flex flex-wrap gap-2">
-                {infoItems.map((info) => (
+                {infoItems.slice(0, 2).map((info) => (
                   <span
                     key={info.key}
                     className="inline-flex items-center gap-1.5 rounded-full border border-[#d9e3f0] bg-[#f8fbff] px-3 py-1.5 text-[12px] font-semibold text-[#42506a]"
@@ -287,29 +293,24 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
                 ))}
               </div>
 
-              <div className="mt-5 rounded-[20px] border border-[#e3ebf5] bg-[#f8fbff] p-4">
-                <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#6a7488]">
-                  Valor do anúncio
-                </div>
-                <div className="mt-1 text-[28px] font-black tracking-[-0.03em] text-[#0e62d8]">
-                  {formatPrice(item.price)}
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {hasBelowFipe ? (
-                    <span className="rounded-full bg-[#eaf2ff] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#0e62d8]">
-                      Oferta
-                    </span>
-                  ) : null}
-                  {hasHighlight ? (
-                    <span className="rounded-full bg-[#e8fbfb] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#0a7c83]">
-                      Visibilidade alta
-                    </span>
-                  ) : null}
-                </div>
+              <div className="mt-4 text-[28px] font-black tracking-[-0.03em] text-[#0e62d8] sm:text-[30px]">
+                {formatPrice(item.price)}
               </div>
 
-              <span className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-[16px] font-bold text-white transition group-hover:bg-[#0c54bc]">
+              <div className="mt-3 flex flex-wrap gap-2">
+                {hasBelowFipe ? (
+                  <span className="rounded-[8px] bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#0e62d8]">
+                    Oportunidade
+                  </span>
+                ) : null}
+                {hasHighlight ? (
+                  <span className="rounded-[8px] bg-[#e8fbfb] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#0a7c83]">
+                    Alta visibilidade
+                  </span>
+                ) : null}
+              </div>
+
+              <span className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-[14px] font-bold text-white transition group-hover:bg-[#0c54bc] sm:text-[15px]">
                 Ver detalhes
               </span>
             </>

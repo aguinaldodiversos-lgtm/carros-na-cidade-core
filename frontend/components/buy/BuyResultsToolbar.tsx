@@ -29,11 +29,11 @@ export default function BuyResultsToolbar({
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
 
   return (
-    <section className="rounded-[24px] border border-[#dbe4f0] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+    <section className="rounded-[18px] border border-[#dbe4f0] bg-white p-3 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5">
           <select
-            className="h-12 min-w-[160px] rounded-xl border border-[#d8dee9] bg-white px-4 text-sm font-semibold text-[#2f3a54] outline-none transition focus:border-[#0e62d8]"
+            className="h-11 w-full min-w-[150px] rounded-xl border border-[#d8dee9] bg-white px-4 text-sm font-semibold text-[#2f3a54] outline-none transition focus:border-[#0e62d8] sm:w-auto"
             value={String(filters.limit || 18)}
             onChange={(event) =>
               onChange({
@@ -47,17 +47,13 @@ export default function BuyResultsToolbar({
             <option value="36">36 por pagina</option>
           </select>
 
-          <div className="inline-flex min-h-12 items-center rounded-xl bg-[#f6f8fc] px-4 text-sm font-semibold text-[#415068]">
-            Estoque em {cityLabel}
-          </div>
-
-          <div className="inline-flex min-h-12 items-center rounded-xl bg-[#eef4ff] px-4 text-sm font-bold text-[#0e62d8]">
-            {totalResults.toLocaleString("pt-BR")} anuncios
+          <div className="inline-flex min-h-11 items-center rounded-xl bg-[#f5f7fb] px-4 text-sm font-semibold text-[#415068]">
+            {totalResults.toLocaleString("pt-BR")} anuncios em {cityLabel}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5">
+          <div className="flex w-full items-center gap-2 rounded-xl border border-[#d8dee9] bg-white px-3 sm:w-auto">
             <svg
               viewBox="0 0 24 24"
               className="h-4 w-4 text-[#6b7488]"
@@ -76,7 +72,7 @@ export default function BuyResultsToolbar({
                   page: 1,
                 })
               }
-              className="h-12 rounded-xl border border-[#d8dee9] bg-white px-4 text-sm font-semibold text-[#2f3a54] outline-none transition focus:border-[#0e62d8]"
+              className="h-11 w-full rounded-xl bg-transparent pr-2 text-sm font-semibold text-[#2f3a54] outline-none sm:w-auto"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -113,7 +109,7 @@ export default function BuyResultsToolbar({
 
           <button
             type="button"
-            className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#dbe4f0] bg-white px-4 text-sm font-semibold text-[#334155] transition hover:bg-[#f8fbff]"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#dbe4f0] bg-white px-4 text-sm font-semibold text-[#334155] transition hover:bg-[#f8fbff] sm:w-auto"
           >
             <svg
               viewBox="0 0 24 24"
