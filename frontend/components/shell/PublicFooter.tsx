@@ -69,6 +69,7 @@ export function PublicFooter() {
                 src="/images/logo.png"
                 alt="Carros na Cidade"
                 fill
+                sizes="90px"
                 className="object-contain object-left brightness-0 invert"
               />
             </Link>
@@ -105,6 +106,7 @@ export function PublicFooter() {
                 src="/images/logo.png"
                 alt="Carros na Cidade"
                 fill
+                sizes="195px"
                 className="object-contain object-left brightness-0 invert"
               />
             </Link>
