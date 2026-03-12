@@ -27,7 +27,7 @@ const slides: Slide[] = [
   {
     id: "home-oportunidades",
     title: "Oportunidades premium para comprar melhor",
-    subtitle: "Modelos selecionados com destaque local e condições competitivas",
+    subtitle: "Modelos selecionados com destaque local e condições especiais",
     image: "/images/home/banner-local-oportunidades.png",
     alt: "Banner de oportunidades locais do portal Carros na Cidade",
     primaryCtaLabel: "Pesquisar agora",
@@ -81,7 +81,7 @@ export function HeroCarousel() {
 
         <div className="absolute inset-y-0 left-0 z-20 flex w-full items-center px-7 md:px-10 lg:px-14">
           <div className="max-w-[420px] text-white lg:max-w-[500px]">
-            <h1 className="text-[38px] font-black leading-[0.98] tracking-[-0.05em] md:text-[48px] lg:text-[60px]">
+            <h1 className="text-[38px] font-black leading-[1.08] tracking-[-0.04em] md:text-[48px] lg:text-[60px]">
               {slide.title}
             </h1>
             <p className="mt-4 max-w-[360px] text-[17px] font-medium leading-7 text-white/82 md:text-[18px]">

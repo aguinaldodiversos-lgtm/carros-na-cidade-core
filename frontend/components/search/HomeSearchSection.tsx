@@ -57,20 +57,15 @@ const categoryOptions = [
 
 function SearchField({
   label,
-  highlightedValue,
   children,
 }: {
   label: string;
-  highlightedValue?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="min-w-0 rounded-[14px] border border-[#d8dde8] bg-white px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition focus-within:border-[#b8c8e8] focus-within:shadow-[0_0_0_3px_rgba(14,98,216,0.08)]">
       <div className="flex h-[56px] items-center gap-3">
-        <div className="min-w-[78px] text-[13px] font-semibold text-[#495267]">
-          {label}
-          {highlightedValue ? <span className="ml-2 text-[#0e62d8]">{highlightedValue}</span> : null}
-        </div>
+        <div className="min-w-[78px] text-[13px] font-semibold text-[#495267]">{label}</div>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
