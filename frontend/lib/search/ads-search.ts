@@ -38,6 +38,9 @@ export interface AdItem {
   created_at?: string;
   image_url?: string | null;
   images?: string[] | null;
+  imported?: boolean;
+  certified?: boolean;
+  sinistro?: boolean;
 }
 
 export interface AdsPagination {
