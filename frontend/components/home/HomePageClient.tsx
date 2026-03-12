@@ -26,11 +26,6 @@ interface HomePageClientProps {
   };
 }
 
-function formatStat(value?: number | string) {
-  const numeric = Number(value ?? 0);
-  return Number.isFinite(numeric) ? numeric.toLocaleString("pt-BR") : "0";
-}
-
 function BenefitIcon({
   children,
   bg = "#edf4ff",
@@ -42,7 +37,7 @@ function BenefitIcon({
 }) {
   return (
     <span
-      className="inline-flex h-12 w-12 items-center justify-center rounded-2xl"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full"
       style={{ backgroundColor: bg, color }}
     >
       {children}
@@ -95,145 +90,78 @@ const benefits = [
 
 export function HomePageClient({ data }: HomePageClientProps) {
   const regionalFocus = data.featuredCities?.[0]?.name || "São Paulo";
-  const highlightAds = (data.highlightAds || []).slice(0, 8);
-  const opportunityAds = (data.opportunityAds || []).slice(0, 8);
-  const authoritySignals = [
-    `+${formatStat(data.stats.total_ads)} anúncios ativos`,
-    `${formatStat(data.stats.total_cities)} cidades em operação`,
-    `${formatStat(data.stats.total_advertisers)} anunciantes e lojistas`,
-  ];
+  const recentAds = data.recentAds || [];
+  const highlightAds = (data.highlightAds?.length ? data.highlightAds : recentAds).slice(0, 4);
+  const opportunityAds = (
+    data.opportunityAds?.length
+      ? data.opportunityAds
+      : recentAds.slice(4, 8).length
+        ? recentAds.slice(4, 8)
+        : recentAds
+  ).slice(0, 4);
 
   return (
-    <main className="min-h-screen bg-[#f3f4f7]">
-      <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-7">
+    <main className="min-h-screen bg-[#f4f4f6]">
+      <div className="mx-auto max-w-7xl px-4 pb-8 md:px-6 md:pb-10">
         <HeroCarousel />
 
-        <div className="relative z-10 -mt-4 px-1 md:-mt-6 md:px-6">
+        <div className="mt-4">
           <HomeSearchSection />
         </div>
 
-        <section className="mt-7 rounded-[18px] border border-[#dfe4ef] bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)] md:px-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#72809a]">
-                Presença local e confiança
-              </p>
-              <h2 className="mt-1 text-[22px] font-extrabold tracking-tight text-[#1d2538] md:text-[24px]">
-                O melhor lugar para encontrar e anunciar carros em {regionalFocus}
-              </h2>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/anuncios"
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-extrabold text-white transition hover:bg-[#0c4fb0]"
-              >
-                Explorar ofertas
-              </Link>
-              <Link
-                href="/planos"
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-[#d8deea] px-4 text-sm font-extrabold text-[#31405d] transition hover:bg-[#f8fafc]"
-              >
-                Começar meu anúncio
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {authoritySignals.map((item) => (
-              <span
-                key={item}
-                className="inline-flex items-center rounded-full bg-[#f4f7fc] px-3 py-1.5 text-xs font-bold text-[#50607d]"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-8">
-          <div className="mb-4">
-            <h2 className="text-[34px] font-extrabold tracking-tight text-[#1d2538]">
+        <section className="mt-5">
+          <div className="mb-3">
+            <h2 className="text-[18px] font-extrabold leading-tight text-[#1d2538] md:text-[20px]">
               Destaques em {regionalFocus}
             </h2>
-            <p className="mt-1 text-[15px] text-[#6b7488]">
-              Veículos patrocinados com maior visibilidade e acabamento premium.
+            <p className="mt-1 text-[14px] text-[#6b7488]">
+              Veículos patrocinados com maior visibilidade
             </p>
           </div>
 
           <AdGrid items={highlightAds} priorityFirstRow priorityCount={4} variant="home" />
         </section>
 
-        <section className="mt-8">
-          <div className="mb-4">
-            <h2 className="text-[34px] font-extrabold tracking-tight text-[#1d2538]">
+        <section className="mt-5">
+          <div className="mb-3">
+            <h2 className="text-[18px] font-extrabold leading-tight text-[#1d2538] md:text-[20px]">
               Oportunidades abaixo da FIPE
             </h2>
-            <p className="mt-1 text-[15px] text-[#6b7488]">
-              Ofertas com preço abaixo do valor de mercado para compra mais inteligente.
+            <p className="mt-1 text-[14px] text-[#6b7488]">
+              Ofertas com preço abaixo do valor de mercado
             </p>
           </div>
 
           <AdGrid items={opportunityAds} priorityCount={4} variant="home" />
         </section>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {benefits.map((item) => (
             <div
               key={item.title}
-              className="rounded-[18px] border border-[#dfe4ef] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]"
+              className="rounded-[12px] border border-[#e1e5ef] bg-white p-4 shadow-[0_2px_18px_rgba(20,30,60,0.06)]"
             >
               <div className="flex items-start gap-4">
                 <BenefitIcon>{item.icon}</BenefitIcon>
 
                 <div className="min-w-0">
-                  <h3 className="text-[18px] font-black text-[#1d2538]">{item.title}</h3>
-                  <p className="mt-1 text-[15px] leading-6 text-[#6b7488]">{item.text}</p>
+                  <h3 className="text-[15px] font-black leading-tight text-[#1d2538] md:text-[16px]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-1 text-[13px] leading-5 text-[#6b7488]">{item.text}</p>
                 </div>
               </div>
 
               {"cta" in item && item.cta ? (
                 <Link
                   href={item.cta.href}
-                  className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#0e62d8] px-5 text-[16px] font-bold text-white transition hover:bg-[#0c4fb0]"
+                  className="mt-4 inline-flex h-10 items-center justify-center rounded-[10px] bg-[#0e62d8] px-5 text-[15px] font-bold text-white transition hover:bg-[#0c4fb0]"
                 >
                   {item.cta.label}
                 </Link>
               ) : null}
             </div>
           ))}
-        </section>
-
-        <section className="mt-8 overflow-hidden rounded-[20px] bg-[linear-gradient(120deg,#123b82_0%,#0e62d8_58%,#2a92ff_100%)] p-6 text-white shadow-[0_18px_40px_rgba(14,98,216,0.22)] md:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/80">
-                Anuncie grátis
-              </p>
-              <h2 className="mt-2 text-[34px] font-extrabold tracking-tight md:text-[42px]">
-                Venda mais rápido com presença local e visibilidade premium
-              </h2>
-              <p className="mt-3 max-w-2xl text-[16px] leading-7 text-white/85">
-                Cadastre seu veículo ou estoque, participe das campanhas do portal, apareça nos destaques e receba
-                contatos qualificados na sua cidade.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/planos"
-                className="inline-flex h-12 items-center justify-center rounded-xl bg-white px-6 text-[15px] font-extrabold text-[#0e62d8] transition hover:bg-[#f4f8ff]"
-              >
-                Criar meu anúncio
-              </Link>
-              <Link
-                href="/anuncios"
-                className="inline-flex h-12 items-center justify-center rounded-xl border border-white/35 px-6 text-[15px] font-extrabold text-white transition hover:bg-white/10"
-              >
-                Ver ofertas da cidade
-              </Link>
-            </div>
-          </div>
         </section>
       </div>
     </main>

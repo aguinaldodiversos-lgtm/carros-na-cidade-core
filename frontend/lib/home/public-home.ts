@@ -16,6 +16,8 @@ export interface HomeDataResponse {
   };
 }
 
+const OFFICIAL_PUBLIC_API_URL = "https://carros-na-cidade-api.onrender.com";
+
 function stripTrailingSlash(url: string) {
   return url.replace(/\/+$/, "");
 }
@@ -24,8 +26,8 @@ function getApiBaseUrl(): string {
   const api =
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    "";
-  return api ? stripTrailingSlash(api) : "";
+    OFFICIAL_PUBLIC_API_URL;
+  return stripTrailingSlash(api);
 }
 
 function fallbackHome(): HomeDataResponse["data"] {
@@ -38,28 +40,62 @@ function fallbackHome(): HomeDataResponse["data"] {
   };
 }
 
-export async function fetchPublicHomeData(): Promise<HomeDataResponse["data"]> {
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) return fallbackHome();
-
+async function fetchJson<T>(url: string, revalidate = 300): Promise<T | null> {
   try {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 8000);
 
-    const response = await fetch(`${apiBase}/api/public/home`, {
+    const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
-      next: { revalidate: 300 },
+      next: { revalidate },
       signal: controller.signal,
-    }).finally(() => clearTimeout(t));
+    }).finally(() => clearTimeout(timer));
 
-    if (!response.ok) return fallbackHome();
-
-    const json = (await response.json()) as HomeDataResponse;
-    if (!json?.success || !json?.data) return fallbackHome();
-
-    return json.data;
+    if (!response.ok) return null;
+    return (await response.json()) as T;
   } catch {
-    return fallbackHome();
+    return null;
   }
+}
+
+async function fetchAdsCollection(
+  apiBase: string,
+  params: Record<string, string | number | boolean>
+): Promise<AdItem[]> {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    query.set(key, String(value));
+  });
+
+  const json = await fetchJson<{
+    success?: boolean;
+    data?: AdItem[];
+  }>(`${apiBase}/api/ads/search?${query.toString()}`, 120);
+
+  return Array.isArray(json?.data) ? json.data : [];
+}
+
+export async function fetchPublicHomeData(): Promise<HomeDataResponse["data"]> {
+  const apiBase = getApiBaseUrl();
+  const empty = fallbackHome();
+
+  const [homeJson, highlightAds, opportunityAds, recentAds] = await Promise.all([
+    fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`, 300),
+    fetchAdsCollection(apiBase, { highlight_only: true, limit: 4 }),
+    fetchAdsCollection(apiBase, { below_fipe: true, limit: 4 }),
+    fetchAdsCollection(apiBase, { limit: 8, sort: "recent" }),
+  ]);
+
+  const homeData = homeJson?.success && homeJson.data ? homeJson.data : empty;
+
+  return {
+    featuredCities: homeData.featuredCities || empty.featuredCities,
+    highlightAds: highlightAds.length ? highlightAds : homeData.highlightAds || empty.highlightAds,
+    opportunityAds: opportunityAds.length ? opportunityAds : homeData.opportunityAds || empty.opportunityAds,
+    recentAds: recentAds.length ? recentAds : homeData.recentAds || empty.recentAds,
+    stats: homeData.stats || empty.stats,
+  };
 }
