@@ -1,7 +1,7 @@
 import { HomePageClient } from "../components/home/HomePageClient";
 import { fetchPublicHomeData } from "../lib/home/public-home";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const data = await fetchPublicHomeData();

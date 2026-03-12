@@ -40,7 +40,7 @@ function fallbackHome(): HomeDataResponse["data"] {
   };
 }
 
-async function fetchJson<T>(url: string, revalidate = 300): Promise<T | null> {
+async function fetchJson<T>(url: string): Promise<T | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
@@ -48,7 +48,7 @@ async function fetchJson<T>(url: string, revalidate = 300): Promise<T | null> {
     const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
-      next: { revalidate },
+      cache: "no-store",
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
 
@@ -73,7 +73,7 @@ async function fetchAdsCollection(
   const json = await fetchJson<{
     success?: boolean;
     data?: AdItem[];
-  }>(`${apiBase}/api/ads/search?${query.toString()}`, 120);
+  }>(`${apiBase}/api/ads/search?${query.toString()}`);
 
   return Array.isArray(json?.data) ? json.data : [];
 }
@@ -83,7 +83,7 @@ export async function fetchPublicHomeData(): Promise<HomeDataResponse["data"]> {
   const empty = fallbackHome();
 
   const [homeJson, highlightAds, opportunityAds, recentAds] = await Promise.all([
-    fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`, 300),
+    fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`),
     fetchAdsCollection(apiBase, { highlight_only: true, limit: 4 }),
     fetchAdsCollection(apiBase, { below_fipe: true, limit: 4 }),
     fetchAdsCollection(apiBase, { limit: 8, sort: "recent" }),
