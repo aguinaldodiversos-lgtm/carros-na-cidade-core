@@ -1,0 +1,14 @@
+COMANDOS PARA O CDM RAIZ DO PROJETO
+
+REBASE
+git status
+git add .
+git commit -m "wip before rebase"
+git pull --rebase origin main
+git push origin main
+
+git add .
+git rebase --continue
+
+git pull --rebase origin main
+git push origin main

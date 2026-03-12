@@ -11,6 +11,7 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
+  { label: "Comprar", href: "/comprar" },
   { label: "Anunciar", href: "/planos" },
   { label: "Favoritos", href: "/login" },
 ];
@@ -85,8 +86,10 @@ export function PublicHeader() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`inline-flex items-center gap-1.5 transition hover:text-[#0e62d8] ${
-                    isActive(pathname, item.href) ? "text-[#0e62d8]" : ""
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 transition hover:text-[#0e62d8] ${
+                    isActive(pathname, item.href)
+                      ? "bg-[#eef4ff] text-[#0e62d8]"
+                      : "text-[#5b667c] hover:bg-[#f7f9fc]"
                   }`}
                 >
                   {item.label === "Favoritos" ? (

@@ -310,7 +310,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
               </div>
 
               <span className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-[16px] font-bold text-white transition group-hover:bg-[#0c54bc]">
-                Ver detalhes do veículo
+                Ver detalhes
               </span>
             </>
           )}
