@@ -71,9 +71,11 @@ function SearchField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-[10px] border border-[#d9deea] bg-white px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-      <div className="mb-1 text-[12px] font-semibold text-[#6b7488]">{label}</div>
-      {children}
+    <div className="min-w-0 rounded-[9px] border border-[#d9deea] bg-white px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+      <div className="flex h-[44px] items-center gap-3">
+        <div className="min-w-[64px] text-[12px] font-semibold text-[#6b7488]">{label}</div>
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
     </div>
   );
 }
@@ -82,7 +84,7 @@ function BaseSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`h-6 w-full rounded-none bg-transparent px-0 text-[15px] font-semibold text-[#2f3a54] outline-none transition focus:text-[#163467] ${props.className || ""}`}
+      className={`h-8 w-full rounded-none bg-transparent px-0 text-[14px] font-semibold text-[#2f3a54] outline-none transition focus:text-[#163467] ${props.className || ""}`}
     />
   );
 }
@@ -228,7 +230,7 @@ export function HomeSearchSection() {
         <div>
           <button
             type="submit"
-            className="inline-flex h-full min-h-[58px] w-full items-center justify-center gap-2 rounded-[10px] bg-[#0e62d8] px-6 text-[17px] font-extrabold text-white shadow-[0_12px_24px_rgba(14,98,216,0.22)] transition hover:bg-[#0c4fb0]"
+            className="inline-flex h-[44px] w-full items-center justify-center gap-2 rounded-[9px] bg-[#0e62d8] px-6 text-[16px] font-extrabold text-white shadow-[0_12px_24px_rgba(14,98,216,0.22)] transition hover:bg-[#0c4fb0] md:h-full md:min-h-[44px]"
           >
             Pesquisar
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">

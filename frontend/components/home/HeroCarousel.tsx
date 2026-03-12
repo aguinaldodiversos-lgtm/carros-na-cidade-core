@@ -71,21 +71,21 @@ export function HeroCarousel() {
 
   return (
     <section className="overflow-hidden rounded-[14px] border border-[#dfe4ec] bg-white shadow-[0_2px_18px_rgba(20,30,60,0.06)]">
-      <div className="relative h-[228px] w-full overflow-hidden md:h-[260px] lg:h-[286px]">
+      <div className="relative h-[230px] w-full overflow-hidden md:h-[270px] lg:h-[288px]">
         <Image
           src={slide.image}
           alt={slide.alt}
           fill
           priority={current === 0}
           sizes="(max-width: 1024px) 100vw, 1200px"
-          className="object-cover object-center"
+          className={`object-cover ${current === 0 ? "object-center" : "object-center"}`}
         />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(12,18,31,0.78)_0%,rgba(12,18,31,0.42)_42%,rgba(12,18,31,0.08)_72%,rgba(12,18,31,0.04)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(12,18,31,0.82)_0%,rgba(12,18,31,0.48)_38%,rgba(12,18,31,0.12)_68%,rgba(12,18,31,0.04)_100%)]" />
 
-        <div className="absolute inset-y-0 left-0 z-20 flex w-full items-center px-7 md:px-8 lg:px-9">
+        <div className="absolute inset-y-0 left-0 z-20 flex w-full items-center px-6 md:px-8 lg:px-8">
           <div className="max-w-[360px] text-white">
             <div className="text-[13px] font-semibold text-white/88">{slide.city}</div>
-            <h1 className="mt-3 text-[28px] font-extrabold leading-[1.1] tracking-[-0.03em] md:text-[34px]">
+            <h1 className="mt-3 text-[27px] font-extrabold leading-[1.08] tracking-[-0.03em] md:text-[35px]">
               {slide.title}
             </h1>
             <p className="mt-3 text-[16px] text-white/84">{slide.subtitle}</p>
@@ -99,7 +99,7 @@ export function HeroCarousel() {
           </div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-center gap-2 pb-8 md:pb-6">
+        <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-center gap-2 pb-5">
           {slides.map((item, index) => (
             <button
               key={item.id}
@@ -107,18 +107,18 @@ export function HeroCarousel() {
               aria-label={`Ir para slide ${index + 1}`}
               onClick={() => setCurrent(index)}
               className={`h-2.5 w-2.5 rounded-full transition ${
-                current === index ? "bg-[#0e62d8]" : "bg-white/74"
+                current === index ? "bg-[#0e62d8]" : "bg-white/65"
               }`}
             />
           ))}
         </div>
 
-        <div className="absolute inset-y-0 left-0 z-20 hidden items-center pl-3 md:flex">
+        <div className="absolute inset-y-0 left-0 z-20 hidden items-center pl-2 md:flex">
           <button
             type="button"
             onClick={prev}
             aria-label="Slide anterior"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/16 text-white backdrop-blur transition hover:bg-white/24"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="m15 18-6-6 6-6" />
@@ -126,19 +126,12 @@ export function HeroCarousel() {
           </button>
         </div>
 
-        <div className="absolute inset-y-0 right-0 z-20 hidden items-center pr-3 md:flex">
-          <Link
-            href={slide.href}
-            aria-label={`Acessar ${slide.title}`}
-            className="hidden"
-          >
-            {slide.title}
-          </Link>
+        <div className="absolute inset-y-0 right-0 z-20 hidden items-center pr-2 md:flex">
           <button
             type="button"
             onClick={next}
             aria-label="Próximo slide"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/16 text-white backdrop-blur transition hover:bg-white/24"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="m9 18 6-6-6-6" />

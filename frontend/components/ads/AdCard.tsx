@@ -44,6 +44,15 @@ function buildTitle(item: AdItem) {
   return [item.year, item.brand, item.model].filter(Boolean).join(" ") || "Veículo";
 }
 
+function normalizePlanLabel(plan?: string | null) {
+  const normalized = String(plan ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "free") return null;
+  if (normalized === "essential") return "Loja verificada";
+  if (normalized === "premium") return "Destaque";
+  return null;
+}
+
 function FavoriteIcon() {
   return (
     <svg
@@ -112,6 +121,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
   const hasHighlight = Boolean(item.highlight_until);
   const detailSlug = resolveDetailSlug(item);
   const isHome = variant === "home";
+  const cleanPlanLabel = normalizePlanLabel(item.plan);
   const infoItems = [
     item.year
       ? {
@@ -125,10 +135,10 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
       label: formatMileage(item.mileage),
       icon: <GaugeIcon />,
     },
-    item.plan
+    cleanPlanLabel
       ? {
           key: "plan",
-          label: item.plan,
+          label: cleanPlanLabel,
           icon: null,
         }
       : null,
@@ -165,7 +175,11 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
           <div className="absolute inset-0 bg-gradient-to-t from-[#09111f]/58 via-transparent to-transparent" />
 
           <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-            {hasHighlight ? (
+            {isHome && hasBelowFipe ? (
+              <span className="rounded-[7px] bg-[#1f74e8] px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
+                {formatPrice(item.price)}
+              </span>
+            ) : hasHighlight ? (
               <span
                 className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm ${
                   isHome ? "rounded-[7px] bg-[#1f74e8]" : "rounded-full bg-[#0a7c83]"
@@ -175,7 +189,7 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
               </span>
             ) : null}
 
-            {hasBelowFipe ? (
+            {hasBelowFipe && !isHome ? (
               <span
                 className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm ${
                   isHome ? "rounded-[7px] bg-[#0e62d8]" : "rounded-full bg-[#0e62d8]"
@@ -221,36 +235,31 @@ export function AdCard({ item, priority = false, variant = "default" }: AdCardPr
             {title}
           </h3>
 
-          <div className={`inline-flex items-center gap-2 text-sm text-[#5f6982] ${isHome ? "mt-1.5" : "mt-3"}`}>
-            <span
-              className={`inline-flex items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8] ${
-                isHome ? "h-6 w-6" : "h-8 w-8"
-              }`}
-            >
-              <LocationIcon />
-            </span>
-            <span className={isHome ? "text-[12px]" : ""}>{location || "Localização não informada"}</span>
-          </div>
+          {isHome ? null : (
+            <div className="mt-3 inline-flex items-center gap-2 text-sm text-[#5f6982]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+                <LocationIcon />
+              </span>
+              <span>{location || "Localização não informada"}</span>
+            </div>
+          )}
 
           {isHome ? (
             <>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {infoItems.slice(0, 2).map((info) => (
-                  <span
-                    key={info.key}
-                    className="inline-flex items-center gap-1 rounded-[999px] bg-[#f4f7fc] px-2 py-1 text-[10px] font-semibold text-[#4b5871]"
-                  >
-                    {info.icon}
-                    {info.label}
-                  </span>
-                ))}
+              <div className="mt-1.5 text-[12px] text-[#616c81]">
+                {location || "Localização não informada"}
               </div>
 
-              <div className="mt-2.5 flex items-end justify-between gap-2">
-                <div className="text-[13px] font-black leading-none tracking-[-0.03em] text-[#0e62d8] md:text-[16px]">
+              <div className="mt-2 flex items-end justify-between gap-2">
+                <div className="text-[14px] font-black leading-none tracking-[-0.03em] text-[#0e62d8] md:text-[16px]">
                   {formatPrice(item.price)}
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {cleanPlanLabel ? (
+                    <span className="rounded-[6px] bg-[#eaf2ff] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#0e62d8]">
+                      {cleanPlanLabel}
+                    </span>
+                  ) : null}
                   {hasBelowFipe ? (
                     <span className="rounded-[6px] bg-[#eaf2ff] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#0e62d8]">
                       Abaixo da FIPE

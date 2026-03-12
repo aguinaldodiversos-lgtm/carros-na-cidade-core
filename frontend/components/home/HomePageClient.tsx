@@ -26,6 +26,12 @@ interface HomePageClientProps {
   };
 }
 
+function isShowcaseReadyAd(item: AdItem) {
+  const title = String(item.title ?? "").toLowerCase();
+  const blockedTerms = ["teste", "worker", "alerta", "whatsapp", "fila api"];
+  return !blockedTerms.some((term) => title.includes(term));
+}
+
 function BenefitIcon({
   children,
   bg = "#edf4ff",
@@ -90,11 +96,13 @@ const benefits = [
 
 export function HomePageClient({ data }: HomePageClientProps) {
   const regionalFocus = data.featuredCities?.[0]?.name || "São Paulo";
-  const recentAds = data.recentAds || [];
-  const highlightAds = (data.highlightAds?.length ? data.highlightAds : recentAds).slice(0, 4);
+  const recentAds = (data.recentAds || []).filter(isShowcaseReadyAd);
+  const curatedHighlightAds = (data.highlightAds || []).filter(isShowcaseReadyAd);
+  const curatedOpportunityAds = (data.opportunityAds || []).filter(isShowcaseReadyAd);
+  const highlightAds = (curatedHighlightAds.length ? curatedHighlightAds : recentAds).slice(0, 4);
   const opportunityAds = (
-    data.opportunityAds?.length
-      ? data.opportunityAds
+    curatedOpportunityAds.length
+      ? curatedOpportunityAds
       : recentAds.slice(4, 8).length
         ? recentAds.slice(4, 8)
         : recentAds
