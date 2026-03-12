@@ -4,6 +4,10 @@ import { createRedisClient } from "../cache/ai.cache.js";
 export function createAiQueue({ logger }) {
   const redis = createRedisClient({ logger });
 
+  if (!redis) {
+    return { aiQueue: null, redis: null };
+  }
+
   const aiQueue = new Queue("ai-jobs", {
     connection: redis,
     defaultJobOptions: {

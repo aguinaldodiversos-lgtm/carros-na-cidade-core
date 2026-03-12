@@ -17,6 +17,13 @@ export async function startAiWorker() {
   }
 
   aiRedisInstance = createRedisClient({ logger });
+  if (!aiRedisInstance) {
+    logger.warn(
+      "[ai.worker] Redis indisponível (REDIS_URL ausente). Worker não iniciado."
+    );
+    return null;
+  }
+
   const cache = createCache({ redis: aiRedisInstance });
 
   aiOrchestratorInstance = new AiOrchestrator({

@@ -4,14 +4,20 @@ import { getQueueRedisConnection } from "../infrastructure/queue/redis.connectio
 import { WHATSAPP_QUEUE_NAME } from "../queues/whatsapp.queue.js";
 import { processWhatsAppJob } from "../modules/whatsapp/whatsapp.service.js";
 
-const redisConnection = getQueueRedisConnection();
-
 let whatsappWorkerInstance = null;
 
 export async function startWhatsAppWorker() {
   if (whatsappWorkerInstance) {
     logger.warn("[whatsapp.worker] Worker já inicializado");
     return whatsappWorkerInstance;
+  }
+
+  const redisConnection = getQueueRedisConnection();
+  if (!redisConnection) {
+    logger.warn(
+      "[whatsapp.worker] Redis indisponível (DISABLE_REDIS ou REDIS_URL). Worker não iniciado."
+    );
+    return null;
   }
 
   const concurrency = Number(process.env.WHATSAPP_WORKER_CONCURRENCY || 5);

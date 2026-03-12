@@ -10,27 +10,31 @@ const redisConnection = getQueueRedisConnection();
 
 export const WHATSAPP_QUEUE_NAME = QUEUE_NAMES.WHATSAPP;
 
-export const whatsappQueue = new Queue(WHATSAPP_QUEUE_NAME, {
-  connection: redisConnection,
-  defaultJobOptions: QUEUE_DEFAULT_JOB_OPTIONS,
-});
+export const whatsappQueue = redisConnection
+  ? new Queue(WHATSAPP_QUEUE_NAME, {
+      connection: redisConnection,
+      defaultJobOptions: QUEUE_DEFAULT_JOB_OPTIONS,
+    })
+  : null;
 
-export const whatsappQueueEvents = new QueueEvents(WHATSAPP_QUEUE_NAME, {
-  connection: redisConnection,
-});
+export const whatsappQueueEvents = redisConnection
+  ? new QueueEvents(WHATSAPP_QUEUE_NAME, { connection: redisConnection })
+  : null;
 
-whatsappQueueEvents.on("completed", ({ jobId }) => {
-  logger.info({ jobId }, "[whatsapp.queue] Job concluído");
-});
-
-whatsappQueueEvents.on("failed", ({ jobId, failedReason }) => {
-  logger.error(
-    { jobId, failedReason },
-    "[whatsapp.queue] Job falhou"
-  );
-});
+if (whatsappQueueEvents) {
+  whatsappQueueEvents.on("completed", ({ jobId }) => {
+    logger.info({ jobId }, "[whatsapp.queue] Job concluído");
+  });
+  whatsappQueueEvents.on("failed", ({ jobId, failedReason }) => {
+    logger.error({ jobId, failedReason }, "[whatsapp.queue] Job falhou");
+  });
+}
 
 export async function addWhatsAppJob(nameOrData, dataOrOptions = {}, maybeOptions = {}) {
+  if (!whatsappQueue) {
+    logger.warn("[whatsapp.queue] Redis não configurado, job ignorado");
+    return null;
+  }
   let jobName = "send-message";
   let jobData = {};
   let jobOptions = {};
@@ -47,11 +51,7 @@ export async function addWhatsAppJob(nameOrData, dataOrOptions = {}, maybeOption
   const job = await whatsappQueue.add(jobName, jobData, jobOptions);
 
   logger.info(
-    {
-      queue: WHATSAPP_QUEUE_NAME,
-      jobId: job.id,
-      jobName,
-    },
+    { queue: WHATSAPP_QUEUE_NAME, jobId: job.id, jobName },
     "[whatsapp.queue] Job adicionado"
   );
 
@@ -59,10 +59,7 @@ export async function addWhatsAppJob(nameOrData, dataOrOptions = {}, maybeOption
 }
 
 export async function closeWhatsAppQueue() {
-  await Promise.all([
-    whatsappQueue.close(),
-    whatsappQueueEvents.close(),
-  ]);
-
+  if (!whatsappQueue || !whatsappQueueEvents) return;
+  await Promise.all([whatsappQueue.close(), whatsappQueueEvents.close()]);
   logger.info("[whatsapp.queue] Fila encerrada com sucesso");
 }

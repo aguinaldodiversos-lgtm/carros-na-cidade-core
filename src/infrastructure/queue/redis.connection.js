@@ -20,9 +20,30 @@ function getRedisUrl() {
   return String(process.env.REDIS_URL || "").trim();
 }
 
+/** Em produção, localhost/127.0.0.1 nunca funciona (ex: Render). Evita ECONNREFUSED. */
+function isLocalhostUrl(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    const host = (u.hostname || "").toLowerCase();
+    return host === "127.0.0.1" || host === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 function shouldEnableRedis() {
   if (isTrue(process.env.DISABLE_REDIS)) return false;
-  return Boolean(getRedisUrl());
+  const url = getRedisUrl();
+  if (!url) return false;
+  const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+  if (isProd && isLocalhostUrl(url)) {
+    logger.warn(
+      "[queue.redis] REDIS_URL aponta para localhost em produção. Redis desativado."
+    );
+    return false;
+  }
+  return true;
 }
 
 function buildRedisOptions() {
@@ -66,19 +87,20 @@ function ensureRedisInstanceForQueues() {
 
   const url = getRedisUrl();
 
-  // Se estiver desabilitado ou sem URL, NÃO vamos crashar o app.
-  // Mas alguns módulos (ex: whatsapp.queue.js) precisam de um objeto "connection" no import-time.
-  // Então devolvemos um client lazy apontando para localhost apenas para manter compatibilidade.
-  if (!url || !shouldEnableRedis()) {
+  // CRÍTICO: Sem REDIS_URL, nunca criar cliente (evita BullMQ/ioredis usar default 127.0.0.1:6379)
+  if (!url) {
     logger.warn(
-      "[queue.redis] Redis não configurado/disabled. Mantendo client lazy (compat) — filas podem não funcionar até configurar REDIS_URL."
+      "[queue.redis] REDIS_URL ausente. Redis desativado. Configure REDIS_URL ou DISABLE_REDIS=true."
     );
+    return null;
+  }
 
-    const fallbackUrl = "redis://127.0.0.1:6379";
-    const client = new Redis(fallbackUrl, buildRedisOptions());
-    attachRedisListeners(client);
-    redis = client;
-    return redis;
+  // Se estiver desabilitado ou URL inválida para produção, NÃO criar.
+  if (!shouldEnableRedis()) {
+    logger.warn(
+      "[queue.redis] Redis desativado ou REDIS_URL ausente. Filas não disponíveis. Configure REDIS_URL no Render para habilitar."
+    );
+    return null;
   }
 
   const client = new Redis(url, buildRedisOptions());
@@ -101,7 +123,9 @@ export function getRedis() {
  * Importante: NÃO pode lançar no import-time.
  */
 export function getQueueRedisConnection() {
-  return ensureRedisInstanceForQueues();
+  const instance = ensureRedisInstanceForQueues();
+  if (!instance) return null;
+  return instance;
 }
 
 /**
@@ -121,9 +145,8 @@ export async function initQueueRedisConnection() {
 
   initPromise = (async () => {
     const client = ensureRedisInstanceForQueues();
-
+    if (!client) return null;
     try {
-      // conecta explicitamente
       await client.connect();
       logger.info("[queue.redis] Redis conectado");
       return client;

@@ -7,6 +7,8 @@ export async function evaluateCities() {
     FROM city_growth_metrics
   `);
 
+  if (!growthQueue) return;
+
   for (const city of cities.rows) {
     if (city.conversion_rate < 0.01 && city.total_ads > 10) {
       await growthQueue.add(
