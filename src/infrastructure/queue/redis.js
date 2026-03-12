@@ -24,10 +24,10 @@ function isLocalhostUrl(url) {
 
 let redisInstance = null;
 const url = getRedisUrl();
-const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-const skipLocalhostInProd = isProd && isLocalhostUrl(url);
+const isLocalDev = ["development", "dev", "local"].includes(String(process.env.NODE_ENV || "").toLowerCase());
+const skipLocalhost = !isLocalDev && isLocalhostUrl(url);
 
-if (url && !isRedisDisabled() && !skipLocalhostInProd) {
+if (url && !isRedisDisabled() && !skipLocalhost) {
   redisInstance = new Redis(process.env.REDIS_URL, {
     maxRetriesPerRequest: 2,
     lazyConnect: true,

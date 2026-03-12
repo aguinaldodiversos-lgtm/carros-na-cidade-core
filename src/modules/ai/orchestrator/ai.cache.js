@@ -25,8 +25,8 @@ export function createRedisClient({ logger }) {
     logger.warn("DISABLE_REDIS=true. Cache AI desativado.");
     return null;
   }
-  const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-  if (isProd && isLocalhostUrl(url)) {
+  const isLocalDev = ["development", "dev", "local"].includes(String(process.env.NODE_ENV || "").toLowerCase());
+  if (!isLocalDev && isLocalhostUrl(url)) {
     logger.warn("REDIS_URL aponta para localhost em produção. Cache AI desativado.");
     return null;
   }

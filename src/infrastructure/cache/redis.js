@@ -19,13 +19,13 @@ function isLocalhostUrl(url) {
 }
 
 const url = String(process.env.REDIS_URL || "").trim();
-const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-const skipLocalhostInProd = isProd && isLocalhostUrl(url);
+const isLocalDev = ["development", "dev", "local"].includes(String(process.env.NODE_ENV || "").toLowerCase());
+const skipLocalhost = !isLocalDev && isLocalhostUrl(url);
 
-if (!url || isRedisDisabled() || skipLocalhostInProd) {
+if (!url || isRedisDisabled() || skipLocalhost) {
   if (!url) logger.warn("⚠️ REDIS_URL não configurado. Cache desativado.");
   else if (isRedisDisabled()) logger.warn("⚠️ DISABLE_REDIS=true. Cache desativado.");
-  else if (skipLocalhostInProd) logger.warn("⚠️ REDIS_URL localhost em produção. Cache desativado.");
+  else if (skipLocalhost) logger.warn("⚠️ REDIS_URL localhost em cloud. Cache desativado.");
 } else {
   redis = new Redis(url, {
     maxRetriesPerRequest: 2,

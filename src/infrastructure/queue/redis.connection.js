@@ -20,7 +20,7 @@ function getRedisUrl() {
   return String(process.env.REDIS_URL || "").trim();
 }
 
-/** Em produção, localhost/127.0.0.1 nunca funciona (ex: Render). Evita ECONNREFUSED. */
+/** Em produção/cloud, localhost/127.0.0.1 nunca funciona (ex: Render). Evita ECONNREFUSED. */
 function isLocalhostUrl(url) {
   if (!url) return false;
   try {
@@ -32,14 +32,20 @@ function isLocalhostUrl(url) {
   }
 }
 
+/** Só permite localhost em desenvolvimento local explícito. */
+function isLocalDevelopment() {
+  const env = String(process.env.NODE_ENV || "").toLowerCase();
+  return env === "development" || env === "dev" || env === "local";
+}
+
 function shouldEnableRedis() {
   if (isTrue(process.env.DISABLE_REDIS)) return false;
   const url = getRedisUrl();
   if (!url) return false;
-  const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-  if (isProd && isLocalhostUrl(url)) {
+  // Bloqueia localhost em qualquer ambiente que não seja development (inclui "produção", "production", etc.)
+  if (!isLocalDevelopment() && isLocalhostUrl(url)) {
     logger.warn(
-      "[queue.redis] REDIS_URL aponta para localhost em produção. Redis desativado."
+      "[queue.redis] REDIS_URL aponta para localhost. Em cloud (Render etc.) use Redis externo. Redis desativado."
     );
     return false;
   }
