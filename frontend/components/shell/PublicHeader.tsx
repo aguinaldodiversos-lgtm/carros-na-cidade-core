@@ -4,18 +4,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type NavItem = {
   label: string;
   href: string;
-  icon?: "heart";
 };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Comprar", href: "/comprar" },
+  { label: "Tabela FIPE", href: "/tabela-fipe/sao-paulo-sp" },
+  { label: "Financiamento", href: "/simulador-financiamento/sao-paulo-sp" },
   { label: "Anunciar", href: "/planos" },
-  { label: "Favoritos", href: "/favoritos", icon: "heart" },
+  { label: "Favoritos", href: "/favoritos" },
 ];
 
 function cn(...classes: Array<string | false | null | undefined>) {
@@ -47,7 +48,7 @@ function ChevronDownIcon() {
     <svg
       viewBox="0 0 20 20"
       aria-hidden="true"
-      className="h-4 w-4 shrink-0 text-[#0e62d8]"
+      className="h-4 w-4 shrink-0 text-[#2F67F6]"
       fill="currentColor"
     >
       <path d="m5 7 5 6 5-6H5Z" />
@@ -78,12 +79,10 @@ export function PublicHeader() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navItems = useMemo(() => NAV_ITEMS, []);
-
   return (
-    <header className="sticky top-0 z-50 border-b border-[#e8edf5] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/88">
+    <header className="sticky top-0 z-50 border-b border-[#E6EAF2] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/88">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
-        <div className="flex h-[74px] items-center justify-between gap-4">
+        <div className="flex h-[78px] items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4 md:gap-7">
             <Link
               href="/"
@@ -93,16 +92,16 @@ export function PublicHeader() {
               <Image
                 src="/images/logo.png"
                 alt="Carros na Cidade"
-                width={170}
-                height={42}
+                width={176}
+                height={44}
                 priority
-                className="h-auto w-[138px] object-contain md:w-[160px]"
+                className="h-auto w-[144px] object-contain md:w-[172px]"
               />
             </Link>
 
             <button
               type="button"
-              className="hidden items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-semibold text-[#2f3a52] transition hover:bg-[#f4f7fb] md:inline-flex"
+              className="hidden items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-semibold text-[#2F3A52] transition hover:bg-[#F4F7FB] md:inline-flex"
               aria-label="Selecionar cidade"
             >
               <span>São Paulo</span>
@@ -110,9 +109,9 @@ export function PublicHeader() {
             </button>
           </div>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-3 lg:flex">
             <nav className="flex items-center gap-1">
-              {navItems.map((item) => {
+              {NAV_ITEMS.map((item) => {
                 const active = isActive(pathname, item.href);
 
                 return (
@@ -120,31 +119,38 @@ export function PublicHeader() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[14px] font-medium transition",
+                      "inline-flex h-10 items-center rounded-lg px-3 text-[14px] font-medium transition",
                       active
-                        ? "bg-[#eef4ff] text-[#0e62d8]"
-                        : "text-[#4e5a73] hover:bg-[#f6f8fc] hover:text-[#0e62d8]"
+                        ? "bg-[#EEF4FF] text-[#2F67F6]"
+                        : "text-[#4E5A73] hover:bg-[#F6F8FC] hover:text-[#2F67F6]"
                     )}
                   >
-                    {item.icon === "heart" ? <HeartIcon /> : null}
-                    <span>{item.label}</span>
+                    {item.label}
                   </Link>
                 );
               })}
+
+              <Link
+                href="/favoritos"
+                aria-label="Favoritos"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#6B7488] transition hover:bg-[#F6F8FC] hover:text-[#2F67F6]"
+              >
+                <HeartIcon />
+              </Link>
             </nav>
 
             <Link
               href="/login"
-              className="inline-flex h-11 items-center justify-center rounded-[10px] bg-[#0e62d8] px-6 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(14,98,216,0.20)] transition hover:bg-[#0c4fb0]"
+              className="inline-flex h-11 items-center justify-center rounded-[10px] bg-[#2F67F6] px-6 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(47,103,246,0.20)] transition hover:bg-[#2457DC]"
             >
               Entrar
             </Link>
           </div>
 
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
             <Link
               href="/login"
-              className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#0e62d8] px-4 text-sm font-bold text-white"
+              className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#2F67F6] px-4 text-sm font-bold text-white"
             >
               Entrar
             </Link>
@@ -152,7 +158,7 @@ export function PublicHeader() {
             <button
               type="button"
               onClick={() => setMobileOpen((state) => !state)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dfe6f0] text-[#334155]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#DFE6F0] text-[#334155]"
               aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
               aria-expanded={mobileOpen}
             >
@@ -162,17 +168,17 @@ export function PublicHeader() {
         </div>
 
         {mobileOpen && (
-          <div className="border-t border-[#edf2f8] py-4 md:hidden">
+          <div className="border-t border-[#EDF2F8] py-4 lg:hidden">
             <div className="grid gap-2">
               <button
                 type="button"
-                className="inline-flex h-11 items-center justify-between rounded-xl border border-[#dfe6f0] bg-white px-4 text-sm font-semibold text-[#2f3a52]"
+                className="inline-flex h-11 items-center justify-between rounded-xl border border-[#DFE6F0] bg-white px-4 text-sm font-semibold text-[#2F3A52]"
               >
                 <span>São Paulo</span>
                 <ChevronDownIcon />
               </button>
 
-              {navItems.map((item) => {
+              {NAV_ITEMS.map((item) => {
                 const active = isActive(pathname, item.href);
 
                 return (
@@ -181,22 +187,30 @@ export function PublicHeader() {
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
-                      "inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition",
+                      "inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold transition",
                       active
-                        ? "bg-[#eef4ff] text-[#0e62d8]"
-                        : "text-[#334155] hover:bg-[#f7f9fc]"
+                        ? "bg-[#EEF4FF] text-[#2F67F6]"
+                        : "text-[#334155] hover:bg-[#F7F9FC]"
                     )}
                   >
-                    {item.icon === "heart" ? <HeartIcon /> : null}
-                    <span>{item.label}</span>
+                    {item.label}
                   </Link>
                 );
               })}
 
               <Link
+                href="/favoritos"
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[#334155] transition hover:bg-[#F7F9FC]"
+              >
+                <HeartIcon />
+                <span>Favoritos</span>
+              </Link>
+
+              <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
-                className="mt-1 inline-flex h-11 items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-bold text-white"
+                className="mt-1 inline-flex h-11 items-center justify-center rounded-xl bg-[#2F67F6] px-4 text-sm font-bold text-white"
               >
                 Entrar
               </Link>
