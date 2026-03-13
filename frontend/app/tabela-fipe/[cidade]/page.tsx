@@ -1,243 +1,102 @@
+// frontend/app/tabela-fipe/[cidade]/page.tsx
 import type { Metadata } from "next";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import CTASection from "@/components/common/CTASection";
-import FAQSection from "@/components/common/FAQSection";
-import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
-import StatsSection from "@/components/common/StatsSection";
-import VehicleCarousel from "@/components/common/VehicleCarousel";
-import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
-import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
-import { getAIFipeInsights, getAIFipeStats } from "@/services/aiService";
-import {
-  getCityProfile,
-  getFipeFaqByCity,
-  isSupportedCitySlug,
-  getStaticCitySlugs,
-  getVehiclesByCity,
-} from "@/services/marketService";
+import { FipePageClient } from "@/components/fipe/FipePageClient";
+import { fetchAdsSearch } from "@/lib/search/ads-search";
 
 type PageProps = {
-  params: { cidade: string };
+  params: {
+    cidade: string;
+  };
 };
 
-export const revalidate = 3600;
-export const dynamicParams = false;
+function prettifyCitySlug(slug: string) {
+  const parts = slug.split("-").filter(Boolean);
+  const ufCandidate = parts.at(-1)?.toUpperCase();
+  const hasUf = Boolean(ufCandidate && ufCandidate.length === 2);
 
-export async function generateStaticParams() {
-  return getStaticCitySlugs(120).map((cidade) => ({ cidade }));
+  const cityName = parts
+    .slice(0, hasUf ? -1 : undefined)
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (lower === "sao") return "São";
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+
+  return {
+    name: cityName || "São Paulo",
+    state: hasUf ? ufCandidate : "SP",
+    label: `${cityName || "São Paulo"} - ${hasUf ? ufCandidate : "SP"}`,
+  };
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  if (!isSupportedCitySlug(params.cidade)) {
-    notFound();
-  }
-
-  const city = getCityProfile(params.cidade);
+  const city = prettifyCitySlug(params.cidade);
 
   return {
-    title: `Tabela FIPE em ${city.name} ${city.uf}`,
-    description: `Consulte a Tabela FIPE em ${city.name} e compare valores para comprar e vender carros com seguranca.`,
-    keywords: [
-      `tabela fipe ${city.name.toLowerCase()}`,
-      `valor do carro em ${city.name.toLowerCase()}`,
-      `preco fipe ${city.name.toLowerCase()}`,
-    ],
+    title: `Tabela FIPE em ${city.name} | Consulte o valor do seu veículo`,
+    description: `Consulte a Tabela FIPE em ${city.name}, compare o valor do seu veículo com anúncios locais e veja destaques e oportunidades abaixo da FIPE na sua cidade.`,
     alternates: {
-      canonical: `/tabela-fipe/${city.slug}`,
+      canonical: `/tabela-fipe/${params.cidade}`,
     },
     openGraph: {
-      title: `Tabela FIPE em ${city.name} (${city.uf})`,
-      description: `Descubra valores FIPE e oportunidades abaixo da tabela em ${city.name}.`,
-      url: `/tabela-fipe/${city.slug}`,
-      locale: "pt_BR",
+      title: `Tabela FIPE em ${city.name}`,
+      description: `Consulte o valor FIPE do seu veículo e compare com anúncios locais em ${city.name}.`,
+      url: `/tabela-fipe/${params.cidade}`,
       type: "website",
+      locale: "pt_BR",
     },
   };
 }
 
-export default async function TabelaFipeCityPage({ params }: PageProps) {
-  if (!isSupportedCitySlug(params.cidade)) {
-    notFound();
-  }
+export const revalidate = 300;
 
-  const city = getCityProfile(params.cidade);
-  const [stats, insights] = await Promise.all([
-    getAIFipeStats(city.slug),
-    getAIFipeInsights(city.slug),
+export default async function TabelaFipeCidadePage({ params }: PageProps) {
+  const city = prettifyCitySlug(params.cidade);
+
+  const [highlightResult, belowFipeResult, fallbackRecentResult] = await Promise.allSettled([
+    fetchAdsSearch({
+      city_slug: params.cidade,
+      highlight_only: true,
+      sort: "highlight",
+      limit: 10,
+      page: 1,
+    }),
+    fetchAdsSearch({
+      city_slug: params.cidade,
+      below_fipe: true,
+      sort: "relevance",
+      limit: 10,
+      page: 1,
+    }),
+    fetchAdsSearch({
+      city_slug: params.cidade,
+      sort: "recent",
+      limit: 10,
+      page: 1,
+    }),
   ]);
-  const vehicles = getVehiclesByCity(city.slug, 8).filter((vehicle) => vehicle.badge === "fipe");
-  const faq = getFipeFaqByCity(city.slug);
 
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faq.map((item) => ({
-      "@type": "Question",
-      name: item.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: item.answer,
-      },
-    })),
-  };
+  const fallbackRecent =
+    fallbackRecentResult.status === "fulfilled" ? fallbackRecentResult.value.data || [] : [];
 
-  const automotiveSchema = {
-    "@context": "https://schema.org",
-    "@type": "AutomotiveBusiness",
-    name: "Carros na Cidade",
-    areaServed: city.displayName,
-    url: `https://carrosnacidade.com/tabela-fipe/${city.slug}`,
-    image: "https://carrosnacidade.com/images/logo.png",
-    priceRange: "$$",
-    serviceType: "Consulta Tabela FIPE",
-  };
-  const breadcrumbItems = [
-    { name: "Home", href: "/" },
-    { name: "Tabela FIPE", href: "/tabela-fipe" },
-    { name: city.displayName },
-  ];
-  const pageSchema = buildWebPageJsonLd({
-    title: `Tabela FIPE em ${city.name}`,
-    description: `Consulte valor de referência, compare com anúncios locais e encontre oportunidades abaixo da FIPE em ${city.name}.`,
-    path: `/tabela-fipe/${city.slug}`,
-    type: "CollectionPage",
-    about: `Tabela FIPE e oportunidades em ${city.name}`,
-  });
+  const highlightAds =
+    highlightResult.status === "fulfilled" && highlightResult.value.data?.length > 0
+      ? highlightResult.value.data
+      : fallbackRecent.slice(0, 10);
+
+  const opportunityAds =
+    belowFipeResult.status === "fulfilled" && belowFipeResult.value.data?.length > 0
+      ? belowFipeResult.value.data
+      : fallbackRecent.slice(0, 10);
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-7xl px-6 py-8">
-        <PageBreadcrumbs items={breadcrumbItems} className="mb-4" />
-        <section className="overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0c4fb2_0%,#1382e7_100%)] p-8 text-white shadow-[0_12px_30px_rgba(15,74,168,0.35)]">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/80">SEO Programatico - FIPE</p>
-          <h1 className="mt-2 text-3xl font-extrabold leading-tight md:text-5xl">Tabela FIPE em {city.name}</h1>
-          <p className="mt-2 max-w-3xl text-sm text-white/90 md:text-base">
-            Consulte valor de referencia por tipo, marca, modelo e ano/combustivel. Compare com anuncios locais
-            abaixo da FIPE e negocie com dados de mercado.
-          </p>
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)]">
-          <h2 className="text-xl font-extrabold text-[#1d2538]">Consultar valor FIPE</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <select className="cnc-select text-base" defaultValue="Carro">
-              <option>Carro</option>
-              <option>Moto</option>
-              <option>Caminhao</option>
-            </select>
-            <select className="cnc-select text-base" defaultValue="Marca">
-              <option>Marca</option>
-              <option>Toyota</option>
-              <option>Honda</option>
-              <option>Chevrolet</option>
-            </select>
-            <select className="cnc-select text-base" defaultValue="Modelo">
-              <option>Modelo</option>
-              <option>Corolla</option>
-              <option>Civic</option>
-              <option>Onix</option>
-            </select>
-            <select className="cnc-select text-base" defaultValue="Ano / Combustivel">
-              <option>Ano / Combustivel</option>
-              <option>2024 Flex</option>
-              <option>2023 Gasolina</option>
-              <option>2022 Diesel</option>
-            </select>
-            <button type="button" className="cnc-btn-primary h-12 justify-center text-[15px]">
-              Consultar FIPE
-            </button>
-          </div>
-        </section>
-
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            {
-              title: `Anúncios em ${city.name}`,
-              description: "Compare o valor de referência com o catálogo local e refine a busca por cidade.",
-              href: `/anuncios?city_slug=${city.slug}`,
-            },
-            {
-              title: "Abaixo da FIPE",
-              description: "Vá direto para oportunidades com preço competitivo na malha territorial.",
-              href: `/cidade/${city.slug}/abaixo-da-fipe`,
-            },
-            {
-              title: "Simular financiamento",
-              description: "Cruze valor FIPE com parcela, prazo e custo efetivo da compra.",
-              href: `/simulador-financiamento/${city.slug}`,
-            },
-            {
-              title: "Blog automotivo local",
-              description: "Conteúdo editorial da cidade para apoiar negociação e timing de compra.",
-              href: `/blog/${city.slug}`,
-            },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(10,20,40,0.08)]"
-            >
-              <h3 className="text-lg font-extrabold text-[#1d2538]">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-[#52607b]">{item.description}</p>
-            </Link>
-          ))}
-        </section>
-
-        <StatsSection
-          title={`Estatisticas inteligentes para ${city.name}`}
-          subtitle="Dados gerados pelo Cerebro IA para orientar preco, timing de compra e oportunidades locais."
-          stats={stats}
-        />
-
-        <section className="mt-8 rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)]">
-          <h2 className="text-2xl font-extrabold text-[#1d2538]">Insights IA por cidade</h2>
-          <ul className="mt-4 grid gap-3 md:grid-cols-3">
-            {insights.map((insight) => (
-              <li key={insight} className="rounded-xl border border-[#e1e5ef] bg-[#f8fafe] p-4 text-sm text-[#4e5872]">
-                {insight}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <VehicleCarousel
-          title={`Veiculos abaixo da FIPE em ${city.name}`}
-          subtitle="Anuncios ranqueados pelo Cerebro IA com maior diferenca positiva de preco."
-          vehicles={vehicles}
-        />
-
-        <section className="mt-8 grid gap-4 md:grid-cols-3">
-          {[
-            "Consulta de FIPE atualizada por cidade",
-            "Comparativo com anuncios locais em tempo real",
-            "Alertas de preco abaixo do mercado",
-          ].map((benefit) => (
-            <article key={benefit} className="rounded-xl border border-[#dfe4ef] bg-white p-4 shadow-[0_2px_14px_rgba(10,20,40,0.04)]">
-              <h3 className="text-base font-extrabold text-[#1e273b]">{benefit}</h3>
-              <p className="mt-2 text-sm text-[#52607b]">
-                Estrutura orientada para SEO local e decisao de compra com dados por cidade.
-              </p>
-            </article>
-          ))}
-        </section>
-
-        <FAQSection title={`Perguntas frequentes - Tabela FIPE em ${city.name}`} items={faq} />
-
-        <CTASection
-          title={`Quer vender ou comprar com mais margem em ${city.name}?`}
-          description="Ative recomendacoes do Cerebro IA para encontrar anuncios com alta liquidez e preco competitivo."
-          primaryLabel="Buscar veiculos agora"
-          primaryHref={`/anuncios?city_slug=${city.slug}&below_fipe=true`}
-          secondaryLabel="Abrir simulador"
-          secondaryHref={`/simulador-financiamento/${city.slug}`}
-        />
-      </main>
-
-      <BreadcrumbJsonLd items={breadcrumbItems} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(automotiveSchema) }} />
-    </>
+    <FipePageClient
+      citySlug={params.cidade}
+      cityName={city.name}
+      cityLabel={city.label}
+      highlightAds={highlightAds}
+      opportunityAds={opportunityAds}
+    />
   );
 }
