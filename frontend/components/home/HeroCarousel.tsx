@@ -1,142 +1,132 @@
+// frontend/components/home/HeroCarousel.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-type HomeBanner = {
+type HeroSlide = {
   id: string;
   image: string;
-  alt: string;
   title: string;
   subtitle: string;
   ctaLabel: string;
   href: string;
 };
 
-const homeBanners: HomeBanner[] = [
-  {
-    id: "home-principal",
-    image: "/images/hero.jpeg",
-    alt: "Banner principal com carro em destaque para compra na cidade",
-    title: "Encontre seu próximo carro em São Paulo",
-    subtitle: "Milhares de ofertas esperando por você",
-    ctaLabel: "Pesquisar agora",
-    href: "/anuncios",
-  },
-  {
-    id: "home-banner-oportunidades",
-    image: "/images/home/banner-local-oportunidades.png",
-    alt: "Banner com oportunidades de carros na cidade",
-    title: "Milhares de oportunidades na sua cidade",
-    subtitle: "Compre, venda e negocie com quem está perto de você",
-    ctaLabel: "Explorar ofertas",
-    href: "/anuncios",
-  },
-  {
-    id: "home-banner-anuncie",
-    image: "/images/home/banner-local-anuncie.png",
-    alt: "Banner para anunciar e vender carro na cidade",
-    title: "Encontre e venda seu carro na sua cidade",
-    subtitle: "Anuncie grátis, negocie rápido e ganhe destaque local",
-    ctaLabel: "Começar anúncio",
-    href: "/planos",
-  },
-];
+interface HeroCarouselProps {
+  slides: HeroSlide[];
+}
 
-export function HeroCarousel() {
-  const [current, setCurrent] = useState(0);
-
-  const activeBanner = useMemo(() => homeBanners[current] || homeBanners[0], [current]);
+export function HeroCarousel({ slides }: HeroCarouselProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrent((prev) => (prev + 1) % homeBanners.length);
-    }, 7000);
+    if (!slides.length) return;
 
-    return () => window.clearInterval(timer);
-  }, []);
+    const interval = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % slides.length);
+    }, 6000);
 
-  function nextSlide() {
-    setCurrent((prev) => (prev + 1) % homeBanners.length);
-  }
+    return () => window.clearInterval(interval);
+  }, [slides.length]);
 
-  function previousSlide() {
-    setCurrent((prev) => (prev - 1 + homeBanners.length) % homeBanners.length);
-  }
+  if (!slides.length) return null;
+
+  const goPrev = () => {
+    setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
+  };
+
+  const goNext = () => {
+    setActiveIndex((current) => (current + 1) % slides.length);
+  };
 
   return (
-    <section className="overflow-hidden rounded-[16px] border border-[#dce3ef] bg-white p-1.5 shadow-[0_10px_30px_rgba(20,30,60,0.08)] md:p-2">
-      <div className="relative h-[330px] w-full overflow-hidden rounded-[14px] md:h-[410px] lg:h-[460px]">
-        <Image
-          src={activeBanner.image}
-          alt={activeBanner.alt}
-          fill
-          priority={current === 0}
-          sizes="(max-width: 1024px) 100vw, 1240px"
-          className="object-cover object-center"
-        />
+    <div className="relative overflow-hidden rounded-[20px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
+      <div className="relative aspect-[16/6.2] min-h-[240px] w-full md:min-h-[400px]">
+        {slides.map((slide, index) => {
+          const isActive = index === activeIndex;
 
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,16,35,0.82)_0%,rgba(8,16,35,0.56)_40%,rgba(8,16,35,0.12)_68%,rgba(8,16,35,0.04)_100%)]" />
-
-        <div className="absolute left-0 top-0 z-20 flex h-full w-full items-center px-6 md:px-10">
-          <div className="max-w-[600px] text-white">
-            <h1 className="text-[30px] font-extrabold leading-[1.06] tracking-[-0.03em] md:text-[44px] lg:text-[50px]">
-              {activeBanner.title}
-            </h1>
-            <p className="mt-4 max-w-[500px] text-[16px] leading-[1.3] text-white/90 md:text-[22px] md:leading-[1.25] lg:text-[24px]">
-              {activeBanner.subtitle}
-            </p>
-
-            <Link
-              href={activeBanner.href}
-              className="mt-7 inline-flex h-[54px] items-center justify-center rounded-[11px] bg-[#0e62d8] px-9 text-[18px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.35)] transition hover:bg-[#0c52b9] md:h-[60px] md:text-[18px]"
-            >
-              {activeBanner.ctaLabel}
-            </Link>
-          </div>
-        </div>
-
-        <div className="absolute left-3 top-0 z-30 hidden h-full items-center md:flex">
-          <button
-            type="button"
-            onClick={previousSlide}
-            aria-label="Slide anterior"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/24 text-white backdrop-blur transition hover:bg-black/34"
-          >
-            <svg viewBox="0 0 24 24" width="24" height="24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="absolute right-3 top-0 z-30 hidden h-full items-center md:flex">
-          <button
-            type="button"
-            onClick={nextSlide}
-            aria-label="Próximo slide"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/24 text-white backdrop-blur transition hover:bg-black/34"
-          >
-            <svg viewBox="0 0 24 24" width="24" height="24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="absolute inset-x-0 bottom-5 z-30 flex items-center justify-center gap-3">
-          {homeBanners.map((banner, index) => (
-            <button
-              key={banner.id}
-              type="button"
-              aria-label={`Ir para banner ${index + 1}`}
-              onClick={() => setCurrent(index)}
-              className={`h-3 w-3 rounded-full transition ${
-                current === index ? "bg-[#19a3ff]" : "bg-white/65"
+          return (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-700 ${
+                isActive ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
-            />
-          ))}
-        </div>
+            >
+              <Image
+                src={slide.image}
+                alt={slide.title}
+                fill
+                priority={index === 0}
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 1200px"
+              />
+
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,13,30,0.72)_0%,rgba(5,13,30,0.34)_38%,rgba(5,13,30,0.08)_100%)]" />
+
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full px-6 md:px-10 lg:px-12">
+                  <div className="max-w-[460px]">
+                    <h1 className="text-[34px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white md:text-[56px]">
+                      {slide.title}
+                    </h1>
+
+                    <p className="mt-4 text-[17px] text-white/82 md:text-[24px]">
+                      {slide.subtitle}
+                    </p>
+
+                    <div className="mt-8">
+                      <Link
+                        href={slide.href}
+                        className="inline-flex h-[54px] items-center justify-center rounded-[12px] bg-[#0e62d8] px-8 text-[18px] font-bold text-white shadow-[0_14px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0]"
+                      >
+                        {slide.ctaLabel}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={goPrev}
+          aria-label="Banner anterior"
+          className="absolute left-4 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="Próximo banner"
+          className="absolute right-4 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
       </div>
-    </section>
+
+      <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
+        {slides.map((slide, index) => (
+          <button
+            key={slide.id}
+            type="button"
+            aria-label={`Ir para banner ${index + 1}`}
+            onClick={() => setActiveIndex(index)}
+            className={`h-3 w-3 rounded-full transition ${
+              index === activeIndex ? "bg-[#15a0ff]" : "bg-white/70"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
