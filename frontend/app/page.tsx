@@ -1,7 +1,8 @@
-import { HomePageClient } from "../components/home/HomePageClient";
-import { fetchPublicHomeData } from "../lib/home/public-home";
+// frontend/app/page.tsx
+import { HomePageClient } from "@/components/home/HomePageClient";
+import { fetchPublicHomeData } from "@/lib/home/public-home";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function HomePage() {
   const data = await fetchPublicHomeData();
