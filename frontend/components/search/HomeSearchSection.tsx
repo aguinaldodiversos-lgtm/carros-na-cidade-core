@@ -1,187 +1,217 @@
+// frontend/components/search/HomeSearchSection.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const cityOptions = [
-  { label: "São Paulo (SP)", value: "sao-paulo-sp" },
-  { label: "Rio de Janeiro (RJ)", value: "rio-de-janeiro-rj" },
-  { label: "Belo Horizonte (MG)", value: "belo-horizonte-mg" },
-  { label: "Campinas (SP)", value: "campinas-sp" },
-  { label: "Curitiba (PR)", value: "curitiba-pr" },
-  { label: "Porto Alegre (RS)", value: "porto-alegre-rs" },
-  { label: "Goiânia (GO)", value: "goiania-go" },
-  { label: "Florianópolis (SC)", value: "florianopolis-sc" },
-];
-
-const brandOptions = ["Toyota", "Honda", "Volkswagen", "Chevrolet", "Jeep", "Hyundai", "Fiat", "Nissan", "BYD"];
-
-const modelOptionsByBrand: Record<string, string[]> = {
-  Toyota: ["Corolla", "Yaris", "Hilux", "Corolla Cross"],
-  Honda: ["Civic", "HR-V", "City", "WR-V"],
-  Volkswagen: ["T-Cross", "Nivus", "Polo", "Taos"],
-  Chevrolet: ["Onix", "Tracker", "Cruze", "S10"],
-  Jeep: ["Compass", "Renegade", "Commander"],
-  Hyundai: ["HB20", "Creta", "Tucson"],
-  Fiat: ["Pulse", "Fastback", "Toro", "Argo"],
-  Nissan: ["Kicks", "Sentra", "Versa"],
-  BYD: ["Dolphin", "Yuan Plus", "Song Plus"],
+type FeaturedCity = {
+  id: number;
+  name: string;
+  slug: string;
 };
 
-const yearOptions = ["2025", "2024", "2023", "2022", "2021", "2020", "2019"];
-const priceOptions = [
-  { label: "Até R$ 50 mil", value: "50000" },
-  { label: "Até R$ 80 mil", value: "80000" },
-  { label: "Até R$ 120 mil", value: "120000" },
-  { label: "Até R$ 180 mil", value: "180000" },
-  { label: "Até R$ 250 mil", value: "250000" },
+interface HomeSearchSectionProps {
+  featuredCities: FeaturedCity[];
+}
+
+const BRAND_OPTIONS = [
+  "Toyota",
+  "Honda",
+  "Jeep",
+  "Volkswagen",
+  "Chevrolet",
+  "Hyundai",
+  "Fiat",
+  "Nissan",
+  "BMW",
+  "Audi",
 ];
-const categoryOptions = [
-  { label: "Hatch", value: "hatch" },
+
+const MODEL_OPTIONS: Record<string, string[]> = {
+  Toyota: ["Corolla", "Hilux", "Yaris", "SW4"],
+  Honda: ["Civic", "HR-V", "City", "Fit"],
+  Jeep: ["Compass", "Renegade", "Commander"],
+  Volkswagen: ["T-Cross", "Nivus", "Virtus", "Taos"],
+  Chevrolet: ["Onix", "Tracker", "Cruze", "S10"],
+  Hyundai: ["HB20", "Creta", "Tucson"],
+  Fiat: ["Pulse", "Fastback", "Toro", "Strada"],
+  Nissan: ["Kicks", "Sentra", "Versa"],
+  BMW: ["320i", "X1", "X3"],
+  Audi: ["A3", "Q3", "Q5"],
+};
+
+const YEAR_OPTIONS = [
+  "2024",
+  "2023",
+  "2022",
+  "2021",
+  "2020",
+  "2019",
+  "2018",
+];
+
+const PRICE_OPTIONS = [
+  { label: "Até R$ 40 mil", value: "40000" },
+  { label: "Até R$ 60 mil", value: "60000" },
+  { label: "Até R$ 80 mil", value: "80000" },
+  { label: "Até R$ 100 mil", value: "100000" },
+  { label: "Até R$ 150 mil", value: "150000" },
+  { label: "Até R$ 200 mil", value: "200000" },
+];
+
+const TYPE_OPTIONS = [
+  { label: "Selecionar", value: "" },
+  { label: "Usados", value: "used" },
+  { label: "Seminovos", value: "seminovos" },
+  { label: "Novos", value: "new" },
+];
+
+const CATEGORY_OPTIONS = [
+  { label: "Categoria", value: "" },
   { label: "Sedã", value: "sedan" },
   { label: "SUV", value: "suv" },
+  { label: "Hatch", value: "hatch" },
   { label: "Picape", value: "pickup" },
-  { label: "Elétrico", value: "electric" },
-  { label: "Híbrido", value: "hybrid" },
+  { label: "Utilitário", value: "utilitario" },
 ];
 
-function SearchField({ label, children }: { label: string; children: React.ReactNode }) {
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+}) {
   return (
-    <div className="min-w-0 rounded-[10px] border border-[#d8deea] bg-white px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-      <div className="flex h-[58px] items-center gap-3">
-        <span className="text-[14px] font-semibold text-[#8d95a7]">{label}</span>
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
-    </div>
+    <label className="block">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-[52px] w-full rounded-[12px] border border-[#dbe2ed] bg-white px-4 text-[16px] font-medium text-[#2b3650] outline-none transition focus:border-[#0e62d8]"
+      >
+        <option value="">{label}</option>
+        {options.map((option) => (
+          <option key={`${label}-${option.value}`} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
-function BaseSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      {...props}
-      className={`h-10 w-full rounded-none bg-transparent px-0 text-[15px] font-semibold text-[#2f3a54] outline-none transition focus:text-[#163467] ${props.className || ""}`}
-    />
-  );
-}
-
-export function HomeSearchSection() {
+export function HomeSearchSection({ featuredCities }: HomeSearchSectionProps) {
   const router = useRouter();
 
-  const [citySlug, setCitySlug] = useState("sao-paulo-sp");
+  const cityOptions = useMemo(() => {
+    if (featuredCities?.length) {
+      return featuredCities.map((city) => ({
+        label: city.name,
+        value: city.slug,
+      }));
+    }
+
+    return [{ label: "São Paulo", value: "sao-paulo-sp" }];
+  }, [featuredCities]);
+
+  const [citySlug, setCitySlug] = useState(cityOptions[0]?.value || "sao-paulo-sp");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
-  const [yearMin, setYearMin] = useState("");
+  const [year, setYear] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-  const [bodyType, setBodyType] = useState("");
+  const [type, setType] = useState("");
+  const [category, setCategory] = useState("");
 
   const modelOptions = useMemo(() => {
-    if (!brand) return [];
-    return modelOptionsByBrand[brand] || [];
+    const options = brand ? MODEL_OPTIONS[brand] || [] : [];
+    return options.map((item) => ({ label: item, value: item }));
   }, [brand]);
 
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-
+  function handleSubmit() {
     const params = new URLSearchParams();
+
     if (citySlug) params.set("city_slug", citySlug);
     if (brand) params.set("brand", brand);
     if (model) params.set("model", model);
-    if (yearMin) params.set("year_min", yearMin);
+    if (year) params.set("year_min", year);
     if (maxPrice) params.set("max_price", maxPrice);
-    if (bodyType) params.set("body_type", bodyType);
+    if (type === "used") params.set("condition", "used");
+    if (type === "seminovos") params.set("condition", "seminovos");
+    if (type === "new") params.set("condition", "new");
+    if (category) params.set("body_type", category);
 
-    router.push(`/anuncios?${params.toString()}`);
+    const query = params.toString();
+    router.push(query ? `/comprar?${query}` : "/comprar");
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-[16px] border border-[#dce3ef] bg-white p-4 shadow-[0_12px_28px_rgba(20,30,60,0.08)] md:p-5"
-    >
-      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
-        <SearchField label="Cidade">
-          <BaseSelect value={citySlug} onChange={(e) => setCitySlug(e.target.value)} aria-label="Cidade">
-            {cityOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
+    <div className="rounded-[20px] border border-[#dce3ee] bg-white px-5 py-5 shadow-[0_16px_34px_rgba(16,28,58,0.08)] md:px-6 md:py-6">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <SelectField
+          label="Cidade"
+          value={citySlug}
+          onChange={setCitySlug}
+          options={cityOptions}
+        />
+        <SelectField
+          label="Marca"
+          value={brand}
+          onChange={(value) => {
+            setBrand(value);
+            setModel("");
+          }}
+          options={BRAND_OPTIONS.map((item) => ({ label: item, value: item }))}
+        />
+        <SelectField
+          label="Modelo"
+          value={model}
+          onChange={setModel}
+          options={modelOptions}
+        />
+        <SelectField
+          label="Ano"
+          value={year}
+          onChange={setYear}
+          options={YEAR_OPTIONS.map((item) => ({ label: item, value: item }))}
+        />
+      </div>
 
-        <SearchField label="Marca">
-          <BaseSelect
-            value={brand}
-            aria-label="Marca"
-            onChange={(e) => {
-              setBrand(e.target.value);
-              setModel("");
-            }}
-          >
-            <option value="">- Selecionar -</option>
-            {brandOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Modelo">
-          <BaseSelect value={model} onChange={(e) => setModel(e.target.value)} disabled={!brand} aria-label="Modelo">
-            <option value="">Modelo</option>
-            {modelOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Ano">
-          <BaseSelect value={yearMin} onChange={(e) => setYearMin(e.target.value)} aria-label="Ano">
-            <option value="">Ano</option>
-            {yearOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Preço até">
-          <BaseSelect value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} aria-label="Preço até">
-            <option value="">Preço até</option>
-            {priceOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
-
-        <SearchField label="Categoria">
-          <BaseSelect value={bodyType} onChange={(e) => setBodyType(e.target.value)} aria-label="Categoria">
-            <option value="">Selecionar -</option>
-            {categoryOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </BaseSelect>
-        </SearchField>
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_220px]">
+        <SelectField
+          label="Preço até"
+          value={maxPrice}
+          onChange={setMaxPrice}
+          options={PRICE_OPTIONS}
+        />
+        <SelectField
+          label="Selecionar"
+          value={type}
+          onChange={setType}
+          options={TYPE_OPTIONS}
+        />
+        <SelectField
+          label="Categoria"
+          value={category}
+          onChange={setCategory}
+          options={CATEGORY_OPTIONS}
+        />
 
         <button
-          type="submit"
-          className="md:col-span-2 inline-flex h-[58px] w-full items-center justify-center gap-2 rounded-[10px] bg-[#0e62d8] px-6 text-[19px] font-extrabold text-white shadow-[0_12px_24px_rgba(14,98,216,0.24)] transition hover:bg-[#0c4fb0]"
+          type="button"
+          onClick={handleSubmit}
+          className="inline-flex h-[52px] items-center justify-center rounded-[12px] bg-[#0e62d8] px-6 text-[18px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.24)] transition hover:bg-[#0c4fb0]"
         >
-          Pesquisar
-          <svg viewBox="0 0 20 20" width="20" height="20" className="h-4 w-4 shrink-0" fill="currentColor">
-            <path d="M7 4 13 10 7 16" />
+          <span>Pesquisar</span>
+          <svg viewBox="0 0 24 24" className="ml-2 h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m9 6 6 6-6 6" />
           </svg>
         </button>
       </div>
-    </form>
+    </div>
   );
 }
