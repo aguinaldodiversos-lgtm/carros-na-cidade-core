@@ -26,7 +26,7 @@ function prettifyCitySlug(slug: string) {
     .join(" ");
 
   const cityName = name || "São Paulo";
-  const state = hasUf ? ufCandidate : "SP";
+  const state = (hasUf && ufCandidate) ? ufCandidate : "SP";
 
   return {
     name: cityName,
