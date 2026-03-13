@@ -15,14 +15,14 @@ type ComprarPageProps = {
   searchParams?: SearchParams;
 };
 
+export const revalidate = 60;
+
 type CityContext = {
   name: string;
   state: string;
   slug: string;
   label: string;
 };
-
-export const revalidate = 60;
 
 function getFirstValue(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -37,11 +37,17 @@ function toReader(searchParams: SearchParams) {
   };
 }
 
-function normalizeTextPart(value: string) {
-  const lower = value.toLowerCase();
-  if (lower === "sao") return "São";
-  if (lower === "joao") return "João";
-  if (lower === "jose") return "José";
+function normalizeWord(word: string) {
+  const lower = word.toLowerCase();
+
+  const dictionary: Record<string, string> = {
+    sao: "São",
+    joao: "João",
+    jose: "José",
+    conceicao: "Conceição",
+  };
+
+  if (dictionary[lower]) return dictionary[lower];
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
@@ -52,7 +58,7 @@ function cityFromSlug(slug: string): CityContext {
 
   const cityName = parts
     .slice(0, hasUf ? -1 : undefined)
-    .map(normalizeTextPart)
+    .map(normalizeWord)
     .join(" ");
 
   const name = cityName || "São Paulo";
@@ -81,9 +87,7 @@ function normalizeBuyFilters(searchParams: SearchParams = {}): AdsSearchFilters 
 }
 
 function resolveCity(filters: AdsSearchFilters): CityContext {
-  if (filters.city_slug) {
-    return cityFromSlug(filters.city_slug);
-  }
+  if (filters.city_slug) return cityFromSlug(filters.city_slug);
 
   return {
     name: "São Paulo",
@@ -129,7 +133,7 @@ function buildMetadataTitle(filters: AdsSearchFilters, city: CityContext) {
 
 function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) {
   if (filters.brand && filters.model) {
-    return `Explore ${filters.brand} ${filters.model} em ${city.name} com catálogo premium, filtros rápidos e anúncios de destaque no Carros na Cidade.`;
+    return `Explore ${filters.brand} ${filters.model} em ${city.name} com catálogo premium, filtros rápidos, veículos em destaque e oportunidades locais no Carros na Cidade.`;
   }
 
   if (filters.brand) {
