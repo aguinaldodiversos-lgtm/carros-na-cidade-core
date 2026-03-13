@@ -37,7 +37,7 @@ function prettifyCitySlug(slug: string) {
 
 function fallbackHero(cityName: string, state: string): AdItem {
   return {
-    id: "hero-fallback",
+    id: 999001,
     slug: "volkswagen-t-cross-2022-2023",
     title: "2022/2023 Volkswagen T-Cross",
     brand: "Volkswagen",
