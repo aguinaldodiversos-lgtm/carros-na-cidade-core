@@ -1,365 +1,553 @@
+// frontend/components/buy/BuyMarketplacePageClient.tsx
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import type {
+  AdItem,
   AdsFacetsResponse,
   AdsSearchFilters,
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import {
-  fetchAdsFacets,
-  fetchAdsSearch,
-} from "@/lib/search/ads-search";
-import {
   buildSearchQueryString,
   mergeSearchFilters,
-  parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
-import { AppliedFilterChips } from "@/components/search/AppliedFilterChips";
-import { SearchPagination } from "@/components/search/SearchPagination";
-import BuyCarsGrid from "@/components/buy/BuyCarsGrid";
-import BuyFiltersSidebar from "@/components/buy/BuyFiltersSidebar";
-import BuyHeaderPanel from "@/components/buy/BuyHeaderPanel";
-import BuyResultsToolbar from "@/components/buy/BuyResultsToolbar";
-
-type BuyMarketplacePageClientProps = {
-  initialResults: AdsSearchResponse;
-  initialFacets: AdsFacetsResponse["facets"] | null;
-};
+import CatalogVehicleCard, { type CatalogItem } from "@/components/buy/CatalogVehicleCard";
 
 type CityContext = {
   name: string;
-  state?: string;
+  state: string;
+  slug: string;
   label: string;
-  slug?: string;
 };
 
-const DEFAULT_CITY: CityContext = {
-  name: "Sao Paulo",
-  state: "SP",
-  label: "Sao Paulo - SP",
+interface BuyMarketplacePageClientProps {
+  initialResults: AdsSearchResponse;
+  initialFacets: AdsFacetsResponse["facets"];
+  initialFilters: AdsSearchFilters;
+  city: CityContext;
+}
+
+type BrandFacet = {
+  brand: string;
+  total: number;
 };
 
-function normalizeBuyFilters(filters: AdsSearchFilters): AdsSearchFilters {
-  return {
-    ...filters,
-    sort: filters.sort || "recent",
-    page: filters.page || 1,
-    limit: filters.limit || 18,
-  };
+type ModelFacet = {
+  brand?: string;
+  model: string;
+  total: number;
+};
+
+function parseNumber(value?: string | number | null) {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function compactBuyFilters(filters: AdsSearchFilters): AdsSearchFilters {
-  const compacted = { ...filters };
-
-  if (compacted.sort === "recent") delete compacted.sort;
-  if (compacted.page === 1) delete compacted.page;
-  if (compacted.limit === 18) delete compacted.limit;
-
-  return compacted;
+function parseDate(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
-function getCityContext(filters: AdsSearchFilters): CityContext {
-  if (filters.city_slug) {
-    const parts = filters.city_slug.split("-").filter(Boolean);
-    const ufCandidate = parts.at(-1)?.toUpperCase();
-    const hasUf = Boolean(ufCandidate && ufCandidate.length === 2);
-    const name = parts
-      .slice(0, hasUf ? -1 : undefined)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
-
-    const state = hasUf ? ufCandidate : undefined;
-    const resolvedName = name || DEFAULT_CITY.name;
-
-    return {
-      name: resolvedName,
-      state,
-      slug: filters.city_slug,
-      label: state ? `${resolvedName} - ${state}` : resolvedName,
-    };
-  }
-
-  if (filters.city) {
-    const [cityPart, statePart] = filters.city
-      .split(" - ")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    const resolvedName = cityPart || filters.city;
-    const resolvedState = filters.state || statePart || undefined;
-
-    return {
-      name: resolvedName,
-      state: resolvedState,
-      label: resolvedState ? `${resolvedName} - ${resolvedState}` : resolvedName,
-    };
-  }
-
-  return DEFAULT_CITY;
+function getPlanValue(item: CatalogItem) {
+  const raw = String(item.plan || "").toLowerCase();
+  if (!raw) return "";
+  return raw;
 }
 
-function buildHeroTitle(filters: AdsSearchFilters, city: CityContext) {
-  if (filters.brand && filters.model) {
-    return `${filters.brand} ${filters.model} em ${city.name}`;
+function isDealer(item: CatalogItem) {
+  return Boolean(
+    item.dealership_id ||
+      item.dealer_name ||
+      item.dealership_name ||
+      item.seller_type === "dealer" ||
+      item.seller_type === "dealership"
+  );
+}
+
+function getAdWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
+  if (item.highlight_until) return 4;
+
+  const plan = getPlanValue(item);
+  const premiumSignals = ["premium", "pro", "complete", "enterprise", "plus", "master"];
+
+  if (premiumSignals.some((signal) => plan.includes(signal))) {
+    return 3;
   }
 
-  if (filters.brand) {
-    return `Carros ${filters.brand} usados e seminovos em ${city.name}`;
+  if (isDealer(item)) {
+    return 2;
   }
 
-  return `Carros usados e seminovos em ${city.name}`;
+  return 1;
+}
+
+function sortCatalogItems(items: CatalogItem[]) {
+  return [...items].sort((a, b) => {
+    const weightA = getAdWeight(a);
+    const weightB = getAdWeight(b);
+
+    if (weightA !== weightB) return weightB - weightA;
+
+    const belowFipeA = a.below_fipe ? 1 : 0;
+    const belowFipeB = b.below_fipe ? 1 : 0;
+    if (belowFipeA !== belowFipeB) return belowFipeB - belowFipeA;
+
+    const createdA = parseDate(a.created_at);
+    const createdB = parseDate(b.created_at);
+    if (createdA !== createdB) return createdB - createdA;
+
+    const priceA = parseNumber(a.price);
+    const priceB = parseNumber(b.price);
+    return priceB - priceA;
+  });
+}
+
+function formatTotal(total?: number) {
+  return new Intl.NumberFormat("pt-BR").format(total || 0);
+}
+
+function TopPromoBanner() {
+  return (
+    <div className="relative overflow-hidden rounded-[20px] border border-[#E5E9F2] bg-white px-7 py-6 shadow-[0_12px_24px_rgba(18,34,72,0.05)]">
+      <div className="absolute right-0 top-0 h-full w-[120px] overflow-hidden">
+        <div className="absolute right-[-20px] top-[-10px] h-[88px] w-[88px] rounded-full border-[12px] border-[#2F67F6]/25" />
+        <div className="absolute right-[-6px] top-[12px] h-[74px] w-[74px] rounded-full border-[10px] border-[#2F67F6]/55" />
+        <div className="absolute bottom-[-26px] right-[-18px] h-[90px] w-[90px] rounded-full bg-[#F5A623]" />
+      </div>
+
+      <div className="relative flex items-center justify-between gap-6">
+        <div>
+          <h3 className="text-[22px] font-extrabold leading-tight text-[#1D2440]">
+            Venda mais rápido
+          </h3>
+          <p className="mt-1 text-[16px] text-[#5F6780]">
+            com anúncios em <span className="font-extrabold text-[#1F66E5]">destaque</span>
+          </p>
+        </div>
+
+        <Link
+          href="/planos"
+          className="inline-flex h-[48px] shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[16px] font-bold text-white transition hover:bg-[#1758CC]"
+        >
+          Patrocinar anúncio
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function Toolbar({
+  filters,
+  onSortChange,
+}: {
+  filters: AdsSearchFilters;
+  onSortChange: (value: string) => void;
+}) {
+  return (
+    <div className="mb-5 flex flex-col gap-3 rounded-[18px] border border-[#E5E9F2] bg-white px-4 py-3 shadow-[0_10px_22px_rgba(18,34,72,0.05)] md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-wrap items-center gap-3">
+        <select className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none">
+          <option>51 últimos</option>
+          <option>100 últimos</option>
+          <option>200 últimos</option>
+        </select>
+
+        <div className="hidden items-center gap-2 text-[#6E748A] md:flex">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+        </div>
+
+        <select
+          value={filters.sort || "recent"}
+          onChange={(event) => onSortChange(event.target.value)}
+          className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none"
+        >
+          <option value="recent">Últimos</option>
+          <option value="relevance">Relevância</option>
+          <option value="price_asc">Menor preço</option>
+          <option value="price_desc">Maior preço</option>
+          <option value="mileage_asc">Menos rodado</option>
+          <option value="year_desc">Mais novo</option>
+        </select>
+      </div>
+
+      <button
+        type="button"
+        className="inline-flex h-[44px] items-center justify-center gap-2 rounded-[12px] border border-[#E5E9F2] bg-[#F6F8FC] px-4 text-[14px] font-bold text-[#47506A] transition hover:bg-[#EEF3FB]"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5 text-[#6E748A]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        >
+          <path d="M4 10.5 12 4l8 6.5v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
+          <path d="M9 14h6" />
+        </svg>
+        Ver no mapa
+      </button>
+    </div>
+  );
+}
+
+function SidebarSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-b border-[#EEF1F6] pb-5 last:border-b-0 last:pb-0">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-[17px] font-extrabold text-[#1D2440]">{title}</h3>
+        <svg
+          viewBox="0 0 20 20"
+          className="h-4 w-4 text-[#7A8398]"
+          fill="currentColor"
+        >
+          <path d="m5 7 5 6 5-6H5Z" />
+        </svg>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ label: string; value: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-[52px] w-full rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[15px] font-medium text-[#33405A] outline-none transition focus:border-[#1F66E5]"
+      >
+        {options.map((option) => (
+          <option key={`${label}-${option.value}`} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function QuickInterestRow({
+  label,
+  count,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between rounded-[12px] px-1 py-2 text-left transition hover:bg-[#F7F9FC]"
+    >
+      <span className="text-[15px] font-medium text-[#33405A]">{label}</span>
+      <span className="inline-flex min-w-[52px] items-center justify-center rounded-full bg-[#F1F4FA] px-3 py-1 text-[12px] font-bold text-[#7A8398]">
+        {formatTotal(count)}
+      </span>
+    </button>
+  );
 }
 
 export default function BuyMarketplacePageClient({
   initialResults,
   initialFacets,
+  initialFilters,
+  city,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
-  const filters = useMemo<AdsSearchFilters>(() => {
-    const parsed = parseAdsSearchFiltersFromSearchParams(searchParams);
-    return normalizeBuyFilters(parsed);
-  }, [searchParams]);
+  const items = useMemo(
+    () => sortCatalogItems((initialResults.data || []) as CatalogItem[]),
+    [initialResults.data]
+  );
 
-  const [results, setResults] = useState<AdsSearchResponse | null>(initialResults);
-  const [facets, setFacets] = useState<AdsFacetsResponse["facets"] | null>(initialFacets);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const firstRow = items.slice(0, 2);
+  const remaining = items.slice(2);
 
-  const hasHydratedRef = useRef(false);
-  const resultsAbortRef = useRef<AbortController | null>(null);
-  const facetsAbortRef = useRef<AbortController | null>(null);
+  const brandOptions = useMemo(() => {
+    const brands = (initialFacets?.brands || []) as BrandFacet[];
+    const options = brands.slice(0, 12).map((item) => ({
+      label: `${item.brand} (${formatTotal(item.total)})`,
+      value: item.brand,
+    }));
 
-  const city = useMemo(() => getCityContext(filters), [filters]);
-  const totalResults = results?.pagination?.total || 0;
-  const title = useMemo(() => buildHeroTitle(filters, city), [filters, city]);
+    return [{ label: "Selecionar marca", value: "" }, ...options];
+  }, [initialFacets?.brands]);
 
-  const quickLinks = useMemo(() => {
-    if (city.slug) {
-      return [
-        { label: `Comprar em ${city.name}`, href: `/cidade/${city.slug}` },
-        { label: "Tabela FIPE local", href: `/tabela-fipe/${city.slug}` },
-        { label: "Simular financiamento", href: `/simulador-financiamento/${city.slug}` },
-        { label: "Blog da cidade", href: `/blog/${city.slug}` },
-      ];
-    }
+  const modelOptions = useMemo(() => {
+    const models = (initialFacets?.models || []) as ModelFacet[];
+    const filtered = initialFilters.brand
+      ? models.filter((item) => item.brand === initialFilters.brand)
+      : models;
 
-    return [
-      { label: "Tabela FIPE", href: "/tabela-fipe" },
-      { label: "Simular financiamento", href: "/simulador-financiamento" },
-      { label: "Planos para anunciar", href: "/planos" },
-    ];
-  }, [city]);
+    const options = filtered.slice(0, 12).map((item) => ({
+      label: `${item.model} (${formatTotal(item.total)})`,
+      value: item.model,
+    }));
 
-  function pushFilters(patch: Partial<AdsSearchFilters>) {
-    const merged = normalizeBuyFilters(mergeSearchFilters(filters, patch));
-    const queryString = buildSearchQueryString(compactBuyFilters(merged));
+    return [{ label: "Selecionar modelo", value: "" }, ...options];
+  }, [initialFacets?.models, initialFilters.brand]);
+
+  const popularBrands = useMemo(
+    () => ((initialFacets?.brands || []) as BrandFacet[]).slice(0, 5),
+    [initialFacets?.brands]
+  );
+
+  const catalogStats = useMemo(() => {
+    const newest = items.length;
+    const cheaper = items.filter((item) => parseNumber(item.price) <= 100000).length;
+    const lessMileage = items.filter((item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000).length;
+
+    return {
+      newest,
+      cheaper,
+      lessMileage,
+    };
+  }, [items]);
+
+  function pushFilters(patch: Partial<AdsSearchFilters>, resetPage = true) {
+    const merged = mergeSearchFilters(initialFilters, {
+      ...patch,
+      ...(resetPage ? { page: 1 } : {}),
+    });
+
+    const queryString = buildSearchQueryString(merged);
     router.push(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
-  function clearAll() {
-    router.push(pathname);
-  }
-
-  useEffect(() => {
-    if (!hasHydratedRef.current) {
-      hasHydratedRef.current = true;
-      return;
-    }
-
-    if (resultsAbortRef.current) {
-      resultsAbortRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    resultsAbortRef.current = controller;
-
-    setLoading(true);
-    setError(null);
-
-    fetchAdsSearch(filters, controller.signal)
-      .then((data) => setResults(data))
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "Erro ao carregar anuncios");
-        setResults(null);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [filters]);
-
-  useEffect(() => {
-    if (!hasHydratedRef.current) return;
-
-    if (facetsAbortRef.current) {
-      facetsAbortRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    facetsAbortRef.current = controller;
-
-    fetchAdsFacets(filters, controller.signal)
-      .then((data) => setFacets(data.facets))
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setFacets(null);
-      });
-
-    return () => controller.abort();
-  }, [
-    filters.brand,
-    filters.model,
-    filters.city,
-    filters.city_id,
-    filters.city_slug,
-    filters.state,
-    filters.below_fipe,
-    filters.highlight_only,
-    filters.transmission,
-    filters.body_type,
-    filters.fuel_type,
-  ]);
-
   return (
-    <main className="min-h-screen bg-[#f1f2f6]">
-      <BuyHeaderPanel
-        title={title}
-        totalResults={totalResults}
-        cityLabel={city.name}
-        quickLinks={quickLinks}
-      />
-
-      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
-        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="xl:sticky xl:top-24 xl:self-start">
-            <BuyFiltersSidebar
-              facets={facets}
-              filters={filters}
-              totalResults={totalResults}
-              cityLabel={city.label}
-              onChange={pushFilters}
-              onClearAll={clearAll}
-            />
+    <main className="bg-[#F5F7FB]">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+        <section className="mb-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_540px] lg:items-start">
+          <div>
+            <h1 className="max-w-3xl text-[34px] font-extrabold leading-[1.08] tracking-[-0.03em] text-[#1D2440] md:text-[46px]">
+              Carros usados e seminovos em {city.name}
+            </h1>
+            <p className="mt-4 text-[22px] font-medium text-[#6E748A]">
+              {formatTotal(initialResults.pagination?.total || items.length)} anúncios encontrados
+            </p>
           </div>
 
-          <div className="space-y-5">
-            <BuyResultsToolbar
-              filters={filters}
-              totalResults={totalResults}
-              cityLabel={city.name}
-              onChange={pushFilters}
-            />
+          <TopPromoBanner />
+        </section>
 
-            <section className="rounded-[18px] border border-[#dbe4f0] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-1">
-                  <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#0e62d8]">
-                    Inventario vivo da cidade
-                  </p>
-                  <p className="text-sm text-[#5c6981]">
-                    Pagina pronta para contexto local, filtros por URL e dados reais da
-                    API oficial.
-                  </p>
-                </div>
+        <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="rounded-[22px] border border-[#E5E9F2] bg-white p-5 shadow-[0_14px_28px_rgba(18,34,72,0.05)]">
+            <SidebarSection title="Filtros rápidos">
+              <div className="space-y-4">
+                <FilterSelect
+                  label="Marca"
+                  value={initialFilters.brand || ""}
+                  options={brandOptions}
+                  onChange={(value) => pushFilters({ brand: value || undefined, model: undefined })}
+                />
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                  {city.slug ? (
-                    <Link
-                      href={`/cidade/${city.slug}`}
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-[#dce4f0] bg-[#f8fbff] px-4 text-sm font-semibold text-[#334155] transition hover:border-[#c5d4eb] hover:text-[#0e62d8]"
+                <FilterSelect
+                  label="Modelo"
+                  value={initialFilters.model || ""}
+                  options={modelOptions}
+                  onChange={(value) => pushFilters({ model: value || undefined })}
+                />
+
+                <FilterSelect
+                  label="Preço até"
+                  value={String(initialFilters.max_price || "")}
+                  options={[
+                    { label: "Faixa de preço", value: "" },
+                    { label: "Até R$ 60.000", value: "60000" },
+                    { label: "Até R$ 80.000", value: "80000" },
+                    { label: "Até R$ 100.000", value: "100000" },
+                    { label: "Até R$ 150.000", value: "150000" },
+                    { label: "Até R$ 200.000", value: "200000" },
+                  ]}
+                  onChange={(value) =>
+                    pushFilters({ max_price: value ? Number(value) : undefined })
+                  }
+                />
+
+                <div>
+                  <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
+                    Tipo
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-[#F3F6FB] p-1">
+                    <button
+                      type="button"
+                      className="inline-flex h-[42px] items-center justify-center rounded-[12px] bg-white text-[14px] font-bold text-[#1D2440] shadow-sm"
                     >
-                      Hub local
-                    </Link>
-                  ) : null}
-
-                  <Link
-                    href="/planos"
-                    className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-bold text-white shadow-[0_10px_20px_rgba(14,98,216,0.18)] transition hover:bg-[#0c54bc]"
-                  >
-                    Patrocinar anuncio
-                  </Link>
+                      Carros
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-[42px] items-center justify-center rounded-[12px] text-[14px] font-bold text-[#778199]"
+                    >
+                      Motos
+                    </button>
+                  </div>
                 </div>
               </div>
+            </SidebarSection>
 
-              <div className="mt-4">
-                <AppliedFilterChips
-                  filters={filters}
-                  onRemove={pushFilters}
-                  onClearAll={clearAll}
+            <SidebarSection title="Localização">
+              <FilterSelect
+                label=""
+                value={city.slug}
+                options={[{ label: city.label, value: city.slug }]}
+                onChange={() => null}
+              />
+            </SidebarSection>
+
+            <SidebarSection title="O que te interessa ver hoje?">
+              <div className="space-y-1">
+                <QuickInterestRow
+                  label="Mais novo"
+                  count={catalogStats.newest}
+                  onClick={() => pushFilters({ sort: "year_desc" })}
+                />
+                <QuickInterestRow
+                  label="Mais barato"
+                  count={catalogStats.cheaper}
+                  onClick={() => pushFilters({ sort: "price_asc" })}
+                />
+                <QuickInterestRow
+                  label="Menos rodado"
+                  count={catalogStats.lessMileage}
+                  onClick={() => pushFilters({ sort: "mileage_asc" })}
                 />
               </div>
-            </section>
+            </SidebarSection>
 
-            {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-                {error}
+            <SidebarSection title="Populares">
+              <div className="space-y-3">
+                {popularBrands.map((item) => (
+                  <button
+                    key={item.brand}
+                    type="button"
+                    onClick={() => pushFilters({ brand: item.brand })}
+                    className="flex w-full items-center justify-between rounded-[12px] px-1 py-2 text-left transition hover:bg-[#F7F9FC]"
+                  >
+                    <span className="text-[15px] font-medium text-[#33405A]">{item.brand}</span>
+                    <span className="text-[14px] font-bold text-[#7A8398]">
+                      {formatTotal(item.total)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </SidebarSection>
+
+            <SidebarSection title="Marcas populares">
+              <div className="grid grid-cols-2 gap-3">
+                {popularBrands.map((item) => (
+                  <button
+                    key={`popular-${item.brand}`}
+                    type="button"
+                    onClick={() => pushFilters({ brand: item.brand })}
+                    className="rounded-[14px] border border-[#E5E9F2] bg-[#FAFBFE] px-3 py-4 text-center text-[14px] font-bold text-[#33405A] transition hover:border-[#C8D5F3] hover:bg-white"
+                  >
+                    {item.brand}
+                  </button>
+                ))}
+              </div>
+            </SidebarSection>
+          </aside>
+
+          <div>
+            <Toolbar
+              filters={initialFilters}
+              onSortChange={(value) => pushFilters({ sort: value })}
+            />
+
+            {firstRow.length > 0 ? (
+              <div className="mb-5 grid gap-5 lg:grid-cols-2">
+                {firstRow.map((item) => (
+                  <CatalogVehicleCard
+                    key={`featured-${item.id}`}
+                    item={item}
+                    featured
+                    weight={getAdWeight(item)}
+                  />
+                ))}
               </div>
             ) : null}
 
-            {loading ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 9 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="overflow-hidden rounded-[24px] border border-[#dbe4f0] bg-white"
-                  >
-                    <div className="aspect-[16/10] animate-pulse bg-[#edf2f8]" />
-                    <div className="space-y-3 p-5">
-                      <div className="h-4 animate-pulse rounded bg-[#edf2f8]" />
-                      <div className="h-4 w-2/3 animate-pulse rounded bg-[#edf2f8]" />
-                      <div className="h-20 animate-pulse rounded-[20px] bg-[#edf2f8]" />
-                      <div className="h-12 animate-pulse rounded-xl bg-[#edf2f8]" />
-                    </div>
-                  </div>
+            {remaining.length > 0 ? (
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {remaining.map((item) => (
+                  <CatalogVehicleCard
+                    key={`card-${item.id}`}
+                    item={item}
+                    weight={getAdWeight(item)}
+                  />
                 ))}
               </div>
-            ) : (
-              <>
-                <BuyCarsGrid items={results?.data || []} />
+            ) : firstRow.length === 0 ? (
+              <div className="rounded-[22px] border border-[#E5E9F2] bg-white px-6 py-12 text-center shadow-[0_14px_28px_rgba(18,34,72,0.05)]">
+                <h2 className="text-[24px] font-extrabold text-[#1D2440]">
+                  Nenhum anúncio encontrado
+                </h2>
+                <p className="mt-3 text-[16px] text-[#6E748A]">
+                  Ajuste os filtros ou tente outra combinação para encontrar ofertas na sua cidade.
+                </p>
+              </div>
+            ) : null}
 
-                <div className="pt-2">
-                  <SearchPagination
-                    page={results?.pagination?.page || 1}
-                    totalPages={results?.pagination?.totalPages || 1}
-                    onChange={(page) => pushFilters({ page })}
-                  />
-                </div>
-              </>
-            )}
-
-            <section className="rounded-[20px] border border-[#dbe4f0] bg-[linear-gradient(135deg,#10234a_0%,#173974_55%,#0e62d8_100%)] p-5 text-white shadow-[0_18px_38px_rgba(10,20,40,0.18)] sm:p-6">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="max-w-2xl">
-                  <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/70">
-                    Conversao comercial
-                  </p>
-                  <h2 className="mt-2 text-[24px] font-black leading-tight tracking-[-0.03em] sm:text-[28px]">
-                    Destaque seu estoque ou simule a proxima compra com contexto local.
-                  </h2>
-                  <p className="mt-3 text-[14px] leading-7 text-white/78 sm:text-sm">
-                    A pagina Comprar foi estruturada para navegar por cidade, comparar
-                    estoque vivo e acelerar visita, lead e decisao comercial.
+            <section className="mt-8 overflow-hidden rounded-[22px] border border-[#DCE4F2] bg-[#1F66E5] shadow-[0_18px_36px_rgba(31,102,229,0.20)]">
+              <div className="flex flex-col gap-5 px-6 py-6 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-[12px] font-extrabold uppercase tracking-[0.18em] text-white/75">
+                    Conversão comercial
+                  </div>
+                  <h3 className="mt-2 text-[24px] font-extrabold leading-tight text-white md:text-[30px]">
+                    Destaque seu estoque ou simule a próxima compra com contexto local.
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-[15px] leading-7 text-white/86">
+                    Aumente a visibilidade dos seus anúncios, compare oportunidades e ganhe
+                    mais velocidade na sua cidade.
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
                     href="/planos"
-                    className="inline-flex h-12 items-center justify-center rounded-xl bg-white px-5 text-sm font-bold text-[#123162] transition hover:bg-[#eef4ff]"
+                    className="inline-flex h-[48px] items-center justify-center rounded-[12px] bg-white px-5 text-[16px] font-bold text-[#1F66E5] transition hover:bg-[#EEF4FF]"
                   >
-                    Anunciar gratis
+                    Anunciar agora
                   </Link>
                   <Link
-                    href={city.slug ? `/simulador-financiamento/${city.slug}` : "/simulador-financiamento"}
-                    className="inline-flex h-12 items-center justify-center rounded-xl border border-white/20 px-5 text-sm font-bold text-white transition hover:bg-white/10"
+                    href={`/simulador-financiamento/${city.slug}`}
+                    className="inline-flex h-[48px] items-center justify-center rounded-[12px] border border-white/35 bg-[#164DB6] px-5 text-[16px] font-bold text-white transition hover:bg-[#123F97]"
                   >
                     Simular financiamento
                   </Link>
@@ -367,7 +555,7 @@ export default function BuyMarketplacePageClient({
               </div>
             </section>
           </div>
-        </div>
+        </section>
       </div>
     </main>
   );
