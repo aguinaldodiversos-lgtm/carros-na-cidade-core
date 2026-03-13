@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Comprar", href: "/comprar" },
   { label: "Tabela FIPE", href: "/tabela-fipe/sao-paulo-sp" },
   { label: "Financiamento", href: "/simulador-financiamento/sao-paulo-sp" },
+  { label: "Blog", href: "/blog" },
   { label: "Anunciar", href: "/planos" },
   { label: "Favoritos", href: "/favoritos" },
 ];
@@ -109,7 +110,7 @@ export function PublicHeader() {
             </button>
           </div>
 
-          <div className="hidden items-center gap-3 lg:flex">
+          <div className="hidden items-center gap-3 xl:flex">
             <nav className="flex items-center gap-1">
               {NAV_ITEMS.map((item) => {
                 const active = isActive(pathname, item.href);
@@ -147,7 +148,7 @@ export function PublicHeader() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-2 xl:hidden">
             <Link
               href="/login"
               className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#2F67F6] px-4 text-sm font-bold text-white"
@@ -168,7 +169,7 @@ export function PublicHeader() {
         </div>
 
         {mobileOpen && (
-          <div className="border-t border-[#EDF2F8] py-4 lg:hidden">
+          <div className="border-t border-[#EDF2F8] py-4 xl:hidden">
             <div className="grid gap-2">
               <button
                 type="button"
