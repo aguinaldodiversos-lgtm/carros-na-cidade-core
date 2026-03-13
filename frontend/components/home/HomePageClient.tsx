@@ -1,174 +1,256 @@
-"use client";
-
+// frontend/components/home/HomePageClient.tsx
 import Link from "next/link";
-import type { AdItem } from "@/lib/search/ads-search";
-import { AdGrid } from "../ads/AdGrid";
-import { HeroCarousel } from "./HeroCarousel";
-import { HomeSearchSection } from "../search/HomeSearchSection";
+import { HeroCarousel } from "@/components/home/HeroCarousel";
+import { HomeSearchSection } from "@/components/search/HomeSearchSection";
+import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
+
+type FeaturedCity = {
+  id: number;
+  name: string;
+  slug: string;
+  demand_score?: number;
+};
+
+type HomeAdItem = {
+  id: number | string;
+  slug?: string;
+  title?: string;
+  brand?: string;
+  model?: string;
+  year?: number | string;
+  mileage?: number | string;
+  city?: string;
+  state?: string;
+  price?: number | string;
+  below_fipe?: boolean;
+  highlight_until?: string | null;
+  image_url?: string | null;
+  images?: string[] | null;
+};
+
+type HomeStats = {
+  total_ads?: number | string;
+  total_cities?: number | string;
+  total_advertisers?: number | string;
+  total_users?: number | string;
+};
 
 interface HomePageClientProps {
   data: {
-    featuredCities: Array<{
-      id: number;
-      name: string;
-      slug: string;
-      demand_score?: number;
-    }>;
-    highlightAds: AdItem[];
-    opportunityAds: AdItem[];
-    recentAds: AdItem[];
-    stats: {
-      total_ads?: number | string;
-      total_cities?: number | string;
-      total_advertisers?: number | string;
-      total_users?: number | string;
-    };
+    featuredCities: FeaturedCity[];
+    highlightAds: HomeAdItem[];
+    opportunityAds: HomeAdItem[];
+    recentAds?: HomeAdItem[];
+    stats: HomeStats;
   };
 }
 
-function isShowcaseReadyAd(item: AdItem) {
-  const title = String(item.title ?? "").toLowerCase();
-  const blockedTerms = ["teste", "worker", "alerta", "whatsapp", "fila api"];
-  return !blockedTerms.some((term) => title.includes(term));
-}
+type HeroSlide = {
+  id: string;
+  image: string;
+  title: string;
+  subtitle: string;
+  ctaLabel: string;
+  href: string;
+};
 
-function BenefitIcon({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#edf4ff] text-[#0e62d8]">
-      {children}
-    </span>
-  );
-}
-
-const benefits = [
+const HERO_SLIDES: HeroSlide[] = [
   {
-    title: "Compra segura",
-    text: "Negocie direto com vendedores verificados",
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 3l7 3v6c0 4.5-2.8 7.4-7 9-4.2-1.6-7-4.5-7-9V6l7-3Z" />
-        <path d="m9 12 2 2 4-4" />
-      </svg>
-    ),
+    id: "main",
+    image: "/images/hero.jpeg",
+    title: "Encontre seu próximo carro em São Paulo",
+    subtitle: "Milhares de ofertas esperando por você",
+    ctaLabel: "Pesquisar agora",
+    href: "/comprar",
   },
   {
-    title: "Foco na sua cidade",
-    text: "Ofertas locais, praticidade e relevância regional",
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z" />
-        <circle cx="12" cy="10" r="2.5" />
-      </svg>
-    ),
+    id: "banner-home",
+    image: "/images/banner_home.png",
+    title: "Encontre e venda seu carro na sua cidade",
+    subtitle: "Anuncie grátis, fácil e rápido em um portal feito para o mercado local",
+    ctaLabel: "Começar meu anúncio",
+    href: "/planos",
   },
   {
-    title: "Transparência de preço",
-    text: "Planos e leitura de valor com base na FIPE",
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 3v18" />
-        <path d="M17 7.5c0-2-2-3.5-5-3.5s-5 1.5-5 3.5 2 3.5 5 3.5 5 1.5 5 3.5-2 3.5-5 3.5-5-1.5-5-3.5" />
-      </svg>
-    ),
-  },
-  {
-    title: "Venda rápida",
-    text: "Anuncie em minutos e aumente sua visibilidade",
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
-      </svg>
-    ),
-    cta: { label: "Criar anúncio", href: "/planos" },
+    id: "banner-otimizado",
+    image: "/images/banner_otimizado.png",
+    title: "Milhares de oportunidades na sua cidade",
+    subtitle: "Compre, venda e negocie com quem está perto de você",
+    ctaLabel: "Explorar ofertas",
+    href: "/comprar",
   },
 ];
 
+function resolveCurrentCityName(featuredCities: FeaturedCity[]) {
+  return featuredCities?.[0]?.name || "São Paulo";
+}
+
+function normalizeCityLabel(item?: Pick<HomeAdItem, "city" | "state">) {
+  const city = item?.city || "São Paulo";
+  const state = item?.state || "SP";
+  return `${city} - ${state}`;
+}
+
 export function HomePageClient({ data }: HomePageClientProps) {
-  const regionalFocus = data.featuredCities?.[0]?.name || "São Paulo";
-  const recentAds = (data.recentAds || []).filter(isShowcaseReadyAd);
-  const curatedHighlightAds = (data.highlightAds || []).filter(isShowcaseReadyAd);
-  const curatedOpportunityAds = (data.opportunityAds || []).filter(isShowcaseReadyAd);
-  const highlightAds = (curatedHighlightAds.length ? curatedHighlightAds : recentAds).slice(0, 4);
-  const opportunityAds = (
-    curatedOpportunityAds.length
-      ? curatedOpportunityAds
-      : recentAds.slice(4, 8).length
-        ? recentAds.slice(4, 8)
-        : recentAds
-  ).slice(0, 4);
+  const currentCity = resolveCurrentCityName(data.featuredCities || []);
+
+  const highlightAds = (data.highlightAds || []).slice(0, 4);
+  const opportunityAds = (data.opportunityAds || []).slice(0, 4);
 
   return (
-    <main className="min-h-screen bg-[#f3f4f8]">
-      <div className="mx-auto max-w-7xl px-4 pb-10 md:px-6 md:pb-12">
-        <section className="pt-4 md:pt-5">
-          <HeroCarousel />
-        </section>
+    <main className="bg-[#f2f3f7]">
+      <section className="mx-auto w-full max-w-7xl px-4 pb-3 pt-4 sm:px-6">
+        <HeroCarousel slides={HERO_SLIDES} />
+      </section>
 
-        <section className="-mt-2 md:mt-4">
-          <HomeSearchSection />
-        </section>
+      <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6">
+        <HomeSearchSection featuredCities={data.featuredCities || []} />
+      </section>
 
-        <section className="mt-8">
-          <div className="mb-3.5">
-            <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.02em] text-[#1d2538] md:text-[36px]">
-              Destaques em {regionalFocus}
-            </h2>
-            <p className="mt-1 text-[14px] text-[#6b7488] md:text-[15px]">Veículos patrocinados com maior visibilidade</p>
+      <section className="mx-auto w-full max-w-7xl px-4 py-2 sm:px-6">
+        <div className="mb-5">
+          <h2 className="text-[28px] font-extrabold leading-tight text-[#1b2436] sm:text-[40px] md:text-[42px]" />
+          <h2 className="text-[24px] font-extrabold leading-tight text-[#1b2436] md:text-[30px]">
+            Destaques em {currentCity}
+          </h2>
+          <p className="mt-1 text-[15px] text-[#6a7388]">
+            Veículos patrocinados com maior visibilidade
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {highlightAds.length > 0 ? (
+            highlightAds.map((item, index) => (
+              <HomeVehicleCard
+                key={`highlight-${item.id}-${index}`}
+                item={item}
+                variant="highlight"
+              />
+            ))
+          ) : (
+            Array.from({ length: 4 }).map((_, index) => (
+              <HomeVehicleCard
+                key={`highlight-fallback-${index}`}
+                item={{
+                  id: `highlight-fallback-${index}`,
+                  title: `Veículo em destaque ${index + 1}`,
+                  city: currentCity,
+                  state: "SP",
+                  price: 0,
+                  image_url: "/images/hero.jpeg",
+                  highlight_until: new Date().toISOString(),
+                }}
+                variant="highlight"
+              />
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mb-5">
+          <h2 className="text-[24px] font-extrabold leading-tight text-[#1b2436] md:text-[30px]">
+            Oportunidades abaixo da FIPE
+          </h2>
+          <p className="mt-1 text-[15px] text-[#6a7388]">
+            Ofertas com preço abaixo do valor de mercado
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {opportunityAds.length > 0 ? (
+            opportunityAds.map((item, index) => (
+              <HomeVehicleCard
+                key={`opportunity-${item.id}-${index}`}
+                item={item}
+                variant="opportunity"
+              />
+            ))
+          ) : (
+            Array.from({ length: 4 }).map((_, index) => (
+              <HomeVehicleCard
+                key={`opportunity-fallback-${index}`}
+                item={{
+                  id: `opportunity-fallback-${index}`,
+                  title: `Oportunidade ${index + 1}`,
+                  city: currentCity,
+                  state: "SP",
+                  price: 0,
+                  image_url: "/images/hero.jpeg",
+                  below_fipe: true,
+                }}
+                variant="opportunity"
+              />
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-[20px] border border-[#e1e6f0] bg-white px-5 py-5 shadow-[0_8px_24px_rgba(16,28,58,0.05)]">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M12 3l7 3v5c0 5-3.3 8.8-7 10-3.7-1.2-7-5-7-10V6l7-3Z" />
+                <path d="m9.5 12 1.7 1.7 3.6-3.9" />
+              </svg>
+            </div>
+            <h3 className="text-[18px] font-extrabold text-[#1f2940]">Compra segura</h3>
+            <p className="mt-2 text-[15px] leading-6 text-[#6a7388]">
+              Negocie direto com vendedores verificados
+            </p>
           </div>
 
-          <AdGrid items={highlightAds} priorityFirstRow priorityCount={4} variant="home" />
-        </section>
-
-        <section className="mt-8">
-          <div className="mb-3.5">
-            <h2 className="text-[32px] font-extrabold leading-tight tracking-[-0.02em] text-[#1d2538] md:text-[36px]">
-              Oportunidades abaixo da FIPE
-            </h2>
-            <p className="mt-1 text-[14px] text-[#6b7488] md:text-[15px]">Ofertas com preço abaixo do valor de mercado</p>
+          <div className="rounded-[20px] border border-[#e1e6f0] bg-white px-5 py-5 shadow-[0_8px_24px_rgba(16,28,58,0.05)]">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
+                <path d="M12 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              </svg>
+            </div>
+            <h3 className="text-[18px] font-extrabold text-[#1f2940]">Foco na sua cidade</h3>
+            <p className="mt-2 text-[15px] leading-6 text-[#6a7388]">
+              Ofertas locais, praticidade e relevância territorial
+            </p>
           </div>
 
-          <AdGrid items={opportunityAds} priorityCount={4} variant="home" />
-        </section>
+          <div className="rounded-[20px] border border-[#e1e6f0] bg-white px-5 py-5 shadow-[0_8px_24px_rgba(16,28,58,0.05)]">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M4 7h16M7 4v6M17 4v6M5 11h14v8H5z" />
+                <path d="M8 15h8M8 18h5" />
+              </svg>
+            </div>
+            <h3 className="text-[18px] font-extrabold text-[#1f2940]">Transparência de preço</h3>
+            <p className="mt-2 text-[15px] leading-6 text-[#6a7388]">
+              Planos, comparação com FIPE e leitura clara das ofertas
+            </p>
+          </div>
 
-        <section className="mt-8 rounded-[16px] border border-[#dce3ef] bg-white shadow-[0_10px_30px_rgba(20,30,60,0.08)]">
-          <div className="grid gap-0.5 bg-[#e8edf6] md:grid-cols-2 xl:grid-cols-4">
-            {benefits.map((item) => (
-              <div key={item.title} className="bg-white p-5">
-                <div className="flex items-start gap-3.5">
-                  <BenefitIcon>{item.icon}</BenefitIcon>
-
-                  <div className="min-w-0">
-                    <h3 className="text-[22px] font-black leading-tight text-[#1d2538] md:text-[24px]">{item.title}</h3>
-                    <p className="mt-1.5 text-[13px] leading-[1.35] text-[#6b7488] md:text-[14px]">{item.text}</p>
-                  </div>
-                </div>
-
-                {"cta" in item && item.cta ? (
-                  <Link
-                    href={item.cta.href}
-                    className="mt-4 inline-flex h-11 items-center justify-center rounded-[10px] bg-[#0e62d8] px-6 text-[15px] font-bold text-white transition hover:bg-[#0c4fb0]"
-                  >
-                    {item.cta.label}
-                  </Link>
-                ) : null}
+          <div className="rounded-[20px] border border-[#e1e6f0] bg-white px-5 py-5 shadow-[0_8px_24px_rgba(16,28,58,0.05)]">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M4 14 10 8l4 4 6-6" />
+                <path d="M20 10V4h-6" />
+              </svg>
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[18px] font-extrabold text-[#1f2940]">Venda rápida</h3>
+                <p className="mt-2 text-[15px] leading-6 text-[#6a7388]">
+                  Anuncie em minutos e ganhe destaque local
+                </p>
               </div>
-            ))}
+              <Link
+                href="/planos"
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-[10px] bg-[#0e62d8] px-5 text-sm font-bold text-white transition hover:bg-[#0c4fb0]"
+              >
+                Criar anúncio
+              </Link>
+            </div>
           </div>
-        </section>
-
-        <section className="mt-6 rounded-[16px] border border-[#dce3ef] bg-[linear-gradient(92deg,#0e62d8_0%,#0a53bc_100%)] p-6 text-white shadow-[0_12px_30px_rgba(14,98,216,0.3)] md:flex md:items-center md:justify-between">
-          <div>
-            <h3 className="text-[23px] font-extrabold leading-tight tracking-[-0.02em] md:text-[28px]">Venda seu carro sem custo para começar</h3>
-            <p className="mt-2 text-[14px] text-white/90 md:text-[16px]">Publique agora e apareça para compradores reais da sua cidade.</p>
-          </div>
-          <Link
-            href="/planos"
-            className="mt-4 inline-flex h-12 items-center justify-center rounded-[10px] bg-white px-7 text-[16px] font-extrabold text-[#0e62d8] transition hover:bg-[#ecf3ff] md:mt-0"
-          >
-            Anunciar grátis
-          </Link>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }
