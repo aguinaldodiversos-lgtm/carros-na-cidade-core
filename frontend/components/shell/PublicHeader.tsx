@@ -1,3 +1,4 @@
+// frontend/components/shell/PublicHeader.tsx
 "use client";
 
 import Image from "next/image";
@@ -8,20 +9,17 @@ import { useMemo, useState } from "react";
 type NavItem = {
   label: string;
   href: string;
+  icon?: "heart";
 };
 
-const navItems: NavItem[] = [
+const NAV_ITEMS: NavItem[] = [
   { label: "Comprar", href: "/comprar" },
   { label: "Anunciar", href: "/planos" },
-  { label: "Favoritos", href: "/login" },
+  { label: "Favoritos", href: "/favoritos", icon: "heart" },
 ];
 
-function MenuIcon({ open }: { open: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" className="h-6 w-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-      {open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M3 6h18M3 12h18M3 18h18" />}
-    </svg>
-  );
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
 }
 
 function isActive(pathname: string, href: string) {
@@ -29,92 +27,118 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function HeartIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-[18px] w-[18px] shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0 text-[#0e62d8]"
+      fill="currentColor"
+    >
+      <path d="m5 7 5 6 5-6H5Z" />
+    </svg>
+  );
+}
+
+function MenuIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      {open ? (
+        <path d="M6 6l12 12M18 6 6 18" />
+      ) : (
+        <path d="M3 6h18M3 12h18M3 18h18" />
+      )}
+    </svg>
+  );
+}
+
 export function PublicHeader() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isHome = pathname === "/";
 
-  const rightButtons = useMemo(
-    () => [
-      {
-        label: "Entrar",
-        href: "/login",
-        className:
-          "inline-flex h-12 items-center justify-center rounded-xl bg-[#0e62d8] px-6 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.22)] transition hover:bg-[#0c4fb0]",
-      },
-    ],
-    []
-  );
+  const navItems = useMemo(() => NAV_ITEMS, []);
 
   return (
-    <header
-      className={`z-50 ${
-        isHome
-          ? "bg-transparent pt-4"
-          : "sticky top-0 border-b border-[#e4e8f1] bg-white/96 shadow-[0_1px_0_rgba(255,255,255,0.55)] backdrop-blur supports-[backdrop-filter]:bg-white/88"
-      }`}
-    >
-      <div className={`mx-auto w-full max-w-7xl px-4 sm:px-6 ${isHome ? "rounded-[14px] border border-[#dfe4ec] bg-white shadow-[0_2px_18px_rgba(20,30,60,0.06)]" : ""}`}>
-        <div className={`flex items-center justify-between gap-4 ${isHome ? "h-[58px] px-3 md:px-4" : "h-[76px]"}`}>
-          <div className="flex min-w-0 items-center gap-3 md:gap-6">
+    <header className="sticky top-0 z-50 border-b border-[#e8edf5] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/88">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
+        <div className="flex h-[74px] items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4 md:gap-7">
             <Link
               href="/"
-              className={`relative block shrink-0 ${isHome ? "h-9 w-[138px] md:w-[150px]" : "h-10 w-[160px] md:h-11 md:w-[176px]"}`}
               aria-label="Carros na Cidade"
+              className="inline-flex shrink-0 items-center"
             >
-              <Image src="/images/logo.png" alt="Carros na Cidade" fill priority className="object-contain object-left" />
+              <Image
+                src="/images/logo.png"
+                alt="Carros na Cidade"
+                width={170}
+                height={42}
+                priority
+                className="h-auto w-[138px] object-contain md:w-[160px]"
+              />
             </Link>
 
             <button
               type="button"
-              className={`hidden items-center gap-2 rounded-xl px-3 py-2 font-bold text-[#263248] transition md:inline-flex ${
-                isHome
-                  ? "border border-transparent text-[14px] hover:border-[#e3e8f1] hover:bg-[#f7f9fc]"
-                  : "border border-transparent text-[14px] hover:border-[#e3e8f1] hover:bg-[#f7f9fc]"
-              }`}
+              className="hidden items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-semibold text-[#2f3a52] transition hover:bg-[#f4f7fb] md:inline-flex"
+              aria-label="Selecionar cidade"
             >
-              São Paulo
-              <svg viewBox="0 0 20 20" width="20" height="20" className="h-4 w-4 shrink-0 text-[#0e62d8]" fill="currentColor">
-                <path d="m5 7 5 6 5-6H5Z" />
-              </svg>
+              <span>São Paulo</span>
+              <ChevronDownIcon />
             </button>
           </div>
 
-          <div className={`hidden items-center md:flex ${isHome ? "gap-4" : "gap-5"}`}>
-            <nav className={`flex items-center font-semibold text-[#5b667c] ${isHome ? "gap-5 text-[14px]" : "gap-6 text-[14px]"}`}>
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 transition hover:text-[#0e62d8] ${
-                    isActive(pathname, item.href)
-                      ? "bg-[#eef4ff] text-[#0e62d8]"
-                      : "text-[#5b667c] hover:bg-[#f7f9fc]"
-                  }`}
-                >
-                  {item.label === "Favoritos" ? (
-                    <svg viewBox="0 0 24 24" width="24" height="24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-                    </svg>
-                  ) : null}
-                  {item.label}
-                </Link>
-              ))}
+          <div className="hidden items-center gap-3 md:flex">
+            <nav className="flex items-center gap-1">
+              {navItems.map((item) => {
+                const active = isActive(pathname, item.href);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[14px] font-medium transition",
+                      active
+                        ? "bg-[#eef4ff] text-[#0e62d8]"
+                        : "text-[#4e5a73] hover:bg-[#f6f8fc] hover:text-[#0e62d8]"
+                    )}
+                  >
+                    {item.icon === "heart" ? <HeartIcon /> : null}
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
             </nav>
 
-            {rightButtons.map((button) => (
-              <Link
-                key={button.href}
-                href={button.href}
-                className={
-                  isHome
-                    ? "inline-flex h-10 items-center justify-center rounded-[8px] bg-[#0e62d8] px-6 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(14,98,216,0.18)] transition hover:bg-[#0c4fb0]"
-                    : button.className
-                }
-              >
-                {button.label}
-              </Link>
-            ))}
+            <Link
+              href="/login"
+              className="inline-flex h-11 items-center justify-center rounded-[10px] bg-[#0e62d8] px-6 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(14,98,216,0.20)] transition hover:bg-[#0c4fb0]"
+            >
+              Entrar
+            </Link>
           </div>
 
           <div className="flex items-center gap-2 md:hidden">
@@ -124,10 +148,11 @@ export function PublicHeader() {
             >
               Entrar
             </Link>
+
             <button
               type="button"
               onClick={() => setMobileOpen((state) => !state)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dfe4ef] text-[#34405a] md:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dfe6f0] text-[#334155]"
               aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
               aria-expanded={mobileOpen}
             >
@@ -137,39 +162,44 @@ export function PublicHeader() {
         </div>
 
         {mobileOpen && (
-          <div className="border-t border-[#edf1f6] py-4 md:hidden">
+          <div className="border-t border-[#edf2f8] py-4 md:hidden">
             <div className="grid gap-2">
               <button
                 type="button"
-                className="inline-flex h-11 items-center justify-between rounded-xl border border-[#dfe4ef] bg-white px-4 text-sm font-semibold text-[#263248]"
+                className="inline-flex h-11 items-center justify-between rounded-xl border border-[#dfe6f0] bg-white px-4 text-sm font-semibold text-[#2f3a52]"
               >
-                São Paulo
-                <svg viewBox="0 0 20 20" width="20" height="20" className="h-4 w-4 shrink-0 text-[#0e62d8]" fill="currentColor">
-                  <path d="m5 7 5 6 5-6H5Z" />
-                </svg>
+                <span>São Paulo</span>
+                <ChevronDownIcon />
               </button>
 
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] transition hover:bg-[#f7f9fc]"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const active = isActive(pathname, item.href);
 
-              {rightButtons.map((button) => (
-                <Link
-                  key={button.href}
-                  href={button.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={button.className}
-                >
-                  {button.label}
-                </Link>
-              ))}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition",
+                      active
+                        ? "bg-[#eef4ff] text-[#0e62d8]"
+                        : "text-[#334155] hover:bg-[#f7f9fc]"
+                    )}
+                  >
+                    {item.icon === "heart" ? <HeartIcon /> : null}
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="mt-1 inline-flex h-11 items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-bold text-white"
+              >
+                Entrar
+              </Link>
             </div>
           </div>
         )}
