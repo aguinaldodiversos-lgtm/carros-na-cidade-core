@@ -141,7 +141,7 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
 
   return [
     {
-      id: "op-1",
+      id: 999101,
       title: "2022 Hyundai Creta",
       city: cityName,
       state: "SP",
@@ -150,7 +150,7 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
       image_url: "/images/hero.jpeg",
     },
     {
-      id: "op-2",
+      id: 999102,
       title: "2021 Volkswagen T-Cross",
       city: cityName,
       state: "SP",
@@ -159,7 +159,7 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
       image_url: "/images/hero.jpeg",
     },
     {
-      id: "op-3",
+      id: 999103,
       title: "2023 Nissan Kicks",
       city: cityName,
       state: "SP",
