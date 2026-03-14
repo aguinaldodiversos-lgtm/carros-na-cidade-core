@@ -59,9 +59,9 @@ function fallbackContent(): SellPageContent {
       subtitle:
         "Publique seu veículo com visual premium, destaque regional, apoio de páginas locais e ferramentas que ajudam você a vender com mais confiança. Ideal para particulares e lojistas.",
       primaryCtaLabel: "Começar meu anúncio",
-      primaryCtaHref: "/entrar?next=/anunciar",
+      primaryCtaHref: "/anunciar/publicar?tipo=particular",
       secondaryCtaLabel: "Sou lojista",
-      secondaryCtaHref: "/entrar?next=/anunciar&tipo=lojista",
+      secondaryCtaHref: "/anunciar/publicar?tipo=lojista",
       stats: [
         { value: "SEO local", label: "páginas por cidade e região" },
         { value: "FIPE", label: "apoio de preço e contexto comercial" },
@@ -109,27 +109,27 @@ function fallbackContent(): SellPageContent {
     steps: [
       {
         step: "01",
-        title: "Cadastre seu veículo",
+        title: "Escolha o perfil",
         description:
-          "Preencha os dados principais, versão, quilometragem, cidade, preço e diferenciais.",
+          "Defina se você vai anunciar como particular ou lojista para seguir no fluxo correto.",
       },
       {
         step: "02",
-        title: "Adicione boas fotos",
+        title: "Entre ou crie sua conta",
         description:
-          "Imagens fortes aumentam percepção de valor, cliques e intenção de contato.",
+          "O acesso prepara o seu ambiente para publicação e continuidade do anúncio.",
       },
       {
         step: "03",
-        title: "Defina um preço competitivo",
+        title: "Preencha os dados do veículo",
         description:
-          "Use a referência de mercado e a FIPE para posicionar seu anúncio com mais inteligência.",
+          "Informe versão, quilometragem, cidade, preço e diferenciais principais.",
       },
       {
         step: "04",
-        title: "Receba contatos e negocie",
+        title: "Publique e receba contatos",
         description:
-          "Leads podem chegar por WhatsApp, formulário e navegação qualificada dentro do portal.",
+          "Seu anúncio entra no portal com foco em visibilidade regional e geração de leads.",
       },
     ],
     dealerBenefits: [
@@ -218,9 +218,9 @@ function fallbackContent(): SellPageContent {
       subtitle:
         "Publique agora e coloque seu veículo em uma vitrine premium, regional e pronta para conversão.",
       primaryCtaLabel: "Criar meu anúncio",
-      primaryCtaHref: "/entrar?next=/anunciar",
+      primaryCtaHref: "/anunciar/publicar?tipo=particular",
       secondaryCtaLabel: "Quero anunciar como lojista",
-      secondaryCtaHref: "/entrar?next=/anunciar&tipo=lojista",
+      secondaryCtaHref: "/anunciar/publicar?tipo=lojista",
     },
   };
 }
