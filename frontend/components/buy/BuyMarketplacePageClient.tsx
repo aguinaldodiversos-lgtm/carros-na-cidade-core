@@ -108,11 +108,7 @@ function normalizeCatalogItemToAdCard(item: CatalogItem) {
     state: item.state,
     price: parseNumber(item.price),
     mileage: parseNumber(item.mileage),
-    yearLabel:
-      item.yearLabel ||
-      item.year_model ||
-      item.year ||
-      "",
+    yearLabel: String(item.year_model ?? item.year ?? "").trim(),
     image: item.image_url || item.image || item.cover_image || "/placeholder-car.jpg",
     badge: getBadge(item, weight),
   };
