@@ -19,8 +19,8 @@ function slugify(value: string) {
 }
 
 export function buildAdSlug(ad: AdCardLinkInput) {
-  if (ad.slug && ad.slug.trim()) {
-    return slugify(ad.slug);
+  if (ad.slug && String(ad.slug).trim()) {
+    return slugify(String(ad.slug));
   }
 
   const composed = [
@@ -36,7 +36,6 @@ export function buildAdSlug(ad: AdCardLinkInput) {
     .join(" ");
 
   const fallback = composed || `anuncio-${String(ad.id || "sem-id")}`;
-
   return slugify(fallback);
 }
 
