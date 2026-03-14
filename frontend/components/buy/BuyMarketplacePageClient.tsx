@@ -1,4 +1,3 @@
-// frontend/components/buy/BuyMarketplacePageClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -13,7 +12,8 @@ import {
   buildSearchQueryString,
   mergeSearchFilters,
 } from "@/lib/search/ads-search-url";
-import CatalogVehicleCard, { type CatalogItem } from "@/components/buy/CatalogVehicleCard";
+import AdCard from "@/components/ads/AdCard";
+import type { CatalogItem } from "@/components/buy/CatalogVehicleCard";
 
 type CityContext = {
   name: string;
@@ -63,7 +63,11 @@ function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
   if (item.highlight_until) return 4;
 
   const plan = String(item.plan || "").toLowerCase();
-  if (["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) => plan.includes(signal))) {
+  if (
+    ["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) =>
+      plan.includes(signal)
+    )
+  ) {
     return 3;
   }
 
@@ -77,6 +81,41 @@ function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
 
   if (isDealer) return 2;
   return 1;
+}
+
+function getBadge(item: CatalogItem, weight: 1 | 2 | 3 | 4) {
+  if (item.below_fipe) return "Abaixo da FIPE";
+  if (weight === 4) return "Destaque";
+  if (weight === 3) return "Loja Premium";
+  return undefined;
+}
+
+function normalizeCatalogItemToAdCard(item: CatalogItem) {
+  const weight = inferWeight(item);
+
+  return {
+    id: item.id,
+    slug: item.slug,
+    title:
+      item.title ||
+      [item.brand, item.model, item.version].filter(Boolean).join(" ").trim() ||
+      "Veículo",
+    brand: item.brand,
+    model: item.model,
+    version: item.version,
+    year: item.year,
+    city: item.city,
+    state: item.state,
+    price: parseNumber(item.price),
+    mileage: parseNumber(item.mileage),
+    yearLabel:
+      item.yearLabel ||
+      item.year_model ||
+      item.year ||
+      "",
+    image: item.image_url || item.image || item.cover_image || "/placeholder-car.jpg",
+    badge: getBadge(item, weight),
+  };
 }
 
 function sortCatalogItems(items: CatalogItem[]) {
@@ -507,8 +546,16 @@ export default function BuyMarketplacePageClient({
   const catalogStats = useMemo(() => {
     return {
       newest: Math.max(items.length, 1520),
-      cheaper: Math.max(items.filter((item) => parseNumber(item.price) <= 100000).length, 130),
-      lessMileage: Math.max(items.filter((item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000).length, 935),
+      cheaper: Math.max(
+        items.filter((item) => parseNumber(item.price) <= 100000).length,
+        130
+      ),
+      lessMileage: Math.max(
+        items.filter(
+          (item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000
+        ).length,
+        935
+      ),
     };
   }, [items]);
 
@@ -663,24 +710,27 @@ export default function BuyMarketplacePageClient({
             />
 
             <div className="mb-5 grid gap-5 lg:grid-cols-2">
-              {firstRow.map((item) => (
-                <CatalogVehicleCard
-                  key={`featured-${item.id}`}
-                  item={item}
-                  featured
-                  weight={inferWeight(item)}
-                />
-              ))}
+              {firstRow.map((item, index) => {
+                const normalized = normalizeCatalogItemToAdCard(item);
+                return (
+                  <AdCard
+                    key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
+                    ad={normalized}
+                  />
+                );
+              })}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {remaining.map((item) => (
-                <CatalogVehicleCard
-                  key={`card-${item.id}`}
-                  item={item}
-                  weight={inferWeight(item)}
-                />
-              ))}
+              {remaining.map((item, index) => {
+                const normalized = normalizeCatalogItemToAdCard(item);
+                return (
+                  <AdCard
+                    key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
+                    ad={normalized}
+                  />
+                );
+              })}
             </div>
           </div>
         </section>
