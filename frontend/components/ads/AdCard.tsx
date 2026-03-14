@@ -18,7 +18,8 @@ type BaseAdData = {
   price?: number | string;
   mileage?: number | string;
   image?: string;
-  image_url?: string;
+  image_url?: string | null;
+  images?: string[] | null;
   cover_image?: string;
   badge?: string;
   below_fipe?: boolean;
@@ -148,7 +149,7 @@ function normalizeAdData(source?: BaseAdData): Required<
     price: parseNumber(item.price),
     mileage: parseNumber(item.mileage),
     yearLabel: String(item.yearLabel || item.year_model || item.year || "").trim(),
-    image: item.image || item.image_url || item.cover_image || "/placeholder-car.jpg",
+    image: item.image || item.image_url || (Array.isArray(item.images) && item.images[0]) || item.cover_image || "/images/hero.jpeg",
     badge: resolveBadge(item),
   };
 }

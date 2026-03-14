@@ -1,4 +1,4 @@
-import { AdCard } from "@/components/ads/AdCard";
+import AdCard from "@/components/ads/AdCard";
 import type { AdItem } from "@/lib/search/ads-search";
 
 type BuyCarsGridProps = {

@@ -1,4 +1,4 @@
-import { AdCard } from "@/components/ads/AdCard";
+import AdCard from "@/components/ads/AdCard";
 import type { ListingCar } from "@/lib/car-data";
 import { listingCarToAdItem } from "@/lib/ads/ad-card-adapter";
 
