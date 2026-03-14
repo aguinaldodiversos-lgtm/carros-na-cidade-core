@@ -8,8 +8,6 @@ export type CatalogItem = AdItem & {
   model?: string;
   version?: string;
   year?: number | string;
-  year_model?: string | null;
-  yearLabel?: string | null;
   mileage?: number | string;
   transmission?: string;
   fuel_type?: string;
@@ -17,8 +15,6 @@ export type CatalogItem = AdItem & {
   state?: string;
   price?: number | string;
   image_url?: string | null;
-  image?: string | null;
-  cover_image?: string | null;
   images?: string[] | null;
   slug?: string;
   below_fipe?: boolean;
@@ -29,7 +25,6 @@ export type CatalogItem = AdItem & {
   dealership_name?: string | null;
   dealership_id?: number | null;
   created_at?: string | null;
-  catalogWeight?: 1 | 2 | 3 | 4;
 };
 
 interface CatalogVehicleCardProps {
@@ -60,19 +55,12 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function parseMileage(value?: number | string) {
-  if (typeof value === "number") return value;
-  if (!value) return 0;
-
-  const cleaned = String(value).replace(/[^\d]/g, "");
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function formatMileage(value?: number | string) {
-  const parsed = parseMileage(value);
-  if (!parsed) return null;
-  return `${parsed.toLocaleString("pt-BR")} km`;
+  const numeric =
+    typeof value === "number" ? value : value ? Number(String(value).replace(/[^\d]/g, "")) : 0;
+
+  if (!numeric || Number.isNaN(numeric)) return null;
+  return `${numeric.toLocaleString("pt-BR")} km`;
 }
 
 function getHref(item: CatalogItem) {
@@ -92,22 +80,21 @@ function getTitle(item: CatalogItem) {
   return pieces.join(" ") || "Veículo";
 }
 
-function getMetaLine(item: CatalogItem) {
-  const pieces = [
-    item.fuel_type,
-    formatMileage(item.mileage),
-    item.transmission,
-  ].filter(Boolean);
+function getVersion(item: CatalogItem) {
+  if (item.version) return item.version;
 
-  if (pieces.length > 0) return pieces.join("  •  ");
-  return "Automático";
+  const meta = [item.fuel_type, formatMileage(item.mileage), item.transmission]
+    .filter(Boolean)
+    .join("  •  ");
+
+  return meta || "Automático";
 }
 
 function getLocation(item: CatalogItem) {
   return [item.city || "São Paulo", item.state || "SP"].join(" - ");
 }
 
-function getBadge(weight: 1 | 2 | 3 | 4) {
+function getPrimaryBadge(weight: 1 | 2 | 3 | 4) {
   if (weight === 4) {
     return {
       label: "Destaque",
@@ -118,28 +105,28 @@ function getBadge(weight: 1 | 2 | 3 | 4) {
   if (weight === 3) {
     return {
       label: "Loja Premium",
-      className: "bg-[#193E98] text-white",
+      className: "bg-[#173F98] text-white",
     };
   }
 
   if (weight === 2) {
     return {
       label: "Loja",
-      className: "bg-[#EEF4FF] text-[#1F66E5] ring-1 ring-[#D8E2FB]",
+      className: "bg-[#EEF4FF] text-[#1F66E5] ring-1 ring-[#D7E2FF]",
     };
   }
 
   return {
     label: "Anúncio",
-    className: "bg-[#F2F5FA] text-[#6C7488] ring-1 ring-[#E8ECF3]",
+    className: "bg-[#F3F5FA] text-[#5F6780] ring-1 ring-[#E4E9F2]",
   };
 }
 
 function getFinanceChip(weight: 1 | 2 | 3 | 4, item: CatalogItem) {
   if (item.below_fipe) return "Abaixo da FIPE";
   if (weight === 4) return "Mais visibilidade";
-  if (weight === 3) return "Revenda premium";
-  if (weight === 2) return "Loja verificada";
+  if (weight === 3) return "Loja premium";
+  if (weight === 2) return "Revenda";
   return "Oferta local";
 }
 
@@ -148,22 +135,25 @@ export default function CatalogVehicleCard({
   featured = false,
   weight,
 }: CatalogVehicleCardProps) {
+  const badge = getPrimaryBadge(weight);
+  const price = parseMoney(item.price);
   const href = getHref(item);
   const title = getTitle(item);
-  const price = parseMoney(item.price);
+  const version = getVersion(item);
   const location = getLocation(item);
-  const meta = getMetaLine(item);
-  const badge = getBadge(weight);
-  const financeChip = getFinanceChip(weight, item);
 
   return (
     <article
-      className={`group overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)] ${
-        featured ? "rounded-[20px]" : ""
+      className={`group overflow-hidden rounded-[20px] border border-[#E5E9F2] bg-white shadow-[0_12px_28px_rgba(18,34,72,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_38px_rgba(18,34,72,0.10)] ${
+        featured ? "rounded-[22px]" : ""
       }`}
     >
       <Link href={href} className="block">
-        <div className={`relative overflow-hidden ${featured ? "aspect-[1.33/0.83]" : "aspect-[1.18/0.84]"}`}>
+        <div
+          className={`relative overflow-hidden ${
+            featured ? "aspect-[1.26/0.78]" : "aspect-[1.12/0.8]"
+          }`}
+        >
           <img
             src={getImage(item)}
             alt={title}
@@ -178,7 +168,7 @@ export default function CatalogVehicleCard({
               {badge.label}
             </span>
 
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#8D96AB] shadow-sm">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/92 text-[#8C95AB] shadow-sm">
               <svg
                 viewBox="0 0 24 24"
                 className="h-[16px] w-[16px]"
@@ -192,41 +182,45 @@ export default function CatalogVehicleCard({
           </div>
 
           {item.below_fipe ? (
-            <div className="absolute left-3 top-12 inline-flex rounded-[10px] bg-[#1C5E47] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
+            <div className="absolute left-3 top-12 inline-flex rounded-[10px] bg-[#175B45] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
               Abaixo da FIPE
             </div>
           ) : null}
         </div>
 
-        <div className={`px-4 pb-4 pt-4 ${featured ? "md:px-5 md:pb-5 md:pt-4" : ""}`}>
+        <div className="px-4 pb-4 pt-4">
           <h3
-            className={`line-clamp-2 font-extrabold leading-[1.12] text-[#1D2440] ${
+            className={`line-clamp-2 font-extrabold leading-[1.15] text-[#1D2440] ${
               featured ? "text-[20px]" : "text-[17px]"
             }`}
           >
             {title}
           </h3>
 
-          <p className="mt-2 line-clamp-1 text-[15px] text-[#6E748A]">{meta}</p>
-          <p className="mt-1 text-[15px] text-[#6E748A]">{location}</p>
+          <p className="mt-2 line-clamp-1 text-[15px] text-[#6E748A]">{version}</p>
+
+          <div className="mt-2 flex items-center gap-2 text-[14px] text-[#6E748A]">
+            <span>{location}</span>
+          </div>
 
           <div className="mt-4 flex items-end justify-between gap-3">
             <div className={`font-extrabold leading-none text-[#1F66E5] ${featured ? "text-[24px]" : "text-[20px]"}`}>
               {formatCurrency(price)}
             </div>
 
-            <div className="rounded-[10px] bg-[#F2F5FA] px-3 py-2 text-[11px] font-bold text-[#6B7489]">
-              {financeChip}
+            <div className="rounded-[10px] bg-[#F3F6FB] px-3 py-2 text-[11px] font-bold text-[#5F6780]">
+              {getFinanceChip(weight, item)}
             </div>
           </div>
 
-          <div
+          <Link
+            href={href}
             className={`mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[#1F66E5] font-bold text-white transition hover:bg-[#1758CC] ${
-              featured ? "h-[50px] text-[18px]" : "h-[46px] text-[16px]"
+              featured ? "h-[52px] text-[19px]" : "h-[48px] text-[17px]"
             }`}
           >
             Ver detalhes
-          </div>
+          </Link>
         </div>
       </Link>
     </article>
