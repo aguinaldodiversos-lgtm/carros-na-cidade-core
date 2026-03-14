@@ -52,6 +52,7 @@ export type AdDetails = {
   images: string[];
   description: string;
   features: string[];
+  weight: 1 | 2 | 3 | 4;
   seller: SellerSummary;
   finance: FinanceSummary;
   stockFromSeller: RelatedAd[];
@@ -60,20 +61,33 @@ export type AdDetails = {
 
 function toNumber(value: unknown, fallback = 0): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
+
   if (typeof value === "string") {
-    const parsed = Number(
-      value
-        .replace(/[R$\s.]/g, "")
-        .replace(",", ".")
-        .replace(/[^\d.-]/g, "")
-    );
+    const cleaned = value
+      .replace(/[R$\s]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .replace(/[^\d.-]/g, "");
+
+    const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
+
   return fallback;
 }
 
 function toText(value: unknown, fallback = ""): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeWeight(value: unknown): 1 | 2 | 3 | 4 {
+  const parsed = Number(value);
+
+  if (parsed === 2) return 2;
+  if (parsed === 3) return 3;
+  if (parsed === 4) return 4;
+
+  return 1;
 }
 
 function getImageFromUnknown(item: unknown): string | null {
@@ -97,7 +111,12 @@ function getImageFromUnknown(item: unknown): string | null {
   return null;
 }
 
-function createVehiclePlaceholder(label: string, accent = "#2F67F6") {
+function createVehiclePlaceholder(label: string, accent = "#2F67F6"): string {
+  const safeLabel = label
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
   const svg = `
     <svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -123,7 +142,7 @@ function createVehiclePlaceholder(label: string, accent = "#2F67F6") {
       <circle cx="872" cy="512" r="58" fill="#111827"/>
       <circle cx="405" cy="512" r="28" fill="#CBD5E1"/>
       <circle cx="872" cy="512" r="28" fill="#CBD5E1"/>
-      <text x="640" y="585" text-anchor="middle" fill="#1D2440" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">${label}</text>
+      <text x="640" y="585" text-anchor="middle" fill="#1D2440" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">${safeLabel}</text>
       <text x="640" y="625" text-anchor="middle" fill="#6E748A" font-family="Arial, Helvetica, sans-serif" font-size="22">Carros na Cidade</text>
     </svg>
   `;
@@ -139,19 +158,31 @@ function normalizeImages(images: unknown, fallbackLabel: string): string[] {
 
   return [
     createVehiclePlaceholder(`${fallbackLabel} • Foto 1`, "#2F67F6"),
-    createVehiclePlaceholder(`${fallbackLabel} • Foto 2`, "#1F9D55"),
-    createVehiclePlaceholder(`${fallbackLabel} • Foto 3`, "#F59E0B"),
-    createVehiclePlaceholder(`${fallbackLabel} • Foto 4`, "#0F172A"),
+    createVehiclePlaceholder(`${fallbackLabel} • Foto 2`, "#1F66E5"),
+    createVehiclePlaceholder(`${fallbackLabel} • Foto 3`, "#0F172A"),
+    createVehiclePlaceholder(`${fallbackLabel} • Foto 4`, "#16A34A"),
     createVehiclePlaceholder(`${fallbackLabel} • Foto 5`, "#8B5CF6"),
-    createVehiclePlaceholder(`${fallbackLabel} • Foto 6`, "#14B8A6"),
+    createVehiclePlaceholder(`${fallbackLabel} • Foto 6`, "#F59E0B"),
   ];
 }
 
 function normalizeRelatedAds(value: unknown, fallbackTitle: string): RelatedAd[] {
   if (!Array.isArray(value) || value.length === 0) return [];
 
-  return value.slice(0, 4).map((item, index) => {
+  return value.slice(0, 8).map((item, index) => {
     const obj = (item ?? {}) as Record<string, unknown>;
+    const location = (obj.location as Record<string, unknown> | undefined) ?? {};
+
+    const image =
+      getImageFromUnknown(obj.image) ||
+      getImageFromUnknown(obj.photo) ||
+      getImageFromUnknown(obj.thumbnail) ||
+      createVehiclePlaceholder(`${fallbackTitle} ${index + 1}`);
+
+    const badgeText =
+      toText(obj.badge) ||
+      (Boolean(obj.isBelowFipe) ? "Abaixo da FIPE" : "") ||
+      (Boolean(obj.isHighlight) ? "Destaque" : "");
 
     return {
       id: toText(obj.id, `ad-${index + 1}`),
@@ -163,23 +194,13 @@ function normalizeRelatedAds(value: unknown, fallbackTitle: string): RelatedAd[]
           .join(" ")
           .trim() ||
         `${fallbackTitle} ${index + 1}`,
-      city:
-        toText(obj.city) ||
-        toText((obj.location as Record<string, unknown> | undefined)?.city, "São Paulo"),
-      state:
-        toText(obj.state) ||
-        toText((obj.location as Record<string, unknown> | undefined)?.state, "SP"),
+      city: toText(obj.city, toText(location.city, "São Paulo")),
+      state: toText(obj.state, toText(location.state, "SP")),
       price: toNumber(obj.price, 0),
-      mileage: toNumber(obj.mileage, 0),
-      yearLabel: toText(obj.yearLabel) || toText(obj.year, "2021/2022"),
-      image:
-        getImageFromUnknown(obj.image) ||
-        getImageFromUnknown(obj.photo) ||
-        createVehiclePlaceholder(`${fallbackTitle} ${index + 1}`),
-      badge:
-        toText(obj.badge) ||
-        (obj.isBelowFipe ? "Abaixo da FIPE" : undefined) ||
-        (obj.isHighlight ? "Destaque" : undefined),
+      mileage: toNumber(obj.mileage ?? obj.km, 0),
+      yearLabel: toText(obj.yearLabel ?? obj.year, "2021/2021"),
+      image,
+      badge: badgeText || undefined,
     };
   });
 }
@@ -187,21 +208,12 @@ function normalizeRelatedAds(value: unknown, fallbackTitle: string): RelatedAd[]
 function buildFallbackAd(slug: string): AdDetails {
   const normalizedSlug = slug?.replace(/-/g, " ").trim() || "corolla-xei";
   const title =
-    normalizedSlug.includes("corolla")
+    normalizedSlug.toLowerCase().includes("corolla")
       ? "2021 Toyota Corolla XEi 2.0 Flex Automático"
       : normalizedSlug
           .split(" ")
           .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
           .join(" ");
-
-  const images = [
-    createVehiclePlaceholder("Toyota Corolla • Principal", "#2F67F6"),
-    createVehiclePlaceholder("Toyota Corolla • Lateral", "#1F66E5"),
-    createVehiclePlaceholder("Toyota Corolla • Traseira", "#0F172A"),
-    createVehiclePlaceholder("Toyota Corolla • Painel", "#16A34A"),
-    createVehiclePlaceholder("Toyota Corolla • Bancos", "#8B5CF6"),
-    createVehiclePlaceholder("Toyota Corolla • Rodas", "#F59E0B"),
-  ];
 
   return {
     id: "fallback-corolla-xei-2021",
@@ -223,7 +235,14 @@ function buildFallbackAd(slug: string): AdDetails {
     plateFinal: "3",
     publishedLabel: "Publicado há 2 dias",
     badges: ["Destaque", "Loja Premium"],
-    images,
+    images: [
+      createVehiclePlaceholder("Toyota Corolla • Principal", "#2F67F6"),
+      createVehiclePlaceholder("Toyota Corolla • Lateral", "#1F66E5"),
+      createVehiclePlaceholder("Toyota Corolla • Traseira", "#0F172A"),
+      createVehiclePlaceholder("Toyota Corolla • Painel", "#16A34A"),
+      createVehiclePlaceholder("Toyota Corolla • Bancos", "#8B5CF6"),
+      createVehiclePlaceholder("Toyota Corolla • Rodas", "#F59E0B"),
+    ],
     description:
       "Toyota Corolla XEi muito bem conservado, com histórico de manutenção, laudo cautelar aprovado e excelente conjunto mecânico. Veículo ideal para quem busca conforto, confiabilidade, segurança e ótima liquidez de revenda.",
     features: [
@@ -240,6 +259,7 @@ function buildFallbackAd(slug: string): AdDetails {
       "Chave presencial",
       "Sensor de estacionamento",
     ],
+    weight: 4,
     seller: {
       name: "Premium Motors",
       city: "São Paulo",
@@ -279,6 +299,28 @@ function buildFallbackAd(slug: string): AdDetails {
         yearLabel: "2021/2021",
         image: createVehiclePlaceholder("Toyota Corolla GLi", "#2F67F6"),
       },
+      {
+        id: "stock-3",
+        slug: "volkswagen-jetta-2020-rline",
+        title: "2020 Volkswagen Jetta R-Line",
+        city: "São Paulo",
+        state: "SP",
+        price: 128900,
+        mileage: 42000,
+        yearLabel: "2020/2020",
+        image: createVehiclePlaceholder("Volkswagen Jetta", "#0F172A"),
+      },
+      {
+        id: "stock-4",
+        slug: "honda-city-2022-touring",
+        title: "2022 Honda City Touring",
+        city: "São Paulo",
+        state: "SP",
+        price: 119500,
+        mileage: 28000,
+        yearLabel: "2022/2022",
+        image: createVehiclePlaceholder("Honda City Touring", "#16A34A"),
+      },
     ],
     similarAds: [
       {
@@ -304,81 +346,146 @@ function buildFallbackAd(slug: string): AdDetails {
         yearLabel: "2022/2022",
         image: createVehiclePlaceholder("Nissan Sentra Advance", "#16A34A"),
       },
+      {
+        id: "sim-3",
+        slug: "chevrolet-cruze-ltz-2021",
+        title: "Chevrolet Cruze LTZ 1.4 Turbo",
+        city: "São Paulo",
+        state: "SP",
+        price: 109900,
+        mileage: 47000,
+        yearLabel: "2021/2021",
+        image: createVehiclePlaceholder("Chevrolet Cruze LTZ", "#8B5CF6"),
+      },
+      {
+        id: "sim-4",
+        slug: "honda-civic-exl-2020",
+        title: "Honda Civic EXL 2.0",
+        city: "São Paulo",
+        state: "SP",
+        price: 118900,
+        mileage: 52000,
+        yearLabel: "2020/2020",
+        image: createVehiclePlaceholder("Honda Civic EXL", "#F59E0B"),
+      },
     ],
   };
 }
 
+function normalizeSellerType(value: unknown, fallback: SellerSummary["type"]): SellerSummary["type"] {
+  const type = toText(value, fallback).toLowerCase();
+
+  if (type === "premium") return "premium";
+  if (type === "basic") return "basic";
+  if (type === "private" || type === "particular") return "private";
+
+  return fallback;
+}
+
+function normalizeBadges(raw: Record<string, unknown>, sellerRaw: Record<string, unknown>, price: number, fipeValue: number): string[] {
+  const badges = new Set<string>();
+
+  const rawBadges = Array.isArray(raw.badges) ? raw.badges : [];
+  rawBadges.forEach((badge) => {
+    if (typeof badge === "string" && badge.trim()) {
+      badges.add(badge.trim());
+    }
+  });
+
+  const weight = normalizeWeight(
+    raw.weight ??
+      raw.listingWeight ??
+      raw.planWeight ??
+      raw.positionWeight ??
+      sellerRaw.weight
+  );
+
+  const sellerType = normalizeSellerType(sellerRaw.type, "private");
+
+  if (Boolean(raw.isHighlight) || weight === 4) {
+    badges.add("Destaque");
+  }
+
+  if (sellerType === "premium") {
+    badges.add("Loja Premium");
+  }
+
+  if (price > 0 && fipeValue > 0 && price < fipeValue) {
+    badges.add("Abaixo da FIPE");
+  }
+
+  return Array.from(badges);
+}
+
 function normalizeAd(raw: Record<string, unknown>, slug: string): AdDetails {
+  const fallback = buildFallbackAd(slug);
+
   const sellerRaw =
     (raw.seller as Record<string, unknown> | undefined) ||
     (raw.dealership as Record<string, unknown> | undefined) ||
     (raw.store as Record<string, unknown> | undefined) ||
     {};
 
-  const brand = toText(raw.brand, "Toyota");
-  const model = toText(raw.model, "Corolla");
-  const version = toText(raw.version, "XEi 2.0 Flex Automático");
+  const location = (raw.location as Record<string, unknown> | undefined) || {};
+
+  const brand = toText(raw.brand, fallback.brand);
+  const model = toText(raw.model, fallback.model);
+  const version = toText(raw.version, fallback.version);
+
   const title =
     toText(raw.title) ||
-    [toText(raw.year), brand, model, version].filter(Boolean).join(" ");
+    [toText(raw.year), brand, model, version].filter(Boolean).join(" ").trim() ||
+    fallback.title;
 
-  const price = toNumber(raw.price, 119990);
-  const fipeValue = toNumber(raw.fipeValue ?? raw.fipe ?? raw.fipe_price, 115700);
+  const price = toNumber(raw.price, fallback.price);
+  const fipeValue = toNumber(raw.fipeValue ?? raw.fipe ?? raw.fipe_price, fallback.fipeValue);
 
-  const badges = new Set<string>();
+  const stockFromSeller = normalizeRelatedAds(
+    raw.stockFromSeller ?? raw.sameSellerAds ?? raw.seller_ads,
+    `${brand} ${model}`
+  );
 
-  const rawBadges = Array.isArray(raw.badges) ? raw.badges : [];
-  rawBadges.forEach((badge) => {
-    if (typeof badge === "string" && badge.trim()) badges.add(badge.trim());
-  });
+  const similarAds = normalizeRelatedAds(
+    raw.similarAds ?? raw.relatedAds ?? raw.recommendations,
+    `${brand} ${model}`
+  );
 
-  const weight = toNumber(raw.weight, 1);
-  if (raw.isHighlight || weight === 4) badges.add("Destaque");
-  if (toText(sellerRaw.type).toLowerCase() === "premium") badges.add("Loja Premium");
-  if (price > 0 && fipeValue > 0 && price < fipeValue) badges.add("Abaixo da FIPE");
-
-  const stockFromSeller =
-    normalizeRelatedAds(
-      raw.stockFromSeller ?? raw.sameSellerAds ?? raw.seller_ads,
-      `${brand} ${model}`
-    ) || [];
-
-  const similarAds =
-    normalizeRelatedAds(raw.similarAds ?? raw.relatedAds ?? raw.recommendations, `${brand} ${model}`) ||
-    [];
-
-  const fallback = buildFallbackAd(slug);
+  const badges = normalizeBadges(raw, sellerRaw, price, fipeValue);
 
   return {
     id: toText(raw.id, fallback.id),
     slug: toText(raw.slug, slug),
-    title: title || fallback.title,
+    title,
     brand,
     model,
     version,
     yearLabel: toText(raw.yearLabel ?? raw.year, fallback.yearLabel),
-    price: price || fallback.price,
-    fipeValue: fipeValue || fallback.fipeValue,
+    price,
+    fipeValue,
     mileage: toNumber(raw.mileage ?? raw.km, fallback.mileage),
-    city:
-      toText(raw.city) ||
-      toText((raw.location as Record<string, unknown> | undefined)?.city, fallback.city),
-    state:
-      toText(raw.state) ||
-      toText((raw.location as Record<string, unknown> | undefined)?.state, fallback.state),
+    city: toText(raw.city, toText(location.city, fallback.city)),
+    state: toText(raw.state, toText(location.state, fallback.state)),
     transmission: toText(raw.transmission, fallback.transmission),
     fuel: toText(raw.fuel, fallback.fuel),
     bodyStyle: toText(raw.bodyStyle ?? raw.body, fallback.bodyStyle),
     color: toText(raw.color, fallback.color),
     plateFinal: toText(raw.plateFinal ?? raw.plate_end, fallback.plateFinal),
     publishedLabel: toText(raw.publishedLabel ?? raw.updatedAt ?? raw.createdAt, fallback.publishedLabel),
-    badges: Array.from(badges).length ? Array.from(badges) : fallback.badges,
+    badges: badges.length ? badges : fallback.badges,
     images: normalizeImages(raw.images ?? raw.photos ?? raw.gallery, `${brand} ${model}`),
     description: toText(raw.description, fallback.description),
     features:
       Array.isArray(raw.features) && raw.features.length
-        ? raw.features.filter((item): item is string => typeof item === "string" && !!item.trim())
+        ? raw.features.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
         : fallback.features,
+    weight: normalizeWeight(
+      raw.weight ??
+        raw.listingWeight ??
+        raw.planWeight ??
+        raw.positionWeight ??
+        sellerRaw.weight ??
+        fallback.weight
+    ),
     seller: {
       name: toText(sellerRaw.name, fallback.seller.name),
       city: toText(sellerRaw.city, fallback.seller.city),
@@ -387,9 +494,7 @@ function normalizeAd(raw: Record<string, unknown>, slug: string): AdDetails {
       reviewCount: toNumber(sellerRaw.reviewCount ?? sellerRaw.reviews, fallback.seller.reviewCount),
       phone: toText(sellerRaw.phone, fallback.seller.phone),
       whatsapp: toText(sellerRaw.whatsapp, fallback.seller.whatsapp),
-      type:
-        (toText(sellerRaw.type, fallback.seller.type).toLowerCase() as SellerSummary["type"]) ||
-        fallback.seller.type,
+      type: normalizeSellerType(sellerRaw.type, fallback.seller.type),
       address: toText(sellerRaw.address, fallback.seller.address),
       stockCount: toNumber(sellerRaw.stockCount ?? sellerRaw.totalAds, fallback.seller.stockCount),
     },
@@ -444,6 +549,7 @@ export async function getAdDetails(slug: string): Promise<AdDetails> {
         if (!response.ok) continue;
 
         const json = await response.json();
+
         const raw =
           (json?.data as Record<string, unknown> | undefined) ||
           (json?.ad as Record<string, unknown> | undefined) ||
