@@ -1,5 +1,5 @@
 import type { ListingCar } from "@/lib/car-data";
-import { AdCard } from "@/components/ads/AdCard";
+import AdCard from "@/components/ads/AdCard";
 import { listingCarToAdItem } from "@/lib/ads/ad-card-adapter";
 
 // Transitional compatibility wrapper: keep legacy imports on the official AdCard.
