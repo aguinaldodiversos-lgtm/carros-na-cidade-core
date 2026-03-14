@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AdDetails, RelatedAd } from "@/lib/ads/get-ad-details";
 
 type Props = {
@@ -13,6 +13,11 @@ type ContactFormState = {
   phone: string;
   email: string;
   message: string;
+};
+
+type DetailItem = {
+  label: string;
+  value: string;
 };
 
 function formatCurrency(value: number) {
@@ -60,7 +65,7 @@ function badgeClasses(label: string) {
 }
 
 function sellerTypeLabel(type: AdDetails["seller"]["type"]) {
-  if (type === "premium") return "Anunciante Platinum";
+  if (type === "premium") return "Lojista Premium";
   if (type === "basic") return "Lojista";
   return "Particular";
 }
@@ -138,9 +143,7 @@ function SectionCard({
     <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
       <div className="mb-5">
         <h2 className="text-[28px] font-bold tracking-[-0.03em] text-[#1D2440]">{title}</h2>
-        {subtitle ? (
-          <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p>
-        ) : null}
+        {subtitle ? <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p> : null}
       </div>
       {children}
     </section>
@@ -163,7 +166,11 @@ function VehicleCard({ item }: { item: RelatedAd }) {
 
       <div className="space-y-2 p-4">
         {item.badge ? (
-          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(item.badge)}`}>
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(
+              item.badge
+            )}`}
+          >
             {item.badge}
           </span>
         ) : null}
@@ -188,6 +195,7 @@ function VehicleCard({ item }: { item: RelatedAd }) {
 }
 
 export default function AdDetailsPage({ ad }: Props) {
+  const safeImages = ad.images?.length ? ad.images : ["/placeholder-car.jpg"];
   const [selectedImage, setSelectedImage] = useState(0);
   const [favorite, setFavorite] = useState(false);
   const [form, setForm] = useState<ContactFormState>({
@@ -196,6 +204,12 @@ export default function AdDetailsPage({ ad }: Props) {
     email: "",
     message: `Olá, tenho interesse no ${ad.title}. Gostaria de mais informações.`,
   });
+
+  useEffect(() => {
+    if (selectedImage > safeImages.length - 1) {
+      setSelectedImage(0);
+    }
+  }, [safeImages.length, selectedImage]);
 
   const showcase = useMemo(() => resolveShowcase(ad), [ad]);
 
@@ -223,18 +237,18 @@ export default function AdDetailsPage({ ad }: Props) {
   const belowFipe = priceDiff < 0;
 
   function goPrevImage() {
-    setSelectedImage((current) => (current === 0 ? ad.images.length - 1 : current - 1));
+    setSelectedImage((current) => (current === 0 ? safeImages.length - 1 : current - 1));
   }
 
   function goNextImage() {
-    setSelectedImage((current) => (current === ad.images.length - 1 ? 0 : current + 1));
+    setSelectedImage((current) => (current === safeImages.length - 1 ? 0 : current + 1));
   }
 
   async function handleShare() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     const title = ad.title;
 
-    if (navigator.share) {
+    if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ title, url });
         return;
@@ -244,10 +258,15 @@ export default function AdDetailsPage({ ad }: Props) {
     }
 
     try {
-      await navigator.clipboard.writeText(url);
-      alert("Link copiado com sucesso.");
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        window.alert("Link copiado com sucesso.");
+        return;
+      }
+
+      window.alert("Não foi possível copiar o link automaticamente.");
     } catch {
-      alert("Não foi possível copiar o link.");
+      window.alert("Não foi possível copiar o link.");
     }
   }
 
@@ -269,7 +288,7 @@ export default function AdDetailsPage({ ad }: Props) {
     );
   }
 
-  const detailItems = [
+  const detailItems: DetailItem[] = [
     { label: "Ano/modelo", value: ad.yearLabel },
     { label: "Quilometragem", value: `${formatNumber(ad.mileage)} km` },
     { label: "Câmbio", value: ad.transmission },
@@ -338,7 +357,11 @@ export default function AdDetailsPage({ ad }: Props) {
               <div className="text-[42px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                 {formatCurrency(ad.price)}
               </div>
-              <div className={`mt-1 text-sm font-semibold ${belowFipe ? "text-green-600" : "text-orange-600"}`}>
+              <div
+                className={`mt-1 text-sm font-semibold ${
+                  belowFipe ? "text-green-600" : "text-orange-600"
+                }`}
+              >
                 {belowFipe ? "Abaixo da FIPE" : "Acima da FIPE"} • {percentageLabel(diffPercent)}
               </div>
             </div>
@@ -369,13 +392,13 @@ export default function AdDetailsPage({ ad }: Props) {
               <div className="relative overflow-hidden rounded-[22px] bg-[#EDF2FB]">
                 <div className="aspect-[16/10] sm:aspect-[16/9] xl:aspect-[16/8.4]">
                   <img
-                    src={ad.images[selectedImage]}
+                    src={safeImages[selectedImage]}
                     alt={`${ad.title} - foto ${selectedImage + 1}`}
                     className="h-full w-full object-cover"
                   />
                 </div>
 
-                {ad.images.length > 1 ? (
+                {safeImages.length > 1 ? (
                   <>
                     <button
                       type="button"
@@ -396,9 +419,9 @@ export default function AdDetailsPage({ ad }: Props) {
                     </button>
 
                     <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/85 px-3 py-2 shadow-lg backdrop-blur">
-                      {ad.images.map((_, index) => (
+                      {safeImages.map((_, index) => (
                         <button
-                          key={index}
+                          key={`dot-${index}`}
                           type="button"
                           onClick={() => setSelectedImage(index)}
                           className={`h-2.5 rounded-full transition ${
@@ -412,14 +435,14 @@ export default function AdDetailsPage({ ad }: Props) {
                 ) : null}
 
                 <div className="absolute bottom-4 right-4 rounded-2xl bg-white/90 px-4 py-2 text-sm font-semibold text-[#1D2440] shadow-lg backdrop-blur">
-                  {ad.images.length} fotos
+                  {safeImages.length} fotos
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-5 lg:grid-cols-6">
-                {ad.images.slice(0, 6).map((image, index) => (
+                {safeImages.slice(0, 6).map((image, index) => (
                   <button
-                    key={index}
+                    key={`thumb-${index}-${image}`}
                     type="button"
                     onClick={() => setSelectedImage(index)}
                     className={`overflow-hidden rounded-[18px] border transition ${
@@ -470,7 +493,11 @@ export default function AdDetailsPage({ ad }: Props) {
                   <div className="mt-2 text-[34px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                     {formatCurrency(ad.fipeValue)}
                   </div>
-                  <div className={`mt-2 text-sm font-semibold ${belowFipe ? "text-green-600" : "text-orange-600"}`}>
+                  <div
+                    className={`mt-2 text-sm font-semibold ${
+                      belowFipe ? "text-green-600" : "text-orange-600"
+                    }`}
+                  >
                     {belowFipe
                       ? `${percentageLabel(diffPercent)} abaixo da FIPE`
                       : `${percentageLabel(diffPercent)} acima da FIPE`}
@@ -538,7 +565,7 @@ export default function AdDetailsPage({ ad }: Props) {
             <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
               <div className="flex items-start gap-4">
                 <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[22px] font-extrabold text-[#2F67F6]">
-                  {ad.seller.name.charAt(0)}
+                  {(ad.seller.name || "A").charAt(0)}
                 </div>
 
                 <div className="min-w-0">
