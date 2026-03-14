@@ -63,7 +63,7 @@ export default function AdCard({ ad }: AdCardProps) {
       <div className="aspect-[16/10] overflow-hidden bg-[#EDF2FB]">
         <img
           src={ad.image || "/placeholder-car.jpg"}
-          alt={ad.title}
+          alt={ad.title || "Veículo"}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
       </div>
