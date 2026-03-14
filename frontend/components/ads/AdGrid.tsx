@@ -1,5 +1,5 @@
 import type { AdItem } from "@/lib/search/ads-search";
-import { AdCard } from "./AdCard";
+import AdCard from "./AdCard";
 
 interface AdGridProps {
   items: AdItem[];
