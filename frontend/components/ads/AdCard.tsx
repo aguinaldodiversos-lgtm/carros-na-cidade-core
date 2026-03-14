@@ -1,322 +1,107 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import type { AdItem } from "@/lib/search/ads-search";
-import { trackAdEvent } from "@/lib/analytics/public-events";
+import { buildAdHref } from "@/lib/ads/build-ad-href";
 
-interface AdCardProps {
-  item: AdItem;
-  priority?: boolean;
-  variant?: "default" | "home";
-}
+type AdCardProps = {
+  ad: {
+    id?: string | number;
+    slug?: string;
+    title: string;
+    brand?: string;
+    model?: string;
+    version?: string;
+    year?: string | number;
+    city?: string;
+    state?: string;
+    price?: number;
+    mileage?: number;
+    yearLabel?: string;
+    image?: string;
+    badge?: string;
+  };
+};
 
-function formatPrice(price?: number) {
-  if (!price || Number(price) <= 0) return "Consulte";
+function formatCurrency(value?: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     maximumFractionDigits: 0,
-  }).format(price);
+  }).format(value || 0);
 }
 
-function formatMileage(value?: number) {
-  if (!value || Number(value) <= 0) return "Km não informado";
-  return `${Number(value).toLocaleString("pt-BR")} km`;
+function formatNumber(value?: number) {
+  return new Intl.NumberFormat("pt-BR").format(value || 0);
 }
 
-function resolveImage(item: AdItem) {
-  if (item.image_url) return item.image_url;
-  if (Array.isArray(item.images) && item.images.length > 0) return item.images[0];
-  return "/images/hero.jpeg";
+function badgeClasses(label?: string) {
+  const normalized = String(label || "").toLowerCase();
+
+  if (normalized.includes("abaixo")) {
+    return "border-green-200 bg-green-50 text-green-700";
+  }
+
+  if (normalized.includes("destaque")) {
+    return "border-orange-200 bg-orange-50 text-orange-700";
+  }
+
+  if (normalized.includes("premium")) {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function resolveDetailSlug(item: AdItem) {
-  return item.slug?.trim() || String(item.id);
-}
-
-function resolveAdHref(item: AdItem) {
-  return `/veiculo/${resolveDetailSlug(item)}`;
-}
-
-function buildTitle(item: AdItem) {
-  if (item.title?.trim()) return item.title.trim();
-  return [item.year, item.brand, item.model].filter(Boolean).join(" ") || "Veículo";
-}
-
-function normalizePlanLabel(plan?: string | null) {
-  const normalized = String(plan ?? "").trim().toLowerCase();
-  if (!normalized) return null;
-  if (normalized === "free") return null;
-  if (normalized === "essential") return "Loja verificada";
-  if (normalized === "premium") return "Destaque";
-  return null;
-}
-
-function FavoriteIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-    </svg>
-  );
-}
-
-function LocationIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10Z" />
-      <circle cx="12" cy="11" r="2.25" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z" />
-    </svg>
-  );
-}
-
-function GaugeIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M4 15a8 8 0 1 1 16 0" />
-      <path d="M12 12l4-2" />
-      <path d="M12 15h.01" />
-    </svg>
-  );
-}
-
-export function AdCard({ item, priority = false, variant = "default" }: AdCardProps) {
-  const image = resolveImage(item);
-  const href = resolveAdHref(item);
-  const title = buildTitle(item);
-  const location = [item.city, item.state].filter(Boolean).join(" - ");
-  const hasBelowFipe = item.below_fipe === true;
-  const hasHighlight = Boolean(item.highlight_until);
-  const detailSlug = resolveDetailSlug(item);
-  const isHome = variant === "home";
-  const cleanPlanLabel = normalizePlanLabel(item.plan);
-  const quickInfo = [item.year ? String(item.year) : null, formatMileage(item.mileage), cleanPlanLabel]
-    .filter(Boolean)
-    .join(" · ");
-  const infoItems = [
-    item.year
-      ? {
-          key: "year",
-          label: String(item.year),
-          icon: <CalendarIcon />,
-        }
-      : null,
-    {
-      key: "mileage",
-      label: formatMileage(item.mileage),
-      icon: <GaugeIcon />,
-    },
-    cleanPlanLabel
-      ? {
-          key: "plan",
-          label: cleanPlanLabel,
-          icon: null,
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    key: string;
-    label: string;
-    icon: React.ReactNode;
-  }>;
+export default function AdCard({ ad }: AdCardProps) {
+  const href = buildAdHref(ad);
 
   return (
-    <article
-      className={`h-full overflow-hidden border bg-white transition duration-300 hover:-translate-y-1 ${
-        isHome
-          ? "rounded-[10px] border-[#e1e5ef] shadow-[0_2px_18px_rgba(20,30,60,0.06)] hover:shadow-[0_8px_22px_rgba(20,30,60,0.10)]"
-          : "rounded-[18px] border-[#dbe4f0] shadow-[0_10px_26px_rgba(15,23,42,0.08)] hover:shadow-[0_16px_34px_rgba(15,23,42,0.14)]"
-      }`}
+    <Link
+      href={href}
+      className="group block overflow-hidden rounded-[24px] border border-[#E5E9F2] bg-white shadow-[0_12px_30px_rgba(30,41,59,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(30,41,59,0.10)]"
     >
-      <Link
-        href={href}
-        aria-label={`Ver detalhes de ${title}`}
-        onClick={() => trackAdEvent(item.id, "click")}
-        className="group flex h-full flex-col"
-      >
-        <div className={`relative overflow-hidden bg-[#edf2f8] ${isHome ? "aspect-[1.36/1]" : "aspect-[16/10] sm:aspect-[16/10]"}`}>
-          <Image
-            src={image}
-            alt={title}
-            fill
-            priority={priority}
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            className="object-cover transition duration-500 group-hover:scale-[1.04]"
-          />
+      <div className="aspect-[16/10] overflow-hidden bg-[#EDF2FB]">
+        <img
+          src={ad.image || "/placeholder-car.jpg"}
+          alt={ad.title}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+        />
+      </div>
 
-          <div className="absolute inset-0 bg-gradient-to-t from-[#09111f]/36 via-transparent to-transparent" />
-
-          <div className="absolute left-3 top-3 flex max-w-[75%] flex-wrap gap-2">
-            {isHome && hasBelowFipe ? (
-              <span className="rounded-[7px] bg-[#1f74e8] px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
-                {formatPrice(item.price)}
-              </span>
-            ) : hasHighlight ? (
-              <span
-                className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm ${
-                  isHome ? "rounded-[7px] bg-[#1f74e8]" : "rounded-[8px] bg-[#0a7c83]"
-                }`}
-              >
-                {isHome ? "Patrocinado" : "Destaque"}
-              </span>
-            ) : null}
-
-            {hasBelowFipe && !isHome ? (
-              <span
-                className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm ${
-                  isHome ? "rounded-[7px] bg-[#0e62d8]" : "rounded-[8px] bg-[#0e62d8]"
-                }`}
-              >
-                {isHome ? "Oferta" : "Abaixo da FIPE"}
-              </span>
-            ) : null}
-          </div>
-
+      <div className="space-y-2 p-4">
+        {ad.badge ? (
           <span
-            className={`absolute right-3 top-3 inline-flex items-center justify-center bg-white/92 text-[#455066] shadow-sm backdrop-blur ${
-              isHome ? "h-7 w-7 rounded-full" : "h-8 w-8 rounded-full sm:h-9 sm:w-9"
-            }`}
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(
+              ad.badge
+            )}`}
           >
-            <FavoriteIcon />
+            {ad.badge}
           </span>
+        ) : null}
 
-          {isHome ? null : (
-            <div className="absolute inset-x-0 bottom-0 px-4 pb-4">
-              <div className="inline-flex rounded-full bg-white/92 px-3 py-1 text-[11px] font-bold text-[#1d2538] shadow-sm backdrop-blur">
-                ID {detailSlug}
-              </div>
-            </div>
-          )}
+        <h3 className="line-clamp-2 min-h-[44px] text-[18px] font-semibold leading-6 text-[#1D2440]">
+          {ad.title}
+        </h3>
+
+        <p className="text-sm text-[#6E748A]">
+          {ad.city || "São Paulo"} - {ad.state || "SP"}
+        </p>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <strong className="text-[20px] font-extrabold text-[#1F66E5]">
+            {formatCurrency(ad.price)}
+          </strong>
+          <span className="text-xs font-medium text-[#6E748A]">
+            {ad.yearLabel || `${ad.year || ""}`}
+          </span>
         </div>
 
-        <div className={`flex flex-1 flex-col ${isHome ? "p-2.5" : "p-4 sm:p-4.5"}`}>
-          {isHome ? null : (
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#0e62d8]">
-              Anuncio premium
-            </div>
-          )}
-
-          <h3
-            className={`line-clamp-2 font-black text-[#162033] ${
-              isHome ? "min-h-[2.6rem] text-[16px] leading-5" : "mt-2 min-h-[2.8rem] text-[17px] leading-5 sm:min-h-[3rem] sm:text-[18px] sm:leading-6"
-            }`}
-          >
-            {title}
-          </h3>
-
-          {isHome ? null : (
-            <>
-              <div className="mt-2 text-[12px] text-[#5f6982] sm:text-[13px]">
-                {quickInfo || "Detalhes principais nao informados"}
-              </div>
-
-              <div className="mt-3 inline-flex items-center gap-2 text-[13px] text-[#5f6982] sm:text-sm">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-                  <LocationIcon />
-                </span>
-                <span>{location || "Localizacao nao informada"}</span>
-              </div>
-            </>
-          )}
-
-          {isHome ? (
-            <>
-              <div className="mt-1.5 text-[12px] text-[#616c81]">
-                {location || "Localização não informada"}
-              </div>
-
-              <div className="mt-2 flex items-end justify-between gap-2">
-                <div className="text-[14px] font-black leading-none tracking-[-0.03em] text-[#0e62d8] md:text-[16px]">
-                  {formatPrice(item.price)}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {cleanPlanLabel ? (
-                    <span className="rounded-[6px] bg-[#eaf2ff] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#0e62d8]">
-                      {cleanPlanLabel}
-                    </span>
-                  ) : null}
-                  {hasBelowFipe ? (
-                    <span className="rounded-[6px] bg-[#eaf2ff] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#0e62d8]">
-                      Abaixo da FIPE
-                    </span>
-                  ) : null}
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#f2f6fd] text-[#0e62d8] transition group-hover:bg-[#0e62d8] group-hover:text-white">
-                    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor">
-                      <path d="M7 4 13 10 7 16" />
-                    </svg>
-                  </span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {infoItems.slice(0, 2).map((info) => (
-                  <span
-                    key={info.key}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#d9e3f0] bg-[#f8fbff] px-3 py-1.5 text-[12px] font-semibold text-[#42506a]"
-                  >
-                    {info.icon}
-                    {info.label}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-4 text-[28px] font-black tracking-[-0.03em] text-[#0e62d8] sm:text-[30px]">
-                {formatPrice(item.price)}
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {hasBelowFipe ? (
-                  <span className="rounded-[8px] bg-[#eaf2ff] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#0e62d8]">
-                    Oportunidade
-                  </span>
-                ) : null}
-                {hasHighlight ? (
-                  <span className="rounded-[8px] bg-[#e8fbfb] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#0a7c83]">
-                    Alta visibilidade
-                  </span>
-                ) : null}
-              </div>
-
-              <span className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-[14px] font-bold text-white transition group-hover:bg-[#0c54bc] sm:text-[15px]">
-                Ver detalhes
-              </span>
-            </>
-          )}
-        </div>
-      </Link>
-    </article>
+        {!!ad.mileage && (
+          <div className="text-xs text-[#6E748A]">
+            {formatNumber(ad.mileage)} km
+          </div>
+        )}
+      </div>
+    </Link>
   );
 }
