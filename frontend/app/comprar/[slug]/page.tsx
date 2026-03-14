@@ -11,6 +11,5 @@ type PageProps = {
 
 export default async function VehicleDetailsRoute({ params }: PageProps) {
   const ad = await getAdDetails(params.slug);
-
   return <AdDetailsPage ad={ad} />;
 }
