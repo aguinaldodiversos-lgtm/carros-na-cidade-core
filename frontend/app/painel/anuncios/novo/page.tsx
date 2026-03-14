@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type SellerType = "particular" | "lojista";
+type SaveState = "idle" | "saved" | "loaded";
+type SubmitState = "idle" | "submitting" | "success" | "error";
 
 type FormState = {
   sellerType: SellerType;
@@ -28,8 +30,6 @@ type FormState = {
   phone: string;
   acceptTerms: boolean;
 };
-
-type SaveState = "idle" | "saved" | "loaded";
 
 const DRAFT_STORAGE_KEY = "carros-na-cidade:new-ad:draft";
 
@@ -185,9 +185,7 @@ function SectionCard({
     <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
       <div className="mb-5">
         <h2 className="text-[28px] font-bold tracking-[-0.03em] text-[#1D2440]">{title}</h2>
-        {subtitle ? (
-          <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p>
-        ) : null}
+        {subtitle ? <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p> : null}
       </div>
       {children}
     </section>
@@ -233,8 +231,11 @@ export default function NovoAnuncioPage() {
     sellerType: searchType,
   });
 
+  const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
   const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
@@ -259,9 +260,15 @@ export default function NovoAnuncioPage() {
 
       setSaveState("loaded");
     } catch {
-      // ignora draft inválido
+      setSaveState("idle");
     }
   }, []);
+
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [photoPreviews]);
 
   const suggestedTitle = useMemo(() => buildSuggestedTitle(form), [form]);
 
@@ -299,11 +306,13 @@ export default function NovoAnuncioPage() {
   }
 
   function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
+    const files = Array.from(event.target.files || []).slice(0, 10);
+
+    photoPreviews.forEach((url) => URL.revokeObjectURL(url));
 
     const urls = files.map((file) => URL.createObjectURL(file));
-    setPhotoPreviews(urls.slice(0, 10));
+    setPhotos(files);
+    setPhotoPreviews(urls);
   }
 
   function handleSaveDraft() {
@@ -319,6 +328,101 @@ export default function NovoAnuncioPage() {
     setShowReview(true);
     handleSaveDraft();
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
+  function validateForm() {
+    if (!form.brand.trim()) return "Informe a marca.";
+    if (!form.model.trim()) return "Informe o modelo.";
+    if (!form.version.trim()) return "Informe a versão.";
+    if (!form.yearModel.trim()) return "Informe o ano/modelo.";
+    if (!form.price.trim()) return "Informe o preço do anúncio.";
+    if (!form.city.trim()) return "Informe a cidade.";
+    if (!form.state.trim()) return "Informe o estado.";
+    if (!form.description.trim()) return "Preencha a descrição do anúncio.";
+    if (!form.whatsapp.trim() && !form.phone.trim()) return "Informe WhatsApp ou telefone.";
+    if (!form.acceptTerms) return "Você precisa aceitar os termos para continuar.";
+    return null;
+  }
+
+  async function handleSubmit() {
+    const validationError = validateForm();
+
+    if (validationError) {
+      setSubmitState("error");
+      setSubmitMessage(validationError);
+      return;
+    }
+
+    setSubmitState("submitting");
+    setSubmitMessage("");
+
+    try {
+      const payload = new FormData();
+
+      payload.append("sellerType", form.sellerType);
+      payload.append("brand", form.brand);
+      payload.append("model", form.model);
+      payload.append("version", form.version);
+      payload.append("yearModel", form.yearModel);
+      payload.append("mileage", form.mileage);
+      payload.append("price", form.price);
+      payload.append("fipeValue", form.fipeValue);
+      payload.append("city", form.city);
+      payload.append("state", form.state);
+      payload.append("fuel", form.fuel);
+      payload.append("transmission", form.transmission);
+      payload.append("bodyStyle", form.bodyStyle);
+      payload.append("color", form.color);
+      payload.append("plateFinal", form.plateFinal);
+      payload.append("title", finalTitle);
+      payload.append("description", form.description);
+      payload.append("whatsapp", form.whatsapp);
+      payload.append("phone", form.phone);
+      payload.append("acceptTerms", form.acceptTerms ? "true" : "false");
+
+      photos.forEach((file) => {
+        payload.append("photos", file, file.name);
+      });
+
+      const response = await fetch("/api/painel/anuncios", {
+        method: "POST",
+        body: payload,
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          result?.message ||
+          "Não foi possível enviar o anúncio para o endpoint configurado.";
+        throw new Error(message);
+      }
+
+      try {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {
+        // ignora
+      }
+
+      setSubmitState("success");
+      setSubmitMessage(result?.message || "Anúncio enviado com sucesso.");
+      setShowReview(true);
+
+      const redirectTo =
+        result?.result?.redirectTo ||
+        result?.result?.redirect_to ||
+        result?.result?.url ||
+        "";
+
+      if (typeof redirectTo === "string" && redirectTo.trim()) {
+        setTimeout(() => {
+          router.push(redirectTo);
+        }, 800);
+      }
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitMessage(error instanceof Error ? error.message : "Erro inesperado ao publicar.");
+    }
   }
 
   const profileDescription =
@@ -352,7 +456,7 @@ export default function NovoAnuncioPage() {
               </h1>
               <p className="mt-4 text-[16px] leading-8 text-[#5C647C] sm:text-[18px]">
                 Esta tela já organiza os dados do veículo, calcula contexto de preço com FIPE,
-                permite salvar rascunho e deixa o anúncio pronto para a próxima integração de publicação.
+                permite salvar rascunho e envia o formulário para um endpoint real através de uma rota interna segura.
               </p>
             </div>
 
@@ -571,7 +675,7 @@ export default function NovoAnuncioPage() {
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                   {photoPreviews.map((src, index) => (
                     <div
-                      key={src}
+                      key={`${src}-${index}`}
                       className="overflow-hidden rounded-[22px] border border-[#E5E9F2] bg-white"
                     >
                       <div className="aspect-[4/3] bg-[#EDF2FB]">
@@ -631,7 +735,7 @@ export default function NovoAnuncioPage() {
 
             <SectionCard
               title="Ações do anúncio"
-              subtitle="Esta etapa já permite salvar rascunho local e seguir para revisão visual antes da integração final do POST."
+              subtitle="Você pode salvar, revisar e publicar para o endpoint configurado."
             >
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -645,23 +749,52 @@ export default function NovoAnuncioPage() {
                 <button
                   type="button"
                   onClick={handleReview}
-                  className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-6 py-4 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
+                  className="inline-flex items-center justify-center rounded-[20px] border border-[#DCE6F7] bg-[#EEF4FF] px-6 py-4 text-base font-bold text-[#1F66E5] transition hover:bg-[#E4EEFF]"
                 >
                   Revisar anúncio
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitState === "submitting"}
+                  className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-6 py-4 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submitState === "submitting" ? "Publicando..." : "Publicar anúncio"}
+                </button>
               </div>
 
-              <div className="mt-4 text-sm text-[#6E748A]">
-                {saveState === "saved" && "Rascunho salvo no navegador com sucesso."}
-                {saveState === "loaded" && "Rascunho anterior carregado automaticamente."}
-                {saveState === "idle" && "Nenhuma ação recente de rascunho."}
+              <div className="mt-4 text-sm">
+                {saveState === "saved" && (
+                  <span className="text-[#15803D]">Rascunho salvo no navegador com sucesso.</span>
+                )}
+                {saveState === "loaded" && (
+                  <span className="text-[#1F66E5]">Rascunho anterior carregado automaticamente.</span>
+                )}
+                {saveState === "idle" && (
+                  <span className="text-[#6E748A]">Nenhuma ação recente de rascunho.</span>
+                )}
               </div>
+
+              {submitMessage ? (
+                <div
+                  className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-7 ${
+                    submitState === "success"
+                      ? "border-green-200 bg-green-50 text-green-700"
+                      : submitState === "error"
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
+                  }`}
+                >
+                  {submitMessage}
+                </div>
+              ) : null}
             </SectionCard>
 
             {showReview ? (
               <SectionCard
                 title="Revisão do anúncio"
-                subtitle="Prévia textual do anúncio pronta para a próxima etapa de integração com publicação real."
+                subtitle="Prévia textual do anúncio pronta para publicação."
               >
                 <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
                   <div className="overflow-hidden rounded-[24px] border border-[#E5E9F2] bg-white">
@@ -822,9 +955,18 @@ export default function NovoAnuncioPage() {
                 <button
                   type="button"
                   onClick={handleReview}
-                  className="inline-flex items-center justify-center rounded-[18px] bg-[#2F67F6] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_26px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
+                  className="inline-flex items-center justify-center rounded-[18px] border border-[#DCE6F7] bg-[#EEF4FF] px-5 py-3 text-sm font-bold text-[#1F66E5] transition hover:bg-[#E4EEFF]"
                 >
                   Revisar anúncio
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitState === "submitting"}
+                  className="inline-flex items-center justify-center rounded-[18px] bg-[#2F67F6] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_26px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submitState === "submitting" ? "Publicando..." : "Publicar no endpoint"}
                 </button>
               </div>
             </section>
