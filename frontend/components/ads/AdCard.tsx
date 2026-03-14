@@ -52,7 +52,7 @@ function badgeClasses(label?: string) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-export default function AdCard({ ad }: AdCardProps) {
+export function AdCard({ ad }: AdCardProps) {
   const href = buildAdHref(ad);
 
   return (
@@ -105,3 +105,5 @@ export default function AdCard({ ad }: AdCardProps) {
     </Link>
   );
 }
+
+export default AdCard;
