@@ -1,5 +1,5 @@
-import AdDetailsPage from "../../../components/ads/AdDetailsPage";
-import { getAdDetails } from "../../../lib/ads/get-ad-details";
+import AdDetailsPage from "@/components/ads/AdDetailsPage";
+import { getAdDetails } from "@/lib/ads/get-ad-details";
 
 export const revalidate = 60;
 
