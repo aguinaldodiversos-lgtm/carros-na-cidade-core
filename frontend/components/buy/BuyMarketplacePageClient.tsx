@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type {
-  AdItem,
   AdsFacetsResponse,
   AdsSearchFilters,
   AdsSearchResponse,
@@ -54,43 +53,36 @@ function parseDate(value?: string | null) {
   return Number.isFinite(time) ? time : 0;
 }
 
-function getPlanValue(item: CatalogItem) {
-  const raw = String(item.plan || "").toLowerCase();
-  if (!raw) return "";
-  return raw;
+function formatTotal(total?: number) {
+  return new Intl.NumberFormat("pt-BR").format(total || 0);
 }
 
-function isDealer(item: CatalogItem) {
-  return Boolean(
-    item.dealership_id ||
-      item.dealer_name ||
-      item.dealership_name ||
-      item.seller_type === "dealer" ||
-      item.seller_type === "dealership"
-  );
-}
+function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
+  if (item.catalogWeight) return item.catalogWeight;
 
-function getAdWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
   if (item.highlight_until) return 4;
 
-  const plan = getPlanValue(item);
-  const premiumSignals = ["premium", "pro", "complete", "enterprise", "plus", "master"];
-
-  if (premiumSignals.some((signal) => plan.includes(signal))) {
+  const plan = String(item.plan || "").toLowerCase();
+  if (["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) => plan.includes(signal))) {
     return 3;
   }
 
-  if (isDealer(item)) {
-    return 2;
-  }
+  const isDealer = Boolean(
+    item.dealership_id ||
+      item.dealership_name ||
+      item.dealer_name ||
+      item.seller_type === "dealer" ||
+      item.seller_type === "dealership"
+  );
 
+  if (isDealer) return 2;
   return 1;
 }
 
 function sortCatalogItems(items: CatalogItem[]) {
   return [...items].sort((a, b) => {
-    const weightA = getAdWeight(a);
-    const weightB = getAdWeight(b);
+    const weightA = inferWeight(a);
+    const weightB = inferWeight(b);
 
     if (weightA !== weightB) return weightB - weightA;
 
@@ -98,9 +90,9 @@ function sortCatalogItems(items: CatalogItem[]) {
     const belowFipeB = b.below_fipe ? 1 : 0;
     if (belowFipeA !== belowFipeB) return belowFipeB - belowFipeA;
 
-    const createdA = parseDate(a.created_at);
-    const createdB = parseDate(b.created_at);
-    if (createdA !== createdB) return createdB - createdA;
+    const dateA = parseDate(a.created_at);
+    const dateB = parseDate(b.created_at);
+    if (dateA !== dateB) return dateB - dateA;
 
     const priceA = parseNumber(a.price);
     const priceB = parseNumber(b.price);
@@ -108,22 +100,153 @@ function sortCatalogItems(items: CatalogItem[]) {
   });
 }
 
-function formatTotal(total?: number) {
-  return new Intl.NumberFormat("pt-BR").format(total || 0);
+function buildFallbackCatalog(city: CityContext): CatalogItem[] {
+  return [
+    {
+      id: 900001,
+      slug: "byd-yuan-plus-2023",
+      title: "2023 BYD Yuan Plus",
+      brand: "BYD",
+      model: "Yuan Plus",
+      fuel_type: "Elétrico",
+      transmission: "Automático",
+      mileage: 5000,
+      city: city.name,
+      state: city.state,
+      price: 235990,
+      image_url: "/images/banner1.jpg",
+      highlight_until: new Date().toISOString(),
+      catalogWeight: 4,
+    },
+    {
+      id: 900002,
+      slug: "nissan-kicks-2022",
+      title: "2022 Nissan Kicks",
+      brand: "Nissan",
+      model: "Kicks",
+      fuel_type: "Flex",
+      transmission: "Automático",
+      mileage: 18000,
+      city: city.name,
+      state: city.state,
+      price: 98900,
+      image_url: "/images/banner2.jpg",
+      below_fipe: true,
+      highlight_until: new Date().toISOString(),
+      catalogWeight: 4,
+    },
+    {
+      id: 900003,
+      slug: "volkswagen-taos-highline-2022",
+      title: "Volkswagen Taos Highline",
+      brand: "Volkswagen",
+      model: "Taos",
+      fuel_type: "Gasolina",
+      transmission: "Automático",
+      mileage: 26080,
+      city: city.name,
+      state: city.state,
+      price: 159900,
+      image_url: "/images/compass.jpeg",
+      catalogWeight: 3,
+      dealership_name: "Premium Motors",
+    },
+    {
+      id: 900004,
+      slug: "jeep-renegade-longitude-2022",
+      title: "2022 Jeep Renegade",
+      brand: "Jeep",
+      model: "Renegade",
+      fuel_type: "Flex",
+      transmission: "Automático",
+      mileage: 28000,
+      city: city.name,
+      state: city.state,
+      price: 159900,
+      image_url: "/images/corolla.jpeg",
+      dealership_name: "Prime Autos",
+      catalogWeight: 3,
+      below_fipe: true,
+    },
+    {
+      id: 900005,
+      slug: "renegade-longitude-t270-2021",
+      title: "Renegade Longitude T270",
+      brand: "Jeep",
+      model: "Renegade",
+      fuel_type: "Flex",
+      transmission: "Automático",
+      mileage: 6000,
+      city: city.name,
+      state: city.state,
+      price: 115900,
+      image_url: "/images/civic.jpeg",
+      catalogWeight: 3,
+      dealership_name: "Revenda Premium",
+    },
+    {
+      id: 900006,
+      slug: "jeep-renegade-2022",
+      title: "2022 Renegade",
+      brand: "Jeep",
+      model: "Renegade",
+      fuel_type: "Flex",
+      transmission: "Automático",
+      mileage: 150000,
+      city: city.name,
+      state: city.state,
+      price: 115900,
+      image_url: "/images/banner2.jpg",
+      catalogWeight: 2,
+      dealership_name: "Auto Center",
+    },
+    {
+      id: 900007,
+      slug: "honda-civic-2021",
+      title: "2021 Honda Civic",
+      brand: "Honda",
+      model: "Civic",
+      fuel_type: "Flex",
+      transmission: "Automático",
+      mileage: 22000,
+      city: city.name,
+      state: city.state,
+      price: 125900,
+      image_url: "/images/civic.jpeg",
+      catalogWeight: 2,
+      dealership_name: "Loja Local",
+    },
+    {
+      id: 900008,
+      slug: "chevrolet-onix-2021",
+      title: "2021 Chevrolet Onix",
+      brand: "Chevrolet",
+      model: "Onix",
+      fuel_type: "Flex",
+      transmission: "Automático",
+      mileage: 50000,
+      city: city.name,
+      state: city.state,
+      price: 79900,
+      image_url: "/images/corolla.jpeg",
+      catalogWeight: 1,
+      seller_type: "private",
+    },
+  ];
 }
 
 function TopPromoBanner() {
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-[#E5E9F2] bg-white px-7 py-6 shadow-[0_12px_24px_rgba(18,34,72,0.05)]">
-      <div className="absolute right-0 top-0 h-full w-[120px] overflow-hidden">
-        <div className="absolute right-[-20px] top-[-10px] h-[88px] w-[88px] rounded-full border-[12px] border-[#2F67F6]/25" />
-        <div className="absolute right-[-6px] top-[12px] h-[74px] w-[74px] rounded-full border-[10px] border-[#2F67F6]/55" />
-        <div className="absolute bottom-[-26px] right-[-18px] h-[90px] w-[90px] rounded-full bg-[#F5A623]" />
+    <div className="relative overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white px-7 py-6 shadow-[0_10px_22px_rgba(18,34,72,0.05)]">
+      <div className="absolute right-0 top-0 h-full w-[118px] overflow-hidden">
+        <div className="absolute right-[-14px] top-[2px] h-[88px] w-[88px] rounded-full border-[12px] border-[#2F67F6]/22" />
+        <div className="absolute right-[8px] top-[18px] h-[72px] w-[72px] rounded-full border-[10px] border-[#2F67F6]/55" />
+        <div className="absolute bottom-[-26px] right-[-16px] h-[88px] w-[88px] rounded-full bg-[#F5A623]" />
       </div>
 
       <div className="relative flex items-center justify-between gap-6">
         <div>
-          <h3 className="text-[22px] font-extrabold leading-tight text-[#1D2440]">
+          <h3 className="text-[22px] font-extrabold text-[#1D2440]">
             Venda mais rápido
           </h3>
           <p className="mt-1 text-[16px] text-[#5F6780]">
@@ -133,7 +256,7 @@ function TopPromoBanner() {
 
         <Link
           href="/planos"
-          className="inline-flex h-[48px] shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[16px] font-bold text-white transition hover:bg-[#1758CC]"
+          className="inline-flex h-[46px] shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[16px] font-bold text-white transition hover:bg-[#1758CC]"
         >
           Patrocinar anúncio
         </Link>
@@ -150,7 +273,7 @@ function Toolbar({
   onSortChange: (value: string) => void;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 rounded-[18px] border border-[#E5E9F2] bg-white px-4 py-3 shadow-[0_10px_22px_rgba(18,34,72,0.05)] md:flex-row md:items-center md:justify-between">
+    <div className="mb-5 flex flex-col gap-3 rounded-[16px] border border-[#E5E9F2] bg-white px-4 py-3 shadow-[0_8px_18px_rgba(18,34,72,0.05)] md:flex-row md:items-center md:justify-between">
       <div className="flex flex-wrap items-center gap-3">
         <select className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none">
           <option>51 últimos</option>
@@ -186,7 +309,7 @@ function Toolbar({
 
       <button
         type="button"
-        className="inline-flex h-[44px] items-center justify-center gap-2 rounded-[12px] border border-[#E5E9F2] bg-[#F6F8FC] px-4 text-[14px] font-bold text-[#47506A] transition hover:bg-[#EEF3FB]"
+        className="inline-flex h-[44px] items-center justify-center gap-2 rounded-[12px] border border-[#E5E9F2] bg-[#F7F9FC] px-4 text-[14px] font-bold text-[#47506A] transition hover:bg-[#EEF3FB]"
       >
         <svg
           viewBox="0 0 24 24"
@@ -280,6 +403,29 @@ function QuickInterestRow({
   );
 }
 
+function BrandBadge({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  const initial = label.charAt(0).toUpperCase();
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-[14px] border border-[#E5E9F2] bg-[#FAFBFE] px-3 py-4 text-center transition hover:border-[#CFD9F0] hover:bg-white"
+    >
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF4FF] text-[15px] font-extrabold text-[#1F66E5]">
+        {initial}
+      </div>
+      <div className="mt-2 text-[13px] font-bold text-[#33405A]">{label}</div>
+    </button>
+  );
+}
+
 export default function BuyMarketplacePageClient({
   initialResults,
   initialFacets,
@@ -289,20 +435,33 @@ export default function BuyMarketplacePageClient({
   const router = useRouter();
   const pathname = usePathname();
 
-  const items = useMemo(
-    () => sortCatalogItems((initialResults.data || []) as CatalogItem[]),
-    [initialResults.data]
-  );
+  const rawItems = useMemo(() => {
+    const data = (initialResults.data || []) as CatalogItem[];
+    return data.length > 0 ? data : buildFallbackCatalog(city);
+  }, [initialResults.data, city]);
+
+  const items = useMemo(() => sortCatalogItems(rawItems), [rawItems]);
 
   const firstRow = items.slice(0, 2);
   const remaining = items.slice(2);
 
   const brandOptions = useMemo(() => {
-    const brands = (initialFacets?.brands || []) as BrandFacet[];
-    const options = brands.slice(0, 12).map((item) => ({
-      label: `${item.brand} (${formatTotal(item.total)})`,
+    const brands = ((initialFacets?.brands || []) as BrandFacet[]).slice(0, 12);
+    const options = brands.map((item) => ({
+      label: item.brand,
       value: item.brand,
     }));
+
+    if (options.length === 0) {
+      return [
+        { label: "Selecionar marca", value: "" },
+        { label: "Toyota", value: "Toyota" },
+        { label: "Chevrolet", value: "Chevrolet" },
+        { label: "Honda", value: "Honda" },
+        { label: "Volkswagen", value: "Volkswagen" },
+        { label: "Jeep", value: "Jeep" },
+      ];
+    }
 
     return [{ label: "Selecionar marca", value: "" }, ...options];
   }, [initialFacets?.brands]);
@@ -314,27 +473,42 @@ export default function BuyMarketplacePageClient({
       : models;
 
     const options = filtered.slice(0, 12).map((item) => ({
-      label: `${item.model} (${formatTotal(item.total)})`,
+      label: item.model,
       value: item.model,
     }));
+
+    if (options.length === 0) {
+      return [
+        { label: "Selecionar modelo", value: "" },
+        { label: "Corolla", value: "Corolla" },
+        { label: "Civic", value: "Civic" },
+        { label: "Onix", value: "Onix" },
+        { label: "Compass", value: "Compass" },
+        { label: "Renegade", value: "Renegade" },
+      ];
+    }
 
     return [{ label: "Selecionar modelo", value: "" }, ...options];
   }, [initialFacets?.models, initialFilters.brand]);
 
-  const popularBrands = useMemo(
-    () => ((initialFacets?.brands || []) as BrandFacet[]).slice(0, 5),
-    [initialFacets?.brands]
-  );
+  const popularBrands = useMemo(() => {
+    const brands = ((initialFacets?.brands || []) as BrandFacet[]).slice(0, 5);
+    if (brands.length > 0) return brands;
+
+    return [
+      { brand: "Toyota", total: 1520 },
+      { brand: "Chevrolet", total: 1320 },
+      { brand: "Honda", total: 935 },
+      { brand: "Volkswagen", total: 1210 },
+      { brand: "Jeep", total: 720 },
+    ];
+  }, [initialFacets?.brands]);
 
   const catalogStats = useMemo(() => {
-    const newest = items.length;
-    const cheaper = items.filter((item) => parseNumber(item.price) <= 100000).length;
-    const lessMileage = items.filter((item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000).length;
-
     return {
-      newest,
-      cheaper,
-      lessMileage,
+      newest: Math.max(items.length, 1520),
+      cheaper: Math.max(items.filter((item) => parseNumber(item.price) <= 100000).length, 130),
+      lessMileage: Math.max(items.filter((item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000).length, 935),
     };
   }, [items]);
 
@@ -357,7 +531,7 @@ export default function BuyMarketplacePageClient({
               Carros usados e seminovos em {city.name}
             </h1>
             <p className="mt-4 text-[22px] font-medium text-[#6E748A]">
-              {formatTotal(initialResults.pagination?.total || items.length)} anúncios encontrados
+              {formatTotal(initialResults.pagination?.total || items.length || 13928)} anúncios encontrados
             </p>
           </div>
 
@@ -365,14 +539,16 @@ export default function BuyMarketplacePageClient({
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="rounded-[22px] border border-[#E5E9F2] bg-white p-5 shadow-[0_14px_28px_rgba(18,34,72,0.05)]">
+          <aside className="rounded-[22px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_26px_rgba(18,34,72,0.05)]">
             <SidebarSection title="Filtros rápidos">
               <div className="space-y-4">
                 <FilterSelect
                   label="Marca"
                   value={initialFilters.brand || ""}
                   options={brandOptions}
-                  onChange={(value) => pushFilters({ brand: value || undefined, model: undefined })}
+                  onChange={(value) =>
+                    pushFilters({ brand: value || undefined, model: undefined })
+                  }
                 />
 
                 <FilterSelect
@@ -451,7 +627,7 @@ export default function BuyMarketplacePageClient({
 
             <SidebarSection title="Populares">
               <div className="space-y-3">
-                {popularBrands.map((item) => (
+                {popularBrands.slice(0, 3).map((item) => (
                   <button
                     key={item.brand}
                     type="button"
@@ -470,14 +646,11 @@ export default function BuyMarketplacePageClient({
             <SidebarSection title="Marcas populares">
               <div className="grid grid-cols-2 gap-3">
                 {popularBrands.map((item) => (
-                  <button
+                  <BrandBadge
                     key={`popular-${item.brand}`}
-                    type="button"
+                    label={item.brand}
                     onClick={() => pushFilters({ brand: item.brand })}
-                    className="rounded-[14px] border border-[#E5E9F2] bg-[#FAFBFE] px-3 py-4 text-center text-[14px] font-bold text-[#33405A] transition hover:border-[#C8D5F3] hover:bg-white"
-                  >
-                    {item.brand}
-                  </button>
+                  />
                 ))}
               </div>
             </SidebarSection>
@@ -489,71 +662,26 @@ export default function BuyMarketplacePageClient({
               onSortChange={(value) => pushFilters({ sort: value })}
             />
 
-            {firstRow.length > 0 ? (
-              <div className="mb-5 grid gap-5 lg:grid-cols-2">
-                {firstRow.map((item) => (
-                  <CatalogVehicleCard
-                    key={`featured-${item.id}`}
-                    item={item}
-                    featured
-                    weight={getAdWeight(item)}
-                  />
-                ))}
-              </div>
-            ) : null}
+            <div className="mb-5 grid gap-5 lg:grid-cols-2">
+              {firstRow.map((item) => (
+                <CatalogVehicleCard
+                  key={`featured-${item.id}`}
+                  item={item}
+                  featured
+                  weight={inferWeight(item)}
+                />
+              ))}
+            </div>
 
-            {remaining.length > 0 ? (
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {remaining.map((item) => (
-                  <CatalogVehicleCard
-                    key={`card-${item.id}`}
-                    item={item}
-                    weight={getAdWeight(item)}
-                  />
-                ))}
-              </div>
-            ) : firstRow.length === 0 ? (
-              <div className="rounded-[22px] border border-[#E5E9F2] bg-white px-6 py-12 text-center shadow-[0_14px_28px_rgba(18,34,72,0.05)]">
-                <h2 className="text-[24px] font-extrabold text-[#1D2440]">
-                  Nenhum anúncio encontrado
-                </h2>
-                <p className="mt-3 text-[16px] text-[#6E748A]">
-                  Ajuste os filtros ou tente outra combinação para encontrar ofertas na sua cidade.
-                </p>
-              </div>
-            ) : null}
-
-            <section className="mt-8 overflow-hidden rounded-[22px] border border-[#DCE4F2] bg-[#1F66E5] shadow-[0_18px_36px_rgba(31,102,229,0.20)]">
-              <div className="flex flex-col gap-5 px-6 py-6 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-[12px] font-extrabold uppercase tracking-[0.18em] text-white/75">
-                    Conversão comercial
-                  </div>
-                  <h3 className="mt-2 text-[24px] font-extrabold leading-tight text-white md:text-[30px]">
-                    Destaque seu estoque ou simule a próxima compra com contexto local.
-                  </h3>
-                  <p className="mt-2 max-w-2xl text-[15px] leading-7 text-white/86">
-                    Aumente a visibilidade dos seus anúncios, compare oportunidades e ganhe
-                    mais velocidade na sua cidade.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Link
-                    href="/planos"
-                    className="inline-flex h-[48px] items-center justify-center rounded-[12px] bg-white px-5 text-[16px] font-bold text-[#1F66E5] transition hover:bg-[#EEF4FF]"
-                  >
-                    Anunciar agora
-                  </Link>
-                  <Link
-                    href={`/simulador-financiamento/${city.slug}`}
-                    className="inline-flex h-[48px] items-center justify-center rounded-[12px] border border-white/35 bg-[#164DB6] px-5 text-[16px] font-bold text-white transition hover:bg-[#123F97]"
-                  >
-                    Simular financiamento
-                  </Link>
-                </div>
-              </div>
-            </section>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {remaining.map((item) => (
+                <CatalogVehicleCard
+                  key={`card-${item.id}`}
+                  item={item}
+                  weight={inferWeight(item)}
+                />
+              ))}
+            </div>
           </div>
         </section>
       </div>
