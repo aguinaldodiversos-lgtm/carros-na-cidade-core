@@ -8,6 +8,8 @@ export type CatalogItem = AdItem & {
   model?: string;
   version?: string;
   year?: number | string;
+  year_model?: string | null;
+  yearLabel?: string | null;
   mileage?: number | string;
   transmission?: string;
   fuel_type?: string;
@@ -15,6 +17,8 @@ export type CatalogItem = AdItem & {
   state?: string;
   price?: number | string;
   image_url?: string | null;
+  image?: string | null;
+  cover_image?: string | null;
   images?: string[] | null;
   slug?: string;
   below_fipe?: boolean;
