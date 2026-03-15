@@ -12,8 +12,10 @@ import {
   buildSearchQueryString,
   mergeSearchFilters,
 } from "@/lib/search/ads-search-url";
-import AdCard from "@/components/ads/AdCard";
-import type { CatalogItem } from "@/components/buy/CatalogVehicleCard";
+import { buildAdHref } from "@/lib/ads/build-ad-href";
+import CatalogVehicleCard, {
+  type CatalogItem,
+} from "@/components/buy/CatalogVehicleCard";
 
 type CityContext = {
   name: string;
@@ -21,7 +23,6 @@ type CityContext = {
   slug: string;
   label: string;
 };
-
 
 interface BuyMarketplacePageClientProps {
   initialResults: AdsSearchResponse;
@@ -82,41 +83,6 @@ function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
 
   if (isDealer) return 2;
   return 1;
-}
-
-function getBadge(item: CatalogItem, weight: 1 | 2 | 3 | 4) {
-  if (item.below_fipe) return "Abaixo da FIPE";
-  if (weight === 4) return "Destaque";
-  if (weight === 3) return "Loja Premium";
-  return undefined;
-}
-
-function normalizeCatalogItemToAdCard(item: CatalogItem) {
-  const weight = inferWeight(item);
-
-  return {
-    id: item.id,
-    slug: item.slug,
-    title:
-      item.title ||
-      [item.brand, item.model, item.version].filter(Boolean).join(" ").trim() ||
-      "Veículo",
-    brand: item.brand,
-    model: item.model,
-    version: item.version,
-    year: item.year,
-    city: item.city,
-    state: item.state,
-    price: parseNumber(item.price),
-    mileage: parseNumber(item.mileage),
-    yearLabel:
-      item.yearLabel ||
-      item.year_model ||
-      item.year ||
-      "",
-    image: item.image_url || item.image || item.cover_image || "/placeholder-car.jpg",
-    badge: getBadge(item, weight),
-  };
 }
 
 function sortCatalogItems(items: CatalogItem[]) {
@@ -404,7 +370,9 @@ function FilterSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">{label}</span>
+      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
+        {label}
+      </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -711,27 +679,50 @@ export default function BuyMarketplacePageClient({
             />
 
             <div className="mb-5 grid gap-5 lg:grid-cols-2">
-              {firstRow.map((item, index) => {
-                const normalized = normalizeCatalogItemToAdCard(item);
-                return (
-                  <AdCard
-                    key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
-                    ad={normalized}
+              {firstRow.map((item, index) => (
+                <Link
+                  key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
+                  href={buildAdHref({
+                    id: item.id,
+                    slug: item.slug,
+                    title: item.title,
+                    brand: item.brand,
+                    model: item.model,
+                    version: item.version,
+                    year: item.year,
+                  })}
+                  className="block"
+                >
+                  <CatalogVehicleCard
+                    item={item}
+                    featured
+                    weight={inferWeight(item)}
                   />
-                );
-              })}
+                </Link>
+              ))}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {remaining.map((item, index) => {
-                const normalized = normalizeCatalogItemToAdCard(item);
-                return (
-                  <AdCard
-                    key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
-                    ad={normalized}
+              {remaining.map((item, index) => (
+                <Link
+                  key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
+                  href={buildAdHref({
+                    id: item.id,
+                    slug: item.slug,
+                    title: item.title,
+                    brand: item.brand,
+                    model: item.model,
+                    version: item.version,
+                    year: item.year,
+                  })}
+                  className="block"
+                >
+                  <CatalogVehicleCard
+                    item={item}
+                    weight={inferWeight(item)}
                   />
-                );
-              })}
+                </Link>
+              ))}
             </div>
           </div>
         </section>
