@@ -16,28 +16,11 @@ interface HeroCarouselProps {
   slides: HeroSlide[];
 }
 
-function isLikelyLogoImage(src: string) {
-  const normalized = String(src || "").toLowerCase();
-  return (
-    normalized.includes("logo") ||
-    normalized.endsWith("/logo.png") ||
-    normalized.endsWith("/logo.svg")
-  );
-}
-
 function normalizeSlides(slides: HeroSlide[]): HeroSlide[] {
-  return slides.map((slide, index) => {
-    const fallbackImage =
-      index % 2 === 0 ? "/images/banner1.jpg" : "/images/banner2.jpg";
-
-    return {
-      ...slide,
-      image:
-        !slide.image || isLikelyLogoImage(slide.image)
-          ? fallbackImage
-          : slide.image,
-    };
-  });
+  return slides.map((slide, index) => ({
+    ...slide,
+    image: index % 2 === 0 ? "/images/banner1.jpg" : "/images/banner2.jpg",
+  }));
 }
 
 export function HeroCarousel({ slides }: HeroCarouselProps) {
@@ -72,7 +55,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
   return (
     <div className="relative overflow-hidden rounded-[20px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
-      <div className="relative aspect-[16/6.2] min-h-[240px] w-full md:min-h-[400px]">
+      <div className="relative h-[260px] w-full md:h-[420px]">
         {safeSlides.map((slide, index) => {
           const isActive = index === activeIndex;
 
