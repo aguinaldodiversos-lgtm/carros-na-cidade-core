@@ -27,11 +27,6 @@
     "@/components/buy/CatalogVehicleCard",
     "@/components/ads/AdCard"
   ],
-  "backendRouteFilesGlobsHint": [
-    ".routes.",
-    "app.js",
-    "index.js"
-  ],
   "envFiles": [
     ".env",
     ".env.example",
@@ -46,5 +41,37 @@
   "backendApiBaseEnvNames": [
     "API_URL",
     "PORT"
+  ],
+  "contractHints": [
+    {
+      "frontendPath": "/content/public/blog-page",
+      "methods": ["GET"],
+      "backendPattern": "/content/public/blog-page"
+    },
+    {
+      "frontendPath": "/ads/:param",
+      "methods": ["GET"],
+      "backendPattern": "/ads/:param"
+    },
+    {
+      "frontendPath": "/public/ads/:param",
+      "methods": ["GET"],
+      "backendPattern": "/public/ads/:param"
+    },
+    {
+      "frontendPath": "/public/listings/:param",
+      "methods": ["GET"],
+      "backendPattern": "/public/listings/:param"
+    },
+    {
+      "frontendPath": "/catalog/ads/:param",
+      "methods": ["GET"],
+      "backendPattern": "/catalog/ads/:param"
+    },
+    {
+      "frontendPath": "/api/ads/:param",
+      "methods": ["GET"],
+      "backendPattern": "/api/ads/:param"
+    }
   ]
 }
