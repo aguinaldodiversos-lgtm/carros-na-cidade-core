@@ -13,7 +13,6 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:prod": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs",
-
     "audit:project": "node ./scripts/project-audit.mjs",
     "audit:project:strict": "node ./scripts/project-audit.mjs --strict",
     "audit:project:json": "node ./scripts/project-audit.mjs --json",
