@@ -60,7 +60,7 @@ function badgeClasses(label: string) {
 }
 
 function sellerTypeLabel(type: AdDetails["seller"]["type"]) {
-  if (type === "premium") return "Anunciante Platinum";
+  if (type === "premium") return "Lojista Premium";
   if (type === "basic") return "Lojista";
   return "Particular";
 }
@@ -125,6 +125,79 @@ function resolveShowcase(ad: AdDetails): {
   };
 }
 
+function IconHeart({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 20s-7-4.6-7-10.3A4.7 4.7 0 019.7 5c1.4 0 2.8.6 3.8 1.8A5 5 0 0117.3 5 4.7 4.7 0 0122 9.7C22 15.4 15 20 12 20z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function IconShare({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8.6 10.7l6.8-4.1M8.6 13.3l6.8 4.1" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function IconWhatsapp({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M16 4C9.4 4 4 9.1 4 15.4c0 2.2.7 4.3 1.9 6L4 28l6.9-1.8c1.7.9 3.3 1.2 5.1 1.2 6.6 0 12-5.1 12-11.4S22.6 4 16 4z"
+        fill="currentColor"
+        opacity="0.12"
+      />
+      <path
+        d="M16 5.5c-5.8 0-10.5 4.4-10.5 9.9 0 2 .6 3.8 1.7 5.3L6 26l5.5-1.4c1.4.7 2.9 1 4.5 1 5.8 0 10.5-4.4 10.5-9.9S21.8 5.5 16 5.5z"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M12.6 11.5c-.3-.7-.6-.7-.8-.7h-.7c-.2 0-.6.1-.9.5-.3.4-1.1 1.1-1.1 2.6 0 1.5 1.1 2.9 1.3 3.1.2.2 2.3 3.5 5.6 4.8 2.7 1.1 3.3.9 3.9.9.6-.1 1.8-.7 2-1.5.3-.8.3-1.4.2-1.5-.1-.1-.4-.2-.9-.5s-1.8-.9-2.1-1-.5-.2-.8.2c-.2.4-.9 1-1.1 1.2-.2.2-.5.2-.9 0-.5-.2-2-.7-3.7-2.2-1.4-1.2-2.3-2.7-2.5-3.2-.3-.5 0-.7.2-1 .2-.2.4-.5.6-.8.2-.3.2-.6.4-.9.1-.3.1-.6 0-.8-.1-.2-.7-1.8-.9-2.4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function IconPhone({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M5 4h4l2 5-2.5 1.5a16.1 16.1 0 005 5L15 13l5 2v4a2 2 0 01-2.2 2A17.8 17.8 0 013 6.2 2 2 0 015 4z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconChevronLeft({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconChevronRight({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function SectionCard({
   title,
   subtitle,
@@ -163,7 +236,9 @@ function VehicleCard({ item }: { item: RelatedAd }) {
 
       <div className="space-y-2 p-4">
         {item.badge ? (
-          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(item.badge)}`}>
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(item.badge)}`}
+          >
             {item.badge}
           </span>
         ) : null}
@@ -245,9 +320,9 @@ export default function AdDetailsPage({ ad }: Props) {
 
     try {
       await navigator.clipboard.writeText(url);
-      alert("Link copiado com sucesso.");
+      window.alert("Link copiado com sucesso.");
     } catch {
-      alert("Não foi possível copiar o link.");
+      window.alert("Não foi possível copiar o link.");
     }
   }
 
@@ -338,7 +413,11 @@ export default function AdDetailsPage({ ad }: Props) {
               <div className="text-[42px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                 {formatCurrency(ad.price)}
               </div>
-              <div className={`mt-1 text-sm font-semibold ${belowFipe ? "text-green-600" : "text-orange-600"}`}>
+              <div
+                className={`mt-1 text-sm font-semibold ${
+                  belowFipe ? "text-green-600" : "text-orange-600"
+                }`}
+              >
                 {belowFipe ? "Abaixo da FIPE" : "Acima da FIPE"} • {percentageLabel(diffPercent)}
               </div>
             </div>
@@ -349,6 +428,7 @@ export default function AdDetailsPage({ ad }: Props) {
                 onClick={() => setFavorite((value) => !value)}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E5E9F2] bg-white px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:border-[#D0D8E7] hover:bg-[#F8FAFF]"
               >
+                <IconHeart className="h-4 w-4" />
                 {favorite ? "Salvo" : "Favoritar"}
               </button>
 
@@ -357,17 +437,18 @@ export default function AdDetailsPage({ ad }: Props) {
                 onClick={handleShare}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E5E9F2] bg-white px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:border-[#D0D8E7] hover:bg-[#F8FAFF]"
               >
+                <IconShare className="h-4 w-4" />
                 Compartilhar
               </button>
             </div>
           </div>
         </div>
 
-        <div className="mt-7 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-7 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-6">
             <section className="overflow-hidden rounded-[28px] border border-[#E5E9F2] bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-4">
               <div className="relative overflow-hidden rounded-[22px] bg-[#EDF2FB]">
-                <div className="aspect-[16/10] sm:aspect-[16/9] xl:aspect-[16/8.4]">
+                <div className="aspect-[16/10] sm:aspect-[16/9] xl:aspect-[16/7.8]">
                   <img
                     src={ad.images[selectedImage]}
                     alt={`${ad.title} - foto ${selectedImage + 1}`}
@@ -383,7 +464,7 @@ export default function AdDetailsPage({ ad }: Props) {
                       className="absolute left-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#1D2440] shadow-lg backdrop-blur transition hover:bg-white"
                       aria-label="Foto anterior"
                     >
-                      ‹
+                      <IconChevronLeft />
                     </button>
 
                     <button
@@ -392,7 +473,7 @@ export default function AdDetailsPage({ ad }: Props) {
                       className="absolute right-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#1D2440] shadow-lg backdrop-blur transition hover:bg-white"
                       aria-label="Próxima foto"
                     >
-                      ›
+                      <IconChevronRight />
                     </button>
 
                     <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/85 px-3 py-2 shadow-lg backdrop-blur">
@@ -470,7 +551,11 @@ export default function AdDetailsPage({ ad }: Props) {
                   <div className="mt-2 text-[34px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                     {formatCurrency(ad.fipeValue)}
                   </div>
-                  <div className={`mt-2 text-sm font-semibold ${belowFipe ? "text-green-600" : "text-orange-600"}`}>
+                  <div
+                    className={`mt-2 text-sm font-semibold ${
+                      belowFipe ? "text-green-600" : "text-orange-600"
+                    }`}
+                  >
                     {belowFipe
                       ? `${percentageLabel(diffPercent)} abaixo da FIPE`
                       : `${percentageLabel(diffPercent)} acima da FIPE`}
@@ -498,9 +583,10 @@ export default function AdDetailsPage({ ad }: Props) {
                       href={whatsappLink}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center justify-center rounded-2xl bg-[#16A34A] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(22,163,74,0.24)] transition hover:bg-[#15803D]"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16A34A] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(22,163,74,0.24)] transition hover:bg-[#15803D]"
                     >
-                      Chamar no WhatsApp
+                      <IconWhatsapp className="h-5 w-5" />
+                      WhatsApp
                     </a>
                   </div>
                 </div>
@@ -535,17 +621,17 @@ export default function AdDetailsPage({ ad }: Props) {
           </div>
 
           <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
-            <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+            <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
               <div className="flex items-start gap-4">
-                <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[22px] font-extrabold text-[#2F67F6]">
+                <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[20px] font-extrabold text-[#2F67F6]">
                   {ad.seller.name.charAt(0)}
                 </div>
 
                 <div className="min-w-0">
-                  <div className="text-[28px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
+                  <div className="text-[24px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                     {ad.seller.name}
                   </div>
-                  <div className="mt-1 text-base font-medium text-[#6E748A]">
+                  <div className="mt-1 text-sm font-medium text-[#6E748A]">
                     {ad.seller.city} - {ad.seller.state}
                   </div>
 
@@ -555,63 +641,66 @@ export default function AdDetailsPage({ ad }: Props) {
                     </div>
 
                     <span className="text-sm text-[#6E748A]">{ad.seller.reviewCount} avaliações</span>
-                    <span className="text-sm text-[#6E748A]">•</span>
-                    <span className="text-sm text-[#6E748A]">{sellerTypeLabel(ad.seller.type)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <Link
-                  href={financingLink}
-                  className="inline-flex items-center justify-center rounded-2xl bg-[#2F67F6] px-4 py-3.5 text-center text-sm font-bold text-white shadow-[0_12px_26px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
-                >
-                  Simular financiamento
-                </Link>
-
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-2xl bg-[#16A34A] px-4 py-3.5 text-center text-sm font-bold text-white shadow-[0_10px_24px_rgba(22,163,74,0.24)] transition hover:bg-[#15803D]"
-                >
-                  WhatsApp
-                </a>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <a
-                  href={`tel:${digitsOnly(ad.seller.phone)}`}
-                  className="inline-flex items-center justify-center rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:bg-white"
-                >
-                  {ad.seller.phone}
-                </a>
-
-                <a
-                  href="#formulario-contato"
-                  className="inline-flex items-center justify-center rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:bg-white"
-                >
-                  Enviar mensagem
-                </a>
-              </div>
-
-              <div className="mt-6 rounded-[22px] border border-[#E5E9F2] bg-[#FBFCFF] p-4">
-                <div className="text-sm font-semibold uppercase tracking-[0.12em] text-[#2F67F6]">
-                  Informações do anunciante
+              <div className="mt-5 grid gap-3">
+                <div className="rounded-[22px] border border-[#E5E9F2] bg-[#FBFCFF] p-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#2F67F6]">
+                    Informações do anunciante
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm text-[#5C647C]">
+                    <p>{sellerTypeLabel(ad.seller.type)}</p>
+                    <p>{ad.seller.address}</p>
+                    <p>{ad.seller.stockCount} veículos anunciados no portal</p>
+                    <p>Peso comercial do anúncio: {ad.weight}</p>
+                  </div>
                 </div>
-                <div className="mt-3 space-y-2 text-sm text-[#5C647C]">
-                  <p>{ad.seller.address}</p>
-                  <p>{ad.seller.stockCount} veículos anunciados no portal</p>
-                  <p>Peso comercial do anúncio: {ad.weight}</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Link
+                    href={financingLink}
+                    className="inline-flex items-center justify-center rounded-2xl bg-[#2F67F6] px-4 py-3.5 text-center text-sm font-bold text-white shadow-[0_12px_26px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
+                  >
+                    Simular
+                  </Link>
+
+                  <a
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16A34A] px-4 py-3.5 text-center text-sm font-bold text-white shadow-[0_10px_24px_rgba(22,163,74,0.24)] transition hover:bg-[#15803D]"
+                  >
+                    <IconWhatsapp className="h-5 w-5" />
+                    WhatsApp
+                  </a>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <a
+                    href={`tel:${digitsOnly(ad.seller.phone)}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:bg-white"
+                  >
+                    <IconPhone className="h-4 w-4" />
+                    {ad.seller.phone}
+                  </a>
+
+                  <a
+                    href="#formulario-contato"
+                    className="inline-flex items-center justify-center rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:bg-white"
+                  >
+                    Enviar mensagem
+                  </a>
                 </div>
               </div>
             </section>
 
             <section
               id="formulario-contato"
-              className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]"
+              className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]"
             >
-              <h3 className="text-[24px] font-bold tracking-[-0.03em] text-[#1D2440]">
+              <h3 className="text-[22px] font-bold tracking-[-0.03em] text-[#1D2440]">
                 Enviar mensagem
               </h3>
               <p className="mt-2 text-sm leading-6 text-[#6E748A]">
