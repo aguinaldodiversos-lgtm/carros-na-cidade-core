@@ -12,7 +12,7 @@ const CODE_EXTENSIONS = new Set([
   ".jsx",
   ".mjs",
   ".cjs",
-  ".json"
+  ".json",
 ]);
 
 const SOURCE_EXTENSIONS = new Set([
@@ -21,18 +21,7 @@ const SOURCE_EXTENSIONS = new Set([
   ".js",
   ".jsx",
   ".mjs",
-  ".cjs"
-]);
-
-const ASSET_EXTENSIONS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".svg",
-  ".gif",
-  ".ico",
-  ".avif"
+  ".cjs",
 ]);
 
 const SKIP_DIRS = new Set([
@@ -42,30 +31,14 @@ const SKIP_DIRS = new Set([
   "dist",
   "coverage",
   "build",
-  ".turbo"
+  ".turbo",
 ]);
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_PATH)) {
-    return {
-      frontendDir: "frontend",
-      backendDir: "src",
-      frontendScanDirs: [
-        "frontend/app",
-        "frontend/components",
-        "frontend/lib",
-        "frontend/hooks",
-        "frontend/services"
-      ],
-      backendScanDirs: ["src", "scripts"],
-      frontendPublicDir: "frontend/public",
-      allowMissingFrontendRoutes: [],
-      knownFrontendSelfLinkingComponents: [],
-      backendRouteFilesGlobsHint: [".routes.", "app.js", "index.js"],
-      envFiles: [".env", ".env.example", "frontend/.env", "frontend/.env.example"],
-      frontendApiBaseEnvNames: ["NEXT_PUBLIC_API_URL", "API_URL"],
-      backendApiBaseEnvNames: ["API_URL", "PORT"]
-    };
+    throw new Error(
+      "project-audit.config.json não encontrado na raiz do projeto."
+    );
   }
 
   return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
@@ -77,7 +50,7 @@ function parseArgs(argv) {
   const args = {
     json: false,
     strict: false,
-    scope: "all"
+    scope: "all",
   };
 
   for (const arg of argv) {
@@ -96,11 +69,11 @@ function toPosix(value) {
 }
 
 function rel(filePath) {
-  return toPosix(path.relative(ROOT, filePath));
+  return filePath ? toPosix(path.relative(ROOT, filePath)) : "";
 }
 
-function exists(p) {
-  return fs.existsSync(p);
+function exists(target) {
+  return fs.existsSync(target);
 }
 
 function readFileSafe(filePath) {
@@ -113,24 +86,24 @@ function readFileSafe(filePath) {
 
 function walk(dirPath) {
   if (!exists(dirPath)) return [];
-  const out = [];
+  const files = [];
 
   for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
     const full = path.join(dirPath, entry.name);
 
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
-      out.push(...walk(full));
+      files.push(...walk(full));
       continue;
     }
 
     const ext = path.extname(entry.name);
     if (CODE_EXTENSIONS.has(ext)) {
-      out.push(full);
+      files.push(full);
     }
   }
 
-  return out;
+  return files;
 }
 
 function walkSourceOnly(dirPath) {
@@ -147,21 +120,14 @@ const backendFiles = config.backendScanDirs
 
 const allFiles = [...new Set([...frontendFiles, ...backendFiles])];
 
-function addFinding(findings, {
-  severity,
-  code,
-  file,
-  message,
-  suggestion,
-  details
-}) {
+function addFinding(findings, { severity, code, file, message, suggestion, details }) {
   findings.push({
     severity,
     code,
-    file: file ? rel(file) : "",
+    file: rel(file),
     message,
     suggestion: suggestion || "",
-    details: details || ""
+    details: details || "",
   });
 }
 
@@ -190,6 +156,7 @@ function extractImports(content) {
     } else if (clause.includes("{")) {
       const [left, right] = clause.split("{");
       defaultImport = left.replace(",", "").trim();
+
       const block = right.replace("}", "");
       for (const part of block.split(",")) {
         const trimmed = part.trim();
@@ -211,11 +178,15 @@ function extractImports(content) {
   return imports;
 }
 
-function resolveImport(fromFile, specifier) {
+function resolveImport(fromFile, specifier, targetRootMode = "frontend") {
   let base = null;
 
   if (specifier.startsWith("@/")) {
-    base = path.join(ROOT, config.frontendDir, specifier.slice(2));
+    if (targetRootMode === "frontend") {
+      base = path.join(ROOT, config.frontendDir, specifier.slice(2));
+    } else {
+      base = path.join(ROOT, specifier.slice(2));
+    }
   } else if (specifier.startsWith(".")) {
     base = path.resolve(path.dirname(fromFile), specifier);
   } else {
@@ -225,11 +196,13 @@ function resolveImport(fromFile, specifier) {
   const candidates = [
     base,
     ...Array.from(SOURCE_EXTENSIONS).map((ext) => `${base}${ext}`),
-    ...Array.from(SOURCE_EXTENSIONS).map((ext) => path.join(base, `index${ext}`))
+    ...Array.from(SOURCE_EXTENSIONS).map((ext) => path.join(base, `index${ext}`)),
   ];
 
   for (const candidate of candidates) {
-    if (exists(candidate) && fs.statSync(candidate).isFile()) return path.normalize(candidate);
+    if (exists(candidate) && fs.statSync(candidate).isFile()) {
+      return path.normalize(candidate);
+    }
   }
 
   return null;
@@ -254,11 +227,26 @@ function extractExportedComponentNames(content, filePath) {
   }
 
   if (!names.size) {
-    const base = path.basename(filePath, path.extname(filePath));
-    if (/^[A-Z]/.test(base)) names.add(base);
+    const baseName = path.basename(filePath, path.extname(filePath));
+    if (/^[A-Z]/.test(baseName)) names.add(baseName);
   }
 
   return Array.from(names);
+}
+
+function normalizeEndpointPath(value) {
+  if (!value) return "";
+
+  let output = value.trim();
+
+  output = output.replace(/https?:\/\/[^/]+/g, "");
+  output = output.replace(/\$\{[^}]+\}/g, ":param");
+  output = output.replace(/\/:([A-Za-z0-9_]+)/g, "/:param");
+  output = output.replace(/\?.*$/, "");
+  output = output.replace(/\/+/g, "/");
+  output = output.replace(/\/$/, "");
+
+  return output || "/";
 }
 
 function collectFrontendRoutes() {
@@ -322,104 +310,167 @@ function routeExists(targetPath, routePatterns, allowMissingRoutes) {
   });
 }
 
-function collectBackendRoutePatterns() {
-  const patterns = new Set();
+function collectBackendRouteRegistry() {
+  const registry = new Map();
 
-  const routeLikeFiles = backendFiles.filter((file) =>
-    config.backendRouteFilesGlobsHint.some((hint) => rel(file).includes(hint))
-  );
+  for (const file of backendFiles) {
+    registry.set(path.normalize(file), {
+      file,
+      content: readFileSafe(file),
+      imports: [],
+      routerVars: new Set(),
+      exportedRouterLike: false,
+      mountPrefixes: new Set([""]),
+      directRoutes: [],
+    });
+  }
 
-  for (const file of routeLikeFiles) {
-    const content = readFileSafe(file);
+  for (const [, entry] of registry) {
+    entry.imports = extractImports(entry.content);
 
-    for (const match of content.matchAll(/router\.(get|post|put|patch|delete|use)\(\s*["'`]([^"'`]+)["'`]/g)) {
-      patterns.add(match[2]);
+    for (const match of entry.content.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:express\.)?Router\s*\(/g)) {
+      entry.routerVars.add(match[1]);
     }
 
-    for (const match of content.matchAll(/app\.(get|post|put|patch|delete|use)\(\s*["'`]([^"'`]+)["'`]/g)) {
-      patterns.add(match[2]);
+    for (const match of entry.content.matchAll(/\b([A-Za-z_$][\w$]*)\.(get|post|put|patch|delete|use)\(\s*["'`]([^"'`]+)["'`]/g)) {
+      const owner = match[1];
+      const method = match[2].toUpperCase();
+      const routePath = match[3];
+
+      if (owner === "app" || entry.routerVars.has(owner)) {
+        entry.directRoutes.push({
+          owner,
+          method,
+          path: routePath,
+        });
+      }
+    }
+
+    if (
+      /export\s+default\s+[A-Za-z_$][\w$]*/.test(entry.content) ||
+      /module\.exports\s*=/.test(entry.content) ||
+      /export\s*\{\s*[A-Za-z_$][\w$]*\s*\}/.test(entry.content)
+    ) {
+      entry.exportedRouterLike = true;
     }
   }
 
-  return Array.from(patterns);
-}
+  const prefixesByFile = new Map();
 
-function normalizeBackendPattern(pattern) {
-  return pattern
-    .replace(/\/:([A-Za-z0-9_]+)/g, "/:param")
-    .replace(/\*+/g, "*");
-}
+  for (const [file, entry] of registry) {
+    prefixesByFile.set(file, new Set([""]));
 
-function backendRouteLikelyMatches(candidatePath, backendPatterns) {
-  const clean = candidatePath.split("?")[0].replace(/\/$/, "") || "/";
-  const candidateParts = clean.split("/").filter(Boolean);
+    const localImportMap = new Map();
 
-  return backendPatterns.some((rawPattern) => {
-    const pattern = normalizeBackendPattern(rawPattern.replace(/\/$/, "") || "/");
-    const patternParts = pattern.split("/").filter(Boolean);
+    for (const imp of entry.imports) {
+      const resolved = resolveImport(file, imp.source, "backend");
+      if (!resolved) continue;
 
-    let i = 0;
-    let j = 0;
-
-    while (i < patternParts.length && j < candidateParts.length) {
-      const pp = patternParts[i];
-      const cp = candidateParts[j];
-
-      if (pp === "*" || pp === ":param") {
-        i += 1;
-        j += 1;
-        continue;
+      if (imp.defaultImport) {
+        localImportMap.set(imp.defaultImport, resolved);
       }
 
-      if (pp !== cp) return false;
-
-      i += 1;
-      j += 1;
+      for (const named of imp.namedImports) {
+        localImportMap.set(named.local, resolved);
+      }
     }
 
-    return i === patternParts.length && j === candidateParts.length;
-  });
+    for (const match of entry.content.matchAll(/\bapp\.use\(\s*["'`]([^"'`]+)["'`]\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g)) {
+      const prefix = match[1];
+      const localName = match[2];
+      const resolved = localImportMap.get(localName);
+
+      if (resolved && registry.has(path.normalize(resolved))) {
+        if (!prefixesByFile.has(path.normalize(resolved))) {
+          prefixesByFile.set(path.normalize(resolved), new Set());
+        }
+        prefixesByFile.get(path.normalize(resolved)).add(prefix);
+      }
+    }
+  }
+
+  const endpoints = [];
+
+  for (const [file, entry] of registry) {
+    const prefixes = prefixesByFile.get(file) || new Set([""]);
+
+    for (const route of entry.directRoutes) {
+      const basePrefixes = route.owner === "app" ? new Set([""]) : prefixes;
+
+      for (const prefix of basePrefixes) {
+        const merged = normalizeEndpointPath(`${prefix}/${route.path}`);
+        endpoints.push({
+          file: entry.file,
+          method: route.method,
+          path: merged,
+        });
+      }
+    }
+  }
+
+  return endpoints;
 }
 
-function extractFrontendApiCalls(file, content) {
+function pathMatchesPattern(candidate, pattern) {
+  const a = normalizeEndpointPath(candidate).split("/").filter(Boolean);
+  const b = normalizeEndpointPath(pattern).split("/").filter(Boolean);
+
+  if (!a.length && !b.length) return true;
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i];
+    const right = b[i];
+
+    if (left === ":param" || right === ":param" || left === "*" || right === "*") {
+      continue;
+    }
+
+    if (left !== right) return false;
+  }
+
+  return true;
+}
+
+function extractFetchCalls(content) {
   const calls = [];
 
-  const fetchRegex = /fetch\(\s*([`"'"][\s\S]*?[`"'])/g;
-  const axiosRegex = /\b(?:axios|api)\.(get|post|put|patch|delete)\(\s*([`"'"][\s\S]*?[`"'])/g;
+  for (const match of content.matchAll(/fetch\(\s*([`"'"][\s\S]*?[`"'])\s*(?:,\s*(\{[\s\S]*?\}))?\s*\)/g)) {
+    const rawUrl = match[1];
+    const rawOptions = match[2] || "";
+    const url = rawUrl.slice(1, -1);
 
-  for (const match of content.matchAll(fetchRegex)) {
+    let method = "GET";
+    const methodMatch = rawOptions.match(/method\s*:\s*["'`]([A-Za-z]+)["'`]/);
+    if (methodMatch) method = methodMatch[1].toUpperCase();
+
     calls.push({
       kind: "fetch",
-      raw: match[1]
+      method,
+      raw: url,
+      normalizedPath: normalizeEndpointPath(url),
     });
   }
 
-  for (const match of content.matchAll(axiosRegex)) {
-    calls.push({
-      kind: "axios",
-      raw: match[2]
-    });
-  }
-
-  return calls.map((call) => {
-    const raw = call.raw.slice(1, -1);
-    return {
-      ...call,
-      value: raw,
-      file
-    };
-  });
+  return calls;
 }
 
-function looksLikeBackendPath(value) {
-  if (!value) return false;
-  if (value.startsWith("http://") || value.startsWith("https://")) return true;
-  if (value.startsWith("/api/")) return true;
-  if (value.startsWith("/content/")) return true;
-  if (value.startsWith("/ads/")) return true;
-  if (value.startsWith("/public/")) return true;
-  if (value.startsWith("/catalog/")) return true;
-  return false;
+function extractAxiosCalls(content) {
+  const calls = [];
+
+  for (const match of content.matchAll(/\b(?:axios|api)\.(get|post|put|patch|delete)\(\s*([`"'"][\s\S]*?[`"'])/g)) {
+    const method = match[1].toUpperCase();
+    const url = match[2].slice(1, -1);
+
+    calls.push({
+      kind: "axios",
+      method,
+      raw: url,
+      normalizedPath: normalizeEndpointPath(url),
+    });
+  }
+
+  return calls;
 }
 
 function collectEnvKeys() {
@@ -462,7 +513,7 @@ function auditJsxInTs(findings) {
         code: "jsx-in-ts",
         file,
         message: "Arquivo .ts aparenta conter JSX.",
-        suggestion: "Mover o arquivo para .tsx ou remover JSX do módulo utilitário."
+        suggestion: "Mover o arquivo para .tsx ou remover JSX do módulo utilitário.",
       });
     }
   }
@@ -486,7 +537,7 @@ function auditFrontendAssets(findings) {
           code: "missing-frontend-asset",
           file,
           message: `Asset do frontend não encontrado: ${assetPath}`,
-          suggestion: "Adicionar o arquivo em frontend/public ou trocar por um asset existente."
+          suggestion: "Adicionar o arquivo em frontend/public ou trocar por um asset existente.",
         });
       }
     }
@@ -500,7 +551,7 @@ function auditFrontendRoutes(findings) {
     const content = readFileSafe(file);
     const refs = [
       ...Array.from(content.matchAll(/href\s*=\s*["'`]([^"'`]+)["'`]/g)),
-      ...Array.from(content.matchAll(/redirect\(\s*["'`]([^"'`]+)["'`]\s*\)/g))
+      ...Array.from(content.matchAll(/redirect\(\s*["'`]([^"'`]+)["'`]\s*\)/g)),
     ];
 
     for (const ref of refs) {
@@ -510,6 +561,7 @@ function auditFrontendRoutes(findings) {
       if (rawTarget.startsWith("/api/")) continue;
 
       const targetPath = rawTarget.split("?")[0].split("#")[0];
+
       const ok = routeExists(
         targetPath,
         routePatterns,
@@ -522,7 +574,7 @@ function auditFrontendRoutes(findings) {
           code: "missing-frontend-route",
           file,
           message: `Link interno aponta para rota não encontrada no App Router: ${targetPath}`,
-          suggestion: "Confirmar se a rota existe em frontend/app ou atualizar o href."
+          suggestion: "Confirmar se a rota existe em frontend/app ou atualizar o href.",
         });
       }
     }
@@ -538,7 +590,7 @@ function auditNestedLinks(findings) {
 
     registry.set(path.normalize(file), {
       names: extractExportedComponentNames(content, file),
-      content
+      content,
     });
   }
 
@@ -553,7 +605,7 @@ function auditNestedLinks(findings) {
         code: "direct-nested-link",
         file,
         message: "Há Link renderizado dentro de outro Link no mesmo arquivo.",
-        suggestion: "Remover o Link externo ou tornar o componente interno não clicável."
+        suggestion: "Remover o Link externo ou tornar o componente interno não clicável.",
       });
     }
 
@@ -561,12 +613,16 @@ function auditNestedLinks(findings) {
     const localSelfLinkingNames = new Set();
 
     for (const imp of imports) {
-      const resolved = resolveImport(file, imp.source);
+      const resolved = resolveImport(file, imp.source, "frontend");
       const configuredSelfLink = configured.has(imp.source);
 
       if (resolved && registry.has(path.normalize(resolved))) {
         const exported = registry.get(path.normalize(resolved)).names;
-        if (imp.defaultImport) localSelfLinkingNames.add(imp.defaultImport);
+
+        if (imp.defaultImport) {
+          localSelfLinkingNames.add(imp.defaultImport);
+        }
+
         for (const named of imp.namedImports) {
           if (exported.includes(named.imported)) {
             localSelfLinkingNames.add(named.local);
@@ -594,7 +650,7 @@ function auditNestedLinks(findings) {
           code: "wrapped-self-linking-component",
           file,
           message: `Componente com navegação própria (${localName}) foi embrulhado por Link.`,
-          suggestion: "Padronizar o componente para controlar sua própria navegação ou expor modo sem Link interno."
+          suggestion: "Padronizar o componente para controlar sua própria navegação ou expor modo sem Link interno.",
         });
       }
     }
@@ -603,10 +659,10 @@ function auditNestedLinks(findings) {
 
 function auditEnvUsage(findings) {
   const envFiles = collectEnvKeys();
-  const allDeclaredKeys = new Set();
+  const declaredKeys = new Set();
 
   for (const keys of envFiles.values()) {
-    for (const key of keys) allDeclaredKeys.add(key);
+    for (const key of keys) declaredKeys.add(key);
   }
 
   for (const file of allFiles) {
@@ -614,133 +670,135 @@ function auditEnvUsage(findings) {
     const matches = Array.from(content.matchAll(/process\.env\.([A-Z0-9_]+)/g));
 
     for (const match of matches) {
-      const key = match[1];
-      if (!allDeclaredKeys.has(key)) {
+      const envKey = match[1];
+      if (!declaredKeys.has(envKey)) {
         addFinding(findings, {
           severity: "warn",
           code: "env-key-not-declared",
           file,
-          message: `Variável de ambiente usada no código sem declaração encontrada nos envs auditados: ${key}`,
-          suggestion: "Declarar a variável em .env.example e nos ambientes necessários."
+          message: `Variável de ambiente usada no código sem declaração auditada: ${envKey}`,
+          suggestion: "Declarar a variável em .env.example e nos ambientes necessários.",
         });
       }
     }
   }
 }
 
-function auditFrontendBackendConnection(findings) {
-  const backendPatterns = collectBackendRoutePatterns();
+function auditFrontendBackendIntegration(findings) {
+  const backendRegistry = collectBackendRouteRegistry();
+  const contractHints = (config.contractHints || []).map((item) => ({
+    frontendPath: normalizeEndpointPath(item.frontendPath),
+    backendPattern: normalizeEndpointPath(item.backendPattern),
+    methods: Array.isArray(item.methods) ? item.methods.map((m) => String(m).toUpperCase()) : ["GET"],
+  }));
 
   for (const file of frontendFiles) {
     const content = readFileSafe(file);
-    const calls = extractFrontendApiCalls(file, content);
+    const apiCalls = [...extractFetchCalls(content), ...extractAxiosCalls(content)];
 
-    for (const call of calls) {
-      const value = call.value;
+    for (const call of apiCalls) {
+      const pathCandidate = call.normalizedPath;
+      if (!pathCandidate || pathCandidate === "/") continue;
 
-      const usesEnvBase = config.frontendApiBaseEnvNames.some(
-        (name) => content.includes(`process.env.${name}`)
+      const matchingHint = contractHints.find(
+        (hint) =>
+          pathMatchesPattern(pathCandidate, hint.frontendPath) &&
+          hint.methods.includes(call.method)
       );
 
-      if (looksLikeBackendPath(value)) {
-        let pathOnly = value;
+      const matchingBackend = backendRegistry.find(
+        (route) =>
+          route.method === call.method &&
+          pathMatchesPattern(pathCandidate, route.path)
+      );
 
-        if (value.startsWith("http://") || value.startsWith("https://")) {
-          try {
-            const url = new URL(value);
-            pathOnly = url.pathname;
-          } catch {
-            pathOnly = value;
-          }
-        }
+      const backendMethodMismatch = backendRegistry.find(
+        (route) =>
+          route.method !== call.method &&
+          pathMatchesPattern(pathCandidate, route.path)
+      );
 
-        if (pathOnly.includes("${")) {
-          addFinding(findings, {
-            severity: "warn",
-            code: "dynamic-api-path",
-            file,
-            message: `Chamada de API dinâmica detectada: ${value}`,
-            suggestion: "Validar manualmente se o endpoint montado dinamicamente possui rota correspondente no backend."
-          });
-          continue;
-        }
-
-        const matchesBackend = backendPatterns.length
-          ? backendRouteLikelyMatches(pathOnly, backendPatterns)
-          : false;
-
-        if (!matchesBackend) {
-          addFinding(findings, {
-            severity: "warn",
-            code: "frontend-backend-endpoint-uncertain",
-            file,
-            message: `O frontend chama um endpoint sem evidência clara de rota correspondente no backend auditado: ${pathOnly}`,
-            suggestion:
-              "Verificar se a rota existe em src/*.routes.* ou app/index. Se existir via prefixo/base route, considere registrar esse padrão no backend."
-          });
-        }
-      }
-
-      if (
-        content.includes("process.env.NEXT_PUBLIC_API_URL") &&
-        !usesEnvBase
-      ) {
+      if (!matchingHint && !matchingBackend) {
         addFinding(findings, {
           severity: "warn",
-          code: "api-base-env-inconsistent",
+          code: "frontend-backend-endpoint-uncertain",
           file,
-          message: "Há indício de uso inconsistente de base URL da API no frontend.",
+          message: `Chamada ${call.method} sem evidência clara de endpoint correspondente no backend: ${pathCandidate}`,
           suggestion:
-            "Padronizar chamadas para montar URLs sempre a partir de NEXT_PUBLIC_API_URL ou de um client centralizado."
+            "Verificar se a rota existe no backend ou adicionar uma dica em contractHints no project-audit.config.json.",
+          details: `Origem: ${call.kind}("${call.raw}")`,
+        });
+      }
+
+      if (!matchingBackend && matchingHint) {
+        addFinding(findings, {
+          severity: "warn",
+          code: "contract-hint-without-backend-proof",
+          file,
+          message: `A integração depende de contractHint, mas o auditor não encontrou prova estática da rota no backend: ${pathCandidate}`,
+          suggestion:
+            "Validar montagem de prefixos/router.use no backend ou concentrar as rotas em arquivos mais previsíveis.",
+          details: `Hint: ${matchingHint.backendPattern} [${matchingHint.methods.join(", ")}]`,
+        });
+      }
+
+      if (!matchingBackend && backendMethodMismatch) {
+        addFinding(findings, {
+          severity: "warn",
+          code: "frontend-backend-method-mismatch",
+          file,
+          message: `O caminho existe no backend, mas com método diferente: ${pathCandidate}`,
+          suggestion: "Revisar o método HTTP usado no frontend ou a implementação da rota no backend.",
+          details: `Frontend: ${call.method} | Backend: ${backendMethodMismatch.method}`,
         });
       }
     }
   }
 }
 
-function auditFrontendBackendContracts(findings) {
-  const frontendContractSignals = [];
-  const backendContractSignals = [];
+function auditContractStability(findings) {
+  const frontendSignals = [];
+  const backendSignals = [];
 
   for (const file of frontendFiles) {
     const content = readFileSafe(file);
-
-    if (/fetchPublicHomeData|fetchBlogPageContent|getAdDetails|AdsSearchResponse|AdsFacetsResponse/.test(content)) {
-      frontendContractSignals.push({
-        file,
+    if (
+      /fetch\(|axios\.|api\.get|api\.post|NEXT_PUBLIC_API_URL|API_URL|AdsSearchResponse|BlogPageContent|getAdDetails|fetchBlogPageContent/.test(
         content
-      });
+      )
+    ) {
+      frontendSignals.push(file);
     }
   }
 
   for (const file of backendFiles) {
     const content = readFileSafe(file);
-
-    if (/res\.json|router\.get|router\.post|app\.get|app\.post|module\.exports|export\s+/.test(content)) {
-      backendContractSignals.push({
-        file,
+    if (
+      /router\.(get|post|put|patch|delete|use)|app\.(get|post|put|patch|delete|use)|res\.json/.test(
         content
-      });
+      )
+    ) {
+      backendSignals.push(file);
     }
   }
 
-  if (!backendContractSignals.length) {
-    addFinding(findings, {
-      severity: "warn",
-      code: "backend-contract-scan-weak",
-      file: null,
-      message: "Poucos sinais de contrato backend detectados. A auditoria de integração pode ficar incompleta.",
-      suggestion: "Concentrar rotas e respostas JSON em arquivos previsíveis e nomeados consistentemente."
-    });
-  }
-
-  if (!frontendContractSignals.length) {
+  if (frontendSignals.length === 0) {
     addFinding(findings, {
       severity: "warn",
       code: "frontend-contract-scan-weak",
       file: null,
-      message: "Poucos sinais de consumo de contrato frontend detectados.",
-      suggestion: "Centralizar consumo de API em clients/serviços para melhorar auditoria futura."
+      message: "Poucos sinais de consumo de API foram encontrados no frontend.",
+      suggestion: "Centralizar chamadas de API em clients/serviços melhora a auditoria futura.",
+    });
+  }
+
+  if (backendSignals.length === 0) {
+    addFinding(findings, {
+      severity: "warn",
+      code: "backend-contract-scan-weak",
+      file: null,
+      message: "Poucos sinais de rotas/respostas JSON foram encontrados no backend.",
+      suggestion: "Concentrar rotas e respostas em arquivos previsíveis melhora a auditoria futura.",
     });
   }
 }
@@ -748,25 +806,34 @@ function auditFrontendBackendContracts(findings) {
 function buildSuggestionsSummary(findings) {
   const summary = [];
 
-  const hasNestedLinks = findings.some((f) => f.code === "wrapped-self-linking-component" || f.code === "direct-nested-link");
-  const hasMissingAssets = findings.some((f) => f.code === "missing-frontend-asset");
-  const hasMissingRoutes = findings.some((f) => f.code === "missing-frontend-route");
-  const hasApiMismatch = findings.some((f) => f.code === "frontend-backend-endpoint-uncertain");
-
-  if (hasNestedLinks) {
-    summary.push("Padronize componentes de card clicáveis com uma prop de controle como linkMode='self' | 'none' para impedir Link dentro de Link.");
+  if (findings.some((f) => f.code === "wrapped-self-linking-component" || f.code === "direct-nested-link")) {
+    summary.push(
+      "Padronize componentes clicáveis com uma prop como linkMode='self' | 'none' para impedir Link dentro de Link."
+    );
   }
 
-  if (hasMissingAssets) {
-    summary.push("Crie uma política única de fallback de imagens e remova referências a arquivos não versionados no repositório.");
+  if (findings.some((f) => f.code === "missing-frontend-asset")) {
+    summary.push(
+      "Crie uma política única de fallback de imagem e remova referências a assets não versionados no repositório."
+    );
   }
 
-  if (hasMissingRoutes) {
-    summary.push("Centralize rotas do frontend em constantes reutilizáveis para reduzir 404 por href divergente.");
+  if (findings.some((f) => f.code === "missing-frontend-route")) {
+    summary.push(
+      "Centralize rotas do frontend em constantes reutilizáveis para reduzir href divergente e 404 silencioso."
+    );
   }
 
-  if (hasApiMismatch) {
-    summary.push("Centralize consumo da API em um client único no frontend e padronize prefixos no backend para facilitar auditoria de contratos.");
+  if (findings.some((f) => f.code === "frontend-backend-endpoint-uncertain")) {
+    summary.push(
+      "Centralize o consumo da API em um client único no frontend e padronize prefixos/router.use no backend para fortalecer a validação de contratos."
+    );
+  }
+
+  if (findings.some((f) => f.code === "env-key-not-declared")) {
+    summary.push(
+      "Mantenha .env.example atualizado com todas as variáveis usadas em frontend e backend."
+    );
   }
 
   if (!summary.length) {
@@ -800,8 +867,8 @@ function runAudit() {
   }
 
   if (args.scope === "all" || args.scope === "integration") {
-    auditFrontendBackendConnection(findings);
-    auditFrontendBackendContracts(findings);
+    auditFrontendBackendIntegration(findings);
+    auditContractStability(findings);
   }
 
   return findings;
@@ -847,15 +914,21 @@ function printPretty(findings) {
 const findings = runAudit();
 
 if (args.json) {
-  console.log(JSON.stringify({
-    meta: {
-      frontendFiles: frontendFiles.length,
-      backendFiles: backendFiles.length,
-      totalFindings: findings.length
-    },
-    findings,
-    summarySuggestions: buildSuggestionsSummary(findings)
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        meta: {
+          frontendFiles: frontendFiles.length,
+          backendFiles: backendFiles.length,
+          totalFindings: findings.length,
+        },
+        findings,
+        summarySuggestions: buildSuggestionsSummary(findings),
+      },
+      null,
+      2
+    )
+  );
 } else {
   printPretty(findings);
 }
