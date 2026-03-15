@@ -1,13 +1,6 @@
 import "dotenv/config";
-import pg from "pg";
+import { pool } from "../infrastructure/database/db.js";
 import { logger } from "../shared/logger.js";
-
-const { Pool } = pg;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 let strategyInterval = null;
 let strategyRunning = false;

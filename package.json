@@ -8,8 +8,8 @@
     "start": "node src/index.js",
     "dev": "node src/index.js",
     "workers": "node src/workers/bootstrap.js",
-    "lint": "echo \"No lint configured\"",
-    "test": "echo \"No tests configured\"",
+    "lint": "eslint src --ext .js",
+    "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
     "smoke:prod": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs",
@@ -48,5 +48,9 @@
     "resend": "^3.2.0",
     "uuid": "^9.0.1",
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "vitest": "^2.1.0"
   }
 }

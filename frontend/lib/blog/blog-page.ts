@@ -161,7 +161,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: "Como conseguir as melhores taxas para financiar seu carro",
         excerpt:
           "Veja dicas práticas para obter as melhores condições de financiamento, comparar CET e negociar entrada e prazo com mais segurança.",
-        coverImage: "/images/banner_home.png",
+        coverImage: "/images/hero.jpeg",
         publishedAt: "2026-04-10",
         readTime: "Ver 4 min",
         category: "Manutenção e Economia",
@@ -176,7 +176,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: `Diferenças entre revisões e manutenções em ${city.name}`,
         excerpt:
           "Entenda quando fazer revisão preventiva, o que realmente precisa ser trocado e como evitar gastos desnecessários no dia a dia.",
-        coverImage: "/images/banner_otimizado.png",
+        coverImage: "/images/hero.jpeg",
         publishedAt: "2026-04-16",
         readTime: "Ver 4 minutos",
         category: "Manutenção e Economia",
@@ -189,7 +189,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: "10 melhores roteiros de carro para o final de semana",
         excerpt:
           "Descubra destinos próximos, ideias de passeio e rotas urbanas para curtir mais o seu carro nos arredores da cidade.",
-        coverImage: "/images/banner_home.png",
+        coverImage: "/images/hero.jpeg",
         publishedAt: "2026-04-10",
         readTime: "Ver ofertas",
         category: "Notícias e Curiosidades",

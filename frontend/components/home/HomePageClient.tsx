@@ -65,7 +65,7 @@ const HERO_SLIDES: HeroSlide[] = [
   },
   {
     id: "banner-home",
-    image: "/images/banner_home.png",
+    image: "/images/hero.jpeg",
     title: "Encontre e venda seu carro na sua cidade",
     subtitle: "Anuncie grátis, fácil e rápido em um portal feito para o mercado local",
     ctaLabel: "Começar meu anúncio",
@@ -73,7 +73,7 @@ const HERO_SLIDES: HeroSlide[] = [
   },
   {
     id: "banner-otimizado",
-    image: "/images/banner_otimizado.png",
+    image: "/images/hero.jpeg",
     title: "Milhares de oportunidades na sua cidade",
     subtitle: "Compre, venda e negocie com quem está perto de você",
     ctaLabel: "Explorar ofertas",

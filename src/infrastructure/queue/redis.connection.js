@@ -176,7 +176,7 @@ export async function closeQueueRedisConnection() {
   } catch {
     try {
       client.disconnect();
-    } catch {}
+    } catch { /* disconnect já falhou, ignora */ }
   } finally {
     logger.info("[queue.redis] Conexão Redis encerrada");
   }

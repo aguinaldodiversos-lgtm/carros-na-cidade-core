@@ -101,4 +101,8 @@ async function generateBanner(event) {
       [publicUrl, event.id]
     );
 
-    console.
+    console.log(`Banner gerado para evento ${event.id}`);
+  } catch (err) {
+    console.error(`Erro ao gerar banner para evento ${event.id}:`, err);
+  }
+}

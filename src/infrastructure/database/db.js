@@ -1,24 +1,10 @@
+import "dotenv/config";
 import { Pool } from "pg";
 import { logger } from "../../shared/logger.js";
+import { getPoolConfig } from "./pool-config.js";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const NODE_ENV = process.env.NODE_ENV || "development";
-
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL is required");
-}
-
-const isProduction = NODE_ENV === "production";
-
-export const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-  max: Number(process.env.PG_POOL_MAX || 20),
-  idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
-  connectionTimeoutMillis: Number(process.env.PG_CONN_TIMEOUT_MS || 10000),
-  keepAlive: true,
-  application_name: process.env.SERVICE_NAME || "carros-na-cidade-core",
-});
+export const pool = new Pool(getPoolConfig());
+export { getPoolConfig };
 
 pool.on("error", (error) => {
   logger.error(

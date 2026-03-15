@@ -1,0 +1,186 @@
+4) Comandos no CMD
+
+Na raiz do projeto:
+
+npm run audit:project
+
+Somente integração frontend ↔ backend:
+
+npm run audit:integration
+
+Somente nested links:
+
+npm run audit:links
+
+Somente assets quebrados do frontend:
+
+npm run audit:assets
+
+Somente rotas do App Router:
+
+npm run audit:routes
+
+Somente env:
+
+npm run audit:env
+
+Somente JSX acidental em .ts:
+
+npm run audit:jsx-ts
+
+Gerar JSON:
+
+npm run audit:project:json > audit-report.json
+
+Modo rígido:
+
+npm run audit:project:strict
+5) O que essa nova versão detecta melhor
+
+Essa versão agora audita o projeto como um todo e fica mais útil para seu cenário porque ela detecta:
+
+Frontend
+
+Link dentro de Link
+
+componente com navegação própria embrulhado por Link
+
+asset inexistente em frontend/public
+
+rota interna do frontend inexistente
+
+JSX em .ts
+
+uso de env sem declaração nos arquivos .env
+
+Backend
+
+tenta levantar padrões de rotas Express a partir de:
+
+router.get/post/put/patch/delete/use
+
+app.get/post/put/patch/delete/use
+
+Integração frontend ↔ backend
+
+detecta chamadas fetch(...)
+
+detecta chamadas axios/api.get/post/...
+
+compara endpoints chamados no frontend com padrões de rota encontrados no backend
+
+acusa quando o frontend chama um endpoint sem evidência clara de rota correspondente
+
+acusa quando a auditoria de contrato está fraca
+
+Sugestões de alteração
+
+Ele não muda nada, mas já imprime sugestões como:
+
+padronizar client de API
+
+centralizar rotas
+
+criar modo linkMode
+
+remover assets não versionados
+
+declarar variáveis em .env.example
+
+6) Limitação honesta dessa auditoria
+
+Ele é muito útil para diagnóstico estático, mas há limites naturais:
+
+não entende 100% de rotas montadas dinamicamente
+
+não consegue provar contratos JSON complexos sem uma convenção mais rígida
+
+não valida respostas reais da API em tempo de execução
+
+não substitui smoke test e testes E2E
+
+Para o seu projeto, isso já resolve uma parte grande das regressões bobas e perigosas.
+
+Comandos principais
+
+Na raiz do projeto:
+
+npm run audit:project
+
+Modo rígido:
+
+npm run audit:project:strict
+
+Somente integração frontend ↔ backend:
+
+npm run audit:integration
+
+Gerar relatório JSON:
+
+npm run audit:project:json > audit-report.json
+Antes de usar
+
+Confirme que estes arquivos existem na raiz do projeto:
+
+scripts/project-audit.mjs
+
+project-audit.config.json
+
+Comandos no CMD
+
+Na raiz do projeto:
+
+npm run audit:project
+
+Somente integração frontend ↔ backend:
+
+npm run audit:integration
+
+Somente nested links:
+
+npm run audit:links
+
+Somente assets quebrados:
+
+npm run audit:assets
+
+Somente rotas:
+
+npm run audit:routes
+
+Somente env:
+
+npm run audit:env
+
+Somente JSX dentro de .ts:
+
+npm run audit:jsx-ts
+
+Gerar relatório JSON:
+
+npm run audit:project:json > audit-report.json
+
+Modo rígido:
+
+npm run audit:project:strict
+O que essa versão 2 passa a validar melhor
+
+assets quebrados no frontend
+
+rota interna do App Router inexistente
+
+Link dentro de Link
+
+componente que já navega sendo embrulhado por outro Link
+
+JSX dentro de arquivo .ts
+
+uso de env sem declaração auditada
+
+chamadas fetch e axios/api.get/post/... no frontend
+
+comparação por método + endpoint com rotas detectadas no backend
+
+suporte a contractHints para casos em que a montagem estática do Express não seja óbvia
+
+sugestões práticas de alteração, sem tocar em nenhum arquivo

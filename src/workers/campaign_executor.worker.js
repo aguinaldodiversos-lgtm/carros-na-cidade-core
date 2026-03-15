@@ -1,4 +1,5 @@
-const { sendWhatsAppMessage } = require("../services/whatsapp.service");
+import { pool } from "../infrastructure/database/db.js";
+import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
 async function executeDealerAcquisition(cityId) {
   console.log(`📞 Aquisição de lojistas para cidade ${cityId}`);

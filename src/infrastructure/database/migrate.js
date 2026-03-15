@@ -71,7 +71,7 @@ async function runMigrations() {
   } catch (error) {
     try {
       await client.query("ROLLBACK");
-    } catch {}
+    } catch { /* rollback já falhou, ignora */ }
 
     logger.error({ error }, "[db.migrate] Erro ao aplicar migrations");
     throw error;
