@@ -1,4 +1,3 @@
-// frontend/components/buy/CatalogVehicleCard.tsx
 import Link from "next/link";
 import type { AdItem } from "@/lib/search/ads-search";
 
@@ -15,6 +14,8 @@ export type CatalogItem = AdItem & {
   state?: string;
   price?: number | string;
   image_url?: string | null;
+  image?: string | null;
+  cover_image?: string | null;
   images?: string[] | null;
   slug?: string;
   below_fipe?: boolean;
@@ -32,6 +33,9 @@ interface CatalogVehicleCardProps {
   item: CatalogItem;
   featured?: boolean;
   weight: 1 | 2 | 3 | 4;
+  linkMode?: "self" | "none";
+  hrefOverride?: string;
+  className?: string;
 }
 
 function parseMoney(value: number | string | null | undefined) {
@@ -78,6 +82,8 @@ function getHref(item: CatalogItem) {
 
 function getImage(item: CatalogItem) {
   if (item.image_url) return item.image_url;
+  if (item.image) return item.image;
+  if (item.cover_image) return item.cover_image;
   if (Array.isArray(item.images) && item.images[0]) return item.images[0];
   return "/images/hero.jpeg";
 }
@@ -143,8 +149,11 @@ export default function CatalogVehicleCard({
   item,
   featured = false,
   weight,
+  linkMode = "self",
+  hrefOverride,
+  className = "",
 }: CatalogVehicleCardProps) {
-  const href = getHref(item);
+  const href = hrefOverride || getHref(item);
   const title = getTitle(item);
   const price = parseMoney(item.price);
   const location = getLocation(item);
@@ -152,79 +161,99 @@ export default function CatalogVehicleCard({
   const badge = getBadge(weight);
   const financeChip = getFinanceChip(weight, item);
 
+  const content = (
+    <>
+      <div
+        className={`relative overflow-hidden ${
+          featured ? "aspect-[1.33/0.83]" : "aspect-[1.18/0.84]"
+        }`}
+      >
+        <img
+          src={getImage(item)}
+          alt={title}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          loading="lazy"
+        />
+
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
+          <span
+            className={`inline-flex rounded-[10px] px-3 py-1 text-[12px] font-extrabold shadow-sm ${badge.className}`}
+          >
+            {badge.label}
+          </span>
+
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#8D96AB] shadow-sm">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[16px] w-[16px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
+            </svg>
+          </span>
+        </div>
+
+        {item.below_fipe ? (
+          <div className="absolute left-3 top-12 inline-flex rounded-[10px] bg-[#1C5E47] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
+            Abaixo da FIPE
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        className={`px-4 pb-4 pt-4 ${featured ? "md:px-5 md:pb-5 md:pt-4" : ""}`}
+      >
+        <h3
+          className={`line-clamp-2 font-extrabold leading-[1.12] text-[#1D2440] ${
+            featured ? "text-[20px]" : "text-[17px]"
+          }`}
+        >
+          {title}
+        </h3>
+
+        <p className="mt-2 line-clamp-1 text-[15px] text-[#6E748A]">{meta}</p>
+        <p className="mt-1 text-[15px] text-[#6E748A]">{location}</p>
+
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div
+            className={`font-extrabold leading-none text-[#1F66E5] ${
+              featured ? "text-[24px]" : "text-[20px]"
+            }`}
+          >
+            {formatCurrency(price)}
+          </div>
+
+          <div className="rounded-[10px] bg-[#F2F5FA] px-3 py-2 text-[11px] font-bold text-[#6B7489]">
+            {financeChip}
+          </div>
+        </div>
+
+        <div
+          className={`mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[#1F66E5] font-bold text-white transition hover:bg-[#1758CC] ${
+            featured ? "h-[50px] text-[18px]" : "h-[46px] text-[16px]"
+          }`}
+        >
+          Ver detalhes
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <article
       className={`group overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)] ${
         featured ? "rounded-[20px]" : ""
-      }`}
+      } ${className}`}
     >
-      <Link href={href} className="block">
-        <div className={`relative overflow-hidden ${featured ? "aspect-[1.33/0.83]" : "aspect-[1.18/0.84]"}`}>
-          <img
-            src={getImage(item)}
-            alt={title}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-            loading="lazy"
-          />
-
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
-            <span
-              className={`inline-flex rounded-[10px] px-3 py-1 text-[12px] font-extrabold shadow-sm ${badge.className}`}
-            >
-              {badge.label}
-            </span>
-
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#8D96AB] shadow-sm">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-[16px] w-[16px]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-              </svg>
-            </span>
-          </div>
-
-          {item.below_fipe ? (
-            <div className="absolute left-3 top-12 inline-flex rounded-[10px] bg-[#1C5E47] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
-              Abaixo da FIPE
-            </div>
-          ) : null}
-        </div>
-
-        <div className={`px-4 pb-4 pt-4 ${featured ? "md:px-5 md:pb-5 md:pt-4" : ""}`}>
-          <h3
-            className={`line-clamp-2 font-extrabold leading-[1.12] text-[#1D2440] ${
-              featured ? "text-[20px]" : "text-[17px]"
-            }`}
-          >
-            {title}
-          </h3>
-
-          <p className="mt-2 line-clamp-1 text-[15px] text-[#6E748A]">{meta}</p>
-          <p className="mt-1 text-[15px] text-[#6E748A]">{location}</p>
-
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <div className={`font-extrabold leading-none text-[#1F66E5] ${featured ? "text-[24px]" : "text-[20px]"}`}>
-              {formatCurrency(price)}
-            </div>
-
-            <div className="rounded-[10px] bg-[#F2F5FA] px-3 py-2 text-[11px] font-bold text-[#6B7489]">
-              {financeChip}
-            </div>
-          </div>
-
-          <div
-            className={`mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[#1F66E5] font-bold text-white transition hover:bg-[#1758CC] ${
-              featured ? "h-[50px] text-[18px]" : "h-[46px] text-[16px]"
-            }`}
-          >
-            Ver detalhes
-          </div>
-        </div>
-      </Link>
+      {linkMode === "none" ? (
+        <div className="block">{content}</div>
+      ) : (
+        <Link href={href} className="block">
+          {content}
+        </Link>
+      )}
     </article>
   );
 }
