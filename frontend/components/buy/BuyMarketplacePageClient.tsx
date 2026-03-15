@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type {
   AdsFacetsResponse,
@@ -12,7 +11,6 @@ import {
   buildSearchQueryString,
   mergeSearchFilters,
 } from "@/lib/search/ads-search-url";
-import { buildAdHref } from "@/lib/ads/build-ad-href";
 import CatalogVehicleCard, {
   type CatalogItem,
 } from "@/components/buy/CatalogVehicleCard";
@@ -42,6 +40,32 @@ type ModelFacet = {
   total: number;
 };
 
+const DEFAULT_BRAND_OPTIONS = [
+  { label: "Selecionar marca", value: "" },
+  { label: "Toyota", value: "Toyota" },
+  { label: "Chevrolet", value: "Chevrolet" },
+  { label: "Honda", value: "Honda" },
+  { label: "Volkswagen", value: "Volkswagen" },
+  { label: "Jeep", value: "Jeep" },
+];
+
+const DEFAULT_MODEL_OPTIONS = [
+  { label: "Selecionar modelo", value: "" },
+  { label: "Corolla", value: "Corolla" },
+  { label: "Civic", value: "Civic" },
+  { label: "Onix", value: "Onix" },
+  { label: "Compass", value: "Compass" },
+  { label: "Renegade", value: "Renegade" },
+];
+
+const DEFAULT_POPULAR_BRANDS: BrandFacet[] = [
+  { brand: "Toyota", total: 1520 },
+  { brand: "Chevrolet", total: 1320 },
+  { brand: "Honda", total: 935 },
+  { brand: "Volkswagen", total: 1210 },
+  { brand: "Jeep", total: 720 },
+];
+
 function parseNumber(value?: string | number | null) {
   if (typeof value === "number") return value;
   if (!value) return 0;
@@ -57,6 +81,43 @@ function parseDate(value?: string | null) {
 
 function formatTotal(total?: number) {
   return new Intl.NumberFormat("pt-BR").format(total || 0);
+}
+
+function toSafeCatalogItems(
+  value: AdsSearchResponse["data"] | undefined,
+  city: CityContext
+): CatalogItem[] {
+  if (Array.isArray(value) && value.length > 0) {
+    return value as CatalogItem[];
+  }
+  return buildFallbackCatalog(city);
+}
+
+function toSafeBrandFacets(value: unknown): BrandFacet[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const obj = (item || {}) as Partial<BrandFacet>;
+      return {
+        brand: String(obj.brand || "").trim(),
+        total: Number(obj.total || 0),
+      };
+    })
+    .filter((item) => item.brand);
+}
+
+function toSafeModelFacets(value: unknown): ModelFacet[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const obj = (item || {}) as Partial<ModelFacet>;
+      return {
+        brand: obj.brand ? String(obj.brand).trim() : undefined,
+        model: String(obj.model || "").trim(),
+        total: Number(obj.total || 0),
+      };
+    })
+    .filter((item) => item.model);
 }
 
 function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
@@ -260,12 +321,12 @@ function TopPromoBanner() {
           </p>
         </div>
 
-        <Link
+        <a
           href="/planos"
           className="inline-flex h-[46px] shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[16px] font-bold text-white transition hover:bg-[#1758CC]"
         >
           Patrocinar anúncio
-        </Link>
+        </a>
       </div>
     </div>
   );
@@ -443,74 +504,57 @@ export default function BuyMarketplacePageClient({
   const router = useRouter();
   const pathname = usePathname();
 
-  const rawItems = useMemo(() => {
-    const data = (initialResults.data || []) as CatalogItem[];
-    return data.length > 0 ? data : buildFallbackCatalog(city);
-  }, [initialResults.data, city]);
+  const rawItems = useMemo(
+    () => toSafeCatalogItems(initialResults?.data, city),
+    [initialResults?.data, city]
+  );
 
   const items = useMemo(() => sortCatalogItems(rawItems), [rawItems]);
 
-  const firstRow = items.slice(0, 2);
-  const remaining = items.slice(2);
+  const firstRow = useMemo(() => items.slice(0, 2), [items]);
+  const remaining = useMemo(() => items.slice(2), [items]);
+
+  const brandFacets = useMemo(
+    () => toSafeBrandFacets(initialFacets?.brands),
+    [initialFacets?.brands]
+  );
+
+  const modelFacets = useMemo(
+    () => toSafeModelFacets(initialFacets?.models),
+    [initialFacets?.models]
+  );
 
   const brandOptions = useMemo(() => {
-    const brands = ((initialFacets?.brands || []) as BrandFacet[]).slice(0, 12);
-    const options = brands.map((item) => ({
+    const options = brandFacets.slice(0, 12).map((item) => ({
       label: item.brand,
       value: item.brand,
     }));
 
-    if (options.length === 0) {
-      return [
-        { label: "Selecionar marca", value: "" },
-        { label: "Toyota", value: "Toyota" },
-        { label: "Chevrolet", value: "Chevrolet" },
-        { label: "Honda", value: "Honda" },
-        { label: "Volkswagen", value: "Volkswagen" },
-        { label: "Jeep", value: "Jeep" },
-      ];
-    }
-
-    return [{ label: "Selecionar marca", value: "" }, ...options];
-  }, [initialFacets?.brands]);
+    return options.length > 0
+      ? [{ label: "Selecionar marca", value: "" }, ...options]
+      : DEFAULT_BRAND_OPTIONS;
+  }, [brandFacets]);
 
   const modelOptions = useMemo(() => {
-    const models = (initialFacets?.models || []) as ModelFacet[];
     const filtered = initialFilters.brand
-      ? models.filter((item) => item.brand === initialFilters.brand)
-      : models;
+      ? modelFacets.filter((item) => item.brand === initialFilters.brand)
+      : modelFacets;
 
     const options = filtered.slice(0, 12).map((item) => ({
       label: item.model,
       value: item.model,
     }));
 
-    if (options.length === 0) {
-      return [
-        { label: "Selecionar modelo", value: "" },
-        { label: "Corolla", value: "Corolla" },
-        { label: "Civic", value: "Civic" },
-        { label: "Onix", value: "Onix" },
-        { label: "Compass", value: "Compass" },
-        { label: "Renegade", value: "Renegade" },
-      ];
-    }
-
-    return [{ label: "Selecionar modelo", value: "" }, ...options];
-  }, [initialFacets?.models, initialFilters.brand]);
+    return options.length > 0
+      ? [{ label: "Selecionar modelo", value: "" }, ...options]
+      : DEFAULT_MODEL_OPTIONS;
+  }, [initialFilters.brand, modelFacets]);
 
   const popularBrands = useMemo(() => {
-    const brands = ((initialFacets?.brands || []) as BrandFacet[]).slice(0, 5);
-    if (brands.length > 0) return brands;
-
-    return [
-      { brand: "Toyota", total: 1520 },
-      { brand: "Chevrolet", total: 1320 },
-      { brand: "Honda", total: 935 },
-      { brand: "Volkswagen", total: 1210 },
-      { brand: "Jeep", total: 720 },
-    ];
-  }, [initialFacets?.brands]);
+    return brandFacets.length > 0
+      ? brandFacets.slice(0, 5)
+      : DEFAULT_POPULAR_BRANDS;
+  }, [brandFacets]);
 
   const catalogStats = useMemo(() => {
     return {
@@ -521,22 +565,28 @@ export default function BuyMarketplacePageClient({
       ),
       lessMileage: Math.max(
         items.filter(
-          (item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000
+          (item) =>
+            parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000
         ).length,
         935
       ),
     };
   }, [items]);
 
-  function pushFilters(patch: Partial<AdsSearchFilters>, resetPage = true) {
-    const merged = mergeSearchFilters(initialFilters, {
-      ...patch,
-      ...(resetPage ? { page: 1 } : {}),
-    });
+  const pushFilters = useCallback(
+    (patch: Partial<AdsSearchFilters>, resetPage = true) => {
+      const merged = mergeSearchFilters(initialFilters, {
+        ...patch,
+        ...(resetPage ? { page: 1 } : {}),
+      });
 
-    const queryString = buildSearchQueryString(merged);
-    router.push(queryString ? `${pathname}?${queryString}` : pathname);
-  }
+      const queryString = buildSearchQueryString(merged);
+      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    },
+    [initialFilters, pathname, router]
+  );
+
+  const totalAds = initialResults?.pagination?.total || items.length || 0;
 
   return (
     <main className="bg-[#F5F7FB]">
@@ -547,7 +597,7 @@ export default function BuyMarketplacePageClient({
               Carros usados e seminovos em {city.name}
             </h1>
             <p className="mt-4 text-[22px] font-medium text-[#6E748A]">
-              {formatTotal(initialResults.pagination?.total || items.length || 13928)} anúncios encontrados
+              {formatTotal(totalAds)} anúncios encontrados
             </p>
           </div>
 
@@ -650,7 +700,9 @@ export default function BuyMarketplacePageClient({
                     onClick={() => pushFilters({ brand: item.brand })}
                     className="flex w-full items-center justify-between rounded-[12px] px-1 py-2 text-left transition hover:bg-[#F7F9FC]"
                   >
-                    <span className="text-[15px] font-medium text-[#33405A]">{item.brand}</span>
+                    <span className="text-[15px] font-medium text-[#33405A]">
+                      {item.brand}
+                    </span>
                     <span className="text-[14px] font-bold text-[#7A8398]">
                       {formatTotal(item.total)}
                     </span>
@@ -680,48 +732,22 @@ export default function BuyMarketplacePageClient({
 
             <div className="mb-5 grid gap-5 lg:grid-cols-2">
               {firstRow.map((item, index) => (
-                <Link
+                <CatalogVehicleCard
                   key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
-                  href={buildAdHref({
-                    id: item.id,
-                    slug: item.slug,
-                    title: item.title,
-                    brand: item.brand,
-                    model: item.model,
-                    version: item.version,
-                    year: item.year,
-                  })}
-                  className="block"
-                >
-                  <CatalogVehicleCard
-                    item={item}
-                    featured
-                    weight={inferWeight(item)}
-                  />
-                </Link>
+                  item={item}
+                  featured
+                  weight={inferWeight(item)}
+                />
               ))}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {remaining.map((item, index) => (
-                <Link
+                <CatalogVehicleCard
                   key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
-                  href={buildAdHref({
-                    id: item.id,
-                    slug: item.slug,
-                    title: item.title,
-                    brand: item.brand,
-                    model: item.model,
-                    version: item.version,
-                    year: item.year,
-                  })}
-                  className="block"
-                >
-                  <CatalogVehicleCard
-                    item={item}
-                    weight={inferWeight(item)}
-                  />
-                </Link>
+                  item={item}
+                  weight={inferWeight(item)}
+                />
               ))}
             </div>
           </div>
