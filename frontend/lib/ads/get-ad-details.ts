@@ -382,7 +382,12 @@ function normalizeSellerType(value: unknown, fallback: SellerSummary["type"]): S
   return fallback;
 }
 
-function normalizeBadges(raw: Record<string, unknown>, sellerRaw: Record<string, unknown>, price: number, fipeValue: number): string[] {
+function normalizeBadges(
+  raw: Record<string, unknown>,
+  sellerRaw: Record<string, unknown>,
+  price: number,
+  fipeValue: number
+): string[] {
   const badges = new Set<string>();
 
   const rawBadges = Array.isArray(raw.badges) ? raw.badges : [];
