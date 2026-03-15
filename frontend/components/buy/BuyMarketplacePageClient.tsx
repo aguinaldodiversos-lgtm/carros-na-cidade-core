@@ -22,6 +22,7 @@ type CityContext = {
   label: string;
 };
 
+
 interface BuyMarketplacePageClientProps {
   initialResults: AdsSearchResponse;
   initialFacets: AdsFacetsResponse["facets"];
