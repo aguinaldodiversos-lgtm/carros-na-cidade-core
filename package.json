@@ -5,14 +5,24 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-   "start": "node src/index.js",
+    "start": "node src/index.js",
     "dev": "node src/index.js",
     "workers": "node src/workers/bootstrap.js",
     "lint": "echo \"No lint configured\"",
     "test": "echo \"No tests configured\"",
     "smoke": "node scripts/smoke.mjs",
     "smoke:prod": "node scripts/smoke.mjs",
-    "smoke:local": "node scripts/smoke.mjs"
+    "smoke:local": "node scripts/smoke.mjs",
+
+    "audit:project": "node ./scripts/project-audit.mjs",
+    "audit:project:strict": "node ./scripts/project-audit.mjs --strict",
+    "audit:project:json": "node ./scripts/project-audit.mjs --json",
+    "audit:links": "node ./scripts/project-audit.mjs --scope=links",
+    "audit:assets": "node ./scripts/project-audit.mjs --scope=assets",
+    "audit:routes": "node ./scripts/project-audit.mjs --scope=routes",
+    "audit:env": "node ./scripts/project-audit.mjs --scope=env",
+    "audit:integration": "node ./scripts/project-audit.mjs --scope=integration",
+    "audit:jsx-ts": "node ./scripts/project-audit.mjs --scope=jsx-ts"
   },
   "engines": {
     "node": ">=20 <21"
