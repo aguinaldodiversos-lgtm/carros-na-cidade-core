@@ -1,4 +1,3 @@
-// frontend/components/home/HomeVehicleCard.tsx
 import Link from "next/link";
 
 type VehicleItem = {
@@ -23,9 +22,16 @@ interface HomeVehicleCardProps {
   variant: "highlight" | "opportunity";
 }
 
+function parseNumber(value?: number | string) {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function formatPrice(value?: number | string) {
-  const numeric = typeof value === "string" ? Number(value) : value;
-  if (!numeric || Number.isNaN(numeric)) return "R$ 0";
+  const numeric = parseNumber(value);
+  if (!numeric) return "R$ 0";
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -34,8 +40,8 @@ function formatPrice(value?: number | string) {
 }
 
 function formatMileage(value?: number | string) {
-  const numeric = typeof value === "string" ? Number(value) : value;
-  if (!numeric || Number.isNaN(numeric)) return null;
+  const numeric = parseNumber(value);
+  if (!numeric) return null;
   return `${numeric.toLocaleString("pt-BR")} km`;
 }
 
@@ -50,13 +56,28 @@ function resolveImage(item: VehicleItem) {
   return "/images/hero.jpeg";
 }
 
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
 function resolveHref(item: VehicleItem) {
-  if (item.slug) return `/veiculo/${item.slug}`;
-  return `/anuncios/${item.id}`;
+  if (item.slug) return `/comprar/${item.slug}`;
+
+  const fallback = [item.title, item.brand, item.model, item.year, item.id]
+    .filter(Boolean)
+    .join(" ");
+
+  return `/comprar/${slugify(fallback || `anuncio-${item.id}`)}`;
 }
 
 function buildOfferLabel(item: VehicleItem, variant: "highlight" | "opportunity") {
-  if (variant === "opportunity" || item.below_fipe) return "8% abaixo da FIPE";
+  if (variant === "opportunity" || item.below_fipe) return "Abaixo da FIPE";
   if (item.highlight_until) return "Oferta destaque";
   return "Em destaque";
 }
@@ -67,7 +88,8 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
   const href = resolveHref(item);
   const mileage = formatMileage(item.mileage);
   const cityLabel = [item.city || "São Paulo", item.state || "SP"].join(" - ");
-  const badgeText = variant === "opportunity" || item.below_fipe ? "Abaixo da FIPE" : "Patrocinado";
+  const badgeText =
+    variant === "opportunity" || item.below_fipe ? "Abaixo da FIPE" : "Patrocinado";
 
   return (
     <Link
@@ -83,13 +105,7 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
         />
 
         <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
-          <span
-            className={`inline-flex rounded-[9px] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm ${
-              variant === "opportunity"
-                ? "bg-[#0e62d8]"
-                : "bg-[#0e62d8]"
-            }`}
-          >
+          <span className="inline-flex rounded-[9px] bg-[#0e62d8] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
             {badgeText}
           </span>
 
