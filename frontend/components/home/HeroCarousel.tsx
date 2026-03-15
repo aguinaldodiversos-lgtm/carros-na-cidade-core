@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -42,7 +41,7 @@ function normalizeSlides(slides: HeroSlide[]): HeroSlide[] {
 }
 
 export function HeroCarousel({ slides }: HeroCarouselProps) {
-  const safeSlides = useMemo(() => normalizeSlides(slides), [slides]);
+  const safeSlides = useMemo(() => normalizeSlides(slides || []), [slides]);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -54,6 +53,12 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
     return () => window.clearInterval(interval);
   }, [safeSlides.length]);
+
+  useEffect(() => {
+    if (activeIndex > safeSlides.length - 1) {
+      setActiveIndex(0);
+    }
+  }, [activeIndex, safeSlides.length]);
 
   if (!safeSlides.length) return null;
 
@@ -78,13 +83,11 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                 isActive ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
             >
-              <Image
+              <img
                 src={slide.image}
                 alt={slide.title}
-                fill
-                priority={index === 0}
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 1200px"
+                className="h-full w-full object-cover"
+                loading={index === 0 ? "eager" : "lazy"}
               />
 
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,13,30,0.72)_0%,rgba(5,13,30,0.34)_38%,rgba(5,13,30,0.08)_100%)]" />
