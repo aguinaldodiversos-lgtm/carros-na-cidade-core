@@ -20,6 +20,7 @@ type BaseAdData = {
   image?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
+  images?: string[] | null;
   badge?: string | null;
   below_fipe?: boolean | null;
   highlight_until?: string | null;
@@ -150,7 +151,13 @@ function normalizeAdData(source?: BaseAdData): {
     yearLabel: String(item.yearLabel || item.year_model || item.year || "").trim(),
     price: parseNumber(item.price),
     mileage: parseNumber(item.mileage),
-    image: String(item.image || item.image_url || item.cover_image || "/placeholder-car.jpg"),
+    image: String(
+      item.image ||
+        item.image_url ||
+        (Array.isArray(item.images) && item.images[0]) ||
+        item.cover_image ||
+        "/images/hero.jpeg"
+    ),
     badge: resolveBadge(item),
   };
 }
@@ -158,6 +165,7 @@ function normalizeAdData(source?: BaseAdData): {
 export function AdCard({ ad, item }: AdCardProps) {
   const source = ad || item || {};
   const normalized = normalizeAdData(source);
+
   const href = buildAdHref({
     id: normalized.id ?? undefined,
     slug: normalized.slug || undefined,
