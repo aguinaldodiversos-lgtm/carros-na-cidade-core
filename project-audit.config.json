@@ -1,0 +1,50 @@
+{
+  "frontendDir": "frontend",
+  "backendDir": "src",
+  "frontendScanDirs": [
+    "frontend/app",
+    "frontend/components",
+    "frontend/lib",
+    "frontend/hooks",
+    "frontend/services"
+  ],
+  "backendScanDirs": [
+    "src",
+    "scripts"
+  ],
+  "frontendPublicDir": "frontend/public",
+  "allowMissingFrontendRoutes": [
+    "/login",
+    "/planos",
+    "/contato",
+    "/sobre",
+    "/favoritos",
+    "/politica-de-privacidade",
+    "/termos-de-uso",
+    "/lgpd"
+  ],
+  "knownFrontendSelfLinkingComponents": [
+    "@/components/buy/CatalogVehicleCard",
+    "@/components/ads/AdCard"
+  ],
+  "backendRouteFilesGlobsHint": [
+    ".routes.",
+    "app.js",
+    "index.js"
+  ],
+  "envFiles": [
+    ".env",
+    ".env.example",
+    "frontend/.env",
+    "frontend/.env.local",
+    "frontend/.env.example"
+  ],
+  "frontendApiBaseEnvNames": [
+    "NEXT_PUBLIC_API_URL",
+    "API_URL"
+  ],
+  "backendApiBaseEnvNames": [
+    "API_URL",
+    "PORT"
+  ]
+}
