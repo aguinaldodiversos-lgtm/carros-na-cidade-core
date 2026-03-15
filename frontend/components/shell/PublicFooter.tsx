@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -56,7 +55,7 @@ const socials = [
 ];
 
 export function PublicFooter() {
-  const pathname = usePathname();
+  const pathname = usePathname() || "/";
   const isHome = pathname === "/";
 
   if (isHome) {
@@ -64,12 +63,11 @@ export function PublicFooter() {
       <footer className="mt-4 bg-[#18253f] text-white">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 text-[12px] text-white/75 md:flex-row md:items-center md:justify-between md:px-6">
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/" className="relative block h-4 w-[90px]" aria-label="Carros na Cidade">
-              <Image
+            <Link href="/" className="block" aria-label="Carros na Cidade">
+              <img
                 src="/images/logo.png"
                 alt="Carros na Cidade"
-                fill
-                className="object-contain object-left brightness-0 invert"
+                className="h-4 w-[90px] object-contain brightness-0 invert"
               />
             </Link>
             <span>© 2026 Carros na Cidade. Todos os direitos reservados.</span>
@@ -96,16 +94,11 @@ export function PublicFooter() {
       <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
         <div className="grid gap-10 border-b border-white/15 pb-10 lg:grid-cols-[1.15fr_1fr]">
           <div>
-            <Link
-              href="/"
-              className="relative block h-11 w-[195px]"
-              aria-label="Carros na Cidade"
-            >
-              <Image
+            <Link href="/" className="block" aria-label="Carros na Cidade">
+              <img
                 src="/images/logo.png"
                 alt="Carros na Cidade"
-                fill
-                className="object-contain object-left brightness-0 invert"
+                className="h-11 w-[195px] object-contain object-left brightness-0 invert"
               />
             </Link>
 
