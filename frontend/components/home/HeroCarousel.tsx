@@ -1,9 +1,8 @@
-// frontend/components/home/HeroCarousel.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type HeroSlide = {
   id: string;
@@ -18,33 +17,58 @@ interface HeroCarouselProps {
   slides: HeroSlide[];
 }
 
+function isLikelyLogoImage(src: string) {
+  const normalized = String(src || "").toLowerCase();
+  return (
+    normalized.includes("logo") ||
+    normalized.endsWith("/logo.png") ||
+    normalized.endsWith("/logo.svg")
+  );
+}
+
+function normalizeSlides(slides: HeroSlide[]): HeroSlide[] {
+  return slides.map((slide, index) => {
+    const fallbackImage =
+      index % 2 === 0 ? "/images/banner1.jpg" : "/images/banner2.jpg";
+
+    return {
+      ...slide,
+      image:
+        !slide.image || isLikelyLogoImage(slide.image)
+          ? fallbackImage
+          : slide.image,
+    };
+  });
+}
+
 export function HeroCarousel({ slides }: HeroCarouselProps) {
+  const safeSlides = useMemo(() => normalizeSlides(slides), [slides]);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    if (!slides.length) return;
+    if (!safeSlides.length) return;
 
     const interval = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % slides.length);
+      setActiveIndex((current) => (current + 1) % safeSlides.length);
     }, 6000);
 
     return () => window.clearInterval(interval);
-  }, [slides.length]);
+  }, [safeSlides.length]);
 
-  if (!slides.length) return null;
+  if (!safeSlides.length) return null;
 
   const goPrev = () => {
-    setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
+    setActiveIndex((current) => (current - 1 + safeSlides.length) % safeSlides.length);
   };
 
   const goNext = () => {
-    setActiveIndex((current) => (current + 1) % slides.length);
+    setActiveIndex((current) => (current + 1) % safeSlides.length);
   };
 
   return (
     <div className="relative overflow-hidden rounded-[20px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
       <div className="relative aspect-[16/6.2] min-h-[240px] w-full md:min-h-[400px]">
-        {slides.map((slide, index) => {
+        {safeSlides.map((slide, index) => {
           const isActive = index === activeIndex;
 
           return (
@@ -115,7 +139,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       </div>
 
       <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
-        {slides.map((slide, index) => (
+        {safeSlides.map((slide, index) => (
           <button
             key={slide.id}
             type="button"
