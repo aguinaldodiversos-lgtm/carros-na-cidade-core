@@ -9,6 +9,7 @@ export type CatalogItem = AdItem & {
   version?: string;
   year?: number | string;
   year_model?: string | null;
+  yearLabel?: string | null;
   mileage?: number | string;
   transmission?: string;
   fuel_type?: string;
@@ -42,13 +43,19 @@ interface CatalogVehicleCardProps {
 
 const FALLBACK_IMAGE = "/images/hero.jpeg";
 
-function safeText(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function toText(value: unknown, fallback = "") {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fallback;
 }
 
 function parseMoney(value: number | string | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
+  if (value === null || value === undefined || value === "") return 0;
 
   const normalized = String(value)
     .replace(/[^\d,.-]/g, "")
@@ -71,7 +78,7 @@ function formatCurrency(value: number) {
 
 function parseMileage(value?: number | string | null) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
+  if (value === null || value === undefined || value === "") return 0;
 
   const cleaned = String(value).replace(/[^\d]/g, "");
   const parsed = Number(cleaned);
@@ -85,41 +92,26 @@ function formatMileage(value?: number | string | null) {
 }
 
 function extractPrimaryYear(item: CatalogItem) {
-  if (typeof item.year === "number" && Number.isFinite(item.year)) {
-    return String(item.year);
-  }
+  const candidates = [item.year, item.yearLabel, item.year_model];
 
-  const fromYear = safeText(item.year);
-  if (fromYear) {
-    const match = fromYear.match(/\d{4}/);
-    if (match) return match[0];
-  }
+  for (const candidate of candidates) {
+    const text = toText(candidate);
+    if (!text) continue;
 
-  const fromYearModel = safeText(item.year_model);
-  if (fromYearModel) {
-    const match = fromYearModel.match(/\d{4}/);
+    const match = text.match(/\d{4}/);
     if (match) return match[0];
   }
 
   return "";
 }
 
-function getHref(item: CatalogItem) {
-  return buildAdHref({
-    id: item.id,
-    slug: item.slug || undefined,
-    title: getTitle(item),
-    brand: item.brand || undefined,
-    model: item.model || undefined,
-    version: item.version || undefined,
-    year: item.year || item.year_model || undefined,
-  });
-}
-
 function getImage(item: CatalogItem) {
-  if (safeText(item.image_url)) return safeText(item.image_url);
-  if (safeText(item.image)) return safeText(item.image);
-  if (safeText(item.cover_image)) return safeText(item.cover_image);
+  const directCandidates = [item.image_url, item.image, item.cover_image];
+
+  for (const candidate of directCandidates) {
+    const text = toText(candidate);
+    if (text) return text;
+  }
 
   if (Array.isArray(item.images)) {
     const firstValidImage = item.images.find(
@@ -132,24 +124,37 @@ function getImage(item: CatalogItem) {
 }
 
 function getTitle(item: CatalogItem) {
-  if (safeText(item.title)) return safeText(item.title);
+  const explicitTitle = toText(item.title);
+  if (explicitTitle) return explicitTitle;
 
   const year = extractPrimaryYear(item);
   const pieces = [
     year,
-    safeText(item.brand),
-    safeText(item.model),
-    safeText(item.version),
+    toText(item.brand),
+    toText(item.model),
+    toText(item.version),
   ].filter(Boolean);
 
   return pieces.join(" ") || "Veículo";
 }
 
+function getHref(item: CatalogItem, resolvedTitle: string) {
+  return buildAdHref({
+    id: item.id,
+    slug: item.slug || undefined,
+    title: resolvedTitle,
+    brand: item.brand || undefined,
+    model: item.model || undefined,
+    version: item.version || undefined,
+    year: item.year || item.year_model || item.yearLabel || undefined,
+  });
+}
+
 function getMetaLine(item: CatalogItem) {
   const pieces = [
-    safeText(item.fuel_type),
+    toText(item.fuel_type),
     formatMileage(item.mileage),
-    safeText(item.transmission),
+    toText(item.transmission),
   ].filter(Boolean);
 
   if (pieces.length > 0) return pieces.join("  •  ");
@@ -157,8 +162,8 @@ function getMetaLine(item: CatalogItem) {
 }
 
 function getLocation(item: CatalogItem) {
-  const city = safeText(item.city, "São Paulo");
-  const state = safeText(item.state, "SP").toUpperCase();
+  const city = toText(item.city, "São Paulo");
+  const state = toText(item.state, "SP").toUpperCase();
   return `${city} - ${state}`;
 }
 
@@ -206,8 +211,8 @@ export default function CatalogVehicleCard({
   hrefOverride,
   className = "",
 }: CatalogVehicleCardProps) {
-  const href = hrefOverride || getHref(item);
   const title = getTitle(item);
+  const href = hrefOverride || getHref(item, title);
   const price = parseMoney(item.price);
   const location = getLocation(item);
   const meta = getMetaLine(item);
@@ -215,16 +220,19 @@ export default function CatalogVehicleCard({
   const financeChip = getFinanceChip(weight, item);
   const image = getImage(item);
 
-  const cardClasses = `group overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)] ${
-    featured ? "rounded-[20px]" : ""
-  } ${className}`.trim();
+  const cardClasses = cx(
+    "group overflow-hidden border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)]",
+    featured ? "rounded-[20px]" : "rounded-[18px]",
+    className
+  );
 
   const content = (
     <>
       <div
-        className={`relative overflow-hidden ${
+        className={cx(
+          "relative overflow-hidden",
           featured ? "aspect-[1.33/0.83]" : "aspect-[1.18/0.84]"
-        }`}
+        )}
       >
         <img
           src={image}
@@ -235,12 +243,18 @@ export default function CatalogVehicleCard({
 
         <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
           <span
-            className={`inline-flex rounded-[10px] px-3 py-1 text-[12px] font-extrabold shadow-sm ${badge.className}`}
+            className={cx(
+              "inline-flex rounded-[10px] px-3 py-1 text-[12px] font-extrabold shadow-sm",
+              badge.className
+            )}
           >
             {badge.label}
           </span>
 
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#8D96AB] shadow-sm">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#8D96AB] shadow-sm"
+          >
             <svg
               viewBox="0 0 24 24"
               className="h-[16px] w-[16px]"
@@ -260,13 +274,12 @@ export default function CatalogVehicleCard({
         ) : null}
       </div>
 
-      <div
-        className={`px-4 pb-4 pt-4 ${featured ? "md:px-5 md:pb-5 md:pt-4" : ""}`}
-      >
+      <div className={cx("px-4 pb-4 pt-4", featured && "md:px-5 md:pb-5 md:pt-4")}>
         <h3
-          className={`line-clamp-2 min-h-[44px] font-extrabold leading-[1.12] text-[#1D2440] ${
+          className={cx(
+            "line-clamp-2 min-h-[44px] font-extrabold leading-[1.12] text-[#1D2440]",
             featured ? "text-[20px]" : "text-[17px]"
-          }`}
+          )}
         >
           {title}
         </h3>
@@ -276,9 +289,10 @@ export default function CatalogVehicleCard({
 
         <div className="mt-4 flex items-end justify-between gap-3">
           <div
-            className={`font-extrabold leading-none text-[#1F66E5] ${
+            className={cx(
+              "font-extrabold leading-none text-[#1F66E5]",
               featured ? "text-[24px]" : "text-[20px]"
-            }`}
+            )}
           >
             {formatCurrency(price)}
           </div>
@@ -289,9 +303,10 @@ export default function CatalogVehicleCard({
         </div>
 
         <div
-          className={`mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[#1F66E5] font-bold text-white transition hover:bg-[#1758CC] ${
+          className={cx(
+            "mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[#1F66E5] font-bold text-white transition hover:bg-[#1758CC]",
             featured ? "h-[50px] text-[18px]" : "h-[46px] text-[16px]"
-          }`}
+          )}
         >
           Ver detalhes
         </div>
@@ -305,7 +320,11 @@ export default function CatalogVehicleCard({
 
   return (
     <article className={cardClasses}>
-      <Link href={href} className="block">
+      <Link
+        href={href}
+        className="block"
+        aria-label={`Ver detalhes de ${title}`}
+      >
         {content}
       </Link>
     </article>
