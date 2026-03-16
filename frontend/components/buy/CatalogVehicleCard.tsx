@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AdItem } from "@/lib/search/ads-search";
+import { buildAdHref } from "@/lib/ads/build-ad-href";
 
 export type CatalogItem = AdItem & {
   title?: string;
@@ -7,6 +8,7 @@ export type CatalogItem = AdItem & {
   model?: string;
   version?: string;
   year?: number | string;
+  year_model?: string | null;
   mileage?: number | string;
   transmission?: string;
   fuel_type?: string;
@@ -38,13 +40,19 @@ interface CatalogVehicleCardProps {
   className?: string;
 }
 
+const FALLBACK_IMAGE = "/images/hero.jpeg";
+
+function safeText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
 function parseMoney(value: number | string | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (!value) return 0;
 
   const normalized = String(value)
     .replace(/[^\d,.-]/g, "")
-    .replace(/\./g, "")
+    .replace(/\.(?=\d{3}(\D|$))/g, "")
     .replace(",", ".");
 
   const parsed = Number(normalized);
@@ -53,6 +61,7 @@ function parseMoney(value: number | string | null | undefined) {
 
 function formatCurrency(value: number) {
   if (!value) return "R$ 0";
+
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -60,8 +69,8 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function parseMileage(value?: number | string) {
-  if (typeof value === "number") return value;
+function parseMileage(value?: number | string | null) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (!value) return 0;
 
   const cleaned = String(value).replace(/[^\d]/g, "");
@@ -69,44 +78,88 @@ function parseMileage(value?: number | string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatMileage(value?: number | string) {
+function formatMileage(value?: number | string | null) {
   const parsed = parseMileage(value);
   if (!parsed) return null;
   return `${parsed.toLocaleString("pt-BR")} km`;
 }
 
+function extractPrimaryYear(item: CatalogItem) {
+  if (typeof item.year === "number" && Number.isFinite(item.year)) {
+    return String(item.year);
+  }
+
+  const fromYear = safeText(item.year);
+  if (fromYear) {
+    const match = fromYear.match(/\d{4}/);
+    if (match) return match[0];
+  }
+
+  const fromYearModel = safeText(item.year_model);
+  if (fromYearModel) {
+    const match = fromYearModel.match(/\d{4}/);
+    if (match) return match[0];
+  }
+
+  return "";
+}
+
 function getHref(item: CatalogItem) {
-  if (item.slug) return `/veiculo/${item.slug}`;
-  return `/anuncios/${item.id}`;
+  return buildAdHref({
+    id: item.id,
+    slug: item.slug || undefined,
+    title: getTitle(item),
+    brand: item.brand || undefined,
+    model: item.model || undefined,
+    version: item.version || undefined,
+    year: item.year || item.year_model || undefined,
+  });
 }
 
 function getImage(item: CatalogItem) {
-  if (item.image_url) return item.image_url;
-  if (item.image) return item.image;
-  if (item.cover_image) return item.cover_image;
-  if (Array.isArray(item.images) && item.images[0]) return item.images[0];
-  return "/images/hero.jpeg";
+  if (safeText(item.image_url)) return safeText(item.image_url);
+  if (safeText(item.image)) return safeText(item.image);
+  if (safeText(item.cover_image)) return safeText(item.cover_image);
+
+  if (Array.isArray(item.images)) {
+    const firstValidImage = item.images.find(
+      (image) => typeof image === "string" && image.trim().length > 0
+    );
+    if (firstValidImage) return firstValidImage;
+  }
+
+  return FALLBACK_IMAGE;
 }
 
 function getTitle(item: CatalogItem) {
-  if (item.title) return item.title;
-  const pieces = [item.year, item.brand, item.model].filter(Boolean);
+  if (safeText(item.title)) return safeText(item.title);
+
+  const year = extractPrimaryYear(item);
+  const pieces = [
+    year,
+    safeText(item.brand),
+    safeText(item.model),
+    safeText(item.version),
+  ].filter(Boolean);
+
   return pieces.join(" ") || "Veículo";
 }
 
 function getMetaLine(item: CatalogItem) {
   const pieces = [
-    item.fuel_type,
+    safeText(item.fuel_type),
     formatMileage(item.mileage),
-    item.transmission,
+    safeText(item.transmission),
   ].filter(Boolean);
 
   if (pieces.length > 0) return pieces.join("  •  ");
-  return "Automático";
+  return "Informações sob consulta";
 }
 
 function getLocation(item: CatalogItem) {
-  return [item.city || "São Paulo", item.state || "SP"].join(" - ");
+  const city = safeText(item.city, "São Paulo");
+  const state = safeText(item.state, "SP").toUpperCase();
+  return `${city} - ${state}`;
 }
 
 function getBadge(weight: 1 | 2 | 3 | 4) {
@@ -160,6 +213,11 @@ export default function CatalogVehicleCard({
   const meta = getMetaLine(item);
   const badge = getBadge(weight);
   const financeChip = getFinanceChip(weight, item);
+  const image = getImage(item);
+
+  const cardClasses = `group overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)] ${
+    featured ? "rounded-[20px]" : ""
+  } ${className}`.trim();
 
   const content = (
     <>
@@ -169,7 +227,7 @@ export default function CatalogVehicleCard({
         }`}
       >
         <img
-          src={getImage(item)}
+          src={image}
           alt={title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           loading="lazy"
@@ -206,7 +264,7 @@ export default function CatalogVehicleCard({
         className={`px-4 pb-4 pt-4 ${featured ? "md:px-5 md:pb-5 md:pt-4" : ""}`}
       >
         <h3
-          className={`line-clamp-2 font-extrabold leading-[1.12] text-[#1D2440] ${
+          className={`line-clamp-2 min-h-[44px] font-extrabold leading-[1.12] text-[#1D2440] ${
             featured ? "text-[20px]" : "text-[17px]"
           }`}
         >
@@ -241,19 +299,15 @@ export default function CatalogVehicleCard({
     </>
   );
 
+  if (linkMode === "none") {
+    return <article className={cardClasses}>{content}</article>;
+  }
+
   return (
-    <article
-      className={`group overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)] ${
-        featured ? "rounded-[20px]" : ""
-      } ${className}`}
-    >
-      {linkMode === "none" ? (
-        <div className="block">{content}</div>
-      ) : (
-        <Link href={href} className="block">
-          {content}
-        </Link>
-      )}
+    <article className={cardClasses}>
+      <Link href={href} className="block">
+        {content}
+      </Link>
     </article>
   );
 }
