@@ -1,4 +1,3 @@
-// frontend/app/comprar/page.tsx
 import type { Metadata } from "next";
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import type {
@@ -72,13 +71,31 @@ function cityFromSlug(slug: string): CityContext {
   };
 }
 
+function cityFromText(city?: string, state?: string): CityContext {
+  const normalizedCity = (city || "São Paulo").trim();
+  const normalizedState = (state || "SP").trim().toUpperCase();
+
+  return {
+    name: normalizedCity,
+    state: normalizedState,
+    slug: `${normalizedCity}-${normalizedState}`
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, "-"),
+    label: `${normalizedCity} - ${normalizedState}`,
+  };
+}
+
 function normalizeBuyFilters(searchParams: SearchParams = {}): AdsSearchFilters {
   const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
 
   return {
     ...parsed,
     city_slug: parsed.city_slug || "sao-paulo-sp",
-    city: parsed.city || "São Paulo - SP",
+    city: parsed.city || "São Paulo",
     state: parsed.state || "SP",
     sort: parsed.sort || "recent",
     page: parsed.page || 1,
@@ -87,19 +104,17 @@ function normalizeBuyFilters(searchParams: SearchParams = {}): AdsSearchFilters 
 }
 
 function resolveCity(filters: AdsSearchFilters): CityContext {
-  if (filters.city_slug) return cityFromSlug(filters.city_slug);
+  if (filters.city_slug) {
+    return cityFromSlug(filters.city_slug);
+  }
 
-  return {
-    name: "São Paulo",
-    state: "SP",
-    slug: "sao-paulo-sp",
-    label: "São Paulo - SP",
-  };
+  return cityFromText(filters.city, filters.state);
 }
 
 function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
   return {
-    success: true,
+    success: false,
+    ok: false,
     data: [],
     pagination: {
       page: filters.page || 1,
@@ -107,7 +122,8 @@ function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
       total: 0,
       totalPages: 1,
     },
-  } as AdsSearchResponse;
+    error: null,
+  };
 }
 
 function buildEmptyFacets(): AdsFacetsResponse["facets"] {
@@ -117,6 +133,35 @@ function buildEmptyFacets(): AdsFacetsResponse["facets"] {
     fuelTypes: [],
     bodyTypes: [],
   };
+}
+
+function isValidResultsResponse(value: unknown): value is AdsSearchResponse {
+  if (!value || typeof value !== "object") return false;
+
+  const response = value as AdsSearchResponse;
+
+  return (
+    Array.isArray(response.data) &&
+    Boolean(response.pagination) &&
+    typeof response.pagination.page === "number" &&
+    typeof response.pagination.limit === "number" &&
+    typeof response.pagination.total === "number" &&
+    typeof response.pagination.totalPages === "number"
+  );
+}
+
+function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
+  if (!value || typeof value !== "object") return false;
+
+  const response = value as AdsFacetsResponse;
+
+  return (
+    Boolean(response.facets) &&
+    Array.isArray(response.facets.brands) &&
+    Array.isArray(response.facets.models) &&
+    Array.isArray(response.facets.fuelTypes) &&
+    Array.isArray(response.facets.bodyTypes)
+  );
 }
 
 function buildMetadataTitle(filters: AdsSearchFilters, city: CityContext) {
@@ -149,15 +194,18 @@ export async function generateMetadata({
   const filters = normalizeBuyFilters(searchParams);
   const city = resolveCity(filters);
 
+  const title = buildMetadataTitle(filters, city);
+  const description = buildMetadataDescription(filters, city);
+
   return {
-    title: buildMetadataTitle(filters, city),
-    description: buildMetadataDescription(filters, city),
+    title,
+    description,
     alternates: {
       canonical: "/comprar",
     },
     openGraph: {
-      title: buildMetadataTitle(filters, city),
-      description: buildMetadataDescription(filters, city),
+      title,
+      description,
       url: "/comprar",
       type: "website",
       locale: "pt_BR",
@@ -177,12 +225,14 @@ export default async function ComprarPage({
   ]);
 
   const initialResults =
-    resultsResponse.status === "fulfilled"
+    resultsResponse.status === "fulfilled" &&
+    isValidResultsResponse(resultsResponse.value)
       ? resultsResponse.value
       : buildEmptyResults(filters);
 
   const initialFacets =
-    facetsResponse.status === "fulfilled"
+    facetsResponse.status === "fulfilled" &&
+    isValidFacetsResponse(facetsResponse.value)
       ? facetsResponse.value.facets
       : buildEmptyFacets();
 
