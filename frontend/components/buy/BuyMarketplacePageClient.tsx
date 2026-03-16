@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type {
@@ -66,10 +67,21 @@ const DEFAULT_POPULAR_BRANDS: BrandFacet[] = [
   { brand: "Jeep", total: 720 },
 ];
 
+function sanitizeText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
 function parseNumber(value?: string | number | null) {
-  if (typeof value === "number") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (!value) return 0;
-  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
+
+  const parsed = Number(
+    String(value)
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\.(?=\d{3}(\D|$))/g, "")
+      .replace(",", ".")
+  );
+
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -83,23 +95,83 @@ function formatTotal(total?: number) {
   return new Intl.NumberFormat("pt-BR").format(total || 0);
 }
 
+function normalizeCatalogItem(raw: unknown, city: CityContext, index: number): CatalogItem | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const item = raw as Partial<CatalogItem> & {
+    image?: string | null;
+    cover_image?: string | null;
+  };
+
+  const id =
+    typeof item.id === "number" && Number.isFinite(item.id)
+      ? item.id
+      : 900000 + index;
+
+  const imageUrl =
+    sanitizeText(item.image_url || "") ||
+    sanitizeText(item.image || "") ||
+    sanitizeText(item.cover_image || "") ||
+    null;
+
+  const images =
+    Array.isArray(item.images) && item.images.length > 0
+      ? item.images.filter((image): image is string => typeof image === "string" && image.trim().length > 0)
+      : imageUrl
+        ? [imageUrl]
+        : null;
+
+  return {
+    ...item,
+    id,
+    slug: sanitizeText(item.slug || "") || undefined,
+    title: sanitizeText(item.title || "") || "Veículo",
+    brand: sanitizeText(item.brand || "") || undefined,
+    model: sanitizeText(item.model || "") || undefined,
+    city: sanitizeText(item.city || "") || city.name,
+    state: sanitizeText(item.state || "") || city.state,
+    year: typeof item.year === "number" ? item.year : parseNumber(item.year as string | number | null) || undefined,
+    mileage:
+      typeof item.mileage === "number"
+        ? item.mileage
+        : parseNumber(item.mileage as string | number | null) || undefined,
+    price:
+      typeof item.price === "number"
+        ? item.price
+        : parseNumber(item.price as string | number | null) || undefined,
+    image_url: imageUrl,
+    images,
+    below_fipe: item.below_fipe === true,
+    highlight_until: item.highlight_until || null,
+    plan: item.plan || null,
+    seller_type: item.seller_type || null,
+    dealer_name: item.dealer_name || null,
+    dealership_name: item.dealership_name || null,
+    dealership_id:
+      typeof item.dealership_id === "number" ? item.dealership_id : null,
+    created_at: item.created_at || null || undefined,
+  };
+}
+
 function toSafeCatalogItems(
   value: AdsSearchResponse["data"] | undefined,
   city: CityContext
 ): CatalogItem[] {
-  if (Array.isArray(value) && value.length > 0) {
-    return value as CatalogItem[];
-  }
-  return buildFallbackCatalog(city);
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => normalizeCatalogItem(item, city, index))
+    .filter((item): item is CatalogItem => Boolean(item));
 }
 
 function toSafeBrandFacets(value: unknown): BrandFacet[] {
   if (!Array.isArray(value)) return [];
+
   return value
     .map((item) => {
       const obj = (item || {}) as Partial<BrandFacet>;
       return {
-        brand: String(obj.brand || "").trim(),
+        brand: sanitizeText(obj.brand || ""),
         total: Number(obj.total || 0),
       };
     })
@@ -108,12 +180,13 @@ function toSafeBrandFacets(value: unknown): BrandFacet[] {
 
 function toSafeModelFacets(value: unknown): ModelFacet[] {
   if (!Array.isArray(value)) return [];
+
   return value
     .map((item) => {
       const obj = (item || {}) as Partial<ModelFacet>;
       return {
-        brand: obj.brand ? String(obj.brand).trim() : undefined,
-        model: String(obj.model || "").trim(),
+        brand: obj.brand ? sanitizeText(obj.brand) : undefined,
+        model: sanitizeText(obj.model || ""),
         total: Number(obj.total || 0),
       };
     })
@@ -139,7 +212,9 @@ function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
       item.dealership_name ||
       item.dealer_name ||
       item.seller_type === "dealer" ||
-      item.seller_type === "dealership"
+      item.seller_type === "dealership" ||
+      item.seller_type === "basic" ||
+      item.seller_type === "premium"
   );
 
   if (isDealer) return 2;
@@ -302,6 +377,43 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
   ];
 }
 
+function EmptyResults({
+  city,
+  onClear,
+}: {
+  city: CityContext;
+  onClear: () => void;
+}) {
+  return (
+    <div className="rounded-[22px] border border-dashed border-[#D6DEEB] bg-white px-6 py-10 text-center shadow-[0_10px_22px_rgba(18,34,72,0.05)]">
+      <h2 className="text-[24px] font-extrabold text-[#1D2440]">
+        Nenhum anúncio encontrado em {city.name}
+      </h2>
+      <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-7 text-[#6E748A]">
+        Ajuste os filtros para ampliar a busca ou volte para a listagem principal
+        da cidade para explorar mais oportunidades.
+      </p>
+
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={onClear}
+          className="inline-flex h-[46px] items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[15px] font-bold text-white transition hover:bg-[#1758CC]"
+        >
+          Limpar filtros
+        </button>
+
+        <Link
+          href={`/comprar?city_slug=${city.slug}`}
+          className="inline-flex h-[46px] items-center justify-center rounded-[12px] border border-[#D8E2F3] bg-white px-6 text-[15px] font-bold text-[#33405A] transition hover:bg-[#F7F9FC]"
+        >
+          Ver todos da cidade
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function TopPromoBanner() {
   return (
     <div className="relative overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white px-7 py-6 shadow-[0_10px_22px_rgba(18,34,72,0.05)]">
@@ -317,16 +429,17 @@ function TopPromoBanner() {
             Venda mais rápido
           </h3>
           <p className="mt-1 text-[16px] text-[#5F6780]">
-            com anúncios em <span className="font-extrabold text-[#1F66E5]">destaque</span>
+            com anúncios em{" "}
+            <span className="font-extrabold text-[#1F66E5]">destaque</span>
           </p>
         </div>
 
-        <a
+        <Link
           href="/planos"
           className="inline-flex h-[46px] shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[16px] font-bold text-white transition hover:bg-[#1758CC]"
         >
           Patrocinar anúncio
-        </a>
+        </Link>
       </div>
     </div>
   );
@@ -342,10 +455,13 @@ function Toolbar({
   return (
     <div className="mb-5 flex flex-col gap-3 rounded-[16px] border border-[#E5E9F2] bg-white px-4 py-3 shadow-[0_8px_18px_rgba(18,34,72,0.05)] md:flex-row md:items-center md:justify-between">
       <div className="flex flex-wrap items-center gap-3">
-        <select className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none">
-          <option>51 últimos</option>
-          <option>100 últimos</option>
-          <option>200 últimos</option>
+        <select
+          defaultValue="51"
+          className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none"
+        >
+          <option value="51">51 últimos</option>
+          <option value="100">100 últimos</option>
+          <option value="200">200 últimos</option>
         </select>
 
         <div className="hidden items-center gap-2 text-[#6E748A] md:flex">
@@ -424,23 +540,26 @@ function FilterSelect({
   options,
   onChange,
 }: {
-  label: string;
+  label?: string;
   value: string;
   options: Array<{ label: string; value: string }>;
   onChange: (value: string) => void;
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
-        {label}
-      </span>
+      {label ? (
+        <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
+          {label}
+        </span>
+      ) : null}
+
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="h-[52px] w-full rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[15px] font-medium text-[#33405A] outline-none transition focus:border-[#1F66E5]"
       >
         {options.map((option) => (
-          <option key={`${label}-${option.value}`} value={option.value}>
+          <option key={`${label || "select"}-${option.value}`} value={option.value}>
             {option.label}
           </option>
         ))}
@@ -504,10 +623,18 @@ export default function BuyMarketplacePageClient({
   const router = useRouter();
   const pathname = usePathname();
 
-  const rawItems = useMemo(
+  const apiItems = useMemo(
     () => toSafeCatalogItems(initialResults?.data, city),
     [initialResults?.data, city]
   );
+
+  const shouldUseFallbackCatalog = useMemo(() => {
+    return initialResults?.success === false && apiItems.length === 0;
+  }, [initialResults?.success, apiItems.length]);
+
+  const rawItems = useMemo(() => {
+    return shouldUseFallbackCatalog ? buildFallbackCatalog(city) : apiItems;
+  }, [apiItems, city, shouldUseFallbackCatalog]);
 
   const items = useMemo(() => sortCatalogItems(rawItems), [rawItems]);
 
@@ -586,7 +713,38 @@ export default function BuyMarketplacePageClient({
     [initialFilters, pathname, router]
   );
 
-  const totalAds = initialResults?.pagination?.total || items.length || 0;
+  const clearFilters = useCallback(() => {
+    pushFilters(
+      {
+        q: undefined,
+        brand: undefined,
+        model: undefined,
+        min_price: undefined,
+        max_price: undefined,
+        year_min: undefined,
+        year_max: undefined,
+        mileage_max: undefined,
+        fuel_type: undefined,
+        transmission: undefined,
+        body_type: undefined,
+        below_fipe: undefined,
+        highlight_only: undefined,
+        sort: "recent",
+        city_slug: city.slug,
+        city: city.name,
+        state: city.state,
+      },
+      true
+    );
+  }, [city.name, city.slug, city.state, pushFilters]);
+
+  const totalAds = useMemo(() => {
+    const paginatedTotal = Number(initialResults?.pagination?.total || 0);
+    if (paginatedTotal > 0) return paginatedTotal;
+    return items.length;
+  }, [initialResults?.pagination?.total, items.length]);
+
+  const hasNoResults = !shouldUseFallbackCatalog && items.length === 0;
 
   return (
     <main className="bg-[#F5F7FB]">
@@ -664,7 +822,6 @@ export default function BuyMarketplacePageClient({
 
             <SidebarSection title="Localização">
               <FilterSelect
-                label=""
                 value={city.slug}
                 options={[{ label: city.label, value: city.slug }]}
                 onChange={() => null}
@@ -730,26 +887,32 @@ export default function BuyMarketplacePageClient({
               onSortChange={(value) => pushFilters({ sort: value })}
             />
 
-            <div className="mb-5 grid gap-5 lg:grid-cols-2">
-              {firstRow.map((item, index) => (
-                <CatalogVehicleCard
-                  key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
-                  item={item}
-                  featured
-                  weight={inferWeight(item)}
-                />
-              ))}
-            </div>
+            {hasNoResults ? (
+              <EmptyResults city={city} onClear={clearFilters} />
+            ) : (
+              <>
+                <div className="mb-5 grid gap-5 lg:grid-cols-2">
+                  {firstRow.map((item, index) => (
+                    <CatalogVehicleCard
+                      key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
+                      item={item}
+                      featured
+                      weight={inferWeight(item)}
+                    />
+                  ))}
+                </div>
 
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {remaining.map((item, index) => (
-                <CatalogVehicleCard
-                  key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
-                  item={item}
-                  weight={inferWeight(item)}
-                />
-              ))}
-            </div>
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {remaining.map((item, index) => (
+                    <CatalogVehicleCard
+                      key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
+                      item={item}
+                      weight={inferWeight(item)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </section>
       </div>
