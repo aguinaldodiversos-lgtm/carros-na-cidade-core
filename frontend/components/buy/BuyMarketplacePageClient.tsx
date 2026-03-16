@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
+
 import type {
   AdsFacetsResponse,
   AdsSearchFilters,
@@ -67,22 +68,18 @@ const DEFAULT_POPULAR_BRANDS: BrandFacet[] = [
   { brand: "Jeep", total: 720 },
 ];
 
-function sanitizeText(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
-}
-
 function parseNumber(value?: string | number | null) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (value === undefined || value === null || value === "") return 0;
+  if (value === null || value === undefined || value === "") return 0;
 
-  const parsed = Number(
-    String(value)
-      .replace(/[^\d,.-]/g, "")
-      .replace(/\.(?=\d{3}(\D|$))/g, "")
-      .replace(",", ".")
-  );
-
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sanitizeText(value: unknown, fallback = ""): string {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fallback;
 }
 
 function parseDate(value?: string | null) {
@@ -95,194 +92,68 @@ function formatTotal(total?: number) {
   return new Intl.NumberFormat("pt-BR").format(total || 0);
 }
 
-function normalizeCatalogItem(
-  raw: unknown,
-  city: CityContext,
-  index: number
-): CatalogItem | null {
-  if (!raw || typeof raw !== "object") return null;
+function normalizeCatalogItem(item: Partial<CatalogItem>, city: CityContext): CatalogItem {
+  const validImages = Array.isArray(item.images)
+    ? item.images.filter(
+        (image): image is string => typeof image === "string" && image.trim().length > 0
+      )
+    : undefined;
 
-  const item = raw as Partial<CatalogItem> & {
-    image?: string | null;
-    cover_image?: string | null;
-    year_model?: string | null;
-  };
-
-  const safeId =
-    typeof item.id === "number" && Number.isFinite(item.id)
-      ? item.id
-      : 900000 + index;
-
-  const imageUrl =
-    sanitizeText(item.image_url) ||
-    sanitizeText(item.image) ||
-    sanitizeText(item.cover_image) ||
-    null;
-
-  const imageList =
-    Array.isArray(item.images) && item.images.length > 0
-      ? item.images.filter(
-          (image): image is string =>
-            typeof image === "string" && image.trim().length > 0
-        )
-      : imageUrl
-        ? [imageUrl]
-        : null;
-
-  const numericYear =
+  const parsedYear =
     typeof item.year === "number"
       ? item.year
-      : parseNumber(item.year) || undefined;
+      : item.year !== undefined && item.year !== null && item.year !== ""
+        ? parseNumber(item.year)
+        : undefined;
 
-  const numericMileage =
+  const parsedMileage =
     typeof item.mileage === "number"
       ? item.mileage
-      : parseNumber(item.mileage) || undefined;
+      : item.mileage !== undefined && item.mileage !== null && item.mileage !== ""
+        ? parseNumber(item.mileage)
+        : undefined;
 
-  const numericPrice =
+  const parsedPrice =
     typeof item.price === "number"
       ? item.price
-      : parseNumber(item.price) || undefined;
+      : item.price !== undefined && item.price !== null && item.price !== ""
+        ? parseNumber(item.price)
+        : undefined;
 
   return {
-  id: item.id,
-  slug: item.slug || undefined,
-  title: item.title || undefined,
-  brand: item.brand || undefined,
-  model: item.model || undefined,
-  version: item.version || undefined,
-  year:
-    typeof item.year === "number"
-      ? item.year
-      : item.year
-        ? parseNumber(item.year)
-        : undefined,
-  year_model: item.year_model || undefined,
-  mileage:
-    typeof item.mileage === "number"
-      ? item.mileage
-      : item.mileage
-        ? parseNumber(item.mileage)
-        : undefined,
-  transmission: item.transmission || undefined,
-  fuel_type: item.fuel_type || undefined,
-  city: item.city || undefined,
-  state: item.state || undefined,
-  price:
-    typeof item.price === "number"
-      ? item.price
-      : item.price
-        ? parseNumber(item.price)
-        : undefined,
-  image_url: item.image_url || undefined,
-  image: item.image || undefined,
-  cover_image: item.cover_image || undefined,
-  images: Array.isArray(item.images) ? item.images : undefined,
-  below_fipe: item.below_fipe === true,
-  highlight_until: item.highlight_until || undefined,
-  plan: item.plan || undefined,
-  seller_type: item.seller_type || undefined,
-  dealer_name: item.dealer_name || undefined,
-  dealership_name: item.dealership_name || undefined,
-  dealership_id:
-    typeof item.dealership_id === "number"
-      ? item.dealership_id
-      : undefined,
-  created_at: item.created_at || undefined,
-  catalogWeight: item.catalogWeight,
-};
-
-function toSafeCatalogItems(
-  value: AdsSearchResponse["data"] | undefined,
-  city: CityContext
-): CatalogItem[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item, index) => normalizeCatalogItem(item, city, index))
-    .filter((item): item is CatalogItem => Boolean(item));
-}
-
-function toSafeBrandFacets(value: unknown): BrandFacet[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item) => {
-      const obj = (item || {}) as Partial<BrandFacet>;
-      return {
-        brand: sanitizeText(obj.brand),
-        total: Number(obj.total || 0),
-      };
-    })
-    .filter((item) => item.brand);
-}
-
-function toSafeModelFacets(value: unknown): ModelFacet[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item) => {
-      const obj = (item || {}) as Partial<ModelFacet>;
-      return {
-        brand: obj.brand ? sanitizeText(obj.brand) : undefined,
-        model: sanitizeText(obj.model),
-        total: Number(obj.total || 0),
-      };
-    })
-    .filter((item) => item.model);
-}
-
-function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
-  if (item.catalogWeight) return item.catalogWeight;
-
-  if (item.highlight_until) return 4;
-
-  const plan = String(item.plan || "").toLowerCase();
-  if (
-    ["premium", "pro", "complete", "enterprise", "plus", "master"].some(
-      (signal) => plan.includes(signal)
-    )
-  ) {
-    return 3;
-  }
-
-  const isDealer = Boolean(
-    item.dealership_id ||
-      item.dealership_name ||
-      item.dealer_name ||
-      item.seller_type === "dealer" ||
-      item.seller_type === "dealership" ||
-      item.seller_type === "basic" ||
-      item.seller_type === "premium"
-  );
-
-  if (isDealer) return 2;
-  return 1;
-}
-
-function sortCatalogItems(items: CatalogItem[]) {
-  return [...items].sort((a, b) => {
-    const weightA = inferWeight(a);
-    const weightB = inferWeight(b);
-
-    if (weightA !== weightB) return weightB - weightA;
-
-    const belowFipeA = a.below_fipe ? 1 : 0;
-    const belowFipeB = b.below_fipe ? 1 : 0;
-    if (belowFipeA !== belowFipeB) return belowFipeB - belowFipeA;
-
-    const dateA = parseDate(a.created_at);
-    const dateB = parseDate(b.created_at);
-    if (dateA !== dateB) return dateB - dateA;
-
-    const priceA = parseNumber(a.price);
-    const priceB = parseNumber(b.price);
-    return priceB - priceA;
-  });
+    id: Number(item.id || 0),
+    slug: sanitizeText(item.slug) || undefined,
+    title: sanitizeText(item.title) || undefined,
+    brand: sanitizeText(item.brand) || undefined,
+    model: sanitizeText(item.model) || undefined,
+    version: sanitizeText(item.version) || undefined,
+    year: parsedYear,
+    year_model: sanitizeText(item.year_model) || undefined,
+    mileage: parsedMileage,
+    transmission: sanitizeText(item.transmission) || undefined,
+    fuel_type: sanitizeText(item.fuel_type) || undefined,
+    city: sanitizeText(item.city) || city.name,
+    state: sanitizeText(item.state) || city.state,
+    price: parsedPrice,
+    image_url: sanitizeText(item.image_url) || undefined,
+    image: sanitizeText(item.image) || undefined,
+    cover_image: sanitizeText(item.cover_image) || undefined,
+    images: validImages && validImages.length > 0 ? validImages : undefined,
+    below_fipe: item.below_fipe === true,
+    highlight_until: sanitizeText(item.highlight_until) || undefined,
+    plan: sanitizeText(item.plan) || undefined,
+    seller_type: sanitizeText(item.seller_type) || undefined,
+    dealer_name: sanitizeText(item.dealer_name) || undefined,
+    dealership_name: sanitizeText(item.dealership_name) || undefined,
+    dealership_id:
+      typeof item.dealership_id === "number" ? item.dealership_id : undefined,
+    created_at: sanitizeText(item.created_at) || undefined,
+    catalogWeight: item.catalogWeight,
+  };
 }
 
 function buildFallbackCatalog(city: CityContext): CatalogItem[] {
-  return [
+  const seed: Array<Partial<CatalogItem>> = [
     {
       id: 900001,
       slug: "byd-yuan-plus-2023",
@@ -414,43 +285,95 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       seller_type: "private",
     },
   ];
+
+  return seed.map((item) => normalizeCatalogItem(item, city));
 }
 
-function EmptyResults({
-  city,
-  onClear,
-}: {
-  city: CityContext;
-  onClear: () => void;
-}) {
-  return (
-    <div className="rounded-[22px] border border-dashed border-[#D6DEEB] bg-white px-6 py-10 text-center shadow-[0_10px_22px_rgba(18,34,72,0.05)]">
-      <h2 className="text-[24px] font-extrabold text-[#1D2440]">
-        Nenhum anúncio encontrado em {city.name}
-      </h2>
-      <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-7 text-[#6E748A]">
-        Ajuste os filtros para ampliar a busca ou volte para a listagem principal
-        da cidade para explorar mais oportunidades.
-      </p>
+function toSafeCatalogItems(
+  value: AdsSearchResponse["data"] | undefined,
+  city: CityContext
+): CatalogItem[] {
+  if (Array.isArray(value) && value.length > 0) {
+    return value.map((item) => normalizeCatalogItem(item, city));
+  }
 
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={onClear}
-          className="inline-flex h-[46px] items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[15px] font-bold text-white transition hover:bg-[#1758CC]"
-        >
-          Limpar filtros
-        </button>
+  return buildFallbackCatalog(city);
+}
 
-        <Link
-          href={`/comprar?city_slug=${city.slug}`}
-          className="inline-flex h-[46px] items-center justify-center rounded-[12px] border border-[#D8E2F3] bg-white px-6 text-[15px] font-bold text-[#33405A] transition hover:bg-[#F7F9FC]"
-        >
-          Ver todos da cidade
-        </Link>
-      </div>
-    </div>
+function toSafeBrandFacets(value: unknown): BrandFacet[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      const obj = (item || {}) as Partial<BrandFacet>;
+      return {
+        brand: sanitizeText(obj.brand),
+        total: Number(obj.total || 0),
+      };
+    })
+    .filter((item) => item.brand);
+}
+
+function toSafeModelFacets(value: unknown): ModelFacet[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      const obj = (item || {}) as Partial<ModelFacet>;
+      return {
+        brand: sanitizeText(obj.brand) || undefined,
+        model: sanitizeText(obj.model),
+        total: Number(obj.total || 0),
+      };
+    })
+    .filter((item) => item.model);
+}
+
+function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
+  if (item.catalogWeight) return item.catalogWeight;
+
+  if (item.highlight_until) return 4;
+
+  const plan = String(item.plan || "").toLowerCase();
+  if (
+    ["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) =>
+      plan.includes(signal)
+    )
+  ) {
+    return 3;
+  }
+
+  const isDealer = Boolean(
+    item.dealership_id ||
+      item.dealership_name ||
+      item.dealer_name ||
+      item.seller_type === "dealer" ||
+      item.seller_type === "dealership"
   );
+
+  if (isDealer) return 2;
+  return 1;
+}
+
+function sortCatalogItems(items: CatalogItem[]) {
+  return [...items].sort((a, b) => {
+    const weightA = inferWeight(a);
+    const weightB = inferWeight(b);
+
+    if (weightA !== weightB) return weightB - weightA;
+
+    const belowFipeA = a.below_fipe ? 1 : 0;
+    const belowFipeB = b.below_fipe ? 1 : 0;
+    if (belowFipeA !== belowFipeB) return belowFipeB - belowFipeA;
+
+    const dateA = parseDate(a.created_at);
+    const dateB = parseDate(b.created_at);
+    if (dateA !== dateB) return dateB - dateA;
+
+    const priceA = parseNumber(a.price);
+    const priceB = parseNumber(b.price);
+    return priceB - priceA;
+  });
 }
 
 function TopPromoBanner() {
@@ -494,13 +417,10 @@ function Toolbar({
   return (
     <div className="mb-5 flex flex-col gap-3 rounded-[16px] border border-[#E5E9F2] bg-white px-4 py-3 shadow-[0_8px_18px_rgba(18,34,72,0.05)] md:flex-row md:items-center md:justify-between">
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          defaultValue="51"
-          className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none"
-        >
-          <option value="51">51 últimos</option>
-          <option value="100">100 últimos</option>
-          <option value="200">200 últimos</option>
+        <select className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none">
+          <option>51 últimos</option>
+          <option>100 últimos</option>
+          <option>200 últimos</option>
         </select>
 
         <div className="hidden items-center gap-2 text-[#6E748A] md:flex">
@@ -579,26 +499,23 @@ function FilterSelect({
   options,
   onChange,
 }: {
-  label?: string;
+  label: string;
   value: string;
   options: Array<{ label: string; value: string }>;
   onChange: (value: string) => void;
 }) {
   return (
     <label className="block">
-      {label ? (
-        <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
-          {label}
-        </span>
-      ) : null}
-
+      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
+        {label}
+      </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="h-[52px] w-full rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[15px] font-medium text-[#33405A] outline-none transition focus:border-[#1F66E5]"
       >
         {options.map((option) => (
-          <option key={`${label || "select"}-${option.value}`} value={option.value}>
+          <option key={`${label}-${option.value}`} value={option.value}>
             {option.label}
           </option>
         ))}
@@ -662,20 +579,13 @@ export default function BuyMarketplacePageClient({
   const router = useRouter();
   const pathname = usePathname();
 
-  const apiItems = useMemo(
+  const rawItems = useMemo(
     () => toSafeCatalogItems(initialResults?.data, city),
     [initialResults?.data, city]
   );
 
-  const shouldUseFallbackCatalog = useMemo(() => {
-    return initialResults?.success === false && apiItems.length === 0;
-  }, [initialResults?.success, apiItems.length]);
-
-  const rawItems = useMemo(() => {
-    return shouldUseFallbackCatalog ? buildFallbackCatalog(city) : apiItems;
-  }, [apiItems, city, shouldUseFallbackCatalog]);
-
   const items = useMemo(() => sortCatalogItems(rawItems), [rawItems]);
+
   const firstRow = useMemo(() => items.slice(0, 2), [items]);
   const remaining = useMemo(() => items.slice(2), [items]);
 
@@ -716,9 +626,7 @@ export default function BuyMarketplacePageClient({
   }, [initialFilters.brand, modelFacets]);
 
   const popularBrands = useMemo(() => {
-    return brandFacets.length > 0
-      ? brandFacets.slice(0, 5)
-      : DEFAULT_POPULAR_BRANDS;
+    return brandFacets.length > 0 ? brandFacets.slice(0, 5) : DEFAULT_POPULAR_BRANDS;
   }, [brandFacets]);
 
   const catalogStats = useMemo(() => {
@@ -751,38 +659,7 @@ export default function BuyMarketplacePageClient({
     [initialFilters, pathname, router]
   );
 
-  const clearFilters = useCallback(() => {
-    pushFilters(
-      {
-        q: undefined,
-        brand: undefined,
-        model: undefined,
-        min_price: undefined,
-        max_price: undefined,
-        year_min: undefined,
-        year_max: undefined,
-        mileage_max: undefined,
-        fuel_type: undefined,
-        transmission: undefined,
-        body_type: undefined,
-        below_fipe: undefined,
-        highlight_only: undefined,
-        sort: "recent",
-        city_slug: city.slug,
-        city: city.name,
-        state: city.state,
-      },
-      true
-    );
-  }, [city.name, city.slug, city.state, pushFilters]);
-
-  const totalAds = useMemo(() => {
-    const paginatedTotal = Number(initialResults?.pagination?.total || 0);
-    if (paginatedTotal > 0) return paginatedTotal;
-    return items.length;
-  }, [initialResults?.pagination?.total, items.length]);
-
-  const hasNoResults = !shouldUseFallbackCatalog && items.length === 0;
+  const totalAds = initialResults?.pagination?.total || items.length || 0;
 
   return (
     <main className="bg-[#F5F7FB]">
@@ -860,9 +737,10 @@ export default function BuyMarketplacePageClient({
 
             <SidebarSection title="Localização">
               <FilterSelect
+                label=""
                 value={city.slug}
                 options={[{ label: city.label, value: city.slug }]}
-                onChange={() => null}
+                onChange={() => undefined}
               />
             </SidebarSection>
 
@@ -925,32 +803,26 @@ export default function BuyMarketplacePageClient({
               onSortChange={(value) => pushFilters({ sort: value })}
             />
 
-            {hasNoResults ? (
-              <EmptyResults city={city} onClear={clearFilters} />
-            ) : (
-              <>
-                <div className="mb-5 grid gap-5 lg:grid-cols-2">
-                  {firstRow.map((item, index) => (
-                    <CatalogVehicleCard
-                      key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
-                      item={item}
-                      featured
-                      weight={inferWeight(item)}
-                    />
-                  ))}
-                </div>
+            <div className="mb-5 grid gap-5 lg:grid-cols-2">
+              {firstRow.map((item, index) => (
+                <CatalogVehicleCard
+                  key={`featured-${item.id ?? item.slug ?? item.title ?? index}`}
+                  item={item}
+                  featured
+                  weight={inferWeight(item)}
+                />
+              ))}
+            </div>
 
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {remaining.map((item, index) => (
-                    <CatalogVehicleCard
-                      key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
-                      item={item}
-                      weight={inferWeight(item)}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {remaining.map((item, index) => (
+                <CatalogVehicleCard
+                  key={`card-${item.id ?? item.slug ?? item.title ?? index}`}
+                  item={item}
+                  weight={inferWeight(item)}
+                />
+              ))}
+            </div>
           </div>
         </section>
       </div>
