@@ -41,11 +41,20 @@ function getApiBaseUrl(): string {
 }
 
 function toText(value: unknown, fallback = ""): string {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fallback;
 }
 
 function toNullableText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+  const text = toText(value, "");
+  return text || null;
+}
+
+function toId(value: unknown, fallback: string): string | number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return fallback;
 }
 
 function toNumberOrString(value: unknown): number | string | null {
@@ -56,14 +65,50 @@ function toNumberOrString(value: unknown): number | string | null {
 
 function toBooleanOrNull(value: unknown): boolean | null {
   if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "sim"].includes(normalized)) return true;
+    if (["false", "0", "no", "nao", "não"].includes(normalized)) return false;
+  }
+  return null;
+}
+
+function getImageFromUnknown(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates = [
+      obj.url,
+      obj.src,
+      obj.image,
+      obj.image_url,
+      obj.cover_image,
+      obj.photo,
+      obj.thumb,
+      obj.thumbnail,
+      obj.large,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+
   return null;
 }
 
 function normalizeImages(value: unknown, imageUrl?: string | null): string[] {
   if (Array.isArray(value)) {
     const normalized = value
-      .map((item) => (typeof item === "string" ? item.trim() : ""))
-      .filter(Boolean);
+      .map(getImageFromUnknown)
+      .filter((item): item is string => Boolean(item));
 
     if (normalized.length > 0) return normalized;
   }
@@ -76,16 +121,22 @@ function normalizeImages(value: unknown, imageUrl?: string | null): string[] {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           const normalized = parsed
-            .map((item) => (typeof item === "string" ? item.trim() : ""))
-            .filter(Boolean);
+            .map(getImageFromUnknown)
+            .filter((item): item is string => Boolean(item));
 
           if (normalized.length > 0) return normalized;
         }
       } catch {
-        // segue para fallback simples
+        // segue fluxo
       }
     }
 
+    const commaSeparated = raw
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (commaSeparated.length > 1) return commaSeparated;
     return [raw];
   }
 
@@ -94,33 +145,40 @@ function normalizeImages(value: unknown, imageUrl?: string | null): string[] {
   return [FALLBACK_IMAGE];
 }
 
-function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdDetail | null {
+function normalizeAdDetail(
+  raw: unknown,
+  requestedIdentifier: string
+): PublicAdDetail | null {
   if (!raw || typeof raw !== "object") return null;
 
   const item = raw as Record<string, unknown>;
 
   const imageUrl =
-    toNullableText(item.image_url) ||
-    toNullableText(item.image) ||
-    toNullableText(item.cover_image);
+    getImageFromUnknown(item.image_url) ||
+    getImageFromUnknown(item.image) ||
+    getImageFromUnknown(item.cover_image) ||
+    getImageFromUnknown(item.photo);
 
-  const images = normalizeImages(item.images, imageUrl);
+  const images = normalizeImages(
+    item.images ?? item.gallery ?? item.photos,
+    imageUrl
+  );
 
-  const fallbackTitle =
+  const titleFallback =
     [
+      toText(item.year || item.year_model),
       toText(item.brand),
       toText(item.model),
       toText(item.version),
-      toText(item.year),
     ]
       .filter(Boolean)
       .join(" ")
       .trim() || "Veículo";
 
   return {
-    id: (item.id as number | string | undefined) ?? requestedIdentifier,
+    id: toId(item.id, requestedIdentifier),
     slug: toNullableText(item.slug) || requestedIdentifier,
-    title: toNullableText(item.title) || fallbackTitle,
+    title: toNullableText(item.title) || titleFallback,
     description: toNullableText(item.description),
     price: toNumberOrString(item.price),
     city: toNullableText(item.city) || "São Paulo",
@@ -128,18 +186,18 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
     brand: toNullableText(item.brand),
     model: toNullableText(item.model),
     version: toNullableText(item.version),
-    year: toNumberOrString(item.year),
-    mileage: toNumberOrString(item.mileage),
-    body_type: toNullableText(item.body_type) || toNullableText(item.bodyStyle),
-    fuel_type: toNullableText(item.fuel_type) || toNullableText(item.fuel),
+    year: toNumberOrString(item.year ?? item.year_model),
+    mileage: toNumberOrString(item.mileage ?? item.km),
+    body_type: toNullableText(item.body_type ?? item.bodyStyle ?? item.body),
+    fuel_type: toNullableText(item.fuel_type ?? item.fuel),
     transmission: toNullableText(item.transmission),
-    below_fipe: toBooleanOrNull(item.below_fipe),
+    below_fipe: toBooleanOrNull(item.below_fipe ?? item.isBelowFipe),
     highlight_until: toNullableText(item.highlight_until),
     plan: toNullableText(item.plan),
     image_url: imageUrl || FALLBACK_IMAGE,
     images,
-    created_at: toNullableText(item.created_at),
-    updated_at: toNullableText(item.updated_at),
+    created_at: toNullableText(item.created_at ?? item.createdAt),
+    updated_at: toNullableText(item.updated_at ?? item.updatedAt),
   };
 }
 
@@ -151,6 +209,8 @@ function extractPayload(json: unknown): unknown {
   if (payload.data && typeof payload.data === "object") return payload.data;
   if (payload.ad && typeof payload.ad === "object") return payload.ad;
   if (payload.item && typeof payload.item === "object") return payload.item;
+  if (payload.vehicle && typeof payload.vehicle === "object") return payload.vehicle;
+  if (payload.listing && typeof payload.listing === "object") return payload.listing;
 
   return payload;
 }
@@ -189,6 +249,7 @@ function buildCandidatePaths(identifier: string): string[] {
   return [
     `/api/ads/${encoded}`,
     `/api/ads/slug/${encoded}`,
+    `/api/ads/by-slug/${encoded}`,
     `/ads/${encoded}`,
     `/public/ads/${encoded}`,
     `/public/listings/${encoded}`,
@@ -217,10 +278,13 @@ async function tryFetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail> {
+export async function fetchAdDetail(
+  identifier: string
+): Promise<PublicAdDetail> {
   const safeIdentifier = toText(identifier, "").trim();
+
   if (!safeIdentifier) {
-    return buildFallbackAd("sem-slug");
+    return buildFallbackAd("sem-identificador");
   }
 
   const apiBase = getApiBaseUrl();
