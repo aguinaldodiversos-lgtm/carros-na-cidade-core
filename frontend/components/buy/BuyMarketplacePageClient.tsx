@@ -145,34 +145,52 @@ function normalizeCatalogItem(
       : parseNumber(item.price) || undefined;
 
   return {
-    ...item,
-    id: safeId,
-    slug: sanitizeText(item.slug) || undefined,
-    title: sanitizeText(item.title, "Veículo"),
-    brand: sanitizeText(item.brand) || undefined,
-    model: sanitizeText(item.model) || undefined,
-    version: sanitizeText(item.version) || undefined,
-    year: numericYear,
-    mileage: numericMileage,
-    price: numericPrice,
-    city: sanitizeText(item.city) || city.name,
-    state: sanitizeText(item.state).toUpperCase() || city.state,
-    transmission: sanitizeText(item.transmission) || undefined,
-    fuel_type: sanitizeText(item.fuel_type) || undefined,
-    image_url: imageUrl,
-    images: imageList,
-    below_fipe: item.below_fipe === true,
-    highlight_until: item.highlight_until || null,
-    plan: item.plan || null,
-    seller_type: item.seller_type || null,
-    dealer_name: item.dealer_name || null,
-    dealership_name: item.dealership_name || null,
-    dealership_id:
-      typeof item.dealership_id === "number" ? item.dealership_id : null,
-    created_at: item.created_at || null,
-    catalogWeight: item.catalogWeight,
-  };
-}
+  id: item.id,
+  slug: item.slug || undefined,
+  title: item.title || undefined,
+  brand: item.brand || undefined,
+  model: item.model || undefined,
+  version: item.version || undefined,
+  year:
+    typeof item.year === "number"
+      ? item.year
+      : item.year
+        ? parseNumber(item.year)
+        : undefined,
+  year_model: item.year_model || undefined,
+  mileage:
+    typeof item.mileage === "number"
+      ? item.mileage
+      : item.mileage
+        ? parseNumber(item.mileage)
+        : undefined,
+  transmission: item.transmission || undefined,
+  fuel_type: item.fuel_type || undefined,
+  city: item.city || undefined,
+  state: item.state || undefined,
+  price:
+    typeof item.price === "number"
+      ? item.price
+      : item.price
+        ? parseNumber(item.price)
+        : undefined,
+  image_url: item.image_url || undefined,
+  image: item.image || undefined,
+  cover_image: item.cover_image || undefined,
+  images: Array.isArray(item.images) ? item.images : undefined,
+  below_fipe: item.below_fipe === true,
+  highlight_until: item.highlight_until || undefined,
+  plan: item.plan || undefined,
+  seller_type: item.seller_type || undefined,
+  dealer_name: item.dealer_name || undefined,
+  dealership_name: item.dealership_name || undefined,
+  dealership_id:
+    typeof item.dealership_id === "number"
+      ? item.dealership_id
+      : undefined,
+  created_at: item.created_at || undefined,
+  catalogWeight: item.catalogWeight,
+};
 
 function toSafeCatalogItems(
   value: AdsSearchResponse["data"] | undefined,
