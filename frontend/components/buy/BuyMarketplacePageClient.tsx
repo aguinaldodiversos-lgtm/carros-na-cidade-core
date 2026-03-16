@@ -72,8 +72,8 @@ function sanitizeText(value: unknown, fallback = "") {
 }
 
 function parseNumber(value?: string | number | null) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (!value) return 0;
+  if (typeof value === "number") return value;
+  if (value === undefined || value === null || value === "") return 0;
 
   const parsed = Number(
     String(value)
