@@ -131,14 +131,14 @@ function normalizeCatalogItem(raw: unknown, city: CityContext, index: number): C
     city: sanitizeText(item.city || "") || city.name,
     state: sanitizeText(item.state || "") || city.state,
     year: typeof item.year === "number" ? item.year : parseNumber(item.year as string | number | null) || undefined,
-    mileage:
-      typeof item.mileage === "number"
-        ? item.mileage
-        : parseNumber(item.mileage as string | number | null) || undefined,
-    price:
-      typeof item.price === "number"
-        ? item.price
-        : parseNumber(item.price as string | number | null) || undefined,
+mileage:
+  typeof item.mileage === "number"
+    ? item.mileage
+    : parseNumber(item.mileage as string | number | null) || undefined,
+price:
+  typeof item.price === "number"
+    ? item.price
+    : parseNumber(item.price as string | number | null) || undefined,
     image_url: imageUrl,
     images,
     below_fipe: item.below_fipe === true,
