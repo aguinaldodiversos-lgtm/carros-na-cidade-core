@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { AdDetails, RelatedAd } from "@/lib/ads/get-ad-details";
+import { buildAdHref } from "@/lib/ads/build-ad-href";
 
 type Props = {
   ad: AdDetails;
@@ -19,6 +20,24 @@ type DetailItem = {
   label: string;
   value: string;
 };
+
+const FALLBACK_IMAGE = "/images/hero.jpeg";
+const CATALOG_HREF = "/comprar";
+const DEFAULT_CITY = "São Paulo";
+const DEFAULT_STATE = "SP";
+
+function toText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -74,21 +93,36 @@ function isDealer(type: AdDetails["seller"]["type"]) {
   return type === "premium" || type === "basic";
 }
 
-function resolveShowcase(ad: AdDetails): {
-  visible: boolean;
-  title: string;
-  subtitle?: string;
-  items: RelatedAd[];
-  emptyMessage?: string;
-} {
+function normalizeRelatedItems(items: RelatedAd[] | undefined | null) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter(Boolean)
+    .map((item, index) => ({
+      id: item.id || `related-${index}`,
+      slug: toText(item.slug, ""),
+      title: toText(item.title, "Veículo"),
+      city: toText(item.city, DEFAULT_CITY),
+      state: toText(item.state, DEFAULT_STATE),
+      price: toNumber(item.price, 0),
+      mileage: toNumber(item.mileage, 0),
+      yearLabel: toText(item.yearLabel, ""),
+      image: toText(item.image, FALLBACK_IMAGE),
+      badge: item.badge ? toText(item.badge, "") : undefined,
+    }));
+}
+
+function resolveShowcase(ad: AdDetails) {
   const dealer = isDealer(ad.seller.type);
+  const stockFromSeller = normalizeRelatedItems(ad.stockFromSeller);
+  const similarAds = normalizeRelatedItems(ad.similarAds);
 
   if (ad.weight === 1) {
     return {
       visible: true,
-      title: `Mais anúncios em ${ad.city}`,
+      title: `Mais anúncios em ${toText(ad.city, DEFAULT_CITY)}`,
       subtitle: "Outras oportunidades e veículos anunciados na sua cidade.",
-      items: ad.similarAds.slice(0, 4),
+      items: similarAds.slice(0, 4),
       emptyMessage: "Nenhum anúncio adicional disponível no momento.",
     };
   }
@@ -98,7 +132,7 @@ function resolveShowcase(ad: AdDetails): {
       visible: true,
       title: "Mais anúncios deste anunciante",
       subtitle: "Exibindo somente anúncios do lojista desta página.",
-      items: ad.stockFromSeller.slice(0, 4),
+      items: stockFromSeller.slice(0, 4),
       emptyMessage: "Este anunciante ainda não possui outros veículos publicados.",
     };
   }
@@ -106,10 +140,10 @@ function resolveShowcase(ad: AdDetails): {
   if (ad.weight === 3) {
     return {
       visible: true,
-      title: `Estoque da ${ad.seller.name}`,
+      title: `Estoque da ${toText(ad.seller.name, "Loja")}`,
       subtitle: "Exibindo somente anúncios da loja deste lojista.",
-      items: ad.stockFromSeller.slice(0, 4),
-      emptyMessage: `A ${ad.seller.name} ainda não possui outros veículos publicados.`,
+      items: stockFromSeller.slice(0, 4),
+      emptyMessage: `A ${toText(ad.seller.name, "loja")} ainda não possui outros veículos publicados.`,
     };
   }
 
@@ -117,16 +151,18 @@ function resolveShowcase(ad: AdDetails): {
     return {
       visible: false,
       title: "",
+      subtitle: "",
       items: [],
+      emptyMessage: "",
     };
   }
 
   return {
     visible: true,
-    title: `Destaques da ${ad.seller.name}`,
+    title: `Destaques da ${toText(ad.seller.name, "Loja")}`,
     subtitle: "Exibindo somente anúncios da página do lojista.",
-    items: ad.stockFromSeller.slice(0, 4),
-    emptyMessage: `A ${ad.seller.name} ainda não possui outros anúncios disponíveis.`,
+    items: stockFromSeller.slice(0, 4),
+    emptyMessage: `A ${toText(ad.seller.name, "loja")} ainda não possui outros anúncios disponíveis.`,
   };
 }
 
@@ -155,58 +191,114 @@ function SectionCard({
 }
 
 function VehicleCard({ item }: { item: RelatedAd }) {
+  const normalizedItem = {
+    id: item.id,
+    slug: toText(item.slug, ""),
+    title: toText(item.title, "Veículo"),
+    city: toText(item.city, DEFAULT_CITY),
+    state: toText(item.state, DEFAULT_STATE),
+    price: toNumber(item.price, 0),
+    mileage: toNumber(item.mileage, 0),
+    yearLabel: toText(item.yearLabel, ""),
+    image: toText(item.image, FALLBACK_IMAGE),
+    badge: item.badge ? toText(item.badge, "") : undefined,
+  };
+
+  const href = buildAdHref({
+    id: normalizedItem.id,
+    slug: normalizedItem.slug || undefined,
+    title: normalizedItem.title,
+    year: normalizedItem.yearLabel || undefined,
+  });
+
   return (
     <Link
-      href={`/comprar/${item.slug}`}
+      href={href}
       className="group overflow-hidden rounded-[24px] border border-[#E5E9F2] bg-white shadow-[0_12px_30px_rgba(30,41,59,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(30,41,59,0.10)]"
     >
       <div className="aspect-[16/10] overflow-hidden bg-[#EDF2FB]">
         <img
-          src={item.image}
-          alt={item.title}
+          src={normalizedItem.image}
+          alt={normalizedItem.title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
       </div>
 
       <div className="space-y-2 p-4">
-        {item.badge ? (
+        {normalizedItem.badge ? (
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(
-              item.badge
+              normalizedItem.badge
             )}`}
           >
-            {item.badge}
+            {normalizedItem.badge}
           </span>
         ) : null}
 
         <h3 className="line-clamp-2 min-h-[44px] text-[18px] font-semibold leading-6 text-[#1D2440]">
-          {item.title}
+          {normalizedItem.title}
         </h3>
 
         <p className="text-sm text-[#6E748A]">
-          {item.city} - {item.state}
+          {normalizedItem.city} - {normalizedItem.state}
         </p>
 
         <div className="flex items-center justify-between gap-3 pt-1">
           <strong className="text-[20px] font-extrabold text-[#1F66E5]">
-            {formatCurrency(item.price)}
+            {formatCurrency(normalizedItem.price)}
           </strong>
-          <span className="text-xs font-medium text-[#6E748A]">{item.yearLabel}</span>
+          <span className="text-xs font-medium text-[#6E748A]">
+            {normalizedItem.yearLabel}
+          </span>
         </div>
+
+        {!!normalizedItem.mileage && (
+          <div className="text-xs text-[#6E748A]">
+            {formatNumber(normalizedItem.mileage)} km
+          </div>
+        )}
       </div>
     </Link>
   );
 }
 
 export default function AdDetailsPage({ ad }: Props) {
-  const safeImages = ad.images?.length ? ad.images : ["/placeholder-car.jpg"];
+  const safeTitle = toText(ad.title, "Veículo");
+  const safeCity = toText(ad.city, DEFAULT_CITY);
+  const safeState = toText(ad.state, DEFAULT_STATE);
+  const safeBrand = toText(ad.brand, "Marca");
+  const safeModel = toText(ad.model, "Modelo");
+  const safeVersion = toText(ad.version, "Versão");
+  const safeDescription = toText(
+    ad.description,
+    "Consulte o anunciante para obter mais detalhes sobre este veículo."
+  );
+
+  const safeImages = useMemo(() => {
+    return Array.isArray(ad.images) && ad.images.length
+      ? ad.images.filter((image) => typeof image === "string" && image.trim()).map((image) => image || FALLBACK_IMAGE)
+      : [FALLBACK_IMAGE];
+  }, [ad.images]);
+
+  const safeBadges = useMemo(() => {
+    return Array.isArray(ad.badges)
+      ? ad.badges.filter((badge) => typeof badge === "string" && badge.trim())
+      : [];
+  }, [ad.badges]);
+
+  const safeFeatures = useMemo(() => {
+    return Array.isArray(ad.features)
+      ? ad.features.filter((feature) => typeof feature === "string" && feature.trim())
+      : [];
+  }, [ad.features]);
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [favorite, setFavorite] = useState(false);
   const [form, setForm] = useState<ContactFormState>({
     name: "",
     phone: "",
     email: "",
-    message: `Olá, tenho interesse no ${ad.title}. Gostaria de mais informações.`,
+    message: `Olá, tenho interesse no ${safeTitle}. Gostaria de mais informações.`,
   });
 
   useEffect(() => {
@@ -215,49 +307,67 @@ export default function AdDetailsPage({ ad }: Props) {
     }
   }, [safeImages.length, selectedImage]);
 
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      message: prev.message?.trim()
+        ? prev.message
+        : `Olá, tenho interesse no ${safeTitle}. Gostaria de mais informações.`,
+    }));
+  }, [safeTitle]);
+
   const showcase = useMemo(() => resolveShowcase(ad), [ad]);
 
+  const whatsappNumber = normalizeWhatsapp(toText(ad.seller.whatsapp, ad.seller.phone));
   const whatsappLink = useMemo(() => {
-    const message = `Olá! Tenho interesse no veículo ${ad.title} anunciado no Carros na Cidade por ${formatCurrency(
-      ad.price
+    if (!whatsappNumber) return "#";
+
+    const message = `Olá! Tenho interesse no veículo ${safeTitle} anunciado no Carros na Cidade por ${formatCurrency(
+      toNumber(ad.price, 0)
     )}. Gostaria de mais informações.`;
 
-    return `https://wa.me/${normalizeWhatsapp(ad.seller.whatsapp)}?text=${encodeURIComponent(message)}`;
-  }, [ad]);
+    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+  }, [ad.price, safeTitle, whatsappNumber]);
 
   const financingLink = useMemo(() => {
     const params = new URLSearchParams({
-      veiculo: ad.slug,
-      titulo: ad.title,
-      valor: String(ad.price),
-      cidade: ad.city,
+      veiculo: toText(ad.slug, ""),
+      titulo: safeTitle,
+      valor: String(toNumber(ad.price, 0)),
+      cidade: safeCity,
     });
 
-    return `/financiamento?${params.toString()}`;
-  }, [ad]);
+    return `/simulador-financiamento/sao-paulo-sp?${params.toString()}`;
+  }, [ad.price, ad.slug, safeCity, safeTitle]);
 
-  const priceDiff = ad.price - ad.fipeValue;
-  const diffPercent = ad.fipeValue ? (priceDiff / ad.fipeValue) * 100 : 0;
+  const price = toNumber(ad.price, 0);
+  const fipeValue = toNumber(ad.fipeValue, 0);
+  const priceDiff = price - fipeValue;
+  const diffPercent = fipeValue ? (priceDiff / fipeValue) * 100 : 0;
   const belowFipe = priceDiff < 0;
 
   function goPrevImage() {
-    setSelectedImage((current) => (current === 0 ? safeImages.length - 1 : current - 1));
+    setSelectedImage((current) =>
+      current === 0 ? safeImages.length - 1 : current - 1
+    );
   }
 
   function goNextImage() {
-    setSelectedImage((current) => (current === safeImages.length - 1 ? 0 : current + 1));
+    setSelectedImage((current) =>
+      current === safeImages.length - 1 ? 0 : current + 1
+    );
   }
 
   async function handleShare() {
     const url = typeof window !== "undefined" ? window.location.href : "";
-    const title = ad.title;
+    const title = safeTitle;
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ title, url });
         return;
       } catch {
-        // fallback
+        // fallback silencioso
       }
     }
 
@@ -267,6 +377,7 @@ export default function AdDetailsPage({ ad }: Props) {
         window.alert("Link copiado com sucesso.");
         return;
       }
+
       window.alert("Não foi possível copiar o link automaticamente.");
     } catch {
       window.alert("Não foi possível copiar o link.");
@@ -276,8 +387,13 @@ export default function AdDetailsPage({ ad }: Props) {
   function handleContactSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!whatsappNumber) {
+      window.alert("WhatsApp do anunciante não disponível no momento.");
+      return;
+    }
+
     const text = [
-      `Olá! Tenho interesse no veículo ${ad.title}.`,
+      `Olá! Tenho interesse no veículo ${safeTitle}.`,
       `Nome: ${form.name || "Não informado"}`,
       `Telefone: ${form.phone || "Não informado"}`,
       `E-mail: ${form.email || "Não informado"}`,
@@ -285,44 +401,53 @@ export default function AdDetailsPage({ ad }: Props) {
     ].join("\n");
 
     window.open(
-      `https://wa.me/${normalizeWhatsapp(ad.seller.whatsapp)}?text=${encodeURIComponent(text)}`,
+      `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`,
       "_blank",
       "noopener,noreferrer"
     );
   }
 
   const detailItems: DetailItem[] = [
-    { label: "Ano/modelo", value: ad.yearLabel },
-    { label: "Quilometragem", value: `${formatNumber(ad.mileage)} km` },
-    { label: "Câmbio", value: ad.transmission },
-    { label: "Combustível", value: ad.fuel },
-    { label: "Carroceria", value: ad.bodyStyle },
-    { label: "Cor", value: ad.color },
-    { label: "Final de placa", value: ad.plateFinal },
-    { label: "Publicação", value: ad.publishedLabel },
+    { label: "Ano/modelo", value: toText(ad.yearLabel, "Não informado") },
+    {
+      label: "Quilometragem",
+      value: `${formatNumber(toNumber(ad.mileage, 0))} km`,
+    },
+    { label: "Câmbio", value: toText(ad.transmission, "Não informado") },
+    { label: "Combustível", value: toText(ad.fuel, "Não informado") },
+    { label: "Carroceria", value: toText(ad.bodyStyle, "Não informado") },
+    { label: "Cor", value: toText(ad.color, "Não informado") },
+    { label: "Final de placa", value: toText(ad.plateFinal, "Não informado") },
+    { label: "Publicação", value: toText(ad.publishedLabel, "Não informado") },
   ];
+
+  const sellerPhone = digitsOnly(toText(ad.seller.phone, ""));
 
   return (
     <main className="min-h-screen bg-[#F5F7FB]">
       <div className="mx-auto max-w-[1360px] px-4 pb-16 pt-6">
         <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm text-[#6E748A]">
           <Link href="/" className="transition hover:text-[#1F66E5]">
-            {ad.city}
+            Home
           </Link>
           <span>›</span>
-          <Link href="/comprar" className="transition hover:text-[#1F66E5]">
-            {ad.brand}
+          <Link href={CATALOG_HREF} className="transition hover:text-[#1F66E5]">
+            Comprar
           </Link>
           <span>›</span>
-          <span>{ad.model}</span>
+          <Link href={CATALOG_HREF} className="transition hover:text-[#1F66E5]">
+            {safeBrand}
+          </Link>
           <span>›</span>
-          <span>{ad.version}</span>
+          <span>{safeModel}</span>
+          <span>›</span>
+          <span>{safeVersion}</span>
         </nav>
 
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap gap-2">
-              {ad.badges.map((badge) => (
+              {safeBadges.map((badge) => (
                 <span
                   key={badge}
                   className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-bold ${badgeClasses(
@@ -335,18 +460,18 @@ export default function AdDetailsPage({ ad }: Props) {
             </div>
 
             <h1 className="max-w-[920px] text-[34px] font-extrabold leading-[1.08] tracking-[-0.04em] text-[#1D2440] sm:text-[46px]">
-              {ad.title}
+              {safeTitle}
             </h1>
 
             <div className="mt-5 flex flex-wrap gap-3">
               <div className="inline-flex items-center gap-2 rounded-2xl border border-[#E5E9F2] bg-white px-3 py-2 text-sm font-medium text-[#4B536A] shadow-sm">
-                {ad.city} - {ad.state}
+                {safeCity} - {safeState}
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-[#E5E9F2] bg-white px-3 py-2 text-sm font-medium text-[#4B536A] shadow-sm">
                 {sellerTypeLabel(ad.seller.type)}
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-[#E5E9F2] bg-white px-3 py-2 text-sm font-medium text-[#4B536A] shadow-sm">
-                {formatNumber(ad.mileage)} km
+                {formatNumber(toNumber(ad.mileage, 0))} km
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-[#E5E9F2] bg-white px-3 py-2 text-sm font-medium text-[#4B536A] shadow-sm">
                 Peso {ad.weight}
@@ -356,16 +481,22 @@ export default function AdDetailsPage({ ad }: Props) {
 
           <div className="flex shrink-0 flex-col gap-3 xl:items-end">
             <div className="text-left xl:text-right">
-              <div className="text-sm font-medium text-[#6E748A]">Preço do veículo</div>
+              <div className="text-sm font-medium text-[#6E748A]">
+                Preço do veículo
+              </div>
               <div className="text-[42px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
-                {formatCurrency(ad.price)}
+                {formatCurrency(price)}
               </div>
               <div
                 className={`mt-1 text-sm font-semibold ${
                   belowFipe ? "text-green-600" : "text-orange-600"
                 }`}
               >
-                {belowFipe ? "Abaixo da FIPE" : "Acima da FIPE"} • {percentageLabel(diffPercent)}
+                {fipeValue > 0
+                  ? `${belowFipe ? "Abaixo da FIPE" : "Acima da FIPE"} • ${percentageLabel(
+                      diffPercent
+                    )}`
+                  : "Comparativo FIPE indisponível"}
               </div>
             </div>
 
@@ -396,7 +527,7 @@ export default function AdDetailsPage({ ad }: Props) {
                 <div className="aspect-[16/10] sm:aspect-[16/9] xl:aspect-[16/8.4]">
                   <img
                     src={safeImages[selectedImage]}
-                    alt={`${ad.title} - foto ${selectedImage + 1}`}
+                    alt={`${safeTitle} - foto ${selectedImage + 1}`}
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -428,7 +559,9 @@ export default function AdDetailsPage({ ad }: Props) {
                           type="button"
                           onClick={() => setSelectedImage(index)}
                           className={`h-2.5 rounded-full transition ${
-                            selectedImage === index ? "w-8 bg-[#2F67F6]" : "w-2.5 bg-[#CBD5E1]"
+                            selectedImage === index
+                              ? "w-8 bg-[#2F67F6]"
+                              : "w-2.5 bg-[#CBD5E1]"
                           }`}
                           aria-label={`Ir para foto ${index + 1}`}
                         />
@@ -455,7 +588,11 @@ export default function AdDetailsPage({ ad }: Props) {
                     }`}
                   >
                     <div className="aspect-[4/3] bg-[#EDF2FB]">
-                      <img src={image} alt={`Miniatura ${index + 1}`} className="h-full w-full object-cover" />
+                      <img
+                        src={image}
+                        alt={`Miniatura ${index + 1}`}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                   </button>
                 ))}
@@ -463,16 +600,24 @@ export default function AdDetailsPage({ ad }: Props) {
             </section>
 
             <SectionCard title="Principais destaques">
-              <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-                {ad.features.map((feature) => (
-                  <div key={feature} className="flex items-start gap-3">
-                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2F67F6]">
-                      ✓
-                    </span>
-                    <span className="text-[15px] font-medium text-[#4B536A]">{feature}</span>
-                  </div>
-                ))}
-              </div>
+              {safeFeatures.length > 0 ? (
+                <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {safeFeatures.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2F67F6]">
+                        ✓
+                      </span>
+                      <span className="text-[15px] font-medium text-[#4B536A]">
+                        {feature}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-[#E5E9F2] bg-[#FBFCFF] p-6 text-sm leading-7 text-[#5C647C]">
+                  Este anúncio ainda não possui destaques cadastrados.
+                </div>
+              )}
             </SectionCard>
 
             <SectionCard title="Informações do veículo">
@@ -482,8 +627,12 @@ export default function AdDetailsPage({ ad }: Props) {
                     key={item.label}
                     className="rounded-[22px] border border-[#E5E9F2] bg-[#FBFCFF] p-4"
                   >
-                    <div className="text-sm font-medium text-[#6E748A]">{item.label}</div>
-                    <div className="mt-2 text-[18px] font-bold text-[#1D2440]">{item.value}</div>
+                    <div className="text-sm font-medium text-[#6E748A]">
+                      {item.label}
+                    </div>
+                    <div className="mt-2 text-[18px] font-bold text-[#1D2440]">
+                      {item.value}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -492,28 +641,36 @@ export default function AdDetailsPage({ ad }: Props) {
             <SectionCard title="Tabela FIPE">
               <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
                 <div className="rounded-[24px] border border-[#D8E8D8] bg-[#F5FCF5] p-5">
-                  <div className="text-sm font-semibold text-[#4B536A]">Valor FIPE</div>
+                  <div className="text-sm font-semibold text-[#4B536A]">
+                    Valor FIPE
+                  </div>
                   <div className="mt-2 text-[34px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
-                    {formatCurrency(ad.fipeValue)}
+                    {formatCurrency(fipeValue)}
                   </div>
                   <div
                     className={`mt-2 text-sm font-semibold ${
                       belowFipe ? "text-green-600" : "text-orange-600"
                     }`}
                   >
-                    {belowFipe
-                      ? `${percentageLabel(diffPercent)} abaixo da FIPE`
-                      : `${percentageLabel(diffPercent)} acima da FIPE`}
+                    {fipeValue > 0
+                      ? belowFipe
+                        ? `${percentageLabel(diffPercent)} abaixo da FIPE`
+                        : `${percentageLabel(diffPercent)} acima da FIPE`
+                      : "Referência FIPE indisponível"}
                   </div>
                 </div>
 
                 <div className="rounded-[24px] border border-[#E5E9F2] bg-[#FBFCFF] p-5">
-                  <div className="text-sm font-semibold text-[#4B536A]">Preço do anúncio</div>
+                  <div className="text-sm font-semibold text-[#4B536A]">
+                    Preço do anúncio
+                  </div>
                   <div className="mt-2 text-[28px] font-extrabold tracking-[-0.04em] text-[#1F66E5]">
-                    {formatCurrency(ad.price)}
+                    {formatCurrency(price)}
                   </div>
                   <div className="mt-2 text-sm text-[#6E748A]">
-                    Diferença de {formatCurrency(Math.abs(priceDiff))} em relação à FIPE.
+                    {fipeValue > 0
+                      ? `Diferença de ${formatCurrency(Math.abs(priceDiff))} em relação à FIPE.`
+                      : "Comparativo FIPE indisponível no momento."}
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -555,10 +712,11 @@ export default function AdDetailsPage({ ad }: Props) {
 
             <SectionCard title="Descrição do veículo">
               <div className="space-y-4 text-[16px] leading-8 text-[#4B536A]">
-                <p>{ad.description}</p>
+                <p>{safeDescription}</p>
                 <p>
-                  Atendimento com foco em transparência, avaliação justa e envio rápido de informações.
-                  Você pode falar direto com o vendedor pelo WhatsApp ou simular financiamento sem sair do portal.
+                  Atendimento com foco em transparência, avaliação justa e envio rápido
+                  de informações. Você pode falar direto com o vendedor pelo WhatsApp
+                  ou simular financiamento sem sair do portal.
                 </p>
               </div>
             </SectionCard>
@@ -568,25 +726,30 @@ export default function AdDetailsPage({ ad }: Props) {
             <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
               <div className="flex items-start gap-4">
                 <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[22px] font-extrabold text-[#2F67F6]">
-                  {(ad.seller.name || "A").charAt(0)}
+                  {toText(ad.seller.name, "A").charAt(0)}
                 </div>
 
                 <div className="min-w-0">
                   <div className="text-[28px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
-                    {ad.seller.name}
+                    {toText(ad.seller.name, "Anunciante")}
                   </div>
                   <div className="mt-1 text-base font-medium text-[#6E748A]">
-                    {ad.seller.city} - {ad.seller.state}
+                    {toText(ad.seller.city, DEFAULT_CITY)} -{" "}
+                    {toText(ad.seller.state, DEFAULT_STATE)}
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <div className="inline-flex items-center gap-1 rounded-full bg-[#FFF7E8] px-3 py-1 text-sm font-semibold text-[#B7791F]">
-                      ★ {ad.seller.rating.toFixed(1)}
+                      ★ {toNumber(ad.seller.rating, 0).toFixed(1)}
                     </div>
 
-                    <span className="text-sm text-[#6E748A]">{ad.seller.reviewCount} avaliações</span>
+                    <span className="text-sm text-[#6E748A]">
+                      {formatNumber(toNumber(ad.seller.reviewCount, 0))} avaliações
+                    </span>
                     <span className="text-sm text-[#6E748A]">•</span>
-                    <span className="text-sm text-[#6E748A]">{sellerTypeLabel(ad.seller.type)}</span>
+                    <span className="text-sm text-[#6E748A]">
+                      {sellerTypeLabel(ad.seller.type)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -611,10 +774,10 @@ export default function AdDetailsPage({ ad }: Props) {
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <a
-                  href={`tel:${digitsOnly(ad.seller.phone)}`}
+                  href={sellerPhone ? `tel:${sellerPhone}` : "#"}
                   className="inline-flex items-center justify-center rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm font-semibold text-[#1D2440] transition hover:bg-white"
                 >
-                  {ad.seller.phone}
+                  {toText(ad.seller.phone, "Telefone indisponível")}
                 </a>
 
                 <a
@@ -630,8 +793,11 @@ export default function AdDetailsPage({ ad }: Props) {
                   Informações do anunciante
                 </div>
                 <div className="mt-3 space-y-2 text-sm text-[#5C647C]">
-                  <p>{ad.seller.address}</p>
-                  <p>{ad.seller.stockCount} veículos anunciados no portal</p>
+                  <p>{toText(ad.seller.address, "Endereço não informado")}</p>
+                  <p>
+                    {formatNumber(toNumber(ad.seller.stockCount, 0))} veículos
+                    anunciados no portal
+                  </p>
                   <p>Peso comercial do anúncio: {ad.weight}</p>
                 </div>
               </div>
@@ -645,20 +811,25 @@ export default function AdDetailsPage({ ad }: Props) {
                 Enviar mensagem
               </h3>
               <p className="mt-2 text-sm leading-6 text-[#6E748A]">
-                Preencha os dados abaixo e a conversa seguirá direto para o vendedor via WhatsApp.
+                Preencha os dados abaixo e a conversa seguirá direto para o vendedor
+                via WhatsApp.
               </p>
 
               <form onSubmit={handleContactSubmit} className="mt-5 space-y-3">
                 <input
                   value={form.name}
-                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
                   placeholder="Nome"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
                 />
 
                 <input
                   value={form.phone}
-                  onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, phone: event.target.value }))
+                  }
                   placeholder="Telefone"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
                 />
@@ -666,14 +837,18 @@ export default function AdDetailsPage({ ad }: Props) {
                 <input
                   type="email"
                   value={form.email}
-                  onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, email: event.target.value }))
+                  }
                   placeholder="seuemail@exemplo.com"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
                 />
 
                 <textarea
                   value={form.message}
-                  onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, message: event.target.value }))
+                  }
                   rows={5}
                   placeholder="Digite sua mensagem"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
