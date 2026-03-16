@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { cache } from "react";
 import AdEventTracker from "@/components/analytics/AdEventTracker";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
@@ -12,6 +11,7 @@ import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
+import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import {
   adaptAdDetailToVehicle,
   buildCityVehicles,
@@ -23,31 +23,146 @@ import {
   getAIVehiclePriceSignal,
 } from "@/services/aiService";
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
 type PageProps = {
   params: { slug: string };
+  searchParams?: SearchParams;
 };
 
 export const revalidate = 1800;
 export const dynamicParams = true;
 
-const getPublicVehicleDetail = cache(async (slug: string) => {
-  return adaptAdDetailToVehicle(await fetchAdDetail(slug));
-});
+function getFirstValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const vehicle = await getPublicVehicleDetail(params.slug);
-  const [cityName] = vehicle.city.split(" (");
+function safeText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function extractYear(value: string) {
+  const match = String(value || "").match(/\d{4}/);
+  return match?.[0] || "2024";
+}
+
+function slugToReadableText(slug: string) {
+  const cleaned = String(slug || "")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/^veiculo\//, "")
+    .replace(/-/g, " ")
+    .trim();
+
+  if (!cleaned) return "Veículo";
+
+  return cleaned
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
+  const fullName = slugToReadableText(slug);
+  const year = extractYear(fullName);
+  const model = fullName || "Veículo";
 
   return {
-    title: `${vehicle.model} ${vehicle.year.split("/")[0]} à venda em ${cityName}`,
-    description: `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulação de financiamento.`,
+    id: ref || slug || "fallback-vehicle",
+    slug: safeText(slug, "veiculo-sem-slug"),
+    model,
+    fullName,
+    price: "R$ 0",
+    condition: "Usado",
+    year: `${year}/${year}`,
+    km: "Km não informado",
+    fuel: "Não informado",
+    transmission: "Não informado",
+    color: "Não informado",
+    city: "São Paulo (SP)",
+    citySlug: "sao-paulo-sp",
+    adCode: ref || slug || "fallback",
+    isBelowFipe: false,
+    fipePrice: "Consulte",
+    images: ["/images/banner1.jpg", "/images/banner2.jpg", "/images/hero.jpeg"],
+    description:
+      "As informações completas deste veículo estão temporariamente indisponíveis. Tente novamente em instantes ou volte para a listagem.",
+    optionalItems: [
+      "Dados em atualização",
+      "Consulte disponibilidade com o anunciante",
+      "Use o simulador para estimar financiamento",
+    ],
+    safetyItems: [
+      "Verifique histórico do veículo",
+      "Confira documentação antes da compra",
+      "Faça vistoria cautelar",
+    ],
+    comfortItems: [
+      "Contato direto pelo portal",
+      "Experiência otimizada para mobile",
+      "Acesso rápido à listagem da cidade",
+    ],
+    sellerNotes:
+      "Os dados deste anúncio estão em atualização. Recomendamos confirmar disponibilidade, preço e opcionais diretamente com o anunciante.",
+    seller: {
+      type: "private",
+      name: "Anunciante no Carros na Cidade",
+      phone: "",
+    },
+  };
+}
+
+const getPublicVehicleDetail = cache(async (slug: string, ref?: string) => {
+  const candidates = Array.from(
+    new Set([safeText(ref), safeText(slug)].filter(Boolean))
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const ad = await fetchAdDetail(candidate);
+      const vehicle = adaptAdDetailToVehicle(ad);
+
+      return {
+        ...vehicle,
+        slug: safeText(vehicle.slug, slug),
+        adCode: safeText(vehicle.adCode, candidate),
+      };
+    } catch {
+      // tenta o próximo identificador
+    }
+  }
+
+  return buildFallbackVehicle(slug, ref);
+});
+
+function buildPageTitle(vehicle: VehicleDetail) {
+  const year = extractYear(vehicle.year);
+  const cityName = safeText(vehicle.city.split(" (")[0], "São Paulo");
+  return `${vehicle.model} ${year} à venda em ${cityName}`;
+}
+
+function buildPageDescription(vehicle: VehicleDetail) {
+  return `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulação de financiamento.`;
+}
+
+export async function generateMetadata({
+  params,
+  searchParams = {},
+}: PageProps): Promise<Metadata> {
+  const ref = getFirstValue(searchParams.ref);
+  const vehicle = await getPublicVehicleDetail(params.slug, ref);
+
+  return {
+    title: buildPageTitle(vehicle),
+    description: buildPageDescription(vehicle),
     alternates: {
-      canonical: `/veiculo/${vehicle.slug}`,
+      canonical: `/veiculo/${vehicle.slug || params.slug}`,
     },
     openGraph: {
-      title: `${vehicle.model} ${vehicle.year.split("/")[0]} à venda em ${cityName}`,
-      description: `${vehicle.fullName} anunciado por ${vehicle.price} em ${vehicle.city}.`,
-      url: `/veiculo/${vehicle.slug}`,
+      title: buildPageTitle(vehicle),
+      description: buildPageDescription(vehicle),
+      url: `/veiculo/${vehicle.slug || params.slug}`,
       images: [
         {
           url: vehicle.images[0] ?? "/images/banner1.jpg",
@@ -60,31 +175,61 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "website",
     },
     keywords: [
-      `${vehicle.model.toLowerCase()} ${cityName.toLowerCase()}`,
-      `comprar ${vehicle.model.toLowerCase()} ${cityName.toLowerCase()}`,
-      `veículo ${cityName.toLowerCase()}`,
+      `${vehicle.model.toLowerCase()} ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
+      `comprar ${vehicle.model.toLowerCase()} ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
+      `veículo ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
     ],
   };
 }
 
-export default async function VehicleDetailPage({ params }: PageProps) {
-  const vehicle = await getPublicVehicleDetail(params.slug);
+export default async function VehicleDetailPage({
+  params,
+  searchParams = {},
+}: PageProps) {
+  const ref = getFirstValue(searchParams.ref);
+  const vehicle = await getPublicVehicleDetail(params.slug, ref);
 
-  const [priceSignal, aiInsights, sellerVehicles, cityVehicles, similarVehicles] =
-    await Promise.all([
-      getAIVehiclePriceSignal(vehicle),
-      getAIVehicleInsights(vehicle),
-      Promise.resolve(buildSellerVehicles(vehicle)),
-      Promise.resolve(buildCityVehicles(vehicle)),
-      getAISimilarVehicles(vehicle),
-    ]);
+  const [
+    priceSignalResult,
+    aiInsightsResult,
+    similarVehiclesResult,
+  ] = await Promise.allSettled([
+    getAIVehiclePriceSignal(vehicle),
+    getAIVehicleInsights(vehicle),
+    getAISimilarVehicles(vehicle),
+  ]);
+
+  const priceSignal =
+    priceSignalResult.status === "fulfilled"
+      ? priceSignalResult.value
+      : {
+          label: "Análise temporariamente indisponível",
+          reason: "Os indicadores automáticos de preço não puderam ser carregados no momento.",
+        };
+
+  const aiInsights =
+    aiInsightsResult.status === "fulfilled"
+      ? aiInsightsResult.value
+      : ({} as Awaited<ReturnType<typeof getAIVehicleInsights>>);
+
+  const sellerVehicles = buildSellerVehicles(vehicle);
+  const cityVehicles = buildCityVehicles(vehicle);
+  const similarVehicles =
+    similarVehiclesResult.status === "fulfilled" &&
+    Array.isArray(similarVehiclesResult.value) &&
+    similarVehiclesResult.value.length > 0
+      ? similarVehiclesResult.value
+      : buildCityVehicles(vehicle, 6);
+
+  const canonicalSlug = safeText(vehicle.slug, params.slug);
+  const year = extractYear(vehicle.year);
 
   const schemaVehicle = {
     "@context": "https://schema.org",
     "@type": "Vehicle",
     name: vehicle.fullName,
     model: vehicle.model,
-    vehicleModelDate: vehicle.year.split("/")[0],
+    vehicleModelDate: year,
     fuelType: vehicle.fuel,
     vehicleTransmission: vehicle.transmission,
     color: vehicle.color,
@@ -97,9 +242,12 @@ export default async function VehicleDetailPage({ params }: PageProps) {
     offers: {
       "@type": "Offer",
       priceCurrency: "BRL",
-      price: vehicle.price.replace(/[^\d,]/g, "").replace(".", "").replace(",", "."),
+      price: vehicle.price
+        .replace(/[^\d,]/g, "")
+        .replace(/\.(?=\d{3}(\D|$))/g, "")
+        .replace(",", "."),
       availability: "https://schema.org/InStock",
-      url: `https://carrosnacidade.com/veiculo/${vehicle.slug}`,
+      url: `https://carrosnacidade.com/veiculo/${canonicalSlug}`,
     },
   };
 
@@ -127,20 +275,22 @@ export default async function VehicleDetailPage({ params }: PageProps) {
       },
     ],
   };
+
   const breadcrumbItems = [
     { name: "Home", href: "/" },
-    { name: "Anúncios", href: "/anuncios" },
+    { name: "Comprar", href: "/comprar" },
     { name: vehicle.model },
   ];
+
   const pageSchema = buildWebPageJsonLd({
-    title: `${vehicle.model} ${vehicle.year.split("/")[0]} à venda`,
-    description: `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulação de financiamento.`,
-    path: `/veiculo/${vehicle.slug}`,
+    title: `${vehicle.model} ${year} à venda`,
+    description: buildPageDescription(vehicle),
+    path: `/veiculo/${canonicalSlug}`,
     type: "WebPage",
     about: vehicle.fullName,
   });
 
-  const sellerPhone = vehicle.seller.phone;
+  const sellerPhone = safeText(vehicle.seller.phone);
 
   return (
     <>
