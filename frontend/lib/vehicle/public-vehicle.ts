@@ -46,13 +46,20 @@ export type VehicleDetail = {
   seller: SellerInfo;
 };
 
+const FALLBACK_IMAGES = [
+  "/images/hero.jpeg",
+  "/images/banner1.jpg",
+  "/images/banner2.jpg",
+];
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
 }
 
 function toTitleCase(value: string) {
@@ -64,7 +71,20 @@ function toTitleCase(value: string) {
 }
 
 function sanitizeText(value: unknown, fallback = "") {
-  return String(value ?? fallback).trim();
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return fallback;
+}
+
+function sanitizeNullableText(value: unknown) {
+  const text = sanitizeText(value);
+  return text || null;
 }
 
 function formatPrice(value?: number | string | null) {
@@ -72,7 +92,12 @@ function formatPrice(value?: number | string | null) {
     typeof value === "number"
       ? value
       : typeof value === "string"
-        ? Number(String(value).replace(/[^\d,.-]/g, "").replace(".", "").replace(",", "."))
+        ? Number(
+            String(value)
+              .replace(/[^\d,.-]/g, "")
+              .replace(/\.(?=\d{3}(\D|$))/g, "")
+              .replace(",", ".")
+          )
         : NaN;
 
   if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -87,11 +112,14 @@ function formatPrice(value?: number | string | null) {
 }
 
 function toNumber(value?: number | string | null) {
-  if (typeof value === "number") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return null;
 
   const normalized = Number(
-    value.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")
+    value
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\.(?=\d{3}(\D|$))/g, "")
+      .replace(",", ".")
   );
 
   return Number.isFinite(normalized) ? normalized : null;
@@ -110,14 +138,14 @@ function formatYear(value?: number | string | null) {
 function formatMileage(value?: number | string | null) {
   const numeric = toNumber(value);
   if (!numeric || numeric <= 0) return "Km não informado";
-  return `${numeric.toLocaleString("pt-BR")} Km`;
+  return `${numeric.toLocaleString("pt-BR")} km`;
 }
 
 function deriveCityDisplay(city?: string | null, state?: string | null) {
-  const cleanCity = sanitizeText(city, "Cidade não informada");
-  const cleanState = sanitizeText(state).toUpperCase();
+  const cleanCity = sanitizeText(city, "São Paulo");
+  const cleanState = sanitizeText(state, "SP").toUpperCase();
 
-  if (cleanCity.includes("(") || !cleanState) {
+  if (cleanCity.includes("(")) {
     return cleanCity;
   }
 
@@ -130,51 +158,95 @@ function deriveCitySlug(city?: string | null, state?: string | null) {
   return slugify(`${cleanCity} ${cleanState}`);
 }
 
-function parseImages(ad: PublicAdDetail): string[] {
-  const imagesField = ad.images;
-
-  if (Array.isArray(imagesField)) {
-    const normalized = imagesField.filter(Boolean);
-    if (normalized.length) return normalized;
+function normalizeImageValue(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
   }
 
-  if (typeof imagesField === "string" && imagesField.trim()) {
-    try {
-      const parsed = JSON.parse(imagesField);
-      if (Array.isArray(parsed)) {
-        const normalized = parsed.filter(Boolean);
-        if (normalized.length) return normalized;
-      }
-    } catch {
-      const normalized = imagesField
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
+  if (value && typeof value === "object") {
+    const maybe = value as Record<string, unknown>;
+    const candidate =
+      maybe.url ??
+      maybe.src ??
+      maybe.image ??
+      maybe.image_url ??
+      maybe.cover_image ??
+      maybe.thumb;
 
-      if (normalized.length) return normalized;
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
     }
   }
 
-  if (ad.image_url) {
-    return [ad.image_url];
+  return null;
+}
+
+function parseImages(ad: PublicAdDetail): string[] {
+  const normalized = new Set<string>();
+
+  if (Array.isArray(ad.images)) {
+    for (const item of ad.images) {
+      const image = normalizeImageValue(item);
+      if (image) normalized.add(image);
+    }
+  } else if (typeof ad.images === "string" && ad.images.trim()) {
+    const raw = ad.images.trim();
+
+    if (raw.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const image = normalizeImageValue(item);
+            if (image) normalized.add(image);
+          }
+        }
+      } catch {
+        raw
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .forEach((image) => normalized.add(image));
+      }
+    } else {
+      raw
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .forEach((image) => normalized.add(image));
+    }
   }
 
-  return ["/images/banner1.jpg", "/images/banner2.jpg", "/images/compass.jpeg"];
+  const directImage = sanitizeNullableText(ad.image_url);
+  if (directImage) normalized.add(directImage);
+
+  const finalImages = Array.from(normalized).filter(Boolean);
+
+  if (finalImages.length > 0) return finalImages;
+
+  return [...FALLBACK_IMAGES];
 }
 
 function deriveVehicleNames(ad: PublicAdDetail) {
   const title = sanitizeText(ad.title);
   const brand = sanitizeText(ad.brand);
   const model = sanitizeText(ad.model);
+  const version = sanitizeText((ad as PublicAdDetail & { version?: string | null }).version);
   const year = sanitizeText(ad.year);
 
   const fullName =
     title ||
-    [brand, model, year].filter(Boolean).join(" ") ||
+    [brand, model, version, year].filter(Boolean).join(" ").trim() ||
+    "Veículo";
+
+  const safeModel =
+    model ||
+    title ||
+    [brand, model].filter(Boolean).join(" ").trim() ||
     "Veículo";
 
   return {
-    model: (model || title || "VEÍCULO").toUpperCase(),
+    model: toTitleCase(safeModel),
     fullName,
   };
 }
@@ -189,15 +261,88 @@ function buildFipeReference(price: number | null, belowFipe: boolean) {
   return formatPrice(estimatedFipe);
 }
 
+function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
+  const sellerName =
+    sanitizeText((ad as PublicAdDetail & { seller_name?: string | null }).seller_name) ||
+    sanitizeText((ad as PublicAdDetail & { dealership_name?: string | null }).dealership_name) ||
+    "Anunciante no Carros na Cidade";
+
+  const sellerPhone =
+    sanitizeNullableText((ad as PublicAdDetail & { phone?: string | null }).phone) ||
+    sanitizeNullableText((ad as PublicAdDetail & { whatsapp?: string | null }).whatsapp) ||
+    undefined;
+
+  const plan = sanitizeText(ad.plan).toLowerCase();
+  const isDealer =
+    plan.includes("premium") ||
+    plan.includes("pro") ||
+    plan.includes("plus") ||
+    plan.includes("master") ||
+    plan.includes("dealer") ||
+    Boolean((ad as PublicAdDetail & { dealership_name?: string | null }).dealership_name);
+
+  if (isDealer) {
+    const cityDisplay = deriveCityDisplay(ad.city, ad.state);
+
+    return {
+      type: "dealer",
+      name: sellerName,
+      logo: "/images/logo.png",
+      address: cityDisplay,
+      rating: 4.8,
+      phone: sellerPhone,
+      storeSlug: slugify(sellerName || "lojista"),
+    };
+  }
+
+  return {
+    type: "private",
+    name: sellerName,
+    phone: sellerPhone,
+  };
+}
+
+function buildOptionalItems(ad: PublicAdDetail) {
+  const items = [
+    ad.transmission ? `Câmbio ${sanitizeText(ad.transmission).toLowerCase()}` : null,
+    ad.fuel_type ? `Combustível ${sanitizeText(ad.fuel_type).toLowerCase()}` : null,
+    ad.below_fipe ? "Preço competitivo em relação à FIPE" : null,
+    "Simulação de financiamento disponível",
+    "Contato rápido com o anunciante",
+  ].filter(Boolean) as string[];
+
+  return Array.from(new Set(items)).slice(0, 6);
+}
+
+function buildSafetyItems() {
+  return [
+    "Valide histórico e procedência antes da compra",
+    "Consulte documentação e vistoria cautelar",
+    "Negociação com apoio do portal",
+  ];
+}
+
+function buildComfortItems(ad: PublicAdDetail) {
+  const items = [
+    "Atendimento digital para proposta inicial",
+    "Experiência otimizada para mobile",
+    "CTA direto para contato e financiamento",
+    ad.city ? `Anúncio com contexto regional de ${toTitleCase(sanitizeText(ad.city))}` : null,
+  ].filter(Boolean) as string[];
+
+  return Array.from(new Set(items)).slice(0, 6);
+}
+
 export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
-  const id = String(ad.id);
-  const slug = sanitizeText(ad.slug, id);
+  const id = sanitizeText(ad.id, "sem-id");
+  const slug = sanitizeText(ad.slug, slugify(id) || "veiculo");
   const images = parseImages(ad);
   const priceNumber = toNumber(ad.price);
   const belowFipe = ad.below_fipe === true;
   const { model, fullName } = deriveVehicleNames(ad);
   const city = deriveCityDisplay(ad.city, ad.state);
   const citySlug = deriveCitySlug(ad.city, ad.state);
+  const seller = buildSellerInfo(ad);
 
   return {
     id,
@@ -210,7 +355,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     km: formatMileage(ad.mileage),
     fuel: sanitizeText(ad.fuel_type, "Não informado"),
     transmission: sanitizeText(ad.transmission, "Não informado"),
-    color: "Não informado",
+    color: sanitizeText((ad as PublicAdDetail & { color?: string | null }).color, "Não informado"),
     city,
     citySlug,
     adCode: id,
@@ -220,27 +365,12 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     description:
       sanitizeText(ad.description) ||
       "Anúncio publicado no Carros na Cidade com informações oficiais do backend e contexto comercial da região.",
-    optionalItems: [
-      "Anúncio ativo com dados sincronizados do portal",
-      "Possibilidade de simular financiamento",
-      "Consulta rápida de preço e contexto regional",
-    ],
-    safetyItems: [
-      "Valide histórico e procedência antes da compra",
-      "Consulte documentação e vistoria cautelar",
-      "Negociação com apoio do portal",
-    ],
-    comfortItems: [
-      "Atendimento digital para proposta inicial",
-      "Experiência de navegação otimizada para mobile",
-      "CTA direto para contato e financiamento",
-    ],
+    optionalItems: buildOptionalItems(ad),
+    safetyItems: buildSafetyItems(),
+    comfortItems: buildComfortItems(ad),
     sellerNotes:
       "Os dados deste anúncio foram carregados da camada pública oficial do portal. Recomendamos confirmar disponibilidade, opcionais e documentação com o anunciante.",
-    seller: {
-      type: "private",
-      name: "Anunciante no Carros na Cidade",
-    },
+    seller,
   };
 }
 
@@ -266,6 +396,15 @@ export function buildSimilarVehicles(vehicle: VehicleDetail, limit = 8): Listing
     .map((seed, index) => toListingCarFromSeed(seed, vehicle, index + 100));
 }
 
-export function buildSellerVehicles(_vehicle: VehicleDetail, _limit = 6): ListingCar[] {
-  return [];
+export function buildSellerVehicles(vehicle: VehicleDetail, limit = 6): ListingCar[] {
+  if (vehicle.seller.type !== "dealer") {
+    return [];
+  }
+
+  return buyCars
+    .slice(0, limit)
+    .map((seed, index) => ({
+      ...toListingCarFromSeed(seed, vehicle, index + 200),
+      city: vehicle.city,
+    }));
 }
