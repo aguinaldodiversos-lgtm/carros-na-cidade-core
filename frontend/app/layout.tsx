@@ -4,17 +4,14 @@ import "./globals.css";
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.API_URL ||
-  "https://carrosnacidade.com";
-
 const SITE_NAME = "Carros na Cidade";
 const DEFAULT_TITLE = "Carros na Cidade | Portal de carros da sua cidade";
 const TITLE_TEMPLATE = "%s | Carros na Cidade";
+const DEFAULT_SITE_URL = "https://carrosnacidade.com";
+const DEFAULT_OG_IMAGE = "/images/hero.jpeg";
 
 const DEFAULT_DESCRIPTION =
-  "Encontre carros usados e seminovos com busca inteligente, filtros avançados, oportunidades abaixo da FIPE e páginas locais por cidade no Carros na Cidade.";
+  "Encontre veículos usados e seminovos com busca inteligente, filtros avançados, oportunidades abaixo da FIPE e páginas locais por cidade no Carros na Cidade.";
 
 const DEFAULT_KEYWORDS = [
   "carros na cidade",
@@ -31,7 +28,24 @@ const DEFAULT_KEYWORDS = [
   "marketplace automotivo",
 ];
 
-const DEFAULT_OG_IMAGE = "/images/hero.jpeg";
+function resolveSiteUrl() {
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    DEFAULT_SITE_URL,
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    try {
+      return new URL(candidate);
+    } catch {
+      continue;
+    }
+  }
+
+  return new URL(DEFAULT_SITE_URL);
+}
+
+const siteUrl = resolveSiteUrl();
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -41,7 +55,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: siteUrl,
   applicationName: SITE_NAME,
   title: {
     default: DEFAULT_TITLE,
@@ -75,7 +89,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    url: SITE_URL,
+    url: siteUrl.toString(),
     siteName: SITE_NAME,
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
@@ -97,7 +111,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/images/favicon.ico" }, { url: "/favicon.ico" }],
     shortcut: ["/images/favicon.ico", "/favicon.ico"],
-    apple: ["/images/favicon.png"],
+    apple: [{ url: "/images/favicon.png" }],
   },
   manifest: "/site.webmanifest",
   appleWebApp: {
@@ -118,7 +132,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className="min-h-screen bg-[#f2f3f7] font-sans text-slate-900 antialiased">
+      <body className="min-h-screen bg-[var(--cnc-bg)] font-sans text-[var(--cnc-text)] antialiased">
         <div className="flex min-h-screen flex-col">
           <PublicHeader />
           <div className="flex-1">{children}</div>
