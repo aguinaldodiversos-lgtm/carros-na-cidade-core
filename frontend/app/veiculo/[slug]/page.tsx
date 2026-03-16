@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+
 import AdEventTracker from "@/components/analytics/AdEventTracker";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
@@ -9,6 +10,7 @@ import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
+
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
@@ -17,11 +19,13 @@ import {
   buildCityVehicles,
   buildSellerVehicles,
 } from "@/lib/vehicle/public-vehicle";
+
 import {
   getAISimilarVehicles,
   getAIVehicleInsights,
   getAIVehiclePriceSignal,
 } from "@/services/aiService";
+import type { VehiclePriceSignal } from "@/services/aiService";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -33,21 +37,23 @@ type PageProps = {
 export const revalidate = 1800;
 export const dynamicParams = true;
 
-function getFirstValue(value: string | string[] | undefined) {
+function getFirstValue(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? "";
   return value ?? "";
 }
 
-function safeText(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+function safeText(value: unknown, fallback = ""): string {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fallback;
 }
 
-function extractYear(value: string) {
+function extractYear(value: string): string {
   const match = String(value || "").match(/\d{4}/);
   return match?.[0] || "2024";
 }
 
-function slugToReadableText(slug: string) {
+function slugToReadableText(slug: string): string {
   const cleaned = String(slug || "")
     .replace(/^\/+|\/+$/g, "")
     .replace(/^veiculo\//, "")
@@ -113,6 +119,15 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
   };
 }
 
+function buildFallbackPriceSignal(): VehiclePriceSignal {
+  return {
+    score: 0,
+    label: "Análise temporariamente indisponível",
+    reason:
+      "Os indicadores automáticos de preço não puderam ser carregados no momento.",
+  };
+}
+
 const getPublicVehicleDetail = cache(async (slug: string, ref?: string) => {
   const candidates = Array.from(
     new Set([safeText(ref), safeText(slug)].filter(Boolean))
@@ -136,13 +151,13 @@ const getPublicVehicleDetail = cache(async (slug: string, ref?: string) => {
   return buildFallbackVehicle(slug, ref);
 });
 
-function buildPageTitle(vehicle: VehicleDetail) {
+function buildPageTitle(vehicle: VehicleDetail): string {
   const year = extractYear(vehicle.year);
   const cityName = safeText(vehicle.city.split(" (")[0], "São Paulo");
   return `${vehicle.model} ${year} à venda em ${cityName}`;
 }
 
-function buildPageDescription(vehicle: VehicleDetail) {
+function buildPageDescription(vehicle: VehicleDetail): string {
   return `${vehicle.fullName} por ${vehicle.price} em ${vehicle.city}. Confira ficha completa, fotos e simulação de financiamento.`;
 }
 
@@ -175,9 +190,18 @@ export async function generateMetadata({
       type: "website",
     },
     keywords: [
-      `${vehicle.model.toLowerCase()} ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
-      `comprar ${vehicle.model.toLowerCase()} ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
-      `veículo ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
+      `${vehicle.model.toLowerCase()} ${safeText(
+        vehicle.city.split(" (")[0],
+        "sao paulo"
+      ).toLowerCase()}`,
+      `comprar ${vehicle.model.toLowerCase()} ${safeText(
+        vehicle.city.split(" (")[0],
+        "sao paulo"
+      ).toLowerCase()}`,
+      `veículo ${safeText(
+        vehicle.city.split(" (")[0],
+        "sao paulo"
+      ).toLowerCase()}`,
     ],
   };
 }
@@ -189,23 +213,17 @@ export default async function VehicleDetailPage({
   const ref = getFirstValue(searchParams.ref);
   const vehicle = await getPublicVehicleDetail(params.slug, ref);
 
-  const [
-    priceSignalResult,
-    aiInsightsResult,
-    similarVehiclesResult,
-  ] = await Promise.allSettled([
-    getAIVehiclePriceSignal(vehicle),
-    getAIVehicleInsights(vehicle),
-    getAISimilarVehicles(vehicle),
-  ]);
+  const [priceSignalResult, aiInsightsResult, similarVehiclesResult] =
+    await Promise.allSettled([
+      getAIVehiclePriceSignal(vehicle),
+      getAIVehicleInsights(vehicle),
+      getAISimilarVehicles(vehicle),
+    ]);
 
-  const priceSignal =
+  const priceSignal: VehiclePriceSignal =
     priceSignalResult.status === "fulfilled"
       ? priceSignalResult.value
-      : {
-          label: "Análise temporariamente indisponível",
-          reason: "Os indicadores automáticos de preço não puderam ser carregados no momento.",
-        };
+      : buildFallbackPriceSignal();
 
   const aiInsights =
     aiInsightsResult.status === "fulfilled"
@@ -214,6 +232,7 @@ export default async function VehicleDetailPage({
 
   const sellerVehicles = buildSellerVehicles(vehicle);
   const cityVehicles = buildCityVehicles(vehicle);
+
   const similarVehicles =
     similarVehiclesResult.status === "fulfilled" &&
     Array.isArray(similarVehiclesResult.value) &&
@@ -333,6 +352,7 @@ export default async function VehicleDetailPage({
 
       <AdEventTracker adId={vehicle.id} eventType="view" />
       <BreadcrumbJsonLd items={breadcrumbItems} />
+
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }}
