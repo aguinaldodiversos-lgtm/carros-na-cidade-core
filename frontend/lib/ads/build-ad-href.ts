@@ -19,8 +19,8 @@ function slugify(value: string) {
 }
 
 export function buildAdSlug(ad: AdCardLinkInput) {
-  if (ad.slug && String(ad.slug).trim()) {
-    return slugify(String(ad.slug));
+  if (ad.slug && ad.slug.trim()) {
+    return slugify(ad.slug);
   }
 
   const composed = [
@@ -35,10 +35,9 @@ export function buildAdSlug(ad: AdCardLinkInput) {
     .map((item) => String(item).trim())
     .join(" ");
 
-  const fallback = composed || `anuncio-${String(ad.id || "sem-id")}`;
-  return slugify(fallback);
+  return slugify(composed || `veiculo-${String(ad.id || "sem-id")}`);
 }
 
 export function buildAdHref(ad: AdCardLinkInput) {
-  return `/comprar/${buildAdSlug(ad)}`;
+  return `/veiculo/${buildAdSlug(ad)}`;
 }
