@@ -72,7 +72,7 @@ function sanitizeText(value: unknown, fallback = "") {
 }
 
 function parseNumber(value?: string | number | null) {
-  if (typeof value === "number") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (value === undefined || value === null || value === "") return 0;
 
   const parsed = Number(
@@ -95,52 +95,72 @@ function formatTotal(total?: number) {
   return new Intl.NumberFormat("pt-BR").format(total || 0);
 }
 
-function normalizeCatalogItem(raw: unknown, city: CityContext, index: number): CatalogItem | null {
+function normalizeCatalogItem(
+  raw: unknown,
+  city: CityContext,
+  index: number
+): CatalogItem | null {
   if (!raw || typeof raw !== "object") return null;
 
   const item = raw as Partial<CatalogItem> & {
     image?: string | null;
     cover_image?: string | null;
+    year_model?: string | null;
   };
 
-  const id =
+  const safeId =
     typeof item.id === "number" && Number.isFinite(item.id)
       ? item.id
       : 900000 + index;
 
   const imageUrl =
-    sanitizeText(item.image_url || "") ||
-    sanitizeText(item.image || "") ||
-    sanitizeText(item.cover_image || "") ||
+    sanitizeText(item.image_url) ||
+    sanitizeText(item.image) ||
+    sanitizeText(item.cover_image) ||
     null;
 
-  const images =
+  const imageList =
     Array.isArray(item.images) && item.images.length > 0
-      ? item.images.filter((image): image is string => typeof image === "string" && image.trim().length > 0)
+      ? item.images.filter(
+          (image): image is string =>
+            typeof image === "string" && image.trim().length > 0
+        )
       : imageUrl
         ? [imageUrl]
         : null;
 
+  const numericYear =
+    typeof item.year === "number"
+      ? item.year
+      : parseNumber(item.year) || undefined;
+
+  const numericMileage =
+    typeof item.mileage === "number"
+      ? item.mileage
+      : parseNumber(item.mileage) || undefined;
+
+  const numericPrice =
+    typeof item.price === "number"
+      ? item.price
+      : parseNumber(item.price) || undefined;
+
   return {
     ...item,
-    id,
-    slug: sanitizeText(item.slug || "") || undefined,
-    title: sanitizeText(item.title || "") || "Veículo",
-    brand: sanitizeText(item.brand || "") || undefined,
-    model: sanitizeText(item.model || "") || undefined,
-    city: sanitizeText(item.city || "") || city.name,
-    state: sanitizeText(item.state || "") || city.state,
-    year: typeof item.year === "number" ? item.year : parseNumber(item.year as string | number | null) || undefined,
-mileage:
-  typeof item.mileage === "number"
-    ? item.mileage
-    : parseNumber(item.mileage as string | number | null) || undefined,
-price:
-  typeof item.price === "number"
-    ? item.price
-    : parseNumber(item.price as string | number | null) || undefined,
+    id: safeId,
+    slug: sanitizeText(item.slug) || undefined,
+    title: sanitizeText(item.title, "Veículo"),
+    brand: sanitizeText(item.brand) || undefined,
+    model: sanitizeText(item.model) || undefined,
+    version: sanitizeText(item.version) || undefined,
+    year: numericYear,
+    mileage: numericMileage,
+    price: numericPrice,
+    city: sanitizeText(item.city) || city.name,
+    state: sanitizeText(item.state).toUpperCase() || city.state,
+    transmission: sanitizeText(item.transmission) || undefined,
+    fuel_type: sanitizeText(item.fuel_type) || undefined,
     image_url: imageUrl,
-    images,
+    images: imageList,
     below_fipe: item.below_fipe === true,
     highlight_until: item.highlight_until || null,
     plan: item.plan || null,
@@ -149,7 +169,8 @@ price:
     dealership_name: item.dealership_name || null,
     dealership_id:
       typeof item.dealership_id === "number" ? item.dealership_id : null,
-    created_at: item.created_at || null || undefined,
+    created_at: item.created_at || null,
+    catalogWeight: item.catalogWeight,
   };
 }
 
@@ -171,7 +192,7 @@ function toSafeBrandFacets(value: unknown): BrandFacet[] {
     .map((item) => {
       const obj = (item || {}) as Partial<BrandFacet>;
       return {
-        brand: sanitizeText(obj.brand || ""),
+        brand: sanitizeText(obj.brand),
         total: Number(obj.total || 0),
       };
     })
@@ -186,7 +207,7 @@ function toSafeModelFacets(value: unknown): ModelFacet[] {
       const obj = (item || {}) as Partial<ModelFacet>;
       return {
         brand: obj.brand ? sanitizeText(obj.brand) : undefined,
-        model: sanitizeText(obj.model || ""),
+        model: sanitizeText(obj.model),
         total: Number(obj.total || 0),
       };
     })
@@ -200,8 +221,8 @@ function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
 
   const plan = String(item.plan || "").toLowerCase();
   if (
-    ["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) =>
-      plan.includes(signal)
+    ["premium", "pro", "complete", "enterprise", "plus", "master"].some(
+      (signal) => plan.includes(signal)
     )
   ) {
     return 3;
@@ -637,7 +658,6 @@ export default function BuyMarketplacePageClient({
   }, [apiItems, city, shouldUseFallbackCatalog]);
 
   const items = useMemo(() => sortCatalogItems(rawItems), [rawItems]);
-
   const firstRow = useMemo(() => items.slice(0, 2), [items]);
   const remaining = useMemo(() => items.slice(2), [items]);
 
