@@ -1,7 +1,4 @@
-import AdDetailsPage from "@/components/ads/AdDetailsPage";
-import { getAdDetails } from "@/lib/ads/get-ad-details";
-
-export const revalidate = 60;
+import { redirect } from "next/navigation";
 
 type PageProps = {
   params: {
@@ -9,7 +6,8 @@ type PageProps = {
   };
 };
 
-export default async function VehicleDetailsRoute({ params }: PageProps) {
-  const ad = await getAdDetails(params.slug);
-  return <AdDetailsPage ad={ad} />;
+export const revalidate = 60;
+
+export default function LegacyVehicleDetailsRoute({ params }: PageProps) {
+  redirect(`/veiculo/${params.slug}`);
 }
