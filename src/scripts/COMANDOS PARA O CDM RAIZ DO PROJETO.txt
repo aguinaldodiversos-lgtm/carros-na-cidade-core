@@ -1,5 +1,13 @@
 COMANDOS PARA O CDM RAIZ DO PROJETO
 
+
+Exemplo de rotina segura
+git add .
+git commit -m "fix: corrigir footer e blog fallback"
+git pull --rebase origin main
+git push origin main
+
+
 REBASE
 git status
 git add .
