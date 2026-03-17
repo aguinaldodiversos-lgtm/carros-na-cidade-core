@@ -9,9 +9,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node ./scripts/prepare-standalone.mjs && node ./scripts/verify-standalone.mjs",
     "start": "node .next/standalone/server.js",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare:standalone": "node ./scripts/prepare-standalone.mjs",
+    "verify:standalone": "node ./scripts/verify-standalone.mjs"
   },
   "dependencies": {
     "autoprefixer": "^10.4.27",
