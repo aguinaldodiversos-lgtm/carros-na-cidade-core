@@ -3,5 +3,11 @@ services:
     name: carros-na-cidade-portal
     runtime: node
     rootDir: frontend
-    buildCommand: npm ci --include=dev --no-audit --no-fund && npm run build && mkdir -p .next/standalone/.next && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
-    startCommand: node .next/standalone/server.js
+    buildCommand: npm ci --include=dev --no-audit --no-fund && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
