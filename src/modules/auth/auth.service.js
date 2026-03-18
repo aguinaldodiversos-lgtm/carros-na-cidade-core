@@ -17,9 +17,13 @@ import {
   revokeAllUserRefreshTokens,
 } from "./sessions/refreshToken.repository.js";
 
-const BCRYPT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+const parsedRounds = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+const BCRYPT_ROUNDS =
+  Number.isInteger(parsedRounds) && parsedRounds >= 4 && parsedRounds <= 15
+    ? parsedRounds
+    : 10;
 
-let cachedUsersColumns = null;
+let usersColumnsPromise = null;
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -38,41 +42,35 @@ function normalizeDocumentType(value) {
   return normalized === "cpf" || normalized === "cnpj" ? normalized : null;
 }
 
-function sanitizeUser(user) {
-  if (!user || typeof user !== "object") return user;
-
-  const sanitized = { ...user };
-  delete sanitized.password;
-  delete sanitized.password_hash;
-  delete sanitized.refresh_token;
-  delete sanitized.refreshToken;
-
-  return sanitized;
+function hasColumn(columns, name) {
+  return columns.has(name);
 }
 
 async function getUsersTableColumns() {
-  if (cachedUsersColumns) return cachedUsersColumns;
+  if (!usersColumnsPromise) {
+    usersColumnsPromise = pool
+      .query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'users'
+        `
+      )
+      .then((result) => new Set(result.rows.map((row) => row.column_name)))
+      .catch((error) => {
+        usersColumnsPromise = null;
+        throw error;
+      });
+  }
 
-  const result = await pool.query(
-    `
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = 'users'
-    `
-  );
-
-  cachedUsersColumns = new Set(result.rows.map((row) => row.column_name));
-  return cachedUsersColumns;
-}
-
-function hasColumn(columns, name) {
-  return columns.has(name);
+  return usersColumnsPromise;
 }
 
 function resolvePasswordColumn(columns) {
   if (hasColumn(columns, "password_hash")) return "password_hash";
   if (hasColumn(columns, "password")) return "password";
+
   throw new AppError(
     'Tabela "users" não possui coluna de senha compatível (password_hash ou password).',
     500
@@ -83,6 +81,31 @@ function appendInsertField(columns, values, placeholders, fieldName, value) {
   columns.push(fieldName);
   values.push(value);
   placeholders.push(`$${values.length}`);
+}
+
+function buildSessionUser(user) {
+  if (!user?.id) {
+    throw new AppError("Usuário inválido para sessão.", 500);
+  }
+
+  const documentType = normalizeDocumentType(user.document_type) || "cpf";
+  const accountType = documentType === "cnpj" ? "CNPJ" : "CPF";
+  const documentVerified = Boolean(user.document_verified);
+
+  return {
+    id: String(user.id),
+    name: normalizeString(user.name) || "Usuario",
+    email: normalizeEmail(user.email),
+    type: accountType,
+    document_type: documentType,
+    document_verified: documentVerified,
+    cnpj_verified: documentType === "cnpj" ? documentVerified : false,
+    role: normalizeString(user.role) || "user",
+    plan: normalizeString(user.plan) || "free",
+    email_verified: Boolean(
+      user.email_verified ?? user.is_email_verified ?? false
+    ),
+  };
 }
 
 export async function hashPassword(password) {
@@ -194,6 +217,16 @@ export async function register(
     );
   }
 
+  if (hasColumn(usersColumns, "is_email_verified")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "is_email_verified",
+      true
+    );
+  }
+
   if (normalizedPhone && hasColumn(usersColumns, "phone")) {
     appendInsertField(
       insertColumns,
@@ -250,7 +283,7 @@ export async function register(
       throw new AppError("Erro ao criar usuário.", 500);
     }
 
-    return issueSession(sanitizeUser(createdUser), reqMeta);
+    return issueSession(buildSessionUser(createdUser), reqMeta);
   } catch (error) {
     if (error?.code === "23505") {
       throw new AppError("Email já cadastrado.", 400);
@@ -311,7 +344,7 @@ export async function login(email, password, reqMeta = {}) {
     success: true,
   });
 
-  return issueSession(sanitizeUser(user), reqMeta);
+  return issueSession(buildSessionUser(user), reqMeta);
 }
 
 /* =====================================================
