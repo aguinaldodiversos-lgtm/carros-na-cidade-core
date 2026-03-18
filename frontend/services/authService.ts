@@ -15,6 +15,11 @@ export type AuthSession = {
   refreshToken?: string;
 };
 
+export type AuthenticatedSession = AuthSession & {
+  accessToken: string;
+  refreshToken: string;
+};
+
 const localCredentials = [
   {
     user_id: "user-cpf-demo",
@@ -40,16 +45,23 @@ type BackendUserPayload = {
   cnpjVerified?: boolean;
 };
 
-type BackendLoginResponse = {
+type BackendAuthResponse = {
+  success?: boolean;
   token?: string;
   access_token?: string;
   accessToken?: string;
   jwt?: string;
+  refreshToken?: string;
+  refresh_token?: string;
   user?: BackendUserPayload;
+  error?: string;
+  message?: string;
   data?: {
     token?: string;
     access_token?: string;
     accessToken?: string;
+    refreshToken?: string;
+    refresh_token?: string;
     user?: BackendUserPayload;
   };
 };
@@ -57,30 +69,62 @@ type BackendLoginResponse = {
 type BackendMeResponse = {
   success?: boolean;
   user?: BackendUserPayload;
+  data?: {
+    user?: BackendUserPayload;
+  };
 };
 
+export type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  city?: string;
+  document_type?: "cpf" | "cnpj";
+  document_number?: string;
+};
+
+export type RegisterResult =
+  | { success: true; session: AuthenticatedSession }
+  | { success: false; error?: string };
+
+function normalizeString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeEmail(value: unknown) {
+  return normalizeString(value).toLowerCase();
+}
+
+function onlyDigits(value: unknown) {
+  return normalizeString(value).replace(/\D/g, "");
+}
+
 function resolveAuthApiBase() {
-  return (
+  return normalizeString(
     process.env.AUTH_API_BASE_URL ??
-    process.env.BACKEND_API_URL ??
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    ""
+      process.env.BACKEND_API_URL ??
+      process.env.API_URL ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      ""
   );
 }
 
 function resolveAuthEndpoint(baseUrl: string, endpoint: string) {
   const base = baseUrl.trim().replace(/\/+$/, "");
   const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
   if (!base) return "";
+
   if (base.endsWith("/api")) {
     return `${base}${path.replace(/^\/api/, "")}`;
   }
+
   return `${base}${path}`;
 }
 
 function normalizeAccountType(input: string | undefined): AccountType {
-  const value = (input ?? "").toUpperCase();
+  const value = normalizeString(input).toUpperCase();
   return value === "CNPJ" ? "CNPJ" : "CPF";
 }
 
@@ -97,23 +141,33 @@ function toAuthUserFromStore(userId: string, emailHint?: string): AuthUser | nul
   };
 }
 
-function toAuthUserFromBackend(payload: BackendUserPayload, fallbackEmail: string): AuthUser | null {
+function toAuthUserFromBackend(
+  payload: BackendUserPayload,
+  fallbackEmail: string
+): AuthUser | null {
   const possibleId = payload.user_id ?? payload.id;
   const userId = possibleId !== undefined ? String(possibleId) : "";
+
   if (!userId) return null;
 
-  const accountType = normalizeAccountType(payload.document_type ?? payload.documentType ?? payload.type);
+  const accountType = normalizeAccountType(
+    payload.document_type ?? payload.documentType ?? payload.type
+  );
+
   return {
     id: userId,
-    name: payload.name?.trim() || "Usuario",
-    email: payload.email?.trim() || fallbackEmail,
+    name: normalizeString(payload.name) || "Usuario",
+    email: normalizeEmail(payload.email) || normalizeEmail(fallbackEmail),
     type: accountType,
     cnpj_verified: Boolean(payload.cnpj_verified ?? payload.cnpjVerified),
   };
 }
 
 function findLocalCredentialByEmail(email: string) {
-  return localCredentials.find((credential) => credential.email.toLowerCase() === email.toLowerCase());
+  const normalizedEmail = normalizeEmail(email);
+  return localCredentials.find(
+    (credential) => credential.email.toLowerCase() === normalizedEmail
+  );
 }
 
 export function getLocalEmailByUserId(userId: string) {
@@ -121,25 +175,53 @@ export function getLocalEmailByUserId(userId: string) {
   return found?.email ?? `${userId}@carrosnacidade.com`;
 }
 
-function extractAccessToken(payload: BackendLoginResponse) {
-  return (
+function extractAccessToken(payload: BackendAuthResponse) {
+  const token =
     payload.accessToken ??
     payload.access_token ??
     payload.token ??
     payload.jwt ??
     payload.data?.accessToken ??
     payload.data?.access_token ??
-    payload.data?.token
-  );
+    payload.data?.token;
+
+  return token ? String(token) : undefined;
 }
 
-function extractRefreshToken(payload: BackendLoginResponse) {
-  const data = payload.data as { refreshToken?: string; refresh_token?: string } | undefined;
-  const root = payload as BackendLoginResponse & { refreshToken?: string; refresh_token?: string };
-  return root.refreshToken ?? root.refresh_token ?? data?.refreshToken ?? data?.refresh_token;
+function extractRefreshToken(payload: BackendAuthResponse) {
+  const token =
+    payload.refreshToken ??
+    payload.refresh_token ??
+    payload.data?.refreshToken ??
+    payload.data?.refresh_token;
+
+  return token ? String(token) : undefined;
 }
 
-async function fetchCurrentUserFromBackend(baseUrl: string, accessToken: string, fallbackEmail: string) {
+function extractBackendUser(payload: BackendAuthResponse | BackendMeResponse) {
+  return payload.user ?? payload.data?.user ?? null;
+}
+
+function extractErrorMessage(
+  payload: Partial<BackendAuthResponse>,
+  fallback: string
+) {
+  return normalizeString(payload.error) || normalizeString(payload.message) || fallback;
+}
+
+async function safeJson<T>(response: Response): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
+async function fetchCurrentUserFromBackend(
+  baseUrl: string,
+  accessToken: string,
+  fallbackEmail: string
+) {
   const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/me");
   if (!endpoint) return null;
 
@@ -154,14 +236,48 @@ async function fetchCurrentUserFromBackend(baseUrl: string, accessToken: string,
 
     if (!response.ok) return null;
 
-    const payload = (await response.json()) as BackendMeResponse;
-    return payload.user ? toAuthUserFromBackend(payload.user, fallbackEmail) : null;
+    const payload = await safeJson<BackendMeResponse>(response);
+    const backendUser = extractBackendUser(payload);
+
+    return backendUser ? toAuthUserFromBackend(backendUser, fallbackEmail) : null;
   } catch {
     return null;
   }
 }
 
-async function authenticateAgainstBackend(email: string, password: string): Promise<AuthSession | null> {
+async function buildAuthenticatedSessionFromResponse(
+  payload: BackendAuthResponse,
+  baseUrl: string,
+  fallbackEmail: string
+): Promise<AuthenticatedSession | null> {
+  const accessToken = extractAccessToken(payload);
+  const refreshToken = extractRefreshToken(payload);
+
+  if (!accessToken || !refreshToken) {
+    return null;
+  }
+
+  const backendUser = extractBackendUser(payload);
+  const resolvedUser =
+    (backendUser ? toAuthUserFromBackend(backendUser, fallbackEmail) : null) ??
+    (await fetchCurrentUserFromBackend(baseUrl, accessToken, fallbackEmail));
+
+  if (!resolvedUser) {
+    return null;
+  }
+
+  return {
+    user: resolvedUser,
+    accessToken,
+    refreshToken,
+  };
+}
+
+async function authenticateAgainstBackend(
+  email: string,
+  password: string
+): Promise<AuthenticatedSession | null> {
+  const normalizedEmail = normalizeEmail(email);
   const baseUrl = resolveAuthApiBase();
   if (!baseUrl) return null;
 
@@ -174,27 +290,17 @@ async function authenticateAgainstBackend(email: string, password: string): Prom
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email: normalizedEmail,
+        password,
+      }),
       cache: "no-store",
     });
 
     if (!response.ok) return null;
 
-    const payload = (await response.json()) as BackendLoginResponse;
-    const accessToken = extractAccessToken(payload);
-    const refreshToken = extractRefreshToken(payload);
-    const backendUser = payload.user ?? payload.data?.user;
-    const resolvedUser =
-      (backendUser ? toAuthUserFromBackend(backendUser, email) : null) ??
-      (accessToken ? await fetchCurrentUserFromBackend(baseUrl, accessToken, email) : null);
-
-    if (!resolvedUser) return null;
-
-    return {
-      user: resolvedUser,
-      accessToken: accessToken ? String(accessToken) : undefined,
-      refreshToken: refreshToken ? String(refreshToken) : undefined,
-    };
+    const payload = await safeJson<BackendAuthResponse>(response);
+    return buildAuthenticatedSessionFromResponse(payload, baseUrl, normalizedEmail);
   } catch {
     return null;
   }
@@ -204,31 +310,58 @@ function authenticateLocally(email: string, password: string): AuthSession | nul
   const credential = findLocalCredentialByEmail(email);
   if (!credential) return null;
   if (credential.password !== password) return null;
+
   const user = toAuthUserFromStore(credential.user_id, credential.email);
   return user ? { user } : null;
 }
 
-export async function authenticateUser(email: string, password: string): Promise<AuthSession | null> {
+export async function authenticateUser(
+  email: string,
+  password: string
+): Promise<AuthSession | null> {
   const backendUser = await authenticateAgainstBackend(email, password);
   if (backendUser) return backendUser;
+
   return authenticateLocally(email, password);
 }
 
-export type RegisterPayload = {
-  name: string;
-  email: string;
-  password: string;
-  phone?: string;
-  city?: string;
-  document_type?: "cpf" | "cnpj";
-  document_number?: string;
-};
+export async function registerUser(
+  payload: RegisterPayload
+): Promise<RegisterResult> {
+  const name = normalizeString(payload.name);
+  const email = normalizeEmail(payload.email);
+  const password = typeof payload.password === "string" ? payload.password : "";
+  const phone = onlyDigits(payload.phone).slice(0, 11);
+  const city = normalizeString(payload.city);
+  const documentNumber = onlyDigits(payload.document_number);
+  const documentType =
+    payload.document_type === "cpf" || payload.document_type === "cnpj"
+      ? payload.document_type
+      : undefined;
 
-export type RegisterResult =
-  | { success: true; session: AuthSession }
-  | { success: false; error?: string };
+  if (!name) {
+    return { success: false, error: "Nome é obrigatório." };
+  }
 
-export async function registerUser(payload: RegisterPayload): Promise<RegisterResult> {
+  if (!email) {
+    return { success: false, error: "Email é obrigatório." };
+  }
+
+  if (!password) {
+    return { success: false, error: "Senha é obrigatória." };
+  }
+
+  if (password.length < 6) {
+    return { success: false, error: "Senha deve ter no minimo 6 caracteres." };
+  }
+
+  if ((documentType && !documentNumber) || (!documentType && documentNumber)) {
+    return {
+      success: false,
+      error: "Informe tipo e numero do documento juntos.",
+    };
+  }
+
   const baseUrl = resolveAuthApiBase();
   if (!baseUrl) {
     return { success: false, error: "API do backend nao configurada." };
@@ -241,14 +374,14 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
 
   try {
     const body: Record<string, unknown> = {
-      name: payload.name.trim(),
-      email: payload.email.trim().toLowerCase(),
-      password: payload.password,
+      name,
+      email,
+      password,
+      ...(phone ? { phone } : {}),
+      ...(city ? { city } : {}),
+      ...(documentType ? { document_type: documentType } : {}),
+      ...(documentNumber ? { document_number: documentNumber } : {}),
     };
-    if (payload.phone) body.phone = payload.phone.replace(/\D/g, "").slice(0, 11);
-    if (payload.city) body.city = payload.city.trim();
-    if (payload.document_type) body.document_type = payload.document_type;
-    if (payload.document_number) body.document_number = payload.document_number.replace(/\D/g, "");
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -257,29 +390,32 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
       cache: "no-store",
     });
 
-    const data = (await response.json().catch(() => ({}))) as BackendLoginResponse & { error?: string; message?: string };
+    const data = await safeJson<BackendAuthResponse>(response);
+
     if (!response.ok) {
-      return { success: false, error: data.error ?? data.message ?? "Nao foi possivel criar a conta." };
+      return {
+        success: false,
+        error: extractErrorMessage(data, "Nao foi possivel criar a conta."),
+      };
     }
 
-    const accessToken = extractAccessToken(data);
-    const refreshToken = extractRefreshToken(data);
-    const backendUser = data.user ?? (data as { data?: { user?: BackendUserPayload } }).data?.user;
-    const resolvedUser =
-      (backendUser ? toAuthUserFromBackend(backendUser, payload.email) : null) ??
-      (accessToken ? await fetchCurrentUserFromBackend(baseUrl, accessToken, payload.email) : null);
+    const session = await buildAuthenticatedSessionFromResponse(
+      data,
+      baseUrl,
+      email
+    );
 
-    if (!resolvedUser) {
-      return { success: false, error: "Nao foi possivel obter dados do usuario." };
+    if (!session) {
+      return {
+        success: false,
+        error:
+          "Cadastro realizado, mas nao foi possivel iniciar a sessao automaticamente.",
+      };
     }
 
     return {
       success: true,
-      session: {
-        user: resolvedUser,
-        accessToken: accessToken ? String(accessToken) : undefined,
-        refreshToken: refreshToken ? String(refreshToken) : undefined,
-      },
+      session,
     };
   } catch {
     return { success: false, error: "Erro de conexao. Tente novamente." };
@@ -293,6 +429,7 @@ export function getAuthUserById(userId: string): AuthUser | null {
 async function postAuthProxy(endpoint: string, payload: Record<string, unknown>) {
   const baseUrl = resolveAuthApiBase();
   if (!baseUrl) return false;
+
   const url = resolveAuthEndpoint(baseUrl, endpoint);
   if (!url) return false;
 
@@ -305,6 +442,7 @@ async function postAuthProxy(endpoint: string, payload: Record<string, unknown>)
       body: JSON.stringify(payload),
       cache: "no-store",
     });
+
     return response.ok;
   } catch {
     return false;
@@ -312,13 +450,24 @@ async function postAuthProxy(endpoint: string, payload: Record<string, unknown>)
 }
 
 export async function requestPasswordReset(email: string) {
-  const proxied = await postAuthProxy("/api/auth/forgot-password", { email });
+  const normalizedEmail = normalizeEmail(email);
+  const proxied = await postAuthProxy("/api/auth/forgot-password", {
+    email: normalizedEmail,
+  });
+
   if (proxied) return true;
-  return Boolean(findLocalCredentialByEmail(email));
+
+  return Boolean(findLocalCredentialByEmail(normalizedEmail));
 }
 
 export async function resetPassword(token: string, password: string) {
-  const proxied = await postAuthProxy("/api/auth/reset-password", { token, password });
+  const normalizedToken = normalizeString(token);
+  const proxied = await postAuthProxy("/api/auth/reset-password", {
+    token: normalizedToken,
+    password,
+  });
+
   if (proxied) return true;
-  return Boolean(token && password.length >= 6);
+
+  return Boolean(normalizedToken && password.length >= 6);
 }
