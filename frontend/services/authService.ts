@@ -88,6 +88,16 @@ export type RegisterResult =
   | { success: true; session: AuthenticatedSession }
   | { success: false; error?: string };
 
+type LoginCompatPayload = {
+  email?: string;
+  password?: string;
+  next?: string;
+};
+
+type RegisterCompatPayload = RegisterPayload & {
+  next?: string;
+};
+
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -471,3 +481,116 @@ export async function resetPassword(token: string, password: string) {
 
   return Boolean(normalizedToken && password.length >= 6);
 }
+
+async function parseLocalApiResponse(response: Response) {
+  const data = await safeJson<Record<string, unknown>>(response);
+
+  if (!response.ok) {
+    const errorMessage =
+      typeof data.error === "string"
+        ? data.error
+        : typeof data.message === "string"
+        ? data.message
+        : "Erro na autenticacao.";
+
+    throw new Error(errorMessage);
+  }
+
+  return data;
+}
+
+export async function login(
+  payloadOrEmail: LoginCompatPayload | string,
+  maybePassword?: string
+) {
+  const email =
+    typeof payloadOrEmail === "string"
+      ? normalizeEmail(payloadOrEmail)
+      : normalizeEmail(payloadOrEmail?.email);
+
+  const password =
+    typeof payloadOrEmail === "string"
+      ? typeof maybePassword === "string"
+        ? maybePassword
+        : ""
+      : typeof payloadOrEmail?.password === "string"
+      ? payloadOrEmail.password
+      : "";
+
+  const next =
+    typeof payloadOrEmail === "string"
+      ? ""
+      : normalizeString(payloadOrEmail?.next);
+
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      email,
+      password,
+      ...(next ? { next } : {}),
+    }),
+  });
+
+  return parseLocalApiResponse(response);
+}
+
+export async function register(payload: RegisterCompatPayload) {
+  const name = normalizeString(payload.name);
+  const email = normalizeEmail(payload.email);
+  const password = typeof payload.password === "string" ? payload.password : "";
+  const phone = onlyDigits(payload.phone).slice(0, 11);
+  const city = normalizeString(payload.city);
+  const documentNumber = onlyDigits(payload.document_number);
+  const next = normalizeString(payload.next);
+
+  const documentType =
+    payload.document_type === "cpf" || payload.document_type === "cnpj"
+      ? payload.document_type
+      : undefined;
+
+  const response = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      ...(phone ? { phone } : {}),
+      ...(city ? { city } : {}),
+      ...(documentType ? { document_type: documentType } : {}),
+      ...(documentNumber ? { document_number: documentNumber } : {}),
+      ...(next ? { next } : {}),
+    }),
+  });
+
+  return parseLocalApiResponse(response);
+}
+
+export const signUp = register;
+export const signup = register;
+export const createUser = register;
+export const createAccount = register;
+
+const authService = {
+  login,
+  authenticateUser,
+  register,
+  registerUser,
+  signUp,
+  signup,
+  createUser,
+  createAccount,
+  requestPasswordReset,
+  resetPassword,
+  getAuthUserById,
+  getLocalEmailByUserId,
+};
+
+export default authService;
