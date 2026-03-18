@@ -81,9 +81,9 @@ export async function POST(request: NextRequest) {
 
     const result = await registerUser(registerPayload);
 
-    if (!result?.success || !result.session) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: result?.error ?? "Nao foi possivel criar a conta." },
+        { error: result.error ?? "Nao foi possivel criar a conta." },
         { status: 400 }
       );
     }
@@ -91,10 +91,10 @@ export async function POST(request: NextRequest) {
     const { session: authSession } = result;
 
     if (
-      !authSession?.user?.id ||
-      !authSession?.user?.email ||
-      !authSession?.accessToken ||
-      !authSession?.refreshToken
+      !authSession.user?.id ||
+      !authSession.user?.email ||
+      !authSession.accessToken ||
+      !authSession.refreshToken
     ) {
       return NextResponse.json(
         { error: "Resposta de autenticacao invalida." },
@@ -113,7 +113,10 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       user: authSession.user,
-      redirect_to: resolvePostLoginRedirect(authSession.user.type, next || undefined),
+      redirect_to: resolvePostLoginRedirect(
+        authSession.user.type,
+        next || undefined
+      ),
     });
 
     response.cookies.set(
