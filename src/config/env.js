@@ -1,10 +1,10 @@
 /**
  * Configuração centralizada e validação de variáveis de ambiente.
- * Garante que o app só inicie com config válida.
+ * Base única para app, workers, migrations e integrações.
  */
 import { z } from "zod";
 
-function parseBoolean(value, defaultValue = false) {
+function coerceBoolean(value, defaultValue = false) {
   if (value === undefined || value === null || value === "") {
     return defaultValue;
   }
@@ -21,6 +21,9 @@ function parseBoolean(value, defaultValue = false) {
   return defaultValue;
 }
 
+const booleanField = (defaultValue = false) =>
+  z.preprocess((value) => coerceBoolean(value, defaultValue), z.boolean());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(4000),
@@ -32,9 +35,8 @@ const envSchema = z.object({
   PG_IDLE_TIMEOUT_MS: z.coerce.number().min(1000).default(30000),
   PG_CONN_TIMEOUT_MS: z.coerce.number().min(1000).default(10000),
   PG_SLOW_QUERY_MS: z.coerce.number().min(100).default(800),
-  PG_SSL_REJECT_UNAUTHORIZED: z
-    .preprocess((value) => parseBoolean(value, false), z.boolean())
-    .default(false),
+  PG_SSL_ENABLED: booleanField(true).default(true),
+  PG_SSL_REJECT_UNAUTHORIZED: booleanField(false).default(false),
 
   // Redis
   REDIS_URL: z.string().optional(),
@@ -61,9 +63,10 @@ function parseEnv() {
 export const env = parseEnv();
 
 export function getDbSslConfig() {
-  const isProd = env.NODE_ENV === "production";
+  const isProduction = env.NODE_ENV === "production";
 
-  if (!isProd) return false;
+  if (!isProduction) return false;
+  if (!env.PG_SSL_ENABLED) return false;
 
   return {
     rejectUnauthorized: env.PG_SSL_REJECT_UNAUTHORIZED,
