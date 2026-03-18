@@ -17,91 +17,277 @@ import {
   revokeAllUserRefreshTokens,
 } from "./sessions/refreshToken.repository.js";
 
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+
+let cachedUsersColumns = null;
+
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeEmail(value) {
+  return normalizeString(value).toLowerCase();
+}
+
+function onlyDigits(value) {
+  return normalizeString(value).replace(/\D/g, "");
+}
+
+function normalizeDocumentType(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  return normalized === "cpf" || normalized === "cnpj" ? normalized : null;
+}
+
+function sanitizeUser(user) {
+  if (!user || typeof user !== "object") return user;
+
+  const sanitized = { ...user };
+  delete sanitized.password;
+  delete sanitized.password_hash;
+  delete sanitized.refresh_token;
+  delete sanitized.refreshToken;
+
+  return sanitized;
+}
+
+async function getUsersTableColumns() {
+  if (cachedUsersColumns) return cachedUsersColumns;
+
+  const result = await pool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'users'
+    `
+  );
+
+  cachedUsersColumns = new Set(result.rows.map((row) => row.column_name));
+  return cachedUsersColumns;
+}
+
+function hasColumn(columns, name) {
+  return columns.has(name);
+}
+
+function resolvePasswordColumn(columns) {
+  if (hasColumn(columns, "password_hash")) return "password_hash";
+  if (hasColumn(columns, "password")) return "password";
+  throw new AppError(
+    'Tabela "users" não possui coluna de senha compatível (password_hash ou password).',
+    500
+  );
+}
+
+function appendInsertField(columns, values, placeholders, fieldName, value) {
+  columns.push(fieldName);
+  values.push(value);
+  placeholders.push(`$${values.length}`);
 }
 
 export async function hashPassword(password) {
   const normalizedPassword = normalizeString(password);
 
   if (!normalizedPassword) {
-    throw new Error("Senha é obrigatória.");
+    throw new AppError("Senha é obrigatória.", 400);
   }
 
   if (normalizedPassword.length < 6) {
-    throw new Error("Senha deve ter no mínimo 6 caracteres.");
+    throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
   }
 
-  const saltRounds = 10;
-  const passwordHash = await bcrypt.hash(normalizedPassword, saltRounds);
-
-  return passwordHash;
+  return bcrypt.hash(normalizedPassword, BCRYPT_ROUNDS);
 }
-const BCRYPT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+
+export async function verifyPassword(password, passwordHash) {
+  const normalizedPassword = normalizeString(password);
+
+  if (!normalizedPassword || !passwordHash) {
+    return false;
+  }
+
+  return bcrypt.compare(normalizedPassword, passwordHash);
+}
 
 /* =====================================================
    REGISTER
 ===================================================== */
-export async function register({ name, email, password, phone, city, document_type, document_number }, reqMeta = {}) {
-  const normalizedEmail = String(email ?? "").trim().toLowerCase();
-  const pwd = String(password ?? "").trim();
+export async function register(
+  { name, email, password, phone, city, document_type, document_number },
+  reqMeta = {}
+) {
+  const usersColumns = await getUsersTableColumns();
 
-  if (!normalizedEmail) throw new AppError("Email é obrigatório.", 400);
-  if (!pwd) throw new AppError("Senha é obrigatória.", 400);
-  if (pwd.length < 6) throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPassword = normalizeString(password);
+  const normalizedName = normalizeString(name) || null;
+  const normalizedPhone = onlyDigits(phone).slice(0, 11) || null;
+  const normalizedCity = normalizeString(city) || null;
+  const normalizedDocumentType = normalizeDocumentType(document_type);
+  const normalizedDocumentNumber = onlyDigits(document_number) || null;
 
-  const existing = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1", [normalizedEmail]);
+  if (!normalizedEmail) {
+    throw new AppError("Email é obrigatório.", 400);
+  }
+
+  if (!normalizedPassword) {
+    throw new AppError("Senha é obrigatória.", 400);
+  }
+
+  if (normalizedPassword.length < 6) {
+    throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+  }
+
+  const existing = await pool.query(
+    "SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1",
+    [normalizedEmail]
+  );
+
   if (existing.rows?.length) {
     throw new AppError("Email já cadastrado.", 400);
   }
 
-  const passwordHash = await bcrypt.hash(pwd, BCRYPT_ROUNDS);
-  const nameVal = name ? String(name).trim() || null : null;
+  const passwordColumn = resolvePasswordColumn(usersColumns);
+  const passwordHash = await hashPassword(normalizedPassword);
 
-  const result = await pool.query(
-    `INSERT INTO users (name, email, password, email_verified)
-     VALUES ($1, $2, $3, true)
-     RETURNING id, name, email, document_type, document_verified`,
-    [nameVal, normalizedEmail, passwordHash]
-  );
+  const insertColumns = [];
+  const insertValues = [];
+  const insertPlaceholders = [];
 
-  const user = result.rows[0];
-  if (!user) throw new AppError("Erro ao criar usuário.", 500);
-
-  const phoneVal = phone ? String(phone).replace(/\D/g, "").slice(0, 11) || null : null;
-  const cityVal = city ? String(city).trim() || null : null;
-  const docType = document_type && ["cpf", "cnpj"].includes(String(document_type).toLowerCase())
-    ? String(document_type).toLowerCase()
-    : null;
-  const docNum = document_number ? String(document_number).replace(/\D/g, "") || null : null;
-
-  if (docType || docNum) {
-    await pool.query(
-      `UPDATE users SET document_type = COALESCE($1, document_type), document_number = COALESCE($2, document_number)
-       WHERE id = $3`,
-      [docType, docNum, user.id]
-    ).catch(() => {});
+  if (hasColumn(usersColumns, "name")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "name",
+      normalizedName
+    );
   }
 
-  return issueSession(user, reqMeta);
+  if (hasColumn(usersColumns, "email")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "email",
+      normalizedEmail
+    );
+  } else {
+    throw new AppError('Tabela "users" sem coluna obrigatória "email".', 500);
+  }
+
+  appendInsertField(
+    insertColumns,
+    insertValues,
+    insertPlaceholders,
+    passwordColumn,
+    passwordHash
+  );
+
+  if (hasColumn(usersColumns, "email_verified")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "email_verified",
+      true
+    );
+  }
+
+  if (normalizedPhone && hasColumn(usersColumns, "phone")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "phone",
+      normalizedPhone
+    );
+  }
+
+  if (normalizedCity && hasColumn(usersColumns, "city")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "city",
+      normalizedCity
+    );
+  }
+
+  if (normalizedDocumentType && hasColumn(usersColumns, "document_type")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "document_type",
+      normalizedDocumentType
+    );
+  }
+
+  if (normalizedDocumentNumber && hasColumn(usersColumns, "document_number")) {
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "document_number",
+      normalizedDocumentNumber
+    );
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        INSERT INTO users (${insertColumns.join(", ")})
+        VALUES (${insertPlaceholders.join(", ")})
+        RETURNING *
+      `,
+      insertValues
+    );
+
+    const createdUser = result.rows?.[0];
+
+    if (!createdUser) {
+      throw new AppError("Erro ao criar usuário.", 500);
+    }
+
+    return issueSession(sanitizeUser(createdUser), reqMeta);
+  } catch (error) {
+    if (error?.code === "23505") {
+      throw new AppError("Email já cadastrado.", 400);
+    }
+
+    throw error;
+  }
 }
 
 /* =====================================================
    LOGIN
 ===================================================== */
 export async function login(email, password, reqMeta = {}) {
-  if (!email || !password) throw new AppError("Credenciais inválidas", 401);
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPassword = normalizeString(password);
 
-  const normalizedEmail = String(email).trim().toLowerCase();
+  if (!normalizedEmail || !normalizedPassword) {
+    throw new AppError("Credenciais inválidas", 401);
+  }
 
-  const result = await pool.query("SELECT * FROM users WHERE email = $1", [
-    normalizedEmail,
-  ]);
-  const user = result.rows[0];
+  const usersColumns = await getUsersTableColumns();
+  const passwordColumn = resolvePasswordColumn(usersColumns);
+
+  const result = await pool.query(
+    "SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1",
+    [normalizedEmail]
+  );
+
+  const user = result.rows?.[0];
 
   await validateUserForLogin(user);
 
-  const passwordValid = await bcrypt.compare(String(password), user.password);
+  const storedPasswordHash = user?.[passwordColumn];
+  const passwordValid = await verifyPassword(
+    normalizedPassword,
+    storedPasswordHash
+  );
 
   if (!passwordValid) {
     await handleFailedLogin(user);
@@ -125,23 +311,25 @@ export async function login(email, password, reqMeta = {}) {
     success: true,
   });
 
-  return issueSession(user, reqMeta);
+  return issueSession(sanitizeUser(user), reqMeta);
 }
 
 /* =====================================================
    REFRESH (ROTATION)
 ===================================================== */
 export async function refresh(oldRefreshToken, reqMeta = {}) {
-  if (!oldRefreshToken) throw new AppError("Refresh token não fornecido", 401);
+  if (!oldRefreshToken) {
+    throw new AppError("Refresh token não fornecido", 401);
+  }
 
   try {
     return await rotateRefreshToken(oldRefreshToken, reqMeta);
   } catch (err) {
-    // Se detectar reuse attack, encerra tudo
     if (err?.code === "REFRESH_REUSE") {
       await revokeAllUserRefreshTokens(err.userId);
       throw new AppError("Sessão comprometida. Faça login novamente.", 401);
     }
+
     throw err;
   }
 }
@@ -150,15 +338,29 @@ export async function refresh(oldRefreshToken, reqMeta = {}) {
    LOGOUT
 ===================================================== */
 export async function logout(refreshToken) {
-  if (!refreshToken) return { message: "Logout realizado com sucesso" };
+  if (!refreshToken) {
+    return { message: "Logout realizado com sucesso" };
+  }
 
   await revokeRefreshToken(refreshToken);
   return { message: "Logout realizado com sucesso" };
 }
 
 export async function logoutAll(userId) {
-  if (!userId) throw new AppError("userId obrigatório", 400);
+  if (!userId) {
+    throw new AppError("userId obrigatório", 400);
+  }
 
   await revokeAllUserRefreshTokens(userId);
   return { message: "Todas as sessões foram encerradas" };
 }
+
+export default {
+  register,
+  login,
+  refresh,
+  logout,
+  logoutAll,
+  hashPassword,
+  verifyPassword,
+};
