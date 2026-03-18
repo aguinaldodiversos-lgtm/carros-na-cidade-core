@@ -1,10 +1,19 @@
 import "dotenv/config";
 import { Pool } from "pg";
+import { env } from "../../config/env.js";
 import { logger } from "../../shared/logger.js";
 import { getPoolConfig } from "./pool-config.js";
 
+function getQueryPreview(text) {
+  if (typeof text !== "string") return "";
+  return text.replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
 export const pool = new Pool(getPoolConfig());
-export { getPoolConfig };
+
+pool.on("connect", () => {
+  logger.debug?.("[db] conexão adquirida pelo pool");
+});
 
 pool.on("error", (error) => {
   logger.error(
@@ -19,13 +28,12 @@ export async function query(text, params = []) {
   try {
     const result = await pool.query(text, params);
     const durationMs = Date.now() - startedAt;
-    const slowMs = Number(process.env.PG_SLOW_QUERY_MS || 800);
 
-    if (durationMs >= slowMs) {
+    if (durationMs >= env.PG_SLOW_QUERY_MS) {
       logger.warn(
         {
           durationMs,
-          text: text.slice(0, 240),
+          text: getQueryPreview(text),
         },
         "[db] slow query"
       );
@@ -36,7 +44,7 @@ export async function query(text, params = []) {
     logger.error(
       {
         error: error?.message || String(error),
-        text: text.slice(0, 240),
+        text: getQueryPreview(text),
       },
       "[db] query falhou"
     );
@@ -53,7 +61,15 @@ export async function withTransaction(callback) {
     await client.query("COMMIT");
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      logger.error(
+        { error: rollbackError?.message || String(rollbackError) },
+        "[db] rollback falhou"
+      );
+    }
+
     throw error;
   } finally {
     client.release();
@@ -74,14 +90,17 @@ export async function healthcheck() {
 }
 
 export async function closeDatabasePool() {
-  await pool.end();
-  logger.info("[db] pool encerrado");
+  try {
+    await pool.end();
+    logger.info("[db] pool encerrado");
+  } catch (error) {
+    logger.error(
+      { error: error?.message || String(error) },
+      "[db] falha ao encerrar pool"
+    );
+    throw error;
+  }
 }
 
-export default {
-  pool,
-  query,
-  withTransaction,
-  healthcheck,
-  closeDatabasePool,
-};
+export default pool;
+export { getPoolConfig };
