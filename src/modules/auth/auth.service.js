@@ -17,6 +17,26 @@ import {
   revokeAllUserRefreshTokens,
 } from "./sessions/refreshToken.repository.js";
 
+function normalizeString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export async function hashPassword(password) {
+  const normalizedPassword = normalizeString(password);
+
+  if (!normalizedPassword) {
+    throw new Error("Senha é obrigatória.");
+  }
+
+  if (normalizedPassword.length < 6) {
+    throw new Error("Senha deve ter no mínimo 6 caracteres.");
+  }
+
+  const saltRounds = 10;
+  const passwordHash = await bcrypt.hash(normalizedPassword, saltRounds);
+
+  return passwordHash;
+}
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 
 /* =====================================================
