@@ -214,6 +214,78 @@ export async function authenticateUser(email: string, password: string): Promise
   return authenticateLocally(email, password);
 }
 
+export type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  city?: string;
+  document_type?: "cpf" | "cnpj";
+  document_number?: string;
+};
+
+export type RegisterResult =
+  | { success: true; session: AuthSession }
+  | { success: false; error?: string };
+
+export async function registerUser(payload: RegisterPayload): Promise<RegisterResult> {
+  const baseUrl = resolveAuthApiBase();
+  if (!baseUrl) {
+    return { success: false, error: "API do backend nao configurada." };
+  }
+
+  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/register");
+  if (!endpoint) {
+    return { success: false, error: "Endpoint de cadastro nao configurado." };
+  }
+
+  try {
+    const body: Record<string, unknown> = {
+      name: payload.name.trim(),
+      email: payload.email.trim().toLowerCase(),
+      password: payload.password,
+    };
+    if (payload.phone) body.phone = payload.phone.replace(/\D/g, "").slice(0, 11);
+    if (payload.city) body.city = payload.city.trim();
+    if (payload.document_type) body.document_type = payload.document_type;
+    if (payload.document_number) body.document_number = payload.document_number.replace(/\D/g, "");
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+
+    const data = (await response.json().catch(() => ({}))) as BackendLoginResponse & { error?: string; message?: string };
+    if (!response.ok) {
+      return { success: false, error: data.error ?? data.message ?? "Nao foi possivel criar a conta." };
+    }
+
+    const accessToken = extractAccessToken(data);
+    const refreshToken = extractRefreshToken(data);
+    const backendUser = data.user ?? (data as { data?: { user?: BackendUserPayload } }).data?.user;
+    const resolvedUser =
+      (backendUser ? toAuthUserFromBackend(backendUser, payload.email) : null) ??
+      (accessToken ? await fetchCurrentUserFromBackend(baseUrl, accessToken, payload.email) : null);
+
+    if (!resolvedUser) {
+      return { success: false, error: "Nao foi possivel obter dados do usuario." };
+    }
+
+    return {
+      success: true,
+      session: {
+        user: resolvedUser,
+        accessToken: accessToken ? String(accessToken) : undefined,
+        refreshToken: refreshToken ? String(refreshToken) : undefined,
+      },
+    };
+  } catch {
+    return { success: false, error: "Erro de conexao. Tente novamente." };
+  }
+}
+
 export function getAuthUserById(userId: string): AuthUser | null {
   return toAuthUserFromStore(userId, getLocalEmailByUserId(userId));
 }

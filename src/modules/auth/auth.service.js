@@ -17,6 +17,55 @@ import {
   revokeAllUserRefreshTokens,
 } from "./sessions/refreshToken.repository.js";
 
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+
+/* =====================================================
+   REGISTER
+===================================================== */
+export async function register({ name, email, password, phone, city, document_type, document_number }, reqMeta = {}) {
+  const normalizedEmail = String(email ?? "").trim().toLowerCase();
+  const pwd = String(password ?? "").trim();
+
+  if (!normalizedEmail) throw new AppError("Email é obrigatório.", 400);
+  if (!pwd) throw new AppError("Senha é obrigatória.", 400);
+  if (pwd.length < 6) throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+
+  const existing = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1", [normalizedEmail]);
+  if (existing.rows?.length) {
+    throw new AppError("Email já cadastrado.", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(pwd, BCRYPT_ROUNDS);
+  const nameVal = name ? String(name).trim() || null : null;
+
+  const result = await pool.query(
+    `INSERT INTO users (name, email, password, email_verified)
+     VALUES ($1, $2, $3, true)
+     RETURNING id, name, email, document_type, document_verified`,
+    [nameVal, normalizedEmail, passwordHash]
+  );
+
+  const user = result.rows[0];
+  if (!user) throw new AppError("Erro ao criar usuário.", 500);
+
+  const phoneVal = phone ? String(phone).replace(/\D/g, "").slice(0, 11) || null : null;
+  const cityVal = city ? String(city).trim() || null : null;
+  const docType = document_type && ["cpf", "cnpj"].includes(String(document_type).toLowerCase())
+    ? String(document_type).toLowerCase()
+    : null;
+  const docNum = document_number ? String(document_number).replace(/\D/g, "") || null : null;
+
+  if (docType || docNum) {
+    await pool.query(
+      `UPDATE users SET document_type = COALESCE($1, document_type), document_number = COALESCE($2, document_number)
+       WHERE id = $3`,
+      [docType, docNum, user.id]
+    ).catch(() => {});
+  }
+
+  return issueSession(user, reqMeta);
+}
+
 /* =====================================================
    LOGIN
 ===================================================== */

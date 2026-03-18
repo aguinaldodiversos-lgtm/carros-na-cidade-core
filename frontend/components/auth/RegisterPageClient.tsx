@@ -13,6 +13,7 @@ import {
 type RegisterFormState = {
   name: string;
   email: string;
+  password: string;
   phone: string;
   city: string;
   documentType: BrazilianDocumentType;
@@ -48,20 +49,13 @@ function isValidPhone(value: string) {
   return digits.length === 10 || digits.length === 11;
 }
 
-function resolveApiBase() {
-  const value =
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "";
-  return value.replace(/\/+$/, "");
-}
-
 export default function RegisterPageClient() {
   const router = useRouter();
 
   const [form, setForm] = useState<RegisterFormState>({
     name: "",
     email: "",
+    password: "",
     phone: "",
     city: "",
     documentType: "cpf",
@@ -82,10 +76,12 @@ export default function RegisterPageClient() {
     [form.document, form.documentType]
   );
 
+  const passwordValid = form.password.length >= 6;
   const canSubmit =
     form.name.trim().length >= 3 &&
     form.city.trim().length >= 2 &&
     emailValid &&
+    passwordValid &&
     phoneValid &&
     documentValid &&
     form.acceptTerms;
@@ -136,17 +132,14 @@ export default function RegisterPageClient() {
       const payload = {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
-        phone: onlyDigits(form.phone),
-        city: form.city.trim(),
-        document: handleSubmitDocument(),
+        password: form.password,
+        phone: onlyDigits(form.phone) || undefined,
+        city: form.city.trim() || undefined,
+        document_type: form.documentType,
+        document_number: documentValid ? onlyDigits(form.document) : undefined,
       };
 
-      const apiBase = resolveApiBase();
-      const endpoint = apiBase
-        ? `${apiBase}/api/auth/register`
-        : "/api/auth/register";
-
-      const response = await fetch(endpoint, {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -174,15 +167,17 @@ export default function RegisterPageClient() {
         throw new Error(errorMessage);
       }
 
+      const data = (await response.json()) as { redirect_to?: string };
       setSubmitState({
         tone: "success",
         message:
-          "Cadastro realizado com sucesso. Agora você já pode entrar e seguir para publicar seu anúncio.",
+          "Cadastro realizado com sucesso. Redirecionando...",
       });
 
       setTimeout(() => {
-        router.push("/login?cadastro=sucesso");
-      }, 900);
+        router.push(data.redirect_to ?? "/dashboard");
+        router.refresh();
+      }, 500);
     } catch (error) {
       setSubmitState({
         tone: "error",
@@ -294,6 +289,25 @@ export default function RegisterPageClient() {
                 {form.email && !emailValid ? (
                   <p className="mt-2 text-[13px] font-medium text-[#C2410C]">
                     Informe um e-mail válido.
+                  </p>
+                ) : null}
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-[14px] font-semibold text-[#33405A]">
+                  Senha
+                </span>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(event) => updateField("password", event.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  autoComplete="new-password"
+                  className="h-[54px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
+                />
+                {form.password && !passwordValid ? (
+                  <p className="mt-2 text-[13px] font-medium text-[#C2410C]">
+                    A senha deve ter no mínimo 6 caracteres.
                   </p>
                 ) : null}
               </label>

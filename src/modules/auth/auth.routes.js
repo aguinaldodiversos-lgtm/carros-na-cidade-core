@@ -120,6 +120,14 @@ router.post(
     const email = requireString(req.body?.email, "email", { lowercase: true });
     const password = requireString(req.body?.password, "password");
     const name = String(req.body?.name ?? "").trim() || null;
+    const phone = String(req.body?.phone ?? "").trim() || null;
+    const city = String(req.body?.city ?? "").trim() || null;
+    const document_type = ["cpf", "cnpj"].includes(String(req.body?.document_type ?? "").toLowerCase())
+      ? String(req.body.document_type).toLowerCase()
+      : null;
+    const document_number = req.body?.document_number
+      ? String(req.body.document_number).replace(/\D/g, "") || null
+      : null;
 
     const register = ensureFn(
       AuthService,
@@ -127,8 +135,46 @@ router.post(
       "auth.service.js"
     );
 
-    const result = await register({ name, email, password });
+    const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+    const result = await register(
+      { name, email, password, phone, city, document_type, document_number },
+      meta
+    );
     return res.status(201).json(result ?? { ok: true });
+  })
+);
+
+/** VERIFY DOCUMENT (CPF/CNPJ) */
+router.post(
+  "/verify-document",
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const document_type = requireString(req.body?.document_type, "document_type").toLowerCase();
+    const document_number = requireString(req.body?.document_number, "document_number").replace(/\D/g, "");
+
+    if (!["cpf", "cnpj"].includes(document_type)) {
+      throw new AppError("Tipo de documento inválido. Use cpf ou cnpj.", 400);
+    }
+
+    const { createRequire } = await import("module");
+    const require = createRequire(import.meta.url);
+    const { verifyDocument } = require("../../services/documents/documentVerification.service.js");
+
+    const result = await verifyDocument({ type: document_type, number: document_number });
+    if (!result.valid) {
+      throw new AppError("Documento inválido.", 400);
+    }
+
+    await pool.query(
+      `UPDATE users SET document_type = $1, document_number = $2, document_verified = true WHERE id = $3`,
+      [document_type, document_number, req.user.id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Documento verificado com sucesso.",
+      company_name: result.company_name || null,
+    });
   })
 );
 
