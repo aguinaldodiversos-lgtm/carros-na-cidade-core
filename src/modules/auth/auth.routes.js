@@ -64,17 +64,7 @@ router.post(
 
     const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
 
-    let result;
-    try {
-      // assinatura antiga: (email, password, meta)
-      result =
-        login.length >= 2
-          ? await login(email, password, meta)
-          : await login({ email, password, ...meta });
-    } catch {
-      // assinatura nova: ({email,password,...})
-      result = await login({ email, password, ...meta });
-    }
+    const result = await login(email, password, meta);
 
     return res.status(200).json(result);
   })
@@ -88,15 +78,7 @@ router.post(
     const refresh = ensureFn(AuthService, ["refresh"], "auth.service.js");
     const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
 
-    let result;
-    try {
-      result =
-        refresh.length >= 2
-          ? await refresh(refreshToken, meta)
-          : await refresh({ refreshToken, ...meta });
-    } catch {
-      result = await refresh({ refreshToken, ...meta });
-    }
+    const result = await refresh(refreshToken, meta);
 
     return res.status(200).json(result);
   })
@@ -122,7 +104,9 @@ router.post(
     const name = String(req.body?.name ?? "").trim() || null;
     const phone = String(req.body?.phone ?? "").trim() || null;
     const city = String(req.body?.city ?? "").trim() || null;
-    const document_type = ["cpf", "cnpj"].includes(String(req.body?.document_type ?? "").toLowerCase())
+    const document_type = ["cpf", "cnpj"].includes(
+      String(req.body?.document_type ?? "").toLowerCase()
+    )
       ? String(req.body.document_type).toLowerCase()
       : null;
     const document_number = req.body?.document_number
@@ -136,10 +120,12 @@ router.post(
     );
 
     const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+
     const result = await register(
       { name, email, password, phone, city, document_type, document_number },
       meta
     );
+
     return res.status(201).json(result ?? { ok: true });
   })
 );
@@ -149,8 +135,14 @@ router.post(
   "/verify-document",
   authMiddleware,
   asyncHandler(async (req, res) => {
-    const document_type = requireString(req.body?.document_type, "document_type").toLowerCase();
-    const document_number = requireString(req.body?.document_number, "document_number").replace(/\D/g, "");
+    const document_type = requireString(
+      req.body?.document_type,
+      "document_type"
+    ).toLowerCase();
+    const document_number = requireString(
+      req.body?.document_number,
+      "document_number"
+    ).replace(/\D/g, "");
 
     if (!["cpf", "cnpj"].includes(document_type)) {
       throw new AppError("Tipo de documento inválido. Use cpf ou cnpj.", 400);
@@ -160,7 +152,11 @@ router.post(
     const require = createRequire(import.meta.url);
     const { verifyDocument } = require("../../services/documents/documentVerification.service.js");
 
-    const result = await verifyDocument({ type: document_type, number: document_number });
+    const result = await verifyDocument({
+      type: document_type,
+      number: document_number,
+    });
+
     if (!result.valid) {
       throw new AppError("Documento inválido.", 400);
     }
@@ -178,7 +174,7 @@ router.post(
   })
 );
 
-/** PASSWORD RESET (compatível com o seu service real) */
+/** PASSWORD RESET */
 async function handleForgotPassword(req, res) {
   const email = requireString(req.body?.email, "email", { lowercase: true });
   const fn = ensureFn(
@@ -212,14 +208,9 @@ async function handleResetPassword(req, res) {
     "password.service.js"
   );
 
-  let result;
-  try {
-    // assinatura antiga: (token, newPassword) ou nova: ({token,newPassword})
-    result =
-      fn.length >= 2 ? await fn(token, newPassword) : await fn({ token, newPassword });
-  } catch {
-    result = await fn({ token, newPassword });
-  }
+  const result = fn.length >= 2
+    ? await fn(token, newPassword)
+    : await fn({ token, newPassword });
 
   return res.status(200).json(result ?? { ok: true });
 }
@@ -250,7 +241,7 @@ async function handleVerifyEmail(req, res) {
 router.post("/verify-email", asyncHandler(handleVerifyEmail));
 router.all("/email/verify", asyncHandler(handleVerifyEmail));
 
-/** EMAIL RESEND (se existir no service) */
+/** EMAIL RESEND */
 router.post(
   "/email/resend",
   asyncHandler(async (req, res) => {
@@ -261,7 +252,9 @@ router.post(
     ]);
 
     if (!resend) {
-      return res.status(501).json({ ok: false, error: "Resend não implementado no service." });
+      return res
+        .status(501)
+        .json({ ok: false, error: "Resend não implementado no service." });
     }
 
     const { email, userId } = req.body || {};
@@ -304,7 +297,10 @@ router.get(
       throw new AppError("Usuario nao encontrado", 404);
     }
 
-    const accountType = String(user.document_type || "").trim().toUpperCase() === "CNPJ" ? "CNPJ" : "CPF";
+    const accountType =
+      String(user.document_type || "").trim().toUpperCase() === "CNPJ"
+        ? "CNPJ"
+        : "CPF";
 
     res.json({
       success: true,
@@ -314,7 +310,8 @@ router.get(
         email: user.email?.trim() || "",
         type: accountType,
         document_type: accountType,
-        cnpj_verified: accountType === "CNPJ" ? Boolean(user.document_verified) : false,
+        cnpj_verified:
+          accountType === "CNPJ" ? Boolean(user.document_verified) : false,
         role: user.role || "user",
         plan: user.plan || "free",
       },
