@@ -13,35 +13,29 @@ function refreshExpiresAt() {
 }
 
 /**
- * Emite um par (access + refresh) e grava o refresh no DB com hash.
- * Também grava token puro na coluna "token" por compat (pode remover depois).
+ * Emite um par (access + refresh) e grava o refresh no DB
+ * no formato compatível com o schema atual.
  */
 export async function issueSession(user, meta = {}) {
   if (!user?.id) throw new Error("Usuário inválido");
 
   const accessToken = signAccessToken(user);
 
-  const familyId = crypto.randomUUID(); // família nova no login
+  const familyId = crypto.randomUUID();
   const jti = newJti();
   const refreshToken = signRefreshToken({ userId: user.id, familyId, jti });
 
-  const tokenHash = hashRefreshToken(refreshToken);
+  // Mantidos por compatibilidade futura, mesmo que o schema atual não use
+  hashRefreshToken(refreshToken);
+
   const expiresAt = refreshExpiresAt();
 
   await pool.query(
     `
-    INSERT INTO refresh_tokens (user_id, token, token_hash, expires_at, revoked, created_at, family_id, created_ip, user_agent)
-    VALUES ($1, $2, $3, $4, false, now(), $5, $6, $7)
+    INSERT INTO refresh_tokens (user_id, token, expires_at)
+    VALUES ($1, $2, $3)
     `,
-    [
-      user.id,
-      refreshToken,              // compat: mantém token puro por enquanto
-      tokenHash,                 // o que usaremos de verdade
-      expiresAt,
-      familyId,
-      meta.ip || null,
-      meta.userAgent || null,
-    ]
+    [user.id, refreshToken, expiresAt]
   );
 
   return { accessToken, refreshToken };
