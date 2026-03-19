@@ -297,30 +297,26 @@ export async function register(
    LOGIN
 ===================================================== */
 export async function login(email, password, reqMeta = {}) {
-  const normalizedEmail = normalizeEmail(email);
-  const normalizedPassword = normalizeString(password);
-
-  if (!normalizedEmail || !normalizedPassword) {
+  if (!email || !password) {
     throw new AppError("Credenciais inválidas", 401);
   }
 
-  const usersColumns = await getUsersTableColumns();
-  const passwordColumn = resolvePasswordColumn(usersColumns);
+  const normalizedEmail = String(email).trim().toLowerCase();
 
   const result = await pool.query(
     "SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1",
     [normalizedEmail]
   );
 
-  const user = result.rows?.[0];
+  const user = result.rows[0];
 
   await validateUserForLogin(user);
 
-  const storedPasswordHash = user?.[passwordColumn];
-  const passwordValid = await verifyPassword(
-    normalizedPassword,
+  const storedPasswordHash = user?.password_hash ?? user?.password ?? null;
+  const passwordValid =
     storedPasswordHash
-  );
+      ? await bcrypt.compare(String(password), storedPasswordHash)
+      : false;
 
   if (!passwordValid) {
     await handleFailedLogin(user);
@@ -344,7 +340,7 @@ export async function login(email, password, reqMeta = {}) {
     success: true,
   });
 
-  return issueSession(buildSessionUser(user), reqMeta);
+  return issueSession(user, reqMeta);
 }
 
 /* =====================================================
