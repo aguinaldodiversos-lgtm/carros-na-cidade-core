@@ -282,8 +282,15 @@ export async function register(
     if (!createdUser) {
       throw new AppError("Erro ao criar usuário.", 500);
     }
+const sessionUser = buildSessionUser(createdUser);
+const session = await issueSession(sessionUser, reqMeta);
 
-    return issueSession(buildSessionUser(createdUser), reqMeta);
+return {
+  user: sessionUser,
+  accessToken: session.accessToken,
+  refreshToken: session.refreshToken,
+};
+    
   } catch (error) {
     if (error?.code === "23505") {
       throw new AppError("Email já cadastrado.", 400);
@@ -340,7 +347,14 @@ export async function login(email, password, reqMeta = {}) {
     success: true,
   });
 
-  return issueSession(user, reqMeta);
+const sessionUser = buildSessionUser(user);
+const session = await issueSession(sessionUser, reqMeta);
+
+return {
+  user: sessionUser,
+  accessToken: session.accessToken,
+  refreshToken: session.refreshToken,
+};
 }
 
 /* =====================================================
