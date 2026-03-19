@@ -43,6 +43,9 @@ type BackendUserPayload = {
   documentType?: string;
   cnpj_verified?: boolean;
   cnpjVerified?: boolean;
+  document_verified?: boolean;
+  role?: string;
+  plan?: string;
 };
 
 type BackendAuthResponse = {
@@ -169,7 +172,10 @@ function toAuthUserFromBackend(
     name: normalizeString(payload.name) || "Usuario",
     email: normalizeEmail(payload.email) || normalizeEmail(fallbackEmail),
     type: accountType,
-    cnpj_verified: Boolean(payload.cnpj_verified ?? payload.cnpjVerified),
+    cnpj_verified:
+      accountType === "CNPJ"
+        ? Boolean(payload.cnpj_verified ?? payload.cnpjVerified ?? payload.document_verified)
+        : false,
   };
 }
 
@@ -307,12 +313,21 @@ async function authenticateAgainstBackend(
       cache: "no-store",
     });
 
-    if (!response.ok) return null;
-
     const payload = await safeJson<BackendAuthResponse>(response);
+
+    if (!response.ok) {
+      throw new Error(
+        extractErrorMessage(payload, "Nao foi possivel autenticar.")
+      );
+    }
+
     return buildAuthenticatedSessionFromResponse(payload, baseUrl, normalizedEmail);
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("Erro de conexao. Tente novamente.");
   }
 }
 
@@ -329,8 +344,11 @@ export async function authenticateUser(
   email: string,
   password: string
 ): Promise<AuthSession | null> {
-  const backendUser = await authenticateAgainstBackend(email, password);
-  if (backendUser) return backendUser;
+  const baseUrl = resolveAuthApiBase();
+
+  if (baseUrl) {
+    return authenticateAgainstBackend(email, password);
+  }
 
   return authenticateLocally(email, password);
 }
