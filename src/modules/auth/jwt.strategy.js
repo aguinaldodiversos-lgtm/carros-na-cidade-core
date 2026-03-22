@@ -1,11 +1,6 @@
 // src/modules/auth/jwt.strategy.js
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { AppError } from "../../shared/middlewares/error.middleware.js";
-
-/* =====================================================
-   CONFIGURAÇÕES
-===================================================== */
 
 const {
   JWT_SECRET,
@@ -26,19 +21,10 @@ const ACCESS_EXPIRES = "15m";
 const REFRESH_EXPIRES = "7d";
 const ALGORITHM = "HS256";
 
-/* =====================================================
-   GERAR ACCESS TOKEN
-===================================================== */
-
 export function generateAccessToken(payload) {
-  if (!payload?.id) {
-    throw new AppError("Payload inválido para access token", 400);
-  }
-
   return jwt.sign(
     {
       ...payload,
-      id: String(payload.id),
       jti: crypto.randomUUID(),
       type: "access",
     },
@@ -52,21 +38,11 @@ export function generateAccessToken(payload) {
   );
 }
 
-/* =====================================================
-   GERAR REFRESH TOKEN
-===================================================== */
-
 export function generateRefreshToken(payload) {
-  if (!payload?.userId) {
-    throw new AppError("Payload inválido para refresh token", 400);
-  }
-
   return jwt.sign(
     {
-      id: String(payload.userId),
-      userId: String(payload.userId),
-      familyId: payload.familyId,
-      jti: payload.jti || crypto.randomUUID(),
+      ...payload,
+      jti: crypto.randomUUID(),
       type: "refresh",
     },
     JWT_REFRESH_SECRET,
@@ -79,10 +55,6 @@ export function generateRefreshToken(payload) {
   );
 }
 
-/* =====================================================
-   VERIFY ACCESS TOKEN
-===================================================== */
-
 export function verifyAccessToken(token) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET, {
@@ -91,19 +63,15 @@ export function verifyAccessToken(token) {
       algorithms: [ALGORITHM],
     });
 
-    if (decoded?.type !== "access") {
+    if (decoded.type !== "access") {
       throw new Error("Token inválido");
     }
 
     return decoded;
   } catch {
-    throw new AppError("Access token inválido ou expirado", 401);
+    throw new Error("Access token inválido ou expirado");
   }
 }
-
-/* =====================================================
-   VERIFY REFRESH TOKEN
-===================================================== */
 
 export function verifyRefreshToken(token) {
   try {
@@ -113,12 +81,12 @@ export function verifyRefreshToken(token) {
       algorithms: [ALGORITHM],
     });
 
-    if (decoded?.type !== "refresh") {
+    if (decoded.type !== "refresh") {
       throw new Error("Token inválido");
     }
 
     return decoded;
   } catch {
-    throw new AppError("Refresh token inválido ou expirado", 401);
+    throw new Error("Refresh token inválido ou expirado");
   }
 }
