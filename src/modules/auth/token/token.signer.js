@@ -5,44 +5,71 @@ import { AppError } from "../../../shared/middlewares/error.middleware.js";
 
 const ALGORITHM = "HS256";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+const DEFAULT_ISSUER = "carros-na-cidade";
+const DEFAULT_AUDIENCE = "carros-na-cidade-users";
+const DEFAULT_ACCESS_TTL_MIN = 15;
+const DEFAULT_REFRESH_TTL_DAYS = 30;
 
-const JWT_ISSUER = process.env.JWT_ISSUER || "carros-na-cidade";
-const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "carros-na-cidade-users";
+function normalizeString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-const parsedAccessTtl = Number(process.env.ACCESS_TOKEN_TTL_MIN || 15);
-const parsedRefreshTtl = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
+function parsePositiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
-const ACCESS_TTL_MIN =
-  Number.isFinite(parsedAccessTtl) && parsedAccessTtl > 0 ? parsedAccessTtl : 15;
+function getJwtConfig() {
+  const jwtSecret = normalizeString(process.env.JWT_SECRET);
+  const jwtRefreshSecret =
+    normalizeString(process.env.JWT_REFRESH_SECRET) || jwtSecret;
 
-const REFRESH_TTL_DAYS =
-  Number.isFinite(parsedRefreshTtl) && parsedRefreshTtl > 0 ? parsedRefreshTtl : 30;
-
-function assertSecrets() {
-  if (!JWT_SECRET) {
+  if (!jwtSecret) {
     throw new AppError("JWT_SECRET não definido no ambiente", 500);
   }
 
-  if (!JWT_REFRESH_SECRET) {
+  if (!jwtRefreshSecret) {
     throw new AppError("JWT_REFRESH_SECRET não definido no ambiente", 500);
   }
+
+  return {
+    jwtSecret,
+    jwtRefreshSecret,
+    issuer: normalizeString(process.env.JWT_ISSUER) || DEFAULT_ISSUER,
+    audience: normalizeString(process.env.JWT_AUDIENCE) || DEFAULT_AUDIENCE,
+    accessTtlMin: parsePositiveNumber(
+      process.env.ACCESS_TOKEN_TTL_MIN,
+      DEFAULT_ACCESS_TTL_MIN
+    ),
+    refreshTtlDays: parsePositiveNumber(
+      process.env.REFRESH_TOKEN_TTL_DAYS,
+      DEFAULT_REFRESH_TTL_DAYS
+    ),
+  };
 }
 
 function normalizeUserId(userId) {
-  if (userId === undefined || userId === null || userId === "") {
+  const normalized = normalizeString(userId);
+  if (!normalized) {
     throw new AppError("Usuário inválido", 400);
   }
+  return normalized;
+}
 
-  return String(userId);
+function normalizeEmail(email) {
+  return normalizeString(email).toLowerCase();
+}
+
+function normalizeUuidLike(value, fallbackFactory = () => crypto.randomUUID()) {
+  const normalized = normalizeString(value);
+  return normalized || fallbackFactory();
 }
 
 export function signAccessToken(user) {
-  assertSecrets();
+  const config = getJwtConfig();
 
   const userId = normalizeUserId(user?.id);
-  const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+  const email = normalizeEmail(user?.email);
 
   return jwt.sign(
     {
@@ -50,29 +77,22 @@ export function signAccessToken(user) {
       email,
       type: "access",
     },
-    JWT_SECRET,
+    config.jwtSecret,
     {
       algorithm: ALGORITHM,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      expiresIn: `${ACCESS_TTL_MIN}m`,
+      issuer: config.issuer,
+      audience: config.audience,
+      expiresIn: `${config.accessTtlMin}m`,
     }
   );
 }
 
 export function signRefreshToken(payload) {
-  assertSecrets();
+  const config = getJwtConfig();
 
   const userId = normalizeUserId(payload?.userId);
-  const familyId =
-    typeof payload?.familyId === "string" && payload.familyId.trim()
-      ? payload.familyId.trim()
-      : crypto.randomUUID();
-
-  const jti =
-    typeof payload?.jti === "string" && payload.jti.trim()
-      ? payload.jti.trim()
-      : crypto.randomUUID();
+  const familyId = normalizeUuidLike(payload?.familyId);
+  const jti = normalizeUuidLike(payload?.jti);
 
   return jwt.sign(
     {
@@ -83,23 +103,28 @@ export function signRefreshToken(payload) {
       type: "refresh",
       typ: "refresh",
     },
-    JWT_REFRESH_SECRET,
+    config.jwtRefreshSecret,
     {
       algorithm: ALGORITHM,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      expiresIn: `${REFRESH_TTL_DAYS}d`,
+      issuer: config.issuer,
+      audience: config.audience,
+      expiresIn: `${config.refreshTtlDays}d`,
     }
   );
 }
 
 export function verifyRefreshToken(refreshToken) {
-  assertSecrets();
+  const config = getJwtConfig();
+  const token = normalizeString(refreshToken);
+
+  if (!token) {
+    throw new AppError("Refresh token inválido", 401);
+  }
 
   try {
-    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET, {
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
+    const decoded = jwt.verify(token, config.jwtRefreshSecret, {
+      issuer: config.issuer,
+      audience: config.audience,
       algorithms: [ALGORITHM],
     });
 
@@ -116,3 +141,9 @@ export function verifyRefreshToken(refreshToken) {
 export function newJti() {
   return crypto.randomUUID();
 }
+
+/**
+ * Aliases de compatibilidade para módulos que possam usar nomenclatura antiga.
+ */
+export const generateAccessToken = signAccessToken;
+export const generateRefreshToken = signRefreshToken;
