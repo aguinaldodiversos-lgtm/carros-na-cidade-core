@@ -1,103 +1,113 @@
-// src/modules/auth/token/token.signer.js
+// src/modules/auth/jwt.strategy.js
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { AppError } from "../../../shared/middlewares/error.middleware.js";
+import { AppError } from "../../shared/middlewares/error.middleware.js";
 
+/* =====================================================
+   CONFIGURAÇÕES
+===================================================== */
+
+const {
+  JWT_SECRET,
+  JWT_REFRESH_SECRET,
+  JWT_ISSUER = "carros-na-cidade",
+  JWT_AUDIENCE = "carros-na-cidade-users",
+} = process.env;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET não definido no .env");
+}
+
+if (!JWT_REFRESH_SECRET) {
+  throw new Error("JWT_REFRESH_SECRET não definido no .env");
+}
+
+const ACCESS_EXPIRES = "15m";
+const REFRESH_EXPIRES = "7d";
 const ALGORITHM = "HS256";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+/* =====================================================
+   GERAR ACCESS TOKEN
+===================================================== */
 
-const JWT_ISSUER = process.env.JWT_ISSUER || "carros-na-cidade";
-const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "carros-na-cidade-users";
-
-const parsedAccessTtl = Number(process.env.ACCESS_TOKEN_TTL_MIN || 15);
-const parsedRefreshTtl = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
-
-const ACCESS_TTL_MIN =
-  Number.isFinite(parsedAccessTtl) && parsedAccessTtl > 0 ? parsedAccessTtl : 15;
-
-const REFRESH_TTL_DAYS =
-  Number.isFinite(parsedRefreshTtl) && parsedRefreshTtl > 0 ? parsedRefreshTtl : 30;
-
-function assertSecrets() {
-  if (!JWT_SECRET) {
-    throw new AppError("JWT_SECRET não definido no ambiente", 500);
+export function generateAccessToken(payload) {
+  if (!payload?.id) {
+    throw new AppError("Payload inválido para access token", 400);
   }
-
-  if (!JWT_REFRESH_SECRET) {
-    throw new AppError("JWT_REFRESH_SECRET não definido no ambiente", 500);
-  }
-}
-
-function normalizeUserId(userId) {
-  if (userId === undefined || userId === null || userId === "") {
-    throw new AppError("Usuário inválido", 400);
-  }
-
-  return String(userId);
-}
-
-export function signAccessToken(user) {
-  assertSecrets();
-
-  const userId = normalizeUserId(user?.id);
-  const email =
-    typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
 
   return jwt.sign(
     {
-      id: userId,
-      email,
+      ...payload,
+      id: String(payload.id),
+      jti: crypto.randomUUID(),
       type: "access",
     },
     JWT_SECRET,
     {
-      algorithm: ALGORITHM,
+      expiresIn: ACCESS_EXPIRES,
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
-      expiresIn: `${ACCESS_TTL_MIN}m`,
+      algorithm: ALGORITHM,
     }
   );
 }
 
-export function signRefreshToken(payload) {
-  assertSecrets();
+/* =====================================================
+   GERAR REFRESH TOKEN
+===================================================== */
 
-  const userId = normalizeUserId(payload?.userId);
-  const familyId =
-    typeof payload?.familyId === "string" && payload.familyId.trim()
-      ? payload.familyId.trim()
-      : crypto.randomUUID();
-
-  const jti =
-    typeof payload?.jti === "string" && payload.jti.trim()
-      ? payload.jti.trim()
-      : crypto.randomUUID();
+export function generateRefreshToken(payload) {
+  if (!payload?.userId) {
+    throw new AppError("Payload inválido para refresh token", 400);
+  }
 
   return jwt.sign(
     {
-      id: userId,
-      userId,
-      familyId,
-      jti,
+      id: String(payload.userId),
+      userId: String(payload.userId),
+      familyId: payload.familyId,
+      jti: payload.jti || crypto.randomUUID(),
       type: "refresh",
     },
     JWT_REFRESH_SECRET,
     {
-      algorithm: ALGORITHM,
+      expiresIn: REFRESH_EXPIRES,
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
-      expiresIn: `${REFRESH_TTL_DAYS}d`,
+      algorithm: ALGORITHM,
     }
   );
 }
 
-export function verifyRefreshToken(refreshToken) {
-  assertSecrets();
+/* =====================================================
+   VERIFY ACCESS TOKEN
+===================================================== */
 
+export function verifyAccessToken(token) {
   try {
-    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET, {
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+      algorithms: [ALGORITHM],
+    });
+
+    if (decoded?.type !== "access") {
+      throw new Error("Token inválido");
+    }
+
+    return decoded;
+  } catch {
+    throw new AppError("Access token inválido ou expirado", 401);
+  }
+}
+
+/* =====================================================
+   VERIFY REFRESH TOKEN
+===================================================== */
+
+export function verifyRefreshToken(token) {
+  try {
+    const decoded = jwt.verify(token, JWT_REFRESH_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
       algorithms: [ALGORITHM],
@@ -109,10 +119,6 @@ export function verifyRefreshToken(refreshToken) {
 
     return decoded;
   } catch {
-    throw new AppError("Refresh token inválido", 401);
+    throw new AppError("Refresh token inválido ou expirado", 401);
   }
-}
-
-export function newJti() {
-  return crypto.randomUUID();
 }
