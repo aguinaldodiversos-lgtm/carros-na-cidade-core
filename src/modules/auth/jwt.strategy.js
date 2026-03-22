@@ -1,113 +1,118 @@
-// src/modules/auth/jwt.strategy.js
-
+// src/modules/auth/token/token.signer.js
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { AppError } from "../../../shared/middlewares/error.middleware.js";
 
-/* =====================================================
-   CONFIGURAÇÕES
-===================================================== */
-
-const {
-  JWT_SECRET,
-  JWT_REFRESH_SECRET,
-  JWT_ISSUER = "carros-na-cidade",
-  JWT_AUDIENCE = "carros-na-cidade-users",
-} = process.env;
-
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET não definido no .env");
-}
-
-if (!JWT_REFRESH_SECRET) {
-  throw new Error("JWT_REFRESH_SECRET não definido no .env");
-}
-
-const ACCESS_EXPIRES = "15m";
-const REFRESH_EXPIRES = "7d";
 const ALGORITHM = "HS256";
 
-/* =====================================================
-   GERAR ACCESS TOKEN
-===================================================== */
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
 
-export function generateAccessToken(payload) {
+const JWT_ISSUER = process.env.JWT_ISSUER || "carros-na-cidade";
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "carros-na-cidade-users";
+
+const parsedAccessTtl = Number(process.env.ACCESS_TOKEN_TTL_MIN || 15);
+const parsedRefreshTtl = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
+
+const ACCESS_TTL_MIN =
+  Number.isFinite(parsedAccessTtl) && parsedAccessTtl > 0 ? parsedAccessTtl : 15;
+
+const REFRESH_TTL_DAYS =
+  Number.isFinite(parsedRefreshTtl) && parsedRefreshTtl > 0 ? parsedRefreshTtl : 30;
+
+function assertSecrets() {
+  if (!JWT_SECRET) {
+    throw new AppError("JWT_SECRET não definido no ambiente", 500);
+  }
+
+  if (!JWT_REFRESH_SECRET) {
+    throw new AppError("JWT_REFRESH_SECRET não definido no ambiente", 500);
+  }
+}
+
+function normalizeUserId(userId) {
+  if (userId === undefined || userId === null || userId === "") {
+    throw new AppError("Usuário inválido", 400);
+  }
+
+  return String(userId);
+}
+
+export function signAccessToken(user) {
+  assertSecrets();
+
+  const userId = normalizeUserId(user?.id);
+  const email =
+    typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+
   return jwt.sign(
     {
-      ...payload,
-      jti: crypto.randomUUID(), // anti replay
+      id: userId,
+      email,
       type: "access",
     },
     JWT_SECRET,
     {
-      expiresIn: ACCESS_EXPIRES,
+      algorithm: ALGORITHM,
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
-      algorithm: ALGORITHM,
+      expiresIn: `${ACCESS_TTL_MIN}m`,
     }
   );
 }
 
-/* =====================================================
-   GERAR REFRESH TOKEN
-===================================================== */
+export function signRefreshToken(payload) {
+  assertSecrets();
 
-export function generateRefreshToken(payload) {
+  const userId = normalizeUserId(payload?.userId);
+  const familyId =
+    typeof payload?.familyId === "string" && payload.familyId.trim()
+      ? payload.familyId.trim()
+      : crypto.randomUUID();
+
+  const jti =
+    typeof payload?.jti === "string" && payload.jti.trim()
+      ? payload.jti.trim()
+      : crypto.randomUUID();
+
   return jwt.sign(
     {
-      ...payload,
-      jti: crypto.randomUUID(),
+      id: userId,
+      userId,
+      familyId,
+      jti,
       type: "refresh",
     },
     JWT_REFRESH_SECRET,
     {
-      expiresIn: REFRESH_EXPIRES,
+      algorithm: ALGORITHM,
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
-      algorithm: ALGORITHM,
+      expiresIn: `${REFRESH_TTL_DAYS}d`,
     }
   );
 }
 
-/* =====================================================
-   VERIFY ACCESS TOKEN
-===================================================== */
+export function verifyRefreshToken(refreshToken) {
+  assertSecrets();
 
-export function verifyAccessToken(token) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
       algorithms: [ALGORITHM],
     });
 
-    if (decoded.type !== "access") {
+    if (decoded?.type !== "refresh") {
       throw new Error("Token inválido");
     }
 
     return decoded;
-  } catch (err) {
-    throw new Error("Access token inválido ou expirado");
+  } catch {
+    throw new AppError("Refresh token inválido", 401);
   }
 }
 
-/* =====================================================
-   VERIFY REFRESH TOKEN
-===================================================== */
-
-export function verifyRefreshToken(token) {
-  try {
-    const decoded = jwt.verify(token, JWT_REFRESH_SECRET, {
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-      algorithms: [ALGORITHM],
-    });
-
-    if (decoded.type !== "refresh") {
-      throw new Error("Token inválido");
-    }
-
-    return decoded;
-  } catch (err) {
-    throw new Error("Refresh token inválido ou expirado");
-  }
+export function newJti() {
+  return crypto.randomUUID();
 }
