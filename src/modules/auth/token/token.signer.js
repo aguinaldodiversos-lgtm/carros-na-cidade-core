@@ -4,7 +4,6 @@ import crypto from "crypto";
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
 
 const ALGORITHM = "HS256";
-
 const DEFAULT_ISSUER = "carros-na-cidade";
 const DEFAULT_AUDIENCE = "carros-na-cidade-users";
 const DEFAULT_ACCESS_TTL_MIN = 15;
@@ -142,8 +141,5 @@ export function newJti() {
   return crypto.randomUUID();
 }
 
-/**
- * Aliases de compatibilidade para módulos que possam usar nomenclatura antiga.
- */
 export const generateAccessToken = signAccessToken;
 export const generateRefreshToken = signRefreshToken;
