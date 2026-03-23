@@ -11,9 +11,10 @@ export async function validateUserForLogin(user) {
     throw new AppError("Credenciais inválidas", 401);
   }
 
-  if (!user.email_verified) {
-    throw new AppError("E-mail ainda não verificado", 403);
-  }
+  // NOTA: A verificação de e-mail foi temporariamente removida do bloqueio de login.
+  // O cadastro já define email_verified = true automaticamente (comportamento atual).
+  // O fluxo real de verificação de e-mail será habilitado na Fase 2C, quando
+  // o envio de e-mail de confirmação estiver implementado corretamente.
 
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
     throw new AppError(

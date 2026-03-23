@@ -19,16 +19,32 @@ const DEFAULT_CITY_SLUG = "sao-paulo-sp";
 const ROUTES = {
   home: "/",
   buy: "/comprar",
-  buyBelowFipe: "/comprar?below_fipe=true",
+  buyBelowFipe: "/oportunidades",
   plans: "/planos",
   login: "/login",
   dealerArea: "/login?next=/dashboard-loja",
   blog: "/blog",
   fipe: `/tabela-fipe/${DEFAULT_CITY_SLUG}`,
   financing: `/simulador-financiamento/${DEFAULT_CITY_SLUG}`,
-  privacy: "/politica-de-privacidade",
+  privacy: "/privacidade",
   terms: "/termos-de-uso",
   lgpd: "/lgpd",
+  // New pages
+  sobre: "/sobre",
+  contato: "/contato",
+  comoFunciona: "/como-funciona",
+  paraLojistas: "/para-lojistas",
+  porQueAnunciar: "/por-que-anunciar",
+  ajuda: "/ajuda",
+  faq: "/faq",
+  seguranca: "/seguranca",
+  lojas: "/lojas",
+  vender: "/vender-meu-carro",
+  comparar: "/comparar",
+  seminovos: "/seminovos",
+  regrasAnuncio: "/regras-de-anuncio",
+  pagamentosReembolsos: "/pagamentos-e-reembolsos",
+  cookies: "/cookies",
 } as const;
 
 const CONTACT = {
@@ -48,18 +64,20 @@ const GROUPS: FooterGroup[] = [
     title: "Comprar",
     links: [
       { label: "Ver anúncios", href: ROUTES.buy },
-      { label: "Comprar", href: ROUTES.buy },
-      { label: "Oportunidades", href: ROUTES.buyBelowFipe },
-      { label: "Abaixo da FIPE", href: ROUTES.buyBelowFipe },
+      { label: "Oportunidades FIPE", href: ROUTES.buyBelowFipe },
+      { label: "Seminovos", href: ROUTES.seminovos },
+      { label: "Lojas verificadas", href: ROUTES.lojas },
+      { label: "Comparar veículos", href: ROUTES.comparar },
       { label: "Simulador de financiamento", href: ROUTES.financing },
     ],
   },
   {
     title: "Vender",
     links: [
-      { label: "Anunciar no portal", href: ROUTES.plans },
-      { label: "Planos para lojistas", href: ROUTES.plans },
-      { label: "Impulsionar anúncio", href: ROUTES.dealerArea },
+      { label: "Anunciar meu carro", href: ROUTES.vender },
+      { label: "Por que anunciar aqui", href: ROUTES.porQueAnunciar },
+      { label: "Para lojistas", href: ROUTES.paraLojistas },
+      { label: "Planos", href: ROUTES.plans },
       { label: "Área do lojista", href: ROUTES.dealerArea },
     ],
   },
@@ -68,17 +86,23 @@ const GROUPS: FooterGroup[] = [
     links: [
       { label: "Tabela FIPE", href: ROUTES.fipe },
       { label: "Blog automotivo", href: ROUTES.blog },
-      { label: "Cidades em foco", href: ROUTES.buy },
-      { label: "Financiamento", href: ROUTES.financing },
+      { label: "Como funciona", href: ROUTES.comoFunciona },
+      { label: "FAQ", href: ROUTES.faq },
+      { label: "Ajuda", href: ROUTES.ajuda },
+      { label: "Segurança", href: ROUTES.seguranca },
     ],
   },
   {
     title: "Institucional",
     links: [
-      { label: "Entrar", href: ROUTES.login },
-      { label: "Planos", href: ROUTES.plans },
+      { label: "Sobre", href: ROUTES.sobre },
+      { label: "Contato", href: ROUTES.contato },
       { label: "Política de privacidade", href: ROUTES.privacy },
       { label: "Termos de uso", href: ROUTES.terms },
+      { label: "LGPD", href: ROUTES.lgpd },
+      { label: "Cookies", href: ROUTES.cookies },
+      { label: "Regras de anúncio", href: ROUTES.regrasAnuncio },
+      { label: "Pagamentos e reembolsos", href: ROUTES.pagamentosReembolsos },
     ],
   },
 ];
@@ -235,13 +259,16 @@ export function PublicFooter() {
 
           <div className="flex flex-wrap gap-4">
             <Link href={ROUTES.privacy} className="transition hover:text-white">
-              Política de privacidade
+              Privacidade
             </Link>
             <Link href={ROUTES.terms} className="transition hover:text-white">
-              Termos de uso
+              Termos
             </Link>
             <Link href={ROUTES.lgpd} className="transition hover:text-white">
               LGPD
+            </Link>
+            <Link href={ROUTES.cookies} className="transition hover:text-white">
+              Cookies
             </Link>
           </div>
         </div>

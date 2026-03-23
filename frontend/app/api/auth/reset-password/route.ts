@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
   const token = body.token?.trim();
   const password = body.password ?? "";
 
-  if (!token || password.length < 6) {
-    return NextResponse.json({ error: "Token e nova senha valida sao obrigatorios" }, { status: 400 });
+  if (!token || password.length < 8) {
+    return NextResponse.json({ error: "Token e nova senha valida sao obrigatorios (minimo 8 caracteres)" }, { status: 400 });
   }
 
   const updated = await resetPassword(token, password);
