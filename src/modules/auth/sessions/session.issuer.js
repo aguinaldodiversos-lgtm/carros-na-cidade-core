@@ -13,29 +13,40 @@ function refreshExpiresAt() {
 }
 
 /**
- * Emite um par (access + refresh) e grava o refresh no DB
- * no formato compatível com o schema atual.
+ * Emite um par (access + refresh) e grava o refresh no DB.
+ *
+ * Correções aplicadas:
+ * 1. token_hash agora é gravado corretamente (não mais descartado).
+ * 2. family_id pode ser recebido como parâmetro para preservar a família
+ *    durante a rotação de tokens (evitar criação de nova família a cada refresh).
+ * 3. O token puro ainda é armazenado em `token` para compatibilidade com
+ *    buscas legadas — mas a busca primária deve usar token_hash.
+ *
+ * @param {object} user - Objeto com pelo menos { id }
+ * @param {object} meta - Metadados da requisição (ip, userAgent)
+ * @param {object} options - Opções adicionais
+ * @param {string} [options.familyId] - ID de família existente (para rotação)
  */
-export async function issueSession(user, meta = {}) {
+export async function issueSession(user, meta = {}, { familyId } = {}) {
   if (!user?.id) throw new Error("Usuário inválido");
 
   const accessToken = signAccessToken(user);
 
-  const familyId = crypto.randomUUID();
+  // Preserva familyId na rotação; cria novo apenas no login inicial
+  const resolvedFamilyId = familyId || crypto.randomUUID();
   const jti = newJti();
-  const refreshToken = signRefreshToken({ userId: user.id, familyId, jti });
+  const refreshToken = signRefreshToken({ userId: user.id, familyId: resolvedFamilyId, jti });
 
-  // Mantidos por compatibilidade futura, mesmo que o schema atual não use
-  hashRefreshToken(refreshToken);
-
+  // Grava o hash do refresh token no banco — nunca o token puro como única cópia
+  const tokenHash = hashRefreshToken(refreshToken);
   const expiresAt = refreshExpiresAt();
 
   await pool.query(
     `
-    INSERT INTO refresh_tokens (user_id, token, expires_at)
-    VALUES ($1, $2, $3)
+    INSERT INTO refresh_tokens (user_id, token, token_hash, family_id, expires_at)
+    VALUES ($1, $2, $3, $4, $5)
     `,
-    [user.id, refreshToken, expiresAt]
+    [user.id, refreshToken, tokenHash, resolvedFamilyId, expiresAt]
   );
 
   return { accessToken, refreshToken };

@@ -115,8 +115,8 @@ export async function hashPassword(password) {
     throw new AppError("Senha é obrigatória.", 400);
   }
 
-  if (normalizedPassword.length < 6) {
-    throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+  if (normalizedPassword.length < 8) {
+    throw new AppError("Senha deve ter no mínimo 8 caracteres.", 400);
   }
 
   return bcrypt.hash(normalizedPassword, BCRYPT_ROUNDS);
@@ -157,8 +157,8 @@ export async function register(
     throw new AppError("Senha é obrigatória.", 400);
   }
 
-  if (normalizedPassword.length < 6) {
-    throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+  if (normalizedPassword.length < 8) {
+    throw new AppError("Senha deve ter no mínimo 8 caracteres.", 400);
   }
 
   const existing = await pool.query(
@@ -207,13 +207,19 @@ export async function register(
     passwordHash
   );
 
+  // email_verified é definido como FALSE no cadastro.
+  // O usuário deve confirmar o e-mail antes de poder fazer login.
+  // ATENÇÃO: a verificação de e-mail está temporariamente desabilitada no login
+  // (auth.security.service.js) até que o fluxo de envio de e-mail esteja ativo.
+  // Quando o fluxo de e-mail for ativado: remover o comentário abaixo e
+  // restaurar o check em validateUserForLogin.
   if (hasColumn(usersColumns, "email_verified")) {
     appendInsertField(
       insertColumns,
       insertValues,
       insertPlaceholders,
       "email_verified",
-      true
+      false
     );
   }
 
@@ -223,7 +229,7 @@ export async function register(
       insertValues,
       insertPlaceholders,
       "is_email_verified",
-      true
+      false
     );
   }
 

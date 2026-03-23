@@ -20,18 +20,24 @@ export type AuthenticatedSession = AuthSession & {
   refreshToken: string;
 };
 
-const localCredentials = [
-  {
-    user_id: "user-cpf-demo",
-    email: "cpf@carrosnacidade.com",
-    password: "123456",
-  },
-  {
-    user_id: "user-cnpj-demo",
-    email: "lojista@carrosnacidade.com",
-    password: "123456",
-  },
-];
+// Credenciais demo APENAS em desenvolvimento local e sem backend configurado.
+// Em produção (NODE_ENV=production) esta lista é vazia — o backend real é sempre consultado.
+// As senhas foram alteradas para não coincidir com senhas reais de produção.
+const LOCAL_DEMO_CREDENTIALS =
+  process.env.NODE_ENV !== "production"
+    ? [
+        {
+          user_id: "user-cpf-demo",
+          email: "cpf@carrosnacidade.com",
+          password: "demo-cpf-local-only",
+        },
+        {
+          user_id: "user-cnpj-demo",
+          email: "lojista@carrosnacidade.com",
+          password: "demo-cnpj-local-only",
+        },
+      ]
+    : [];
 
 type BackendUserPayload = {
   id?: string | number;
@@ -181,13 +187,13 @@ function toAuthUserFromBackend(
 
 function findLocalCredentialByEmail(email: string) {
   const normalizedEmail = normalizeEmail(email);
-  return localCredentials.find(
+  return LOCAL_DEMO_CREDENTIALS.find(
     (credential) => credential.email.toLowerCase() === normalizedEmail
   );
 }
 
 export function getLocalEmailByUserId(userId: string) {
-  const found = localCredentials.find((credential) => credential.user_id === userId);
+  const found = LOCAL_DEMO_CREDENTIALS.find((credential) => credential.user_id === userId);
   return found?.email ?? `${userId}@carrosnacidade.com`;
 }
 
@@ -379,8 +385,8 @@ export async function registerUser(
     return { success: false, error: "Senha é obrigatória." };
   }
 
-  if (password.length < 6) {
-    return { success: false, error: "Senha deve ter no minimo 6 caracteres." };
+  if (password.length < 8) {
+    return { success: false, error: "Senha deve ter no minimo 8 caracteres." };
   }
 
   if ((documentType && !documentNumber) || (!documentType && documentNumber)) {
@@ -497,7 +503,7 @@ export async function resetPassword(token: string, password: string) {
 
   if (proxied) return true;
 
-  return Boolean(normalizedToken && password.length >= 6);
+  return Boolean(normalizedToken && password.length >= 8);
 }
 
 async function parseLocalApiResponse(response: Response) {
@@ -591,6 +597,8 @@ export async function register(payload: RegisterCompatPayload) {
   return parseLocalApiResponse(response);
 }
 
+// Aliases mantidos apenas para compatibilidade com código existente.
+// Prefira importar `register` diretamente em novos usos.
 export const signUp = register;
 export const signup = register;
 export const createUser = register;

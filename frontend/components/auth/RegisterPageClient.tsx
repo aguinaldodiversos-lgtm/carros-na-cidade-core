@@ -76,7 +76,7 @@ export default function RegisterPageClient() {
     [form.document, form.documentType]
   );
 
-  const passwordValid = form.password.length >= 6;
+  const passwordValid = form.password.length >= 8;
   const canSubmit =
     form.name.trim().length >= 3 &&
     form.city.trim().length >= 2 &&
@@ -301,13 +301,13 @@ export default function RegisterPageClient() {
                   type="password"
                   value={form.password}
                   onChange={(event) => updateField("password", event.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   autoComplete="new-password"
                   className="h-[54px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
                 />
                 {form.password && !passwordValid ? (
                   <p className="mt-2 text-[13px] font-medium text-[#C2410C]">
-                    A senha deve ter no mínimo 6 caracteres.
+                    A senha deve ter no mínimo 8 caracteres.
                   </p>
                 ) : null}
               </label>

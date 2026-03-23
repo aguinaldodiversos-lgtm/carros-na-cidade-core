@@ -114,7 +114,7 @@ export default function RecoverPasswordPanel() {
         />
         <input
           type="password"
-          minLength={6}
+          minLength={8}
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
           placeholder="Nova senha"
