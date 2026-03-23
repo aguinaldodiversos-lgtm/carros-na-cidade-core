@@ -78,6 +78,16 @@ export async function authMiddleware(req, res, next) {
       return next(err);
     }
 
+    const message = err?.message || "Acesso não autorizado";
+
+    if (
+      message.includes("Access token inválido") ||
+      message.includes("Token inválido") ||
+      message.includes("expirado")
+    ) {
+      return next(new AppError("Acesso não autorizado", 401));
+    }
+
     return next(new AppError("Falha interna na autenticação", 500));
   }
 }
