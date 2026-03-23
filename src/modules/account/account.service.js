@@ -16,7 +16,11 @@ const DEFAULT_PLANS = [
     validity_days: null,
     billing_model: "free",
     description: "Ideal para pessoa fisica que quer anunciar sem mensalidade.",
-    benefits: ["Ate 3 anuncios ativos por CPF", "Contato direto via WhatsApp", "Sem comissao por venda"],
+    benefits: [
+      "Ate 3 anuncios ativos por CPF",
+      "Contato direto via WhatsApp",
+      "Sem comissao por venda",
+    ],
     recommended: false,
   },
   {
@@ -31,8 +35,13 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "one_time",
-    description: "Destaque no topo da busca com mais visibilidade para vender mais rapido.",
-    benefits: ["Destaque no topo da busca", "Badge premium no anuncio", "Prioridade de exibicao por 30 dias"],
+    description:
+      "Destaque no topo da busca com mais visibilidade para vender mais rapido.",
+    benefits: [
+      "Destaque no topo da busca",
+      "Badge premium no anuncio",
+      "Prioridade de exibicao por 30 dias",
+    ],
     recommended: true,
   },
   {
@@ -47,8 +56,13 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: null,
     billing_model: "free",
-    description: "Para lojas com CNPJ verificado iniciarem no portal sem mensalidade.",
-    benefits: ["Ate 20 anuncios ativos", "Perfil de loja ativo", "Sem comissao nas vendas"],
+    description:
+      "Para lojas com CNPJ verificado iniciarem no portal sem mensalidade.",
+    benefits: [
+      "Ate 20 anuncios ativos",
+      "Perfil de loja ativo",
+      "Sem comissao nas vendas",
+    ],
     recommended: false,
   },
   {
@@ -63,8 +77,13 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description: "Plano de entrada para escalar anuncios da loja com destaque opcional.",
-    benefits: ["Ate 80 anuncios", "Perfil de loja personalizado", "Destaques configuraveis"],
+    description:
+      "Plano de entrada para escalar anuncios da loja com destaque opcional.",
+    benefits: [
+      "Ate 80 anuncios",
+      "Perfil de loja personalizado",
+      "Destaques configuraveis",
+    ],
     recommended: false,
   },
   {
@@ -79,8 +98,13 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description: "Mais anuncios, destaque automatico e estatisticas avancadas.",
-    benefits: ["Ate 200 anuncios", "Destaque automatico", "Dashboard de performance por cidade"],
+    description:
+      "Mais anuncios, destaque automatico e estatisticas avancadas.",
+    benefits: [
+      "Ate 200 anuncios",
+      "Destaque automatico",
+      "Dashboard de performance por cidade",
+    ],
     recommended: true,
   },
   {
@@ -95,8 +119,13 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description: "Impulsionamento regional com banner promocional e campanha especial.",
-    benefits: ["Banner promocional na home regional", "Impulsionamento geolocalizado", "Ate 350 anuncios ativos"],
+    description:
+      "Impulsionamento regional com banner promocional e campanha especial.",
+    benefits: [
+      "Banner promocional na home regional",
+      "Impulsionamento geolocalizado",
+      "Ate 350 anuncios ativos",
+    ],
     recommended: false,
   },
 ];
@@ -107,16 +136,20 @@ const BOOST_OPTIONS = [
     days: 7,
     price: 39.9,
     label: "Destaque por 7 dias",
-    description: "Prioridade alta nas buscas e badge de destaque por 7 dias.",
+    description:
+      "Prioridade alta nas buscas e badge de destaque por 7 dias.",
   },
   {
     id: "boost-30d",
     days: 30,
     price: 129.9,
     label: "Destaque por 30 dias",
-    description: "Exibicao premium no topo, carrossel principal e reforco de recomendacao IA.",
+    description:
+      "Exibicao premium no topo, carrossel principal e reforco de recomendacao IA.",
   },
 ];
+
+const columnCache = new Map();
 
 function normalizeAccountType(input) {
   return String(input ?? "").trim().toUpperCase() === "CNPJ" ? "CNPJ" : "CPF";
@@ -134,13 +167,22 @@ function clonePlan(plan) {
   };
 }
 
-function mapPlanRow(row) {
-  const benefits = Array.isArray(row.benefits)
-    ? row.benefits
-    : typeof row.benefits === "string"
-      ? JSON.parse(row.benefits || "[]")
-      : [];
+function safeJsonArray(value) {
+  if (Array.isArray(value)) return value;
 
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function mapPlanRow(row) {
   return {
     id: String(row.id),
     name: String(row.name),
@@ -151,12 +193,119 @@ function mapPlanRow(row) {
     has_store_profile: Boolean(row.has_store_profile),
     priority_level: toNumber(row.priority_level, 0),
     is_active: Boolean(row.is_active),
-    validity_days: row.validity_days === null || row.validity_days === undefined ? null : toNumber(row.validity_days, 0),
+    validity_days:
+      row.validity_days === null || row.validity_days === undefined
+        ? null
+        : toNumber(row.validity_days, 0),
     billing_model: row.billing_model || "free",
     description: String(row.description || ""),
-    benefits,
+    benefits: safeJsonArray(row.benefits),
     recommended: Boolean(row.recommended),
   };
+}
+
+function toIsoStringOrNull(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+async function getTableColumns(tableName) {
+  const normalizedTable = String(tableName || "").trim().toLowerCase();
+  if (!normalizedTable) return new Set();
+
+  if (columnCache.has(normalizedTable)) {
+    return columnCache.get(normalizedTable);
+  }
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = $1
+      `,
+      [normalizedTable]
+    );
+
+    const columns = new Set(result.rows.map((row) => row.column_name));
+    columnCache.set(normalizedTable, columns);
+    return columns;
+  } catch {
+    const empty = new Set();
+    columnCache.set(normalizedTable, empty);
+    return empty;
+  }
+}
+
+function hasColumn(columns, columnName) {
+  return columns.has(columnName);
+}
+
+function quoteIdentifier(identifier) {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(identifier)) {
+    throw new AppError("Identificador SQL invalido", 500);
+  }
+  return `"${identifier}"`;
+}
+
+async function resolveAdsOwnerColumn() {
+  const columns = await getTableColumns("ads");
+  const candidates = ["user_id", "advertiser_user_id", "owner_user_id"];
+
+  for (const candidate of candidates) {
+    if (hasColumn(columns, candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function resolveSubscriptionUserColumn() {
+  const columns = await getTableColumns("user_subscriptions");
+  const candidates = ["user_id", "account_user_id", "subscriber_user_id"];
+
+  for (const candidate of candidates) {
+    if (hasColumn(columns, candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function resolveSubscriptionPlanColumn() {
+  const columns = await getTableColumns("user_subscriptions");
+  const candidates = ["plan_id", "subscription_plan_id"];
+
+  for (const candidate of candidates) {
+    if (hasColumn(columns, candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function resolveSubscriptionStatusColumn() {
+  const columns = await getTableColumns("user_subscriptions");
+  return hasColumn(columns, "status") ? "status" : null;
+}
+
+async function resolveSubscriptionCreatedAtColumn() {
+  const columns = await getTableColumns("user_subscriptions");
+  if (hasColumn(columns, "created_at")) return "created_at";
+  if (hasColumn(columns, "updated_at")) return "updated_at";
+  return null;
+}
+
+async function resolveSubscriptionExpiresAtColumn() {
+  const columns = await getTableColumns("user_subscriptions");
+  if (hasColumn(columns, "expires_at")) return "expires_at";
+  if (hasColumn(columns, "current_period_end")) return "current_period_end";
+  return null;
 }
 
 async function queryPlansFromDatabase() {
@@ -195,25 +344,54 @@ async function queryPlansFromDatabase() {
 
 function resolveLegacyPlanAlias(planValue, accountType) {
   const normalized = String(planValue || "").trim().toLowerCase();
+
   if (!normalized || normalized === "free") {
-    return accountType === "CNPJ" ? "cnpj-free-store" : "cpf-free-essential";
+    return accountType === "CNPJ"
+      ? "cnpj-free-store"
+      : "cpf-free-essential";
   }
+
   if (normalized === "start") return "cnpj-store-start";
   if (normalized === "pro") return "cnpj-store-pro";
   if (normalized === "evento-premium") return "cnpj-evento-premium";
+
   return normalized;
 }
 
 async function getCurrentPlanIdFromDatabase(userId) {
   try {
+    const userColumn = await resolveSubscriptionUserColumn();
+    const planColumn = await resolveSubscriptionPlanColumn();
+    const statusColumn = await resolveSubscriptionStatusColumn();
+    const expiresAtColumn = await resolveSubscriptionExpiresAtColumn();
+    const createdAtColumn = await resolveSubscriptionCreatedAtColumn();
+
+    if (!userColumn || !planColumn) {
+      return null;
+    }
+
+    const whereClauses = [`us.${quoteIdentifier(userColumn)} = $1`];
+
+    if (statusColumn) {
+      whereClauses.push(`us.${quoteIdentifier(statusColumn)} = 'active'`);
+    }
+
+    if (expiresAtColumn) {
+      whereClauses.push(
+        `(us.${quoteIdentifier(expiresAtColumn)} IS NULL OR us.${quoteIdentifier(expiresAtColumn)} > NOW())`
+      );
+    }
+
+    const orderByClause = createdAtColumn
+      ? `ORDER BY us.${quoteIdentifier(createdAtColumn)} DESC`
+      : "";
+
     const result = await pool.query(
       `
-      SELECT us.plan_id
+      SELECT us.${quoteIdentifier(planColumn)} AS plan_id
       FROM user_subscriptions us
-      WHERE us.user_id = $1
-        AND us.status = 'active'
-        AND (us.expires_at IS NULL OR us.expires_at > NOW())
-      ORDER BY us.created_at DESC
+      WHERE ${whereClauses.join(" AND ")}
+      ${orderByClause}
       LIMIT 1
       `,
       [userId]
@@ -227,11 +405,14 @@ async function getCurrentPlanIdFromDatabase(userId) {
 
 async function hasSubscriptionHistory(userId) {
   try {
+    const userColumn = await resolveSubscriptionUserColumn();
+    if (!userColumn) return false;
+
     const result = await pool.query(
       `
       SELECT 1
       FROM user_subscriptions
-      WHERE user_id = $1
+      WHERE ${quoteIdentifier(userColumn)} = $1
       LIMIT 1
       `,
       [userId]
@@ -244,17 +425,24 @@ async function hasSubscriptionHistory(userId) {
 }
 
 async function countActiveAdsByUser(userId) {
-  const result = await pool.query(
-    `
-    SELECT COUNT(*)::int AS total
-    FROM ads
-    WHERE user_id = $1
-      AND status = 'active'
-    `,
-    [userId]
-  );
+  const ownerColumn = await resolveAdsOwnerColumn();
+  if (!ownerColumn) return 0;
 
-  return toNumber(result.rows[0]?.total, 0);
+  try {
+    const result = await pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM ads
+      WHERE ${quoteIdentifier(ownerColumn)} = $1
+        AND status = 'active'
+      `,
+      [userId]
+    );
+
+    return toNumber(result.rows[0]?.total, 0);
+  } catch {
+    return 0;
+  }
 }
 
 export async function getAccountUser(userId) {
@@ -295,7 +483,9 @@ export async function listPlans({ type, onlyActive = true } = {}) {
   const plans = await queryPlansFromDatabase();
 
   return plans
-    .filter((plan) => (type ? plan.type === normalizeAccountType(type) : true))
+    .filter((plan) =>
+      type ? plan.type === normalizeAccountType(type) : true
+    )
     .filter((plan) => (onlyActive ? plan.is_active : true));
 }
 
@@ -308,6 +498,7 @@ async function resolveCurrentPlan(user) {
   const plans = await listPlans({ type: user.type, onlyActive: false });
   const planIdFromSubscription = await getCurrentPlanIdFromDatabase(user.id);
   const hasHistory = await hasSubscriptionHistory(user.id);
+
   const preferredId =
     planIdFromSubscription ||
     (hasHistory
@@ -327,59 +518,88 @@ function getFreeLimit(accountType, cnpjVerified) {
 }
 
 function normalizeDashboardAd(row) {
-  const featuredUntil = row.highlight_until ? new Date(row.highlight_until).toISOString() : null;
+  const featuredUntil = toIsoStringOrNull(row.highlight_until);
   const createdAt = row.created_at ? new Date(row.created_at) : new Date();
   const updatedAt = row.updated_at ? new Date(row.updated_at) : createdAt;
-  const fallbackExpiry = new Date(Math.max(createdAt.getTime(), updatedAt.getTime()) + 30 * 24 * 60 * 60 * 1000);
-  const isFeatured = featuredUntil ? new Date(featuredUntil).getTime() > Date.now() : false;
+  const fallbackExpiry = new Date(
+    Math.max(createdAt.getTime(), updatedAt.getTime()) +
+      30 * 24 * 60 * 60 * 1000
+  );
+
+  const featuredUntilMs = featuredUntil
+    ? new Date(featuredUntil).getTime()
+    : null;
+
+  const isFeatured =
+    typeof featuredUntilMs === "number" &&
+    !Number.isNaN(featuredUntilMs) &&
+    featuredUntilMs > Date.now();
 
   return {
     id: String(row.id),
-    user_id: String(row.user_id),
+    user_id: String(
+      row.owner_user_id ??
+        row.user_id ??
+        row.advertiser_user_id ??
+        row.owner_id ??
+        ""
+    ),
     title: row.title?.trim() || "Anuncio sem titulo",
     price: toNumber(row.price, 0),
-    image_url: "/images/banner1.jpg",
+    image_url: row.image_url || "/images/banner1.jpg",
     status: row.status === "paused" ? "paused" : "active",
     is_featured: isFeatured,
     featured_until: featuredUntil,
     priority_level: isFeatured ? "high" : "normal",
-    views: 0,
+    views: toNumber(row.views, 0),
     expires_at: fallbackExpiry.toISOString(),
   };
 }
 
 export async function listOwnedAds(userId) {
-  const result = await pool.query(
-    `
-    SELECT
-      id,
-      user_id,
-      title,
-      price,
-      status,
-      highlight_until,
-      created_at,
-      updated_at
-    FROM ads
-    WHERE user_id = $1
-      AND status IN ('active', 'paused')
-    ORDER BY
-      CASE WHEN status = 'active' THEN 0 ELSE 1 END,
-      updated_at DESC NULLS LAST,
-      created_at DESC NULLS LAST
-    `,
-    [userId]
-  );
+  const ownerColumn = await resolveAdsOwnerColumn();
+  if (!ownerColumn) return [];
 
-  return result.rows.map(normalizeDashboardAd);
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        ${quoteIdentifier(ownerColumn)} AS owner_user_id,
+        title,
+        price,
+        status,
+        highlight_until,
+        created_at,
+        updated_at
+      FROM ads
+      WHERE ${quoteIdentifier(ownerColumn)} = $1
+        AND status IN ('active', 'paused')
+      ORDER BY
+        CASE WHEN status = 'active' THEN 0 ELSE 1 END,
+        updated_at DESC NULLS LAST,
+        created_at DESC NULLS LAST
+      `,
+      [userId]
+    );
+
+    return result.rows.map(normalizeDashboardAd);
+  } catch {
+    return [];
+  }
 }
 
 export async function getOwnedAd(userId, adId) {
+  const ownerColumn = await resolveAdsOwnerColumn();
+  if (!ownerColumn) {
+    throw new AppError("Anuncio nao encontrado", 404);
+  }
+
   const result = await pool.query(
     `
     SELECT
       id,
-      user_id,
+      ${quoteIdentifier(ownerColumn)} AS owner_user_id,
       title,
       price,
       status,
@@ -388,7 +608,7 @@ export async function getOwnedAd(userId, adId) {
       updated_at
     FROM ads
     WHERE id = $1
-      AND user_id = $2
+      AND ${quoteIdentifier(ownerColumn)} = $2
       AND status != 'deleted'
     LIMIT 1
     `,
@@ -466,7 +686,9 @@ export async function validatePlanEligibility(userId) {
   if (activeAds < planLimit) {
     return {
       allowed: true,
-      reason: currentPlan ? "Limite disponivel no plano atual" : "Limite gratuito disponivel",
+      reason: currentPlan
+        ? "Limite disponivel no plano atual"
+        : "Limite gratuito disponivel",
       suggested_plan_type: null,
     };
   }
@@ -487,7 +709,7 @@ export function listBoostOptions() {
 
 export async function updateOwnedAdStatus(userId, adId, action) {
   const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.user_id, owner?.advertiser_user_id]
+  const ownerIds = [owner?.user_id, owner?.advertiser_user_id, owner?.owner_user_id]
     .filter(Boolean)
     .map((value) => String(value));
 
@@ -507,7 +729,7 @@ export async function updateOwnedAdStatus(userId, adId, action) {
 
 export async function deleteOwnedAd(userId, adId) {
   const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.user_id, owner?.advertiser_user_id]
+  const ownerIds = [owner?.user_id, owner?.advertiser_user_id, owner?.owner_user_id]
     .filter(Boolean)
     .map((value) => String(value));
 
