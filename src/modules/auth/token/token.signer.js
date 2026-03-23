@@ -1,4 +1,3 @@
-// src/modules/auth/token/token.signer.js
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
@@ -18,7 +17,7 @@ function parsePositiveNumber(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function getJwtConfig() {
+export function getJwtConfig() {
   const jwtSecret = normalizeString(process.env.JWT_SECRET);
   const jwtRefreshSecret =
     normalizeString(process.env.JWT_REFRESH_SECRET) || jwtSecret;
@@ -73,6 +72,7 @@ export function signAccessToken(user) {
   return jwt.sign(
     {
       id: userId,
+      sub: userId,
       email,
       type: "access",
     },
@@ -96,6 +96,7 @@ export function signRefreshToken(payload) {
   return jwt.sign(
     {
       id: userId,
+      sub: userId,
       userId,
       familyId,
       jti,
@@ -127,11 +128,18 @@ export function verifyRefreshToken(refreshToken) {
       algorithms: [ALGORITHM],
     });
 
-    if (decoded?.type !== "refresh" && decoded?.typ !== "refresh") {
+    const tokenType = decoded?.type ?? decoded?.typ;
+    if (tokenType !== "refresh") {
       throw new Error("Token inválido");
     }
 
-    return decoded;
+    return {
+      ...decoded,
+      id: String(decoded?.id ?? decoded?.sub ?? ""),
+      userId: String(decoded?.userId ?? decoded?.id ?? decoded?.sub ?? ""),
+      familyId: decoded?.familyId ?? null,
+      jti: decoded?.jti ?? null,
+    };
   } catch {
     throw new AppError("Refresh token inválido", 401);
   }
