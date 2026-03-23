@@ -64,12 +64,13 @@ export async function POST(request: NextRequest) {
       refreshToken: authSession.refreshToken,
     });
 
+    const redirectTo = authSession.accessToken
+      ? resolvePostLoginRedirect(authSession.user.type, next || undefined)
+      : "/login";
+
     const response = NextResponse.json({
       user: authSession.user,
-      redirect_to: resolvePostLoginRedirect(
-        authSession.user.type,
-        next || undefined
-      ),
+      redirect_to: redirectTo,
     });
 
     response.cookies.set(

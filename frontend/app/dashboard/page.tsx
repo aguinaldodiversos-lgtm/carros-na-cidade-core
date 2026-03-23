@@ -60,7 +60,17 @@ export default async function DashboardPage() {
   }
 
   try {
+<<<<<<< HEAD
     const payload = await fetchDashboard(session);
+=======
+    payload = await fetchDashboard(session);
+  } catch {
+    redirect("/login?from_dashboard=1");
+  }
+  if (!payload) {
+    redirect("/login?from_dashboard=1");
+  }
+>>>>>>> e316506 (fix: corrigir footer e blog fallback)
 
     if (!payload) {
       return <DashboardLoadError />;

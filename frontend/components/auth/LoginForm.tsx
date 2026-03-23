@@ -47,7 +47,9 @@ export default function LoginForm({ next }: LoginFormProps) {
         return;
       }
 
-      router.push(payload.redirect_to ?? "/dashboard");
+      setLoading(false);
+      const destination = payload.redirect_to ?? "/dashboard";
+      router.push(destination);
       router.refresh();
     } catch {
       setError("Falha na conexao. Tente novamente.");
