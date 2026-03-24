@@ -9,7 +9,7 @@ type Props = {
   initialType: SellerType;
 };
 
-const PANEL_NEW_AD_ROUTE = "/painel/anuncios/novo";
+const PANEL_NEW_AD_ROUTE = "/anunciar/novo";
 
 function buildPanelHref(type: SellerType) {
   return `${PANEL_NEW_AD_ROUTE}?tipo=${type}`;

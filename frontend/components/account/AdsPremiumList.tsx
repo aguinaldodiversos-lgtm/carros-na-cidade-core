@@ -46,7 +46,7 @@ export default function AdsPremiumList({
       <div className="rounded-2xl border border-dashed border-[#cfd8e8] bg-white/80 py-16 text-center">
         <p className="text-base font-semibold text-[#4b5563]">Nenhum anúncio nesta lista.</p>
         <Link
-          href="/anunciar"
+          href="/anunciar/novo"
           className="mt-4 inline-flex items-center justify-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-6 py-3 text-sm font-bold text-white"
         >
           + Criar novo anúncio

@@ -9,7 +9,7 @@ import { ensureDevServerUp, expectPublishFeedback, loginAsLocalUser } from "./he
  * Variáveis: E2E_EMAIL, E2E_PASSWORD
  * Servidor: npm run dev (ou PLAYWRIGHT_BASE_URL).
  *
- * Nota: sessão demo local não tem accessToken; /dashboard redireciona, mas /painel/anuncios/novo funciona.
+ * Rota oficial: /anunciar/novo (legado /painel/anuncios/novo redireciona).
  */
 
 test.beforeAll(async ({ request, baseURL }) => {
@@ -20,7 +20,7 @@ test.describe.serial("Login → publicar anúncio", () => {
   test("faz login e publica o anúncio até o retorno da API", async ({ page, context }) => {
     await loginAsLocalUser(page, context);
 
-    await page.goto("/painel/anuncios/novo?tipo=particular&step=1", {
+    await page.goto("/anunciar/novo?tipo=particular&step=1", {
       waitUntil: "domcontentloaded",
       timeout: 60_000,
     });

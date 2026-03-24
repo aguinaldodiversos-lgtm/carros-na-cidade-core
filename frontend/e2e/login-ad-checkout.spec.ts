@@ -15,7 +15,7 @@ test.describe.serial("Login → anúncio → checkout", () => {
   test("percorre login, wizard, publicação e tenta pagamento no plano pago", async ({ page, context }) => {
     await loginAsLocalUser(page, context);
 
-    await page.goto("/painel/anuncios/novo?tipo=particular&step=1", {
+    await page.goto("/anunciar/novo?tipo=particular&step=1", {
       waitUntil: "domcontentloaded",
       timeout: 60_000,
     });

@@ -81,7 +81,7 @@ export default function AccountDashboardView({
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
-              href="/anunciar"
+              href="/anunciar/novo"
               className="inline-flex h-11 items-center justify-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.2)] transition hover:brightness-110"
             >
               + Novo anúncio
@@ -99,7 +99,7 @@ export default function AccountDashboardView({
             </p>
           </div>
           <Link
-            href="/anunciar"
+            href="/anunciar/novo"
             className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white"
           >
             + Novo anúncio
@@ -202,7 +202,7 @@ export default function AccountDashboardView({
 
         <div className="flex justify-center rounded-2xl border border-dashed border-[#cfd8e8] bg-[#fafbfc] py-6">
           <Link
-            href="/anunciar"
+            href="/anunciar/novo"
             className="inline-flex items-center gap-2 text-sm font-bold text-[#0e62d8] hover:underline"
           >
             <span className="text-xl">+</span> Criar novo anúncio

@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   try {
     const payload = await fetchDashboard(session);
     return NextResponse.json(payload);
-  } catch {
+  } catch (error) {
+    console.error("[api/dashboard/me] fetchDashboard failed:", error);
     return NextResponse.json(
       { error: "Falha ao carregar dashboard" },
       { status: 502 }

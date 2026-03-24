@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { DashboardPayload } from "@/lib/dashboard-types";
-import SellWizardProgress from "./new-ad-wizard/SellWizardProgress";
+import type { SessionAccountType } from "@/lib/auth/redirects";
+import SellWizardLayout from "./new-ad-wizard/SellWizardLayout";
 import {
   StepConditions,
   StepFinalize,
@@ -90,6 +91,10 @@ function buildTitle(form: WizardFormState) {
   return t || "Novo anúncio";
 }
 
+function clampStep(value: number) {
+  return Math.min(Math.max(value, 0), STEP_COUNT - 1);
+}
+
 export default function NewAdWizardClient({ initialType }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,6 +108,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
   const [submitMessage, setSubmitMessage] = useState("");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [sessionAccountType, setSessionAccountType] = useState<SessionAccountType | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const step = form.step;
@@ -123,10 +129,8 @@ export default function NewAdWizardClient({ initialType }: Props) {
       const tipo = params.get("tipo");
       const stepParam = params.get("step");
       const n = stepParam ? parseInt(stepParam, 10) : NaN;
-      const urlStep =
-        Number.isFinite(n) && n >= 1 && n <= STEP_COUNT ? n - 1 : typeof parsed.step === "number"
-          ? Math.min(Math.max(parsed.step, 0), STEP_COUNT - 1)
-          : 0;
+      const urlHasStep = Number.isFinite(n) && n >= 1 && n <= STEP_COUNT;
+      const urlStep = urlHasStep ? n - 1 : typeof parsed.step === "number" ? clampStep(parsed.step) : 0;
 
       setForm({
         ...INITIAL_FORM,
@@ -154,8 +158,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      const { step: _s, ...rest } = form;
-      window.localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(rest));
+      window.localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(form));
     } catch {
       // ignore
     }
@@ -166,6 +169,28 @@ export default function NewAdWizardClient({ initialType }: Props) {
       previews.forEach((u) => URL.revokeObjectURL(u));
     };
   }, [previews]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (!cancelled) setSessionAccountType(null);
+          return;
+        }
+        const data = (await res.json()) as { user?: { type?: string } };
+        const t = data.user?.type;
+        if (!cancelled && (t === "CPF" || t === "CNPJ")) {
+          setSessionAccountType(t);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSessionAccountType(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,15 +381,27 @@ export default function NewAdWizardClient({ initialType }: Props) {
     3: "Marque os equipamentos e opcionais.",
     4: "Informe condições e histórico relevantes.",
     5: "Escolha se deseja destacar o anúncio.",
-    6: "Revise, informe contato e publique.",
+    6: "Revise, descreva se quiser, informe contato e publique.",
   };
 
-  return (
-    <main className="min-h-screen bg-[#F5F7FB]">
-      <SellWizardProgress currentStep={step} />
+  const isAnunciarRoute = pathname.includes("/anunciar/novo");
 
-      <div className="mx-auto max-w-[820px] px-4 pb-20 pt-6 sm:pt-8">
-        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#6E748A]">
+  const breadcrumb = (
+    <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#6E748A]">
+      {isAnunciarRoute ? (
+        <>
+          <Link href="/" className="transition hover:text-[#1F66E5]">
+            Início
+          </Link>
+          <span>›</span>
+          <Link href="/anunciar" className="transition hover:text-[#1F66E5]">
+            Anunciar
+          </Link>
+          <span>›</span>
+          <span>Novo anúncio</span>
+        </>
+      ) : (
+        <>
           <Link href="/painel" className="transition hover:text-[#1F66E5]">
             Painel
           </Link>
@@ -374,108 +411,123 @@ export default function NewAdWizardClient({ initialType }: Props) {
           </Link>
           <span>›</span>
           <span>Novo anúncio</span>
-        </nav>
+        </>
+      )}
+    </nav>
+  );
 
-        <div className="mb-8 rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
-          <div className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F67F6]">Perfil</div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => changeSellerType("particular")}
-              className={`rounded-[22px] border p-4 text-left text-sm font-semibold transition ${
-                form.sellerType === "particular"
-                  ? "border-[#2F67F6] bg-[#EEF4FF] text-[#1D2440]"
-                  : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
-              }`}
-            >
-              Particular
-            </button>
-            <button
-              type="button"
-              onClick={() => changeSellerType("lojista")}
-              className={`rounded-[22px] border p-4 text-left text-sm font-semibold transition ${
-                form.sellerType === "lojista"
-                  ? "border-[#2F67F6] bg-[#EEF4FF] text-[#1D2440]"
-                  : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
-              }`}
-            >
-              Lojista
-            </button>
-          </div>
-        </div>
-
-        <section className="rounded-[32px] border border-[#E5E9F2] bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] sm:p-8">
-          <h1 className="text-[28px] font-extrabold tracking-[-0.04em] text-[#1D2440] sm:text-[34px]">{stepTitle}</h1>
-          <p className="mt-2 text-sm leading-7 text-[#6E748A] sm:text-[15px]">{stepSubtitle[step]}</p>
-
-          <div className="mt-8">
-            {step === 0 ? <StepVehicle state={form} patch={patch} /> : null}
-            {step === 1 ? <StepListingInfo state={form} patch={patch} /> : null}
-            {step === 2 ? (
-              <StepPhotos
-                photos={photos}
-                previews={previews}
-                coverIndex={coverIndex}
-                onFiles={handlePhotoFiles}
-                onRemove={removePhoto}
-                onSetCover={setCover}
-              />
-            ) : null}
-            {step === 3 ? <StepOptionals state={form} patch={patch} /> : null}
-            {step === 4 ? <StepConditions state={form} patch={patch} /> : null}
-            {step === 5 ? (
-              <StepHighlight state={form} patch={patch} boostOptions={boostOptions} />
-            ) : null}
-            {step === 6 ? (
-              <StepFinalize state={form} patch={patch} dashboard={dashboard} dashboardError={dashboardError} />
-            ) : null}
-          </div>
-
-          {submitMessage ? (
-            <div
-              className={`mt-6 rounded-[18px] border px-4 py-3 text-sm leading-7 ${
-                submitState === "success"
-                  ? "border-green-200 bg-green-50 text-green-800"
-                  : "border-red-200 bg-red-50 text-red-800"
-              }`}
-            >
-              {submitMessage}
-            </div>
-          ) : null}
-
-          <div className="mt-10 flex flex-col-reverse gap-3 border-t border-[#EEF2F7] pt-8 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="button"
-              onClick={goBack}
-              disabled={step === 0}
-              className="inline-flex items-center justify-center rounded-[20px] border border-[#E5E9F2] bg-white px-6 py-3.5 text-base font-bold text-[#1D2440] transition hover:bg-[#F9FBFF] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ← Voltar
-            </button>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {step < STEP_COUNT - 1 ? (
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
-                >
-                  Continuar →
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitState === "submitting"}
-                  className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5] disabled:opacity-60"
-                >
-                  {submitState === "submitting" ? "Publicando..." : "Publicar anúncio"}
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
+  const profileSlot = (
+    <div className="mb-8 rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
+      <div className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F67F6]">Perfil do anúncio</div>
+      <p className="mt-1 text-sm text-[#6E748A]">O mesmo fluxo para particular e lojista; a cobrança difere na etapa final.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => changeSellerType("particular")}
+          className={`rounded-[22px] border p-4 text-left text-sm font-semibold transition ${
+            form.sellerType === "particular"
+              ? "border-[#2F67F6] bg-[#EEF4FF] text-[#1D2440]"
+              : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
+          }`}
+        >
+          Particular
+        </button>
+        <button
+          type="button"
+          onClick={() => changeSellerType("lojista")}
+          className={`rounded-[22px] border p-4 text-left text-sm font-semibold transition ${
+            form.sellerType === "lojista"
+              ? "border-[#2F67F6] bg-[#EEF4FF] text-[#1D2440]"
+              : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
+          }`}
+        >
+          Lojista
+        </button>
       </div>
-    </main>
+    </div>
+  );
+
+  const messageSlot =
+    submitMessage ? (
+      <div
+        className={`mt-6 rounded-[18px] border px-4 py-3 text-sm leading-7 ${
+          submitState === "success"
+            ? "border-green-200 bg-green-50 text-green-800"
+            : "border-red-200 bg-red-50 text-red-800"
+        }`}
+      >
+        {submitMessage}
+      </div>
+    ) : null;
+
+  const footer = (
+    <div className="mt-10 flex flex-col-reverse gap-3 border-t border-[#EEF2F7] pt-8 sm:flex-row sm:items-center sm:justify-between">
+      <button
+        type="button"
+        onClick={goBack}
+        disabled={step === 0}
+        className="inline-flex items-center justify-center rounded-[20px] border border-[#E5E9F2] bg-white px-6 py-3.5 text-base font-bold text-[#1D2440] transition hover:bg-[#F9FBFF] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ← Voltar
+      </button>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {step < STEP_COUNT - 1 ? (
+          <button
+            type="button"
+            onClick={goNext}
+            className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
+          >
+            Continuar →
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitState === "submitting"}
+            className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5] disabled:opacity-60"
+          >
+            {submitState === "submitting" ? "Publicando..." : "Publicar anúncio"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <SellWizardLayout
+      currentStep={step}
+      breadcrumb={breadcrumb}
+      profileSlot={profileSlot}
+      title={stepTitle}
+      subtitle={stepSubtitle[step]}
+      messageSlot={messageSlot}
+      footer={footer}
+    >
+      {step === 0 ? <StepVehicle state={form} patch={patch} /> : null}
+      {step === 1 ? <StepListingInfo state={form} patch={patch} /> : null}
+      {step === 2 ? (
+        <StepPhotos
+          photos={photos}
+          previews={previews}
+          coverIndex={coverIndex}
+          onFiles={handlePhotoFiles}
+          onRemove={removePhoto}
+          onSetCover={setCover}
+        />
+      ) : null}
+      {step === 3 ? <StepOptionals state={form} patch={patch} /> : null}
+      {step === 4 ? <StepConditions state={form} patch={patch} /> : null}
+      {step === 5 ? <StepHighlight state={form} patch={patch} boostOptions={boostOptions} /> : null}
+      {step === 6 ? (
+        <StepFinalize
+          state={form}
+          patch={patch}
+          dashboard={dashboard}
+          dashboardError={dashboardError}
+          sessionAccountType={sessionAccountType}
+        />
+      ) : null}
+    </SellWizardLayout>
   );
 }

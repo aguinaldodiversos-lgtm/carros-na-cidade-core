@@ -8,7 +8,7 @@ type Props = {
 
 export default function SellWizardProgress({ currentStep }: Props) {
   return (
-    <div className="w-full overflow-x-auto border-b border-[#E5E9F2] bg-white/90 backdrop-blur-sm">
+    <div className="w-full overflow-x-auto border-b border-[#E5E9F2] bg-white/95 backdrop-blur-md">
       <div className="mx-auto flex min-w-[720px] max-w-[1100px] items-stretch justify-between gap-1 px-4 py-4 sm:px-6">
         {Array.from({ length: STEP_COUNT }, (_, index) => {
           const active = index === currentStep;

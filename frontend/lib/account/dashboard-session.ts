@@ -49,7 +49,8 @@ export async function loadDashboardPayload(
 ): Promise<DashboardPayload | null> {
   try {
     return await fetchDashboard(session);
-  } catch {
+  } catch (error) {
+    console.error("[dashboard] fetchDashboard failed:", error);
     return null;
   }
 }

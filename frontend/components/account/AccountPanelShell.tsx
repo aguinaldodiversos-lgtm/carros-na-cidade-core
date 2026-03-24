@@ -115,7 +115,7 @@ export default function AccountPanelShell({
               Menu
             </button>
             <Link
-              href="/anunciar"
+              href="/anunciar/novo"
               className="inline-flex h-10 items-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white"
             >
               + Novo anúncio
@@ -177,7 +177,7 @@ export default function AccountPanelShell({
 
           <div className="mt-auto pt-6">
             <Link
-              href="/anunciar"
+              href="/anunciar/novo"
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.25)] transition hover:brightness-110"
             >
               <span className="text-lg leading-none">+</span>

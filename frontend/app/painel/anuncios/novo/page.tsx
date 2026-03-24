@@ -1,26 +1,21 @@
-import { Suspense } from "react";
-import NewAdWizardClient from "@/components/painel/NewAdWizardClient";
+import { redirect } from "next/navigation";
 
 type PageProps = {
-  searchParams?: {
-    tipo?: string;
-  };
+  searchParams?: Record<string, string | string[] | undefined>;
 };
 
-function WizardFallback() {
-  return (
-    <div className="min-h-[50vh] bg-[#F5F7FB] px-4 py-16 text-center text-sm text-[#6E748A]">
-      Carregando fluxo de anúncio…
-    </div>
-  );
-}
-
-export default function NovoAnuncioPage({ searchParams }: PageProps) {
-  const initialType = searchParams?.tipo === "lojista" ? "lojista" : "particular";
-
-  return (
-    <Suspense fallback={<WizardFallback />}>
-      <NewAdWizardClient initialType={initialType} />
-    </Suspense>
-  );
+/** Rota legada: um único fluxo oficial em `/anunciar/novo`. */
+export default function PainelNovoAnuncioRedirect({ searchParams }: PageProps) {
+  const q = new URLSearchParams();
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (typeof value === "string") {
+        q.set(key, value);
+      } else if (Array.isArray(value)) {
+        value.forEach((v) => q.append(key, v));
+      }
+    }
+  }
+  const suffix = q.toString() ? `?${q.toString()}` : "";
+  redirect(`/anunciar/novo${suffix}`);
 }

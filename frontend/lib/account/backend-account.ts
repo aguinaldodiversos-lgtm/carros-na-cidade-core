@@ -1,4 +1,5 @@
 import type { DashboardPayload } from "@/lib/dashboard-types";
+import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import type { SubscriptionPlan } from "@/services/planStore";
 import type { SessionData } from "@/services/sessionService";
 
@@ -26,22 +27,13 @@ type PaymentCheckoutResponse = {
   boost_option_id?: string;
 };
 
-function stripTrailingSlash(value: string) {
-  return value.replace(/\/+$/, "");
-}
-
-function getApiBaseUrl() {
-  const api = process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim() || "";
-  return api ? stripTrailingSlash(api) : "";
-}
-
 async function fetchBackendJson<T>(path: string, init: FetchInit = {}): Promise<T> {
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) {
+  const url = resolveBackendApiUrl(path);
+  if (!url) {
     throw new Error("Backend API URL nao configurada.");
   }
 
-  const response = await fetch(`${apiBase}${path}`, {
+  const response = await fetch(url, {
     method: init.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
@@ -147,12 +139,12 @@ export async function createSubscriptionCheckout(
 }
 
 export async function forwardPaymentWebhookToBackend(rawBody: string, headers: Record<string, string>) {
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) {
+  const url = resolveBackendApiUrl("/api/payments/webhook");
+  if (!url) {
     throw new Error("Backend API URL nao configurada.");
   }
 
-  const response = await fetch(`${apiBase}/api/payments/webhook`, {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": headers["content-type"] || "application/json",

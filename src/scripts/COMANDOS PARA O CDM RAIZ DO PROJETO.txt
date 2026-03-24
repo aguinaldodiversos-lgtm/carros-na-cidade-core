@@ -1,5 +1,36 @@
 COMANDOS PARA O CDM RAIZ DO PROJETO
 
+Quando o projeto for alterado pelo curso e deve subir para o github
+
+Use esta sequência no terminal, dentro da pasta do projeto:
+
+git status
+git add .
+git commit -m "refatora fluxo de criacao de anuncio"
+git push origin main
+
+Se o push for rejeitado, rode esta sequência:
+
+git fetch origin
+git pull --rebase origin main
+git push origin main
+
+Se quiser um fluxo mais seguro usando branch:
+
+git checkout -b feature/fluxo-criacao-anuncio
+git status
+git add .
+git commit -m "refatora fluxo de criacao de anuncio"
+git push origin feature/fluxo-criacao-anuncio
+
+Depois você faz o merge da branch no GitHub.
+
+Se aparecer erro de rebase em andamento, use:
+
+git status
+git rebase --continue
+git push origin main
+
 
 Exemplo de rotina segura
 git add .

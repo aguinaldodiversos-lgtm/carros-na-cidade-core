@@ -10,6 +10,7 @@ import { fabricationYearChoices, uniqueModelYears, versionsForYear } from "./fip
 import type { WizardFormState } from "./types";
 import ChipSelect from "./ChipSelect";
 import type { DashboardPayload } from "@/lib/dashboard-types";
+import type { SessionAccountType } from "@/lib/auth/redirects";
 
 const selectClass =
   "w-full rounded-[18px] border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition focus:border-[#AFC6FF] focus:bg-white";
@@ -347,16 +348,10 @@ export function StepListingInfo({ state, patch }: { state: WizardFormState; patc
         </label>
       </div>
 
-      <label className="block">
-        <span className={labelClass}>Descrição (opcional)</span>
-        <textarea
-          value={state.description}
-          onChange={(e) => patch({ description: e.target.value })}
-          rows={5}
-          placeholder="Destaque diferenciais, estado de conservação e histórico de revisões."
-          className={`${selectClass} min-h-[120px] resize-y`}
-        />
-      </label>
+      <p className="text-xs text-[#98A2B3]">
+        A descrição do anúncio fica na etapa final, para manter esta etapa só com quilometragem e preço como campos
+        editáveis principais.
+      </p>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-[22px] border border-[#E5E9F2] bg-[#FBFCFF] p-5">
@@ -590,11 +585,13 @@ export function StepFinalize({
   patch,
   dashboard,
   dashboardError,
+  sessionAccountType,
 }: {
   state: WizardFormState;
   patch: Patch;
   dashboard: DashboardPayload | null;
   dashboardError: string | null;
+  sessionAccountType: SessionAccountType | null;
 }) {
   const title = useMemo(
     () =>
@@ -603,11 +600,17 @@ export function StepFinalize({
     [state.brandLabel, state.modelLabel, state.versionLabel, state.yearModel]
   );
 
-  const isLojista = state.sellerType === "lojista";
-  const isCnpjUser = dashboard?.user.type === "CNPJ";
+  const wantsLojista = state.sellerType === "lojista";
+  const isCnpjSession = sessionAccountType === "CNPJ";
+  const isCnpjDashboard = dashboard?.user.type === "CNPJ";
   const hasSlots =
     dashboard && typeof dashboard.stats.available_limit === "number" && dashboard.stats.available_limit > 0;
-  const showLojistaFree = isLojista && isCnpjUser && hasSlots;
+
+  const showLojistaPlanUi = wantsLojista && isCnpjSession && (isCnpjDashboard || dashboard === null);
+  const showLojistaFree = wantsLojista && isCnpjSession && isCnpjDashboard && hasSlots;
+  const showLojistaNoSlots = wantsLojista && isCnpjSession && isCnpjDashboard && !hasSlots;
+  const showPfOrParticularPayment = !wantsLojista || sessionAccountType !== "CNPJ";
+  const showLojistaMismatch = wantsLojista && sessionAccountType === "CPF";
 
   return (
     <div className="space-y-8">
@@ -634,12 +637,20 @@ export function StepFinalize({
         </div>
       ) : null}
 
-      {!isLojista || !isCnpjUser ? (
+      {showLojistaMismatch ? (
+        <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-6 text-sm leading-7 text-amber-950">
+          Você selecionou <span className="font-bold">Lojista</span>, mas sua conta é de{" "}
+          <span className="font-bold">pessoa física</span>. Para anunciar como loja, use uma conta com CNPJ ou volte e
+          escolha <span className="font-bold">Particular</span> no topo do formulário.
+        </div>
+      ) : null}
+
+      {showPfOrParticularPayment ? (
         <div className="rounded-[24px] border border-[#DCE6F7] bg-white p-6">
-          <h4 className="text-lg font-extrabold text-[#1D2440]">Publicação (pessoa física)</h4>
+          <h4 className="text-lg font-extrabold text-[#1D2440]">Publicação e pagamento (pessoa física)</h4>
           <p className="mt-2 text-sm leading-7 text-[#5C647C]">
             O valor da publicação e eventuais destaques seguem o plano vigente no portal. Você poderá concluir o pagamento
-            após revisar os dados, conforme regras do checkout integrado.
+            após revisar os dados, conforme regras do checkout integrado (Mercado Pago quando aplicável).
           </p>
           <Link href="/planos" className="mt-3 inline-block text-sm font-bold text-[#2F67F6] underline">
             Ver planos e valores
@@ -647,18 +658,26 @@ export function StepFinalize({
         </div>
       ) : null}
 
-      {isLojista && isCnpjUser ? (
+      {showLojistaPlanUi && !showPfOrParticularPayment ? (
         <div className="rounded-[24px] border border-[#DCE6F7] bg-white p-6">
-          <h4 className="text-lg font-extrabold text-[#1D2440]">Sua loja</h4>
+          <h4 className="text-lg font-extrabold text-[#1D2440]">Lojista — plano e vagas</h4>
           {showLojistaFree ? (
             <p className="mt-2 text-sm leading-7 text-[#15803D]">
               Seu plano atual inclui vagas para anúncios. Você pode publicar{" "}
               <span className="font-bold">sem cobrança individual</span> por esta publicação, dentro do limite disponível (
               {dashboard?.stats.available_limit} restantes).
             </p>
-          ) : (
+          ) : showLojistaNoSlots ? (
             <p className="mt-2 text-sm leading-7 text-[#5C647C]">
               Não há vagas disponíveis no plano atual ou é necessário assinar um plano para lojistas.{" "}
+              <Link href="/planos" className="font-bold text-[#2F67F6] underline">
+                Ver planos para lojistas
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-2 text-sm leading-7 text-[#5C647C]">
+              Não foi possível carregar vagas do plano agora. Você ainda pode tentar publicar; o sistema validará no
+              servidor.{" "}
               <Link href="/planos" className="font-bold text-[#2F67F6] underline">
                 Ver planos para lojistas
               </Link>
@@ -666,6 +685,17 @@ export function StepFinalize({
           )}
         </div>
       ) : null}
+
+      <label className="block">
+        <span className={labelClass}>Descrição do anúncio (opcional)</span>
+        <textarea
+          value={state.description}
+          onChange={(e) => patch({ description: e.target.value })}
+          rows={5}
+          placeholder="Destaque diferenciais, estado de conservação e histórico de revisões."
+          className={`${selectClass} min-h-[120px] resize-y`}
+        />
+      </label>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">

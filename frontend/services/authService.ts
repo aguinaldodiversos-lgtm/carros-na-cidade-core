@@ -1,4 +1,5 @@
 import type { AccountType } from "@/lib/dashboard-types";
+import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { getUserById } from "@/services/planStore";
 
 export type AuthUser = {
@@ -113,29 +114,6 @@ function onlyDigits(value: unknown) {
   return normalizeString(value).replace(/\D/g, "");
 }
 
-function resolveAuthApiBase() {
-  return normalizeString(
-    process.env.AUTH_API_BASE_URL ??
-      process.env.BACKEND_API_URL ??
-      process.env.API_URL ??
-      process.env.NEXT_PUBLIC_API_URL ??
-      ""
-  );
-}
-
-function resolveAuthEndpoint(baseUrl: string, endpoint: string) {
-  const base = baseUrl.trim().replace(/\/+$/, "");
-  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-
-  if (!base) return "";
-
-  if (base.endsWith("/api")) {
-    return `${base}${path.replace(/^\/api/, "")}`;
-  }
-
-  return `${base}${path}`;
-}
-
 function normalizeAccountType(input: string | undefined): AccountType {
   const value = normalizeString(input).toUpperCase();
   return value === "CNPJ" ? "CNPJ" : "CPF";
@@ -233,12 +211,8 @@ async function safeJson<T>(response: Response): Promise<T> {
   }
 }
 
-async function fetchCurrentUserFromBackend(
-  baseUrl: string,
-  accessToken: string,
-  fallbackEmail: string
-) {
-  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/me");
+async function fetchCurrentUserFromBackend(accessToken: string, fallbackEmail: string) {
+  const endpoint = resolveBackendApiUrl("/api/auth/me");
   if (!endpoint) return null;
 
   try {
@@ -263,7 +237,6 @@ async function fetchCurrentUserFromBackend(
 
 async function buildAuthenticatedSessionFromResponse(
   payload: BackendAuthResponse,
-  baseUrl: string,
   fallbackEmail: string
 ): Promise<AuthenticatedSession | null> {
   const accessToken = extractAccessToken(payload);
@@ -276,7 +249,7 @@ async function buildAuthenticatedSessionFromResponse(
   const backendUser = extractBackendUser(payload);
   const resolvedUser =
     (backendUser ? toAuthUserFromBackend(backendUser, fallbackEmail) : null) ??
-    (await fetchCurrentUserFromBackend(baseUrl, accessToken, fallbackEmail));
+    (await fetchCurrentUserFromBackend(accessToken, fallbackEmail));
 
   if (!resolvedUser) {
     return null;
@@ -294,10 +267,9 @@ async function authenticateAgainstBackend(
   password: string
 ): Promise<AuthenticatedSession | null> {
   const normalizedEmail = normalizeEmail(email);
-  const baseUrl = resolveAuthApiBase();
-  if (!baseUrl) return null;
+  if (!getBackendApiBaseUrl()) return null;
 
-  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/login");
+  const endpoint = resolveBackendApiUrl("/api/auth/login");
   if (!endpoint) return null;
 
   try {
@@ -321,7 +293,7 @@ async function authenticateAgainstBackend(
       );
     }
 
-    return buildAuthenticatedSessionFromResponse(payload, baseUrl, normalizedEmail);
+    return buildAuthenticatedSessionFromResponse(payload, normalizedEmail);
   } catch (error) {
     if (error instanceof Error) {
       throw error;
@@ -344,9 +316,7 @@ export async function authenticateUser(
   email: string,
   password: string
 ): Promise<AuthSession | null> {
-  const baseUrl = resolveAuthApiBase();
-
-  if (baseUrl) {
+  if (getBackendApiBaseUrl()) {
     return authenticateAgainstBackend(email, password);
   }
 
@@ -390,12 +360,11 @@ export async function registerUser(
     };
   }
 
-  const baseUrl = resolveAuthApiBase();
-  if (!baseUrl) {
+  if (!getBackendApiBaseUrl()) {
     return { success: false, error: "API do backend nao configurada." };
   }
 
-  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/register");
+  const endpoint = resolveBackendApiUrl("/api/auth/register");
   if (!endpoint) {
     return { success: false, error: "Endpoint de cadastro nao configurado." };
   }
@@ -427,11 +396,7 @@ export async function registerUser(
       };
     }
 
-    const session = await buildAuthenticatedSessionFromResponse(
-      data,
-      baseUrl,
-      email
-    );
+    const session = await buildAuthenticatedSessionFromResponse(data, email);
 
     if (!session) {
       return {
@@ -455,10 +420,7 @@ export function getAuthUserById(userId: string): AuthUser | null {
 }
 
 async function postAuthProxy(endpoint: string, payload: Record<string, unknown>) {
-  const baseUrl = resolveAuthApiBase();
-  if (!baseUrl) return false;
-
-  const url = resolveAuthEndpoint(baseUrl, endpoint);
+  const url = resolveBackendApiUrl(endpoint);
   if (!url) return false;
 
   try {
