@@ -3,16 +3,21 @@ import { test, expect } from "@playwright/test";
 import { ensureDevServerUp, expectPublishFeedback, loginAsLocalUser } from "./helpers";
 
 /**
- * Fluxo completo: login → wizard → publicar → /planos → checkout.
- * Para só até publicar, use `login-ad-publish.spec.ts`.
+ * Login → wizard (7 etapas) → Publicar anúncio.
+ *
+ * Login local (sem API remota): cpf@carrosnacidade.com / 123456
+ * Variáveis: E2E_EMAIL, E2E_PASSWORD
+ * Servidor: npm run dev (ou PLAYWRIGHT_BASE_URL).
+ *
+ * Nota: sessão demo local não tem accessToken; /dashboard redireciona, mas /painel/anuncios/novo funciona.
  */
 
 test.beforeAll(async ({ request, baseURL }) => {
   await ensureDevServerUp(request, baseURL);
 });
 
-test.describe.serial("Login → anúncio → checkout", () => {
-  test("percorre login, wizard, publicação e tenta pagamento no plano pago", async ({ page, context }) => {
+test.describe.serial("Login → publicar anúncio", () => {
+  test("faz login e publica o anúncio até o retorno da API", async ({ page, context }) => {
     await loginAsLocalUser(page, context);
 
     await page.goto("/painel/anuncios/novo?tipo=particular&step=1", {
@@ -90,31 +95,5 @@ test.describe.serial("Login → anúncio → checkout", () => {
 
     const bodyText = (await page.textContent("body")) ?? "";
     expectPublishFeedback(bodyText);
-
-    await page.goto("/planos", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /Planos para particulares/i })).toBeVisible();
-
-    const paidButton = page.getByRole("button", { name: /Comprar destaque|Assinar plano/i }).first();
-    await expect(paidButton).toBeVisible({ timeout: 15_000 });
-
-    const popupPromise = context.waitForEvent("page", { timeout: 8000 }).catch(() => null);
-    await paidButton.click();
-    const popup = await popupPromise;
-
-    await page.waitForTimeout(2500);
-
-    const mercado =
-      popup?.url()?.includes("mercadopago") ||
-      popup?.url()?.includes("mercadolivre") ||
-      page.url().includes("mercadopago");
-
-    const backToLogin = page.url().includes("/login");
-    const errorBox = await page
-      .getByText(/Nao autenticado|checkout|Falha|nao foi possivel iniciar/i)
-      .first()
-      .isVisible()
-      .catch(() => false);
-
-    expect(mercado || backToLogin || errorBox).toBeTruthy();
   });
 });

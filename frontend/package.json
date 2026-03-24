@@ -16,6 +16,7 @@
     "prepare:standalone": "node ./scripts/prepare-standalone.mjs",
     "verify:standalone": "node ./scripts/verify-standalone.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:publish": "playwright test e2e/login-ad-publish.spec.ts",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
