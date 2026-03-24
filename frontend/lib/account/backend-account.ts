@@ -3,11 +3,17 @@ import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import type { SubscriptionPlan } from "@/services/planStore";
 import type { SessionData } from "@/services/sessionService";
 
+type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+type JsonObject = Record<string, unknown>;
+
 type FetchInit = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
-  body?: Record<string, unknown>;
+  method?: HttpMethod;
+  body?: JsonObject;
   accessToken?: string;
   cache?: RequestCache;
+  timeoutMs?: number;
+  headers?: Record<string, string>;
 };
 
 type OwnedAdResponse = {
@@ -27,52 +33,212 @@ type PaymentCheckoutResponse = {
   boost_option_id?: string;
 };
 
-async function fetchBackendJson<T>(path: string, init: FetchInit = {}): Promise<T> {
+type ApiErrorPayload = {
+  error?: string;
+  message?: string;
+  code?: string;
+  details?: unknown;
+};
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+class BackendApiError extends Error {
+  public readonly status: number;
+  public readonly code?: string;
+  public readonly details?: unknown;
+  public readonly url: string;
+
+  constructor(params: {
+    message: string;
+    status: number;
+    url: string;
+    code?: string;
+    details?: unknown;
+  }) {
+    super(params.message);
+    this.name = "BackendApiError";
+    this.status = params.status;
+    this.url = params.url;
+    this.code = params.code;
+    this.details = params.details;
+  }
+}
+
+function assertAccessToken(session: SessionData | null | undefined): string {
+  const token = session?.accessToken?.trim();
+  if (!token) {
+    throw new Error("Sessão inválida ou token de acesso ausente.");
+  }
+  return token;
+}
+
+function buildUrl(path: string): string {
   const url = resolveBackendApiUrl(path);
   if (!url) {
     throw new Error("Backend API URL nao configurada.");
   }
+  return url;
+}
 
-  const response = await fetch(url, {
-    method: init.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
-    },
-    body: init.body ? JSON.stringify(init.body) : undefined,
-    cache: init.cache ?? "no-store",
-  });
+function isJsonResponse(contentType: string | null): boolean {
+  return !!contentType && contentType.toLowerCase().includes("application/json");
+}
 
-  const payload = (await response.json().catch(() => ({}))) as T & { error?: string; message?: string };
-  if (!response.ok) {
-    throw new Error(payload.error || payload.message || "Falha na comunicacao com o backend.");
+async function parseResponseBody<T>(response: Response): Promise<T | ApiErrorPayload | null> {
+  if (response.status === 204) {
+    return null;
   }
 
-  return payload;
+  const contentType = response.headers.get("content-type");
+
+  try {
+    if (isJsonResponse(contentType)) {
+      return (await response.json()) as T | ApiErrorPayload;
+    }
+
+    const text = await response.text();
+    if (!text) return null;
+
+    try {
+      return JSON.parse(text) as T | ApiErrorPayload;
+    } catch {
+      return { message: text };
+    }
+  } catch {
+    return null;
+  }
+}
+
+function extractErrorMessage(payload: ApiErrorPayload | null, fallback: string): string {
+  if (!payload) return fallback;
+  return payload.error || payload.message || fallback;
+}
+
+async function fetchBackendJson<T>(path: string, init: FetchInit = {}): Promise<T> {
+  const url = buildUrl(path);
+  const controller = new AbortController();
+  const timeoutMs = init.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: init.method ?? "GET",
+      headers: {
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
+        ...(init.headers ?? {}),
+      },
+      body: init.body ? JSON.stringify(init.body) : undefined,
+      cache: init.cache ?? "no-store",
+      signal: controller.signal,
+    });
+
+    const payload = await parseResponseBody<T>(response);
+
+    if (!response.ok) {
+      const errorPayload = (payload ?? null) as ApiErrorPayload | null;
+      throw new BackendApiError({
+        message: extractErrorMessage(errorPayload, "Falha na comunicacao com o backend."),
+        status: response.status,
+        url,
+        code: errorPayload?.code,
+        details: errorPayload?.details,
+      });
+    }
+
+    return payload as T;
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      throw error;
+    }
+
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Tempo limite excedido ao comunicar com o backend: ${path}`);
+    }
+
+    throw error instanceof Error
+      ? new Error(`Erro ao comunicar com o backend em ${path}: ${error.message}`)
+      : new Error(`Erro desconhecido ao comunicar com o backend em ${path}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchBackendText(
+  path: string,
+  init: Omit<FetchInit, "body"> & { body?: string }
+): Promise<{
+  ok: boolean;
+  status: number;
+  body: string;
+  contentType: string;
+}> {
+  const url = buildUrl(path);
+  const controller = new AbortController();
+  const timeoutMs = init.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: init.method ?? "POST",
+      headers: {
+        Accept: "*/*",
+        ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
+        ...(init.headers ?? {}),
+      },
+      body: init.body,
+      cache: init.cache ?? "no-store",
+      signal: controller.signal,
+    });
+
+    const payload = await response.text();
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: payload,
+      contentType: response.headers.get("content-type") || "text/plain",
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Tempo limite excedido ao encaminhar request para ${path}`);
+    }
+
+    throw error instanceof Error
+      ? new Error(`Erro ao encaminhar request para ${path}: ${error.message}`)
+      : new Error(`Erro desconhecido ao encaminhar request para ${path}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function fetchPlans(options: { type?: "CPF" | "CNPJ"; activeOnly?: boolean } = {}) {
   const query = new URLSearchParams();
+
   if (options.type) query.set("type", options.type);
   if (options.activeOnly !== undefined) query.set("active", String(options.activeOnly));
 
-  const payload = await fetchBackendJson<{ plans: SubscriptionPlan[] }>(
-    `/api/account/plans${query.toString() ? `?${query.toString()}` : ""}`,
-    { cache: "no-store" }
-  );
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+
+  const payload = await fetchBackendJson<{ plans: SubscriptionPlan[] }>(`/api/account/plans${suffix}`, {
+    cache: "no-store",
+  });
 
   return payload.plans;
 }
 
 export async function fetchDashboard(session: SessionData) {
   return fetchBackendJson<DashboardPayload>("/api/account/dashboard", {
-    accessToken: session.accessToken,
+    accessToken: assertAccessToken(session),
   });
 }
 
 export async function fetchOwnedAd(session: SessionData, adId: string) {
   return fetchBackendJson<OwnedAdResponse>(`/api/account/ads/${encodeURIComponent(adId)}`, {
-    accessToken: session.accessToken,
+    accessToken: assertAccessToken(session),
   });
 }
 
@@ -84,23 +250,26 @@ export async function fetchPlanEligibility(session: SessionData) {
     suggested_plans: SubscriptionPlan[];
   }>("/api/account/plans/eligibility", {
     method: "POST",
-    accessToken: session.accessToken,
+    accessToken: assertAccessToken(session),
     body: {},
   });
 }
 
 export async function patchOwnedAdStatus(session: SessionData, adId: string, action: "pause" | "activate") {
-  return fetchBackendJson<{ ad: OwnedAdResponse["ad"] }>(`/api/account/ads/${encodeURIComponent(adId)}/status`, {
-    method: "PATCH",
-    accessToken: session.accessToken,
-    body: { action },
-  });
+  return fetchBackendJson<{ ad: OwnedAdResponse["ad"] }>(
+    `/api/account/ads/${encodeURIComponent(adId)}/status`,
+    {
+      method: "PATCH",
+      accessToken: assertAccessToken(session),
+      body: { action },
+    }
+  );
 }
 
 export async function deleteOwnedAd(session: SessionData, adId: string) {
   return fetchBackendJson<{ ok: true }>(`/api/account/ads/${encodeURIComponent(adId)}`, {
     method: "DELETE",
-    accessToken: session.accessToken,
+    accessToken: assertAccessToken(session),
   });
 }
 
@@ -117,7 +286,7 @@ export async function createPaymentCheckout(
 ) {
   return fetchBackendJson<PaymentCheckoutResponse>("/api/payments/create", {
     method: "POST",
-    accessToken: session.accessToken,
+    accessToken: assertAccessToken(session),
     body,
   });
 }
@@ -133,33 +302,22 @@ export async function createSubscriptionCheckout(
 ) {
   return fetchBackendJson<PaymentCheckoutResponse>("/api/payments/subscription", {
     method: "POST",
-    accessToken: session.accessToken,
+    accessToken: assertAccessToken(session),
     body,
   });
 }
 
 export async function forwardPaymentWebhookToBackend(rawBody: string, headers: Record<string, string>) {
-  const url = resolveBackendApiUrl("/api/payments/webhook");
-  if (!url) {
-    throw new Error("Backend API URL nao configurada.");
-  }
-
-  const response = await fetch(url, {
+  return fetchBackendText("/api/payments/webhook", {
     method: "POST",
+    body: rawBody,
     headers: {
       "Content-Type": headers["content-type"] || "application/json",
       ...(headers["x-signature"] ? { "x-signature": headers["x-signature"] } : {}),
       ...(headers["x-request-id"] ? { "x-request-id": headers["x-request-id"] } : {}),
     },
-    body: rawBody,
     cache: "no-store",
   });
-
-  const payload = await response.text();
-  return {
-    ok: response.ok,
-    status: response.status,
-    body: payload,
-    contentType: response.headers.get("content-type") || "application/json",
-  };
 }
+
+export { BackendApiError };
