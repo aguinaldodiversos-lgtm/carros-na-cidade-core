@@ -10,6 +10,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const payload = await fetchDashboard(session);
-  return NextResponse.json(payload);
+  try {
+    const payload = await fetchDashboard(session);
+    return NextResponse.json(payload);
+  } catch {
+    return NextResponse.json(
+      { error: "Falha ao carregar dashboard" },
+      { status: 502 }
+    );
+  }
 }
