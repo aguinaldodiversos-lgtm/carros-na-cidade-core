@@ -282,25 +282,15 @@ export async function register(
     if (!createdUser) {
       throw new AppError("Erro ao criar usuário.", 500);
     }
-const sessionUser = buildSessionUser(createdUser);
-const session = await issueSession(sessionUser, reqMeta);
 
-<<<<<<< HEAD
-return {
-  user: sessionUser,
-  accessToken: session.accessToken,
-  refreshToken: session.refreshToken,
-};
-    
-=======
     const sessionUser = buildSessionUser(createdUser);
     const session = await issueSession(sessionUser, reqMeta);
+
     return {
       user: sessionUser,
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
     };
->>>>>>> f6c75ce (fix: corrigir footer e blog fallback)
   } catch (error) {
     if (error?.code === "23505") {
       throw new AppError("Email já cadastrado.", 400);
@@ -357,24 +347,14 @@ export async function login(email, password, reqMeta = {}) {
     success: true,
   });
 
-<<<<<<< HEAD
-const sessionUser = buildSessionUser(user);
-const session = await issueSession(sessionUser, reqMeta);
-
-return {
-  user: sessionUser,
-  accessToken: session.accessToken,
-  refreshToken: session.refreshToken,
-};
-=======
   const sessionUser = buildSessionUser(user);
   const session = await issueSession(sessionUser, reqMeta);
+
   return {
     user: sessionUser,
     accessToken: session.accessToken,
     refreshToken: session.refreshToken,
   };
->>>>>>> f6c75ce (fix: corrigir footer e blog fallback)
 }
 
 /* =====================================================

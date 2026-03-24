@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import BoostCheckout from "@/components/payments/BoostCheckout";
 import { fetchOwnedAd } from "@/lib/account/backend-account";
-import { AUTH_COOKIE_NAME, getSessionDataFromCookieValue } from "@/services/sessionService";
+import {
+  AUTH_COOKIE_NAME,
+  mergeMiddlewareSessionTokens,
+} from "@/services/sessionService";
+import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 
 type ImpulsionarPageProps = {
   params: {
@@ -36,14 +40,23 @@ function formatDate(value: string | null) {
 
 export default async function ImpulsionarPage({ params, searchParams }: ImpulsionarPageProps) {
   const cookieStore = cookies();
-  const session = getSessionDataFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value);
-  if (!session) {
+  const raw = mergeMiddlewareSessionTokens(
+    headers(),
+    cookieStore.get(AUTH_COOKIE_NAME)?.value
+  );
+  if (!raw) {
     redirect("/login");
   }
 
-  if (!session.accessToken) {
-    redirect(session.type === "CNPJ" ? "/dashboard-loja" : "/dashboard");
+  if (!raw.accessToken && !raw.refreshToken) {
+    redirect(raw.type === "CNPJ" ? "/dashboard-loja" : "/dashboard");
   }
+
+  const ensured = await ensureSessionWithFreshBackendTokens(raw);
+  if (!ensured.ok) {
+    redirect("/login");
+  }
+  const session = ensured.session;
 
   let payload: Awaited<ReturnType<typeof fetchOwnedAd>> | null = null;
   try {

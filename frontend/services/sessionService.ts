@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import type { NextRequest } from "next/server";
 import type { AccountType } from "@/lib/dashboard-types";
+import {
+  MW_ACCESS_TOKEN_HEADER,
+  MW_REFRESH_TOKEN_HEADER,
+} from "@/lib/auth/session-headers";
 
 export const AUTH_COOKIE_NAME = "cnc_session";
 
@@ -95,13 +99,41 @@ export function getSessionUserFromCookieValue(tokenValue: string | undefined | n
 }
 
 export function getSessionUserFromRequest(request: NextRequest) {
-  const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  return getSessionUserFromCookieValue(cookie);
+  const session = getSessionDataFromRequest(request);
+  if (!session) return null;
+
+  return {
+    id: session.id,
+    name: session.name,
+    email: session.email,
+    type: session.type,
+  };
+}
+
+/**
+ * Mescla tokens repassados pelo middleware (mesma requisição) com o cookie bruto.
+ * O Set-Cookie da renovação só vale na próxima ida ao browser; o SSR precisa dos headers internos.
+ */
+export function mergeMiddlewareSessionTokens(
+  headersList: { get(name: string): string | null | undefined },
+  cookieValue: string | undefined | null
+): SessionData | null {
+  const cookieSession = getSessionDataFromCookieValue(cookieValue);
+  const mwAccess = headersList.get(MW_ACCESS_TOKEN_HEADER);
+  const mwRefresh = headersList.get(MW_REFRESH_TOKEN_HEADER);
+  if (mwAccess && cookieSession) {
+    return {
+      ...cookieSession,
+      accessToken: mwAccess,
+      refreshToken: mwRefresh || cookieSession.refreshToken,
+    };
+  }
+  return cookieSession;
 }
 
 export function getSessionDataFromRequest(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  return getSessionDataFromCookieValue(cookie);
+  return mergeMiddlewareSessionTokens(request.headers, cookie);
 }
 
 export function getSessionCookieOptions(maxAgeSeconds = DEFAULT_DURATION_SECONDS) {
