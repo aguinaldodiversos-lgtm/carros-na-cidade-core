@@ -9,6 +9,7 @@ type NormalizedPayload = {
   model: string;
   version: string;
   yearModel: string;
+  yearManufacture: string;
   mileage: string;
   price: string;
   fipeValue: string;
@@ -24,6 +25,10 @@ type NormalizedPayload = {
   whatsapp: string;
   phone: string;
   acceptTerms: boolean;
+  armored: boolean;
+  optionalFeatures: string;
+  conditionFlags: string;
+  boostOptionId: string;
   photoCount: number;
 };
 
@@ -52,6 +57,7 @@ function buildNormalizedPayload(source: FormData): NormalizedPayload {
     model: firstText(source, "model"),
     version: firstText(source, "version"),
     yearModel: firstText(source, "yearModel"),
+    yearManufacture: firstText(source, "yearManufacture"),
     mileage: firstText(source, "mileage"),
     price: firstText(source, "price"),
     fipeValue: firstText(source, "fipeValue"),
@@ -67,6 +73,10 @@ function buildNormalizedPayload(source: FormData): NormalizedPayload {
     whatsapp: firstText(source, "whatsapp"),
     phone: firstText(source, "phone"),
     acceptTerms: toBoolean(firstText(source, "acceptTerms")),
+    armored: toBoolean(firstText(source, "armored")),
+    optionalFeatures: firstText(source, "optionalFeatures"),
+    conditionFlags: firstText(source, "conditionFlags"),
+    boostOptionId: firstText(source, "boostOptionId"),
     photoCount: photos.length,
   };
 }
@@ -84,6 +94,9 @@ function buildMultipartPayload(source: FormData) {
 
   output.append("yearModel", normalized.yearModel);
   output.append("year_model", normalized.yearModel);
+
+  output.append("yearManufacture", normalized.yearManufacture);
+  output.append("year_manufacture", normalized.yearManufacture);
 
   output.append("mileage", normalized.mileage);
   output.append("price", normalized.price);
@@ -111,6 +124,16 @@ function buildMultipartPayload(source: FormData) {
 
   output.append("acceptTerms", normalized.acceptTerms ? "true" : "false");
   output.append("accept_terms", normalized.acceptTerms ? "true" : "false");
+
+  output.append("armored", normalized.armored ? "true" : "false");
+  output.append("optionalFeatures", normalized.optionalFeatures);
+  output.append("optional_features", normalized.optionalFeatures);
+  output.append("conditionFlags", normalized.conditionFlags);
+  output.append("condition_flags", normalized.conditionFlags);
+  if (normalized.boostOptionId) {
+    output.append("boostOptionId", normalized.boostOptionId);
+    output.append("boost_option_id", normalized.boostOptionId);
+  }
 
   output.append("payload", JSON.stringify(normalized));
   output.append("data", JSON.stringify(normalized));

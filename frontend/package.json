@@ -14,7 +14,9 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "prepare:standalone": "node ./scripts/prepare-standalone.mjs",
-    "verify:standalone": "node ./scripts/verify-standalone.mjs"
+    "verify:standalone": "node ./scripts/verify-standalone.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "autoprefixer": "^10.4.27",
@@ -28,6 +30,7 @@
     "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@types/node": "^20.19.9",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
