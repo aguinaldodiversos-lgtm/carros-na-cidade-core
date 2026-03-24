@@ -1,8 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-sans",
+});
 
 const SITE_NAME = "Carros na Cidade";
 const DEFAULT_TITLE = "Carros na Cidade | Portal de carros da sua cidade";
@@ -26,23 +33,24 @@ const DEFAULT_KEYWORDS = [
   "veículos seminovos",
   "portal automotivo",
   "marketplace automotivo",
-];
+] as const;
 
-function resolveSiteUrl() {
-  const candidates = [
-    process.env.NEXT_PUBLIC_SITE_URL,
-    DEFAULT_SITE_URL,
-  ].filter(Boolean) as string[];
+function parseUrl(value?: string | null): URL | null {
+  if (!value) return null;
 
-  for (const candidate of candidates) {
-    try {
-      return new URL(candidate);
-    } catch {
-      continue;
-    }
+  try {
+    return new URL(value);
+  } catch {
+    return null;
   }
+}
 
-  return new URL(DEFAULT_SITE_URL);
+function resolveSiteUrl(): URL {
+  return (
+    parseUrl(process.env.NEXT_PUBLIC_SITE_URL) ??
+    parseUrl(process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "")) ??
+    new URL(DEFAULT_SITE_URL)
+  );
 }
 
 const siteUrl = resolveSiteUrl();
@@ -62,7 +70,7 @@ export const metadata: Metadata = {
     template: TITLE_TEMPLATE,
   },
   description: DEFAULT_DESCRIPTION,
-  keywords: DEFAULT_KEYWORDS,
+  keywords: [...DEFAULT_KEYWORDS],
   category: "automotive",
   alternates: {
     canonical: "/",
@@ -125,17 +133,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+type RootLayoutProps = Readonly<{
   children: React.ReactNode;
-}>) {
+}>;
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={inter.variable}>
       <body className="min-h-screen bg-[var(--cnc-bg)] font-sans text-[var(--cnc-text)] antialiased">
         <div className="flex min-h-screen flex-col">
           <PublicHeader />
-          <div className="flex-1">{children}</div>
+          <main className="flex-1">{children}</main>
           <PublicFooter />
         </div>
       </body>
