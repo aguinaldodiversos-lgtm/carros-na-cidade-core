@@ -6,13 +6,19 @@
   --cnc-bg: #f2f3f7;
   --cnc-surface: #ffffff;
   --cnc-line: #dde2ec;
+  --cnc-line-strong: #cfd6e4;
   --cnc-text: #161f34;
+  --cnc-text-strong: #0f172a;
   --cnc-muted: #5d667d;
+  --cnc-muted-soft: #7c879f;
   --cnc-primary: #0e62d8;
   --cnc-primary-strong: #0c4fb0;
+  --cnc-primary-soft: #eaf2ff;
   --cnc-footer-a: #152954;
   --cnc-footer-b: #0e1b3b;
-  --font-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --cnc-success: #0f9f6e;
+  --cnc-danger: #d14343;
+  --cnc-warning: #d18a12;
   --header-height: 78px;
 }
 
@@ -25,6 +31,8 @@
 html {
   min-height: 100%;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 html,
@@ -37,7 +45,10 @@ body {
   min-height: 100vh;
   background: var(--cnc-bg);
   color: var(--cnc-text);
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -53,9 +64,18 @@ svg {
   max-width: 100%;
 }
 
+img {
+  height: auto;
+}
+
 a {
   color: inherit;
   text-decoration: none;
+  transition:
+    color 180ms ease,
+    opacity 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
 button,
@@ -77,6 +97,12 @@ textarea {
   resize: vertical;
 }
 
+strong,
+b {
+  font-weight: 700;
+  color: var(--cnc-text-strong);
+}
+
 ::selection {
   background: rgba(14, 98, 216, 0.16);
   color: var(--cnc-text);
@@ -86,30 +112,172 @@ textarea {
   display: none !important;
 }
 
-.cnc-input {
-  @apply h-12 w-full rounded-xl border border-[#d9deea] bg-white px-4 text-[16px] text-[#222b3e] transition outline-none placeholder:text-[#8a93a8] focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/10;
+:focus-visible {
+  outline: 2px solid rgba(14, 98, 216, 0.22);
+  outline-offset: 2px;
 }
 
-.cnc-select {
-  @apply cnc-input appearance-none pr-10;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #5c6780 50%),
-    linear-gradient(135deg, #5c6780 50%, transparent 50%);
-  background-position:
-    calc(100% - 22px) calc(1em + 3px),
-    calc(100% - 16px) calc(1em + 3px);
-  background-size:
-    6px 6px,
-    6px 6px;
-  background-repeat: no-repeat;
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 0;
+    color: var(--cnc-text-strong);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 1.4rem + 2vw, 3.2rem);
+  }
+
+  h2 {
+    font-size: clamp(1.6rem, 1.2rem + 1.2vw, 2.4rem);
+  }
+
+  h3 {
+    font-size: clamp(1.25rem, 1rem + 0.8vw, 1.75rem);
+  }
+
+  h4 {
+    font-size: 1.125rem;
+  }
+
+  p {
+    margin: 0;
+    color: var(--cnc-muted);
+    line-height: 1.75;
+  }
+
+  small {
+    color: var(--cnc-muted-soft);
+  }
 }
 
-.cnc-btn-primary {
-  @apply inline-flex items-center justify-center rounded-xl border border-transparent bg-[#0e62d8] px-6 py-3 text-base font-bold text-white transition hover:bg-[#0c4fb0] focus:outline-none focus:ring-2 focus:ring-[#0e62d8]/20 disabled:opacity-60;
+@layer components {
+  .cnc-container {
+    @apply mx-auto w-full max-w-7xl px-4 md:px-6 xl:px-8;
+  }
+
+  .cnc-section {
+    @apply py-8 md:py-10 xl:py-12;
+  }
+
+  .cnc-input {
+    @apply h-12 w-full rounded-xl border bg-white px-4 text-[16px] font-medium text-[#20283b] outline-none transition placeholder:text-[#8a93a8];
+    border-color: var(--cnc-line);
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.02);
+  }
+
+  .cnc-input:hover {
+    border-color: var(--cnc-line-strong);
+  }
+
+  .cnc-input:focus {
+    border-color: var(--cnc-primary);
+    box-shadow:
+      0 0 0 4px rgba(14, 98, 216, 0.09),
+      0 2px 12px rgba(14, 98, 216, 0.06);
+  }
+
+  .cnc-select {
+    @apply cnc-input appearance-none pr-12;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #5c6780 50%),
+      linear-gradient(135deg, #5c6780 50%, transparent 50%);
+    background-position:
+      calc(100% - 22px) calc(50% - 2px),
+      calc(100% - 16px) calc(50% - 2px);
+    background-size:
+      6px 6px,
+      6px 6px;
+    background-repeat: no-repeat;
+  }
+
+  .cnc-label {
+    @apply mb-2 block text-sm font-semibold;
+    color: var(--cnc-text-strong);
+    letter-spacing: -0.01em;
+  }
+
+  .cnc-helper {
+    @apply mt-2 text-sm;
+    color: var(--cnc-muted);
+  }
+
+  .cnc-btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl border border-transparent px-6 py-3 text-[15px] font-semibold text-white transition focus:outline-none disabled:opacity-60;
+    background: linear-gradient(180deg, #1670ee 0%, #0e62d8 100%);
+    box-shadow: 0 10px 24px rgba(14, 98, 216, 0.22);
+    letter-spacing: -0.01em;
+  }
+
+  .cnc-btn-primary:hover {
+    background: linear-gradient(180deg, #1568de 0%, #0c4fb0 100%);
+    box-shadow: 0 12px 28px rgba(14, 98, 216, 0.28);
+  }
+
+  .cnc-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border bg-white px-5 py-3 text-[15px] font-semibold transition;
+    border-color: var(--cnc-line);
+    color: var(--cnc-text-strong);
+  }
+
+  .cnc-btn-secondary:hover {
+    border-color: var(--cnc-line-strong);
+    background: #fafbfd;
+  }
+
+  .cnc-card {
+    @apply overflow-hidden rounded-2xl border bg-white;
+    border-color: #e1e5ef;
+    box-shadow:
+      0 2px 18px rgba(20, 30, 60, 0.06),
+      0 1px 1px rgba(15, 23, 42, 0.02);
+  }
+
+  .cnc-card-premium {
+    @apply rounded-3xl border bg-white;
+    border-color: rgba(223, 228, 238, 0.9);
+    box-shadow:
+      0 14px 34px rgba(16, 28, 58, 0.08),
+      0 2px 10px rgba(16, 28, 58, 0.03);
+  }
+
+  .cnc-eyebrow {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em];
+    color: var(--cnc-primary);
+    background: var(--cnc-primary-soft);
+  }
+
+  .cnc-title {
+    @apply font-bold;
+    color: var(--cnc-text-strong);
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+  }
+
+  .cnc-subtitle {
+    @apply text-base md:text-lg;
+    color: var(--cnc-muted);
+    line-height: 1.75;
+    letter-spacing: -0.01em;
+  }
+
+  .cnc-divider {
+    border-top: 1px solid var(--cnc-line);
+  }
 }
 
-.cnc-card {
-  @apply overflow-hidden rounded-2xl border border-[#e1e5ef] bg-white shadow-[0_2px_18px_rgba(20,30,60,0.06)];
+@media (max-width: 768px) {
+  body {
+    line-height: 1.6;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
