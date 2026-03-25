@@ -13,10 +13,38 @@ type Patch = (partial: Partial<WizardFormState>) => void;
 
 type CityRow = { id: number; name: string; state: string; slug?: string };
 
+function normalizeCitySearchRows(raw: unknown): CityRow[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CityRow[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const idRaw = o.id;
+    const id =
+      typeof idRaw === "number" && Number.isFinite(idRaw)
+        ? idRaw
+        : typeof idRaw === "string"
+          ? parseInt(idRaw, 10)
+          : NaN;
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const name = typeof o.name === "string" ? o.name.trim() : "";
+    if (!name) continue;
+    const st = typeof o.state === "string" ? o.state.trim() : "";
+    out.push({
+      id,
+      name,
+      state: st,
+      slug: typeof o.slug === "string" ? o.slug : undefined,
+    });
+  }
+  return out;
+}
+
 export function FinalizeLocationFields({ state, patch }: { state: WizardFormState; patch: Patch }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<CityRow[]>([]);
   const debounceRef = useRef<number | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -28,17 +56,33 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
     async (q: string) => {
       if (uf.length !== 2 || q.trim().length < 2) {
         setSuggestions([]);
+        setSearchError(null);
         return;
       }
       setLoading(true);
+      setSearchError(null);
       try {
         const params = new URLSearchParams({ q: q.trim(), uf });
         const res = await fetch(`/api/painel/cidades/search?${params.toString()}`, { cache: "no-store" });
-        const json = (await res.json()) as { data?: CityRow[] };
-        const rows = Array.isArray(json?.data) ? json.data : [];
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: unknown;
+          message?: string;
+        };
+        if (!res.ok) {
+          setSuggestions([]);
+          setSearchError(
+            typeof json?.message === "string" && json.message.trim()
+              ? json.message
+              : "Não foi possível buscar cidades. Tente novamente."
+          );
+          return;
+        }
+        const rows = normalizeCitySearchRows(json?.data);
         setSuggestions(rows);
       } catch {
         setSuggestions([]);
+        setSearchError("Falha de rede ao buscar cidades.");
       } finally {
         setLoading(false);
       }
@@ -55,6 +99,7 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
     const q = searchQuery.trim();
     if (uf.length !== 2 || q.length < 2) {
       setSuggestions([]);
+      setSearchError(null);
       return;
     }
     debounceRef.current = window.setTimeout(() => {
@@ -77,15 +122,17 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
     patch({ cityId: null, city: "" });
     setSearchQuery("");
     setSuggestions([]);
+    setSearchError(null);
     setOpen(false);
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function pick(row: CityRow) {
+    const st = String(row.state).trim().toUpperCase().slice(0, 2);
     patch({
       cityId: row.id,
       city: row.name,
-      state: String(row.state).trim().toUpperCase().slice(0, 2),
+      state: st.length === 2 ? st : uf,
     });
     setSearchQuery("");
     setSuggestions([]);
@@ -110,6 +157,7 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
               patch({ state: nextUf, cityId: null, city: "" });
               setSearchQuery("");
               setSuggestions([]);
+              setSearchError(null);
               setOpen(false);
             }}
           >
@@ -154,6 +202,7 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
+                  setSearchError(null);
                   setOpen(true);
                 }}
                 onFocus={() => setOpen(true)}
@@ -166,8 +215,16 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
                 aria-expanded={open}
               />
               {loading ? <div className="mt-1 text-xs text-[#6E748A]">Buscando cidades…</div> : null}
-              {open && uf.length === 2 && searchQuery.trim().length >= 2 && suggestions.length === 0 && !loading ? (
-                <p className="mt-1 text-xs text-amber-800">Nenhuma cidade encontrada para esse trecho. Ajuste a busca.</p>
+              {searchError ? <p className="mt-1 text-xs text-red-700">{searchError}</p> : null}
+              {open &&
+              uf.length === 2 &&
+              searchQuery.trim().length >= 2 &&
+              suggestions.length === 0 &&
+              !loading &&
+              !searchError ? (
+                <p className="mt-1 text-xs text-amber-800">
+                  Nenhuma cidade encontrada para esse trecho na base. Ajuste a busca ou a UF.
+                </p>
               ) : null}
               {open && suggestions.length > 0 ? (
                 <ul

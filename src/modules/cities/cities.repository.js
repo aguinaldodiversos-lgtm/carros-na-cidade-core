@@ -1,5 +1,20 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { slugify } from "../../shared/utils/slugify.js";
+import { stateColumnValuesForUf, stateRowMatchesUf } from "./brazil-state-variants.js";
+
+/** Dobras comuns pt-BR para ILIKE/translate no PostgreSQL (nome da cidade). */
+const PG_FOLD_ACCENT_FROM =
+  "áàâãäéèêëíìîïóòôõöúùûüçãõñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÃÕÑ";
+const PG_FOLD_ACCENT_TO =
+  "aaaaaeeeeiiiiooooouuuucaonaaaaaeeeeiiiiooooouuuucaon";
+
+function foldedNameExpr(columnSql) {
+  return `translate(lower(COALESCE(${columnSql}, '')), '${PG_FOLD_ACCENT_FROM}', '${PG_FOLD_ACCENT_TO}')`;
+}
+
+function foldedParamExpr(paramSlot) {
+  return `translate(lower(COALESCE(${paramSlot}, '')), '${PG_FOLD_ACCENT_FROM}', '${PG_FOLD_ACCENT_TO}')`;
+}
 
 function normalizeNameForMatch(value) {
   return String(value ?? "")
@@ -92,19 +107,21 @@ export async function resolveCityByNameAndUf(name, uf) {
   for (const slug of candidates) {
     const row = await findCityBySlug(slug);
     if (!row) continue;
-    const rowState = row.state ? String(row.state).trim().toUpperCase() : "";
-    if (rowState && rowState !== ufNorm) continue;
+    if (row.state != null && String(row.state).trim() !== "" && !stateRowMatchesUf(row.state, ufNorm)) {
+      continue;
+    }
     return row;
   }
 
   const target = normalizeNameForMatch(rawName);
+  const stateVariants = stateColumnValuesForUf(ufNorm);
   const poolResult = await pool.query(
     `
     SELECT id, name, state, slug
     FROM cities
-    WHERE UPPER(TRIM(state)) = $1
+    WHERE UPPER(TRIM(state)) = ANY($1::text[])
     `,
-    [ufNorm]
+    [stateVariants]
   );
 
   for (const row of poolResult.rows) {
@@ -128,25 +145,29 @@ export async function searchCitiesByUfAndQuery(uf, query, limit = 12) {
   if (ufNorm.length !== 2 || q.length < 2) return [];
 
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 12));
-  const stripped = q.replace(/[%_]/g, " ").trim();
+  const stripped = q.replace(/[%_\\]/g, " ").trim();
   if (stripped.length < 2) return [];
 
-  const pattern = `%${stripped}%`;
-  const prefix = `${stripped}%`;
+  const stateVariants = stateColumnValuesForUf(ufNorm);
+  const foldName = foldedNameExpr("c.name");
+  const foldQ = foldedParamExpr("$2::text");
 
   const result = await pool.query(
     `
-    SELECT id, name, state, slug
-    FROM cities
-    WHERE UPPER(TRIM(state)) = $1
-      AND name ILIKE $2
+    SELECT c.id, c.name, c.state, c.slug
+    FROM cities c
+    WHERE UPPER(TRIM(c.state)) = ANY($1::text[])
+      AND ${foldName} LIKE '%' || ${foldQ} || '%'
     ORDER BY
-      CASE WHEN name ILIKE $3 THEN 0 ELSE 1 END,
-      CHAR_LENGTH(name) ASC,
-      name ASC
-    LIMIT $4
+      CASE
+        WHEN ${foldName} LIKE ${foldQ} || '%' THEN 0
+        ELSE 1
+      END,
+      CHAR_LENGTH(c.name) ASC,
+      c.name ASC
+    LIMIT $3
     `,
-    [ufNorm, pattern, prefix, safeLimit]
+    [stateVariants, stripped, safeLimit]
   );
 
   return result.rows;

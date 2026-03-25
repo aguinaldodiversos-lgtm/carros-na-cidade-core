@@ -44,7 +44,11 @@ export async function resolveCity(req, res, next) {
 export async function searchCities(req, res, next) {
   try {
     const q = String(req.query.q ?? "").trim();
-    const uf = String(req.query.uf ?? "").trim();
+    const uf = String(req.query.uf ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 2);
     if (uf.length !== 2) {
       return res.status(400).json({
         success: false,
@@ -58,7 +62,7 @@ export async function searchCities(req, res, next) {
 
     const limit = Math.min(30, Math.max(1, Number(req.query.limit) || 12));
     const rows = await citiesRepository.searchCitiesByUfAndQuery(uf, q, limit);
-    const ufNorm = uf.toUpperCase().slice(0, 2);
+    const ufNorm = uf;
 
     res.json({
       success: true,
