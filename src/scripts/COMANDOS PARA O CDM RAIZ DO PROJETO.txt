@@ -15,6 +15,21 @@ git fetch origin
 git pull --rebase origin main
 git push origin main
 
+
+Comandos para subir
+
+git status
+git add .
+git commit -m "refina tipografia e base visual premium do portal"
+git push origin main
+
+Se o push for rejeitado:
+
+git fetch origin
+git pull --rebase origin main
+git push origin main
+
+
 Se quiser um fluxo mais seguro usando branch:
 
 git checkout -b feature/fluxo-criacao-anuncio
