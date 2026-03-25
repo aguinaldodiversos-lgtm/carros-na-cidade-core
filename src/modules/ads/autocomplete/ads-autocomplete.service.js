@@ -7,6 +7,7 @@ import {
   loadModelDictionary,
 } from "./ads-autocomplete.repository.js";
 import { inferAdsFiltersFromFreeQuery } from "../filters/ads-free-query.parser.js";
+import { normalizeSearchText as normalizeText } from "../../../shared/utils/normalizeSearchText.js";
 
 /* =====================================================
    CONFIG
@@ -112,18 +113,8 @@ async function getCityBrandPresence() {
 }
 
 /* =====================================================
-   TEXT HELPERS
+   TEXT HELPERS (normalizeText = shared normalizeSearchText)
 ===================================================== */
-
-function normalizeText(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function tokenize(value) {
   return normalizeText(value)

@@ -1,6 +1,7 @@
 /**
- * Valores que podem aparecer em `cities.state` no banco (UF de 2 letras ou nome do estado).
- * Usado em WHERE UPPER(TRIM(state)) = ANY($1) para autocomplete e resolução.
+ * Aliases geográficos: relaciona o conteúdo de `cities.state` (sigla ou nome) à UF escolhida.
+ * Usado só no filtro em memória do `cities.service` sobre o dicionário oficial (`loadCityDictionary`).
+ * Não é segunda fonte de cidades.
  */
 export function stateColumnValuesForUf(ufInput) {
   const code = String(ufInput ?? "")

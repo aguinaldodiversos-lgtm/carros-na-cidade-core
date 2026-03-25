@@ -1,4 +1,4 @@
-import * as citiesRepository from "../cities/cities.repository.js";
+import * as citiesService from "../cities/cities.service.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 
 export async function resolveCity(req, res, next) {
@@ -12,9 +12,9 @@ export async function resolveCity(req, res, next) {
       });
     }
 
-    const ufNorm = uf.toUpperCase().slice(0, 2);
+    const ufNorm = uf.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
 
-    const row = await citiesRepository.resolveCityByNameAndUf(q, uf);
+    const row = await citiesService.resolveCityByNameAndUf(q, uf);
     if (!row) {
       return res.status(404).json({
         success: false,
@@ -61,7 +61,7 @@ export async function searchCities(req, res, next) {
     }
 
     const limit = Math.min(30, Math.max(1, Number(req.query.limit) || 12));
-    const rows = await citiesRepository.searchCitiesByUfAndQuery(uf, q, limit);
+    const rows = await citiesService.searchCitiesByUfAndPartialName(uf, q, limit);
     const ufNorm = uf;
 
     res.json({
@@ -91,7 +91,7 @@ export async function getCityById(req, res, next) {
       });
     }
 
-    const row = await citiesRepository.findCityById(id);
+    const row = await citiesService.getCityById(id);
     if (!row) {
       return res.status(404).json({
         success: false,
