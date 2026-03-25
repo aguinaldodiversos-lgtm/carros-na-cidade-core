@@ -9,6 +9,7 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-sans",
+  fallback: ["system-ui", "Arial", "sans-serif"],
 });
 
 const SITE_NAME = "Carros na Cidade";
@@ -39,18 +40,14 @@ function parseUrl(value?: string | null): URL | null {
   if (!value) return null;
 
   try {
-    return new URL(value);
+    return new URL(value.trim().replace(/\/+$/, ""));
   } catch {
     return null;
   }
 }
 
 function resolveSiteUrl(): URL {
-  return (
-    parseUrl(process.env.NEXT_PUBLIC_SITE_URL) ??
-    parseUrl(process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "")) ??
-    new URL(DEFAULT_SITE_URL)
-  );
+  return parseUrl(process.env.NEXT_PUBLIC_SITE_URL) ?? new URL(DEFAULT_SITE_URL);
 }
 
 const siteUrl = resolveSiteUrl();
@@ -143,7 +140,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body className="min-h-screen bg-[var(--cnc-bg)] font-sans text-[var(--cnc-text)] antialiased">
         <div className="flex min-h-screen flex-col">
           <PublicHeader />
-          <main className="flex-1">{children}</main>
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
           <PublicFooter />
         </div>
       </body>
