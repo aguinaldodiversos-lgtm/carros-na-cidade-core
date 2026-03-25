@@ -44,8 +44,8 @@ const INITIAL_FORM: WizardFormState = {
   price: "",
   description: "",
   cityId: null,
-  city: "São Paulo",
-  state: "SP",
+  city: "",
+  state: "",
   plateFinal: "",
   whatsapp: "",
   phone: "",
@@ -77,8 +77,11 @@ function validateStep(step: number, form: WizardFormState, photoCount: number): 
     case 5:
       return null;
     case 6:
-      if (!form.city.trim()) return "Informe a cidade.";
-      if (!form.state.trim() || form.state.length !== 2) return "Informe o estado (UF).";
+      if (!form.state.trim() || form.state.length !== 2) return "Selecione a UF.";
+      if (form.cityId == null || !Number.isFinite(form.cityId)) {
+        return "Selecione uma cidade válida da lista para continuar.";
+      }
+      if (!form.city.trim()) return "Selecione uma cidade válida da lista para continuar.";
       if (!form.whatsapp.trim() && !form.phone.trim()) return "Informe WhatsApp ou telefone.";
       if (!form.acceptTerms) return "Aceite os termos para publicar.";
       return null;
@@ -323,9 +326,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
       payload.append("fipeValue", form.fipeValue);
       payload.append("city", form.city);
       payload.append("state", form.state);
-      if (form.cityId != null) {
-        payload.append("cityId", String(form.cityId));
-      }
+      payload.append("cityId", String(form.cityId));
       payload.append("fuel", form.fuel);
       payload.append("transmission", form.transmission);
       payload.append("bodyStyle", form.bodyStyle);

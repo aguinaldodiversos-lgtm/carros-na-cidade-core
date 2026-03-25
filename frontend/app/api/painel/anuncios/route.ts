@@ -5,7 +5,6 @@ import {
   buildBackendCreateAdPayload,
   extractBackendErrorMessage,
   fetchResolvedCityByIdFromBackend,
-  resolveCityFromBackend,
   type WizardNormalizedFields,
 } from "@/lib/painel/create-ad-backend";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
@@ -110,24 +109,28 @@ export async function POST(request: NextRequest) {
 
     const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);
     const parsedCityId = normalized.cityId ? parseInt(normalized.cityId, 10) : NaN;
-    let resolved =
-      Number.isFinite(parsedCityId) && parsedCityId > 0
-        ? await fetchResolvedCityByIdFromBackend(
-            parsedCityId,
-            ufForm.length === 2 ? ufForm : undefined
-          )
-        : null;
 
-    if (!resolved) {
-      resolved = await resolveCityFromBackend(normalized.city, normalized.state);
+    if (!Number.isFinite(parsedCityId) || parsedCityId <= 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Selecione uma cidade válida da lista para continuar.",
+        },
+        { status: 400 }
+      );
     }
+
+    const resolved = await fetchResolvedCityByIdFromBackend(
+      parsedCityId,
+      ufForm.length === 2 ? ufForm : undefined
+    );
 
     if (!resolved) {
       return NextResponse.json(
         {
           ok: false,
           message:
-            "Não encontramos essa cidade na base. Confira o nome da cidade e a UF (ex.: São Paulo / SP).",
+            "Cidade não encontrada na base. Volte ao campo Cidade e escolha novamente na lista.",
         },
         { status: 400 }
       );

@@ -35,17 +35,6 @@ export type WizardNormalizedFields = {
   photoCount: number;
 };
 
-/** Mesma lógica do backend `slugify` (NFD + minúsculas + hífens). */
-export function slugifyForCity(text: string): string {
-  return text
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export function parsePriceBr(value: string): number {
   if (!value?.trim()) return 0;
   const cleaned = value
@@ -190,71 +179,6 @@ export async function fetchResolvedCityByIdFromBackend(
   } catch {
     return null;
   }
-}
-
-/**
- * Resolve cidade na base (endpoint dedicado + fallback por slug da página pública).
- */
-export async function resolveCityFromBackend(city: string, state: string): Promise<ResolvedCityRow | null> {
-  const uf = state.trim().toUpperCase().slice(0, 2);
-  const q = city.trim();
-  if (!q || uf.length !== 2) return null;
-
-  const primary = resolveBackendApiUrl(
-    `/api/public/cities/resolve?${new URLSearchParams({ q, uf }).toString()}`
-  );
-  if (primary) {
-    try {
-      const res = await fetch(primary, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const parsed = parseResolvedCityPayload(json, uf);
-        if (parsed) return parsed;
-      }
-    } catch {
-      // fallback abaixo
-    }
-  }
-
-  const ufLower = uf.toLowerCase();
-  const slugCity = slugifyForCity(q);
-  const candidates = [
-    `${slugCity}-${ufLower}`,
-    slugifyForCity(`${q} ${uf}`),
-    slugCity,
-  ].filter((s, i, arr) => s && arr.indexOf(s) === i);
-
-  for (const slug of candidates) {
-    const url = resolveBackendApiUrl(`/api/public/cities/${encodeURIComponent(slug)}`);
-    if (!url) continue;
-    try {
-      const res = await fetch(url, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      if (!res.ok) continue;
-      const json = (await res.json()) as {
-        data?: { city?: { id?: number | string; name?: string; state?: string } };
-      };
-      const c = json?.data?.city;
-      if (!c?.id) continue;
-      const id =
-        typeof c.id === "number" ? c.id : typeof c.id === "string" ? parseInt(c.id, 10) : NaN;
-      if (!Number.isFinite(id) || id <= 0) continue;
-      const name = typeof c.name === "string" ? c.name.trim() : "";
-      let st = typeof c.state === "string" ? c.state.trim() : "";
-      if (!st) st = uf;
-      if (!name || !st) continue;
-      return { id, name, state: st };
-    } catch {
-      // próximo slug
-    }
-  }
-
-  return null;
 }
 
 export function extractBackendErrorMessage(parsed: unknown, status: number): string {

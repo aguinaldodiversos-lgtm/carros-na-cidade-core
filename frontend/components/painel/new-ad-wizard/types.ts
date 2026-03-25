@@ -21,8 +21,9 @@ export type WizardFormState = {
   mileage: string;
   price: string;
   description: string;
-  /** Quando preenchido, a publicação valida por id na base */
+  /** Obrigatório para publicar: id da tabela `cities` após escolha no autocomplete */
   cityId: number | null;
+  /** Nome canônico da cidade (base), preenchido junto com cityId */
   city: string;
   state: string;
   plateFinal: string;
