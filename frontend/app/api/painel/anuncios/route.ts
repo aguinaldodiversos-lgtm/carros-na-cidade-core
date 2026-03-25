@@ -1,36 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import {
+  buildBackendCreateAdPayload,
+  extractBackendErrorMessage,
+  type WizardNormalizedFields,
+  resolveCityIdFromBackend,
+} from "@/lib/painel/create-ad-backend";
+import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
+import {
+  AUTH_COOKIE_NAME,
+  getSessionCookieOptions,
+  getSessionDataFromRequest,
+} from "@/services/sessionService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type NormalizedPayload = {
-  sellerType: string;
-  brand: string;
-  model: string;
-  version: string;
-  yearModel: string;
-  yearManufacture: string;
-  mileage: string;
-  price: string;
-  fipeValue: string;
-  city: string;
-  state: string;
-  fuel: string;
-  transmission: string;
-  bodyStyle: string;
-  color: string;
-  plateFinal: string;
-  title: string;
-  description: string;
-  whatsapp: string;
-  phone: string;
-  acceptTerms: boolean;
-  armored: boolean;
-  optionalFeatures: string;
-  conditionFlags: string;
-  boostOptionId: string;
-  photoCount: number;
-};
 
 function firstText(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -41,12 +25,7 @@ function toBoolean(value: string) {
   return value === "true" || value === "1" || value === "on";
 }
 
-function normalizePath(path: string) {
-  if (!path) return "";
-  return path.startsWith("/") ? path : `/${path}`;
-}
-
-function buildNormalizedPayload(source: FormData): NormalizedPayload {
+function buildNormalizedPayload(source: FormData): WizardNormalizedFields {
   const photos = source
     .getAll("photos")
     .filter((item): item is File => item instanceof File && item.size > 0);
@@ -81,124 +60,6 @@ function buildNormalizedPayload(source: FormData): NormalizedPayload {
   };
 }
 
-function buildMultipartPayload(source: FormData) {
-  const normalized = buildNormalizedPayload(source);
-  const output = new FormData();
-
-  output.append("sellerType", normalized.sellerType);
-  output.append("seller_type", normalized.sellerType);
-
-  output.append("brand", normalized.brand);
-  output.append("model", normalized.model);
-  output.append("version", normalized.version);
-
-  output.append("yearModel", normalized.yearModel);
-  output.append("year_model", normalized.yearModel);
-
-  output.append("yearManufacture", normalized.yearManufacture);
-  output.append("year_manufacture", normalized.yearManufacture);
-
-  output.append("mileage", normalized.mileage);
-  output.append("price", normalized.price);
-
-  output.append("fipeValue", normalized.fipeValue);
-  output.append("fipe_value", normalized.fipeValue);
-
-  output.append("city", normalized.city);
-  output.append("state", normalized.state);
-  output.append("fuel", normalized.fuel);
-  output.append("transmission", normalized.transmission);
-
-  output.append("bodyStyle", normalized.bodyStyle);
-  output.append("body_style", normalized.bodyStyle);
-
-  output.append("color", normalized.color);
-
-  output.append("plateFinal", normalized.plateFinal);
-  output.append("plate_final", normalized.plateFinal);
-
-  output.append("title", normalized.title);
-  output.append("description", normalized.description);
-  output.append("whatsapp", normalized.whatsapp);
-  output.append("phone", normalized.phone);
-
-  output.append("acceptTerms", normalized.acceptTerms ? "true" : "false");
-  output.append("accept_terms", normalized.acceptTerms ? "true" : "false");
-
-  output.append("armored", normalized.armored ? "true" : "false");
-  output.append("optionalFeatures", normalized.optionalFeatures);
-  output.append("optional_features", normalized.optionalFeatures);
-  output.append("conditionFlags", normalized.conditionFlags);
-  output.append("condition_flags", normalized.conditionFlags);
-  if (normalized.boostOptionId) {
-    output.append("boostOptionId", normalized.boostOptionId);
-    output.append("boost_option_id", normalized.boostOptionId);
-  }
-
-  output.append("payload", JSON.stringify(normalized));
-  output.append("data", JSON.stringify(normalized));
-
-  const photos = source
-    .getAll("photos")
-    .filter((item): item is File => item instanceof File && item.size > 0);
-
-  photos.forEach((file, index) => {
-    const fileName = file.name || `foto-${index + 1}.jpg`;
-    output.append("photos", file, fileName);
-  });
-
-  return output;
-}
-
-function buildJsonPayload(source: FormData) {
-  return buildNormalizedPayload(source);
-}
-
-function getBaseUrls() {
-  return Array.from(
-    new Set(
-      [process.env.API_URL, process.env.NEXT_PUBLIC_API_URL]
-        .filter(Boolean)
-        .map((item) => String(item).replace(/\/$/, ""))
-    )
-  );
-}
-
-function getCandidatePaths() {
-  const configured = process.env.ADS_CREATE_PATH?.trim();
-
-  if (configured) {
-    return [normalizePath(configured)];
-  }
-
-  return [
-    "/ads",
-    "/api/ads",
-    "/public/ads",
-    "/dashboard/ads",
-    "/dealership/ads",
-  ];
-}
-
-function buildForwardHeaders(request: NextRequest) {
-  const headers: HeadersInit = {
-    Accept: "application/json",
-  };
-
-  const authorization = request.headers.get("authorization");
-  const cookie = request.headers.get("cookie");
-
-  if (authorization) {
-    headers.Authorization = authorization;
-  }
-
-  if (cookie) {
-    headers.Cookie = cookie;
-  }
-
-  return headers;
-}
-
 async function parseResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
 
@@ -216,130 +77,102 @@ async function parseResponse(response: Response) {
 
 export async function POST(request: NextRequest) {
   try {
-    const source = await request.formData();
-    const bases = getBaseUrls();
-    const candidatePaths = getCandidatePaths();
-
-    if (!bases.length) {
+    if (!getBackendApiBaseUrl()) {
       return NextResponse.json(
         {
           ok: false,
-          message: "API_URL ou NEXT_PUBLIC_API_URL não está configurada no frontend.",
+          message:
+            "API do backend não configurada (AUTH_API_BASE_URL, BACKEND_API_URL, API_URL ou NEXT_PUBLIC_API_URL).",
         },
         { status: 500 }
       );
     }
 
-    const headers = buildForwardHeaders(request);
-    const multipartPayload = buildMultipartPayload(source);
-    const jsonPayload = buildJsonPayload(source);
+    const source = await request.formData();
+    const normalized = buildNormalizedPayload(source);
 
-    const errors: Array<{
-      url: string;
-      mode: "multipart" | "json";
-      status?: number;
-      message: string;
-    }> = [];
+    const session = getSessionDataFromRequest(request);
+    const ensured = await ensureSessionWithFreshBackendTokens(session);
 
-    for (const base of bases) {
-      for (const path of candidatePaths) {
-        const url = `${base}${path}`;
-
-        try {
-          const response = await fetch(url, {
-            method: "POST",
-            headers,
-            body: multipartPayload,
-            cache: "no-store",
-          });
-
-          const parsed = await parseResponse(response);
-
-          if (response.ok) {
-            return NextResponse.json(
-              {
-                ok: true,
-                message:
-                  typeof parsed?.message === "string"
-                    ? parsed.message
-                    : "Anúncio enviado com sucesso.",
-                result: parsed,
-              },
-              { status: 200 }
-            );
-          }
-
-          errors.push({
-            url,
-            mode: "multipart",
-            status: response.status,
-            message:
-              typeof parsed?.message === "string"
-                ? parsed.message
-                : `Falha no backend com status ${response.status}.`,
-          });
-        } catch (error) {
-          errors.push({
-            url,
-            mode: "multipart",
-            message: error instanceof Error ? error.message : "Erro inesperado no envio multipart.",
-          });
-        }
-
-        try {
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              ...headers,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(jsonPayload),
-            cache: "no-store",
-          });
-
-          const parsed = await parseResponse(response);
-
-          if (response.ok) {
-            return NextResponse.json(
-              {
-                ok: true,
-                message:
-                  typeof parsed?.message === "string"
-                    ? parsed.message
-                    : "Anúncio enviado com sucesso.",
-                result: parsed,
-              },
-              { status: 200 }
-            );
-          }
-
-          errors.push({
-            url,
-            mode: "json",
-            status: response.status,
-            message:
-              typeof parsed?.message === "string"
-                ? parsed.message
-                : `Falha no backend com status ${response.status}.`,
-          });
-        } catch (error) {
-          errors.push({
-            url,
-            mode: "json",
-            message: error instanceof Error ? error.message : "Erro inesperado no envio JSON.",
-          });
-        }
-      }
+    if (!ensured.ok || !ensured.session.accessToken) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Faça login para publicar o anúncio.",
+        },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json(
+    const cityId = await resolveCityIdFromBackend(normalized.city, normalized.state);
+    if (!cityId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Não encontramos essa cidade na base. Confira o nome da cidade e a UF (ex.: São Paulo / SP).",
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = buildBackendCreateAdPayload(normalized, cityId);
+    const url = resolveBackendApiUrl("/api/ads");
+    if (!url) {
+      return NextResponse.json(
+        { ok: false, message: "URL do backend inválida." },
+        { status: 500 }
+      );
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${ensured.session.accessToken}`,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+
+    const parsed = await parseResponse(response);
+
+    const setSessionCookie = (res: NextResponse) => {
+      if (ensured.newCookie) {
+        res.cookies.set(AUTH_COOKIE_NAME, ensured.newCookie, getSessionCookieOptions());
+      }
+    };
+
+    if (response.ok) {
+      const res = NextResponse.json({
+        ok: true,
+        message: "Anúncio enviado com sucesso.",
+        result: parsed,
+      });
+      setSessionCookie(res);
+      return res;
+    }
+
+    const message = extractBackendErrorMessage(parsed, response.status);
+    const details =
+      parsed && typeof parsed === "object" && "details" in parsed
+        ? (parsed as { details: unknown }).details
+        : undefined;
+
+    const status =
+      response.status >= 400 && response.status < 600 ? response.status : 502;
+
+    const res = NextResponse.json(
       {
         ok: false,
-        message: "Não foi possível publicar o anúncio no backend.",
-        attempts: errors,
+        message,
+        ...(details !== undefined ? { details } : {}),
       },
-      { status: 502 }
+      { status }
     );
+    setSessionCookie(res);
+    return res;
   } catch (error) {
     return NextResponse.json(
       {

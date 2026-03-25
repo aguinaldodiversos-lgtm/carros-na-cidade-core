@@ -346,7 +346,15 @@ export default function NewAdWizardClient({ initialType }: Props) {
       const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result?.message || "Não foi possível publicar o anúncio.");
+        const base =
+          typeof result?.message === "string" && result.message.trim()
+            ? result.message
+            : "Não foi possível publicar o anúncio.";
+        const withDetails =
+          process.env.NODE_ENV === "development" && result?.details != null
+            ? `${base} (${JSON.stringify(result.details)})`
+            : base;
+        throw new Error(withDetails);
       }
 
       try {
