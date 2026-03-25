@@ -1,4 +1,5 @@
 import * as citiesRepository from "../cities/cities.repository.js";
+import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 
 export async function resolveCity(req, res, next) {
   try {
@@ -11,6 +12,8 @@ export async function resolveCity(req, res, next) {
       });
     }
 
+    const ufNorm = uf.toUpperCase().slice(0, 2);
+
     const row = await citiesRepository.resolveCityByNameAndUf(q, uf);
     if (!row) {
       return res.status(404).json({
@@ -19,12 +22,17 @@ export async function resolveCity(req, res, next) {
       });
     }
 
+    const stateOut =
+      row.state != null && String(row.state).trim() !== ""
+        ? String(row.state).trim()
+        : ufNorm || inferUfFromSlug(row.slug);
+
     res.json({
       success: true,
       data: {
         id: row.id,
         name: row.name,
-        state: row.state,
+        state: stateOut,
         slug: row.slug,
       },
     });
@@ -50,13 +58,17 @@ export async function searchCities(req, res, next) {
 
     const limit = Math.min(30, Math.max(1, Number(req.query.limit) || 12));
     const rows = await citiesRepository.searchCitiesByUfAndQuery(uf, q, limit);
+    const ufNorm = uf.toUpperCase().slice(0, 2);
 
     res.json({
       success: true,
       data: rows.map((r) => ({
         id: r.id,
         name: r.name,
-        state: r.state,
+        state:
+          r.state != null && String(r.state).trim() !== ""
+            ? String(r.state).trim()
+            : ufNorm || inferUfFromSlug(r.slug),
         slug: r.slug,
       })),
     });
@@ -83,12 +95,17 @@ export async function getCityById(req, res, next) {
       });
     }
 
+    const stateOut =
+      row.state != null && String(row.state).trim() !== ""
+        ? String(row.state).trim()
+        : inferUfFromSlug(row.slug);
+
     res.json({
       success: true,
       data: {
         id: row.id,
         name: row.name,
-        state: row.state,
+        state: stateOut,
         slug: row.slug,
       },
     });

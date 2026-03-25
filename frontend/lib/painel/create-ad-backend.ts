@@ -144,7 +144,7 @@ export function buildBackendCreateAdPayload(
   };
 }
 
-function parseResolvedCityPayload(json: unknown): ResolvedCityRow | null {
+function parseResolvedCityPayload(json: unknown, fallbackUf?: string): ResolvedCityRow | null {
   if (!json || typeof json !== "object") return null;
   const o = json as Record<string, unknown>;
   const data = o.data;
@@ -159,7 +159,10 @@ function parseResolvedCityPayload(json: unknown): ResolvedCityRow | null {
         : NaN;
   if (!Number.isFinite(id) || id <= 0) return null;
   const name = typeof d.name === "string" ? d.name.trim() : "";
-  const state = typeof d.state === "string" ? d.state.trim() : "";
+  let state = typeof d.state === "string" ? d.state.trim() : "";
+  if (!state && fallbackUf) {
+    state = fallbackUf.trim().toUpperCase().slice(0, 2);
+  }
   if (!name || !state) return null;
   return {
     id,
@@ -170,7 +173,10 @@ function parseResolvedCityPayload(json: unknown): ResolvedCityRow | null {
 }
 
 /** Resolve cidade por id (validação quando o wizard envia city_id). */
-export async function fetchResolvedCityByIdFromBackend(cityId: number): Promise<ResolvedCityRow | null> {
+export async function fetchResolvedCityByIdFromBackend(
+  cityId: number,
+  fallbackUf?: string
+): Promise<ResolvedCityRow | null> {
   const url = resolveBackendApiUrl(`/api/public/cities/by-id/${encodeURIComponent(String(cityId))}`);
   if (!url) return null;
   try {
@@ -180,7 +186,7 @@ export async function fetchResolvedCityByIdFromBackend(cityId: number): Promise<
     });
     if (!res.ok) return null;
     const json = await res.json();
-    return parseResolvedCityPayload(json);
+    return parseResolvedCityPayload(json, fallbackUf);
   } catch {
     return null;
   }
@@ -205,7 +211,7 @@ export async function resolveCityFromBackend(city: string, state: string): Promi
       });
       if (res.ok) {
         const json = await res.json();
-        const parsed = parseResolvedCityPayload(json);
+        const parsed = parseResolvedCityPayload(json, uf);
         if (parsed) return parsed;
       }
     } catch {
@@ -239,7 +245,8 @@ export async function resolveCityFromBackend(city: string, state: string): Promi
         typeof c.id === "number" ? c.id : typeof c.id === "string" ? parseInt(c.id, 10) : NaN;
       if (!Number.isFinite(id) || id <= 0) continue;
       const name = typeof c.name === "string" ? c.name.trim() : "";
-      const st = typeof c.state === "string" ? c.state.trim() : "";
+      let st = typeof c.state === "string" ? c.state.trim() : "";
+      if (!st) st = uf;
       if (!name || !st) continue;
       return { id, name, state: st };
     } catch {

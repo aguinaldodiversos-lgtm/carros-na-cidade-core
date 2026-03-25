@@ -108,10 +108,14 @@ export async function POST(request: NextRequest) {
 
     const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
 
+    const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);
     const parsedCityId = normalized.cityId ? parseInt(normalized.cityId, 10) : NaN;
     let resolved =
       Number.isFinite(parsedCityId) && parsedCityId > 0
-        ? await fetchResolvedCityByIdFromBackend(parsedCityId)
+        ? await fetchResolvedCityByIdFromBackend(
+            parsedCityId,
+            ufForm.length === 2 ? ufForm : undefined
+          )
         : null;
 
     if (!resolved) {
@@ -129,7 +133,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);
     const ufResolved = String(resolved.state).trim().toUpperCase().slice(0, 2);
     if (ufForm && ufResolved && ufForm !== ufResolved) {
       return NextResponse.json(
