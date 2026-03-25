@@ -9,6 +9,7 @@ import { formatCurrencyInput, formatKm, parseCurrency, parseKmDigits } from "./c
 import { fabricationYearChoices, uniqueModelYears, versionsForYear } from "./fipe-years";
 import type { WizardFormState } from "./types";
 import ChipSelect from "./ChipSelect";
+import { FinalizeLocationFields } from "./FinalizeLocationFields";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import type { SessionAccountType } from "@/lib/auth/redirects";
 
@@ -600,17 +601,15 @@ export function StepFinalize({
     [state.brandLabel, state.modelLabel, state.versionLabel, state.yearModel]
   );
 
-  const wantsLojista = state.sellerType === "lojista";
-  const isCnpjSession = sessionAccountType === "CNPJ";
+  const isLojistaAccount = sessionAccountType === "CNPJ";
   const isCnpjDashboard = dashboard?.user.type === "CNPJ";
   const hasSlots =
     dashboard && typeof dashboard.stats.available_limit === "number" && dashboard.stats.available_limit > 0;
 
-  const showLojistaPlanUi = wantsLojista && isCnpjSession && (isCnpjDashboard || dashboard === null);
-  const showLojistaFree = wantsLojista && isCnpjSession && isCnpjDashboard && hasSlots;
-  const showLojistaNoSlots = wantsLojista && isCnpjSession && isCnpjDashboard && !hasSlots;
-  const showPfOrParticularPayment = !wantsLojista || sessionAccountType !== "CNPJ";
-  const showLojistaMismatch = wantsLojista && sessionAccountType === "CPF";
+  const showLojistaPlanUi = isLojistaAccount && (isCnpjDashboard || dashboard === null);
+  const showLojistaFree = isLojistaAccount && isCnpjDashboard && hasSlots;
+  const showLojistaNoSlots = isLojistaAccount && isCnpjDashboard && !hasSlots;
+  const showPfOrParticularPayment = sessionAccountType !== "CNPJ";
 
   return (
     <div className="space-y-8">
@@ -634,14 +633,6 @@ export function StepFinalize({
       {dashboardError ? (
         <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           {dashboardError}
-        </div>
-      ) : null}
-
-      {showLojistaMismatch ? (
-        <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-6 text-sm leading-7 text-amber-950">
-          Você selecionou <span className="font-bold">Lojista</span>, mas sua conta é de{" "}
-          <span className="font-bold">pessoa física</span>. Para anunciar como loja, use uma conta com CNPJ ou volte e
-          escolha <span className="font-bold">Particular</span> no topo do formulário.
         </div>
       ) : null}
 
@@ -697,30 +688,9 @@ export function StepFinalize({
         />
       </label>
 
+      <FinalizeLocationFields state={state} patch={patch} />
+
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="block">
-          <span className={labelClass}>
-            Cidade <span className="text-red-500">*</span>
-          </span>
-          <input
-            className={selectClass}
-            value={state.city}
-            onChange={(e) => patch({ city: e.target.value })}
-            placeholder="São Paulo"
-          />
-        </label>
-        <label className="block">
-          <span className={labelClass}>
-            Estado <span className="text-red-500">*</span>
-          </span>
-          <input
-            className={selectClass}
-            value={state.state}
-            onChange={(e) => patch({ state: e.target.value.toUpperCase().slice(0, 2) })}
-            placeholder="SP"
-            maxLength={2}
-          />
-        </label>
         <label className="block">
           <span className={labelClass}>WhatsApp</span>
           <input

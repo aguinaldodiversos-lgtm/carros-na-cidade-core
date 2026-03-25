@@ -2,10 +2,12 @@
  * Mapeia o wizard de anúncio para o payload esperado pelo backend
  * (`validateCreateAdPayload` em `src/modules/ads/ads.validators.js`).
  */
+import type { AccountType } from "@/lib/dashboard-types";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 
 export type WizardNormalizedFields = {
-  sellerType: string;
+  /** id enviado pelo wizard quando o usuário escolhe uma cidade na lista */
+  cityId: string;
   brand: string;
   model: string;
   version: string;
@@ -70,6 +72,13 @@ export function parseYear(value: string): number {
   return n;
 }
 
+export type ResolvedCityRow = {
+  id: number;
+  name: string;
+  state: string;
+  slug?: string;
+};
+
 export type BackendCreateAdPayload = {
   title: string;
   description?: string | null;
@@ -96,7 +105,8 @@ function buildDefaultTitle(n: WizardNormalizedFields): string {
 
 export function buildBackendCreateAdPayload(
   n: WizardNormalizedFields,
-  cityId: number
+  resolved: ResolvedCityRow,
+  accountType: AccountType
 ): BackendCreateAdPayload {
   const price = parsePriceBr(n.price);
   const mileage = parseMileageInt(n.mileage);
@@ -107,8 +117,11 @@ export function buildBackendCreateAdPayload(
   const fipe = parsePriceBr(n.fipeValue);
   const belowFipe = fipe > 0 && price > 0 && price < fipe;
 
-  const state = n.state.trim().toUpperCase().slice(0, 2);
-  const city = n.city.trim();
+  const state = String(resolved.state ?? "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 2);
+  const city = String(resolved.name ?? "").trim();
 
   const description = n.description?.trim() || null;
 
@@ -116,14 +129,14 @@ export function buildBackendCreateAdPayload(
     title,
     description,
     price,
-    city_id: cityId,
+    city_id: resolved.id,
     city,
     state,
     brand: n.brand.trim(),
     model: n.model.trim(),
     year,
     mileage,
-    category: n.sellerType === "lojista" ? "lojista" : "particular",
+    category: accountType === "CNPJ" ? "lojista" : "particular",
     body_type: n.bodyStyle?.trim() || null,
     fuel_type: n.fuel?.trim() || null,
     transmission: n.transmission?.trim() || null,
@@ -131,15 +144,80 @@ export function buildBackendCreateAdPayload(
   };
 }
 
+function parseResolvedCityPayload(json: unknown): ResolvedCityRow | null {
+  if (!json || typeof json !== "object") return null;
+  const o = json as Record<string, unknown>;
+  const data = o.data;
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const idRaw = d.id;
+  const id =
+    typeof idRaw === "number"
+      ? idRaw
+      : typeof idRaw === "string"
+        ? parseInt(idRaw, 10)
+        : NaN;
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const name = typeof d.name === "string" ? d.name.trim() : "";
+  const state = typeof d.state === "string" ? d.state.trim() : "";
+  if (!name || !state) return null;
+  return {
+    id,
+    name,
+    state,
+    slug: typeof d.slug === "string" ? d.slug : undefined,
+  };
+}
+
+/** Resolve cidade por id (validação quando o wizard envia city_id). */
+export async function fetchResolvedCityByIdFromBackend(cityId: number): Promise<ResolvedCityRow | null> {
+  const url = resolveBackendApiUrl(`/api/public/cities/by-id/${encodeURIComponent(String(cityId))}`);
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return parseResolvedCityPayload(json);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Resolve `city_id` via página pública da cidade (mesmo slug usado em /cidade/[slug]).
+ * Resolve cidade na base (endpoint dedicado + fallback por slug da página pública).
  */
-export async function resolveCityIdFromBackend(city: string, state: string): Promise<number | null> {
-  const uf = state.trim().toLowerCase();
-  const slugCity = slugifyForCity(city);
+export async function resolveCityFromBackend(city: string, state: string): Promise<ResolvedCityRow | null> {
+  const uf = state.trim().toUpperCase().slice(0, 2);
+  const q = city.trim();
+  if (!q || uf.length !== 2) return null;
+
+  const primary = resolveBackendApiUrl(
+    `/api/public/cities/resolve?${new URLSearchParams({ q, uf }).toString()}`
+  );
+  if (primary) {
+    try {
+      const res = await fetch(primary, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const parsed = parseResolvedCityPayload(json);
+        if (parsed) return parsed;
+      }
+    } catch {
+      // fallback abaixo
+    }
+  }
+
+  const ufLower = uf.toLowerCase();
+  const slugCity = slugifyForCity(q);
   const candidates = [
-    `${slugCity}-${uf}`,
-    slugifyForCity(`${city} ${state}`),
+    `${slugCity}-${ufLower}`,
+    slugifyForCity(`${q} ${uf}`),
     slugCity,
   ].filter((s, i, arr) => s && arr.indexOf(s) === i);
 
@@ -153,16 +231,19 @@ export async function resolveCityIdFromBackend(city: string, state: string): Pro
       });
       if (!res.ok) continue;
       const json = (await res.json()) as {
-        data?: { city?: { id?: number | string } };
+        data?: { city?: { id?: number | string; name?: string; state?: string } };
       };
-      const raw = json?.data?.city?.id;
-      if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-      if (typeof raw === "string") {
-        const n = parseInt(raw, 10);
-        if (Number.isFinite(n)) return n;
-      }
+      const c = json?.data?.city;
+      if (!c?.id) continue;
+      const id =
+        typeof c.id === "number" ? c.id : typeof c.id === "string" ? parseInt(c.id, 10) : NaN;
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const name = typeof c.name === "string" ? c.name.trim() : "";
+      const st = typeof c.state === "string" ? c.state.trim() : "";
+      if (!name || !st) continue;
+      return { id, name, state: st };
     } catch {
-      // tenta próximo slug
+      // próximo slug
     }
   }
 

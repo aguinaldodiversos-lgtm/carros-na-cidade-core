@@ -1,0 +1,32 @@
+/** UFs para seleção consistente (evita texto solto na UF). */
+export const BR_UF_VALUES = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+] as const;
+
+export type BrazilUf = (typeof BR_UF_VALUES)[number];

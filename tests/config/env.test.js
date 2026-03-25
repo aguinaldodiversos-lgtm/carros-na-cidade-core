@@ -19,10 +19,10 @@ describe("getDbSslConfig", () => {
     expect(getDbSslConfig()).toBe(false);
   });
 
-  it("retorna rejectUnauthorized true em production por padrão", async () => {
+  it("retorna rejectUnauthorized false em production por padrão (compatível com certs gerenciados)", async () => {
     process.env.NODE_ENV = "production";
     process.env.DATABASE_URL = "postgresql://localhost/test";
     const { getDbSslConfig } = await import("../../src/config/env.js");
-    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: true });
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
   });
 });

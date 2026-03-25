@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import type { AccountType } from "@/lib/dashboard-types";
 import {
   buildBackendCreateAdPayload,
   extractBackendErrorMessage,
+  fetchResolvedCityByIdFromBackend,
+  resolveCityFromBackend,
   type WizardNormalizedFields,
-  resolveCityIdFromBackend,
 } from "@/lib/painel/create-ad-backend";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import {
@@ -31,7 +33,7 @@ function buildNormalizedPayload(source: FormData): WizardNormalizedFields {
     .filter((item): item is File => item instanceof File && item.size > 0);
 
   return {
-    sellerType: firstText(source, "sellerType") || "particular",
+    cityId: firstText(source, "cityId"),
     brand: firstText(source, "brand"),
     model: firstText(source, "model"),
     version: firstText(source, "version"),
@@ -104,8 +106,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cityId = await resolveCityIdFromBackend(normalized.city, normalized.state);
-    if (!cityId) {
+    const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
+
+    const parsedCityId = normalized.cityId ? parseInt(normalized.cityId, 10) : NaN;
+    let resolved =
+      Number.isFinite(parsedCityId) && parsedCityId > 0
+        ? await fetchResolvedCityByIdFromBackend(parsedCityId)
+        : null;
+
+    if (!resolved) {
+      resolved = await resolveCityFromBackend(normalized.city, normalized.state);
+    }
+
+    if (!resolved) {
       return NextResponse.json(
         {
           ok: false,
@@ -116,7 +129,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = buildBackendCreateAdPayload(normalized, cityId);
+    const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);
+    const ufResolved = String(resolved.state).trim().toUpperCase().slice(0, 2);
+    if (ufForm && ufResolved && ufForm !== ufResolved) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "A UF informada não corresponde à cidade selecionada.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = buildBackendCreateAdPayload(normalized, resolved, accountType);
     const url = resolveBackendApiUrl("/api/ads");
     if (!url) {
       return NextResponse.json(

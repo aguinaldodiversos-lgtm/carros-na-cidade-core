@@ -43,6 +43,7 @@ const INITIAL_FORM: WizardFormState = {
   mileage: "",
   price: "",
   description: "",
+  cityId: null,
   city: "São Paulo",
   state: "SP",
   plateFinal: "",
@@ -118,8 +119,12 @@ export default function NewAdWizardClient({ initialType }: Props) {
   }, []);
 
   useEffect(() => {
-    setForm((prev) => ({ ...prev, sellerType: initialType }));
-  }, [initialType]);
+    if (sessionAccountType === "CNPJ") {
+      setForm((prev) => ({ ...prev, sellerType: "lojista" }));
+    } else if (sessionAccountType === "CPF") {
+      setForm((prev) => ({ ...prev, sellerType: "particular" }));
+    }
+  }, [sessionAccountType]);
 
   useEffect(() => {
     try {
@@ -135,6 +140,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
       setForm({
         ...INITIAL_FORM,
         ...parsed,
+        cityId: typeof parsed.cityId === "number" ? parsed.cityId : null,
         sellerType:
           tipo === "lojista" ? "lojista" : parsed.sellerType === "lojista" ? "lojista" : initialType,
         step: urlStep,
@@ -146,13 +152,19 @@ export default function NewAdWizardClient({ initialType }: Props) {
   }, [initialType]);
 
   const syncUrl = useCallback(
-    (nextStep: number, seller: SellerType) => {
+    (nextStep: number) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("tipo", seller);
+      const tipo =
+        sessionAccountType === "CNPJ"
+          ? "lojista"
+          : sessionAccountType === "CPF"
+            ? "particular"
+            : form.sellerType;
+      params.set("tipo", tipo);
       params.set("step", String(nextStep + 1));
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams, sessionAccountType, form.sellerType]
   );
 
   useEffect(() => {
@@ -226,11 +238,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   const title = useMemo(() => buildTitle(form), [form]);
 
-  function changeSellerType(type: SellerType) {
-    patch({ sellerType: type });
-    syncUrl(form.step, type);
-  }
-
   function handlePhotoFiles(next: File[]) {
     previews.forEach((u) => URL.revokeObjectURL(u));
     const urls = next.map((f) => URL.createObjectURL(f));
@@ -276,7 +283,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
     if (step < STEP_COUNT - 1) {
       const next = step + 1;
       patch({ step: next });
-      syncUrl(next, form.sellerType);
+      syncUrl(next);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
@@ -287,7 +294,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
     if (step > 0) {
       const next = step - 1;
       patch({ step: next });
-      syncUrl(next, form.sellerType);
+      syncUrl(next);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
@@ -306,7 +313,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
     try {
       const payload = new FormData();
-      payload.append("sellerType", form.sellerType);
       payload.append("brand", form.brandLabel);
       payload.append("model", form.modelLabel);
       payload.append("version", form.versionLabel);
@@ -317,6 +323,9 @@ export default function NewAdWizardClient({ initialType }: Props) {
       payload.append("fipeValue", form.fipeValue);
       payload.append("city", form.city);
       payload.append("state", form.state);
+      if (form.cityId != null) {
+        payload.append("cityId", String(form.cityId));
+      }
       payload.append("fuel", form.fuel);
       payload.append("transmission", form.transmission);
       payload.append("bodyStyle", form.bodyStyle);
@@ -424,37 +433,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
     </nav>
   );
 
-  const profileSlot = (
-    <div className="mb-8 rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
-      <div className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F67F6]">Perfil do anúncio</div>
-      <p className="mt-1 text-sm text-[#6E748A]">O mesmo fluxo para particular e lojista; a cobrança difere na etapa final.</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => changeSellerType("particular")}
-          className={`rounded-[22px] border p-4 text-left text-sm font-semibold transition ${
-            form.sellerType === "particular"
-              ? "border-[#2F67F6] bg-[#EEF4FF] text-[#1D2440]"
-              : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
-          }`}
-        >
-          Particular
-        </button>
-        <button
-          type="button"
-          onClick={() => changeSellerType("lojista")}
-          className={`rounded-[22px] border p-4 text-left text-sm font-semibold transition ${
-            form.sellerType === "lojista"
-              ? "border-[#2F67F6] bg-[#EEF4FF] text-[#1D2440]"
-              : "border-[#E5E9F2] bg-[#FBFCFF] text-[#5C647C]"
-          }`}
-        >
-          Lojista
-        </button>
-      </div>
-    </div>
-  );
-
   const messageSlot =
     submitMessage ? (
       <div
@@ -506,7 +484,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
     <SellWizardLayout
       currentStep={step}
       breadcrumb={breadcrumb}
-      profileSlot={profileSlot}
       title={stepTitle}
       subtitle={stepSubtitle[step]}
       messageSlot={messageSlot}

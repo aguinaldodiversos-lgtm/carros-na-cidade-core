@@ -21,6 +21,8 @@ export type WizardFormState = {
   mileage: string;
   price: string;
   description: string;
+  /** Quando preenchido, a publicação valida por id na base */
+  cityId: number | null;
   city: string;
   state: string;
   plateFinal: string;
