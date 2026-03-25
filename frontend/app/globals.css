@@ -118,6 +118,10 @@ b {
 }
 
 @layer base {
+  html {
+    @apply font-sans;
+  }
+
   h1,
   h2,
   h3,
@@ -168,6 +172,58 @@ b {
     @apply py-8 md:py-10 xl:py-12;
   }
 
+  .cnc-display {
+    @apply text-4xl md:text-5xl font-bold tracking-tighter text-[var(--cnc-text-strong)];
+    line-height: 1.05;
+  }
+
+  .cnc-h1 {
+    @apply text-3xl md:text-4xl font-bold tracking-tighter text-[var(--cnc-text-strong)];
+    line-height: 1.1;
+  }
+
+  .cnc-h2 {
+    @apply text-2xl md:text-3xl font-bold tracking-tight text-[var(--cnc-text-strong)];
+    line-height: 1.15;
+  }
+
+  .cnc-h3 {
+    @apply text-xl md:text-2xl font-semibold tracking-tight text-[var(--cnc-text-strong)];
+    line-height: 1.2;
+  }
+
+  .cnc-body-lg {
+    @apply text-lg font-normal text-[var(--cnc-muted)];
+    line-height: 1.8;
+    letter-spacing: -0.01em;
+  }
+
+  .cnc-body {
+    @apply text-base font-normal text-[var(--cnc-muted)];
+    line-height: 1.75;
+    letter-spacing: -0.01em;
+  }
+
+  .cnc-label {
+    @apply mb-2 block text-sm font-semibold text-[var(--cnc-text-strong)];
+    letter-spacing: -0.01em;
+  }
+
+  .cnc-helper {
+    @apply mt-2 text-sm text-[var(--cnc-muted)];
+  }
+
+  .cnc-meta {
+    @apply text-xs font-semibold uppercase text-[var(--cnc-muted-soft)];
+    letter-spacing: 0.02em;
+  }
+
+  .cnc-price {
+    @apply text-2xl font-bold text-[var(--cnc-text-strong)];
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+
   .cnc-input {
     @apply h-12 w-full rounded-xl border bg-white px-4 text-[16px] font-medium text-[#20283b] outline-none transition placeholder:text-[#8a93a8];
     border-color: var(--cnc-line);
@@ -197,17 +253,6 @@ b {
       6px 6px,
       6px 6px;
     background-repeat: no-repeat;
-  }
-
-  .cnc-label {
-    @apply mb-2 block text-sm font-semibold;
-    color: var(--cnc-text-strong);
-    letter-spacing: -0.01em;
-  }
-
-  .cnc-helper {
-    @apply mt-2 text-sm;
-    color: var(--cnc-muted);
   }
 
   .cnc-btn-primary {
@@ -256,15 +301,13 @@ b {
   }
 
   .cnc-title {
-    @apply font-bold;
-    color: var(--cnc-text-strong);
+    @apply font-bold text-[var(--cnc-text-strong)];
     letter-spacing: -0.035em;
     line-height: 1.08;
   }
 
   .cnc-subtitle {
-    @apply text-base md:text-lg;
-    color: var(--cnc-muted);
+    @apply text-base md:text-lg text-[var(--cnc-muted)];
     line-height: 1.75;
     letter-spacing: -0.01em;
   }
