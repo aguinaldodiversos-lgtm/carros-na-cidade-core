@@ -1,5 +1,10 @@
 import * as citiesRepository from "./cities.repository.js";
+import {
+  isIbgeAutoSeedEnabled,
+  upsertMunicipiosForUfFromIbge,
+} from "./ibge-municipios.service.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { logger } from "../../shared/logger.js";
 import { normalizeSearchText } from "../../shared/utils/normalizeSearchText.js";
 import { slugify } from "../../shared/utils/slugify.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
@@ -17,7 +22,22 @@ async function getCitiesRowsForUf(ufNorm) {
   if (cached && Date.now() - cached.loadedAt < UF_CITIES_CACHE_TTL_MS) {
     return cached.rows;
   }
-  const rows = await citiesRepository.findCitiesByStateVariants(ufNorm);
+
+  let rows = await citiesRepository.findCitiesByStateVariants(ufNorm);
+
+  if (rows.length === 0 && isIbgeAutoSeedEnabled()) {
+    try {
+      await upsertMunicipiosForUfFromIbge(ufNorm);
+      ufCitiesCache.delete(ufNorm);
+      rows = await citiesRepository.findCitiesByStateVariants(ufNorm);
+    } catch (err) {
+      logger.warn(
+        { err: err?.message || String(err), uf: ufNorm },
+        "[cities.service] IBGE auto-seed falhou (painel ainda pode usar dados já existentes)"
+      );
+    }
+  }
+
   ufCitiesCache.set(ufNorm, { rows, loadedAt: Date.now() });
   return rows;
 }
@@ -111,7 +131,15 @@ export async function getCityById(id) {
 }
 
 export async function getTopCitiesByDemand(limit = 20) {
-  return citiesRepository.listTopCitiesByDemand(limit);
+  try {
+    return await citiesRepository.listTopCitiesByDemand(limit);
+  } catch (err) {
+    logger.warn(
+      { err: err?.message || String(err) },
+      "[cities.service] getTopCitiesByDemand: retornando vazio"
+    );
+    return [];
+  }
 }
 
 export async function getCityBySlug(slug) {

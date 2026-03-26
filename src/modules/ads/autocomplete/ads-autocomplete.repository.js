@@ -1,6 +1,7 @@
 // src/modules/ads/autocomplete/ads-autocomplete.repository.js
 
 import { pool } from "../../../infrastructure/database/db.js";
+import { logger } from "../../../shared/logger.js";
 
 /* =====================================================
    DICTIONARIES
@@ -53,27 +54,50 @@ export async function loadModelDictionary(limit = 2500) {
 export async function loadCityDictionary(limit = 4000) {
   const safeLimit = Math.min(10000, Math.max(100, Number(limit) || 4000));
 
-  const result = await pool.query(
-    `
-    SELECT
-      c.id,
-      c.name,
-      c.slug,
-      c.state,
-      COALESCE(cs.ranking_priority, 0) AS ranking_priority,
-      COALESCE(cs.territorial_score, 0) AS territorial_score
-    FROM cities c
-    LEFT JOIN city_scores cs ON cs.city_id = c.id
-    ORDER BY
-      COALESCE(cs.ranking_priority, 0) DESC,
-      COALESCE(cs.territorial_score, 0) DESC,
-      c.name ASC
-    LIMIT $1
-    `,
-    [safeLimit]
-  );
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.name,
+        c.slug,
+        c.state,
+        COALESCE(cs.ranking_priority, 0) AS ranking_priority,
+        COALESCE(cs.territorial_score, 0) AS territorial_score
+      FROM cities c
+      LEFT JOIN city_scores cs ON cs.city_id = c.id
+      ORDER BY
+        COALESCE(cs.ranking_priority, 0) DESC,
+        COALESCE(cs.territorial_score, 0) DESC,
+        c.name ASC
+      LIMIT $1
+      `,
+      [safeLimit]
+    );
 
-  return result.rows;
+    return result.rows;
+  } catch (err) {
+    logger.warn(
+      { err: err?.message || String(err) },
+      "[ads-autocomplete] loadCityDictionary: fallback sem city_scores"
+    );
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.name,
+        c.slug,
+        c.state,
+        0::int AS ranking_priority,
+        0::int AS territorial_score
+      FROM cities c
+      ORDER BY c.name ASC
+      LIMIT $1
+      `,
+      [safeLimit]
+    );
+    return result.rows;
+  }
 }
 
 export async function loadCityBrandPresence(limit = 5000) {

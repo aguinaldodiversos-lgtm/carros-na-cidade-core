@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("../../src/shared/db/table-columns.js", () => ({
+  getTableColumnSet: vi.fn(async (table) => {
+    const t = String(table).toLowerCase();
+    if (t === "city_scores") return new Set(["ranking_priority", "territorial_score"]);
+    if (t === "cities") return new Set(["id", "name", "slug", "state"]);
+    return new Set();
+  }),
+  tableHasColumn: (set, name) => set.has(name),
+}));
+
 vi.mock("../../src/infrastructure/database/db.js", () => ({
   pool: {
     query: vi.fn(),
@@ -31,8 +41,11 @@ describe("findCitiesByStateVariants (tabela cities)", () => {
 
     const rows = await findCitiesByStateVariants("SP");
 
-    expect(pool.query).toHaveBeenCalledTimes(1);
-    const [sql, params] = vi.mocked(pool.query).mock.calls[0];
+    const cityCall = vi.mocked(pool.query).mock.calls.find(([sql]) =>
+      String(sql).includes("FROM cities")
+    );
+    expect(cityCall).toBeDefined();
+    const [sql, params] = cityCall;
     expect(sql).toMatch(/FROM\s+cities\s+c/i);
     expect(sql).toMatch(/=\s*ANY\(\$1::text\[\]\)/);
     expect(sql).toMatch(/c\.slug\s+~\*/);

@@ -10,6 +10,7 @@
     "workers": "node src/workers/bootstrap.js",
     "lint": "eslint src --ext .js",
     "test": "vitest run",
+    "seed:cities": "node scripts/seed-ibge-municipios.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:prod": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs",

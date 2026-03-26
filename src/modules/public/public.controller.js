@@ -1,6 +1,16 @@
 import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
 import * as citiesService from "../cities/cities.service.js";
 import * as marketIntelligenceService from "../market-intelligence/market-intelligence.service.js";
+
+async function safeQuery(label, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    logger.warn({ err: err?.message || String(err), label }, "[public.controller] parte da home falhou");
+    return null;
+  }
+}
 
 export async function getHomeData(req, res, next) {
   try {
@@ -12,10 +22,13 @@ export async function getHomeData(req, res, next) {
       recentAdsResult,
       statsResult,
     ] = await Promise.all([
-      citiesService.getTopCitiesByDemand(8),
-      marketIntelligenceService.getTopOpportunities(8),
+      safeQuery("featuredCities", () => citiesService.getTopCitiesByDemand(8)).then((r) => r ?? []),
+      safeQuery("topOpportunities", () => marketIntelligenceService.getTopOpportunities(8)).then(
+        (r) => r ?? []
+      ),
 
-      pool.query(`
+      safeQuery("highlightAds", () =>
+        pool.query(`
         SELECT 
           a.id,
           a.title,
@@ -35,9 +48,11 @@ export async function getHomeData(req, res, next) {
           AND a.highlight_until > NOW()
         ORDER BY a.highlight_until DESC
         LIMIT 12
-      `),
+      `)
+      ),
 
-      pool.query(`
+      safeQuery("opportunityAds", () =>
+        pool.query(`
         SELECT 
           a.id,
           a.title,
@@ -55,9 +70,11 @@ export async function getHomeData(req, res, next) {
           AND a.below_fipe = true
         ORDER BY a.created_at DESC
         LIMIT 12
-      `),
+      `)
+      ),
 
-      pool.query(`
+      safeQuery("recentAds", () =>
+        pool.query(`
         SELECT 
           a.id,
           a.title,
@@ -74,15 +91,18 @@ export async function getHomeData(req, res, next) {
         WHERE a.status = 'active'
         ORDER BY a.created_at DESC
         LIMIT 12
-      `),
+      `)
+      ),
 
-      pool.query(`
+      safeQuery("stats", () =>
+        pool.query(`
         SELECT 
           (SELECT COUNT(*) FROM ads WHERE status = 'active') AS total_ads,
           (SELECT COUNT(*) FROM cities) AS total_cities,
           (SELECT COUNT(*) FROM advertisers) AS total_advertisers,
           (SELECT COUNT(*) FROM users) AS total_users
-      `),
+      `)
+      ),
     ]);
 
     res.json({
@@ -90,10 +110,15 @@ export async function getHomeData(req, res, next) {
       data: {
         featuredCities,
         topOpportunities,
-        highlightAds: highlightAdsResult.rows,
-        opportunityAds: opportunityAdsResult.rows,
-        recentAds: recentAdsResult.rows,
-        stats: statsResult.rows[0],
+        highlightAds: highlightAdsResult?.rows ?? [],
+        opportunityAds: opportunityAdsResult?.rows ?? [],
+        recentAds: recentAdsResult?.rows ?? [],
+        stats: statsResult?.rows?.[0] ?? {
+          total_ads: "0",
+          total_cities: "0",
+          total_advertisers: "0",
+          total_users: "0",
+        },
       },
     });
   } catch (err) {
