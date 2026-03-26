@@ -3,33 +3,23 @@
   "version": "2.1.0",
   "description": "Backend do portal Carros na Cidade - Arquitetura SaaS",
   "private": true,
-  "type": "module",
   "main": "src/index.js",
-  "engines": {
-    "node": ">=20 <21"
-  },
+  "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --env-file=.env src/index.js",
-    "dev:debug": "node --inspect --env-file=.env src/index.js",
-
+    "dev": "node src/index.js",
+    "dev:debug": "node --inspect src/index.js",
     "workers": "node src/workers/bootstrap.js",
     "workers:debug": "node --inspect src/workers/bootstrap.js",
-
     "lint": "eslint src scripts --ext .js,.mjs",
     "lint:fix": "eslint src scripts --ext .js,.mjs --fix",
-
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-
-    "smoke": "node scripts/smoke.mjs",
-    "smoke:local": "node scripts/smoke.mjs --env=local",
-    "smoke:prod": "node scripts/smoke.mjs --env=prod",
-
     "seed:cities": "node scripts/seed-ibge-municipios.mjs",
     "import:cities": "node scripts/import-ibge-cities.js",
-
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:prod": "node scripts/smoke.mjs",
+    "smoke:local": "node scripts/smoke.mjs",
     "audit:project": "node ./scripts/project-audit.mjs",
     "audit:project:strict": "node ./scripts/project-audit.mjs --strict",
     "audit:project:json": "node ./scripts/project-audit.mjs --json",
@@ -39,9 +29,11 @@
     "audit:env": "node ./scripts/project-audit.mjs --scope=env",
     "audit:integration": "node ./scripts/project-audit.mjs --scope=integration",
     "audit:jsx-ts": "node ./scripts/project-audit.mjs --scope=jsx-ts",
-
     "check": "npm run lint && npm run test",
     "verify": "npm run check && npm run audit:project"
+  },
+  "engines": {
+    "node": ">=20 <21"
   },
   "dependencies": {
     "axios": "^1.6.7",
