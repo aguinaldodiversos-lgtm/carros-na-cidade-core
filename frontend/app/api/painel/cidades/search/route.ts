@@ -37,5 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Resposta inválida do backend." }, { status: 502 });
   }
 
-  return NextResponse.json(data, { status: res.status });
+  const out = NextResponse.json(data, { status: res.status });
+  out.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return out;
 }

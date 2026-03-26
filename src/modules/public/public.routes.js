@@ -30,11 +30,8 @@ router.get(
   resolveCity
 );
 
-router.get(
-  "/cities/search",
-  cacheGet({ prefix: "public:city:search", ttlSeconds: 60, varyBy: ["query"] }),
-  searchCities
-);
+// Sem cache Redis: lista depende do cadastro em `cities` e cache vazio atrapalha o painel após deploy.
+router.get("/cities/search", searchCities);
 
 router.get(
   "/cities/by-id/:id",

@@ -53,8 +53,9 @@ export async function searchCitiesByUfAndPartialName(uf, query, limit = 20) {
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
   const rows = await getCitiesRowsForUf(ufNorm);
 
+  // findCitiesByStateVariants já restringe à UF (state + slug). Não filtrar de novo aqui:
+  // formatos de `state` no banco (ex.: código) ou slug não padrão removiam todas as linhas.
   const scored = rows
-    .filter((row) => rowBelongsToUf(row, ufNorm))
     .map((row) => {
       const nName = normalizeSearchText(row.name);
       const contains = nName.includes(qNorm);
@@ -99,7 +100,6 @@ export async function resolveCityByNameAndUf(name, uf) {
   const target = normalizeSearchText(rawName);
   const inUf = await getCitiesRowsForUf(ufNorm);
   for (const row of inUf) {
-    if (!rowBelongsToUf(row, ufNorm)) continue;
     if (normalizeSearchText(row.name) === target) return row;
   }
 

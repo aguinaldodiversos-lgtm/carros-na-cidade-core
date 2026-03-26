@@ -22,10 +22,12 @@ function normalizeCitySearchRows(raw: unknown): CityRow[] {
     const idRaw = o.id;
     const id =
       typeof idRaw === "number" && Number.isFinite(idRaw)
-        ? idRaw
+        ? Math.trunc(idRaw)
         : typeof idRaw === "string"
-          ? parseInt(idRaw, 10)
-          : NaN;
+          ? parseInt(String(idRaw).trim(), 10)
+          : typeof idRaw === "bigint"
+            ? Number(idRaw)
+            : NaN;
     if (!Number.isFinite(id) || id <= 0) continue;
     const name = typeof o.name === "string" ? o.name.trim() : "";
     if (!name) continue;

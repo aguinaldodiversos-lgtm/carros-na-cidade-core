@@ -42,7 +42,8 @@ export async function findCitiesByStateVariants(ufNorm) {
   if (code.length !== 2) return [];
 
   const variants = stateColumnValuesForUf(code).map((v) => String(v).trim().toUpperCase());
-  const slugPattern = `-${code.toLowerCase()}$`;
+  const suf = code.toLowerCase();
+  const slugPattern = `[-_]${suf}$`;
 
   const result = await pool.query(
     `

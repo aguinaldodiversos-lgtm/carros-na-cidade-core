@@ -36,7 +36,7 @@ describe("findCitiesByStateVariants (tabela cities)", () => {
     expect(sql).toMatch(/FROM\s+cities\s+c/i);
     expect(sql).toMatch(/=\s*ANY\(\$1::text\[\]\)/);
     expect(sql).toMatch(/c\.slug\s+~\*/);
-    expect(params[1]).toBe("-sp$");
+    expect(params[1]).toBe("[-_]sp$");
     expect(Array.isArray(params[0])).toBe(true);
     expect(params[0]).toContain("SP");
     expect(rows[0].name).toBe("Campinas");
