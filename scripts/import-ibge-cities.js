@@ -1,44 +1,84 @@
+import "dotenv/config";
 import pg from "pg";
 
 const { Pool } = pg;
 
 const IBGE_BASE_URL = "https://servicodados.ibge.gov.br/api/v1/localidades";
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
-});
+const REQUEST_TIMEOUT_MS = 30000;
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    throw new Error(`Variável de ambiente obrigatória ausente: ${name}`);
+  }
+  return value.trim();
+}
+
+function createPool() {
+  const connectionString = requiredEnv("DATABASE_URL");
+
+  return new Pool({
+    connectionString,
+    ssl:
+      process.env.NODE_ENV === "production"
+        ? { rejectUnauthorized: false }
+        : false,
+    max: 5,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000,
+  });
+}
 
 function normalizeText(value = "") {
-  return value
+  return String(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/'/g, "")
-    .replace(/`/g, "")
+    .replace(/['`´^~]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 
 function slugifyCity(name, state) {
-  return `${normalizeText(name).replace(/\s+/g, "-")}-${state.toLowerCase()}`;
+  const base = normalizeText(name)
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return `${base}-${String(state).toLowerCase()}`;
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`IBGE request failed (${response.status}) for ${url}: ${text}`);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Falha ao consultar IBGE (${response.status}) em ${url}: ${text}`
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Timeout ao consultar IBGE: ${url}`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return response.json();
 }
 
 async function fetchStates() {
@@ -51,8 +91,74 @@ async function fetchCitiesByUf(uf) {
   );
 }
 
+async function ensureCitiesTable(client) {
+  await client.query(`
+    CREATE EXTENSION IF NOT EXISTS unaccent;
+  `);
+
+  await client.query(`
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS cities (
+      id BIGSERIAL PRIMARY KEY,
+      ibge_code BIGINT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      state CHAR(2) NOT NULL,
+      state_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_cities_state
+      ON cities (state);
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_cities_state_name
+      ON cities (state, name);
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_cities_normalized_name
+      ON cities (normalized_name);
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_cities_normalized_name_trgm
+      ON cities
+      USING gin (normalized_name gin_trgm_ops);
+  `);
+
+  await client.query(`
+    CREATE OR REPLACE FUNCTION set_updated_at()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = NOW();
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await client.query(`
+    DROP TRIGGER IF EXISTS trg_cities_updated_at ON cities;
+  `);
+
+  await client.query(`
+    CREATE TRIGGER trg_cities_updated_at
+    BEFORE UPDATE ON cities
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+  `);
+}
+
 async function upsertCity(client, city) {
-  const query = `
+  const sql = `
     INSERT INTO cities (
       ibge_code,
       name,
@@ -81,39 +187,56 @@ async function upsertCity(client, city) {
     city.state_name,
   ];
 
-  await client.query(query, values);
+  await client.query(sql, values);
 }
 
-async function run() {
+async function importCities() {
+  const pool = createPool();
   const client = await pool.connect();
 
-  try {
-    console.log("[IBGE] Iniciando importação de cidades...");
-    const states = await fetchStates();
+  let totalStates = 0;
+  let totalCitiesProcessed = 0;
 
-    console.log(`[IBGE] ${states.length} estados encontrados.`);
+  try {
+    console.log("[cities:import] Iniciando sincronização com IBGE...");
+
+    await ensureCitiesTable(client);
+
+    const states = await fetchStates();
+    totalStates = Array.isArray(states) ? states.length : 0;
+
+    if (!totalStates) {
+      throw new Error("Nenhum estado foi retornado pela API do IBGE.");
+    }
+
+    console.log(`[cities:import] ${totalStates} estados encontrados.`);
 
     await client.query("BEGIN");
-
-    let totalImported = 0;
 
     for (const state of states) {
       const uf = String(state.sigla || "").trim().toUpperCase();
       const stateName = String(state.nome || "").trim();
 
-      if (!uf || !stateName) {
-        console.warn("[IBGE] Estado inválido ignorado:", state);
+      if (!uf || uf.length !== 2 || !stateName) {
+        console.warn("[cities:import] Estado inválido ignorado:", state);
         continue;
       }
 
-      console.log(`[IBGE] Buscando municípios de ${uf}...`);
+      console.log(`[cities:import] Buscando municípios de ${uf}...`);
+
       const cities = await fetchCitiesByUf(uf);
+
+      if (!Array.isArray(cities)) {
+        console.warn(`[cities:import] Resposta inesperada para UF ${uf}.`);
+        continue;
+      }
 
       for (const city of cities) {
         const cityName = String(city.nome || "").trim();
         const ibgeCode = Number(city.id);
 
-        if (!cityName || !ibgeCode) {
+        if (!cityName || !Number.isFinite(ibgeCode) || ibgeCode <= 0) {
+          console.warn("[cities:import] Cidade inválida ignorada:", city);
           continue;
         }
 
@@ -126,17 +249,26 @@ async function run() {
           state_name: stateName,
         });
 
-        totalImported += 1;
+        totalCitiesProcessed += 1;
       }
 
-      console.log(`[IBGE] ${uf}: ${cities.length} municípios processados.`);
+      console.log(
+        `[cities:import] ${uf}: ${cities.length} municípios processados.`
+      );
     }
 
     await client.query("COMMIT");
-    console.log(`[IBGE] Importação concluída com sucesso. Total processado: ${totalImported}`);
+
+    const countResult = await client.query(`SELECT COUNT(*)::int AS total FROM cities`);
+    const totalInDatabase = countResult.rows?.[0]?.total ?? 0;
+
+    console.log(
+      `[cities:import] Importação concluída com sucesso. Estados: ${totalStates}. Registros processados: ${totalCitiesProcessed}. Total atual na tabela cities: ${totalInDatabase}.`
+    );
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("[IBGE] Falha na importação:", error);
+
+    console.error("[cities:import] Falha na importação:", error);
     process.exitCode = 1;
   } finally {
     client.release();
@@ -144,4 +276,4 @@ async function run() {
   }
 }
 
-run();
+importCities();
