@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Diagnóstico: quantas cidades existem no dicionário oficial e amostras de busca (UF + trecho).
+ * Diagnóstico: contagem por UF na tabela `cities` e amostras de busca (UF + trecho).
  * Uso: node scripts/diagnostic-cities-panel.mjs
- * Requer: DATABASE_URL no .env (para contagem via loadCityDictionary / service).
+ * Requer: DATABASE_URL no .env (busca por UF usa a tabela `cities` via findCitiesByStateVariants).
  * Opcional: BASE_URL=http://localhost:4000 para testar HTTP /api/public/cities/search
  */
 /* eslint-disable no-console */
@@ -19,16 +19,16 @@ async function httpSearch(q, uf) {
 }
 
 async function main() {
-  console.log("=== Cidades (dicionário oficial + cities.service) ===\n");
+  console.log("=== Cidades (tabela cities + cities.service) ===\n");
 
   try {
-    const { loadCityDictionary } = await import(
-      "../src/modules/ads/autocomplete/ads-autocomplete.repository.js"
+    const { findCitiesByStateVariants } = await import(
+      "../src/modules/cities/cities.repository.js"
     );
     const { searchCitiesByUfAndPartialName } = await import("../src/modules/cities/cities.service.js");
 
-    const all = await loadCityDictionary(10000);
-    console.log(`Registros retornados por loadCityDictionary(10000): ${all.length}`);
+    const spRows = await findCitiesByStateVariants("SP");
+    console.log(`Cidades na tabela (filtro UF=SP, state+slug): ${spRows.length}`);
 
     const samples = [
       ["SP", "camp"],

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../src/modules/ads/autocomplete/ads-autocomplete.repository.js", () => ({
-  loadCityDictionary: vi.fn(),
+vi.mock("../../src/modules/cities/cities.repository.js", () => ({
+  findCitiesByStateVariants: vi.fn(),
 }));
 
-import { loadCityDictionary } from "../../src/modules/ads/autocomplete/ads-autocomplete.repository.js";
+import * as citiesRepository from "../../src/modules/cities/cities.repository.js";
 import { searchCitiesByUfAndPartialName } from "../../src/modules/cities/cities.service.js";
 
 /** Mesma forma de linhas que loadCityDictionary retorna do banco */
@@ -15,9 +15,9 @@ const MOCK_CITIES = [
   { id: 201, name: "Curitiba", slug: "curitiba-pr", state: "PR", ranking_priority: 0, territorial_score: 0 },
 ];
 
-describe("searchCitiesByUfAndPartialName (fonte = loadCityDictionary oficial)", () => {
+describe("searchCitiesByUfAndPartialName (tabela cities por UF)", () => {
   beforeEach(() => {
-    vi.mocked(loadCityDictionary).mockResolvedValue(MOCK_CITIES);
+    vi.mocked(citiesRepository.findCitiesByStateVariants).mockResolvedValue(MOCK_CITIES);
   });
 
   it("UF=SP + trecho camp → encontra Campinas", async () => {

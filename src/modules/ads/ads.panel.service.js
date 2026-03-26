@@ -10,9 +10,9 @@ function assertOwner(ownerContext, userId) {
 
   const owners = [ownerContext.user_id, ownerContext.advertiser_user_id]
     .filter(Boolean)
-    .map(Number);
+    .map((value) => String(value));
 
-  if (!owners.includes(Number(userId))) {
+  if (!owners.includes(String(userId))) {
     throw new AppError("Sem permissão para alterar este anúncio", 403);
   }
 }

@@ -250,19 +250,6 @@ function quoteIdentifier(identifier) {
   return `"${identifier}"`;
 }
 
-async function resolveAdsOwnerColumn() {
-  const columns = await getTableColumns("ads");
-  const candidates = ["user_id", "advertiser_user_id", "owner_user_id"];
-
-  for (const candidate of candidates) {
-    if (hasColumn(columns, candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
 async function resolveSubscriptionUserColumn() {
   const columns = await getTableColumns("user_subscriptions");
   const candidates = ["user_id", "account_user_id", "subscriber_user_id"];
@@ -425,16 +412,14 @@ async function hasSubscriptionHistory(userId) {
 }
 
 async function countActiveAdsByUser(userId) {
-  const ownerColumn = await resolveAdsOwnerColumn();
-  if (!ownerColumn) return 0;
-
   try {
     const result = await pool.query(
       `
       SELECT COUNT(*)::int AS total
-      FROM ads
-      WHERE ${quoteIdentifier(ownerColumn)} = $1
-        AND status = 'active'
+      FROM ads a
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE a.status = 'active'
+        AND (a.user_id = $1 OR adv.user_id = $1)
       `,
       [userId]
     );
@@ -557,28 +542,26 @@ function normalizeDashboardAd(row) {
 }
 
 export async function listOwnedAds(userId) {
-  const ownerColumn = await resolveAdsOwnerColumn();
-  if (!ownerColumn) return [];
-
   try {
     const result = await pool.query(
       `
       SELECT
-        id,
-        ${quoteIdentifier(ownerColumn)} AS owner_user_id,
-        title,
-        price,
-        status,
-        highlight_until,
-        created_at,
-        updated_at
-      FROM ads
-      WHERE ${quoteIdentifier(ownerColumn)} = $1
-        AND status IN ('active', 'paused')
+        a.id,
+        a.user_id AS owner_user_id,
+        a.title,
+        a.price,
+        a.status,
+        a.highlight_until,
+        a.created_at,
+        a.updated_at
+      FROM ads a
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE a.status IN ('active', 'paused')
+        AND (a.user_id = $1 OR adv.user_id = $1)
       ORDER BY
-        CASE WHEN status = 'active' THEN 0 ELSE 1 END,
-        updated_at DESC NULLS LAST,
-        created_at DESC NULLS LAST
+        CASE WHEN a.status = 'active' THEN 0 ELSE 1 END,
+        a.updated_at DESC NULLS LAST,
+        a.created_at DESC NULLS LAST
       `,
       [userId]
     );
@@ -590,26 +573,22 @@ export async function listOwnedAds(userId) {
 }
 
 export async function getOwnedAd(userId, adId) {
-  const ownerColumn = await resolveAdsOwnerColumn();
-  if (!ownerColumn) {
-    throw new AppError("Anuncio nao encontrado", 404);
-  }
-
   const result = await pool.query(
     `
     SELECT
-      id,
-      ${quoteIdentifier(ownerColumn)} AS owner_user_id,
-      title,
-      price,
-      status,
-      highlight_until,
-      created_at,
-      updated_at
-    FROM ads
-    WHERE id = $1
-      AND ${quoteIdentifier(ownerColumn)} = $2
-      AND status != 'deleted'
+      a.id,
+      a.user_id AS owner_user_id,
+      a.title,
+      a.price,
+      a.status,
+      a.highlight_until,
+      a.created_at,
+      a.updated_at
+    FROM ads a
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    WHERE a.id = $1
+      AND a.status != 'deleted'
+      AND (a.user_id = $2 OR adv.user_id = $2)
     LIMIT 1
     `,
     [adId, userId]

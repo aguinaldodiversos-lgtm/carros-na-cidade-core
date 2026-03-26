@@ -30,4 +30,10 @@ describe("stateRowMatchesUf", () => {
   it("rejeita estado de outra UF", () => {
     expect(stateRowMatchesUf("RJ", "SP")).toBe(false);
   });
+
+  it("rejeita estado vazio (slug deve decidir em rowBelongsToUf)", () => {
+    expect(stateRowMatchesUf(null, "SP")).toBe(false);
+    expect(stateRowMatchesUf("", "SP")).toBe(false);
+    expect(stateRowMatchesUf("   ", "SP")).toBe(false);
+  });
 });

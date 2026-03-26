@@ -1,27 +1,24 @@
 import * as citiesRepository from "./cities.repository.js";
-import { loadCityDictionary } from "../ads/autocomplete/ads-autocomplete.repository.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { normalizeSearchText } from "../../shared/utils/normalizeSearchText.js";
 import { slugify } from "../../shared/utils/slugify.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 import { stateRowMatchesUf } from "./brazil-state-variants.js";
 
-/** Mesmo dicionário do autocomplete global; cache curto para não reler a cada tecla. */
-const OFFICIAL_CITIES_CACHE_TTL_MS = Number(
+/** Cidades por UF vindas da tabela `cities` (sem corte por ranking global). */
+const UF_CITIES_CACHE_TTL_MS = Number(
   process.env.CITIES_PANEL_DICTIONARY_CACHE_TTL_MS || 10 * 60 * 1000
 );
 
-let officialCitiesCache = { rows: null, loadedAt: 0 };
+const ufCitiesCache = new Map();
 
-async function getOfficialCityDictionaryRows() {
-  if (
-    officialCitiesCache.rows &&
-    Date.now() - officialCitiesCache.loadedAt < OFFICIAL_CITIES_CACHE_TTL_MS
-  ) {
-    return officialCitiesCache.rows;
+async function getCitiesRowsForUf(ufNorm) {
+  const cached = ufCitiesCache.get(ufNorm);
+  if (cached && Date.now() - cached.loadedAt < UF_CITIES_CACHE_TTL_MS) {
+    return cached.rows;
   }
-  const rows = await loadCityDictionary(10000);
-  officialCitiesCache = { rows, loadedAt: Date.now() };
+  const rows = await citiesRepository.findCitiesByStateVariants(ufNorm);
+  ufCitiesCache.set(ufNorm, { rows, loadedAt: Date.now() });
   return rows;
 }
 
@@ -43,7 +40,7 @@ function rowBelongsToUf(row, ufNorm) {
 }
 
 /**
- * Mesma origem de dados do autocomplete global (`/api/ads/autocomplete`): `loadCityDictionary`.
+ * Dados da tabela `cities` filtrados por UF (state + sufixo do slug), depois nome parcial em memória.
  */
 export async function searchCitiesByUfAndPartialName(uf, query, limit = 20) {
   const ufNorm = normalizeUfInput(uf);
@@ -54,7 +51,7 @@ export async function searchCitiesByUfAndPartialName(uf, query, limit = 20) {
   if (ufNorm.length !== 2 || qNorm.length < 2) return [];
 
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
-  const rows = await getOfficialCityDictionaryRows();
+  const rows = await getCitiesRowsForUf(ufNorm);
 
   const scored = rows
     .filter((row) => rowBelongsToUf(row, ufNorm))
@@ -100,8 +97,8 @@ export async function resolveCityByNameAndUf(name, uf) {
   }
 
   const target = normalizeSearchText(rawName);
-  const dict = await getOfficialCityDictionaryRows();
-  for (const row of dict) {
+  const inUf = await getCitiesRowsForUf(ufNorm);
+  for (const row of inUf) {
     if (!rowBelongsToUf(row, ufNorm)) continue;
     if (normalizeSearchText(row.name) === target) return row;
   }

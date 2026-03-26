@@ -53,7 +53,8 @@ export function stateRowMatchesUf(rowStateRaw, ufCode) {
     .replace(/[^A-Z]/g, "")
     .slice(0, 2);
   if (ufNorm.length !== 2) return false;
-  if (rowStateRaw == null || String(rowStateRaw).trim() === "") return true;
+  // Estado vazio não casa com qualquer UF (evita vazamento entre UFs; use slug em rowBelongsToUf).
+  if (rowStateRaw == null || String(rowStateRaw).trim() === "") return false;
   const row = String(rowStateRaw).trim().toUpperCase();
   if (row === ufNorm) return true;
   const variants = stateColumnValuesForUf(ufNorm);
