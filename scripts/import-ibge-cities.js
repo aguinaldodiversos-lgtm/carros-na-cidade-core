@@ -86,6 +86,13 @@ async function fetchCitiesByUf(uf) {
   );
 }
 
+/**
+ * Chave inequívoca: UF + nome normalizado (mesmo critério do IBGE por estado).
+ */
+function ibgeLookupKey(uf, officialName) {
+  return `${String(uf).trim().toUpperCase()}|${normalizeText(officialName)}`;
+}
+
 async function ensureCitiesTable(client) {
   await client.query(`CREATE EXTENSION IF NOT EXISTS unaccent;`);
   await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
@@ -106,6 +113,7 @@ async function ensureCitiesTable(client) {
 
   await client.query(`
     ALTER TABLE cities
+<<<<<<< HEAD
       ADD COLUMN IF NOT EXISTS ibge_code BIGINT;
   `);
 
@@ -132,17 +140,33 @@ async function ensureCitiesTable(client) {
   await client.query(`
     ALTER TABLE cities
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+=======
+      ADD COLUMN IF NOT EXISTS ibge_code BIGINT,
+      ADD COLUMN IF NOT EXISTS name TEXT,
+      ADD COLUMN IF NOT EXISTS normalized_name TEXT,
+      ADD COLUMN IF NOT EXISTS slug TEXT,
+      ADD COLUMN IF NOT EXISTS state CHAR(2),
+      ADD COLUMN IF NOT EXISTS state_name TEXT,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
   `);
 
   await client.query(`
     UPDATE cities
+<<<<<<< HEAD
     SET normalized_name = lower(trim(name))
     WHERE normalized_name IS NULL
       AND name IS NOT NULL;
+=======
+    SET created_at = COALESCE(created_at, NOW())
+    WHERE created_at IS NULL;
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
   `);
 
   await client.query(`
     UPDATE cities
+<<<<<<< HEAD
     SET slug = lower(
       regexp_replace(
         regexp_replace(trim(name), '\\s+', '-', 'g'),
@@ -161,6 +185,222 @@ async function ensureCitiesTable(client) {
     SET state_name = state
     WHERE state_name IS NULL
       AND state IS NOT NULL;
+=======
+    SET updated_at = COALESCE(updated_at, NOW())
+    WHERE updated_at IS NULL;
+  `);
+
+  await client.query(`
+    UPDATE cities
+    SET normalized_name = trim(
+      regexp_replace(lower(unaccent(coalesce(name, ''))), '[[:space:]]+', ' ', 'g')
+    )
+    WHERE normalized_name IS NULL OR trim(normalized_name) = '';
+  `);
+
+  await client.query(`
+    UPDATE cities
+    SET state_name = trim(coalesce(state::text, ''))
+    WHERE state_name IS NULL OR trim(state_name) = '';
+  `);
+
+  await client.query(`
+    UPDATE cities
+    SET slug = trim(
+      both '-' FROM regexp_replace(
+        regexp_replace(
+          lower(unaccent(coalesce(name, ''))),
+          '[^a-z0-9]+',
+          '-',
+          'g'
+        ),
+        '-+',
+        '-',
+        'g'
+      )
+    ) || '-' || lower(trim(coalesce(state::text, ''))) || '-' || id::text
+    WHERE (slug IS NULL OR trim(slug) = '')
+      AND name IS NOT NULL
+      AND trim(coalesce(name, '')) <> ''
+      AND state IS NOT NULL
+      AND trim(coalesce(state::text, '')) <> '';
+  `);
+
+  await client.query(`
+    WITH ranked AS (
+      SELECT
+        id,
+        slug,
+        row_number() OVER (PARTITION BY slug ORDER BY id) AS rn
+      FROM cities
+    )
+    UPDATE cities c
+    SET slug = c.slug || '-' || c.id::text
+    FROM ranked r
+    WHERE c.id = r.id
+      AND r.rn > 1;
+  `);
+
+  await client.query(`
+    ALTER TABLE cities
+      ALTER COLUMN created_at SET DEFAULT NOW(),
+      ALTER COLUMN updated_at SET DEFAULT NOW();
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM cities WHERE ibge_code IS NULL) THEN
+        ALTER TABLE cities ALTER COLUMN ibge_code SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE name IS NULL OR trim(coalesce(name::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN name SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE normalized_name IS NULL OR trim(coalesce(normalized_name::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN normalized_name SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE slug IS NULL OR trim(coalesce(slug::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN slug SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE state IS NULL OR trim(coalesce(state::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN state SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE state_name IS NULL OR trim(coalesce(state_name::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN state_name SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM cities WHERE created_at IS NULL) THEN
+        ALTER TABLE cities ALTER COLUMN created_at SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM cities WHERE updated_at IS NULL) THEN
+        ALTER TABLE cities ALTER COLUMN updated_at SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_index i
+        JOIN pg_class t ON t.oid = i.indrelid
+        WHERE t.relname = 'cities'
+          AND pg_table_is_visible(t.oid)
+          AND i.indisunique
+          AND i.indnkeyatts = 1
+          AND (
+            SELECT a.attname
+            FROM pg_attribute a
+            WHERE a.attrelid = t.oid
+              AND a.attnum = i.indkey[0]
+              AND NOT a.attisdropped
+          ) = 'ibge_code'
+      ) THEN
+        ALTER TABLE cities ADD CONSTRAINT cities_ibge_code_key UNIQUE (ibge_code);
+      END IF;
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+      WHEN unique_violation THEN
+        RAISE EXCEPTION
+          'cities: existem linhas com ibge_code duplicado ou nulo; corrija antes de importar.';
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_index i
+        JOIN pg_class t ON t.oid = i.indrelid
+        WHERE t.relname = 'cities'
+          AND pg_table_is_visible(t.oid)
+          AND i.indisunique
+          AND i.indnkeyatts = 1
+          AND (
+            SELECT a.attname
+            FROM pg_attribute a
+            WHERE a.attrelid = t.oid
+              AND a.attnum = i.indkey[0]
+              AND NOT a.attisdropped
+          ) = 'slug'
+      ) THEN
+        ALTER TABLE cities ADD CONSTRAINT cities_slug_key UNIQUE (slug);
+      END IF;
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+      WHEN unique_violation THEN
+        RAISE EXCEPTION
+          'cities: existem linhas com slug duplicado; corrija antes de importar.';
+    END
+    $c$;
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
   `);
 
   await client.query(`
@@ -218,6 +458,7 @@ async function ensureCitiesTable(client) {
   `);
 }
 
+<<<<<<< HEAD
 async function findExistingCityByIbgeCode(client, ibgeCode) {
   const result = await client.query(
     `
@@ -333,6 +574,209 @@ async function upsertCitySafely(client, payload) {
 
   await insertCity(client, payload);
   return "inserted";
+=======
+/**
+ * Upsert em uma única ida ao banco (sem ON CONFLICT: compatível mesmo se o planner não enxergar índice único).
+ * Ordem: UPDATE por ibge_code → legado sem ibge_code (UF + nome normalizado) → INSERT se ainda não existir.
+ */
+async function upsertCity(client, city) {
+  const params = [
+    city.ibge_code,
+    city.name,
+    city.normalized_name,
+    city.slug,
+    city.state,
+    city.state_name,
+  ];
+
+  await client.query(
+    `
+    WITH by_code AS (
+      UPDATE cities
+      SET
+        name = $2,
+        normalized_name = $3,
+        slug = $4,
+        state = $5,
+        state_name = $6,
+        updated_at = NOW()
+      WHERE ibge_code = $1
+      RETURNING id
+    ),
+    by_legacy AS (
+      UPDATE cities
+      SET
+        ibge_code = $1,
+        name = $2,
+        normalized_name = $3,
+        slug = $4,
+        state = $5,
+        state_name = $6,
+        updated_at = NOW()
+      WHERE id = (
+        SELECT c.id
+        FROM cities c
+        WHERE c.ibge_code IS NULL
+          AND upper(trim(c.state::text)) = upper(trim($5::text))
+          AND (
+            trim(
+              regexp_replace(
+                lower(unaccent(coalesce(c.name, ''))),
+                '[[:space:]]+',
+                ' ',
+                'g'
+              )
+            ) = $3
+            OR trim(coalesce(c.normalized_name::text, '')) = $3
+          )
+        ORDER BY c.id ASC
+        LIMIT 1
+      )
+      AND NOT EXISTS (SELECT 1 FROM by_code)
+      RETURNING id
+    ),
+    ins AS (
+      INSERT INTO cities (ibge_code, name, normalized_name, slug, state, state_name)
+      SELECT $1, $2, $3, $4, $5, $6
+      WHERE NOT EXISTS (SELECT 1 FROM by_code)
+        AND NOT EXISTS (SELECT 1 FROM by_legacy)
+        AND NOT EXISTS (SELECT 1 FROM cities WHERE ibge_code = $1)
+      RETURNING id
+    )
+    SELECT 1
+    `,
+    params
+  );
+}
+
+/**
+ * Monta mapa IBGE por UF + nome normalizado. Se a mesma chave aparecer duas vezes na API, marca ambígua.
+ */
+function buildIbgeLookupFromMunicipios(uf, stateName, municipios) {
+  const entries = [];
+  if (!Array.isArray(municipios)) {
+    return entries;
+  }
+
+  for (const city of municipios) {
+    const cityName = String(city.nome || "").trim();
+    const ibgeCode = Number(city.id);
+    if (!cityName || !Number.isFinite(ibgeCode) || ibgeCode <= 0) {
+      continue;
+    }
+    const key = ibgeLookupKey(uf, cityName);
+    entries.push({
+      key,
+      uf,
+      stateName,
+      ibge_code: ibgeCode,
+      name: cityName,
+      normalized_name: normalizeText(cityName),
+      slug: slugifyCity(cityName, uf),
+    });
+  }
+  return entries;
+}
+
+/**
+ * Reconcilia linhas legadas sem ibge_code: match inequívoco por UF + nome normalizado (uma linha legada por chave; menor id primeiro).
+ */
+async function reconcileLegacyCitiesWithoutIbge(client, ibgeByKey) {
+  const { rows } = await client.query(`
+    SELECT id, name, state
+    FROM cities
+    WHERE ibge_code IS NULL
+    ORDER BY id ASC
+  `);
+
+  let reconciled = 0;
+  const claimedKeys = new Set();
+
+  for (const row of rows) {
+    const uf = String(row.state || "")
+      .trim()
+      .toUpperCase();
+    const rawName = String(row.name || "").trim();
+    if (!uf || uf.length !== 2 || !rawName) {
+      continue;
+    }
+
+    const key = ibgeLookupKey(uf, rawName);
+    if (claimedKeys.has(key)) {
+      continue;
+    }
+
+    const ibge = ibgeByKey.get(key);
+    if (!ibge || ibge.ambiguous) {
+      continue;
+    }
+
+    const taken = await client.query(
+      `SELECT 1 FROM cities WHERE ibge_code = $1 AND id <> $2 LIMIT 1`,
+      [ibge.ibge_code, row.id]
+    );
+    if (taken.rows.length > 0) {
+      continue;
+    }
+
+    let update;
+    try {
+      update = await client.query(
+        `
+        UPDATE cities
+        SET
+          ibge_code = $1,
+          name = $2,
+          normalized_name = $3,
+          slug = $4,
+          state = $5,
+          state_name = $6,
+          updated_at = NOW()
+        WHERE id = $7
+          AND ibge_code IS NULL
+        `,
+        [
+          ibge.ibge_code,
+          ibge.name,
+          ibge.normalized_name,
+          ibge.slug,
+          ibge.uf,
+          ibge.state_name,
+          row.id,
+        ]
+      );
+    } catch (err) {
+      if (err && err.code === "23505") {
+        console.warn(
+          `[cities:import] Reconciliação: id=${row.id} ignorado (conflito de unicidade slug/ibge).`
+        );
+        continue;
+      }
+      throw err;
+    }
+
+    if (update.rowCount > 0) {
+      claimedKeys.add(key);
+      reconciled += 1;
+    }
+  }
+
+  if (reconciled > 0) {
+    console.log(
+      `[cities:import] Reconciliação: ${reconciled} cidade(s) legada(s) receberam ibge_code (match por UF + nome).`
+    );
+  }
+
+  const stillNull = await client.query(
+    `SELECT COUNT(*)::int AS n FROM cities WHERE ibge_code IS NULL`
+  );
+  const n = stillNull.rows?.[0]?.n ?? 0;
+  if (n > 0) {
+    console.log(
+      `[cities:import] Aviso: ${n} registro(s) ainda sem ibge_code (NOT NULL não será forçado até preencher). Revise dados ou rode o import após corrigir.`
+    );
+  }
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
 }
 
 async function countCities(client) {
@@ -340,6 +784,106 @@ async function countCities(client) {
     `SELECT COUNT(*)::int AS total FROM cities`
   );
   return result.rows?.[0]?.total ?? 0;
+}
+
+/**
+ * Após import completo, reforça NOT NULL apenas onde não há mais NULL (migração progressiva).
+ */
+async function applyDeferredNotNullConstraints(client) {
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM cities WHERE ibge_code IS NULL) THEN
+        ALTER TABLE cities ALTER COLUMN ibge_code SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE name IS NULL OR trim(coalesce(name::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN name SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE normalized_name IS NULL OR trim(coalesce(normalized_name::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN normalized_name SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE slug IS NULL OR trim(coalesce(slug::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN slug SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE state IS NULL OR trim(coalesce(state::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN state SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM cities
+        WHERE state_name IS NULL OR trim(coalesce(state_name::text, '')) = ''
+      ) THEN
+        ALTER TABLE cities ALTER COLUMN state_name SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM cities WHERE created_at IS NULL) THEN
+        ALTER TABLE cities ALTER COLUMN created_at SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
+
+  await client.query(`
+    DO $c$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM cities WHERE updated_at IS NULL) THEN
+        ALTER TABLE cities ALTER COLUMN updated_at SET NOT NULL;
+      END IF;
+    END
+    $c$;
+  `);
 }
 
 async function importCities() {
@@ -358,10 +902,16 @@ async function importCities() {
 
     console.log(`[cities:import] ${states.length} estados encontrados.`);
 
+<<<<<<< HEAD
     let totalProcessed = 0;
     let totalInserted = 0;
     let totalUpdatedByIbge = 0;
     let totalUpdatedByNameState = 0;
+=======
+    const ibgeByKey = new Map();
+
+    const ufPayloads = [];
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
 
     for (const state of states) {
       const uf = String(state.sigla || "").trim().toUpperCase();
@@ -373,16 +923,58 @@ async function importCities() {
       }
 
       console.log(`[cities:import] Buscando municípios de ${uf}...`);
+<<<<<<< HEAD
       const cities = await fetchCitiesByUf(uf);
+=======
 
-      if (!Array.isArray(cities)) {
+      const municipios = await fetchCitiesByUf(uf);
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
+
+      if (!Array.isArray(municipios)) {
         console.warn(`[cities:import] Resposta inesperada para UF ${uf}.`);
         continue;
       }
 
+<<<<<<< HEAD
       let processedInState = 0;
+=======
+      for (const entry of buildIbgeLookupFromMunicipios(
+        uf,
+        stateName,
+        municipios
+      )) {
+        if (ibgeByKey.has(entry.key)) {
+          const prev = ibgeByKey.get(entry.key);
+          prev.ambiguous = true;
+        } else {
+          ibgeByKey.set(entry.key, {
+            ibge_code: entry.ibge_code,
+            name: entry.name,
+            normalized_name: entry.normalized_name,
+            slug: entry.slug,
+            uf: entry.uf,
+            state_name: entry.stateName,
+            ambiguous: false,
+          });
+        }
+      }
 
-      for (const city of cities) {
+      ufPayloads.push({ uf, stateName, municipios });
+    }
+
+    await reconcileLegacyCitiesWithoutIbge(client, ibgeByKey);
+
+    let totalProcessed = 0;
+
+    for (const { uf, stateName, municipios } of ufPayloads) {
+      if (!Array.isArray(municipios)) {
+        continue;
+      }
+
+      let stateProcessed = 0;
+>>>>>>> 453f5a9 (fix: corrigir footer e blog fallback)
+
+      for (const city of municipios) {
         const cityName = String(city.nome || "").trim();
         const ibgeCode = Number(city.id);
 
@@ -413,6 +1005,8 @@ async function importCities() {
         `[cities:import] ${uf}: ${processedInState} municípios processados.`
       );
     }
+
+    await applyDeferredNotNullConstraints(client);
 
     const totalInDatabase = await countCities(client);
 
