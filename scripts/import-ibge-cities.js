@@ -19,13 +19,11 @@ function createPool() {
 
   return new Pool({
     connectionString,
-    ssl:
-      process.env.NODE_ENV === "production"
-        ? { rejectUnauthorized: false }
-        : false,
-    max: 5,
+    ssl: { rejectUnauthorized: false },
+    max: 3,
     idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000,
+    keepAlive: true,
   });
 }
 
