@@ -20,7 +20,7 @@ function createPool() {
   return new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
-    max: 3,
+    max: 1,
     idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 15000,
     keepAlive: true,
@@ -54,9 +54,7 @@ async function fetchJson(url) {
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
+      headers: { Accept: "application/json" },
       signal: controller.signal,
     });
 
@@ -72,7 +70,6 @@ async function fetchJson(url) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error(`Timeout ao consultar IBGE: ${url}`);
     }
-
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -90,13 +87,8 @@ async function fetchCitiesByUf(uf) {
 }
 
 async function ensureCitiesTable(client) {
-  await client.query(`
-    CREATE EXTENSION IF NOT EXISTS unaccent;
-  `);
-
-  await client.query(`
-    CREATE EXTENSION IF NOT EXISTS pg_trgm;
-  `);
+  await client.query(`CREATE EXTENSION IF NOT EXISTS unaccent;`);
+  await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS cities (
@@ -143,9 +135,7 @@ async function ensureCitiesTable(client) {
     $$ LANGUAGE plpgsql;
   `);
 
-  await client.query(`
-    DROP TRIGGER IF EXISTS trg_cities_updated_at ON cities;
-  `);
+  await client.query(`DROP TRIGGER IF EXISTS trg_cities_updated_at ON cities;`);
 
   await client.query(`
     CREATE TRIGGER trg_cities_updated_at
@@ -188,28 +178,30 @@ async function upsertCity(client, city) {
   await client.query(sql, values);
 }
 
+async function countCities(client) {
+  const result = await client.query(
+    `SELECT COUNT(*)::int AS total FROM cities`
+  );
+  return result.rows?.[0]?.total ?? 0;
+}
+
 async function importCities() {
   const pool = createPool();
   const client = await pool.connect();
 
-  let totalStates = 0;
-  let totalCitiesProcessed = 0;
-
   try {
     console.log("[cities:import] Iniciando sincronização com IBGE...");
-
     await ensureCitiesTable(client);
 
     const states = await fetchStates();
-    totalStates = Array.isArray(states) ? states.length : 0;
 
-    if (!totalStates) {
-      throw new Error("Nenhum estado foi retornado pela API do IBGE.");
+    if (!Array.isArray(states) || states.length === 0) {
+      throw new Error("Nenhum estado retornado pela API do IBGE.");
     }
 
-    console.log(`[cities:import] ${totalStates} estados encontrados.`);
+    console.log(`[cities:import] ${states.length} estados encontrados.`);
 
-    await client.query("BEGIN");
+    let totalProcessed = 0;
 
     for (const state of states) {
       const uf = String(state.sigla || "").trim().toUpperCase();
@@ -229,12 +221,13 @@ async function importCities() {
         continue;
       }
 
+      let stateProcessed = 0;
+
       for (const city of cities) {
         const cityName = String(city.nome || "").trim();
         const ibgeCode = Number(city.id);
 
         if (!cityName || !Number.isFinite(ibgeCode) || ibgeCode <= 0) {
-          console.warn("[cities:import] Cidade inválida ignorada:", city);
           continue;
         }
 
@@ -247,25 +240,21 @@ async function importCities() {
           state_name: stateName,
         });
 
-        totalCitiesProcessed += 1;
+        totalProcessed += 1;
+        stateProcessed += 1;
       }
 
       console.log(
-        `[cities:import] ${uf}: ${cities.length} municípios processados.`
+        `[cities:import] ${uf}: ${stateProcessed} municípios processados.`
       );
     }
 
-    await client.query("COMMIT");
-
-    const countResult = await client.query(`SELECT COUNT(*)::int AS total FROM cities`);
-    const totalInDatabase = countResult.rows?.[0]?.total ?? 0;
+    const totalInDatabase = await countCities(client);
 
     console.log(
-      `[cities:import] Importação concluída com sucesso. Estados: ${totalStates}. Registros processados: ${totalCitiesProcessed}. Total atual na tabela cities: ${totalInDatabase}.`
+      `[cities:import] Importação concluída com sucesso. Registros processados: ${totalProcessed}. Total atual na tabela cities: ${totalInDatabase}.`
     );
   } catch (error) {
-    await client.query("ROLLBACK");
-
     console.error("[cities:import] Falha na importação:", error);
     process.exitCode = 1;
   } finally {
