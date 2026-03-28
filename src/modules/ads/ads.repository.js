@@ -24,7 +24,6 @@ const UPDATE_FIELDS = [
 export async function createAd(data) {
   const query = `
     INSERT INTO ads (
-      user_id,
       advertiser_id,
       title,
       description,
@@ -48,13 +47,12 @@ export async function createAd(data) {
       updated_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),NOW()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW(),NOW()
     )
     RETURNING *;
   `;
 
   const values = [
-    data.user_id || null,
     data.advertiser_id || null,
     data.title,
     data.description || null,
@@ -107,7 +105,6 @@ export async function findOwnerContextById(id) {
     `
     SELECT
       a.id,
-      a.user_id,
       a.advertiser_id,
       a.status,
       adv.user_id AS advertiser_user_id

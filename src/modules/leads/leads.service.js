@@ -32,7 +32,7 @@ async function enqueueLeadNotification({ ad, lead }) {
     logger.warn(
       {
         adId: ad?.id,
-        sellerId: ad?.user_id,
+        sellerId: ad?.seller_user_id,
         leadId: lead?.id,
       },
       "[leads.service] Anúncio sem whatsapp_number; notificação não enfileirada"
@@ -48,7 +48,7 @@ async function enqueueLeadNotification({ ad, lead }) {
     logger.warn(
       {
         adId: ad?.id,
-        sellerId: ad?.user_id,
+        sellerId: ad?.seller_user_id,
         leadId: lead?.id,
       },
       "[leads.service] whatsapp_number inválido; notificação não enfileirada"
@@ -62,7 +62,7 @@ async function enqueueLeadNotification({ ad, lead }) {
       {
         leadId: lead.id,
         adId: ad.id,
-        sellerId: ad.user_id,
+        sellerId: ad.seller_user_id,
         cityId: ad.city_id,
         phone: normalizedSellerPhone,
         message,
@@ -71,7 +71,7 @@ async function enqueueLeadNotification({ ad, lead }) {
         createdAt: new Date().toISOString(),
       },
       {
-        jobId: `lead:${lead.id}:ad:${ad.id}:seller:${ad.user_id}`,
+        jobId: `lead:${lead.id}:ad:${ad.id}:seller:${ad.seller_user_id}`,
       }
     );
 
@@ -79,7 +79,7 @@ async function enqueueLeadNotification({ ad, lead }) {
       {
         leadId: lead.id,
         adId: ad.id,
-        sellerId: ad.user_id,
+        sellerId: ad.seller_user_id,
         jobId: job?.id,
       },
       "[leads.service] Notificação WhatsApp enfileirada com sucesso"
@@ -92,7 +92,7 @@ async function enqueueLeadNotification({ ad, lead }) {
         error,
         leadId: lead.id,
         adId: ad.id,
-        sellerId: ad.user_id,
+        sellerId: ad.seller_user_id,
       },
       "[leads.service] Falha ao enfileirar notificação WhatsApp"
     );
@@ -112,15 +112,16 @@ export async function createLead(input) {
     const adResult = await client.query(
       `
       SELECT
-        id,
-        user_id,
-        city_id,
-        title,
-        whatsapp_number,
-        status
-      FROM ads
-      WHERE id = $1
-      FOR UPDATE
+        a.id,
+        a.city_id,
+        a.title,
+        a.whatsapp_number,
+        a.status,
+        adv.user_id AS seller_user_id
+      FROM ads a
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE a.id = $1
+      FOR UPDATE OF a
       `,
       [adId]
     );
@@ -135,6 +136,10 @@ export async function createLead(input) {
       throw new AppError("Anúncio não está ativo", 400);
     }
 
+    if (ad.seller_user_id == null) {
+      throw new AppError("Anúncio sem vendedor vinculado", 400);
+    }
+
     const leadResult = await client.query(
       `
       INSERT INTO leads (
@@ -147,7 +152,7 @@ export async function createLead(input) {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
       `,
-      [ad.id, ad.user_id, ad.city_id, buyerName, buyerPhone]
+      [ad.id, ad.seller_user_id, ad.city_id, buyerName, buyerPhone]
     );
 
     const lead = leadResult.rows[0];
@@ -173,7 +178,7 @@ export async function createLead(input) {
         total_leads = seller_scores.total_leads + 1,
         updated_at = NOW()
       `,
-      [ad.user_id]
+      [ad.seller_user_id]
     );
 
     await client.query("COMMIT");
@@ -182,7 +187,7 @@ export async function createLead(input) {
       {
         leadId: lead.id,
         adId: ad.id,
-        sellerId: ad.user_id,
+        sellerId: ad.seller_user_id,
         cityId: ad.city_id,
       },
       "[leads.service] Lead criado com sucesso"

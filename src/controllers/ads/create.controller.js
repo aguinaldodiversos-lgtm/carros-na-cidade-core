@@ -96,8 +96,9 @@ async function createAd(req, res) {
     const adsCountResult = await pool.query(
       `
       SELECT COUNT(*)::int AS total
-      FROM ads
-      WHERE user_id = $1
+      FROM ads a
+      JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE adv.user_id = $1
       `,
       [userId]
     );
@@ -125,9 +126,10 @@ async function createAd(req, res) {
       const activeAdsResult = await pool.query(
         `
         SELECT COUNT(*)::int AS total
-        FROM ads
-        WHERE user_id = $1
-          AND status = 'active'
+        FROM ads a
+        JOIN advertisers adv ON adv.id = a.advertiser_id
+        WHERE adv.user_id = $1
+          AND a.status = 'active'
         `,
         [userId]
       );
@@ -178,13 +180,32 @@ async function createAd(req, res) {
     const slugBase = `${brand}-${model}-${year}`;
     const slug = slugify(slugBase + "-" + Date.now());
 
+    const advertiserResult = await pool.query(
+      `
+      SELECT id
+      FROM advertisers
+      WHERE user_id = $1
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    const advertiserRow = advertiserResult.rows[0];
+    if (!advertiserRow) {
+      return res.status(400).json({
+        error: "Anunciante não encontrado",
+        message:
+          "É necessário ter cadastro de anunciante vinculado à conta para publicar.",
+      });
+    }
+
     /* =====================================================
        INSERIR ANÚNCIO
     ===================================================== */
     const insertResult = await pool.query(
       `
       INSERT INTO ads (
-        user_id,
+        advertiser_id,
         brand,
         model,
         year,
@@ -201,7 +222,7 @@ async function createAd(req, res) {
       RETURNING *
       `,
       [
-        userId,
+        advertiserRow.id,
         brand,
         model,
         year,

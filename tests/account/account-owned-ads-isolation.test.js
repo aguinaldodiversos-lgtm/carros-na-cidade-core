@@ -14,7 +14,7 @@ describe("isolamento de anúncios por conta (SQL)", () => {
     vi.mocked(pool.query).mockReset();
   });
 
-  it("listOwnedAds usa JOIN com advertisers e filtra por um único $1 (dono)", async () => {
+  it("listOwnedAds usa JOIN com advertisers e filtra só por adv.user_id (dono)", async () => {
     vi.mocked(pool.query).mockResolvedValue({ rows: [] });
 
     await listOwnedAds("conta-alpha");
@@ -22,10 +22,9 @@ describe("isolamento de anúncios por conta (SQL)", () => {
     expect(pool.query).toHaveBeenCalledTimes(1);
     const [sql, params] = vi.mocked(pool.query).mock.calls[0];
     expect(sql).toMatch(/FROM\s+ads\s+a/i);
-    expect(sql).toMatch(/LEFT\s+JOIN\s+advertisers\s+adv/i);
-    expect(sql).toMatch(/a\.user_id\s*=\s*\$1/);
+    expect(sql).toMatch(/JOIN\s+advertisers\s+adv/i);
     expect(sql).toMatch(/adv\.user_id\s*=\s*\$1/);
-    expect(sql).toMatch(/OR/);
+    expect(sql).not.toMatch(/a\.user_id/);
     expect(params).toEqual(["conta-alpha"]);
   });
 
@@ -48,7 +47,7 @@ describe("isolamento de anúncios por conta (SQL)", () => {
     expect(params).toEqual(["42", "dono-2"]);
     const [sql] = vi.mocked(pool.query).mock.calls[0];
     expect(sql).toMatch(/WHERE\s+a\.id\s*=\s*\$1/s);
-    expect(sql).toMatch(/a\.user_id\s*=\s*\$2/);
     expect(sql).toMatch(/adv\.user_id\s*=\s*\$2/);
+    expect(sql).not.toMatch(/a\.user_id/);
   });
 });

@@ -8,11 +8,12 @@ function assertOwner(ownerContext, userId) {
     throw new AppError("Anúncio não encontrado", 404);
   }
 
-  const owners = [ownerContext.user_id, ownerContext.advertiser_user_id]
-    .filter(Boolean)
-    .map((value) => String(value));
+  const advertiserUserId = ownerContext.advertiser_user_id;
+  if (advertiserUserId == null) {
+    throw new AppError("Anúncio não encontrado", 404);
+  }
 
-  if (!owners.includes(String(userId))) {
+  if (String(advertiserUserId) !== String(userId)) {
     throw new AppError("Sem permissão para alterar este anúncio", 403);
   }
 }
@@ -29,14 +30,20 @@ async function findAdvertiserByUserId(userId) {
 export async function createAd(data, user) {
   const advertiser = await findAdvertiserByUserId(user.id);
 
+  if (!advertiser?.id) {
+    throw new AppError(
+      "Cadastro de anunciante não encontrado. Complete seu perfil antes de publicar.",
+      400
+    );
+  }
+
   const slug = slugify(
     `${data.brand}-${data.model}-${data.year}-${Date.now()}`
   );
 
   return adsRepository.createAd({
     ...data,
-    user_id: user.id,
-    advertiser_id: advertiser?.id || null,
+    advertiser_id: advertiser.id,
     plan: user.plan || "free",
     slug,
     status: "active",

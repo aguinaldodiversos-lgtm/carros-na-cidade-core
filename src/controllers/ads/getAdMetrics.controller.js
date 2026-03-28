@@ -19,9 +19,10 @@ async function getAdMetrics(req, res) {
     // verificar se anúncio existe
     const adResult = await pool.query(
       `
-      SELECT id, user_id
-      FROM ads
-      WHERE id = $1
+      SELECT a.id, adv.user_id AS owner_user_id
+      FROM ads a
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE a.id = $1
       LIMIT 1
       `,
       [adId]
@@ -35,7 +36,10 @@ async function getAdMetrics(req, res) {
 
     // (opcional) proteger acesso ao dono do anúncio
     // se existir req.user
-    if (req.user && adResult.rows[0].user_id !== req.user.id) {
+    if (
+      req.user &&
+      String(adResult.rows[0].owner_user_id || "") !== String(req.user.id)
+    ) {
       return res.status(403).json({
         error: "Acesso não autorizado",
       });

@@ -417,9 +417,9 @@ async function countActiveAdsByUser(userId) {
       `
       SELECT COUNT(*)::int AS total
       FROM ads a
-      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+      JOIN advertisers adv ON adv.id = a.advertiser_id
       WHERE a.status = 'active'
-        AND (a.user_id = $1 OR adv.user_id = $1)
+        AND adv.user_id = $1
       `,
       [userId]
     );
@@ -547,7 +547,7 @@ export async function listOwnedAds(userId) {
       `
       SELECT
         a.id,
-        a.user_id AS owner_user_id,
+        adv.user_id AS owner_user_id,
         a.title,
         a.price,
         a.status,
@@ -555,9 +555,9 @@ export async function listOwnedAds(userId) {
         a.created_at,
         a.updated_at
       FROM ads a
-      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+      JOIN advertisers adv ON adv.id = a.advertiser_id
       WHERE a.status IN ('active', 'paused')
-        AND (a.user_id = $1 OR adv.user_id = $1)
+        AND adv.user_id = $1
       ORDER BY
         CASE WHEN a.status = 'active' THEN 0 ELSE 1 END,
         a.updated_at DESC NULLS LAST,
@@ -577,7 +577,7 @@ export async function getOwnedAd(userId, adId) {
     `
     SELECT
       a.id,
-      a.user_id AS owner_user_id,
+      adv.user_id AS owner_user_id,
       a.title,
       a.price,
       a.status,
@@ -585,10 +585,10 @@ export async function getOwnedAd(userId, adId) {
       a.created_at,
       a.updated_at
     FROM ads a
-    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    JOIN advertisers adv ON adv.id = a.advertiser_id
     WHERE a.id = $1
       AND a.status != 'deleted'
-      AND (a.user_id = $2 OR adv.user_id = $2)
+      AND adv.user_id = $2
     LIMIT 1
     `,
     [adId, userId]
@@ -688,7 +688,7 @@ export function listBoostOptions() {
 
 export async function updateOwnedAdStatus(userId, adId, action) {
   const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.user_id, owner?.advertiser_user_id, owner?.owner_user_id]
+  const ownerIds = [owner?.advertiser_user_id]
     .filter(Boolean)
     .map((value) => String(value));
 
@@ -708,7 +708,7 @@ export async function updateOwnedAdStatus(userId, adId, action) {
 
 export async function deleteOwnedAd(userId, adId) {
   const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.user_id, owner?.advertiser_user_id, owner?.owner_user_id]
+  const ownerIds = [owner?.advertiser_user_id]
     .filter(Boolean)
     .map((value) => String(value));
 

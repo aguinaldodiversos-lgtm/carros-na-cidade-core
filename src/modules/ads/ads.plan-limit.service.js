@@ -16,13 +16,15 @@ export async function checkAdLimit(userId, userPlan) {
 
   const result = await pool.query(
     `
-    SELECT COUNT(*) FROM ads
-    WHERE user_id = $1 AND status != 'deleted'
+    SELECT COUNT(*)::int AS count
+    FROM ads a
+    JOIN advertisers adv ON adv.id = a.advertiser_id
+    WHERE adv.user_id = $1 AND a.status != 'deleted'
     `,
     [userId]
   );
 
-  const count = parseInt(result.rows[0].count);
+  const count = parseInt(result.rows[0].count, 10);
 
   if (count >= limit) {
     throw new AppError(
