@@ -1,5 +1,5 @@
 /**
- * Insere um anúncio de teste (requer DATABASE_URL, ≥1 advertiser e ≥1 cidade).
+ * Insere um anúncio de teste (schema real da tabela `ads`).
  * Uso: node scripts/seed-test-ad.mjs
  */
 import "dotenv/config";
@@ -19,8 +19,12 @@ const pool = new Pool({
 });
 
 try {
+  await pool.query(`
+    ALTER TABLE ads ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''
+  `);
+
   const adv = await pool.query(
-    "SELECT id, user_id FROM advertisers ORDER BY id ASC LIMIT 1"
+    "SELECT id FROM advertisers ORDER BY id ASC LIMIT 1"
   );
   if (!adv.rows[0]) {
     console.error(
@@ -50,11 +54,11 @@ try {
       city_id,
       city,
       state,
-      category,
       brand,
       model,
       year,
       mileage,
+      category,
       body_type,
       fuel_type,
       transmission,
@@ -66,8 +70,7 @@ try {
       updated_at
     )
     VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-      NULL, NULL, NULL, false, 'active', 'free', $13, NOW(), NOW()
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'active', 'free', $17, NOW(), NOW()
     )
     RETURNING id, slug, title, price, city, state, advertiser_id
     `,
@@ -79,11 +82,15 @@ try {
       c.id,
       c.name,
       c.state,
-      "sedan",
       "Volkswagen",
       "Gol",
       2020,
       48000,
+      "sedan",
+      "sedan",
+      "flex",
+      "manual",
+      false,
       slug,
     ]
   );
