@@ -3,8 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Ambiente injetado no `npm run dev` quando PW_START_SERVER=1.
  * Espelha o Render (portal): API + FIPE. Permite override via E2E_BACKEND_API_URL / BACKEND_API_URL.
+ * `Record<string, string>` — exigido pelo tipo de `webServer.env` (Playwright); `ProcessEnv` não serve.
  */
-function playwrightDevEnv(): NodeJS.ProcessEnv {
+function playwrightDevEnv(): Record<string, string> {
   const base =
     process.env.E2E_BACKEND_API_URL?.trim() ||
     process.env.BACKEND_API_URL?.trim() ||
@@ -16,8 +17,11 @@ function playwrightDevEnv(): NodeJS.ProcessEnv {
   const site =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://127.0.0.1:3000";
 
-  return {
-    ...process.env,
+  const merged: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) merged[key] = value;
+  }
+  Object.assign(merged, {
     NODE_ENV: "development",
     AUTH_API_BASE_URL: base,
     BACKEND_API_URL: base,
@@ -25,7 +29,8 @@ function playwrightDevEnv(): NodeJS.ProcessEnv {
     NEXT_PUBLIC_API_URL: base,
     FIPE_API_BASE_URL: fipe,
     NEXT_PUBLIC_SITE_URL: site,
-  };
+  });
+  return merged;
 }
 
 export default defineConfig({
