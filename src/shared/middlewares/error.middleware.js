@@ -10,24 +10,62 @@ export class AppError extends Error {
   }
 }
 
+function pgDetails(err) {
+  return {
+    code: err?.code ?? null,
+    detail: err?.detail ?? null,
+    constraint: err?.constraint ?? null,
+    table: err?.table ?? null,
+    column: err?.column ?? null,
+    schema: err?.schema ?? null,
+  };
+}
+
 function handlePostgresError(err) {
+  const details = pgDetails(err);
+  const detailText =
+    typeof err?.detail === "string" && err.detail.trim()
+      ? err.detail.trim()
+      : "";
+
   if (err.code === "23505") {
-    return new AppError("Registro duplicado.", 409);
+    return new AppError("Registro duplicado.", 409, true, details);
   }
 
   if (err.code === "23503") {
-    return new AppError("Relacionamento inválido.", 400);
+    const msg = detailText
+      ? `Relacionamento inválido: ${detailText}`
+      : "Relacionamento inválido (chave estrangeira).";
+    return new AppError(msg, 400, true, details);
   }
 
   if (err.code === "23502") {
-    return new AppError("Campo obrigatório não informado.", 400);
+    const col = err?.column ? ` (${String(err.column)})` : "";
+    return new AppError(
+      `Campo obrigatório não informado${col}.`,
+      400,
+      true,
+      details
+    );
+  }
+
+  if (err.code === "23514") {
+    const msg =
+      typeof err?.message === "string" && err.message.trim()
+        ? err.message.trim()
+        : "Restrição de validação do banco não atendida.";
+    return new AppError(msg, 400, true, details);
   }
 
   if (err.code === "22P02") {
-    return new AppError("Valor inválido informado.", 400);
+    return new AppError("Valor inválido informado.", 400, true, details);
   }
 
-  return new AppError("Erro no banco de dados.", 500, false);
+  if (typeof err?.message === "string" && err.message.trim()) {
+    return new AppError(err.message.trim(), 500, false, details);
+  }
+
+  return new AppError("Erro no banco de dados.", 500, false, details);
 }
 
 export function errorHandler(err, req, res, _next) {
@@ -35,7 +73,40 @@ export function errorHandler(err, req, res, _next) {
 
   if (!(error instanceof AppError)) {
     if (error?.code && String(error.code).startsWith("23")) {
+      const logger = getLogger({
+        requestId: req?.requestId || null,
+        method: req?.method || null,
+        path: req?.originalUrl || req?.url || null,
+      });
+      logger.error(
+        {
+          ...pgDetails(error),
+          originalMessage: error?.message || null,
+        },
+        "[postgres] falha antes do mapeamento"
+      );
       error = handlePostgresError(error);
+    } else if (error?.code && String(error.code).startsWith("42")) {
+      const logger = getLogger({
+        requestId: req?.requestId || null,
+        method: req?.method || null,
+        path: req?.originalUrl || req?.url || null,
+      });
+      logger.error(
+        {
+          ...pgDetails(error),
+          originalMessage: error?.message || null,
+        },
+        "[postgres] erro de schema/objeto"
+      );
+      error = new AppError(
+        typeof error?.message === "string" && error.message.trim()
+          ? error.message.trim()
+          : "Erro de schema no banco de dados.",
+        500,
+        false,
+        pgDetails(error)
+      );
     } else {
       error = new AppError(
         error?.message || "Internal Server Error",

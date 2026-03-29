@@ -185,7 +185,20 @@ export function extractBackendErrorMessage(parsed: unknown, status: number): str
   if (parsed && typeof parsed === "object") {
     const o = parsed as Record<string, unknown>;
     const msg = o.message;
-    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof msg === "string" && msg.trim()) {
+      const details = o.details;
+      if (details && typeof details === "object") {
+        const d = details as Record<string, unknown>;
+        const code = d.code;
+        const constraint = d.constraint;
+        const suffix =
+          typeof code === "string" && code
+            ? ` [${code}${typeof constraint === "string" && constraint ? ` · ${constraint}` : ""}]`
+            : "";
+        return msg.trim() + suffix;
+      }
+      return msg.trim();
+    }
     const err = o.error;
     if (typeof err === "string" && err.trim()) return err;
     if (err === true && typeof o.message === "string") return o.message;

@@ -5,9 +5,12 @@ import { ensureDevServerUp, expectPublishFeedback, loginAsLocalUser } from "./he
 /**
  * Login → wizard (7 etapas) → Publicar anúncio.
  *
- * Login local (sem API remota): cpf@carrosnacidade.com / 123456
- * Variáveis: E2E_EMAIL, E2E_PASSWORD
- * Servidor: npm run dev (ou PLAYWRIGHT_BASE_URL).
+ * Credenciais padrão: cpf@carrosnacidade.com / 123456 — override com E2E_EMAIL, E2E_PASSWORD.
+ *
+ * API / FIPE (igual ao Render): copie `env.local.example` → `.env.local` para `npm run dev`.
+ * Com `PW_START_SERVER=1`, o Playwright injeta AUTH_API_BASE_URL, BACKEND_API_URL, API_URL,
+ * NEXT_PUBLIC_API_URL → https://carros-na-cidade-api.onrender.com e FIPE_API_BASE_URL (Parallelum).
+ * Override: E2E_BACKEND_API_URL ou BACKEND_API_URL.
  *
  * Rota oficial: /anunciar/novo (legado /painel/anuncios/novo redireciona).
  */
@@ -36,11 +39,29 @@ test.describe.serial("Login → publicar anúncio", () => {
       },
       { timeout: 90_000 }
     );
-    await selects.nth(0).selectOption({ index: 1 });
+    // Algumas marcas podem vir sem modelos na FIPE local; tenta várias opções de marca.
+    let brandPicked = false;
+    const brandCount = await selects.nth(0).locator("option").count();
+    for (let bi = 1; bi < Math.min(brandCount, 12); bi += 1) {
+      await selects.nth(0).selectOption({ index: bi });
+      await page
+        .waitForResponse((r) => r.url().includes("/api/fipe/models") && r.ok(), { timeout: 90_000 })
+        .catch(() => null);
+      await page.waitForFunction(
+        () => {
+          const sel = document.querySelectorAll("main select")[1];
+          return sel && sel.querySelectorAll("option").length > 1;
+        },
+        { timeout: 30_000 }
+      );
+      const modelOpts = await selects.nth(1).locator("option").count();
+      if (modelOpts > 1) {
+        brandPicked = true;
+        break;
+      }
+    }
+    expect(brandPicked, "Nenhuma marca retornou modelos da FIPE (configure API ou escolha outro ambiente).").toBeTruthy();
 
-    await page.waitForResponse((r) => r.url().includes("/api/fipe/models") && r.ok(), { timeout: 90_000 });
-
-    expect(await selects.nth(1).locator("option").count()).toBeGreaterThan(1);
     await selects.nth(1).selectOption({ index: 1 });
 
     await page.waitForResponse((r) => r.url().includes("/api/fipe/years") && r.ok(), { timeout: 90_000 });
@@ -84,9 +105,17 @@ test.describe.serial("Login → publicar anúncio", () => {
     await page.getByRole("button", { name: /Continuar/i }).click();
 
     await expect(page.getByRole("heading", { level: 1, name: /Finalização/i })).toBeVisible();
-    await page.getByPlaceholder("São Paulo").fill("São Paulo");
-    await page.getByPlaceholder("SP").fill("SP");
-    await page.getByPlaceholder("(11) 99999-9999").fill("11999999999");
+
+    // Localização: UF em <select>, cidade via busca na API (`FinalizeLocationFields`).
+    await page.locator("label").filter({ hasText: /Estado \(UF\)/i }).locator("select").selectOption("SP");
+    const cityInput = page.getByPlaceholder("Digite ao menos 2 letras e escolha na lista");
+    await cityInput.fill("Atibaia");
+    // Debounce ~280ms + fetch; aguarda sugestão (API BFF → backend com cidades).
+    await page.getByRole("button", { name: /^Atibaia$/i }).first().waitFor({ state: "visible", timeout: 90_000 });
+    await page.getByRole("button", { name: /^Atibaia$/i }).first().click();
+
+    await page.getByPlaceholder("(11) 99999-9999").first().fill("11999999999");
+    await page.getByPlaceholder("(11) 3333-3333").fill("1133333333");
     await page.locator('input[type="checkbox"]').last().check();
 
     await page.getByRole("button", { name: /Publicar anúncio/i }).click();

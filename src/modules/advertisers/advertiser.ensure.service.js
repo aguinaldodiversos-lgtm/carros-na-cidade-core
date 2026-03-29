@@ -1,8 +1,5 @@
 import { pool, withTransaction } from "../../infrastructure/database/db.js";
-import {
-  assertAccountAllowsAdPublishing,
-  getAccountUser,
-} from "../account/account.service.js";
+import { getAccountUser } from "../account/account.service.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { slugify } from "../../shared/utils/slugify.js";
 
@@ -103,8 +100,8 @@ function buildContactFieldsForAdvertiser(contact, advertiserCols) {
  * Garante um registro em `advertisers` para o usuário, quando apto a publicar.
  * Usa lock consultivo por usuário para evitar duplicidade sob concorrência.
  *
- * Regras de documento: mesma fonte que o painel (`getAccountUser` + `assertAccountAllowsAdPublishing`),
- * alinhada a `validatePlanEligibility` (bloqueio explícito só para CNPJ não verificado).
+ * Dados de conta e lojista vêm de `getAccountUser` (mesma query do painel).
+ * Não há segunda validação de CPF/CNPJ aqui: onboarding/painel consolidam o documento.
  *
  * @param {string} userId
  * @param {{ cityId: number }} context — city_id do anúncio (obrigatório para novo cadastro)
@@ -120,7 +117,6 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
   }
 
   const account = await getAccountUser(userId);
-  assertAccountAllowsAdPublishing(account);
 
   const [advertiserCols, usersCols] = await Promise.all([
     getAdvertisersColumnSet(),
@@ -172,7 +168,8 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       user_id: userId,
       city_id: Number(cityId),
       name: displayName,
-      company_name: isLojista ? displayName : "",
+      // PF: null evita CHECK/NOT NULL ambíguos com string vazia em alguns schemas
+      company_name: isLojista ? displayName : null,
       email: String(account.email || "")
         .trim()
         .toLowerCase() || null,
@@ -190,6 +187,10 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
         continue;
       }
       if (key === "email" && !value) {
+        continue;
+      }
+      // PF: não forçar company_name (evita CHECK/NOT NULL com '' ou NULL inadequado)
+      if (key === "company_name" && value == null) {
         continue;
       }
       fieldNames.push(key);
