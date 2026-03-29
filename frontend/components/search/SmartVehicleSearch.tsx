@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useCityOptional } from "@/lib/city/CityContext";
+import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import { useSemanticAutocomplete } from "../../hooks/useSemanticAutocomplete";
 import { buildSearchUrl } from "../../lib/search/build-search-url";
 import type { FlatAutocompleteSuggestion } from "../../lib/search/semantic-autocomplete";
@@ -11,6 +13,7 @@ import type { FlatAutocompleteSuggestion } from "../../lib/search/semantic-autoc
 export interface SmartVehicleSearchProps {
   placeholder?: string;
   resultsBasePath?: string;
+  /** Se omitido, usa `useCity().city.slug` após hidratação; senão, cidade padrão pública. */
   currentCitySlug?: string | null;
   className?: string;
   minLength?: number;
@@ -58,11 +61,22 @@ function wrapUp(current: number, len: number) {
 export function SmartVehicleSearch({
   placeholder = "Digite marca, modelo, cidade ou o que você procura",
   resultsBasePath = "/anuncios",
-  currentCitySlug = null,
+  currentCitySlug,
   className = "",
   minLength = 2,
 }: SmartVehicleSearchProps) {
   const router = useRouter();
+  const cityCtx = useCityOptional();
+  const effectiveCitySlug = useMemo(() => {
+    if (currentCitySlug != null && String(currentCitySlug).trim() !== "") {
+      return String(currentCitySlug).trim();
+    }
+    if (cityCtx?.isReady) {
+      return cityCtx.city.slug;
+    }
+    return DEFAULT_PUBLIC_CITY_SLUG;
+  }, [currentCitySlug, cityCtx?.isReady, cityCtx?.city.slug]);
+
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -79,7 +93,7 @@ export function SmartVehicleSearch({
     close,
     open,
   } = useSemanticAutocomplete({
-    currentCitySlug,
+    currentCitySlug: effectiveCitySlug,
     limit: 8,
     debounceMs: 220,
     minLength,

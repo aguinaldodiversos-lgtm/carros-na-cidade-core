@@ -40,7 +40,12 @@ function fallbackHome(): HomeDataResponse["data"] {
   };
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+function homeCacheTags(citySlug?: string): string[] {
+  const s = citySlug?.trim() || "default";
+  return ["public-home", `public-home:${s}`];
+}
+
+async function fetchJson<T>(url: string, tags: string[]): Promise<T | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
@@ -48,7 +53,7 @@ async function fetchJson<T>(url: string): Promise<T | null> {
     const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
-      cache: "no-store",
+      next: { revalidate: 300, tags },
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
 
@@ -61,7 +66,8 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 
 async function fetchAdsCollection(
   apiBase: string,
-  params: Record<string, string | number | boolean>
+  params: Record<string, string | number | boolean>,
+  tags: string[]
 ): Promise<AdItem[]> {
   const query = new URLSearchParams();
 
@@ -73,20 +79,40 @@ async function fetchAdsCollection(
   const json = await fetchJson<{
     success?: boolean;
     data?: AdItem[];
-  }>(`${apiBase}/api/ads/search?${query.toString()}`);
+  }>(`${apiBase}/api/ads/search?${query.toString()}`, tags);
 
   return Array.isArray(json?.data) ? json.data : [];
 }
 
-export async function fetchPublicHomeData(): Promise<HomeDataResponse["data"]> {
+/**
+ * Home pública por território. Usa `city_slug` + opcionalmente `city_id` para alinhar com o backend.
+ * Tags Next.js permitem `revalidateTag` quando houver webhook de invalidação.
+ */
+export async function fetchPublicHomeData(
+  citySlug?: string,
+  cityId?: number
+): Promise<HomeDataResponse["data"]> {
   const apiBase = getApiBaseUrl();
   const empty = fallbackHome();
 
+  const cs = citySlug?.trim();
+  const tags = homeCacheTags(cs);
+  const withTerritory = (base: Record<string, string | number | boolean>) => {
+    const o: Record<string, string | number | boolean> = { ...base };
+    if (cs) o.city_slug = cs;
+    if (cityId && Number.isFinite(cityId) && cityId > 0) o.city_id = cityId;
+    return o;
+  };
+
   const [homeJson, highlightAds, opportunityAds, recentAds] = await Promise.all([
-    fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`),
-    fetchAdsCollection(apiBase, { highlight_only: true, limit: 4 }),
-    fetchAdsCollection(apiBase, { below_fipe: true, limit: 4 }),
-    fetchAdsCollection(apiBase, { limit: 8, sort: "recent" }),
+    fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`, tags),
+    fetchAdsCollection(
+      apiBase,
+      withTerritory({ highlight_only: true, limit: 12, sort: "highlight" }),
+      tags
+    ),
+    fetchAdsCollection(apiBase, withTerritory({ below_fipe: true, limit: 4 }), tags),
+    fetchAdsCollection(apiBase, withTerritory({ limit: 8, sort: "recent" }), tags),
   ]);
 
   const homeData = homeJson?.success && homeJson.data ? homeJson.data : empty;

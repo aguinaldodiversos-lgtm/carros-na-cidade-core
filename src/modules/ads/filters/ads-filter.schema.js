@@ -150,6 +150,9 @@ const adsFilterQueryBase = z.object({
   // flags
   below_fipe: boolParam().optional(),
   highlight: boolParam().optional(),
+
+  /** Filtra anúncios do mesmo anunciante (loja) — busca pública. */
+  advertiser_id: intParam(1, 2147483647).optional(),
 });
 
 /* =========================================================

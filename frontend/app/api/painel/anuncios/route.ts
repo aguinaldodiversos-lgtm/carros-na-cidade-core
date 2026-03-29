@@ -5,7 +5,7 @@ import {
   buildBackendCreateAdPayload,
   extractBackendErrorMessage,
   fetchResolvedCityByIdFromBackend,
-  type WizardNormalizedFields,
+  type PublishWizardInput,
 } from "@/lib/painel/create-ad-backend";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import {
@@ -26,18 +26,14 @@ function toBoolean(value: string) {
   return value === "true" || value === "1" || value === "on";
 }
 
-function buildNormalizedPayload(source: FormData): WizardNormalizedFields {
-  const photos = source
-    .getAll("photos")
-    .filter((item): item is File => item instanceof File && item.size > 0);
-
+/** Extrai apenas campos usados em POST /api/ads (demais chaves do FormData são ignoradas). */
+function parsePublishWizardForm(source: FormData): PublishWizardInput {
   return {
     cityId: firstText(source, "cityId"),
     brand: firstText(source, "brand"),
     model: firstText(source, "model"),
     version: firstText(source, "version"),
     yearModel: firstText(source, "yearModel"),
-    yearManufacture: firstText(source, "yearManufacture"),
     mileage: firstText(source, "mileage"),
     price: firstText(source, "price"),
     fipeValue: firstText(source, "fipeValue"),
@@ -46,18 +42,9 @@ function buildNormalizedPayload(source: FormData): WizardNormalizedFields {
     fuel: firstText(source, "fuel"),
     transmission: firstText(source, "transmission"),
     bodyStyle: firstText(source, "bodyStyle"),
-    color: firstText(source, "color"),
-    plateFinal: firstText(source, "plateFinal"),
     title: firstText(source, "title"),
     description: firstText(source, "description"),
-    whatsapp: firstText(source, "whatsapp"),
-    phone: firstText(source, "phone"),
     acceptTerms: toBoolean(firstText(source, "acceptTerms")),
-    armored: toBoolean(firstText(source, "armored")),
-    optionalFeatures: firstText(source, "optionalFeatures"),
-    conditionFlags: firstText(source, "conditionFlags"),
-    boostOptionId: firstText(source, "boostOptionId"),
-    photoCount: photos.length,
   };
 }
 
@@ -90,7 +77,17 @@ export async function POST(request: NextRequest) {
     }
 
     const source = await request.formData();
-    const normalized = buildNormalizedPayload(source);
+    const normalized = parsePublishWizardForm(source);
+
+    if (!normalized.acceptTerms) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "É necessário aceitar os termos para publicar o anúncio.",
+        },
+        { status: 400 }
+      );
+    }
 
     const session = getSessionDataFromRequest(request);
     const ensured = await ensureSessionWithFreshBackendTokens(session);
@@ -150,10 +147,7 @@ export async function POST(request: NextRequest) {
     const body = buildBackendCreateAdPayload(normalized, resolved, accountType);
     const url = resolveBackendApiUrl("/api/ads");
     if (!url) {
-      return NextResponse.json(
-        { ok: false, message: "URL do backend inválida." },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, message: "URL do backend inválida." }, { status: 500 });
     }
 
     const response = await fetch(url, {

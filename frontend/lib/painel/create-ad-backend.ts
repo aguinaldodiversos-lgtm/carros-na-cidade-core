@@ -1,18 +1,29 @@
 /**
- * Mapeia o wizard de anúncio para o payload esperado pelo backend
- * (`validateCreateAdPayload` em `src/modules/ads/ads.validators.js`).
+ * BFF → POST /api/ads (backend modular).
+ *
+ * Contrato espelha `validateCreateAdPayload` / `CreateAdSchema` em:
+ *   `src/modules/ads/ads.validators.js`
+ *
+ * O backend resolve `advertiser_id` via sessão + `ensurePublishEligibility` — nunca envie
+ * `advertiser_id` no JSON.
+ *
+ * Campos de veículo (`body_type`, `fuel_type`, `transmission`) aceitam rótulos livres no
+ * JSON; o backend aplica `ads.storage-normalize` + enums canônicos (`ads.canonical.constants.js`).
  */
 import type { AccountType } from "@/lib/dashboard-types";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 
-export type WizardNormalizedFields = {
-  /** id enviado pelo wizard quando o usuário escolhe uma cidade na lista */
+/**
+ * Campos do wizard usados exclusivamente para montar o corpo de POST /api/ads.
+ * Outros campos do FormData (fotos, opcionais, etc.) são ignorados por esta camada até
+ * existir endpoint de mídia no mesmo contrato.
+ */
+export type PublishWizardInput = {
   cityId: string;
   brand: string;
   model: string;
   version: string;
   yearModel: string;
-  yearManufacture: string;
   mileage: string;
   price: string;
   fipeValue: string;
@@ -21,18 +32,31 @@ export type WizardNormalizedFields = {
   fuel: string;
   transmission: string;
   bodyStyle: string;
-  color: string;
-  plateFinal: string;
   title: string;
   description: string;
-  whatsapp: string;
-  phone: string;
   acceptTerms: boolean;
-  armored: boolean;
-  optionalFeatures: string;
-  conditionFlags: string;
-  boostOptionId: string;
-  photoCount: number;
+};
+
+/**
+ * Corpo JSON oficial de criação — alinhado ao CreateAdSchema (snake_case).
+ * @see src/modules/ads/ads.validators.js
+ */
+export type BackendCreateAdPayload = {
+  title: string;
+  description?: string | null;
+  price: number;
+  city_id: number;
+  city: string;
+  state: string;
+  brand: string;
+  model: string;
+  year: number;
+  mileage: number;
+  category?: string | null;
+  body_type?: string | null;
+  fuel_type?: string | null;
+  transmission?: string | null;
+  below_fipe: boolean;
 };
 
 export function parsePriceBr(value: string): number {
@@ -68,32 +92,18 @@ export type ResolvedCityRow = {
   slug?: string;
 };
 
-export type BackendCreateAdPayload = {
-  title: string;
-  description?: string | null;
-  price: number;
-  city_id: number;
-  city: string;
-  state: string;
-  brand: string;
-  model: string;
-  year: number;
-  mileage: number;
-  category?: string | null;
-  body_type?: string | null;
-  fuel_type?: string | null;
-  transmission?: string | null;
-  below_fipe: boolean;
-};
-
-function buildDefaultTitle(n: WizardNormalizedFields): string {
+function buildDefaultTitle(n: PublishWizardInput): string {
   const parts = [n.yearModel, n.brand, n.model, n.version].filter(Boolean);
   const t = parts.join(" ").trim();
   return t.length >= 3 ? t : `${n.brand} ${n.model}`.trim() || "Anuncio veiculo";
 }
 
+/**
+ * Monta o JSON enviado a POST /api/ads.
+ * `city` / `state` vêm da cidade resolvida no backend público (fonte de verdade), não do texto livre do formulário.
+ */
 export function buildBackendCreateAdPayload(
-  n: WizardNormalizedFields,
+  n: PublishWizardInput,
   resolved: ResolvedCityRow,
   accountType: AccountType
 ): BackendCreateAdPayload {
@@ -161,7 +171,7 @@ function parseResolvedCityPayload(json: unknown, fallbackUf?: string): ResolvedC
   };
 }
 
-/** Resolve cidade por id (validação quando o wizard envia city_id). */
+/** GET /api/public/cities/by-id/:id — valida city_id antes do publish. */
 export async function fetchResolvedCityByIdFromBackend(
   cityId: number,
   fallbackUf?: string

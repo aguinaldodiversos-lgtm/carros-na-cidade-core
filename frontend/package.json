@@ -16,6 +16,7 @@
     "prepare:standalone": "node ./scripts/prepare-standalone.mjs",
     "verify:standalone": "node ./scripts/verify-standalone.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:main": "playwright test e2e/main-flow.spec.ts",
     "test:e2e:publish": "playwright test e2e/login-ad-publish.spec.ts",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -33,10 +34,12 @@
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "^20.19.9",
+    "@types/pg": "^8.20.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
+    "pg": "^8.20.0",
     "typescript": "^5.6.3"
   }
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 type StaticPageSection = {
@@ -10,6 +11,8 @@ interface StaticPageLayoutProps {
   title: string;
   description: string;
   sections: StaticPageSection[];
+  /** Conteúdo opcional após as seções (ex.: links legais). */
+  afterSections?: ReactNode;
 }
 
 export function StaticPageLayout({
@@ -17,6 +20,7 @@ export function StaticPageLayout({
   title,
   description,
   sections,
+  afterSections,
 }: StaticPageLayoutProps) {
   return (
     <main className="min-h-screen bg-[#f4f6fa]">
@@ -52,6 +56,8 @@ export function StaticPageLayout({
               </section>
             ))}
           </div>
+
+          {afterSections ? <div className="mt-2 border-t border-[#eef1f7] pt-6">{afterSections}</div> : null}
         </div>
       </div>
     </main>

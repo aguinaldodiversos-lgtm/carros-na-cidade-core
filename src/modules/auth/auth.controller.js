@@ -7,6 +7,7 @@ export async function login(req, res, next) {
     const tokens = await authService.login(email, password, {
       ip: req.ip,
       userAgent: req.headers["user-agent"],
+      requestId: req.requestId,
     });
 
     res.json(tokens);
@@ -22,6 +23,7 @@ export async function refresh(req, res, next) {
     const tokens = await authService.refresh(refreshToken, {
       ip: req.ip,
       userAgent: req.headers["user-agent"],
+      requestId: req.requestId,
     });
 
     res.json(tokens);

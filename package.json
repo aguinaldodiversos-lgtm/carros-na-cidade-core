@@ -13,7 +13,16 @@
     "workers:debug": "node --inspect src/workers/bootstrap.js",
     "lint": "eslint src scripts --ext .js,.mjs",
     "lint:fix": "eslint src scripts --ext .js,.mjs --fix",
-    "test": "vitest run",
+    "test": "vitest run --exclude tests/integration/**",
+    "integration:db:up": "docker compose -f docker-compose.test.yml up -d",
+    "integration:db:down": "docker compose -f docker-compose.test.yml down",
+    "integration:db:wait": "node scripts/wait-for-postgres.mjs",
+    "integration:db:prepare": "node scripts/integration-db-prepare.mjs",
+    "test:integration:ads": "node scripts/run-integration-ads-tests.mjs",
+    "test:integration:ads:full": "npm run integration:db:up && npm run integration:db:wait && npm run integration:db:prepare && npm run test:integration:ads",
+    "test:pg-contract": "node scripts/run-pg-fuel-contract.mjs",
+    "db:check-ads": "node scripts/print-ads-constraints.js",
+    "db:print-checks": "node scripts/print-ads-constraints.js",
     "test:watch": "vitest",
     "seed:cities": "node scripts/seed-ibge-municipios.mjs",
     "import:cities": "node scripts/import-ibge-cities.js",
@@ -30,7 +39,10 @@
     "audit:integration": "node ./scripts/project-audit.mjs --scope=integration",
     "audit:jsx-ts": "node ./scripts/project-audit.mjs --scope=jsx-ts",
     "check": "npm run lint && npm run test",
-    "verify": "npm run check && npm run audit:project"
+    "verify": "npm run check && npm run audit:project",
+    "test:e2e": "npm run test:e2e --prefix frontend",
+    "test:e2e:main": "npm run test:e2e:main --prefix frontend",
+    "e2e": "npm run test:e2e --prefix frontend"
   },
   "engines": {
     "node": ">=20 <21"

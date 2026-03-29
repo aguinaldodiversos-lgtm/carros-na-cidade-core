@@ -1,6 +1,12 @@
-const { BetaAnalyticsDataClient } = require("@google-analytics/data");
-const path = require("path");
-const pool = require("../../database/connection");
+import path from "path";
+import { fileURLToPath } from "url";
+import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const keyPath = path.join(
   __dirname,
@@ -49,8 +55,18 @@ class GA4Collector {
       );
     }
 
-    console.log("✅ Dados GA4 coletados");
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "seo.ga4.collect",
+          result: "success",
+        }),
+        propertyId,
+        rows: response.rows?.length ?? 0,
+      },
+      "[seo] dados GA4 coletados"
+    );
   }
 }
 
-module.exports = new GA4Collector();
+export default new GA4Collector();

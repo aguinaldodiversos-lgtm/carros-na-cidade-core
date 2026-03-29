@@ -1,7 +1,13 @@
 import { AppError } from "../../shared/middlewares/error.middleware.js";
-import { slugify } from "../../shared/utils/slugify.js";
-import { ensureAdvertiserForPublishing } from "../advertisers/advertiser.ensure.service.js";
+import {
+  executeAdUpdate,
+  prepareAdUpdatePayload,
+} from "./ads.persistence.service.js";
 import * as adsRepository from "./ads.repository.js";
+import {
+  logAdsPublishFailure,
+  sanitizeAdPayloadForLog,
+} from "./ads.publish-flow.log.js";
 
 function assertOwner(ownerContext, userId) {
   if (!ownerContext) {
@@ -18,35 +24,43 @@ function assertOwner(ownerContext, userId) {
   }
 }
 
-export async function createAd(data, user) {
-  const advertiser = await ensureAdvertiserForPublishing(user.id, {
-    cityId: data.city_id,
-  });
+export async function updateAd(id, data, user, ctx = {}) {
+  const requestId = ctx.requestId ?? null;
+  let stage = "loadOwnerContext";
+  let advertiserId = null;
+  let cityId = null;
 
-  const slug = slugify(
-    `${data.brand}-${data.model}-${data.year}-${Date.now()}`
-  );
+  try {
+    const ownerContext = await adsRepository.findOwnerContextById(id);
+    if (ownerContext) {
+      advertiserId = ownerContext.advertiser_id ?? null;
+      cityId = ownerContext.city_id ?? null;
+    }
+    assertOwner(ownerContext, user.id);
 
-  return adsRepository.createAd({
-    ...data,
-    advertiser_id: advertiser.id,
-    plan: user.plan || "free",
-    slug,
-    status: "active",
-  });
-}
+    stage = "prepareUpdatePayload";
+    const payload = prepareAdUpdatePayload({ ...data });
 
-export async function updateAd(id, data, user) {
-  const ownerContext = await adsRepository.findOwnerContextById(id);
-  assertOwner(ownerContext, user.id);
+    stage = "executeUpdate";
+    const updated = await executeAdUpdate(id, payload, { requestId });
 
-  const updated = await adsRepository.updateAd(id, data);
+    if (!updated) {
+      throw new AppError("Falha ao atualizar anúncio", 500);
+    }
 
-  if (!updated) {
-    throw new AppError("Falha ao atualizar anúncio", 500);
+    return updated;
+  } catch (err) {
+    logAdsPublishFailure(err, {
+      stage: `ads.updateAd.${stage}`,
+      requestId,
+      userId: user.id,
+      advertiserId,
+      cityId,
+      adId: id,
+      payload: sanitizeAdPayloadForLog({ ...data, ad_id: id }),
+    });
+    throw err;
   }
-
-  return updated;
 }
 
 export async function removeAd(id, user) {

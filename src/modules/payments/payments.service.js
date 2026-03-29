@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { query, withTransaction } from "../../infrastructure/database/db.js";
 import { getAccountUser, getOwnedAd, getPlanById, listBoostOptions } from "../account/account.service.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const MP_PUBLIC_KEY = process.env.MP_PUBLIC_KEY || "";
@@ -152,6 +154,7 @@ export async function createPlanCheckout({
   successUrl,
   failureUrl,
   pendingUrl,
+  requestId,
 }) {
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
@@ -190,6 +193,21 @@ export async function createPlanCheckout({
       status: "pending",
       metadata,
     });
+
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "payments.checkout.plan",
+          result: "success",
+          requestId,
+          userId,
+        }),
+        planId: plan.id,
+        intentId,
+        mock: true,
+      },
+      "[payments] checkout plan (mock)"
+    );
 
     return {
       plan_id: plan.id,
@@ -242,6 +260,21 @@ export async function createPlanCheckout({
     metadata,
   });
 
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "payments.checkout.plan",
+        result: "success",
+        requestId,
+        userId,
+      }),
+      planId: plan.id,
+      intentId,
+      mercadoPagoId: preference.id,
+    },
+    "[payments] checkout plan criado"
+  );
+
   return {
     plan_id: plan.id,
     payment_type: "one_time",
@@ -255,6 +288,7 @@ export async function createPlanSubscription({
   userId,
   planId,
   successUrl,
+  requestId,
 }) {
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
@@ -294,6 +328,21 @@ export async function createPlanSubscription({
       status: "pending",
       metadata,
     });
+
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "payments.checkout.subscription",
+          result: "success",
+          requestId,
+          userId,
+        }),
+        planId: plan.id,
+        intentId,
+        mock: true,
+      },
+      "[payments] subscription checkout (mock)"
+    );
 
     return {
       plan_id: plan.id,
@@ -335,6 +384,21 @@ export async function createPlanSubscription({
     metadata,
   });
 
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "payments.checkout.subscription",
+        result: "success",
+        requestId,
+        userId,
+      }),
+      planId: plan.id,
+      intentId,
+      mercadoPagoId: preapproval.id,
+    },
+    "[payments] subscription checkout criado"
+  );
+
   return {
     plan_id: plan.id,
     payment_type: "recurring",
@@ -351,6 +415,7 @@ export async function createBoostCheckout({
   successUrl,
   failureUrl,
   pendingUrl,
+  requestId,
 }) {
   const [user, ad] = await Promise.all([getAccountUser(userId), getOwnedAd(userId, adId)]);
   const boostOption = listBoostOptions().find((option) => option.id === boostOptionId);
@@ -384,6 +449,21 @@ export async function createBoostCheckout({
       status: "pending",
       metadata,
     });
+
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "payments.checkout.boost",
+          result: "success",
+          requestId,
+          userId,
+        }),
+        adId: ad.id,
+        intentId,
+        mock: true,
+      },
+      "[payments] boost checkout (mock)"
+    );
 
     return {
       context: "ad_boost",
@@ -437,6 +517,21 @@ export async function createBoostCheckout({
     status: "pending",
     metadata,
   });
+
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "payments.checkout.boost",
+        result: "success",
+        requestId,
+        userId,
+      }),
+      adId: ad.id,
+      intentId,
+      mercadoPagoId: preference.id,
+    },
+    "[payments] boost checkout criado"
+  );
 
   return {
     context: "ad_boost",
@@ -649,6 +744,7 @@ async function applyBoostApproval(client, intent) {
           THEN highlight_until + ($2 || ' days')::interval
         ELSE NOW() + ($2 || ' days')::interval
       END,
+      priority = LEAST(99, COALESCE(priority, 1) + 8),
       updated_at = NOW()
     WHERE id = $1
       AND status != 'deleted'
@@ -661,15 +757,38 @@ export async function handleWebhookNotification({
   rawBody,
   signature,
   requestId,
+  traceRequestId,
 }) {
   const isValid = verifyWebhookSignature(rawBody, signature, requestId);
   if (!isValid) {
+    logger.warn(
+      {
+        ...buildDomainFields({
+          action: "payments.webhook.verify",
+          result: "error",
+          requestId: traceRequestId,
+        }),
+        reason: "invalid_signature",
+      },
+      "[payments] webhook assinatura inválida"
+    );
     throw new AppError("invalid signature", 401);
   }
 
   const payload = rawBody ? JSON.parse(rawBody) : {};
   const resourceId = String(payload?.data?.id ?? "");
   if (!resourceId) {
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "payments.webhook",
+          result: "success",
+          requestId: traceRequestId,
+        }),
+        ignored: true,
+      },
+      "[payments] webhook sem resource id — ignorado"
+    );
     return { ok: true, ignored: true };
   }
 
@@ -678,6 +797,17 @@ export async function handleWebhookNotification({
   const intent = await resolveIntentForWebhook(paymentData, resourceId);
 
   if (!intent) {
+    logger.warn(
+      {
+        ...buildDomainFields({
+          action: "payments.webhook.resolve_intent",
+          result: "error",
+          requestId: traceRequestId,
+        }),
+        resourceId,
+      },
+      "[payments] webhook intent não encontrado"
+    );
     return { ok: true, warning: "payment intent not found" };
   }
 
@@ -797,6 +927,21 @@ export async function handleWebhookNotification({
       await applyBoostApproval(client, boostIntent);
     }
   });
+
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "payments.webhook.apply",
+        result: "success",
+        requestId: traceRequestId,
+        userId: intent.user_id,
+      }),
+      paymentStatus: paymentData.status,
+      context: intent.context,
+      intentId: intent.id,
+    },
+    "[payments] webhook processado"
+  );
 
   return {
     ok: true,

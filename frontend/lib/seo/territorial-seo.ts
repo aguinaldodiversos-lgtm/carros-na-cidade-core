@@ -21,7 +21,7 @@ function normalizeTitle(title?: string | null): string {
 function normalizeDescription(description?: string | null): string {
   const raw = sanitizeText(
     description,
-    "Encontre veículos, ofertas e oportunidades locais no Carros na Cidade."
+    "Marketplace automotivo regional: carros por cidade e estado, com filtros e rotas que respeitam o território — Carros na Cidade."
   );
 
   return raw.length <= 160 ? raw : `${raw.slice(0, 157)}...`;

@@ -62,7 +62,11 @@ router.post(
       "auth.service.js"
     );
 
-    const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+    const meta = {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || null,
+      requestId: req.requestId,
+    };
 
     const result = await login(email, password, meta);
 
@@ -76,7 +80,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const refreshToken = requireString(req.body?.refreshToken, "refreshToken");
     const refresh = ensureFn(AuthService, ["refresh"], "auth.service.js");
-    const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+    const meta = {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || null,
+      requestId: req.requestId,
+    };
 
     const result = await refresh(refreshToken, meta);
 
@@ -119,7 +127,11 @@ router.post(
       "auth.service.js"
     );
 
-    const meta = { ip: req.ip, userAgent: req.headers["user-agent"] || null };
+    const meta = {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"] || null,
+      requestId: req.requestId,
+    };
 
     const result = await register(
       { name, email, password, phone, city, document_type, document_number },

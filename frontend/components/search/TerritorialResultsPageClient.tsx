@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AdsSearchFilters, AdsFacetsResponse } from "../../lib/search/ads-search";
@@ -25,6 +26,7 @@ import { SmartVehicleSearch } from "./SmartVehicleSearch";
 import { TerritorialBreadcrumbs } from "./TerritorialBreadcrumbs";
 import { TerritorialHeroLinks } from "./TerritorialHeroLinks";
 import { TerritorialInternalLinksSection } from "./TerritorialInternalLinksSection";
+import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
 
 type TerritorialMode =
   | "city"
@@ -256,24 +258,33 @@ export function TerritorialResultsPageClient({
   }, [data.facets]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
+    <main className="mx-auto w-full max-w-7xl px-4 py-7 md:px-6 md:py-9 xl:px-8">
       <TerritorialBreadcrumbs data={data} mode={mode} />
 
-      <section className="rounded-[28px] border border-[#e2e8f0] bg-white p-6 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+      <section className="rounded-[28px] border border-[#e2e8f0] bg-gradient-to-br from-white to-[#f8fafc] p-6 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-3">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0e62d8]">
-            SEO territorial
+            {data.city?.name
+              ? `Carros na Cidade · ${data.city.name}${
+                  data.city.state ? ` (${data.city.state})` : ""
+                }`
+              : "Carros na Cidade · sua região"}
           </span>
 
-          <h1 className="text-2xl font-extrabold text-[#0f172a] md:text-3xl">
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#0f172a] md:text-[32px] md:leading-tight">
             {data.seo?.title || "Resultados da cidade"}
           </h1>
 
           {data.seo?.description ? (
-            <p className="max-w-4xl text-sm leading-6 text-[#64748b] md:text-base">
+            <p className="max-w-4xl text-sm leading-7 text-[#64748b] md:text-[15px]">
               {data.seo.description}
             </p>
-          ) : null}
+          ) : (
+            <p className="max-w-4xl text-sm leading-7 text-[#64748b] md:text-[15px]">
+              Explore anúncios e rotas pensadas para este território — com filtros que respeitam a
+              cidade que você escolheu.
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-2 pt-1">
             {data.city?.name && (
@@ -309,12 +320,24 @@ export function TerritorialResultsPageClient({
           </div>
 
           <TerritorialHeroLinks data={data} />
+
+          <div className="mt-5 flex flex-col gap-3 border-t border-[#e2e8f0] pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[13px] font-medium uppercase tracking-[0.1em] text-[#64748b]">
+              {REGIONAL_BRAND_TAGLINE}
+            </p>
+            <Link
+              href={`/comprar?city_slug=${encodeURIComponent(slug)}`}
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-5 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(31,102,229,0.22)] transition hover:bg-[#1758CC]"
+            >
+              Catálogo completo em {data.city?.name || "sua cidade"}
+            </Link>
+          </div>
         </div>
       </section>
 
       <div className="mt-6">
         <SmartVehicleSearch
-          placeholder="Ex.: Corolla XEi, Hilux diesel, Onix até 80 mil"
+          placeholder={`Buscar em ${data.city?.name || "sua cidade"}: modelo, combustível ou faixa de preço`}
           resultsBasePath={pathname}
           currentCitySlug={slug}
         />
@@ -336,7 +359,7 @@ export function TerritorialResultsPageClient({
           <div className="text-sm text-[#64748b]">
             {loading
               ? "Atualizando resultados..."
-              : `${primaryPagination?.total || primaryItems.length || 0} resultados`}
+              : `${primaryPagination?.total || primaryItems.length || 0} anúncios neste território`}
           </div>
 
           <SearchSortSelect

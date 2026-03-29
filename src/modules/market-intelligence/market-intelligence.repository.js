@@ -13,6 +13,12 @@ export async function listTopOpportunities(limit = 20) {
       c.stage,
       COALESCE(co.opportunity_score, 0) AS opportunity_score,
       COALESCE(co.priority_level, 'low') AS priority_level,
+      CASE COALESCE(co.priority_level, 'low')
+        WHEN 'critical' THEN 'alta'
+        WHEN 'high' THEN 'alta'
+        WHEN 'medium' THEN 'media'
+        ELSE 'baixa'
+      END AS growth_tier_pt,
       COALESCE(cm.demand_score, 0) AS demand_score,
       COALESCE(cd.dominance_score, 0) AS dominance_score,
       COALESCE(cd.total_ads, 0) AS total_ads,
@@ -44,6 +50,12 @@ export async function getCityOpportunityBySlug(slug) {
       c.stage,
       COALESCE(co.opportunity_score, 0) AS opportunity_score,
       COALESCE(co.priority_level, 'low') AS priority_level,
+      CASE COALESCE(co.priority_level, 'low')
+        WHEN 'critical' THEN 'alta'
+        WHEN 'high' THEN 'alta'
+        WHEN 'medium' THEN 'media'
+        ELSE 'baixa'
+      END AS growth_tier_pt,
       COALESCE(co.demand_index, 0) AS demand_index,
       COALESCE(co.supply_index, 0) AS supply_index,
       COALESCE(cm.demand_score, 0) AS demand_score,
@@ -76,6 +88,12 @@ export async function listCityOpportunitySignals(limit = 50) {
       c.state,
       c.stage,
       COALESCE(co.priority_level, 'low') AS priority_level,
+      CASE COALESCE(co.priority_level, 'low')
+        WHEN 'critical' THEN 'alta'
+        WHEN 'high' THEN 'alta'
+        WHEN 'medium' THEN 'media'
+        ELSE 'baixa'
+      END AS growth_tier_pt,
       COALESCE(co.opportunity_score, 0) AS opportunity_score,
       COALESCE(cp.prediction_label, 'cold') AS prediction_label,
       COALESCE(cp.prediction_score, 0) AS prediction_score

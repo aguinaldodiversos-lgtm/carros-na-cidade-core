@@ -56,7 +56,8 @@ async function processarCidade(cidade, cidadeFocoId) {
 
     const oportunidade = oppResult.rows[0].priority_level;
 
-    if (!isCidadeFoco && !["critical"].includes(oportunidade)) {
+    const tierAtiva = ["critical", "high", "medium"].includes(oportunidade);
+    if (!isCidadeFoco && !tierAtiva) {
       return;
     }
 

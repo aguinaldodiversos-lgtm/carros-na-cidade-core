@@ -1,4 +1,5 @@
 // frontend/lib/search/semantic-autocomplete.ts
+// GET /api/ads/autocomplete e GET /api/ads/autocomplete/semantic — Express: src/modules/ads/ads.routes.js (prefixo /api/ads em app.js).
 
 export type AutocompleteSuggestionType =
   | "brand"

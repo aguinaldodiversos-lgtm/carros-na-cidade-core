@@ -6,6 +6,8 @@ export interface AdsSearchFilters {
   city_slug?: string;
   city?: string;
   state?: string;
+  /** Anúncios do mesmo anunciante (ex.: loja). */
+  advertiser_id?: number;
   min_price?: number;
   max_price?: number;
   year_min?: number;
@@ -357,6 +359,7 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   appendIfPresent(params, "city_slug", filters.city_slug);
   appendIfPresent(params, "city", filters.city);
   appendIfPresent(params, "state", filters.state);
+  appendIfPresent(params, "advertiser_id", filters.advertiser_id);
   appendIfPresent(params, "min_price", filters.min_price);
   appendIfPresent(params, "max_price", filters.max_price);
   appendIfPresent(params, "year_min", filters.year_min);

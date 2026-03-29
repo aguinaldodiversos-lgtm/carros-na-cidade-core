@@ -249,6 +249,22 @@ function normalizeEndpointPath(value) {
   return output || "/";
 }
 
+/**
+ * `fetch(\`${apiBase}/api/...\`)` normaliza para `:param/api/...` ou `/:param/api/...`
+ * (normalizeEndpointPath substitui `${...}` e pode ou não preservar `/` inicial).
+ * O backend Express monta `/api/...` sem o segmento de host — alinhamos para o match.
+ */
+function stripLeadingApiBasePlaceholder(path) {
+  const p = normalizeEndpointPath(path);
+  if (p.startsWith("/:param/api/")) {
+    return p.replace(/^\/:param/, "");
+  }
+  if (p.startsWith(":param/api/")) {
+    return p.slice(":param".length);
+  }
+  return p;
+}
+
 function collectFrontendRoutes() {
   const appDir = path.join(ROOT, config.frontendDir, "app");
   if (!exists(appDir)) return [];
@@ -358,7 +374,11 @@ function collectBackendRouteRegistry() {
   const prefixesByFile = new Map();
 
   for (const [file, entry] of registry) {
-    prefixesByFile.set(file, new Set([""]));
+    // Não sobrescrever: app.js pode já ter registado prefixos em ficheiros de router
+    // montados antes deste ficheiro ser visitado na iteração.
+    if (!prefixesByFile.has(file)) {
+      prefixesByFile.set(file, new Set([""]));
+    }
 
     const localImportMap = new Map();
 
@@ -381,10 +401,11 @@ function collectBackendRouteRegistry() {
       const resolved = localImportMap.get(localName);
 
       if (resolved && registry.has(path.normalize(resolved))) {
-        if (!prefixesByFile.has(path.normalize(resolved))) {
-          prefixesByFile.set(path.normalize(resolved), new Set());
+        const key = path.normalize(resolved);
+        if (!prefixesByFile.has(key)) {
+          prefixesByFile.set(key, new Set([""]));
         }
-        prefixesByFile.get(path.normalize(resolved)).add(prefix);
+        prefixesByFile.get(key).add(prefix);
       }
     }
   }
@@ -700,6 +721,17 @@ function auditFrontendBackendIntegration(findings) {
       const pathCandidate = call.normalizedPath;
       if (!pathCandidate || pathCandidate === "/") continue;
 
+      /** Serviço opcional (métricas de boost), não é a API core em `src/app.js`. */
+      if (
+        typeof call.raw === "string" &&
+        (call.raw.includes("AI_API_BASE") ||
+          call.raw.includes("NEXT_PUBLIC_AI_API_URL"))
+      ) {
+        continue;
+      }
+
+      const pathForBackendMatch = stripLeadingApiBasePlaceholder(pathCandidate);
+
       const matchingHint = contractHints.find(
         (hint) =>
           pathMatchesPattern(pathCandidate, hint.frontendPath) &&
@@ -709,13 +741,13 @@ function auditFrontendBackendIntegration(findings) {
       const matchingBackend = backendRegistry.find(
         (route) =>
           route.method === call.method &&
-          pathMatchesPattern(pathCandidate, route.path)
+          pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
       const backendMethodMismatch = backendRegistry.find(
         (route) =>
           route.method !== call.method &&
-          pathMatchesPattern(pathCandidate, route.path)
+          pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
       if (!matchingHint && !matchingBackend) {

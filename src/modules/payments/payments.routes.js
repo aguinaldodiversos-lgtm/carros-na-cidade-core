@@ -44,6 +44,7 @@ router.post(
         userId: req.user.id,
         adId,
         boostOptionId,
+        requestId: req.requestId,
         ...urls,
       });
 
@@ -58,6 +59,7 @@ router.post(
     const payload = await createPlanCheckout({
       userId: req.user.id,
       planId,
+      requestId: req.requestId,
       ...urls,
     });
 
@@ -91,6 +93,7 @@ router.post(
       rawBody: req.rawBody || JSON.stringify(req.body || {}),
       signature: req.headers["x-signature"] || null,
       requestId: req.headers["x-request-id"] || null,
+      traceRequestId: req.requestId,
     });
 
     res.json(payload);

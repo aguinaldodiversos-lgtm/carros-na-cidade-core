@@ -636,6 +636,14 @@ export function StepFinalize({
         </div>
       ) : null}
 
+      {dashboard?.publish_eligibility &&
+      !dashboard.publish_eligibility.allowed &&
+      dashboard.publish_eligibility.reason ? (
+        <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
+          {dashboard.publish_eligibility.reason}
+        </div>
+      ) : null}
+
       {showPfOrParticularPayment ? (
         <div className="rounded-[24px] border border-[#DCE6F7] bg-white p-6">
           <h4 className="text-lg font-extrabold text-[#1D2440]">Publicação e pagamento (pessoa física)</h4>

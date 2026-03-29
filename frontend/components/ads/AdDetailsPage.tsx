@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { AdDetails, RelatedAd } from "@/lib/ads/get-ad-details";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
+import { useCityOptional } from "@/lib/city/CityContext";
+import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 type Props = {
   ad: AdDetails;
@@ -263,6 +265,7 @@ function VehicleCard({ item }: { item: RelatedAd }) {
 }
 
 export default function AdDetailsPage({ ad }: Props) {
+  const cityCtx = useCityOptional();
   const safeTitle = toText(ad.title, "Veículo");
   const safeCity = toText(ad.city, DEFAULT_CITY);
   const safeState = toText(ad.state, DEFAULT_STATE);
@@ -337,8 +340,9 @@ export default function AdDetailsPage({ ad }: Props) {
       cidade: safeCity,
     });
 
-    return `/simulador-financiamento/sao-paulo-sp?${params.toString()}`;
-  }, [ad.price, ad.slug, safeCity, safeTitle]);
+    const slug = cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG;
+    return `/simulador-financiamento/${encodeURIComponent(slug)}?${params.toString()}`;
+  }, [ad.price, ad.slug, safeCity, safeTitle, cityCtx?.city.slug]);
 
   const price = toNumber(ad.price, 0);
   const fipeValue = toNumber(ad.fipeValue, 0);

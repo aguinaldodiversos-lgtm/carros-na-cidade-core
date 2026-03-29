@@ -16,6 +16,8 @@ import {
 import CatalogVehicleCard, {
   type CatalogItem,
 } from "@/components/buy/CatalogVehicleCard";
+import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
+import { SITE_ROUTES } from "@/lib/site/site-navigation";
 
 type CityContext = {
   name: string;
@@ -355,7 +357,12 @@ function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
   return 1;
 }
 
-function sortCatalogItems(items: CatalogItem[]) {
+function sortCatalogItems(items: CatalogItem[], sort?: string) {
+  const mode = sort || "relevance";
+  if (mode === "relevance" || mode === "highlight") {
+    return items;
+  }
+
   return [...items].sort((a, b) => {
     const weightA = inferWeight(a);
     const weightB = inferWeight(b);
@@ -388,11 +395,11 @@ function TopPromoBanner() {
       <div className="relative flex items-center justify-between gap-6">
         <div>
           <h3 className="text-[22px] font-extrabold text-[#1D2440]">
-            Venda mais rápido
+            Destaque na região
           </h3>
           <p className="mt-1 text-[16px] text-[#5F6780]">
-            com anúncios em{" "}
-            <span className="font-extrabold text-[#1F66E5]">destaque</span>
+            Seja encontrado por quem busca carro na{" "}
+            <span className="font-extrabold text-[#1F66E5]">cidade certa</span>
           </p>
         </div>
 
@@ -436,12 +443,13 @@ function Toolbar({
         </div>
 
         <select
-          value={filters.sort || "recent"}
+          value={filters.sort || "relevance"}
           onChange={(event) => onSortChange(event.target.value)}
           className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none"
         >
+          <option value="relevance">Relevância (plano + destaque + região)</option>
+          <option value="highlight">Destaque ativo primeiro</option>
           <option value="recent">Últimos</option>
-          <option value="relevance">Relevância</option>
           <option value="price_asc">Menor preço</option>
           <option value="price_desc">Maior preço</option>
           <option value="mileage_asc">Menos rodado</option>
@@ -477,16 +485,9 @@ function SidebarSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-b border-[#EEF1F6] pb-5 last:border-b-0 last:pb-0">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-[17px] font-extrabold text-[#1D2440]">{title}</h3>
-        <svg
-          viewBox="0 0 20 20"
-          className="h-4 w-4 text-[#7A8398]"
-          fill="currentColor"
-        >
-          <path d="m5 7 5 6 5-6H5Z" />
-        </svg>
+    <section className="border-b border-[#EEF1F6] pb-6 last:border-b-0 last:pb-0">
+      <div className="mb-4 border-b border-[#F4F7FB] pb-3">
+        <h3 className="text-[15px] font-extrabold tracking-tight text-[#1D2440]">{title}</h3>
       </div>
       {children}
     </section>
@@ -663,18 +664,56 @@ export default function BuyMarketplacePageClient({
 
   return (
     <main className="bg-[#F5F7FB]">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 xl:px-8 md:py-10">
         <section className="mb-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_540px] lg:items-start">
           <div>
-            <h1 className="max-w-3xl text-[34px] font-extrabold leading-[1.08] tracking-[-0.03em] text-[#1D2440] md:text-[46px]">
-              Carros usados e seminovos em {city.name}
+            <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#1F66E5]">
+              {REGIONAL_BRAND_TAGLINE}
+            </p>
+            <h1 className="mt-2 max-w-3xl text-[34px] font-extrabold leading-[1.08] tracking-[-0.03em] text-[#1D2440] md:text-[46px]">
+              Usados e seminovos em {city.name}
             </h1>
-            <p className="mt-4 text-[22px] font-medium text-[#6E748A]">
-              {formatTotal(totalAds)} anúncios encontrados
+            <p className="mt-4 max-w-2xl text-[17px] leading-relaxed text-[#5C6678]">
+              Catálogo ancorado em <span className="font-semibold text-[#1D2440]">{city.name}</span>{" "}
+              ({city.state}): cada listagem traz cidade e estado para você comparar com o que importa
+              na sua rotina.
+            </p>
+            <p className="mt-3 text-[22px] font-semibold text-[#6E748A]">
+              {formatTotal(totalAds)} anúncios neste território
+            </p>
+            <p className="mt-3 text-[14px] text-[#6E748A]">
+              <Link
+                href={`/cidade/${city.slug}`}
+                className="font-bold text-[#1F66E5] underline-offset-2 hover:underline"
+              >
+                Ver hub de {city.name}
+              </Link>
+              <span className="text-[#9AA3B5]"> — marcas, oportunidades e rotas locais</span>
             </p>
           </div>
 
           <TopPromoBanner />
+        </section>
+
+        <section
+          className="mb-6 flex flex-col gap-3 rounded-[16px] border border-[#E5E9F2] bg-white px-4 py-4 shadow-[0_8px_18px_rgba(18,34,72,0.04)] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6"
+          aria-label="Confiança na compra"
+        >
+          <div className="flex flex-col gap-1 sm:max-w-xl">
+            <p className="text-[15px] font-extrabold text-[#1D2440]">
+              Confiança começa no território certo
+            </p>
+            <p className="text-[13px] leading-relaxed text-[#6E748A]">
+              Preferimos cidade e estado visíveis em cada anúncio. Combine visita presencial e siga
+              nosso guia antes de fechar negócio.
+            </p>
+          </div>
+          <Link
+            href={SITE_ROUTES.seguranca}
+            className="inline-flex shrink-0 items-center justify-center rounded-[12px] border border-[#D8E2FB] bg-[#F5F8FF] px-4 py-3 text-[14px] font-bold text-[#1F66E5] transition hover:bg-[#EEF4FF]"
+          >
+            Dicas de negociação segura
+          </Link>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">

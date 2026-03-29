@@ -17,6 +17,8 @@ export interface PublicAdDetail {
   below_fipe?: boolean | null;
   highlight_until?: string | null;
   plan?: string | null;
+  advertiser_id?: number | string | null;
+  city_slug?: string | null;
   image_url?: string | null;
   images?: string[] | string | null;
   created_at?: string | null;
@@ -194,6 +196,11 @@ function normalizeAdDetail(
     below_fipe: toBooleanOrNull(item.below_fipe ?? item.isBelowFipe),
     highlight_until: toNullableText(item.highlight_until),
     plan: toNullableText(item.plan),
+    advertiser_id:
+      item.advertiser_id != null && item.advertiser_id !== ""
+        ? toNumberOrString(item.advertiser_id)
+        : null,
+    city_slug: toNullableText(item.city_slug),
     image_url: imageUrl || FALLBACK_IMAGE,
     images,
     created_at: toNullableText(item.created_at ?? item.createdAt),
@@ -236,6 +243,8 @@ function buildFallbackAd(identifier: string): PublicAdDetail {
     below_fipe: null,
     highlight_until: null,
     plan: null,
+    advertiser_id: null,
+    city_slug: null,
     image_url: FALLBACK_IMAGE,
     images: [FALLBACK_IMAGE],
     created_at: null,

@@ -9,6 +9,7 @@ export async function GET() {
     "/sitemaps/core.xml",
     "/sitemaps/content.xml",
     "/sitemaps/cities.xml",
+    "/sitemaps/local-seo.xml",
     "/sitemaps/brands.xml",
     "/sitemaps/models.xml",
     "/sitemaps/opportunities.xml",

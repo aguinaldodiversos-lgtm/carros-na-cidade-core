@@ -167,6 +167,22 @@ function getLocation(item: CatalogItem) {
   return `${city} - ${state}`;
 }
 
+/** Texto curto para data de publicação quando a API envia created_at. */
+function getListedHint(createdAt?: string | null) {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (!Number.isFinite(d.getTime())) return null;
+
+  const diffMs = Date.now() - d.getTime();
+  const days = Math.floor(diffMs / 86_400_000);
+
+  if (days < 1) return "Publicado hoje";
+  if (days === 1) return "Publicado há 1 dia";
+  if (days < 7) return `Publicado há ${days} dias`;
+  if (days < 30) return `Publicado há ${Math.floor(days / 7)} semanas`;
+  return `Desde ${d.toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" })}`;
+}
+
 function getBadge(weight: 1 | 2 | 3 | 4) {
   if (weight === 4) {
     return {
@@ -219,6 +235,7 @@ export default function CatalogVehicleCard({
   const badge = getBadge(weight);
   const financeChip = getFinanceChip(weight, item);
   const image = getImage(item);
+  const listedHint = getListedHint(item.created_at);
 
   const cardClasses = cx(
     "group overflow-hidden border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)]",
@@ -286,6 +303,9 @@ export default function CatalogVehicleCard({
 
         <p className="mt-2 line-clamp-1 text-[15px] text-[#6E748A]">{meta}</p>
         <p className="mt-1 text-[15px] text-[#6E748A]">{location}</p>
+        {listedHint ? (
+          <p className="mt-1 text-[12px] font-medium text-[#8B94A8]">{listedHint}</p>
+        ) : null}
 
         <div className="mt-4 flex items-end justify-between gap-3">
           <div

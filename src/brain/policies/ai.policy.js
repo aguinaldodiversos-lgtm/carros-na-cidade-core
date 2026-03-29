@@ -101,7 +101,8 @@ export class AiPolicy {
     }
   }
 
-  shouldCache() {
+  /** @param {string} [_task] — reservado para tarefas que não devem ir ao cache */
+  shouldCache(_task) {
     return true;
   }
 

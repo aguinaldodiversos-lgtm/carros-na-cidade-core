@@ -20,9 +20,25 @@ export function validateWhatsAppJobData(data) {
     throw new Error("Mensagem inválida ou ausente");
   }
 
-  return {
+  const out = {
     ...data,
     phone: normalizedPhone,
     message: String(data.message).trim(),
   };
+
+  if (data.dealerLeadId != null) {
+    const n = Number(data.dealerLeadId);
+    if (Number.isFinite(n) && n > 0) {
+      out.dealerLeadId = n;
+    }
+  }
+
+  if (data.cityId != null) {
+    const n = Number(data.cityId);
+    if (Number.isFinite(n) && n > 0) {
+      out.cityId = n;
+    }
+  }
+
+  return out;
 }

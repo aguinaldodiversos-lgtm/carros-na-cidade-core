@@ -9,8 +9,13 @@ import {
 import {
   validateAdIdentifier,
   validateAdId,
-  validateCreateAdPayload,
+  validateUpdateAdPayload,
 } from "./ads.validators.js";
+import { invalidateAdsCachesAfterMutation } from "./ads.mutation-cache.js";
+import {
+  logAdsPublishFailure,
+  sanitizeAdPayloadForLog,
+} from "./ads.publish-flow.log.js";
 
 export async function facets(req, res, next) {
   try {
@@ -74,8 +79,24 @@ export async function show(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const payload = validateCreateAdPayload(req.body);
-    const ad = await adsService.create(payload, req.user);
+    const ad = await adsService.create(req.body, req.user, {
+      requestId: req.requestId || null,
+    });
+
+    try {
+      await invalidateAdsCachesAfterMutation();
+    } catch (cacheErr) {
+      logAdsPublishFailure(cacheErr, {
+        stage: "ads.controller.invalidateCache",
+        requestId: req.requestId || null,
+        userId: req.user?.id ?? null,
+        advertiserId: ad?.advertiser_id ?? null,
+        cityId: ad?.city_id ?? req.body?.city_id ?? null,
+        adId: ad?.id ?? null,
+        payload: sanitizeAdPayloadForLog(req.body),
+      });
+      throw cacheErr;
+    }
 
     res.status(201).json({
       success: true,
@@ -89,7 +110,12 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const id = validateAdId(req.params.id);
-    const ad = await adsService.update(id, req.body, req.user);
+    const payload = validateUpdateAdPayload(req.body);
+    const ad = await adsService.update(id, payload, req.user, {
+      requestId: req.requestId || null,
+    });
+
+    await invalidateAdsCachesAfterMutation();
 
     res.json({
       success: true,
@@ -104,6 +130,8 @@ export async function remove(req, res, next) {
   try {
     const id = validateAdId(req.params.id);
     await adsService.remove(id, req.user);
+
+    await invalidateAdsCachesAfterMutation();
 
     res.json({
       success: true,

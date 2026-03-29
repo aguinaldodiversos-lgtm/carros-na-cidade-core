@@ -1,9 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
+import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
+import { AppProviders } from "@/components/providers/AppProviders";
+import { DEFAULT_CITY } from "@/lib/city/city-default";
+import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
+import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
+
+import { CityRegionBanner } from "../components/city/CityRegionBanner";
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
+import { TrustRibbon } from "../components/shell/TrustRibbon";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -13,13 +22,13 @@ const inter = Inter({
 });
 
 const SITE_NAME = "Carros na Cidade";
-const DEFAULT_TITLE = "Carros na Cidade | Portal de carros da sua cidade";
+const DEFAULT_TITLE = "Carros na Cidade | Marketplace automotivo regional";
 const TITLE_TEMPLATE = "%s | Carros na Cidade";
 const DEFAULT_SITE_URL = "https://carrosnacidade.com";
 const DEFAULT_OG_IMAGE = "/images/hero.jpeg";
 
 const DEFAULT_DESCRIPTION =
-  "Encontre veículos usados e seminovos com busca inteligente, filtros avançados, oportunidades abaixo da FIPE e páginas locais por cidade no Carros na Cidade.";
+  "Marketplace automotivo regional: carros por cidade e estado, listagens que respeitam o território, referência FIPE e negociação com contexto local — Carros na Cidade.";
 
 const DEFAULT_KEYWORDS = [
   "carros na cidade",
@@ -134,17 +143,34 @@ type RootLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-export default function RootLayout({ children }: RootLayoutProps) {
+export default async function RootLayout({ children }: RootLayoutProps) {
+  const cookieStore = await cookies();
+  const rawCity = cookieStore.get(CITY_COOKIE_NAME)?.value;
+  const initialCity = parseCityCookieValue(rawCity) ?? DEFAULT_CITY;
+
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body className="min-h-screen bg-[var(--cnc-bg)] font-sans text-[var(--cnc-text)] antialiased">
-        <div className="flex min-h-screen flex-col">
-          <PublicHeader />
-          <main id="main-content" className="flex-1">
-            {children}
-          </main>
-          <PublicFooter />
-        </div>
+        <AppProviders initialCity={initialCity}>
+          <div className="flex min-h-screen flex-col">
+            <Suspense
+              fallback={
+                <div
+                  className="h-[78px] border-b border-[#E6EAF2] bg-white/95"
+                  aria-hidden
+                />
+              }
+            >
+              <PublicHeader />
+            </Suspense>
+            <TrustRibbon />
+            <CityRegionBanner />
+            <main id="main-content" className="flex-1">
+              {children}
+            </main>
+            <PublicFooter />
+          </div>
+        </AppProviders>
       </body>
     </html>
   );

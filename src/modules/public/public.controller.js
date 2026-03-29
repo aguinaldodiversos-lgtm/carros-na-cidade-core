@@ -46,7 +46,11 @@ export async function getHomeData(req, res, next) {
         WHERE a.status = 'active'
           AND a.highlight_until IS NOT NULL
           AND a.highlight_until > NOW()
-        ORDER BY a.highlight_until DESC
+        ORDER BY
+          (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) DESC,
+          a.priority DESC NULLS LAST,
+          a.highlight_until DESC,
+          a.created_at DESC
         LIMIT 12
       `)
       ),

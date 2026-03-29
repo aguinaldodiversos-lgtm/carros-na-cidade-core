@@ -1,4 +1,7 @@
 import { defineConfig } from "vitest/config";
+import { applyVitestIntegrationEnv } from "./tests/integration/helpers/integration-db-bootstrap.js";
+
+applyVitestIntegrationEnv();
 
 export default defineConfig({
   test: {

@@ -1,4 +1,5 @@
 import db from "../../infrastructure/database/db.js";
+import { normalizeAdVehicleFieldsForPersistence } from "./ads.storage-normalize.js";
 
 const UPDATE_FIELDS = [
   "title",
@@ -22,6 +23,8 @@ const UPDATE_FIELDS = [
 ];
 
 export async function createAd(data) {
+  const row = normalizeAdVehicleFieldsForPersistence(data, { partial: false });
+
   const query = `
     INSERT INTO ads (
       advertiser_id,
@@ -53,25 +56,25 @@ export async function createAd(data) {
   `;
 
   const values = [
-    data.advertiser_id || null,
-    data.title,
-    data.description || null,
-    data.price,
-    data.city_id,
-    data.city,
-    data.state,
-    data.category || null,
-    data.brand,
-    data.model,
-    data.year,
-    data.mileage ?? 0,
-    data.body_type || null,
-    data.fuel_type || null,
-    data.transmission || null,
-    Boolean(data.below_fipe),
-    data.status || "active",
-    data.plan || "free",
-    data.slug,
+    row.advertiser_id || null,
+    row.title,
+    row.description || null,
+    row.price,
+    row.city_id,
+    row.city,
+    row.state,
+    row.category || null,
+    row.brand,
+    row.model,
+    row.year,
+    row.mileage ?? 0,
+    row.body_type || null,
+    row.fuel_type || null,
+    row.transmission || null,
+    Boolean(row.below_fipe),
+    row.status || "active",
+    row.plan || "free",
+    row.slug,
   ];
 
   const { rows } = await db.query(query, values);
@@ -106,6 +109,7 @@ export async function findOwnerContextById(id) {
     SELECT
       a.id,
       a.advertiser_id,
+      a.city_id,
       a.status,
       adv.user_id AS advertiser_user_id
     FROM ads a
@@ -120,14 +124,18 @@ export async function findOwnerContextById(id) {
 }
 
 export async function updateAd(id, data) {
+  const normalized = normalizeAdVehicleFieldsForPersistence(data, {
+    partial: true,
+  });
+
   const fields = [];
   const values = [];
   let index = 1;
 
   for (const field of UPDATE_FIELDS) {
-    if (Object.prototype.hasOwnProperty.call(data, field)) {
+    if (Object.prototype.hasOwnProperty.call(normalized, field)) {
       fields.push(`${field} = $${index++}`);
-      values.push(data[field]);
+      values.push(normalized[field]);
     }
   }
 

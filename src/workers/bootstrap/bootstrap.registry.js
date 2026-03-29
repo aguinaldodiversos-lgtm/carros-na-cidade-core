@@ -1,5 +1,8 @@
-// src/workers/bootstrap/bootstrap.registry.js
-
+/**
+ * Única fonte de verdade dos workers iniciados por `bootstrap.service.js` / `npm run workers`.
+ * Cada entrada: env `RUN_WORKER_*` + `defaultValue` + módulo ESM com start/stop.
+ * Não adicionar segundo registro paralelo em outro diretório.
+ */
 export const WORKERS_REGISTRY = [
   {
     name: "AI Worker",

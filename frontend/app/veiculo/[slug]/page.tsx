@@ -10,16 +10,19 @@ import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
+import VehicleTrustPanel from "@/components/vehicle/VehicleTrustPanel";
 
+import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
+import { fetchRelatedListingsForAdPage } from "@/lib/vehicle/related-ads";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import {
   adaptAdDetailToVehicle,
   buildCityVehicles,
-  buildSellerVehicles,
 } from "@/lib/vehicle/public-vehicle";
 
+import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import {
   getAISimilarVehicles,
   getAIVehicleInsights,
@@ -87,10 +90,17 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
     transmission: "Não informado",
     color: "Não informado",
     city: "São Paulo (SP)",
-    citySlug: "sao-paulo-sp",
+    citySlug: DEFAULT_PUBLIC_CITY_SLUG,
     adCode: ref || slug || "fallback",
+    adPublishedAt: null,
+    adUpdatedAt: null,
     isBelowFipe: false,
     fipePrice: "Consulte",
+    priceNumeric: null,
+    fipeDeltaBrl: null,
+    fipeDeltaPercent: null,
+    isPaidListing: false,
+    advertiserId: null,
     images: ["/images/banner1.jpg", "/images/banner2.jpg", "/images/hero.jpeg"],
     description:
       "As informações completas deste veículo estão temporariamente indisponíveis. Tente novamente em instantes ou volte para a listagem.",
@@ -128,7 +138,12 @@ function buildFallbackPriceSignal(): VehiclePriceSignal {
   };
 }
 
-const getPublicVehicleDetail = cache(async (slug: string, ref?: string) => {
+type PublicVehiclePayload = {
+  ad: PublicAdDetail;
+  vehicle: VehicleDetail;
+};
+
+const getPublicAdAndVehicle = cache(async (slug: string, ref?: string): Promise<PublicVehiclePayload> => {
   const candidates = Array.from(
     new Set([safeText(ref), safeText(slug)].filter(Boolean))
   );
@@ -139,16 +154,33 @@ const getPublicVehicleDetail = cache(async (slug: string, ref?: string) => {
       const vehicle = adaptAdDetailToVehicle(ad);
 
       return {
-        ...vehicle,
-        slug: safeText(vehicle.slug, slug),
-        adCode: safeText(vehicle.adCode, candidate),
+        ad,
+        vehicle: {
+          ...vehicle,
+          slug: safeText(vehicle.slug, slug),
+          adCode: safeText(vehicle.adCode, candidate),
+        },
       };
     } catch {
       // tenta o próximo identificador
     }
   }
 
-  return buildFallbackVehicle(slug, ref);
+  const fallbackVehicle = buildFallbackVehicle(slug, ref);
+
+  const fallbackAd: PublicAdDetail = {
+    id: fallbackVehicle.id,
+    slug: fallbackVehicle.slug,
+    plan: "free",
+    highlight_until: null,
+    advertiser_id: null,
+    city_slug: fallbackVehicle.citySlug,
+  };
+
+  return {
+    ad: fallbackAd,
+    vehicle: fallbackVehicle,
+  };
 });
 
 function buildPageTitle(vehicle: VehicleDetail): string {
@@ -166,7 +198,7 @@ export async function generateMetadata({
   searchParams = {},
 }: PageProps): Promise<Metadata> {
   const ref = getFirstValue(searchParams.ref);
-  const vehicle = await getPublicVehicleDetail(params.slug, ref);
+  const { vehicle } = await getPublicAdAndVehicle(params.slug, ref);
 
   return {
     title: buildPageTitle(vehicle),
@@ -211,13 +243,14 @@ export default async function VehicleDetailPage({
   searchParams = {},
 }: PageProps) {
   const ref = getFirstValue(searchParams.ref);
-  const vehicle = await getPublicVehicleDetail(params.slug, ref);
+  const { ad, vehicle } = await getPublicAdAndVehicle(params.slug, ref);
 
-  const [priceSignalResult, aiInsightsResult, similarVehiclesResult] =
+  const [priceSignalResult, aiInsightsResult, similarVehiclesResult, relatedResult] =
     await Promise.allSettled([
       getAIVehiclePriceSignal(vehicle),
       getAIVehicleInsights(vehicle),
       getAISimilarVehicles(vehicle),
+      fetchRelatedListingsForAdPage(ad, vehicle),
     ]);
 
   const priceSignal: VehiclePriceSignal =
@@ -230,8 +263,14 @@ export default async function VehicleDetailPage({
       ? aiInsightsResult.value
       : ({} as Awaited<ReturnType<typeof getAIVehicleInsights>>);
 
-  const sellerVehicles = buildSellerVehicles(vehicle);
-  const cityVehicles = buildCityVehicles(vehicle);
+  let sellerVehicles =
+    relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
+  let cityVehicles =
+    relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
+
+  if (relatedResult.status !== "fulfilled") {
+    cityVehicles = buildCityVehicles(vehicle);
+  }
 
   const similarVehicles =
     similarVehiclesResult.status === "fulfilled" &&
@@ -313,7 +352,7 @@ export default async function VehicleDetailPage({
 
   return (
     <>
-      <main className="mx-auto w-full max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pb-8 md:pt-8">
+      <main className="mx-auto w-full max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pb-8 md:pt-9 xl:px-8">
         <PageBreadcrumbs
           items={breadcrumbItems}
           className="mb-4 overflow-x-auto whitespace-nowrap"
@@ -327,7 +366,10 @@ export default async function VehicleDetailPage({
               vehicleId={vehicle.id}
               vehicleName={vehicle.fullName}
               whatsappPhone={sellerPhone}
+              financeCitySlug={vehicle.citySlug}
+              vehiclePriceNumeric={vehicle.priceNumeric}
             />
+            <VehicleTrustPanel vehicle={vehicle} />
           </div>
         </div>
 

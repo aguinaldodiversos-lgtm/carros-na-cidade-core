@@ -12,6 +12,8 @@ interface FinancingLandingPageClientProps {
   heroVehicle: AdItem;
   highlightAds: AdItem[];
   opportunityAds: AdItem[];
+  /** Preenchimento vindo do anúncio (query `valor`) */
+  initialVehicleValue?: number;
 }
 
 type VehicleTypeOption = "SUV" | "Hatch" | "Sedã" | "Picape" | "Utilitário";
@@ -170,24 +172,43 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
   ];
 }
 
+function buildInitialFormState(heroVehicle: AdItem, initialVehicleValue?: number): FormState {
+  const fromHero = parseMoney(heroVehicle.price);
+  const vehicleValue =
+    initialVehicleValue != null && initialVehicleValue > 0
+      ? Math.round(initialVehicleValue)
+      : fromHero > 0
+        ? Math.round(fromHero)
+        : 100000;
+  const downPayment = Math.min(Math.max(Math.round(vehicleValue * 0.2), 0), vehicleValue);
+
+  return {
+    vehicleType: "SUV",
+    pricePreset: "",
+    vehicleValue,
+    downPayment,
+    condition: "Novo ou semi",
+    term: 36,
+    monthlyRate: 1.99,
+  };
+}
+
 export function FinancingLandingPageClient({
   citySlug,
   cityName,
   cityLabel,
   heroVehicle,
   opportunityAds,
+  initialVehicleValue,
 }: FinancingLandingPageClientProps) {
-  const initialPrice = parseMoney(heroVehicle.price) || 105900;
+  const [form, setForm] = useState<FormState>(() =>
+    buildInitialFormState(heroVehicle, initialVehicleValue)
+  );
 
-  const [form, setForm] = useState<FormState>({
-    vehicleType: "SUV",
-    pricePreset: "100000",
-    vehicleValue: 100000,
-    downPayment: 20000,
-    condition: "Novo ou semi",
-    term: 36,
-    monthlyRate: 1.99,
-  });
+  const initialPrice =
+    initialVehicleValue != null && initialVehicleValue > 0
+      ? Math.round(initialVehicleValue)
+      : parseMoney(heroVehicle.price) || form.vehicleValue;
 
   const displayHeroTitle = resolveTitle(heroVehicle);
   const displayHeroImage = resolveImage(heroVehicle);

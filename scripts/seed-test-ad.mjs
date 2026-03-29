@@ -23,12 +23,29 @@ try {
     ALTER TABLE ads ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''
   `);
 
+  const users = await pool.query(
+    "SELECT id FROM users ORDER BY id ASC LIMIT 1"
+  );
+  if (!users.rows[0]) {
+    console.error(
+      "Nenhum usuário em users. Crie uma conta antes de rodar este script."
+    );
+    process.exit(1);
+  }
+
+  const userId = String(users.rows[0].id);
+  const { ensureAdvertiserForUser } = await import(
+    "../src/modules/advertisers/advertiser.ensure.service.js"
+  );
+  await ensureAdvertiserForUser(userId, { source: "seed-test-ad" });
+
   const adv = await pool.query(
-    "SELECT id FROM advertisers ORDER BY id ASC LIMIT 1"
+    "SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1",
+    [userId]
   );
   if (!adv.rows[0]) {
     console.error(
-      "Nenhuma linha em advertisers. Crie um anunciante antes de rodar este script."
+      "Falha ao garantir anunciante (ensureAdvertiserForUser). Verifique cities e logs."
     );
     process.exit(1);
   }

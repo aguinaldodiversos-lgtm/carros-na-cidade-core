@@ -1,6 +1,7 @@
 import { logger } from "../../shared/logger.js";
 import { validateWhatsAppJobData } from "./whatsapp.validators.js";
 import { getWhatsAppProvider } from "./providers/index.js";
+import * as dealerLeadsRepo from "../dealer-acquisition/dealer-leads.repository.js";
 
 export async function sendWhatsAppMessage(payload) {
   const data = validateWhatsAppJobData(payload);
@@ -14,6 +15,7 @@ export async function sendWhatsAppMessage(payload) {
       adId: data.adId ?? null,
       sellerId: data.sellerId ?? null,
       cityId: data.cityId ?? null,
+      dealerLeadId: data.dealerLeadId ?? null,
       origin: data.origin ?? null,
       channel: data.channel ?? "whatsapp",
       createdAt: data.createdAt ?? null,
@@ -27,9 +29,30 @@ export async function sendWhatsAppMessage(payload) {
       adId: data.adId ?? null,
       sellerId: data.sellerId ?? null,
       providerMessageId: result?.messageId ?? null,
+      dealerLeadId: data.dealerLeadId ?? null,
     },
     "[whatsapp.service] Mensagem enviada com sucesso"
   );
+
+  if (data.dealerLeadId) {
+    try {
+      const recorded = await dealerLeadsRepo.markOutboundSent(data.dealerLeadId, {
+        providerMessageId: result?.messageId ?? null,
+        body: data.message,
+      });
+      if (recorded && data.cityId) {
+        await dealerLeadsRepo.bumpCityDealerMetrics(data.cityId, {
+          pipeline: 0,
+          outreach: 1,
+        });
+      }
+    } catch (err) {
+      logger.error(
+        { err: err?.message || String(err), dealerLeadId: data.dealerLeadId },
+        "[whatsapp.service] Falha ao registrar outreach em dealer_leads"
+      );
+    }
+  }
 
   return result;
 }

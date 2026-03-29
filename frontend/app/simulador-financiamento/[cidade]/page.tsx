@@ -8,7 +8,25 @@ type PageProps = {
   params: {
     cidade: string;
   };
+  searchParams?: Record<string, string | string[] | undefined>;
 };
+
+function getFirstQueryValue(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+  key: string
+): string | undefined {
+  const raw = searchParams?.[key];
+  if (Array.isArray(raw)) return raw[0];
+  return raw;
+}
+
+function parseValorFromSearch(searchParams?: Record<string, string | string[] | undefined>) {
+  const raw = getFirstQueryValue(searchParams, "valor");
+  if (!raw) return undefined;
+  const normalized = raw.replace(/[^\d.,-]/g, "").replace(",", ".");
+  const n = Number(normalized);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+}
 
 function prettifyCitySlug(slug: string) {
   const parts = slug.split("-").filter(Boolean);
@@ -77,8 +95,10 @@ export const revalidate = 300;
 
 export default async function SimuladorFinanciamentoCidadePage({
   params,
+  searchParams = {},
 }: PageProps) {
   const city = prettifyCitySlug(params.cidade);
+  const initialVehicleValue = parseValorFromSearch(searchParams);
 
   const [opportunitiesResult, highlightResult, recentResult] = await Promise.allSettled([
     fetchAdsSearch({
@@ -127,6 +147,7 @@ export default async function SimuladorFinanciamentoCidadePage({
       heroVehicle={heroVehicle}
       highlightAds={highlightAds}
       opportunityAds={opportunityAds}
+      initialVehicleValue={initialVehicleValue}
     />
   );
 }

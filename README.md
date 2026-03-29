@@ -59,7 +59,10 @@ cd frontend && npm run dev
 | `npm run dev` | Inicia o backend |
 | `npm run workers` | Inicia workers (BullMQ) |
 | `npm run lint` | ESLint no backend |
-| `npm test` | Testes (Vitest) |
+| `npm test` | Testes (Vitest; sem `tests/integration`) |
+| `npm run test:integration:ads:full` | Postgres (Docker) + migrations + suíte de integração de anúncios |
+| `npm run test:pg-contract` | Opcional: CHECKs reais em `public.ads` (fuel/transmission), com Postgres no ar |
+| `npm run e2e` | Playwright no `frontend` (Next + API + DB — ver `docs/testing/e2e.md`) |
 | `npm run smoke` | Smoke tests contra a API |
 | `cd frontend && npm run build` | Build do Next.js |
 

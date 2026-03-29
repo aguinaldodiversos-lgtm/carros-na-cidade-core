@@ -315,6 +315,30 @@ b {
   .cnc-divider {
     border-top: 1px solid var(--cnc-line);
   }
+
+  /** Estados vazios — hierarquia clara sem poluir a página */
+  .cnc-empty-state {
+    @apply rounded-[22px] border border-dashed px-6 py-11 text-center sm:px-8 sm:py-12;
+    border-color: rgba(203, 213, 225, 0.95);
+    background: linear-gradient(180deg, #ffffff 0%, #fafbfe 100%);
+    box-shadow:
+      0 8px 28px rgba(20, 30, 60, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .cnc-empty-state__title {
+    @apply text-[17px] font-bold tracking-tight text-[var(--cnc-text-strong)];
+    line-height: 1.25;
+  }
+
+  .cnc-empty-state__desc {
+    @apply mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-[var(--cnc-muted)];
+  }
+
+  /** Ritmo vertical entre blocos grandes (home, catálogo) */
+  .cnc-stack-section {
+    @apply py-8 md:py-10 lg:py-11;
+  }
 }
 
 @media (max-width: 768px) {

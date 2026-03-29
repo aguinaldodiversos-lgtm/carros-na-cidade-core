@@ -1,8 +1,13 @@
 // frontend/components/search/HomeSearchSection.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+
+import {
+  DEFAULT_PUBLIC_CITY_LABEL,
+  DEFAULT_PUBLIC_CITY_SLUG,
+} from "@/lib/site/public-config";
 
 type FeaturedCity = {
   id: number;
@@ -12,6 +17,9 @@ type FeaturedCity = {
 
 interface HomeSearchSectionProps {
   featuredCities: FeaturedCity[];
+  /** Território ativo (cookie / query / City Engine) */
+  defaultCitySlug: string;
+  defaultCityLabel?: string;
 }
 
 const BRAND_OPTIONS = [
@@ -105,21 +113,40 @@ function SelectField({
   );
 }
 
-export function HomeSearchSection({ featuredCities }: HomeSearchSectionProps) {
+export function HomeSearchSection({
+  featuredCities,
+  defaultCitySlug,
+  defaultCityLabel,
+}: HomeSearchSectionProps) {
   const router = useRouter();
 
   const cityOptions = useMemo(() => {
-    if (featuredCities?.length) {
-      return featuredCities.map((city) => ({
-        label: city.name,
-        value: city.slug,
-      }));
+    let base = featuredCities?.length
+      ? featuredCities.map((city) => ({
+          label: city.name,
+          value: city.slug,
+        }))
+      : [{ label: DEFAULT_PUBLIC_CITY_LABEL, value: DEFAULT_PUBLIC_CITY_SLUG }];
+
+    if (defaultCitySlug && !base.some((o) => o.value === defaultCitySlug)) {
+      base = [
+        {
+          label: defaultCityLabel || defaultCitySlug,
+          value: defaultCitySlug,
+        },
+        ...base,
+      ];
     }
+    return base;
+  }, [featuredCities, defaultCitySlug, defaultCityLabel]);
 
-    return [{ label: "São Paulo", value: "sao-paulo-sp" }];
-  }, [featuredCities]);
+  const [citySlug, setCitySlug] = useState(
+    () => defaultCitySlug || cityOptions[0]?.value || DEFAULT_PUBLIC_CITY_SLUG
+  );
 
-  const [citySlug, setCitySlug] = useState(cityOptions[0]?.value || "sao-paulo-sp");
+  useEffect(() => {
+    setCitySlug(defaultCitySlug || cityOptions[0]?.value || DEFAULT_PUBLIC_CITY_SLUG);
+  }, [defaultCitySlug, cityOptions]);
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
@@ -150,7 +177,7 @@ export function HomeSearchSection({ featuredCities }: HomeSearchSectionProps) {
   }
 
   return (
-    <div className="rounded-[20px] border border-[#dce3ee] bg-white px-5 py-5 shadow-[0_16px_34px_rgba(16,28,58,0.08)] md:px-6 md:py-6">
+    <div className="rounded-[22px] border border-[#dce3ee] bg-white px-5 py-5 shadow-[0_12px_32px_rgba(16,28,58,0.07)] md:px-6 md:py-6">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <SelectField
           label="Cidade"

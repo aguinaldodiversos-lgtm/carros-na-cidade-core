@@ -1,6 +1,8 @@
 import { google } from "googleapis";
 import { getGoogleAuth } from "./googleAuth.js";
 import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 
 export async function fetchSearchConsoleData(siteUrl) {
   try {
@@ -26,7 +28,17 @@ export async function fetchSearchConsoleData(siteUrl) {
 
     return response.data.rows || [];
   } catch (error) {
-    console.error("❌ Search Console falhou:", error.message);
+    logger.error(
+      {
+        ...buildDomainFields({
+          action: "seo.search_console.fetch",
+          result: "error",
+        }),
+        errMessage: error?.message || String(error),
+        siteUrl,
+      },
+      "[seo] Search Console API falhou — usando fallback local"
+    );
 
     return await fallbackSearchConsole();
   }
@@ -39,7 +51,17 @@ async function fallbackSearchConsole() {
     ORDER BY last_updated DESC
   `);
 
-  console.warn("⚠️ Usando fallback de SEO local");
+  logger.warn(
+    {
+      ...buildDomainFields({
+        action: "seo.search_console.fetch",
+        result: "success",
+      }),
+      fallback: true,
+      source: "city_seo_metrics",
+    },
+    "[seo] fallback Search Console local"
+  );
 
   return result.rows;
 }

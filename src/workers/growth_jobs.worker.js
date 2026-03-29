@@ -119,6 +119,28 @@ async function executeJob(client, job) {
       return;
     }
 
+    case "DEALER_ACQUISITION_SUGGESTED": {
+      await client.query(
+        `
+        INSERT INTO autopilot_actions (action_type, payload, status, created_at)
+        VALUES ('dealer_acquisition_suggested', $1::jsonb, 'pending', NOW())
+        `,
+        [JSON.stringify(payload)]
+      ).catch(() => {});
+      return;
+    }
+
+    case "CAMPAIGN_SUGGEST_LOCAL": {
+      await client.query(
+        `
+        INSERT INTO autopilot_actions (action_type, payload, status, created_at)
+        VALUES ('campaign_suggest_local', $1::jsonb, 'pending', NOW())
+        `,
+        [JSON.stringify(payload)]
+      ).catch(() => {});
+      return;
+    }
+
     default:
       // Tipo desconhecido: não quebra processamento
       return;

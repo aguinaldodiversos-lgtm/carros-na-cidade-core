@@ -1,6 +1,7 @@
 // src/modules/ads/filters/ads-filter.builder.js
 
 import { buildSortClause } from "./ads-filter.sort.js";
+import { cityDemandBoostExpr, planRankExpr } from "./ads-ranking.sql.js";
 
 function pushFilter(where, params, expression, ...values) {
   let sql = expression;
@@ -32,6 +33,7 @@ export function buildAdsSearchQuery(filters = {}) {
     body_type,
     below_fipe,
     highlight_only,
+    advertiser_id,
     page = 1,
     limit = 20,
     sort = "relevance",
@@ -77,17 +79,22 @@ export function buildAdsSearchQuery(filters = {}) {
   if (body_type) pushFilter(where, params, `a.body_type ILIKE ?`, `%${body_type}%`);
   if (below_fipe !== undefined) pushFilter(where, params, `a.below_fipe = ?`, Boolean(below_fipe));
   if (highlight_only === true) where.push(`a.highlight_until > NOW()`);
+  if (advertiser_id !== undefined && advertiser_id !== null) {
+    pushFilter(where, params, `a.advertiser_id = ?`, Number(advertiser_id));
+  }
 
   const whereClause = `WHERE ${where.join(" AND ")}`;
   const orderByClause = buildSortClause(sort, { useTextRank });
 
   const hybridScoreExpr = `
     (
-      (CASE WHEN a.highlight_until > NOW() THEN 100 ELSE 0 END)
+      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125
+      + (${planRankExpr})
+      + (${cityDemandBoostExpr})
       + (COALESCE(a.priority, 1) * 10)
-      + (COALESCE(m.ctr, 0) * 60)
+      + (COALESCE(m.ctr, 0) * 52)
       + (COALESCE(m.leads, 0) * 2)
-      + (30.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))
+      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))
       + (${useTextRank ? `${textRankExpression} * 50` : "0"})
     )
   `;
@@ -109,6 +116,7 @@ export function buildAdsSearchQuery(filters = {}) {
     FROM ads a
     LEFT JOIN cities c ON c.id = a.city_id
     LEFT JOIN ad_metrics m ON m.ad_id = a.id
+    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id
     ${whereClause}
     ORDER BY ${orderByClause}
     LIMIT $${limitIndex}

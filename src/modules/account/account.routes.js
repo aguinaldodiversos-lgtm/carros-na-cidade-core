@@ -7,9 +7,10 @@ import {
   getOwnedAd,
   listBoostOptions,
   listPlans,
+  resolvePublishEligibility,
   updateOwnedAdStatus,
-  validatePlanEligibility,
 } from "./account.service.js";
+import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
 
 const router = express.Router();
 
@@ -44,7 +45,10 @@ router.get(
 router.post(
   "/plans/eligibility",
   asyncHandler(async (req, res) => {
-    const validation = await validatePlanEligibility(req.user.id);
+    await ensureAdvertiserForUser(String(req.user.id), {
+      source: "plans_eligibility",
+    });
+    const validation = await resolvePublishEligibility(req.user.id);
     const suggestedPlans = validation.suggested_plan_type
       ? await listPlans({
           type: validation.suggested_plan_type,

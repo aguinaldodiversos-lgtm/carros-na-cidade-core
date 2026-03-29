@@ -1,5 +1,5 @@
 import { logger } from "../../shared/logger.js";
-import { runOpportunityEngine } from "../../brain/engines/opportunity.engine.js";
+import { runOpportunityScoringOnly } from "../../modules/growth/growth-brain-pipeline.js";
 
 let opportunityInterval = null;
 let opportunityRunning = false;
@@ -14,7 +14,7 @@ async function runOnce() {
   opportunityRunning = true;
 
   try {
-    await runOpportunityEngine();
+    await runOpportunityScoringOnly();
   } catch (error) {
     logger.error({ error }, "[opportunity.worker] Erro no processamento");
   } finally {

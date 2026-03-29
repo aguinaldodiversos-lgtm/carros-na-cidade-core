@@ -18,7 +18,41 @@ function pgDetails(err) {
     table: err?.table ?? null,
     column: err?.column ?? null,
     schema: err?.schema ?? null,
+    hint: err?.hint ?? null,
+    severity: err?.severity ?? null,
+    routine: err?.routine ?? null,
+    position: err?.position ?? null,
   };
+}
+
+const MAX_WHERE_SNIPPET = 480;
+
+function serializeUnknownErr(err) {
+  if (!err || typeof err !== "object") {
+    return { message: String(err) };
+  }
+  const o = {
+    message: typeof err.message === "string" ? err.message : String(err),
+    name: typeof err.name === "string" ? err.name : null,
+    stack:
+      process.env.NODE_ENV === "development" && typeof err.stack === "string"
+        ? err.stack
+        : null,
+  };
+  if (err.code != null) o.code = err.code;
+  if (err.constraint != null) o.constraint = err.constraint;
+  if (err.detail != null) o.detail = err.detail;
+  if (err.column != null) o.column = err.column;
+  if (err.table != null) o.table = err.table;
+  if (err.schema != null) o.schema = err.schema;
+  if (err.hint != null) o.hint = err.hint;
+  if (typeof err.where === "string" && err.where.length) {
+    o.where =
+      err.where.length > MAX_WHERE_SNIPPET
+        ? `${err.where.slice(0, MAX_WHERE_SNIPPET)}…`
+        : err.where;
+  }
+  return o;
 }
 
 function handlePostgresError(err) {
@@ -82,6 +116,15 @@ export function errorHandler(err, req, res, _next) {
         {
           ...pgDetails(error),
           originalMessage: error?.message || null,
+          rawVehicleFields: req?.body
+            ? {
+                body_type: req.body.body_type ?? null,
+                fuel_type: req.body.fuel_type ?? null,
+                transmission: req.body.transmission ?? null,
+              }
+            : null,
+          requestId: req?.requestId || null,
+          userId: req?.user?.id != null ? String(req.user.id) : null,
         },
         "[postgres] falha antes do mapeamento"
       );
@@ -96,6 +139,8 @@ export function errorHandler(err, req, res, _next) {
         {
           ...pgDetails(error),
           originalMessage: error?.message || null,
+          requestId: req?.requestId || null,
+          userId: req?.user?.id != null ? String(req.user.id) : null,
         },
         "[postgres] erro de schema/objeto"
       );
@@ -108,9 +153,23 @@ export function errorHandler(err, req, res, _next) {
         pgDetails(error)
       );
     } else {
+      const raw = err;
+      const logger = getLogger({
+        requestId: req?.requestId || null,
+        method: req?.method || null,
+        path: req?.originalUrl || req?.url || null,
+      });
+      logger.error(
+        {
+          requestId: req?.requestId || null,
+          userId: req?.user?.id != null ? String(req.user.id) : null,
+          err: serializeUnknownErr(raw),
+        },
+        "[errorHandler] erro não mapeado antes do AppError"
+      );
       error = new AppError(
-        error?.message || "Internal Server Error",
-        error?.statusCode || 500,
+        raw?.message || "Internal Server Error",
+        raw?.statusCode || 500,
         false
       );
     }
@@ -124,12 +183,14 @@ export function errorHandler(err, req, res, _next) {
 
   logger.error(
     {
+      requestId: req?.requestId || null,
+      userId: req?.user?.id != null ? String(req.user.id) : null,
       statusCode: error.statusCode,
       isOperational: error.isOperational,
       details: error.details || null,
       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     },
-    error.message
+    `[http] ${error.statusCode >= 500 ? "5xx" : "erro"}: ${error.message}`
   );
 
   if (res.headersSent) {

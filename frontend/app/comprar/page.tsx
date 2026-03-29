@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
+import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
+import type { CityRef } from "@/lib/city/city-types";
+import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import type {
   AdsFacetsResponse,
   AdsSearchFilters,
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { fetchAdsFacets, fetchAdsSearch } from "@/lib/search/ads-search";
-import { parseAdsSearchFiltersFromSearchParams } from "@/lib/search/ads-search-url";
+import {
+  buildSearchQueryString,
+  parseAdsSearchFiltersFromSearchParams,
+} from "@/lib/search/ads-search-url";
+import {
+  DEFAULT_PUBLIC_CITY_LABEL,
+  DEFAULT_PUBLIC_CITY_SLUG,
+} from "@/lib/site/public-config";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -89,15 +101,31 @@ function cityFromText(city?: string, state?: string): CityContext {
   };
 }
 
-function normalizeBuyFilters(searchParams: SearchParams = {}): AdsSearchFilters {
+function normalizeBuyFilters(
+  searchParams: SearchParams = {},
+  cookieCity?: CityRef | null
+): AdsSearchFilters {
   const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
+
+  const fallbackSlug = cookieCity?.slug || DEFAULT_PUBLIC_CITY_SLUG;
+  const fallbackCityName = cookieCity?.name || DEFAULT_PUBLIC_CITY_LABEL;
+  const fallbackState = cookieCity?.state || "SP";
+
+  let city_id = parsed.city_id;
+  if (!city_id && cookieCity?.id) {
+    const slugMatches = !parsed.city_slug || parsed.city_slug === cookieCity.slug;
+    if (slugMatches) {
+      city_id = cookieCity.id;
+    }
+  }
 
   return {
     ...parsed,
-    city_slug: parsed.city_slug || "sao-paulo-sp",
-    city: parsed.city || "São Paulo",
-    state: parsed.state || "SP",
-    sort: parsed.sort || "recent",
+    city_slug: parsed.city_slug || fallbackSlug,
+    city_id,
+    city: parsed.city || fallbackCityName,
+    state: parsed.state || fallbackState,
+    sort: parsed.sort || "relevance",
     page: parsed.page || 1,
     limit: parsed.limit || 18,
   };
@@ -178,35 +206,39 @@ function buildMetadataTitle(filters: AdsSearchFilters, city: CityContext) {
 
 function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) {
   if (filters.brand && filters.model) {
-    return `Explore ${filters.brand} ${filters.model} em ${city.name} com catálogo premium, filtros rápidos, veículos em destaque e oportunidades locais no Carros na Cidade.`;
+    return `${filters.brand} ${filters.model} em ${city.name} (${city.state}): catálogo regional com filtros por cidade, anúncios com contexto local e oportunidades no Carros na Cidade.`;
   }
 
   if (filters.brand) {
-    return `Explore carros ${filters.brand} em ${city.name} com filtros rápidos, anúncios premium e oportunidades locais no Carros na Cidade.`;
+    return `Carros ${filters.brand} em ${city.name}: listagem focada no seu território, com filtros rápidos e ofertas reais na região — Carros na Cidade.`;
   }
 
-  return `Explore carros usados e seminovos em ${city.name} com filtros rápidos, anúncios premium, oportunidades locais e catálogo automotivo profissional no Carros na Cidade.`;
+  return `Usados e seminovos em ${city.name} (${city.state}): marketplace regional onde cada anúncio nasce na cidade — compare preços e negocie com contexto local no Carros na Cidade.`;
 }
 
 export async function generateMetadata({
   searchParams = {},
 }: ComprarPageProps): Promise<Metadata> {
-  const filters = normalizeBuyFilters(searchParams);
+  const cookieStore = await cookies();
+  const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
+  const filters = normalizeBuyFilters(searchParams, cookieCity);
   const city = resolveCity(filters);
 
   const title = buildMetadataTitle(filters, city);
   const description = buildMetadataDescription(filters, city);
+  const canonicalQs = buildSearchQueryString(filters);
+  const canonicalPath = canonicalQs ? `/comprar?${canonicalQs}` : "/comprar";
 
   return {
     title,
     description,
     alternates: {
-      canonical: "/comprar",
+      canonical: canonicalPath,
     },
     openGraph: {
       title,
       description,
-      url: "/comprar",
+      url: canonicalPath,
       type: "website",
       locale: "pt_BR",
     },
@@ -216,7 +248,9 @@ export async function generateMetadata({
 export default async function ComprarPage({
   searchParams = {},
 }: ComprarPageProps) {
-  const filters = normalizeBuyFilters(searchParams);
+  const cookieStore = await cookies();
+  const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
+  const filters = normalizeBuyFilters(searchParams, cookieCity);
   const city = resolveCity(filters);
 
   const [resultsResponse, facetsResponse] = await Promise.allSettled([

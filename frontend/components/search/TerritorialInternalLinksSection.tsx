@@ -17,14 +17,17 @@ export function TerritorialInternalLinksSection({
 
   if (!groups.length) return null;
 
+  const cityName = data.city?.name?.trim() || "sua cidade";
+
   return (
-    <section className="space-y-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <section className="space-y-5 rounded-[22px] border border-[#E5E9F2] bg-white p-5 shadow-[0_10px_24px_rgba(20,30,60,0.05)]">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900">
-          Navegação local inteligente
+        <h2 className="text-[17px] font-extrabold text-[#1D2440]">
+          Continuar em {cityName}
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Explore rotas relacionadas da cidade, marcas e modelos com mais demanda.
+        <p className="mt-1 text-sm leading-relaxed text-[#6E748A]">
+          Rotas relacionadas a partir deste território: marcas, modelos e oportunidades alinhadas à
+          mesma região.
         </p>
       </div>
 
@@ -32,20 +35,20 @@ export function TerritorialInternalLinksSection({
         {groups.map((group) => (
           <div
             key={group.title}
-            className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4"
+            className="rounded-2xl border border-[#EEF1F6] bg-[#F8FAFC] p-4"
           >
-            <h3 className="text-sm font-semibold text-zinc-900">{group.title}</h3>
+            <h3 className="text-sm font-bold text-[#33405A]">{group.title}</h3>
 
             <div className="mt-3 flex flex-col gap-2">
               {group.items.map((item) => (
                 <Link
                   key={`${group.title}-${item.href}-${item.label}`}
                   href={item.href}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-100"
+                  className="flex items-center justify-between rounded-xl border border-transparent bg-white px-3 py-2 text-sm font-medium text-[#47506A] shadow-sm transition hover:border-[#D8E2FB] hover:bg-[#F5F8FF]"
                 >
                   <span className="truncate">{item.label}</span>
                   {item.badge ? (
-                    <span className="ml-3 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
+                    <span className="ml-3 rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[11px] font-bold text-[#47506A]">
                       {item.badge}
                     </span>
                   ) : null}

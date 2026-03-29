@@ -1,6 +1,12 @@
-const { google } = require("googleapis");
-const path = require("path");
-const pool = require("../../database/connection");
+import path from "path";
+import { fileURLToPath } from "url";
+import { google } from "googleapis";
+import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const keyPath = path.join(
   __dirname,
@@ -48,7 +54,7 @@ class SeoCollector {
         `,
         [
           startDate,
-          "global", // depois vamos quebrar por cidade via query
+          "global",
           row.impressions,
           row.clicks,
           row.ctr,
@@ -58,8 +64,17 @@ class SeoCollector {
       );
     }
 
-    console.log("✅ Dados Search Console coletados");
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "seo.search_console.collect",
+          result: "success",
+        }),
+        rows: response.data.rows?.length ?? 0,
+      },
+      "[seo] dados Search Console coletados"
+    );
   }
 }
 
-module.exports = new SeoCollector();
+export default new SeoCollector();

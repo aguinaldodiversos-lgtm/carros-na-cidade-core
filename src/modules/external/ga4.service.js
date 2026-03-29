@@ -1,6 +1,8 @@
 import { google } from "googleapis";
 import { getGoogleAuth } from "./googleAuth.js";
 import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 
 export async function fetchGA4CityData(propertyId) {
   try {
@@ -26,7 +28,17 @@ export async function fetchGA4CityData(propertyId) {
 
     return response.data.rows || [];
   } catch (error) {
-    console.error("❌ GA4 falhou:", error.message);
+    logger.error(
+      {
+        ...buildDomainFields({
+          action: "seo.ga4.fetch",
+          result: "error",
+        }),
+        errMessage: error?.message || String(error),
+        propertyId,
+      },
+      "[seo] GA4 API falhou — usando fallback local"
+    );
 
     return await fallbackGA4();
   }
@@ -39,7 +51,17 @@ async function fallbackGA4() {
     ORDER BY last_updated DESC
   `);
 
-  console.warn("⚠️ Usando fallback GA4 local");
+  logger.warn(
+    {
+      ...buildDomainFields({
+        action: "seo.ga4.fetch",
+        result: "success",
+      }),
+      fallback: true,
+      source: "city_seo_metrics",
+    },
+    "[seo] fallback GA4 local"
+  );
 
   return result.rows;
 }

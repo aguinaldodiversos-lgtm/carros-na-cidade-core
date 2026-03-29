@@ -1,12 +1,13 @@
-// src/modules/auth/auth.audit.service.js
-
 import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 
 export async function logLoginAttempt({
   userId,
   ip,
   userAgent,
   success,
+  requestId,
 }) {
   try {
     await pool.query(
@@ -17,6 +18,17 @@ export async function logLoginAttempt({
       [userId || null, ip || null, userAgent || null, success]
     );
   } catch (err) {
-    console.error("Erro ao registrar login log:", err.message);
+    logger.error(
+      {
+        ...buildDomainFields({
+          action: "auth.login_audit.persist",
+          result: "error",
+          requestId,
+          userId,
+          errMessage: err?.message || String(err),
+        }),
+      },
+      "[auth] falha ao persistir login_logs"
+    );
   }
 }

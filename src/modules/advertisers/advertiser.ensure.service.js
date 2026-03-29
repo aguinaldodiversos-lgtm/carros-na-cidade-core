@@ -1,7 +1,9 @@
 import { pool, withTransaction } from "../../infrastructure/database/db.js";
-import { getAccountUser } from "../account/account.service.js";
+import { getAccountUser } from "../account/account.user.read.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { slugify } from "../../shared/utils/slugify.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 
 /** Ordem de preferência para ler telefone/WhatsApp em `users` (schema varia por deploy). */
 const USER_CONTACT_COLUMN_PRIORITY = [
@@ -97,24 +99,83 @@ function buildContactFieldsForAdvertiser(contact, advertiserCols) {
 }
 
 /**
- * Garante um registro em `advertisers` para o usuário, quando apto a publicar.
- * Usa lock consultivo por usuário para evitar duplicidade sob concorrência.
- *
- * Dados de conta e lojista vêm de `getAccountUser` (mesma query do painel).
- * Não há segunda validação de CPF/CNPJ aqui: onboarding/painel consolidam o documento.
+ * Resolve `city_id` para novo registro em `advertisers`:
+ * 1) `explicitCityId` válido em `cities`
+ * 2) texto em `users.city` (se existir coluna) → busca aproximada em `cities`
+ * 3) primeira cidade cadastrada (fallback)
  *
  * @param {string} userId
- * @param {{ cityId: number }} context — city_id do anúncio (obrigatório para novo cadastro)
- * @returns {Promise<{ id: string|number, user_id?: string }>}
+ * @param {number|null|undefined} explicitCityId
  */
-export async function ensureAdvertiserForPublishing(userId, context = {}) {
-  const cityId = context.cityId;
-  if (cityId == null || Number.isNaN(Number(cityId))) {
+export async function resolveCityIdForNewAdvertiser(userId, explicitCityId) {
+  if (explicitCityId != null && !Number.isNaN(Number(explicitCityId))) {
+    const cid = Number(explicitCityId);
+    const { rows } = await pool.query(
+      `SELECT id FROM cities WHERE id = $1 LIMIT 1`,
+      [cid]
+    );
+    if (rows[0]?.id != null) {
+      return Number(rows[0].id);
+    }
+  }
+
+  const usersCols = await getUsersColumnSet();
+  if (hasColumn(usersCols, "city")) {
+    const u = await pool.query(`SELECT city FROM users WHERE id = $1 LIMIT 1`, [
+      userId,
+    ]);
+    const cityText = String(u.rows[0]?.city || "").trim();
+    if (cityText.length >= 2) {
+      const token = cityText.split(/[-–—,\s]+/)[0]?.trim();
+      if (token && token.length >= 2) {
+        const { rows: match } = await pool.query(
+          `
+          SELECT id FROM cities
+          WHERE name ILIKE $1
+          ORDER BY id ASC
+          LIMIT 1
+          `,
+          [`%${token}%`]
+        );
+        if (match[0]?.id != null) {
+          return Number(match[0].id);
+        }
+      }
+    }
+  }
+
+  const { rows: fb } = await pool.query(
+    `SELECT id FROM cities ORDER BY id ASC LIMIT 1`
+  );
+  if (!fb[0]?.id) {
     throw new AppError(
-      "Não foi possível criar o cadastro de anunciante: cidade inválida.",
-      400
+      "Nenhuma cidade cadastrada no sistema. Importe cidades (ex.: seed IBGE) antes de usar anunciantes.",
+      503
     );
   }
+  return Number(fb[0].id);
+}
+
+/**
+ * Fonte única: garante uma linha em `advertisers` por usuário (idempotente).
+ * Se já existir, devolve; se não, cria com `city_id` resolvido (explícito ou fallback).
+ *
+ * @param {string} userId
+ * @param {{ cityId?: number|null, requestId?: string|null, source?: string }} [options]
+ * @returns {Promise<{ id: string|number, user_id?: string }>}
+ */
+export async function ensureAdvertiserForUser(userId, options = {}) {
+  const requestId = options.requestId ?? null;
+  const source = options.source ?? "ensure";
+
+  if (!userId || String(userId).trim() === "") {
+    throw new AppError("userId obrigatório para anunciante.", 400);
+  }
+
+  const cityId = await resolveCityIdForNewAdvertiser(
+    userId,
+    options.cityId != null ? Number(options.cityId) : null
+  );
 
   const account = await getAccountUser(userId);
 
@@ -168,7 +229,6 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       user_id: userId,
       city_id: Number(cityId),
       name: displayName,
-      // PF: null evita CHECK/NOT NULL ambíguos com string vazia em alguns schemas
       company_name: isLojista ? displayName : null,
       email: String(account.email || "")
         .trim()
@@ -189,7 +249,6 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       if (key === "email" && !value) {
         continue;
       }
-      // PF: não forçar company_name (evita CHECK/NOT NULL com '' ou NULL inadequado)
       if (key === "company_name" && value == null) {
         continue;
       }
@@ -224,6 +283,21 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
           insertValues
         );
 
+        logger.info(
+          {
+            ...buildDomainFields({
+              action: "advertiser.ensure.create",
+              result: "success",
+              requestId,
+              userId,
+            }),
+            source,
+            cityId: Number(cityId),
+            advertiserId: insert.rows[0]?.id,
+          },
+          "[advertiser] cadastro criado"
+        );
+
         return insert.rows[0];
       } catch (error) {
         if (error?.code === "23505" && attempt < maxAttempts - 1) {
@@ -234,5 +308,28 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
     }
 
     throw new AppError("Não foi possível criar o cadastro de anunciante.", 500);
+  });
+}
+
+/**
+ * Publicação de anúncio: exige `city_id` do veículo (cidade do anúncio).
+ * Idempotente: se o anunciante já existir, reutiliza a linha (não altera cidade).
+ *
+ * @param {string} userId
+ * @param {{ cityId: number, requestId?: string|null, source?: string }} context
+ */
+export async function ensureAdvertiserForPublishing(userId, context = {}) {
+  const cityId = context.cityId;
+  if (cityId == null || Number.isNaN(Number(cityId))) {
+    throw new AppError(
+      "Não foi possível criar o cadastro de anunciante: cidade inválida.",
+      400
+    );
+  }
+
+  return ensureAdvertiserForUser(userId, {
+    cityId: Number(cityId),
+    requestId: context.requestId ?? null,
+    source: context.source ?? "ads.publish",
   });
 }

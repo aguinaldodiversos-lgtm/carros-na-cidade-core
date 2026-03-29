@@ -2,12 +2,22 @@ import { logger } from "../../shared/logger.js";
 import * as dealersService from "../../modules/dealers/dealers.service.js";
 import * as campaignsService from "../../modules/campaigns/campaigns.service.js";
 import * as citiesService from "../../modules/cities/cities.service.js";
+import { runGooglePlacesOutreachPipeline } from "../../modules/dealer-acquisition/dealer-outreach.service.js";
 
 export async function runDealerAcquisitionEngine(limitCities = 100) {
   logger.info(
     { limitCities },
     "[brain.dealer-acquisition] Iniciando aquisição territorial de lojistas"
   );
+
+  try {
+    const pipeline = await runGooglePlacesOutreachPipeline({
+      limitCities: Math.min(limitCities, 50),
+    });
+    logger.info({ pipeline }, "[brain.dealer-acquisition] Pipeline Google Places / WhatsApp");
+  } catch (error) {
+    logger.error({ error }, "[brain.dealer-acquisition] Falha no pipeline Google Places");
+  }
 
   const cities = await citiesService.getCitiesForExpansion(limitCities);
 

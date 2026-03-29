@@ -1,4 +1,26 @@
 // src/app.js
+//
+// =============================================================================
+// API HTTP OFICIAL (produção)
+// =============================================================================
+// Único ponto de montagem do Express para o servidor em src/index.js.
+// Mapa completo: docs/api-routes-inventory.md
+//
+// Prefixos montados:
+//   /api/public      → modules/public/public.routes.js
+//   /api/public/seo  → modules/public/public-seo.routes.js
+//   /api/auth        → modules/auth/auth.routes.js
+//   /api/account     → modules/account/account.routes.js
+//   /api/payments    → modules/payments/payments.routes.js
+//   /api/leads       → modules/leads/leads.routes.js
+//   /api/ads         → modules/ads/ads.routes.js + modules/ads/ads.events.routes.js (POST …/event)
+//   /api/events      → modules/ads/events.routes.js (POST / — mesmo handler que ingest de ad_events)
+//
+// Rotas HTTP legadas CommonJS em src/routes foram removidas; mantêm-se apenas health/metrics.
+//
+// Anúncios: código ativo só em src/modules/ads/. Legado CommonJS isolado em src/legacy/services-ads/.
+// =============================================================================
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -25,6 +47,7 @@ import accountRoutes from "./modules/account/account.routes.js";
 import paymentsRoutes from "./modules/payments/payments.routes.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
+import dealerAcquisitionInboundRoutes from "./modules/dealer-acquisition/dealer-inbound.routes.js";
 
 const app = express();
 
@@ -149,6 +172,7 @@ app.use("/api/leads", leadsRoutes);
 app.use("/api/ads", adsRoutes);
 app.use("/api/ads", adsEventsRoutes);
 app.use("/api/events", adEventsRoutes);
+app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
 
 // 404
 app.use((req, _res, next) => {

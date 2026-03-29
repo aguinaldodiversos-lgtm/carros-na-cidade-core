@@ -54,7 +54,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
+    <div className="relative overflow-hidden rounded-[22px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
       <div className="relative h-[260px] w-full md:h-[420px]">
         {safeSlides.map((slide, index) => {
           const isActive = index === activeIndex;
@@ -78,15 +78,15 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full px-6 md:px-10 lg:px-12">
                   <div className="max-w-[460px]">
-                    <h1 className="text-[34px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white md:text-[56px]">
+                    <h1 className="text-[32px] font-extrabold leading-[1.06] tracking-[-0.035em] text-white md:text-[52px] md:leading-[1.05]">
                       {slide.title}
                     </h1>
 
-                    <p className="mt-4 text-[17px] text-white/82 md:text-[24px]">
+                    <p className="mt-4 max-w-[42ch] text-[15px] font-medium leading-relaxed text-white/85 md:mt-5 md:text-[18px] md:leading-relaxed">
                       {slide.subtitle}
                     </p>
 
-                    <div className="mt-8">
+                    <div className="mt-7 md:mt-9">
                       <Link
                         href={slide.href}
                         className="inline-flex h-[54px] items-center justify-center rounded-[12px] bg-[#0e62d8] px-8 text-[18px] font-bold text-white shadow-[0_14px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0]"

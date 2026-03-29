@@ -151,6 +151,10 @@ function buildFallbackBoostMetrics(input: BoostInput): AdBoostMetrics {
   };
 }
 
+/**
+ * Métricas de “boost” para UI (scores). Chama serviço **opcional** em NEXT_PUBLIC_AI_API_URL,
+ * não a API core do portal (`NEXT_PUBLIC_API_URL`). Checkout de destaque pago usa POST /api/payments/create (BoostCheckout).
+ */
 export async function applyAdBoostMetrics(input: BoostInput): Promise<AdBoostMetrics> {
   const fallback = buildFallbackBoostMetrics(input);
 

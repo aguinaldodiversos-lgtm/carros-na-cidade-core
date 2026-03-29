@@ -7,13 +7,14 @@ import type {
   BlogPageContent,
   BlogPost,
 } from "@/lib/blog/blog-page";
+import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogPageClientProps {
   content: BlogPageContent;
 }
 
 const FALLBACK_PLANOS_HREF = "/planos";
-const FALLBACK_BLOG_CITY_HREF = "/blog/sao-paulo-sp";
+const FALLBACK_BLOG_CITY_HREF = `/blog/${DEFAULT_PUBLIC_CITY_SLUG}`;
 const FALLBACK_HERO_IMAGE = "/images/hero.jpeg";
 const FALLBACK_BOTTOM_BANNER_IMAGE = "/images/banner1.jpg";
 
@@ -201,7 +202,7 @@ function SidebarCard({
 export function BlogPageClient({ content }: BlogPageClientProps) {
   const [query, setQuery] = useState("");
 
-  const citySlug = toText(content.citySlug, "sao-paulo-sp");
+  const citySlug = toText(content.citySlug, DEFAULT_PUBLIC_CITY_SLUG);
   const cityName = toText(content.cityName, "São Paulo");
 
   const heroTitle = toText(content.heroBanner?.title, "Blog Carros na Cidade");

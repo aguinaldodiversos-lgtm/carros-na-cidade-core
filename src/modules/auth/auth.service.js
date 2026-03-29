@@ -3,7 +3,10 @@ import bcrypt from "bcryptjs";
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 import { logLoginAttempt } from "./auth.audit.service.js";
+import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
 import {
   validateUserForLogin,
   handleFailedLogin,
@@ -283,8 +286,25 @@ export async function register(
       throw new AppError("Erro ao criar usuário.", 500);
     }
 
+    await ensureAdvertiserForUser(String(createdUser.id), {
+      requestId: reqMeta.requestId,
+      source: "auth.register",
+    });
+
     const sessionUser = buildSessionUser(createdUser);
     const session = await issueSession(sessionUser, reqMeta);
+
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "auth.register",
+          result: "success",
+          requestId: reqMeta.requestId,
+          userId: createdUser.id,
+        }),
+      },
+      "[auth] registro ok"
+    );
 
     return {
       user: sessionUser,
@@ -333,7 +353,21 @@ export async function login(email, password, reqMeta = {}) {
       ip: reqMeta.ip,
       userAgent: reqMeta.userAgent,
       success: false,
+      requestId: reqMeta.requestId,
     });
+
+    logger.warn(
+      {
+        ...buildDomainFields({
+          action: "auth.login",
+          result: "error",
+          requestId: reqMeta.requestId,
+          userId: user?.id,
+          reason: "invalid_credentials",
+        }),
+      },
+      "[auth] login falhou"
+    );
 
     throw new AppError("Credenciais inválidas", 401);
   }
@@ -345,7 +379,20 @@ export async function login(email, password, reqMeta = {}) {
     ip: reqMeta.ip,
     userAgent: reqMeta.userAgent,
     success: true,
+    requestId: reqMeta.requestId,
   });
+
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "auth.login",
+        result: "success",
+        requestId: reqMeta.requestId,
+        userId: user.id,
+      }),
+    },
+    "[auth] login ok"
+  );
 
   const sessionUser = buildSessionUser(user);
   const session = await issueSession(sessionUser, reqMeta);

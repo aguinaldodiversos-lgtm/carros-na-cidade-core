@@ -1,5 +1,7 @@
 import { growthQueue } from "../../infrastructure/queue/growth.queue.js";
 import { pool } from "../../infrastructure/database/db.js";
+import { logger } from "../../shared/logger.js";
+import { buildDomainFields } from "../../shared/domainLog.js";
 
 export async function evaluateCities() {
   const cities = await pool.query(`
@@ -19,5 +21,14 @@ export async function evaluateCities() {
     }
   }
 
-  console.log("🧠 Growth Brain enfileirou ações");
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "ai.growth_brain.enqueue",
+        result: "success",
+      }),
+      enqueued: cities.rows?.length ?? 0,
+    },
+    "[ai] growth brain — jobs enfileirados"
+  );
 }

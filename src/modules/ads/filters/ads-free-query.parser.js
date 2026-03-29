@@ -54,12 +54,6 @@ function tokenize(text) {
     .slice(0, FREE_QUERY_MAX_TERMS);
 }
 
-function uniquePush(list, item, comparator = (a, b) => a === b) {
-  if (!list.some((existing) => comparator(existing, item))) {
-    list.push(item);
-  }
-}
-
 async function getBrandDictionary() {
   if (isCacheFresh(dictionaryCache.brands)) return dictionaryCache.brands.data;
 

@@ -52,10 +52,18 @@ export type DashboardStats = {
   is_verified_store: boolean;
 };
 
+/** Alinhado a `resolvePublishEligibility` no backend (mesmas regras que POST /account/plans/eligibility). */
+export type PublishEligibility = {
+  allowed: boolean;
+  reason: string | null;
+};
+
 export type DashboardPayload = {
   user: DashboardUser;
   current_plan: DashboardPlanSummary | null;
   stats: DashboardStats;
+  /** Presente quando o backend expõe elegibilidade unificada (FASE 6). */
+  publish_eligibility?: PublishEligibility;
   active_ads: DashboardAd[];
   paused_ads: DashboardAd[];
   boost_options: BoostOption[];

@@ -1,4 +1,4 @@
-export function buildFallback(task, input) {
+export function buildFallback(task, _input) {
   switch (task) {
     case "ad_description_short":
       return "Veículo em excelente estado. Documentação em dia. Entre em contato para mais informações e agendar uma visita.";

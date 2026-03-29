@@ -22,16 +22,18 @@ export default function VehicleCarousel({
   const safeVehicles = sanitizeVehicles(vehicles);
 
   return (
-    <section className="mt-8 rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)]">
-      <header className="mb-4">
-        <h2 className="text-2xl font-extrabold text-[#1d2538]">{title}</h2>
+    <section className="mt-8 rounded-[22px] border border-[#e1e6f0] bg-white p-5 shadow-[0_8px_28px_rgba(10,20,40,0.06)] md:p-6">
+      <header className="mb-5 border-b border-[#f0f3f8] pb-4">
+        <h2 className="text-[22px] font-extrabold leading-tight tracking-[-0.02em] text-[#1d2538] md:text-2xl">
+          {title}
+        </h2>
         {subtitle ? (
-          <p className="mt-1 text-sm leading-6 text-[#5f6982]">{subtitle}</p>
+          <p className="mt-2 text-[14px] leading-relaxed text-[#5f6982] md:text-[15px]">{subtitle}</p>
         ) : null}
       </header>
 
       {safeVehicles.length > 0 ? (
-        <div className="-mx-2 flex snap-x gap-4 overflow-x-auto px-2 pb-3 [scrollbar-width:none] touch-pan-x [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-2 flex snap-x gap-4 overflow-x-auto px-2 pb-2 [scrollbar-width:none] touch-pan-x [&::-webkit-scrollbar]:hidden">
           {safeVehicles.map((vehicle, index) => (
             <div
               key={vehicle.id || vehicle.slug || `${vehicle.model}-${index}`}
@@ -42,8 +44,8 @@ export default function VehicleCarousel({
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-[#d7deea] bg-[#f8fafc] px-5 py-8 text-center">
-          <p className="text-sm font-medium text-[#5f6982]">{emptyMessage}</p>
+        <div className="cnc-empty-state py-9 sm:py-10">
+          <p className="cnc-empty-state__title text-[16px]">{emptyMessage}</p>
         </div>
       )}
     </section>

@@ -18,12 +18,11 @@ export function AdGrid({
 }: AdGridProps) {
   if (!items.length) {
     return (
-      <div className="rounded-[24px] border border-dashed border-[#cbd5e1] bg-white px-6 py-12 text-center shadow-sm">
-        <h3 className="text-lg font-bold text-[#0f172a]">
-          Nenhum anúncio encontrado
-        </h3>
-        <p className="mt-2 text-sm text-[#64748b]">
-          Ajuste os filtros ou tente uma nova combinação de busca.
+      <div className="cnc-empty-state">
+        <p className="cnc-empty-state__title">Nenhum anúncio encontrado</p>
+        <p className="cnc-empty-state__desc">
+          Afrouxe um filtro, troque a ordenação ou busque outro modelo — o catálogo deste território
+          pode mudar ao longo do dia.
         </p>
       </div>
     );

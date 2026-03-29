@@ -1,5 +1,11 @@
 // src/modules/ads/filters/ads-free-query.constants.js
 
+export {
+  BODY_TYPE_SYNONYMS,
+  FUEL_SYNONYMS,
+  TRANSMISSION_SYNONYMS,
+} from "../ads.canonical.constants.js";
+
 export const FREE_QUERY_CACHE_TTL_MS = Number(
   process.env.ADS_FREE_QUERY_CACHE_TTL_MS || 10 * 60 * 1000
 );
@@ -48,32 +54,6 @@ export const FREE_QUERY_STOPWORDS = new Set([
   "anuncios",
   "anúncios",
 ]);
-
-export const FUEL_SYNONYMS = {
-  flex: ["flex", "totalflex", "total-flex"],
-  gasolina: ["gasolina"],
-  diesel: ["diesel"],
-  eletrico: ["eletrico", "elétrico", "ev"],
-  hibrido: ["hibrido", "híbrido", "hybrid"],
-  gnv: ["gnv"],
-  etanol: ["etanol", "alcool", "álcool"],
-};
-
-export const TRANSMISSION_SYNONYMS = {
-  automatico: ["automatico", "automático", "auto", "at"],
-  manual: ["manual", "mt"],
-  cvt: ["cvt"],
-};
-
-export const BODY_TYPE_SYNONYMS = {
-  suv: ["suv", "utilitario", "utilitário", "crossover"],
-  hatch: ["hatch", "hatchback"],
-  sedan: ["sedan", "sedã", "seda"],
-  picape: ["picape", "pickup", "camionete"],
-  coupe: ["coupe", "coupé"],
-  minivan: ["minivan", "van"],
-  wagon: ["wagon", "perua"],
-};
 
 export const BELOW_FIPE_TERMS = [
   "abaixo da fipe",

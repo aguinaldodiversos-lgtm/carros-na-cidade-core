@@ -1,6 +1,10 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as adsRepository from "../ads/ads.repository.js";
+import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
+import { getAccountUser } from "./account.user.read.js";
+
+export { getAccountUser };
 
 const DEFAULT_PLANS = [
   {
@@ -435,39 +439,24 @@ async function countActiveAdsByUser(userId) {
   }
 }
 
-export async function getAccountUser(userId) {
-  const result = await pool.query(
-    `
-    SELECT
-      id,
-      name,
-      email,
-      COALESCE(document_type, 'cpf') AS document_type,
-      COALESCE(document_verified, false) AS document_verified,
-      COALESCE(plan, 'free') AS plan
-    FROM users
-    WHERE id = $1
-    LIMIT 1
-    `,
-    [userId]
-  );
+/** Total de anúncios não excluídos (regra “primeiro anúncio” / documento). */
+export async function countNonDeletedAdsForUser(userId) {
+  try {
+    const result = await pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM ads a
+      JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE adv.user_id = $1
+        AND a.status != 'deleted'
+      `,
+      [userId]
+    );
 
-  const row = result.rows[0];
-  if (!row) {
-    throw new AppError("Usuario nao encontrado", 404);
+    return toNumber(result.rows[0]?.total, 0);
+  } catch {
+    return 0;
   }
-
-  const type = normalizeAccountType(row.document_type);
-
-  return {
-    id: String(row.id),
-    name: row.name?.trim() || "Usuario",
-    email: row.email?.trim() || "",
-    type,
-    cnpj_verified: type === "CNPJ" ? Boolean(row.document_verified) : false,
-    document_verified: Boolean(row.document_verified),
-    raw_plan: row.plan || "free",
-  };
 }
 
 export async function listPlans({ type, onlyActive = true } = {}) {
@@ -609,9 +598,11 @@ export async function getOwnedAd(userId, adId) {
 }
 
 export async function getDashboardPayload(userId) {
-  const [user, ads] = await Promise.all([
-    getAccountUser(userId),
+  await ensureAdvertiserForUser(String(userId), { source: "dashboard" });
+  const user = await getAccountUser(userId);
+  const [ads, publishEligibility] = await Promise.all([
     listOwnedAds(userId),
+    resolvePublishEligibility(userId, user),
   ]);
 
   const activeAds = ads.filter((ad) => ad.status === "active");
@@ -647,15 +638,31 @@ export async function getDashboardPayload(userId) {
       plan_name: currentPlan?.name ?? "Plano gratuito",
       is_verified_store: user.type === "CNPJ" ? user.cnpj_verified : false,
     },
+    publish_eligibility: {
+      allowed: publishEligibility.allowed,
+      reason: publishEligibility.reason,
+    },
     active_ads: activeAds,
     paused_ads: pausedAds,
     boost_options: BOOST_OPTIONS.map((option) => ({ ...option })),
   };
 }
 
-export async function validatePlanEligibility(userId) {
-  const user = await getAccountUser(userId);
+/**
+ * Fonte única de elegibilidade para publicar anúncio (PF/PJ):
+ * - CNPJ: documento verificado obrigatório
+ * - CPF: com zero anúncios não excluídos, CPF deve estar verificado
+ * - Limite: compara anúncios ativos ao teto do plano (mesma métrica que o painel usa em available_limit)
+ *
+ * Usado por: POST /account/plans/eligibility, pipeline de criação de anúncio, payload do dashboard.
+ *
+ * @param {object|null} [preloadedUser] — conta já carregada (evita query duplicada)
+ * @returns {Promise<{ allowed: boolean, reason: string|null, suggested_plan_type: string|null }>}
+ */
+export async function resolvePublishEligibility(userId, preloadedUser = null) {
+  const user = preloadedUser ?? (await getAccountUser(userId));
   const activeAds = await countActiveAdsByUser(userId);
+  const totalNonDeleted = await countNonDeletedAdsForUser(userId);
   const currentPlan = await resolveCurrentPlan(user);
   const freeLimit = getFreeLimit(user.type, user.cnpj_verified);
   const planLimit = currentPlan?.ad_limit ?? freeLimit;
@@ -665,6 +672,14 @@ export async function validatePlanEligibility(userId) {
       allowed: false,
       reason: "CNPJ precisa estar verificado para publicar",
       suggested_plan_type: "CNPJ",
+    };
+  }
+
+  if (user.type === "CPF" && totalNonDeleted === 0 && !user.document_verified) {
+    return {
+      allowed: false,
+      reason: "Para anunciar, é necessário verificar o CPF.",
+      suggested_plan_type: "CPF",
     };
   }
 
@@ -686,6 +701,11 @@ export async function validatePlanEligibility(userId) {
         : "Limite de anuncios da conta lojista atingido",
     suggested_plan_type: user.type,
   };
+}
+
+/** @deprecated Use o nome `resolvePublishEligibility` (mesma implementação). */
+export async function validatePlanEligibility(userId, preloadedUser = null) {
+  return resolvePublishEligibility(userId, preloadedUser);
 }
 
 export function listBoostOptions() {

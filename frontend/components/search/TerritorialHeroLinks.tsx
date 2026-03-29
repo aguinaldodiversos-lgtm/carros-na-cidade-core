@@ -21,7 +21,7 @@ export function TerritorialHeroLinks({ data }: TerritorialHeroLinksProps) {
         <Link
           key={`${item.href}-${item.label}`}
           href={item.href}
-          className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
+          className="rounded-full border border-[#E5E9F2] bg-[#F8FAFC] px-4 py-2 text-sm font-semibold text-[#33405A] transition hover:border-[#CFD9F0] hover:bg-white"
         >
           {item.label}
         </Link>

@@ -18,5 +18,15 @@ module.exports = {
         "no-console": "warn",
       },
     },
+    {
+      files: [
+        "src/modules/**/*.js",
+        "src/brain/**/*.js",
+        "src/shared/domainLog.js",
+      ],
+      rules: {
+        "no-console": "error",
+      },
+    },
   ],
 };

@@ -26,6 +26,8 @@ export type VehicleDetail = {
   model: string;
   fullName: string;
   price: string;
+  /** Valor numérico do preço (BRL), quando derivado do anúncio */
+  priceNumeric: number | null;
   condition: "Novo" | "Usado";
   year: string;
   km: string;
@@ -35,8 +37,20 @@ export type VehicleDetail = {
   city: string;
   citySlug: string;
   adCode: string;
+  /** ISO 8601 quando disponível na API */
+  adPublishedAt: string | null;
+  /** ISO 8601 quando disponível e diferente da publicação */
+  adUpdatedAt: string | null;
   isBelowFipe: boolean;
   fipePrice: string;
+  /** Diferença anúncio − referência FIPE estimada (BRL); negativo = abaixo da referência */
+  fipeDeltaBrl: number | null;
+  /** Mesma diferença em % sobre a referência estimada */
+  fipeDeltaPercent: number | null;
+  /** Plano pago ou destaque ativo (para carrossel e prioridades de conversão) */
+  isPaidListing: boolean;
+  /** ID do anunciante na base, quando disponível */
+  advertiserId: string | null;
   images: string[];
   description: string;
   optionalItems: string[];
@@ -45,6 +59,38 @@ export type VehicleDetail = {
   sellerNotes: string;
   seller: SellerInfo;
 };
+
+/** Rótulos para exibição no detalhe do anúncio (pt-BR). */
+export function formatListingDateLabels(
+  publishedIso: string | null | undefined,
+  updatedIso: string | null | undefined
+): { primary: string; secondary?: string } {
+  const published = publishedIso ? new Date(publishedIso) : null;
+  const updated = updatedIso ? new Date(updatedIso) : null;
+
+  const fmt = new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const pubOk = published && Number.isFinite(published.getTime());
+  const updOk = updated && Number.isFinite(updated.getTime());
+
+  if (pubOk) {
+    const primary = `Publicado em ${fmt.format(published!)}`;
+    if (updOk && Math.abs(updated!.getTime() - published!.getTime()) > 86_400_000) {
+      return { primary, secondary: `Atualizado em ${fmt.format(updated!)}` };
+    }
+    return { primary };
+  }
+
+  if (updOk) {
+    return { primary: `Última atualização em ${fmt.format(updated!)}` };
+  }
+
+  return { primary: "" };
+}
 
 const FALLBACK_IMAGES = [
   "/images/hero.jpeg",
@@ -251,14 +297,37 @@ function deriveVehicleNames(ad: PublicAdDetail) {
   };
 }
 
+function buildFipeReferenceAmount(price: number | null, belowFipe: boolean): number | null {
+  if (!price || price <= 0) return null;
+
+  return belowFipe ? Math.round(price / 0.95) : Math.round(price * 1.04);
+}
+
 function buildFipeReference(price: number | null, belowFipe: boolean) {
-  if (!price || price <= 0) return "Consulte";
+  const estimated = buildFipeReferenceAmount(price, belowFipe);
+  if (estimated == null) return "Consulte";
+  return formatPrice(estimated);
+}
 
-  const estimatedFipe = belowFipe
-    ? Math.round(price / 0.95)
-    : Math.round(price * 1.04);
+function computeIsPaidListing(
+  plan: string | null | undefined,
+  highlightUntil: string | null | undefined
+): boolean {
+  if (highlightUntil) {
+    const t = new Date(highlightUntil).getTime();
+    if (Number.isFinite(t) && t > Date.now()) return true;
+  }
 
-  return formatPrice(estimatedFipe);
+  const p = (plan || "free").toLowerCase().trim();
+  if (!p || p === "free") return false;
+  if (p.includes("free-essential") || p.includes("cpf-free")) return false;
+  return true;
+}
+
+function advertiserIdFromAd(ad: PublicAdDetail): string | null {
+  const v = ad.advertiser_id;
+  if (v == null || v === "") return null;
+  return String(v);
 }
 
 function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
@@ -316,9 +385,10 @@ function buildOptionalItems(ad: PublicAdDetail) {
 
 function buildSafetyItems() {
   return [
-    "Valide histórico e procedência antes da compra",
-    "Consulte documentação e vistoria cautelar",
-    "Negociação com apoio do portal",
+    "Confirme histórico de sinistros e origem do veículo antes de fechar qualquer pagamento",
+    "Prefira inspeção presencial, fotos reais e leitura de chassi; desconfie de anúncios genéricos ou com pressa para pix antecipado",
+    "Exija documentação em dia e considere vistoria cautelar reconhecida antes da quitação",
+    "Use os canais do portal para registrar o primeiro contato e mantenha comprovantes em caso de negociação",
   ];
 }
 
@@ -341,8 +411,22 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
   const belowFipe = ad.below_fipe === true;
   const { model, fullName } = deriveVehicleNames(ad);
   const city = deriveCityDisplay(ad.city, ad.state);
-  const citySlug = deriveCitySlug(ad.city, ad.state);
+  const citySlug = sanitizeNullableText(ad.city_slug) || deriveCitySlug(ad.city, ad.state);
   const seller = buildSellerInfo(ad);
+
+  const publishedRaw = sanitizeNullableText(ad.created_at);
+  const updatedRaw = sanitizeNullableText(ad.updated_at);
+
+  const refAmount = buildFipeReferenceAmount(priceNumber, belowFipe);
+  const fipeDeltaBrl =
+    refAmount != null && priceNumber != null ? priceNumber - refAmount : null;
+  const fipeDeltaPercent =
+    refAmount != null && refAmount > 0 && fipeDeltaBrl != null
+      ? (fipeDeltaBrl / refAmount) * 100
+      : null;
+
+  const isPaidListing = computeIsPaidListing(ad.plan, ad.highlight_until);
+  const advertiserId = advertiserIdFromAd(ad);
 
   return {
     id,
@@ -350,6 +434,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     model,
     fullName,
     price: formatPrice(ad.price),
+    priceNumeric: priceNumber,
     condition: "Usado",
     year: formatYear(ad.year),
     km: formatMileage(ad.mileage),
@@ -359,8 +444,14 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     city,
     citySlug,
     adCode: id,
+    adPublishedAt: publishedRaw,
+    adUpdatedAt: updatedRaw,
     isBelowFipe: belowFipe,
     fipePrice: buildFipeReference(priceNumber, belowFipe),
+    fipeDeltaBrl,
+    fipeDeltaPercent,
+    isPaidListing,
+    advertiserId,
     images,
     description:
       sanitizeText(ad.description) ||

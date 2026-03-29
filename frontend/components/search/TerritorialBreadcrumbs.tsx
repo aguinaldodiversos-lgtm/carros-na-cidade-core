@@ -23,25 +23,29 @@ export function TerritorialBreadcrumbs({
   if (!items.length) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex flex-wrap items-center gap-2 text-sm text-zinc-500">
+    <nav aria-label="Breadcrumb" className="mb-5 md:mb-6">
+      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug text-[#64748b] md:text-sm">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
 
           return (
             <li key={`${item.href}-${item.label}`} className="flex items-center gap-2">
               {isLast ? (
-                <span className="font-medium text-zinc-800">{item.label}</span>
+                <span className="font-semibold text-[#0f172a]">{item.label}</span>
               ) : (
                 <Link
                   href={item.href}
-                  className="transition hover:text-zinc-900"
+                  className="font-medium transition hover:text-[#0f172a]"
                 >
                   {item.label}
                 </Link>
               )}
 
-              {!isLast && <span className="text-zinc-300">/</span>}
+              {!isLast && (
+                <span className="text-[#cbd5e1] select-none" aria-hidden>
+                  /
+                </span>
+              )}
             </li>
           );
         })}
