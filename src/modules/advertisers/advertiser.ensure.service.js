@@ -1,4 +1,8 @@
 import { pool, withTransaction } from "../../infrastructure/database/db.js";
+import {
+  assertAccountAllowsAdPublishing,
+  getAccountUser,
+} from "../account/account.service.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { slugify } from "../../shared/utils/slugify.js";
 
@@ -95,61 +99,12 @@ function buildContactFieldsForAdvertiser(contact, advertiserCols) {
   return out;
 }
 
-function normalizeDocType(value) {
-  const t = String(value || "")
-    .trim()
-    .toLowerCase();
-  return t === "cnpj" || t === "cpf" ? t : null;
-}
-
-function buildSelectUserForAdvertiserSql(usersCols) {
-  const parts = [];
-
-  parts.push("id");
-
-  if (usersCols.has("name")) {
-    parts.push(`COALESCE(NULLIF(TRIM(name), ''), '') AS name`);
-  } else {
-    parts.push(`''::text AS name`);
-  }
-
-  if (usersCols.has("email")) {
-    parts.push("email");
-  } else {
-    parts.push(`NULL::text AS email`);
-  }
-
-  if (usersCols.has("document_type")) {
-    parts.push("document_type");
-  } else {
-    parts.push(`'cpf'::text AS document_type`);
-  }
-
-  if (usersCols.has("document_verified")) {
-    parts.push("COALESCE(document_verified, false) AS document_verified");
-  } else {
-    parts.push("false AS document_verified");
-  }
-
-  if (usersCols.has("plan")) {
-    parts.push(`COALESCE(plan, 'free') AS plan`);
-  } else {
-    parts.push(`'free' AS plan`);
-  }
-
-  for (const col of USER_CONTACT_COLUMN_PRIORITY) {
-    if (usersCols.has(col)) {
-      parts.push(col);
-    }
-  }
-
-  return `SELECT ${parts.join(",\n        ")}
-      FROM users`;
-}
-
 /**
  * Garante um registro em `advertisers` para o usuário, quando apto a publicar.
  * Usa lock consultivo por usuário para evitar duplicidade sob concorrência.
+ *
+ * Regras de documento: mesma fonte que o painel (`getAccountUser` + `assertAccountAllowsAdPublishing`),
+ * alinhada a `validatePlanEligibility` (bloqueio explícito só para CNPJ não verificado).
  *
  * @param {string} userId
  * @param {{ cityId: number }} context — city_id do anúncio (obrigatório para novo cadastro)
@@ -163,6 +118,9 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       400
     );
   }
+
+  const account = await getAccountUser(userId);
+  assertAccountAllowsAdPublishing(account);
 
   const [advertiserCols, usersCols] = await Promise.all([
     getAdvertisersColumnSet(),
@@ -183,49 +141,42 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       return existing.rows[0];
     }
 
-    const userSql = `${buildSelectUserForAdvertiserSql(usersCols)}
-      WHERE id = $1
-      LIMIT 1`;
-
-    const userResult = await client.query(userSql, [userId]);
-
-    const user = userResult.rows[0];
-    if (!user) {
-      throw new AppError("Usuário não encontrado.", 404);
-    }
-
-    if (!user.document_verified) {
-      throw new AppError(
-        "Para publicar, verifique seu documento (CPF ou CNPJ) no perfil.",
-        400
+    const contactCols = USER_CONTACT_COLUMN_PRIORITY.filter((c) =>
+      usersCols.has(c)
+    );
+    let contactRow = {};
+    if (contactCols.length) {
+      const cr = await client.query(
+        `
+        SELECT ${contactCols.join(", ")}
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+        `,
+        [userId]
       );
+      contactRow = cr.rows[0] || {};
     }
 
-    const docType = normalizeDocType(user.document_type);
-    if (!docType) {
-      throw new AppError(
-        "Complete o tipo de documento (CPF ou CNPJ) no perfil antes de publicar.",
-        400
-      );
-    }
+    const contact = pickContactFromUserRow(contactRow, usersCols);
+    const contactFields = buildContactFieldsForAdvertiser(contact, advertiserCols);
 
-    const displayName = user.name?.trim() || "Anunciante";
+    const displayName = account.name?.trim() || "Anunciante";
     const baseSlug = (
       slugify(`${displayName}-${userId}`) || `anunciante-${userId}`
     ).slice(0, 120);
 
-    const contact = pickContactFromUserRow(user, usersCols);
-    const contactFields = buildContactFieldsForAdvertiser(contact, advertiserCols);
+    const isLojista = account.type === "CNPJ";
 
     const row = {
       user_id: userId,
       city_id: Number(cityId),
       name: displayName,
-      company_name: docType === "cnpj" ? displayName : "",
-      email: String(user.email || "")
+      company_name: isLojista ? displayName : "",
+      email: String(account.email || "")
         .trim()
         .toLowerCase() || null,
-      plan: user.plan || "free",
+      plan: account.raw_plan || "free",
       status: "active",
       verified: false,
       ...contactFields,

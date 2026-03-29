@@ -460,8 +460,27 @@ export async function getAccountUser(userId) {
     email: row.email?.trim() || "",
     type,
     cnpj_verified: type === "CNPJ" ? Boolean(row.document_verified) : false,
+    document_verified: Boolean(row.document_verified),
     raw_plan: row.plan || "free",
   };
+}
+
+/**
+ * Alinha publicação de anúncio com `validatePlanEligibility` / painel de conta:
+ * - CNPJ (lojista): exige documento verificado (mesma fonte: `users.document_verified` via getAccountUser).
+ * - CPF (pessoa física): não bloqueia aqui — a regra de negócio de “validar uma vez” aplica-se ao fluxo de cadastro;
+ *   o painel já não exige `document_verified` para PF em `validatePlanEligibility`.
+ */
+export function assertAccountAllowsAdPublishing(accountUser) {
+  if (!accountUser) {
+    throw new AppError("Usuario nao encontrado", 404);
+  }
+  if (accountUser.type === "CNPJ" && !accountUser.cnpj_verified) {
+    throw new AppError(
+      "Para publicar como lojista, é necessário verificar o CNPJ no perfil.",
+      400
+    );
+  }
 }
 
 export async function listPlans({ type, onlyActive = true } = {}) {
