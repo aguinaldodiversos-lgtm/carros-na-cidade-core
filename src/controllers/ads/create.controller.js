@@ -180,24 +180,12 @@ async function createAd(req, res) {
     const slugBase = `${brand}-${model}-${year}`;
     const slug = slugify(slugBase + "-" + Date.now());
 
-    const advertiserResult = await pool.query(
-      `
-      SELECT id
-      FROM advertisers
-      WHERE user_id = $1
-      LIMIT 1
-      `,
-      [userId]
+    const { ensureAdvertiserForPublishing } = await import(
+      "../../modules/advertisers/advertiser.ensure.service.js"
     );
-
-    const advertiserRow = advertiserResult.rows[0];
-    if (!advertiserRow) {
-      return res.status(400).json({
-        error: "Anunciante não encontrado",
-        message:
-          "É necessário ter cadastro de anunciante vinculado à conta para publicar.",
-      });
-    }
+    const advertiserRow = await ensureAdvertiserForPublishing(String(userId), {
+      cityId: city_id,
+    });
 
     /* =====================================================
        INSERIR ANÚNCIO
@@ -244,6 +232,11 @@ async function createAd(req, res) {
       ad,
     });
   } catch (err) {
+    if (err?.statusCode >= 400 && err?.statusCode < 500) {
+      return res.status(err.statusCode).json({
+        error: err.message || "Requisição inválida",
+      });
+    }
     console.error("Erro ao criar anúncio:", err);
     return res.status(500).json({
       error: "Erro interno no servidor",

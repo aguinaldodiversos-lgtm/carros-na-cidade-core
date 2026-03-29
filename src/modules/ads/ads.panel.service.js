@@ -1,6 +1,6 @@
-import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { slugify } from "../../shared/utils/slugify.js";
+import { ensureAdvertiserForPublishing } from "../advertisers/advertiser.ensure.service.js";
 import * as adsRepository from "./ads.repository.js";
 
 function assertOwner(ownerContext, userId) {
@@ -18,24 +18,10 @@ function assertOwner(ownerContext, userId) {
   }
 }
 
-async function findAdvertiserByUserId(userId) {
-  const result = await pool.query(
-    `SELECT id, user_id FROM advertisers WHERE user_id = $1 LIMIT 1`,
-    [userId]
-  );
-
-  return result.rows[0] || null;
-}
-
 export async function createAd(data, user) {
-  const advertiser = await findAdvertiserByUserId(user.id);
-
-  if (!advertiser?.id) {
-    throw new AppError(
-      "Cadastro de anunciante não encontrado. Complete seu perfil antes de publicar.",
-      400
-    );
-  }
+  const advertiser = await ensureAdvertiserForPublishing(user.id, {
+    cityId: data.city_id,
+  });
 
   const slug = slugify(
     `${data.brand}-${data.model}-${data.year}-${Date.now()}`
