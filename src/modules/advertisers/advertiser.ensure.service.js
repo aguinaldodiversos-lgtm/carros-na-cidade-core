@@ -2,7 +2,28 @@ import { pool, withTransaction } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { slugify } from "../../shared/utils/slugify.js";
 
+/** Ordem de preferência para ler telefone/WhatsApp em `users` (schema varia por deploy). */
+const USER_CONTACT_COLUMN_PRIORITY = [
+  "whatsapp",
+  "phone",
+  "mobile_phone",
+  "telephone",
+  "telefone",
+  "contact_phone",
+  "celular",
+];
+
+/** Onde gravar o mesmo contato em `advertisers` (só colunas que existirem). */
+const ADVERTISER_CONTACT_COLUMN_PRIORITY = [
+  "whatsapp",
+  "phone",
+  "mobile_phone",
+  "telephone",
+  "telefone",
+];
+
 let advertisersColumnsPromise = null;
+let usersColumnsPromise = null;
 
 async function getAdvertisersColumnSet() {
   if (!advertisersColumnsPromise) {
@@ -25,8 +46,53 @@ async function getAdvertisersColumnSet() {
   return advertisersColumnsPromise;
 }
 
-function hasAdvertiserColumn(columns, name) {
+async function getUsersColumnSet() {
+  if (!usersColumnsPromise) {
+    usersColumnsPromise = pool
+      .query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'users'
+        `
+      )
+      .then((result) => new Set(result.rows.map((row) => row.column_name)))
+      .catch((error) => {
+        usersColumnsPromise = null;
+        throw error;
+      });
+  }
+
+  return usersColumnsPromise;
+}
+
+function hasColumn(columns, name) {
   return columns.has(name);
+}
+
+function pickContactFromUserRow(row, usersCols) {
+  for (const col of USER_CONTACT_COLUMN_PRIORITY) {
+    if (!usersCols.has(col)) continue;
+    const v = row[col];
+    if (v != null && String(v).trim()) {
+      return String(v).trim();
+    }
+  }
+  return null;
+}
+
+function buildContactFieldsForAdvertiser(contact, advertiserCols) {
+  if (!contact) {
+    return {};
+  }
+  const out = {};
+  for (const col of ADVERTISER_CONTACT_COLUMN_PRIORITY) {
+    if (advertiserCols.has(col)) {
+      out[col] = contact;
+    }
+  }
+  return out;
 }
 
 function normalizeDocType(value) {
@@ -34,6 +100,51 @@ function normalizeDocType(value) {
     .trim()
     .toLowerCase();
   return t === "cnpj" || t === "cpf" ? t : null;
+}
+
+function buildSelectUserForAdvertiserSql(usersCols) {
+  const parts = [];
+
+  parts.push("id");
+
+  if (usersCols.has("name")) {
+    parts.push(`COALESCE(NULLIF(TRIM(name), ''), '') AS name`);
+  } else {
+    parts.push(`''::text AS name`);
+  }
+
+  if (usersCols.has("email")) {
+    parts.push("email");
+  } else {
+    parts.push(`NULL::text AS email`);
+  }
+
+  if (usersCols.has("document_type")) {
+    parts.push("document_type");
+  } else {
+    parts.push(`'cpf'::text AS document_type`);
+  }
+
+  if (usersCols.has("document_verified")) {
+    parts.push("COALESCE(document_verified, false) AS document_verified");
+  } else {
+    parts.push("false AS document_verified");
+  }
+
+  if (usersCols.has("plan")) {
+    parts.push(`COALESCE(plan, 'free') AS plan`);
+  } else {
+    parts.push(`'free' AS plan`);
+  }
+
+  for (const col of USER_CONTACT_COLUMN_PRIORITY) {
+    if (usersCols.has(col)) {
+      parts.push(col);
+    }
+  }
+
+  return `SELECT ${parts.join(",\n        ")}
+      FROM users`;
 }
 
 /**
@@ -53,7 +164,10 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
     );
   }
 
-  const columns = await getAdvertisersColumnSet();
+  const [advertiserCols, usersCols] = await Promise.all([
+    getAdvertisersColumnSet(),
+    getUsersColumnSet(),
+  ]);
 
   return withTransaction(async (client) => {
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [
@@ -69,22 +183,11 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       return existing.rows[0];
     }
 
-    const userResult = await client.query(
-      `
-      SELECT
-        id,
-        COALESCE(NULLIF(TRIM(name), ''), '') AS name,
-        email,
-        phone,
-        document_type,
-        COALESCE(document_verified, false) AS document_verified,
-        COALESCE(plan, 'free') AS plan
-      FROM users
+    const userSql = `${buildSelectUserForAdvertiserSql(usersCols)}
       WHERE id = $1
-      LIMIT 1
-      `,
-      [userId]
-    );
+      LIMIT 1`;
+
+    const userResult = await client.query(userSql, [userId]);
 
     const user = userResult.rows[0];
     if (!user) {
@@ -111,11 +214,13 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       slugify(`${displayName}-${userId}`) || `anunciante-${userId}`
     ).slice(0, 120);
 
+    const contact = pickContactFromUserRow(user, usersCols);
+    const contactFields = buildContactFieldsForAdvertiser(contact, advertiserCols);
+
     const row = {
       user_id: userId,
       city_id: Number(cityId),
       name: displayName,
-      // PF: string vazia quando a coluna existir e for NOT NULL; lojista: nome fantasia mínimo
       company_name: docType === "cnpj" ? displayName : "",
       email: String(user.email || "")
         .trim()
@@ -123,15 +228,14 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       plan: user.plan || "free",
       status: "active",
       verified: false,
-      phone: user.phone ? String(user.phone).trim() : null,
-      whatsapp: user.phone ? String(user.phone).trim() : null,
+      ...contactFields,
     };
 
     const fieldNames = [];
     const values = [];
 
     for (const [key, value] of Object.entries(row)) {
-      if (!hasAdvertiserColumn(columns, key)) {
+      if (!hasColumn(advertiserCols, key)) {
         continue;
       }
       if (key === "email" && !value) {
@@ -141,7 +245,7 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
       values.push(value);
     }
 
-    if (!hasAdvertiserColumn(columns, "slug")) {
+    if (!hasColumn(advertiserCols, "slug")) {
       throw new AppError(
         "Schema de anunciantes incompatível (coluna slug ausente).",
         500
@@ -149,10 +253,11 @@ export async function ensureAdvertiserForPublishing(userId, context = {}) {
     }
 
     const maxAttempts = 8;
-    let slug = baseSlug;
+    const slug = baseSlug;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const attemptSlug = attempt === 0 ? slug : `${baseSlug}-${Date.now()}-${attempt}`.slice(0, 120);
+      const attemptSlug =
+        attempt === 0 ? slug : `${baseSlug}-${Date.now()}-${attempt}`.slice(0, 120);
       const insertFields = [...fieldNames, "slug"];
       const insertValues = [...values, attemptSlug];
       const placeholders = insertFields.map((_, i) => `$${i + 1}`).join(", ");
