@@ -48,7 +48,7 @@ export default function SellerSection({
     cityVehicles.length > 0;
 
   if (vehicle.seller.type === "dealer") {
-    const logo = vehicle.seller.logo || "/images/logo.png";
+    const logo = vehicle.seller.logo || "/images/logo.svg";
     const sellerName = vehicle.seller.name || "Loja parceira";
     const sellerAddress = vehicle.seller.address || vehicle.city;
     const rating = Number.isFinite(vehicle.seller.rating) ? vehicle.seller.rating : 4.8;

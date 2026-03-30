@@ -47,25 +47,27 @@ interface HomePageClientProps {
   activeCityName: string;
 }
 
+/** Imagens estáveis (CDN) — evita banner quebrado quando não há assets locais. */
+const HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1920&q=82",
+  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1920&q=82",
+] as const;
+
 function buildHeroSlides(cityName: string, _citySlug: string): HeroSlide[] {
-  return [
-    {
-      id: "find-car",
-      image: "/images/home-banner-1.png",
-      title: `Encontre seu próximo carro em ${cityName}`,
-      subtitle: "Milhares de ofertas esperando por você",
-      ctaLabel: "Pesquisar agora",
-      href: "#home-quick-search",
-    },
-    {
-      id: "sell-fast",
-      image: "/images/home-banner-2.png",
-      title: "Anuncie seu carro grátis e venda rápido!",
-      subtitle: "Venda fácil para sua cidade. Fale direto com compradores.",
-      ctaLabel: "Anunciar grátis",
-      href: "/anunciar",
-    },
-  ];
+  const title = `Encontre seu próximo carro em ${cityName}`;
+  const subtitle = "Milhares de ofertas esperando por você";
+  const cta = {
+    ctaLabel: "Pesquisar agora",
+    href: "#home-quick-search" as const,
+  };
+
+  return HERO_IMAGES.map((image, index) => ({
+    id: `hero-${index + 1}`,
+    image,
+    title,
+    subtitle,
+    ...cta,
+  }));
 }
 
 function resolveCurrentCityName(featuredCities: FeaturedCity[], activeName: string) {
@@ -87,8 +89,8 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
   const opportunityAds = (data.opportunityAds || []).slice(0, 4);
 
   return (
-    <div className="bg-[#f0f2f6]">
-      <section className="relative mx-auto w-full max-w-7xl px-4 pb-2 pt-4 sm:px-6 sm:pt-5 xl:px-8">
+    <div className="bg-[#eef1f6]">
+      <section className="relative mx-auto w-full max-w-7xl px-4 pb-3 pt-5 sm:px-6 sm:pb-4 sm:pt-6 lg:px-8 lg:pt-8">
         <HeroCarousel slides={heroSlides} />
 
         <div className="relative z-20 px-0 sm:px-0">
@@ -100,7 +102,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12 xl:px-8">
+      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-14 xl:px-8">
         <div className="mb-6 text-center md:text-left">
           <h2 className="text-[22px] font-extrabold tracking-tight text-[#1b2436] md:text-[28px]">
             Destaques em {currentCity}
@@ -121,7 +123,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-[#cfd6e6] bg-white/80 px-6 py-12 text-center">
+          <div className="rounded-[18px] border border-dashed border-[#cfd6e6] bg-white px-6 py-14 text-center shadow-[0_4px_28px_rgba(15,23,42,0.06)]">
             <p className="text-[16px] font-semibold text-[#4e5a73]">Nenhum destaque no momento</p>
             <p className="mt-2 text-[14px] text-[#6a7388]">
               Quando houver veículos em destaque na região, eles aparecerão aqui.
@@ -136,7 +138,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
         )}
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 xl:px-8">
+      <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-14 xl:px-8">
         <div className="mb-6 text-center md:text-left">
           <h2 className="text-[22px] font-extrabold tracking-tight text-[#1b2436] md:text-[28px]">
             Oportunidades abaixo da FIPE
@@ -157,7 +159,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-[#cfd6e6] bg-white/80 px-6 py-12 text-center">
+          <div className="rounded-[18px] border border-dashed border-[#cfd6e6] bg-white px-6 py-14 text-center shadow-[0_4px_28px_rgba(15,23,42,0.06)]">
             <p className="text-[16px] font-semibold text-[#4e5a73]">
               Nenhuma oportunidade abaixo da FIPE agora
             </p>
@@ -174,9 +176,9 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
         )}
       </section>
 
-      <section className="border-t border-[#e4e8f0] bg-[#e8ebf2] py-10 sm:py-12">
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:gap-5 xl:px-8">
-          <div className="rounded-[14px] border border-white/60 bg-white px-4 py-5 shadow-sm sm:px-5">
+      <section className="border-t border-[#e2e7f0] bg-[#e8ebf2] py-12 sm:py-14">
+        <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-5 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:gap-6 xl:px-8">
+          <div className="rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M12 3l7 3v5c0 5-3.3 8.8-7 10-3.7-1.2-7-5-7-10V6l7-3Z" />
@@ -189,7 +191,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
             </p>
           </div>
 
-          <div className="rounded-[14px] border border-white/60 bg-white px-4 py-5 shadow-sm sm:px-5">
+          <div className="rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
@@ -202,7 +204,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
             </p>
           </div>
 
-          <div className="rounded-[14px] border border-white/60 bg-white px-4 py-5 shadow-sm sm:px-5">
+          <div className="rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M4 7h16M7 4v6M17 4v6M5 11h14v8H5z" />
@@ -215,7 +217,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
             </p>
           </div>
 
-          <div className="flex flex-col rounded-[14px] border border-white/60 bg-white px-4 py-5 shadow-sm sm:px-5">
+          <div className="flex flex-col rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 11h3l2-6h8l2 6h3v2h-2l-1 9H6l-1-9H3z" />

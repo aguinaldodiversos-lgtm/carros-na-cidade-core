@@ -118,9 +118,9 @@ export function PublicFooter() {
             <div className="flex max-w-xl flex-col gap-3">
               <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
                 <img
-                  src="/images/logo.png"
+                  src="/images/logo.svg"
                   alt="Carros na Cidade"
-                  className="h-6 w-[120px] object-contain brightness-0 invert sm:h-7 sm:w-[140px]"
+                  className="h-6 w-[120px] object-contain object-left brightness-0 invert sm:h-7 sm:w-[140px]"
                   loading="lazy"
                 />
               </Link>
@@ -168,7 +168,7 @@ export function PublicFooter() {
           <div>
             <Link href={SITE_ROUTES.home} className="block" aria-label="Carros na Cidade">
               <img
-                src="/images/logo.png"
+                src="/images/logo.svg"
                 alt="Carros na Cidade"
                 className="h-11 w-[195px] object-contain object-left brightness-0 invert"
                 loading="lazy"

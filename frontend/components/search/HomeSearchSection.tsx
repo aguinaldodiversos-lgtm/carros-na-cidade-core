@@ -97,7 +97,7 @@ function SelectField({
         id={`field-${label}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-[48px] w-full rounded-[10px] border border-[#dbe2ed] bg-white px-3 text-[15px] font-medium text-[#1b2436] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20 md:h-[52px] md:px-4"
+        className="h-[48px] w-full cursor-pointer rounded-[11px] border border-[#d5deeb] bg-[#fafbfd] px-3 text-[15px] font-medium text-[#1b2436] outline-none transition hover:border-[#c5d0e0] focus:border-[#0e62d8] focus:bg-white focus:ring-2 focus:ring-[#0e62d8]/18 md:h-[52px] md:px-4"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
@@ -180,13 +180,13 @@ export function HomeSearchSection({
   return (
     <section
       id="home-quick-search"
-      className="relative z-10 -mt-8 rounded-[18px] border border-[#dce3ee] bg-white px-4 py-5 shadow-[0_16px_40px_rgba(16,28,58,0.1)] sm:-mt-10 sm:px-6 sm:py-6 md:-mt-12"
+      className="relative z-10 -mt-8 rounded-[20px] border border-[#dce3ee] bg-white px-4 py-6 shadow-[0_20px_48px_rgba(16,28,58,0.11)] sm:-mt-10 sm:px-6 sm:py-7 md:-mt-[52px]"
       aria-labelledby="home-search-heading"
     >
       <h2 id="home-search-heading" className="sr-only">
         Busca rápida de veículos
       </h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         <SelectField
           label="Cidade"
           placeholderOption="- Selecionar -"
@@ -250,7 +250,7 @@ export function HomeSearchSection({
           <button
             type="button"
             onClick={handleSubmit}
-            className="inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-[10px] bg-[#0e62d8] px-4 text-[16px] font-extrabold text-white shadow-[0_10px_24px_rgba(14,98,216,0.22)] transition hover:bg-[#0c4fb0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8] md:h-[52px] md:text-[17px]"
+            className="inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-[11px] bg-[#0e62d8] px-4 text-[16px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8] md:h-[52px] md:text-[17px]"
           >
             Pesquisar
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">

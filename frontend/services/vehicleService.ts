@@ -129,7 +129,7 @@ const vehiclesSeed: VehicleDetail[] = [
     seller: {
       type: "dealer",
       name: "Premium Motors Sao Paulo",
-      logo: "/images/logo.png",
+      logo: "/images/logo.svg",
       address: "Avenida dos Bandeirantes, 4200 - Sao Paulo/SP",
       rating: 4.8,
       phone: "5511998877665",
@@ -167,7 +167,7 @@ const vehiclesSeed: VehicleDetail[] = [
     seller: {
       type: "dealer",
       name: "Premium Motors Sao Paulo",
-      logo: "/images/logo.png",
+      logo: "/images/logo.svg",
       address: "Avenida dos Bandeirantes, 4200 - Sao Paulo/SP",
       rating: 4.8,
       phone: "5511998877665",

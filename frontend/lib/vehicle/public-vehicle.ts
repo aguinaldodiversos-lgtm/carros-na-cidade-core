@@ -341,7 +341,7 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
     return {
       type: "dealer",
       name: sellerName,
-      logo: "/images/logo.png",
+      logo: "/images/logo.svg",
       address: cityDisplay,
       rating: 4.8,
       phone: sellerPhone,

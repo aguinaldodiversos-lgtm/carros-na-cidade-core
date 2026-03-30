@@ -24,7 +24,8 @@ const SITE_NAME = "Carros na Cidade";
 const DEFAULT_TITLE = "Carros na Cidade | Marketplace automotivo regional";
 const TITLE_TEMPLATE = "%s | Carros na Cidade";
 const DEFAULT_SITE_URL = "https://carrosnacidade.com";
-const DEFAULT_OG_IMAGE = "/images/hero.jpeg";
+const DEFAULT_OG_IMAGE =
+  "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&h=630&q=82";
 
 const DEFAULT_DESCRIPTION =
   "Marketplace automotivo regional: carros por cidade e estado, listagens que respeitam o território, referência FIPE e negociação com contexto local — Carros na Cidade.";
@@ -122,9 +123,9 @@ export const metadata: Metadata = {
     images: [DEFAULT_OG_IMAGE],
   },
   icons: {
-    icon: [{ url: "/images/favicon.ico" }, { url: "/favicon.ico" }],
-    shortcut: ["/images/favicon.ico", "/favicon.ico"],
-    apple: [{ url: "/images/favicon.png" }],
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: ["/favicon.svg"],
+    apple: [{ url: "/favicon.svg" }],
   },
   manifest: "/site.webmanifest",
   appleWebApp: {
@@ -154,7 +155,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           <div className="flex min-h-screen flex-col">
             <Suspense
               fallback={
-                <div className="h-[78px] border-b border-[#E6EAF2] bg-white/95" aria-hidden />
+                <div className="h-[72px] border-b border-[#E6EAF2] bg-white/95" aria-hidden />
               }
             >
               <PublicHeader />

@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { CityHeaderSelector } from "@/components/city/CityHeaderSelector";
 import { useCity } from "@/lib/city/CityContext";
-import { SITE_ROUTES } from "@/lib/site/site-navigation";
+import { getTerritorialRoutesForCity, SITE_ROUTES } from "@/lib/site/site-navigation";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -45,30 +45,32 @@ function MenuIcon({ open }: { open: boolean }) {
 }
 
 const linkNav =
-  "inline-flex h-10 items-center rounded-lg px-2 text-[14px] font-medium text-[#4E5A73] transition hover:bg-[#F6F8FC] hover:text-[#0e62d8] xl:px-3";
+  "inline-flex h-10 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-[#4E5A73] transition hover:bg-[#F6F8FC] hover:text-[#0e62d8] lg:px-2.5 lg:text-[13px] xl:px-3 xl:text-[14px]";
 
 export function PublicHeader() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { city, openCityPicker } = useCity();
+  const territory = getTerritorialRoutesForCity(city.slug);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#E6EAF2] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
-        <div className="flex h-[64px] items-center justify-between gap-3 md:h-[68px] md:gap-6">
-          <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-5">
+    <header className="sticky top-0 z-50 border-b border-[#E6EAF2] bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur supports-[backdrop-filter]:bg-white/90">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-[64px] items-center gap-3 md:h-[72px] md:gap-4">
+          <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4 lg:gap-5">
             <Link
               href="/"
               aria-label="Carros na Cidade"
-              className="inline-flex shrink-0 items-center gap-2"
+              className="inline-flex shrink-0 items-center"
             >
               <Image
-                src="/images/logo.png"
+                src="/images/logo.svg"
                 alt="Carros na Cidade"
-                width={160}
-                height={40}
+                width={200}
+                height={36}
                 priority
-                className="h-auto w-[128px] object-contain sm:w-[148px]"
+                unoptimized
+                className="h-[32px] w-auto object-contain sm:h-[34px] md:h-[36px]"
               />
             </Link>
 
@@ -78,9 +80,22 @@ export function PublicHeader() {
           </div>
 
           <nav
-            className="hidden items-center gap-1 md:flex xl:gap-2"
+            className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 lg:flex xl:gap-1"
             aria-label="Navegação principal"
           >
+            <Link href={territory.comprar} className={linkNav}>
+              Comprar
+            </Link>
+            <Link href={territory.financing} className={linkNav}>
+              <span className="hidden lg:inline">Simulador de Financiamento</span>
+              <span className="lg:hidden">Simulador</span>
+            </Link>
+            <Link href={territory.fipe} className={linkNav}>
+              Fipe
+            </Link>
+            <Link href={territory.blog} className={linkNav}>
+              Blog
+            </Link>
             <Link href="/anunciar" className={linkNav}>
               Anunciar
             </Link>
@@ -90,19 +105,22 @@ export function PublicHeader() {
             <Link
               href={SITE_ROUTES.favoritos}
               aria-label="Favoritos"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#6B7488] transition hover:bg-[#F6F8FC] hover:text-[#e11d48]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#6B7488] transition hover:bg-[#F6F8FC] hover:text-[#e11d48]"
             >
               <HeartIcon />
             </Link>
+          </nav>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
             <Link
               href={SITE_ROUTES.login}
-              className="ml-1 inline-flex h-10 items-center justify-center rounded-[10px] bg-[#0e62d8] px-5 text-[14px] font-bold text-white shadow-sm transition hover:bg-[#0c4fb0]"
+              className="hidden h-10 items-center justify-center rounded-[10px] bg-[#0e62d8] px-5 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(14,98,216,0.22)] transition hover:bg-[#0c4fb0] lg:inline-flex"
             >
               Entrar
             </Link>
-          </nav>
+          </div>
 
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex shrink-0 items-center gap-2 lg:hidden">
             <button
               type="button"
               onClick={() => openCityPicker()}
@@ -112,7 +130,7 @@ export function PublicHeader() {
             </button>
             <Link
               href={SITE_ROUTES.login}
-              className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#0e62d8] px-4 text-sm font-bold text-white"
+              className="inline-flex h-10 items-center justify-center rounded-[10px] bg-[#0e62d8] px-4 text-sm font-bold text-white shadow-[0_6px_16px_rgba(14,98,216,0.2)]"
             >
               Entrar
             </Link>
@@ -129,7 +147,7 @@ export function PublicHeader() {
         </div>
 
         {mobileOpen && (
-          <div className="border-t border-[#EDF2F8] py-4 md:hidden">
+          <div className="border-t border-[#EDF2F8] py-4 lg:hidden">
             <nav className="grid gap-2" aria-label="Menu">
               <button
                 type="button"
@@ -141,6 +159,34 @@ export function PublicHeader() {
               >
                 Cidade: {city.label}
               </button>
+              <Link
+                href={territory.comprar}
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] hover:bg-[#F7F9FC]"
+              >
+                Comprar
+              </Link>
+              <Link
+                href={territory.financing}
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] hover:bg-[#F7F9FC]"
+              >
+                Simulador de Financiamento
+              </Link>
+              <Link
+                href={territory.fipe}
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] hover:bg-[#F7F9FC]"
+              >
+                Fipe
+              </Link>
+              <Link
+                href={territory.blog}
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] hover:bg-[#F7F9FC]"
+              >
+                Blog
+              </Link>
               <Link
                 href="/anunciar"
                 onClick={() => setMobileOpen(false)}
@@ -155,13 +201,6 @@ export function PublicHeader() {
               >
                 <HeartIcon />
                 Favoritos
-              </Link>
-              <Link
-                href={SITE_ROUTES.comprar}
-                onClick={() => setMobileOpen(false)}
-                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-[#334155] hover:bg-[#F7F9FC]"
-              >
-                Comprar carros
               </Link>
               <Link
                 href={SITE_ROUTES.comoFunciona}

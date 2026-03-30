@@ -46,10 +46,11 @@ export default function Header({ boxed = false }: HeaderProps) {
           <div className="flex min-w-0 items-center gap-2 sm:gap-5">
             <Link href="/" className="relative block h-10 w-[154px] shrink-0 sm:h-11 sm:w-[188px]">
               <Image
-                src="/images/logo.png"
+                src="/images/logo.svg"
                 alt="Carros na Cidade"
                 fill
                 priority
+                unoptimized
                 className="object-contain object-left"
               />
             </Link>
