@@ -30,9 +30,7 @@ export async function startSeoQueueWorker() {
 
   seoQueueStarted = true;
 
-  const intervalMs = Number(
-    process.env.SEO_QUEUE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.SEO_QUEUE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[seo-queue.worker] Inicializando worker");
 

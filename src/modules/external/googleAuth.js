@@ -7,10 +7,7 @@ const __dirname = path.dirname(__filename);
 
 export function getGoogleAuth(scopes) {
   return new google.auth.GoogleAuth({
-    keyFile: path.join(
-      __dirname,
-      "../../credentials/google-service-account.json"
-    ),
+    keyFile: path.join(__dirname, "../../credentials/google-service-account.json"),
     scopes,
   });
 }

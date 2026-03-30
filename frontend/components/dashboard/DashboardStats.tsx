@@ -23,14 +23,30 @@ export default function DashboardStats({ stats, accountType }: DashboardStatsPro
 
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Anuncios ativos" value={String(stats.active_ads)} helper={`Pausados: ${stats.paused_ads}`} />
+      <StatCard
+        label="Anuncios ativos"
+        value={String(stats.active_ads)}
+        helper={`Pausados: ${stats.paused_ads}`}
+      />
       <StatCard
         label="Limite disponivel"
         value={limitLabel}
-        helper={accountType === "CPF" ? "Maximo gratuito: 3 anuncios por CPF" : "Maximo gratuito: 20 anuncios com CNPJ verificado"}
+        helper={
+          accountType === "CPF"
+            ? "Maximo gratuito: 3 anuncios por CPF"
+            : "Maximo gratuito: 20 anuncios com CNPJ verificado"
+        }
       />
-      <StatCard label="Plano atual" value={stats.plan_name} helper={`Destaques ativos: ${stats.featured_ads}`} />
-      <StatCard label="Visualizacoes totais" value={stats.total_views.toLocaleString("pt-BR")} helper="Atualizado em tempo real" />
+      <StatCard
+        label="Plano atual"
+        value={stats.plan_name}
+        helper={`Destaques ativos: ${stats.featured_ads}`}
+      />
+      <StatCard
+        label="Visualizacoes totais"
+        value={stats.total_views.toLocaleString("pt-BR")}
+        helper="Atualizado em tempo real"
+      />
     </section>
   );
 }

@@ -27,18 +27,26 @@ export default function PlanCard({ plan, userType }: PlanCardProps) {
         </span>
       )}
 
-      <p className="text-xs font-bold uppercase tracking-wide text-[#5f6982]">{userType === "CPF" ? "Particular" : "Lojista"}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-[#5f6982]">
+        {userType === "CPF" ? "Particular" : "Lojista"}
+      </p>
       <h3 className="mt-1 text-2xl font-extrabold text-[#1d2538]">{plan.name}</h3>
       <p className="mt-1 text-sm text-[#5a647d]">{plan.description}</p>
 
       <div className="mt-4 flex items-end gap-2">
         <span className="text-3xl font-extrabold text-[#0e62d8]">{formatPrice(plan.price)}</span>
-        {plan.billing_model === "monthly" && <span className="pb-1 text-sm font-semibold text-[#5a647d]">/mes</span>}
+        {plan.billing_model === "monthly" && (
+          <span className="pb-1 text-sm font-semibold text-[#5a647d]">/mes</span>
+        )}
       </div>
 
       <div className="mt-4 rounded-xl border border-[#e2e6f0] bg-[#f8fafe] p-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6980]">Limites e prioridade</p>
-        <p className="mt-1 text-sm font-semibold text-[#2b3550]">Ate {plan.ad_limit} anuncios ativos</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6980]">
+          Limites e prioridade
+        </p>
+        <p className="mt-1 text-sm font-semibold text-[#2b3550]">
+          Ate {plan.ad_limit} anuncios ativos
+        </p>
         <p className="text-sm text-[#4e5973]">Prioridade na busca: {plan.priority_level}</p>
       </div>
 
@@ -58,7 +66,9 @@ export default function PlanCard({ plan, userType }: PlanCardProps) {
       </div>
 
       <div className="mt-4 rounded-xl border border-[#e2e6f0] bg-[#f8fafe] p-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6980]">Resultado operacional</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6980]">
+          Resultado operacional
+        </p>
         <p className="mt-1 text-sm text-[#4e5973]">
           {plan.has_store_profile
             ? "Mais capacidade para estoque, vitrine de loja e ativação de anúncios prioritários."
@@ -75,14 +85,17 @@ export default function PlanCard({ plan, userType }: PlanCardProps) {
         </Link>
       ) : (
         <PlanCheckoutButton
-          endpoint={plan.billing_model === "monthly" ? "/api/payments/subscription" : "/api/payments/create"}
+          endpoint={
+            plan.billing_model === "monthly" ? "/api/payments/subscription" : "/api/payments/create"
+          }
           planId={plan.id}
           label={plan.billing_model === "monthly" ? "Assinar plano" : "Comprar destaque"}
         />
       )}
 
       <p className="mt-3 text-xs leading-5 text-[#66728a]">
-        Após a ativação, o plano ou impulso passa a sustentar limite, exibição e gestão dentro do painel.
+        Após a ativação, o plano ou impulso passa a sustentar limite, exibição e gestão dentro do
+        painel.
       </p>
     </article>
   );

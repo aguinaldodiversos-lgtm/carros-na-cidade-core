@@ -35,16 +35,7 @@ export async function upsertInternalLink({
       updated_at = NOW()
     RETURNING *
     `,
-    [
-      sourcePath,
-      targetPath,
-      anchorText,
-      cityId,
-      brand,
-      model,
-      linkType,
-      Number(score || 0),
-    ]
+    [sourcePath, targetPath, anchorText, cityId, brand, model, linkType, Number(score || 0)]
   );
 
   return result.rows[0];

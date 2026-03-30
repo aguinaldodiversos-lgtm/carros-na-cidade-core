@@ -149,18 +149,10 @@ async function planCityActions(limit = 10) {
       2
     );
 
-    await enqueueJob(
-      "SEO_PRIORITIZE_CITY",
-      { city_id: city.id, city_slug: city.slug },
-      2
-    );
+    await enqueueJob("SEO_PRIORITIZE_CITY", { city_id: city.id, city_slug: city.slug }, 2);
 
     if (Number(city.leads) >= 10) {
-      await enqueueJob(
-        "AUTO_CAMPAIGN",
-        { city_id: city.id, city_name: city.name },
-        1
-      );
+      await enqueueJob("AUTO_CAMPAIGN", { city_id: city.id, city_name: city.name }, 1);
     }
 
     if (Number(city.avg_ctr) >= 0.02 && Number(city.total_ads) < 25) {

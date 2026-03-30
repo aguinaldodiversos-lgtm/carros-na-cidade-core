@@ -31,11 +31,9 @@ function buildCityStats(snapshot) {
     totalHighlightedAds: Number(snapshot.highlighted_ads_count || 0),
     totalBelowFipeAds: Number(snapshot.below_fipe_ads_count || 0),
     totalLeads:
-      Number(snapshot.dominance_total_leads || 0) ||
-      Number(snapshot.total_leads_metric || 0),
+      Number(snapshot.dominance_total_leads || 0) || Number(snapshot.total_leads_metric || 0),
     totalDealers:
-      Number(snapshot.advertisers_count || 0) ||
-      Number(snapshot.total_dealers_metric || 0),
+      Number(snapshot.advertisers_count || 0) || Number(snapshot.total_dealers_metric || 0),
     avgCtr: Number(snapshot.avg_ctr || 0),
     publishedCityPages: Number(snapshot.published_city_pages_count || 0),
   };
@@ -106,39 +104,38 @@ export async function getCityPublicPage(slug, query = {}) {
 
   const cityFilters = normalizeCityFilters(slug, query);
 
-  const [highlightAds, opportunityAds, recentAds, facetsResult] =
-    await Promise.all([
-      adsService.search(
-        {
-          ...cityFilters,
-          highlight_only: true,
-          sort: "highlight",
-          limit: 12,
-        },
-        "public_city",
-        { safeMode: true }
-      ),
-      adsService.search(
-        {
-          ...cityFilters,
-          below_fipe: true,
-          sort: "recent",
-          limit: 12,
-        },
-        "public_city_below_fipe",
-        { safeMode: true }
-      ),
-      adsService.search(
-        {
-          ...cityFilters,
-          sort: "recent",
-          limit: 12,
-        },
-        "public_city",
-        { safeMode: true }
-      ),
-      getFacetsWithFilters(cityFilters, { safeMode: true }),
-    ]);
+  const [highlightAds, opportunityAds, recentAds, facetsResult] = await Promise.all([
+    adsService.search(
+      {
+        ...cityFilters,
+        highlight_only: true,
+        sort: "highlight",
+        limit: 12,
+      },
+      "public_city",
+      { safeMode: true }
+    ),
+    adsService.search(
+      {
+        ...cityFilters,
+        below_fipe: true,
+        sort: "recent",
+        limit: 12,
+      },
+      "public_city_below_fipe",
+      { safeMode: true }
+    ),
+    adsService.search(
+      {
+        ...cityFilters,
+        sort: "recent",
+        limit: 12,
+      },
+      "public_city",
+      { safeMode: true }
+    ),
+    getFacetsWithFilters(cityFilters, { safeMode: true }),
+  ]);
 
   const brands = facetsResult?.facets?.brands || [];
   const models = facetsResult?.facets?.models || [];

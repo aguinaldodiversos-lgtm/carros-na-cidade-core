@@ -1,8 +1,5 @@
 export class CircuitBreaker {
-  constructor({
-    failureThreshold = 5,
-    recoveryTimeMs = 30000,
-  } = {}) {
+  constructor({ failureThreshold = 5, recoveryTimeMs = 30000 } = {}) {
     this.failureThreshold = failureThreshold;
     this.recoveryTimeMs = recoveryTimeMs;
     this.failures = 0;

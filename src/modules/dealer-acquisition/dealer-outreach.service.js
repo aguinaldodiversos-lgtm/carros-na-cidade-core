@@ -7,8 +7,10 @@ import * as citiesService from "../cities/cities.service.js";
 
 function getFrontendBaseUrl() {
   return (
-    String(process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "")
-      .replace(/\/+$/, "") || "https://carrosnacidade.com"
+    String(process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "").replace(
+      /\/+$/,
+      ""
+    ) || "https://carrosnacidade.com"
   );
 }
 

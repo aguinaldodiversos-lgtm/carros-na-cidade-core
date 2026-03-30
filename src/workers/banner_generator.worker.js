@@ -57,17 +57,13 @@ async function generateBanner(event) {
   try {
     // Limite de gerações
     if (event.banner_generated_count >= 3) {
-      console.log(
-        `⛔ Evento ${event.id} atingiu limite de banners`
-      );
+      console.log(`⛔ Evento ${event.id} atingiu limite de banners`);
       return;
     }
 
     // Se já aprovado, não gerar
     if (event.banner_status === "approved") {
-      console.log(
-        `✅ Evento ${event.id} já aprovado, ignorando`
-      );
+      console.log(`✅ Evento ${event.id} já aprovado, ignorando`);
       return;
     }
 

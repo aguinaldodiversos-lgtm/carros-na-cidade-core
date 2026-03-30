@@ -30,9 +30,7 @@ export async function startSitemapWorker() {
 
   sitemapStarted = true;
 
-  const intervalMs = Number(
-    process.env.SITEMAP_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.SITEMAP_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[sitemap.worker] Inicializando worker");
 

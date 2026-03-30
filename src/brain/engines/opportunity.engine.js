@@ -9,11 +9,7 @@ import { logger } from "../../shared/logger.js";
  * - Concorrência: anunciantes distintos com estoque ativo na cidade
  */
 
-function calculateOpportunityScore({
-  demandSignal = 0,
-  supply = 0,
-  competition = 0,
-}) {
+function calculateOpportunityScore({ demandSignal = 0, supply = 0, competition = 0 }) {
   const supplyPenalty = Math.min(180, supply * 0.45);
   const competitionPenalty = Math.min(140, competition * 2.8);
   const score = demandSignal - supplyPenalty * 0.55 - competitionPenalty * 0.45 + 48;
@@ -41,7 +37,9 @@ function buildDemandSignal(alertDemand, searchDemand) {
 }
 
 export async function runOpportunityEngine() {
-  logger.info("[brain.opportunity] Iniciando avaliação territorial (demanda / oferta / concorrência)");
+  logger.info(
+    "[brain.opportunity] Iniciando avaliação territorial (demanda / oferta / concorrência)"
+  );
 
   const citiesResult = await pool.query(`
     SELECT id
@@ -167,13 +165,7 @@ export async function runOpportunityEngine() {
       if (err?.code !== "42703") {
         throw err;
       }
-      await pool.query(sqlCore, [
-        cityId,
-        alertDemand,
-        supply,
-        score,
-        priority,
-      ]);
+      await pool.query(sqlCore, [cityId, alertDemand, supply, score, priority]);
     }
 
     logger.info(

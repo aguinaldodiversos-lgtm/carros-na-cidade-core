@@ -1,7 +1,9 @@
 # PROJECT RULES — CARROS NA CIDADE
 
 ## Identidade do projeto
+
 Carros na Cidade é um portal automotivo regional com foco em:
+
 - SEO massivo por cidade
 - páginas territoriais indexáveis
 - experiência premium de marketplace
@@ -16,7 +18,9 @@ Ele é um portal de grande porte preparado para escalar cidade por cidade e domi
 ---
 
 ## Objetivo principal
+
 Construir o portal automotivo regional mais bem estruturado tecnicamente do Brasil, com:
+
 - busca inteligente
 - páginas indexáveis em escala
 - forte SEO local
@@ -28,7 +32,9 @@ Construir o portal automotivo regional mais bem estruturado tecnicamente do Bras
 ---
 
 ## Escala pretendida
+
 O projeto deve suportar:
+
 - 5.500+ páginas dinâmicas indexáveis na primeira fase
 - expansão futura para 20.000+ páginas
 - 100k+ anúncios
@@ -38,13 +44,16 @@ O projeto deve suportar:
 ---
 
 ## Stack oficial
+
 ### Frontend
+
 - Next.js 14
 - App Router
 - TypeScript
 - Tailwind CSS
 
 ### Backend
+
 - Node.js
 - Express
 - PostgreSQL
@@ -53,13 +62,16 @@ O projeto deve suportar:
 ---
 
 ## Arquitetura obrigatória
+
 ### Estrutura base
+
 - `app/`
 - `components/`
 - `lib/`
 - `hooks/`
 
 ### Organização conceitual
+
 - `app/` = rotas e composição das páginas
 - `components/` = componentes visuais e blocos reutilizáveis
 - `lib/` = integração, tipos, SEO, filtros, busca e dados
@@ -68,15 +80,19 @@ O projeto deve suportar:
 ---
 
 ## Shell público oficial
+
 ### Regra obrigatória
+
 O shell público oficial está no `app/layout.tsx`.
 
 ### Portanto
+
 - Nenhuma página pública pode renderizar `Header` ou `Footer` localmente
 - O header oficial deve vir de `components/shell/PublicHeader.tsx`
 - O footer oficial deve vir de `components/shell/PublicFooter.tsx`
 
 ### Proibido
+
 - Criar `Header/Footer` dentro de páginas públicas
 - Criar uma segunda família de shell
 - Duplicar estrutura visual global
@@ -84,14 +100,18 @@ O shell público oficial está no `app/layout.tsx`.
 ---
 
 ## Rotas públicas oficiais
+
 ### Home
+
 - `/`
 
 ### Listagem principal
+
 - `/anuncios`
 - `/comprar` pode existir como alias operacional, mas não deve virar arquitetura paralela
 
 ### Páginas territoriais
+
 - `/cidade/[slug]`
 - `/cidade/[slug]/marca/[brand]`
 - `/cidade/[slug]/marca/[brand]/modelo/[model]`
@@ -99,31 +119,40 @@ O shell público oficial está no `app/layout.tsx`.
 - `/cidade/[slug]/abaixo-da-fipe`
 
 ### Detalhe do veículo
+
 - Rota oficial e canônica: `/veiculo/[slug]`
 
 ### Regra obrigatória
+
 - Cards e links de anúncio devem apontar prioritariamente para `/veiculo/[slug]`
 
 ---
 
 ## Integração oficial com backend
+
 ### Home pública
+
 - `GET /api/public/home`
 
 ### Busca/listagem
+
 - `GET /api/ads/search`
 
 ### Facets
+
 - `GET /api/ads/facets`
 
 ### Autocomplete
+
 - `GET /api/ads/autocomplete`
 - `GET /api/ads/autocomplete/semantic`
 
 ### Detalhe do anúncio
+
 - `GET /api/ads/:identifier`
 
 ### Territorial
+
 - `GET /api/public/cities/:slug`
 - `GET /api/public/cities/:slug/brand/:brand`
 - `GET /api/public/cities/:slug/brand/:brand/model/:model`
@@ -131,11 +160,13 @@ O shell público oficial está no `app/layout.tsx`.
 - `GET /api/public/cities/:slug/below-fipe`
 
 ### Regra obrigatória
+
 Novas integrações públicas devem usar a camada `lib/*`, não criar `services/*` paralelos para páginas públicas novas.
 
 ---
 
 ## Regras de frontend
+
 - Frontend deve ser server-first sempre que possível
 - Client Components só devem ser usados para interações reais
 - Filtros devem refletir query params
@@ -148,13 +179,16 @@ Novas integrações públicas devem usar a camada `lib/*`, não criar `services/
 ---
 
 ## Card oficial de anúncio
+
 Deve existir um card oficial reutilizável para:
+
 - home
 - listagem
 - vitrines
 - páginas territoriais
 
 O card deve conter:
+
 - imagem real
 - badge discreta
 - título forte
@@ -165,6 +199,7 @@ O card deve conter:
 - link correto para `/veiculo/[slug]`
 
 ### Proibido
+
 - placeholders como solução final
 - múltiplos cards competindo pela mesma função
 - visual fraco ou genérico
@@ -172,7 +207,9 @@ O card deve conter:
 ---
 
 ## SEO técnico
+
 ### Obrigatório
+
 - `generateMetadata` nas páginas estratégicas
 - JSON-LD desacoplado
 - canonical correto
@@ -183,6 +220,7 @@ O card deve conter:
 - consistência entre rota, título, descrição e conteúdo
 
 ### Páginas prioritárias
+
 - home
 - `/anuncios`
 - páginas territoriais
@@ -191,7 +229,9 @@ O card deve conter:
 ---
 
 ## Visual e UX
+
 O portal deve transmitir:
+
 - mercado sério
 - confiança
 - organização
@@ -200,6 +240,7 @@ O portal deve transmitir:
 - padrão de grande marketplace automotivo
 
 ### Proibido
+
 - visual de dashboard genérico
 - aparência de template barato
 - poluição visual
@@ -209,8 +250,11 @@ O portal deve transmitir:
 ---
 
 ## Regras para IA de desenvolvimento
+
 ### Antes de gerar qualquer código
+
 Sempre verificar:
+
 1. rota oficial
 2. componente oficial
 3. fetch oficial
@@ -221,6 +265,7 @@ Sempre verificar:
 8. se já existe estrutura semelhante
 
 ### Proibido para IA
+
 - inventar estrutura paralela
 - criar novo shell
 - criar nova família de cards
@@ -232,7 +277,9 @@ Sempre verificar:
 ---
 
 ## Critério de qualidade
+
 Todo código novo deve buscar:
+
 - consistência arquitetural
 - legibilidade
 - reuso

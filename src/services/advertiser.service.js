@@ -1,10 +1,9 @@
-const pool = require('../config/db');
+const pool = require("../config/db");
 
 async function getOrCreateAdvertiser(email) {
-  const { rows } = await pool.query(
-    'SELECT id, plan, status FROM advertisers WHERE email = $1',
-    [email]
-  );
+  const { rows } = await pool.query("SELECT id, plan, status FROM advertisers WHERE email = $1", [
+    email,
+  ]);
 
   if (rows.length) return rows[0];
 

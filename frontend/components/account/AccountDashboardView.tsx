@@ -24,7 +24,10 @@ export default function AccountDashboardView({
   const [boostAd, setBoostAd] = useState<DashboardAd | null>(null);
   const [tab, setTab] = useState<"todos" | "ativos" | "pausados">("todos");
 
-  const allAds = useMemo(() => [...data.active_ads, ...data.paused_ads], [data.active_ads, data.paused_ads]);
+  const allAds = useMemo(
+    () => [...data.active_ads, ...data.paused_ads],
+    [data.active_ads, data.paused_ads]
+  );
 
   const filteredAds = useMemo(() => {
     if (tab === "ativos") return data.active_ads;
@@ -58,8 +61,7 @@ export default function AccountDashboardView({
 
   const firstName = data.user.name.trim().split(/\s+/)[0] || data.user.name;
   const planLabel = data.current_plan?.name ?? data.stats.plan_name;
-  const accountBadge =
-    variant === "pf" ? "Pessoa física · CPF" : "Lojista · CNPJ";
+  const accountBadge = variant === "pf" ? "Pessoa física · CPF" : "Lojista · CNPJ";
 
   return (
     <div className="space-y-8">
@@ -122,7 +124,9 @@ export default function AccountDashboardView({
               </p>
             </div>
             <div className="rounded-xl bg-[#f8fafc] px-5 py-4 text-right">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">Limite disponível</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">
+                Limite disponível
+              </p>
               <p className="text-2xl font-extrabold text-[#0e62d8]">{data.stats.available_limit}</p>
             </div>
           </div>
@@ -132,17 +136,23 @@ export default function AccountDashboardView({
       {mode === "home" && variant === "lojista" && (
         <section className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">Anúncios ativos</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">
+              Anúncios ativos
+            </p>
             <p className="mt-2 text-3xl font-extrabold text-[#0f172a]">{data.stats.active_ads}</p>
           </div>
           <div className="rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">Total de visitas</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">
+              Total de visitas
+            </p>
             <p className="mt-2 text-3xl font-extrabold text-[#0f172a]">
               {data.stats.total_views.toLocaleString("pt-BR")}
             </p>
           </div>
           <div className="rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">Saldo / créditos</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">
+              Saldo / créditos
+            </p>
             <p className="mt-2 text-lg font-extrabold text-[#64748b]">—</p>
             <p className="mt-1 text-xs text-[#94a3b8]">Integração financeira em evolução</p>
           </div>

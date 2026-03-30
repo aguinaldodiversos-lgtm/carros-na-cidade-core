@@ -8,10 +8,6 @@ import * as integrationController from "./integration.controller.js";
 
 const router = express.Router();
 
-router.post(
-  "/ads",
-  verifyHmac,
-  integrationController.createAd
-);
+router.post("/ads", verifyHmac, integrationController.createAd);
 
 export default router;

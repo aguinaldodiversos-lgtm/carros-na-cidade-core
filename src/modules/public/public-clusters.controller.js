@@ -23,11 +23,7 @@ export async function getCityPage(req, res, next) {
 
 export async function getCityBrandClusterPage(req, res, next) {
   try {
-    const data = await getCityBrandPage(
-      req.params.slug,
-      req.params.brand,
-      req.query
-    );
+    const data = await getCityBrandPage(req.params.slug, req.params.brand, req.query);
 
     res.json({
       success: true,

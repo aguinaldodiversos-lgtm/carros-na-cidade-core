@@ -38,7 +38,9 @@ export default function SellWizardLayout({
         {breadcrumb}
         {profileSlot}
         <section className="rounded-[32px] border border-[#E5E9F2] bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] sm:p-8">
-          <h1 className="text-[28px] font-extrabold tracking-[-0.04em] text-[#1D2440] sm:text-[34px]">{title}</h1>
+          <h1 className="text-[28px] font-extrabold tracking-[-0.04em] text-[#1D2440] sm:text-[34px]">
+            {title}
+          </h1>
           <p className="mt-2 text-sm leading-7 text-[#6E748A] sm:text-[15px]">{subtitle}</p>
 
           <div className="mt-8">{children}</div>

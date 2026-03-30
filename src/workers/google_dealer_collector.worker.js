@@ -80,9 +80,7 @@ async function runGoogleDealerCollector() {
           [detalhes.name, detalhes.phone, cidade.id]
         );
 
-        console.log(
-          `🏪 Loja captada: ${detalhes.name} (${cidade.name})`
-        );
+        console.log(`🏪 Loja captada: ${detalhes.name} (${cidade.name})`);
 
         // enviar mensagem via WhatsApp
         const mensagem = gerarMensagemConvite(cidade);

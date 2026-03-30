@@ -13,7 +13,11 @@ let redis = null;
 let initPromise = null;
 
 function isTrue(v) {
-  return String(v || "").trim().toLowerCase() === "true";
+  return (
+    String(v || "")
+      .trim()
+      .toLowerCase() === "true"
+  );
 }
 
 function getRedisUrl() {
@@ -143,9 +147,7 @@ export async function initQueueRedisConnection() {
   if (initPromise) return initPromise;
 
   if (!shouldEnableRedis()) {
-    logger.warn(
-      "[queue.redis] Redis desativado (DISABLE_REDIS=true ou REDIS_URL vazio)"
-    );
+    logger.warn("[queue.redis] Redis desativado (DISABLE_REDIS=true ou REDIS_URL vazio)");
     return null;
   }
 
@@ -176,7 +178,9 @@ export async function closeQueueRedisConnection() {
   } catch {
     try {
       client.disconnect();
-    } catch { /* disconnect já falhou, ignora */ }
+    } catch {
+      /* disconnect já falhou, ignora */
+    }
   } finally {
     logger.info("[queue.redis] Conexão Redis encerrada");
   }

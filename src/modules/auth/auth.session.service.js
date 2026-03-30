@@ -1,10 +1,7 @@
 // src/modules/auth/auth.session.service.js
 
 import { pool } from "../../infrastructure/database/db.js";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "./jwt.strategy.js";
+import { generateAccessToken, generateRefreshToken } from "./jwt.strategy.js";
 
 const REFRESH_TOKEN_DAYS = 7;
 const MAX_ACTIVE_SESSIONS = 5;

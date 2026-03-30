@@ -102,10 +102,7 @@ export async function stopWorkerSafe(workerConfig) {
     const stop = mod?.[stopExport];
 
     if (typeof stop !== "function") {
-      logger.warn(
-        { worker: name, exportName: stopExport },
-        "⚠️ Worker sem rotina de shutdown"
-      );
+      logger.warn({ worker: name, exportName: stopExport }, "⚠️ Worker sem rotina de shutdown");
 
       return {
         name,

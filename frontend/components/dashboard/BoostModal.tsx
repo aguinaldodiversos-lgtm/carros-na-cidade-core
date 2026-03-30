@@ -25,7 +25,9 @@ export default function BoostModal({ open, ad, options, onClose }: BoostModalPro
       <div className="w-full max-w-md rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_20px_50px_rgba(10,20,45,0.22)]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#5f6982]">Impulsionamento</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#5f6982]">
+              Impulsionamento
+            </p>
             <h3 className="mt-1 text-lg font-extrabold text-[#1d2538]">{ad.title}</h3>
           </div>
           <button
@@ -43,7 +45,9 @@ export default function BoostModal({ open, ad, options, onClose }: BoostModalPro
             <div key={option.id} className="rounded-xl border border-[#dce3f0] bg-[#f8fafe] p-3">
               <p className="text-sm font-bold text-[#21304f]">{option.label}</p>
               <p className="mt-0.5 text-xs text-[#5a6580]">{option.description}</p>
-              <p className="mt-1 text-base font-extrabold text-[#0e62d8]">{formatPrice(option.price)}</p>
+              <p className="mt-1 text-base font-extrabold text-[#0e62d8]">
+                {formatPrice(option.price)}
+              </p>
             </div>
           ))}
         </div>

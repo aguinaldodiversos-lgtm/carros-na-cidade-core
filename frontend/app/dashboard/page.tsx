@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import AccountDashboardView from "@/components/account/AccountDashboardView";
-import {
-  loadDashboardPayload,
-  requirePfDashboardSession,
-} from "@/lib/account/dashboard-session";
+import { loadDashboardPayload, requirePfDashboardSession } from "@/lib/account/dashboard-session";
 
 export const metadata: Metadata = {
   title: "Painel",
@@ -24,8 +21,8 @@ function DashboardLoadError() {
           Não foi possível carregar seu painel agora
         </h1>
         <p className="text-sm leading-6 text-slate-600 sm:text-base">
-          Sua sessão foi reconhecida, mas houve uma falha ao carregar os dados do
-          dashboard. Tente atualizar a página em instantes.
+          Sua sessão foi reconhecida, mas houve uma falha ao carregar os dados do dashboard. Tente
+          atualizar a página em instantes.
         </p>
       </div>
     </div>
@@ -40,7 +37,5 @@ export default async function DashboardPage() {
     return <DashboardLoadError />;
   }
 
-  return (
-    <AccountDashboardView initialData={payload} variant="pf" mode="home" />
-  );
+  return <AccountDashboardView initialData={payload} variant="pf" mode="home" />;
 }

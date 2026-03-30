@@ -83,61 +83,71 @@ async function executeJob(client, job) {
     case "SEO_PRIORITIZE_CITY": {
       // Sinal interno: você pode escrever em system_settings ou city_status
       // Aqui: registra evento em city_status se existir
-      await client.query(
-        `
+      await client
+        .query(
+          `
         INSERT INTO city_status (city_id, status, updated_at)
         VALUES ($1, 'priority', NOW())
         ON CONFLICT (city_id)
         DO UPDATE SET status='priority', updated_at=NOW()
         `,
-        [payload.city_id]
-      ).catch(() => {});
+          [payload.city_id]
+        )
+        .catch(() => {});
       return;
     }
 
     case "AUTO_CAMPAIGN": {
       // Apenas registra intenção: execução real depois via integrations
-      await client.query(
-        `
+      await client
+        .query(
+          `
         INSERT INTO autopilot_actions (action_type, payload, status, created_at)
         VALUES ('AUTO_CAMPAIGN', $1::jsonb, 'pending', NOW())
         `,
-        [JSON.stringify(payload)]
-      ).catch(() => {});
+          [JSON.stringify(payload)]
+        )
+        .catch(() => {});
       return;
     }
 
     case "OPPORTUNITY_DETECTED": {
       // Registra oportunidade para dashboard/monitoramento
-      await client.query(
-        `
+      await client
+        .query(
+          `
         INSERT INTO city_opportunities (city_id, type, priority_level, created_at)
         VALUES ($1, $2, 'high', NOW())
         `,
-        [payload.city_id, payload.signal || "generic"]
-      ).catch(() => {});
+          [payload.city_id, payload.signal || "generic"]
+        )
+        .catch(() => {});
       return;
     }
 
     case "DEALER_ACQUISITION_SUGGESTED": {
-      await client.query(
-        `
+      await client
+        .query(
+          `
         INSERT INTO autopilot_actions (action_type, payload, status, created_at)
         VALUES ('dealer_acquisition_suggested', $1::jsonb, 'pending', NOW())
         `,
-        [JSON.stringify(payload)]
-      ).catch(() => {});
+          [JSON.stringify(payload)]
+        )
+        .catch(() => {});
       return;
     }
 
     case "CAMPAIGN_SUGGEST_LOCAL": {
-      await client.query(
-        `
+      await client
+        .query(
+          `
         INSERT INTO autopilot_actions (action_type, payload, status, created_at)
         VALUES ('campaign_suggest_local', $1::jsonb, 'pending', NOW())
         `,
-        [JSON.stringify(payload)]
-      ).catch(() => {});
+          [JSON.stringify(payload)]
+        )
+        .catch(() => {});
       return;
     }
 

@@ -35,12 +35,7 @@ async function garantirSEO(cidade, db) {
         )
         VALUES ($1, $2, $3, $4, NOW())
         `,
-        [
-          cidade.id,
-          slug,
-          conteudo.title,
-          conteudo.content,
-        ]
+        [cidade.id, slug, conteudo.title, conteudo.content]
       );
     }
   }

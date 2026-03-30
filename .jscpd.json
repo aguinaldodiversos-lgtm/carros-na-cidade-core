@@ -1,0 +1,18 @@
+{
+  "threshold": 8,
+  "minLines": 22,
+  "minTokens": 100,
+  "ignore": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/dist/**",
+    "**/package-lock.json",
+    "**/*.test.js",
+    "**/*.test.ts",
+    "**/e2e/**",
+    "frontend/playwright-report/**"
+  ],
+  "reporters": ["console", "json"],
+  "absolute": true
+}

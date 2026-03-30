@@ -1,5 +1,7 @@
 function normalizeSlugPart(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 export function buildStageClusters({ city, brands = [], modelsByBrand = {} }) {
@@ -37,12 +39,7 @@ export function buildStageClusters({ city, brands = [], modelsByBrand = {} }) {
       brand: brandRow.brand,
       path: `${base}/marca/${brandSlug}`,
       money_page: city.stage !== "discovery",
-      priority:
-        city.stage === "dominance"
-          ? 90
-          : city.stage === "expansion"
-            ? 80
-            : 65,
+      priority: city.stage === "dominance" ? 90 : city.stage === "expansion" ? 80 : 65,
     });
 
     const models = modelsByBrand[brandRow.brand] || [];
@@ -56,17 +53,10 @@ export function buildStageClusters({ city, brands = [], modelsByBrand = {} }) {
         model: modelRow.model,
         path: `${base}/marca/${brandSlug}/modelo/${modelSlug}`,
         money_page: city.stage === "dominance" || city.stage === "expansion",
-        priority:
-          city.stage === "dominance"
-            ? 85
-            : city.stage === "expansion"
-              ? 72
-              : 58,
+        priority: city.stage === "dominance" ? 85 : city.stage === "expansion" ? 72 : 58,
       });
     }
   }
 
-  return [...common, ...brandClusters, ...modelClusters].sort(
-    (a, b) => b.priority - a.priority
-  );
+  return [...common, ...brandClusters, ...modelClusters].sort((a, b) => b.priority - a.priority);
 }

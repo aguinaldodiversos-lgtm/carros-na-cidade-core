@@ -22,9 +22,7 @@ async function runLeadScoring() {
 
     for (const lead of leads.rows) {
       const result = await scoreLead(lead);
-      console.log(
-        `Lead ${lead.id} score: ${result.score} (${result.priority})`
-      );
+      console.log(`Lead ${lead.id} score: ${result.score} (${result.priority})`);
     }
 
     console.log("✅ Lead Scoring finalizado");

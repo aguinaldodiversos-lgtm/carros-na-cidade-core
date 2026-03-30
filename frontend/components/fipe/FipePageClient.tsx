@@ -12,11 +12,7 @@ import {
   listFipeModels,
   listFipeYears,
 } from "@/lib/fipe/fipe-client";
-import type {
-  FipeOption,
-  FipeQuote,
-  FipeVehicleType,
-} from "@/lib/fipe/fipe-provider";
+import type { FipeOption, FipeQuote, FipeVehicleType } from "@/lib/fipe/fipe-provider";
 
 type VehicleItem = {
   id: number | string;
@@ -93,10 +89,11 @@ export function FipePageClient({
   );
 
   const safeOpportunityAds = useMemo(
-    () => normalizeAds(opportunityAds, cityName).map((item) => ({
-      ...item,
-      below_fipe: true,
-    })),
+    () =>
+      normalizeAds(opportunityAds, cityName).map((item) => ({
+        ...item,
+        below_fipe: true,
+      })),
     [opportunityAds, cityName]
   );
 
@@ -226,8 +223,8 @@ export function FipePageClient({
               </h1>
 
               <p className="mt-4 max-w-4xl text-[18px] leading-8 text-[#5f6880] md:text-[20px]">
-                Descubra o valor de mercado real do seu veículo atualizado pela Tabela
-                Fipe e veja por quanto ele está sendo anunciado na sua cidade.
+                Descubra o valor de mercado real do seu veículo atualizado pela Tabela Fipe e veja
+                por quanto ele está sendo anunciado na sua cidade.
               </p>
 
               <div className="mt-8 rounded-[22px] border border-[#e1e8f4] bg-[linear-gradient(180deg,#eff4ff_0%,#f7f9fd_100%)] p-5 shadow-[0_12px_28px_rgba(16,28,58,0.06)] md:p-6">
@@ -287,7 +284,13 @@ export function FipePageClient({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
                   <div className="flex h-[54px] items-center gap-3 rounded-[12px] border border-[#dbe3ef] bg-white px-4 text-[#62708a]">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#7d8ba3]" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5 text-[#7d8ba3]"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    >
                       <path d="M4 14h3l2-6 3 10 2-6h6" />
                     </svg>
                     <span className="text-[15px]">
@@ -306,7 +309,13 @@ export function FipePageClient({
                 </div>
 
                 <div className="mt-5 flex items-center gap-3 rounded-[14px] bg-white/70 px-4 py-4 text-[#4f5e7a] ring-1 ring-[#e1e8f4]">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#0e62d8]" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5 text-[#0e62d8]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
                     <path d="M12 8v5l3 2" />
                     <path d="M21 12a9 9 0 1 1-9-9" />
                   </svg>
@@ -422,12 +431,24 @@ export function FipePageClient({
                         href={`/simulador-financiamento/${citySlug}`}
                         className="inline-flex items-center gap-3 text-[18px] font-semibold text-[#41506b]"
                       >
-                        <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#0e62d8]" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5 text-[#0e62d8]"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                        >
                           <rect x="3" y="5" width="18" height="14" rx="2" />
                           <path d="M7 9h10M7 13h5" />
                         </svg>
                         <span>Simular financiamento</span>
-                        <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#f7a400]" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5 text-[#f7a400]"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
                           <path d="m9 6 6 6-6 6" />
                         </svg>
                       </Link>
@@ -452,8 +473,8 @@ export function FipePageClient({
                         Agora é hora de anunciar seu carro grátis!
                       </p>
                       <p className="mt-3 text-[18px] leading-8 text-white/84">
-                        Compare com a FIPE, destaque o seu veículo e receba propostas
-                        rapidamente na sua cidade.
+                        Compare com a FIPE, destaque o seu veículo e receba propostas rapidamente na
+                        sua cidade.
                       </p>
                     </div>
 
@@ -495,8 +516,8 @@ export function FipePageClient({
                 </h3>
 
                 <p className="mt-3 text-[17px] leading-7 text-[#616b81]">
-                  Sabe quanto seu carro vale? Anuncie ele grátis agora e receba
-                  propostas rapidamente.
+                  Sabe quanto seu carro vale? Anuncie ele grátis agora e receba propostas
+                  rapidamente.
                 </p>
 
                 <Link
@@ -529,8 +550,8 @@ export function FipePageClient({
               </h3>
 
               <p className="mt-3 text-[16px] leading-7 text-[#616b81]">
-                Use o valor FIPE como referência, anuncie com preço competitivo e
-                receba propostas mais rápido.
+                Use o valor FIPE como referência, anuncie com preço competitivo e receba propostas
+                mais rápido.
               </p>
 
               <Link
@@ -570,7 +591,13 @@ export function FipePageClient({
                 </div>
 
                 <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] bg-[#eef4ff] text-[#0e62d8]">
-                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-7 w-7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
                     <rect x="3" y="5" width="18" height="14" rx="2" />
                     <path d="M7 9h10M7 13h5" />
                   </svg>

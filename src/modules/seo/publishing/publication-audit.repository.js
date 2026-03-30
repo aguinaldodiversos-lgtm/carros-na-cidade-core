@@ -28,11 +28,7 @@ export async function createPublicationAudit({
   );
 }
 
-export async function updatePublicationHealth({
-  publicationId,
-  isIndexable,
-  healthStatus,
-}) {
+export async function updatePublicationHealth({ publicationId, isIndexable, healthStatus }) {
   await query(
     `
     UPDATE seo_publications

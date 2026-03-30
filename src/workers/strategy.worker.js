@@ -96,9 +96,7 @@ export async function startStrategyWorker() {
 
   strategyStarted = true;
 
-  const intervalMs = Number(
-    process.env.STRATEGY_WORKER_INTERVAL_MS || 4 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.STRATEGY_WORKER_INTERVAL_MS || 4 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[strategy.worker] Inicializando worker");
 

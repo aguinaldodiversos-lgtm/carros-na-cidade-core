@@ -92,11 +92,7 @@ export function formatListingDateLabels(
   return { primary: "" };
 }
 
-const FALLBACK_IMAGES = [
-  "/images/hero.jpeg",
-  "/images/banner1.jpg",
-  "/images/banner2.jpg",
-];
+const FALLBACK_IMAGES = ["/images/hero.jpeg", "/images/banner1.jpg", "/images/banner2.jpg"];
 
 function slugify(value: string) {
   return value
@@ -212,12 +208,7 @@ function normalizeImageValue(value: unknown): string | null {
   if (value && typeof value === "object") {
     const maybe = value as Record<string, unknown>;
     const candidate =
-      maybe.url ??
-      maybe.src ??
-      maybe.image ??
-      maybe.image_url ??
-      maybe.cover_image ??
-      maybe.thumb;
+      maybe.url ?? maybe.src ?? maybe.image ?? maybe.image_url ?? maybe.cover_image ?? maybe.thumb;
 
     if (typeof candidate === "string" && candidate.trim()) {
       return candidate.trim();
@@ -281,15 +272,9 @@ function deriveVehicleNames(ad: PublicAdDetail) {
   const year = sanitizeText(ad.year);
 
   const fullName =
-    title ||
-    [brand, model, version, year].filter(Boolean).join(" ").trim() ||
-    "Veículo";
+    title || [brand, model, version, year].filter(Boolean).join(" ").trim() || "Veículo";
 
-  const safeModel =
-    model ||
-    title ||
-    [brand, model].filter(Boolean).join(" ").trim() ||
-    "Veículo";
+  const safeModel = model || title || [brand, model].filter(Boolean).join(" ").trim() || "Veículo";
 
   return {
     model: toTitleCase(safeModel),
@@ -418,8 +403,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
   const updatedRaw = sanitizeNullableText(ad.updated_at);
 
   const refAmount = buildFipeReferenceAmount(priceNumber, belowFipe);
-  const fipeDeltaBrl =
-    refAmount != null && priceNumber != null ? priceNumber - refAmount : null;
+  const fipeDeltaBrl = refAmount != null && priceNumber != null ? priceNumber - refAmount : null;
   const fipeDeltaPercent =
     refAmount != null && refAmount > 0 && fipeDeltaBrl != null
       ? (fipeDeltaBrl / refAmount) * 100
@@ -475,9 +459,7 @@ function toListingCarFromSeed(seed: ListingCar, vehicle: VehicleDetail, index: n
 }
 
 export function buildCityVehicles(vehicle: VehicleDetail, limit = 6): ListingCar[] {
-  return buyCars
-    .slice(0, limit)
-    .map((seed, index) => toListingCarFromSeed(seed, vehicle, index));
+  return buyCars.slice(0, limit).map((seed, index) => toListingCarFromSeed(seed, vehicle, index));
 }
 
 export function buildSimilarVehicles(vehicle: VehicleDetail, limit = 8): ListingCar[] {
@@ -492,10 +474,8 @@ export function buildSellerVehicles(vehicle: VehicleDetail, limit = 6): ListingC
     return [];
   }
 
-  return buyCars
-    .slice(0, limit)
-    .map((seed, index) => ({
-      ...toListingCarFromSeed(seed, vehicle, index + 200),
-      city: vehicle.city,
-    }));
+  return buyCars.slice(0, limit).map((seed, index) => ({
+    ...toListingCarFromSeed(seed, vehicle, index + 200),
+    city: vehicle.city,
+  }));
 }

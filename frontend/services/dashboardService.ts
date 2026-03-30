@@ -18,7 +18,10 @@ function toPlanSummary(plan: ReturnType<typeof getPlanById> | null): DashboardPl
   };
 }
 
-export function getDashboardPayload(userId: string, sessionEmail?: string): DashboardPayload | null {
+export function getDashboardPayload(
+  userId: string,
+  sessionEmail?: string
+): DashboardPayload | null {
   const user = getUserById(userId);
   if (!user) return null;
 
@@ -29,7 +32,10 @@ export function getDashboardPayload(userId: string, sessionEmail?: string): Dash
 
   const activeSubscription = getActiveSubscription(user.user_id);
   const activePlan = activeSubscription ? getPlanById(activeSubscription.plan_id) : null;
-  const freePlan = getPlans({ type: user.document_type, onlyActive: true }).find((plan) => plan.billing_model === "free") ?? null;
+  const freePlan =
+    getPlans({ type: user.document_type, onlyActive: true }).find(
+      (plan) => plan.billing_model === "free"
+    ) ?? null;
   const currentPlan = activePlan ?? freePlan;
 
   const freeLimit = getFreeLimit(user.document_type, user.cnpj_verified);

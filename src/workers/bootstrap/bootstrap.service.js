@@ -1,10 +1,6 @@
 import { logger } from "../../shared/logger.js";
 import { WORKERS_REGISTRY } from "./bootstrap.registry.js";
-import {
-  isEnabled,
-  startWorkerSafe,
-  stopWorkerSafe,
-} from "./bootstrap.helpers.js";
+import { isEnabled, startWorkerSafe, stopWorkerSafe } from "./bootstrap.helpers.js";
 import { bootstrapState } from "./bootstrap.state.js";
 
 export async function startWorkersBootstrap() {
@@ -23,9 +19,7 @@ export async function startWorkersBootstrap() {
   }
 
   if (bootstrapState.bootstrapStarted) {
-    logger.warn(
-      "[workers.bootstrap] Bootstrap já executado; ignorando nova inicialização"
-    );
+    logger.warn("[workers.bootstrap] Bootstrap já executado; ignorando nova inicialização");
 
     return {
       started: true,
@@ -42,9 +36,7 @@ export async function startWorkersBootstrap() {
     "🚀 Iniciando bootstrap de workers..."
   );
 
-  const results = await Promise.all(
-    WORKERS_REGISTRY.map((worker) => startWorkerSafe(worker))
-  );
+  const results = await Promise.all(WORKERS_REGISTRY.map((worker) => startWorkerSafe(worker)));
 
   bootstrapState.startedWorkers = results.filter(
     (result) => result.enabled && result.started && result.success
@@ -53,9 +45,7 @@ export async function startWorkersBootstrap() {
   bootstrapState.bootstrapStarted = true;
 
   const enabledWorkers = results.filter((item) => item.enabled);
-  const successfulWorkers = results.filter(
-    (item) => item.enabled && item.started && item.success
-  );
+  const successfulWorkers = results.filter((item) => item.enabled && item.started && item.success);
   const failedWorkers = results.filter((item) => item.enabled && !item.success);
 
   const summary = {

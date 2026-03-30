@@ -16,10 +16,7 @@ type TerritorialPayload = {
 };
 
 /** Resolve metadados mínimos da cidade a partir do slug territorial. */
-export async function GET(
-  _request: Request,
-  { params }: { params: { slug: string } }
-) {
+export async function GET(_request: Request, { params }: { params: { slug: string } }) {
   const slug = String(params.slug || "").trim();
   if (!slug) {
     return NextResponse.json({ success: false, message: "Slug obrigatório." }, { status: 400 });
@@ -54,11 +51,17 @@ export async function GET(
     });
 
     if (!city) {
-      return NextResponse.json({ success: false, message: "Cidade não encontrada." }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: "Cidade não encontrada." },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true, data: city });
   } catch {
-    return NextResponse.json({ success: false, message: "Falha ao resolver cidade." }, { status: 502 });
+    return NextResponse.json(
+      { success: false, message: "Falha ao resolver cidade." },
+      { status: 502 }
+    );
   }
 }

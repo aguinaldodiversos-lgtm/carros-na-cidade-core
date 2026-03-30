@@ -30,9 +30,7 @@ export async function startCityPredictionWorker() {
 
   cityPredictionStarted = true;
 
-  const intervalMs = Number(
-    process.env.CITY_PREDICTION_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.CITY_PREDICTION_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[city-prediction.worker] Inicializando worker");
 

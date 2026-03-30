@@ -1,10 +1,7 @@
 import { Queue, QueueEvents } from "bullmq";
 import { logger } from "../shared/logger.js";
 import { getQueueRedisConnection } from "../infrastructure/queue/redis.connection.js";
-import {
-  QUEUE_NAMES,
-  QUEUE_DEFAULT_JOB_OPTIONS,
-} from "../infrastructure/queue/queue.constants.js";
+import { QUEUE_NAMES, QUEUE_DEFAULT_JOB_OPTIONS } from "../infrastructure/queue/queue.constants.js";
 
 const redisConnection = getQueueRedisConnection();
 

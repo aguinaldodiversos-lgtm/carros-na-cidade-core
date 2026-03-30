@@ -9,23 +9,23 @@ Fonte de verdade no backend: `src/modules/ads/ads.validators.js` (`CreateAdSchem
 
 ## Corpo JSON (snake_case)
 
-| Campo | Tipo | Obrigatório | Notas |
-|--------|------|-------------|--------|
-| `title` | string | sim | mín. 3 caracteres |
-| `description` | string \| null | não | |
-| `price` | number | sim | > 0 |
-| `city_id` | number | sim | inteiro positivo; deve existir em `cities` |
-| `city` | string | sim | mín. 2 caracteres (nome do município) |
-| `state` | string | sim | UF, 2 caracteres |
-| `brand` | string | sim | |
-| `model` | string | sim | |
-| `year` | number | sim | 1900–2100 |
-| `mileage` | number | sim | ≥ 0 (default 0 no schema) |
-| `category` | string \| null | não | livre; BFF do painel envia `particular` / `lojista` conforme conta |
-| `body_type` | string \| null | não | Pré-processamento + enum canônico (`ads.vehicle-fields.zod.js`) |
-| `fuel_type` | string \| null | não | idem |
-| `transmission` | string \| null | não | idem |
-| `below_fipe` | boolean | não | default `false` |
+| Campo          | Tipo           | Obrigatório | Notas                                                              |
+| -------------- | -------------- | ----------- | ------------------------------------------------------------------ |
+| `title`        | string         | sim         | mín. 3 caracteres                                                  |
+| `description`  | string \| null | não         |                                                                    |
+| `price`        | number         | sim         | > 0                                                                |
+| `city_id`      | number         | sim         | inteiro positivo; deve existir em `cities`                         |
+| `city`         | string         | sim         | mín. 2 caracteres (nome do município)                              |
+| `state`        | string         | sim         | UF, 2 caracteres                                                   |
+| `brand`        | string         | sim         |                                                                    |
+| `model`        | string         | sim         |                                                                    |
+| `year`         | number         | sim         | 1900–2100                                                          |
+| `mileage`      | number         | sim         | ≥ 0 (default 0 no schema)                                          |
+| `category`     | string \| null | não         | livre; BFF do painel envia `particular` / `lojista` conforme conta |
+| `body_type`    | string \| null | não         | Pré-processamento + enum canônico (`ads.vehicle-fields.zod.js`)    |
+| `fuel_type`    | string \| null | não         | idem                                                               |
+| `transmission` | string \| null | não         | idem                                                               |
+| `below_fipe`   | boolean        | não         | default `false`                                                    |
 
 Valores de veículo aceitam **rótulos** no JSON; o backend normaliza com `ads.storage-normalize.js` e valida contra `ads.canonical.constants.js`.
 

@@ -4,10 +4,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import BoostCheckout from "@/components/payments/BoostCheckout";
 import { fetchOwnedAd } from "@/lib/account/backend-account";
-import {
-  AUTH_COOKIE_NAME,
-  mergeMiddlewareSessionTokens,
-} from "@/services/sessionService";
+import { AUTH_COOKIE_NAME, mergeMiddlewareSessionTokens } from "@/services/sessionService";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 
 type ImpulsionarPageProps = {
@@ -40,10 +37,7 @@ function formatDate(value: string | null) {
 
 export default async function ImpulsionarPage({ params, searchParams }: ImpulsionarPageProps) {
   const cookieStore = cookies();
-  const raw = mergeMiddlewareSessionTokens(
-    headers(),
-    cookieStore.get(AUTH_COOKIE_NAME)?.value
-  );
+  const raw = mergeMiddlewareSessionTokens(headers(), cookieStore.get(AUTH_COOKIE_NAME)?.value);
   if (!raw) {
     redirect("/login");
   }
@@ -73,10 +67,13 @@ export default async function ImpulsionarPage({ params, searchParams }: Impulsio
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
       <section className="mb-5 rounded-2xl border border-[#dfe4ef] bg-white p-4 shadow-[0_3px_18px_rgba(10,20,40,0.06)] sm:p-6">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#5e6983]">Impulsionamento de anuncio</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5e6983]">
+          Impulsionamento de anuncio
+        </p>
         <h1 className="mt-1 text-2xl font-extrabold text-[#1d2538]">Pagamento de destaque</h1>
         <p className="mt-2 text-sm text-[#5b6781]">
-          Ao aprovar o pagamento, o anuncio recebe badge de destaque, prioridade alta e recalculo de ranking no Cerebro IA.
+          Ao aprovar o pagamento, o anuncio recebe badge de destaque, prioridade alta e recalculo de
+          ranking no Cerebro IA.
         </p>
       </section>
 
@@ -90,16 +87,20 @@ export default async function ImpulsionarPage({ params, searchParams }: Impulsio
             <p className="text-3xl font-extrabold text-[#0e62d8]">{formatPrice(ad.price)}</p>
             <div className="grid gap-2 rounded-xl border border-[#e2e8f2] bg-[#f8fafe] p-3 text-sm text-[#4e5b75] sm:grid-cols-2">
               <p>
-                <strong className="font-bold text-[#1f2c47]">Status:</strong> {ad.status === "active" ? "Ativo" : "Pausado"}
+                <strong className="font-bold text-[#1f2c47]">Status:</strong>{" "}
+                {ad.status === "active" ? "Ativo" : "Pausado"}
               </p>
               <p>
-                <strong className="font-bold text-[#1f2c47]">Visualizacoes:</strong> {ad.views.toLocaleString("pt-BR")}
+                <strong className="font-bold text-[#1f2c47]">Visualizacoes:</strong>{" "}
+                {ad.views.toLocaleString("pt-BR")}
               </p>
               <p>
-                <strong className="font-bold text-[#1f2c47]">Destaque:</strong> {ad.is_featured ? "Sim" : "Nao"}
+                <strong className="font-bold text-[#1f2c47]">Destaque:</strong>{" "}
+                {ad.is_featured ? "Sim" : "Nao"}
               </p>
               <p>
-                <strong className="font-bold text-[#1f2c47]">Validade atual:</strong> {formatDate(ad.featured_until)}
+                <strong className="font-bold text-[#1f2c47]">Validade atual:</strong>{" "}
+                {formatDate(ad.featured_until)}
               </p>
             </div>
           </div>

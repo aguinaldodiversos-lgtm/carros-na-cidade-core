@@ -39,10 +39,10 @@ async function computeCityDominance() {
 
   return result.rows.map((row) => {
     const dominance_score =
-      (Number(row.total_leads) * 4) +
-      (Number(row.demand_score) * 2) +
-      (Number(row.avg_ctr) * 100) +
-      (Number(row.total_ads) * 0.5);
+      Number(row.total_leads) * 4 +
+      Number(row.demand_score) * 2 +
+      Number(row.avg_ctr) * 100 +
+      Number(row.total_ads) * 0.5;
 
     return {
       ...row,
@@ -92,26 +92,14 @@ async function planActions(cities) {
     if (city.dominance_score < 40) continue;
 
     // 1️⃣ SEO LOCAL
-    await enqueue(
-      "SEO_LOCAL_CONTENT",
-      { city_id: city.city_id, city_slug: city.slug },
-      2
-    );
+    await enqueue("SEO_LOCAL_CONTENT", { city_id: city.city_id, city_slug: city.slug }, 2);
 
     // 2️⃣ PRIORIZAR SEO DA CIDADE
-    await enqueue(
-      "SEO_PRIORITIZE_CITY",
-      { city_id: city.city_id },
-      2
-    );
+    await enqueue("SEO_PRIORITIZE_CITY", { city_id: city.city_id }, 2);
 
     // 3️⃣ AUTO CAMPAIGN (somente cidades quentes)
     if (city.total_leads >= 10) {
-      await enqueue(
-        "AUTO_CAMPAIGN",
-        { city_id: city.city_id },
-        1
-      );
+      await enqueue("AUTO_CAMPAIGN", { city_id: city.city_id }, 1);
     }
   }
 

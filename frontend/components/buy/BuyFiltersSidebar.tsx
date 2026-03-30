@@ -24,13 +24,7 @@ function CountPill({ children }: { children: ReactNode }) {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-4 border-b border-[#e6ebf3] p-5 last:border-b-0">
       <div className="flex items-center justify-between">
@@ -93,9 +87,7 @@ function QuickButton({
       type="button"
       onClick={onClick}
       className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-[14px] font-semibold transition ${
-        active
-          ? "bg-[#edf4ff] text-[#0e62d8]"
-          : "bg-[#f7f9fc] text-[#334155] hover:bg-[#eef3f8]"
+        active ? "bg-[#edf4ff] text-[#0e62d8]" : "bg-[#f7f9fc] text-[#334155] hover:bg-[#eef3f8]"
       }`}
     >
       {children}
@@ -167,9 +159,7 @@ export default function BuyFiltersSidebar({
   function applyFilters() {
     const location = parseLocationValue(locationValue);
     const nextCity =
-      location.city && location.state
-        ? `${location.city} - ${location.state}`
-        : location.city;
+      location.city && location.state ? `${location.city} - ${location.state}` : location.city;
     const keepCurrentSlug = Boolean(filters.city_slug && locationValue === cityLabel);
 
     onChange({
@@ -295,8 +285,7 @@ export default function BuyFiltersSidebar({
       <Section title="Localizacao">
         <div className="space-y-3">
           <div className="rounded-2xl border border-[#e4eaf2] bg-[#f8fafc] p-3 text-sm leading-6 text-[#5f6c84]">
-            Identificamos a sua localizacao para mostrar melhores oportunidades perto
-            de voce.
+            Identificamos a sua localizacao para mostrar melhores oportunidades perto de voce.
           </div>
 
           <SelectField
@@ -377,7 +366,9 @@ export default function BuyFiltersSidebar({
                   {item.brand.slice(0, 2).toUpperCase()}
                 </span>
               </div>
-              <div className="mt-2 text-[11px] font-bold text-[#334155] sm:text-xs">{item.brand}</div>
+              <div className="mt-2 text-[11px] font-bold text-[#334155] sm:text-xs">
+                {item.brand}
+              </div>
             </button>
           ))}
         </div>

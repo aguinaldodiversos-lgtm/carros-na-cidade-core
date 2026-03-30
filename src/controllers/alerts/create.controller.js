@@ -9,17 +9,11 @@ module.exports = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const {
-      city,
-      brand,
-      model,
-      price_max,
-      year_min
-    } = req.body;
+    const { city, brand, model, price_max, year_min } = req.body;
 
     if (!city) {
       return res.status(400).json({
-        error: "Cidade é obrigatória"
+        error: "Cidade é obrigatória",
       });
     }
 
@@ -42,7 +36,7 @@ module.exports = async (req, res) => {
       brand || null,
       model || null,
       price_max || null,
-      year_min || null
+      year_min || null,
     ];
 
     const result = await pool.query(query, values);
@@ -51,7 +45,7 @@ module.exports = async (req, res) => {
   } catch (err) {
     console.error("Erro ao criar alerta:", err);
     res.status(500).json({
-      error: "Erro ao criar alerta"
+      error: "Erro ao criar alerta",
     });
   }
 };

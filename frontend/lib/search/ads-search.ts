@@ -193,11 +193,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
   const id =
     toOptionalNumber(item.id) ??
     Math.abs(
-      String(
-        toText(item.slug) ||
-          toText(item.title) ||
-          `ad-${index + 1}`
-      )
+      String(toText(item.slug) || toText(item.title) || `ad-${index + 1}`)
         .split("")
         .reduce((acc, char) => acc + char.charCodeAt(0), 0)
     );
@@ -231,20 +227,14 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
   };
 }
 
-function normalizePagination(
-  raw: unknown,
-  fallbackPage = 1,
-  fallbackLimit = 20
-): AdsPagination {
-  const pagination =
-    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+function normalizePagination(raw: unknown, fallbackPage = 1, fallbackLimit = 20): AdsPagination {
+  const pagination = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
 
   const page = Math.max(1, toNumber(pagination.page, fallbackPage));
   const limit = Math.max(1, toNumber(pagination.limit, fallbackLimit));
   const total = Math.max(0, toNumber(pagination.total, 0));
   const totalPages =
-    Math.max(0, toNumber(pagination.totalPages, 0)) ||
-    (limit > 0 ? Math.ceil(total / limit) : 0);
+    Math.max(0, toNumber(pagination.totalPages, 0)) || (limit > 0 ? Math.ceil(total / limit) : 0);
 
   return {
     page,
@@ -254,12 +244,8 @@ function normalizePagination(
   };
 }
 
-function normalizeSearchPayload(
-  json: unknown,
-  filters: AdsSearchFilters
-): AdsSearchResponse {
-  const payload =
-    json && typeof json === "object" ? (json as Record<string, unknown>) : {};
+function normalizeSearchPayload(json: unknown, filters: AdsSearchFilters): AdsSearchResponse {
+  const payload = json && typeof json === "object" ? (json as Record<string, unknown>) : {};
 
   const rawData = Array.isArray(payload.data)
     ? payload.data
@@ -292,10 +278,7 @@ function normalizeSearchPayload(
   };
 }
 
-function normalizeFacetArray<T extends Record<string, unknown>>(
-  raw: unknown,
-  keys: string[]
-): T[] {
+function normalizeFacetArray<T extends Record<string, unknown>>(raw: unknown, keys: string[]): T[] {
   if (!Array.isArray(raw)) return [];
 
   return raw
@@ -318,8 +301,7 @@ function normalizeFacetArray<T extends Record<string, unknown>>(
 }
 
 function normalizeFacetsPayload(json: unknown): AdsFacetsResponse {
-  const payload =
-    json && typeof json === "object" ? (json as Record<string, unknown>) : {};
+  const payload = json && typeof json === "object" ? (json as Record<string, unknown>) : {};
 
   const rawFacets =
     payload.facets && typeof payload.facets === "object"
@@ -329,10 +311,7 @@ function normalizeFacetsPayload(json: unknown): AdsFacetsResponse {
   return {
     success: payload.success !== false,
     facets: {
-      brands: normalizeFacetArray<{ brand: string; total: number }>(
-        rawFacets.brands,
-        ["brand"]
-      ),
+      brands: normalizeFacetArray<{ brand: string; total: number }>(rawFacets.brands, ["brand"]),
       models: normalizeFacetArray<{ brand: string; model: string; total: number }>(
         rawFacets.models,
         ["brand", "model"]
@@ -428,10 +407,7 @@ export async function fetchAdsSearch(
         filters.page || EMPTY_PAGINATION.page,
         filters.limit || EMPTY_PAGINATION.limit
       ),
-      error:
-        error instanceof Error
-          ? error.message
-          : "Falha inesperada ao buscar anúncios.",
+      error: error instanceof Error ? error.message : "Falha inesperada ao buscar anúncios.",
     };
   }
 }

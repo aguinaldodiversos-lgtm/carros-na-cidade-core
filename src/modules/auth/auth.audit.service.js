@@ -2,13 +2,7 @@ import { pool } from "../../infrastructure/database/db.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 
-export async function logLoginAttempt({
-  userId,
-  ip,
-  userAgent,
-  success,
-  requestId,
-}) {
+export async function logLoginAttempt({ userId, ip, userAgent, success, requestId }) {
   try {
     await pool.query(
       `

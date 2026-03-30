@@ -1,5 +1,4 @@
-import { AiOrchestrator } from "../../../brain/orchestrator/ai.orchestrator.js";
-import { createRedisClient, createCache } from "../../../brain/cache/ai.cache.js";
+import { getSharedAiOrchestrator } from "../../../brain/orchestrator/brain-stack.js";
 import { logger } from "../../../shared/logger.js";
 import { withRetry } from "../../../shared/observability/retry.js";
 import { CircuitBreaker } from "../../../shared/observability/circuit-breaker.js";
@@ -8,25 +7,13 @@ import * as contentPublisherRepository from "./content-publisher.repository.js";
 import * as publicationAuditService from "./publication-audit.service.js";
 import { validatePublicationPayload } from "./publication-validator.service.js";
 
-let orchestratorInstance = null;
 const providerCircuit = new CircuitBreaker({
   failureThreshold: 5,
   recoveryTimeMs: 30000,
 });
 
 function getOrchestrator() {
-  if (orchestratorInstance) return orchestratorInstance;
-
-  const redis = createRedisClient({ logger });
-  const cache = createCache({ redis });
-
-  orchestratorInstance = new AiOrchestrator({
-    logger,
-    cache,
-    aiQueue: null,
-  });
-
-  return orchestratorInstance;
+  return getSharedAiOrchestrator(logger);
 }
 
 function buildPublicationTitle(cluster) {
@@ -106,9 +93,7 @@ export async function publishClusterContent(cluster) {
       path: cluster.path,
       title: buildPublicationTitle(cluster),
       content:
-        typeof aiResult.output === "string"
-          ? aiResult.output
-          : JSON.stringify(aiResult.output),
+        typeof aiResult.output === "string" ? aiResult.output : JSON.stringify(aiResult.output),
       excerpt: null,
       cityId: cluster.city_id,
       brand: cluster.brand || null,

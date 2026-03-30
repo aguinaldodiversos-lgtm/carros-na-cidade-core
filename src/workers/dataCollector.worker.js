@@ -4,13 +4,9 @@ import { pool } from "../infrastructure/database/db.js";
 
 export async function collectExternalData() {
   try {
-    const seoData = await fetchSearchConsoleData(
-      process.env.SITE_URL
-    );
+    const seoData = await fetchSearchConsoleData(process.env.SITE_URL);
 
-    const gaData = await fetchGA4CityData(
-      process.env.GA4_PROPERTY_ID
-    );
+    const gaData = await fetchGA4CityData(process.env.GA4_PROPERTY_ID);
 
     await saveSEOData(seoData);
     await saveGAData(gaData);
@@ -55,8 +51,7 @@ async function saveGAData(rows) {
       SET sessions = $2
       WHERE city_name = $1
       `,
-      [row.dimensionValues?.[0]?.value || row.city_name,
-       row.metricValues?.[0]?.value || 0]
+      [row.dimensionValues?.[0]?.value || row.city_name, row.metricValues?.[0]?.value || 0]
     );
   }
 }

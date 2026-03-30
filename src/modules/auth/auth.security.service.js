@@ -16,10 +16,7 @@ export async function validateUserForLogin(user) {
   }
 
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
-    throw new AppError(
-      "Conta temporariamente bloqueada. Tente novamente mais tarde.",
-      403
-    );
+    throw new AppError("Conta temporariamente bloqueada. Tente novamente mais tarde.", 403);
   }
 }
 

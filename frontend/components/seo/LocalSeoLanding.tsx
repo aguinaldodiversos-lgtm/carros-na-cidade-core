@@ -46,7 +46,9 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
               <dd className="text-lg font-semibold text-slate-900">{model.catalogTotalAds}</dd>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-              <dt className="text-xs font-medium uppercase text-slate-500">Preço médio (amostra)</dt>
+              <dt className="text-xs font-medium uppercase text-slate-500">
+                Preço médio (amostra)
+              </dt>
               <dd className="text-lg font-semibold text-slate-900">
                 {model.avgPrice !== null ? formatMoney(model.avgPrice) : "—"}
               </dd>
@@ -97,13 +99,9 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
               {sampleAds.map((ad) => {
                 const href = buildAdHref(ad);
                 const img =
-                  ad.image_url ||
-                  (Array.isArray(ad.images) && ad.images[0]) ||
-                  "/images/hero.jpeg";
+                  ad.image_url || (Array.isArray(ad.images) && ad.images[0]) || "/images/hero.jpeg";
                 const title =
-                  ad.title ||
-                  [ad.brand, ad.model, ad.year].filter(Boolean).join(" ") ||
-                  "Veículo";
+                  ad.title || [ad.brand, ad.model, ad.year].filter(Boolean).join(" ") || "Veículo";
                 return (
                   <li key={ad.id}>
                     <Link

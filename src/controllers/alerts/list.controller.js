@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
   } catch (err) {
     console.error("Erro ao listar alertas:", err);
     res.status(500).json({
-      error: "Erro ao listar alertas"
+      error: "Erro ao listar alertas",
     });
   }
 };

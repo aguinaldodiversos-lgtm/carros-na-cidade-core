@@ -26,7 +26,9 @@ export function createRedisClient({ logger }) {
     logger.warn("DISABLE_REDIS=true. Cache AI desativado.");
     return null;
   }
-  const isLocalDev = ["development", "dev", "local"].includes(String(process.env.NODE_ENV || "").toLowerCase());
+  const isLocalDev = ["development", "dev", "local"].includes(
+    String(process.env.NODE_ENV || "").toLowerCase()
+  );
   if (!isLocalDev && isLocalhostUrl(url)) {
     logger.warn("REDIS_URL aponta para localhost em produção. Cache AI desativado.");
     return null;
@@ -38,10 +40,7 @@ export function createRedisClient({ logger }) {
   });
 
   redis.on("error", (err) => {
-    logger.error(
-      { error: err?.message || String(err) },
-      "[brain.ai.cache] Redis error"
-    );
+    logger.error({ error: err?.message || String(err) }, "[brain.ai.cache] Redis error");
   });
 
   redis.on("connect", () => {
@@ -54,21 +53,33 @@ export function createRedisClient({ logger }) {
 export function createCache({ redis }) {
   if (!redis) {
     return {
-      async get() { return null; },
+      async get() {
+        return null;
+      },
       async set() {},
       async del() {},
       async expire() {},
-      async incrByFloat() { return 0; },
+      async incrByFloat() {
+        return 0;
+      },
     };
   }
   return {
-    async get(key) { return redis.get(key); },
+    async get(key) {
+      return redis.get(key);
+    },
     async set(key, value, ttlSeconds) {
       if (!ttlSeconds) return redis.set(key, value);
       return redis.set(key, value, "EX", ttlSeconds);
     },
-    async del(key) { return redis.del(key); },
-    async expire(key, ttlSeconds) { return redis.expire(key, ttlSeconds); },
-    async incrByFloat(key, n) { return redis.incrbyfloat(key, n); },
+    async del(key) {
+      return redis.del(key);
+    },
+    async expire(key, ttlSeconds) {
+      return redis.expire(key, ttlSeconds);
+    },
+    async incrByFloat(key, n) {
+      return redis.incrbyfloat(key, n);
+    },
   };
 }

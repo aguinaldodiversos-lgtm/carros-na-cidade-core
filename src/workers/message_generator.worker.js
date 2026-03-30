@@ -86,9 +86,7 @@ async function runMessageGenerator() {
       const messages = await generateMessages(city);
       await insertVariants(city.id, messages);
 
-      console.log(
-        `✉️ Novas mensagens criadas para ${city.name}-${city.state}`
-      );
+      console.log(`✉️ Novas mensagens criadas para ${city.name}-${city.state}`);
     }
 
     console.log("✅ Message generator finalizado");

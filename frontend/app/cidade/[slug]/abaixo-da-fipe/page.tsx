@@ -11,10 +11,8 @@ interface CityBelowFipePageProps {
 }
 
 const getCityBelowFipePageData = cache(
-  async (
-    slug: string,
-    searchParams: Record<string, string | string[] | undefined>
-  ) => fetchCityBelowFipeTerritorialPage(slug, searchParams)
+  async (slug: string, searchParams: Record<string, string | string[] | undefined>) =>
+    fetchCityBelowFipeTerritorialPage(slug, searchParams)
 );
 
 export async function generateMetadata({
@@ -25,14 +23,8 @@ export async function generateMetadata({
   return buildTerritorialMetadata(data, "below_fipe");
 }
 
-export default async function CityBelowFipePage({
-  params,
-  searchParams,
-}: CityBelowFipePageProps) {
-  const initialData = await getCityBelowFipePageData(
-    params.slug,
-    searchParams
-  );
+export default async function CityBelowFipePage({ params, searchParams }: CityBelowFipePageProps) {
+  const initialData = await getCityBelowFipePageData(params.slug, searchParams);
 
   return (
     <>

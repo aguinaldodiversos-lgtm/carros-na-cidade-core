@@ -60,9 +60,7 @@ async function fetchJson(url) {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `Falha ao consultar IBGE (${response.status}) em ${url}: ${text}`
-      );
+      throw new Error(`Falha ao consultar IBGE (${response.status}) em ${url}: ${text}`);
     }
 
     return await response.json();
@@ -459,10 +457,7 @@ async function upsertCitySafely(client, payload) {
       await insertCity(client, payload);
     } catch (err) {
       if (err && err.code === "23505") {
-        const again = await findExistingCityByIbgeCode(
-          client,
-          payload.ibge_code
-        );
+        const again = await findExistingCityByIbgeCode(client, payload.ibge_code);
         if (again) {
           await updateExistingCity(client, again.id, payload);
           return "updated_by_ibge";
@@ -479,10 +474,7 @@ async function upsertCitySafely(client, payload) {
       await insertCity(client, payload);
     } catch (err) {
       if (err && err.code === "23505") {
-        const again = await findExistingCityByIbgeCode(
-          client,
-          payload.ibge_code
-        );
+        const again = await findExistingCityByIbgeCode(client, payload.ibge_code);
         if (again) {
           await updateExistingCity(client, again.id, payload);
           return "updated_by_ibge";
@@ -496,10 +488,7 @@ async function upsertCitySafely(client, payload) {
 
   const only = candidates[0];
 
-  if (
-    only.ibge_code != null &&
-    Number(only.ibge_code) === Number(payload.ibge_code)
-  ) {
+  if (only.ibge_code != null && Number(only.ibge_code) === Number(payload.ibge_code)) {
     await updateExistingCity(client, only.id, payload);
     return "updated_by_ibge";
   }
@@ -509,10 +498,7 @@ async function upsertCitySafely(client, payload) {
       await insertCity(client, payload);
     } catch (err) {
       if (err && err.code === "23505") {
-        const again = await findExistingCityByIbgeCode(
-          client,
-          payload.ibge_code
-        );
+        const again = await findExistingCityByIbgeCode(client, payload.ibge_code);
         if (again) {
           await updateExistingCity(client, again.id, payload);
           return "updated_by_ibge";
@@ -535,9 +521,7 @@ async function upsertCitySafely(client, payload) {
 }
 
 async function countCities(client) {
-  const result = await client.query(
-    `SELECT COUNT(*)::int AS total FROM cities`
-  );
+  const result = await client.query(`SELECT COUNT(*)::int AS total FROM cities`);
   return result.rows?.[0]?.total ?? 0;
 }
 
@@ -672,7 +656,9 @@ async function importCities() {
     const ufsFailed = [];
 
     for (const state of states) {
-      const uf = String(state.sigla || "").trim().toUpperCase();
+      const uf = String(state.sigla || "")
+        .trim()
+        .toUpperCase();
       const stateName = String(state.nome || "").trim();
 
       if (!uf || uf.length !== 2 || !stateName) {
@@ -751,8 +737,7 @@ async function importCities() {
     }
 
     const totalInDatabase = await countCities(client);
-    const totalUpdated =
-      totalUpdatedByIbge + totalReconciledByNameState;
+    const totalUpdated = totalUpdatedByIbge + totalReconciledByNameState;
     const ufsTentadas = ufsOk.length + ufsFailed.length;
 
     console.log("[cities:import] --- Resumo final ---");
@@ -761,9 +746,7 @@ async function importCities() {
     console.log(`[cities:import] UFs com falha: ${ufsFailed.length}`);
     if (ufsFailed.length > 0) {
       for (const f of ufsFailed) {
-        console.log(
-          `[cities:import]   falha ${f.uf}: ${f.error.split("\n")[0]}`
-        );
+        console.log(`[cities:import]   falha ${f.uf}: ${f.error.split("\n")[0]}`);
       }
     }
     console.log(

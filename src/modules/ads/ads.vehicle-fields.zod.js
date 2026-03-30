@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  BODY_TYPES,
-  FUEL_TYPES,
-  TRANSMISSION_TYPES,
-} from "./ads.canonical.constants.js";
+import { BODY_TYPES, FUEL_TYPES, TRANSMISSION_TYPES } from "./ads.canonical.constants.js";
 import {
   normalizeBodyTypeForStorage,
   normalizeFuelTypeForStorage,
@@ -31,15 +27,9 @@ function normalizedVehicleField(normalize, schema) {
   );
 }
 
-export const bodyTypeZodField = normalizedVehicleField(
-  normalizeBodyTypeForStorage,
-  bodyTypeEnum
-);
+export const bodyTypeZodField = normalizedVehicleField(normalizeBodyTypeForStorage, bodyTypeEnum);
 
-export const fuelTypeZodField = normalizedVehicleField(
-  normalizeFuelTypeForStorage,
-  fuelTypeEnum
-);
+export const fuelTypeZodField = normalizedVehicleField(normalizeFuelTypeForStorage, fuelTypeEnum);
 
 export const transmissionZodField = normalizedVehicleField(
   normalizeTransmissionForStorage,

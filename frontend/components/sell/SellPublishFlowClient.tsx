@@ -148,7 +148,8 @@ export default function SellPublishFlowClient({ initialType }: Props) {
                   Quero vender meu carro
                 </h2>
                 <p className="mt-3 text-[15px] leading-7 text-[#5C647C]">
-                  Fluxo mais simples, rápido e focado em boa apresentação do veículo e contato qualificado.
+                  Fluxo mais simples, rápido e focado em boa apresentação do veículo e contato
+                  qualificado.
                 </p>
               </button>
 
@@ -168,7 +169,8 @@ export default function SellPublishFlowClient({ initialType }: Props) {
                   Quero anunciar como loja
                 </h2>
                 <p className="mt-3 text-[15px] leading-7 text-[#5C647C]">
-                  Fluxo preparado para operação comercial, estoque, hierarquia de exposição e evolução com CRM.
+                  Fluxo preparado para operação comercial, estoque, hierarquia de exposição e
+                  evolução com CRM.
                 </p>
               </button>
             </div>
@@ -213,7 +215,8 @@ export default function SellPublishFlowClient({ initialType }: Props) {
               </div>
 
               <div className="mt-4 text-sm text-[#6E748A]">
-                Destino pós-acesso: <span className="font-semibold text-[#1D2440]">{panelHref}</span>
+                Destino pós-acesso:{" "}
+                <span className="font-semibold text-[#1D2440]">{panelHref}</span>
               </div>
             </div>
           </div>
@@ -271,7 +274,8 @@ export default function SellPublishFlowClient({ initialType }: Props) {
                   Fluxo preparado para conversão
                 </div>
                 <p className="mt-2 text-[15px] leading-7 text-[#5C647C]">
-                  Essa etapa já separa corretamente particular e lojista e entrega um caminho mais limpo para autenticação e continuidade do anúncio.
+                  Essa etapa já separa corretamente particular e lojista e entrega um caminho mais
+                  limpo para autenticação e continuidade do anúncio.
                 </p>
               </div>
             </div>

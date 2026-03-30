@@ -53,18 +53,10 @@ export async function planCityGrowthActions(limit = 10) {
       2
     );
 
-    await enqueueGrowthJob(
-      "SEO_PRIORITIZE_CITY",
-      { city_id: city.id, city_slug: city.slug },
-      2
-    );
+    await enqueueGrowthJob("SEO_PRIORITIZE_CITY", { city_id: city.id, city_slug: city.slug }, 2);
 
     if (Number(city.leads) >= 10) {
-      await enqueueGrowthJob(
-        "AUTO_CAMPAIGN",
-        { city_id: city.id, city_name: city.name },
-        1
-      );
+      await enqueueGrowthJob("AUTO_CAMPAIGN", { city_id: city.id, city_name: city.name }, 1);
     }
 
     if (Number(city.avg_ctr) >= 0.02 && Number(city.total_ads) < 25) {

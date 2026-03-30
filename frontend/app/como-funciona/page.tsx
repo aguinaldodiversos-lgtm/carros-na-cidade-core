@@ -47,7 +47,10 @@ export default function ComoFuncionaPage() {
             Segurança na negociação
           </Link>
           {" · "}
-          <Link href="/politica-de-privacidade" className="font-semibold text-[#0e62d8] hover:underline">
+          <Link
+            href="/politica-de-privacidade"
+            className="font-semibold text-[#0e62d8] hover:underline"
+          >
             Privacidade
           </Link>
           {" · "}

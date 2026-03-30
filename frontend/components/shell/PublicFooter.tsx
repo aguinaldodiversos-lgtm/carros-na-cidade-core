@@ -5,15 +5,8 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
 import { useCityOptional } from "@/lib/city/CityContext";
-import {
-  DEFAULT_PUBLIC_CITY_SLUG,
-  getPublicSocialLinks,
-} from "@/lib/site/public-config";
-import {
-  buildFooterNavSections,
-  SITE_CONTACT,
-  SITE_ROUTES,
-} from "@/lib/site/site-navigation";
+import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/public-config";
+import { buildFooterNavSections, SITE_CONTACT, SITE_ROUTES } from "@/lib/site/site-navigation";
 
 type FooterLinkItem = {
   label: string;
@@ -30,13 +23,7 @@ function isExternalHref(href: string) {
   );
 }
 
-function FooterAnchor({
-  item,
-  className,
-}: {
-  item: FooterLinkItem;
-  className?: string;
-}) {
+function FooterAnchor({ item, className }: { item: FooterLinkItem; className?: string }) {
   const external = item.external || isExternalHref(item.href);
 
   if (external) {
@@ -96,11 +83,7 @@ function FooterNavColumns({
       {sections.map((group) => (
         <div key={group.id}>
           <h3 className={headingClass}>{group.title}</h3>
-          <ul
-            className={
-              dense ? "mt-2 space-y-1.5 text-[12px]" : "mt-4 space-y-2.5 text-sm"
-            }
-          >
+          <ul className={dense ? "mt-2 space-y-1.5 text-[12px]" : "mt-4 space-y-2.5 text-sm"}>
             {group.links.map((link) => (
               <li key={`${group.id}-${link.id}`}>
                 <FooterAnchor
@@ -123,8 +106,7 @@ export function PublicFooter() {
   const socials = getPublicSocialLinks();
   const cityCtx = useCityOptional();
   const footerSections = useMemo(
-    () =>
-      buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG),
+    () => buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG),
     [cityCtx?.city.slug]
   );
 
@@ -146,10 +128,7 @@ export function PublicFooter() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 md:gap-4">
-              <a
-                href={`mailto:${SITE_CONTACT.email}`}
-                className="transition hover:text-white"
-              >
+              <a href={`mailto:${SITE_CONTACT.email}`} className="transition hover:text-white">
                 {SITE_CONTACT.email}
               </a>
               <FooterAnchor
@@ -206,9 +185,9 @@ export function PublicFooter() {
             </Link>
 
             <p className="mt-4 max-w-xl text-sm leading-7 text-white/75">
-              Marketplace onde a cidade manda: anúncios com território claro, listagens que respeitam
-              a sua região e ferramentas para comprar ou vender com contexto local — sem promessa de
-              &quot;estoque nacional&quot; genérico.
+              Marketplace onde a cidade manda: anúncios com território claro, listagens que
+              respeitam a sua região e ferramentas para comprar ou vender com contexto local — sem
+              promessa de &quot;estoque nacional&quot; genérico.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2 text-sm text-white/75">

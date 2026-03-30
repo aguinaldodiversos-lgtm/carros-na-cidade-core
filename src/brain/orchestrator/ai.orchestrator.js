@@ -1,10 +1,7 @@
 // src/brain/orchestrator/ai.orchestrator.js
 // Orquestrador: decisão (ordem dos provedores) vs execução (chamada + retry + circuit breaker + dedupe).
 
-import {
-  OrchestratorInputSchema,
-  OrchestratorResultSchema,
-} from "../schemas/ai.schemas.js";
+import { OrchestratorInputSchema, OrchestratorResultSchema } from "../schemas/ai.schemas.js";
 import { AiPolicy } from "../policies/ai.policy.js";
 import { auditAiCall } from "../audit/ai.audit.js";
 import { LocalAiProvider } from "../providers/local.provider.js";
@@ -125,6 +122,7 @@ export class AiOrchestrator {
     }
 
     const prompt = buildPrompt({ task, input, context });
+    const routingPolicy = this.policy.stagePolicy({ task, context });
     const canPremium = await this.policy.canUsePremium({ task, context });
     const executionMode = this.policy.resolveExecutionMode({ task, context });
     const order = resolveProviderOrder({ executionMode, canPremium });
@@ -217,6 +215,8 @@ export class AiOrchestrator {
               ...(res.meta || {}),
               executionMode,
               stage: context?.stage || "discovery",
+              policyReason: routingPolicy.reason,
+              policyQuality: routingPolicy.quality,
             },
           });
         } catch (err) {
@@ -285,6 +285,8 @@ export class AiOrchestrator {
           reason: "FALLBACK_TEMPLATE",
           executionMode,
           stage: context?.stage || "discovery",
+          policyReason: routingPolicy.reason,
+          policyQuality: routingPolicy.quality,
         },
       });
     });

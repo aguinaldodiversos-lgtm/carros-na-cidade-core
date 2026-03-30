@@ -1,2 +1,2 @@
 // ads.service.js
-await queue.add("notifySubscribers", ad)
+await queue.add("notifySubscribers", ad);

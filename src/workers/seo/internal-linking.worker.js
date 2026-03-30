@@ -35,23 +35,15 @@ export async function startInternalLinkingWorker() {
 
   internalLinkingStarted = true;
 
-  const intervalMs = Number(
-    process.env.INTERNAL_LINKING_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.INTERNAL_LINKING_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
-  logger.info(
-    { intervalMs },
-    "[internal-linking.worker] Inicializando worker"
-  );
+  logger.info({ intervalMs }, "[internal-linking.worker] Inicializando worker");
 
   await runOnce();
 
   internalLinkingInterval = setInterval(() => {
     runOnce().catch((error) => {
-      logger.error(
-        { error },
-        "[internal-linking.worker] Erro na execução agendada"
-      );
+      logger.error({ error }, "[internal-linking.worker] Erro na execução agendada");
     });
   }, intervalMs);
 }

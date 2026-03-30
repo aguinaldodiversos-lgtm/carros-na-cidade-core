@@ -88,8 +88,7 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
   const href = resolveHref(item);
   const mileage = formatMileage(item.mileage);
   const cityLabel = [item.city || "São Paulo", item.state || "SP"].join(" - ");
-  const badgeText =
-    variant === "opportunity" || item.below_fipe ? "Abaixo da FIPE" : "Patrocinado";
+  const badgeText = variant === "opportunity" || item.below_fipe ? "Abaixo da FIPE" : "Patrocinado";
 
   return (
     <Link
@@ -110,7 +109,13 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
           </span>
 
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#95a0b7] shadow-sm">
-            <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[16px] w-[16px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
               <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
             </svg>
           </span>
@@ -140,7 +145,13 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
           </div>
 
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#f2f5fa] text-[#46536f] transition group-hover:bg-[#0e62d8] group-hover:text-white">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="m9 6 6 6-6 6" />
             </svg>
           </span>

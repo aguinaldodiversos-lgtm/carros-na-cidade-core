@@ -137,21 +137,19 @@ const runPgAdsCheckIntegration =
   process.env.RUN_PG_ADS_CHECK_TESTS === "1" &&
   Boolean(String(process.env.DATABASE_URL || "").trim());
 
-describe.skipIf(!runPgAdsCheckIntegration)(
-  "integração PostgreSQL: CHECK em public.ads",
-  () => {
-    let pool;
+describe.skipIf(!runPgAdsCheckIntegration)("integração PostgreSQL: CHECK em public.ads", () => {
+  let pool;
 
-    beforeAll(() => {
-      pool = new pg.Pool(getPoolConfig());
-    });
+  beforeAll(() => {
+    pool = new pg.Pool(getPoolConfig());
+  });
 
-    afterAll(async () => {
-      if (pool) await pool.end();
-    });
+  afterAll(async () => {
+    if (pool) await pool.end();
+  });
 
-    it("retorna constraints de verificação da tabela ads (se existir)", async () => {
-      const { rows } = await pool.query(`
+  it("retorna constraints de verificação da tabela ads (se existir)", async () => {
+    const { rows } = await pool.query(`
       SELECT c.conname,
              pg_get_constraintdef(c.oid) AS definition
       FROM pg_constraint c
@@ -162,15 +160,14 @@ describe.skipIf(!runPgAdsCheckIntegration)(
         AND c.contype = 'c'
       ORDER BY c.conname
     `);
-      expect(rows).toBeDefined();
-      if (rows.length === 0) {
-        console.warn(
-          "[fuel-transmission-contract] Nenhum CHECK em public.ads — tabela ausente ou sem constraints nomeadas."
-        );
-      } else {
-        const names = rows.map((r) => r.conname).join(", ");
-        console.warn(`[fuel-transmission-contract] CHECKs em ads: ${names}`);
-      }
-    });
-  }
-);
+    expect(rows).toBeDefined();
+    if (rows.length === 0) {
+      console.warn(
+        "[fuel-transmission-contract] Nenhum CHECK em public.ads — tabela ausente ou sem constraints nomeadas."
+      );
+    } else {
+      const names = rows.map((r) => r.conname).join(", ");
+      console.warn(`[fuel-transmission-contract] CHECKs em ads: ${names}`);
+    }
+  });
+});

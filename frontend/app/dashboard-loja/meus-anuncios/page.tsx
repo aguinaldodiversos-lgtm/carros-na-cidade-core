@@ -29,7 +29,5 @@ export default async function LojaMeusAnunciosPage() {
     return <LoadError />;
   }
 
-  return (
-    <AccountDashboardView initialData={payload} variant="lojista" mode="ads" />
-  );
+  return <AccountDashboardView initialData={payload} variant="lojista" mode="ads" />;
 }

@@ -18,9 +18,7 @@ async function createCampaign(city, channel, type, budget) {
     [city, channel, type, budget]
   );
 
-  console.log(
-    `📢 Campanha criada: ${type} em ${city} via ${channel}`
-  );
+  console.log(`📢 Campanha criada: ${type} em ${city} via ${channel}`);
 }
 
 /* =====================================================
@@ -30,20 +28,10 @@ async function runAutopilotCampaigns(cities) {
   for (const city of cities) {
     if (city.score > 5) {
       // Campanha Google
-      await createCampaign(
-        city.city,
-        "google",
-        "city_search",
-        50
-      );
+      await createCampaign(city.city, "google", "city_search", 50);
 
       // Campanha Meta
-      await createCampaign(
-        city.city,
-        "meta",
-        "city_awareness",
-        30
-      );
+      await createCampaign(city.city, "meta", "city_awareness", 30);
     }
   }
 }

@@ -193,14 +193,8 @@ async function fetchTerritorialPage(
   return json.data;
 }
 
-export function fetchCityTerritorialPage(
-  slug: string,
-  searchParams?: TerritorialFetchInput
-) {
-  return fetchTerritorialPage(
-    `/api/public/cities/${encodeURIComponent(slug)}`,
-    searchParams
-  );
+export function fetchCityTerritorialPage(slug: string, searchParams?: TerritorialFetchInput) {
+  return fetchTerritorialPage(`/api/public/cities/${encodeURIComponent(slug)}`, searchParams);
 }
 
 export function fetchCityBrandTerritorialPage(

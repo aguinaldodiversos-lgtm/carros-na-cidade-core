@@ -39,7 +39,11 @@ function IconArrowRight({ className = "h-4 w-4" }: { className?: string }) {
 function IconStore({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M4 10h16v9a2 2 0 01-2 2H6a2 2 0 01-2-2v-9z" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M4 10h16v9a2 2 0 01-2 2H6a2 2 0 01-2-2v-9z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
       <path d="M3 10l2-5h14l2 5" stroke="currentColor" strokeWidth="1.8" />
       <path d="M9 14h6v7H9z" stroke="currentColor" strokeWidth="1.8" />
     </svg>
@@ -119,15 +123,7 @@ function SectionTitle({
   );
 }
 
-function FaqItem({
-  item,
-  open,
-  onToggle,
-}: {
-  item: SellFaq;
-  open: boolean;
-  onToggle: () => void;
-}) {
+function FaqItem({ item, open, onToggle }: { item: SellFaq; open: boolean; onToggle: () => void }) {
   return (
     <div className="rounded-[24px] border border-[#E5E9F2] bg-white">
       <button
@@ -157,7 +153,9 @@ function HeroIllustration() {
       <div className="relative space-y-4">
         <div className="flex items-center justify-between rounded-[24px] border border-[#E5E9F2] bg-white p-4 shadow-sm">
           <div>
-            <div className="text-sm font-semibold text-[#6E748A]">Seu anúncio no padrão premium</div>
+            <div className="text-sm font-semibold text-[#6E748A]">
+              Seu anúncio no padrão premium
+            </div>
             <div className="mt-1 text-[22px] font-extrabold text-[#1D2440]">Carros na Cidade</div>
           </div>
           <div className="rounded-full bg-[#EEF4FF] p-3 text-[#2F67F6]">
@@ -182,7 +180,8 @@ function HeroIllustration() {
             </div>
             <div className="text-[18px] font-bold text-[#1D2440]">Contato rápido</div>
             <p className="mt-2 text-sm leading-7 text-[#5C647C]">
-              O comprador encontra preço, contexto e CTA claros para entrar em contato com mais intenção.
+              O comprador encontra preço, contexto e CTA claros para entrar em contato com mais
+              intenção.
             </p>
           </div>
         </div>
@@ -506,7 +505,9 @@ export default function SellPageClient({ content }: Props) {
               <h2 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.04em] sm:text-[46px]">
                 {content.bottomCta.title}
               </h2>
-              <p className="mt-4 text-[16px] leading-8 text-white/85">{content.bottomCta.subtitle}</p>
+              <p className="mt-4 text-[16px] leading-8 text-white/85">
+                {content.bottomCta.subtitle}
+              </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">

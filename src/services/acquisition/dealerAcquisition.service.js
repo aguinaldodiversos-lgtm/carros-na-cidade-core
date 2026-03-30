@@ -1,10 +1,8 @@
 const axios = require("axios");
 
-const GOOGLE_TEXT_SEARCH =
-  "https://maps.googleapis.com/maps/api/place/textsearch/json";
+const GOOGLE_TEXT_SEARCH = "https://maps.googleapis.com/maps/api/place/textsearch/json";
 
-const GOOGLE_PLACE_DETAILS =
-  "https://maps.googleapis.com/maps/api/place/details/json";
+const GOOGLE_PLACE_DETAILS = "https://maps.googleapis.com/maps/api/place/details/json";
 
 /* =====================================================
    BUSCAR LOJAS NA CIDADE
@@ -52,10 +50,7 @@ async function buscarDetalhesLoja(place_id) {
 
     return {
       name: result.name,
-      phone:
-        result.international_phone_number ||
-        result.formatted_phone_number ||
-        null,
+      phone: result.international_phone_number || result.formatted_phone_number || null,
     };
   } catch (err) {
     console.error("Erro ao buscar detalhes da loja:", err.message);

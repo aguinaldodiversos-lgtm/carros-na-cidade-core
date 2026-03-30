@@ -28,20 +28,21 @@ process.env.RUN_INTEGRATION_ADS_TESTS = "1";
 process.env.NODE_ENV = process.env.NODE_ENV || "test";
 
 if (!String(process.env.JWT_SECRET || "").trim()) {
-  process.env.JWT_SECRET =
-    "vitest-integration-jwt-secret-minimum-32-characters-long";
+  process.env.JWT_SECRET = "vitest-integration-jwt-secret-minimum-32-characters-long";
 }
 if (!String(process.env.JWT_REFRESH_SECRET || "").trim()) {
-  process.env.JWT_REFRESH_SECRET =
-    "vitest-integration-refresh-secret-minimum-32-chars-long";
+  process.env.JWT_REFRESH_SECRET = "vitest-integration-refresh-secret-minimum-32-chars-long";
+}
+
+// Integração: não consumir API paga por defeito (orquestrador em modo local).
+if (!String(process.env.AI_MODE || "").trim()) {
+  process.env.AI_MODE = "local";
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const vitestEntry = path.join(root, "node_modules", "vitest", "vitest.mjs");
 if (!existsSync(vitestEntry)) {
-  console.error(
-    "[run-integration-ads-tests] vitest não encontrado em node_modules. Rode npm ci."
-  );
+  console.error("[run-integration-ads-tests] vitest não encontrado em node_modules. Rode npm ci.");
   process.exit(1);
 }
 

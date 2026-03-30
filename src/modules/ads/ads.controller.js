@@ -2,20 +2,10 @@
 
 import * as adsService from "./ads.service.js";
 import { getFacets } from "./facets.service.js";
-import {
-  parseAdsFacetFilters,
-  parseAdsFilters,
-} from "./filters/ads-filter.parser.js";
-import {
-  validateAdIdentifier,
-  validateAdId,
-  validateUpdateAdPayload,
-} from "./ads.validators.js";
+import { parseAdsFacetFilters, parseAdsFilters } from "./filters/ads-filter.parser.js";
+import { validateAdIdentifier, validateAdId, validateUpdateAdPayload } from "./ads.validators.js";
 import { invalidateAdsCachesAfterMutation } from "./ads.mutation-cache.js";
-import {
-  logAdsPublishFailure,
-  sanitizeAdPayloadForLog,
-} from "./ads.publish-flow.log.js";
+import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
 
 export async function facets(req, res, next) {
   try {

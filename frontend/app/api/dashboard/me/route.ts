@@ -28,9 +28,6 @@ export async function GET(request: NextRequest) {
     }
     return res;
   } catch {
-    return NextResponse.json(
-      { error: "Falha ao carregar dashboard" },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: "Falha ao carregar dashboard" }, { status: 502 });
   }
 }

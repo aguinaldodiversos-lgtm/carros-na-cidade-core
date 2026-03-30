@@ -40,7 +40,10 @@ export default function LgpdPage() {
       afterSections={
         <p className="text-[15px] leading-7 text-[#5c6881]">
           Leia também a{" "}
-          <Link href="/politica-de-privacidade" className="font-semibold text-[#0e62d8] hover:underline">
+          <Link
+            href="/politica-de-privacidade"
+            className="font-semibold text-[#0e62d8] hover:underline"
+          >
             Política de Privacidade
           </Link>
           {" e os "}

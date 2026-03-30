@@ -30,9 +30,7 @@ export async function startOpportunityWorker() {
 
   opportunityStarted = true;
 
-  const intervalMs = Number(
-    process.env.OPPORTUNITY_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.OPPORTUNITY_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[opportunity.worker] Inicializando worker");
 

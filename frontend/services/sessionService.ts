@@ -1,10 +1,7 @@
 import crypto from "crypto";
 import type { NextRequest } from "next/server";
 import type { AccountType } from "@/lib/dashboard-types";
-import {
-  MW_ACCESS_TOKEN_HEADER,
-  MW_REFRESH_TOKEN_HEADER,
-} from "@/lib/auth/session-headers";
+import { MW_ACCESS_TOKEN_HEADER, MW_REFRESH_TOKEN_HEADER } from "@/lib/auth/session-headers";
 
 export const AUTH_COOKIE_NAME = "cnc_session";
 
@@ -55,7 +52,9 @@ export function createSessionToken(user: SessionData, maxAgeSeconds = DEFAULT_DU
   return `${body}.${signature}`;
 }
 
-export function getSessionDataFromCookieValue(tokenValue: string | undefined | null): SessionData | null {
+export function getSessionDataFromCookieValue(
+  tokenValue: string | undefined | null
+): SessionData | null {
   if (!tokenValue) return null;
 
   const [body, signature] = tokenValue.split(".");
@@ -86,7 +85,9 @@ export function getSessionDataFromCookieValue(tokenValue: string | undefined | n
   }
 }
 
-export function getSessionUserFromCookieValue(tokenValue: string | undefined | null): SessionUser | null {
+export function getSessionUserFromCookieValue(
+  tokenValue: string | undefined | null
+): SessionUser | null {
   const session = getSessionDataFromCookieValue(tokenValue);
   if (!session) return null;
 

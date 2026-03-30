@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   backend:
-    name: Backend (lint + test + contract audit)
+    name: Backend (lint + test + audits)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -29,14 +29,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prettier (format check — monorepo)
+        run: npm run format:check
+
       - name: ESLint (backend)
         run: npm run lint
 
-      - name: Unit tests (backend)
-        run: npm test
+      - name: Unit tests + coverage (backend)
+        run: npm run test:coverage
 
       - name: Contract audit (BFF ↔ Express)
         run: npm run audit:contract
+
+      - name: System integrity scan (estático)
+        run: npm run audit:integrity
+
+      - name: Clone detection (jscpd)
+        run: npm run audit:clones
 
       - name: Job summary
         if: success()
@@ -105,8 +114,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Unit tests (Vitest)
-        run: npm run test
+      - name: Unit tests + coverage (Vitest)
+        run: npm run test:coverage
+
+      - name: Project audit (links, assets, env — avisos não bloqueiam)
+        working-directory: ${{ github.workspace }}
+        run: npm run audit:project
 
       - name: Next.js build
         run: npm run build

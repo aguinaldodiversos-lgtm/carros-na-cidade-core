@@ -29,10 +29,7 @@ export async function runRefreshPlannerEngine(limit = 2000) {
     });
 
     const intervalHours = Number(plan.refresh_interval_hours || 168);
-    await refreshPlanRepository.markRefreshExecuted(
-      plan.id,
-      addHours(new Date(), intervalHours)
-    );
+    await refreshPlanRepository.markRefreshExecuted(plan.id, addHours(new Date(), intervalHours));
   }
 
   logger.info(

@@ -7,26 +7,30 @@ A suíte `tests/integration/ads-pipeline.integration.test.js` valida auth (login
 - Docker (ou Postgres acessível com a mesma URL)
 - Node 20
 
+### IA durante a suíte
+
+Por defeito o runner e o `beforeAll` usam **`AI_MODE=local`** (se não estiver definido) e **`resetBrainAiStackForTests()`** para não gastar quota/custo na API paga e não herdar singleton do orquestrador entre testes. Referência das variáveis: [docs/configuration/ai-environment.md](../configuration/ai-environment.md).
+
 ## O que a suíte valida (regressão)
 
-| Área | O que é exercitado |
-|------|---------------------|
-| Auth | Login, refresh, logout invalida refresh |
-| Advertiser | Linha em `advertisers` após elegibilidade; `ensureAdvertiserForUser` para outro usuário |
-| Pipeline | `createAdNormalized` + linha em `ads` (title, brand, model, year, `city_id`, `advertiser_id`, status, slug) |
-| Público | `ads.service.show(slug)` alinha com o banco |
-| Painel | `listOwnedAds` / `getOwnedAd` — dono vê; outro usuário não vê |
-| `city_id` | Segundo anúncio com outra cidade (seed ou INSERT no `beforeAll`) |
-| Schema opc. | INSERT com `fuel_type` inválido → `23514` se existir CHECK |
+| Área        | O que é exercitado                                                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Auth        | Login, refresh, logout invalida refresh                                                                                             |
+| Advertiser  | Linha em `advertisers` após elegibilidade; `ensureAdvertiserForUser` para outro usuário                                             |
+| Pipeline    | `createAdNormalized` + linha em `ads` (title, brand, model, year, `city_id`, `advertiser_id`, status, slug)                         |
+| Público     | `ads.service.show(slug)` alinha com o banco                                                                                         |
+| Painel      | `listOwnedAds` / `getOwnedAd` — dono vê; outro usuário não vê; com vários anúncios, a listagem inclui todos os IDs criados no teste |
+| `city_id`   | Segundo anúncio com outra cidade (seed ou INSERT no `beforeAll`)                                                                    |
+| Schema opc. | INSERT com `fuel_type` inválido → `23514` se existir CHECK                                                                          |
 
 `RUN_INTEGRATION_ADS_TESTS=1` é definido por `npm run test:integration:ads` e **força** a suíte mesmo com `SKIP_INTEGRATION_ADS=1` no `.env`.
 
 ## Variáveis (padrão, sem adivinhar)
 
-| Variável | Padrão usado pelos scripts |
-|----------|----------------------------|
+| Variável            | Padrão usado pelos scripts                                            |
+| ------------------- | --------------------------------------------------------------------- |
 | `TEST_DATABASE_URL` | `postgresql://postgres:postgres@127.0.0.1:5433/carros_na_cidade_test` |
-| `DATABASE_URL` | Igual a `TEST_DATABASE_URL` quando os scripts rodam a suíte |
+| `DATABASE_URL`      | Igual a `TEST_DATABASE_URL` quando os scripts rodam a suíte           |
 
 A porta **5433** no host evita conflito com um Postgres de desenvolvimento na **5432**.
 

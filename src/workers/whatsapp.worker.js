@@ -22,21 +22,14 @@ export async function startWhatsAppWorker() {
 
   const concurrency = Number(process.env.WHATSAPP_WORKER_CONCURRENCY || 5);
 
-  whatsappWorkerInstance = new Worker(
-    WHATSAPP_QUEUE_NAME,
-    async (job) => processWhatsAppJob(job),
-    {
-      connection: redisConnection,
-      concurrency,
-      autorun: true,
-    }
-  );
+  whatsappWorkerInstance = new Worker(WHATSAPP_QUEUE_NAME, async (job) => processWhatsAppJob(job), {
+    connection: redisConnection,
+    concurrency,
+    autorun: true,
+  });
 
   whatsappWorkerInstance.on("ready", () => {
-    logger.info(
-      { queue: WHATSAPP_QUEUE_NAME, concurrency },
-      "[whatsapp.worker] Worker pronto"
-    );
+    logger.info({ queue: WHATSAPP_QUEUE_NAME, concurrency }, "[whatsapp.worker] Worker pronto");
   });
 
   whatsappWorkerInstance.on("active", (job) => {

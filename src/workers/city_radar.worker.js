@@ -85,9 +85,7 @@ async function processarCidade(cidade) {
       [cidade.id, status, score]
     );
 
-    console.log(
-      `📍 ${cidade.name} → status: ${status} | score: ${score}`
-    );
+    console.log(`📍 ${cidade.name} → status: ${status} | score: ${score}`);
   } catch (err) {
     console.error("Erro no radar da cidade:", cidade.name, err);
   }

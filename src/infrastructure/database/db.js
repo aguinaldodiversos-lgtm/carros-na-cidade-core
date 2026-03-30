@@ -16,10 +16,7 @@ pool.on("connect", () => {
 });
 
 pool.on("error", (error) => {
-  logger.error(
-    { error: error?.message || String(error) },
-    "[db] erro inesperado no pool"
-  );
+  logger.error({ error: error?.message || String(error) }, "[db] erro inesperado no pool");
 });
 
 export async function query(text, params = []) {
@@ -81,10 +78,7 @@ export async function healthcheck() {
     const result = await pool.query("SELECT 1 AS ok");
     return result.rows?.[0]?.ok === 1;
   } catch (error) {
-    logger.error(
-      { error: error?.message || String(error) },
-      "[db] healthcheck falhou"
-    );
+    logger.error({ error: error?.message || String(error) }, "[db] healthcheck falhou");
     return false;
   }
 }
@@ -94,10 +88,7 @@ export async function closeDatabasePool() {
     await pool.end();
     logger.info("[db] pool encerrado");
   } catch (error) {
-    logger.error(
-      { error: error?.message || String(error) },
-      "[db] falha ao encerrar pool"
-    );
+    logger.error({ error: error?.message || String(error) }, "[db] falha ao encerrar pool");
     throw error;
   }
 }

@@ -78,7 +78,9 @@ export default function BoostCheckout({ adId, options, defaultOptionId }: BoostC
             <label
               key={option.id}
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
-                selected ? "border-[#0e62d8] bg-[#eef4ff]" : "border-[#dfe4ef] bg-white hover:bg-[#f9fbff]"
+                selected
+                  ? "border-[#0e62d8] bg-[#eef4ff]"
+                  : "border-[#dfe4ef] bg-white hover:bg-[#f9fbff]"
               }`}
             >
               <input
@@ -93,7 +95,9 @@ export default function BoostCheckout({ adId, options, defaultOptionId }: BoostC
                 <span className="block text-sm font-extrabold text-[#1f2a45]">{option.label}</span>
                 <span className="mt-0.5 block text-xs text-[#5b6680]">{option.description}</span>
               </span>
-              <strong className="text-base font-extrabold text-[#0e62d8]">{formatPrice(option.price)}</strong>
+              <strong className="text-base font-extrabold text-[#0e62d8]">
+                {formatPrice(option.price)}
+              </strong>
             </label>
           );
         })}
@@ -110,7 +114,11 @@ export default function BoostCheckout({ adId, options, defaultOptionId }: BoostC
         </div>
       )}
 
-      {error && <p className="mt-3 rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">{error}</p>}
+      {error && (
+        <p className="mt-3 rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">
+          {error}
+        </p>
+      )}
 
       <button
         type="button"

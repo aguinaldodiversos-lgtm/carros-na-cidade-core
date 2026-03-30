@@ -24,7 +24,9 @@ function isLocalhostUrl(url) {
 
 let redisInstance = null;
 const url = getRedisUrl();
-const isLocalDev = ["development", "dev", "local"].includes(String(process.env.NODE_ENV || "").toLowerCase());
+const isLocalDev = ["development", "dev", "local"].includes(
+  String(process.env.NODE_ENV || "").toLowerCase()
+);
 const skipLocalhost = !isLocalDev && isLocalhostUrl(url);
 
 if (url && !isRedisDisabled() && !skipLocalhost) {

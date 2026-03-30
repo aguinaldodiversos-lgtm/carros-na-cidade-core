@@ -30,9 +30,7 @@ async function getExecutedMigrations(client) {
 
 async function getMigrationFiles() {
   const files = await fs.readdir(MIGRATIONS_DIR);
-  return files
-    .filter((file) => file.endsWith(".sql"))
-    .sort((a, b) => a.localeCompare(b));
+  return files.filter((file) => file.endsWith(".sql")).sort((a, b) => a.localeCompare(b));
 }
 
 async function runMigrations() {
@@ -58,10 +56,7 @@ async function runMigrations() {
 
       await client.query("BEGIN");
       await client.query(sql);
-      await client.query(
-        `INSERT INTO schema_migrations (filename) VALUES ($1)`,
-        [file]
-      );
+      await client.query(`INSERT INTO schema_migrations (filename) VALUES ($1)`, [file]);
       await client.query("COMMIT");
 
       logger.info({ file }, "[db.migrate] Migration aplicada com sucesso");
@@ -71,7 +66,9 @@ async function runMigrations() {
   } catch (error) {
     try {
       await client.query("ROLLBACK");
-    } catch { /* rollback já falhou, ignora */ }
+    } catch {
+      /* rollback já falhou, ignora */
+    }
 
     logger.error({ error }, "[db.migrate] Erro ao aplicar migrations");
     throw error;

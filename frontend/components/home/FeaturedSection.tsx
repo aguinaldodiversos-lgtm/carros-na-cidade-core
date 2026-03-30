@@ -11,7 +11,9 @@ export default function FeaturedSection({ title, subtitle, cars }: FeaturedSecti
   return (
     <section className="mt-8">
       <header className="mb-4">
-        <h2 className="text-[28px] font-extrabold leading-tight text-[#1d2538] sm:text-[44px]">{title}</h2>
+        <h2 className="text-[28px] font-extrabold leading-tight text-[#1d2538] sm:text-[44px]">
+          {title}
+        </h2>
         <p className="mt-1 text-[19px] text-[#5f6880] sm:text-[32px]">{subtitle}</p>
       </header>
 

@@ -4,10 +4,7 @@ import http from "http";
 import app from "./app.js";
 import runMigrations from "./database/migrate.js";
 import { logger } from "./shared/logger.js";
-import {
-  startWorkersBootstrap,
-  stopWorkersBootstrap,
-} from "./workers/bootstrap.js";
+import { startWorkersBootstrap, stopWorkersBootstrap } from "./workers/bootstrap.js";
 import { closeWhatsAppQueue } from "./queues/whatsapp.queue.js";
 import { closeQueueRedisConnection } from "./infrastructure/queue/redis.connection.js";
 import { closeDatabasePool } from "./infrastructure/database/db.js";
@@ -15,10 +12,8 @@ import { closeDatabasePool } from "./infrastructure/database/db.js";
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
-const RUN_MIGRATIONS =
-  String(process.env.RUN_MIGRATIONS || "true").toLowerCase() === "true";
-const RUN_WORKERS =
-  String(process.env.RUN_WORKERS || "false").toLowerCase() === "true";
+const RUN_MIGRATIONS = String(process.env.RUN_MIGRATIONS || "true").toLowerCase() === "true";
+const RUN_WORKERS = String(process.env.RUN_WORKERS || "false").toLowerCase() === "true";
 const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS || 15000);
 
 let server = null;
@@ -81,10 +76,7 @@ async function gracefulShutdown(signal = "unknown") {
   shuttingDown = true;
 
   shutdownTimeout = setTimeout(() => {
-    logger.error(
-      { timeoutMs: SHUTDOWN_TIMEOUT_MS },
-      "[index] graceful shutdown timeout"
-    );
+    logger.error({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, "[index] graceful shutdown timeout");
     forceShutdown(1);
   }, SHUTDOWN_TIMEOUT_MS);
 

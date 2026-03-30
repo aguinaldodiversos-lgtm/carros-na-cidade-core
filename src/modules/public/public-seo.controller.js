@@ -18,10 +18,7 @@ export async function getPublicSitemap(req, res, next) {
 export async function getPublicSitemapByType(req, res, next) {
   try {
     const limit = Number(req.query.limit || 50000);
-    const data = await sitemapPublicService.getPublicSitemapByType(
-      req.params.type,
-      limit
-    );
+    const data = await sitemapPublicService.getPublicSitemapByType(req.params.type, limit);
 
     res.json({
       success: true,
@@ -35,10 +32,7 @@ export async function getPublicSitemapByType(req, res, next) {
 export async function getPublicSitemapByRegion(req, res, next) {
   try {
     const limit = Number(req.query.limit || 50000);
-    const data = await sitemapPublicService.getPublicSitemapByRegion(
-      req.params.state,
-      limit
-    );
+    const data = await sitemapPublicService.getPublicSitemapByRegion(req.params.state, limit);
 
     res.json({
       success: true,
@@ -52,10 +46,7 @@ export async function getPublicSitemapByRegion(req, res, next) {
 export async function getInternalLinks(req, res, next) {
   try {
     const limit = Number(req.query.limit || 200);
-    const data = await internalLinksPublicService.getInternalLinksByPath(
-      req.query.path,
-      limit
-    );
+    const data = await internalLinksPublicService.getInternalLinksByPath(req.query.path, limit);
 
     res.json({
       success: true,

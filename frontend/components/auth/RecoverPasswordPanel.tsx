@@ -79,11 +79,16 @@ export default function RecoverPasswordPanel() {
   return (
     <section className="mx-auto w-full max-w-xl space-y-5 rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_4px_22px_rgba(15,24,44,0.08)] sm:p-6">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6983]">Recuperacao de senha</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5f6983]">
+          Recuperacao de senha
+        </p>
         <h1 className="mt-1 text-2xl font-extrabold text-[#1d2538]">Recuperar acesso</h1>
       </div>
 
-      <form onSubmit={requestRecovery} className="space-y-3 rounded-xl border border-[#e2e7f1] bg-[#f8fafe] p-4">
+      <form
+        onSubmit={requestRecovery}
+        className="space-y-3 rounded-xl border border-[#e2e7f1] bg-[#f8fafe] p-4"
+      >
         <h2 className="text-base font-extrabold text-[#1d2538]">Solicitar link</h2>
         <input
           type="email"
@@ -102,7 +107,10 @@ export default function RecoverPasswordPanel() {
         </button>
       </form>
 
-      <form onSubmit={resetAccess} className="space-y-3 rounded-xl border border-[#e2e7f1] bg-[#f8fafe] p-4">
+      <form
+        onSubmit={resetAccess}
+        className="space-y-3 rounded-xl border border-[#e2e7f1] bg-[#f8fafe] p-4"
+      >
         <h2 className="text-base font-extrabold text-[#1d2538]">Redefinir senha</h2>
         <input
           type="text"
@@ -130,8 +138,16 @@ export default function RecoverPasswordPanel() {
         </button>
       </form>
 
-      {notice && <p className="rounded-xl border border-[#cfe8d9] bg-[#eefaf2] px-3 py-2 text-sm text-[#247046]">{notice}</p>}
-      {error && <p className="rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">{error}</p>}
+      {notice && (
+        <p className="rounded-xl border border-[#cfe8d9] bg-[#eefaf2] px-3 py-2 text-sm text-[#247046]">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p className="rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

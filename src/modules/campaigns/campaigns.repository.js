@@ -58,11 +58,7 @@ export async function listCampaignsByCity(cityId, limit = 20) {
   return result.rows;
 }
 
-export async function enqueueGrowthJob({
-  job_type,
-  payload,
-  priority = 3,
-}) {
+export async function enqueueGrowthJob({ job_type, payload, priority = 3 }) {
   await pool.query(
     `
     INSERT INTO growth_jobs (

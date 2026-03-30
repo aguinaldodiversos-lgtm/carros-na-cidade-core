@@ -43,14 +43,9 @@ async function runRegionalExpansion() {
       const leads = Number(row.leads_total || 0);
       const converted = Number(row.converted || 0);
 
-      const conversionRate =
-        leads > 0 ? (converted / leads) * 100 : 0;
+      const conversionRate = leads > 0 ? (converted / leads) * 100 : 0;
 
-      const decision = decideEffort(
-        Number(row.opportunity_score || 0),
-        conversionRate,
-        leads
-      );
+      const decision = decideEffort(Number(row.opportunity_score || 0), conversionRate, leads);
 
       await pool.query(
         `
@@ -67,16 +62,10 @@ async function runRegionalExpansion() {
           status = EXCLUDED.status,
           last_evaluated_at = NOW()
       `,
-        [
-          row.city_id,
-          decision.effort,
-          decision.status,
-        ]
+        [row.city_id, decision.effort, decision.status]
       );
 
-      console.log(
-        `Cidade ${row.city_id}: ${decision.effort} / ${decision.status}`
-      );
+      console.log(`Cidade ${row.city_id}: ${decision.effort} / ${decision.status}`);
     }
 
     console.log("✅ Regional expansion finalizado");

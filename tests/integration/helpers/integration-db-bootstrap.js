@@ -1,4 +1,5 @@
 import { INTEGRATION_TEST_DATABASE_URL_DEFAULT } from "./integration-test-constants.js";
+import { resetBrainAiStackForTests } from "../../../src/brain/orchestrator/brain-stack.js";
 
 /**
  * Executado no carregamento do `vitest.config.js` (antes dos testes).
@@ -30,7 +31,14 @@ export function applyVitestIntegrationEnv() {
     process.env.JWT_SECRET = "vitest-integration-jwt-secret-minimum-32-characters-long";
   }
   if (!String(process.env.JWT_REFRESH_SECRET || "").trim()) {
-    process.env.JWT_REFRESH_SECRET =
-      "vitest-integration-refresh-secret-minimum-32-chars-long";
+    process.env.JWT_REFRESH_SECRET = "vitest-integration-refresh-secret-minimum-32-chars-long";
+  }
+
+  // Suíte ads (runner define RUN_INTEGRATION_ADS_TESTS=1): IA só no gateway local, sem custo OpenAI.
+  if (process.env.RUN_INTEGRATION_ADS_TESTS === "1") {
+    if (!String(process.env.AI_MODE || "").trim()) {
+      process.env.AI_MODE = "local";
+    }
+    resetBrainAiStackForTests();
   }
 }

@@ -30,9 +30,7 @@ export async function startCityScoreWorker() {
 
   cityScoreStarted = true;
 
-  const intervalMs = Number(
-    process.env.CITY_SCORE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.CITY_SCORE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[city-score.worker] Inicializando worker");
 

@@ -9,7 +9,9 @@ const RESET_TOKEN_BYTES = Number(process.env.PASSWORD_RESET_TOKEN_BYTES || 32);
 const RESET_TOKEN_TTL_MIN = Number(process.env.PASSWORD_RESET_TOKEN_TTL_MIN || 60);
 
 function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
+  return String(email || "")
+    .trim()
+    .toLowerCase();
 }
 
 function sha256(input) {
@@ -51,10 +53,9 @@ export async function createPasswordResetToken(email) {
   const query = await getQuery();
 
   try {
-    const { rows } = await query(
-      `SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`,
-      [normalized]
-    );
+    const { rows } = await query(`SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`, [
+      normalized,
+    ]);
 
     // não enumerar usuários
     if (!rows?.length) return { ok: true };

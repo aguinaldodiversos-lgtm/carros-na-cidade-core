@@ -12,7 +12,10 @@ export async function resolveCity(req, res, next) {
       });
     }
 
-    const ufNorm = uf.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+    const ufNorm = uf
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 2);
 
     const row = await citiesService.resolveCityByNameAndUf(q, uf);
     if (!row) {

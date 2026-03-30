@@ -7,15 +7,13 @@ import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
 
 function normalizeSlugPart(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 export async function getCityModelPage(citySlug, brand, model, query = {}) {
-  const snapshot = await cityModelRepository.getCityModelSnapshot(
-    citySlug,
-    brand,
-    model
-  );
+  const snapshot = await cityModelRepository.getCityModelSnapshot(citySlug, brand, model);
 
   if (!snapshot || !snapshot.city_id) {
     throw new AppError("Página de modelo da cidade não encontrada", 404);

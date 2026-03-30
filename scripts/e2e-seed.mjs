@@ -15,8 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
 dotenv.config({ path: path.join(__dirname, "../.env.local"), override: true });
 
-const DEFAULT_TEST_DB =
-  "postgresql://postgres:postgres@127.0.0.1:5433/carros_na_cidade_test";
+const DEFAULT_TEST_DB = "postgresql://postgres:postgres@127.0.0.1:5433/carros_na_cidade_test";
 
 const conn =
   String(process.env.TEST_DATABASE_URL || "").trim() ||
@@ -72,10 +71,9 @@ if (updated.rowCount === 0) {
   );
 }
 
-const { rows } = await pool.query(
-  "SELECT id FROM users WHERE LOWER(email) = LOWER($1)",
-  [E2E_EMAIL]
-);
+const { rows } = await pool.query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [
+  E2E_EMAIL,
+]);
 const userId = rows[0]?.id != null ? String(rows[0].id) : null;
 if (!userId) {
   throw new Error("[e2e-seed] Falha ao resolver id do utilizador E2E.");

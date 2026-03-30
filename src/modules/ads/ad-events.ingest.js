@@ -17,12 +17,7 @@ export async function recordAdEvent(req, res, next) {
       INSERT INTO ad_events (ad_id, event_type, ip_address, user_agent)
       VALUES ($1,$2,$3,$4)
       `,
-      [
-        ad_id,
-        event_type,
-        req.ip,
-        req.headers["user-agent"] || null,
-      ]
+      [ad_id, event_type, req.ip, req.headers["user-agent"] || null]
     );
 
     res.json({ success: true });

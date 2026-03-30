@@ -8,10 +8,7 @@ import { buildDomainFields } from "../../shared/domainLog.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const keyPath = path.join(
-  __dirname,
-  "../../credentials/google-service-account.json"
-);
+const keyPath = path.join(__dirname, "../../credentials/google-service-account.json");
 
 const analyticsDataClient = new BetaAnalyticsDataClient({
   keyFilename: keyPath,
@@ -23,11 +20,7 @@ class GA4Collector {
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "city" }],
-      metrics: [
-        { name: "sessions" },
-        { name: "totalUsers" },
-        { name: "conversions" },
-      ],
+      metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "conversions" }],
     });
 
     for (const row of response.rows) {

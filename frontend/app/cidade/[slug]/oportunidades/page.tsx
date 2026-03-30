@@ -11,10 +11,8 @@ interface CityOpportunitiesPageProps {
 }
 
 const getCityOpportunitiesPageData = cache(
-  async (
-    slug: string,
-    searchParams: Record<string, string | string[] | undefined>
-  ) => fetchCityOpportunitiesTerritorialPage(slug, searchParams)
+  async (slug: string, searchParams: Record<string, string | string[] | undefined>) =>
+    fetchCityOpportunitiesTerritorialPage(slug, searchParams)
 );
 
 export async function generateMetadata({
@@ -29,10 +27,7 @@ export default async function CityOpportunitiesPage({
   params,
   searchParams,
 }: CityOpportunitiesPageProps) {
-  const initialData = await getCityOpportunitiesPageData(
-    params.slug,
-    searchParams
-  );
+  const initialData = await getCityOpportunitiesPageData(params.slug, searchParams);
 
   return (
     <>

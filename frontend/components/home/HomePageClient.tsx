@@ -89,8 +89,7 @@ function buildHeroSlides(cityName: string, citySlug: string): HeroSlide[] {
       id: "banner-otimizado",
       image: "/images/hero.jpeg",
       title: `Oportunidades em ${cityName} e arredores`,
-      subtitle:
-        "De seminovos a usados, com filtros que respeitam o território que você escolheu.",
+      subtitle: "De seminovos a usados, com filtros que respeitam o território que você escolheu.",
       ctaLabel: "Explorar ofertas",
       href: catalogHref,
     },
@@ -111,11 +110,7 @@ function normalizeCityLabel(item?: Pick<HomeAdItem, "city" | "state">) {
   return `${city} - ${state}`;
 }
 
-export function HomePageClient({
-  data,
-  activeCitySlug,
-  activeCityName,
-}: HomePageClientProps) {
+export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePageClientProps) {
   const currentCity = activeCityName || resolveCurrentCityName(data.featuredCities || []);
   const currentCitySlug = activeCitySlug || resolveCurrentCitySlug(data.featuredCities || []);
   const heroSlides = buildHeroSlides(currentCity, currentCitySlug);
@@ -245,7 +240,13 @@ export function HomePageClient({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 md:gap-5">
           <div className="rounded-[22px] border border-[#e6eaf2] bg-white px-5 py-6 shadow-[0_8px_28px_rgba(16,28,58,0.06)] md:px-6">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+              >
                 <path d="M12 3l7 3v5c0 5-3.3 8.8-7 10-3.7-1.2-7-5-7-10V6l7-3Z" />
                 <path d="m9.5 12 1.7 1.7 3.6-3.9" />
               </svg>
@@ -258,20 +259,33 @@ export function HomePageClient({
 
           <div className="rounded-[22px] border border-[#e6eaf2] bg-white px-5 py-6 shadow-[0_8px_28px_rgba(16,28,58,0.06)] md:px-6">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+              >
                 <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
                 <path d="M12 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
               </svg>
             </div>
             <h3 className="text-[18px] font-extrabold text-[#1f2940]">Cidade como eixo</h3>
             <p className="mt-2 text-[15px] leading-6 text-[#6a7388]">
-              Listagens e filtros pensados para o território que você escolheu — não um mapa genérico do país
+              Listagens e filtros pensados para o território que você escolheu — não um mapa
+              genérico do país
             </p>
           </div>
 
           <div className="rounded-[22px] border border-[#e6eaf2] bg-white px-5 py-6 shadow-[0_8px_28px_rgba(16,28,58,0.06)] md:px-6">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+              >
                 <path d="M4 7h16M7 4v6M17 4v6M5 11h14v8H5z" />
                 <path d="M8 15h8M8 18h5" />
               </svg>
@@ -284,14 +298,22 @@ export function HomePageClient({
 
           <div className="rounded-[22px] border border-[#e6eaf2] bg-white px-5 py-6 shadow-[0_8px_28px_rgba(16,28,58,0.06)] md:px-6">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+              >
                 <path d="M4 14 10 8l4 4 6-6" />
                 <path d="M20 10V4h-6" />
               </svg>
             </div>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-[18px] font-extrabold text-[#1f2940]">Visibilidade na região</h3>
+                <h3 className="text-[18px] font-extrabold text-[#1f2940]">
+                  Visibilidade na região
+                </h3>
                 <p className="mt-2 text-[15px] leading-6 text-[#6a7388]">
                   Publique com cidade e estado corretos e chegue a quem realmente pode ver o carro
                 </p>

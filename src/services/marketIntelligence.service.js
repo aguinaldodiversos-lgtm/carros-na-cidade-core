@@ -117,13 +117,9 @@ function generateRecommendations(opps) {
 
   opps.slice(0, 5).forEach((o) => {
     if (o.level === "critico") {
-      recs.push(
-        `Alta demanda por ${o.brand} ${o.model} em ${o.city}. Priorizar campanha local.`
-      );
+      recs.push(`Alta demanda por ${o.brand} ${o.model} em ${o.city}. Priorizar campanha local.`);
     } else if (o.level === "alto") {
-      recs.push(
-        `Boa oportunidade para ${o.brand} ${o.model} em ${o.city}.`
-      );
+      recs.push(`Boa oportunidade para ${o.brand} ${o.model} em ${o.city}.`);
     }
   });
 

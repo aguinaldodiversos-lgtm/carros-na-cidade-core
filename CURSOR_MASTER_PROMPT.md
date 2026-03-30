@@ -1,10 +1,12 @@
 # CURSOR MASTER PROMPT — CARROS NA CIDADE
 
 Leia obrigatoriamente os arquivos abaixo antes de qualquer alteração:
+
 - `PROJECT_RULES.md`
 - `AI_CONTEXT.md`
 
 Você está trabalhando no projeto **Carros na Cidade**, um portal automotivo regional de alta escala com foco em:
+
 - SEO local massivo
 - páginas territoriais dinâmicas
 - experiência premium de marketplace
@@ -13,6 +15,7 @@ Você está trabalhando no projeto **Carros na Cidade**, um portal automotivo re
 - integração robusta com APIs públicas
 
 ## Instruções obrigatórias
+
 - Respeite rigorosamente a arquitetura oficial do projeto
 - Não crie shell local em páginas públicas
 - Não crie estruturas paralelas
@@ -27,7 +30,9 @@ Você está trabalhando no projeto **Carros na Cidade**, um portal automotivo re
 - O footer oficial está em `components/shell/PublicFooter.tsx`
 
 ## Regra de trabalho
+
 Antes de implementar qualquer tarefa:
+
 1. identifique os arquivos envolvidos
 2. verifique se já existe módulo equivalente
 3. proponha mudanças mínimas e consistentes
@@ -35,6 +40,7 @@ Antes de implementar qualquer tarefa:
 5. evite retrabalho
 
 ## Regras de frontend
+
 - priorize server-first
 - use client components apenas para interações reais
 - filtros devem refletir query params
@@ -43,7 +49,9 @@ Antes de implementar qualquer tarefa:
 - mantenha padrão visual premium
 
 ## Regras visuais
+
 O portal deve parecer:
+
 - premium
 - moderno
 - confiável
@@ -51,9 +59,11 @@ O portal deve parecer:
 - comparável a grandes marketplaces automotivos
 
 ## Regra crítica
+
 Se existir ambiguidade entre uma solução rápida e uma solução consistente com a arquitetura do projeto, sempre escolha a solução consistente com a arquitetura.
 
 ## Forma de resposta esperada do agente
+
 - diga quais arquivos serão alterados
 - explique em uma frase o objetivo da alteração
 - faça apenas as mudanças necessárias

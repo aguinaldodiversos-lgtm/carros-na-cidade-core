@@ -16,13 +16,7 @@ function parseNumberInput(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-b border-[#edf1f6] pb-5 last:border-b-0 last:pb-0">
       <div className="mb-4 flex items-center justify-between">
@@ -80,9 +74,7 @@ function PillButton({
       type="button"
       onClick={onClick}
       className={`inline-flex items-center justify-between rounded-full px-4 py-2 text-sm font-semibold transition ${
-        active
-          ? "bg-[#edf4ff] text-[#0e62d8]"
-          : "bg-[#f5f7fb] text-[#475569] hover:bg-[#edf1f7]"
+        active ? "bg-[#edf4ff] text-[#0e62d8]" : "bg-[#f5f7fb] text-[#475569] hover:bg-[#edf1f7]"
       }`}
     >
       {children}
@@ -216,14 +208,22 @@ export function SearchFacetsSidebar({
 
       <Section title="O que te interessa ver hoje?">
         <div className="space-y-2">
-          <PillButton onClick={() => onChange({ sort: "year_desc", page: 1 })} active={filters.sort === "year_desc"}>
+          <PillButton
+            onClick={() => onChange({ sort: "year_desc", page: 1 })}
+            active={filters.sort === "year_desc"}
+          >
             <span>Mais novo</span>
             <span className="ml-4 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-[#7b8498]">
-              {(facets?.brands?.reduce((acc, item) => acc + item.total, 0) || 0).toLocaleString("pt-BR")}
+              {(facets?.brands?.reduce((acc, item) => acc + item.total, 0) || 0).toLocaleString(
+                "pt-BR"
+              )}
             </span>
           </PillButton>
 
-          <PillButton onClick={() => onChange({ sort: "price_asc", page: 1 })} active={filters.sort === "price_asc"}>
+          <PillButton
+            onClick={() => onChange({ sort: "price_asc", page: 1 })}
+            active={filters.sort === "price_asc"}
+          >
             <span>Mais barato</span>
             <span className="ml-4 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-[#7b8498]">
               130
@@ -274,7 +274,9 @@ export function SearchFacetsSidebar({
               }`}
             >
               <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm">
-                <span className="text-sm font-black text-[#556176]">{item.brand.slice(0, 2).toUpperCase()}</span>
+                <span className="text-sm font-black text-[#556176]">
+                  {item.brand.slice(0, 2).toUpperCase()}
+                </span>
               </div>
               <div className="mt-2 text-xs font-bold text-[#334155]">{item.brand}</div>
             </button>

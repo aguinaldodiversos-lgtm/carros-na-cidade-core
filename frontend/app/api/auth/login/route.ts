@@ -28,19 +28,13 @@ export async function POST(request: NextRequest) {
     const next = normalizeString(body.next);
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email e senha sao obrigatorios" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
     }
 
     const authSession = await authenticateUser(email, password);
 
     if (!authSession) {
-      return NextResponse.json(
-        { error: "Credenciais invalidas" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
     }
 
     if (
@@ -49,10 +43,7 @@ export async function POST(request: NextRequest) {
       !authSession.user.email ||
       !authSession.user.type
     ) {
-      return NextResponse.json(
-        { error: "Resposta de autenticacao invalida." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Resposta de autenticacao invalida." }, { status: 500 });
     }
 
     const sessionToken = createSessionToken({
@@ -73,19 +64,12 @@ export async function POST(request: NextRequest) {
       redirect_to: redirectTo,
     });
 
-    response.cookies.set(
-      AUTH_COOKIE_NAME,
-      sessionToken,
-      getSessionCookieOptions()
-    );
+    response.cookies.set(AUTH_COOKIE_NAME, sessionToken, getSessionCookieOptions());
 
     return response;
   } catch (error) {
     console.error("POST /api/auth/login error:", error);
 
-    return NextResponse.json(
-      { error: "Erro interno ao processar o login." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erro interno ao processar o login." }, { status: 500 });
   }
 }

@@ -8,14 +8,13 @@ async function calculateCityMetrics() {
   for (const city of cities.rows) {
     const cityId = city.id;
 
-    const ads = await pool.query(
-      `SELECT * FROM ads WHERE city_id = $1 AND status = 'active'`,
-      [cityId]
-    );
+    const ads = await pool.query(`SELECT * FROM ads WHERE city_id = $1 AND status = 'active'`, [
+      cityId,
+    ]);
 
     const totalAds = ads.rows.length;
 
-    const staleAds = ads.rows.filter(ad => {
+    const staleAds = ads.rows.filter((ad) => {
       const created = new Date(ad.created_at);
       const diff = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
       return diff > 30;
@@ -30,8 +29,7 @@ async function calculateCityMetrics() {
     const totalViews = parseInt(analytics.rows[0]?.views || 0);
     const totalLeads = parseInt(analytics.rows[0]?.leads || 0);
 
-    const conversionRate =
-      totalViews > 0 ? totalLeads / totalViews : 0;
+    const conversionRate = totalViews > 0 ? totalLeads / totalViews : 0;
 
     await pool.query(
       `
@@ -72,7 +70,7 @@ async function calculateCityMetrics() {
         totalAds ? totalViews / totalAds : 0,
         totalAds ? totalLeads / totalAds : 0,
         conversionRate,
-        0
+        0,
       ]
     );
   }

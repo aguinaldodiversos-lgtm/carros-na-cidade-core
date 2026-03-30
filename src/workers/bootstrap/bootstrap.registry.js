@@ -20,7 +20,7 @@ export const WORKERS_REGISTRY = [
     startExport: "startSeoWorker",
     stopExport: "stopSeoWorker",
   },
-    {
+  {
     name: "Money Pages Worker",
     env: "RUN_WORKER_MONEY_PAGES",
     defaultValue: "false",
@@ -44,7 +44,7 @@ export const WORKERS_REGISTRY = [
     startExport: "startSeoPublishingWorker",
     stopExport: "stopSeoPublishingWorker",
   },
-    {
+  {
     name: "Sitemap Worker",
     env: "RUN_WORKER_SITEMAP",
     defaultValue: "false",

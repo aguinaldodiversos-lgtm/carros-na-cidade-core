@@ -7,11 +7,7 @@ export const metadata: Metadata = {
   description: "Painel do anunciante — Carros na Cidade.",
 };
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requirePfDashboardSession();
 
   return (

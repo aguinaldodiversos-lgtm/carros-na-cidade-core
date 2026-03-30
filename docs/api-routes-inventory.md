@@ -25,40 +25,40 @@ Todas as integrações novas devem usar **exclusivamente** estes prefixos e mód
 
 ### Raiz e probes
 
-| Método | Caminho | Origem |
-|--------|---------|--------|
-| `HEAD` | `/` | `app.js` |
-| `GET` | `/` | `app.js` (JSON meta) |
-| `GET` | `/health/meta` | `app.js` |
+| Método | Caminho        | Origem               |
+| ------ | -------------- | -------------------- |
+| `HEAD` | `/`            | `app.js`             |
+| `GET`  | `/`            | `app.js` (JSON meta) |
+| `GET`  | `/health/meta` | `app.js`             |
 
 ### Infra
 
-| Método | Caminho | Router |
-|--------|---------|--------|
-| `GET` | `/health` | `src/routes/health.js` |
-| `GET` | `/metrics` | `src/routes/metrics.js` |
+| Método | Caminho    | Router                  |
+| ------ | ---------- | ----------------------- |
+| `GET`  | `/health`  | `src/routes/health.js`  |
+| `GET`  | `/metrics` | `src/routes/metrics.js` |
 
 ### `/api/public` — `src/modules/public/public.routes.js`
 
-| Método | Caminho | Notas |
-|--------|---------|--------|
-| `GET` | `/api/public/home` | |
-| `GET` | `/api/public/cities/resolve` | |
-| `GET` | `/api/public/cities/search` | |
-| `GET` | `/api/public/cities/by-id/:id` | |
-| `GET` | `/api/public/cities/:slug` | |
-| `GET` | `/api/public/cities/:slug/brand/:brand` | |
-| `GET` | `/api/public/cities/:slug/brand/:brand/model/:model` | |
-| `GET` | `/api/public/cities/:slug/opportunities` | |
-| `GET` | `/api/public/cities/:slug/below-fipe` | |
+| Método | Caminho                                              | Notas |
+| ------ | ---------------------------------------------------- | ----- |
+| `GET`  | `/api/public/home`                                   |       |
+| `GET`  | `/api/public/cities/resolve`                         |       |
+| `GET`  | `/api/public/cities/search`                          |       |
+| `GET`  | `/api/public/cities/by-id/:id`                       |       |
+| `GET`  | `/api/public/cities/:slug`                           |       |
+| `GET`  | `/api/public/cities/:slug/brand/:brand`              |       |
+| `GET`  | `/api/public/cities/:slug/brand/:brand/model/:model` |       |
+| `GET`  | `/api/public/cities/:slug/opportunities`             |       |
+| `GET`  | `/api/public/cities/:slug/below-fipe`                |       |
 
 ### `/api/public/seo` — `src/modules/public/public-seo.routes.js`
 
 Prefixo efetivo: `/api/public/seo` (montado em `app.use("/api/public/seo", publicSeoRoutes)`).
 
-| Método | Caminho completo (exemplos) |
-|--------|-----------------------------|
-| `GET` | `/api/public/seo/sitemap`, `/sitemap/type/:type`, `/sitemap/region/:state`, `/internal-links`, `/sitemap.xml` |
+| Método | Caminho completo (exemplos)                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/public/seo/sitemap`, `/sitemap/type/:type`, `/sitemap/region/:state`, `/internal-links`, `/sitemap.xml` |
 
 ### `/api/auth` — `src/modules/auth/auth.routes.js`
 
@@ -82,10 +82,10 @@ Inclui: `GET /facets`, `/search`, `/`, `GET /:identifier`, `POST /`, `PUT/DELETE
 
 ### Eventos de anúncio (`ad_events`)
 
-| URL | Router | Implementação |
-|-----|--------|----------------|
+| URL                   | Router                 | Implementação                           |
+| --------------------- | ---------------------- | --------------------------------------- |
 | `POST /api/ads/event` | `ads.events.routes.js` | `ad-events.ingest.js` → `recordAdEvent` |
-| `POST /api/events` | `events.routes.js` | **Mesmo handler** (`recordAdEvent`) |
+| `POST /api/events`    | `events.routes.js`     | **Mesmo handler** (`recordAdEvent`)     |
 
 O frontend usa **`/api/ads/event`**. `POST /api/events` permanece por compatibilidade; qualquer mudança na regra de insert deve ser feita só em `src/modules/ads/ad-events.ingest.js`.
 

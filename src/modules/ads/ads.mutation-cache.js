@@ -1,6 +1,4 @@
-import {
-  cacheInvalidatePrefix,
-} from "../../shared/cache/cache.middleware.js";
+import { cacheInvalidatePrefix } from "../../shared/cache/cache.middleware.js";
 
 /**
  * Invalidação de caches após mutação de anúncios (listas, facets, autocomplete).

@@ -27,10 +27,7 @@ async function listMigrationFiles() {
 }
 
 async function hasMigration(client, id) {
-  const result = await client.query(
-    `SELECT 1 FROM schema_migrations WHERE id = $1 LIMIT 1`,
-    [id]
-  );
+  const result = await client.query(`SELECT 1 FROM schema_migrations WHERE id = $1 LIMIT 1`, [id]);
 
   return result.rowCount > 0;
 }
@@ -52,10 +49,9 @@ async function runSingleMigration(client, filename) {
   await client.query("BEGIN");
   try {
     await client.query(sql);
-    await client.query(
-      `INSERT INTO schema_migrations (id, executed_at) VALUES ($1, NOW())`,
-      [migrationId]
-    );
+    await client.query(`INSERT INTO schema_migrations (id, executed_at) VALUES ($1, NOW())`, [
+      migrationId,
+    ]);
     await client.query("COMMIT");
 
     logger.info({ migrationId }, "[migrate] migration aplicada com sucesso");

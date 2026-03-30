@@ -42,24 +42,15 @@ export async function POST(request: NextRequest) {
         : undefined;
 
     if (!name) {
-      return NextResponse.json(
-        { error: "Nome é obrigatório." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Nome é obrigatório." }, { status: 400 });
     }
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email e senha sao obrigatorios" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
     }
 
     if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Senha deve ter no minimo 6 caracteres" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Senha deve ter no minimo 6 caracteres" }, { status: 400 });
     }
 
     if ((documentType && !documentNumber) || (!documentType && documentNumber)) {
@@ -96,10 +87,7 @@ export async function POST(request: NextRequest) {
       !authSession.accessToken ||
       !authSession.refreshToken
     ) {
-      return NextResponse.json(
-        { error: "Resposta de autenticacao invalida." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Resposta de autenticacao invalida." }, { status: 500 });
     }
 
     const sessionToken = createSessionToken({
@@ -113,25 +101,15 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       user: authSession.user,
-      redirect_to: resolvePostLoginRedirect(
-        authSession.user.type,
-        next || undefined
-      ),
+      redirect_to: resolvePostLoginRedirect(authSession.user.type, next || undefined),
     });
 
-    response.cookies.set(
-      AUTH_COOKIE_NAME,
-      sessionToken,
-      getSessionCookieOptions()
-    );
+    response.cookies.set(AUTH_COOKIE_NAME, sessionToken, getSessionCookieOptions());
 
     return response;
   } catch (error) {
     console.error("POST /api/auth/register error:", error);
 
-    return NextResponse.json(
-      { error: "Erro interno ao processar o cadastro." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erro interno ao processar o cadastro." }, { status: 500 });
   }
 }

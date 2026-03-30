@@ -1,7 +1,23 @@
 function normalizeStage(stage) {
-  return stage || "discovery";
+  const s = String(stage || "discovery")
+    .toLowerCase()
+    .trim();
+  const known = new Set([
+    "discovery",
+    "seed",
+    "expansion",
+    "dominance",
+    "optimization",
+    "maturity",
+  ]);
+  if (!s) return "discovery";
+  return known.has(s) ? s : s;
 }
 
+/**
+ * Política de roteamento local vs premium por estágio do território e tipo de tarefa.
+ * Objetivo: operação rápida barata (local) por defeito; premium quando o impacto de receita/SEO justifica.
+ */
 export function resolveAiStagePolicy({ stage, task, forcePremium = false }) {
   const normalizedStage = normalizeStage(stage);
 
@@ -77,7 +93,40 @@ export function resolveAiStagePolicy({ stage, task, forcePremium = false }) {
     };
   }
 
+  if (task === "banner_prompt_only") {
+    if (normalizedStage === "dominance" || normalizedStage === "expansion") {
+      return {
+        preferredMode: "premium",
+        allowPremium: true,
+        quality: "high",
+        reason: "BANNER_CREATIVE_HIGH_STAGE",
+      };
+    }
+    if (normalizedStage === "seed") {
+      return {
+        preferredMode: "local",
+        allowPremium: false,
+        quality: "medium",
+        reason: "BANNER_CREATIVE_SEED",
+      };
+    }
+    return {
+      preferredMode: "local",
+      allowPremium: true,
+      quality: "medium",
+      reason: "BANNER_CREATIVE_DEFAULT",
+    };
+  }
+
   if (task === "ad_description_short") {
+    if (normalizedStage === "dominance" || normalizedStage === "optimization") {
+      return {
+        preferredMode: "local",
+        allowPremium: true,
+        quality: "high",
+        reason: "DESCRIPTION_HOT_MARKET_OPTIONAL_PREMIUM",
+      };
+    }
     return {
       preferredMode: "local",
       allowPremium: false,

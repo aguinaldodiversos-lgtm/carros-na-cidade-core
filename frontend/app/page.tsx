@@ -31,8 +31,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
       : null;
 
   const cityIdForHome =
-    resolved?.id ??
-    (fromCookie?.slug === activeSlug ? fromCookie.id : undefined);
+    resolved?.id ?? (fromCookie?.slug === activeSlug ? fromCookie.id : undefined);
 
   const data = await fetchPublicHomeData(activeSlug, cityIdForHome);
 
@@ -46,10 +45,6 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
   const activeCitySlug = activeSlug;
 
   return (
-    <HomePageClient
-      data={data}
-      activeCitySlug={activeCitySlug}
-      activeCityName={activeCityName}
-    />
+    <HomePageClient data={data} activeCitySlug={activeCitySlug} activeCityName={activeCityName} />
   );
 }

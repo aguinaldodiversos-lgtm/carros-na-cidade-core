@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type {
-  BlogCategory,
-  BlogPageContent,
-  BlogPost,
-} from "@/lib/blog/blog-page";
+import type { BlogCategory, BlogPageContent, BlogPost } from "@/lib/blog/blog-page";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogPageClientProps {
@@ -95,13 +91,7 @@ function CategoryIcon({ type }: { type?: BlogCategory["icon"] }) {
   );
 }
 
-function EmptyState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="rounded-[20px] border border-dashed border-[#D8DFEC] bg-white px-6 py-10 text-center shadow-[0_8px_24px_rgba(20,30,60,0.04)]">
       <h3 className="text-[22px] font-extrabold text-[#1D2440]">{title}</h3>
@@ -135,9 +125,7 @@ function BlogPostCard({
     <article className="overflow-hidden rounded-[20px] border border-[#E7EAF3] bg-white shadow-[0_12px_28px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(20,30,60,0.10)]">
       <Link href={href} className="block">
         <div
-          className={`overflow-hidden ${
-            featured ? "aspect-[1.26/0.74]" : "aspect-[1.12/0.78]"
-          }`}
+          className={`overflow-hidden ${featured ? "aspect-[1.26/0.74]" : "aspect-[1.12/0.78]"}`}
         >
           <img
             src={coverImage}
@@ -160,9 +148,7 @@ function BlogPostCard({
             {title}
           </h3>
 
-          <p className="mt-3 text-[15px] text-[#7A8197]">
-            {formatDate(post.publishedAt)}
-          </p>
+          <p className="mt-3 text-[15px] text-[#7A8197]">{formatDate(post.publishedAt)}</p>
 
           <p className="mt-3 text-[16px] leading-7 text-[#636C82]">{excerpt}</p>
 
@@ -184,13 +170,7 @@ function BlogPostCard({
   );
 }
 
-function SidebarCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function SidebarCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[20px] border border-[#E7EAF3] bg-white p-5 shadow-[0_12px_28px_rgba(20,30,60,0.06)]">
       <h3 className="text-[22px] font-extrabold text-[#1D2440]">{title}</h3>
@@ -220,40 +200,19 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
     content.bottomBanner?.subtitle,
     `Anuncie grátis em ${cityName} e fale direto com compradores da sua cidade.`
   );
-  const bottomBannerImage = toSafeImage(
-    content.bottomBanner?.image,
-    FALLBACK_BOTTOM_BANNER_IMAGE
-  );
-  const bottomBannerHref = normalizeHref(
-    content.bottomBanner?.ctaHref,
-    FALLBACK_PLANOS_HREF
-  );
-  const bottomBannerCta = toText(
-    content.bottomBanner?.ctaLabel,
-    "Criar anúncio grátis"
-  );
+  const bottomBannerImage = toSafeImage(content.bottomBanner?.image, FALLBACK_BOTTOM_BANNER_IMAGE);
+  const bottomBannerHref = normalizeHref(content.bottomBanner?.ctaHref, FALLBACK_PLANOS_HREF);
+  const bottomBannerCta = toText(content.bottomBanner?.ctaLabel, "Criar anúncio grátis");
 
-  const sidebarTitle = toText(
-    content.sidebarSaleCta?.title,
-    "Anuncie seu carro grátis"
-  );
+  const sidebarTitle = toText(content.sidebarSaleCta?.title, "Anuncie seu carro grátis");
   const sidebarSubtitle = toText(
     content.sidebarSaleCta?.subtitle,
     "Venda fácil e segura na sua cidade."
   );
-  const sidebarHref = normalizeHref(
-    content.sidebarSaleCta?.ctaHref,
-    FALLBACK_PLANOS_HREF
-  );
-  const sidebarCta = toText(
-    content.sidebarSaleCta?.ctaLabel,
-    "Criar anúncio grátis"
-  );
+  const sidebarHref = normalizeHref(content.sidebarSaleCta?.ctaHref, FALLBACK_PLANOS_HREF);
+  const sidebarCta = toText(content.sidebarSaleCta?.ctaLabel, "Criar anúncio grátis");
 
-  const newsletterTitle = toText(
-    content.newsletter?.title,
-    "Receba as últimas"
-  );
+  const newsletterTitle = toText(content.newsletter?.title, "Receba as últimas");
   const newsletterSubtitle = toText(
     content.newsletter?.subtitle,
     "Dicas e novidades de automóveis na sua cidade."
@@ -262,10 +221,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
     content.newsletter?.placeholder,
     "Digite seu melhor email aqui"
   );
-  const newsletterCta = toText(
-    content.newsletter?.ctaLabel,
-    "Quero Receber"
-  );
+  const newsletterCta = toText(content.newsletter?.ctaLabel, "Quero Receber");
 
   const safeCategories = useMemo(() => {
     return Array.isArray(content.categories) ? content.categories : [];
@@ -323,9 +279,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
     : allPosts.length;
 
   const hasNoSearchResults =
-    normalizedQuery.length > 0 &&
-    filteredFeatured.length === 0 &&
-    filteredPopular.length === 0;
+    normalizedQuery.length > 0 && filteredFeatured.length === 0 && filteredPopular.length === 0;
 
   return (
     <main className="bg-[#F5F7FC]">
@@ -394,12 +348,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
                 {filteredFeatured.length > 0 ? (
                   <div className="grid gap-5 md:grid-cols-2">
                     {filteredFeatured.map((post) => (
-                      <BlogPostCard
-                        key={post.id}
-                        post={post}
-                        citySlug={citySlug}
-                        featured
-                      />
+                      <BlogPostCard key={post.id} post={post} citySlug={citySlug} featured />
                     ))}
                   </div>
                 ) : (
@@ -418,11 +367,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
                 {filteredPopular.length > 0 ? (
                   <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {filteredPopular.map((post) => (
-                      <BlogPostCard
-                        key={post.id}
-                        post={post}
-                        citySlug={citySlug}
-                      />
+                      <BlogPostCard key={post.id} post={post} citySlug={citySlug} />
                     ))}
                   </div>
                 ) : (
@@ -439,9 +384,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
 
           <aside className="space-y-5">
             <SidebarCard title={sidebarTitle}>
-              <p className="text-[18px] leading-8 text-[#5E6880]">
-                {sidebarSubtitle}
-              </p>
+              <p className="text-[18px] leading-8 text-[#5E6880]">{sidebarSubtitle}</p>
 
               <Link
                 href={sidebarHref}
@@ -452,9 +395,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
             </SidebarCard>
 
             <SidebarCard title={newsletterTitle}>
-              <p className="text-[18px] leading-8 text-[#5E6880]">
-                {newsletterSubtitle}
-              </p>
+              <p className="text-[18px] leading-8 text-[#5E6880]">{newsletterSubtitle}</p>
 
               <input
                 placeholder={newsletterPlaceholder}
@@ -521,9 +462,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
               <h2 className="text-[30px] font-extrabold leading-tight text-white md:text-[44px]">
                 {bottomBannerTitle}
               </h2>
-              <p className="mt-4 text-[18px] leading-8 text-white/85">
-                {bottomBannerSubtitle}
-              </p>
+              <p className="mt-4 text-[18px] leading-8 text-white/85">{bottomBannerSubtitle}</p>
             </div>
 
             <Link

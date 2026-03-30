@@ -67,7 +67,10 @@ export async function listTopCitiesByDemand(limit = 20) {
     );
     return result.rows;
   } catch (err) {
-    logger.error({ err: err?.message || String(err) }, "[cities.repository] listTopCitiesByDemand falhou");
+    logger.error(
+      { err: err?.message || String(err) },
+      "[cities.repository] listTopCitiesByDemand falhou"
+    );
     return [];
   }
 }
@@ -95,9 +98,7 @@ export async function findCitiesByStateVariants(ufNorm) {
     ? `COALESCE(cs.ranking_priority, 0) DESC, COALESCE(cs.territorial_score, 0) DESC, c.name ASC`
     : `c.name ASC`;
 
-  const joinScores = hasScores
-    ? `LEFT JOIN city_scores cs ON cs.city_id = c.id`
-    : "";
+  const joinScores = hasScores ? `LEFT JOIN city_scores cs ON cs.city_id = c.id` : "";
 
   const selectScores = hasScores
     ? `COALESCE(cs.ranking_priority, 0) AS ranking_priority,
@@ -244,7 +245,10 @@ export async function listCitiesForExpansion(limit = 100) {
     );
     return result.rows;
   } catch (err) {
-    logger.error({ err: err?.message || String(err) }, "[cities.repository] listCitiesForExpansion falhou");
+    logger.error(
+      { err: err?.message || String(err) },
+      "[cities.repository] listCitiesForExpansion falhou"
+    );
     return [];
   }
 }

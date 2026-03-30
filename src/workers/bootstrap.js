@@ -1,8 +1,5 @@
 import { logger } from "../shared/logger.js";
-import {
-  startWorkersBootstrap,
-  stopWorkersBootstrap,
-} from "./bootstrap/bootstrap.service.js";
+import { startWorkersBootstrap, stopWorkersBootstrap } from "./bootstrap/bootstrap.service.js";
 
 export { startWorkersBootstrap, stopWorkersBootstrap };
 

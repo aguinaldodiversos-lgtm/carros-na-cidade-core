@@ -1,11 +1,7 @@
 import crypto from "crypto";
 import { pool } from "../../../infrastructure/database/db.js";
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
-import {
-  signAccessToken,
-  signRefreshToken,
-  newJti,
-} from "../token/token.signer.js";
+import { signAccessToken, signRefreshToken, newJti } from "../token/token.signer.js";
 import { hashRefreshToken } from "../token/token.hash.js";
 
 const DEFAULT_REFRESH_TTL_DAYS = 30;
@@ -20,10 +16,7 @@ function parsePositiveNumber(value, fallback) {
 }
 
 function refreshExpiresAt() {
-  const ttlDays = parsePositiveNumber(
-    process.env.REFRESH_TOKEN_TTL_DAYS,
-    DEFAULT_REFRESH_TTL_DAYS
-  );
+  const ttlDays = parsePositiveNumber(process.env.REFRESH_TOKEN_TTL_DAYS, DEFAULT_REFRESH_TTL_DAYS);
 
   const date = new Date();
   date.setDate(date.getDate() + ttlDays);

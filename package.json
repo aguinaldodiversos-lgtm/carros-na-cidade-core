@@ -13,7 +13,11 @@
     "workers:debug": "node --inspect src/workers/bootstrap.js",
     "lint": "eslint src scripts --ext .js,.mjs",
     "lint:fix": "eslint src scripts --ext .js,.mjs --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit:deps": "npm audit --audit-level=high",
     "test": "vitest run --exclude tests/integration/**",
+    "test:coverage": "vitest run --exclude tests/integration/** --coverage",
     "integration:db:up": "docker compose -f docker-compose.test.yml up -d",
     "integration:db:down": "docker compose -f docker-compose.test.yml down",
     "integration:db:wait": "node scripts/wait-for-postgres.mjs",
@@ -40,13 +44,19 @@
     "audit:integration": "node ./scripts/project-audit.mjs --scope=integration",
     "audit:contract": "node ./scripts/project-audit.mjs --scope=integration",
     "audit:jsx-ts": "node ./scripts/project-audit.mjs --scope=jsx-ts",
+    "env:keys": "node scripts/list-env-keys.mjs",
+    "audit:integrity": "node scripts/system-integrity-scan.mjs",
+    "audit:clones": "jscpd src frontend --config .jscpd.json",
+    "audit:system": "npm run audit:integrity && npm run audit:clones",
     "check": "npm run lint && npm run test",
     "verify": "npm run check && npm run audit:project",
     "test:e2e": "npm run test:e2e --prefix frontend",
     "test:e2e:main": "npm run test:e2e:main --prefix frontend",
     "e2e": "npm run test:e2e --prefix frontend",
+    "e2e:smoke": "npm run test:e2e:smoke --prefix frontend",
     "e2e:prepare": "npm run integration:db:up && npm run integration:db:wait && npm run integration:db:prepare && node scripts/e2e-seed.mjs",
-    "test:frontend": "npm run test --prefix frontend"
+    "test:frontend": "npm run test --prefix frontend",
+    "test:frontend:coverage": "npm run test:coverage --prefix frontend"
   },
   "engines": {
     "node": ">=20 <21"
@@ -75,7 +85,10 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^8.57.0",
+    "jscpd": "^3.5.10",
+    "prettier": "^3.4.2",
     "vitest": "^2.1.0"
   }
 }

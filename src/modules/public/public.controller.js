@@ -7,7 +7,10 @@ async function safeQuery(label, fn) {
   try {
     return await fn();
   } catch (err) {
-    logger.warn({ err: err?.message || String(err), label }, "[public.controller] parte da home falhou");
+    logger.warn(
+      { err: err?.message || String(err), label },
+      "[public.controller] parte da home falhou"
+    );
     return null;
   }
 }

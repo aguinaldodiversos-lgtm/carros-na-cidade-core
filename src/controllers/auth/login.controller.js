@@ -11,10 +11,9 @@ module.exports = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const result = await pool.query(
-      "SELECT id, password_hash FROM users WHERE email = $1",
-      [email]
-    );
+    const result = await pool.query("SELECT id, password_hash FROM users WHERE email = $1", [
+      email,
+    ]);
 
     const user = result.rows[0];
 
@@ -32,11 +31,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     res.json({ token });
   } catch (err) {

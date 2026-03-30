@@ -5,10 +5,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const keyPath = path.join(
-  __dirname,
-  "../../credentials/google-service-account.json"
-);
+const keyPath = path.join(__dirname, "../../credentials/google-service-account.json");
 
 const SCOPES = [
   "https://www.googleapis.com/auth/webmasters.readonly",

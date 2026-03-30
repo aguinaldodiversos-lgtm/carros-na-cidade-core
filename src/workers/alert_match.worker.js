@@ -49,9 +49,7 @@ async function processAd(ad) {
 
     if (alerts.length === 0) return;
 
-    console.log(
-      `📣 ${alerts.length} alerts compatíveis para anúncio ${ad.id}`
-    );
+    console.log(`📣 ${alerts.length} alerts compatíveis para anúncio ${ad.id}`);
 
     for (const alert of alerts) {
       const message = `

@@ -10,9 +10,7 @@ interface TerritorialInternalLinksSectionProps {
   data: TerritorialPagePayload;
 }
 
-export function TerritorialInternalLinksSection({
-  data,
-}: TerritorialInternalLinksSectionProps) {
+export function TerritorialInternalLinksSection({ data }: TerritorialInternalLinksSectionProps) {
   const groups = buildTerritorialInternalLinkGroups(data);
 
   if (!groups.length) return null;
@@ -22,9 +20,7 @@ export function TerritorialInternalLinksSection({
   return (
     <section className="space-y-5 rounded-[22px] border border-[#E5E9F2] bg-white p-5 shadow-[0_10px_24px_rgba(20,30,60,0.05)]">
       <div>
-        <h2 className="text-[17px] font-extrabold text-[#1D2440]">
-          Continuar em {cityName}
-        </h2>
+        <h2 className="text-[17px] font-extrabold text-[#1D2440]">Continuar em {cityName}</h2>
         <p className="mt-1 text-sm leading-relaxed text-[#6E748A]">
           Rotas relacionadas a partir deste território: marcas, modelos e oportunidades alinhadas à
           mesma região.
@@ -33,10 +29,7 @@ export function TerritorialInternalLinksSection({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {groups.map((group) => (
-          <div
-            key={group.title}
-            className="rounded-2xl border border-[#EEF1F6] bg-[#F8FAFC] p-4"
-          >
+          <div key={group.title} className="rounded-2xl border border-[#EEF1F6] bg-[#F8FAFC] p-4">
             <h3 className="text-sm font-bold text-[#33405A]">{group.title}</h3>
 
             <div className="mt-3 flex flex-col gap-2">

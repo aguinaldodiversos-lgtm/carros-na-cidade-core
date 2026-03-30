@@ -45,11 +45,7 @@ export function listFipeModels(vehicleType: FipeVehicleType, brandCode: string) 
   );
 }
 
-export function listFipeYears(
-  vehicleType: FipeVehicleType,
-  brandCode: string,
-  modelCode: string
-) {
+export function listFipeYears(vehicleType: FipeVehicleType, brandCode: string, modelCode: string) {
   return requestJson<FipeOption[]>(
     `/api/fipe/years/${encodeURIComponent(brandCode)}/${encodeURIComponent(
       modelCode

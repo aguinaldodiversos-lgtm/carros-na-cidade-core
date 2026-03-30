@@ -110,10 +110,7 @@ function buildContactFieldsForAdvertiser(contact, advertiserCols) {
 export async function resolveCityIdForNewAdvertiser(userId, explicitCityId) {
   if (explicitCityId != null && !Number.isNaN(Number(explicitCityId))) {
     const cid = Number(explicitCityId);
-    const { rows } = await pool.query(
-      `SELECT id FROM cities WHERE id = $1 LIMIT 1`,
-      [cid]
-    );
+    const { rows } = await pool.query(`SELECT id FROM cities WHERE id = $1 LIMIT 1`, [cid]);
     if (rows[0]?.id != null) {
       return Number(rows[0].id);
     }
@@ -121,9 +118,7 @@ export async function resolveCityIdForNewAdvertiser(userId, explicitCityId) {
 
   const usersCols = await getUsersColumnSet();
   if (hasColumn(usersCols, "city")) {
-    const u = await pool.query(`SELECT city FROM users WHERE id = $1 LIMIT 1`, [
-      userId,
-    ]);
+    const u = await pool.query(`SELECT city FROM users WHERE id = $1 LIMIT 1`, [userId]);
     const cityText = String(u.rows[0]?.city || "").trim();
     if (cityText.length >= 2) {
       const token = cityText.split(/[-–—,\s]+/)[0]?.trim();
@@ -144,9 +139,7 @@ export async function resolveCityIdForNewAdvertiser(userId, explicitCityId) {
     }
   }
 
-  const { rows: fb } = await pool.query(
-    `SELECT id FROM cities ORDER BY id ASC LIMIT 1`
-  );
+  const { rows: fb } = await pool.query(`SELECT id FROM cities ORDER BY id ASC LIMIT 1`);
   if (!fb[0]?.id) {
     throw new AppError(
       "Nenhuma cidade cadastrada no sistema. Importe cidades (ex.: seed IBGE) antes de usar anunciantes.",
@@ -185,9 +178,7 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
   ]);
 
   return withTransaction(async (client) => {
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [
-      String(userId),
-    ]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [String(userId)]);
 
     const existing = await client.query(
       `SELECT id, user_id FROM advertisers WHERE user_id = $1 LIMIT 1`,
@@ -198,9 +189,7 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
       return existing.rows[0];
     }
 
-    const contactCols = USER_CONTACT_COLUMN_PRIORITY.filter((c) =>
-      usersCols.has(c)
-    );
+    const contactCols = USER_CONTACT_COLUMN_PRIORITY.filter((c) => usersCols.has(c));
     let contactRow = {};
     if (contactCols.length) {
       const cr = await client.query(
@@ -219,9 +208,7 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
     const contactFields = buildContactFieldsForAdvertiser(contact, advertiserCols);
 
     const displayName = account.name?.trim() || "Anunciante";
-    const baseSlug = (
-      slugify(`${displayName}-${userId}`) || `anunciante-${userId}`
-    ).slice(0, 120);
+    const baseSlug = (slugify(`${displayName}-${userId}`) || `anunciante-${userId}`).slice(0, 120);
 
     const isLojista = account.type === "CNPJ";
 
@@ -230,9 +217,10 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
       city_id: Number(cityId),
       name: displayName,
       company_name: isLojista ? displayName : null,
-      email: String(account.email || "")
-        .trim()
-        .toLowerCase() || null,
+      email:
+        String(account.email || "")
+          .trim()
+          .toLowerCase() || null,
       plan: account.raw_plan || "free",
       status: "active",
       verified: false,
@@ -257,10 +245,7 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
     }
 
     if (!hasColumn(advertiserCols, "slug")) {
-      throw new AppError(
-        "Schema de anunciantes incompatível (coluna slug ausente).",
-        500
-      );
+      throw new AppError("Schema de anunciantes incompatível (coluna slug ausente).", 500);
     }
 
     const maxAttempts = 8;
@@ -321,10 +306,7 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
 export async function ensureAdvertiserForPublishing(userId, context = {}) {
   const cityId = context.cityId;
   if (cityId == null || Number.isNaN(Number(cityId))) {
-    throw new AppError(
-      "Não foi possível criar o cadastro de anunciante: cidade inválida.",
-      400
-    );
+    throw new AppError("Não foi possível criar o cadastro de anunciante: cidade inválida.", 400);
   }
 
   return ensureAdvertiserForUser(userId, {

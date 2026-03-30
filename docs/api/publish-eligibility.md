@@ -16,12 +16,12 @@ Mesma lógica para:
 
 Para evitar “anunciante não encontrado”, o backend garante uma linha em `advertisers` nestes pontos:
 
-| Momento | Onde |
-|--------|------|
-| Registro | `auth.service.js` após criar `users` |
-| Painel | início de `getDashboardPayload` |
-| Elegibilidade de plano | `POST /account/plans/eligibility` (rota) |
-| Publicar anúncio | `ensureAdvertiserForPublishing` com `city_id` do anúncio (após `resolvePublishEligibility` aprovar) |
+| Momento                | Onde                                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| Registro               | `auth.service.js` após criar `users`                                                                |
+| Painel                 | início de `getDashboardPayload`                                                                     |
+| Elegibilidade de plano | `POST /account/plans/eligibility` (rota)                                                            |
+| Publicar anúncio       | `ensureAdvertiserForPublishing` com `city_id` do anúncio (após `resolvePublishEligibility` aprovar) |
 
 Leitura de conta sem dependência circular: `getAccountUser` em `account.user.read.js`.
 

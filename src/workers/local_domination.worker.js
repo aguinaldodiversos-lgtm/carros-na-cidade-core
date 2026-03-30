@@ -99,9 +99,7 @@ async function analyzeCity(cityId) {
     ]
   );
 
-  console.log(
-    `🏙️ Cidade ${cityId} analisada | score: ${cityPowerScore.toFixed(2)}`
-  );
+  console.log(`🏙️ Cidade ${cityId} analisada | score: ${cityPowerScore.toFixed(2)}`);
 }
 
 async function runLocalDomination() {

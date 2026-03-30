@@ -82,9 +82,7 @@ async function runMessageOptimizer() {
           [bestVariant.id]
         );
 
-        console.log(
-          `🏆 Cidade ${cityId} nova mensagem vencedora: ${bestVariant.id}`
-        );
+        console.log(`🏆 Cidade ${cityId} nova mensagem vencedora: ${bestVariant.id}`);
       }
     }
 

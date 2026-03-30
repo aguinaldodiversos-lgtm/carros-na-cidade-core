@@ -8,9 +8,6 @@ type AdListingCardProps = {
   featured?: boolean;
 };
 
-export default function AdListingCard({
-  car,
-  featured = false,
-}: AdListingCardProps) {
+export default function AdListingCard({ car, featured = false }: AdListingCardProps) {
   return <AdCard item={listingCarToAdItem(car)} priority={featured} />;
 }

@@ -98,20 +98,18 @@ function isDealer(type: AdDetails["seller"]["type"]) {
 function normalizeRelatedItems(items: RelatedAd[] | undefined | null) {
   if (!Array.isArray(items)) return [];
 
-  return items
-    .filter(Boolean)
-    .map((item, index) => ({
-      id: item.id || `related-${index}`,
-      slug: toText(item.slug, ""),
-      title: toText(item.title, "Veículo"),
-      city: toText(item.city, DEFAULT_CITY),
-      state: toText(item.state, DEFAULT_STATE),
-      price: toNumber(item.price, 0),
-      mileage: toNumber(item.mileage, 0),
-      yearLabel: toText(item.yearLabel, ""),
-      image: toText(item.image, FALLBACK_IMAGE),
-      badge: item.badge ? toText(item.badge, "") : undefined,
-    }));
+  return items.filter(Boolean).map((item, index) => ({
+    id: item.id || `related-${index}`,
+    slug: toText(item.slug, ""),
+    title: toText(item.title, "Veículo"),
+    city: toText(item.city, DEFAULT_CITY),
+    state: toText(item.state, DEFAULT_STATE),
+    price: toNumber(item.price, 0),
+    mileage: toNumber(item.mileage, 0),
+    yearLabel: toText(item.yearLabel, ""),
+    image: toText(item.image, FALLBACK_IMAGE),
+    badge: item.badge ? toText(item.badge, "") : undefined,
+  }));
 }
 
 function resolveShowcase(ad: AdDetails) {
@@ -180,12 +178,8 @@ function SectionCard({
   return (
     <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
       <div className="mb-5">
-        <h2 className="text-[28px] font-bold tracking-[-0.03em] text-[#1D2440]">
-          {title}
-        </h2>
-        {subtitle ? (
-          <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p>
-        ) : null}
+        <h2 className="text-[28px] font-bold tracking-[-0.03em] text-[#1D2440]">{title}</h2>
+        {subtitle ? <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p> : null}
       </div>
       {children}
     </section>
@@ -249,15 +243,11 @@ function VehicleCard({ item }: { item: RelatedAd }) {
           <strong className="text-[20px] font-extrabold text-[#1F66E5]">
             {formatCurrency(normalizedItem.price)}
           </strong>
-          <span className="text-xs font-medium text-[#6E748A]">
-            {normalizedItem.yearLabel}
-          </span>
+          <span className="text-xs font-medium text-[#6E748A]">{normalizedItem.yearLabel}</span>
         </div>
 
         {!!normalizedItem.mileage && (
-          <div className="text-xs text-[#6E748A]">
-            {formatNumber(normalizedItem.mileage)} km
-          </div>
+          <div className="text-xs text-[#6E748A]">{formatNumber(normalizedItem.mileage)} km</div>
         )}
       </div>
     </Link>
@@ -279,7 +269,9 @@ export default function AdDetailsPage({ ad }: Props) {
 
   const safeImages = useMemo(() => {
     return Array.isArray(ad.images) && ad.images.length
-      ? ad.images.filter((image) => typeof image === "string" && image.trim()).map((image) => image || FALLBACK_IMAGE)
+      ? ad.images
+          .filter((image) => typeof image === "string" && image.trim())
+          .map((image) => image || FALLBACK_IMAGE)
       : [FALLBACK_IMAGE];
   }, [ad.images]);
 
@@ -351,15 +343,11 @@ export default function AdDetailsPage({ ad }: Props) {
   const belowFipe = priceDiff < 0;
 
   function goPrevImage() {
-    setSelectedImage((current) =>
-      current === 0 ? safeImages.length - 1 : current - 1
-    );
+    setSelectedImage((current) => (current === 0 ? safeImages.length - 1 : current - 1));
   }
 
   function goNextImage() {
-    setSelectedImage((current) =>
-      current === safeImages.length - 1 ? 0 : current + 1
-    );
+    setSelectedImage((current) => (current === safeImages.length - 1 ? 0 : current + 1));
   }
 
   async function handleShare() {
@@ -485,9 +473,7 @@ export default function AdDetailsPage({ ad }: Props) {
 
           <div className="flex shrink-0 flex-col gap-3 xl:items-end">
             <div className="text-left xl:text-right">
-              <div className="text-sm font-medium text-[#6E748A]">
-                Preço do veículo
-              </div>
+              <div className="text-sm font-medium text-[#6E748A]">Preço do veículo</div>
               <div className="text-[42px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                 {formatCurrency(price)}
               </div>
@@ -563,9 +549,7 @@ export default function AdDetailsPage({ ad }: Props) {
                           type="button"
                           onClick={() => setSelectedImage(index)}
                           className={`h-2.5 rounded-full transition ${
-                            selectedImage === index
-                              ? "w-8 bg-[#2F67F6]"
-                              : "w-2.5 bg-[#CBD5E1]"
+                            selectedImage === index ? "w-8 bg-[#2F67F6]" : "w-2.5 bg-[#CBD5E1]"
                           }`}
                           aria-label={`Ir para foto ${index + 1}`}
                         />
@@ -611,9 +595,7 @@ export default function AdDetailsPage({ ad }: Props) {
                       <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2F67F6]">
                         ✓
                       </span>
-                      <span className="text-[15px] font-medium text-[#4B536A]">
-                        {feature}
-                      </span>
+                      <span className="text-[15px] font-medium text-[#4B536A]">{feature}</span>
                     </div>
                   ))}
                 </div>
@@ -631,12 +613,8 @@ export default function AdDetailsPage({ ad }: Props) {
                     key={item.label}
                     className="rounded-[22px] border border-[#E5E9F2] bg-[#FBFCFF] p-4"
                   >
-                    <div className="text-sm font-medium text-[#6E748A]">
-                      {item.label}
-                    </div>
-                    <div className="mt-2 text-[18px] font-bold text-[#1D2440]">
-                      {item.value}
-                    </div>
+                    <div className="text-sm font-medium text-[#6E748A]">{item.label}</div>
+                    <div className="mt-2 text-[18px] font-bold text-[#1D2440]">{item.value}</div>
                   </div>
                 ))}
               </div>
@@ -645,9 +623,7 @@ export default function AdDetailsPage({ ad }: Props) {
             <SectionCard title="Tabela FIPE">
               <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
                 <div className="rounded-[24px] border border-[#D8E8D8] bg-[#F5FCF5] p-5">
-                  <div className="text-sm font-semibold text-[#4B536A]">
-                    Valor FIPE
-                  </div>
+                  <div className="text-sm font-semibold text-[#4B536A]">Valor FIPE</div>
                   <div className="mt-2 text-[34px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                     {formatCurrency(fipeValue)}
                   </div>
@@ -665,9 +641,7 @@ export default function AdDetailsPage({ ad }: Props) {
                 </div>
 
                 <div className="rounded-[24px] border border-[#E5E9F2] bg-[#FBFCFF] p-5">
-                  <div className="text-sm font-semibold text-[#4B536A]">
-                    Preço do anúncio
-                  </div>
+                  <div className="text-sm font-semibold text-[#4B536A]">Preço do anúncio</div>
                   <div className="mt-2 text-[28px] font-extrabold tracking-[-0.04em] text-[#1F66E5]">
                     {formatCurrency(price)}
                   </div>
@@ -718,9 +692,9 @@ export default function AdDetailsPage({ ad }: Props) {
               <div className="space-y-4 text-[16px] leading-8 text-[#4B536A]">
                 <p>{safeDescription}</p>
                 <p>
-                  Atendimento com foco em transparência, avaliação justa e envio rápido
-                  de informações. Você pode falar direto com o vendedor pelo WhatsApp
-                  ou simular financiamento sem sair do portal.
+                  Atendimento com foco em transparência, avaliação justa e envio rápido de
+                  informações. Você pode falar direto com o vendedor pelo WhatsApp ou simular
+                  financiamento sem sair do portal.
                 </p>
               </div>
             </SectionCard>
@@ -799,8 +773,7 @@ export default function AdDetailsPage({ ad }: Props) {
                 <div className="mt-3 space-y-2 text-sm text-[#5C647C]">
                   <p>{toText(ad.seller.address, "Endereço não informado")}</p>
                   <p>
-                    {formatNumber(toNumber(ad.seller.stockCount, 0))} veículos
-                    anunciados no portal
+                    {formatNumber(toNumber(ad.seller.stockCount, 0))} veículos anunciados no portal
                   </p>
                   <p>Peso comercial do anúncio: {ad.weight}</p>
                 </div>
@@ -815,25 +788,20 @@ export default function AdDetailsPage({ ad }: Props) {
                 Enviar mensagem
               </h3>
               <p className="mt-2 text-sm leading-6 text-[#6E748A]">
-                Preencha os dados abaixo e a conversa seguirá direto para o vendedor
-                via WhatsApp.
+                Preencha os dados abaixo e a conversa seguirá direto para o vendedor via WhatsApp.
               </p>
 
               <form onSubmit={handleContactSubmit} className="mt-5 space-y-3">
                 <input
                   value={form.name}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, name: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                   placeholder="Nome"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
                 />
 
                 <input
                   value={form.phone}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, phone: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
                   placeholder="Telefone"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
                 />
@@ -841,9 +809,7 @@ export default function AdDetailsPage({ ad }: Props) {
                 <input
                   type="email"
                   value={form.email}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, email: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
                   placeholder="seuemail@exemplo.com"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"
                 />

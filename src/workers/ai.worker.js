@@ -1,10 +1,6 @@
 import { Worker } from "bullmq";
 import { logger } from "../shared/logger.js";
-import {
-  createRedisClient,
-  createCache,
-} from "../brain/cache/ai.cache.js";
-import { AiOrchestrator } from "../brain/orchestrator/ai.orchestrator.js";
+import { getBrainAiStack } from "../brain/orchestrator/brain-stack.js";
 
 let aiWorkerInstance = null;
 let aiRedisInstance = null;
@@ -16,21 +12,14 @@ export async function startAiWorker() {
     return aiWorkerInstance;
   }
 
-  aiRedisInstance = createRedisClient({ logger });
+  const { redis, orchestrator } = getBrainAiStack({ logger });
+  aiRedisInstance = redis;
   if (!aiRedisInstance) {
-    logger.warn(
-      "[ai.worker] Redis indisponível (REDIS_URL ausente). Worker não iniciado."
-    );
+    logger.warn("[ai.worker] Redis indisponível (REDIS_URL ausente). Worker não iniciado.");
     return null;
   }
 
-  const cache = createCache({ redis: aiRedisInstance });
-
-  aiOrchestratorInstance = new AiOrchestrator({
-    logger,
-    cache,
-    aiQueue: null,
-  });
+  aiOrchestratorInstance = orchestrator;
 
   aiWorkerInstance = new Worker(
     "ai-jobs",

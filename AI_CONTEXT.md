@@ -1,6 +1,7 @@
 # AI CONTEXT — CARROS NA CIDADE
 
 ## O que é o projeto
+
 Carros na Cidade é um portal automotivo regional de alta escala, voltado para compra, venda e descoberta de veículos com forte foco em SEO local, páginas territoriais e experiência premium.
 
 Este projeto não é apenas um site de anúncios.
@@ -9,7 +10,9 @@ Ele faz parte de um ecossistema automotivo mais amplo com visão de crescimento 
 ---
 
 ## Visão do produto
+
 Estamos construindo:
+
 - um portal automotivo regional premium
 - com páginas dinâmicas por cidade, marca e modelo
 - com mais de 5.500 páginas indexáveis na primeira fase
@@ -20,8 +23,11 @@ Estamos construindo:
 ---
 
 ## Estrutura macro do ecossistema
+
 ### Frente 1 — Portal público
+
 Responsável por:
+
 - home premium
 - busca/listagem
 - páginas territoriais
@@ -31,7 +37,9 @@ Responsável por:
 - indexação em escala
 
 ### Frente 2 — Inteligência operacional e comercial
+
 Responsável por:
+
 - automação de publicação
 - automação comercial
 - análise de oportunidades
@@ -42,7 +50,9 @@ Responsável por:
 ---
 
 ## Estratégia de crescimento
+
 O crescimento do portal é baseado em:
+
 - SEO local massivo
 - geração dinâmica de páginas territoriais
 - forte linkagem interna
@@ -51,7 +61,9 @@ O crescimento do portal é baseado em:
 - expansão cidade por cidade
 
 ### Estrutura de páginas indexáveis
+
 Exemplos:
+
 - `/cidade/[slug]`
 - `/cidade/[slug]/marca/[brand]`
 - `/cidade/[slug]/marca/[brand]/modelo/[model]`
@@ -65,10 +77,13 @@ A meta inicial é gerar mais de 5.500 páginas dinâmicas indexáveis com qualid
 ---
 
 ## Estratégia de IA do projeto
+
 O sistema possui duas IAs controladas por um Orquestrador.
 
 ### IA 1 — IA operacional / local
+
 Responsável por:
+
 - tarefas de alto volume
 - apoio operacional
 - processamento frequente
@@ -77,7 +92,9 @@ Responsável por:
 - tarefas repetitivas
 
 ### IA 2 — IA premium / estratégica
+
 Responsável por:
+
 - copy premium
 - SEO refinado
 - análises complexas
@@ -86,7 +103,9 @@ Responsável por:
 - tarefas com maior valor agregado
 
 ### Orquestrador
+
 Existe um Orquestrador responsável por:
+
 - definir qual IA usar em cada situação
 - aplicar regras rígidas
 - impedir desvios arquiteturais
@@ -100,7 +119,9 @@ Ela deve operar como parte de uma arquitetura controlada.
 ---
 
 ## Situação atual do frontend
+
 O frontend passou por geração anterior com IA e acabou criando:
+
 - shell duplicado
 - componentes duplicados
 - páginas em arquiteturas paralelas
@@ -113,7 +134,9 @@ Agora o objetivo é convergir tudo para uma única arquitetura limpa.
 ---
 
 ## Arquitetura correta
+
 A direção correta do frontend é:
+
 - App Router
 - server-first
 - shell único
@@ -126,6 +149,7 @@ A direção correta do frontend é:
 ---
 
 ## Decisões já tomadas
+
 - `app/layout.tsx` é o shell público oficial
 - `components/shell/PublicHeader.tsx` e `PublicFooter.tsx` são oficiais
 - rota oficial do detalhe: `/veiculo/[slug]`
@@ -139,7 +163,9 @@ A direção correta do frontend é:
 ---
 
 ## Qualidade esperada
+
 Toda geração de código deve buscar:
+
 - padrão premium
 - consistência visual
 - integração real
@@ -151,6 +177,7 @@ Toda geração de código deve buscar:
 ---
 
 ## O que a IA deve evitar
+
 - duplicação
 - criação de nova arquitetura paralela
 - criação de novo shell

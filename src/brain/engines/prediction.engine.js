@@ -35,11 +35,7 @@ export async function runCityPredictionEngine() {
     const adsGrowth = ads * 0.8;
     const dealerGrowth = dealers * 2;
 
-    const predictionScore =
-      opportunity +
-      adsGrowth +
-      dealerGrowth +
-      population / 10000;
+    const predictionScore = opportunity + adsGrowth + dealerGrowth + population / 10000;
 
     const label = classifyPrediction(predictionScore);
 
@@ -62,13 +58,7 @@ export async function runCityPredictionEngine() {
         dealer_growth = EXCLUDED.dealer_growth,
         evaluated_at = NOW()
       `,
-      [
-        city.id,
-        predictionScore,
-        label,
-        adsGrowth,
-        dealerGrowth,
-      ]
+      [city.id, predictionScore, label, adsGrowth, dealerGrowth]
     );
 
     logger.info(

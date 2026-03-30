@@ -159,9 +159,7 @@ function toAuthUserFromBackend(
 
 function findLocalCredentialByEmail(email: string) {
   const normalizedEmail = normalizeEmail(email);
-  return localCredentials.find(
-    (credential) => credential.email.toLowerCase() === normalizedEmail
-  );
+  return localCredentials.find((credential) => credential.email.toLowerCase() === normalizedEmail);
 }
 
 export function getLocalEmailByUserId(userId: string) {
@@ -196,10 +194,7 @@ function extractBackendUser(payload: BackendAuthResponse | BackendMeResponse) {
   return payload.user ?? payload.data?.user ?? null;
 }
 
-function extractErrorMessage(
-  payload: Partial<BackendAuthResponse>,
-  fallback: string
-) {
+function extractErrorMessage(payload: Partial<BackendAuthResponse>, fallback: string) {
   return normalizeString(payload.error) || normalizeString(payload.message) || fallback;
 }
 
@@ -288,9 +283,7 @@ async function authenticateAgainstBackend(
     const payload = await safeJson<BackendAuthResponse>(response);
 
     if (!response.ok) {
-      throw new Error(
-        extractErrorMessage(payload, "Nao foi possivel autenticar.")
-      );
+      throw new Error(extractErrorMessage(payload, "Nao foi possivel autenticar."));
     }
 
     return buildAuthenticatedSessionFromResponse(payload, normalizedEmail);
@@ -323,9 +316,7 @@ export async function authenticateUser(
   return authenticateLocally(email, password);
 }
 
-export async function registerUser(
-  payload: RegisterPayload
-): Promise<RegisterResult> {
+export async function registerUser(payload: RegisterPayload): Promise<RegisterResult> {
   const name = normalizeString(payload.name);
   const email = normalizeEmail(payload.email);
   const password = typeof payload.password === "string" ? payload.password : "";
@@ -401,8 +392,7 @@ export async function registerUser(
     if (!session) {
       return {
         success: false,
-        error:
-          "Cadastro realizado, mas nao foi possivel iniciar a sessao automaticamente.",
+        error: "Cadastro realizado, mas nao foi possivel iniciar a sessao automaticamente.",
       };
     }
 
@@ -470,8 +460,8 @@ async function parseLocalApiResponse(response: Response) {
       typeof data.error === "string"
         ? data.error
         : typeof data.message === "string"
-        ? data.message
-        : "Erro na autenticacao.";
+          ? data.message
+          : "Erro na autenticacao.";
 
     throw new Error(errorMessage);
   }
@@ -479,10 +469,7 @@ async function parseLocalApiResponse(response: Response) {
   return data;
 }
 
-export async function login(
-  payloadOrEmail: LoginCompatPayload | string,
-  maybePassword?: string
-) {
+export async function login(payloadOrEmail: LoginCompatPayload | string, maybePassword?: string) {
   const email =
     typeof payloadOrEmail === "string"
       ? normalizeEmail(payloadOrEmail)
@@ -494,13 +481,10 @@ export async function login(
         ? maybePassword
         : ""
       : typeof payloadOrEmail?.password === "string"
-      ? payloadOrEmail.password
-      : "";
+        ? payloadOrEmail.password
+        : "";
 
-  const next =
-    typeof payloadOrEmail === "string"
-      ? ""
-      : normalizeString(payloadOrEmail?.next);
+  const next = typeof payloadOrEmail === "string" ? "" : normalizeString(payloadOrEmail?.next);
 
   const response = await fetch("/api/auth/login", {
     method: "POST",

@@ -30,9 +30,7 @@ export async function startMoneyPagesWorker() {
 
   moneyPagesStarted = true;
 
-  const intervalMs = Number(
-    process.env.MONEY_PAGES_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.MONEY_PAGES_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[money-pages.worker] Inicializando worker");
 

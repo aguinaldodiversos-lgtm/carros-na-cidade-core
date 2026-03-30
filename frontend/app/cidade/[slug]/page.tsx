@@ -11,16 +11,11 @@ interface CityPageProps {
 }
 
 const getCityPageData = cache(
-  async (
-    slug: string,
-    searchParams: Record<string, string | string[] | undefined>
-  ) => fetchCityTerritorialPage(slug, searchParams)
+  async (slug: string, searchParams: Record<string, string | string[] | undefined>) =>
+    fetchCityTerritorialPage(slug, searchParams)
 );
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}: CityPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CityPageProps): Promise<Metadata> {
   const data = await getCityPageData(params.slug, searchParams);
   return buildTerritorialMetadata(data, "city");
 }
@@ -31,11 +26,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   return (
     <>
       <TerritorialSeoJsonLd data={initialData} mode="city" />
-      <TerritorialResultsPageClient
-        mode="city"
-        slug={params.slug}
-        initialData={initialData}
-      />
+      <TerritorialResultsPageClient mode="city" slug={params.slug} initialData={initialData} />
     </>
   );
 }

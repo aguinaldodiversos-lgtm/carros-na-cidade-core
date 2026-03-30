@@ -1,12 +1,7 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { logger } from "../../shared/logger.js";
 
-function resolveCityStage({
-  totalAds,
-  totalLeads,
-  dominanceScore,
-  opportunityScore,
-}) {
+function resolveCityStage({ totalAds, totalLeads, dominanceScore, opportunityScore }) {
   if (dominanceScore >= 120 && totalAds >= 80) return "dominance";
   if (opportunityScore >= 80 || totalLeads >= 20 || totalAds >= 40) return "expansion";
   if (opportunityScore >= 40 || totalAds >= 10) return "seed";

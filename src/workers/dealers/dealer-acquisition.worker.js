@@ -34,19 +34,13 @@ export async function startDealerAcquisitionWorker() {
     process.env.DEALER_ACQUISITION_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
   );
 
-  logger.info(
-    { intervalMs },
-    "[dealer-acquisition.worker] Inicializando worker"
-  );
+  logger.info({ intervalMs }, "[dealer-acquisition.worker] Inicializando worker");
 
   await runOnce();
 
   dealerAcquisitionInterval = setInterval(() => {
     runOnce().catch((error) => {
-      logger.error(
-        { error },
-        "[dealer-acquisition.worker] Erro na execução agendada"
-      );
+      logger.error({ error }, "[dealer-acquisition.worker] Erro na execução agendada");
     });
   }, intervalMs);
 }

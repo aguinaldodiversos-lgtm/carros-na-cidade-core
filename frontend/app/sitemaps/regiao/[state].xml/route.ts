@@ -6,10 +6,7 @@ import { fetchPublicSitemapByRegion } from "../../../../lib/seo/sitemap-client";
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
-export async function GET(
-  _req: Request,
-  ctx: { params?: { state?: string } }
-) {
+export async function GET(_req: Request, ctx: { params?: { state?: string } }) {
   try {
     const raw = ctx?.params?.state ?? "";
     const normalizedState = String(raw).trim().toUpperCase();

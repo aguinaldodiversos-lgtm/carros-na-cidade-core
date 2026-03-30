@@ -7,10 +7,7 @@ import { logger } from "../../../shared/logger.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const keyPath = path.join(
-  __dirname,
-  "../../../credentials/google-service-account.json"
-);
+const keyPath = path.join(__dirname, "../../../credentials/google-service-account.json");
 
 export async function collectSearchConsoleData(startDate, endDate) {
   const auth = new google.auth.GoogleAuth({

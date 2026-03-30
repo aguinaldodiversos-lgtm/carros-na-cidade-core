@@ -24,9 +24,7 @@ async function runEventBroadcastWorker() {
     `);
 
     for (const event of events.rows) {
-      console.log(
-        `Disparando divulgação do evento ${event.id} - ${event.title}`
-      );
+      console.log(`Disparando divulgação do evento ${event.id} - ${event.title}`);
 
       // aqui entrará:
       // - envio WhatsApp

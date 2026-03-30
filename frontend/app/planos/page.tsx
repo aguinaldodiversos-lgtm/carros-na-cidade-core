@@ -9,11 +9,7 @@ export const metadata: Metadata = {
   title: "Planos de assinatura para anunciar carros",
   description:
     "Anunciar carro gratis ou em destaque. Planos para particular e lojista automotivo com cobranca via Mercado Pago.",
-  keywords: [
-    "anunciar carro gratis",
-    "plano para lojista automotivo",
-    "vender carro sem comissao",
-  ],
+  keywords: ["anunciar carro gratis", "plano para lojista automotivo", "vender carro sem comissao"],
   alternates: {
     canonical: "/planos",
   },
@@ -30,10 +26,7 @@ export const metadata: Metadata = {
 export const revalidate = 900;
 
 export default async function PlanosPage() {
-  const [cpfPlans, cnpjPlans] = await Promise.all([
-    getPlansByType("CPF"),
-    getPlansByType("CNPJ"),
-  ]);
+  const [cpfPlans, cnpjPlans] = await Promise.all([getPlansByType("CPF"), getPlansByType("CNPJ")]);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -44,7 +37,8 @@ export default async function PlanosPage() {
           Planos para particulares
         </h2>
         <p className="mt-1 text-sm text-[#5f6982]">
-          CPF validado no backend. Limite gratuito de 3 anúncios ativos com upgrade automático para mais volume.
+          CPF validado no backend. Limite gratuito de 3 anúncios ativos com upgrade automático para
+          mais volume.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {cpfPlans.map((plan) => (
@@ -58,7 +52,8 @@ export default async function PlanosPage() {
           Planos para lojistas
         </h2>
         <p className="mt-1 text-sm text-[#5f6982]">
-          CNPJ verificado no backend. Limite gratuito de 20 anúncios ativos e planos pagos com destaque e prioridade.
+          CNPJ verificado no backend. Limite gratuito de 20 anúncios ativos e planos pagos com
+          destaque e prioridade.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {cnpjPlans.map((plan) => (
@@ -74,13 +69,13 @@ export default async function PlanosPage() {
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <article className="rounded-xl border border-[#e1e5ef] bg-[#f8fafe] p-4">
-            <h3 className="text-base font-extrabold text-[#1e2b45]">
-              Plano Destaque (avulso)
-            </h3>
+            <h3 className="text-base font-extrabold text-[#1e2b45]">Plano Destaque (avulso)</h3>
             <ul className="mt-2 space-y-1 text-sm text-[#4d5872]">
               <li>Pagamento único via checkout do Mercado Pago.</li>
               <li>Validade do destaque definida por plano (ex.: 7 ou 30 dias).</li>
-              <li>Após aprovação no webhook, destaque e prioridade são ativados automaticamente.</li>
+              <li>
+                Após aprovação no webhook, destaque e prioridade são ativados automaticamente.
+              </li>
               <li>Ao vencer, prioridade e badge premium são removidos sem ação manual.</li>
             </ul>
           </article>
@@ -100,9 +95,9 @@ export default async function PlanosPage() {
 
         <div className="mt-4 rounded-xl border border-[#d9e5ff] bg-[#edf4ff] p-4">
           <p className="text-sm text-[#435372]">
-            Segurança aplicada no backend: validação de assinatura do webhook,
-            verificação de valor e plan_id, idempotência para evitar ativação duplicada
-            e confirmação server-to-server do status no Mercado Pago.
+            Segurança aplicada no backend: validação de assinatura do webhook, verificação de valor
+            e plan_id, idempotência para evitar ativação duplicada e confirmação server-to-server do
+            status no Mercado Pago.
           </p>
         </div>
       </section>

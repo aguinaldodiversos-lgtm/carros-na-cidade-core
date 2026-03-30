@@ -30,23 +30,15 @@ export async function startSeoPublishingWorker() {
 
   seoPublishingStarted = true;
 
-  const intervalMs = Number(
-    process.env.SEO_PUBLISHING_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.SEO_PUBLISHING_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
-  logger.info(
-    { intervalMs },
-    "[seo-publishing.worker] Inicializando worker"
-  );
+  logger.info({ intervalMs }, "[seo-publishing.worker] Inicializando worker");
 
   await runOnce();
 
   seoPublishingInterval = setInterval(() => {
     runOnce().catch((error) => {
-      logger.error(
-        { error },
-        "[seo-publishing.worker] Erro na execução agendada"
-      );
+      logger.error({ error }, "[seo-publishing.worker] Erro na execução agendada");
     });
   }, intervalMs);
 }

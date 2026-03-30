@@ -2,7 +2,9 @@ import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 function normalizeAccountType(input) {
-  const raw = String(input ?? "").trim().toLowerCase();
+  const raw = String(input ?? "")
+    .trim()
+    .toLowerCase();
   return raw === "cnpj" ? "CNPJ" : "CPF";
 }
 

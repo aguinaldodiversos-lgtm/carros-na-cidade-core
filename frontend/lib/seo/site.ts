@@ -3,10 +3,7 @@ function stripTrailingSlash(url: string) {
 }
 
 export function getSiteUrl() {
-  return stripTrailingSlash(
-    process.env.NEXT_PUBLIC_SITE_URL ||
-      "https://carrosnacidade.com"
-  );
+  return stripTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || "https://carrosnacidade.com");
 }
 
 export function toAbsoluteUrl(path: string) {

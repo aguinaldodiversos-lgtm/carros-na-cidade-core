@@ -23,7 +23,9 @@ test.describe.serial("Login → anúncio → checkout", () => {
     await page.goto("/planos", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /Planos para particulares/i })).toBeVisible();
 
-    const paidButton = page.getByRole("button", { name: /Comprar destaque|Assinar plano/i }).first();
+    const paidButton = page
+      .getByRole("button", { name: /Comprar destaque|Assinar plano/i })
+      .first();
     await expect(paidButton).toBeVisible({ timeout: 15_000 });
 
     const popupPromise = context.waitForEvent("page", { timeout: 8000 }).catch(() => null);

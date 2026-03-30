@@ -39,7 +39,9 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
       </article>
 
       <article className="mt-4 rounded-xl border border-[#d9e5ff] bg-[#edf4ff] p-4">
-        <h3 className="text-base font-extrabold text-[#1f2a43]">Insights de mercado do Cérebro IA</h3>
+        <h3 className="text-base font-extrabold text-[#1f2a43]">
+          Insights de mercado do Cérebro IA
+        </h3>
         <ul className="mt-2 space-y-1 text-sm text-[#4e5870]">
           {aiInsights.map((insight) => (
             <li key={insight} className="inline-flex items-start gap-2">

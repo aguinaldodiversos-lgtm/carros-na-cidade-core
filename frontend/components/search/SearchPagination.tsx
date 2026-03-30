@@ -6,11 +6,7 @@ interface SearchPaginationProps {
   onChange: (page: number) => void;
 }
 
-export function SearchPagination({
-  page,
-  totalPages,
-  onChange,
-}: SearchPaginationProps) {
+export function SearchPagination({ page, totalPages, onChange }: SearchPaginationProps) {
   if (totalPages <= 1) return null;
 
   const pages: number[] = [];

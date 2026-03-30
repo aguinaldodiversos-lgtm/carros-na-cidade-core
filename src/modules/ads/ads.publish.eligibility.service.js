@@ -26,10 +26,7 @@ export async function ensurePublishEligibility(user, context = {}) {
   const planCheck = await resolvePublishEligibility(userId, account);
 
   if (!planCheck.allowed) {
-    throw new AppError(
-      planCheck.reason || "Não é possível publicar neste momento.",
-      400
-    );
+    throw new AppError(planCheck.reason || "Não é possível publicar neste momento.", 400);
   }
 
   const advertiser = await ensureAdvertiserForPublishing(userId, {

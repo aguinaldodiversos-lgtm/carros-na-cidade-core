@@ -42,10 +42,7 @@ function isValidEventType(eventType: string): eventType is AdEventType {
   return AD_EVENT_TYPE_SET.has(eventType as AdEventType);
 }
 
-function buildPayload(
-  adId: string | number,
-  eventType: AdEventType
-): TrackAdEventPayload | null {
+function buildPayload(adId: string | number, eventType: AdEventType): TrackAdEventPayload | null {
   const normalizedAdId = normalizeAdId(adId);
 
   if (!normalizedAdId) return null;
@@ -79,10 +76,7 @@ function trySendBeacon(url: string, payload: TrackAdEventPayload) {
   }
 }
 
-export async function trackAdEvent(
-  adId: string | number,
-  eventType: AdEventType
-): Promise<void> {
+export async function trackAdEvent(adId: string | number, eventType: AdEventType): Promise<void> {
   const payload = buildPayload(adId, eventType);
   if (!payload) return;
 

@@ -14,8 +14,7 @@ export async function recalculateSellerScore(sellerId) {
 
   const { total_leads, total_responses } = result.rows[0];
 
-  const responseRate =
-    total_leads > 0 ? total_responses / total_leads : 0;
+  const responseRate = total_leads > 0 ? total_responses / total_leads : 0;
 
   const score = responseRate * 100;
 

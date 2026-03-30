@@ -212,15 +212,11 @@ export function AdCard({ ad, item }: AdCardProps) {
           <strong className="text-[20px] font-extrabold text-[#1F66E5]">
             {formatCurrency(normalized.price)}
           </strong>
-          <span className="text-xs font-medium text-[#6E748A]">
-            {normalized.yearLabel}
-          </span>
+          <span className="text-xs font-medium text-[#6E748A]">{normalized.yearLabel}</span>
         </div>
 
         {!!normalized.mileage && (
-          <div className="text-xs text-[#6E748A]">
-            {formatNumber(normalized.mileage)} km
-          </div>
+          <div className="text-xs text-[#6E748A]">{formatNumber(normalized.mileage)} km</div>
         )}
       </div>
     </Link>

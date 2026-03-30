@@ -86,7 +86,6 @@ async function runMetricsWorker() {
     logger.info("🧠 learning_model atualizado");
 
     logger.info("🏁 Metrics Worker finalizado com sucesso");
-
   } catch (err) {
     logger.error({
       message: "❌ Erro no Metrics Worker",

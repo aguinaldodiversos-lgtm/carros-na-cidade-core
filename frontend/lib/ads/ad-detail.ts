@@ -147,10 +147,7 @@ function normalizeImages(value: unknown, imageUrl?: string | null): string[] {
   return [FALLBACK_IMAGE];
 }
 
-function normalizeAdDetail(
-  raw: unknown,
-  requestedIdentifier: string
-): PublicAdDetail | null {
+function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdDetail | null {
   if (!raw || typeof raw !== "object") return null;
 
   const item = raw as Record<string, unknown>;
@@ -161,10 +158,7 @@ function normalizeAdDetail(
     getImageFromUnknown(item.cover_image) ||
     getImageFromUnknown(item.photo);
 
-  const images = normalizeImages(
-    item.images ?? item.gallery ?? item.photos,
-    imageUrl
-  );
+  const images = normalizeImages(item.images ?? item.gallery ?? item.photos, imageUrl);
 
   const titleFallback =
     [
@@ -287,9 +281,7 @@ async function tryFetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-export async function fetchAdDetail(
-  identifier: string
-): Promise<PublicAdDetail> {
+export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail> {
   const safeIdentifier = toText(identifier, "").trim();
 
   if (!safeIdentifier) {

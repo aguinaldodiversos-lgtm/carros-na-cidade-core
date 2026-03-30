@@ -41,7 +41,10 @@ export function toCityRef(partial: {
 }): CityRef | null {
   const slug = String(partial.slug || "").trim();
   const name = String(partial.name || "").trim();
-  const state = String(partial.state || "").trim().toUpperCase().slice(0, 2);
+  const state = String(partial.state || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 2);
   if (!slug || !name) return null;
   return {
     id: normalizeCityId(partial.id),

@@ -1,1 +1,10 @@
-{"user":{"id":"12","name":"AGUINALDO SANTOS PEREIRA","email":"teste01@gmail.com","type":"CPF","cnpj_verified":false},"redirect_to":"/dashboard"}
+{
+  "user": {
+    "id": "12",
+    "name": "AGUINALDO SANTOS PEREIRA",
+    "email": "teste01@gmail.com",
+    "type": "CPF",
+    "cnpj_verified": false
+  },
+  "redirect_to": "/dashboard"
+}

@@ -37,9 +37,7 @@ export async function startMarketWorker() {
 
   marketStarted = true;
 
-  const intervalMs = Number(
-    process.env.MARKET_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.MARKET_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[market.worker] Inicializando worker");
 

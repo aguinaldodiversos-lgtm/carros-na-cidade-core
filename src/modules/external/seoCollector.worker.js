@@ -21,13 +21,7 @@ export async function collectSEOData() {
         avg_position = EXCLUDED.avg_position,
         last_updated = NOW()
       `,
-      [
-        row.keys[0],
-        row.impressions,
-        row.clicks,
-        row.ctr,
-        row.position
-      ]
+      [row.keys[0], row.impressions, row.clicks, row.ctr, row.position]
     );
   }
 }

@@ -229,7 +229,9 @@ export function registerBoostPaymentIntent(data: {
   days: number;
   amount: number;
 }) {
-  const existing = boostPayments.find((payment) => payment.mercado_pago_id === data.mercado_pago_id);
+  const existing = boostPayments.find(
+    (payment) => payment.mercado_pago_id === data.mercado_pago_id
+  );
   if (existing) return existing;
 
   const created: BoostPaymentRecord = {
@@ -258,7 +260,9 @@ export function applyBoostToAd(adId: string, days: number) {
   const ad = getMutableAdById(adId);
   if (!ad) return null;
 
-  const baseTime = ad.featured_until ? Math.max(new Date(ad.featured_until).getTime(), Date.now()) : Date.now();
+  const baseTime = ad.featured_until
+    ? Math.max(new Date(ad.featured_until).getTime(), Date.now())
+    : Date.now();
   const boostedUntil = new Date(baseTime + days * 24 * 60 * 60 * 1000).toISOString();
 
   ad.is_featured = true;

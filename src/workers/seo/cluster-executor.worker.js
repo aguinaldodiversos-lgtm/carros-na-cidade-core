@@ -30,23 +30,15 @@ export async function startClusterExecutorWorker() {
 
   clusterExecutorStarted = true;
 
-  const intervalMs = Number(
-    process.env.CLUSTER_EXECUTOR_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.CLUSTER_EXECUTOR_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
-  logger.info(
-    { intervalMs },
-    "[cluster-executor.worker] Inicializando worker"
-  );
+  logger.info({ intervalMs }, "[cluster-executor.worker] Inicializando worker");
 
   await runOnce();
 
   clusterExecutorInterval = setInterval(() => {
     runOnce().catch((error) => {
-      logger.error(
-        { error },
-        "[cluster-executor.worker] Erro na execução agendada"
-      );
+      logger.error({ error }, "[cluster-executor.worker] Erro na execução agendada");
     });
   }, intervalMs);
 }

@@ -14,11 +14,7 @@ export default function BuyCarsGrid({ items }: BuyCarsGridProps) {
       {featuredItems.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {featuredItems.map((item, index) => (
-            <AdCard
-              key={`${item.id}-${item.slug || index}`}
-              item={item}
-              priority={index < 2}
-            />
+            <AdCard key={`${item.id}-${item.slug || index}`} item={item} priority={index < 2} />
           ))}
         </div>
       ) : null}
@@ -26,11 +22,7 @@ export default function BuyCarsGrid({ items }: BuyCarsGridProps) {
       {remainingItems.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {remainingItems.map((item, index) => (
-            <AdCard
-              key={`${item.id}-${item.slug || index}`}
-              item={item}
-              priority={index < 3}
-            />
+            <AdCard key={`${item.id}-${item.slug || index}`} item={item} priority={index < 3} />
           ))}
         </div>
       ) : null}

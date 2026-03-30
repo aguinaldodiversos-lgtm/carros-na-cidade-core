@@ -7,15 +7,18 @@ async function generateSeoLocal() {
   `);
 
   for (const row of cities.rows) {
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO seo_pages (city_id, type, created_at)
       VALUES ($1,'city',NOW())
       ON CONFLICT DO NOTHING
-    `,[row.city_id]);
+    `,
+      [row.city_id]
+    );
   }
 }
 
-export function startSeoLocalWorker(){
+export function startSeoLocalWorker() {
   generateSeoLocal();
-  setInterval(generateSeoLocal, 6*60*60*1000);
+  setInterval(generateSeoLocal, 6 * 60 * 60 * 1000);
 }

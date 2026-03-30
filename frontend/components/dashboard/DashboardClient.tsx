@@ -14,12 +14,20 @@ type DashboardClientProps = {
   createLabel: string;
 };
 
-export default function DashboardClient({ initialData, heading, subheading, createLabel }: DashboardClientProps) {
+export default function DashboardClient({
+  initialData,
+  heading,
+  subheading,
+  createLabel,
+}: DashboardClientProps) {
   const [data, setData] = useState(initialData);
   const [busyAdId, setBusyAdId] = useState<string | null>(null);
   const [boostPreviewAd, setBoostPreviewAd] = useState<DashboardAd | null>(null);
 
-  const allAds = useMemo(() => [...data.active_ads, ...data.paused_ads], [data.active_ads, data.paused_ads]);
+  const allAds = useMemo(
+    () => [...data.active_ads, ...data.paused_ads],
+    [data.active_ads, data.paused_ads]
+  );
   const defaultBoostAd = allAds[0] ?? null;
 
   const refreshDashboard = async () => {
@@ -66,7 +74,9 @@ export default function DashboardClient({ initialData, heading, subheading, crea
       <section className="rounded-2xl border border-[#dfe4ef] bg-white p-4 shadow-[0_3px_18px_rgba(10,20,40,0.06)] sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#5d6983]">Painel do anunciante</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#5d6983]">
+              Painel do anunciante
+            </p>
             <h1 className="mt-1 text-2xl font-extrabold text-[#1d2538] sm:text-3xl">{heading}</h1>
             <p className="mt-1 text-sm text-[#5b6680]">{subheading}</p>
           </div>
@@ -98,7 +108,9 @@ export default function DashboardClient({ initialData, heading, subheading, crea
               {data.user.name.slice(0, 2).toUpperCase()}
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-[#5d6983]">Logo da loja</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#5d6983]">
+                Logo da loja
+              </p>
               <p className="text-base font-extrabold text-[#1d2538]">{data.user.name}</p>
               <p className="text-sm text-[#5d6982]">
                 {data.stats.is_verified_store ? "CNPJ verificado" : "CNPJ pendente de verificacao"}
@@ -117,7 +129,13 @@ export default function DashboardClient({ initialData, heading, subheading, crea
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.active_ads.map((ad) => (
-            <AdCard key={ad.id} ad={ad} onToggleStatus={updateStatus} onDelete={removeAd} busy={busyAdId === ad.id} />
+            <AdCard
+              key={ad.id}
+              ad={ad}
+              onToggleStatus={updateStatus}
+              onDelete={removeAd}
+              busy={busyAdId === ad.id}
+            />
           ))}
         </div>
       </section>
@@ -129,7 +147,13 @@ export default function DashboardClient({ initialData, heading, subheading, crea
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.paused_ads.map((ad) => (
-            <AdCard key={ad.id} ad={ad} onToggleStatus={updateStatus} onDelete={removeAd} busy={busyAdId === ad.id} />
+            <AdCard
+              key={ad.id}
+              ad={ad}
+              onToggleStatus={updateStatus}
+              onDelete={removeAd}
+              busy={busyAdId === ad.id}
+            />
           ))}
         </div>
       </section>

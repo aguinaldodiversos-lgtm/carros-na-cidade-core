@@ -21,13 +21,10 @@ function computeTerritorialScore(city) {
   const opportunityScore = Number(city.opportunity_score || 0);
   const predictionScore = Number(city.prediction_score || 0);
 
-  const totalAds =
-    Number(city.dominance_total_ads || 0) ||
-    Number(city.metric_total_ads || 0);
+  const totalAds = Number(city.dominance_total_ads || 0) || Number(city.metric_total_ads || 0);
 
   const totalLeads =
-    Number(city.dominance_total_leads || 0) ||
-    Number(city.metric_total_leads || 0);
+    Number(city.dominance_total_leads || 0) || Number(city.metric_total_leads || 0);
 
   const totalDealers = Number(city.metric_total_dealers || 0);
   const stageWeight = normalizeStageWeight(city.stage);
@@ -74,12 +71,8 @@ export async function rebuildCityScores(limit = 1000) {
       dominanceScore: city.dominance_score,
       opportunityScore: city.opportunity_score,
       predictionScore: city.prediction_score,
-      totalAds:
-        Number(city.dominance_total_ads || 0) ||
-        Number(city.metric_total_ads || 0),
-      totalLeads:
-        Number(city.dominance_total_leads || 0) ||
-        Number(city.metric_total_leads || 0),
+      totalAds: Number(city.dominance_total_ads || 0) || Number(city.metric_total_ads || 0),
+      totalLeads: Number(city.dominance_total_leads || 0) || Number(city.metric_total_leads || 0),
       totalDealers: Number(city.metric_total_dealers || 0),
       stage: city.stage || "discovery",
       territorialScore,

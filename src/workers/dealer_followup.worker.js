@@ -64,9 +64,7 @@ async function runDealerFollowup() {
 
       // verificar tempo entre follow-ups
       if (lead.last_sent_at) {
-        const diffHours =
-          (Date.now() - new Date(lead.last_sent_at).getTime()) /
-          (1000 * 60 * 60);
+        const diffHours = (Date.now() - new Date(lead.last_sent_at).getTime()) / (1000 * 60 * 60);
 
         if (step === 1 && diffHours < 48) continue;
         if (step === 2 && diffHours < 96) continue;

@@ -10,13 +10,7 @@ const pool = new Pool({
    CONFIG
 ===================================================== */
 
-const TARGET_CITIES = [
-  "Campinas",
-  "Sorocaba",
-  "Jundiaí",
-  "São Paulo",
-  "Santos",
-];
+const TARGET_CITIES = ["Campinas", "Sorocaba", "Jundiaí", "São Paulo", "Santos"];
 
 /* =====================================================
    FUNÇÃO SIMPLES DE EXTRAÇÃO DE NÚMEROS
@@ -33,9 +27,7 @@ function extractNumber(text) {
 
 async function fetchWebmotors(city) {
   try {
-    const url = `https://www.webmotors.com.br/carros/estoque/${encodeURIComponent(
-      city
-    )}`;
+    const url = `https://www.webmotors.com.br/carros/estoque/${encodeURIComponent(city)}`;
 
     const res = await axios.get(url, {
       headers: {
@@ -114,9 +106,7 @@ async function runCompetitorScan() {
       await saveStat(city, "webmotors", webmotors);
       await saveStat(city, "olx", olx);
 
-      console.log(
-        `📊 ${city}: Webmotors=${webmotors} | OLX=${olx}`
-      );
+      console.log(`📊 ${city}: Webmotors=${webmotors} | OLX=${olx}`);
     } catch (err) {
       console.error(`Erro ao processar cidade ${city}:`, err.message);
     }

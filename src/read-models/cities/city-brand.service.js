@@ -7,7 +7,9 @@ import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
 
 function normalizeBrandSlug(brand) {
-  return String(brand || "").trim().toLowerCase();
+  return String(brand || "")
+    .trim()
+    .toLowerCase();
 }
 
 export async function getCityBrandPage(citySlug, brand, query = {}) {

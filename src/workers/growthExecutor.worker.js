@@ -31,15 +31,9 @@ async function executePendingActions() {
           console.log("⚠️ Ação desconhecida", action.action_type);
       }
 
-      await pool.query(
-        `UPDATE growth_actions SET status = 'done' WHERE id = $1`,
-        [action.id]
-      );
+      await pool.query(`UPDATE growth_actions SET status = 'done' WHERE id = $1`, [action.id]);
     } catch (err) {
-      await pool.query(
-        `UPDATE growth_actions SET status = 'failed' WHERE id = $1`,
-        [action.id]
-      );
+      await pool.query(`UPDATE growth_actions SET status = 'failed' WHERE id = $1`, [action.id]);
     }
   }
 }

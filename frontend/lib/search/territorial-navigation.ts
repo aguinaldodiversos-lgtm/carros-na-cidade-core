@@ -4,12 +4,7 @@ import type {
   TerritorialPagePayload,
 } from "./territorial-public";
 
-export type TerritorialMode =
-  | "city"
-  | "brand"
-  | "model"
-  | "opportunities"
-  | "below_fipe";
+export type TerritorialMode = "city" | "brand" | "model" | "opportunities" | "below_fipe";
 
 export interface TerritorialNavItem {
   label: string;
@@ -40,10 +35,7 @@ function compactItems<T>(items: Array<T | null | undefined>): T[] {
   return items.filter(Boolean) as T[];
 }
 
-function buildPrimaryRouteItems(
-  data: TerritorialPagePayload,
-  links: TerritorialInternalLinks
-) {
+function buildPrimaryRouteItems(data: TerritorialPagePayload, links: TerritorialInternalLinks) {
   return compactItems<TerritorialNavItem>([
     links.city && !isCurrentPath(data, links.city)
       ? {
@@ -66,18 +58,13 @@ function buildPrimaryRouteItems(
           badge: toTotalBadge(data.stats?.totalBelowFipeAds),
         }
       : null,
-    links.brand &&
-    data.brand?.name &&
-    !isCurrentPath(data, links.brand)
+    links.brand && data.brand?.name && !isCurrentPath(data, links.brand)
       ? {
           label: `${data.brand.name} em ${data.city?.name || "sua cidade"}`,
           href: links.brand,
         }
       : null,
-    links.model &&
-    data.brand?.name &&
-    data.model?.name &&
-    !isCurrentPath(data, links.model)
+    links.model && data.brand?.name && data.model?.name && !isCurrentPath(data, links.model)
       ? {
           label: `${data.brand.name} ${data.model.name} em ${data.city?.name || "sua cidade"}`,
           href: links.model,
@@ -151,9 +138,7 @@ export function buildTerritorialBreadcrumbs(
   return breadcrumbs;
 }
 
-export function buildTerritorialHeroLinks(
-  data: TerritorialPagePayload
-): TerritorialNavItem[] {
+export function buildTerritorialHeroLinks(data: TerritorialPagePayload): TerritorialNavItem[] {
   const links = data.internalLinks;
   if (!links) return [];
 

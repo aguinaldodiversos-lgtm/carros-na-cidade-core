@@ -44,7 +44,7 @@ function prettifyCitySlug(slug: string) {
     .join(" ");
 
   const cityName = name || "São Paulo";
-  const state = (hasUf && ufCandidate) ? ufCandidate : "SP";
+  const state = hasUf && ufCandidate ? ufCandidate : "SP";
 
   return {
     name: cityName,
@@ -123,8 +123,7 @@ export default async function SimuladorFinanciamentoCidadePage({
     }),
   ]);
 
-  const recentAds =
-    recentResult.status === "fulfilled" ? recentResult.value.data || [] : [];
+  const recentAds = recentResult.status === "fulfilled" ? recentResult.value.data || [] : [];
 
   const opportunityAds =
     opportunitiesResult.status === "fulfilled" && opportunitiesResult.value.data?.length > 0
@@ -136,8 +135,7 @@ export default async function SimuladorFinanciamentoCidadePage({
       ? highlightResult.value.data
       : recentAds.slice(0, 4);
 
-  const heroVehicle =
-    highlightAds[0] || opportunityAds[0] || fallbackHero(city.name, city.state);
+  const heroVehicle = highlightAds[0] || opportunityAds[0] || fallbackHero(city.name, city.state);
 
   return (
     <FinancingLandingPageClient

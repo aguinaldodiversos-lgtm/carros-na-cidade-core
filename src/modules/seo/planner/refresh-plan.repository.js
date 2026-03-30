@@ -28,13 +28,7 @@ export async function upsertRefreshPlan({
       updated_at = NOW()
     RETURNING *
     `,
-    [
-      clusterPlanId,
-      refreshReason,
-      Number(refreshIntervalHours || 168),
-      nextRefreshAt,
-      status,
-    ]
+    [clusterPlanId, refreshReason, Number(refreshIntervalHours || 168), nextRefreshAt, status]
   );
 
   return result.rows[0];

@@ -13,7 +13,9 @@ export function parseCityCookieValue(raw: string | undefined): CityRef | null {
       id: normalizeCityId(parsed.id),
       slug: String(parsed.slug),
       name: String(parsed.name),
-      state: String(parsed.state || "SP").toUpperCase().slice(0, 2),
+      state: String(parsed.state || "SP")
+        .toUpperCase()
+        .slice(0, 2),
       label: parsed.label || buildCityLabel(parsed.name, parsed.state || "SP"),
     };
   } catch {

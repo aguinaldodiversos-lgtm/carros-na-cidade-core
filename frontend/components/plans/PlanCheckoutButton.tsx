@@ -29,9 +29,7 @@ export default function PlanCheckoutButton({ endpoint, planId, label }: PlanChec
 
       if (!response.ok) {
         if (response.status === 401) {
-          const next = encodeURIComponent(
-            `${window.location.pathname}${window.location.search}`
-          );
+          const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
           window.location.assign(`/login?next=${next}`);
           return;
         }

@@ -27,9 +27,7 @@ for (let i = 0; i < attempts; i += 1) {
     process.exit(0);
   } catch (err) {
     const msg = err?.message || String(err);
-    console.log(
-      `[wait-for-postgres] Tentativa ${i + 1}/${attempts}: ${msg.slice(0, 120)}`
-    );
+    console.log(`[wait-for-postgres] Tentativa ${i + 1}/${attempts}: ${msg.slice(0, 120)}`);
     await new Promise((r) => setTimeout(r, delayMs));
   }
 }

@@ -32,9 +32,7 @@ export async function assertIntegrationDatabaseReady(pool) {
       process.env.TEST_DATABASE_URL || process.env.DATABASE_URL
         ? "Verifique DATABASE_URL/TEST_DATABASE_URL e se o Postgres está acessível."
         : "Suba o Postgres (ex.: docker compose -f docker-compose.test.yml up -d) ou defina DATABASE_URL.";
-    throw new Error(
-      `[integration] Postgres inacessível. ${hint} Detalhe: ${err?.message || err}`
-    );
+    throw new Error(`[integration] Postgres inacessível. ${hint} Detalhe: ${err?.message || err}`);
   }
 }
 

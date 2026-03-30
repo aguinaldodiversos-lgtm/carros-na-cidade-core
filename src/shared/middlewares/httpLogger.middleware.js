@@ -2,8 +2,7 @@ import { getLogger } from "../logger.js";
 import { query } from "../../infrastructure/database/db.js";
 
 const REQUEST_AUDIT_ENABLED =
-  String(process.env.REQUEST_AUDIT_LOGS_ENABLED || "true").toLowerCase() ===
-  "true";
+  String(process.env.REQUEST_AUDIT_LOGS_ENABLED || "true").toLowerCase() === "true";
 
 async function persistRequestAuditLog({
   requestId,
@@ -46,8 +45,7 @@ export function httpLoggerMiddleware(req, res, next) {
   res.on("finish", () => {
     const durationMs = Date.now() - start;
     const statusCode = res.statusCode;
-    const level =
-      statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
+    const level = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
 
     log[level](
       {

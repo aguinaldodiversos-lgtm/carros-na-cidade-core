@@ -4,10 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  DEFAULT_PUBLIC_CITY_LABEL,
-  DEFAULT_PUBLIC_CITY_SLUG,
-} from "@/lib/site/public-config";
+import { DEFAULT_PUBLIC_CITY_LABEL, DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 type FeaturedCity = {
   id: number;
@@ -48,15 +45,7 @@ const MODEL_OPTIONS: Record<string, string[]> = {
   Audi: ["A3", "Q3", "Q5"],
 };
 
-const YEAR_OPTIONS = [
-  "2024",
-  "2023",
-  "2022",
-  "2021",
-  "2020",
-  "2019",
-  "2018",
-];
+const YEAR_OPTIONS = ["2024", "2023", "2022", "2021", "2020", "2019", "2018"];
 
 const PRICE_OPTIONS = [
   { label: "Até R$ 40 mil", value: "40000" },
@@ -179,12 +168,7 @@ export function HomeSearchSection({
   return (
     <div className="rounded-[22px] border border-[#dce3ee] bg-white px-5 py-5 shadow-[0_12px_32px_rgba(16,28,58,0.07)] md:px-6 md:py-6">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <SelectField
-          label="Cidade"
-          value={citySlug}
-          onChange={setCitySlug}
-          options={cityOptions}
-        />
+        <SelectField label="Cidade" value={citySlug} onChange={setCitySlug} options={cityOptions} />
         <SelectField
           label="Marca"
           value={brand}
@@ -194,12 +178,7 @@ export function HomeSearchSection({
           }}
           options={BRAND_OPTIONS.map((item) => ({ label: item, value: item }))}
         />
-        <SelectField
-          label="Modelo"
-          value={model}
-          onChange={setModel}
-          options={modelOptions}
-        />
+        <SelectField label="Modelo" value={model} onChange={setModel} options={modelOptions} />
         <SelectField
           label="Ano"
           value={year}
@@ -215,12 +194,7 @@ export function HomeSearchSection({
           onChange={setMaxPrice}
           options={PRICE_OPTIONS}
         />
-        <SelectField
-          label="Selecionar"
-          value={type}
-          onChange={setType}
-          options={TYPE_OPTIONS}
-        />
+        <SelectField label="Selecionar" value={type} onChange={setType} options={TYPE_OPTIONS} />
         <SelectField
           label="Categoria"
           value={category}
@@ -234,7 +208,13 @@ export function HomeSearchSection({
           className="inline-flex h-[52px] items-center justify-center rounded-[12px] bg-[#0e62d8] px-6 text-[18px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.24)] transition hover:bg-[#0c4fb0]"
         >
           <span>Pesquisar</span>
-          <svg viewBox="0 0 24 24" className="ml-2 h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            viewBox="0 0 24 24"
+            className="ml-2 h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="m9 6 6 6-6 6" />
           </svg>
         </button>

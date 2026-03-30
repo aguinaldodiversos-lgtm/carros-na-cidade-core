@@ -44,7 +44,10 @@ export default function TermosDeUsoPage() {
       ]}
       afterSections={
         <p className="text-[15px] leading-7 text-[#5c6881]">
-          <Link href="/politica-de-privacidade" className="font-semibold text-[#0e62d8] hover:underline">
+          <Link
+            href="/politica-de-privacidade"
+            className="font-semibold text-[#0e62d8] hover:underline"
+          >
             Política de privacidade
           </Link>
           {" · "}

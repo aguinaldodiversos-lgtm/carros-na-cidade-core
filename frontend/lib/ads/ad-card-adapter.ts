@@ -120,14 +120,8 @@ function resolveBadgeFlags(value?: string) {
   const normalized = sanitizeText(value)?.toLowerCase();
 
   return {
-    belowFipe:
-      normalized === "fipe" ||
-      normalized?.includes("abaixo da fipe") ||
-      false,
-    highlight:
-      normalized === "destaque" ||
-      normalized?.includes("destaque") ||
-      false,
+    belowFipe: normalized === "fipe" || normalized?.includes("abaixo da fipe") || false,
+    highlight: normalized === "destaque" || normalized?.includes("destaque") || false,
   };
 }
 
@@ -138,25 +132,15 @@ export function listingCarToAdItem(vehicle: ListingCar): AdItem {
     sanitizeText((vehicle as ListingCar & { badge?: string }).badge)
   );
 
-  const title = buildTitle([
-    sanitizeText(vehicle.model),
-    sanitizeText(vehicle.version),
-  ]);
+  const title = buildTitle([sanitizeText(vehicle.model), sanitizeText(vehicle.version)]);
 
   const rawId =
-    typeof vehicle.id === "number" && Number.isFinite(vehicle.id)
-      ? vehicle.id
-      : undefined;
+    typeof vehicle.id === "number" && Number.isFinite(vehicle.id) ? vehicle.id : undefined;
 
   const stableId =
     rawId ||
     createStableId(
-      [
-        sanitizeText(vehicle.slug),
-        title,
-        sanitizeText(vehicle.price),
-        sanitizeText(vehicle.city),
-      ]
+      [sanitizeText(vehicle.slug), title, sanitizeText(vehicle.price), sanitizeText(vehicle.city)]
         .filter(Boolean)
         .join("|")
     );

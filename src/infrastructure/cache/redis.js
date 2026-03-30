@@ -19,7 +19,9 @@ function isLocalhostUrl(url) {
 }
 
 const url = String(process.env.REDIS_URL || "").trim();
-const isLocalDev = ["development", "dev", "local"].includes(String(process.env.NODE_ENV || "").toLowerCase());
+const isLocalDev = ["development", "dev", "local"].includes(
+  String(process.env.NODE_ENV || "").toLowerCase()
+);
 const skipLocalhost = !isLocalDev && isLocalhostUrl(url);
 
 if (!url || isRedisDisabled() || skipLocalhost) {
@@ -36,9 +38,7 @@ if (!url || isRedisDisabled() || skipLocalhost) {
   });
 
   redis.on("connect", () => logger.info("✅ Redis conectado"));
-  redis.on("error", (err) =>
-    logger.error({ message: "❌ Erro Redis", err: err?.message || err })
-  );
+  redis.on("error", (err) => logger.error({ message: "❌ Erro Redis", err: err?.message || err }));
 }
 
 export { redis };

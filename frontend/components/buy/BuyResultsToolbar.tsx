@@ -87,9 +87,7 @@ export default function BuyResultsToolbar({
               type="button"
               onClick={() => setViewMode("grid")}
               className={`inline-flex h-10 items-center rounded-[10px] px-3 text-sm font-bold transition ${
-                viewMode === "grid"
-                  ? "bg-white text-[#233149] shadow-sm"
-                  : "text-[#66748b]"
+                viewMode === "grid" ? "bg-white text-[#233149] shadow-sm" : "text-[#66748b]"
               }`}
             >
               Grade
@@ -98,9 +96,7 @@ export default function BuyResultsToolbar({
               type="button"
               onClick={() => setViewMode("map")}
               className={`inline-flex h-10 items-center rounded-[10px] px-3 text-sm font-bold transition ${
-                viewMode === "map"
-                  ? "bg-white text-[#233149] shadow-sm"
-                  : "text-[#66748b]"
+                viewMode === "map" ? "bg-white text-[#233149] shadow-sm" : "text-[#66748b]"
               }`}
             >
               Lista

@@ -5,10 +5,7 @@ import {
   type MarketStat,
 } from "@/services/marketService";
 import { type ListingCar } from "@/lib/car-data";
-import {
-  buildSimilarVehicles,
-  type VehicleDetail,
-} from "@/lib/vehicle/public-vehicle";
+import { buildSimilarVehicles, type VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 const AI_API_BASE = process.env.NEXT_PUBLIC_AI_API_URL;
 

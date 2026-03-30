@@ -35,9 +35,7 @@ function serializeUnknownErr(err) {
     message: typeof err.message === "string" ? err.message : String(err),
     name: typeof err.name === "string" ? err.name : null,
     stack:
-      process.env.NODE_ENV === "development" && typeof err.stack === "string"
-        ? err.stack
-        : null,
+      process.env.NODE_ENV === "development" && typeof err.stack === "string" ? err.stack : null,
   };
   if (err.code != null) o.code = err.code;
   if (err.constraint != null) o.constraint = err.constraint;
@@ -57,10 +55,7 @@ function serializeUnknownErr(err) {
 
 function handlePostgresError(err) {
   const details = pgDetails(err);
-  const detailText =
-    typeof err?.detail === "string" && err.detail.trim()
-      ? err.detail.trim()
-      : "";
+  const detailText = typeof err?.detail === "string" && err.detail.trim() ? err.detail.trim() : "";
 
   if (err.code === "23505") {
     return new AppError("Registro duplicado.", 409, true, details);
@@ -75,12 +70,7 @@ function handlePostgresError(err) {
 
   if (err.code === "23502") {
     const col = err?.column ? ` (${String(err.column)})` : "";
-    return new AppError(
-      `Campo obrigatório não informado${col}.`,
-      400,
-      true,
-      details
-    );
+    return new AppError(`Campo obrigatório não informado${col}.`, 400, true, details);
   }
 
   if (err.code === "23514") {
@@ -167,11 +157,7 @@ export function errorHandler(err, req, res, _next) {
         },
         "[errorHandler] erro não mapeado antes do AppError"
       );
-      error = new AppError(
-        raw?.message || "Internal Server Error",
-        raw?.statusCode || 500,
-        false
-      );
+      error = new AppError(raw?.message || "Internal Server Error", raw?.statusCode || 500, false);
     }
   }
 

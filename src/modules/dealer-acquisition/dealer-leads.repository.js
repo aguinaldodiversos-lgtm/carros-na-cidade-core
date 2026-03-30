@@ -84,10 +84,7 @@ export async function upsertDealerLeadFromGoogle(params) {
 }
 
 export async function insertInteraction(row) {
-  const rawPayload =
-    row.raw === undefined || row.raw === null
-      ? null
-      : JSON.stringify(row.raw);
+  const rawPayload = row.raw === undefined || row.raw === null ? null : JSON.stringify(row.raw);
 
   await pool.query(
     `
@@ -188,10 +185,7 @@ export async function recordInboundByPhone(phoneDigits, body) {
     channel: "whatsapp",
   });
 
-  await pool.query(
-    `UPDATE dealer_leads SET updated_at = NOW() WHERE id = $1`,
-    [leadId]
-  );
+  await pool.query(`UPDATE dealer_leads SET updated_at = NOW() WHERE id = $1`, [leadId]);
 
   return leadId;
 }

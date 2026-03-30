@@ -40,9 +40,7 @@ export function StaticPageLayout({
           <h1 className="mt-2 text-[34px] font-extrabold tracking-tight text-[#1d2538] md:text-[44px]">
             {title}
           </h1>
-          <p className="mt-4 max-w-3xl text-[16px] leading-7 text-[#5c6881]">
-            {description}
-          </p>
+          <p className="mt-4 max-w-3xl text-[16px] leading-7 text-[#5c6881]">{description}</p>
 
           <div className="mt-8 space-y-8">
             {sections.map((section) => (
@@ -57,7 +55,9 @@ export function StaticPageLayout({
             ))}
           </div>
 
-          {afterSections ? <div className="mt-2 border-t border-[#eef1f7] pt-6">{afterSections}</div> : null}
+          {afterSections ? (
+            <div className="mt-2 border-t border-[#eef1f7] pt-6">{afterSections}</div>
+          ) : null}
         </div>
       </div>
     </main>

@@ -33,10 +33,7 @@ function evaluateStatus(current, target) {
     return "dominant";
   }
 
-  if (
-    current.dealers >= target.dealers * 0.6 &&
-    current.ads >= target.ads * 0.6
-  ) {
+  if (current.dealers >= target.dealers * 0.6 && current.ads >= target.ads * 0.6) {
     return "ready";
   }
 

@@ -25,12 +25,24 @@ function formatDate(value: string | null) {
 
 function StatusBadge({ active, highlighted }: { active: boolean; highlighted: boolean }) {
   if (highlighted) {
-    return <span className="rounded-full bg-[#e43358] px-2.5 py-1 text-[11px] font-extrabold uppercase text-white">Destaque</span>;
+    return (
+      <span className="rounded-full bg-[#e43358] px-2.5 py-1 text-[11px] font-extrabold uppercase text-white">
+        Destaque
+      </span>
+    );
   }
   if (active) {
-    return <span className="rounded-full bg-[#198754] px-2.5 py-1 text-[11px] font-extrabold uppercase text-white">Ativo</span>;
+    return (
+      <span className="rounded-full bg-[#198754] px-2.5 py-1 text-[11px] font-extrabold uppercase text-white">
+        Ativo
+      </span>
+    );
   }
-  return <span className="rounded-full bg-[#8f98af] px-2.5 py-1 text-[11px] font-extrabold uppercase text-white">Pausado</span>;
+  return (
+    <span className="rounded-full bg-[#8f98af] px-2.5 py-1 text-[11px] font-extrabold uppercase text-white">
+      Pausado
+    </span>
+  );
 }
 
 export default function AdCard({ ad, busy = false, onToggleStatus, onDelete }: AdCardProps) {
@@ -44,7 +56,9 @@ export default function AdCard({ ad, busy = false, onToggleStatus, onDelete }: A
 
       <div className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="line-clamp-2 text-lg font-extrabold leading-tight text-[#1d2538]">{ad.title}</h3>
+          <h3 className="line-clamp-2 text-lg font-extrabold leading-tight text-[#1d2538]">
+            {ad.title}
+          </h3>
           <StatusBadge active={isActive} highlighted={ad.is_featured} />
         </div>
 
@@ -52,16 +66,20 @@ export default function AdCard({ ad, busy = false, onToggleStatus, onDelete }: A
 
         <div className="grid gap-2 rounded-xl border border-[#e2e7f1] bg-[#f8fafe] p-3 text-sm text-[#4f5b76] sm:grid-cols-2">
           <p>
-            <strong className="font-bold text-[#1f2c47]">Status:</strong> {isActive ? "Ativo" : "Pausado"}
+            <strong className="font-bold text-[#1f2c47]">Status:</strong>{" "}
+            {isActive ? "Ativo" : "Pausado"}
           </p>
           <p>
-            <strong className="font-bold text-[#1f2c47]">Visualizacoes:</strong> {ad.views.toLocaleString("pt-BR")}
+            <strong className="font-bold text-[#1f2c47]">Visualizacoes:</strong>{" "}
+            {ad.views.toLocaleString("pt-BR")}
           </p>
           <p>
-            <strong className="font-bold text-[#1f2c47]">Expira em:</strong> {formatDate(ad.expires_at)}
+            <strong className="font-bold text-[#1f2c47]">Expira em:</strong>{" "}
+            {formatDate(ad.expires_at)}
           </p>
           <p>
-            <strong className="font-bold text-[#1f2c47]">Destaque ate:</strong> {formatDate(ad.featured_until)}
+            <strong className="font-bold text-[#1f2c47]">Destaque ate:</strong>{" "}
+            {formatDate(ad.featured_until)}
           </p>
         </div>
 

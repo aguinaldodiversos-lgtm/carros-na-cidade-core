@@ -27,9 +27,6 @@ export async function checkAdLimit(userId, userPlan) {
   const count = parseInt(result.rows[0].count, 10);
 
   if (count >= limit) {
-    throw new AppError(
-      "Limite de anúncios atingido para seu plano",
-      403
-    );
+    throw new AppError("Limite de anúncios atingido para seu plano", 403);
   }
 }

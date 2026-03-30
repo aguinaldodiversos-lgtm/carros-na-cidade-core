@@ -33,11 +33,7 @@ function validateNormalizedRanges(data) {
     throw new AppError("Faixa de preço inválida", 400);
   }
 
-  if (
-    data.year_min !== undefined &&
-    data.year_max !== undefined &&
-    data.year_min > data.year_max
-  ) {
+  if (data.year_min !== undefined && data.year_max !== undefined && data.year_min > data.year_max) {
     throw new AppError("Faixa de ano inválida", 400);
   }
 

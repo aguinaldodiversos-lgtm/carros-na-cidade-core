@@ -7,10 +7,7 @@ import { logger } from "../../../shared/logger.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const keyPath = path.join(
-  __dirname,
-  "../../../credentials/google-service-account.json"
-);
+const keyPath = path.join(__dirname, "../../../credentials/google-service-account.json");
 
 const analyticsClient = new BetaAnalyticsDataClient({
   keyFilename: keyPath,
@@ -28,11 +25,7 @@ export async function collectGA4Data(startDate, endDate) {
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "city" }],
-    metrics: [
-      { name: "sessions" },
-      { name: "totalUsers" },
-      { name: "conversions" },
-    ],
+    metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "conversions" }],
   });
 
   for (const row of response.rows || []) {

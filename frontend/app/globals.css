@@ -243,8 +243,7 @@ b {
 
   .cnc-select {
     @apply cnc-input appearance-none pr-12;
-    background-image:
-      linear-gradient(45deg, transparent 50%, #5c6780 50%),
+    background-image: linear-gradient(45deg, transparent 50%, #5c6780 50%),
       linear-gradient(135deg, #5c6780 50%, transparent 50%);
     background-position:
       calc(100% - 22px) calc(50% - 2px),

@@ -1,5 +1,20 @@
 import axios from "axios";
 
+function extractResponsesOutputText(data) {
+  if (!data || typeof data !== "object") return "";
+  if (typeof data.output_text === "string" && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+  const out0 = data.output?.[0];
+  if (out0?.type === "message" && Array.isArray(out0.content)) {
+    const textPart = out0.content.find((c) => c.type === "output_text" || c.type === "text");
+    if (typeof textPart?.text === "string") return textPart.text.trim();
+  }
+  const legacy = data.output?.[0]?.content?.[0]?.text;
+  if (typeof legacy === "string") return legacy.trim();
+  return "";
+}
+
 export class PremiumAiProvider {
   constructor({ logger }) {
     this.logger = logger;
@@ -47,10 +62,7 @@ export class PremiumAiProvider {
 
     const latencyMs = Date.now() - t0;
 
-    const text =
-      res.data?.output_text ||
-      res.data?.output?.[0]?.content?.[0]?.text ||
-      "";
+    const text = extractResponsesOutputText(res.data) || "";
 
     return {
       provider: "premium",

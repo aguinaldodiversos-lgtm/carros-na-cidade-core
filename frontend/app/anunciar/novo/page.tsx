@@ -4,7 +4,8 @@ import NewAdWizardClient from "@/components/painel/NewAdWizardClient";
 
 export const metadata: Metadata = {
   title: "Novo anúncio",
-  description: "Crie seu anúncio em etapas no Carros na Cidade — dados do veículo, fotos, opcionais e publicação.",
+  description:
+    "Crie seu anúncio em etapas no Carros na Cidade — dados do veículo, fotos, opcionais e publicação.",
   alternates: { canonical: "/anunciar/novo" },
 };
 

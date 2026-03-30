@@ -7,11 +7,7 @@ export const metadata: Metadata = {
   description: "Painel do lojista — Carros na Cidade.",
 };
 
-export default async function DashboardLojaLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLojaLayout({ children }: { children: React.ReactNode }) {
   const session = await requireLojistaDashboardSession();
 
   return (

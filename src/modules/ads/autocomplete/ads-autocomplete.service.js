@@ -13,9 +13,7 @@ import { normalizeSearchText as normalizeText } from "../../../shared/utils/norm
    CONFIG
 ===================================================== */
 
-const CACHE_TTL_MS = Number(
-  process.env.ADS_AUTOCOMPLETE_CACHE_TTL_MS || 10 * 60 * 1000
-);
+const CACHE_TTL_MS = Number(process.env.ADS_AUTOCOMPLETE_CACHE_TTL_MS || 10 * 60 * 1000);
 
 const DEFAULT_LIMIT = 8;
 
@@ -82,9 +80,7 @@ async function getCities() {
       rankingPriority: Number(row.ranking_priority || 0),
       territorialScore: Number(row.territorial_score || 0),
       normalizedName: normalizeText(row.name),
-      normalizedLabel: normalizeText(
-        `${row.name}${row.state ? ` ${row.state}` : ""}`
-      ),
+      normalizedLabel: normalizeText(`${row.name}${row.state ? ` ${row.state}` : ""}`),
     })),
     loadedAt: Date.now(),
   };
@@ -208,13 +204,7 @@ function scoreCandidate({
   const context = cityContextBoost(currentCitySlug, candidateCitySlug);
 
   return Number(
-    (
-      exactPrefix * 0.42 +
-      dice * 0.26 +
-      overlap * 0.22 +
-      popularity +
-      context
-    ).toFixed(6)
+    (exactPrefix * 0.42 + dice * 0.26 + overlap * 0.22 + popularity + context).toFixed(6)
   );
 }
 
@@ -353,12 +343,13 @@ function buildModelSuggestions(
         currentCitySlug,
       });
 
-      score += scoreCandidate({
-        query,
-        candidate: item.model,
-        total: item.total,
-        currentCitySlug,
-      }) * 0.7;
+      score +=
+        scoreCandidate({
+          query,
+          candidate: item.model,
+          total: item.total,
+          currentCitySlug,
+        }) * 0.7;
 
       if (normalizedBrand && item.normalizedBrand === normalizedBrand) {
         score += 0.18;
@@ -376,9 +367,7 @@ function buildModelSuggestions(
     })
     .filter((item) => item.score >= 0.24);
 
-  return sortByScore(
-    uniqueBy(scored, (item) => `${item.brand}:${item.model}`)
-  ).slice(0, limit);
+  return sortByScore(uniqueBy(scored, (item) => `${item.brand}:${item.model}`)).slice(0, limit);
 }
 
 function buildCitySuggestions(
@@ -397,13 +386,14 @@ function buildCitySuggestions(
         candidateCitySlug: item.slug,
       });
 
-      score += scoreCandidate({
-        query,
-        candidate: item.name,
-        total: item.rankingPriority + item.territorialScore,
-        currentCitySlug,
-        candidateCitySlug: item.slug,
-      }) * 0.75;
+      score +=
+        scoreCandidate({
+          query,
+          candidate: item.name,
+          total: item.rankingPriority + item.territorialScore,
+          currentCitySlug,
+          candidateCitySlug: item.slug,
+        }) * 0.75;
 
       if (inferred.city_slug && inferred.city_slug === item.slug) {
         score += 0.22;
@@ -426,11 +416,7 @@ function buildCitySuggestions(
   return sortByScore(uniqueBy(scored, (item) => item.slug)).slice(0, limit);
 }
 
-async function buildComposedSuggestions(
-  inferred,
-  currentCitySlug,
-  { limit = DEFAULT_LIMIT } = {}
-) {
+async function buildComposedSuggestions(inferred, currentCitySlug, { limit = DEFAULT_LIMIT } = {}) {
   const suggestions = [];
   const cityPresence = await getCityBrandPresence();
 
@@ -549,19 +535,18 @@ export async function getSemanticAutocomplete(
   const recognized = buildRecognizedPayload(inferred);
   const applicableFilters = buildApplicableFilters(inferred);
 
-  const [brandSuggestions, modelSuggestions, citySuggestions, composed] =
-    await Promise.all([
-      buildBrandSuggestions(q, brands, { limit }),
-      buildModelSuggestions(q, models, inferred, {
-        limit,
-        currentCitySlug,
-      }),
-      buildCitySuggestions(q, cities, inferred, {
-        limit,
-        currentCitySlug,
-      }),
-      buildComposedSuggestions(inferred, currentCitySlug, { limit }),
-    ]);
+  const [brandSuggestions, modelSuggestions, citySuggestions, composed] = await Promise.all([
+    buildBrandSuggestions(q, brands, { limit }),
+    buildModelSuggestions(q, models, inferred, {
+      limit,
+      currentCitySlug,
+    }),
+    buildCitySuggestions(q, cities, inferred, {
+      limit,
+      currentCitySlug,
+    }),
+    buildComposedSuggestions(inferred, currentCitySlug, { limit }),
+  ]);
 
   return {
     query: q,

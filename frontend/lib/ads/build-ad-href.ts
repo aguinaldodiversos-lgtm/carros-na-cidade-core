@@ -35,14 +35,7 @@ export function buildAdSlug(ad: AdCardLinkInput) {
     return slugify(String(ad.slug));
   }
 
-  const composed = [
-    ad.title,
-    ad.brand,
-    ad.model,
-    ad.version,
-    ad.year,
-    ad.id,
-  ]
+  const composed = [ad.title, ad.brand, ad.model, ad.version, ad.year, ad.id]
     .filter((item) => item !== undefined && item !== null && String(item).trim())
     .map((item) => String(item).trim())
     .join(" ");
@@ -53,9 +46,7 @@ export function buildAdSlug(ad: AdCardLinkInput) {
 export function buildAdHref(ad: AdCardLinkInput) {
   const slug = buildAdSlug(ad);
   const id =
-    ad.id !== undefined && ad.id !== null && String(ad.id).trim()
-      ? String(ad.id).trim()
-      : "";
+    ad.id !== undefined && ad.id !== null && String(ad.id).trim() ? String(ad.id).trim() : "";
 
   const hasRealSlug = hasStableSlug(ad.slug);
 

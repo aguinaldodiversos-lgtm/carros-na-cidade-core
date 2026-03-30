@@ -4,12 +4,7 @@ const axios = require("axios");
    ENV VALIDATION
 ===================================================== */
 function validateEnv() {
-  const required = [
-    "ZAPI_API",
-    "ZAPI_CLIENT_TOKEN",
-    "ZAPI_INSTANCE_ID",
-    "ZAPI_INSTANCE_TOKEN",
-  ];
+  const required = ["ZAPI_API", "ZAPI_CLIENT_TOKEN", "ZAPI_INSTANCE_ID", "ZAPI_INSTANCE_TOKEN"];
 
   for (const key of required) {
     if (!process.env[key]) {
@@ -80,11 +75,7 @@ async function sendWhatsAppMessage(phone, message) {
     return true;
   } catch (err) {
     if (err.response) {
-      console.error(
-        "❌ Erro Z-API:",
-        err.response.status,
-        err.response.data
-      );
+      console.error("❌ Erro Z-API:", err.response.status, err.response.data);
     } else {
       console.error("❌ Erro no WhatsApp:", err.message);
     }

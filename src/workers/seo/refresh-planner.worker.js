@@ -30,23 +30,15 @@ export async function startRefreshPlannerWorker() {
 
   refreshPlannerStarted = true;
 
-  const intervalMs = Number(
-    process.env.REFRESH_PLANNER_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.REFRESH_PLANNER_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
-  logger.info(
-    { intervalMs },
-    "[refresh-planner.worker] Inicializando worker"
-  );
+  logger.info({ intervalMs }, "[refresh-planner.worker] Inicializando worker");
 
   await runOnce();
 
   refreshPlannerInterval = setInterval(() => {
     runOnce().catch((error) => {
-      logger.error(
-        { error },
-        "[refresh-planner.worker] Erro na execução agendada"
-      );
+      logger.error({ error }, "[refresh-planner.worker] Erro na execução agendada");
     });
   }, intervalMs);
 }

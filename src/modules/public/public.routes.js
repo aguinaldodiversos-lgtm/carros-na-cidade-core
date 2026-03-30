@@ -9,20 +9,12 @@ import {
   getCityOpportunityClusterPage,
   getCityBelowFipeClusterPage,
 } from "./public-clusters.controller.js";
-import {
-  getCityById,
-  resolveCity,
-  searchCities,
-} from "./public-city-query.controller.js";
+import { getCityById, resolveCity, searchCities } from "./public-city-query.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 
 const router = express.Router();
 
-router.get(
-  "/home",
-  cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }),
-  getHomeData
-);
+router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
 
 router.get(
   "/cities/resolve",

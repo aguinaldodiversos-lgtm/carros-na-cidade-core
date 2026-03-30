@@ -46,8 +46,7 @@ async function scoreLead(lead) {
     [lead.city_id]
   );
 
-  const cityPriority =
-    cityResult.rows[0]?.priority_level || "low";
+  const cityPriority = cityResult.rows[0]?.priority_level || "low";
 
   const score = calculateScore(lead, cityPriority);
   const priority = getPriority(score);

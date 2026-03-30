@@ -6,9 +6,7 @@ import {
   getPublicSitemapByRegion,
   getPublicSitemapByType,
 } from "./public-seo.controller.js";
-import {
-  listPublicSitemapEntries,
-} from "./public-seo.service.js";
+import { listPublicSitemapEntries } from "./public-seo.service.js";
 
 const router = express.Router();
 
@@ -54,10 +52,12 @@ function buildUrlEntry(loc, { lastmod, changefreq, priority } = {}) {
 }
 
 function buildSitemapXml(urls) {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     `${urls.join("\n")}\n` +
-    `</urlset>\n`;
+    `</urlset>\n`
+  );
 }
 
 router.get("/sitemap", getPublicSitemap);
@@ -81,7 +81,11 @@ router.get("/sitemap.xml", async (req, res) => {
       const ts = nowIso();
       urls.push(
         buildUrlEntry(`${getSiteUrl()}/`, { lastmod: ts, changefreq: "daily", priority: 1.0 }),
-        buildUrlEntry(`${getSiteUrl()}/anuncios`, { lastmod: ts, changefreq: "daily", priority: 0.9 })
+        buildUrlEntry(`${getSiteUrl()}/anuncios`, {
+          lastmod: ts,
+          changefreq: "daily",
+          priority: 0.9,
+        })
       );
     }
 
@@ -97,7 +101,11 @@ router.get("/sitemap.xml", async (req, res) => {
 
     const xml = buildSitemapXml([
       buildUrlEntry(`${getSiteUrl()}/`, { lastmod: nowIso(), changefreq: "daily", priority: 1.0 }),
-      buildUrlEntry(`${getSiteUrl()}/anuncios`, { lastmod: nowIso(), changefreq: "daily", priority: 0.9 }),
+      buildUrlEntry(`${getSiteUrl()}/anuncios`, {
+        lastmod: nowIso(),
+        changefreq: "daily",
+        priority: 0.9,
+      }),
     ]);
 
     res

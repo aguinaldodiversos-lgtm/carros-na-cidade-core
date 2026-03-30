@@ -5,40 +5,15 @@ import path from "node:path";
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, "project-audit.config.json");
 
-const CODE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".json",
-]);
+const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json"]);
 
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
-const SKIP_DIRS = new Set([
-  "node_modules",
-  ".git",
-  ".next",
-  "dist",
-  "coverage",
-  "build",
-  ".turbo",
-]);
+const SKIP_DIRS = new Set(["node_modules", ".git", ".next", "dist", "coverage", "build", ".turbo"]);
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_PATH)) {
-    throw new Error(
-      "project-audit.config.json não encontrado na raiz do projeto."
-    );
+    throw new Error("project-audit.config.json não encontrado na raiz do projeto.");
   }
 
   return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
@@ -409,11 +384,15 @@ function collectBackendRouteRegistry() {
   for (const [, entry] of registry) {
     entry.imports = extractImports(entry.content);
 
-    for (const match of entry.content.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:express\.)?Router\s*\(/g)) {
+    for (const match of entry.content.matchAll(
+      /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:express\.)?Router\s*\(/g
+    )) {
       entry.routerVars.add(match[1]);
     }
 
-    for (const match of entry.content.matchAll(/\b([A-Za-z_$][\w$]*)\.(get|post|put|patch|delete|use)\(\s*["'`]([^"'`]+)["'`]/g)) {
+    for (const match of entry.content.matchAll(
+      /\b([A-Za-z_$][\w$]*)\.(get|post|put|patch|delete|use)\(\s*["'`]([^"'`]+)["'`]/g
+    )) {
       const owner = match[1];
       const method = match[2].toUpperCase();
       const routePath = match[3];
@@ -460,7 +439,9 @@ function collectBackendRouteRegistry() {
       }
     }
 
-    for (const match of entry.content.matchAll(/\bapp\.use\(\s*["'`]([^"'`]+)["'`]\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g)) {
+    for (const match of entry.content.matchAll(
+      /\bapp\.use\(\s*["'`]([^"'`]+)["'`]\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g
+    )) {
       const prefix = match[1];
       const localName = match[2];
       const resolved = localImportMap.get(localName);
@@ -561,7 +542,9 @@ function extractFetchCalls(content) {
 function extractAxiosCalls(content) {
   const calls = [];
 
-  for (const match of content.matchAll(/\b(?:axios|api)\.(get|post|put|patch|delete)\(\s*([`"'"][\s\S]*?[`"'])/g)) {
+  for (const match of content.matchAll(
+    /\b(?:axios|api)\.(get|post|put|patch|delete)\(\s*([`"'"][\s\S]*?[`"'])/g
+  )) {
     const method = match[1].toUpperCase();
     const url = match[2].slice(1, -1);
 
@@ -665,11 +648,7 @@ function auditFrontendRoutes(findings) {
 
       const targetPath = rawTarget.split("?")[0].split("#")[0];
 
-      const ok = routeExists(
-        targetPath,
-        routePatterns,
-        config.allowMissingFrontendRoutes || []
-      );
+      const ok = routeExists(targetPath, routePatterns, config.allowMissingFrontendRoutes || []);
 
       if (!ok) {
         addFinding(findings, {
@@ -682,6 +661,76 @@ function auditFrontendRoutes(findings) {
       }
     }
   }
+}
+
+/** `<Link>` do Next aninhado noutro `<Link>` (estrutura real, não só dois Links no mesmo ficheiro). */
+function hasNestedNextLink(content) {
+  let i = 0;
+  while (i < content.length) {
+    const start = content.indexOf("<Link", i);
+    if (start === -1) return false;
+    const gt = content.indexOf(">", start);
+    if (gt === -1) {
+      i = start + 1;
+      continue;
+    }
+    let depth = 1;
+    let j = gt + 1;
+    while (j < content.length && depth > 0) {
+      const nextOpen = content.indexOf("<Link", j);
+      const nextClose = content.indexOf("</Link>", j);
+      if (nextClose === -1) break;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth += 1;
+        if (depth > 1) return true;
+        j = nextOpen + 5;
+        const gt2 = content.indexOf(">", j);
+        j = gt2 === -1 ? nextOpen + 1 : gt2 + 1;
+      } else {
+        depth -= 1;
+        j = nextClose + 7;
+      }
+    }
+    i = start + 1;
+  }
+  return false;
+}
+
+/** `componentName` aparece dentro do primeiro segmento `<Link>...</Link>` que o contém (embrulho real). */
+function nextLinkWrapsComponent(content, componentName) {
+  const tag = `<${componentName}`;
+  let i = 0;
+  while (i < content.length) {
+    const start = content.indexOf("<Link", i);
+    if (start === -1) return false;
+    const gt = content.indexOf(">", start);
+    if (gt === -1) {
+      i = start + 1;
+      continue;
+    }
+    let depth = 1;
+    let j = gt + 1;
+    while (j < content.length && depth > 0) {
+      const nextOpen = content.indexOf("<Link", j);
+      const nextClose = content.indexOf("</Link>", j);
+      if (nextClose === -1) break;
+      const compIdx = content.indexOf(tag, j);
+      if (compIdx !== -1 && compIdx < nextClose && (nextOpen === -1 || compIdx < nextOpen)) {
+        return true;
+      }
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth += 1;
+        j = nextOpen + 5;
+        const gt2 = content.indexOf(">", j);
+        j = gt2 === -1 ? nextOpen + 1 : gt2 + 1;
+      } else {
+        depth -= 1;
+        j = nextClose + 7;
+      }
+    }
+    i = start + 1;
+  }
+  return false;
 }
 
 function auditNestedLinks(findings) {
@@ -702,7 +751,7 @@ function auditNestedLinks(findings) {
   for (const file of frontendFiles) {
     const content = readFileSafe(file);
 
-    if (/<Link\b[\s\S]{0,5000}<Link\b[\s\S]{0,5000}<\/Link>[\s\S]{0,5000}<\/Link>/m.test(content)) {
+    if (hasNestedNextLink(content)) {
       addFinding(findings, {
         severity: "error",
         code: "direct-nested-link",
@@ -742,22 +791,25 @@ function auditNestedLinks(findings) {
     }
 
     for (const localName of localSelfLinkingNames) {
-      const pattern = new RegExp(
-        `<Link\\b[\\s\\S]{0,6000}<${localName}\\b[\\s\\S]{0,3000}\\/?>[\\s\\S]{0,6000}<\\/Link>`,
-        "m"
-      );
-
-      if (pattern.test(content)) {
+      if (nextLinkWrapsComponent(content, localName)) {
         addFinding(findings, {
           severity: "error",
           code: "wrapped-self-linking-component",
           file,
           message: `Componente com navegação própria (${localName}) foi embrulhado por Link.`,
-          suggestion: "Padronizar o componente para controlar sua própria navegação ou expor modo sem Link interno.",
+          suggestion:
+            "Padronizar o componente para controlar sua própria navegação ou expor modo sem Link interno.",
         });
       }
     }
   }
+}
+
+function shouldSkipEnvAuditFile(filePath) {
+  const r = rel(filePath);
+  if (/\.test\.(js|mjs|ts|tsx)$/.test(r)) return true;
+  if (r.includes("/e2e/") || r.startsWith("tests/")) return true;
+  return false;
 }
 
 function auditEnvUsage(findings) {
@@ -769,6 +821,7 @@ function auditEnvUsage(findings) {
   }
 
   for (const file of allFiles) {
+    if (shouldSkipEnvAuditFile(file)) continue;
     const content = readFileSafe(file);
     const matches = Array.from(content.matchAll(/process\.env\.([A-Z0-9_]+)/g));
 
@@ -792,7 +845,9 @@ function auditFrontendBackendIntegration(findings) {
   const contractHints = (config.contractHints || []).map((item) => ({
     frontendPath: normalizeEndpointPath(item.frontendPath),
     backendPattern: normalizeEndpointPath(item.backendPattern),
-    methods: Array.isArray(item.methods) ? item.methods.map((m) => String(m).toUpperCase()) : ["GET"],
+    methods: Array.isArray(item.methods)
+      ? item.methods.map((m) => String(m).toUpperCase())
+      : ["GET"],
     backendProofOptional: Boolean(item.backendProofOptional),
   }));
 
@@ -807,8 +862,7 @@ function auditFrontendBackendIntegration(findings) {
       /** Serviço opcional (métricas de boost), não é a API core em `src/app.js`. */
       if (
         typeof call.raw === "string" &&
-        (call.raw.includes("AI_API_BASE") ||
-          call.raw.includes("NEXT_PUBLIC_AI_API_URL"))
+        (call.raw.includes("AI_API_BASE") || call.raw.includes("NEXT_PUBLIC_AI_API_URL"))
       ) {
         continue;
       }
@@ -825,20 +879,17 @@ function auditFrontendBackendIntegration(findings) {
 
       const matchingBff = bffRouteRegistry.find(
         (route) =>
-          route.method === call.method &&
-          pathMatchesPattern(pathForBackendMatch, route.path)
+          route.method === call.method && pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
       const matchingBackend = backendRegistry.find(
         (route) =>
-          route.method === call.method &&
-          pathMatchesPattern(pathForBackendMatch, route.path)
+          route.method === call.method && pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
       const backendMethodMismatch = backendRegistry.find(
         (route) =>
-          route.method !== call.method &&
-          pathMatchesPattern(pathForBackendMatch, route.path)
+          route.method !== call.method && pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
       const satisfiedBySurface = matchingBackend || matchingBff;
@@ -873,7 +924,8 @@ function auditFrontendBackendIntegration(findings) {
           code: "frontend-backend-method-mismatch",
           file,
           message: `O caminho existe no backend, mas com método diferente: ${pathCandidate}`,
-          suggestion: "Revisar o método HTTP usado no frontend ou a implementação da rota no backend.",
+          suggestion:
+            "Revisar o método HTTP usado no frontend ou a implementação da rota no backend.",
           details: `Frontend: ${call.method} | Backend: ${backendMethodMismatch.method}`,
         });
       }
@@ -923,7 +975,8 @@ function auditContractStability(findings) {
       code: "backend-contract-scan-weak",
       file: null,
       message: "Poucos sinais de rotas/respostas JSON foram encontrados no backend.",
-      suggestion: "Concentrar rotas e respostas em arquivos previsíveis melhora a auditoria futura.",
+      suggestion:
+        "Concentrar rotas e respostas em arquivos previsíveis melhora a auditoria futura.",
     });
   }
 }
@@ -931,7 +984,11 @@ function auditContractStability(findings) {
 function buildSuggestionsSummary(findings) {
   const summary = [];
 
-  if (findings.some((f) => f.code === "wrapped-self-linking-component" || f.code === "direct-nested-link")) {
+  if (
+    findings.some(
+      (f) => f.code === "wrapped-self-linking-component" || f.code === "direct-nested-link"
+    )
+  ) {
     summary.push(
       "Padronize componentes clicáveis com uma prop como linkMode='self' | 'none' para impedir Link dentro de Link."
     );

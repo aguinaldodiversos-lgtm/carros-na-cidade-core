@@ -151,11 +151,7 @@ function parseResolvedCityPayload(json: unknown, fallbackUf?: string): ResolvedC
   const d = data as Record<string, unknown>;
   const idRaw = d.id;
   const id =
-    typeof idRaw === "number"
-      ? idRaw
-      : typeof idRaw === "string"
-        ? parseInt(idRaw, 10)
-        : NaN;
+    typeof idRaw === "number" ? idRaw : typeof idRaw === "string" ? parseInt(idRaw, 10) : NaN;
   if (!Number.isFinite(id) || id <= 0) return null;
   const name = typeof d.name === "string" ? d.name.trim() : "";
   let state = typeof d.state === "string" ? d.state.trim() : "";
@@ -176,7 +172,9 @@ export async function fetchResolvedCityByIdFromBackend(
   cityId: number,
   fallbackUf?: string
 ): Promise<ResolvedCityRow | null> {
-  const url = resolveBackendApiUrl(`/api/public/cities/by-id/${encodeURIComponent(String(cityId))}`);
+  const url = resolveBackendApiUrl(
+    `/api/public/cities/by-id/${encodeURIComponent(String(cityId))}`
+  );
   if (!url) return null;
   try {
     const res = await fetch(url, {

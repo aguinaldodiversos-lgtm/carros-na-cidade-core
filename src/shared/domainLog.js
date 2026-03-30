@@ -8,13 +8,7 @@
  * @param {string} [fields.requestId]
  * @param {string|number} [fields.userId]
  */
-export function buildDomainFields({
-  action,
-  result,
-  requestId,
-  userId,
-  ...extra
-}) {
+export function buildDomainFields({ action, result, requestId, userId, ...extra }) {
   const o = {
     domain: "app",
     action,

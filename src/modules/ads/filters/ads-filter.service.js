@@ -30,11 +30,7 @@ function buildSafeSearchFallback(error, rawFilters = {}) {
   };
 }
 
-export async function searchAdsWithFilters(
-  rawFilters = {},
-  scope = "public_global",
-  options = {}
-) {
+export async function searchAdsWithFilters(rawFilters = {}, scope = "public_global", options = {}) {
   const safeMode = options.safeMode !== false;
 
   try {

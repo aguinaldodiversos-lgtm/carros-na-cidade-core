@@ -52,7 +52,6 @@ export async function getAcquisitionTargetsByCity(cityId, limit = 50) {
   return dealers.map((dealer) => ({
     ...dealer,
     acquisition_priority_score:
-      (dealer.verified ? 20 : 0) +
-      Math.max(0, 30 - Number(dealer.active_ads || 0)),
+      (dealer.verified ? 20 : 0) + Math.max(0, 30 - Number(dealer.active_ads || 0)),
   }));
 }

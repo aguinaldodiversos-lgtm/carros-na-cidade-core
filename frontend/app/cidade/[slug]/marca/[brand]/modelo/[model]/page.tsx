@@ -23,20 +23,12 @@ export async function generateMetadata({
   params,
   searchParams,
 }: CityModelPageProps): Promise<Metadata> {
-  const data = await getCityModelPageData(
-    params.slug,
-    params.brand,
-    params.model,
-    searchParams
-  );
+  const data = await getCityModelPageData(params.slug, params.brand, params.model, searchParams);
 
   return buildTerritorialMetadata(data, "model");
 }
 
-export default async function CityModelPage({
-  params,
-  searchParams,
-}: CityModelPageProps) {
+export default async function CityModelPage({ params, searchParams }: CityModelPageProps) {
   const initialData = await getCityModelPageData(
     params.slug,
     params.brand,

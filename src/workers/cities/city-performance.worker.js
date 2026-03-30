@@ -21,10 +21,7 @@ async function runOnce() {
       total: result.total,
     });
   } catch (error) {
-    logger.error(
-      { error: error?.message || String(error) },
-      "[city-performance.worker] erro"
-    );
+    logger.error({ error: error?.message || String(error) }, "[city-performance.worker] erro");
 
     await finishWorkerRun(runId, "city-performance-worker", "failed", {
       durationMs: Date.now() - startedAt,
@@ -39,9 +36,7 @@ export async function startCityPerformanceWorker() {
   if (started) return;
   started = true;
 
-  const intervalMs = Number(
-    process.env.CITY_PERFORMANCE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.CITY_PERFORMANCE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   await runOnce();
 

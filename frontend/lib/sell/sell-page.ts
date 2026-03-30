@@ -116,14 +116,12 @@ function fallbackContent(): SellPageContent {
       {
         step: "02",
         title: "Entre ou crie sua conta",
-        description:
-          "O acesso prepara o seu ambiente para publicação e continuidade do anúncio.",
+        description: "O acesso prepara o seu ambiente para publicação e continuidade do anúncio.",
       },
       {
         step: "03",
         title: "Preencha os dados do veículo",
-        description:
-          "Informe versão, quilometragem, cidade, preço e diferenciais principais.",
+        description: "Informe versão, quilometragem, cidade, preço e diferenciais principais.",
       },
       {
         step: "04",
@@ -135,8 +133,7 @@ function fallbackContent(): SellPageContent {
     dealerBenefits: [
       {
         title: "Página da loja e vitrine regional",
-        description:
-          "Sua operação ganha presença profissional e mais autoridade na sua cidade.",
+        description: "Sua operação ganha presença profissional e mais autoridade na sua cidade.",
       },
       {
         title: "Hierarquia comercial de exposição",
@@ -145,15 +142,13 @@ function fallbackContent(): SellPageContent {
       },
       {
         title: "Base pronta para integração com CRM",
-        description:
-          "Estrutura pensada para crescer junto com operação, leads e estoque.",
+        description: "Estrutura pensada para crescer junto com operação, leads e estoque.",
       },
     ],
     privateSellerBenefits: [
       {
         title: "Publicação simples",
-        description:
-          "Fluxo claro para quem quer vender um único carro sem complexidade.",
+        description: "Fluxo claro para quem quer vender um único carro sem complexidade.",
       },
       {
         title: "Mais confiança na apresentação",
@@ -162,28 +157,24 @@ function fallbackContent(): SellPageContent {
       },
       {
         title: "Maior chance de contato qualificado",
-        description:
-          "O foco regional reduz ruído e aproxima o comprador certo.",
+        description: "O foco regional reduz ruído e aproxima o comprador certo.",
       },
     ],
     testimonials: [
       {
         name: "Carlos M.",
         role: "Vendedor particular • São Paulo",
-        text:
-          "Gostei da proposta porque o anúncio fica com aparência muito mais profissional e o comprador já chega mais decidido.",
+        text: "Gostei da proposta porque o anúncio fica com aparência muito mais profissional e o comprador já chega mais decidido.",
       },
       {
         name: "Prime Auto Center",
         role: "Lojista • Zona Sul",
-        text:
-          "Para loja, o diferencial está na presença regional e na forma como o estoque ganha cara de operação séria.",
+        text: "Para loja, o diferencial está na presença regional e na forma como o estoque ganha cara de operação séria.",
       },
       {
         name: "Fernanda R.",
         role: "Vendedora particular • ABC",
-        text:
-          "A combinação entre anúncio bonito, preço de referência e contato rápido ajuda muito na confiança.",
+        text: "A combinação entre anúncio bonito, preço de referência e contato rápido ajuda muito na confiança.",
       },
     ],
     faq: [

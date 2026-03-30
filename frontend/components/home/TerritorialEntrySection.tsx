@@ -21,9 +21,7 @@ const DEFAULT_CITIES: TerritorialCityEntry[] = [
   { name: "Bragança Paulista", slug: "braganca-paulista", state: "SP" },
 ];
 
-export function TerritorialEntrySection({
-  cities = DEFAULT_CITIES,
-}: TerritorialEntrySectionProps) {
+export function TerritorialEntrySection({ cities = DEFAULT_CITIES }: TerritorialEntrySectionProps) {
   if (!cities.length) return null;
 
   return (
@@ -33,9 +31,7 @@ export function TerritorialEntrySection({
           Exploração territorial
         </span>
 
-        <h2 className="text-xl font-bold text-zinc-900">
-          Navegue por cidades estratégicas
-        </h2>
+        <h2 className="text-xl font-bold text-zinc-900">Navegue por cidades estratégicas</h2>
 
         <p className="text-sm text-zinc-500">
           Entre direto nas páginas locais, oportunidades e ofertas abaixo da FIPE.
@@ -44,18 +40,11 @@ export function TerritorialEntrySection({
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cities.map((city) => (
-          <div
-            key={city.slug}
-            className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4"
-          >
+          <div key={city.slug} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-zinc-900">
-                  {city.name}
-                </h3>
-                {city.state ? (
-                  <p className="mt-1 text-sm text-zinc-500">{city.state}</p>
-                ) : null}
+                <h3 className="text-base font-semibold text-zinc-900">{city.name}</h3>
+                {city.state ? <p className="mt-1 text-sm text-zinc-500">{city.state}</p> : null}
               </div>
             </div>
 

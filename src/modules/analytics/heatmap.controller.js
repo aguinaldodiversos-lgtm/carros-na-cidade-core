@@ -27,7 +27,7 @@ export async function getHeatmap(req, res, next) {
         ON roi.city_id = c.id
     `);
 
-    const heatmap = result.rows.map(city => {
+    const heatmap = result.rows.map((city) => {
       const score = calculateCityScore({
         demand_score: Number(city.demand_score || 1),
         total_leads: Number(city.total_leads || 0),
@@ -69,7 +69,6 @@ export async function getHeatmap(req, res, next) {
       total_cities: heatmap.length,
       heatmap,
     });
-
   } catch (err) {
     next(err);
   }

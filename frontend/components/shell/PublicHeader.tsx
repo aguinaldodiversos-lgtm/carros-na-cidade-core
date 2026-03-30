@@ -9,11 +9,7 @@ import { Fragment, useMemo, useState } from "react";
 import { CityHeaderSelector } from "@/components/city/CityHeaderSelector";
 import { useCity } from "@/lib/city/CityContext";
 import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
-import {
-  buildHeaderNavSections,
-  SITE_ROUTES,
-  isNavLinkActive,
-} from "@/lib/site/site-navigation";
+import { buildHeaderNavSections, SITE_ROUTES, isNavLinkActive } from "@/lib/site/site-navigation";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -61,11 +57,7 @@ function MenuIcon({ open }: { open: boolean }) {
       stroke="currentColor"
       strokeWidth="2"
     >
-      {open ? (
-        <path d="M6 6l12 12M18 6 6 18" />
-      ) : (
-        <path d="M3 6h18M3 12h18M3 18h18" />
-      )}
+      {open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M3 6h18M3 12h18M3 18h18" />}
     </svg>
   );
 }
@@ -80,10 +72,7 @@ export function PublicHeader() {
   const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { city, openCityPicker } = useCity();
-  const headerNavSections = useMemo(
-    () => buildHeaderNavSections(city.slug),
-    [city.slug]
-  );
+  const headerNavSections = useMemo(() => buildHeaderNavSections(city.slug), [city.slug]);
   const cityHubHref = `/cidade/${encodeURIComponent(city.slug)}`;
 
   return (
@@ -138,10 +127,7 @@ export function PublicHeader() {
           </div>
 
           <div className="hidden items-center gap-2 xl:flex">
-            <nav
-              className="flex items-center gap-1"
-              aria-label="Navegação principal"
-            >
+            <nav className="flex items-center gap-1" aria-label="Navegação principal">
               {headerNavSections.map((section, sectionIndex) => (
                 <Fragment key={section.id}>
                   {sectionIndex > 0 ? (
@@ -150,17 +136,9 @@ export function PublicHeader() {
                       aria-hidden
                     />
                   ) : null}
-                  <div
-                    role="group"
-                    aria-label={section.title}
-                    className="flex items-center gap-1"
-                  >
+                  <div role="group" aria-label={section.title} className="flex items-center gap-1">
                     {section.links.map((item) => {
-                      const active = isNavLinkActive(
-                        pathname,
-                        searchParams,
-                        item.href
-                      );
+                      const active = isNavLinkActive(pathname, searchParams, item.href);
                       return (
                         <Link
                           key={item.id}
@@ -180,10 +158,7 @@ export function PublicHeader() {
                 </Fragment>
               ))}
 
-              <span
-                className="mx-0.5 hidden h-5 w-px shrink-0 bg-[#E6EAF2] xl:block"
-                aria-hidden
-              />
+              <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-[#E6EAF2] xl:block" aria-hidden />
 
               <Link
                 href={SITE_ROUTES.favoritos}
@@ -290,17 +265,9 @@ export function PublicHeader() {
                   <p className="px-4 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9aa3b8]">
                     {section.title}
                   </p>
-                  <div
-                    role="group"
-                    aria-label={section.title}
-                    className="grid gap-1"
-                  >
+                  <div role="group" aria-label={section.title} className="grid gap-1">
                     {section.links.map((item) => {
-                      const active = isNavLinkActive(
-                        pathname,
-                        searchParams,
-                        item.href
-                      );
+                      const active = isNavLinkActive(pathname, searchParams, item.href);
                       return (
                         <Link
                           key={item.id}

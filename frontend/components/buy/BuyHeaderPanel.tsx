@@ -34,9 +34,8 @@ export default function BuyHeaderPanel({
           </p>
 
           <p className="mt-4 max-w-[620px] text-[14px] leading-6 text-[#5d677d] sm:text-[15px] sm:leading-7 lg:text-[16px]">
-            Explore estoque ativo, oportunidades regionais e filtros preparados para
-            navegacao local em{" "}
-            <span className="font-semibold text-[#1f2a3f]">{cityLabel}</span>.
+            Explore estoque ativo, oportunidades regionais e filtros preparados para navegacao local
+            em <span className="font-semibold text-[#1f2a3f]">{cityLabel}</span>.
           </p>
 
           {quickLinks.length > 0 ? (
@@ -65,13 +64,12 @@ export default function BuyHeaderPanel({
             </h2>
 
             <p className="mt-1 text-[17px] leading-tight text-[#39445b] sm:text-[21px] lg:text-[25px]">
-              com anúncios em{" "}
-              <span className="font-black text-[#0e62d8]">destaque</span>
+              com anúncios em <span className="font-black text-[#0e62d8]">destaque</span>
             </p>
 
             <p className="mt-4 text-[13px] leading-6 text-[#627087] sm:text-sm">
-              Ganhe mais visibilidade no inventario local e apareca na frente de quem
-              esta comprando em {cityLabel}.
+              Ganhe mais visibilidade no inventario local e apareca na frente de quem esta comprando
+              em {cityLabel}.
             </p>
 
             <Link

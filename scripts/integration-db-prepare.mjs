@@ -27,9 +27,7 @@ const pool = db.default;
 const { closeDatabasePool } = db;
 
 try {
-  const { rows } = await pool.query(
-    "SELECT COUNT(*)::int AS c FROM cities"
-  );
+  const { rows } = await pool.query("SELECT COUNT(*)::int AS c FROM cities");
   if (rows[0]?.c === 0) {
     await pool.query(
       `

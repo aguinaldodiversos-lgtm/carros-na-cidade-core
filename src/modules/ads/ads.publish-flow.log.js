@@ -39,8 +39,7 @@ export function sanitizeAdPayloadForLog(payload) {
 
   if (typeof payload.description === "string" && payload.description.length) {
     const d = payload.description;
-    out.description =
-      d.length > MAX_DESC ? `${d.slice(0, MAX_DESC)}…` : d;
+    out.description = d.length > MAX_DESC ? `${d.slice(0, MAX_DESC)}…` : d;
   }
 
   if (payload.advertiser_id != null) {

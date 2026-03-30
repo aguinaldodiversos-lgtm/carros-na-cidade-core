@@ -120,7 +120,9 @@ export async function fetchPublicHomeData(
   return {
     featuredCities: homeData.featuredCities || empty.featuredCities,
     highlightAds: highlightAds.length ? highlightAds : homeData.highlightAds || empty.highlightAds,
-    opportunityAds: opportunityAds.length ? opportunityAds : homeData.opportunityAds || empty.opportunityAds,
+    opportunityAds: opportunityAds.length
+      ? opportunityAds
+      : homeData.opportunityAds || empty.opportunityAds,
     recentAds: recentAds.length ? recentAds : homeData.recentAds || empty.recentAds,
     stats: homeData.stats || empty.stats,
   };

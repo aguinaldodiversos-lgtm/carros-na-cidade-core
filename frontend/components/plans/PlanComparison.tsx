@@ -35,15 +35,22 @@ export default function PlanComparison() {
 
       <div className="mt-4 space-y-3 md:hidden">
         {rows.map((row) => (
-          <article key={row.feature} className="rounded-xl border border-[#e1e5ef] bg-[#f8fafe] p-3">
+          <article
+            key={row.feature}
+            className="rounded-xl border border-[#e1e5ef] bg-[#f8fafe] p-3"
+          >
             <h3 className="text-sm font-extrabold text-[#24324d]">{row.feature}</h3>
             <div className="mt-2 grid gap-2 text-sm">
               <p className="rounded-lg bg-[#eaf2ff] px-2 py-2 text-[#1f2f4e]">
-                <span className="block text-[11px] font-bold uppercase tracking-wide text-[#0e62d8]">Carros na Cidade</span>
+                <span className="block text-[11px] font-bold uppercase tracking-wide text-[#0e62d8]">
+                  Carros na Cidade
+                </span>
                 {row.carrosNaCidade}
               </p>
               <p className="rounded-lg bg-[#f2f4f9] px-2 py-2 text-[#5e6780]">
-                <span className="block text-[11px] font-bold uppercase tracking-wide text-[#6a748b]">Outras plataformas</span>
+                <span className="block text-[11px] font-bold uppercase tracking-wide text-[#6a748b]">
+                  Outras plataformas
+                </span>
                 {row.outras}
               </p>
             </div>
@@ -55,9 +62,15 @@ export default function PlanComparison() {
         <table className="min-w-full overflow-hidden rounded-xl border border-[#e1e5ef]">
           <thead className="bg-[#f3f6fc]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#5f6980]">Comparativo</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#0e62d8]">Carros na Cidade</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#5f6980]">Outras plataformas</th>
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#5f6980]">
+                Comparativo
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#0e62d8]">
+                Carros na Cidade
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#5f6980]">
+                Outras plataformas
+              </th>
             </tr>
           </thead>
           <tbody>

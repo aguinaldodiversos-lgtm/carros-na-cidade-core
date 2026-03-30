@@ -28,12 +28,7 @@ import { TerritorialHeroLinks } from "./TerritorialHeroLinks";
 import { TerritorialInternalLinksSection } from "./TerritorialInternalLinksSection";
 import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
 
-type TerritorialMode =
-  | "city"
-  | "brand"
-  | "model"
-  | "opportunities"
-  | "below_fipe";
+type TerritorialMode = "city" | "brand" | "model" | "opportunities" | "below_fipe";
 
 interface TerritorialResultsPageClientProps {
   mode: TerritorialMode;
@@ -178,10 +173,7 @@ export function TerritorialResultsPageClient({
 
   const lockedKeys = useMemo(() => getLockedKeys(mode), [mode]);
   const primaryItems = useMemo(() => getPrimaryItems(data, mode), [data, mode]);
-  const primaryPagination = useMemo(
-    () => getPrimaryPagination(data, mode),
-    [data, mode]
-  );
+  const primaryPagination = useMemo(() => getPrimaryPagination(data, mode), [data, mode]);
 
   function pushFilters(patch: Partial<AdsSearchFilters>) {
     const merged = mergeSearchFilters(filters, {
@@ -223,11 +215,7 @@ export function TerritorialResultsPageClient({
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Erro ao carregar página territorial"
-        );
+        setError(err instanceof Error ? err.message : "Erro ao carregar página territorial");
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -362,10 +350,7 @@ export function TerritorialResultsPageClient({
               : `${primaryPagination?.total || primaryItems.length || 0} anúncios neste território`}
           </div>
 
-          <SearchSortSelect
-            value={filters.sort || "relevance"}
-            onChange={pushFilters}
-          />
+          <SearchSortSelect value={filters.sort || "relevance"} onChange={pushFilters} />
         </div>
       </div>
 

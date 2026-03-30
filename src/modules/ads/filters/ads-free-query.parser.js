@@ -47,9 +47,7 @@ function tokenize(text) {
     .map((token) => token.trim())
     .filter(
       (token) =>
-        token &&
-        token.length >= FREE_QUERY_MIN_TOKEN_LENGTH &&
-        !FREE_QUERY_STOPWORDS.has(token)
+        token && token.length >= FREE_QUERY_MIN_TOKEN_LENGTH && !FREE_QUERY_STOPWORDS.has(token)
     )
     .slice(0, FREE_QUERY_MAX_TERMS);
 }
@@ -242,18 +240,13 @@ function pickBestMatch(text, candidates, key = "normalized") {
 }
 
 async function inferBrandAndModel(text) {
-  const [brands, models] = await Promise.all([
-    getBrandDictionary(),
-    getModelDictionary(),
-  ]);
+  const [brands, models] = await Promise.all([getBrandDictionary(), getModelDictionary()]);
 
   const brandMatch = pickBestMatch(text, brands, "normalized");
 
   let modelCandidates = models;
   if (brandMatch) {
-    modelCandidates = models.filter(
-      (item) => item.brandNormalized === brandMatch.normalized
-    );
+    modelCandidates = models.filter((item) => item.brandNormalized === brandMatch.normalized);
   }
 
   const modelMatch = pickBestMatch(text, modelCandidates, "normalized");
@@ -315,7 +308,10 @@ function buildCleanResidualQuery(text, inferred = {}) {
   }
 
   residual = residual
-    .replace(/\b(ate|até|acima de|mais de|entre|de|e|a partir de|minimo|minimo de|mínimo|mínimo de)\b/gi, " ")
+    .replace(
+      /\b(ate|até|acima de|mais de|entre|de|e|a partir de|minimo|minimo de|mínimo|mínimo de)\b/gi,
+      " "
+    )
     .replace(/\b\d{1,3}(?:[.,]\d{3})*\b/g, " ")
     .replace(/\b(19\d{2}|20\d{2}|2100)\b/g, " ")
     .replace(/\b(mil|k)\b/g, " ")

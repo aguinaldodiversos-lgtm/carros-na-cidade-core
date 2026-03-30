@@ -19,8 +19,7 @@ function parsePositiveNumber(value, fallback) {
 
 export function getJwtConfig() {
   const jwtSecret = normalizeString(process.env.JWT_SECRET);
-  const jwtRefreshSecret =
-    normalizeString(process.env.JWT_REFRESH_SECRET) || jwtSecret;
+  const jwtRefreshSecret = normalizeString(process.env.JWT_REFRESH_SECRET) || jwtSecret;
 
   if (!jwtSecret) {
     throw new AppError("JWT_SECRET não definido no ambiente", 500);
@@ -35,10 +34,7 @@ export function getJwtConfig() {
     jwtRefreshSecret,
     issuer: normalizeString(process.env.JWT_ISSUER) || DEFAULT_ISSUER,
     audience: normalizeString(process.env.JWT_AUDIENCE) || DEFAULT_AUDIENCE,
-    accessTtlMin: parsePositiveNumber(
-      process.env.ACCESS_TOKEN_TTL_MIN,
-      DEFAULT_ACCESS_TTL_MIN
-    ),
+    accessTtlMin: parsePositiveNumber(process.env.ACCESS_TOKEN_TTL_MIN, DEFAULT_ACCESS_TTL_MIN),
     refreshTtlDays: parsePositiveNumber(
       process.env.REFRESH_TOKEN_TTL_DAYS,
       DEFAULT_REFRESH_TTL_DAYS

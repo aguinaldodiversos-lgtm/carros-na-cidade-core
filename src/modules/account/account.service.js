@@ -39,8 +39,7 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "one_time",
-    description:
-      "Destaque no topo da busca com mais visibilidade para vender mais rapido.",
+    description: "Destaque no topo da busca com mais visibilidade para vender mais rapido.",
     benefits: [
       "Destaque no topo da busca",
       "Badge premium no anuncio",
@@ -60,13 +59,8 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: null,
     billing_model: "free",
-    description:
-      "Para lojas com CNPJ verificado iniciarem no portal sem mensalidade.",
-    benefits: [
-      "Ate 20 anuncios ativos",
-      "Perfil de loja ativo",
-      "Sem comissao nas vendas",
-    ],
+    description: "Para lojas com CNPJ verificado iniciarem no portal sem mensalidade.",
+    benefits: ["Ate 20 anuncios ativos", "Perfil de loja ativo", "Sem comissao nas vendas"],
     recommended: false,
   },
   {
@@ -81,13 +75,8 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description:
-      "Plano de entrada para escalar anuncios da loja com destaque opcional.",
-    benefits: [
-      "Ate 80 anuncios",
-      "Perfil de loja personalizado",
-      "Destaques configuraveis",
-    ],
+    description: "Plano de entrada para escalar anuncios da loja com destaque opcional.",
+    benefits: ["Ate 80 anuncios", "Perfil de loja personalizado", "Destaques configuraveis"],
     recommended: false,
   },
   {
@@ -102,13 +91,8 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description:
-      "Mais anuncios, destaque automatico e estatisticas avancadas.",
-    benefits: [
-      "Ate 200 anuncios",
-      "Destaque automatico",
-      "Dashboard de performance por cidade",
-    ],
+    description: "Mais anuncios, destaque automatico e estatisticas avancadas.",
+    benefits: ["Ate 200 anuncios", "Destaque automatico", "Dashboard de performance por cidade"],
     recommended: true,
   },
   {
@@ -123,8 +107,7 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description:
-      "Impulsionamento regional com banner promocional e campanha especial.",
+    description: "Impulsionamento regional com banner promocional e campanha especial.",
     benefits: [
       "Banner promocional na home regional",
       "Impulsionamento geolocalizado",
@@ -140,16 +123,14 @@ const BOOST_OPTIONS = [
     days: 7,
     price: 39.9,
     label: "Destaque por 7 dias",
-    description:
-      "Prioridade alta nas buscas e badge de destaque por 7 dias.",
+    description: "Prioridade alta nas buscas e badge de destaque por 7 dias.",
   },
   {
     id: "boost-30d",
     days: 30,
     price: 129.9,
     label: "Destaque por 30 dias",
-    description:
-      "Exibicao premium no topo, carrossel principal e reforco de recomendacao IA.",
+    description: "Exibicao premium no topo, carrossel principal e reforco de recomendacao IA.",
   },
 ];
 
@@ -160,7 +141,9 @@ const columnCache = new Map();
  * Aceita `cnpj`/`cpf` em qualquer caixa (como gravado em `users.document_type`).
  */
 function normalizeAccountType(input) {
-  const raw = String(input ?? "").trim().toLowerCase();
+  const raw = String(input ?? "")
+    .trim()
+    .toLowerCase();
   return raw === "cnpj" ? "CNPJ" : "CPF";
 }
 
@@ -220,7 +203,9 @@ function toIsoStringOrNull(value) {
 }
 
 async function getTableColumns(tableName) {
-  const normalizedTable = String(tableName || "").trim().toLowerCase();
+  const normalizedTable = String(tableName || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedTable) return new Set();
 
   if (columnCache.has(normalizedTable)) {
@@ -339,12 +324,12 @@ async function queryPlansFromDatabase() {
 }
 
 function resolveLegacyPlanAlias(planValue, accountType) {
-  const normalized = String(planValue || "").trim().toLowerCase();
+  const normalized = String(planValue || "")
+    .trim()
+    .toLowerCase();
 
   if (!normalized || normalized === "free") {
-    return accountType === "CNPJ"
-      ? "cnpj-free-store"
-      : "cpf-free-essential";
+    return accountType === "CNPJ" ? "cnpj-free-store" : "cpf-free-essential";
   }
 
   if (normalized === "start") return "cnpj-store-start";
@@ -463,9 +448,7 @@ export async function listPlans({ type, onlyActive = true } = {}) {
   const plans = await queryPlansFromDatabase();
 
   return plans
-    .filter((plan) =>
-      type ? plan.type === normalizeAccountType(type) : true
-    )
+    .filter((plan) => (type ? plan.type === normalizeAccountType(type) : true))
     .filter((plan) => (onlyActive ? plan.is_active : true));
 }
 
@@ -502,13 +485,10 @@ function normalizeDashboardAd(row) {
   const createdAt = row.created_at ? new Date(row.created_at) : new Date();
   const updatedAt = row.updated_at ? new Date(row.updated_at) : createdAt;
   const fallbackExpiry = new Date(
-    Math.max(createdAt.getTime(), updatedAt.getTime()) +
-      30 * 24 * 60 * 60 * 1000
+    Math.max(createdAt.getTime(), updatedAt.getTime()) + 30 * 24 * 60 * 60 * 1000
   );
 
-  const featuredUntilMs = featuredUntil
-    ? new Date(featuredUntil).getTime()
-    : null;
+  const featuredUntilMs = featuredUntil ? new Date(featuredUntil).getTime() : null;
 
   const isFeatured =
     typeof featuredUntilMs === "number" &&
@@ -518,11 +498,7 @@ function normalizeDashboardAd(row) {
   return {
     id: String(row.id),
     user_id: String(
-      row.owner_user_id ??
-        row.user_id ??
-        row.advertiser_user_id ??
-        row.owner_id ??
-        ""
+      row.owner_user_id ?? row.user_id ?? row.advertiser_user_id ?? row.owner_id ?? ""
     ),
     title: row.title?.trim() || "Anuncio sem titulo",
     price: toNumber(row.price, 0),
@@ -686,9 +662,7 @@ export async function resolvePublishEligibility(userId, preloadedUser = null) {
   if (activeAds < planLimit) {
     return {
       allowed: true,
-      reason: currentPlan
-        ? "Limite disponivel no plano atual"
-        : "Limite gratuito disponivel",
+      reason: currentPlan ? "Limite disponivel no plano atual" : "Limite gratuito disponivel",
       suggested_plan_type: null,
     };
   }
@@ -714,9 +688,7 @@ export function listBoostOptions() {
 
 export async function updateOwnedAdStatus(userId, adId, action) {
   const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.advertiser_user_id]
-    .filter(Boolean)
-    .map((value) => String(value));
+  const ownerIds = [owner?.advertiser_user_id].filter(Boolean).map((value) => String(value));
 
   if (!owner || !ownerIds.includes(String(userId))) {
     throw new AppError("Anuncio nao encontrado", 404);
@@ -734,9 +706,7 @@ export async function updateOwnedAdStatus(userId, adId, action) {
 
 export async function deleteOwnedAd(userId, adId) {
   const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.advertiser_user_id]
-    .filter(Boolean)
-    .map((value) => String(value));
+  const ownerIds = [owner?.advertiser_user_id].filter(Boolean).map((value) => String(value));
 
   if (!owner || !ownerIds.includes(String(userId))) {
     throw new AppError("Anuncio nao encontrado", 404);

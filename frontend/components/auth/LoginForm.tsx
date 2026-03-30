@@ -60,7 +60,9 @@ export default function LoginForm({ next }: LoginFormProps) {
   return (
     <section className="mx-auto w-full max-w-md rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_4px_24px_rgba(16,25,45,0.08)] sm:p-6">
       <div className="mb-5">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#5a6884]">Acesso do anunciante</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5a6884]">
+          Acesso do anunciante
+        </p>
         <h1 className="mt-1 text-2xl font-extrabold text-[#1c253a]">Entrar</h1>
       </div>
 
@@ -91,7 +93,11 @@ export default function LoginForm({ next }: LoginFormProps) {
           />
         </label>
 
-        {error && <p className="rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">{error}</p>}
+        {error && (
+          <p className="rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit"

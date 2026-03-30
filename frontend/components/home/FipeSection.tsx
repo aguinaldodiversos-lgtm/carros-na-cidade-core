@@ -30,13 +30,9 @@ const fipe = [
 export default function FipeSection() {
   return (
     <section className="max-w-6xl mx-auto px-6 mt-16">
-      <h2 className="text-2xl font-bold mb-1">
-        Oportunidades abaixo da FIPE
-      </h2>
+      <h2 className="text-2xl font-bold mb-1">Oportunidades abaixo da FIPE</h2>
 
-      <p className="text-gray-500 mb-8">
-        Ofertas com preço abaixo do valor de mercado
-      </p>
+      <p className="text-gray-500 mb-8">Ofertas com preço abaixo do valor de mercado</p>
 
       <div className="grid md:grid-cols-4 gap-6">
         {fipe.map((car) => (

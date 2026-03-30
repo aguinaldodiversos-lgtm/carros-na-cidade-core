@@ -22,24 +22,13 @@ export async function generateMetadata({
   params,
   searchParams,
 }: CityBrandPageProps): Promise<Metadata> {
-  const data = await getCityBrandPageData(
-    params.slug,
-    params.brand,
-    searchParams
-  );
+  const data = await getCityBrandPageData(params.slug, params.brand, searchParams);
 
   return buildTerritorialMetadata(data, "brand");
 }
 
-export default async function CityBrandPage({
-  params,
-  searchParams,
-}: CityBrandPageProps) {
-  const initialData = await getCityBrandPageData(
-    params.slug,
-    params.brand,
-    searchParams
-  );
+export default async function CityBrandPage({ params, searchParams }: CityBrandPageProps) {
+  const initialData = await getCityBrandPageData(params.slug, params.brand, searchParams);
 
   return (
     <>

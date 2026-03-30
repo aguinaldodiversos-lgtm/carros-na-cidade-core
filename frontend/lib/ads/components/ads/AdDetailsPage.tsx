@@ -195,7 +195,7 @@ function VehicleCard({ item }: { item: RelatedAd }) {
 }
 
 export default function AdDetailsPage({ ad }: Props) {
-  const safeImages = ad.images?.length ? ad.images : ["/placeholder-car.jpg"];
+  const safeImages = ad.images?.length ? ad.images : ["/images/hero.jpeg"];
   const [selectedImage, setSelectedImage] = useState(0);
   const [favorite, setFavorite] = useState(false);
   const [form, setForm] = useState<ContactFormState>({
@@ -452,7 +452,11 @@ export default function AdDetailsPage({ ad }: Props) {
                     }`}
                   >
                     <div className="aspect-[4/3] bg-[#EDF2FB]">
-                      <img src={image} alt={`Miniatura ${index + 1}`} className="h-full w-full object-cover" />
+                      <img
+                        src={image}
+                        alt={`Miniatura ${index + 1}`}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                   </button>
                 ))}
@@ -554,8 +558,9 @@ export default function AdDetailsPage({ ad }: Props) {
               <div className="space-y-4 text-[16px] leading-8 text-[#4B536A]">
                 <p>{ad.description}</p>
                 <p>
-                  Atendimento com foco em transparência, avaliação justa e envio rápido de informações.
-                  Você pode falar direto com o vendedor pelo WhatsApp ou simular financiamento sem sair do portal.
+                  Atendimento com foco em transparência, avaliação justa e envio rápido de
+                  informações. Você pode falar direto com o vendedor pelo WhatsApp ou simular
+                  financiamento sem sair do portal.
                 </p>
               </div>
             </SectionCard>
@@ -581,9 +586,13 @@ export default function AdDetailsPage({ ad }: Props) {
                       ★ {ad.seller.rating.toFixed(1)}
                     </div>
 
-                    <span className="text-sm text-[#6E748A]">{ad.seller.reviewCount} avaliações</span>
+                    <span className="text-sm text-[#6E748A]">
+                      {ad.seller.reviewCount} avaliações
+                    </span>
                     <span className="text-sm text-[#6E748A]">•</span>
-                    <span className="text-sm text-[#6E748A]">{sellerTypeLabel(ad.seller.type)}</span>
+                    <span className="text-sm text-[#6E748A]">
+                      {sellerTypeLabel(ad.seller.type)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -670,7 +679,9 @@ export default function AdDetailsPage({ ad }: Props) {
 
                 <textarea
                   value={form.message}
-                  onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, message: event.target.value }))
+                  }
                   rows={5}
                   placeholder="Digite sua mensagem"
                   className="w-full rounded-2xl border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3 text-sm text-[#1D2440] outline-none transition placeholder:text-[#9AA3B2] focus:border-[#AFC6FF] focus:bg-white"

@@ -24,7 +24,10 @@ export const OrchestratorInputSchema = z.object({
       requestId: z.string().optional(),
       pii: z.boolean().default(false),
       forcePremium: z.boolean().default(false),
+      /** Estágio de crescimento do território — política de roteamento (antes era removido pelo Zod sem .passthrough). */
+      stage: z.string().optional(),
     })
+    .passthrough()
     .default({}),
 });
 

@@ -8,10 +8,7 @@ import { buildDomainFields } from "../../shared/domainLog.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const keyPath = path.join(
-  __dirname,
-  "../../credentials/google-service-account.json"
-);
+const keyPath = path.join(__dirname, "../../credentials/google-service-account.json");
 
 class SeoCollector {
   async collectSearchConsoleData(startDate, endDate) {
@@ -52,15 +49,7 @@ class SeoCollector {
           ctr = EXCLUDED.ctr,
           avg_position = EXCLUDED.avg_position
         `,
-        [
-          startDate,
-          "global",
-          row.impressions,
-          row.clicks,
-          row.ctr,
-          row.position,
-          "google",
-        ]
+        [startDate, "global", row.impressions, row.clicks, row.ctr, row.position, "google"]
       );
     }
 

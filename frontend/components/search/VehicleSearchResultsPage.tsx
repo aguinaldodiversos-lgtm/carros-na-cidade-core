@@ -44,13 +44,7 @@ function getCityProfileFromSlug(slug?: string | null) {
   };
 }
 
-function ToolbarButton({
-  children,
-  active,
-}: {
-  children: React.ReactNode;
-  active?: boolean;
-}) {
+function ToolbarButton({ children, active }: { children: React.ReactNode; active?: boolean }) {
   return (
     <button
       type="button"
@@ -198,9 +192,7 @@ export function VehicleSearchResultsPage({
               {hero.title}
             </h1>
 
-            <p className="mt-4 max-w-2xl text-[17px] leading-7 text-[#6b7488]">
-              {hero.subtitle}
-            </p>
+            <p className="mt-4 max-w-2xl text-[17px] leading-7 text-[#6b7488]">{hero.subtitle}</p>
 
             <p className="mt-5 text-[20px] font-medium text-[#6b7488]">
               {totalResults.toLocaleString("pt-BR")} anúncios encontrados
@@ -228,7 +220,8 @@ export function VehicleSearchResultsPage({
                   Ganhe visibilidade no momento certo
                 </h2>
                 <p className="mt-2 text-[18px] text-[#4f5a74]">
-                  Ative plano, publique com limite correto e impulsione anúncios com maior intenção local.
+                  Ative plano, publique com limite correto e impulsione anúncios com maior intenção
+                  local.
                 </p>
               </div>
 

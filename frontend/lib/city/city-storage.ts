@@ -1,8 +1,4 @@
-import {
-  CITY_COOKIE_NAME,
-  CITY_STORAGE_KEY,
-  CITY_USER_SET_KEY,
-} from "@/lib/city/city-constants";
+import { CITY_COOKIE_NAME, CITY_STORAGE_KEY, CITY_USER_SET_KEY } from "@/lib/city/city-constants";
 import type { CityRef } from "@/lib/city/city-types";
 import { buildCityLabel, normalizeCityId } from "@/lib/city/city-types";
 
@@ -25,7 +21,9 @@ export function readCityFromLocalStorage(): CityRef | null {
       id: normalizeCityId(parsed.id),
       slug: String(parsed.slug),
       name: String(parsed.name),
-      state: String(parsed.state || "SP").toUpperCase().slice(0, 2),
+      state: String(parsed.state || "SP")
+        .toUpperCase()
+        .slice(0, 2),
       label: parsed.label || buildCityLabel(parsed.name, parsed.state || "SP"),
     };
   } catch {
@@ -38,10 +36,7 @@ export type WriteCityStorageOptions = {
   userConfirmed?: boolean;
 };
 
-export function writeCityToLocalStorage(
-  city: CityRef,
-  options?: WriteCityStorageOptions
-): void {
+export function writeCityToLocalStorage(city: CityRef, options?: WriteCityStorageOptions): void {
   if (!isBrowser()) return;
   try {
     localStorage.setItem(CITY_STORAGE_KEY, JSON.stringify(city));
@@ -78,7 +73,9 @@ export function readCityFromCookie(): CityRef | null {
       id: normalizeCityId(parsed.id),
       slug: String(parsed.slug),
       name: String(parsed.name),
-      state: String(parsed.state || "SP").toUpperCase().slice(0, 2),
+      state: String(parsed.state || "SP")
+        .toUpperCase()
+        .slice(0, 2),
       label: parsed.label || buildCityLabel(parsed.name, parsed.state || "SP"),
     };
   } catch {

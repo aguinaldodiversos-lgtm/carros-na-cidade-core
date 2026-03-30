@@ -203,10 +203,7 @@ export async function createLead(input) {
       throw error;
     }
 
-    logger.error(
-      { error, adId, buyerName },
-      "[leads.service] Erro ao criar lead"
-    );
+    logger.error({ error, adId, buyerName }, "[leads.service] Erro ao criar lead");
 
     throw new AppError("Erro ao criar lead", 500);
   } finally {

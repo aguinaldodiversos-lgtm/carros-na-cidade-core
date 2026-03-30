@@ -1,7 +1,12 @@
 import crypto from "crypto";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { query, withTransaction } from "../../infrastructure/database/db.js";
-import { getAccountUser, getOwnedAd, getPlanById, listBoostOptions } from "../account/account.service.js";
+import {
+  getAccountUser,
+  getOwnedAd,
+  getPlanById,
+  listBoostOptions,
+} from "../account/account.service.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 
@@ -137,13 +142,13 @@ async function getPaymentIntentById(intentId) {
   return result.rows[0] || null;
 }
 
-function resolveSubscriptionStatus(paymentStatus) {
+export function resolveSubscriptionStatus(paymentStatus) {
   if (paymentStatus === "approved") return "active";
   if (paymentStatus === "pending") return "pending";
   return "canceled";
 }
 
-function resolveExpiryDate(validityDays) {
+export function resolveExpiryDate(validityDays) {
   if (!validityDays) return null;
   return new Date(Date.now() + Number(validityDays) * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -284,12 +289,7 @@ export async function createPlanCheckout({
   };
 }
 
-export async function createPlanSubscription({
-  userId,
-  planId,
-  successUrl,
-  requestId,
-}) {
+export async function createPlanSubscription({ userId, planId, successUrl, requestId }) {
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
   if (!plan || !plan.is_active) {
@@ -672,14 +672,7 @@ async function upsertPlanPayment(client, intent, paymentData) {
       payment_type = EXCLUDED.payment_type,
       updated_at = NOW()
     `,
-    [
-      intent.user_id,
-      intent.plan_id,
-      paymentId,
-      paymentData.status,
-      amount,
-      paymentData.paymentType,
-    ]
+    [intent.user_id, intent.plan_id, paymentId, paymentData.status, amount, paymentData.paymentType]
   );
 }
 
@@ -753,12 +746,7 @@ async function applyBoostApproval(client, intent) {
   );
 }
 
-export async function handleWebhookNotification({
-  rawBody,
-  signature,
-  requestId,
-  traceRequestId,
-}) {
+export async function handleWebhookNotification({ rawBody, signature, requestId, traceRequestId }) {
   const isValid = verifyWebhookSignature(rawBody, signature, requestId);
   if (!isValid) {
     logger.warn(

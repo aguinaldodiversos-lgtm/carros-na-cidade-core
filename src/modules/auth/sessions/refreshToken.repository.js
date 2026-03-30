@@ -91,9 +91,7 @@ export async function rotateRefreshToken(oldRefreshToken, meta = {}) {
   );
 
   // Carrega usuário e emite nova sessão
-  const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [
-    decoded.id,
-  ]);
+  const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [decoded.id]);
   const user = userRes.rows[0];
   if (!user) throw new AppError("Usuário inválido", 401);
 

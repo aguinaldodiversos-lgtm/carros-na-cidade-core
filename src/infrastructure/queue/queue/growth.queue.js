@@ -3,6 +3,4 @@
 import { Queue } from "bullmq";
 import { redis } from "../redis.js";
 
-export const growthQueue = redis
-  ? new Queue("growth-actions", { connection: redis })
-  : null;
+export const growthQueue = redis ? new Queue("growth-actions", { connection: redis }) : null;

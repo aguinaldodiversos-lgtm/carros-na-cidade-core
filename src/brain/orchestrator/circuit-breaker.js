@@ -40,9 +40,7 @@ export class ProviderCircuitBreaker {
 
   recordFailure() {
     const now = Date.now();
-    this.failureTimestamps = this.failureTimestamps.filter(
-      (t) => now - t < this.windowMs
-    );
+    this.failureTimestamps = this.failureTimestamps.filter((t) => now - t < this.windowMs);
     this.failureTimestamps.push(now);
 
     if (this.failureTimestamps.length >= this.failureThreshold) {

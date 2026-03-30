@@ -41,9 +41,7 @@ export default function SellerSection({
   const phoneDisplay = formatPhoneDisplay(vehicle.seller.phone);
 
   const showSellerCarousel =
-    vehicle.seller.type === "dealer" &&
-    vehicle.isPaidListing &&
-    sellerVehicles.length > 0;
+    vehicle.seller.type === "dealer" && vehicle.isPaidListing && sellerVehicles.length > 0;
 
   const showCityCarousel =
     (!showSellerCarousel || (vehicle.seller.type === "dealer" && !vehicle.isPaidListing)) &&
@@ -53,9 +51,7 @@ export default function SellerSection({
     const logo = vehicle.seller.logo || "/images/logo.png";
     const sellerName = vehicle.seller.name || "Loja parceira";
     const sellerAddress = vehicle.seller.address || vehicle.city;
-    const rating = Number.isFinite(vehicle.seller.rating)
-      ? vehicle.seller.rating
-      : 4.8;
+    const rating = Number.isFinite(vehicle.seller.rating) ? vehicle.seller.rating : 4.8;
 
     return (
       <>
@@ -67,11 +63,7 @@ export default function SellerSection({
           <div className="mt-3 flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
             <div className="flex items-start gap-4">
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[#dbe2f0] bg-white shadow-sm">
-                <img
-                  src={logo}
-                  alt={sellerName}
-                  className="h-full w-full object-contain p-2"
-                />
+                <img src={logo} alt={sellerName} className="h-full w-full object-contain p-2" />
               </div>
 
               <div className="min-w-0">
@@ -95,14 +87,18 @@ export default function SellerSection({
                   </p>
                 ) : (
                   <p className="mt-3 text-sm text-[#6b768c]">
-                    Use o formulário ao lado para solicitar contato ou tirar dúvidas sobre o veículo.
+                    Use o formulário ao lado para solicitar contato ou tirar dúvidas sobre o
+                    veículo.
                   </p>
                 )}
 
                 <p className="mt-3 text-[13px] leading-relaxed text-[#6b768c]">
-                  Negocie com calma: combine visita, peça laudo ou vistoria e confira documentação antes
-                  de fechar.{" "}
-                  <Link href={SITE_ROUTES.seguranca} className="font-semibold text-[#0e62d8] hover:underline">
+                  Negocie com calma: combine visita, peça laudo ou vistoria e confira documentação
+                  antes de fechar.{" "}
+                  <Link
+                    href={SITE_ROUTES.seguranca}
+                    className="font-semibold text-[#0e62d8] hover:underline"
+                  >
                     Boas práticas de segurança
                   </Link>
                 </p>

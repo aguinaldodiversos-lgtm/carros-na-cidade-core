@@ -16,10 +16,7 @@ export function getLoginRedirect(nextPath: string) {
 /** Sessão obrigatória para área /dashboard (apenas CPF). */
 export async function requirePfDashboardSession(): Promise<SessionData> {
   const cookieStore = cookies();
-  const session = mergeMiddlewareSessionTokens(
-    headers(),
-    cookieStore.get(AUTH_COOKIE_NAME)?.value
-  );
+  const session = mergeMiddlewareSessionTokens(headers(), cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
   if (!session || (!session.accessToken && !session.refreshToken)) {
     redirect(getLoginRedirect("/dashboard"));
@@ -33,10 +30,7 @@ export async function requirePfDashboardSession(): Promise<SessionData> {
 /** Sessão obrigatória para área /dashboard-loja (apenas CNPJ). */
 export async function requireLojistaDashboardSession(): Promise<SessionData> {
   const cookieStore = cookies();
-  const session = mergeMiddlewareSessionTokens(
-    headers(),
-    cookieStore.get(AUTH_COOKIE_NAME)?.value
-  );
+  const session = mergeMiddlewareSessionTokens(headers(), cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
   if (!session || (!session.accessToken && !session.refreshToken)) {
     redirect(getLoginRedirect("/dashboard-loja"));
@@ -47,9 +41,7 @@ export async function requireLojistaDashboardSession(): Promise<SessionData> {
   return session;
 }
 
-export async function loadDashboardPayload(
-  session: SessionData
-): Promise<DashboardPayload | null> {
+export async function loadDashboardPayload(session: SessionData): Promise<DashboardPayload | null> {
   const ensured = await ensureSessionWithFreshBackendTokens(session);
   if (!ensured.ok) {
     return null;

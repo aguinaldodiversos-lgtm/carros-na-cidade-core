@@ -7,8 +7,7 @@ export const DEFAULT_PUBLIC_CITY_SLUG = "sao-paulo-sp";
 export const DEFAULT_PUBLIC_CITY_LABEL = "São Paulo";
 
 /** Posicionamento regional — evite linguagem de “marketplace nacional genérico”. */
-export const REGIONAL_BRAND_TAGLINE =
-  "Carros de verdade, cidade por cidade.";
+export const REGIONAL_BRAND_TAGLINE = "Carros de verdade, cidade por cidade.";
 
 export const REGIONAL_VALUE_PROPOSITION =
   "Cada anúncio nasce em um território: cidade e estado guiam a busca, o preço e a negociação — sem diluir o que importa no seu dia a dia.";

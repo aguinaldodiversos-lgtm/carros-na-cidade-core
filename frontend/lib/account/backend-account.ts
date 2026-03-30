@@ -223,9 +223,12 @@ export async function fetchPlans(options: { type?: "CPF" | "CNPJ"; activeOnly?: 
 
   const suffix = query.toString() ? `?${query.toString()}` : "";
 
-  const payload = await fetchBackendJson<{ plans: SubscriptionPlan[] }>(`/api/account/plans${suffix}`, {
-    cache: "no-store",
-  });
+  const payload = await fetchBackendJson<{ plans: SubscriptionPlan[] }>(
+    `/api/account/plans${suffix}`,
+    {
+      cache: "no-store",
+    }
+  );
 
   return payload.plans;
 }
@@ -255,7 +258,11 @@ export async function fetchPlanEligibility(session: SessionData) {
   });
 }
 
-export async function patchOwnedAdStatus(session: SessionData, adId: string, action: "pause" | "activate") {
+export async function patchOwnedAdStatus(
+  session: SessionData,
+  adId: string,
+  action: "pause" | "activate"
+) {
   return fetchBackendJson<{ ad: OwnedAdResponse["ad"] }>(
     `/api/account/ads/${encodeURIComponent(adId)}/status`,
     {
@@ -307,7 +314,10 @@ export async function createSubscriptionCheckout(
   });
 }
 
-export async function forwardPaymentWebhookToBackend(rawBody: string, headers: Record<string, string>) {
+export async function forwardPaymentWebhookToBackend(
+  rawBody: string,
+  headers: Record<string, string>
+) {
   return fetchBackendText("/api/payments/webhook", {
     method: "POST",
     body: rawBody,

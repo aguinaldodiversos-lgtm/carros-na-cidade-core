@@ -14,10 +14,7 @@ interface TerritorialBreadcrumbsProps {
   mode: TerritorialMode;
 }
 
-export function TerritorialBreadcrumbs({
-  data,
-  mode,
-}: TerritorialBreadcrumbsProps) {
+export function TerritorialBreadcrumbs({ data, mode }: TerritorialBreadcrumbsProps) {
   const items = buildTerritorialBreadcrumbs(data, mode);
 
   if (!items.length) return null;
@@ -33,10 +30,7 @@ export function TerritorialBreadcrumbs({
               {isLast ? (
                 <span className="font-semibold text-[#0f172a]">{item.label}</span>
               ) : (
-                <Link
-                  href={item.href}
-                  className="font-medium transition hover:text-[#0f172a]"
-                >
+                <Link href={item.href} className="font-medium transition hover:text-[#0f172a]">
                   {item.label}
                 </Link>
               )}

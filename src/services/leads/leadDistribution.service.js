@@ -75,13 +75,7 @@ async function distribuirLead(lead, db) {
           )
           VALUES ($1, $2, $3, $4, $5, NOW())
           `,
-          [
-            lojista.id,
-            lead.name,
-            lead.phone,
-            lead.price_range || null,
-            lead.city_id,
-          ]
+          [lojista.id, lead.name, lead.phone, lead.price_range || null, lead.city_id]
         );
 
         // Atualizar última entrega de lead
@@ -96,10 +90,7 @@ async function distribuirLead(lead, db) {
 
         console.log(`📤 Lead enviado para lojista: ${lojista.name}`);
       } catch (err) {
-        console.error(
-          `❌ Erro ao enviar lead para ${lojista.name}:`,
-          err.message
-        );
+        console.error(`❌ Erro ao enviar lead para ${lojista.name}:`, err.message);
       }
     }
   } catch (err) {

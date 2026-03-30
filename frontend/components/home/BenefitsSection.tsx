@@ -1,7 +1,13 @@
 function BenefitIcon({ path }: { path: string }) {
   return (
     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eaf3ff] text-[#0e62d8]">
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-6 w-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <path d={path} />
       </svg>
     </div>
@@ -21,8 +27,12 @@ function BenefitItem({
     <article className="flex items-start gap-4">
       <BenefitIcon path={icon} />
       <div>
-        <h3 className="text-[23px] font-extrabold leading-tight text-[#1f2637] sm:text-[24px]">{title}</h3>
-        <p className="mt-1 text-[16px] leading-tight text-[#4e5974] sm:text-[17px]">{description}</p>
+        <h3 className="text-[23px] font-extrabold leading-tight text-[#1f2637] sm:text-[24px]">
+          {title}
+        </h3>
+        <p className="mt-1 text-[16px] leading-tight text-[#4e5974] sm:text-[17px]">
+          {description}
+        </p>
       </div>
     </article>
   );

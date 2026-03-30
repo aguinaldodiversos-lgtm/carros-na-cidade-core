@@ -10,9 +10,7 @@ function normalizeText(value) {
 }
 
 function countWords(value) {
-  return normalizeText(value)
-    .split(" ")
-    .filter(Boolean).length;
+  return normalizeText(value).split(" ").filter(Boolean).length;
 }
 
 function buildExcerpt(content) {
@@ -62,10 +60,7 @@ export function validatePublicationPayload(payload) {
     warnings.push("missing_faq_signal");
   }
 
-  const score =
-    100 -
-    issues.length * 25 -
-    warnings.length * 5;
+  const score = 100 - issues.length * 25 - warnings.length * 5;
 
   return {
     ok: issues.length === 0,

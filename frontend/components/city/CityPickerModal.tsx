@@ -81,11 +81,15 @@ export function CityPickerModal() {
         <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#1F66E5]">
           Sua cidade no Carros na Cidade
         </p>
-        <h2 id="city-picker-title" className="mt-1 text-[22px] font-extrabold tracking-tight text-[#1D2440]">
+        <h2
+          id="city-picker-title"
+          className="mt-1 text-[22px] font-extrabold tracking-tight text-[#1D2440]"
+        >
           Onde você quer comprar ou vender?
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-[#6E748A]">
-          A busca e os anúncios passam a refletir o território escolhido. Você pode alterar quando quiser.
+          A busca e os anúncios passam a refletir o território escolhido. Você pode alterar quando
+          quiser.
         </p>
       </div>
     ),
@@ -118,7 +122,13 @@ export function CityPickerModal() {
               className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full text-[#94a3b8] transition hover:bg-[#f1f5f9] hover:text-[#475569] md:right-4 md:top-4"
               aria-label="Fechar seletor de cidade"
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>
             </button>
@@ -168,7 +178,9 @@ export function CityPickerModal() {
                 {loadingSearch ? (
                   <p className="text-sm text-[#64748b]">Buscando…</p>
                 ) : results.length === 0 ? (
-                  <p className="text-sm text-[#64748b]">Nenhuma cidade encontrada para esse trecho.</p>
+                  <p className="text-sm text-[#64748b]">
+                    Nenhuma cidade encontrada para esse trecho.
+                  </p>
                 ) : (
                   <ul className="max-h-48 space-y-1 overflow-y-auto rounded-[14px] border border-[#EEF1F6] bg-[#fafbfd] p-2">
                     {results.map((c) => {
@@ -210,7 +222,9 @@ export function CityPickerModal() {
               {loadingFeatured ? (
                 <p className="text-sm text-[#64748b]">Carregando cidades…</p>
               ) : featured.length === 0 ? (
-                <p className="text-sm text-[#64748b]">Use a busca acima para encontrar sua cidade.</p>
+                <p className="text-sm text-[#64748b]">
+                  Use a busca acima para encontrar sua cidade.
+                </p>
               ) : (
                 <ul className="flex flex-wrap gap-2">
                   {featured.map((c) => (

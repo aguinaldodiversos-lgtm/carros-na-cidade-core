@@ -32,13 +32,7 @@ async function notifyMatchingAlerts(ad) {
         AND (a.price_max IS NULL OR $4 <= a.price_max)
         AND (a.year_min IS NULL OR $5 >= a.year_min)
       `,
-      [
-        ad.city,
-        ad.brand,
-        ad.model,
-        ad.price,
-        ad.year,
-      ]
+      [ad.city, ad.brand, ad.model, ad.price, ad.year]
     );
 
     const alerts = result.rows;
@@ -75,9 +69,7 @@ async function queueNotification(alert, ad, channel, dailyLimit) {
     const todayCount = parseInt(todayResult.rows[0].count, 10);
 
     if (todayCount >= dailyLimit) {
-      console.log(
-        `⛔ Limite diário atingido para user ${alert.user_id} (${channel})`
-      );
+      console.log(`⛔ Limite diário atingido para user ${alert.user_id} (${channel})`);
       return;
     }
 
@@ -94,9 +86,7 @@ async function queueNotification(alert, ad, channel, dailyLimit) {
     );
 
     if (duplicateCheck.rows.length > 0) {
-      console.log(
-        `⚠️ Notificação duplicada ignorada (alert ${alert.id}, ad ${ad.id}, ${channel})`
-      );
+      console.log(`⚠️ Notificação duplicada ignorada (alert ${alert.id}, ad ${ad.id}, ${channel})`);
       return;
     }
 
@@ -110,9 +100,7 @@ async function queueNotification(alert, ad, channel, dailyLimit) {
       [alert.user_id, alert.id, ad.id, channel]
     );
 
-    console.log(
-      `📨 Notificação enfileirada: user ${alert.user_id} (${channel})`
-    );
+    console.log(`📨 Notificação enfileirada: user ${alert.user_id} (${channel})`);
   } catch (err) {
     console.error("Erro ao enfileirar notificação:", err);
   }

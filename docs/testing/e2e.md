@@ -54,27 +54,38 @@ npm run e2e
 
 (executa `npm run test:e2e` no `frontend`).
 
+### Smoke (`@smoke`)
+
+Testes marcados com `{ tag: "@smoke" }` cobrem regressões frequentes (redirect legado do painel, fluxo PF principal) sem correr a suíte inteira:
+
+```bash
+cd frontend
+npm run test:e2e:smoke
+```
+
+Na raiz: `npm run e2e:smoke`. Ver também [coverage-and-integration.md](./coverage-and-integration.md).
+
 ## Variáveis úteis
 
-| Variável | Função |
-|----------|--------|
-| `PLAYWRIGHT_BASE_URL` | URL do Next (padrão `http://127.0.0.1:3000`) |
-| `E2E_BACKEND_API_URL` | API Express + BFF (`NEXT_PUBLIC_API_URL` no `webServer`; padrão `http://127.0.0.1:4000`) |
-| `E2E_DATABASE_URL` / `TEST_DATABASE_URL` | Assert SQL em `assertLatestAdPersistedForEmail` (opcional) |
-| `E2E_EMAIL` / `E2E_PASSWORD` | Login em `10-login-ad-publish.spec.ts` (padrão cpf@… / 123456) |
-| `E2E_PJ_EMAIL` / `E2E_PJ_PASSWORD` | Futuro fluxo PJ em `critical-pj-flow.spec.ts` |
-| `SKIP_E2E_MAIN` | `1` pula o spec principal `main-flow.spec.ts` |
-| `PW_START_SERVER=1` | Playwright sobe o Next via `webServer` (ver `frontend/playwright.config.ts`) |
+| Variável                                 | Função                                                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `PLAYWRIGHT_BASE_URL`                    | URL do Next (padrão `http://127.0.0.1:3000`)                                             |
+| `E2E_BACKEND_API_URL`                    | API Express + BFF (`NEXT_PUBLIC_API_URL` no `webServer`; padrão `http://127.0.0.1:4000`) |
+| `E2E_DATABASE_URL` / `TEST_DATABASE_URL` | Assert SQL em `assertLatestAdPersistedForEmail` (opcional)                               |
+| `E2E_EMAIL` / `E2E_PASSWORD`             | Login em `10-login-ad-publish.spec.ts` (padrão cpf@… / 123456)                           |
+| `E2E_PJ_EMAIL` / `E2E_PJ_PASSWORD`       | Futuro fluxo PJ em `critical-pj-flow.spec.ts`                                            |
+| `SKIP_E2E_MAIN`                          | `1` pula o spec principal `main-flow.spec.ts`                                            |
+| `PW_START_SERVER=1`                      | Playwright sobe o Next via `webServer` (ver `frontend/playwright.config.ts`)             |
 
 ## Specs
 
-| Ficheiro | Conteúdo |
-|----------|----------|
-| `main-flow.spec.ts` | **PF**: cadastro → painel → wizard → busca API → painel → `/anuncios` → **`/veiculo/[slug]`** |
-| `10-login-ad-publish.spec.ts` | Login fixo → wizard → publicar |
-| `20-login-ad-checkout.spec.ts` | Login → wizard → planos/checkout |
-| `anunciar-redirect.spec.ts` | Redirect legado `/painel/anuncios/novo` |
-| `critical-pj-flow.spec.ts` | PJ opcional (skipped sem credenciais) |
+| Ficheiro                       | Conteúdo                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `main-flow.spec.ts`            | **PF**: cadastro → painel → wizard → busca API → painel → `/anuncios` → **`/veiculo/[slug]`** |
+| `10-login-ad-publish.spec.ts`  | Login fixo → wizard → publicar                                                                |
+| `20-login-ad-checkout.spec.ts` | Login → wizard → planos/checkout                                                              |
+| `anunciar-redirect.spec.ts`    | Redirect legado `/painel/anuncios/novo`                                                       |
+| `critical-pj-flow.spec.ts`     | PJ opcional (skipped sem credenciais)                                                         |
 
 ## Relatório da última execução automatizada
 

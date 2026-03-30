@@ -85,17 +85,13 @@ export default function Alertas() {
           placeholder="Preço máximo"
           type="number"
           value={form.price_max}
-          onChange={(e) =>
-            setForm({ ...form, price_max: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, price_max: e.target.value })}
         />
         <input
           placeholder="Ano mínimo"
           type="number"
           value={form.year_min}
-          onChange={(e) =>
-            setForm({ ...form, year_min: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, year_min: e.target.value })}
         />
 
         <button type="submit">Criar alerta</button>
@@ -110,19 +106,31 @@ export default function Alertas() {
             marginBottom: 10,
           }}
         >
-          <p><strong>Cidade:</strong> {alert.city}</p>
-          {alert.brand && <p><strong>Marca:</strong> {alert.brand}</p>}
-          {alert.model && <p><strong>Modelo:</strong> {alert.model}</p>}
+          <p>
+            <strong>Cidade:</strong> {alert.city}
+          </p>
+          {alert.brand && (
+            <p>
+              <strong>Marca:</strong> {alert.brand}
+            </p>
+          )}
+          {alert.model && (
+            <p>
+              <strong>Modelo:</strong> {alert.model}
+            </p>
+          )}
           {alert.price_max && (
-            <p><strong>Preço máx:</strong> R$ {alert.price_max}</p>
+            <p>
+              <strong>Preço máx:</strong> R$ {alert.price_max}
+            </p>
           )}
           {alert.year_min && (
-            <p><strong>Ano mín:</strong> {alert.year_min}</p>
+            <p>
+              <strong>Ano mín:</strong> {alert.year_min}
+            </p>
           )}
 
-          <button onClick={() => deleteAlert(alert.id)}>
-            Excluir
-          </button>
+          <button onClick={() => deleteAlert(alert.id)}>Excluir</button>
         </div>
       ))}
     </div>

@@ -155,10 +155,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           <div className="flex min-h-screen flex-col">
             <Suspense
               fallback={
-                <div
-                  className="h-[78px] border-b border-[#E6EAF2] bg-white/95"
-                  aria-hidden
-                />
+                <div className="h-[78px] border-b border-[#E6EAF2] bg-white/95" aria-hidden />
               }
             >
               <PublicHeader />

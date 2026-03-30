@@ -10,9 +10,7 @@ import { ensureDevServerUp } from "./helpers";
  * Para implementar: login loja + `/dashboard-loja` ou `/anunciar/novo?tipo=lojista` + asserts.
  */
 
-const hasPjCreds = Boolean(
-  process.env.E2E_PJ_EMAIL?.trim() && process.env.E2E_PJ_PASSWORD?.trim()
-);
+const hasPjCreds = Boolean(process.env.E2E_PJ_EMAIL?.trim() && process.env.E2E_PJ_PASSWORD?.trim());
 
 const describePj = hasPjCreds ? test.describe : test.describe.skip;
 

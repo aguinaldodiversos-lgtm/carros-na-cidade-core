@@ -128,12 +128,9 @@ function getTitle(item: CatalogItem) {
   if (explicitTitle) return explicitTitle;
 
   const year = extractPrimaryYear(item);
-  const pieces = [
-    year,
-    toText(item.brand),
-    toText(item.model),
-    toText(item.version),
-  ].filter(Boolean);
+  const pieces = [year, toText(item.brand), toText(item.model), toText(item.version)].filter(
+    Boolean
+  );
 
   return pieces.join(" ") || "Veículo";
 }
@@ -340,11 +337,7 @@ export default function CatalogVehicleCard({
 
   return (
     <article className={cardClasses}>
-      <Link
-        href={href}
-        className="block"
-        aria-label={`Ver detalhes de ${title}`}
-      >
+      <Link href={href} className="block" aria-label={`Ver detalhes de ${title}`}>
         {content}
       </Link>
     </article>

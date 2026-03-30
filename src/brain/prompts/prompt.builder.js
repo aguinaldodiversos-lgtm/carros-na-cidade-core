@@ -44,6 +44,7 @@ Regras:
 - Estrutura com H1, H2, parágrafos curtos
 - Sem exagero de keywords
 - Inclua seção FAQ com 4 perguntas
+- Contexto de maturidade do território (ajuste o tom): ${context?.stage || "discovery"}
 Brief:
 ${JSON.stringify(input, null, 2)}
 `;

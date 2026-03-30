@@ -15,7 +15,12 @@ async function httpSearch(q, uf) {
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   const json = await res.json().catch(() => ({}));
   const data = Array.isArray(json?.data) ? json.data : [];
-  return { ok: res.ok, status: res.status, count: data.length, names: data.slice(0, 8).map((r) => r.name) };
+  return {
+    ok: res.ok,
+    status: res.status,
+    count: data.length,
+    names: data.slice(0, 8).map((r) => r.name),
+  };
 }
 
 async function main() {
@@ -25,7 +30,9 @@ async function main() {
     const { findCitiesByStateVariants } = await import(
       "../src/modules/cities/cities.repository.js"
     );
-    const { searchCitiesByUfAndPartialName } = await import("../src/modules/cities/cities.service.js");
+    const { searchCitiesByUfAndPartialName } = await import(
+      "../src/modules/cities/cities.service.js"
+    );
 
     const spRows = await findCitiesByStateVariants("SP");
     console.log(`Cidades na tabela (filtro UF=SP, state+slug): ${spRows.length}`);
@@ -39,7 +46,13 @@ async function main() {
     for (const [uf, q] of samples) {
       const found = await searchCitiesByUfAndPartialName(uf, q, 20);
       console.log(`\nUF=${uf} q="${q}" → ${found.length} cidade(s)`);
-      console.log("  Primeiras:", found.slice(0, 6).map((c) => `${c.name} (id=${c.id})`).join(" | ") || "(nenhuma)");
+      console.log(
+        "  Primeiras:",
+        found
+          .slice(0, 6)
+          .map((c) => `${c.name} (id=${c.id})`)
+          .join(" | ") || "(nenhuma)"
+      );
     }
   } catch (e) {
     console.error("Erro ao consultar o banco via módulos Node:", e?.message || e);
@@ -54,7 +67,9 @@ async function main() {
       ["SP", "atib"],
     ]) {
       const r = await httpSearch(q, uf);
-      console.log(`GET /api/public/cities/search q=${q} uf=${uf} → HTTP ${r.status}, ${r.count} resultado(s)`);
+      console.log(
+        `GET /api/public/cities/search q=${q} uf=${uf} → HTTP ${r.status}, ${r.count} resultado(s)`
+      );
       if (r.names.length) console.log("  Amostra:", r.names.join(", "));
       if (!r.ok && r.status !== 200) console.log("  (backend pode estar parado ou URL incorreta)");
     }

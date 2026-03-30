@@ -20,9 +20,7 @@ const DEFAULT_ITEMS: TerritorialHeaderLinkItem[] = [
   { label: "Abaixo da FIPE", href: "/cidade/atibaia/abaixo-da-fipe" },
 ];
 
-export function TerritorialHeaderLinks({
-  items = DEFAULT_ITEMS,
-}: TerritorialHeaderLinksProps) {
+export function TerritorialHeaderLinks({ items = DEFAULT_ITEMS }: TerritorialHeaderLinksProps) {
   if (!items.length) return null;
 
   return (

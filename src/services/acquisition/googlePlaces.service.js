@@ -1,7 +1,6 @@
 const axios = require("axios");
 
-const GOOGLE_PLACES_URL =
-  "https://maps.googleapis.com/maps/api/place/textsearch/json";
+const GOOGLE_PLACES_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json";
 
 /* =====================================================
    BUSCAR LOJAS DE CARROS NA CIDADE

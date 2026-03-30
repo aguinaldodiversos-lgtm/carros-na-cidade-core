@@ -12,11 +12,8 @@ function playwrightDevEnv(): Record<string, string> {
     process.env.BACKEND_API_URL?.trim() ||
     process.env.AUTH_API_BASE_URL?.trim() ||
     "http://127.0.0.1:4000";
-  const fipe =
-    process.env.FIPE_API_BASE_URL?.trim() ||
-    "https://parallelum.com.br/fipe/api/v1";
-  const site =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://127.0.0.1:3000";
+  const fipe = process.env.FIPE_API_BASE_URL?.trim() || "https://parallelum.com.br/fipe/api/v1";
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://127.0.0.1:3000";
 
   const merged: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {

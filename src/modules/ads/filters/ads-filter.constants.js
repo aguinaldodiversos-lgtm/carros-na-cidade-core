@@ -58,7 +58,11 @@ export const ADS_SCOPE_CONFIG = Object.freeze({
 });
 
 export function isAllowedAdsSort(sort) {
-  return ADS_ALLOWED_SORTS.has(String(sort || "").trim().toLowerCase());
+  return ADS_ALLOWED_SORTS.has(
+    String(sort || "")
+      .trim()
+      .toLowerCase()
+  );
 }
 
 export function getAdsScopeConfig(scope = "public_global") {

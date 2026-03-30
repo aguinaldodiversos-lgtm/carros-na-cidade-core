@@ -15,7 +15,13 @@ import {
   StepPhotos,
   StepVehicle,
 } from "./new-ad-wizard/WizardSteps";
-import { STEP_COUNT, STEP_LABELS, WIZARD_STORAGE_KEY, type WizardFormState, type SellerType } from "./new-ad-wizard/types";
+import {
+  STEP_COUNT,
+  STEP_LABELS,
+  WIZARD_STORAGE_KEY,
+  type WizardFormState,
+  type SellerType,
+} from "./new-ad-wizard/types";
 import { parseCurrency } from "./new-ad-wizard/currency";
 
 type Props = {
@@ -67,7 +73,8 @@ function validateStep(step: number, form: WizardFormState, photoCount: number): 
       return null;
     case 1:
       if (!form.mileage.trim()) return "Informe a quilometragem.";
-      if (!form.price.trim() || parseCurrency(form.price) <= 0) return "Informe o preço do anúncio.";
+      if (!form.price.trim() || parseCurrency(form.price) <= 0)
+        return "Informe o preço do anúncio.";
       return null;
     case 2:
       if (photoCount < 1) return "Adicione pelo menos uma foto.";
@@ -91,7 +98,10 @@ function validateStep(step: number, form: WizardFormState, photoCount: number): 
 }
 
 function buildTitle(form: WizardFormState) {
-  const t = [form.yearModel, form.brandLabel, form.modelLabel, form.versionLabel].filter(Boolean).join(" ").trim();
+  const t = [form.yearModel, form.brandLabel, form.modelLabel, form.versionLabel]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   return t || "Novo anúncio";
 }
 
@@ -108,7 +118,9 @@ export default function NewAdWizardClient({ initialType }: Props) {
   const [photos, setPhotos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">(
+    "idle"
+  );
   const [submitMessage, setSubmitMessage] = useState("");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -138,14 +150,22 @@ export default function NewAdWizardClient({ initialType }: Props) {
       const stepParam = params.get("step");
       const n = stepParam ? parseInt(stepParam, 10) : NaN;
       const urlHasStep = Number.isFinite(n) && n >= 1 && n <= STEP_COUNT;
-      const urlStep = urlHasStep ? n - 1 : typeof parsed.step === "number" ? clampStep(parsed.step) : 0;
+      const urlStep = urlHasStep
+        ? n - 1
+        : typeof parsed.step === "number"
+          ? clampStep(parsed.step)
+          : 0;
 
       setForm({
         ...INITIAL_FORM,
         ...parsed,
         cityId: typeof parsed.cityId === "number" ? parsed.cityId : null,
         sellerType:
-          tipo === "lojista" ? "lojista" : parsed.sellerType === "lojista" ? "lojista" : initialType,
+          tipo === "lojista"
+            ? "lojista"
+            : parsed.sellerType === "lojista"
+              ? "lojista"
+              : initialType,
         step: urlStep,
       });
     } catch {
@@ -230,7 +250,10 @@ export default function NewAdWizardClient({ initialType }: Props) {
         }
       })
       .catch(() => {
-        if (!cancelled) setDashboardError("Não foi possível verificar seu plano. Você ainda pode salvar o rascunho.");
+        if (!cancelled)
+          setDashboardError(
+            "Não foi possível verificar seu plano. Você ainda pode salvar o rascunho."
+          );
       });
     return () => {
       cancelled = true;
@@ -377,10 +400,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
       setSubmitMessage(result?.message || "Anúncio enviado com sucesso.");
 
       const redirectTo =
-        result?.result?.redirectTo ||
-        result?.result?.redirect_to ||
-        result?.result?.url ||
-        "";
+        result?.result?.redirectTo || result?.result?.redirect_to || result?.result?.url || "";
 
       if (typeof redirectTo === "string" && redirectTo.trim()) {
         setTimeout(() => router.push(redirectTo), 800);
@@ -434,18 +454,17 @@ export default function NewAdWizardClient({ initialType }: Props) {
     </nav>
   );
 
-  const messageSlot =
-    submitMessage ? (
-      <div
-        className={`mt-6 rounded-[18px] border px-4 py-3 text-sm leading-7 ${
-          submitState === "success"
-            ? "border-green-200 bg-green-50 text-green-800"
-            : "border-red-200 bg-red-50 text-red-800"
-        }`}
-      >
-        {submitMessage}
-      </div>
-    ) : null;
+  const messageSlot = submitMessage ? (
+    <div
+      className={`mt-6 rounded-[18px] border px-4 py-3 text-sm leading-7 ${
+        submitState === "success"
+          ? "border-green-200 bg-green-50 text-green-800"
+          : "border-red-200 bg-red-50 text-red-800"
+      }`}
+    >
+      {submitMessage}
+    </div>
+  ) : null;
 
   const footer = (
     <div className="mt-10 flex flex-col-reverse gap-3 border-t border-[#EEF2F7] pt-8 sm:flex-row sm:items-center sm:justify-between">

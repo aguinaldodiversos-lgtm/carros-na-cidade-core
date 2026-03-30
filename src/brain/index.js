@@ -1,4 +1,9 @@
 export { AiOrchestrator } from "./orchestrator/ai.orchestrator.js";
+export {
+  getBrainAiStack,
+  getSharedAiOrchestrator,
+  resetBrainAiStackForTests,
+} from "./orchestrator/brain-stack.js";
 export { AiPolicy } from "./policies/ai.policy.js";
 
 export { LocalAiProvider } from "./providers/local.provider.js";

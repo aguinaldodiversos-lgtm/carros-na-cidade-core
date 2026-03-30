@@ -72,10 +72,7 @@ describe("normalizeAdVehicleFieldsForPersistence", () => {
   });
 
   it("update parcial: só chaves presentes", () => {
-    const out = normalizeAdVehicleFieldsForPersistence(
-      { fuel_type: "Diesel" },
-      { partial: true }
-    );
+    const out = normalizeAdVehicleFieldsForPersistence({ fuel_type: "Diesel" }, { partial: true });
     expect(out).toEqual({ fuel_type: "diesel" });
   });
 });

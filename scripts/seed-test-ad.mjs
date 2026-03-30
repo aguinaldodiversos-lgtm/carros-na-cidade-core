@@ -23,13 +23,9 @@ try {
     ALTER TABLE ads ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''
   `);
 
-  const users = await pool.query(
-    "SELECT id FROM users ORDER BY id ASC LIMIT 1"
-  );
+  const users = await pool.query("SELECT id FROM users ORDER BY id ASC LIMIT 1");
   if (!users.rows[0]) {
-    console.error(
-      "Nenhum usuário em users. Crie uma conta antes de rodar este script."
-    );
+    console.error("Nenhum usuário em users. Crie uma conta antes de rodar este script.");
     process.exit(1);
   }
 
@@ -39,10 +35,7 @@ try {
   );
   await ensureAdvertiserForUser(userId, { source: "seed-test-ad" });
 
-  const adv = await pool.query(
-    "SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1",
-    [userId]
-  );
+  const adv = await pool.query("SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1", [userId]);
   if (!adv.rows[0]) {
     console.error(
       "Falha ao garantir anunciante (ensureAdvertiserForUser). Verifique cities e logs."

@@ -6,15 +6,7 @@ async function createAdFromApi(req, res) {
   try {
     const advertiserId = req.advertiserId;
 
-    const {
-      brand,
-      model,
-      year,
-      price,
-      mileage,
-      city_id,
-      description,
-    } = req.body;
+    const { brand, model, year, price, mileage, city_id, description } = req.body;
 
     if (!brand || !model || !year || !price) {
       return res.status(400).json({
@@ -28,12 +20,8 @@ async function createAdFromApi(req, res) {
       });
     }
 
-    const { createAdNormalized } = await import(
-      "../../modules/ads/ads.create.pipeline.service.js"
-    );
-    const { default: db } = await import(
-      "../../infrastructure/database/db.js"
-    );
+    const { createAdNormalized } = await import("../../modules/ads/ads.create.pipeline.service.js");
+    const { default: db } = await import("../../infrastructure/database/db.js");
 
     const { rows: advRows } = await db.query(
       `SELECT user_id FROM advertisers WHERE id = $1 LIMIT 1`,
@@ -57,7 +45,9 @@ async function createAdFromApi(req, res) {
       price: Number(price),
       city_id: Number(city_id),
       city: cityRows[0]?.name || "Cidade",
-      state: String(cityRows[0]?.state || "SP").slice(0, 2).toUpperCase(),
+      state: String(cityRows[0]?.state || "SP")
+        .slice(0, 2)
+        .toUpperCase(),
       brand: String(brand).trim(),
       model: String(model).trim(),
       year: Number(year),

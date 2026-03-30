@@ -11,10 +11,7 @@ module.exports = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const result = await pool.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email]
-    );
+    const result = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
 
     const user = result.rows[0];
 

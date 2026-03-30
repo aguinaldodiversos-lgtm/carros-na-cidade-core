@@ -30,9 +30,7 @@ export async function startGrowthBrainWorker() {
 
   growthBrainStarted = true;
 
-  const intervalMs = Number(
-    process.env.GROWTH_BRAIN_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.GROWTH_BRAIN_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[growth-brain.worker] Inicializando worker");
 

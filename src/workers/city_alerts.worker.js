@@ -54,11 +54,7 @@ async function runCityAlerts() {
       /* ========================================
          ALERTA 1: estratégica sem conversão
       ======================================== */
-      if (
-        city.city_type === "strategic" &&
-        leads > 20 &&
-        converted === 0
-      ) {
+      if (city.city_type === "strategic" && leads > 20 && converted === 0) {
         await createAlert(
           city.city_id,
           "no_conversion",
@@ -70,11 +66,7 @@ async function runCityAlerts() {
       /* ========================================
          ALERTA 2: crescimento acelerado
       ======================================== */
-      if (
-        city.status === "scaling" &&
-        city.growth_score > 120 &&
-        city.confidence_score > 15
-      ) {
+      if (city.status === "scaling" && city.growth_score > 120 && city.confidence_score > 15) {
         await createAlert(
           city.city_id,
           "fast_growth",

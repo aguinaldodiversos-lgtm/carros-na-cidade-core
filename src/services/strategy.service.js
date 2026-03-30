@@ -61,17 +61,21 @@ async function sendStrategyReport() {
 
     // Envio por email
     if (process.env.STRATEGY_EMAIL) {
-      await axios.post("https://api.resend.com/emails", {
-        from: "Carros na Cidade <no-reply@carrosnacidade.com>",
-        to: process.env.STRATEGY_EMAIL,
-        subject: "Relatório estratégico",
-        html: `<pre>${message}</pre>`,
-      }, {
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
+      await axios.post(
+        "https://api.resend.com/emails",
+        {
+          from: "Carros na Cidade <no-reply@carrosnacidade.com>",
+          to: process.env.STRATEGY_EMAIL,
+          subject: "Relatório estratégico",
+          html: `<pre>${message}</pre>`,
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       console.log("📧 Relatório estratégico enviado por email");
     }

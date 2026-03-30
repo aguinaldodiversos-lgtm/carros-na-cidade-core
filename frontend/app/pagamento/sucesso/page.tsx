@@ -6,14 +6,20 @@ export default function PagamentoSucessoPage() {
       <section className="rounded-2xl border border-[#dfe4ef] bg-white p-8 text-center shadow-[0_2px_18px_rgba(10,20,40,0.06)]">
         <h1 className="text-3xl font-extrabold text-[#1d2538]">Pagamento aprovado</h1>
         <p className="mt-2 text-sm text-[#53607b]">
-          Recebemos a confirmacao do Mercado Pago. O plano de assinatura ou o destaque do anuncio
-          so e liberado depois da validacao automatica do webhook no backend oficial.
+          Recebemos a confirmacao do Mercado Pago. O plano de assinatura ou o destaque do anuncio so
+          e liberado depois da validacao automatica do webhook no backend oficial.
         </p>
         <div className="mt-5 flex justify-center gap-3">
-          <Link href="/planos" className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white">
+          <Link
+            href="/planos"
+            className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white"
+          >
             Voltar para planos
           </Link>
-          <Link href="/anuncios" className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]">
+          <Link
+            href="/anuncios"
+            className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]"
+          >
             Ir para anuncios
           </Link>
         </div>

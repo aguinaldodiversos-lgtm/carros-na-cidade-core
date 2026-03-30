@@ -24,13 +24,13 @@ const url = process.env.DATABASE_URL;
 const strict =
   process.argv.includes("--strict") ||
   ["1", "true", "yes"].includes(
-    String(process.env.CHECK_ADS_STRICT || "").trim().toLowerCase()
+    String(process.env.CHECK_ADS_STRICT || "")
+      .trim()
+      .toLowerCase()
   );
 
 if (!url) {
-  console.error(
-    "[db:check-ads] Defina DATABASE_URL para inspecionar o banco (ex.: staging)."
-  );
+  console.error("[db:check-ads] Defina DATABASE_URL para inspecionar o banco (ex.: staging).");
   process.exit(1);
 }
 
@@ -79,12 +79,9 @@ function classifyConstraint(name, definition) {
 }
 
 function canonicalSetForColumn(column) {
-  if (column === "body_type")
-    return new Set([...CANONICAL_BODY_TYPE_SLUGS]);
-  if (column === "fuel_type")
-    return new Set([...CANONICAL_FUEL_TYPE_SLUGS]);
-  if (column === "transmission")
-    return new Set([...CANONICAL_TRANSMISSION_SLUGS]);
+  if (column === "body_type") return new Set([...CANONICAL_BODY_TYPE_SLUGS]);
+  if (column === "fuel_type") return new Set([...CANONICAL_FUEL_TYPE_SLUGS]);
+  if (column === "transmission") return new Set([...CANONICAL_TRANSMISSION_SLUGS]);
   return new Set();
 }
 
@@ -141,9 +138,7 @@ try {
   let hasDivergence = false;
 
   for (const col of tracked) {
-    const matching = rows.filter(
-      (r) => classifyConstraint(r.name, r.definition) === col
-    );
+    const matching = rows.filter((r) => classifyConstraint(r.name, r.definition) === col);
 
     if (matching.length === 0) {
       console.log(

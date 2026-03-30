@@ -17,10 +17,7 @@ import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import { fetchRelatedListingsForAdPage } from "@/lib/vehicle/related-ads";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
-import {
-  adaptAdDetailToVehicle,
-  buildCityVehicles,
-} from "@/lib/vehicle/public-vehicle";
+import { adaptAdDetailToVehicle, buildCityVehicles } from "@/lib/vehicle/public-vehicle";
 
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import {
@@ -133,8 +130,7 @@ function buildFallbackPriceSignal(): VehiclePriceSignal {
   return {
     score: 0,
     label: "Análise temporariamente indisponível",
-    reason:
-      "Os indicadores automáticos de preço não puderam ser carregados no momento.",
+    reason: "Os indicadores automáticos de preço não puderam ser carregados no momento.",
   };
 }
 
@@ -143,45 +139,45 @@ type PublicVehiclePayload = {
   vehicle: VehicleDetail;
 };
 
-const getPublicAdAndVehicle = cache(async (slug: string, ref?: string): Promise<PublicVehiclePayload> => {
-  const candidates = Array.from(
-    new Set([safeText(ref), safeText(slug)].filter(Boolean))
-  );
+const getPublicAdAndVehicle = cache(
+  async (slug: string, ref?: string): Promise<PublicVehiclePayload> => {
+    const candidates = Array.from(new Set([safeText(ref), safeText(slug)].filter(Boolean)));
 
-  for (const candidate of candidates) {
-    try {
-      const ad = await fetchAdDetail(candidate);
-      const vehicle = adaptAdDetailToVehicle(ad);
+    for (const candidate of candidates) {
+      try {
+        const ad = await fetchAdDetail(candidate);
+        const vehicle = adaptAdDetailToVehicle(ad);
 
-      return {
-        ad,
-        vehicle: {
-          ...vehicle,
-          slug: safeText(vehicle.slug, slug),
-          adCode: safeText(vehicle.adCode, candidate),
-        },
-      };
-    } catch {
-      // tenta o próximo identificador
+        return {
+          ad,
+          vehicle: {
+            ...vehicle,
+            slug: safeText(vehicle.slug, slug),
+            adCode: safeText(vehicle.adCode, candidate),
+          },
+        };
+      } catch {
+        // tenta o próximo identificador
+      }
     }
+
+    const fallbackVehicle = buildFallbackVehicle(slug, ref);
+
+    const fallbackAd: PublicAdDetail = {
+      id: fallbackVehicle.id,
+      slug: fallbackVehicle.slug,
+      plan: "free",
+      highlight_until: null,
+      advertiser_id: null,
+      city_slug: fallbackVehicle.citySlug,
+    };
+
+    return {
+      ad: fallbackAd,
+      vehicle: fallbackVehicle,
+    };
   }
-
-  const fallbackVehicle = buildFallbackVehicle(slug, ref);
-
-  const fallbackAd: PublicAdDetail = {
-    id: fallbackVehicle.id,
-    slug: fallbackVehicle.slug,
-    plan: "free",
-    highlight_until: null,
-    advertiser_id: null,
-    city_slug: fallbackVehicle.citySlug,
-  };
-
-  return {
-    ad: fallbackAd,
-    vehicle: fallbackVehicle,
-  };
-});
+);
 
 function buildPageTitle(vehicle: VehicleDetail): string {
   const year = extractYear(vehicle.year);
@@ -230,18 +226,12 @@ export async function generateMetadata({
         vehicle.city.split(" (")[0],
         "sao paulo"
       ).toLowerCase()}`,
-      `veículo ${safeText(
-        vehicle.city.split(" (")[0],
-        "sao paulo"
-      ).toLowerCase()}`,
+      `veículo ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
     ],
   };
 }
 
-export default async function VehicleDetailPage({
-  params,
-  searchParams = {},
-}: PageProps) {
+export default async function VehicleDetailPage({ params, searchParams = {} }: PageProps) {
   const ref = getFirstValue(searchParams.ref);
   const { ad, vehicle } = await getPublicAdAndVehicle(params.slug, ref);
 
@@ -254,19 +244,15 @@ export default async function VehicleDetailPage({
     ]);
 
   const priceSignal: VehiclePriceSignal =
-    priceSignalResult.status === "fulfilled"
-      ? priceSignalResult.value
-      : buildFallbackPriceSignal();
+    priceSignalResult.status === "fulfilled" ? priceSignalResult.value : buildFallbackPriceSignal();
 
   const aiInsights =
     aiInsightsResult.status === "fulfilled"
       ? aiInsightsResult.value
       : ({} as Awaited<ReturnType<typeof getAIVehicleInsights>>);
 
-  let sellerVehicles =
-    relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
-  let cityVehicles =
-    relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
+  let sellerVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
+  let cityVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
 
   if (relatedResult.status !== "fulfilled") {
     cityVehicles = buildCityVehicles(vehicle);

@@ -28,7 +28,9 @@ export default function VehicleCarousel({
           {title}
         </h2>
         {subtitle ? (
-          <p className="mt-2 text-[14px] leading-relaxed text-[#5f6982] md:text-[15px]">{subtitle}</p>
+          <p className="mt-2 text-[14px] leading-relaxed text-[#5f6982] md:text-[15px]">
+            {subtitle}
+          </p>
         ) : null}
       </header>
 

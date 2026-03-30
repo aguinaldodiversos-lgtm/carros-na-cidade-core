@@ -9,13 +9,8 @@ import type {
   AdsSearchFilters,
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
-import {
-  buildSearchQueryString,
-  mergeSearchFilters,
-} from "@/lib/search/ads-search-url";
-import CatalogVehicleCard, {
-  type CatalogItem,
-} from "@/components/buy/CatalogVehicleCard";
+import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
+import CatalogVehicleCard, { type CatalogItem } from "@/components/buy/CatalogVehicleCard";
 import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
 import { SITE_ROUTES } from "@/lib/site/site-navigation";
 
@@ -147,8 +142,7 @@ function normalizeCatalogItem(item: Partial<CatalogItem>, city: CityContext): Ca
     seller_type: sanitizeText(item.seller_type) || undefined,
     dealer_name: sanitizeText(item.dealer_name) || undefined,
     dealership_name: sanitizeText(item.dealership_name) || undefined,
-    dealership_id:
-      typeof item.dealership_id === "number" ? item.dealership_id : undefined,
+    dealership_id: typeof item.dealership_id === "number" ? item.dealership_id : undefined,
     created_at: sanitizeText(item.created_at) || undefined,
     catalogWeight: item.catalogWeight,
   };
@@ -394,9 +388,7 @@ function TopPromoBanner() {
 
       <div className="relative flex items-center justify-between gap-6">
         <div>
-          <h3 className="text-[22px] font-extrabold text-[#1D2440]">
-            Destaque na região
-          </h3>
+          <h3 className="text-[22px] font-extrabold text-[#1D2440]">Destaque na região</h3>
           <p className="mt-1 text-[16px] text-[#5F6780]">
             Seja encontrado por quem busca carro na{" "}
             <span className="font-extrabold text-[#1F66E5]">cidade certa</span>
@@ -477,13 +469,7 @@ function Toolbar({
   );
 }
 
-function SidebarSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-b border-[#EEF1F6] pb-6 last:border-b-0 last:pb-0">
       <div className="mb-4 border-b border-[#F4F7FB] pb-3">
@@ -507,9 +493,7 @@ function FilterSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
-        {label}
-      </span>
+      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -548,13 +532,7 @@ function QuickInterestRow({
   );
 }
 
-function BrandBadge({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
+function BrandBadge({ label, onClick }: { label: string; onClick: () => void }) {
   const initial = label.charAt(0).toUpperCase();
 
   return (
@@ -633,15 +611,10 @@ export default function BuyMarketplacePageClient({
   const catalogStats = useMemo(() => {
     return {
       newest: Math.max(items.length, 1520),
-      cheaper: Math.max(
-        items.filter((item) => parseNumber(item.price) <= 100000).length,
-        130
-      ),
+      cheaper: Math.max(items.filter((item) => parseNumber(item.price) <= 100000).length, 130),
       lessMileage: Math.max(
-        items.filter(
-          (item) =>
-            parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000
-        ).length,
+        items.filter((item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000)
+          .length,
         935
       ),
     };
@@ -675,8 +648,8 @@ export default function BuyMarketplacePageClient({
             </h1>
             <p className="mt-4 max-w-2xl text-[17px] leading-relaxed text-[#5C6678]">
               Catálogo ancorado em <span className="font-semibold text-[#1D2440]">{city.name}</span>{" "}
-              ({city.state}): cada listagem traz cidade e estado para você comparar com o que importa
-              na sua rotina.
+              ({city.state}): cada listagem traz cidade e estado para você comparar com o que
+              importa na sua rotina.
             </p>
             <p className="mt-3 text-[22px] font-semibold text-[#6E748A]">
               {formatTotal(totalAds)} anúncios neste território
@@ -724,9 +697,7 @@ export default function BuyMarketplacePageClient({
                   label="Marca"
                   value={initialFilters.brand || ""}
                   options={brandOptions}
-                  onChange={(value) =>
-                    pushFilters({ brand: value || undefined, model: undefined })
-                  }
+                  onChange={(value) => pushFilters({ brand: value || undefined, model: undefined })}
                 />
 
                 <FilterSelect
@@ -753,9 +724,7 @@ export default function BuyMarketplacePageClient({
                 />
 
                 <div>
-                  <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">
-                    Tipo
-                  </span>
+                  <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">Tipo</span>
                   <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-[#F3F6FB] p-1">
                     <button
                       type="button"
@@ -812,9 +781,7 @@ export default function BuyMarketplacePageClient({
                     onClick={() => pushFilters({ brand: item.brand })}
                     className="flex w-full items-center justify-between rounded-[12px] px-1 py-2 text-left transition hover:bg-[#F7F9FC]"
                   >
-                    <span className="text-[15px] font-medium text-[#33405A]">
-                      {item.brand}
-                    </span>
+                    <span className="text-[15px] font-medium text-[#33405A]">{item.brand}</span>
                     <span className="text-[14px] font-bold text-[#7A8398]">
                       {formatTotal(item.total)}
                     </span>

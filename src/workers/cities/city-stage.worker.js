@@ -30,9 +30,7 @@ export async function startCityStageWorker() {
 
   cityStageStarted = true;
 
-  const intervalMs = Number(
-    process.env.CITY_STAGE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.CITY_STAGE_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[city-stage.worker] Inicializando worker");
 

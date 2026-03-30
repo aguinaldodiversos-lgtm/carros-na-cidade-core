@@ -16,14 +16,8 @@ export function requirePlan(requiredPlan) {
 
     const userPlan = req.user.plan || "free";
 
-    if (
-      PLAN_HIERARCHY[userPlan] <
-      PLAN_HIERARCHY[requiredPlan]
-    ) {
-      throw new AppError(
-        `Plano ${requiredPlan} necessário`,
-        403
-      );
+    if (PLAN_HIERARCHY[userPlan] < PLAN_HIERARCHY[requiredPlan]) {
+      throw new AppError(`Plano ${requiredPlan} necessário`, 403);
     }
 
     next();

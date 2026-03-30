@@ -65,11 +65,7 @@ export function mergeSearchFilters(
 
   Object.keys(merged).forEach((key) => {
     const typedKey = key as keyof AdsSearchFilters;
-    if (
-      merged[typedKey] === undefined ||
-      merged[typedKey] === null ||
-      merged[typedKey] === ""
-    ) {
+    if (merged[typedKey] === undefined || merged[typedKey] === null || merged[typedKey] === "") {
       delete merged[typedKey];
     }
   });

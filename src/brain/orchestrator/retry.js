@@ -2,10 +2,7 @@
  * Retry leve com limite (erros de rede / timeout intermitentes).
  */
 
-const DEFAULT_ATTEMPTS = Math.max(
-  1,
-  Math.min(5, Number(process.env.AI_PROVIDER_ATTEMPTS || 2))
-);
+const DEFAULT_ATTEMPTS = Math.max(1, Math.min(5, Number(process.env.AI_PROVIDER_ATTEMPTS || 2)));
 const DEFAULT_DELAY_MS = Number(process.env.AI_PROVIDER_RETRY_DELAY_MS || 200);
 
 /**
@@ -18,8 +15,7 @@ const DEFAULT_DELAY_MS = Number(process.env.AI_PROVIDER_RETRY_DELAY_MS || 200);
  * @param {number} [opts.delayMs]
  */
 export async function withRetry(fn, opts = {}) {
-  const maxAttempts =
-    opts.maxAttempts != null ? opts.maxAttempts : DEFAULT_ATTEMPTS;
+  const maxAttempts = opts.maxAttempts != null ? opts.maxAttempts : DEFAULT_ATTEMPTS;
   const delayMs = opts.delayMs != null ? opts.delayMs : DEFAULT_DELAY_MS;
   const logger = opts.logger;
   const label = opts.label || "ai";

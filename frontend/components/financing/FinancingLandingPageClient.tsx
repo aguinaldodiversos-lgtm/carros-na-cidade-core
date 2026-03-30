@@ -30,13 +30,7 @@ type FormState = {
   monthlyRate: number;
 };
 
-const VEHICLE_TYPES: VehicleTypeOption[] = [
-  "SUV",
-  "Hatch",
-  "Sedã",
-  "Picape",
-  "Utilitário",
-];
+const VEHICLE_TYPES: VehicleTypeOption[] = ["SUV", "Hatch", "Sedã", "Picape", "Utilitário"];
 
 const VALUE_PRESETS = [
   { label: "Valor do Veículo", value: "" },
@@ -56,12 +50,7 @@ const DOWN_PAYMENT_PRESETS = [
   { label: "R$ 40.000", value: 40000 },
 ];
 
-const VEHICLE_CONDITIONS: VehicleConditionOption[] = [
-  "Novo",
-  "Novo ou semi",
-  "Seminovo",
-  "Usado",
-];
+const VEHICLE_CONDITIONS: VehicleConditionOption[] = ["Novo", "Novo ou semi", "Seminovo", "Usado"];
 
 const TERMS: TermOption[] = [12, 24, 36, 48, 60, 72];
 const RATES = [1.29, 1.39, 1.59, 1.79, 1.99, 2.19, 2.39];
@@ -132,10 +121,7 @@ function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number,
 
   if (monthlyRate === 0) return financedAmount / months;
 
-  return (
-    (financedAmount * monthlyRate) /
-    (1 - Math.pow(1 + monthlyRate, -months))
-  );
+  return (financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
 }
 
 function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
@@ -216,20 +202,13 @@ export function FinancingLandingPageClient({
   const simulated = useMemo(() => {
     const entry = Math.min(form.downPayment, form.vehicleValue);
     const financedAmount = Math.max(form.vehicleValue - entry, 0);
-    const monthlyPayment = calculateMonthlyPayment(
-      financedAmount,
-      form.monthlyRate,
-      form.term
-    );
+    const monthlyPayment = calculateMonthlyPayment(financedAmount, form.monthlyRate, form.term);
     const totalPaid = monthlyPayment * form.term + entry;
     const financedPct = form.vehicleValue > 0 ? (entry / form.vehicleValue) * 100 : 0;
 
     const localDiscount =
       initialPrice > 0
-        ? Math.max(
-            0,
-            Math.round(((initialPrice - form.vehicleValue) / initialPrice) * 100)
-          )
+        ? Math.max(0, Math.round(((initialPrice - form.vehicleValue) / initialPrice) * 100))
         : 20;
 
     return {
@@ -264,8 +243,8 @@ export function FinancingLandingPageClient({
               </h1>
 
               <p className="mt-5 max-w-3xl text-[18px] leading-8 text-[#5f6780] md:text-[22px]">
-                Descubra as parcelas, taxas e condições para realizar o sonho do
-                carro novo ou usado.
+                Descubra as parcelas, taxas e condições para realizar o sonho do carro novo ou
+                usado.
               </p>
 
               <div className="mt-8 rounded-[24px] border border-[#e6eaf2] bg-white p-6 shadow-[0_18px_40px_rgba(30,37,71,0.08)] md:p-7">
@@ -502,11 +481,7 @@ export function FinancingLandingPageClient({
                       value={formatCurrency(simulated.financedAmount)}
                       icon="dot"
                     />
-                    <FinanceRow
-                      label="Prazo"
-                      value={`${form.term} meses`}
-                      icon="doc"
-                    />
+                    <FinanceRow label="Prazo" value={`${form.term} meses`} icon="doc" />
                     <FinanceRow
                       label="Valor da Parcela"
                       value={formatCurrencyPrecise(simulated.monthlyPayment)}
@@ -553,7 +528,13 @@ export function FinancingLandingPageClient({
                 className="inline-flex items-center gap-2 text-[18px] font-semibold text-[#2f67f6] transition hover:text-[#214fca]"
               >
                 <span>Ver mais oportunidades abaixo da tabela Fipe</span>
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="m9 6 6 6-6 6" />
                 </svg>
               </Link>
@@ -599,19 +580,11 @@ export function FinancingLandingPageClient({
   );
 }
 
-function FieldLabel({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
       {label ? (
-        <span className="mb-2 block text-[15px] font-semibold text-[#59627a]">
-          {label}
-        </span>
+        <span className="mb-2 block text-[15px] font-semibold text-[#59627a]">{label}</span>
       ) : null}
       {children}
     </label>
@@ -639,17 +612,27 @@ function FeatureMiniCard({
         <div
           className={cn(
             "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-            iconColor === "orange"
-              ? "bg-[#fff3df] text-[#f5a623]"
-              : "bg-[#eaf1ff] text-[#2f67f6]"
+            iconColor === "orange" ? "bg-[#fff3df] text-[#f5a623]" : "bg-[#eaf1ff] text-[#2f67f6]"
           )}
         >
           {iconColor === "orange" ? (
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+            >
               <path d="M12 3l8 3v5c0 5.25-3.1 9.1-8 11-4.9-1.9-8-5.75-8-11V6l8-3Z" />
             </svg>
           ) : (
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+            >
               <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
               <path d="M12 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
             </svg>
@@ -657,9 +640,7 @@ function FeatureMiniCard({
         </div>
 
         <div className="min-w-0">
-          <h4 className="text-[18px] font-extrabold text-[#1e2547] md:text-[20px]">
-            {title}
-          </h4>
+          <h4 className="text-[18px] font-extrabold text-[#1e2547] md:text-[20px]">{title}</h4>
           <p className="mt-2 text-[15px] leading-6 text-[#646d83]">{description}</p>
         </div>
       </div>
@@ -695,7 +676,13 @@ function FinanceRow({
       <div className="flex items-center gap-3 text-[17px] text-[#505a73]">
         <span className="inline-flex h-5 w-5 items-center justify-center text-[#8b95aa]">
           {icon === "calendar" ? (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
               <path d="M4 7h16M7 4v6M17 4v6M5 11h14v8H5z" />
             </svg>
           ) : icon === "dot" ? (
@@ -703,12 +690,24 @@ function FinanceRow({
               <circle cx="12" cy="12" r="6" />
             </svg>
           ) : icon === "doc" ? (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
               <path d="M7 3h7l5 5v13H7z" />
               <path d="M14 3v5h5" />
             </svg>
           ) : (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
               <path d="M12 8v5l3 2" />
               <path d="M21 12a9 9 0 1 1-9-9" />
             </svg>
@@ -738,7 +737,8 @@ function OpportunityCard({
   cityLabel: string;
   parcel: number;
 }) {
-  const title = item.title || [item.year, item.brand, item.model].filter(Boolean).join(" ") || "Veículo";
+  const title =
+    item.title || [item.year, item.brand, item.model].filter(Boolean).join(" ") || "Veículo";
   const image = resolveImage(item);
   const href = resolveLink(item);
   const price = parseMoney(item.price) || 0;
@@ -761,7 +761,13 @@ function OpportunityCard({
           </span>
 
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/92 text-[#8892a7] shadow-sm">
-            <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[16px] w-[16px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
               <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
             </svg>
           </span>
@@ -769,9 +775,7 @@ function OpportunityCard({
       </div>
 
       <div className="px-5 pb-5 pt-4">
-        <h3 className="text-[18px] font-extrabold text-[#1e2547] md:text-[20px]">
-          {title}
-        </h3>
+        <h3 className="text-[18px] font-extrabold text-[#1e2547] md:text-[20px]">{title}</h3>
 
         <p className="mt-2 text-[16px] text-[#646d83]">{cityLabel}</p>
 
@@ -793,8 +797,8 @@ function OpportunityCard({
         </button>
 
         <div className="mt-3 rounded-[12px] bg-[#f8fafd] px-4 py-3 text-[13px] text-[#5d6780] ring-1 ring-[#edf1f7]">
-          a partir de <span className="font-bold text-[#153e9f]">{formatCurrencyPrecise(parcel)}</span>{" "}
-          a.m.
+          a partir de{" "}
+          <span className="font-bold text-[#153e9f]">{formatCurrencyPrecise(parcel)}</span> a.m.
         </div>
       </div>
     </Link>

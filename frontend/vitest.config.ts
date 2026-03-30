@@ -10,6 +10,19 @@ export default defineConfig({
     globals: false,
     include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules", "e2e/**", ".next/**"],
+    coverage: {
+      provider: "v8",
+      include: ["lib/**/*.ts", "lib/**/*.tsx", "services/**/*.ts"],
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "**/node_modules/**"],
+      reporter: ["text", "json-summary", "html"],
+      reportsDirectory: "./coverage/frontend",
+      thresholds: {
+        lines: 2,
+        branches: 55,
+        functions: 48,
+        statements: 2,
+      },
+    },
   },
   resolve: {
     alias: {

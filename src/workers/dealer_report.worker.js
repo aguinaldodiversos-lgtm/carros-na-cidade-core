@@ -53,11 +53,7 @@ async function runDealerReportWorker() {
       const cityStats = cityStatsResult.rows[0];
 
       // gerar insights com IA
-      const insights = await gerarInsightsLojista(
-        dealer,
-        metrics,
-        cityStats
-      );
+      const insights = await gerarInsightsLojista(dealer, metrics, cityStats);
 
       const message = `
 📊 Relatório semanal – Carros na Cidade

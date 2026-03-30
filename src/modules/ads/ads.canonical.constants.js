@@ -40,19 +40,13 @@ export const TRANSMISSION_SYNONYMS = Object.freeze({
 });
 
 /** @readonly */
-export const CANONICAL_BODY_TYPE_SLUGS = Object.freeze(
-  Object.keys(BODY_TYPE_SYNONYMS)
-);
+export const CANONICAL_BODY_TYPE_SLUGS = Object.freeze(Object.keys(BODY_TYPE_SYNONYMS));
 
 /** @readonly */
-export const CANONICAL_FUEL_TYPE_SLUGS = Object.freeze(
-  Object.keys(FUEL_SYNONYMS)
-);
+export const CANONICAL_FUEL_TYPE_SLUGS = Object.freeze(Object.keys(FUEL_SYNONYMS));
 
 /** @readonly */
-export const CANONICAL_TRANSMISSION_SLUGS = Object.freeze(
-  Object.keys(TRANSMISSION_SYNONYMS)
-);
+export const CANONICAL_TRANSMISSION_SLUGS = Object.freeze(Object.keys(TRANSMISSION_SYNONYMS));
 
 /**
  * Listas canônicas (slugs) para contrato Zod / API — mesmas chaves dos mapas de sinônimos.

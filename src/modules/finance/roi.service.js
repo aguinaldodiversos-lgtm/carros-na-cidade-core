@@ -64,9 +64,7 @@ export async function calculateCityROI(cityId) {
 
   const cpa = totalLeads > 0 ? spend / totalLeads : 0;
 
-  const roi = spend > 0
-    ? (estimatedRevenue - spend) / spend
-    : 0;
+  const roi = spend > 0 ? (estimatedRevenue - spend) / spend : 0;
 
   /* ===============================
      5️⃣ UPSERT NA TABELA city_roi_metrics
@@ -86,14 +84,7 @@ export async function calculateCityROI(cityId) {
       roi = EXCLUDED.roi,
       last_updated = NOW()
     `,
-    [
-      cityId,
-      spend,
-      estimatedRevenue,
-      roas,
-      cpa,
-      roi,
-    ]
+    [cityId, spend, estimatedRevenue, roas, cpa, roi]
   );
 
   /* ===============================

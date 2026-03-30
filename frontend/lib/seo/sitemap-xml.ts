@@ -39,15 +39,7 @@ function normalizeChangefreq(value?: string): string | undefined {
   if (!value) return undefined;
 
   const normalized = String(value).trim().toLowerCase();
-  const allowed = new Set([
-    "always",
-    "hourly",
-    "daily",
-    "weekly",
-    "monthly",
-    "yearly",
-    "never",
-  ]);
+  const allowed = new Set(["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"]);
 
   return allowed.has(normalized) ? normalized : undefined;
 }
@@ -74,10 +66,12 @@ export function buildSitemapXml(entries: PublicSitemapEntry[]): string {
     })
     .join("");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>` +
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
     body +
-    `</urlset>`;
+    `</urlset>`
+  );
 }
 
 export function buildSitemapIndexXml(items: SitemapIndexItem[]): string {
@@ -98,8 +92,10 @@ export function buildSitemapIndexXml(items: SitemapIndexItem[]): string {
     })
     .join("");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>` +
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>` +
     `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
     body +
-    `</sitemapindex>`;
+    `</sitemapindex>`
+  );
 }

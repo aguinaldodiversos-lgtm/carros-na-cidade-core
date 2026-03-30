@@ -1,5 +1,7 @@
 function toSlugPart(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 export function buildCityTerritorialLinks({
@@ -36,9 +38,7 @@ export function buildCityTerritorialLinks({
   links.models = relatedModels.slice(0, 12).map((item) => ({
     model: item.model,
     total: Number(item.total || 0),
-    path: brand
-      ? `${base}/marca/${toSlugPart(brand)}/modelo/${toSlugPart(item.model)}`
-      : null,
+    path: brand ? `${base}/marca/${toSlugPart(brand)}/modelo/${toSlugPart(item.model)}` : null,
   }));
 
   return links;

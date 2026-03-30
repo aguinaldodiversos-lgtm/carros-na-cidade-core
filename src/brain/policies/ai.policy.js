@@ -121,10 +121,7 @@ export class AiPolicy {
       },
     };
 
-    const hash = crypto
-      .createHash("sha256")
-      .update(JSON.stringify(normalized))
-      .digest("hex");
+    const hash = crypto.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
 
     return `ai:cache:${task}:${hash}`;
   }

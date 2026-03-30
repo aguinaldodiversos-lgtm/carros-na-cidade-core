@@ -80,9 +80,7 @@ export function AppliedFilterChips({
     chips.push({
       key: "price",
       label: `Preço: ${formatCurrency(filters.min_price) || "R$ 0"}${
-        filters.max_price !== undefined
-          ? ` até ${formatCurrency(filters.max_price)}`
-          : " ou mais"
+        filters.max_price !== undefined ? ` até ${formatCurrency(filters.max_price)}` : " ou mais"
       }`,
       remove: () =>
         onRemove({

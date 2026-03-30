@@ -13,7 +13,10 @@ export default function FiltersBar() {
     <section className="mt-5 rounded-2xl border border-[#e0e4ef] bg-white p-5">
       <div className="grid gap-4 lg:grid-cols-8">
         {filters.map((filter, index) => (
-          <label key={`${filter.label}-${index}`} className={`${index < 4 ? "lg:col-span-2" : "lg:col-span-2"}`}>
+          <label
+            key={`${filter.label}-${index}`}
+            className={`${index < 4 ? "lg:col-span-2" : "lg:col-span-2"}`}
+          >
             <span className="sr-only">{filter.label}</span>
             <select
               defaultValue={filter.defaultValue ?? filter.label}

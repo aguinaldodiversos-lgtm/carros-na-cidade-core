@@ -71,8 +71,7 @@ const boolParam = () =>
     if (!s) return undefined;
 
     if (["true", "1", "yes", "y", "on", "sim"].includes(s)) return true;
-    if (["false", "0", "no", "n", "off", "nao", "não"].includes(s))
-      return false;
+    if (["false", "0", "no", "n", "off", "nao", "não"].includes(s)) return false;
 
     return v; // força falha (z.boolean)
   }, z.boolean());
@@ -96,20 +95,14 @@ const sortParam = () =>
 
 const adsFilterQueryBase = z.object({
   // paginação
-  page: intParam(ADS_FILTER_LIMITS.PAGE_MIN, ADS_FILTER_LIMITS.PAGE_MAX).default(
-    ADS_DEFAULTS.page
+  page: intParam(ADS_FILTER_LIMITS.PAGE_MIN, ADS_FILTER_LIMITS.PAGE_MAX).default(ADS_DEFAULTS.page),
+  limit: intParam(ADS_FILTER_LIMITS.LIMIT_MIN, ADS_FILTER_LIMITS.LIMIT_MAX).default(
+    ADS_DEFAULTS.limit
   ),
-  limit: intParam(
-    ADS_FILTER_LIMITS.LIMIT_MIN,
-    ADS_FILTER_LIMITS.LIMIT_MAX
-  ).default(ADS_DEFAULTS.limit),
   sort: sortParam(),
 
   // busca livre
-  q: optionalTrimmedString(
-    ADS_FILTER_LIMITS.QUERY_MIN_LENGTH,
-    ADS_FILTER_LIMITS.QUERY_MAX_LENGTH
-  ),
+  q: optionalTrimmedString(ADS_FILTER_LIMITS.QUERY_MIN_LENGTH, ADS_FILTER_LIMITS.QUERY_MAX_LENGTH),
 
   // território
   city: optionalTrimmedStringMax(ADS_FILTER_LIMITS.CITY_MAX_LENGTH),
@@ -138,14 +131,8 @@ const adsFilterQueryBase = z.object({
   price_min: numberParam(ADS_FILTER_LIMITS.PRICE_MIN, ADS_FILTER_LIMITS.PRICE_MAX).optional(),
   price_max: numberParam(ADS_FILTER_LIMITS.PRICE_MIN, ADS_FILTER_LIMITS.PRICE_MAX).optional(),
 
-  mileage_min: intParam(
-    ADS_FILTER_LIMITS.MILEAGE_MIN,
-    ADS_FILTER_LIMITS.MILEAGE_MAX
-  ).optional(),
-  mileage_max: intParam(
-    ADS_FILTER_LIMITS.MILEAGE_MIN,
-    ADS_FILTER_LIMITS.MILEAGE_MAX
-  ).optional(),
+  mileage_min: intParam(ADS_FILTER_LIMITS.MILEAGE_MIN, ADS_FILTER_LIMITS.MILEAGE_MAX).optional(),
+  mileage_max: intParam(ADS_FILTER_LIMITS.MILEAGE_MIN, ADS_FILTER_LIMITS.MILEAGE_MAX).optional(),
 
   // flags
   below_fipe: boolParam().optional(),

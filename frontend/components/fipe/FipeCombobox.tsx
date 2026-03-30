@@ -49,9 +49,7 @@ export function FipeCombobox({
 
     if (!normalizedQuery) return options.slice(0, 12);
 
-    return options
-      .filter((item) => item.name.toLowerCase().includes(normalizedQuery))
-      .slice(0, 12);
+    return options.filter((item) => item.name.toLowerCase().includes(normalizedQuery)).slice(0, 12);
   }, [options, query]);
 
   return (

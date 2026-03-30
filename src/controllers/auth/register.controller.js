@@ -17,10 +17,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    const existing = await pool.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email]
-    );
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
 
     if (existing.rows.length > 0) {
       return res.status(400).json({
@@ -39,11 +36,7 @@ module.exports = async (req, res) => {
 
     const user = result.rows[0];
 
-    const token = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     res.json({ token });
   } catch (err) {

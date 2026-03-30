@@ -92,9 +92,7 @@ export default function AdsPremiumList({
                   </td>
                   <td className="max-w-[280px] px-4 py-3 align-middle">
                     <p className="font-extrabold text-[#1d2538]">{name}</p>
-                    {version ? (
-                      <p className="mt-0.5 text-xs text-[#6b7280]">{version}</p>
-                    ) : null}
+                    {version ? <p className="mt-0.5 text-xs text-[#6b7280]">{version}</p> : null}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 align-middle text-[#5b6680]">—</td>
                   <td className="whitespace-nowrap px-4 py-3 align-middle font-extrabold text-[#0e62d8]">

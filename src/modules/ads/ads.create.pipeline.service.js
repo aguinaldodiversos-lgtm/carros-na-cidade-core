@@ -1,14 +1,8 @@
 import { slugify } from "../../shared/utils/slugify.js";
 import { ensurePublishEligibility } from "./ads.publish.eligibility.service.js";
-import {
-  executeAdInsert,
-  prepareAdInsertPayload,
-} from "./ads.persistence.service.js";
+import { executeAdInsert, prepareAdInsertPayload } from "./ads.persistence.service.js";
 import { validateCreateAdPayload } from "./ads.validators.js";
-import {
-  logAdsPublishFailure,
-  sanitizeAdPayloadForLog,
-} from "./ads.publish-flow.log.js";
+import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 
@@ -37,9 +31,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
     advertiserId = advertiser.id;
 
     stage = "buildInsertRow";
-    const slug = slugify(
-      `${validated.brand}-${validated.model}-${validated.year}-${Date.now()}`
-    );
+    const slug = slugify(`${validated.brand}-${validated.model}-${validated.year}-${Date.now()}`);
     const plan = user?.plan || account.raw_plan || "free";
 
     const row = prepareAdInsertPayload({
@@ -72,9 +64,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
   } catch (err) {
     const cityId =
       validated?.city_id ??
-      (rawPayload && typeof rawPayload === "object"
-        ? rawPayload.city_id
-        : null);
+      (rawPayload && typeof rawPayload === "object" ? rawPayload.city_id : null);
 
     logAdsPublishFailure(err, {
       stage: `ads.createNormalized.${stage}`,

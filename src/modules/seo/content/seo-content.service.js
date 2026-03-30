@@ -1,24 +1,10 @@
 import { slugify } from "../../../shared/utils/slugify.js";
 import * as seoContentRepository from "./seo-content.repository.js";
-import { AiOrchestrator } from "../../../brain/orchestrator/ai.orchestrator.js";
-import { createRedisClient, createCache } from "../../../brain/cache/ai.cache.js";
+import { getSharedAiOrchestrator } from "../../../brain/orchestrator/brain-stack.js";
 import { logger } from "../../../shared/logger.js";
 
-let orchestratorInstance = null;
-
 function getOrchestrator() {
-  if (orchestratorInstance) return orchestratorInstance;
-
-  const redis = createRedisClient({ logger });
-  const cache = createCache({ redis });
-
-  orchestratorInstance = new AiOrchestrator({
-    logger,
-    cache,
-    aiQueue: null,
-  });
-
-  return orchestratorInstance;
+  return getSharedAiOrchestrator(logger);
 }
 
 export async function generateSeoArticle({ city, brand, model }) {

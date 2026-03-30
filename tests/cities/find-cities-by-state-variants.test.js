@@ -41,9 +41,9 @@ describe("findCitiesByStateVariants (tabela cities)", () => {
 
     const rows = await findCitiesByStateVariants("SP");
 
-    const cityCall = vi.mocked(pool.query).mock.calls.find(([sql]) =>
-      String(sql).includes("FROM cities")
-    );
+    const cityCall = vi
+      .mocked(pool.query)
+      .mock.calls.find(([sql]) => String(sql).includes("FROM cities"));
     expect(cityCall).toBeDefined();
     const [sql, params] = cityCall;
     expect(sql).toMatch(/FROM\s+cities\s+c/i);

@@ -47,9 +47,7 @@ export default function RegionalEntryHub({
         <PageBreadcrumbs items={breadcrumbItems} className="mb-4" />
 
         <section className="overflow-hidden rounded-[28px] border border-[#dfe4ef] bg-white p-6 shadow-[0_16px_36px_rgba(15,23,42,0.08)] md:p-8">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#5a6781]">
-            {eyebrow}
-          </p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#5a6781]">{eyebrow}</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-extrabold tracking-tight text-[#1d2538] md:text-5xl">
             {title}
           </h1>
@@ -94,7 +92,10 @@ export default function RegionalEntryHub({
                 Escolha uma cidade estratégica para navegar direto pela jornada local.
               </p>
             </div>
-            <Link href="/anuncios" className="text-sm font-bold text-[#0e62d8] hover:text-[#0c4fb0]">
+            <Link
+              href="/anuncios"
+              className="text-sm font-bold text-[#0e62d8] hover:text-[#0c4fb0]"
+            >
               Ver catálogo nacional
             </Link>
           </div>
@@ -108,9 +109,7 @@ export default function RegionalEntryHub({
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#5d6983]">
                   {city.uf}
                 </p>
-                <h3 className="mt-2 text-xl font-extrabold text-[#1d2538]">
-                  {city.displayName}
-                </h3>
+                <h3 className="mt-2 text-xl font-extrabold text-[#1d2538]">{city.displayName}</h3>
                 <p className="mt-2 text-sm leading-6 text-[#5a6781]">
                   Explore o fluxo local ligado ao inventário, intenção e descoberta orgânica.
                 </p>

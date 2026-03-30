@@ -1,11 +1,7 @@
 // frontend/lib/search/semantic-autocomplete.ts
 // GET /api/ads/autocomplete e GET /api/ads/autocomplete/semantic — Express: src/modules/ads/ads.routes.js (prefixo /api/ads em app.js).
 
-export type AutocompleteSuggestionType =
-  | "brand"
-  | "model"
-  | "city"
-  | "composed";
+export type AutocompleteSuggestionType = "brand" | "model" | "city" | "composed";
 
 export interface FlatAutocompleteSuggestion {
   type: AutocompleteSuggestionType;
@@ -82,9 +78,7 @@ export interface FlatAutocompleteResponse {
 }
 
 function getApiBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "http://localhost:4000"
-  );
+  return process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "http://localhost:4000";
 }
 
 export async function fetchSemanticAutocomplete(
@@ -105,17 +99,14 @@ export async function fetchSemanticAutocomplete(
     params.set("current_city_slug", options.currentCitySlug);
   }
 
-  const response = await fetch(
-    `${apiBase}/api/ads/autocomplete/semantic?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: options?.signal,
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(`${apiBase}/api/ads/autocomplete/semantic?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    signal: options?.signal,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     throw new Error(`Autocomplete semantic failed with status ${response.status}`);
@@ -148,17 +139,14 @@ export async function fetchFlatAutocomplete(
     params.set("current_city_slug", options.currentCitySlug);
   }
 
-  const response = await fetch(
-    `${apiBase}/api/ads/autocomplete?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: options?.signal,
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(`${apiBase}/api/ads/autocomplete?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    signal: options?.signal,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     throw new Error(`Autocomplete failed with status ${response.status}`);

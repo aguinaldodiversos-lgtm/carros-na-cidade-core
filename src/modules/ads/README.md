@@ -10,18 +10,18 @@
 
 ## Mapa rápido
 
-| Responsabilidade | Arquivo(s) |
-|------------------|------------|
-| Rotas HTTP (`GET/POST/PUT/DELETE`) | `ads.routes.js` → `ads.controller.js` |
-| Fachada de serviço (`create`, `list`, …) | `ads.service.js` |
+| Responsabilidade                                         | Arquivo(s)                                                                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Rotas HTTP (`GET/POST/PUT/DELETE`)                       | `ads.routes.js` → `ads.controller.js`                                                                                     |
+| Fachada de serviço (`create`, `list`, …)                 | `ads.service.js`                                                                                                          |
 | Pipeline de criação (validação → elegibilidade → INSERT) | `ads.create.pipeline.service.js`, `ads.publish.eligibility.service.js`, `ads.persistence.service.js`, `ads.repository.js` |
-| Edição / remoção (painel) | `ads.panel.service.js` |
-| Busca pública / detalhe | `ads.public.service.js` |
-| Eventos (`ad_events`) — **única implementação** | `ad-events.ingest.js` |
-| Dois URLs, **mesmo handler** | `ads.events.routes.js` (`POST /api/ads/event`) e `events.routes.js` (`POST /api/events`) — não duplicar lógica |
-| Logs de falha de publicação | `ads.publish-flow.log.js` |
-| Autocomplete | `autocomplete/*` |
-| Filtros / facets | `filters/*`, `facets.service.js` |
+| Edição / remoção (painel)                                | `ads.panel.service.js`                                                                                                    |
+| Busca pública / detalhe                                  | `ads.public.service.js`                                                                                                   |
+| Eventos (`ad_events`) — **única implementação**          | `ad-events.ingest.js`                                                                                                     |
+| Dois URLs, **mesmo handler**                             | `ads.events.routes.js` (`POST /api/ads/event`) e `events.routes.js` (`POST /api/events`) — não duplicar lógica            |
+| Logs de falha de publicação                              | `ads.publish-flow.log.js`                                                                                                 |
+| Autocomplete                                             | `autocomplete/*`                                                                                                          |
+| Filtros / facets                                         | `filters/*`, `facets.service.js`                                                                                          |
 
 ## Não fazer
 

@@ -1,9 +1,5 @@
 import { query } from "../../infrastructure/database/db.js";
-import {
-  incrementCounter,
-  observeHistogram,
-  setGauge,
-} from "./metrics.registry.js";
+import { incrementCounter, observeHistogram, setGauge } from "./metrics.registry.js";
 
 export async function startWorkerRun(workerName, meta = {}) {
   const result = await query(

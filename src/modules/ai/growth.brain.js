@@ -13,11 +13,7 @@ export async function evaluateCities() {
 
   for (const city of cities.rows) {
     if (city.conversion_rate < 0.01 && city.total_ads > 10) {
-      await growthQueue.add(
-        "IMPROVE_SEO",
-        { cityId: city.city_id },
-        { priority: 2 }
-      );
+      await growthQueue.add("IMPROVE_SEO", { cityId: city.city_id }, { priority: 2 });
     }
   }
 

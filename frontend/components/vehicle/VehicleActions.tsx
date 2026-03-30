@@ -32,11 +32,7 @@ function normalizeWhatsapp(value?: string) {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
-function buildFinanceLink(
-  vehicleId: string,
-  citySlug: string,
-  vehiclePrice?: number | null
-) {
+function buildFinanceLink(vehicleId: string, citySlug: string, vehiclePrice?: number | null) {
   const params = new URLSearchParams({
     veiculo: vehicleId,
   });
@@ -54,9 +50,7 @@ function estimateMonthlyPayment(vehicleValue: number) {
   const monthlyRate = 1.99 / 100;
   const months = 36;
   if (financed <= 0 || months <= 0) return 0;
-  return (
-    (financed * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months))
-  );
+  return (financed * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
 }
 
 function formatBrl(value: number) {
@@ -80,10 +74,7 @@ export default function VehicleActions({
   const [leadStatus, setLeadStatus] = useState<LeadStatus>(null);
   const cityCtx = useCityOptional();
 
-  const normalizedWhatsapp = useMemo(
-    () => normalizeWhatsapp(whatsappPhone),
-    [whatsappPhone]
-  );
+  const normalizedWhatsapp = useMemo(() => normalizeWhatsapp(whatsappPhone), [whatsappPhone]);
 
   const hasWhatsapp = normalizedWhatsapp.length >= 12;
 
@@ -91,15 +82,10 @@ export default function VehicleActions({
     return encodeURIComponent(`Olá, tenho interesse no veículo ${vehicleName}`);
   }, [vehicleName]);
 
-  const waLink = hasWhatsapp
-    ? `https://wa.me/${normalizedWhatsapp}?text=${waText}`
-    : null;
+  const waLink = hasWhatsapp ? `https://wa.me/${normalizedWhatsapp}?text=${waText}` : null;
 
   const financeLink = useMemo(() => {
-    const slug =
-      financeCitySlug?.trim() ||
-      cityCtx?.city.slug ||
-      DEFAULT_PUBLIC_CITY_SLUG;
+    const slug = financeCitySlug?.trim() || cityCtx?.city.slug || DEFAULT_PUBLIC_CITY_SLUG;
     return buildFinanceLink(vehicleId, slug, vehiclePriceNumeric);
   }, [vehicleId, financeCitySlug, cityCtx?.city.slug, vehiclePriceNumeric]);
 
@@ -154,9 +140,7 @@ export default function VehicleActions({
       setBuyerPhone("");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Não foi possível enviar seu contato agora.";
+        error instanceof Error ? error.message : "Não foi possível enviar seu contato agora.";
 
       setLeadStatus({ tone: "error", message });
     } finally {
@@ -178,9 +162,7 @@ export default function VehicleActions({
         id="lead-form"
         className="rounded-2xl border border-[#dfe4ef] bg-white p-5 shadow-[0_2px_16px_rgba(10,20,40,0.05)]"
       >
-        <h2 className="text-xl font-extrabold text-[#1d2538]">
-          Fale com o anunciante
-        </h2>
+        <h2 className="text-xl font-extrabold text-[#1d2538]">Fale com o anunciante</h2>
 
         <p className="mt-1 text-sm text-[#5c6880]">
           Resposta rápida no WhatsApp ou solicite retorno pelo formulário. Financiamento com

@@ -40,9 +40,7 @@ export interface LocalSeoLandingModel {
 const TRANSMISSION_AUTO = "automatico";
 
 function averagePriceFromAds(ads: Array<{ price?: number }>): number | null {
-  const nums = ads
-    .map((a) => a.price)
-    .filter((p): p is number => typeof p === "number" && p > 0);
+  const nums = ads.map((a) => a.price).filter((p): p is number => typeof p === "number" && p > 0);
   if (!nums.length) return null;
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
 }
@@ -80,8 +78,18 @@ function formatBrandList(brands: Array<{ brand: string }>): string {
 }
 
 function buildParagraphs(model: Omit<LocalSeoLandingModel, "paragraphs">): string[] {
-  const { cityName, state, region, variant, totalAds, catalogTotalAds, avgPrice, topBrands, isEmptyVariant, isEmptyCity } =
-    model;
+  const {
+    cityName,
+    state,
+    region,
+    variant,
+    totalAds,
+    catalogTotalAds,
+    avgPrice,
+    topBrands,
+    isEmptyVariant,
+    isEmptyCity,
+  } = model;
   const uf = state ? ` (${state})` : "";
   const priceText =
     avgPrice !== null
@@ -185,17 +193,19 @@ export async function loadLocalSeoLanding(
       const city = data.city;
       if (!city?.name) notFound();
 
-      const catalogTotalAds = maxTotal(
-        data.stats?.totalAds,
-        data.pagination?.recentAds?.total
-      );
+      const catalogTotalAds = maxTotal(data.stats?.totalAds, data.pagination?.recentAds?.total);
       const totalAds = catalogTotalAds;
       const sampleAds = (data.sections?.recentAds || []).slice(0, 10);
       const topBrands = topBrandsFromFacets(data.facets?.brands);
       const avgPrice = await ensureAvgPrice(safeSlug, sampleAds, "general");
       const isEmptyCity = catalogTotalAds === 0;
 
-      const comprarHref = buildComprarHref({ city_slug: safeSlug, sort: "recent", page: 1, limit: 20 });
+      const comprarHref = buildComprarHref({
+        city_slug: safeSlug,
+        sort: "recent",
+        page: 1,
+        limit: 20,
+      });
 
       const base: Omit<LocalSeoLandingModel, "paragraphs" | "h1"> = {
         variant: "em",

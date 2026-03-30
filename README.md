@@ -4,13 +4,13 @@ Portal de anúncios automotivos com simulador de financiamento, tabela FIPE e ca
 
 ## Stack
 
-| Camada | Tecnologia |
-|--------|------------|
-| Backend | Node.js 20, Express, PostgreSQL, Redis, BullMQ |
-| Frontend | Next.js 14, React 18, Tailwind CSS |
-| Auth | JWT, jwks-rsa |
-| Pagamentos | Mercado Pago |
-| Deploy | Render (frontend) |
+| Camada     | Tecnologia                                     |
+| ---------- | ---------------------------------------------- |
+| Backend    | Node.js 20, Express, PostgreSQL, Redis, BullMQ |
+| Frontend   | Next.js 14, React 18, Tailwind CSS             |
+| Auth       | JWT, jwks-rsa                                  |
+| Pagamentos | Mercado Pago                                   |
+| Deploy     | Render (frontend)                              |
 
 ## Pré-requisitos
 
@@ -54,17 +54,17 @@ cd frontend && npm run dev
 
 ## Scripts
 
-| Comando | Descrição |
-|---------|-----------|
-| `npm run dev` | Inicia o backend |
-| `npm run workers` | Inicia workers (BullMQ) |
-| `npm run lint` | ESLint no backend |
-| `npm test` | Testes (Vitest; sem `tests/integration`) |
-| `npm run test:integration:ads:full` | Postgres (Docker) + migrations + suíte de integração de anúncios |
-| `npm run test:pg-contract` | Opcional: CHECKs reais em `public.ads` (fuel/transmission), com Postgres no ar |
-| `npm run e2e` | Playwright no `frontend` (Next + API + DB — ver `docs/testing/e2e.md`) |
-| `npm run smoke` | Smoke tests contra a API |
-| `cd frontend && npm run build` | Build do Next.js |
+| Comando                             | Descrição                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `npm run dev`                       | Inicia o backend                                                               |
+| `npm run workers`                   | Inicia workers (BullMQ)                                                        |
+| `npm run lint`                      | ESLint no backend                                                              |
+| `npm test`                          | Testes (Vitest; sem `tests/integration`)                                       |
+| `npm run test:integration:ads:full` | Postgres (Docker) + migrations + suíte de integração de anúncios               |
+| `npm run test:pg-contract`          | Opcional: CHECKs reais em `public.ads` (fuel/transmission), com Postgres no ar |
+| `npm run e2e`                       | Playwright no `frontend` (Next + API + DB — ver `docs/testing/e2e.md`)         |
+| `npm run smoke`                     | Smoke tests contra a API                                                       |
+| `cd frontend && npm run build`      | Build do Next.js                                                               |
 
 ## Arquitetura
 

@@ -21,10 +21,7 @@ async function runOnce() {
       audited: results.length,
     });
   } catch (error) {
-    logger.error(
-      { error: error?.message || String(error) },
-      "[publication-audit.worker] erro"
-    );
+    logger.error({ error: error?.message || String(error) }, "[publication-audit.worker] erro");
 
     await finishWorkerRun(runId, "publication-audit-worker", "failed", {
       durationMs: Date.now() - startedAt,
@@ -39,9 +36,7 @@ export async function startPublicationAuditWorker() {
   if (started) return;
   started = true;
 
-  const intervalMs = Number(
-    process.env.PUBLICATION_AUDIT_WORKER_INTERVAL_MS || 30 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.PUBLICATION_AUDIT_WORKER_INTERVAL_MS || 30 * 60 * 1000);
 
   await runOnce();
 

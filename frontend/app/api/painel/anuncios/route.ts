@@ -185,8 +185,7 @@ export async function POST(request: NextRequest) {
         ? (parsed as { details: unknown }).details
         : undefined;
 
-    const status =
-      response.status >= 400 && response.status < 600 ? response.status : 502;
+    const status = response.status >= 400 && response.status < 600 ? response.status : 502;
 
     const res = NextResponse.json(
       {

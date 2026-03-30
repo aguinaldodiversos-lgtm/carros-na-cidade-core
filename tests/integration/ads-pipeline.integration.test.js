@@ -24,6 +24,10 @@ import {
   createPublishableUser,
   cleanupIntegrationArtifacts,
 } from "./helpers/ads-integration-fixtures.js";
+import {
+  applyIntegrationAiLocalDefaults,
+  resetBrainAiStackForTests,
+} from "./helpers/integration-ai-test-env.js";
 
 const runTag = `t${Date.now()}`;
 
@@ -50,6 +54,7 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
   "integração — núcleo de anúncios (DB real)",
   () => {
     beforeAll(async () => {
+      applyIntegrationAiLocalDefaults();
       await assertIntegrationDatabaseReady(pool);
 
       const city = await getFirstCity(pool);
@@ -89,23 +94,20 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
         emails: shared.emails,
         adIds: shared.adIds,
       });
+      resetBrainAiStackForTests();
     });
 
     describe.sequential("autenticação e sessão", () => {
       it("login com senha retorna access e refresh token", async () => {
-        const session = await login(
-          shared.userA.email,
-          "Integration1!",
-          { ip: "127.0.0.1", userAgent: "vitest-integration" }
-        );
+        const session = await login(shared.userA.email, "Integration1!", {
+          ip: "127.0.0.1",
+          userAgent: "vitest-integration",
+        });
         expect(
           session.accessToken,
           "accessToken ausente — falha em auth.service / JWT"
         ).toBeTruthy();
-        expect(
-          session.refreshToken,
-          "refreshToken ausente — falha em auth.service"
-        ).toBeTruthy();
+        expect(session.refreshToken, "refreshToken ausente — falha em auth.service").toBeTruthy();
         expect(String(session.user?.id)).toBe(String(shared.userA.id));
         authSession = session;
       });
@@ -143,17 +145,11 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
           cityId: Number(shared.city.id),
           source: "integration.ensure",
         });
-        expect(String(adv.user_id ?? shared.userB.id)).toBe(
-          String(shared.userB.id)
-        );
-        const { rows } = await pool.query(
-          `SELECT id FROM advertisers WHERE user_id = $1`,
-          [shared.userB.id]
-        );
-        expect(
-          rows.length,
-          "User B deve ter exatamente um advertiser após ensure"
-        ).toBe(1);
+        expect(String(adv.user_id ?? shared.userB.id)).toBe(String(shared.userB.id));
+        const { rows } = await pool.query(`SELECT id FROM advertisers WHERE user_id = $1`, [
+          shared.userB.id,
+        ]);
+        expect(rows.length, "User B deve ter exatamente um advertiser após ensure").toBe(1);
       });
     });
 
@@ -187,10 +183,9 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
         expect(Number(row.city_id)).toBe(Number(c.id));
         expect(row.advertiser_id).toBeTruthy();
 
-        const advCheck = await pool.query(
-          `SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1`,
-          [shared.userA.id]
-        );
+        const advCheck = await pool.query(`SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1`, [
+          shared.userA.id,
+        ]);
         expect(advCheck.rows.length).toBe(1);
         expect(String(row.advertiser_id)).toBe(String(advCheck.rows[0].id));
 
@@ -201,10 +196,7 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
           `,
           [row.id]
         );
-        expect(
-          dbRows.length,
-          "Linha em `ads` deve existir após insert"
-        ).toBe(1);
+        expect(dbRows.length, "Linha em `ads` deve existir após insert").toBe(1);
         const db = dbRows[0];
         expect(db.title).toBe(shared.payload.title);
         expect(db.brand).toBe(shared.payload.brand);
@@ -229,10 +221,7 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
           `,
           [adId]
         );
-        expect(
-          rows.length,
-          "Anúncio deve existir com advertiser ligado"
-        ).toBe(1);
+        expect(rows.length, "Anúncio deve existir com advertiser ligado").toBe(1);
         expect(String(rows[0].user_id)).toBe(String(shared.userA.id));
       });
     });
@@ -273,17 +262,14 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
 
       it("usuário B: listOwnedAds vazio (sem vazar anúncio de A)", async () => {
         const list = await listOwnedAds(String(shared.userB.id));
-        expect(
-          list.length,
-          "User B não deve ver anúncios de A no painel"
-        ).toBe(0);
+        expect(list.length, "User B não deve ver anúncios de A no painel").toBe(0);
       });
 
       it("usuário B não acessa anúncio de A (getOwnedAd → 404)", async () => {
         const adId = shared.adIds[0];
-        await expect(
-          getOwnedAd(String(shared.userB.id), String(adId))
-        ).rejects.toThrow(/nao encontrado/i);
+        await expect(getOwnedAd(String(shared.userB.id), String(adId))).rejects.toThrow(
+          /nao encontrado/i
+        );
       });
     });
 
@@ -319,11 +305,17 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
         shared.adIds.push(row.id);
 
         expect(Number(row.city_id)).toBe(Number(c2.id));
-        const { rows } = await pool.query(
-          `SELECT city_id FROM ads WHERE id = $1`,
-          [row.id]
-        );
+        const { rows } = await pool.query(`SELECT city_id FROM ads WHERE id = $1`, [row.id]);
         expect(Number(rows[0].city_id)).toBe(Number(c2.id));
+      });
+
+      it("listOwnedAds inclui todos os anúncios persistidos da conta A", async () => {
+        const list = await listOwnedAds(String(shared.userA.id));
+        const ids = new Set(list.map((a) => String(a.id)));
+        for (const id of shared.adIds) {
+          expect(ids.has(String(id)), `painel deve listar o anúncio ${id}`).toBe(true);
+        }
+        expect(list.length).toBeGreaterThanOrEqual(shared.adIds.length);
       });
     });
 

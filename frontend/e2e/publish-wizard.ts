@@ -52,19 +52,22 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
       break;
     }
   }
-  expect(brandPicked, "Nenhuma marca retornou modelos da FIPE (configure API ou ambiente).").toBeTruthy();
+  expect(
+    brandPicked,
+    "Nenhuma marca retornou modelos da FIPE (configure API ou ambiente)."
+  ).toBeTruthy();
 
-  const brandLabel =
-    (await selects.nth(0).locator("option:checked").textContent())?.trim() || "";
+  const brandLabel = (await selects.nth(0).locator("option:checked").textContent())?.trim() || "";
 
   await selects.nth(1).selectOption({ index: 1 });
 
-  await page.waitForResponse((r) => r.url().includes("/api/fipe/years") && r.ok(), { timeout: 90_000 });
+  await page.waitForResponse((r) => r.url().includes("/api/fipe/years") && r.ok(), {
+    timeout: 90_000,
+  });
 
   await page.waitForTimeout(400);
 
-  const modelLabel =
-    (await selects.nth(1).locator("option:checked").textContent())?.trim() || "";
+  const modelLabel = (await selects.nth(1).locator("option:checked").textContent())?.trim() || "";
 
   const allSelects = page.locator("main select");
   expect(await allSelects.count()).toBeGreaterThanOrEqual(6);
@@ -81,7 +84,9 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
 
   await page.getByRole("button", { name: /Continuar/i }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: /Informações do anúncio/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Informações do anúncio/i })
+  ).toBeVisible();
   await page.getByLabel(/Quilometragem/i).fill("45000");
   await page.getByLabel(/^Preço/i).fill("8500000");
   await page.getByRole("button", { name: /Continuar/i }).click();
@@ -107,11 +112,21 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
 
   await expect(page.getByRole("heading", { level: 1, name: /Finalização/i })).toBeVisible();
 
-  await page.locator("label").filter({ hasText: /Estado \(UF\)/i }).locator("select").selectOption("SP");
+  await page
+    .locator("label")
+    .filter({ hasText: /Estado \(UF\)/i })
+    .locator("select")
+    .selectOption("SP");
   const cityInput = page.getByPlaceholder("Digite ao menos 2 letras e escolha na lista");
   await cityInput.fill("Atibaia");
-  await page.getByRole("button", { name: /^Atibaia$/i }).first().waitFor({ state: "visible", timeout: 90_000 });
-  await page.getByRole("button", { name: /^Atibaia$/i }).first().click();
+  await page
+    .getByRole("button", { name: /^Atibaia$/i })
+    .first()
+    .waitFor({ state: "visible", timeout: 90_000 });
+  await page
+    .getByRole("button", { name: /^Atibaia$/i })
+    .first()
+    .click();
 
   await page.getByPlaceholder("(11) 99999-9999").first().fill("11999999999");
   await page.getByPlaceholder("(11) 3333-3333").fill("1133333333");
@@ -120,9 +135,7 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
     .check();
 
   const publishResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes("/api/painel/anuncios") &&
-      r.request().method() === "POST",
+    (r) => r.url().includes("/api/painel/anuncios") && r.request().method() === "POST",
     { timeout: 120_000 }
   );
 

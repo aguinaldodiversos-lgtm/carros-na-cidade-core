@@ -26,11 +26,11 @@ Não substitui inspeção do banco real em produção (`npm run db:check-ads` pa
 
 ## O que veio do código (fonte de verdade parcial)
 
-| Tabela | Origem principal no repo |
-|--------|---------------------------|
-| `ads` | `src/modules/ads/ads.repository.js` (INSERT/UPDATE), `ads.storage-normalize.js` |
-| `users` | `src/modules/auth/auth.service.js` (insert dinâmico + `password_hash` ou `password`) |
-| `cities` | `src/modules/cities/ibge-municipios.service.js` (`INSERT INTO cities (name, state, slug)`) |
+| Tabela        | Origem principal no repo                                                                        |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `ads`         | `src/modules/ads/ads.repository.js` (INSERT/UPDATE), `ads.storage-normalize.js`                 |
+| `users`       | `src/modules/auth/auth.service.js` (insert dinâmico + `password_hash` ou `password`)            |
+| `cities`      | `src/modules/cities/ibge-municipios.service.js` (`INSERT INTO cities (name, state, slug)`)      |
 | `advertisers` | `src/modules/advertisers/advertiser.ensure.service.js` (insert dinâmico por colunas existentes) |
 
 ## O que foi assumido na baseline

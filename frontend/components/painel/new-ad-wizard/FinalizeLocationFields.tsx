@@ -65,7 +65,9 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
       setSearchError(null);
       try {
         const params = new URLSearchParams({ q: q.trim(), uf });
-        const res = await fetch(`/api/painel/cidades/search?${params.toString()}`, { cache: "no-store" });
+        const res = await fetch(`/api/painel/cidades/search?${params.toString()}`, {
+          cache: "no-store",
+        });
         const json = (await res.json()) as {
           success?: boolean;
           data?: unknown;
@@ -210,13 +212,17 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
                 onFocus={() => setOpen(true)}
                 disabled={uf.length !== 2}
                 placeholder={
-                  uf.length !== 2 ? "Selecione a UF primeiro" : "Digite ao menos 2 letras e escolha na lista"
+                  uf.length !== 2
+                    ? "Selecione a UF primeiro"
+                    : "Digite ao menos 2 letras e escolha na lista"
                 }
                 autoComplete="off"
                 aria-autocomplete="list"
                 aria-expanded={open}
               />
-              {loading ? <div className="mt-1 text-xs text-[#6E748A]">Buscando cidades…</div> : null}
+              {loading ? (
+                <div className="mt-1 text-xs text-[#6E748A]">Buscando cidades…</div>
+              ) : null}
               {searchError ? <p className="mt-1 text-xs text-red-700">{searchError}</p> : null}
               {open &&
               uf.length === 2 &&
@@ -253,7 +259,8 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
 
       {!hasResolvedCity && uf.length === 2 ? (
         <p className="text-xs leading-relaxed text-[#6E748A]">
-          A cidade precisa ser escolhida na lista (dados oficiais da base). Texto livre não é aceito na publicação.
+          A cidade precisa ser escolhida na lista (dados oficiais da base). Texto livre não é aceito
+          na publicação.
         </p>
       ) : null}
     </div>

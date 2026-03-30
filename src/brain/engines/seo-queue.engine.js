@@ -24,10 +24,7 @@ export async function runSeoQueueEngine(limit = 1000) {
     });
   }
 
-  logger.info(
-    { totalClusters: clusters.length },
-    "[brain.seo-queue] Fila SEO gerada"
-  );
+  logger.info({ totalClusters: clusters.length }, "[brain.seo-queue] Fila SEO gerada");
 
   return { queued: clusters.length };
 }

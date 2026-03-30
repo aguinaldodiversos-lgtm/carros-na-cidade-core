@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import {
-  fetchAdsFacets,
-  fetchAdsSearch,
-} from "@/lib/search/ads-search";
+import { fetchAdsFacets, fetchAdsSearch } from "@/lib/search/ads-search";
 import { parseAdsSearchFiltersFromSearchParams } from "@/lib/search/ads-search-url";
 import { VehicleSearchResultsPage } from "../../components/search/VehicleSearchResultsPage";
 
@@ -34,9 +31,7 @@ function hasActiveFilters(searchParams: SearchParams) {
   });
 }
 
-export async function generateMetadata({
-  searchParams,
-}: AnunciosPageProps): Promise<Metadata> {
+export async function generateMetadata({ searchParams }: AnunciosPageProps): Promise<Metadata> {
   const filteredView = hasActiveFilters(searchParams);
 
   return {

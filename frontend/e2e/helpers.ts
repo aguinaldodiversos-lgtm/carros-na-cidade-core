@@ -4,10 +4,7 @@ import type { APIRequestContext } from "@playwright/test";
 export const LOCAL_EMAIL = process.env.E2E_EMAIL ?? "cpf@carrosnacidade.com";
 export const LOCAL_PASSWORD = process.env.E2E_PASSWORD ?? "123456";
 
-export async function ensureDevServerUp(
-  request: APIRequestContext,
-  baseURL: string | undefined
-) {
+export async function ensureDevServerUp(request: APIRequestContext, baseURL: string | undefined) {
   const origin = baseURL ?? "http://127.0.0.1:3000";
   let lastStatus = 0;
   for (let i = 0; i < 15; i += 1) {
@@ -198,9 +195,7 @@ export async function assertSearchApiListsVehicle(
     await new Promise((r) => setTimeout(r, 2000));
   }
 
-  throw new Error(
-    `Busca pública não listou anúncio com marca contendo "${brand}" após ~25s.`
-  );
+  throw new Error(`Busca pública não listou anúncio com marca contendo "${brand}" após ~25s.`);
 }
 
 /**
@@ -242,8 +237,7 @@ export async function getFirstSearchAdSlug(
  * Sem DB configurado, não faz nada.
  */
 export async function ensureE2eUserDocumentVerified(email: string) {
-  const conn =
-    process.env.E2E_DATABASE_URL?.trim() || process.env.TEST_DATABASE_URL?.trim() || "";
+  const conn = process.env.E2E_DATABASE_URL?.trim() || process.env.TEST_DATABASE_URL?.trim() || "";
   if (!conn) return;
 
   const { default: pg } = await import("pg");
@@ -262,8 +256,7 @@ export async function ensureE2eUserDocumentVerified(email: string) {
  * Se `E2E_DATABASE_URL` ou `TEST_DATABASE_URL` estiver definido, confere `ads` + `users`.
  */
 export async function assertLatestAdPersistedForEmail(email: string, brandHint: string) {
-  const conn =
-    process.env.E2E_DATABASE_URL?.trim() || process.env.TEST_DATABASE_URL?.trim() || "";
+  const conn = process.env.E2E_DATABASE_URL?.trim() || process.env.TEST_DATABASE_URL?.trim() || "";
   if (!conn) {
     return;
   }
@@ -286,7 +279,10 @@ export async function assertLatestAdPersistedForEmail(email: string, brandHint: 
     expect(rows.length, "Nenhuma linha em ads para o usuário criado no E2E.").toBeGreaterThan(0);
     const row = rows[0] as { brand?: string; model?: string; status?: string };
     expect(String(row.status || "").toLowerCase()).toMatch(/active/);
-    const b = String(brandHint || "").split(/\s+/)[0]?.toLowerCase() || "";
+    const b =
+      String(brandHint || "")
+        .split(/\s+/)[0]
+        ?.toLowerCase() || "";
     if (b) {
       expect(String(row.brand || "").toLowerCase()).toContain(b);
     }

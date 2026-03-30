@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import AccountDashboardView from "@/components/account/AccountDashboardView";
-import {
-  loadDashboardPayload,
-  requirePfDashboardSession,
-} from "@/lib/account/dashboard-session";
+import { loadDashboardPayload, requirePfDashboardSession } from "@/lib/account/dashboard-session";
 
 export const metadata: Metadata = {
   title: "Meus anúncios",
@@ -29,7 +26,5 @@ export default async function MeusAnunciosPage() {
     return <LoadError />;
   }
 
-  return (
-    <AccountDashboardView initialData={payload} variant="pf" mode="ads" />
-  );
+  return <AccountDashboardView initialData={payload} variant="pf" mode="ads" />;
 }

@@ -129,7 +129,10 @@ Texto descritivo da página
 function extractTitle(content, fallback) {
   if (!content) return fallback;
 
-  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   if (lines.length > 0 && lines[0].length < 120) {
     return lines[0];

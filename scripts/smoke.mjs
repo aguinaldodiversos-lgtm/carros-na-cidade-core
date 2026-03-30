@@ -12,8 +12,7 @@ const ORIGIN = process.env.SMOKE_ORIGIN || ""; // ex: https://carrosnacidade.com
 const ENABLE_AUTH = String(process.env.SMOKE_AUTH || "true").toLowerCase() === "true";
 const ENABLE_METRICS = String(process.env.SMOKE_METRICS || "true").toLowerCase() === "true";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -107,7 +106,9 @@ function lineWarn(msg) {
 }
 
 function briefText(text) {
-  const t = String(text || "").replace(/\s+/g, " ").trim();
+  const t = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
   return t.length > 220 ? `${t.slice(0, 220)}…` : t;
 }
 
@@ -116,7 +117,10 @@ function briefText(text) {
 ========================= */
 
 function expectStatus(res, allowed, label) {
-  assert(allowed.includes(res.status), `${label}: esperado ${allowed.join("/")} e veio ${res.status}`);
+  assert(
+    allowed.includes(res.status),
+    `${label}: esperado ${allowed.join("/")} e veio ${res.status}`
+  );
 }
 
 function expectNot5xx(res, label) {
@@ -124,14 +128,20 @@ function expectNot5xx(res, label) {
 }
 
 function expectJson(res, label) {
-  assert(res.contentType.includes("application/json"), `${label}: esperado JSON (content-type: ${res.contentType || "n/a"})`);
+  assert(
+    res.contentType.includes("application/json"),
+    `${label}: esperado JSON (content-type: ${res.contentType || "n/a"})`
+  );
   assert(res.json !== null, `${label}: JSON inválido (parse falhou). Body: ${briefText(res.text)}`);
 }
 
 function expectXml(res, label) {
   const looksXml = res.contentType.includes("xml") || res.text.trim().startsWith("<?xml");
   assert(looksXml, `${label}: esperado XML (content-type: ${res.contentType || "n/a"})`);
-  assert(res.text.includes("<urlset") || res.text.includes("<sitemapindex"), `${label}: XML sem urlset/sitemapindex`);
+  assert(
+    res.text.includes("<urlset") || res.text.includes("<sitemapindex"),
+    `${label}: XML sem urlset/sitemapindex`
+  );
 }
 
 function extractArrayFromJson(json) {
@@ -243,7 +253,8 @@ async function run() {
       expectJson(r, "GET /");
       // opcional: valida shape mínimo, sem ser rígido
       if (r.json && typeof r.json === "object") {
-        if (!("success" in r.json)) warnings.push("GET /: JSON sem campo 'success' (não bloqueia).");
+        if (!("success" in r.json))
+          warnings.push("GET /: JSON sem campo 'success' (não bloqueia).");
       }
     },
   });
@@ -261,14 +272,17 @@ async function run() {
 
   // CORS Preflight (só faz sentido se ORIGIN estiver setado)
   if (ORIGIN) {
-    await test("OPTIONS /health/meta (CORS preflight)", () =>
-      request("/health/meta", {
-        method: "OPTIONS",
-        headers: {
-          "access-control-request-method": "GET",
-          "access-control-request-headers": "content-type",
-        },
-      }), {
+    await test(
+      "OPTIONS /health/meta (CORS preflight)",
+      () =>
+        request("/health/meta", {
+          method: "OPTIONS",
+          headers: {
+            "access-control-request-method": "GET",
+            "access-control-request-headers": "content-type",
+          },
+        }),
+      {
         required: true,
         validate: (r) => {
           // normalmente 204, mas 200 ok também
@@ -286,38 +300,52 @@ async function run() {
      2) SEO Sitemap
   ========================= */
 
-  const sitemapRes = await test("GET /api/public/seo/sitemap", () => request("/api/public/seo/sitemap"), {
-    validate: (r) => {
-      expectStatus(r, [200], "sitemap");
-      expectXml(r, "sitemap");
-      // duplicidade de URLs
-      const locs = parseSitemapLocs(r.text);
-      if (!locs.length) warnings.push("sitemap: nenhum <loc> encontrado (estranho).");
-      const dup = findDuplicates(locs);
-      if (dup.length) warnings.push(`sitemap: URLs duplicadas detectadas (ex.: ${dup.slice(0, 3).join(", ")})`);
-      // sanity size
-      if (r.text.length > 5_000_000) warnings.push("sitemap: XML maior que 5MB (pode ser problema).");
-    },
-  });
+  const sitemapRes = await test(
+    "GET /api/public/seo/sitemap",
+    () => request("/api/public/seo/sitemap"),
+    {
+      validate: (r) => {
+        expectStatus(r, [200], "sitemap");
+        expectXml(r, "sitemap");
+        // duplicidade de URLs
+        const locs = parseSitemapLocs(r.text);
+        if (!locs.length) warnings.push("sitemap: nenhum <loc> encontrado (estranho).");
+        const dup = findDuplicates(locs);
+        if (dup.length)
+          warnings.push(`sitemap: URLs duplicadas detectadas (ex.: ${dup.slice(0, 3).join(", ")})`);
+        // sanity size
+        if (r.text.length > 5_000_000)
+          warnings.push("sitemap: XML maior que 5MB (pode ser problema).");
+      },
+    }
+  );
 
   /* =========================
      3) Ads (core)
   ========================= */
 
-  const adsListRes = await test("GET /api/ads?page=1&limit=10", () => request("/api/ads?page=1&limit=10"), {
-    validate: (r) => {
-      expectStatus(r, [200], "ads list");
-      expectJson(r, "ads list");
+  const adsListRes = await test(
+    "GET /api/ads?page=1&limit=10",
+    () => request("/api/ads?page=1&limit=10"),
+    {
+      validate: (r) => {
+        expectStatus(r, [200], "ads list");
+        expectJson(r, "ads list");
 
-      const arr = extractArrayFromJson(r.json);
-      if (!arr) warnings.push("ads list: resposta JSON não contém array (items/data/results/ads).");
-      else {
-        const ids = extractIds(arr);
-        const dups = findDuplicates(ids);
-        if (dups.length) warnings.push(`ads list: IDs duplicados detectados (ex.: ${dups.slice(0, 3).join(", ")})`);
-      }
-    },
-  });
+        const arr = extractArrayFromJson(r.json);
+        if (!arr)
+          warnings.push("ads list: resposta JSON não contém array (items/data/results/ads).");
+        else {
+          const ids = extractIds(arr);
+          const dups = findDuplicates(ids);
+          if (dups.length)
+            warnings.push(
+              `ads list: IDs duplicados detectados (ex.: ${dups.slice(0, 3).join(", ")})`
+            );
+        }
+      },
+    }
+  );
 
   await test(
     "GET /api/ads?q=civic&city=atibaia&sort=recent",
@@ -340,27 +368,21 @@ async function run() {
     { expectedStatuses: [400, 422] }
   );
 
-  await test(
-    "BAD sort invalid",
-    () => request("/api/ads?sort=__invalid__&page=1&limit=10"),
-    { expectedStatuses: [400, 422] }
-  );
+  await test("BAD sort invalid", () => request("/api/ads?sort=__invalid__&page=1&limit=10"), {
+    expectedStatuses: [400, 422],
+  });
 
-  await test(
-    "BAD limit too high",
-    () => request("/api/ads?page=1&limit=9999"),
-    { expectedStatuses: [400, 422] }
-  );
+  await test("BAD limit too high", () => request("/api/ads?page=1&limit=9999"), {
+    expectedStatuses: [400, 422],
+  });
 
   /* =========================
      5) Not found must be 404 (never 500)
   ========================= */
 
-  await test(
-    "GET /__smoke_not_found__ (should be 404)",
-    () => request("/__smoke_not_found__"),
-    { expectedStatuses: [404] }
-  );
+  await test("GET /__smoke_not_found__ (should be 404)", () => request("/__smoke_not_found__"), {
+    expectedStatuses: [404],
+  });
 
   /* =========================
      6) Burst/concurrency stability
@@ -396,7 +418,8 @@ async function run() {
     assert(any5xx === 0, `burst: detectado ${any5xx} respostas 5xx`);
     assert(failures === 0, `burst: falhas=${failures}/${total}`);
     const dup = findDuplicates(ids);
-    if (dup.length) warnings.push(`burst: requestId duplicado detectado (ex.: ${dup.slice(0, 3).join(", ")})`);
+    if (dup.length)
+      warnings.push(`burst: requestId duplicado detectado (ex.: ${dup.slice(0, 3).join(", ")})`);
 
     // retorna um res "fake" pra log padronizado
     return {
@@ -441,18 +464,15 @@ async function run() {
   ========================= */
 
   if (ENABLE_METRICS) {
-    await test(
-      "GET /metrics (optional)",
-      () => request("/metrics"),
-      {
-        required: false,
-        validate: (r) => {
-          // aceita 200/403/404, mas nunca 5xx
-          expectNot5xx(r, "/metrics");
-          if (![200, 403, 404].includes(r.status)) warnings.push(`/metrics: status incomum ${r.status}`);
-        },
-      }
-    );
+    await test("GET /metrics (optional)", () => request("/metrics"), {
+      required: false,
+      validate: (r) => {
+        // aceita 200/403/404, mas nunca 5xx
+        expectNot5xx(r, "/metrics");
+        if (![200, 403, 404].includes(r.status))
+          warnings.push(`/metrics: status incomum ${r.status}`);
+      },
+    });
   } else {
     warnings.push("SMOKE_METRICS=false: pulando /metrics.");
   }
@@ -501,7 +521,9 @@ async function run() {
     console.log(lineWarn("sitemap: body muito pequeno, revise endpoint."));
   }
   if (adsListRes?.json && !extractArrayFromJson(adsListRes.json)) {
-    console.log(lineWarn("ads list: não achei array na resposta; smoke está flexível, mas revise o formato."));
+    console.log(
+      lineWarn("ads list: não achei array na resposta; smoke está flexível, mas revise o formato.")
+    );
   }
 
   console.log("\n✅ SMOKE PASSED");

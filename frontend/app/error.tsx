@@ -43,14 +43,12 @@ export default function GlobalError({
               boxShadow: "0 10px 30px rgba(16,24,40,0.08)",
             }}
           >
-            <h1 style={{ marginTop: 0, fontSize: "28px" }}>
-              Ocorreu um erro ao carregar a página
-            </h1>
+            <h1 style={{ marginTop: 0, fontSize: "28px" }}>Ocorreu um erro ao carregar a página</h1>
 
             <p style={{ color: "#6E748A", lineHeight: 1.6 }}>
-              Houve uma falha inesperada na interface. Tente recarregar a página.
-              Se o problema continuar, revise o console do navegador para
-              identificar o componente que está quebrando.
+              Houve uma falha inesperada na interface. Tente recarregar a página. Se o problema
+              continuar, revise o console do navegador para identificar o componente que está
+              quebrando.
             </p>
 
             <div style={{ marginTop: "20px" }}>

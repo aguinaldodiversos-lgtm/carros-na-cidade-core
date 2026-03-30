@@ -6,10 +6,7 @@ export async function runSitemapEngine(limit = 50000) {
 
   const entries = await buildTerritorialSitemap(limit);
 
-  logger.info(
-    { totalEntries: entries.length },
-    "[brain.sitemap] Sitemap territorial finalizado"
-  );
+  logger.info({ totalEntries: entries.length }, "[brain.sitemap] Sitemap territorial finalizado");
 
   return entries;
 }

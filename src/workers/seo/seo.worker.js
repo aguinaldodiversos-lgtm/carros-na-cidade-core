@@ -53,9 +53,7 @@ export async function startSeoWorker() {
 
   seoStarted = true;
 
-  const intervalMs = Number(
-    process.env.SEO_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000
-  );
+  const intervalMs = Number(process.env.SEO_WORKER_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
   logger.info({ intervalMs }, "[seo.worker] Inicializando worker");
 

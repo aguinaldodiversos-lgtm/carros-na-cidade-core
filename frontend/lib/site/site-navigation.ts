@@ -7,8 +7,7 @@
 import { DEFAULT_PUBLIC_CITY_SLUG } from "./public-config";
 
 export function getTerritorialRoutesForCity(citySlug: string) {
-  const slug =
-    (citySlug || DEFAULT_PUBLIC_CITY_SLUG).trim() || DEFAULT_PUBLIC_CITY_SLUG;
+  const slug = (citySlug || DEFAULT_PUBLIC_CITY_SLUG).trim() || DEFAULT_PUBLIC_CITY_SLUG;
   const enc = encodeURIComponent(slug);
   return {
     comprar: `/comprar?city_slug=${enc}`,

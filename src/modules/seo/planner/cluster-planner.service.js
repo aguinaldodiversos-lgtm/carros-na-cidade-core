@@ -31,20 +31,16 @@ export async function buildCityClusterPlan(city) {
   const brandLimit = resolveBrandLimitByStage(city.stage);
   const modelLimit = resolveModelLimitByStage(city.stage);
 
-  const brands = await clusterPlannerRepository.listTopBrandsByCity(
-    city.city_id,
-    brandLimit
-  );
+  const brands = await clusterPlannerRepository.listTopBrandsByCity(city.city_id, brandLimit);
 
   const modelsByBrand = {};
 
   for (const brandRow of brands) {
-    modelsByBrand[brandRow.brand] =
-      await clusterPlannerRepository.listTopModelsByCityAndBrand(
-        city.city_id,
-        brandRow.brand,
-        modelLimit
-      );
+    modelsByBrand[brandRow.brand] = await clusterPlannerRepository.listTopModelsByCityAndBrand(
+      city.city_id,
+      brandRow.brand,
+      modelLimit
+    );
   }
 
   const clusters = buildStageClusters({

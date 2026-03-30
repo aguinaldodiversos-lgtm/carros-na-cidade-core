@@ -32,10 +32,7 @@ import metricsRoutes from "./routes/metrics.js";
 
 import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.js";
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
-import {
-  errorHandler,
-  AppError,
-} from "./shared/middlewares/error.middleware.js";
+import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js";
 import { requestMetricsMiddleware } from "./shared/observability/request.metrics.middleware.js";
 
 import adEventsRoutes from "./modules/ads/events.routes.js";

@@ -12,10 +12,7 @@ router.post("/:eventId/approve", async (req, res) => {
   try {
     const { eventId } = req.params;
 
-    await pool.query(
-      `UPDATE events SET banner_status = 'approved' WHERE id = $1`,
-      [eventId]
-    );
+    await pool.query(`UPDATE events SET banner_status = 'approved' WHERE id = $1`, [eventId]);
 
     res.json({ success: true, status: "approved" });
   } catch (err) {

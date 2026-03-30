@@ -22,10 +22,7 @@ function stripTrailingSlash(url: string) {
 
 function getApiBaseUrl(): string {
   // prioridade: API_URL (server) > NEXT_PUBLIC_API_URL (client) > vazio
-  const api =
-    process.env.API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    "";
+  const api = process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim() || "";
 
   return api ? stripTrailingSlash(api) : "";
 }
@@ -60,9 +57,7 @@ function normalizeEntry(entry: PublicSitemapEntry): PublicSitemapEntry {
     lastmod: entry.lastmod || undefined,
     changefreq: entry.changefreq || undefined,
     priority:
-      entry.priority !== undefined && entry.priority !== null
-        ? Number(entry.priority)
-        : undefined,
+      entry.priority !== undefined && entry.priority !== null ? Number(entry.priority) : undefined,
     clusterType: entry.clusterType || undefined,
     stage: entry.stage || undefined,
     state: entry.state || undefined,

@@ -95,25 +95,12 @@ async function processarMetricasCidade(cidade) {
         conversion_rate = EXCLUDED.conversion_rate,
         updated_at = NOW()
       `,
-      [
-        cityId,
-        visits,
-        leads,
-        adsCount,
-        advertisersCount,
-        conversionRate,
-      ]
+      [cityId, visits, leads, adsCount, advertisersCount, conversionRate]
     );
 
-    console.log(
-      `📊 Métricas: ${cidade.name} | visitas: ${visits} | leads: ${leads}`
-    );
+    console.log(`📊 Métricas: ${cidade.name} | visitas: ${visits} | leads: ${leads}`);
   } catch (err) {
-    console.error(
-      "❌ Erro ao processar métricas da cidade:",
-      cidade.name,
-      err.message
-    );
+    console.error("❌ Erro ao processar métricas da cidade:", cidade.name, err.message);
   }
 }
 

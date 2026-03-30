@@ -25,9 +25,7 @@ const FUEL_LOOKUP = buildLookup(FUEL_SYNONYMS);
 const TRANS_LOOKUP = buildLookup(TRANSMISSION_SYNONYMS);
 
 function stripDiacritics(value) {
-  return String(value)
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+  return String(value).normalize("NFD").replace(/\p{M}/gu, "");
 }
 
 function resolveFromLookup(lookup, raw) {
@@ -105,9 +103,7 @@ export function normalizeFuelTypeForStorage(value) {
   for (const part of tokenizeFuelParts(collapsed)) {
     const partResolved = resolveFromLookup(FUEL_LOOKUP, part);
     if (partResolved !== undefined) return partResolved;
-    const partCompound = inferFuelCompoundSlug(
-      stripDiacritics(part.toLowerCase())
-    );
+    const partCompound = inferFuelCompoundSlug(stripDiacritics(part.toLowerCase()));
     if (partCompound) return partCompound;
   }
 

@@ -1,9 +1,7 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-const {
-  ativarAquisicaoDeLojistas,
-} = require("../services/acquisition/dealerAcquisition.service");
+const { ativarAquisicaoDeLojistas } = require("../services/acquisition/dealerAcquisition.service");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

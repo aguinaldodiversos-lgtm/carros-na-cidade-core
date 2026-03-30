@@ -1,9 +1,6 @@
 import type { CityRef } from "@/lib/city/city-types";
 import { buildCityLabel } from "@/lib/city/city-types";
-import {
-  DEFAULT_PUBLIC_CITY_LABEL,
-  DEFAULT_PUBLIC_CITY_SLUG,
-} from "@/lib/site/public-config";
+import { DEFAULT_PUBLIC_CITY_LABEL, DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 /** Cidade padrão garantida — nunca deixa o sistema sem território válido para API. */
 export const DEFAULT_CITY: CityRef = {

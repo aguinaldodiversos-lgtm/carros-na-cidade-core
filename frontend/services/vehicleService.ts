@@ -46,7 +46,9 @@ export type VehicleDetail = {
   seller: SellerInfo;
 };
 
-function isDealerVehicle(vehicle: VehicleDetail): vehicle is VehicleDetail & { seller: SellerDealer } {
+function isDealerVehicle(
+  vehicle: VehicleDetail
+): vehicle is VehicleDetail & { seller: SellerDealer } {
   return vehicle.seller.type === "dealer";
 }
 
@@ -151,7 +153,12 @@ const vehiclesSeed: VehicleDetail[] = [
     adCode: "66376181",
     isBelowFipe: false,
     fipePrice: "R$ 389.500",
-    images: ["/images/banner2.jpg", "/images/banner1.jpg", "/images/compass.jpeg", "/images/civic.jpeg"],
+    images: [
+      "/images/banner2.jpg",
+      "/images/banner1.jpg",
+      "/images/compass.jpeg",
+      "/images/civic.jpeg",
+    ],
     description: "SUV eletrico premium, alta autonomia e acabamento executivo.",
     optionalItems: ["Suspensao adaptativa", "Som premium", "Farol Matrix LED"],
     safetyItems: ["Frenagem autonoma", "Assistente de faixa", "8 airbags"],
@@ -184,7 +191,12 @@ const vehiclesSeed: VehicleDetail[] = [
     adCode: "66376182",
     isBelowFipe: true,
     fipePrice: "R$ 168.400",
-    images: ["/images/corolla.jpeg", "/images/civic.jpeg", "/images/banner1.jpg", "/images/banner2.jpg"],
+    images: [
+      "/images/corolla.jpeg",
+      "/images/civic.jpeg",
+      "/images/banner1.jpg",
+      "/images/banner2.jpg",
+    ],
     description: "Compacto premium hibrido com excelente dirigibilidade e acabamento refinado.",
     optionalItems: ["Teto solar", "Midia widescreen", "Rodas aro 19"],
     safetyItems: ["Controle de estabilidade", "Airbags frontais e laterais", "Isofix"],
@@ -200,7 +212,8 @@ const vehiclesSeed: VehicleDetail[] = [
 
 function parseSlugToVehicle(slug: string): VehicleDetail {
   const parts = slug.split("-");
-  const id = parts.at(-1) && /^\d+$/.test(parts.at(-1) ?? "") ? (parts.at(-1) as string) : "00000000";
+  const id =
+    parts.at(-1) && /^\d+$/.test(parts.at(-1) ?? "") ? (parts.at(-1) as string) : "00000000";
   const city = getCityProfile("sao-paulo-sp");
   const modelRaw = parts.slice(0, -1).join(" ") || "Veiculo";
   const model = modelRaw.split(" ").slice(0, 2).join(" ").toUpperCase();

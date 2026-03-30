@@ -1,9 +1,6 @@
 require("dotenv").config();
 const { Pool } = require("pg");
-const {
-  calculateTargets,
-  evaluateStatus,
-} = require("../services/cityMilestone.service");
+const { calculateTargets, evaluateStatus } = require("../services/cityMilestone.service");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -45,10 +42,7 @@ async function runCityMilestones() {
       // tráfego placeholder (até integrar analytics real)
       const traffic = ads * 20;
 
-      const status = evaluateStatus(
-        { dealers, ads, traffic },
-        targets
-      );
+      const status = evaluateStatus({ dealers, ads, traffic }, targets);
 
       await pool.query(
         `
@@ -75,21 +69,10 @@ async function runCityMilestones() {
           status = EXCLUDED.status,
           last_evaluated_at = NOW()
       `,
-        [
-          city.id,
-          targets.dealers,
-          targets.ads,
-          targets.traffic,
-          dealers,
-          ads,
-          traffic,
-          status,
-        ]
+        [city.id, targets.dealers, targets.ads, targets.traffic, dealers, ads, traffic, status]
       );
 
-      console.log(
-        `Cidade ${city.name}: ${status} (${dealers} lojistas)`
-      );
+      console.log(`Cidade ${city.name}: ${status} (${dealers} lojistas)`);
     }
 
     console.log("✅ City milestones atualizados");

@@ -31,19 +31,14 @@ export function mapAdItemToListingCar(item: AdItem): ListingCar {
   const price = priceNum > 0 ? formatBrl(priceNum) : "Consulte";
 
   const title =
-    item.title ||
-    [item.brand, item.model].filter(Boolean).join(" ").trim() ||
-    "Veículo";
+    item.title || [item.brand, item.model].filter(Boolean).join(" ").trim() || "Veículo";
 
   const brandUpper = (item.brand || title.split(" ")[0] || "Veículo").toUpperCase();
   const modelRest = item.model
     ? item.model
     : title.replace(new RegExp(`^${item.brand || ""}`, "i"), "").trim() || title;
 
-  const cityLabel =
-    item.city && item.state
-      ? `${item.city} (${item.state})`
-      : item.city || "";
+  const cityLabel = item.city && item.state ? `${item.city} (${item.state})` : item.city || "";
 
   const hl = item.highlight_until ? new Date(item.highlight_until).getTime() : NaN;
   const hasHighlight = Number.isFinite(hl) && hl > Date.now();
@@ -51,9 +46,7 @@ export function mapAdItemToListingCar(item: AdItem): ListingCar {
   const badge = hasHighlight ? "destaque" : item.below_fipe ? "fipe" : undefined;
 
   const image =
-    item.image_url ||
-    (Array.isArray(item.images) && item.images[0]) ||
-    "/images/hero.jpeg";
+    item.image_url || (Array.isArray(item.images) && item.images[0]) || "/images/hero.jpeg";
 
   return {
     id: String(item.id),
@@ -121,8 +114,7 @@ export async function fetchRelatedListingsForAdPage(
     }
   }
 
-  const showCity =
-    seller.length === 0 || !isDealer || !isPaid;
+  const showCity = seller.length === 0 || !isDealer || !isPaid;
 
   let city: ListingCar[] = [];
 

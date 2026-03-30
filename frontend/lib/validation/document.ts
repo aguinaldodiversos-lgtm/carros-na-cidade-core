@@ -23,10 +23,7 @@ export function formatCnpj(value: string) {
     .replace(/(\d{4})(\d)/, "$1-$2");
 }
 
-export function formatBrazilianDocument(
-  value: string,
-  type: BrazilianDocumentType
-) {
+export function formatBrazilianDocument(value: string, type: BrazilianDocumentType) {
   return type === "cnpj" ? formatCnpj(value) : formatCpf(value);
 }
 
@@ -81,9 +78,6 @@ export function isValidCnpj(value: string) {
   return secondDigit === Number(cnpj[13]);
 }
 
-export function isValidBrazilianDocument(
-  value: string,
-  type: BrazilianDocumentType
-) {
+export function isValidBrazilianDocument(value: string, type: BrazilianDocumentType) {
   return type === "cnpj" ? isValidCnpj(value) : isValidCpf(value);
 }

@@ -138,10 +138,7 @@ function getImageFromUnknown(item: unknown): string | null {
 }
 
 function createVehiclePlaceholder(label: string, accent = "#2F67F6"): string {
-  const safeLabel = label
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  const safeLabel = label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const svg = `
     <svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -276,11 +273,7 @@ function normalizeBadges(
   });
 
   const weight = normalizeWeight(
-    raw.weight ??
-      raw.listingWeight ??
-      raw.planWeight ??
-      raw.positionWeight ??
-      sellerRaw.weight
+    raw.weight ?? raw.listingWeight ?? raw.planWeight ?? raw.positionWeight ?? sellerRaw.weight
   );
 
   const sellerType = normalizeSellerType(sellerRaw.type, "private");
@@ -369,13 +362,12 @@ function normalizeRelatedAds(value: unknown, fallbackTitle: string): RelatedAd[]
 
 function buildFallbackAd(slug: string): AdDetails {
   const normalizedSlug = slug?.replace(/-/g, " ").trim() || "corolla-xei";
-  const title =
-    normalizedSlug.toLowerCase().includes("corolla")
-      ? "2021 Toyota Corolla XEi 2.0 Flex Automático"
-      : normalizedSlug
-          .split(" ")
-          .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
-          .join(" ");
+  const title = normalizedSlug.toLowerCase().includes("corolla")
+    ? "2021 Toyota Corolla XEi 2.0 Flex Automático"
+    : normalizedSlug
+        .split(" ")
+        .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
+        .join(" ");
 
   return {
     id: "fallback-corolla-xei-2021",
@@ -537,10 +529,7 @@ function buildFallbackAd(slug: string): AdDetails {
 function normalizeAd(raw: Record<string, unknown>, requestedSlug: string): AdDetails {
   const fallback = buildFallbackAd(requestedSlug);
 
-  const sellerRaw =
-    getObject(raw.seller) ||
-    getObject(raw.dealership) ||
-    getObject(raw.store);
+  const sellerRaw = getObject(raw.seller) || getObject(raw.dealership) || getObject(raw.store);
 
   const location = getObject(raw.location);
 
@@ -566,10 +555,7 @@ function normalizeAd(raw: Record<string, unknown>, requestedSlug: string): AdDet
     });
 
   const price = toNumber(raw.price, fallback.price);
-  const fipeValue = toNumber(
-    raw.fipeValue ?? raw.fipe ?? raw.fipe_price,
-    fallback.fipeValue
-  );
+  const fipeValue = toNumber(raw.fipeValue ?? raw.fipe ?? raw.fipe_price, fallback.fipeValue);
 
   const phone = toText(
     sellerRaw.phone ?? sellerRaw.telefone ?? sellerRaw.mobile,
@@ -647,20 +633,11 @@ function normalizeAd(raw: Record<string, unknown>, requestedSlug: string): AdDet
       whatsapp: whatsapp || fallback.seller.whatsapp,
       type: normalizeSellerType(sellerRaw.type ?? raw.seller_type, fallback.seller.type),
       address: toText(sellerRaw.address, fallback.seller.address),
-      stockCount: toNumber(
-        sellerRaw.stockCount ?? sellerRaw.totalAds,
-        fallback.seller.stockCount
-      ),
+      stockCount: toNumber(sellerRaw.stockCount ?? sellerRaw.totalAds, fallback.seller.stockCount),
     },
     finance: {
-      monthlyFrom: toNumber(
-        getObject(raw.finance).monthlyFrom,
-        fallback.finance.monthlyFrom
-      ),
-      entryLabel: toText(
-        getObject(raw.finance).entryLabel,
-        fallback.finance.entryLabel
-      ),
+      monthlyFrom: toNumber(getObject(raw.finance).monthlyFrom, fallback.finance.monthlyFrom),
+      entryLabel: toText(getObject(raw.finance).entryLabel, fallback.finance.entryLabel),
     },
     stockFromSeller: stockFromSeller.length > 0 ? stockFromSeller : fallback.stockFromSeller,
     similarAds: similarAds.length > 0 ? similarAds : fallback.similarAds,

@@ -264,14 +264,17 @@ export async function fetchBlogPageContent(citySlug: string): Promise<BlogPageCo
       ...fallback.newsletter,
       ...(remote.newsletter || {}),
     },
-    categories: Array.isArray(remote.categories) && remote.categories.length > 0
-      ? (remote.categories as BlogCategory[])
-      : fallback.categories,
-    featuredPosts: Array.isArray(remote.featuredPosts) && remote.featuredPosts.length > 0
-      ? (remote.featuredPosts as BlogPost[])
-      : fallback.featuredPosts,
-    popularPosts: Array.isArray(remote.popularPosts) && remote.popularPosts.length > 0
-      ? (remote.popularPosts as BlogPost[])
-      : fallback.popularPosts,
+    categories:
+      Array.isArray(remote.categories) && remote.categories.length > 0
+        ? (remote.categories as BlogCategory[])
+        : fallback.categories,
+    featuredPosts:
+      Array.isArray(remote.featuredPosts) && remote.featuredPosts.length > 0
+        ? (remote.featuredPosts as BlogPost[])
+        : fallback.featuredPosts,
+    popularPosts:
+      Array.isArray(remote.popularPosts) && remote.popularPosts.length > 0
+        ? (remote.popularPosts as BlogPost[])
+        : fallback.popularPosts,
   };
 }

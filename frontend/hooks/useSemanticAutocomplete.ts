@@ -119,9 +119,7 @@ export function useSemanticAutocomplete(
 
         setSemanticData(null);
         setActiveIndex(-1);
-        setError(
-          err instanceof Error ? err.message : "Falha ao carregar autocomplete"
-        );
+        setError(err instanceof Error ? err.message : "Falha ao carregar autocomplete");
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);

@@ -42,9 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/carros-em-:slug",
-    "/carros-baratos-em-:slug",
-    "/carros-automaticos-em-:slug",
-  ],
+  matcher: ["/carros-em-:slug", "/carros-baratos-em-:slug", "/carros-automaticos-em-:slug"],
 };

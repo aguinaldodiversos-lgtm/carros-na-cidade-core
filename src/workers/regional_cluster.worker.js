@@ -73,9 +73,7 @@ async function activateCluster(hubCityId, targetCityId) {
     [targetCityId]
   );
 
-  console.log(
-    `📍 Expansão ativada: ${hubCityId} → ${targetCityId}`
-  );
+  console.log(`📍 Expansão ativada: ${hubCityId} → ${targetCityId}`);
 }
 
 async function runRegionalCluster() {

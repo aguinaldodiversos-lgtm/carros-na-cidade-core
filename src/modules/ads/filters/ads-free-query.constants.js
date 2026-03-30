@@ -66,9 +66,4 @@ export const BELOW_FIPE_TERMS = [
   "baratos",
 ];
 
-export const HIGHLIGHT_TERMS = [
-  "destaque",
-  "destaques",
-  "premium",
-  "top",
-];
+export const HIGHLIGHT_TERMS = ["destaque", "destaques", "premium", "top"];

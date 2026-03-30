@@ -43,8 +43,7 @@ function buildHeadline(vehicle: VehicleDetail) {
 
 function buildPriceSignal(priceSignal?: VehiclePriceSignal | null) {
   return {
-    label:
-      safeText(priceSignal?.label, "") || "Análise em processamento pelo Cérebro IA",
+    label: safeText(priceSignal?.label, "") || "Análise em processamento pelo Cérebro IA",
     reason:
       safeText(priceSignal?.reason, "") ||
       "Estamos consolidando sinais de preço, contexto regional e comportamento de mercado para este anúncio.",
@@ -88,18 +87,13 @@ function formatFipeDelta(vehicle: VehicleDetail) {
 function SpecPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#e1e5ef] bg-[#f8fafe] px-3 py-2.5">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#6a748d]">
-        {label}
-      </p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[#6a748d]">{label}</p>
       <p className="mt-0.5 text-[15px] font-semibold leading-snug text-[#2a3550]">{value}</p>
     </div>
   );
 }
 
-export default function VehicleInfo({
-  vehicle,
-  priceSignal,
-}: VehicleInfoProps) {
+export default function VehicleInfo({ vehicle, priceSignal }: VehicleInfoProps) {
   const headline = buildHeadline(vehicle);
   const signal = buildPriceSignal(priceSignal);
   const dateLabels = formatListingDateLabels(vehicle.adPublishedAt, vehicle.adUpdatedAt);

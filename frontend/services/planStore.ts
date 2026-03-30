@@ -75,7 +75,11 @@ const planSeed: SubscriptionPlan[] = [
     updated_at: nowIso(),
     billing_model: "free",
     description: "Ideal para pessoa fisica que quer anunciar sem mensalidade.",
-    benefits: ["Ate 3 anuncios ativos por CPF", "Contato direto via WhatsApp", "Sem comissao por venda"],
+    benefits: [
+      "Ate 3 anuncios ativos por CPF",
+      "Contato direto via WhatsApp",
+      "Sem comissao por venda",
+    ],
   },
   {
     id: "cpf-premium-highlight",
@@ -92,7 +96,11 @@ const planSeed: SubscriptionPlan[] = [
     updated_at: nowIso(),
     billing_model: "one_time",
     description: "Destaque no topo da busca com mais visibilidade para vender mais rapido.",
-    benefits: ["Destaque no topo da busca", "Badge premium no anuncio", "Prioridade de exibicao por 30 dias"],
+    benefits: [
+      "Destaque no topo da busca",
+      "Badge premium no anuncio",
+      "Prioridade de exibicao por 30 dias",
+    ],
     recommended: true,
   },
   {
@@ -162,7 +170,11 @@ const planSeed: SubscriptionPlan[] = [
     updated_at: nowIso(),
     billing_model: "monthly",
     description: "Impulsionamento regional com banner promocional e campanha especial.",
-    benefits: ["Banner promocional na home regional", "Impulsionamento geolocalizado", "Ate 350 anuncios ativos"],
+    benefits: [
+      "Banner promocional na home regional",
+      "Impulsionamento geolocalizado",
+      "Ate 350 anuncios ativos",
+    ],
   },
 ];
 
@@ -231,8 +243,13 @@ export function isValidCNPJ(value: string) {
   return `${d1}${d2}` === cnpj.slice(12);
 }
 
-export function getPlans({ type, onlyActive = true }: { type?: PlanType; onlyActive?: boolean } = {}) {
-  return planSeed.filter((plan) => (type ? plan.type === type : true)).filter((plan) => (onlyActive ? plan.is_active : true));
+export function getPlans({
+  type,
+  onlyActive = true,
+}: { type?: PlanType; onlyActive?: boolean } = {}) {
+  return planSeed
+    .filter((plan) => (type ? plan.type === type : true))
+    .filter((plan) => (onlyActive ? plan.is_active : true));
 }
 
 export function getPlanById(planId: string) {
@@ -264,7 +281,8 @@ export function updatePlanById(
   if (payload.name !== undefined) plan.name = payload.name;
   if (payload.price !== undefined) plan.price = payload.price;
   if (payload.ad_limit !== undefined) plan.ad_limit = payload.ad_limit;
-  if (payload.is_featured_enabled !== undefined) plan.is_featured_enabled = payload.is_featured_enabled;
+  if (payload.is_featured_enabled !== undefined)
+    plan.is_featured_enabled = payload.is_featured_enabled;
   if (payload.has_store_profile !== undefined) plan.has_store_profile = payload.has_store_profile;
   if (payload.priority_level !== undefined) plan.priority_level = payload.priority_level;
   if (payload.is_active !== undefined) plan.is_active = payload.is_active;
@@ -298,7 +316,11 @@ export function getActiveSubscription(userId: string) {
 export function validatePublishEligibility(userId: string) {
   const user = getUserById(userId);
   if (!user) {
-    return { allowed: false, reason: "Usuario nao encontrado", suggested_plan_type: null as PlanType | null };
+    return {
+      allowed: false,
+      reason: "Usuario nao encontrado",
+      suggested_plan_type: null as PlanType | null,
+    };
   }
 
   if (user.document_type === "CPF" && !isValidCPF(user.document)) {
@@ -323,12 +345,24 @@ export function validatePublishEligibility(userId: string) {
   if (activeSubscription) {
     const plan = getPlanById(activeSubscription.plan_id);
     if (!plan) {
-      return { allowed: false, reason: "Plano da assinatura nao encontrado", suggested_plan_type: user.document_type };
+      return {
+        allowed: false,
+        reason: "Plano da assinatura nao encontrado",
+        suggested_plan_type: user.document_type,
+      };
     }
     if (activeAds < plan.ad_limit) {
-      return { allowed: true, reason: "Limite disponivel no plano ativo", suggested_plan_type: null };
+      return {
+        allowed: true,
+        reason: "Limite disponivel no plano ativo",
+        suggested_plan_type: null,
+      };
     }
-    return { allowed: false, reason: "Limite do plano ativo atingido", suggested_plan_type: user.document_type };
+    return {
+      allowed: false,
+      reason: "Limite do plano ativo atingido",
+      suggested_plan_type: user.document_type,
+    };
   }
 
   const freeLimit = user.document_type === "CPF" ? 3 : 20;
@@ -338,7 +372,10 @@ export function validatePublishEligibility(userId: string) {
 
   return {
     allowed: false,
-    reason: user.document_type === "CPF" ? "Limite de 3 anuncios gratuitos por CPF atingido" : "Limite de 20 anuncios gratuitos por CNPJ atingido",
+    reason:
+      user.document_type === "CPF"
+        ? "Limite de 3 anuncios gratuitos por CPF atingido"
+        : "Limite de 20 anuncios gratuitos por CNPJ atingido",
     suggested_plan_type: user.document_type,
   };
 }
@@ -350,7 +387,10 @@ export function createOrUpdateSubscription(data: {
   expires_at: string | null;
   payment_id: string | null;
 }) {
-  const existing = userSubscriptions.find((item) => item.user_id === data.user_id && item.plan_id === data.plan_id && item.status === "active");
+  const existing = userSubscriptions.find(
+    (item) =>
+      item.user_id === data.user_id && item.plan_id === data.plan_id && item.status === "active"
+  );
   if (existing) {
     existing.status = data.status;
     existing.expires_at = data.expires_at;
@@ -371,7 +411,9 @@ export function createOrUpdateSubscription(data: {
 }
 
 export function registerPayment(data: Omit<PaymentRecord, "id" | "created_at" | "updated_at">) {
-  const existingByExternalId = payments.find((payment) => payment.mercado_pago_id === data.mercado_pago_id);
+  const existingByExternalId = payments.find(
+    (payment) => payment.mercado_pago_id === data.mercado_pago_id
+  );
   if (existingByExternalId) {
     existingByExternalId.status = data.status;
     existingByExternalId.updated_at = nowIso();

@@ -6,11 +6,7 @@ export interface BuildSearchUrlOptions {
   filters?: Record<string, unknown>;
 }
 
-function appendIfPresent(
-  params: URLSearchParams,
-  key: string,
-  value: unknown
-): void {
+function appendIfPresent(params: URLSearchParams, key: string, value: unknown): void {
   if (value === undefined || value === null || value === "") return;
   params.set(key, String(value));
 }

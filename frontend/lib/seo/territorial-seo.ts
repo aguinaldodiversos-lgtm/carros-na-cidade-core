@@ -2,12 +2,7 @@ import type { Metadata } from "next";
 import type { TerritorialPagePayload } from "../search/territorial-public";
 import { getSiteUrl, toAbsoluteUrl } from "./site";
 
-type TerritorialSeoMode =
-  | "city"
-  | "brand"
-  | "model"
-  | "opportunities"
-  | "below_fipe";
+type TerritorialSeoMode = "city" | "brand" | "model" | "opportunities" | "below_fipe";
 
 function sanitizeText(value?: string | null, fallback = ""): string {
   return String(value || fallback).trim();
@@ -40,9 +35,7 @@ function resolveOgImage(data: TerritorialPagePayload): string | undefined {
 
   const candidate =
     first?.image_url ||
-    (Array.isArray(first?.images) && first.images.length > 0
-      ? first.images[0]
-      : null);
+    (Array.isArray(first?.images) && first.images.length > 0 ? first.images[0] : null);
 
   return candidate ? toAbsoluteUrl(candidate) : undefined;
 }

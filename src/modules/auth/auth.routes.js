@@ -147,14 +147,11 @@ router.post(
   "/verify-document",
   authMiddleware,
   asyncHandler(async (req, res) => {
-    const document_type = requireString(
-      req.body?.document_type,
-      "document_type"
-    ).toLowerCase();
-    const document_number = requireString(
-      req.body?.document_number,
-      "document_number"
-    ).replace(/\D/g, "");
+    const document_type = requireString(req.body?.document_type, "document_type").toLowerCase();
+    const document_number = requireString(req.body?.document_number, "document_number").replace(
+      /\D/g,
+      ""
+    );
 
     if (!["cpf", "cnpj"].includes(document_type)) {
       throw new AppError("Tipo de documento inválido. Use cpf ou cnpj.", 400);
@@ -220,9 +217,7 @@ async function handleResetPassword(req, res) {
     "password.service.js"
   );
 
-  const result = fn.length >= 2
-    ? await fn(token, newPassword)
-    : await fn({ token, newPassword });
+  const result = fn.length >= 2 ? await fn(token, newPassword) : await fn({ token, newPassword });
 
   return res.status(200).json(result ?? { ok: true });
 }
@@ -264,9 +259,7 @@ router.post(
     ]);
 
     if (!resend) {
-      return res
-        .status(501)
-        .json({ ok: false, error: "Resend não implementado no service." });
+      return res.status(501).json({ ok: false, error: "Resend não implementado no service." });
     }
 
     const { email, userId } = req.body || {};
@@ -310,7 +303,9 @@ router.get(
     }
 
     const accountType =
-      String(user.document_type || "").trim().toUpperCase() === "CNPJ"
+      String(user.document_type || "")
+        .trim()
+        .toUpperCase() === "CNPJ"
         ? "CNPJ"
         : "CPF";
 
@@ -322,8 +317,7 @@ router.get(
         email: user.email?.trim() || "",
         type: accountType,
         document_type: accountType,
-        cnpj_verified:
-          accountType === "CNPJ" ? Boolean(user.document_verified) : false,
+        cnpj_verified: accountType === "CNPJ" ? Boolean(user.document_verified) : false,
         role: user.role || "user",
         plan: user.plan || "free",
       },

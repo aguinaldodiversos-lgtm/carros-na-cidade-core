@@ -18,11 +18,7 @@ function calculateGrowthScore(data) {
   const dealers = Number(data.dealers || 0);
   const opportunity = Number(data.opportunity_score || 0);
 
-  return (
-    dealers * 5 +
-    ads * 0.5 +
-    opportunity
-  );
+  return dealers * 5 + ads * 0.5 + opportunity;
 }
 
 function calculateConfidence(converted, leads) {
@@ -106,14 +102,7 @@ async function runCityIntelligence() {
           status = EXCLUDED.status,
           last_evaluated_at = NOW()
       `,
-        [
-          city.id,
-          cityType,
-          confidence,
-          growthScore,
-          decision.effort,
-          decision.status,
-        ]
+        [city.id, cityType, confidence, growthScore, decision.effort, decision.status]
       );
 
       console.log(

@@ -6,10 +6,7 @@ export async function ensureCityCampaign({
   opportunityScore = 0,
   priority = 2,
 }) {
-  const existing = await campaignsRepository.findActiveCampaignByCityAndType(
-    cityId,
-    campaignType
-  );
+  const existing = await campaignsRepository.findActiveCampaignByCityAndType(cityId, campaignType);
 
   if (existing) {
     return {

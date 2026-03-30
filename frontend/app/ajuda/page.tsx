@@ -4,8 +4,7 @@ import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 
 export const metadata: Metadata = {
   title: "Central de ajuda | Carros na Cidade",
-  description:
-    "Perguntas frequentes sobre o portal, anúncios, conta e uso do Carros na Cidade.",
+  description: "Perguntas frequentes sobre o portal, anúncios, conta e uso do Carros na Cidade.",
 };
 
 export default function AjudaPage() {

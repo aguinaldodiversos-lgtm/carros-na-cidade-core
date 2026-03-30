@@ -6,9 +6,7 @@ import { buildDomainFields } from "../../shared/domainLog.js";
 
 export async function fetchGA4CityData(propertyId) {
   try {
-    const auth = getGoogleAuth([
-      "https://www.googleapis.com/auth/analytics.readonly",
-    ]);
+    const auth = getGoogleAuth(["https://www.googleapis.com/auth/analytics.readonly"]);
 
     const client = await auth.getClient();
 

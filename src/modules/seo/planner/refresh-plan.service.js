@@ -19,10 +19,7 @@ export async function buildRefreshPlansForTopClusters(limit = 1000) {
   const results = [];
 
   for (const cluster of clusters) {
-    const intervalHours = resolveRefreshIntervalHours(
-      cluster.stage,
-      cluster.money_page
-    );
+    const intervalHours = resolveRefreshIntervalHours(cluster.stage, cluster.money_page);
 
     const nextRefreshAt = addHours(new Date(), intervalHours);
 

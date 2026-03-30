@@ -8,15 +8,7 @@ const pool = new Pool({
 
 async function createAlert(req, res) {
   try {
-    const {
-      name,
-      phone,
-      city_id,
-      brand,
-      model,
-      price_range,
-      urgency,
-    } = req.body;
+    const { name, phone, city_id, brand, model, price_range, urgency } = req.body;
 
     if (!name || !phone || !city_id) {
       return res.status(400).json({
@@ -31,15 +23,7 @@ async function createAlert(req, res) {
       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       RETURNING *
       `,
-      [
-        name,
-        phone,
-        city_id,
-        brand || null,
-        model || null,
-        price_range || null,
-        urgency || null,
-      ]
+      [name, phone, city_id, brand || null, model || null, price_range || null, urgency || null]
     );
 
     const alert = result.rows[0];

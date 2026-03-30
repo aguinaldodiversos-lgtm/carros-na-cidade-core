@@ -151,7 +151,8 @@ export function buildAdsFacetWhere(filters = {}) {
   if (filters.city_slug) pushFilter(where, params, `c.slug = ?`, filters.city_slug);
   if (filters.brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${filters.brand}%`);
   if (filters.model) pushFilter(where, params, `a.model ILIKE ?`, `%${filters.model}%`);
-  if (filters.below_fipe !== undefined) pushFilter(where, params, `a.below_fipe = ?`, Boolean(filters.below_fipe));
+  if (filters.below_fipe !== undefined)
+    pushFilter(where, params, `a.below_fipe = ?`, Boolean(filters.below_fipe));
   if (filters.fuel_type) pushFilter(where, params, `a.fuel_type ILIKE ?`, `%${filters.fuel_type}%`);
   if (filters.transmission) {
     pushFilter(

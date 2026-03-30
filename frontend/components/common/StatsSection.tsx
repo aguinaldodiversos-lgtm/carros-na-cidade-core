@@ -17,8 +17,12 @@ export default function StatsSection({ title, subtitle, stats }: StatsSectionPro
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <article key={stat.label} className="rounded-xl border border-[#e1e5ef] bg-[#f8fafe] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#5f6980]">{stat.label}</p>
-            <p className="mt-1 text-[30px] font-extrabold leading-none text-[#0e62d8]">{stat.value}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#5f6980]">
+              {stat.label}
+            </p>
+            <p className="mt-1 text-[30px] font-extrabold leading-none text-[#0e62d8]">
+              {stat.value}
+            </p>
             <p className="mt-2 text-sm leading-snug text-[#4e5972]">{stat.description}</p>
           </article>
         ))}

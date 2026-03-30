@@ -1,10 +1,8 @@
 import axios from "axios";
 import { logger } from "../../shared/logger.js";
 
-const TEXT_SEARCH_URL =
-  "https://maps.googleapis.com/maps/api/place/textsearch/json";
-const PLACE_DETAILS_URL =
-  "https://maps.googleapis.com/maps/api/place/details/json";
+const TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json";
+const PLACE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
 
 function getApiKey() {
   return String(process.env.GOOGLE_PLACES_API_KEY || "").trim();
@@ -68,7 +66,8 @@ export async function textSearchCarDealersPaged(city, queryTemplate, maxPages = 
   const key = getApiKey();
   if (!key) return [];
 
-  const query = buildQuery(city, queryTemplate) ||
+  const query =
+    buildQuery(city, queryTemplate) ||
     `revenda de carros em ${city.name}${city.state ? ` ${city.state}` : ""}`;
 
   const aggregated = [];
@@ -134,8 +133,7 @@ export async function fetchPlaceDetails(placeId) {
     const response = await axios.get(PLACE_DETAILS_URL, {
       params: {
         place_id: placeId,
-        fields:
-          "name,formatted_phone_number,international_phone_number,formatted_address,geometry",
+        fields: "name,formatted_phone_number,international_phone_number,formatted_address,geometry",
         key,
       },
       timeout: 20000,
@@ -144,10 +142,7 @@ export async function fetchPlaceDetails(placeId) {
     const result = response.data?.result;
     if (!result) return null;
 
-    const phone =
-      result.international_phone_number ||
-      result.formatted_phone_number ||
-      null;
+    const phone = result.international_phone_number || result.formatted_phone_number || null;
 
     return {
       name: result.name,

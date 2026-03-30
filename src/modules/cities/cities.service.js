@@ -1,8 +1,5 @@
 import * as citiesRepository from "./cities.repository.js";
-import {
-  isIbgeAutoSeedEnabled,
-  upsertMunicipiosForUfFromIbge,
-} from "./ibge-municipios.service.js";
+import { isIbgeAutoSeedEnabled, upsertMunicipiosForUfFromIbge } from "./ibge-municipios.service.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import { normalizeSearchText } from "../../shared/utils/normalizeSearchText.js";

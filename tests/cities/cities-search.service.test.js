@@ -9,10 +9,38 @@ import { searchCitiesByUfAndPartialName } from "../../src/modules/cities/cities.
 
 /** Mesma forma de linhas que loadCityDictionary retorna do banco */
 const MOCK_CITIES = [
-  { id: 101, name: "Campinas", slug: "campinas-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 102, name: "Atibaia", slug: "atibaia-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 103, name: "São Paulo", slug: "sao-paulo-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 201, name: "Curitiba", slug: "curitiba-pr", state: "PR", ranking_priority: 0, territorial_score: 0 },
+  {
+    id: 101,
+    name: "Campinas",
+    slug: "campinas-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 102,
+    name: "Atibaia",
+    slug: "atibaia-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 103,
+    name: "São Paulo",
+    slug: "sao-paulo-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 201,
+    name: "Curitiba",
+    slug: "curitiba-pr",
+    state: "PR",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
 ];
 
 describe("searchCitiesByUfAndPartialName (tabela cities por UF)", () => {

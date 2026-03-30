@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useCity } from "@/lib/city/CityContext";
-import {
-  hasUserConfirmedCity,
-  markUserConfirmedCity,
-} from "@/lib/city/city-storage";
+import { hasUserConfirmedCity, markUserConfirmedCity } from "@/lib/city/city-storage";
 
 /**
  * Primeiro acesso: reforça a escolha de cidade (o padrão ainda vem do cookie).
@@ -35,10 +32,9 @@ export function CityRegionBanner() {
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p className="text-[14px] leading-snug text-[#1d2a44]">
-          <span className="font-bold text-[#0e62d8]">Confirme sua região.</span>{" "}
-          Os anúncios e buscas usam{" "}
-          <strong className="font-semibold">{city.label}</strong>. Se não for a sua cidade, ajuste
-          agora.
+          <span className="font-bold text-[#0e62d8]">Confirme sua região.</span> Os anúncios e
+          buscas usam <strong className="font-semibold">{city.label}</strong>. Se não for a sua
+          cidade, ajuste agora.
         </p>
         <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
           <button

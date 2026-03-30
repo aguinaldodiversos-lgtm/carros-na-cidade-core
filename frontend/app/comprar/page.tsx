@@ -15,10 +15,7 @@ import {
   buildSearchQueryString,
   parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
-import {
-  DEFAULT_PUBLIC_CITY_LABEL,
-  DEFAULT_PUBLIC_CITY_SLUG,
-} from "@/lib/site/public-config";
+import { DEFAULT_PUBLIC_CITY_LABEL, DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -216,9 +213,7 @@ function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) 
   return `Usados e seminovos em ${city.name} (${city.state}): marketplace regional onde cada anúncio nasce na cidade — compare preços e negocie com contexto local no Carros na Cidade.`;
 }
 
-export async function generateMetadata({
-  searchParams = {},
-}: ComprarPageProps): Promise<Metadata> {
+export async function generateMetadata({ searchParams = {} }: ComprarPageProps): Promise<Metadata> {
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
@@ -245,9 +240,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function ComprarPage({
-  searchParams = {},
-}: ComprarPageProps) {
+export default async function ComprarPage({ searchParams = {} }: ComprarPageProps) {
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
@@ -259,14 +252,12 @@ export default async function ComprarPage({
   ]);
 
   const initialResults =
-    resultsResponse.status === "fulfilled" &&
-    isValidResultsResponse(resultsResponse.value)
+    resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
       ? resultsResponse.value
       : buildEmptyResults(filters);
 
   const initialFacets =
-    facetsResponse.status === "fulfilled" &&
-    isValidFacetsResponse(facetsResponse.value)
+    facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)
       ? facetsResponse.value.facets
       : buildEmptyFacets();
 

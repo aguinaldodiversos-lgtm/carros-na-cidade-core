@@ -6,9 +6,7 @@ import { buildDomainFields } from "../../shared/domainLog.js";
 
 export async function fetchSearchConsoleData(siteUrl) {
   try {
-    const auth = getGoogleAuth([
-      "https://www.googleapis.com/auth/webmasters.readonly",
-    ]);
+    const auth = getGoogleAuth(["https://www.googleapis.com/auth/webmasters.readonly"]);
 
     const client = await auth.getClient();
 

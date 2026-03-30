@@ -1,27 +1,18 @@
-import { createAiQueue } from "./ai.queue.js";
-import { createRedisClient, createCache } from "./ai.cache.js";
-import { AiOrchestrator } from "./ai.orchestrator.js";
+/**
+ * Compat: módulo legado — toda a lógica vive em `src/brain/`.
+ */
 import { logger } from "../../shared/logger.js";
-
-let orchestrator;
-let aiQueue;
+import {
+  getBrainAiStack,
+  getSharedAiOrchestrator,
+} from "../../../brain/orchestrator/brain-stack.js";
 
 export function getAiOrchestrator() {
-  if (orchestrator) return orchestrator;
-
-  // redis + cache
-  const redis = createRedisClient({ logger });
-  const cache = createCache({ redis });
-
-  // queue (opcional)
-  const { aiQueue: q } = createAiQueue({ logger });
-  aiQueue = q;
-
-  orchestrator = new AiOrchestrator({ logger, cache, aiQueue });
-
-  return orchestrator;
+  return getSharedAiOrchestrator(logger);
 }
 
 export function getAiQueue() {
-  return aiQueue;
+  return null;
 }
+
+export { getBrainAiStack, getSharedAiOrchestrator };

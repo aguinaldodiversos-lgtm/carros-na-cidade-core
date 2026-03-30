@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FipeOption } from "@/lib/fipe/fipe-provider";
-import { fetchFipeQuote, listFipeBrands, listFipeModels, listFipeYears } from "@/lib/fipe/fipe-client";
+import {
+  fetchFipeQuote,
+  listFipeBrands,
+  listFipeModels,
+  listFipeYears,
+} from "@/lib/fipe/fipe-client";
 import { CONDITION_ITEMS, OPTIONAL_ITEMS, VEHICLE_COLORS } from "./constants";
 import { formatCurrencyInput, formatKm, parseCurrency, parseKmDigits } from "./currency";
 import { fabricationYearChoices, uniqueModelYears, versionsForYear } from "./fipe-years";
@@ -79,7 +84,8 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
   const modelYears = useMemo(() => uniqueModelYears(yearOptions), [yearOptions]);
   const selectedModelYear = state.yearModel ? parseInt(state.yearModel, 10) : null;
   const versionChoices = useMemo(
-    () => versionsForYear(yearOptions, Number.isFinite(selectedModelYear) ? selectedModelYear : null),
+    () =>
+      versionsForYear(yearOptions, Number.isFinite(selectedModelYear) ? selectedModelYear : null),
     [yearOptions, selectedModelYear]
   );
 
@@ -153,7 +159,9 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         const priceNum = parseCurrency(quote.price);
         const formatted =
           priceNum > 0
-            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(priceNum)
+            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                priceNum
+              )
             : "";
         patch({
           fipeValue: formatted,
@@ -164,7 +172,15 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         // mantém FIPE manual nas etapas seguintes
       }
     },
-    [patch, state.fipeBrandCode, state.fipeModelCode, state.fipeVehicleType, state.fuel, state.yearModel, yearOptions]
+    [
+      patch,
+      state.fipeBrandCode,
+      state.fipeModelCode,
+      state.fipeVehicleType,
+      state.fuel,
+      state.yearModel,
+      yearOptions,
+    ]
   );
 
   return (
@@ -283,7 +299,11 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         <span className={labelClass}>
           Cor <span className="text-red-500">*</span>
         </span>
-        <select className={selectClass} value={state.color} onChange={(e) => patch({ color: e.target.value })}>
+        <select
+          className={selectClass}
+          value={state.color}
+          onChange={(e) => patch({ color: e.target.value })}
+        >
           <option value="">Escolha uma...</option>
           {VEHICLE_COLORS.map((c) => (
             <option key={c} value={c}>
@@ -316,8 +336,8 @@ export function StepListingInfo({ state, patch }: { state: WizardFormState; patc
   return (
     <div className="space-y-6">
       <p className="text-sm leading-7 text-[#6E748A]">
-        Use um valor competitivo para aumentar suas chances de venda. Quilometragem e preço são os únicos campos numéricos
-        principais desta etapa.
+        Use um valor competitivo para aumentar suas chances de venda. Quilometragem e preço são os
+        únicos campos numéricos principais desta etapa.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -350,8 +370,8 @@ export function StepListingInfo({ state, patch }: { state: WizardFormState; patc
       </div>
 
       <p className="text-xs text-[#98A2B3]">
-        A descrição do anúncio fica na etapa final, para manter esta etapa só com quilometragem e preço como campos
-        editáveis principais.
+        A descrição do anúncio fica na etapa final, para manter esta etapa só com quilometragem e
+        preço como campos editáveis principais.
       </p>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -391,7 +411,14 @@ type PhotoProps = {
   onSetCover: (index: number) => void;
 };
 
-export function StepPhotos({ photos, previews, coverIndex, onFiles, onRemove, onSetCover }: PhotoProps) {
+export function StepPhotos({
+  photos,
+  previews,
+  coverIndex,
+  onFiles,
+  onRemove,
+  onSetCover,
+}: PhotoProps) {
   const [dragOver, setDragOver] = useState(false);
 
   const handleDrop = (e: React.DragEvent) => {
@@ -410,8 +437,8 @@ export function StepPhotos({ photos, previews, coverIndex, onFiles, onRemove, on
   return (
     <div className="space-y-6">
       <p className="text-sm leading-7 text-[#6E748A]">
-        Fotos claras e bem iluminadas geram mais contatos. Você pode arrastar imagens para a área abaixo ou clicar para
-        selecionar.
+        Fotos claras e bem iluminadas geram mais contatos. Você pode arrastar imagens para a área
+        abaixo ou clicar para selecionar.
       </p>
 
       <label
@@ -422,11 +449,15 @@ export function StepPhotos({ photos, previews, coverIndex, onFiles, onRemove, on
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed px-6 py-10 text-center transition ${
-          dragOver ? "border-[#2F67F6] bg-[#F2F7FF]" : "border-[#B9C8E8] bg-[#F8FBFF] hover:border-[#2F67F6]"
+          dragOver
+            ? "border-[#2F67F6] bg-[#F2F7FF]"
+            : "border-[#B9C8E8] bg-[#F8FBFF] hover:border-[#2F67F6]"
         }`}
       >
         <span className="text-lg font-bold text-[#1D2440]">Adicionar fotos</span>
-        <span className="mt-2 max-w-md text-sm text-[#6E748A]">Até 10 imagens. Formatos JPG ou PNG.</span>
+        <span className="mt-2 max-w-md text-sm text-[#6E748A]">
+          Até 10 imagens. Formatos JPG ou PNG.
+        </span>
         <input
           type="file"
           accept="image/*"
@@ -499,7 +530,9 @@ export function StepOptionals({ state, patch }: { state: WizardFormState; patch:
 export function StepConditions({ state, patch }: { state: WizardFormState; patch: Patch }) {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[#6E748A]">Selecione as condições que se aplicam ao veículo ou ao negócio.</p>
+      <p className="text-sm text-[#6E748A]">
+        Selecione as condições que se aplicam ao veículo ou ao negócio.
+      </p>
       <ChipSelect
         items={CONDITION_ITEMS}
         selected={state.conditionIds}
@@ -529,8 +562,8 @@ export function StepHighlight({
       <div className="rounded-[24px] border border-[#DCE6F7] bg-[linear-gradient(135deg,#F8FBFF_0%,#EEF4FF_100%)] p-6">
         <h3 className="text-xl font-extrabold text-[#1D2440]">Destaque no Carros na Cidade</h3>
         <p className="mt-2 text-sm leading-7 text-[#5C647C]">
-          Anúncios em destaque aparecem com mais visibilidade, melhor posicionamento nas buscas locais e entrada em vitrines
-          especiais da sua região.
+          Anúncios em destaque aparecem com mais visibilidade, melhor posicionamento nas buscas
+          locais e entrada em vitrines especiais da sua região.
         </p>
       </div>
 
@@ -546,7 +579,9 @@ export function StepHighlight({
             }`}
           >
             <div className="text-sm font-bold text-[#2F67F6]">Sem destaque agora</div>
-            <p className="mt-2 text-sm text-[#5C647C]">Publique primeiro e impulsione depois pelo painel.</p>
+            <p className="mt-2 text-sm text-[#5C647C]">
+              Publique primeiro e impulsione depois pelo painel.
+            </p>
           </button>
           {boostOptions.map((opt) => (
             <button
@@ -562,8 +597,10 @@ export function StepHighlight({
               <div className="text-lg font-extrabold text-[#1D2440]">{opt.label}</div>
               <p className="mt-2 text-sm text-[#5C647C]">{opt.description}</p>
               <div className="mt-3 text-sm font-bold text-[#2F67F6]">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(opt.price)} · {opt.days}{" "}
-                dias
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                  opt.price
+                )}{" "}
+                · {opt.days} dias
               </div>
             </button>
           ))}
@@ -596,15 +633,19 @@ export function StepFinalize({
 }) {
   const title = useMemo(
     () =>
-      [state.yearModel, state.brandLabel, state.modelLabel, state.versionLabel].filter(Boolean).join(" ").trim() ||
-      "Novo anúncio",
+      [state.yearModel, state.brandLabel, state.modelLabel, state.versionLabel]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || "Novo anúncio",
     [state.brandLabel, state.modelLabel, state.versionLabel, state.yearModel]
   );
 
   const isLojistaAccount = sessionAccountType === "CNPJ";
   const isCnpjDashboard = dashboard?.user.type === "CNPJ";
   const hasSlots =
-    dashboard && typeof dashboard.stats.available_limit === "number" && dashboard.stats.available_limit > 0;
+    dashboard &&
+    typeof dashboard.stats.available_limit === "number" &&
+    dashboard.stats.available_limit > 0;
 
   const showLojistaPlanUi = isLojistaAccount && (isCnpjDashboard || dashboard === null);
   const showLojistaFree = isLojistaAccount && isCnpjDashboard && hasSlots;
@@ -646,12 +687,18 @@ export function StepFinalize({
 
       {showPfOrParticularPayment ? (
         <div className="rounded-[24px] border border-[#DCE6F7] bg-white p-6">
-          <h4 className="text-lg font-extrabold text-[#1D2440]">Publicação e pagamento (pessoa física)</h4>
+          <h4 className="text-lg font-extrabold text-[#1D2440]">
+            Publicação e pagamento (pessoa física)
+          </h4>
           <p className="mt-2 text-sm leading-7 text-[#5C647C]">
-            O valor da publicação e eventuais destaques seguem o plano vigente no portal. Você poderá concluir o pagamento
-            após revisar os dados, conforme regras do checkout integrado (Mercado Pago quando aplicável).
+            O valor da publicação e eventuais destaques seguem o plano vigente no portal. Você
+            poderá concluir o pagamento após revisar os dados, conforme regras do checkout integrado
+            (Mercado Pago quando aplicável).
           </p>
-          <Link href="/planos" className="mt-3 inline-block text-sm font-bold text-[#2F67F6] underline">
+          <Link
+            href="/planos"
+            className="mt-3 inline-block text-sm font-bold text-[#2F67F6] underline"
+          >
             Ver planos e valores
           </Link>
         </div>
@@ -663,20 +710,21 @@ export function StepFinalize({
           {showLojistaFree ? (
             <p className="mt-2 text-sm leading-7 text-[#15803D]">
               Seu plano atual inclui vagas para anúncios. Você pode publicar{" "}
-              <span className="font-bold">sem cobrança individual</span> por esta publicação, dentro do limite disponível (
-              {dashboard?.stats.available_limit} restantes).
+              <span className="font-bold">sem cobrança individual</span> por esta publicação, dentro
+              do limite disponível ({dashboard?.stats.available_limit} restantes).
             </p>
           ) : showLojistaNoSlots ? (
             <p className="mt-2 text-sm leading-7 text-[#5C647C]">
-              Não há vagas disponíveis no plano atual ou é necessário assinar um plano para lojistas.{" "}
+              Não há vagas disponíveis no plano atual ou é necessário assinar um plano para
+              lojistas.{" "}
               <Link href="/planos" className="font-bold text-[#2F67F6] underline">
                 Ver planos para lojistas
               </Link>
             </p>
           ) : (
             <p className="mt-2 text-sm leading-7 text-[#5C647C]">
-              Não foi possível carregar vagas do plano agora. Você ainda pode tentar publicar; o sistema validará no
-              servidor.{" "}
+              Não foi possível carregar vagas do plano agora. Você ainda pode tentar publicar; o
+              sistema validará no servidor.{" "}
               <Link href="/planos" className="font-bold text-[#2F67F6] underline">
                 Ver planos para lojistas
               </Link>
@@ -727,7 +775,8 @@ export function StepFinalize({
           className="mt-1 h-4 w-4 rounded border-[#C5D1E8]"
         />
         <span className="text-sm leading-7 text-[#5C647C]">
-          Confirmo que as informações são verdadeiras e autorizo a publicação conforme as regras do portal.
+          Confirmo que as informações são verdadeiras e autorizo a publicação conforme as regras do
+          portal.
         </span>
       </label>
     </div>

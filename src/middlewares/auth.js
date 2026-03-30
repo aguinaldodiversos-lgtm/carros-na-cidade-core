@@ -10,10 +10,7 @@ function auth(req, res, next) {
 
     const token = header.replace("Bearer ", "");
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = decoded;
 

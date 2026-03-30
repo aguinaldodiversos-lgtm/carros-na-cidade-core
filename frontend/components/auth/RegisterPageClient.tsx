@@ -30,14 +30,10 @@ function formatPhone(value: string) {
   const digits = onlyDigits(value).slice(0, 11);
 
   if (digits.length <= 10) {
-    return digits
-      .replace(/^(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{4})(\d)/, "$1-$2");
+    return digits.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
   }
 
-  return digits
-    .replace(/^(\d{2})(\d)/, "($1) $2")
-    .replace(/(\d{5})(\d)/, "$1-$2");
+  return digits.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
 }
 
 function isValidEmail(value: string) {
@@ -86,10 +82,7 @@ export default function RegisterPageClient() {
     documentValid &&
     form.acceptTerms;
 
-  function updateField<K extends keyof RegisterFormState>(
-    field: K,
-    value: RegisterFormState[K]
-  ) {
+  function updateField<K extends keyof RegisterFormState>(field: K, value: RegisterFormState[K]) {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -156,10 +149,7 @@ export default function RegisterPageClient() {
             message?: string;
           };
 
-          errorMessage =
-            errorPayload.message ||
-            errorPayload.error ||
-            errorMessage;
+          errorMessage = errorPayload.message || errorPayload.error || errorMessage;
         } catch {
           // fallback silencioso
         }
@@ -170,8 +160,7 @@ export default function RegisterPageClient() {
       const data = (await response.json()) as { redirect_to?: string };
       setSubmitState({
         tone: "success",
-        message:
-          "Cadastro realizado com sucesso. Redirecionando...",
+        message: "Cadastro realizado com sucesso. Redirecionando...",
       });
 
       setTimeout(() => {
@@ -181,10 +170,7 @@ export default function RegisterPageClient() {
     } catch (error) {
       setSubmitState({
         tone: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Erro inesperado ao cadastrar.",
+        message: error instanceof Error ? error.message : "Erro inesperado ao cadastrar.",
       });
     } finally {
       setIsSubmitting(false);
@@ -206,16 +192,14 @@ export default function RegisterPageClient() {
               </h1>
 
               <p className="mt-4 text-[18px] leading-8 text-[#5D667D] md:text-[20px]">
-                Faça seu cadastro com validação de CPF ou CNPJ para aumentar a
-                segurança da plataforma e reduzir fraudes no portal.
+                Faça seu cadastro com validação de CPF ou CNPJ para aumentar a segurança da
+                plataforma e reduzir fraudes no portal.
               </p>
             </div>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="rounded-[20px] border border-[#E7EAF3] bg-[#FBFCFF] p-4">
-                <div className="text-[14px] font-extrabold text-[#1D2440]">
-                  Documento validado
-                </div>
+                <div className="text-[14px] font-extrabold text-[#1D2440]">Documento validado</div>
                 <p className="mt-2 text-[14px] leading-6 text-[#6E748A]">
                   CPF ou CNPJ precisa ser matematicamente válido para seguir.
                 </p>
@@ -241,12 +225,10 @@ export default function RegisterPageClient() {
             </div>
 
             <div className="mt-8 rounded-[24px] border border-[#E7EAF3] bg-[linear-gradient(135deg,#16326a_0%,#0d1a38_100%)] p-6 text-white">
-              <h2 className="text-[24px] font-extrabold">
-                Menos fraude, mais confiança no portal
-              </h2>
+              <h2 className="text-[24px] font-extrabold">Menos fraude, mais confiança no portal</h2>
               <p className="mt-3 text-[16px] leading-7 text-white/80">
-                A validação de CPF/CNPJ no cadastro ajuda a filtrar perfis
-                inconsistentes e melhora a qualidade geral dos anúncios.
+                A validação de CPF/CNPJ no cadastro ajuda a filtrar perfis inconsistentes e melhora
+                a qualidade geral dos anúncios.
               </p>
             </div>
           </div>
@@ -276,9 +258,7 @@ export default function RegisterPageClient() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-[14px] font-semibold text-[#33405A]">
-                  E-mail
-                </span>
+                <span className="mb-2 block text-[14px] font-semibold text-[#33405A]">E-mail</span>
                 <input
                   type="email"
                   value={form.email}
@@ -294,9 +274,7 @@ export default function RegisterPageClient() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-[14px] font-semibold text-[#33405A]">
-                  Senha
-                </span>
+                <span className="mb-2 block text-[14px] font-semibold text-[#33405A]">Senha</span>
                 <input
                   type="password"
                   value={form.password}
@@ -320,9 +298,7 @@ export default function RegisterPageClient() {
                   <input
                     type="tel"
                     value={form.phone}
-                    onChange={(event) =>
-                      updateField("phone", formatPhone(event.target.value))
-                    }
+                    onChange={(event) => updateField("phone", formatPhone(event.target.value))}
                     placeholder="(17) 99999-9999"
                     className="h-[54px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
                   />
@@ -389,16 +365,11 @@ export default function RegisterPageClient() {
                   onChange={(event) =>
                     updateField(
                       "document",
-                      formatBrazilianDocument(
-                        event.target.value,
-                        form.documentType
-                      )
+                      formatBrazilianDocument(event.target.value, form.documentType)
                     )
                   }
                   placeholder={
-                    form.documentType === "cpf"
-                      ? "000.000.000-00"
-                      : "00.000.000/0000-00"
+                    form.documentType === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"
                   }
                   className="h-[54px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
                 />
@@ -420,17 +391,12 @@ export default function RegisterPageClient() {
                 <input
                   type="checkbox"
                   checked={form.acceptTerms}
-                  onChange={(event) =>
-                    updateField("acceptTerms", event.target.checked)
-                  }
+                  onChange={(event) => updateField("acceptTerms", event.target.checked)}
                   className="mt-1 h-4 w-4 rounded border-[#CBD5E1]"
                 />
                 <span className="text-[14px] leading-6 text-[#5D667D]">
                   Declaro que os dados informados são verdadeiros e aceito os{" "}
-                  <Link
-                    href="/termos-de-uso"
-                    className="font-bold text-[#1F66E5] hover:underline"
-                  >
+                  <Link href="/termos-de-uso" className="font-bold text-[#1F66E5] hover:underline">
                     Termos de uso
                   </Link>{" "}
                   e a{" "}
@@ -466,10 +432,7 @@ export default function RegisterPageClient() {
 
               <p className="text-center text-[14px] text-[#6E748A]">
                 Já tem cadastro?{" "}
-                <Link
-                  href="/login"
-                  className="font-bold text-[#1F66E5] hover:underline"
-                >
+                <Link href="/login" className="font-bold text-[#1F66E5] hover:underline">
                   Entrar na conta
                 </Link>
               </p>

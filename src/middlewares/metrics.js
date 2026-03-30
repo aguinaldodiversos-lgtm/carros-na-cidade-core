@@ -10,11 +10,9 @@ function metricsMiddleware(req, res, next) {
     try {
       if (!idValue) return;
 
-      const tableName =
-        table === "advertiser" ? "advertiser_metrics" : "event_metrics";
+      const tableName = table === "advertiser" ? "advertiser_metrics" : "event_metrics";
 
-      const field =
-        table === "advertiser" ? "advertiser_id" : "event_id";
+      const field = table === "advertiser" ? "advertiser_id" : "event_id";
 
       await pool.query(
         `

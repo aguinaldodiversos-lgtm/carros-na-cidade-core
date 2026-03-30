@@ -9,10 +9,16 @@ export default function PagamentoErroPage() {
           Nao foi possivel confirmar seu pagamento. Tente novamente ou escolha outro plano.
         </p>
         <div className="mt-5 flex justify-center gap-3">
-          <Link href="/planos" className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white">
+          <Link
+            href="/planos"
+            className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white"
+          >
             Tentar novamente
           </Link>
-          <Link href="/contato" className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]">
+          <Link
+            href="/contato"
+            className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]"
+          >
             Falar com suporte
           </Link>
         </div>
