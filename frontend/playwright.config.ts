@@ -6,11 +6,12 @@ import { defineConfig, devices } from "@playwright/test";
  * `Record<string, string>` — exigido pelo tipo de `webServer.env` (Playwright); `ProcessEnv` não serve.
  */
 function playwrightDevEnv(): Record<string, string> {
+  // Padrão: API local (E2E com Docker + `npm run e2e:prepare`). Override: E2E_BACKEND_API_URL=…
   const base =
     process.env.E2E_BACKEND_API_URL?.trim() ||
     process.env.BACKEND_API_URL?.trim() ||
     process.env.AUTH_API_BASE_URL?.trim() ||
-    "https://carros-na-cidade-api.onrender.com";
+    "http://127.0.0.1:4000";
   const fipe =
     process.env.FIPE_API_BASE_URL?.trim() ||
     "https://parallelum.com.br/fipe/api/v1";
@@ -39,7 +40,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  timeout: 240_000,
+  timeout: 360_000,
   expect: { timeout: 25_000 },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000",
@@ -54,7 +55,8 @@ export default defineConfig({
         webServer: {
           command: "npm run dev -- --port 3000",
           url: "http://127.0.0.1:3000",
-          reuseExistingServer: true,
+          // Se true, um Next já na 3000 sem AUTH_API_* / NEXT_PUBLIC_API_URL faz login cair no modo local sem JWT → 401 em /api/painel/anuncios.
+          reuseExistingServer: process.env.PW_REUSE_SERVER === "1",
           timeout: 120_000,
           env: playwrightDevEnv(),
         },

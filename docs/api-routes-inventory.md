@@ -12,7 +12,14 @@
 
 ---
 
-## 1. Rotas oficiais (montadas em `src/app.js`)
+## 1. BFF (Next.js) vs API Express
+
+O browser e os Client Components chamam primeiro rotas **`/api/...` no Next** (ficheiros `frontend/app/api/.../route.ts`), que fazem sessão/cookies e **proxy** para o Express (`NEXT_PUBLIC_API_URL` / `API_URL`). O mapa Express continua a ser a fonte de verdade da API de negócio; o BFF é a superfície pública do frontend.
+
+- **Auditoria de contrato (CI):** `npm run audit:contract` — valida chamadas `fetch`/axios no frontend contra rotas Express **e** rotas BFF descobertas em `frontend/app/api`, mais `contractHints` em `project-audit.config.json` (ex.: integrações opcionais sem router no repo).
+- Dicas `backendProofOptional: true` marcam endpoints documentados mas não provados estaticamente no `src/` (ex. conteúdo remoto).
+
+## 2. Rotas oficiais (montadas em `src/app.js`)
 
 Todas as integrações novas devem usar **exclusivamente** estes prefixos e módulos em `src/modules/`.
 
@@ -84,7 +91,7 @@ O frontend usa **`/api/ads/event`**. `POST /api/events` permanece por compatibil
 
 ---
 
-## 2. Legado não montado em produção
+## 3. Legado não montado em produção
 
 Os roteadores CommonJS que viviam em `src/routes/*` (exceto `health.js` / `metrics.js`) foram **removidos** — não havia import em `app.js`; duplicavam `src/modules/*`.
 
@@ -110,7 +117,7 @@ Detalhes e comparação com o legado CommonJS: `src/modules/integrations/README.
 
 ---
 
-## 3. Política para novas correções
+## 4. Política para novas correções
 
 1. **Novas features e correções de API:** usar somente `src/modules/**` e montar em `src/app.js` se for rota HTTP nova.
 2. **Não adicionar** rotas em `src/routes/*` além de `health.js` / `metrics.js`; não estender `src/controllers/*` sem plano de migração para `modules/`.
@@ -119,6 +126,6 @@ Detalhes e comparação com o legado CommonJS: `src/modules/integrations/README.
 
 ---
 
-## 4. Referência rápida — ordem de montagem em `app.js`
+## 5. Referência rápida — ordem de montagem em `app.js`
 
 A ordem importa para rotas dinâmicas: rotas mais específicas em `ads.routes.js` (`/search`, `/facets`, …) vêm antes de `GET /:identifier`.

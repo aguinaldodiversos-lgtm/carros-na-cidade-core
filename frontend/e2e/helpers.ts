@@ -25,25 +25,31 @@ export async function ensureDevServerUp(
 
 export async function loginAsLocalUser(page: Page, context: BrowserContext) {
   await context.clearCookies();
-  await page.goto("/login", { waitUntil: "domcontentloaded", timeout: 60_000 });
 
-  if (!page.url().includes("/login")) {
-    await context.clearCookies();
-    await page.goto("/login", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  const loginRes = await page.request.post("/api/auth/login", {
+    data: {
+      email: LOCAL_EMAIL,
+      password: LOCAL_PASSWORD,
+    },
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!loginRes.ok()) {
+    const errBody = await loginRes.text();
+    if (loginRes.status() === 401 && /Credenciais invalidas|invalidas/i.test(errBody)) {
+      test.skip(true, "Login rejeitado (credenciais ou backend; E2E_EMAIL/E2E_PASSWORD).");
+    }
+    throw new Error(
+      `POST /api/auth/login falhou: HTTP ${loginRes.status()} — ${errBody.slice(0, 500)}`
+    );
   }
 
-  const emailInput = page.locator('input[type="email"]');
-  await emailInput.waitFor({ state: "visible", timeout: 60_000 });
-  await emailInput.fill(LOCAL_EMAIL);
-  await page.locator('input[type="password"]').fill(LOCAL_PASSWORD);
-  await page.getByRole("button", { name: "Entrar" }).click();
-
-  await page.waitForTimeout(2500);
-
-  const body = (await page.textContent("body")) ?? "";
-  if (/Credenciais invalidas|invalidas/i.test(body)) {
-    test.skip(true, "Login rejeitado (use credenciais do backend ou E2E_EMAIL/E2E_PASSWORD).");
-  }
+  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 120_000 });
+  await page.waitForURL(/\/(dashboard|dashboard-loja)/, {
+    timeout: 120_000,
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForTimeout(800);
 }
 
 /** Aceita sucesso da API ou erro conhecido (backend ausente, 502, etc.). */
@@ -111,33 +117,35 @@ export type RegisterCredentials = {
 };
 
 /**
- * Preenche `/cadastro` e aguarda POST /api/auth/register com 200.
- * Não faz login manual depois — o fluxo costuma redirecionar para /dashboard.
+ * Cadastro via BFF `POST /api/auth/register` (mesmo payload que o formulário).
+ * Usa `page.request` para evitar descompasso React/DOM no Playwright; define cookie de sessão no contexto.
  */
 export async function registerNewUserViaUi(page: Page, cred: RegisterCredentials) {
-  await page.goto("/cadastro", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  const phoneDigits = cred.phone.replace(/\D/g, "").slice(0, 11);
+  const cpfDigits = cred.cpfDigits.replace(/\D/g, "").slice(0, 11);
 
-  const registerWait = page.waitForResponse(
-    (r) => r.url().includes("/api/auth/register") && r.request().method() === "POST",
-    { timeout: 120_000 }
-  );
+  const res = await page.request.post("/api/auth/register", {
+    data: {
+      name: cred.name,
+      email: cred.email,
+      password: cred.password,
+      phone: phoneDigits,
+      city: cred.city,
+      document_type: "cpf",
+      document_number: cpfDigits,
+    },
+    headers: { "Content-Type": "application/json" },
+  });
 
-  await page.getByPlaceholder("Digite seu nome completo").fill(cred.name);
-  await page.getByPlaceholder("voce@exemplo.com").fill(cred.email);
-  await page.getByPlaceholder("Mínimo 6 caracteres").fill(cred.password);
-  await page.getByPlaceholder("(17) 99999-9999").fill(cred.phone);
-  await page.getByPlaceholder("Ex.: São José do Rio Preto - SP").fill(cred.city);
-  await page.getByPlaceholder("000.000.000-00").fill(formatCpfMask(cred.cpfDigits));
-  await page.getByText(/CPF válido/i).waitFor({ state: "visible", timeout: 15_000 });
-  await page.locator('input[type="checkbox"]').first().check();
+  if (!res.ok()) {
+    const body = await res.text();
+    throw new Error(`Cadastro rejeitado: HTTP ${res.status()} — ${body.slice(0, 600)}`);
+  }
 
-  await page.getByRole("button", { name: /Criar minha conta/i }).click();
-
-  const res = await registerWait;
-  expect(res.ok(), `Cadastro rejeitado: HTTP ${res.status()}`).toBeTruthy();
-
-  await page.waitForURL(/\/(dashboard|login)/, { timeout: 120_000 }).catch(() => null);
-  await page.waitForTimeout(1500);
+  const payload = (await res.json()) as { redirect_to?: string };
+  const dest = payload.redirect_to ?? "/dashboard";
+  await page.goto(dest, { waitUntil: "domcontentloaded", timeout: 120_000 });
+  await page.waitForTimeout(800);
 }
 
 /** Base da API backend (mesma prioridade que o BFF Next). */
@@ -160,30 +168,39 @@ export async function assertSearchApiListsVehicle(
   brandHint: string
 ) {
   const brand = brandHint.split(/\s+/)[0]?.trim() || brandHint;
-  const url = new URL(`${apiBase}/api/ads/search`);
-  url.searchParams.set("brand", brand);
-  url.searchParams.set("limit", "30");
+  const deadline = Date.now() + 25_000;
 
-  const res = await request.get(url.toString(), {
-    headers: { Accept: "application/json" },
-    timeout: 60_000,
-  });
+  while (Date.now() < deadline) {
+    const url = new URL(`${apiBase}/api/ads/search`);
+    url.searchParams.set("brand", brand);
+    url.searchParams.set("limit", "30");
 
-  expect(res.ok(), `GET /api/ads/search falhou: ${res.status()}`).toBeTruthy();
-  const json = (await res.json()) as {
-    data?: Array<{ brand?: string; title?: string }>;
-  };
-  const rows = Array.isArray(json?.data) ? json.data : [];
-  const match = rows.some(
-    (row) =>
-      String(row?.brand || "")
-        .toLowerCase()
-        .includes(brand.toLowerCase()) ||
-      String(row?.title || "")
-        .toLowerCase()
-        .includes(brand.toLowerCase())
+    const res = await request.get(url.toString(), {
+      headers: { Accept: "application/json" },
+      timeout: 60_000,
+    });
+
+    expect(res.ok(), `GET /api/ads/search falhou: ${res.status()}`).toBeTruthy();
+    const json = (await res.json()) as {
+      data?: Array<{ brand?: string; title?: string }>;
+    };
+    const rows = Array.isArray(json?.data) ? json.data : [];
+    const match = rows.some(
+      (row) =>
+        String(row?.brand || "")
+          .toLowerCase()
+          .includes(brand.toLowerCase()) ||
+        String(row?.title || "")
+          .toLowerCase()
+          .includes(brand.toLowerCase())
+    );
+    if (match) return;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  throw new Error(
+    `Busca pública não listou anúncio com marca contendo "${brand}" após ~25s.`
   );
-  expect(match, `Nenhum anúncio na busca pública para marca contendo "${brand}"`).toBeTruthy();
 }
 
 /**
@@ -195,21 +212,50 @@ export async function getFirstSearchAdSlug(
   brandHint: string
 ): Promise<string | null> {
   const brand = brandHint.split(/\s+/)[0]?.trim() || brandHint;
-  const url = new URL(`${apiBase}/api/ads/search`);
-  url.searchParams.set("brand", brand);
-  url.searchParams.set("limit", "15");
+  const deadline = Date.now() + 25_000;
 
-  const res = await request.get(url.toString(), {
-    headers: { Accept: "application/json" },
-    timeout: 60_000,
-  });
-  if (!res.ok()) return null;
-  const json = (await res.json()) as {
-    data?: Array<{ slug?: string }>;
-  };
-  const rows = Array.isArray(json?.data) ? json.data : [];
-  const row = rows.find((r) => r?.slug && String(r.slug).trim().length > 0);
-  return row?.slug ? String(row.slug) : null;
+  while (Date.now() < deadline) {
+    const url = new URL(`${apiBase}/api/ads/search`);
+    url.searchParams.set("brand", brand);
+    url.searchParams.set("limit", "15");
+
+    const res = await request.get(url.toString(), {
+      headers: { Accept: "application/json" },
+      timeout: 60_000,
+    });
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ slug?: string }>;
+      };
+      const rows = Array.isArray(json?.data) ? json.data : [];
+      const row = rows.find((r) => r?.slug && String(r.slug).trim().length > 0);
+      const slug = row?.slug ? String(row.slug) : null;
+      if (slug) return slug;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return null;
+}
+
+/**
+ * Marca CPF como verificado no Postgres de teste (publicação exige `document_verified`).
+ * Sem DB configurado, não faz nada.
+ */
+export async function ensureE2eUserDocumentVerified(email: string) {
+  const conn =
+    process.env.E2E_DATABASE_URL?.trim() || process.env.TEST_DATABASE_URL?.trim() || "";
+  if (!conn) return;
+
+  const { default: pg } = await import("pg");
+  const pool = new pg.Pool({ connectionString: conn });
+  try {
+    await pool.query(
+      `UPDATE users SET document_verified = true WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+      [email]
+    );
+  } finally {
+    await pool.end().catch(() => null);
+  }
 }
 
 /**

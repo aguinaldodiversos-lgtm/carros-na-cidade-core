@@ -60,6 +60,22 @@ Encerrar o container:
 npm run integration:db:down
 ```
 
+## CI (GitHub Actions)
+
+No workflow `.github/workflows/ci.yml`, o job **`Integration (ads + Postgres)`** sobe **Postgres 15** como [service container](https://docs.github.com/en/actions/use-containerized-services/creating-postgresql-service-containers) na porta **5432** e define:
+
+- `TEST_DATABASE_URL` / `DATABASE_URL` → `postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test`
+
+Em seguida: `npm run ci:integration-ads` (equivalente a `integration:db:wait` → `integration:db:prepare` → `test:integration:ads`).
+
+Localmente com Docker na **5433**, continue usando `npm run test:integration:ads:full` ou defina `TEST_DATABASE_URL` explicitamente.
+
+Para espelhar os passos da CI (Postgres já acessível na URL corrente):
+
+```bash
+npm run ci:integration-ads
+```
+
 ## `npm test` vs integração
 
 - `npm test` — usa `vitest run --exclude tests/integration/**` (CI e desenvolvimento sem Docker continuam simples).

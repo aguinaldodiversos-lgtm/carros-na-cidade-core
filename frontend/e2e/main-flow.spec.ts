@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   ensureDevServerUp,
+  ensureE2eUserDocumentVerified,
   generateValidCpfDigits,
   registerNewUserViaUi,
   getBackendApiBaseUrl,
@@ -17,7 +18,7 @@ import { runPublishWizardFlow } from "./publish-wizard";
  * Pré-requisitos:
  * - Next em `PLAYWRIGHT_BASE_URL` (padrão http://127.0.0.1:3000)
  * - Backend acessível em `E2E_BACKEND_API_URL` / `NEXT_PUBLIC_API_URL` (padrão http://127.0.0.1:4000)
- * - FIPE + cidades (Atibaia) como no `login-ad-publish`
+ * - FIPE + cidades (Atibaia) como no fluxo `10-login-ad-publish`
  * - Persistência DB (opcional): `E2E_DATABASE_URL` ou `TEST_DATABASE_URL`
  *
  * Pular: `SKIP_E2E_MAIN=1`
@@ -53,8 +54,12 @@ test.describe.serial("PF — cadastro → publicar → painel → público (veí
     await context.clearCookies();
 
     await registerNewUserViaUi(page, cred);
+    await ensureE2eUserDocumentVerified(email);
 
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 120_000 });
+    await page.waitForURL(/\/dashboard/, {
+      timeout: 120_000,
+      waitUntil: "domcontentloaded",
+    });
 
     await page.goto("/dashboard/meus-anuncios", {
       waitUntil: "domcontentloaded",
@@ -69,9 +74,8 @@ test.describe.serial("PF — cadastro → publicar → painel → público (veí
     expect(brandWord.length).toBeGreaterThan(1);
 
     const apiBase = getBackendApiBaseUrl();
-    await assertSearchApiListsVehicle(request, apiBase, brandWord);
-
     await assertLatestAdPersistedForEmail(email, brandWord);
+    await assertSearchApiListsVehicle(request, apiBase, brandWord);
 
     await page.goto("/dashboard/meus-anuncios", {
       waitUntil: "domcontentloaded",

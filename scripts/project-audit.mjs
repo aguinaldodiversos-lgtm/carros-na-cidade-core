@@ -265,6 +265,15 @@ function stripLeadingApiBasePlaceholder(path) {
   return p;
 }
 
+/** `${apiBase}/content/...` → `/content/...` após normalizeEndpointPath. */
+function stripLeadingUrlPlaceholder(path) {
+  const p = normalizeEndpointPath(path);
+  if (p.startsWith(":param/")) {
+    return normalizeEndpointPath(`/${p.slice(":param/".length)}`);
+  }
+  return p;
+}
+
 function collectFrontendRoutes() {
   const appDir = path.join(ROOT, config.frontendDir, "app");
   if (!exists(appDir)) return [];
@@ -325,6 +334,62 @@ function routeExists(targetPath, routePatterns, allowMissingRoutes) {
     return i === patternParts.length && j === targetParts.length;
   });
 }
+
+/**
+ * Rotas HTTP do BFF (Next.js App Router: `frontend/app/api/.../route.ts`).
+ * Chamadas do browser a `/api/...` batem aqui primeiro; só depois é que o handler
+ * faz proxy ao Express — o auditor deve aceitar isto como prova de contrato.
+ */
+function appApiSegmentToPattern(segment) {
+  if (/^\[\[\.\.\..+\]\]$/.test(segment)) return "*";
+  if (/^\[\.\.\..+\]$/.test(segment)) return "*";
+  if (/^\[.+\]$/.test(segment)) return ":param";
+  return segment;
+}
+
+function collectBffRouteRegistry() {
+  const appApiDir = path.join(ROOT, config.frontendDir, "app", "api");
+  if (!exists(appApiDir)) return [];
+
+  const endpoints = [];
+  const routeFiles = walkSourceOnly(appApiDir).filter((f) =>
+    /(^|\/)route\.(ts|tsx|js|jsx)$/.test(toPosix(f))
+  );
+
+  for (const file of routeFiles) {
+    const relToApi = toPosix(path.relative(appApiDir, file));
+    const dir = path.dirname(relToApi);
+    const rawParts = dir === "." ? [] : dir.split("/").filter(Boolean);
+    const patternParts = rawParts.map(appApiSegmentToPattern);
+    const pathPattern = normalizeEndpointPath(`/api/${patternParts.join("/")}`);
+
+    const content = readFileSafe(file);
+    const methods = [];
+    for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]) {
+      if (
+        new RegExp(`export\\s+async\\s+function\\s+${m}\\b`).test(content) ||
+        new RegExp(`export\\s+const\\s+${m}\\s*=`).test(content)
+      ) {
+        methods.push(m);
+      }
+    }
+    if (!methods.length) {
+      methods.push("GET");
+    }
+
+    for (const method of methods) {
+      endpoints.push({
+        file: rel(file),
+        method,
+        path: pathPattern,
+      });
+    }
+  }
+
+  return endpoints;
+}
+
+const bffRouteRegistry = collectBffRouteRegistry();
 
 function collectBackendRouteRegistry() {
   const registry = new Map();
@@ -456,13 +521,10 @@ function pathMatchesPattern(candidate, pattern) {
 function extractFetchCalls(content) {
   const calls = [];
 
-  for (const match of content.matchAll(/fetch\(\s*([`"'"][\s\S]*?[`"'])\s*(?:,\s*(\{[\s\S]*?\}))?\s*\)/g)) {
-    const rawUrl = match[1];
-    const rawOptions = match[2] || "";
-    const url = rawUrl.slice(1, -1);
-
+  const pushCall = (url, rawOptions) => {
+    if (!url || typeof url !== "string") return;
     let method = "GET";
-    const methodMatch = rawOptions.match(/method\s*:\s*["'`]([A-Za-z]+)["'`]/);
+    const methodMatch = (rawOptions || "").match(/method\s*:\s*["'`]([A-Za-z]+)["'`]/);
     if (methodMatch) method = methodMatch[1].toUpperCase();
 
     calls.push({
@@ -471,6 +533,26 @@ function extractFetchCalls(content) {
       raw: url,
       normalizedPath: normalizeEndpointPath(url),
     });
+  };
+
+  // Opções: não-guloso para não atravessar encadeamentos (.then) nem outros fetch no mesmo ficheiro.
+  const opt = "(?:,\\s*(\\{[\\s\\S]*?\\}))?";
+  // Aspas duplas ou simples
+  for (const match of content.matchAll(
+    new RegExp(`fetch\\(\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*${opt}\\s*\\)`, "g")
+  )) {
+    pushCall(match[1], match[2] || "");
+  }
+  for (const match of content.matchAll(
+    new RegExp(`fetch\\(\\s*'((?:[^'\\\\]|\\\\.)*)'\\s*${opt}\\s*\\)`, "g")
+  )) {
+    pushCall(match[1], match[2] || "");
+  }
+  // Template literals: conteúdo pode incluir aspas (ex.: .replace(/\/$/, ""))
+  for (const match of content.matchAll(
+    new RegExp(`fetch\\(\\s*\`([\\s\\S]*?)\`\\s*${opt}\\s*\\)`, "g")
+  )) {
+    pushCall(match[1], match[2] || "");
   }
 
   return calls;
@@ -711,6 +793,7 @@ function auditFrontendBackendIntegration(findings) {
     frontendPath: normalizeEndpointPath(item.frontendPath),
     backendPattern: normalizeEndpointPath(item.backendPattern),
     methods: Array.isArray(item.methods) ? item.methods.map((m) => String(m).toUpperCase()) : ["GET"],
+    backendProofOptional: Boolean(item.backendProofOptional),
   }));
 
   for (const file of frontendFiles) {
@@ -730,12 +813,20 @@ function auditFrontendBackendIntegration(findings) {
         continue;
       }
 
-      const pathForBackendMatch = stripLeadingApiBasePlaceholder(pathCandidate);
+      const pathForBackendMatch = stripLeadingUrlPlaceholder(
+        stripLeadingApiBasePlaceholder(pathCandidate)
+      );
 
       const matchingHint = contractHints.find(
         (hint) =>
-          pathMatchesPattern(pathCandidate, hint.frontendPath) &&
+          pathMatchesPattern(pathForBackendMatch, hint.frontendPath) &&
           hint.methods.includes(call.method)
+      );
+
+      const matchingBff = bffRouteRegistry.find(
+        (route) =>
+          route.method === call.method &&
+          pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
       const matchingBackend = backendRegistry.find(
@@ -750,31 +841,33 @@ function auditFrontendBackendIntegration(findings) {
           pathMatchesPattern(pathForBackendMatch, route.path)
       );
 
-      if (!matchingHint && !matchingBackend) {
+      const satisfiedBySurface = matchingBackend || matchingBff;
+
+      if (!matchingHint && !satisfiedBySurface) {
         addFinding(findings, {
           severity: "warn",
           code: "frontend-backend-endpoint-uncertain",
           file,
           message: `Chamada ${call.method} sem evidência clara de endpoint correspondente no backend: ${pathCandidate}`,
           suggestion:
-            "Verificar se a rota existe no backend ou adicionar uma dica em contractHints no project-audit.config.json.",
+            "Verificar se a rota existe no backend, no BFF (frontend/app/api) ou adicionar contractHints em project-audit.config.json.",
           details: `Origem: ${call.kind}("${call.raw}")`,
         });
       }
 
-      if (!matchingBackend && matchingHint) {
+      if (!matchingBackend && !matchingBff && matchingHint && !matchingHint.backendProofOptional) {
         addFinding(findings, {
           severity: "warn",
           code: "contract-hint-without-backend-proof",
           file,
-          message: `A integração depende de contractHint, mas o auditor não encontrou prova estática da rota no backend: ${pathCandidate}`,
+          message: `A integração depende de contractHint, mas o auditor não encontrou prova estática da rota no backend: ${pathForBackendMatch}`,
           suggestion:
             "Validar montagem de prefixos/router.use no backend ou concentrar as rotas em arquivos mais previsíveis.",
           details: `Hint: ${matchingHint.backendPattern} [${matchingHint.methods.join(", ")}]`,
         });
       }
 
-      if (!matchingBackend && backendMethodMismatch) {
+      if (!matchingBackend && !matchingBff && backendMethodMismatch) {
         addFinding(findings, {
           severity: "warn",
           code: "frontend-backend-method-mismatch",
@@ -914,6 +1007,9 @@ function printPretty(findings) {
   console.log("");
   console.log("AUDITORIA COMPLETA DO PROJETO");
   console.log("=============================");
+  if (args.scope === "all" || args.scope === "integration") {
+    console.log(`Rotas BFF (Next app/api)      : ${bffRouteRegistry.length}`);
+  }
   console.log(`Arquivos frontend auditados : ${frontendFiles.length}`);
   console.log(`Arquivos backend auditados  : ${backendFiles.length}`);
   console.log(`Erros                       : ${errors.length}`);
@@ -952,6 +1048,7 @@ if (args.json) {
         meta: {
           frontendFiles: frontendFiles.length,
           backendFiles: backendFiles.length,
+          bffRoutes: bffRouteRegistry.length,
           totalFindings: findings.length,
         },
         findings,

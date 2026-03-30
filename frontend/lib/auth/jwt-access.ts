@@ -23,7 +23,9 @@ export function accessTokenNeedsRefresh(
   accessToken: string | undefined,
   skewMs = 120_000
 ): boolean {
+  if (!accessToken) return true;
   const expMs = getJwtExpiryMs(accessToken);
-  if (!expMs) return true;
+  // JWT sem `exp` legível (ou token opaco): não forçar refresh — evita 401 quando POST /api/auth/refresh falha.
+  if (!expMs) return false;
   return Date.now() + skewMs >= expMs;
 }

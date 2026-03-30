@@ -11,13 +11,15 @@
     "build": "next build",
     "postbuild": "node ./scripts/prepare-standalone.mjs && node ./scripts/verify-standalone.mjs",
     "start": "node .next/standalone/server.js",
-    "lint": "next lint",
+    "lint": "next lint --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prepare:standalone": "node ./scripts/prepare-standalone.mjs",
     "verify:standalone": "node ./scripts/verify-standalone.mjs",
     "test:e2e": "playwright test",
     "test:e2e:main": "playwright test e2e/main-flow.spec.ts",
-    "test:e2e:publish": "playwright test e2e/login-ad-publish.spec.ts",
+    "test:e2e:publish": "playwright test e2e/10-login-ad-publish.spec.ts",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
@@ -40,6 +42,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
     "pg": "^8.20.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
   }
 }

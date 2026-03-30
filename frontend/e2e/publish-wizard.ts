@@ -10,7 +10,7 @@ export type PublishWizardResult = {
 };
 
 /**
- * Executa o assistente `/anunciar/novo` até Publicar (alinhado a `login-ad-publish.spec.ts`).
+ * Executa o assistente `/anunciar/novo` até Publicar (alinhado a `10-login-ad-publish.spec.ts`).
  */
 export async function runPublishWizardFlow(page: Page): Promise<PublishWizardResult> {
   await page.goto("/anunciar/novo?tipo=particular&step=1", {
@@ -82,8 +82,8 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
   await page.getByRole("button", { name: /Continuar/i }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: /Informações do anúncio/i })).toBeVisible();
-  await page.locator('input[inputmode="numeric"]').first().fill("45000");
-  await page.getByPlaceholder("R$ 0,00").fill("8500000");
+  await page.getByLabel(/Quilometragem/i).fill("45000");
+  await page.getByLabel(/^Preço/i).fill("8500000");
   await page.getByRole("button", { name: /Continuar/i }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: /Fotos/i })).toBeVisible();
@@ -115,7 +115,9 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
 
   await page.getByPlaceholder("(11) 99999-9999").first().fill("11999999999");
   await page.getByPlaceholder("(11) 3333-3333").fill("1133333333");
-  await page.locator('input[type="checkbox"]').last().check();
+  await page
+    .getByRole("checkbox", { name: /informações são verdadeiras|autorizo a publicação/i })
+    .check();
 
   const publishResponsePromise = page.waitForResponse(
     (r) =>
@@ -127,7 +129,12 @@ export async function runPublishWizardFlow(page: Page): Promise<PublishWizardRes
   await page.getByRole("button", { name: /Publicar anúncio/i }).click();
 
   const publishRes = await publishResponsePromise;
-  expect(publishRes.ok(), `POST /api/painel/anuncios falhou: ${publishRes.status()}`).toBeTruthy();
+  if (!publishRes.ok()) {
+    const errText = await publishRes.text();
+    throw new Error(
+      `POST /api/painel/anuncios falhou: HTTP ${publishRes.status()} — ${errText.slice(0, 900)}`
+    );
+  }
 
   await page.waitForTimeout(4000);
 

@@ -46,7 +46,8 @@
     {
       "frontendPath": "/content/public/blog-page",
       "methods": ["GET"],
-      "backendPattern": "/content/public/blog-page"
+      "backendPattern": "/content/public/blog-page",
+      "backendProofOptional": true
     },
     {
       "frontendPath": "/ads/:param",
