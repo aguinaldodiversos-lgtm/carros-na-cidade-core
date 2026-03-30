@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-type HeroSlide = {
+export type HeroSlide = {
   id: string;
   image: string;
   title: string;
@@ -16,23 +16,16 @@ interface HeroCarouselProps {
   slides: HeroSlide[];
 }
 
-function normalizeSlides(slides: HeroSlide[]): HeroSlide[] {
-  return slides.map((slide, index) => ({
-    ...slide,
-    image: index % 2 === 0 ? "/images/banner1.jpg" : "/images/banner2.jpg",
-  }));
-}
-
 export function HeroCarousel({ slides }: HeroCarouselProps) {
-  const safeSlides = useMemo(() => normalizeSlides(slides || []), [slides]);
+  const safeSlides = slides?.length ? slides : [];
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    if (!safeSlides.length) return;
+    if (safeSlides.length <= 1) return;
 
     const interval = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % safeSlides.length);
-    }, 6000);
+    }, 6500);
 
     return () => window.clearInterval(interval);
   }, [safeSlides.length]);
@@ -42,6 +35,11 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       setActiveIndex(0);
     }
   }, [activeIndex, safeSlides.length]);
+
+  const scrollToSearch = useCallback(() => {
+    const el = document.getElementById("home-quick-search");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   if (!safeSlides.length) return null;
 
@@ -54,8 +52,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-[22px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
-      <div className="relative h-[260px] w-full md:h-[420px]">
+    <div className="relative overflow-hidden rounded-[20px] border border-[#dbe1ec] bg-[#0f172a] shadow-[0_20px_50px_rgba(15,23,42,0.12)]">
+      <div className="relative h-[240px] w-full sm:h-[320px] md:h-[400px] lg:h-[420px]">
         {safeSlides.map((slide, index) => {
           const isActive = index === activeIndex;
 
@@ -66,33 +64,45 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                 isActive ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={slide.image}
-                alt={slide.title}
-                className="h-full w-full object-cover"
+                alt=""
+                role="presentation"
+                className="h-full w-full object-cover object-center"
                 loading={index === 0 ? "eager" : "lazy"}
               />
 
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,13,30,0.72)_0%,rgba(5,13,30,0.34)_38%,rgba(5,13,30,0.08)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,15,35,0.78)_0%,rgba(8,15,35,0.45)_42%,rgba(8,15,35,0.12)_100%)]" />
 
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full px-6 md:px-10 lg:px-12">
-                  <div className="max-w-[460px]">
-                    <h1 className="text-[32px] font-extrabold leading-[1.06] tracking-[-0.035em] text-white md:text-[52px] md:leading-[1.05]">
+                <div className="w-full px-5 sm:px-8 md:px-10 lg:px-12">
+                  <div className="max-w-[520px]">
+                    <h1 className="text-[26px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white sm:text-[36px] md:text-[44px] lg:text-[48px]">
                       {slide.title}
                     </h1>
 
-                    <p className="mt-4 max-w-[42ch] text-[15px] font-medium leading-relaxed text-white/85 md:mt-5 md:text-[18px] md:leading-relaxed">
+                    <p className="mt-3 max-w-[40ch] text-[14px] font-medium leading-relaxed text-white/90 sm:mt-4 sm:text-[16px] md:text-[17px]">
                       {slide.subtitle}
                     </p>
 
-                    <div className="mt-7 md:mt-9">
-                      <Link
-                        href={slide.href}
-                        className="inline-flex h-[54px] items-center justify-center rounded-[12px] bg-[#0e62d8] px-8 text-[18px] font-bold text-white shadow-[0_14px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0]"
-                      >
-                        {slide.ctaLabel}
-                      </Link>
+                    <div className="mt-6 sm:mt-8">
+                      {slide.href.startsWith("#") ? (
+                        <button
+                          type="button"
+                          onClick={scrollToSearch}
+                          className="inline-flex h-[48px] min-w-[180px] items-center justify-center rounded-[11px] bg-[#0e62d8] px-7 text-[16px] font-bold text-white shadow-[0_12px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:h-[52px] md:text-[17px]"
+                        >
+                          {slide.ctaLabel}
+                        </button>
+                      ) : (
+                        <Link
+                          href={slide.href}
+                          className="inline-flex h-[48px] min-w-[180px] items-center justify-center rounded-[11px] bg-[#0e62d8] px-7 text-[16px] font-bold text-white shadow-[0_12px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:h-[52px] md:text-[17px]"
+                        >
+                          {slide.ctaLabel}
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -105,15 +115,9 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           type="button"
           onClick={goPrev}
           aria-label="Banner anterior"
-          className="absolute left-4 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
+          className="absolute left-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/15 text-white backdrop-blur transition hover:bg-white/25 md:left-4 md:h-11 md:w-11"
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
@@ -122,15 +126,9 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           type="button"
           onClick={goNext}
           aria-label="Próximo banner"
-          className="absolute right-4 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
+          className="absolute right-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/15 text-white backdrop-blur transition hover:bg-white/25 md:right-4 md:h-11 md:w-11"
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="m9 6 6 6-6 6" />
           </svg>
         </button>
@@ -142,9 +140,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             key={slide.id}
             type="button"
             aria-label={`Ir para banner ${index + 1}`}
+            aria-current={index === activeIndex}
             onClick={() => setActiveIndex(index)}
-            className={`h-3 w-3 rounded-full transition ${
-              index === activeIndex ? "bg-[#15a0ff]" : "bg-white/70"
+            className={`h-2.5 w-2.5 rounded-full transition md:h-3 md:w-3 ${
+              index === activeIndex ? "bg-white" : "bg-white/55 hover:bg-white/80"
             }`}
           />
         ))}

@@ -9,10 +9,9 @@ import { DEFAULT_CITY } from "@/lib/city/city-default";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 
-import { CityRegionBanner } from "../components/city/CityRegionBanner";
+import { LayoutChrome } from "../components/shell/LayoutChrome";
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
-import { TrustRibbon } from "../components/shell/TrustRibbon";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -160,8 +159,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
             >
               <PublicHeader />
             </Suspense>
-            <TrustRibbon />
-            <CityRegionBanner />
+            <LayoutChrome />
             <main id="main-content" className="flex-1">
               {children}
             </main>

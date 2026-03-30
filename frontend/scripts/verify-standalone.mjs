@@ -104,6 +104,8 @@ async function run() {
     "favicon.ico",
     path.join("images", "logo.png"),
     path.join("images", "hero.jpeg"),
+    path.join("images", "home-banner-1.png"),
+    path.join("images", "home-banner-2.png"),
   ];
 
   console.log("\n🔎 Verificando assets críticos...\n");

@@ -112,57 +112,48 @@ export function PublicFooter() {
 
   if (isHome) {
     return (
-      <footer className="mt-4 bg-[#18253f] text-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 text-[12px] text-white/75 sm:px-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href={SITE_ROUTES.home} className="block" aria-label="Carros na Cidade">
+      <footer className="mt-auto bg-[#141a2e] text-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+          <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+            <div className="flex max-w-xl flex-col gap-3">
+              <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
                 <img
                   src="/images/logo.png"
                   alt="Carros na Cidade"
-                  className="h-4 w-[90px] object-contain brightness-0 invert"
+                  className="h-6 w-[120px] object-contain brightness-0 invert sm:h-7 sm:w-[140px]"
                   loading="lazy"
                 />
               </Link>
-              <span>© {currentYear} Carros na Cidade. Todos os direitos reservados.</span>
+              <p className="text-[13px] leading-relaxed text-white/65">
+                © {currentYear} Carros na Cidade. Todos os direitos reservados.
+              </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 md:gap-4">
-              <a href={`mailto:${SITE_CONTACT.email}`} className="transition hover:text-white">
-                {SITE_CONTACT.email}
+            <div className="flex flex-wrap items-center gap-5 md:justify-end">
+              {socials.length > 0 ? (
+                <div className="flex items-center gap-4" aria-label="Redes sociais">
+                  {socials.map((s) => (
+                    <FooterAnchor
+                      key={s.href}
+                      item={{ ...s, external: true }}
+                      className="text-white/80 transition hover:text-white"
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <a
+                href={SITE_CONTACT.phoneHref}
+                className="inline-flex items-center gap-2 text-[14px] font-semibold text-white/90 hover:text-white"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M6.6 10.8c1.8 3.6 4.8 6.6 8.4 8.4l2.8-2.8c.4-.4 1-.5 1.5-.3 1 .4 2.1.6 3.3.6.8 0 1.4.6 1.4 1.4V21c0 .8-.6 1.4-1.4 1.4C9.4 22.4 1.6 14.6 1.6 4.9 1.6 4.1 2.2 3.5 3 3.5h2.1c.8 0 1.4.6 1.4 1.4 0 1.1.2 2.3.6 3.3.2.5.1 1.1-.3 1.5l-2.8 2.8Z" />
+                </svg>
+                {SITE_CONTACT.phoneDisplay}
               </a>
-              <FooterAnchor
-                item={{
-                  label: SITE_CONTACT.phoneDisplay,
-                  href: SITE_CONTACT.phoneHref,
-                }}
-                className="transition hover:text-white"
-              />
             </div>
           </div>
 
-          <FooterNavColumns
-            dense
-            headingClass="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/55"
-            sections={footerSections}
-          />
-
-          {socials.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 border-t border-white/10 pt-3">
-              <span className="text-[11px] uppercase tracking-wide text-white/50">Redes</span>
-              <div className="flex flex-wrap gap-4">
-                {socials.map((s) => (
-                  <FooterAnchor
-                    key={s.href}
-                    item={{ ...s, external: true }}
-                    className="text-sm font-medium text-white/85 transition hover:text-white"
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-4 border-t border-white/10 pt-3 text-[12px] text-white/75">
+          <div className="flex flex-wrap gap-4 border-t border-white/10 pt-4 text-[12px] text-white/55">
             <FooterLegalLinks className="flex flex-wrap gap-4" />
           </div>
         </div>
