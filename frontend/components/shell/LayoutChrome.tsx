@@ -11,8 +11,10 @@ import { TrustRibbon } from "@/components/shell/TrustRibbon";
 export function LayoutChrome() {
   const pathname = usePathname() || "/";
   const isHome = pathname === "/";
+  /** Catálogo comprar: início direto após o header, sem faixas institucionais. */
+  const isComprar = pathname === "/comprar" || pathname.startsWith("/comprar/");
 
-  if (isHome) {
+  if (isHome || isComprar) {
     return null;
   }
 

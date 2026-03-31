@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { BuyHero } from "@/components/buy/BuyHero";
 import { BuyPageShell } from "@/components/buy/BuyPageShell";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { ResultsToolbar } from "@/components/buy/ResultsToolbar";
@@ -177,9 +176,7 @@ export default function BuyMarketplacePageClient({
       }
     >
       <main>
-        <BuyHero cityName={city.name} totalAds={totalAds} />
-
-        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-5 lg:px-8 lg:pb-10 lg:pt-6">
           <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] lg:items-start lg:gap-10">
             <aside className="hidden lg:sticky lg:top-[76px] lg:block lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pb-8 lg:pr-1">
               <FilterSidebar {...filterSidebarProps} />
