@@ -52,7 +52,6 @@ export default function Header({ boxed = false }: HeaderProps) {
                 alt="Carros na Cidade"
                 fill
                 priority
-                unoptimized
                 className="object-contain object-left"
               />
             </Link>

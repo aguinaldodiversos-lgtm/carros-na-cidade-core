@@ -67,11 +67,10 @@ export function PublicHeader() {
               <Image
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
-                width={200}
-                height={36}
+                width={220}
+                height={48}
                 priority
-                unoptimized
-                className="h-[32px] w-auto max-w-[200px] object-contain object-left sm:h-[34px] md:h-[38px]"
+                className="h-[34px] w-auto max-w-[220px] object-contain object-left sm:h-[38px] md:h-[42px]"
               />
             </Link>
 

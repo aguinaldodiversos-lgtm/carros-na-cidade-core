@@ -122,7 +122,7 @@ export const metadata: Metadata = {
     images: [SITE_OG_IMAGE_PATH],
   },
   icons: {
-    icon: [{ url: SITE_FAVICON_SRC, type: "image/svg+xml" }],
+    icon: [{ url: SITE_FAVICON_SRC, type: "image/png" }],
     shortcut: [SITE_FAVICON_SRC],
     apple: [{ url: SITE_FAVICON_SRC }],
   },

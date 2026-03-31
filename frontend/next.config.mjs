@@ -4,7 +4,7 @@ const nextConfig = {
   poweredByHeader: false,
   output: "standalone",
   async rewrites() {
-    return [{ source: "/favicon.ico", destination: "/images/favicon.svg" }];
+    return [{ source: "/favicon.ico", destination: "/images/favicon.png" }];
   },
   images: {
     remotePatterns: [

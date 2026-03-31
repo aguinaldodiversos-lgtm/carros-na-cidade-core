@@ -101,8 +101,8 @@ async function run() {
   }
 
   const criticalAssets = [
-    path.join("images", "favicon.svg"),
-    path.join("images", "logo.svg"),
+    path.join("images", "favicon.png"),
+    path.join("images", "logo.png"),
     "site.webmanifest",
     path.join("images", "home-banner-1.png"),
     path.join("images", "home-banner-2.png"),

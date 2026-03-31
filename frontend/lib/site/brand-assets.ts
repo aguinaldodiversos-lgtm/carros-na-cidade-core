@@ -2,10 +2,10 @@
  * Assets de marca em `public/images`.
  * Ajuste apenas estes caminhos se os arquivos no disco tiverem outro nome/extensão.
  */
-export const SITE_LOGO_SRC = "/images/logo.svg";
+export const SITE_LOGO_SRC = "/images/logo.png";
 
-/** Ícone da aba / PWA — mesmo arquivo referenciado em metadata. */
-export const SITE_FAVICON_SRC = "/images/favicon.svg";
+/** Ícone da aba / PWA — PNG oficial em `public/images`. */
+export const SITE_FAVICON_SRC = "/images/favicon.png";
 
 /**
  * Banners do carrossel da Home (ordem de exibição).

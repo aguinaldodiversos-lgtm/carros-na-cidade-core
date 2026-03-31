@@ -1,7 +1,7 @@
 // frontend/components/search/HomeSearchSection.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { DEFAULT_PUBLIC_CITY_LABEL, DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
@@ -47,7 +47,6 @@ const MODEL_OPTIONS: Record<string, string[]> = {
 const YEAR_OPTIONS = ["2024", "2023", "2022", "2021", "2020", "2019", "2018"];
 
 const PRICE_OPTIONS = [
-  { label: "Selecionar", value: "" },
   { label: "Até R$ 40 mil", value: "40000" },
   { label: "Até R$ 60 mil", value: "60000" },
   { label: "Até R$ 80 mil", value: "80000" },
@@ -57,14 +56,12 @@ const PRICE_OPTIONS = [
 ];
 
 const TYPE_OPTIONS = [
-  { label: "Selecionar", value: "" },
   { label: "Usados", value: "used" },
   { label: "Seminovos", value: "seminovos" },
   { label: "Novos", value: "new" },
 ];
 
 const CATEGORY_OPTIONS = [
-  { label: "Selecionar", value: "" },
   { label: "Sedã", value: "sedan" },
   { label: "SUV", value: "suv" },
   { label: "Hatch", value: "hatch" },
@@ -87,21 +84,25 @@ function SelectField({
   placeholderOption?: string;
 }) {
   const emptyLabel = placeholderOption ?? label;
+  const fieldId = useId();
+  const selectId = `${fieldId}-${label.replace(/\s+/g, "-")}`;
+
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-[12px] font-semibold uppercase tracking-wide text-[#6b7280]">{label}</span>
-      <label className="sr-only" htmlFor={`field-${label}`}>
+      <label className="sr-only" htmlFor={selectId}>
         {label}
       </label>
       <select
-        id={`field-${label}`}
+        id={selectId}
+        name={selectId}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-[48px] w-full cursor-pointer rounded-[11px] border border-[#d5deeb] bg-[#fafbfd] px-3 text-[15px] font-medium text-[#1b2436] outline-none transition hover:border-[#c5d0e0] focus:border-[#0e62d8] focus:bg-white focus:ring-2 focus:ring-[#0e62d8]/18 md:h-[52px] md:px-4"
+        className="h-[48px] w-full cursor-pointer appearance-none rounded-[11px] border border-[#d5deeb] bg-[#fafbfd] px-3 text-[15px] font-medium text-[#1b2436] outline-none transition hover:border-[#c5d0e0] focus:border-[#0e62d8] focus:bg-white focus:ring-2 focus:ring-[#0e62d8]/18 md:h-[52px] md:px-4"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
-          <option key={`${label}-${option.value || "empty"}-${option.label}`} value={option.value}>
+          <option key={`${label}-${option.value}-${option.label}`} value={option.value}>
             {option.label}
           </option>
         ))}
@@ -155,6 +156,12 @@ export function HomeSearchSection({
     const options = brand ? MODEL_OPTIONS[brand] || [] : [];
     return options.map((item) => ({ label: item, value: item }));
   }, [brand]);
+
+  useEffect(() => {
+    if (!model) return;
+    const allowed = modelOptions.some((o) => o.value === model);
+    if (!allowed) setModel("");
+  }, [model, modelOptions]);
 
   function handleSubmit() {
     const params = new URLSearchParams();
@@ -249,7 +256,7 @@ export function HomeSearchSection({
           <button
             type="button"
             onClick={handleSubmit}
-            className="inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-[11px] bg-[#0e62d8] px-4 text-[16px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8] md:h-[52px] md:text-[17px]"
+            className="inline-flex h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-[11px] bg-[#0e62d8] px-4 text-[16px] font-extrabold text-white shadow-[0_12px_28px_rgba(14,98,216,0.28)] transition hover:bg-[#0c4fb0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8] md:h-[52px] md:text-[17px]"
           >
             Pesquisar
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">

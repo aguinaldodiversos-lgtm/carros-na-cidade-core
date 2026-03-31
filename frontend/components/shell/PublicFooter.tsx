@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
 import { useCityOptional } from "@/lib/city/CityContext";
@@ -63,28 +62,19 @@ function FooterLegalLinks({ className }: { className?: string }) {
   );
 }
 
-/** Mesmos quatro pilares do rodapé completo, em versão compacta (home). */
 function FooterNavColumns({
-  dense,
   headingClass,
   sections,
 }: {
-  dense?: boolean;
   headingClass: string;
   sections: ReturnType<typeof buildFooterNavSections>;
 }) {
   return (
-    <div
-      className={
-        dense
-          ? "grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
-          : "grid gap-8 sm:grid-cols-2 lg:grid-cols-4"
-      }
-    >
+    <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
       {sections.map((group) => (
         <div key={group.id}>
           <h3 className={headingClass}>{group.title}</h3>
-          <ul className={dense ? "mt-2 space-y-1.5 text-[12px]" : "mt-4 space-y-2.5 text-sm"}>
+          <ul className="mt-4 space-y-2.5 text-sm">
             {group.links.map((link) => (
               <li key={`${group.id}-${link.id}`}>
                 <FooterAnchor
@@ -101,8 +91,6 @@ function FooterNavColumns({
 }
 
 export function PublicFooter() {
-  const pathname = usePathname() || "/";
-  const isHome = pathname === "/";
   const currentYear = new Date().getFullYear();
   const socials = getPublicSocialLinks();
   const cityCtx = useCityOptional();
@@ -110,57 +98,6 @@ export function PublicFooter() {
     () => buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG),
     [cityCtx?.city.slug]
   );
-
-  if (isHome) {
-    return (
-      <footer className="mt-auto bg-[#141a2e] text-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
-          <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div className="flex max-w-xl flex-col gap-3">
-              <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
-                <img
-                  src={SITE_LOGO_SRC}
-                  alt="Carros na Cidade"
-                  className="h-6 w-[120px] object-contain object-left brightness-0 invert sm:h-7 sm:w-[140px]"
-                  loading="lazy"
-                />
-              </Link>
-              <p className="text-[13px] leading-relaxed text-white/65">
-                © {currentYear} Carros na Cidade. Todos os direitos reservados.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-5 md:justify-end">
-              {socials.length > 0 ? (
-                <div className="flex items-center gap-4" aria-label="Redes sociais">
-                  {socials.map((s) => (
-                    <FooterAnchor
-                      key={s.href}
-                      item={{ ...s, external: true }}
-                      className="text-white/80 transition hover:text-white"
-                    />
-                  ))}
-                </div>
-              ) : null}
-              <a
-                href={SITE_CONTACT.phoneHref}
-                className="inline-flex items-center gap-2 text-[14px] font-semibold text-white/90 hover:text-white"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M6.6 10.8c1.8 3.6 4.8 6.6 8.4 8.4l2.8-2.8c.4-.4 1-.5 1.5-.3 1 .4 2.1.6 3.3.6.8 0 1.4.6 1.4 1.4V21c0 .8-.6 1.4-1.4 1.4C9.4 22.4 1.6 14.6 1.6 4.9 1.6 4.1 2.2 3.5 3 3.5h2.1c.8 0 1.4.6 1.4 1.4 0 1.1.2 2.3.6 3.3.2.5.1 1.1-.3 1.5l-2.8 2.8Z" />
-                </svg>
-                {SITE_CONTACT.phoneDisplay}
-              </a>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-4 border-t border-white/10 pt-4 text-[12px] text-white/55">
-            <FooterLegalLinks className="flex flex-wrap gap-4" />
-          </div>
-        </div>
-      </footer>
-    );
-  }
 
   return (
     <footer className="mt-16 bg-[linear-gradient(135deg,#16326a_0%,#0d1a38_100%)] text-white">
@@ -171,7 +108,7 @@ export function PublicFooter() {
               <img
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
-                className="h-11 w-[195px] object-contain object-left brightness-0 invert"
+                className="h-11 w-auto max-w-[220px] object-contain object-left"
                 loading="lazy"
               />
             </Link>
