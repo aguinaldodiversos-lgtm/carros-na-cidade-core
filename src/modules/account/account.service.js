@@ -1,5 +1,6 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { logger } from "../../shared/logger.js";
 import * as adsRepository from "../ads/ads.repository.js";
 import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
 import { getAccountUser } from "./account.user.read.js";
@@ -574,7 +575,20 @@ export async function getOwnedAd(userId, adId) {
 }
 
 export async function getDashboardPayload(userId) {
-  await ensureAdvertiserForUser(String(userId), { source: "dashboard" });
+  const uid = String(userId);
+  try {
+    await ensureAdvertiserForUser(uid, { source: "dashboard" });
+  } catch (err) {
+    logger.warn(
+      {
+        err: err?.message || String(err),
+        userId: uid,
+        code: err?.code,
+      },
+      "[account.dashboard] ensureAdvertiserForUser falhou — seguindo com painel (anúncios podem estar vazios)"
+    );
+  }
+
   const user = await getAccountUser(userId);
   const [ads, publishEligibility] = await Promise.all([
     listOwnedAds(userId),

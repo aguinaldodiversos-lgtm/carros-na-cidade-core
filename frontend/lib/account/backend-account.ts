@@ -1,4 +1,5 @@
 import type { DashboardPayload } from "@/lib/dashboard-types";
+import { normalizeDashboardPayload } from "@/lib/dashboard/normalize-dashboard-payload";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import type { SubscriptionPlan } from "@/services/planStore";
 import type { SessionData } from "@/services/sessionService";
@@ -234,9 +235,14 @@ export async function fetchPlans(options: { type?: "CPF" | "CNPJ"; activeOnly?: 
 }
 
 export async function fetchDashboard(session: SessionData) {
-  return fetchBackendJson<DashboardPayload>("/api/account/dashboard", {
+  const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
     accessToken: assertAccessToken(session),
   });
+  const normalized = normalizeDashboardPayload(raw);
+  if (!normalized) {
+    throw new Error("Resposta do dashboard em formato inesperado ou sem dados de usuário.");
+  }
+  return normalized;
 }
 
 export async function fetchOwnedAd(session: SessionData, adId: string) {
