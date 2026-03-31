@@ -1,7 +1,7 @@
 // frontend/components/home/HomePageClient.tsx
 import Link from "next/link";
 import { HeroCarousel, type HeroSlide } from "@/components/home/HeroCarousel";
-import { HomeSearchSection } from "@/components/search/HomeSearchSection";
+import { HomeSearchShell } from "@/components/home/search/HomeSearchShell";
 import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
 import { HOME_HERO_BANNER_IMAGES } from "@/lib/site/brand-assets";
 
@@ -79,10 +79,11 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
         <HeroCarousel slides={heroSlides} />
 
         <div className="relative z-30 px-0 sm:px-0">
-          <HomeSearchSection
+          <HomeSearchShell
             featuredCities={data.featuredCities || []}
             defaultCitySlug={currentCitySlug}
             defaultCityLabel={currentCity}
+            totalAdsHint={data.stats?.total_ads}
           />
         </div>
       </section>
