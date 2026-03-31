@@ -41,7 +41,7 @@ interface CatalogVehicleCardProps {
   className?: string;
 }
 
-const FALLBACK_IMAGE = "/images/hero.jpeg";
+const FALLBACK_IMAGE = "/images/vehicle-placeholder.svg";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -184,27 +184,27 @@ function getBadge(weight: 1 | 2 | 3 | 4) {
   if (weight === 4) {
     return {
       label: "Destaque",
-      className: "bg-[#118A93] text-white",
+      className: "bg-cyan-600 text-white",
     };
   }
 
   if (weight === 3) {
     return {
       label: "Loja Premium",
-      className: "bg-[#193E98] text-white",
+      className: "bg-blue-800 text-white",
     };
   }
 
   if (weight === 2) {
     return {
       label: "Loja",
-      className: "bg-[#EEF4FF] text-[#1F66E5] ring-1 ring-[#D8E2FB]",
+      className: "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
     };
   }
 
   return {
     label: "Anúncio",
-    className: "bg-[#F2F5FA] text-[#6C7488] ring-1 ring-[#E8ECF3]",
+    className: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
   };
 }
 
@@ -235,8 +235,8 @@ export default function CatalogVehicleCard({
   const listedHint = getListedHint(item.created_at);
 
   const cardClasses = cx(
-    "group overflow-hidden border border-[#E5E9F2] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(20,30,60,0.10)]",
-    featured ? "rounded-[20px]" : "rounded-[18px]",
+    "group overflow-hidden rounded-lg border border-slate-200/90 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md",
+    featured ? "rounded-xl" : "rounded-lg",
     className
   );
 
@@ -282,7 +282,7 @@ export default function CatalogVehicleCard({
         </div>
 
         {item.below_fipe ? (
-          <div className="absolute left-3 top-12 inline-flex rounded-[10px] bg-[#1C5E47] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
+          <div className="absolute left-3 top-12 inline-flex rounded-md bg-blue-700 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
             Abaixo da FIPE
           </div>
         ) : null}
@@ -291,15 +291,15 @@ export default function CatalogVehicleCard({
       <div className={cx("px-4 pb-4 pt-4", featured && "md:px-5 md:pb-5 md:pt-4")}>
         <h3
           className={cx(
-            "line-clamp-2 min-h-[44px] font-extrabold leading-[1.12] text-[#1D2440]",
-            featured ? "text-[20px]" : "text-[17px]"
+            "line-clamp-2 min-h-[44px] font-bold uppercase leading-tight tracking-tight text-slate-900",
+            featured ? "text-lg md:text-xl" : "text-base"
           )}
         >
           {title}
         </h3>
 
-        <p className="mt-2 line-clamp-1 text-[15px] text-[#6E748A]">{meta}</p>
-        <p className="mt-1 text-[15px] text-[#6E748A]">{location}</p>
+        <p className="mt-2 line-clamp-1 text-sm text-slate-600">{meta}</p>
+        <p className="mt-1 text-sm text-slate-500">{location}</p>
         {listedHint ? (
           <p className="mt-1 text-[12px] font-medium text-[#8B94A8]">{listedHint}</p>
         ) : null}
@@ -307,22 +307,22 @@ export default function CatalogVehicleCard({
         <div className="mt-4 flex items-end justify-between gap-3">
           <div
             className={cx(
-              "font-extrabold leading-none text-[#1F66E5]",
-              featured ? "text-[24px]" : "text-[20px]"
+              "font-bold leading-none text-blue-700",
+              featured ? "text-2xl" : "text-xl"
             )}
           >
             {formatCurrency(price)}
           </div>
 
-          <div className="rounded-[10px] bg-[#F2F5FA] px-3 py-2 text-[11px] font-bold text-[#6B7489]">
+          <div className="rounded-md bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600">
             {financeChip}
           </div>
         </div>
 
         <div
           className={cx(
-            "mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[#1F66E5] font-bold text-white transition hover:bg-[#1758CC]",
-            featured ? "h-[50px] text-[18px]" : "h-[46px] text-[16px]"
+            "mt-4 inline-flex w-full items-center justify-center rounded-md bg-blue-700 font-semibold text-white transition hover:bg-blue-800",
+            featured ? "h-12 text-base" : "h-11 text-[15px]"
           )}
         >
           Ver detalhes

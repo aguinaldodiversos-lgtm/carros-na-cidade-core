@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type {
@@ -11,8 +11,6 @@ import type {
 } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import CatalogVehicleCard, { type CatalogItem } from "@/components/buy/CatalogVehicleCard";
-import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
-import { SITE_ROUTES } from "@/lib/site/site-navigation";
 
 type CityContext = {
   name: string;
@@ -162,7 +160,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 235990,
-      image_url: "/images/banner1.jpg",
+      image_url: "/images/vehicle-placeholder.svg",
       highlight_until: new Date().toISOString(),
       catalogWeight: 4,
     },
@@ -178,7 +176,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 98900,
-      image_url: "/images/banner2.jpg",
+      image_url: "/images/vehicle-placeholder.svg",
       below_fipe: true,
       highlight_until: new Date().toISOString(),
       catalogWeight: 4,
@@ -195,7 +193,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 159900,
-      image_url: "/images/compass.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
       catalogWeight: 3,
       dealership_name: "Premium Motors",
     },
@@ -211,7 +209,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 159900,
-      image_url: "/images/corolla.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
       dealership_name: "Prime Autos",
       catalogWeight: 3,
       below_fipe: true,
@@ -228,7 +226,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 115900,
-      image_url: "/images/civic.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
       catalogWeight: 3,
       dealership_name: "Revenda Premium",
     },
@@ -244,7 +242,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 115900,
-      image_url: "/images/banner2.jpg",
+      image_url: "/images/vehicle-placeholder.svg",
       catalogWeight: 2,
       dealership_name: "Auto Center",
     },
@@ -260,7 +258,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 125900,
-      image_url: "/images/civic.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
       catalogWeight: 2,
       dealership_name: "Loja Local",
     },
@@ -276,7 +274,7 @@ function buildFallbackCatalog(city: CityContext): CatalogItem[] {
       city: city.name,
       state: city.state,
       price: 79900,
-      image_url: "/images/corolla.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
       catalogWeight: 1,
       seller_type: "private",
     },
@@ -357,6 +355,28 @@ function sortCatalogItems(items: CatalogItem[], sort?: string) {
     return items;
   }
 
+  if (mode === "recent") {
+    return [...items].sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at));
+  }
+
+  if (mode === "year_desc") {
+    return [...items].sort((a, b) => parseNumber(b.year) - parseNumber(a.year));
+  }
+
+  if (mode === "price_asc") {
+    return [...items].sort((a, b) => parseNumber(a.price) - parseNumber(b.price));
+  }
+
+  if (mode === "price_desc") {
+    return [...items].sort((a, b) => parseNumber(b.price) - parseNumber(a.price));
+  }
+
+  if (mode === "mileage_asc") {
+    return [...items].sort(
+      (a, b) => parseNumber(a.mileage) - parseNumber(b.mileage)
+    );
+  }
+
   return [...items].sort((a, b) => {
     const weightA = inferWeight(a);
     const weightB = inferWeight(b);
@@ -379,25 +399,20 @@ function sortCatalogItems(items: CatalogItem[], sort?: string) {
 
 function TopPromoBanner() {
   return (
-    <div className="relative overflow-hidden rounded-[18px] border border-[#E5E9F2] bg-white px-7 py-6 shadow-[0_10px_22px_rgba(18,34,72,0.05)]">
-      <div className="absolute right-0 top-0 h-full w-[118px] overflow-hidden">
-        <div className="absolute right-[-14px] top-[2px] h-[88px] w-[88px] rounded-full border-[12px] border-[#2F67F6]/22" />
-        <div className="absolute right-[8px] top-[18px] h-[72px] w-[72px] rounded-full border-[10px] border-[#2F67F6]/55" />
-        <div className="absolute bottom-[-26px] right-[-16px] h-[88px] w-[88px] rounded-full bg-[#F5A623]" />
+    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="pointer-events-none absolute right-0 top-0 h-full w-28 overflow-hidden">
+        <div className="absolute right-2 top-6 h-20 w-12 bg-gradient-to-b from-amber-300 via-sky-400 to-blue-600 opacity-90 blur-[0.5px]" />
+        <div className="absolute bottom-8 right-0 h-16 w-16 rounded-full bg-cyan-400/30" />
+        <div className="absolute bottom-2 right-6 h-10 w-10 rounded-full bg-blue-600/25" />
       </div>
-
-      <div className="relative flex items-center justify-between gap-6">
-        <div>
-          <h3 className="text-[22px] font-extrabold text-[#1D2440]">Destaque na região</h3>
-          <p className="mt-1 text-[16px] text-[#5F6780]">
-            Seja encontrado por quem busca carro na{" "}
-            <span className="font-extrabold text-[#1F66E5]">cidade certa</span>
-          </p>
-        </div>
-
+      <div className="relative max-w-md pr-4">
+        <p className="text-xl font-semibold leading-snug text-slate-900">Venda mais rápido</p>
+        <p className="mt-1 text-xl leading-snug text-slate-800">
+          com anúncios em <span className="font-bold text-blue-700">destaque</span>
+        </p>
         <Link
           href="/planos"
-          className="inline-flex h-[46px] shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-6 text-[16px] font-bold text-white transition hover:bg-[#1758CC]"
+          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-blue-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800"
         >
           Patrocinar anúncio
         </Link>
@@ -406,76 +421,107 @@ function TopPromoBanner() {
   );
 }
 
-function Toolbar({
+function BuyToolbar({
   filters,
+  onLimitChange,
   onSortChange,
+  mapHref,
 }: {
   filters: AdsSearchFilters;
+  onLimitChange: (limit: number) => void;
   onSortChange: (value: string) => void;
+  mapHref: string;
 }) {
+  const limit = filters.limit || 51;
+
   return (
-    <div className="mb-5 flex flex-col gap-3 rounded-[16px] border border-[#E5E9F2] bg-white px-4 py-3 shadow-[0_8px_18px_rgba(18,34,72,0.05)] md:flex-row md:items-center md:justify-between">
+    <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-3">
-        <select className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none">
-          <option>51 últimos</option>
-          <option>100 últimos</option>
-          <option>200 últimos</option>
-        </select>
-
-        <div className="hidden items-center gap-2 text-[#6E748A] md:flex">
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <path d="M4 6h16M7 12h10M10 18h4" />
-          </svg>
-        </div>
-
+        <label htmlFor="buy-result-limit" className="sr-only">
+          Quantidade de resultados
+        </label>
         <select
-          value={filters.sort || "relevance"}
-          onChange={(event) => onSortChange(event.target.value)}
-          className="h-[44px] rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[14px] font-semibold text-[#47506A] outline-none"
+          id="buy-result-limit"
+          value={limit}
+          onChange={(event) => onLimitChange(Number(event.target.value))}
+          className="h-11 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
         >
-          <option value="relevance">Relevância (plano + destaque + região)</option>
-          <option value="highlight">Destaque ativo primeiro</option>
-          <option value="recent">Últimos</option>
-          <option value="price_asc">Menor preço</option>
-          <option value="price_desc">Maior preço</option>
-          <option value="mileage_asc">Menos rodado</option>
-          <option value="year_desc">Mais novo</option>
+          <option value={51}>51 Últimos</option>
+          <option value={100}>100 Últimos</option>
+          <option value={200}>200 Últimos</option>
         </select>
       </div>
 
-      <button
-        type="button"
-        className="inline-flex h-[44px] items-center justify-center gap-2 rounded-[12px] border border-[#E5E9F2] bg-[#F7F9FC] px-4 text-[14px] font-bold text-[#47506A] transition hover:bg-[#EEF3FB]"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className="h-5 w-5 text-[#6E748A]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="buy-sort" className="sr-only">
+          Ordenação
+        </label>
+        <select
+          id="buy-sort"
+          value={filters.sort || "recent"}
+          onChange={(event) => onSortChange(event.target.value)}
+          className="h-11 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
         >
-          <path d="M4 10.5 12 4l8 6.5v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
-          <path d="M9 14h6" />
-        </svg>
-        Ver no mapa
-      </button>
+          <option value="recent">Últimos</option>
+          <option value="relevance">Relevância</option>
+          <option value="year_desc">Mais novo</option>
+          <option value="price_asc">Menor preço</option>
+          <option value="price_desc">Maior preço</option>
+          <option value="mileage_asc">Menos rodado</option>
+          <option value="highlight">Destaque</option>
+        </select>
+
+        <Link
+          href={mapHref}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5 text-slate-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden
+          >
+            <path d="M4 10.5 12 4l8 6.5v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
+            <path d="M9 14h6" />
+          </svg>
+          Ver no mapa
+        </Link>
+      </div>
     </div>
   );
 }
 
-function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
+function CollapsibleSidebarSection({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
-    <section className="border-b border-[#EEF1F6] pb-6 last:border-b-0 last:pb-0">
-      <div className="mb-4 border-b border-[#F4F7FB] pb-3">
-        <h3 className="text-[15px] font-extrabold tracking-tight text-[#1D2440]">{title}</h3>
-      </div>
-      {children}
+    <section className="border-b border-slate-100 py-4 last:border-0 last:pb-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="text-sm font-semibold text-slate-800">{title}</span>
+        <svg
+          viewBox="0 0 20 20"
+          className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`}
+          fill="currentColor"
+          aria-hidden
+        >
+          <path d="m5 7 5 6 5-6H5Z" />
+        </svg>
+      </button>
+      {open ? <div className="mt-4">{children}</div> : null}
     </section>
   );
 }
@@ -493,11 +539,11 @@ function FilterSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-slate-600">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-[52px] w-full rounded-[12px] border border-[#E5E9F2] bg-white px-4 text-[15px] font-medium text-[#33405A] outline-none transition focus:border-[#1F66E5]"
+        className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-[15px] font-medium text-slate-800 outline-none transition focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
       >
         {options.map((option) => (
           <option key={`${label}-${option.value}`} value={option.value}>
@@ -522,10 +568,10 @@ function QuickInterestRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between rounded-[12px] px-1 py-2 text-left transition hover:bg-[#F7F9FC]"
+      className="flex w-full items-center justify-between rounded-md px-1 py-2 text-left transition hover:bg-slate-50"
     >
-      <span className="text-[15px] font-medium text-[#33405A]">{label}</span>
-      <span className="inline-flex min-w-[52px] items-center justify-center rounded-full bg-[#F1F4FA] px-3 py-1 text-[12px] font-bold text-[#7A8398]">
+      <span className="text-[15px] font-medium text-slate-700">{label}</span>
+      <span className="inline-flex min-w-[52px] items-center justify-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
         {formatTotal(count)}
       </span>
     </button>
@@ -539,12 +585,12 @@ function BrandBadge({ label, onClick }: { label: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="rounded-[14px] border border-[#E5E9F2] bg-[#FAFBFE] px-3 py-4 text-center transition hover:border-[#CFD9F0] hover:bg-white"
+      className="rounded-lg border border-slate-200 bg-white px-2 py-3 text-center shadow-sm transition hover:border-slate-300"
     >
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF4FF] text-[15px] font-extrabold text-[#1F66E5]">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md bg-slate-50 text-sm font-bold text-blue-700">
         {initial}
       </div>
-      <div className="mt-2 text-[13px] font-bold text-[#33405A]">{label}</div>
+      <div className="mt-2 text-xs font-semibold text-slate-700">{label}</div>
     </button>
   );
 }
@@ -563,7 +609,10 @@ export default function BuyMarketplacePageClient({
     [initialResults?.data, city]
   );
 
-  const items = useMemo(() => sortCatalogItems(rawItems), [rawItems]);
+  const items = useMemo(
+    () => sortCatalogItems(rawItems, initialFilters.sort),
+    [rawItems, initialFilters.sort]
+  );
 
   const firstRow = useMemo(() => items.slice(0, 2), [items]);
   const remaining = useMemo(() => items.slice(2), [items]);
@@ -634,64 +683,31 @@ export default function BuyMarketplacePageClient({
   );
 
   const totalAds = initialResults?.pagination?.total || items.length || 0;
+  const mapHref = `/cidade/${encodeURIComponent(city.slug)}`;
 
   return (
-    <main className="bg-[#F5F7FB]">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 xl:px-8 md:py-10">
-        <section className="mb-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_540px] lg:items-start">
-          <div>
-            <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#1F66E5]">
-              {REGIONAL_BRAND_TAGLINE}
-            </p>
-            <h1 className="mt-2 max-w-3xl text-[34px] font-extrabold leading-[1.08] tracking-[-0.03em] text-[#1D2440] md:text-[46px]">
-              Usados e seminovos em {city.name}
-            </h1>
-            <p className="mt-4 max-w-2xl text-[17px] leading-relaxed text-[#5C6678]">
-              Catálogo ancorado em <span className="font-semibold text-[#1D2440]">{city.name}</span>{" "}
-              ({city.state}): cada listagem traz cidade e estado para você comparar com o que
-              importa na sua rotina.
-            </p>
-            <p className="mt-3 text-[22px] font-semibold text-[#6E748A]">
-              {formatTotal(totalAds)} anúncios neste território
-            </p>
-            <p className="mt-3 text-[14px] text-[#6E748A]">
-              <Link
-                href={`/cidade/${city.slug}`}
-                className="font-bold text-[#1F66E5] underline-offset-2 hover:underline"
-              >
-                Ver hub de {city.name}
-              </Link>
-              <span className="text-[#9AA3B5]"> — marcas, oportunidades e rotas locais</span>
-            </p>
-          </div>
+    <main className="min-h-screen bg-gray-50">
+      <div className="border-b border-slate-100 bg-gray-50">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,440px)] lg:items-center">
+            <div>
+              <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-slate-900 md:text-4xl lg:text-[2.35rem] lg:leading-tight">
+                Carros usados e seminovos em {city.name}
+              </h1>
+              <p className="mt-3 text-base font-medium text-slate-600 md:text-lg">
+                {formatTotal(totalAds)} anúncios encontrados
+              </p>
+            </div>
 
-          <TopPromoBanner />
-        </section>
+            <TopPromoBanner />
+          </section>
+        </div>
+      </div>
 
-        <section
-          className="mb-6 flex flex-col gap-3 rounded-[16px] border border-[#E5E9F2] bg-white px-4 py-4 shadow-[0_8px_18px_rgba(18,34,72,0.04)] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6"
-          aria-label="Confiança na compra"
-        >
-          <div className="flex flex-col gap-1 sm:max-w-xl">
-            <p className="text-[15px] font-extrabold text-[#1D2440]">
-              Confiança começa no território certo
-            </p>
-            <p className="text-[13px] leading-relaxed text-[#6E748A]">
-              Preferimos cidade e estado visíveis em cada anúncio. Combine visita presencial e siga
-              nosso guia antes de fechar negócio.
-            </p>
-          </div>
-          <Link
-            href={SITE_ROUTES.seguranca}
-            className="inline-flex shrink-0 items-center justify-center rounded-[12px] border border-[#D8E2FB] bg-[#F5F8FF] px-4 py-3 text-[14px] font-bold text-[#1F66E5] transition hover:bg-[#EEF4FF]"
-          >
-            Dicas de negociação segura
-          </Link>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="rounded-[22px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_26px_rgba(18,34,72,0.05)]">
-            <SidebarSection title="Filtros rápidos">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <CollapsibleSidebarSection title="Filtros rápidos">
               <div className="space-y-4">
                 <FilterSelect
                   label="Marca"
@@ -724,35 +740,36 @@ export default function BuyMarketplacePageClient({
                 />
 
                 <div>
-                  <span className="mb-2 block text-[14px] font-semibold text-[#4E5A73]">Tipo</span>
-                  <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-[#F3F6FB] p-1">
+                  <span className="mb-2 block text-sm font-medium text-slate-600">Tipo</span>
+                  <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
                     <button
                       type="button"
-                      className="inline-flex h-[42px] items-center justify-center rounded-[12px] bg-white text-[14px] font-bold text-[#1D2440] shadow-sm"
+                      className="inline-flex h-10 items-center justify-center rounded-md bg-white text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200"
                     >
                       Carros
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-[42px] items-center justify-center rounded-[12px] text-[14px] font-bold text-[#778199]"
+                      className="inline-flex h-10 items-center justify-center rounded-md text-sm font-medium text-slate-500"
+                      disabled
                     >
                       Motos
                     </button>
                   </div>
                 </div>
               </div>
-            </SidebarSection>
+            </CollapsibleSidebarSection>
 
-            <SidebarSection title="Localização">
+            <CollapsibleSidebarSection title="Localização">
               <FilterSelect
                 label=""
                 value={city.slug}
                 options={[{ label: city.label, value: city.slug }]}
                 onChange={() => undefined}
               />
-            </SidebarSection>
+            </CollapsibleSidebarSection>
 
-            <SidebarSection title="O que te interessa ver hoje?">
+            <CollapsibleSidebarSection title="O que te interessa ver hoje?">
               <div className="space-y-1">
                 <QuickInterestRow
                   label="Mais novo"
@@ -770,28 +787,28 @@ export default function BuyMarketplacePageClient({
                   onClick={() => pushFilters({ sort: "mileage_asc" })}
                 />
               </div>
-            </SidebarSection>
+            </CollapsibleSidebarSection>
 
-            <SidebarSection title="Populares">
+            <CollapsibleSidebarSection title="Populares">
               <div className="space-y-3">
                 {popularBrands.slice(0, 3).map((item) => (
                   <button
                     key={item.brand}
                     type="button"
                     onClick={() => pushFilters({ brand: item.brand })}
-                    className="flex w-full items-center justify-between rounded-[12px] px-1 py-2 text-left transition hover:bg-[#F7F9FC]"
+                    className="flex w-full items-center justify-between rounded-md px-1 py-2 text-left transition hover:bg-slate-50"
                   >
-                    <span className="text-[15px] font-medium text-[#33405A]">{item.brand}</span>
-                    <span className="text-[14px] font-bold text-[#7A8398]">
+                    <span className="text-[15px] font-medium text-slate-700">{item.brand}</span>
+                    <span className="text-sm font-semibold text-slate-500">
                       {formatTotal(item.total)}
                     </span>
                   </button>
                 ))}
               </div>
-            </SidebarSection>
+            </CollapsibleSidebarSection>
 
-            <SidebarSection title="Marcas populares">
-              <div className="grid grid-cols-2 gap-3">
+            <CollapsibleSidebarSection title="Marcas populares">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {popularBrands.map((item) => (
                   <BrandBadge
                     key={`popular-${item.brand}`}
@@ -800,12 +817,14 @@ export default function BuyMarketplacePageClient({
                   />
                 ))}
               </div>
-            </SidebarSection>
+            </CollapsibleSidebarSection>
           </aside>
 
           <div>
-            <Toolbar
+            <BuyToolbar
               filters={initialFilters}
+              mapHref={mapHref}
+              onLimitChange={(limit) => pushFilters({ limit })}
               onSortChange={(value) => pushFilters({ sort: value })}
             />
 

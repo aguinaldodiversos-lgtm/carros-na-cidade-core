@@ -122,9 +122,9 @@ function normalizeBuyFilters(
     city_id,
     city: parsed.city || fallbackCityName,
     state: parsed.state || fallbackState,
-    sort: parsed.sort || "relevance",
+    sort: parsed.sort || "recent",
     page: parsed.page || 1,
-    limit: parsed.limit || 18,
+    limit: parsed.limit || 51,
   };
 }
 
@@ -143,7 +143,7 @@ function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
     data: [],
     pagination: {
       page: filters.page || 1,
-      limit: filters.limit || 18,
+      limit: filters.limit || 51,
       total: 0,
       totalPages: 1,
     },
