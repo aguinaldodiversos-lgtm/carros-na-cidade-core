@@ -1,6 +1,16 @@
+import Image from "next/image";
 import Link from "next/link";
+
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
+import {
+  financeChipLabel,
+  primaryBadgeFromWeight,
+  primaryBadgeLabel,
+  VehicleBelowFipeBadge,
+  VehicleFinanceChip,
+  VehiclePrimaryBadge,
+} from "@/components/buy/VehicleBadge";
 
 export type CatalogItem = AdItem & {
   title?: string;
@@ -154,7 +164,7 @@ function getMetaLine(item: CatalogItem) {
     toText(item.transmission),
   ].filter(Boolean);
 
-  if (pieces.length > 0) return pieces.join("  •  ");
+  if (pieces.length > 0) return pieces.join("  ·  ");
   return "Informações sob consulta";
 }
 
@@ -164,7 +174,6 @@ function getLocation(item: CatalogItem) {
   return `${city} - ${state}`;
 }
 
-/** Texto curto para data de publicação quando a API envia created_at. */
 function getListedHint(createdAt?: string | null) {
   if (!createdAt) return null;
   const d = new Date(createdAt);
@@ -180,42 +189,6 @@ function getListedHint(createdAt?: string | null) {
   return `Desde ${d.toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-function getBadge(weight: 1 | 2 | 3 | 4) {
-  if (weight === 4) {
-    return {
-      label: "Destaque",
-      className: "bg-cyan-600 text-white",
-    };
-  }
-
-  if (weight === 3) {
-    return {
-      label: "Loja Premium",
-      className: "bg-blue-800 text-white",
-    };
-  }
-
-  if (weight === 2) {
-    return {
-      label: "Loja",
-      className: "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
-    };
-  }
-
-  return {
-    label: "Anúncio",
-    className: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
-  };
-}
-
-function getFinanceChip(weight: 1 | 2 | 3 | 4, item: CatalogItem) {
-  if (item.below_fipe) return "Abaixo da FIPE";
-  if (weight === 4) return "Mais visibilidade";
-  if (weight === 3) return "Revenda premium";
-  if (weight === 2) return "Loja verificada";
-  return "Oferta local";
-}
-
 export default function CatalogVehicleCard({
   item,
   featured = false,
@@ -229,14 +202,15 @@ export default function CatalogVehicleCard({
   const price = parseMoney(item.price);
   const location = getLocation(item);
   const meta = getMetaLine(item);
-  const badge = getBadge(weight);
-  const financeChip = getFinanceChip(weight, item);
+  const primaryVariant = primaryBadgeFromWeight(weight);
+  const financeLabel = financeChipLabel(weight, Boolean(item.below_fipe));
   const image = getImage(item);
   const listedHint = getListedHint(item.created_at);
+  const isLocalImage = image.startsWith("/");
 
   const cardClasses = cx(
-    "group overflow-hidden rounded-lg border border-slate-200/90 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md",
-    featured ? "rounded-xl" : "rounded-lg",
+    "group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-16px_rgba(15,23,42,0.18)]",
+    featured ? "ring-1 ring-slate-200/60" : "",
     className
   );
 
@@ -244,85 +218,77 @@ export default function CatalogVehicleCard({
     <>
       <div
         className={cx(
-          "relative overflow-hidden",
-          featured ? "aspect-[1.33/0.83]" : "aspect-[1.18/0.84]"
+          "relative overflow-hidden bg-slate-100",
+          featured ? "aspect-[16/10]" : "aspect-[4/3]"
         )}
       >
-        <img
+        <Image
           src={image}
           alt={title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          fill
+          unoptimized={!isLocalImage}
+          className="object-cover transition duration-500 group-hover:scale-[1.04]"
+          sizes={featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw"}
           loading="lazy"
         />
 
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
-          <span
-            className={cx(
-              "inline-flex rounded-[10px] px-3 py-1 text-[12px] font-extrabold shadow-sm",
-              badge.className
-            )}
-          >
-            {badge.label}
-          </span>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-slate-900/10" />
 
-          <span
-            aria-hidden="true"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#8D96AB] shadow-sm"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-[16px] w-[16px]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-            </svg>
-          </span>
+        <div className="absolute left-3 top-3 z-[1] flex max-w-[calc(100%-4rem)] flex-col items-start gap-1.5">
+          <VehiclePrimaryBadge variant={primaryVariant}>
+            {primaryBadgeLabel(primaryVariant)}
+          </VehiclePrimaryBadge>
+          {item.below_fipe ? <VehicleBelowFipeBadge /> : null}
         </div>
 
-        {item.below_fipe ? (
-          <div className="absolute left-3 top-12 inline-flex rounded-md bg-blue-700 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
-            Abaixo da FIPE
-          </div>
-        ) : null}
+        <span
+          aria-hidden="true"
+          className="absolute right-3 top-3 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-400 shadow-md ring-1 ring-white/80 backdrop-blur-sm"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-[17px] w-[17px]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
+          </svg>
+        </span>
       </div>
 
-      <div className={cx("px-4 pb-4 pt-4", featured && "md:px-5 md:pb-5 md:pt-4")}>
+      <div className={cx("flex flex-1 flex-col px-4 pb-4 pt-4", featured && "md:px-5 md:pb-5 md:pt-5")}>
         <h3
           className={cx(
-            "line-clamp-2 min-h-[44px] font-bold uppercase leading-tight tracking-tight text-slate-900",
-            featured ? "text-lg md:text-xl" : "text-base"
+            "line-clamp-2 min-h-[2.75rem] font-bold leading-snug tracking-tight text-slate-900",
+            featured ? "text-lg md:text-xl" : "text-[15px] md:text-base"
           )}
         >
           {title}
         </h3>
 
-        <p className="mt-2 line-clamp-1 text-sm text-slate-600">{meta}</p>
-        <p className="mt-1 text-sm text-slate-500">{location}</p>
+        <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-slate-600">{meta}</p>
+        <p className="mt-1 text-[13px] font-medium text-slate-500">{location}</p>
         {listedHint ? (
-          <p className="mt-1 text-[12px] font-medium text-[#8B94A8]">{listedHint}</p>
+          <p className="mt-1 text-[12px] font-medium text-slate-400">{listedHint}</p>
         ) : null}
 
-        <div className="mt-4 flex items-end justify-between gap-3">
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-2 border-t border-slate-100 pt-4">
           <div
             className={cx(
-              "font-bold leading-none text-blue-700",
+              "font-extrabold leading-none tracking-tight text-blue-700",
               featured ? "text-2xl" : "text-xl"
             )}
           >
             {formatCurrency(price)}
           </div>
-
-          <div className="rounded-md bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600">
-            {financeChip}
-          </div>
+          <VehicleFinanceChip>{financeLabel}</VehicleFinanceChip>
         </div>
 
         <div
           className={cx(
-            "mt-4 inline-flex w-full items-center justify-center rounded-md bg-blue-700 font-semibold text-white transition hover:bg-blue-800",
-            featured ? "h-12 text-base" : "h-11 text-[15px]"
+            "mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-700 text-center text-sm font-semibold text-white transition group-hover:bg-blue-800",
+            featured ? "min-h-[3rem] text-base" : "min-h-[2.75rem]"
           )}
         >
           Ver detalhes
@@ -337,7 +303,7 @@ export default function CatalogVehicleCard({
 
   return (
     <article className={cardClasses}>
-      <Link href={href} className="block" aria-label={`Ver detalhes de ${title}`}>
+      <Link href={href} className="flex h-full flex-col" aria-label={`Ver detalhes de ${title}`}>
         {content}
       </Link>
     </article>

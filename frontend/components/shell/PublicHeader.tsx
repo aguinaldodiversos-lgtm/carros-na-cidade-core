@@ -3,12 +3,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { CityHeaderSelector } from "@/components/city/CityHeaderSelector";
 import { useCity } from "@/lib/city/CityContext";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
-import { SITE_ROUTES } from "@/lib/site/site-navigation";
+import { getTerritorialRoutesForCity, isNavLinkActive, SITE_ROUTES } from "@/lib/site/site-navigation";
 
 function HeartIcon() {
   return (
@@ -40,18 +41,48 @@ function MenuIcon({ open }: { open: boolean }) {
   );
 }
 
-const linkNav =
-  "inline-flex h-10 shrink-0 items-center rounded-lg px-3 text-[14px] font-medium text-slate-600 transition hover:bg-slate-50 hover:text-blue-700";
+function HeaderNavLink({
+  href,
+  children,
+  className = "",
+  onClick,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
+  const pathname = usePathname() || "/";
+  const searchParams = useSearchParams();
+
+  const active = isNavLinkActive(pathname, searchParams, href);
+
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`inline-flex h-10 max-w-full items-center rounded-lg px-2.5 text-[13px] font-semibold transition xl:px-3 xl:text-[14px] ${
+        active
+          ? "bg-slate-100/90 text-blue-800 shadow-sm"
+          : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
+      } ${className}`}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { city, openCityPicker } = useCity();
 
+  const routes = useMemo(() => getTerritorialRoutesForCity(city.slug), [city.slug]);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white">
+    <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-[64px] items-center gap-3 md:h-[68px] md:gap-4">
-          <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">
+        <div className="flex h-[64px] items-center gap-2 md:h-[68px] md:gap-3">
+          <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
             <Link href="/" aria-label="Carros na Cidade" className="inline-flex shrink-0 items-center">
               <Image
                 src={SITE_LOGO_SRC}
@@ -59,7 +90,7 @@ export function PublicHeader() {
                 width={220}
                 height={52}
                 priority
-                className="h-[36px] w-auto max-w-[220px] object-contain object-left sm:h-[40px]"
+                className="h-[34px] w-auto max-w-[200px] object-contain object-left sm:h-[38px]"
               />
             </Link>
 
@@ -69,59 +100,79 @@ export function PublicHeader() {
           </div>
 
           <nav
-            className="ml-auto hidden items-center gap-0.5 md:flex lg:gap-1"
+            className="ml-2 hidden min-w-0 flex-1 items-center justify-center gap-0.5 md:ml-4 md:flex lg:gap-1"
             aria-label="Navegação principal"
           >
-            <Link href="/anunciar" className={linkNav}>
-              Anunciar
-            </Link>
-            <Link href={SITE_ROUTES.favoritos} className={linkNav}>
-              Favoritos
-            </Link>
-            <Link
-              href={SITE_ROUTES.favoritos}
-              aria-label="Favoritos"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-rose-600"
-            >
-              <HeartIcon />
-            </Link>
-            <Link
-              href={SITE_ROUTES.login}
-              className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-blue-800"
-            >
-              Entrar
-            </Link>
+            <HeaderNavLink href={routes.comprar}>Comprar</HeaderNavLink>
+            <HeaderNavLink href={routes.financing}>
+              <span className="hidden md:inline">Simulador de Financiamento</span>
+              <span className="md:hidden">Simulador</span>
+            </HeaderNavLink>
+            <HeaderNavLink href={routes.fipe}>FIPE</HeaderNavLink>
+            <HeaderNavLink href={routes.blog}>Blog</HeaderNavLink>
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
-            <button
-              type="button"
-              onClick={() => openCityPicker()}
-              className="inline-flex max-w-[140px] truncate rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700"
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 md:gap-1">
+            <nav
+              className="hidden items-center gap-0.5 md:flex lg:gap-1"
+              aria-label="Ações da conta"
             >
-              {city.label}
-            </button>
-            <Link
-              href={SITE_ROUTES.login}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white"
-            >
-              Entrar
-            </Link>
-            <button
-              type="button"
-              onClick={() => setMobileOpen((s) => !s)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700"
-              aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
-              aria-expanded={mobileOpen}
-            >
-              <MenuIcon open={mobileOpen} />
-            </button>
+              <Link
+                href="/anunciar"
+                className="inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-blue-700 xl:px-3 xl:text-[14px]"
+              >
+                Anunciar
+              </Link>
+              <Link href={SITE_ROUTES.favoritos} className="hidden sm:inline-flex">
+                <span className="inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-blue-700 xl:px-3 xl:text-[14px]">
+                  Favoritos
+                </span>
+              </Link>
+              <Link
+                href={SITE_ROUTES.favoritos}
+                aria-label="Favoritos"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-rose-600"
+              >
+                <HeartIcon />
+              </Link>
+              <Link
+                href={SITE_ROUTES.login}
+                className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:px-5 xl:text-[14px]"
+              >
+                Entrar
+              </Link>
+            </nav>
+
+            <div className="flex items-center gap-2 md:hidden">
+              <button
+                type="button"
+                onClick={() => openCityPicker()}
+                className="inline-flex max-w-[120px] truncate rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700"
+              >
+                {city.label}
+              </button>
+              <Link
+                href={SITE_ROUTES.login}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
+              >
+                Entrar
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileOpen((s) => !s)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700"
+                aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
+                aria-expanded={mobileOpen}
+              >
+                <MenuIcon open={mobileOpen} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {mobileOpen && (
+        {mobileOpen ? (
           <div className="border-t border-slate-100 py-4 md:hidden">
-            <nav className="grid gap-2" aria-label="Menu">
+            <nav className="grid gap-1" aria-label="Menu">
               <button
                 type="button"
                 onClick={() => {
@@ -132,6 +183,34 @@ export function PublicHeader() {
               >
                 Cidade: {city.label}
               </button>
+              <HeaderNavLink
+                href={routes.comprar}
+                onClick={() => setMobileOpen(false)}
+                className="w-full justify-start px-4"
+              >
+                Comprar
+              </HeaderNavLink>
+              <HeaderNavLink
+                href={routes.financing}
+                onClick={() => setMobileOpen(false)}
+                className="w-full justify-start px-4"
+              >
+                Simulador de Financiamento
+              </HeaderNavLink>
+              <HeaderNavLink
+                href={routes.fipe}
+                onClick={() => setMobileOpen(false)}
+                className="w-full justify-start px-4"
+              >
+                FIPE
+              </HeaderNavLink>
+              <HeaderNavLink
+                href={routes.blog}
+                onClick={() => setMobileOpen(false)}
+                className="w-full justify-start px-4"
+              >
+                Blog
+              </HeaderNavLink>
               <Link
                 href="/anunciar"
                 onClick={() => setMobileOpen(false)}
@@ -149,7 +228,7 @@ export function PublicHeader() {
               </Link>
             </nav>
           </div>
-        )}
+        ) : null}
       </div>
     </header>
   );

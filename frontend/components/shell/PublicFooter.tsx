@@ -100,48 +100,49 @@ export function PublicFooter() {
   );
 
   return (
-    <footer className="mt-16 bg-[linear-gradient(135deg,#16326a_0%,#0d1a38_100%)] text-white">
-      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
-        <div className="grid gap-10 border-b border-white/15 pb-10 lg:grid-cols-[1.15fr_1fr]">
+    <footer className="mt-auto border-t border-white/10 bg-[linear-gradient(165deg,#1a3a7a_0%,#0f2249_45%,#0a1833_100%)] text-white">
+      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
+        <div className="grid gap-12 border-b border-white/12 pb-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
           <div>
-            <Link href={SITE_ROUTES.home} className="block" aria-label="Carros na Cidade">
+            <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
               <img
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
-                className="h-11 w-auto max-w-[220px] object-contain object-left"
+                className="h-12 w-auto max-w-[240px] object-contain object-left"
                 loading="lazy"
               />
             </Link>
 
-            <p className="mt-4 max-w-xl text-sm leading-7 text-white/75">
-              Marketplace onde a cidade manda: anúncios com território claro, listagens que
-              respeitam a sua região e ferramentas para comprar ou vender com contexto local — sem
-              promessa de &quot;estoque nacional&quot; genérico.
+            <p className="mt-5 max-w-md text-sm leading-relaxed text-white/80">
+              Marketplace automotivo regional: catálogo por cidade, referência FIPE local e negociação
+              com contexto — sem estoque genérico nacional.
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-2 text-sm text-white/75">
+            <div className="mt-6 space-y-2 text-sm">
               <a
                 href={`mailto:${SITE_CONTACT.email}`}
-                className="inline-flex items-center rounded-full border border-white/15 px-3 py-1 transition hover:border-white/35 hover:text-white"
+                className="flex w-fit items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-medium text-white/90 transition hover:border-white/40 hover:bg-white/5"
               >
+                <span className="text-white/55">E-mail</span>
                 {SITE_CONTACT.email}
               </a>
 
               <a
                 href={SITE_CONTACT.phoneHref}
-                className="inline-flex items-center rounded-full border border-white/15 px-3 py-1 transition hover:border-white/35 hover:text-white"
+                className="flex w-fit items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-medium text-white/90 transition hover:border-white/40 hover:bg-white/5"
               >
+                <span className="text-white/55">Telefone</span>
                 {SITE_CONTACT.phoneDisplay}
               </a>
             </div>
 
             {socials.length > 0 ? (
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-6 flex flex-wrap gap-2">
                 {socials.map((social) => (
                   <FooterAnchor
                     key={social.href}
                     item={{ ...social, external: true }}
-                    className="inline-flex h-10 items-center rounded-full border border-white/15 px-4 text-sm font-medium text-white/85 transition hover:border-white/35 hover:text-white"
+                    className="inline-flex h-10 items-center rounded-full border border-white/20 px-4 text-sm font-semibold text-white/90 transition hover:border-white/45 hover:bg-white/10"
                   />
                 ))}
               </div>
@@ -149,15 +150,15 @@ export function PublicFooter() {
           </div>
 
           <FooterNavColumns
-            headingClass="text-sm font-extrabold uppercase tracking-[0.16em] text-white/90"
+            headingClass="text-[13px] font-extrabold uppercase tracking-[0.18em] text-white/95"
             sections={footerSections}
           />
         </div>
 
-        <div className="flex flex-col gap-3 pt-6 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
-          <p>© {currentYear} Carros na Cidade. Todos os direitos reservados.</p>
+        <div className="flex flex-col gap-4 pt-8 text-sm text-white/55 md:flex-row md:items-center md:justify-between">
+          <p className="font-medium">© {currentYear} Carros na Cidade. Todos os direitos reservados.</p>
 
-          <FooterLegalLinks className="flex flex-wrap gap-4" />
+          <FooterLegalLinks className="flex flex-wrap gap-x-6 gap-y-2" />
         </div>
       </div>
     </footer>
