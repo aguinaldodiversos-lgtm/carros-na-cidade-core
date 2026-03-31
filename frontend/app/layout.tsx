@@ -9,6 +9,8 @@ import { DEFAULT_CITY } from "@/lib/city/city-default";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 
+import { SITE_FAVICON_SRC, SITE_OG_IMAGE_PATH } from "@/lib/site/brand-assets";
+
 import { LayoutChrome } from "../components/shell/LayoutChrome";
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
@@ -24,9 +26,6 @@ const SITE_NAME = "Carros na Cidade";
 const DEFAULT_TITLE = "Carros na Cidade | Marketplace automotivo regional";
 const TITLE_TEMPLATE = "%s | Carros na Cidade";
 const DEFAULT_SITE_URL = "https://carrosnacidade.com";
-const DEFAULT_OG_IMAGE =
-  "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&h=630&q=82";
-
 const DEFAULT_DESCRIPTION =
   "Marketplace automotivo regional: carros por cidade e estado, listagens que respeitam o território, referência FIPE e negociação com contexto local — Carros na Cidade.";
 
@@ -109,7 +108,7 @@ export const metadata: Metadata = {
     description: DEFAULT_DESCRIPTION,
     images: [
       {
-        url: DEFAULT_OG_IMAGE,
+        url: SITE_OG_IMAGE_PATH,
         width: 1200,
         height: 630,
         alt: SITE_NAME,
@@ -120,12 +119,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
-    images: [DEFAULT_OG_IMAGE],
+    images: [SITE_OG_IMAGE_PATH],
   },
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-    shortcut: ["/favicon.svg"],
-    apple: [{ url: "/favicon.svg" }],
+    icon: [{ url: SITE_FAVICON_SRC, type: "image/svg+xml" }],
+    shortcut: [SITE_FAVICON_SRC],
+    apple: [{ url: SITE_FAVICON_SRC }],
   },
   manifest: "/site.webmanifest",
   appleWebApp: {

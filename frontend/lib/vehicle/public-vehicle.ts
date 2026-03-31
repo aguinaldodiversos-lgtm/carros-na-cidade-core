@@ -1,6 +1,7 @@
 import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 
 export type SellerDealer = {
   type: "dealer";
@@ -341,7 +342,7 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
     return {
       type: "dealer",
       name: sellerName,
-      logo: "/images/logo.svg",
+      logo: SITE_LOGO_SRC,
       address: cityDisplay,
       rating: 4.8,
       phone: sellerPhone,

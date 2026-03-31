@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { CityHeaderSelector } from "@/components/city/CityHeaderSelector";
 import { useCity } from "@/lib/city/CityContext";
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { getTerritorialRoutesForCity, SITE_ROUTES } from "@/lib/site/site-navigation";
 
 function cn(...classes: Array<string | false | null | undefined>) {
@@ -64,13 +65,13 @@ export function PublicHeader() {
               className="inline-flex shrink-0 items-center"
             >
               <Image
-                src="/images/logo.svg"
+                src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
                 width={200}
                 height={36}
                 priority
                 unoptimized
-                className="h-[32px] w-auto object-contain sm:h-[34px] md:h-[36px]"
+                className="h-[32px] w-auto max-w-[200px] object-contain object-left sm:h-[34px] md:h-[38px]"
               />
             </Link>
 

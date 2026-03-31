@@ -1,5 +1,6 @@
 import Link from "next/link";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import { SITE_ROUTES } from "@/lib/site/site-navigation";
 import type { ListingCar } from "@/lib/car-data";
@@ -48,7 +49,7 @@ export default function SellerSection({
     cityVehicles.length > 0;
 
   if (vehicle.seller.type === "dealer") {
-    const logo = vehicle.seller.logo || "/images/logo.svg";
+    const logo = vehicle.seller.logo || SITE_LOGO_SRC;
     const sellerName = vehicle.seller.name || "Loja parceira";
     const sellerAddress = vehicle.seller.address || vehicle.city;
     const rating = Number.isFinite(vehicle.seller.rating) ? vehicle.seller.rating : 4.8;

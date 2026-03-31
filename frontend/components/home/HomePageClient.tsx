@@ -3,6 +3,7 @@ import Link from "next/link";
 import { HeroCarousel, type HeroSlide } from "@/components/home/HeroCarousel";
 import { HomeSearchSection } from "@/components/search/HomeSearchSection";
 import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
+import { HOME_HERO_BANNER_IMAGES } from "@/lib/site/brand-assets";
 
 type FeaturedCity = {
   id: number;
@@ -47,26 +48,10 @@ interface HomePageClientProps {
   activeCityName: string;
 }
 
-/** Imagens estáveis (CDN) — evita banner quebrado quando não há assets locais. */
-const HERO_IMAGES = [
-  "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1920&q=82",
-  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1920&q=82",
-] as const;
-
-function buildHeroSlides(cityName: string, _citySlug: string): HeroSlide[] {
-  const title = `Encontre seu próximo carro em ${cityName}`;
-  const subtitle = "Milhares de ofertas esperando por você";
-  const cta = {
-    ctaLabel: "Pesquisar agora",
-    href: "#home-quick-search" as const,
-  };
-
-  return HERO_IMAGES.map((image, index) => ({
+function buildHeroSlides(): HeroSlide[] {
+  return HOME_HERO_BANNER_IMAGES.map((image, index) => ({
     id: `hero-${index + 1}`,
     image,
-    title,
-    subtitle,
-    ...cta,
   }));
 }
 
@@ -83,7 +68,7 @@ function resolveCurrentCitySlug(featuredCities: FeaturedCity[], activeSlug: stri
 export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePageClientProps) {
   const currentCity = resolveCurrentCityName(data.featuredCities || [], activeCityName);
   const currentCitySlug = resolveCurrentCitySlug(data.featuredCities || [], activeCitySlug);
-  const heroSlides = buildHeroSlides(currentCity, currentCitySlug);
+  const heroSlides = buildHeroSlides();
 
   const highlightTop = (data.highlightAds || []).slice(0, 4);
   const opportunityAds = (data.opportunityAds || []).slice(0, 4);
@@ -93,7 +78,7 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
       <section className="relative mx-auto w-full max-w-7xl px-4 pb-3 pt-5 sm:px-6 sm:pb-4 sm:pt-6 lg:px-8 lg:pt-8">
         <HeroCarousel slides={heroSlides} />
 
-        <div className="relative z-20 px-0 sm:px-0">
+        <div className="relative z-30 px-0 sm:px-0">
           <HomeSearchSection
             featuredCities={data.featuredCities || []}
             defaultCitySlug={currentCitySlug}

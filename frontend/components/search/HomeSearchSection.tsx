@@ -137,13 +137,12 @@ export function HomeSearchSection({
     return base;
   }, [featuredCities, defaultCitySlug, defaultCityLabel]);
 
-  const [citySlug, setCitySlug] = useState(
-    () => defaultCitySlug || cityOptions[0]?.value || DEFAULT_PUBLIC_CITY_SLUG
-  );
+  const [citySlug, setCitySlug] = useState(() => defaultCitySlug || DEFAULT_PUBLIC_CITY_SLUG);
 
+  /** Sincroniza só quando a cidade padrão vinda do servidor muda — não depender de `cityOptions` (nova referência a cada render quebrava os selects). */
   useEffect(() => {
-    setCitySlug(defaultCitySlug || cityOptions[0]?.value || DEFAULT_PUBLIC_CITY_SLUG);
-  }, [defaultCitySlug, cityOptions]);
+    setCitySlug(defaultCitySlug || DEFAULT_PUBLIC_CITY_SLUG);
+  }, [defaultCitySlug]);
 
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
@@ -180,7 +179,7 @@ export function HomeSearchSection({
   return (
     <section
       id="home-quick-search"
-      className="relative z-10 -mt-8 rounded-[20px] border border-[#dce3ee] bg-white px-4 py-6 shadow-[0_20px_48px_rgba(16,28,58,0.11)] sm:-mt-10 sm:px-6 sm:py-7 md:-mt-[52px]"
+      className="relative isolate z-30 -mt-8 rounded-[20px] border border-[#dce3ee] bg-white px-4 py-6 shadow-[0_20px_48px_rgba(16,28,58,0.11)] sm:-mt-10 sm:px-6 sm:py-7 md:-mt-[52px]"
       aria-labelledby="home-search-heading"
     >
       <h2 id="home-search-heading" className="sr-only">

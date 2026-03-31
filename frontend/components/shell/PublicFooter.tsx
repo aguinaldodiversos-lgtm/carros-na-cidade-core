@@ -6,6 +6,7 @@ import { useMemo } from "react";
 
 import { useCityOptional } from "@/lib/city/CityContext";
 import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/public-config";
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { buildFooterNavSections, SITE_CONTACT, SITE_ROUTES } from "@/lib/site/site-navigation";
 
 type FooterLinkItem = {
@@ -118,7 +119,7 @@ export function PublicFooter() {
             <div className="flex max-w-xl flex-col gap-3">
               <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
                 <img
-                  src="/images/logo.svg"
+                  src={SITE_LOGO_SRC}
                   alt="Carros na Cidade"
                   className="h-6 w-[120px] object-contain object-left brightness-0 invert sm:h-7 sm:w-[140px]"
                   loading="lazy"
@@ -168,7 +169,7 @@ export function PublicFooter() {
           <div>
             <Link href={SITE_ROUTES.home} className="block" aria-label="Carros na Cidade">
               <img
-                src="/images/logo.svg"
+                src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
                 className="h-11 w-[195px] object-contain object-left brightness-0 invert"
                 loading="lazy"

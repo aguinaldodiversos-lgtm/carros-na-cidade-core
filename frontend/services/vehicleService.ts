@@ -1,5 +1,6 @@
 import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { getCityProfile } from "@/services/marketService";
 
 export type SellerDealer = {
@@ -129,7 +130,7 @@ const vehiclesSeed: VehicleDetail[] = [
     seller: {
       type: "dealer",
       name: "Premium Motors Sao Paulo",
-      logo: "/images/logo.svg",
+      logo: SITE_LOGO_SRC,
       address: "Avenida dos Bandeirantes, 4200 - Sao Paulo/SP",
       rating: 4.8,
       phone: "5511998877665",
@@ -167,7 +168,7 @@ const vehiclesSeed: VehicleDetail[] = [
     seller: {
       type: "dealer",
       name: "Premium Motors Sao Paulo",
-      logo: "/images/logo.svg",
+      logo: SITE_LOGO_SRC,
       address: "Avenida dos Bandeirantes, 4200 - Sao Paulo/SP",
       rating: 4.8,
       phone: "5511998877665",

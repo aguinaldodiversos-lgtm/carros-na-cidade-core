@@ -100,7 +100,13 @@ async function run() {
     console.log(`✅ CSS copiado para standalone: ${standaloneCssCount} arquivo(s)`);
   }
 
-  const criticalAssets = ["favicon.svg", path.join("images", "logo.svg"), "site.webmanifest"];
+  const criticalAssets = [
+    path.join("images", "favicon.svg"),
+    path.join("images", "logo.svg"),
+    "site.webmanifest",
+    path.join("images", "home-banner-1.png"),
+    path.join("images", "home-banner-2.png"),
+  ];
 
   console.log("\n🔎 Verificando assets críticos...\n");
 

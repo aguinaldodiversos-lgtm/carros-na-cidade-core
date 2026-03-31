@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
+
 type HeaderProps = {
   boxed?: boolean;
 };
@@ -46,7 +48,7 @@ export default function Header({ boxed = false }: HeaderProps) {
           <div className="flex min-w-0 items-center gap-2 sm:gap-5">
             <Link href="/" className="relative block h-10 w-[154px] shrink-0 sm:h-11 sm:w-[188px]">
               <Image
-                src="/images/logo.svg"
+                src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
                 fill
                 priority
