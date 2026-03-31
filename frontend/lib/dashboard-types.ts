@@ -58,7 +58,19 @@ export type PublishEligibility = {
   reason: string | null;
 };
 
+/** Métricas agregadas (camelCase) — espelho opcional de `stats`. */
+export type DashboardMetrics = {
+  activeAds: number;
+  highlightedAds: number;
+  views: number;
+  leads: number;
+};
+
 export type DashboardPayload = {
+  /** Presente nas respostas da API quando o backend envia o envelope estendido. */
+  ok?: boolean;
+  accountType?: "PF" | "PJ";
+  metrics?: DashboardMetrics;
   user: DashboardUser;
   current_plan: DashboardPlanSummary | null;
   stats: DashboardStats;

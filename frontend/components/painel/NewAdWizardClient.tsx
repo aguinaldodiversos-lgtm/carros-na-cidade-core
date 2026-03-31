@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { fetchDashboardPayloadClient } from "@/lib/dashboard/fetch-dashboard-me-client";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import type { SessionAccountType } from "@/lib/auth/redirects";
 import SellWizardLayout from "./new-ad-wizard/SellWizardLayout";
@@ -229,10 +230,10 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/dashboard/me", { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) {
-          if (res.status === 401) {
+    fetchDashboardPayloadClient()
+      .then((result) => {
+        if (!result.ok) {
+          if (result.status === 401) {
             if (!cancelled) {
               setDashboard(null);
               setDashboardError(null);
@@ -241,11 +242,8 @@ export default function NewAdWizardClient({ initialType }: Props) {
           }
           throw new Error("Falha ao carregar painel.");
         }
-        return res.json() as Promise<DashboardPayload>;
-      })
-      .then((data) => {
-        if (!cancelled && data) {
-          setDashboard(data);
+        if (!cancelled) {
+          setDashboard(result.payload);
           setDashboardError(null);
         }
       })

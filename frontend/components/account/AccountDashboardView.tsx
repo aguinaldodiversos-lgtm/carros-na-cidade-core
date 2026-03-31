@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import AdsPremiumList from "@/components/account/AdsPremiumList";
 import BoostModal from "@/components/dashboard/BoostModal";
+import { fetchDashboardPayloadClient } from "@/lib/dashboard/fetch-dashboard-me-client";
 import type { DashboardAd, DashboardPayload } from "@/lib/dashboard-types";
 
 export type AccountDashboardViewMode = "home" | "ads";
@@ -36,10 +37,8 @@ export default function AccountDashboardView({
   }, [tab, data.active_ads, data.paused_ads, allAds]);
 
   const refreshDashboard = async () => {
-    const response = await fetch("/api/dashboard/me", { method: "GET", cache: "no-store" });
-    if (!response.ok) return;
-    const payload = (await response.json()) as DashboardPayload;
-    setData(payload);
+    const result = await fetchDashboardPayloadClient();
+    if (result.ok) setData(result.payload);
   };
 
   const updateStatus = async (ad: DashboardAd) => {

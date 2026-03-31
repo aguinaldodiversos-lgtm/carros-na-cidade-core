@@ -574,50 +574,42 @@ export async function getOwnedAd(userId, adId) {
   return normalizeDashboardAd(row);
 }
 
-export async function getDashboardPayload(userId) {
+/**
+ * @param {string} userId
+ * @param {{ accountType?: 'CPF' | 'CNPJ' }} [options] — tipo da conta (JWT/DB) para fallback seguro se a montagem falhar
+ */
+export async function getDashboardPayload(userId, options = {}) {
   const uid = String(userId);
+  const emptyBoost = BOOST_OPTIONS.map((option) => ({ ...option }));
+  const fallbackAccountType = options.accountType === "CNPJ" ? "CNPJ" : "CPF";
+
   try {
-    await ensureAdvertiserForUser(uid, { source: "dashboard" });
-  } catch (err) {
-    logger.warn(
-      {
-        err: err?.message || String(err),
-        userId: uid,
-        code: err?.code,
-      },
-      "[account.dashboard] ensureAdvertiserForUser falhou — seguindo com painel (anúncios podem estar vazios)"
-    );
-  }
+    try {
+      await ensureAdvertiserForUser(uid, { source: "dashboard" });
+    } catch (err) {
+      logger.warn(
+        {
+          err: err?.message || String(err),
+          userId: uid,
+          code: err?.code,
+        },
+        "[account.dashboard] ensureAdvertiserForUser falhou — seguindo com painel (anúncios podem estar vazios)"
+      );
+    }
 
-  const user = await getAccountUser(userId);
-  const [ads, publishEligibility] = await Promise.all([
-    listOwnedAds(userId),
-    resolvePublishEligibility(userId, user),
-  ]);
+    const user = await getAccountUser(userId);
+    const [ads, publishEligibility] = await Promise.all([
+      listOwnedAds(userId),
+      resolvePublishEligibility(userId, user),
+    ]);
 
-  const activeAds = ads.filter((ad) => ad.status === "active");
-  const pausedAds = ads.filter((ad) => ad.status === "paused");
-  const currentPlan = await resolveCurrentPlan(user);
-  const freeLimit = getFreeLimit(user.type, user.cnpj_verified);
-  const planLimit = currentPlan?.ad_limit ?? freeLimit;
+    const activeAds = ads.filter((ad) => ad.status === "active");
+    const pausedAds = ads.filter((ad) => ad.status === "paused");
+    const currentPlan = await resolveCurrentPlan(user);
+    const freeLimit = getFreeLimit(user.type, user.cnpj_verified);
+    const planLimit = currentPlan?.ad_limit ?? freeLimit;
 
-  return {
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      type: user.type,
-      cnpj_verified: user.cnpj_verified,
-    },
-    current_plan: currentPlan
-      ? {
-          id: currentPlan.id,
-          name: currentPlan.name,
-          ad_limit: currentPlan.ad_limit,
-          billing_model: currentPlan.billing_model,
-        }
-      : null,
-    stats: {
+    const stats = {
       active_ads: activeAds.length,
       paused_ads: pausedAds.length,
       featured_ads: activeAds.filter((ad) => ad.is_featured).length,
@@ -627,15 +619,105 @@ export async function getDashboardPayload(userId) {
       available_limit: Math.max(planLimit - activeAds.length, 0),
       plan_name: currentPlan?.name ?? "Plano gratuito",
       is_verified_store: user.type === "CNPJ" ? user.cnpj_verified : false,
-    },
-    publish_eligibility: {
-      allowed: publishEligibility.allowed,
-      reason: publishEligibility.reason,
-    },
-    active_ads: activeAds,
-    paused_ads: pausedAds,
-    boost_options: BOOST_OPTIONS.map((option) => ({ ...option })),
-  };
+    };
+
+    return {
+      ok: true,
+      accountType: user.type === "CNPJ" ? "PJ" : "PF",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        type: user.type,
+        cnpj_verified: user.cnpj_verified,
+      },
+      advertiser: null,
+      current_plan: currentPlan
+        ? {
+            id: currentPlan.id,
+            name: currentPlan.name,
+            ad_limit: currentPlan.ad_limit,
+            billing_model: currentPlan.billing_model,
+          }
+        : null,
+      plan: currentPlan
+        ? {
+            id: currentPlan.id,
+            name: currentPlan.name,
+            ad_limit: currentPlan.ad_limit,
+            billing_model: currentPlan.billing_model,
+          }
+        : null,
+      stats,
+      metrics: {
+        activeAds: stats.active_ads,
+        highlightedAds: stats.featured_ads,
+        views: stats.total_views,
+        leads: 0,
+      },
+      publish_eligibility: {
+        allowed: publishEligibility.allowed,
+        reason: publishEligibility.reason,
+      },
+      active_ads: activeAds,
+      paused_ads: pausedAds,
+      recentAds: [...activeAds, ...pausedAds].slice(0, 12),
+      alerts: [],
+      boost_options: emptyBoost,
+    };
+  } catch (err) {
+    logger.error(
+      {
+        err: err?.message || String(err),
+        userId: uid,
+        code: err?.code,
+      },
+      "[account.dashboard] getDashboardPayload falhou — retornando painel minimo"
+    );
+
+    const freeLimit = getFreeLimit(fallbackAccountType, false);
+
+    return {
+      ok: true,
+      accountType: fallbackAccountType === "CNPJ" ? "PJ" : "PF",
+      user: {
+        id: uid,
+        name: "Usuario",
+        email: "",
+        type: fallbackAccountType,
+        cnpj_verified: false,
+      },
+      advertiser: null,
+      current_plan: null,
+      plan: null,
+      stats: {
+        active_ads: 0,
+        paused_ads: 0,
+        featured_ads: 0,
+        total_views: 0,
+        free_limit: freeLimit,
+        plan_limit: freeLimit,
+        available_limit: freeLimit,
+        plan_name: "Plano gratuito",
+        is_verified_store: false,
+      },
+      metrics: {
+        activeAds: 0,
+        highlightedAds: 0,
+        views: 0,
+        leads: 0,
+      },
+      publish_eligibility: {
+        allowed: false,
+        reason: "Nao foi possivel carregar os dados da conta agora. Tente novamente.",
+      },
+      active_ads: [],
+      paused_ads: [],
+      recentAds: [],
+      alerts: [],
+      boost_options: emptyBoost,
+    };
+  }
 }
 
 /**

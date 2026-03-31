@@ -5,6 +5,7 @@ import Link from "next/link";
 import AdCard from "@/components/dashboard/AdCard";
 import BoostModal from "@/components/dashboard/BoostModal";
 import DashboardStats from "@/components/dashboard/DashboardStats";
+import { fetchDashboardPayloadClient } from "@/lib/dashboard/fetch-dashboard-me-client";
 import type { DashboardAd, DashboardPayload } from "@/lib/dashboard-types";
 
 type DashboardClientProps = {
@@ -31,10 +32,8 @@ export default function DashboardClient({
   const defaultBoostAd = allAds[0] ?? null;
 
   const refreshDashboard = async () => {
-    const response = await fetch("/api/dashboard/me", { method: "GET", cache: "no-store" });
-    if (!response.ok) return;
-    const payload = (await response.json()) as DashboardPayload;
-    setData(payload);
+    const result = await fetchDashboardPayloadClient();
+    if (result.ok) setData(result.payload);
   };
 
   const updateStatus = async (ad: DashboardAd) => {

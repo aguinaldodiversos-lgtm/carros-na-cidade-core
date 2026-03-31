@@ -37,7 +37,8 @@ router.use(authMiddleware);
 router.get(
   "/dashboard",
   asyncHandler(async (req, res) => {
-    const payload = await getDashboardPayload(req.user.id);
+    const accountType = req.user?.account_type === "CNPJ" ? "CNPJ" : "CPF";
+    const payload = await getDashboardPayload(req.user.id, { accountType });
     res.json(payload);
   })
 );

@@ -27,7 +27,10 @@ export async function GET(request: NextRequest) {
       res.cookies.set(AUTH_COOKIE_NAME, ensured.newCookie, getSessionCookieOptions());
     }
     return res;
-  } catch {
+  } catch (error) {
+    if (process.env.DASHBOARD_DEBUG === "1") {
+      console.error("[GET /api/dashboard/me]", error);
+    }
     return NextResponse.json({ error: "Falha ao carregar dashboard" }, { status: 502 });
   }
 }

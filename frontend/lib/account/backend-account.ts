@@ -1,6 +1,7 @@
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import { normalizeDashboardPayload } from "@/lib/dashboard/normalize-dashboard-payload";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBoostOptions } from "@/services/adService";
 import type { SubscriptionPlan } from "@/services/planStore";
 import type { SessionData } from "@/services/sessionService";
 
@@ -234,15 +235,46 @@ export async function fetchPlans(options: { type?: "CPF" | "CNPJ"; activeOnly?: 
   return payload.plans;
 }
 
+function buildFallbackDashboardFromSession(session: SessionData): DashboardPayload {
+  const isCnpj = session.type === "CNPJ";
+  const freeLimit = isCnpj ? 0 : 3;
+  return {
+    user: {
+      id: session.id,
+      name: session.name,
+      email: session.email,
+      type: session.type,
+      cnpj_verified: false,
+    },
+    current_plan: null,
+    stats: {
+      active_ads: 0,
+      paused_ads: 0,
+      featured_ads: 0,
+      total_views: 0,
+      free_limit: freeLimit,
+      plan_limit: freeLimit,
+      available_limit: freeLimit,
+      plan_name: "Plano gratuito",
+      is_verified_store: false,
+    },
+    publish_eligibility: {
+      allowed: false,
+      reason: "Resposta do servidor em formato inesperado. Atualize a página ou tente novamente.",
+    },
+    active_ads: [],
+    paused_ads: [],
+    boost_options: getBoostOptions(),
+  };
+}
+
 export async function fetchDashboard(session: SessionData) {
   const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
     accessToken: assertAccessToken(session),
   });
   const normalized = normalizeDashboardPayload(raw);
-  if (!normalized) {
-    throw new Error("Resposta do dashboard em formato inesperado ou sem dados de usuário.");
-  }
-  return normalized;
+  if (normalized) return normalized;
+  return buildFallbackDashboardFromSession(session);
 }
 
 export async function fetchOwnedAd(session: SessionData, adId: string) {
