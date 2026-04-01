@@ -87,7 +87,14 @@ export default function AdsPremiumList({
                 >
                   <td className="px-4 py-3 align-middle">
                     <div className="relative h-14 w-24 overflow-hidden rounded-lg bg-[#eef2f8]">
-                      <Image src={ad.image_url} alt="" fill className="object-cover" sizes="96px" />
+                      <Image
+                        src={ad.image_url}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                        unoptimized={!ad.image_url.startsWith("/")}
+                      />
                     </div>
                   </td>
                   <td className="max-w-[280px] px-4 py-3 align-middle">

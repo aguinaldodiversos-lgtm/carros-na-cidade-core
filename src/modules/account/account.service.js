@@ -482,6 +482,39 @@ function getFreeLimit(accountType, cnpjVerified) {
   return cnpjVerified ? 20 : 0;
 }
 
+function primaryImageUrlFromAdRow(row) {
+  const direct = row?.image_url != null ? String(row.image_url).trim() : "";
+  if (direct) return direct;
+
+  const raw = row?.images;
+  if (Array.isArray(raw)) {
+    const u = raw.find((x) => typeof x === "string" && x.trim());
+    return u ? u.trim() : "";
+  }
+  if (raw && typeof raw === "object") {
+    try {
+      const arr = Array.isArray(raw) ? raw : null;
+      if (arr?.length) {
+        const u = arr.find((x) => typeof x === "string" && x.trim());
+        if (u) return u.trim();
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === "string") {
+        return parsed[0].trim();
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return "";
+}
+
 function normalizeDashboardAd(row) {
   const featuredUntil = toIsoStringOrNull(row.highlight_until);
   const createdAt = row.created_at ? new Date(row.created_at) : new Date();
@@ -497,6 +530,8 @@ function normalizeDashboardAd(row) {
     !Number.isNaN(featuredUntilMs) &&
     featuredUntilMs > Date.now();
 
+  const imageUrl = primaryImageUrlFromAdRow(row) || "/images/vehicle-placeholder.svg";
+
   return {
     id: String(row.id),
     user_id: String(
@@ -504,7 +539,7 @@ function normalizeDashboardAd(row) {
     ),
     title: row.title?.trim() || "Anuncio sem titulo",
     price: toNumber(row.price, 0),
-    image_url: row.image_url || "/images/banner1.jpg",
+    image_url: imageUrl,
     status: row.status === "paused" ? "paused" : "active",
     is_featured: isFeatured,
     featured_until: featuredUntil,
@@ -526,7 +561,8 @@ export async function listOwnedAds(userId) {
         a.status,
         a.highlight_until,
         a.created_at,
-        a.updated_at
+        a.updated_at,
+        a.images
       FROM ads a
       JOIN advertisers adv ON adv.id = a.advertiser_id
       WHERE a.status IN ('active', 'paused')
@@ -556,7 +592,8 @@ export async function getOwnedAd(userId, adId) {
       a.status,
       a.highlight_until,
       a.created_at,
-      a.updated_at
+      a.updated_at,
+      a.images
     FROM ads a
     JOIN advertisers adv ON adv.id = a.advertiser_id
     WHERE a.id = $1

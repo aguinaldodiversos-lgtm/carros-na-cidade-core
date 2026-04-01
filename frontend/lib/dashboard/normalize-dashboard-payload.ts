@@ -126,6 +126,17 @@ function normalizeStats(raw: unknown): DashboardStats {
   };
 }
 
+function pickDashboardAdImageUrl(raw: Record<string, unknown>): string {
+  const direct = toStr(raw.image_url, "").trim();
+  if (direct) return direct;
+  const imgs = raw.images;
+  if (Array.isArray(imgs)) {
+    const first = imgs.find((x) => typeof x === "string" && x.trim());
+    if (first) return String(first).trim();
+  }
+  return "/images/vehicle-placeholder.svg";
+}
+
 function normalizeAd(raw: unknown): DashboardAd | null {
   if (!isRecord(raw)) return null;
   const id = toStr(raw.id);
@@ -137,7 +148,7 @@ function normalizeAd(raw: unknown): DashboardAd | null {
     user_id: toStr(raw.user_id),
     title: toStr(raw.title, "Anúncio"),
     price: toNum(raw.price, 0),
-    image_url: toStr(raw.image_url, "/images/vehicle-placeholder.svg"),
+    image_url: pickDashboardAdImageUrl(raw),
     status,
     is_featured: Boolean(raw.is_featured),
     featured_until: typeof raw.featured_until === "string" ? raw.featured_until : null,

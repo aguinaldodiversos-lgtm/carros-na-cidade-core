@@ -51,7 +51,13 @@ export default function AdCard({ ad, busy = false, onToggleStatus, onDelete }: A
   return (
     <article className="overflow-hidden rounded-2xl border border-[#dfe4ef] bg-white shadow-[0_3px_18px_rgba(10,20,40,0.07)]">
       <div className="relative h-[180px] w-full">
-        <Image src={ad.image_url} alt={ad.title} fill className="object-cover" />
+        <Image
+          src={ad.image_url}
+          alt={ad.title}
+          fill
+          className="object-cover"
+          unoptimized={!ad.image_url.startsWith("/")}
+        />
       </div>
 
       <div className="space-y-3 p-4">
