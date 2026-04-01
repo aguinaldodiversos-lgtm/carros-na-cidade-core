@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { AccountType } from "@/lib/dashboard-types";
 import { MW_ACCESS_TOKEN_HEADER, MW_REFRESH_TOKEN_HEADER } from "@/lib/auth/session-headers";
 
@@ -145,4 +145,38 @@ export function getSessionCookieOptions(maxAgeSeconds = DEFAULT_DURATION_SECONDS
     path: "/",
     maxAge: maxAgeSeconds,
   };
+}
+
+/**
+ * Remove o cookie de sessão (mesmo path/flags que `getSessionCookieOptions`, maxAge 0).
+ * Usar em logout e quando o refresh token falha para não manter sessão morta no navegador.
+ */
+export function getClearSessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: 0,
+  };
+}
+
+/**
+ * 401 com limpeza do cookie `cnc_session` quando ainda há valor no request,
+ * para não deixar o browser preso a sessão inválida/expirada (comportamento típico em aba normal vs anônima).
+ */
+export function applyUnauthorizedWithSessionCleanup(
+  request: NextRequest,
+  body: Record<string, unknown> = { error: "Nao autenticado" }
+) {
+  const res = NextResponse.json(body, { status: 401 });
+  if (request.cookies.get(AUTH_COOKIE_NAME)?.value) {
+    res.cookies.set(AUTH_COOKIE_NAME, "", getClearSessionCookieOptions());
+  }
+  return res;
+}
+
+export function applyPrivateNoStoreHeaders(res: NextResponse) {
+  res.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
+  return res;
 }

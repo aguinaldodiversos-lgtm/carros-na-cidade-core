@@ -3,6 +3,7 @@ import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { authenticateUser } from "@/services/authService";
 import {
   AUTH_COOKIE_NAME,
+  applyPrivateNoStoreHeaders,
   createSessionToken,
   getSessionCookieOptions,
 } from "@/services/sessionService";
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
     });
 
     response.cookies.set(AUTH_COOKIE_NAME, sessionToken, getSessionCookieOptions());
+    applyPrivateNoStoreHeaders(response);
 
     return response;
   } catch (error) {

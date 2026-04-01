@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
 
 type SubmitState =
   | { tone: "idle"; message: string }
@@ -45,8 +46,11 @@ export default function RegisterPageClient() {
       setIsSubmitting(true);
       setSubmitState({ tone: "idle", message: "" });
 
+      clearClientAuthArtifacts();
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },

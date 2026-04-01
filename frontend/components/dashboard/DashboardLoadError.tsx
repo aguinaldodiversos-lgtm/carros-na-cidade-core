@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
 
 /**
  * Falha ao carregar dados do painel (SSR ou API) — sessão pode estar ok; permite retry.
@@ -8,6 +10,19 @@ import { usePathname } from "next/navigation";
 export function DashboardLoadError() {
   const pathname = usePathname() || "/dashboard";
   const loginHref = `/login?next=${encodeURIComponent(pathname)}`;
+  const [ending, setEnding] = useState(false);
+
+  async function endSessionAndLogin() {
+    if (ending) return;
+    setEnding(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      clearClientAuthArtifacts();
+      window.location.assign(loginHref);
+    } catch {
+      setEnding(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -36,6 +51,14 @@ export function DashboardLoadError() {
           >
             Entrar de novo
           </a>
+          <button
+            type="button"
+            onClick={endSessionAndLogin}
+            disabled={ending}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            {ending ? "Encerrando…" : "Encerrar sessão e entrar de novo"}
+          </button>
         </div>
       </div>
     </div>

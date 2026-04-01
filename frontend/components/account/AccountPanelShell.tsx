@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { AccountLogoutButton } from "@/components/account/AccountLogoutButton";
 
 export type AccountPanelVariant = "pf" | "lojista";
 
@@ -242,6 +243,7 @@ export default function AccountPanelShell({
               >
                 ← Voltar ao site
               </Link>
+              <AccountLogoutButton className="mt-3 block w-full px-1 text-left text-xs font-bold text-[#6b7280] hover:text-[#0e62d8] disabled:opacity-60" />
             </div>
           </aside>
 

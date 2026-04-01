@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
 
 type LoginResponse = {
   error?: string;
@@ -28,8 +29,11 @@ export default function LoginForm({ next }: LoginFormProps) {
     setError("");
 
     try {
+      clearClientAuthArtifacts();
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
