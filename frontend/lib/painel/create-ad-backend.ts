@@ -14,9 +14,8 @@ import type { AccountType } from "@/lib/dashboard-types";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 
 /**
- * Campos do wizard usados exclusivamente para montar o corpo de POST /api/ads.
- * Outros campos do FormData (fotos, opcionais, etc.) são ignorados por esta camada até
- * existir endpoint de mídia no mesmo contrato.
+ * Campos do wizard usados para montar o corpo de POST /api/ads.
+ * Fotos são salvas em `public/uploads/ads` pelo route handler e enviadas como `images[]`.
  */
 export type PublishWizardInput = {
   cityId: string;
@@ -57,6 +56,7 @@ export type BackendCreateAdPayload = {
   fuel_type?: string | null;
   transmission?: string | null;
   below_fipe: boolean;
+  images?: string[];
 };
 
 export function parsePriceBr(value: string): number {
@@ -105,7 +105,8 @@ function buildDefaultTitle(n: PublishWizardInput): string {
 export function buildBackendCreateAdPayload(
   n: PublishWizardInput,
   resolved: ResolvedCityRow,
-  accountType: AccountType
+  accountType: AccountType,
+  imageUrls: string[] = []
 ): BackendCreateAdPayload {
   const price = parsePriceBr(n.price);
   const mileage = parseMileageInt(n.mileage);
@@ -124,6 +125,11 @@ export function buildBackendCreateAdPayload(
 
   const description = n.description?.trim() || null;
 
+  const cleanedUrls = imageUrls
+    .map((u) => u.trim())
+    .filter((u) => u.length > 0)
+    .slice(0, 24);
+
   return {
     title,
     description,
@@ -140,6 +146,7 @@ export function buildBackendCreateAdPayload(
     fuel_type: n.fuel?.trim() || null,
     transmission: n.transmission?.trim() || null,
     below_fipe: belowFipe,
+    ...(cleanedUrls.length > 0 ? { images: cleanedUrls } : {}),
   };
 }
 

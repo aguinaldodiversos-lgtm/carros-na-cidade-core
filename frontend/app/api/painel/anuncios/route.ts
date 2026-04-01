@@ -7,6 +7,7 @@ import {
   fetchResolvedCityByIdFromBackend,
   type PublishWizardInput,
 } from "@/lib/painel/create-ad-backend";
+import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import {
   AUTH_COOKIE_NAME,
@@ -155,7 +156,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = buildBackendCreateAdPayload(normalized, resolved, accountType);
+    const photoUrls = await saveWizardPhotosToPublic(source);
+    const attemptedPhotos = source
+      .getAll("photos")
+      .filter((f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0);
+
+    if (photoUrls.length === 0 && attemptedPhotos.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Não foi possível salvar as fotos. Use JPG ou PNG (máx. 6 MB por foto).",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (photoUrls.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Adicione pelo menos uma foto do veículo para publicar.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = buildBackendCreateAdPayload(normalized, resolved, accountType, photoUrls);
     const url = resolveBackendApiUrl("/api/ads");
     if (!url) {
       return NextResponse.json({ ok: false, message: "URL do backend inválida." }, { status: 500 });

@@ -27,6 +27,8 @@ const CreateAdSchema = z.object({
   fuel_type: fuelTypeZodField,
   transmission: transmissionZodField,
   below_fipe: z.coerce.boolean().optional().default(false),
+  /** URLs públicas (relativas ao portal ou absolutas) — ordem = capa primeiro. */
+  images: z.array(z.string().min(1).max(2048)).max(24).optional().default([]),
 });
 
 const UpdateAdSchema = CreateAdSchema.partial();

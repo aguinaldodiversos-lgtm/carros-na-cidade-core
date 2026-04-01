@@ -17,6 +17,7 @@ const UPDATE_FIELDS = [
   "fuel_type",
   "transmission",
   "below_fipe",
+  "images",
   "highlight_until",
   "plan",
   "status",
@@ -24,6 +25,11 @@ const UPDATE_FIELDS = [
 
 export async function createAd(data) {
   const row = normalizeAdVehicleFieldsForPersistence(data, { partial: false });
+
+  const images =
+    Array.isArray(row.images) && row.images.length > 0
+      ? row.images.filter((u) => typeof u === "string" && u.trim())
+      : [];
 
   const query = `
     INSERT INTO ads (
@@ -43,6 +49,7 @@ export async function createAd(data) {
       fuel_type,
       transmission,
       below_fipe,
+      images,
       status,
       plan,
       slug,
@@ -50,7 +57,7 @@ export async function createAd(data) {
       updated_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW(),NOW()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,NOW(),NOW()
     )
     RETURNING *;
   `;
@@ -72,6 +79,7 @@ export async function createAd(data) {
     row.fuel_type || null,
     row.transmission || null,
     Boolean(row.below_fipe),
+    JSON.stringify(images),
     row.status || "active",
     row.plan || "free",
     row.slug,
