@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import AccountDashboardView from "@/components/account/AccountDashboardView";
-import { DashboardLoadError } from "@/components/dashboard/DashboardLoadError";
+import { DashboardClientRecovery } from "@/components/dashboard/DashboardClientRecovery";
 import {
   loadDashboardPayload,
   requireLojistaDashboardSession,
@@ -19,7 +19,7 @@ export default async function LojaMeusAnunciosPage() {
   const payload = await loadDashboardPayload(session);
 
   if (!payload) {
-    return <DashboardLoadError />;
+    return <DashboardClientRecovery variant="lojista" mode="ads" />;
   }
 
   return <AccountDashboardView initialData={payload} variant="lojista" mode="ads" />;

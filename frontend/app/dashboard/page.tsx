@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import AccountDashboardView from "@/components/account/AccountDashboardView";
-import { DashboardLoadError } from "@/components/dashboard/DashboardLoadError";
+import { DashboardClientRecovery } from "@/components/dashboard/DashboardClientRecovery";
 import { loadDashboardPayload, requirePfDashboardSession } from "@/lib/account/dashboard-session";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   const payload = await loadDashboardPayload(session);
 
   if (!payload) {
-    return <DashboardLoadError />;
+    return <DashboardClientRecovery variant="pf" mode="home" />;
   }
 
   return <AccountDashboardView initialData={payload} variant="pf" mode="home" />;

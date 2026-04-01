@@ -3,13 +3,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { CityHeaderSelector } from "@/components/city/CityHeaderSelector";
 import { useCity } from "@/lib/city/CityContext";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
-import { getTerritorialRoutesForCity, isNavLinkActive, SITE_ROUTES } from "@/lib/site/site-navigation";
+import {
+  getTerritorialRoutesForCity,
+  isNavLinkActive,
+  SITE_ROUTES,
+} from "@/lib/site/site-navigation";
+import type { AccountType } from "@/lib/dashboard-types";
+
+function dashboardHrefForAccountType(type: AccountType) {
+  return type === "CNPJ" ? "/dashboard-loja" : "/dashboard";
+}
 
 function HeartIcon() {
   return (
@@ -75,6 +84,28 @@ function HeaderNavLink({
 export function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { city, openCityPicker } = useCity();
+  const [sessionUser, setSessionUser] = useState<{ name: string; type: AccountType } | null | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json() as Promise<{ user: { name: string; type: AccountType } }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setSessionUser(data?.user ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const routes = useMemo(() => getTerritorialRoutesForCity(city.slug), [city.slug]);
 
@@ -135,12 +166,21 @@ export function PublicHeader() {
               >
                 <HeartIcon />
               </Link>
-              <Link
-                href={SITE_ROUTES.login}
-                className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:px-5 xl:text-[14px]"
-              >
-                Entrar
-              </Link>
+              {sessionUser ? (
+                <Link
+                  href={dashboardHrefForAccountType(sessionUser.type)}
+                  className="ml-1 inline-flex h-10 max-w-[160px] items-center justify-center truncate rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:max-w-[200px] xl:px-5 xl:text-[14px]"
+                >
+                  Minha conta
+                </Link>
+              ) : (
+                <Link
+                  href={SITE_ROUTES.login}
+                  className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:px-5 xl:text-[14px]"
+                >
+                  Entrar
+                </Link>
+              )}
             </nav>
 
             <div className="flex items-center gap-2 md:hidden">
@@ -151,12 +191,21 @@ export function PublicHeader() {
               >
                 {city.label}
               </button>
-              <Link
-                href={SITE_ROUTES.login}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
-              >
-                Entrar
-              </Link>
+              {sessionUser ? (
+                <Link
+                  href={dashboardHrefForAccountType(sessionUser.type)}
+                  className="inline-flex h-10 max-w-[120px] items-center justify-center truncate rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
+                >
+                  Conta
+                </Link>
+              ) : (
+                <Link
+                  href={SITE_ROUTES.login}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
+                >
+                  Entrar
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => setMobileOpen((s) => !s)}
