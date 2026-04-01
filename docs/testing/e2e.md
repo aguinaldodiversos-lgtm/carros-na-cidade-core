@@ -83,6 +83,8 @@ Na raiz: `npm run e2e:smoke`. Ver também [coverage-and-integration.md](./covera
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | `main-flow.spec.ts`            | **PF**: cadastro → painel → wizard → busca API → painel → `/anuncios` → **`/veiculo/[slug]`** |
 | `10-login-ad-publish.spec.ts`  | Login fixo → wizard → publicar                                                                |
+| `register-minimal-to-publish.spec.ts` | **Cadastro mínimo** (e-mail+senha) → gate CPF → wizard → publicar (`npm run test:e2e:register-publish`) |
+| `user-isolation-api.spec.ts` | Dois cadastros → `GET /api/dashboard/me` com `user.id` distinto por cookie (`npm run test:e2e:isolation`) |
 | `20-login-ad-checkout.spec.ts` | Login → wizard → planos/checkout                                                              |
 | `anunciar-redirect.spec.ts`    | Redirect legado `/painel/anuncios/novo`                                                       |
 | `critical-pj-flow.spec.ts`     | PJ opcional (skipped sem credenciais)                                                         |
@@ -97,6 +99,10 @@ Sem `npm run dev` no frontend, **todos os testes falham** em `ensureDevServerUp`
 - **Mercado Pago / planos**: `20-login-ad-checkout` depende de rotas de pagamento configuradas.
 - **Credenciais locais**: com `npm run e2e:prepare`, o utilizador fixo `cpf@carrosnacidade.com` / `123456` existe na base; override com `E2E_EMAIL` / `E2E_PASSWORD` se necessário.
 - **FIPE**: wizard depende de API FIPE (via Next); falhas de rede externa quebram o passo de marcas/modelos.
+
+## Edge cases e backlog de QA
+
+Lista detalhada de cenários de borda, lacunas de cobertura e tickets sugeridos (**QA-101…**): [qa-edge-cases.md](./qa-edge-cases.md).
 
 ## Integração com CI
 

@@ -44,7 +44,7 @@ export async function authMiddleware(req, res, next) {
         id,
         role,
         plan,
-        COALESCE(document_type, 'cpf') AS document_type
+        document_type
       FROM users
       WHERE id = $1
       LIMIT 1
@@ -58,10 +58,13 @@ export async function authMiddleware(req, res, next) {
       throw new AppError("Usuário inválido", 401);
     }
 
-    const docType = String(user.document_type ?? "cpf")
-      .trim()
-      .toLowerCase();
-    const accountType = docType === "cnpj" ? "CNPJ" : "CPF";
+    const rawDoc = user.document_type;
+    const accountType =
+      rawDoc == null || String(rawDoc).trim() === ""
+        ? "pending"
+        : String(rawDoc).trim().toLowerCase() === "cnpj"
+          ? "CNPJ"
+          : "CPF";
 
     req.user = {
       id: String(user.id),

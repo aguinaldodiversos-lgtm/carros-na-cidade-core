@@ -60,7 +60,12 @@ export default function AccountDashboardView({
 
   const firstName = data.user.name.trim().split(/\s+/)[0] || data.user.name;
   const planLabel = data.current_plan?.name ?? data.stats.plan_name;
-  const accountBadge = variant === "pf" ? "Pessoa física · CPF" : "Lojista · CNPJ";
+  const accountBadge =
+    variant === "pf"
+      ? data.user.type === "pending"
+        ? "Conta — complete seus dados ao criar o primeiro anúncio"
+        : "Pessoa física · CPF"
+      : "Lojista · CNPJ";
 
   return (
     <div className="space-y-8">

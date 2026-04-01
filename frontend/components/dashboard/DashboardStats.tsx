@@ -1,8 +1,8 @@
-import type { DashboardStats as DashboardStatsType } from "@/lib/dashboard-types";
+import type { AccountType, DashboardStats as DashboardStatsType } from "@/lib/dashboard-types";
 
 type DashboardStatsProps = {
   stats: DashboardStatsType;
-  accountType: "CPF" | "CNPJ";
+  accountType: AccountType;
 };
 
 function StatCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
@@ -16,10 +16,13 @@ function StatCard({ label, value, helper }: { label: string; value: string; help
 }
 
 export default function DashboardStats({ stats, accountType }: DashboardStatsProps) {
-  const limitLabel =
-    accountType === "CPF"
-      ? `${stats.available_limit} de ${stats.plan_limit} vagas restantes`
-      : `${stats.available_limit} de ${stats.plan_limit} vagas restantes`;
+  const limitLabel = `${stats.available_limit} de ${stats.plan_limit} vagas restantes`;
+  const limitHelper =
+    accountType === "CNPJ"
+      ? "Maximo gratuito: 20 anuncios com CNPJ verificado"
+      : accountType === "pending"
+        ? "Complete CPF ou CNPJ para publicar; limite gratuito segue as regras PF apos cadastro."
+        : "Maximo gratuito: 3 anuncios por CPF";
 
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -31,11 +34,7 @@ export default function DashboardStats({ stats, accountType }: DashboardStatsPro
       <StatCard
         label="Limite disponivel"
         value={limitLabel}
-        helper={
-          accountType === "CPF"
-            ? "Maximo gratuito: 3 anuncios por CPF"
-            : "Maximo gratuito: 20 anuncios com CNPJ verificado"
-        }
+        helper={limitHelper}
       />
       <StatCard
         label="Plano atual"

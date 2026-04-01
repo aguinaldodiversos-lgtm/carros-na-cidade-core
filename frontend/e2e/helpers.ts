@@ -117,6 +117,74 @@ export type RegisterCredentials = {
  * Cadastro via BFF `POST /api/auth/register` (mesmo payload que o formulário).
  * Usa `page.request` para evitar descompasso React/DOM no Playwright; define cookie de sessão no contexto.
  */
+export type MinimalRegisterCredentials = {
+  email: string;
+  password: string;
+};
+
+/**
+ * Cadastro mínimo (e-mail + senha), via BFF — mesmo contrato da página de registro.
+ */
+export async function registerMinimalUserViaApi(page: Page, cred: MinimalRegisterCredentials) {
+  const res = await page.request.post("/api/auth/register", {
+    data: {
+      email: cred.email,
+      password: cred.password,
+    },
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok()) {
+    const body = await res.text();
+    throw new Error(`Cadastro mínimo rejeitado: HTTP ${res.status()} — ${body.slice(0, 600)}`);
+  }
+
+  const payload = (await res.json()) as { redirect_to?: string };
+  const dest = payload.redirect_to ?? "/dashboard";
+  await page.goto(dest, { waitUntil: "domcontentloaded", timeout: 120_000 });
+  await page.waitForTimeout(800);
+}
+
+/**
+ * Conta `pending`: preenche CPF/nome no gate antes do wizard FIPE.
+ */
+export async function completePendingProfileIfNeeded(page: Page) {
+  await page.waitForFunction(
+    () => {
+      const headings = Array.from(document.querySelectorAll("h1")).map((el) => el.textContent || "");
+      return headings.some(
+        (t) =>
+          /Dados do veículo/i.test(t) || /Complete seu cadastro para anunciar/i.test(t)
+      );
+    },
+    { timeout: 120_000 }
+  );
+
+  const vehicle = page.getByRole("heading", { level: 1, name: /Dados do veículo/i });
+  if (await vehicle.isVisible()) {
+    return;
+  }
+
+  await page.getByPlaceholder(/Como aparecerá nos anúncios/i).fill(`E2E mínimo ${Date.now()}`);
+  const cpf = generateValidCpfDigits();
+  await page.getByPlaceholder("000.000.000-00").fill(formatCpfMask(cpf));
+
+  const verifyPromise = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/auth/verify-document") &&
+      r.request().method() === "POST" &&
+      r.ok(),
+    { timeout: 120_000 }
+  );
+
+  await page.getByRole("button", { name: /Salvar e continuar/i }).click();
+  await verifyPromise;
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Dados do veículo/i })
+  ).toBeVisible({ timeout: 120_000 });
+}
+
 export async function registerNewUserViaUi(page: Page, cred: RegisterCredentials) {
   const phoneDigits = cred.phone.replace(/\D/g, "").slice(0, 11);
   const cpfDigits = cred.cpfDigits.replace(/\D/g, "").slice(0, 11);

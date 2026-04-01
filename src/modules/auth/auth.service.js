@@ -6,7 +6,6 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import { logLoginAttempt } from "./auth.audit.service.js";
-import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
 import {
   validateUserForLogin,
   handleFailedLogin,
@@ -89,8 +88,19 @@ function buildSessionUser(user) {
     throw new AppError("Usuário inválido para sessão.", 500);
   }
 
-  const documentType = normalizeDocumentType(user.document_type) || "cpf";
-  const accountType = documentType === "cnpj" ? "CNPJ" : "CPF";
+  const rawDoc = user.document_type;
+  const normalizedDoc =
+    rawDoc != null && String(rawDoc).trim() !== ""
+      ? normalizeDocumentType(user.document_type)
+      : null;
+
+  let accountType;
+  if (!normalizedDoc) {
+    accountType = "pending";
+  } else {
+    accountType = normalizedDoc === "cnpj" ? "CNPJ" : "CPF";
+  }
+
   const documentVerified = Boolean(user.document_verified);
 
   return {
@@ -98,9 +108,9 @@ function buildSessionUser(user) {
     name: normalizeString(user.name) || "Usuario",
     email: normalizeEmail(user.email),
     type: accountType,
-    document_type: documentType,
+    document_type: normalizedDoc ?? undefined,
     document_verified: documentVerified,
-    cnpj_verified: documentType === "cnpj" ? documentVerified : false,
+    cnpj_verified: accountType === "CNPJ" ? documentVerified : false,
     role: normalizeString(user.role) || "user",
     plan: normalizeString(user.plan) || "free",
     email_verified: Boolean(user.email_verified ?? user.is_email_verified ?? false),
@@ -142,7 +152,12 @@ export async function register(
 
   const normalizedEmail = normalizeEmail(email);
   const normalizedPassword = normalizeString(password);
-  const normalizedName = normalizeString(name) || null;
+  const normalizedName =
+    normalizeString(name) ||
+    (() => {
+      const local = normalizedEmail.split("@")[0] || "usuario";
+      return local.slice(0, 80);
+    })();
   const normalizedPhone = onlyDigits(phone).slice(0, 11) || null;
   const normalizedCity = normalizeString(city) || null;
   const normalizedDocumentType = normalizeDocumentType(document_type);
@@ -238,11 +253,6 @@ export async function register(
     if (!createdUser) {
       throw new AppError("Erro ao criar usuário.", 500);
     }
-
-    await ensureAdvertiserForUser(String(createdUser.id), {
-      requestId: reqMeta.requestId,
-      source: "auth.register",
-    });
 
     const sessionUser = buildSessionUser(createdUser);
     const session = await issueSession(sessionUser, reqMeta);

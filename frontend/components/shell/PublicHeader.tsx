@@ -17,7 +17,8 @@ import {
 import type { AccountType } from "@/lib/dashboard-types";
 
 function dashboardHrefForAccountType(type: AccountType) {
-  return type === "CNPJ" ? "/dashboard-loja" : "/dashboard";
+  if (type === "CNPJ") return "/dashboard-loja";
+  return "/dashboard";
 }
 
 function HeartIcon() {

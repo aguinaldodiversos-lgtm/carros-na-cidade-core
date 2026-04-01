@@ -2,7 +2,10 @@ import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 function normalizeAccountType(input) {
-  const raw = String(input ?? "")
+  if (input == null || String(input).trim() === "") {
+    return "pending";
+  }
+  const raw = String(input)
     .trim()
     .toLowerCase();
   return raw === "cnpj" ? "CNPJ" : "CPF";
@@ -19,7 +22,7 @@ export async function getAccountUser(userId) {
       id,
       name,
       email,
-      COALESCE(document_type, 'cpf') AS document_type,
+      document_type,
       COALESCE(document_verified, false) AS document_verified,
       COALESCE(plan, 'free') AS plan
     FROM users

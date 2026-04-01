@@ -7,6 +7,12 @@ export const metadata: Metadata = {
   description: "Painel do anunciante — Carros na Cidade.",
 };
 
+function accountLabelFromSession(type: string) {
+  if (type === "CNPJ") return "CNPJ · Lojista";
+  if (type === "pending") return "Conta — complete ao criar o 1º anúncio";
+  return "CPF · Pessoa física";
+}
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requirePfDashboardSession();
 
@@ -15,7 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       basePath="/dashboard"
       variant="pf"
       userName={session.name}
-      accountLabel="CPF · Pessoa física"
+      accountLabel={accountLabelFromSession(session.type)}
     >
       {children}
     </AccountPanelShell>

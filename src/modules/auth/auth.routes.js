@@ -170,9 +170,32 @@ router.post(
       throw new AppError("Documento inválido.", 400);
     }
 
+    const dup = await pool.query(
+      `
+      SELECT id FROM users
+      WHERE document_number = $1
+        AND id::text <> $2::text
+      LIMIT 1
+      `,
+      [document_number, String(req.user.id)]
+    );
+    if (dup.rows?.length) {
+      throw new AppError("Este documento já está cadastrado em outra conta.", 409);
+    }
+
+    const displayName = String(req.body?.name ?? "").trim();
+
     await pool.query(
-      `UPDATE users SET document_type = $1, document_number = $2, document_verified = true WHERE id = $3`,
-      [document_type, document_number, req.user.id]
+      `
+      UPDATE users
+      SET
+        document_type = $1,
+        document_number = $2,
+        document_verified = true,
+        name = COALESCE(NULLIF($4, ''), name)
+      WHERE id = $3
+      `,
+      [document_type, document_number, req.user.id, displayName]
     );
 
     return res.status(200).json({
@@ -286,7 +309,7 @@ router.get(
         id,
         name,
         email,
-        COALESCE(document_type, 'cpf') AS document_type,
+        document_type,
         COALESCE(document_verified, false) AS document_verified,
         COALESCE(plan, 'free') AS plan,
         role
@@ -302,10 +325,11 @@ router.get(
       throw new AppError("Usuario nao encontrado", 404);
     }
 
-    const accountType =
-      String(user.document_type || "")
-        .trim()
-        .toUpperCase() === "CNPJ"
+    const rawDoc = user.document_type;
+    const hasDoc = rawDoc != null && String(rawDoc).trim() !== "";
+    const accountType = !hasDoc
+      ? "pending"
+      : String(rawDoc).trim().toLowerCase() === "cnpj"
         ? "CNPJ"
         : "CPF";
 
@@ -316,7 +340,7 @@ router.get(
         name: user.name?.trim() || "Usuario",
         email: user.email?.trim() || "",
         type: accountType,
-        document_type: accountType,
+        document_type: hasDoc ? String(rawDoc).trim().toLowerCase() : null,
         cnpj_verified: accountType === "CNPJ" ? Boolean(user.document_verified) : false,
         role: user.role || "user",
         plan: user.plan || "free",

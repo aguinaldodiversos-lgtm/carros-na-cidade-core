@@ -1,7 +1,8 @@
-export type SessionAccountType = "CPF" | "CNPJ";
+export type SessionAccountType = "CPF" | "CNPJ" | "pending";
 
 export function getDefaultDashboardRedirect(type: SessionAccountType) {
-  return type === "CNPJ" ? "/dashboard-loja" : "/dashboard";
+  if (type === "CNPJ") return "/dashboard-loja";
+  return "/dashboard";
 }
 
 export function sanitizeInternalRedirect(value?: string | null) {

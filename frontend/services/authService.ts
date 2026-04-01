@@ -79,7 +79,7 @@ type BackendMeResponse = {
 };
 
 export type RegisterPayload = {
-  name: string;
+  name?: string;
   email: string;
   password: string;
   phone?: string;
@@ -116,7 +116,9 @@ function onlyDigits(value: unknown) {
 
 function normalizeAccountType(input: string | undefined): AccountType {
   const value = normalizeString(input).toUpperCase();
-  return value === "CNPJ" ? "CNPJ" : "CPF";
+  if (value === "CNPJ") return "CNPJ";
+  if (value === "PENDING") return "pending";
+  return "CPF";
 }
 
 function toAuthUserFromStore(userId: string, emailHint?: string): AuthUser | null {
@@ -142,7 +144,7 @@ function toAuthUserFromBackend(
   if (!userId) return null;
 
   const accountType = normalizeAccountType(
-    payload.document_type ?? payload.documentType ?? payload.type
+    payload.type ?? payload.document_type ?? payload.documentType
   );
 
   return {
@@ -328,10 +330,6 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
       ? payload.document_type
       : undefined;
 
-  if (!name) {
-    return { success: false, error: "Nome é obrigatório." };
-  }
-
   if (!email) {
     return { success: false, error: "Email é obrigatório." };
   }
@@ -362,9 +360,9 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
 
   try {
     const body: Record<string, unknown> = {
-      name,
       email,
       password,
+      ...(name ? { name } : {}),
       ...(phone ? { phone } : {}),
       ...(city ? { city } : {}),
       ...(documentType ? { document_type: documentType } : {}),

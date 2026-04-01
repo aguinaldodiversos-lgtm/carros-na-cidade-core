@@ -9,14 +9,24 @@ export type PublishWizardResult = {
   modelLabel: string;
 };
 
+export type RunPublishWizardOptions = {
+  /** Se true, não navega de novo — use após `completePendingProfileIfNeeded` na mesma URL. */
+  skipInitialNavigation?: boolean;
+};
+
 /**
  * Executa o assistente `/anunciar/novo` até Publicar (alinhado a `10-login-ad-publish.spec.ts`).
  */
-export async function runPublishWizardFlow(page: Page): Promise<PublishWizardResult> {
-  await page.goto("/anunciar/novo?tipo=particular&step=1", {
-    waitUntil: "domcontentloaded",
-    timeout: 60_000,
-  });
+export async function runPublishWizardFlow(
+  page: Page,
+  options?: RunPublishWizardOptions
+): Promise<PublishWizardResult> {
+  if (!options?.skipInitialNavigation) {
+    await page.goto("/anunciar/novo?tipo=particular&step=1", {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
+  }
   await expect(page.getByRole("heading", { level: 1, name: /Dados do veículo/i })).toBeVisible();
 
   const selects = page.locator("main select");

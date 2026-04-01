@@ -459,15 +459,16 @@ export async function getPlanById(planId) {
 }
 
 async function resolveCurrentPlan(user) {
-  const plans = await listPlans({ type: user.type, onlyActive: false });
+  const planType = user.type === "pending" ? "CPF" : user.type;
+  const plans = await listPlans({ type: planType, onlyActive: false });
   const planIdFromSubscription = await getCurrentPlanIdFromDatabase(user.id);
   const hasHistory = await hasSubscriptionHistory(user.id);
 
   const preferredId =
     planIdFromSubscription ||
     (hasHistory
-      ? resolveLegacyPlanAlias("free", user.type)
-      : resolveLegacyPlanAlias(user.raw_plan, user.type));
+      ? resolveLegacyPlanAlias("free", planType)
+      : resolveLegacyPlanAlias(user.raw_plan, planType));
 
   return (
     plans.find((plan) => plan.id === preferredId) ??
@@ -477,7 +478,7 @@ async function resolveCurrentPlan(user) {
 }
 
 function getFreeLimit(accountType, cnpjVerified) {
-  if (accountType === "CPF") return 3;
+  if (accountType === "pending" || accountType === "CPF") return 3;
   return cnpjVerified ? 20 : 0;
 }
 
@@ -581,22 +582,14 @@ export async function getOwnedAd(userId, adId) {
 export async function getDashboardPayload(userId, options = {}) {
   const uid = String(userId);
   const emptyBoost = BOOST_OPTIONS.map((option) => ({ ...option }));
-  const fallbackAccountType = options.accountType === "CNPJ" ? "CNPJ" : "CPF";
+  const fallbackAccountType =
+    options.accountType === "CNPJ"
+      ? "CNPJ"
+      : options.accountType === "pending"
+        ? "pending"
+        : "CPF";
 
   try {
-    try {
-      await ensureAdvertiserForUser(uid, { source: "dashboard" });
-    } catch (err) {
-      logger.warn(
-        {
-          err: err?.message || String(err),
-          userId: uid,
-          code: err?.code,
-        },
-        "[account.dashboard] ensureAdvertiserForUser falhou — seguindo com painel (anúncios podem estar vazios)"
-      );
-    }
-
     const user = await getAccountUser(userId);
     const [ads, publishEligibility] = await Promise.all([
       listOwnedAds(userId),
@@ -623,7 +616,8 @@ export async function getDashboardPayload(userId, options = {}) {
 
     return {
       ok: true,
-      accountType: user.type === "CNPJ" ? "PJ" : "PF",
+      accountType:
+        user.type === "CNPJ" ? "PJ" : user.type === "CPF" ? "PF" : null,
       user: {
         id: user.id,
         name: user.name,
@@ -675,11 +669,15 @@ export async function getDashboardPayload(userId, options = {}) {
       "[account.dashboard] getDashboardPayload falhou — retornando painel minimo"
     );
 
-    const freeLimit = getFreeLimit(fallbackAccountType, false);
+    const freeLimit = getFreeLimit(
+      fallbackAccountType === "pending" ? "pending" : fallbackAccountType === "CNPJ" ? "CNPJ" : "CPF",
+      false
+    );
 
     return {
       ok: true,
-      accountType: fallbackAccountType === "CNPJ" ? "PJ" : "PF",
+      accountType:
+        fallbackAccountType === "CNPJ" ? "PJ" : fallbackAccountType === "pending" ? null : "PF",
       user: {
         id: uid,
         name: "Usuario",
@@ -738,6 +736,14 @@ export async function resolvePublishEligibility(userId, preloadedUser = null) {
   const currentPlan = await resolveCurrentPlan(user);
   const freeLimit = getFreeLimit(user.type, user.cnpj_verified);
   const planLimit = currentPlan?.ad_limit ?? freeLimit;
+
+  if (user.type === "pending") {
+    return {
+      allowed: false,
+      reason: "Complete seu perfil com CPF ou CNPJ para publicar anúncios.",
+      suggested_plan_type: null,
+    };
+  }
 
   if (user.type === "CNPJ" && !user.cnpj_verified) {
     return {

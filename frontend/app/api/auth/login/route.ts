@@ -37,12 +37,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
     }
 
-    if (
-      !authSession.user ||
-      !authSession.user.id ||
-      !authSession.user.email ||
-      !authSession.user.type
-    ) {
+    const u = authSession.user;
+    if (!u?.id || !u.email || typeof u.type !== "string" || !u.type.trim()) {
       return NextResponse.json({ error: "Resposta de autenticacao invalida." }, { status: 500 });
     }
 

@@ -11,7 +11,10 @@ export async function validateUserForLogin(user) {
     throw new AppError("Credenciais inválidas", 401);
   }
 
-  if (!user.email_verified) {
+  /** Só bloqueia quando a coluna existir e estiver explicitamente `false` (legado com NULL continua a entrar). */
+  const ev = user.email_verified;
+  const isEv = user.is_email_verified;
+  if (ev === false || isEv === false) {
     throw new AppError("E-mail ainda não verificado", 403);
   }
 

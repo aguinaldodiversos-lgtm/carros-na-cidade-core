@@ -102,6 +102,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (ensured.session.type === "pending") {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Complete seu cadastro com CPF ou CNPJ antes de publicar. Use a etapa inicial em Novo anúncio.",
+        },
+        { status: 400 }
+      );
+    }
+
     const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
 
     const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);

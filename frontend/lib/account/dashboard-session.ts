@@ -13,16 +13,13 @@ export function getLoginRedirect(nextPath: string) {
   return `/login?next=${encodeURIComponent(nextPath)}`;
 }
 
-/** Sessão obrigatória para área /dashboard (apenas CPF). */
+/** Sessão autenticada para área /dashboard (PF, conta incompleta ou PF completo). */
 export async function requirePfDashboardSession(): Promise<SessionData> {
   const cookieStore = cookies();
   const session = mergeMiddlewareSessionTokens(headers(), cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
   if (!session || (!session.accessToken && !session.refreshToken)) {
     redirect(getLoginRedirect("/dashboard"));
-  }
-  if (session.type === "CNPJ") {
-    redirect("/dashboard-loja");
   }
   return session;
 }

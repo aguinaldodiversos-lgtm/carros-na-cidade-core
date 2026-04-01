@@ -1,4 +1,5 @@
-export type AccountType = "CPF" | "CNPJ";
+/** `pending` = conta criada sem CPF/CNPJ; completar no primeiro anúncio. */
+export type AccountType = "CPF" | "CNPJ" | "pending";
 
 export type DashboardUser = {
   id: string;

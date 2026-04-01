@@ -23,6 +23,8 @@
     "test:e2e:dashboard": "playwright test e2e/dashboard-login-pf-pj.spec.ts",
     "test:e2e:smoke": "playwright test --grep \"@smoke\"",
     "test:e2e:publish": "playwright test e2e/10-login-ad-publish.spec.ts",
+    "test:e2e:register-publish": "playwright test e2e/register-minimal-to-publish.spec.ts",
+    "test:e2e:isolation": "playwright test e2e/user-isolation-api.spec.ts",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

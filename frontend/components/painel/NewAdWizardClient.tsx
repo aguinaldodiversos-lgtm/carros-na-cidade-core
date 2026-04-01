@@ -24,6 +24,7 @@ import {
   type SellerType,
 } from "./new-ad-wizard/types";
 import { parseCurrency } from "./new-ad-wizard/currency";
+import CompleteProfileGate from "./CompleteProfileGate";
 
 type Props = {
   initialType: SellerType;
@@ -127,6 +128,8 @@ export default function NewAdWizardClient({ initialType }: Props) {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [sessionAccountType, setSessionAccountType] = useState<SessionAccountType | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [dashboardReload, setDashboardReload] = useState(0);
+  const [dashboardFetchDone, setDashboardFetchDone] = useState(false);
 
   const step = form.step;
 
@@ -141,6 +144,13 @@ export default function NewAdWizardClient({ initialType }: Props) {
       setForm((prev) => ({ ...prev, sellerType: "particular" }));
     }
   }, [sessionAccountType]);
+
+  useEffect(() => {
+    const t = dashboard?.user?.type;
+    if (t === "CPF" || t === "CNPJ" || t === "pending") {
+      setSessionAccountType(t);
+    }
+  }, [dashboard]);
 
   useEffect(() => {
     try {
@@ -208,28 +218,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/auth/me", { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) {
-          if (!cancelled) setSessionAccountType(null);
-          return;
-        }
-        const data = (await res.json()) as { user?: { type?: string } };
-        const t = data.user?.type;
-        if (!cancelled && (t === "CPF" || t === "CNPJ")) {
-          setSessionAccountType(t);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setSessionAccountType(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
     fetchDashboardPayloadClient()
       .then((result) => {
         if (!result.ok) {
@@ -252,11 +240,14 @@ export default function NewAdWizardClient({ initialType }: Props) {
           setDashboardError(
             "Não foi possível verificar seu plano. Você ainda pode salvar o rascunho."
           );
+      })
+      .finally(() => {
+        if (!cancelled) setDashboardFetchDone(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [step, dashboardReload]);
 
   const boostOptions = dashboard?.boost_options ?? [];
 
@@ -497,6 +488,29 @@ export default function NewAdWizardClient({ initialType }: Props) {
       </div>
     </div>
   );
+
+  if (!dashboardFetchDone) {
+    return (
+      <div className="min-h-[40vh] bg-[#F5F7FB] px-4 py-16 text-center text-sm text-[#6E748A]">
+        Carregando fluxo de anúncio…
+      </div>
+    );
+  }
+
+  if (dashboard?.user?.type === "pending") {
+    return (
+      <div className="min-h-screen bg-[#F5F7FB] px-4 py-10">
+        <div className="mx-auto max-w-7xl">
+          <CompleteProfileGate
+            onCompleted={() => {
+              setDashboardFetchDone(false);
+              setDashboardReload((n) => n + 1);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SellWizardLayout

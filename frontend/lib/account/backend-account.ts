@@ -260,7 +260,10 @@ function buildFallbackDashboardFromSession(session: SessionData): DashboardPaylo
     },
     publish_eligibility: {
       allowed: false,
-      reason: "Resposta do servidor em formato inesperado. Atualize a página ou tente novamente.",
+      reason:
+        session.type === "pending"
+          ? "Complete seu perfil com CPF ou CNPJ para publicar anúncios."
+          : "Resposta do servidor em formato inesperado. Atualize a página ou tente novamente.",
     },
     active_ads: [],
     paused_ads: [],

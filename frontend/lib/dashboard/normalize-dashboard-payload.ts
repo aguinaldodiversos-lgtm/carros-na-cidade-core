@@ -38,12 +38,22 @@ export function unwrapDashboardPayload(raw: unknown): unknown {
   return raw;
 }
 
+/** Exportado para testes unitários. */
+export function normalizeDashboardUserType(raw: unknown): DashboardUser["type"] {
+  if (raw === "CNPJ" || raw === "CPF" || raw === "pending") return raw;
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (s === "cnpj") return "CNPJ";
+  if (s === "cpf") return "CPF";
+  if (s === "pending") return "pending";
+  return "pending";
+}
+
 function normalizeUser(raw: unknown): DashboardUser | null {
   if (!isRecord(raw)) return null;
   const id = toStr(raw.id || raw.sub);
   const name = toStr(raw.name, "Usuário");
   const email = toStr(raw.email);
-  const type = raw.type === "CNPJ" || raw.type === "CPF" ? raw.type : "CPF";
+  const type = normalizeDashboardUserType(raw.type);
   if (!id) return null;
   return {
     id,

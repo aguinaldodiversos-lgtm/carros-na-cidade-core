@@ -41,10 +41,6 @@ export async function POST(request: NextRequest) {
         ? body.document_type
         : undefined;
 
-    if (!name) {
-      return NextResponse.json({ error: "Nome é obrigatório." }, { status: 400 });
-    }
-
     if (!email || !password) {
       return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
     }
@@ -61,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const registerPayload = {
-      name,
+      ...(name ? { name } : {}),
       email,
       password,
       ...(phone ? { phone } : {}),
@@ -81,9 +77,12 @@ export async function POST(request: NextRequest) {
 
     const { session: authSession } = result;
 
+    const ru = authSession.user;
     if (
-      !authSession.user?.id ||
-      !authSession.user?.email ||
+      !ru?.id ||
+      !ru.email ||
+      typeof ru.type !== "string" ||
+      !ru.type.trim() ||
       !authSession.accessToken ||
       !authSession.refreshToken
     ) {
@@ -91,10 +90,10 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionToken = createSessionToken({
-      id: authSession.user.id,
-      name: authSession.user.name,
-      email: authSession.user.email,
-      type: authSession.user.type,
+      id: ru.id,
+      name: ru.name,
+      email: ru.email,
+      type: ru.type,
       accessToken: authSession.accessToken,
       refreshToken: authSession.refreshToken,
     });
