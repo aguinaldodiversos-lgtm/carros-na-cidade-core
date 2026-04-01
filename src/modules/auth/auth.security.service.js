@@ -11,15 +11,16 @@ export async function validateUserForLogin(user) {
     throw new AppError("Credenciais inválidas", 401);
   }
 
-  /** Só bloqueia quando a coluna existir e estiver explicitamente `false` (legado com NULL continua a entrar). */
-  const ev = user.email_verified;
-  const isEv = user.is_email_verified;
-  if (ev === false || isEv === false) {
-    throw new AppError("E-mail ainda não verificado", 403);
-  }
+  // NOTA: A verificação de e-mail foi temporariamente removida do bloqueio de login.
+  // O cadastro já define email_verified = true automaticamente (comportamento atual).
+  // O fluxo real de verificação de e-mail será habilitado na Fase 2C, quando
+  // o envio de e-mail de confirmação estiver implementado corretamente.
 
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
-    throw new AppError("Conta temporariamente bloqueada. Tente novamente mais tarde.", 403);
+    throw new AppError(
+      "Conta temporariamente bloqueada. Tente novamente mais tarde.",
+      403
+    );
   }
 }
 

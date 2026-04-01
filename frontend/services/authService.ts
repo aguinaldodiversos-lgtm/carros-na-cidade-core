@@ -1,5 +1,4 @@
 import type { AccountType } from "@/lib/dashboard-types";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { getUserById } from "@/services/planStore";
 
 export type AuthUser = {
@@ -21,18 +20,24 @@ export type AuthenticatedSession = AuthSession & {
   refreshToken: string;
 };
 
-const localCredentials = [
-  {
-    user_id: "user-cpf-demo",
-    email: "cpf@carrosnacidade.com",
-    password: "123456",
-  },
-  {
-    user_id: "user-cnpj-demo",
-    email: "lojista@carrosnacidade.com",
-    password: "123456",
-  },
-];
+// Credenciais demo APENAS em desenvolvimento local e sem backend configurado.
+// Em produção (NODE_ENV=production) esta lista é vazia — o backend real é sempre consultado.
+// As senhas foram alteradas para não coincidir com senhas reais de produção.
+const LOCAL_DEMO_CREDENTIALS =
+  process.env.NODE_ENV !== "production"
+    ? [
+        {
+          user_id: "user-cpf-demo",
+          email: "cpf@carrosnacidade.com",
+          password: "demo-cpf-local-only",
+        },
+        {
+          user_id: "user-cnpj-demo",
+          email: "lojista@carrosnacidade.com",
+          password: "demo-cnpj-local-only",
+        },
+      ]
+    : [];
 
 type BackendUserPayload = {
   id?: string | number;
@@ -79,7 +84,7 @@ type BackendMeResponse = {
 };
 
 export type RegisterPayload = {
-  name?: string;
+  name: string;
   email: string;
   password: string;
   phone?: string;
@@ -114,11 +119,32 @@ function onlyDigits(value: unknown) {
   return normalizeString(value).replace(/\D/g, "");
 }
 
+function resolveAuthApiBase() {
+  return normalizeString(
+    process.env.AUTH_API_BASE_URL ??
+      process.env.BACKEND_API_URL ??
+      process.env.API_URL ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      ""
+  );
+}
+
+function resolveAuthEndpoint(baseUrl: string, endpoint: string) {
+  const base = baseUrl.trim().replace(/\/+$/, "");
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  if (!base) return "";
+
+  if (base.endsWith("/api")) {
+    return `${base}${path.replace(/^\/api/, "")}`;
+  }
+
+  return `${base}${path}`;
+}
+
 function normalizeAccountType(input: string | undefined): AccountType {
   const value = normalizeString(input).toUpperCase();
-  if (value === "CNPJ") return "CNPJ";
-  if (value === "PENDING") return "pending";
-  return "CPF";
+  return value === "CNPJ" ? "CNPJ" : "CPF";
 }
 
 function toAuthUserFromStore(userId: string, emailHint?: string): AuthUser | null {
@@ -144,7 +170,7 @@ function toAuthUserFromBackend(
   if (!userId) return null;
 
   const accountType = normalizeAccountType(
-    payload.type ?? payload.document_type ?? payload.documentType
+    payload.document_type ?? payload.documentType ?? payload.type
   );
 
   return {
@@ -161,11 +187,13 @@ function toAuthUserFromBackend(
 
 function findLocalCredentialByEmail(email: string) {
   const normalizedEmail = normalizeEmail(email);
-  return localCredentials.find((credential) => credential.email.toLowerCase() === normalizedEmail);
+  return LOCAL_DEMO_CREDENTIALS.find(
+    (credential) => credential.email.toLowerCase() === normalizedEmail
+  );
 }
 
 export function getLocalEmailByUserId(userId: string) {
-  const found = localCredentials.find((credential) => credential.user_id === userId);
+  const found = LOCAL_DEMO_CREDENTIALS.find((credential) => credential.user_id === userId);
   return found?.email ?? `${userId}@carrosnacidade.com`;
 }
 
@@ -196,7 +224,10 @@ function extractBackendUser(payload: BackendAuthResponse | BackendMeResponse) {
   return payload.user ?? payload.data?.user ?? null;
 }
 
-function extractErrorMessage(payload: Partial<BackendAuthResponse>, fallback: string) {
+function extractErrorMessage(
+  payload: Partial<BackendAuthResponse>,
+  fallback: string
+) {
   return normalizeString(payload.error) || normalizeString(payload.message) || fallback;
 }
 
@@ -208,8 +239,12 @@ async function safeJson<T>(response: Response): Promise<T> {
   }
 }
 
-async function fetchCurrentUserFromBackend(accessToken: string, fallbackEmail: string) {
-  const endpoint = resolveBackendApiUrl("/api/auth/me");
+async function fetchCurrentUserFromBackend(
+  baseUrl: string,
+  accessToken: string,
+  fallbackEmail: string
+) {
+  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/me");
   if (!endpoint) return null;
 
   try {
@@ -234,6 +269,7 @@ async function fetchCurrentUserFromBackend(accessToken: string, fallbackEmail: s
 
 async function buildAuthenticatedSessionFromResponse(
   payload: BackendAuthResponse,
+  baseUrl: string,
   fallbackEmail: string
 ): Promise<AuthenticatedSession | null> {
   const accessToken = extractAccessToken(payload);
@@ -246,7 +282,7 @@ async function buildAuthenticatedSessionFromResponse(
   const backendUser = extractBackendUser(payload);
   const resolvedUser =
     (backendUser ? toAuthUserFromBackend(backendUser, fallbackEmail) : null) ??
-    (await fetchCurrentUserFromBackend(accessToken, fallbackEmail));
+    (await fetchCurrentUserFromBackend(baseUrl, accessToken, fallbackEmail));
 
   if (!resolvedUser) {
     return null;
@@ -264,9 +300,10 @@ async function authenticateAgainstBackend(
   password: string
 ): Promise<AuthenticatedSession | null> {
   const normalizedEmail = normalizeEmail(email);
-  if (!getBackendApiBaseUrl()) return null;
+  const baseUrl = resolveAuthApiBase();
+  if (!baseUrl) return null;
 
-  const endpoint = resolveBackendApiUrl("/api/auth/login");
+  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/login");
   if (!endpoint) return null;
 
   try {
@@ -285,10 +322,12 @@ async function authenticateAgainstBackend(
     const payload = await safeJson<BackendAuthResponse>(response);
 
     if (!response.ok) {
-      throw new Error(extractErrorMessage(payload, "Nao foi possivel autenticar."));
+      throw new Error(
+        extractErrorMessage(payload, "Nao foi possivel autenticar.")
+      );
     }
 
-    return buildAuthenticatedSessionFromResponse(payload, normalizedEmail);
+    return buildAuthenticatedSessionFromResponse(payload, baseUrl, normalizedEmail);
   } catch (error) {
     if (error instanceof Error) {
       throw error;
@@ -311,14 +350,18 @@ export async function authenticateUser(
   email: string,
   password: string
 ): Promise<AuthSession | null> {
-  if (getBackendApiBaseUrl()) {
+  const baseUrl = resolveAuthApiBase();
+
+  if (baseUrl) {
     return authenticateAgainstBackend(email, password);
   }
 
   return authenticateLocally(email, password);
 }
 
-export async function registerUser(payload: RegisterPayload): Promise<RegisterResult> {
+export async function registerUser(
+  payload: RegisterPayload
+): Promise<RegisterResult> {
   const name = normalizeString(payload.name);
   const email = normalizeEmail(payload.email);
   const password = typeof payload.password === "string" ? payload.password : "";
@@ -330,6 +373,10 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
       ? payload.document_type
       : undefined;
 
+  if (!name) {
+    return { success: false, error: "Nome é obrigatório." };
+  }
+
   if (!email) {
     return { success: false, error: "Email é obrigatório." };
   }
@@ -338,8 +385,8 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
     return { success: false, error: "Senha é obrigatória." };
   }
 
-  if (password.length < 6) {
-    return { success: false, error: "Senha deve ter no minimo 6 caracteres." };
+  if (password.length < 8) {
+    return { success: false, error: "Senha deve ter no minimo 8 caracteres." };
   }
 
   if ((documentType && !documentNumber) || (!documentType && documentNumber)) {
@@ -349,20 +396,21 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
     };
   }
 
-  if (!getBackendApiBaseUrl()) {
+  const baseUrl = resolveAuthApiBase();
+  if (!baseUrl) {
     return { success: false, error: "API do backend nao configurada." };
   }
 
-  const endpoint = resolveBackendApiUrl("/api/auth/register");
+  const endpoint = resolveAuthEndpoint(baseUrl, "/api/auth/register");
   if (!endpoint) {
     return { success: false, error: "Endpoint de cadastro nao configurado." };
   }
 
   try {
     const body: Record<string, unknown> = {
+      name,
       email,
       password,
-      ...(name ? { name } : {}),
       ...(phone ? { phone } : {}),
       ...(city ? { city } : {}),
       ...(documentType ? { document_type: documentType } : {}),
@@ -385,12 +433,17 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
       };
     }
 
-    const session = await buildAuthenticatedSessionFromResponse(data, email);
+    const session = await buildAuthenticatedSessionFromResponse(
+      data,
+      baseUrl,
+      email
+    );
 
     if (!session) {
       return {
         success: false,
-        error: "Cadastro realizado, mas nao foi possivel iniciar a sessao automaticamente.",
+        error:
+          "Cadastro realizado, mas nao foi possivel iniciar a sessao automaticamente.",
       };
     }
 
@@ -408,7 +461,10 @@ export function getAuthUserById(userId: string): AuthUser | null {
 }
 
 async function postAuthProxy(endpoint: string, payload: Record<string, unknown>) {
-  const url = resolveBackendApiUrl(endpoint);
+  const baseUrl = resolveAuthApiBase();
+  if (!baseUrl) return false;
+
+  const url = resolveAuthEndpoint(baseUrl, endpoint);
   if (!url) return false;
 
   try {
@@ -447,7 +503,7 @@ export async function resetPassword(token: string, password: string) {
 
   if (proxied) return true;
 
-  return Boolean(normalizedToken && password.length >= 6);
+  return Boolean(normalizedToken && password.length >= 8);
 }
 
 async function parseLocalApiResponse(response: Response) {
@@ -458,8 +514,8 @@ async function parseLocalApiResponse(response: Response) {
       typeof data.error === "string"
         ? data.error
         : typeof data.message === "string"
-          ? data.message
-          : "Erro na autenticacao.";
+        ? data.message
+        : "Erro na autenticacao.";
 
     throw new Error(errorMessage);
   }
@@ -467,7 +523,10 @@ async function parseLocalApiResponse(response: Response) {
   return data;
 }
 
-export async function login(payloadOrEmail: LoginCompatPayload | string, maybePassword?: string) {
+export async function login(
+  payloadOrEmail: LoginCompatPayload | string,
+  maybePassword?: string
+) {
   const email =
     typeof payloadOrEmail === "string"
       ? normalizeEmail(payloadOrEmail)
@@ -479,10 +538,13 @@ export async function login(payloadOrEmail: LoginCompatPayload | string, maybePa
         ? maybePassword
         : ""
       : typeof payloadOrEmail?.password === "string"
-        ? payloadOrEmail.password
-        : "";
+      ? payloadOrEmail.password
+      : "";
 
-  const next = typeof payloadOrEmail === "string" ? "" : normalizeString(payloadOrEmail?.next);
+  const next =
+    typeof payloadOrEmail === "string"
+      ? ""
+      : normalizeString(payloadOrEmail?.next);
 
   const response = await fetch("/api/auth/login", {
     method: "POST",
@@ -535,6 +597,8 @@ export async function register(payload: RegisterCompatPayload) {
   return parseLocalApiResponse(response);
 }
 
+// Aliases mantidos apenas para compatibilidade com código existente.
+// Prefira importar `register` diretamente em novos usos.
 export const signUp = register;
 export const signup = register;
 export const createUser = register;

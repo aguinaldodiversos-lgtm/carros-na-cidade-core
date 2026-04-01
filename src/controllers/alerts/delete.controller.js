@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -14,7 +15,7 @@ module.exports = async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("Erro ao excluir alerta:", err);
+    logger.error({ err: "Erro ao excluir alerta:", err }, "controller error");
     res.status(500).json({
       error: "Erro ao excluir alerta",
     });

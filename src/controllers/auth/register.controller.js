@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -40,7 +41,7 @@ module.exports = async (req, res) => {
 
     res.json({ token });
   } catch (err) {
-    console.error("Erro no registro:", err);
+    logger.error({ err: "Erro no registro:", err }, "controller error");
     res.status(500).json({
       error: "Erro ao registrar usuário",
     });

@@ -11,12 +11,9 @@ import {
   updateOwnedAdStatus,
 } from "./account.service.js";
 import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
+import { asyncHandler } from "../../shared/utils/async-handler.js";
 
 const router = express.Router();
-
-function asyncHandler(fn) {
-  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-}
 
 router.get(
   "/plans",

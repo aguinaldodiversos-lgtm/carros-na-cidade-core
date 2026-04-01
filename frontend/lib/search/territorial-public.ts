@@ -1,4 +1,5 @@
 import type { AdItem, AdsFacetsResponse, AdsPagination } from "./ads-search";
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 
 export interface TerritorialCityIdentity {
   id: number | string;
@@ -124,11 +125,7 @@ function stripTrailingSlash(url: string) {
 }
 
 function getApiBaseUrl(): string {
-  const api =
-    process.env.API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    "http://localhost:4000";
-
+  return getBackendApiBaseUrl() || "http://localhost:4000";
   return stripTrailingSlash(api);
 }
 

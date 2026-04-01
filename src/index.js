@@ -1,5 +1,8 @@
 import "dotenv/config";
 
+// Validação de ambiente fail-fast — lança antes de importar qualquer módulo de negócio
+import "./config/env.js";
+
 import http from "http";
 import app from "./app.js";
 import runMigrations from "./database/migrate.js";

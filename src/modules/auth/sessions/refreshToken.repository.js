@@ -90,12 +90,15 @@ export async function rotateRefreshToken(oldRefreshToken, meta = {}) {
     [tokenRow.id]
   );
 
-  // Carrega usuário e emite nova sessão
-  const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [decoded.id]);
+  // Carrega usuário e emite nova sessão PRESERVANDO a mesma família de tokens.
+  // Isso garante que a detecção de reuso (REFRESH_REUSE) funcione corretamente:
+  // se um token revogado da mesma família for usado, toda a família é revogada.
+  const userRes = await pool.query("SELECT * FROM users WHERE id = $1", [
+    decoded.id,
+  ]);
   const user = userRes.rows[0];
   if (!user) throw new AppError("Usuário inválido", 401);
 
-  // Nova sessão (novo familyId por padrão no login; aqui a emissão cria nova família.
-  // Se quiser manter mesma família no refresh, eu adapto para reaproveitar tokenRow.family_id)
-  return issueSession(user, meta);
+  // Nova sessão preservando o family_id do token rotacionado
+  return issueSession(user, meta, { familyId: tokenRow.family_id });
 }

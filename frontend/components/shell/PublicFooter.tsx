@@ -1,18 +1,111 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-
-import { useCityOptional } from "@/lib/city/CityContext";
-import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/public-config";
-import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
-import { buildFooterNavSections, SITE_CONTACT, SITE_ROUTES } from "@/lib/site/site-navigation";
+import { usePathname } from "next/navigation";
 
 type FooterLinkItem = {
   label: string;
   href: string;
   external?: boolean;
 };
+
+type FooterGroup = {
+  title: string;
+  links: FooterLinkItem[];
+};
+
+const DEFAULT_CITY_SLUG = "sao-paulo-sp";
+
+const ROUTES = {
+  home: "/",
+  buy: "/comprar",
+  buyBelowFipe: "/oportunidades",
+  plans: "/planos",
+  login: "/login",
+  dealerArea: "/login?next=/dashboard-loja",
+  blog: "/blog",
+  fipe: `/tabela-fipe/${DEFAULT_CITY_SLUG}`,
+  financing: `/simulador-financiamento/${DEFAULT_CITY_SLUG}`,
+  privacy: "/privacidade",
+  terms: "/termos-de-uso",
+  lgpd: "/lgpd",
+  // New pages
+  sobre: "/sobre",
+  contato: "/contato",
+  comoFunciona: "/como-funciona",
+  paraLojistas: "/para-lojistas",
+  porQueAnunciar: "/por-que-anunciar",
+  ajuda: "/ajuda",
+  faq: "/faq",
+  seguranca: "/seguranca",
+  lojas: "/lojas",
+  vender: "/vender-meu-carro",
+  comparar: "/comparar",
+  seminovos: "/seminovos",
+  regrasAnuncio: "/regras-de-anuncio",
+  pagamentosReembolsos: "/pagamentos-e-reembolsos",
+  cookies: "/cookies",
+} as const;
+
+const CONTACT = {
+  email: "contato@carrosnacidade.com",
+  phoneDisplay: "(11) 98768-4221",
+  phoneHref: "tel:+5511987684221",
+} as const;
+
+const SOCIALS: FooterLinkItem[] = [
+  { label: "Instagram", href: "https://instagram.com", external: true },
+  { label: "Facebook", href: "https://facebook.com", external: true },
+  { label: "LinkedIn", href: "https://linkedin.com", external: true },
+];
+
+const GROUPS: FooterGroup[] = [
+  {
+    title: "Comprar",
+    links: [
+      { label: "Ver anúncios", href: ROUTES.buy },
+      { label: "Oportunidades FIPE", href: ROUTES.buyBelowFipe },
+      { label: "Seminovos", href: ROUTES.seminovos },
+      { label: "Lojas verificadas", href: ROUTES.lojas },
+      { label: "Comparar veículos", href: ROUTES.comparar },
+      { label: "Simulador de financiamento", href: ROUTES.financing },
+    ],
+  },
+  {
+    title: "Vender",
+    links: [
+      { label: "Anunciar meu carro", href: ROUTES.vender },
+      { label: "Por que anunciar aqui", href: ROUTES.porQueAnunciar },
+      { label: "Para lojistas", href: ROUTES.paraLojistas },
+      { label: "Planos", href: ROUTES.plans },
+      { label: "Área do lojista", href: ROUTES.dealerArea },
+    ],
+  },
+  {
+    title: "Conteúdo",
+    links: [
+      { label: "Tabela FIPE", href: ROUTES.fipe },
+      { label: "Blog automotivo", href: ROUTES.blog },
+      { label: "Como funciona", href: ROUTES.comoFunciona },
+      { label: "FAQ", href: ROUTES.faq },
+      { label: "Ajuda", href: ROUTES.ajuda },
+      { label: "Segurança", href: ROUTES.seguranca },
+    ],
+  },
+  {
+    title: "Institucional",
+    links: [
+      { label: "Sobre", href: ROUTES.sobre },
+      { label: "Contato", href: ROUTES.contato },
+      { label: "Política de privacidade", href: ROUTES.privacy },
+      { label: "Termos de uso", href: ROUTES.terms },
+      { label: "LGPD", href: ROUTES.lgpd },
+      { label: "Cookies", href: ROUTES.cookies },
+      { label: "Regras de anúncio", href: ROUTES.regrasAnuncio },
+      { label: "Pagamentos e reembolsos", href: ROUTES.pagamentosReembolsos },
+    ],
+  },
+];
 
 function isExternalHref(href: string) {
   return (
@@ -23,7 +116,13 @@ function isExternalHref(href: string) {
   );
 }
 
-function FooterAnchor({ item, className }: { item: FooterLinkItem; className?: string }) {
+function FooterAnchor({
+  item,
+  className,
+}: {
+  item: FooterLinkItem;
+  className?: string;
+}) {
   const external = item.external || isExternalHref(item.href);
 
   if (external) {
@@ -46,119 +145,132 @@ function FooterAnchor({ item, className }: { item: FooterLinkItem; className?: s
   );
 }
 
-function FooterLegalLinks({ className }: { className?: string }) {
-  return (
-    <div className={className}>
-      <Link href={SITE_ROUTES.privacy} className="transition hover:text-white">
-        Política de privacidade
-      </Link>
-      <Link href={SITE_ROUTES.terms} className="transition hover:text-white">
-        Termos de uso
-      </Link>
-      <Link href={SITE_ROUTES.lgpd} className="transition hover:text-white">
-        LGPD
-      </Link>
-    </div>
-  );
-}
-
-function FooterNavColumns({
-  headingClass,
-  sections,
-}: {
-  headingClass: string;
-  sections: ReturnType<typeof buildFooterNavSections>;
-}) {
-  return (
-    <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-      {sections.map((group) => (
-        <div key={group.id}>
-          <h3 className={headingClass}>{group.title}</h3>
-          <ul className="mt-4 space-y-2.5 text-sm">
-            {group.links.map((link) => (
-              <li key={`${group.id}-${link.id}`}>
-                <FooterAnchor
-                  item={link}
-                  className="inline-flex min-h-9 items-center text-white/70 transition hover:text-white"
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function PublicFooter() {
+  const pathname = usePathname() || "/";
+  const isHome = pathname === "/";
   const currentYear = new Date().getFullYear();
-  const socials = getPublicSocialLinks();
-  const cityCtx = useCityOptional();
-  const footerSections = useMemo(
-    () => buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG),
-    [cityCtx?.city.slug]
-  );
 
-  return (
-    <footer className="mt-auto border-t border-white/10 bg-[linear-gradient(165deg,#1a3a7a_0%,#0f2249_45%,#0a1833_100%)] text-white">
-      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
-        <div className="grid gap-12 border-b border-white/12 pb-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
-          <div>
-            <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
+  if (isHome) {
+    return (
+      <footer className="mt-4 bg-[#18253f] text-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 text-[12px] text-white/75 md:flex-row md:items-center md:justify-between md:px-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href={ROUTES.home} className="block" aria-label="Carros na Cidade">
               <img
-                src={SITE_LOGO_SRC}
+                src="/images/logo.png"
                 alt="Carros na Cidade"
-                className="h-12 w-auto max-w-[240px] object-contain object-left"
+                className="h-4 w-[90px] object-contain brightness-0 invert"
                 loading="lazy"
               />
             </Link>
 
-            <p className="mt-5 max-w-md text-sm leading-relaxed text-white/80">
-              Marketplace automotivo regional: catálogo por cidade, referência FIPE local e negociação
-              com contexto — sem estoque genérico nacional.
+            <span>© {currentYear} Carros na Cidade. Todos os direitos reservados.</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <FooterAnchor
+              item={{ label: "Facebook", href: "https://facebook.com", external: true }}
+              className="transition hover:text-white"
+            />
+            <FooterAnchor
+              item={{ label: "Instagram", href: "https://instagram.com", external: true }}
+              className="transition hover:text-white"
+            />
+            <FooterAnchor
+              item={{ label: CONTACT.phoneDisplay, href: CONTACT.phoneHref }}
+              className="transition hover:text-white"
+            />
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  return (
+    <footer className="mt-16 bg-[linear-gradient(135deg,#16326a_0%,#0d1a38_100%)] text-white">
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
+        <div className="grid gap-10 border-b border-white/15 pb-10 lg:grid-cols-[1.15fr_1fr]">
+          <div>
+            <Link href={ROUTES.home} className="block" aria-label="Carros na Cidade">
+              <img
+                src="/images/logo.png"
+                alt="Carros na Cidade"
+                className="h-11 w-[195px] object-contain object-left brightness-0 invert"
+                loading="lazy"
+              />
+            </Link>
+
+            <p className="mt-4 max-w-xl text-sm leading-7 text-white/75">
+              Portal automotivo regional com foco em performance, autoridade local,
+              busca inteligente e estrutura preparada para crescer cidade por cidade.
             </p>
 
-            <div className="mt-6 space-y-2 text-sm">
+            <div className="mt-4 flex flex-wrap gap-2 text-sm text-white/75">
               <a
-                href={`mailto:${SITE_CONTACT.email}`}
-                className="flex w-fit items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-medium text-white/90 transition hover:border-white/40 hover:bg-white/5"
+                href={`mailto:${CONTACT.email}`}
+                className="inline-flex items-center rounded-full border border-white/15 px-3 py-1 transition hover:border-white/35 hover:text-white"
               >
-                <span className="text-white/55">E-mail</span>
-                {SITE_CONTACT.email}
+                {CONTACT.email}
               </a>
 
               <a
-                href={SITE_CONTACT.phoneHref}
-                className="flex w-fit items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-medium text-white/90 transition hover:border-white/40 hover:bg-white/5"
+                href={CONTACT.phoneHref}
+                className="inline-flex items-center rounded-full border border-white/15 px-3 py-1 transition hover:border-white/35 hover:text-white"
               >
-                <span className="text-white/55">Telefone</span>
-                {SITE_CONTACT.phoneDisplay}
+                {CONTACT.phoneDisplay}
               </a>
             </div>
 
-            {socials.length > 0 ? (
-              <div className="mt-6 flex flex-wrap gap-2">
-                {socials.map((social) => (
-                  <FooterAnchor
-                    key={social.href}
-                    item={{ ...social, external: true }}
-                    className="inline-flex h-10 items-center rounded-full border border-white/20 px-4 text-sm font-semibold text-white/90 transition hover:border-white/45 hover:bg-white/10"
-                  />
-                ))}
-              </div>
-            ) : null}
+            <div className="mt-5 flex flex-wrap gap-2">
+              {SOCIALS.map((social) => (
+                <FooterAnchor
+                  key={social.label}
+                  item={social}
+                  className="inline-flex h-10 items-center rounded-full border border-white/15 px-4 text-sm font-medium text-white/85 transition hover:border-white/35 hover:text-white"
+                />
+              ))}
+            </div>
           </div>
 
-          <FooterNavColumns
-            headingClass="text-[13px] font-extrabold uppercase tracking-[0.18em] text-white/95"
-            sections={footerSections}
-          />
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {GROUPS.map((group) => (
+              <div key={group.title}>
+                <h3 className="text-sm font-extrabold uppercase tracking-[0.16em] text-white/90">
+                  {group.title}
+                </h3>
+
+                <ul className="mt-4 space-y-2.5 text-sm text-white/70">
+                  {group.links.map((link) => (
+                    <li key={`${group.title}-${link.label}`}>
+                      <FooterAnchor
+                        item={link}
+                        className="inline-flex min-h-10 items-center transition hover:text-white"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-4 pt-8 text-sm text-white/55 md:flex-row md:items-center md:justify-between">
-          <p className="font-medium">© {currentYear} Carros na Cidade. Todos os direitos reservados.</p>
+        <div className="flex flex-col gap-3 pt-6 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
+          <p>© {currentYear} Carros na Cidade. Todos os direitos reservados.</p>
 
-          <FooterLegalLinks className="flex flex-wrap gap-x-6 gap-y-2" />
+          <div className="flex flex-wrap gap-4">
+            <Link href={ROUTES.privacy} className="transition hover:text-white">
+              Privacidade
+            </Link>
+            <Link href={ROUTES.terms} className="transition hover:text-white">
+              Termos
+            </Link>
+            <Link href={ROUTES.lgpd} className="transition hover:text-white">
+              LGPD
+            </Link>
+            <Link href={ROUTES.cookies} className="transition hover:text-white">
+              Cookies
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

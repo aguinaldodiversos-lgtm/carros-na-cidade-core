@@ -32,14 +32,12 @@ export interface AdDetailResponse {
   item?: PublicAdDetail;
 }
 
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+
 const FALLBACK_IMAGE = "/images/hero.jpeg";
 
 function getApiBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
-    process.env.API_URL?.replace(/\/+$/, "") ||
-    "http://localhost:4000"
-  );
+  return getBackendApiBaseUrl() || "http://localhost:4000";
 }
 
 function toText(value: unknown, fallback = ""): string {

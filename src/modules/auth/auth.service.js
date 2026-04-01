@@ -3,8 +3,6 @@ import bcrypt from "bcryptjs";
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
-import { logger } from "../../shared/logger.js";
-import { buildDomainFields } from "../../shared/domainLog.js";
 import { logLoginAttempt } from "./auth.audit.service.js";
 import {
   validateUserForLogin,
@@ -21,7 +19,9 @@ import {
 
 const parsedRounds = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 const BCRYPT_ROUNDS =
-  Number.isInteger(parsedRounds) && parsedRounds >= 4 && parsedRounds <= 15 ? parsedRounds : 10;
+  Number.isInteger(parsedRounds) && parsedRounds >= 4 && parsedRounds <= 15
+    ? parsedRounds
+    : 10;
 
 let usersColumnsPromise = null;
 
@@ -88,19 +88,8 @@ function buildSessionUser(user) {
     throw new AppError("Usuário inválido para sessão.", 500);
   }
 
-  const rawDoc = user.document_type;
-  const normalizedDoc =
-    rawDoc != null && String(rawDoc).trim() !== ""
-      ? normalizeDocumentType(user.document_type)
-      : null;
-
-  let accountType;
-  if (!normalizedDoc) {
-    accountType = "pending";
-  } else {
-    accountType = normalizedDoc === "cnpj" ? "CNPJ" : "CPF";
-  }
-
+  const documentType = normalizeDocumentType(user.document_type) || "cpf";
+  const accountType = documentType === "cnpj" ? "CNPJ" : "CPF";
   const documentVerified = Boolean(user.document_verified);
 
   return {
@@ -108,12 +97,14 @@ function buildSessionUser(user) {
     name: normalizeString(user.name) || "Usuario",
     email: normalizeEmail(user.email),
     type: accountType,
-    document_type: normalizedDoc ?? undefined,
+    document_type: documentType,
     document_verified: documentVerified,
-    cnpj_verified: accountType === "CNPJ" ? documentVerified : false,
+    cnpj_verified: documentType === "cnpj" ? documentVerified : false,
     role: normalizeString(user.role) || "user",
     plan: normalizeString(user.plan) || "free",
-    email_verified: Boolean(user.email_verified ?? user.is_email_verified ?? false),
+    email_verified: Boolean(
+      user.email_verified ?? user.is_email_verified ?? false
+    ),
   };
 }
 
@@ -124,8 +115,8 @@ export async function hashPassword(password) {
     throw new AppError("Senha é obrigatória.", 400);
   }
 
-  if (normalizedPassword.length < 6) {
-    throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+  if (normalizedPassword.length < 8) {
+    throw new AppError("Senha deve ter no mínimo 8 caracteres.", 400);
   }
 
   return bcrypt.hash(normalizedPassword, BCRYPT_ROUNDS);
@@ -152,12 +143,7 @@ export async function register(
 
   const normalizedEmail = normalizeEmail(email);
   const normalizedPassword = normalizeString(password);
-  const normalizedName =
-    normalizeString(name) ||
-    (() => {
-      const local = normalizedEmail.split("@")[0] || "usuario";
-      return local.slice(0, 80);
-    })();
+  const normalizedName = normalizeString(name) || null;
   const normalizedPhone = onlyDigits(phone).slice(0, 11) || null;
   const normalizedCity = normalizeString(city) || null;
   const normalizedDocumentType = normalizeDocumentType(document_type);
@@ -171,13 +157,14 @@ export async function register(
     throw new AppError("Senha é obrigatória.", 400);
   }
 
-  if (normalizedPassword.length < 6) {
-    throw new AppError("Senha deve ter no mínimo 6 caracteres.", 400);
+  if (normalizedPassword.length < 8) {
+    throw new AppError("Senha deve ter no mínimo 8 caracteres.", 400);
   }
 
-  const existing = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1", [
-    normalizedEmail,
-  ]);
+  const existing = await pool.query(
+    "SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1",
+    [normalizedEmail]
+  );
 
   if (existing.rows?.length) {
     throw new AppError("Email já cadastrado.", 400);
@@ -191,31 +178,79 @@ export async function register(
   const insertPlaceholders = [];
 
   if (hasColumn(usersColumns, "name")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "name", normalizedName);
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "name",
+      normalizedName
+    );
   }
 
   if (hasColumn(usersColumns, "email")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "email", normalizedEmail);
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "email",
+      normalizedEmail
+    );
   } else {
     throw new AppError('Tabela "users" sem coluna obrigatória "email".', 500);
   }
 
-  appendInsertField(insertColumns, insertValues, insertPlaceholders, passwordColumn, passwordHash);
+  appendInsertField(
+    insertColumns,
+    insertValues,
+    insertPlaceholders,
+    passwordColumn,
+    passwordHash
+  );
 
+  // email_verified é definido como FALSE no cadastro.
+  // O usuário deve confirmar o e-mail antes de poder fazer login.
+  // ATENÇÃO: a verificação de e-mail está temporariamente desabilitada no login
+  // (auth.security.service.js) até que o fluxo de envio de e-mail esteja ativo.
+  // Quando o fluxo de e-mail for ativado: remover o comentário abaixo e
+  // restaurar o check em validateUserForLogin.
   if (hasColumn(usersColumns, "email_verified")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "email_verified", true);
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "email_verified",
+      false
+    );
   }
 
   if (hasColumn(usersColumns, "is_email_verified")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "is_email_verified", true);
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "is_email_verified",
+      false
+    );
   }
 
   if (normalizedPhone && hasColumn(usersColumns, "phone")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "phone", normalizedPhone);
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "phone",
+      normalizedPhone
+    );
   }
 
   if (normalizedCity && hasColumn(usersColumns, "city")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "city", normalizedCity);
+    appendInsertField(
+      insertColumns,
+      insertValues,
+      insertPlaceholders,
+      "city",
+      normalizedCity
+    );
   }
 
   if (normalizedDocumentType && hasColumn(usersColumns, "document_type")) {
@@ -253,27 +288,15 @@ export async function register(
     if (!createdUser) {
       throw new AppError("Erro ao criar usuário.", 500);
     }
+const sessionUser = buildSessionUser(createdUser);
+const session = await issueSession(sessionUser, reqMeta);
 
-    const sessionUser = buildSessionUser(createdUser);
-    const session = await issueSession(sessionUser, reqMeta);
-
-    logger.info(
-      {
-        ...buildDomainFields({
-          action: "auth.register",
-          result: "success",
-          requestId: reqMeta.requestId,
-          userId: createdUser.id,
-        }),
-      },
-      "[auth] registro ok"
-    );
-
-    return {
-      user: sessionUser,
-      accessToken: session.accessToken,
-      refreshToken: session.refreshToken,
-    };
+return {
+  user: sessionUser,
+  accessToken: session.accessToken,
+  refreshToken: session.refreshToken,
+};
+    
   } catch (error) {
     if (error?.code === "23505") {
       throw new AppError("Email já cadastrado.", 400);
@@ -293,18 +316,20 @@ export async function login(email, password, reqMeta = {}) {
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
-  const result = await pool.query("SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1", [
-    normalizedEmail,
-  ]);
+  const result = await pool.query(
+    "SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1",
+    [normalizedEmail]
+  );
 
   const user = result.rows[0];
 
   await validateUserForLogin(user);
 
   const storedPasswordHash = user?.password_hash ?? user?.password ?? null;
-  const passwordValid = storedPasswordHash
-    ? await bcrypt.compare(String(password), storedPasswordHash)
-    : false;
+  const passwordValid =
+    storedPasswordHash
+      ? await bcrypt.compare(String(password), storedPasswordHash)
+      : false;
 
   if (!passwordValid) {
     await handleFailedLogin(user);
@@ -314,21 +339,7 @@ export async function login(email, password, reqMeta = {}) {
       ip: reqMeta.ip,
       userAgent: reqMeta.userAgent,
       success: false,
-      requestId: reqMeta.requestId,
     });
-
-    logger.warn(
-      {
-        ...buildDomainFields({
-          action: "auth.login",
-          result: "error",
-          requestId: reqMeta.requestId,
-          userId: user?.id,
-          reason: "invalid_credentials",
-        }),
-      },
-      "[auth] login falhou"
-    );
 
     throw new AppError("Credenciais inválidas", 401);
   }
@@ -340,29 +351,16 @@ export async function login(email, password, reqMeta = {}) {
     ip: reqMeta.ip,
     userAgent: reqMeta.userAgent,
     success: true,
-    requestId: reqMeta.requestId,
   });
 
-  logger.info(
-    {
-      ...buildDomainFields({
-        action: "auth.login",
-        result: "success",
-        requestId: reqMeta.requestId,
-        userId: user.id,
-      }),
-    },
-    "[auth] login ok"
-  );
+const sessionUser = buildSessionUser(user);
+const session = await issueSession(sessionUser, reqMeta);
 
-  const sessionUser = buildSessionUser(user);
-  const session = await issueSession(sessionUser, reqMeta);
-
-  return {
-    user: sessionUser,
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
-  };
+return {
+  user: sessionUser,
+  accessToken: session.accessToken,
+  refreshToken: session.refreshToken,
+};
 }
 
 /* =====================================================

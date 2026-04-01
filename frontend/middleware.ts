@@ -1,46 +1,24 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getSessionDataFromCookieValue } from "@/services/sessionService";
 
-/**
- * URLs legadas com hífen → canônico com barra (SEO local).
- * As rotas /carros-*-em/[slug] são SSR; não redirecionar para /comprar.
- */
+const AUTH_COOKIE_NAME = "cnc_session";
+
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const cookieValue = request.cookies.get(AUTH_COOKIE_NAME)?.value;
 
-  const hyphenEm = /^\/carros-em-([^/]+)\/?$/.exec(pathname);
-  if (hyphenEm?.[1]) {
-    const slug = hyphenEm[1].replace(/\/+$/, "");
-    if (slug) {
-      const url = request.nextUrl.clone();
-      url.pathname = `/carros-em/${slug}`;
-      return NextResponse.redirect(url, 301);
-    }
+  // Valida HMAC + expiração via sessionService — não aceita cookie forjado ou expirado
+  const session = getSessionDataFromCookieValue(cookieValue);
+
+  if (session?.id) {
+    return NextResponse.next();
   }
 
-  const hyphenBaratos = /^\/carros-baratos-em-([^/]+)\/?$/.exec(pathname);
-  if (hyphenBaratos?.[1]) {
-    const slug = hyphenBaratos[1].replace(/\/+$/, "");
-    if (slug) {
-      const url = request.nextUrl.clone();
-      url.pathname = `/carros-baratos-em/${slug}`;
-      return NextResponse.redirect(url, 301);
-    }
-  }
-
-  const hyphenAuto = /^\/carros-automaticos-em-([^/]+)\/?$/.exec(pathname);
-  if (hyphenAuto?.[1]) {
-    const slug = hyphenAuto[1].replace(/\/+$/, "");
-    if (slug) {
-      const url = request.nextUrl.clone();
-      url.pathname = `/carros-automaticos-em/${slug}`;
-      return NextResponse.redirect(url, 301);
-    }
-  }
-
-  return NextResponse.next();
+  // Cookie ausente, inválido ou expirado → redireciona para login
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("next", request.nextUrl.pathname);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/carros-em-:slug", "/carros-baratos-em-:slug", "/carros-automaticos-em-:slug"],
+  matcher: ["/dashboard/:path*", "/dashboard-loja/:path*", "/impulsionar/:path*", "/conta"],
 };

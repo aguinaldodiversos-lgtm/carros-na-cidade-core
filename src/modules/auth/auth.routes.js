@@ -3,6 +3,7 @@ import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { pool } from "../../infrastructure/database/db.js";
+import { asyncHandler } from "../../shared/utils/async-handler.js";
 
 import * as AuthServiceNS from "./auth.service.js";
 import * as PasswordServiceNS from "./password.service.js";
@@ -37,10 +38,6 @@ function ensureFn(mod, candidates, serviceName) {
     500,
     false
   );
-}
-
-function asyncHandler(fn) {
-  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
 
 function requireString(value, fieldName, { lowercase = false } = {}) {

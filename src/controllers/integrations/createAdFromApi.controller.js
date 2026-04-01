@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 /**
  * LEGADO — carregado apenas por `src/routes/integrations/index.js`, **não montado** em `app.js`.
  * Já delega criação a `createAdNormalized` (pipeline oficial). Não duplicar regra de INSERT aqui.
@@ -68,7 +69,7 @@ async function createAdFromApi(req, res) {
         error: err.message || "Requisição inválida",
       });
     }
-    console.error("Erro ao criar anúncio via API:", err);
+    logger.error({ err: "Erro ao criar anúncio via API:", err }, "controller error");
     res.status(500).json({ error: "Erro interno" });
   }
 }

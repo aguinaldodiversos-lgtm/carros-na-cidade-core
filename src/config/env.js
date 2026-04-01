@@ -41,9 +41,29 @@ const envSchema = z.object({
   // Redis
   REDIS_URL: z.string().optional(),
 
-  // JWT (opcional em dev)
-  JWT_SECRET: z.string().optional(),
-  JWT_REFRESH_SECRET: z.string().optional(),
+  // JWT — obrigatórios em produção; em dev admite valor curto (mas não vazio)
+  JWT_SECRET: z
+    .string()
+    .min(1, "JWT_SECRET é obrigatório")
+    .refine(
+      (v) => process.env.NODE_ENV !== "production" || v.length >= 32,
+      "JWT_SECRET deve ter ao menos 32 caracteres em produção"
+    ),
+  JWT_REFRESH_SECRET: z
+    .string()
+    .min(1, "JWT_REFRESH_SECRET é obrigatório")
+    .refine(
+      (v) => process.env.NODE_ENV !== "production" || v.length >= 32,
+      "JWT_REFRESH_SECRET deve ter ao menos 32 caracteres em produção"
+    ),
+
+  // MercadoPago (opcional – desabilita checkout real quando ausente)
+  MP_ACCESS_TOKEN: z.string().optional(),
+  MP_PUBLIC_KEY: z.string().optional(),
+  MP_WEBHOOK_SECRET: z.string().optional(),
+
+  // URL pública do backend (usada em notificações/webhook)
+  APP_BASE_URL: z.string().url().optional(),
 
   // Service
   SERVICE_NAME: z.string().default("carros-na-cidade-core"),

@@ -1,6 +1,7 @@
 import express from "express";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { asyncHandler } from "../../shared/utils/async-handler.js";
 import {
   createBoostCheckout,
   createPlanCheckout,
@@ -9,10 +10,6 @@ import {
 } from "./payments.service.js";
 
 const router = express.Router();
-
-function asyncHandler(fn) {
-  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-}
 
 function resolvePublicUrls(req) {
   const origin = String(req.body?.success_url || "").trim()
