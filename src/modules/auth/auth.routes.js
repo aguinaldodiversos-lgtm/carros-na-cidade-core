@@ -7,6 +7,7 @@ import { pool } from "../../infrastructure/database/db.js";
 import * as AuthServiceNS from "./auth.service.js";
 import * as PasswordServiceNS from "./password.service.js";
 import * as EmailVerificationServiceNS from "./emailVerification.service.js";
+import { verifyDocument } from "../../services/documents/documentVerification.service.js";
 
 const router = express.Router();
 
@@ -156,10 +157,6 @@ router.post(
     if (!["cpf", "cnpj"].includes(document_type)) {
       throw new AppError("Tipo de documento inválido. Use cpf ou cnpj.", 400);
     }
-
-    const { createRequire } = await import("module");
-    const require = createRequire(import.meta.url);
-    const { verifyDocument } = require("../../services/documents/documentVerification.service.js");
 
     const result = await verifyDocument({
       type: document_type,

@@ -1,12 +1,12 @@
-const { Pool } = require("pg");
-const { verifyDocument } = require("../../services/documents/documentVerification.service");
+import { Pool } from "pg";
+import { verifyDocument } from "../../services/documents/documentVerification.service.js";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-async function verifyUserDocument(req, res) {
+export async function verifyUserDocument(req, res) {
   try {
     const userId = req.user.id;
     const { document_type, document_number } = req.body;
@@ -58,5 +58,3 @@ async function verifyUserDocument(req, res) {
     });
   }
 }
-
-module.exports = { verifyUserDocument };
