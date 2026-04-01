@@ -1,4 +1,5 @@
 import type { AdItem } from "@/lib/search/ads-search";
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 
 export interface HomeDataResponse {
   success: boolean;
@@ -16,18 +17,9 @@ export interface HomeDataResponse {
   };
 }
 
-const OFFICIAL_PUBLIC_API_URL = "https://carros-na-cidade-api.onrender.com";
-
-function stripTrailingSlash(url: string) {
-  return url.replace(/\/+$/, "");
-}
-
+// URL central — usa NEXT_PUBLIC_API_URL / API_URL / AUTH_API_BASE_URL (frontend/lib/env/backend-api.ts)
 function getApiBaseUrl(): string {
-  const api =
-    process.env.API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    OFFICIAL_PUBLIC_API_URL;
-  return stripTrailingSlash(api);
+  return getBackendApiBaseUrl() || "https://carros-na-cidade-api.onrender.com";
 }
 
 function fallbackHome(): HomeDataResponse["data"] {

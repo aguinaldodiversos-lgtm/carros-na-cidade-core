@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 
@@ -39,7 +40,7 @@ module.exports = async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("Erro no reset password:", err);
+    logger.error({ err: "Erro no reset password:", err }, "controller error");
     res.status(500).json({
       error: "Erro ao redefinir senha",
     });

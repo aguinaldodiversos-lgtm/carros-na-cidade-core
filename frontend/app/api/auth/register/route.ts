@@ -3,7 +3,6 @@ import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { registerUser } from "@/services/authService";
 import {
   AUTH_COOKIE_NAME,
-  applyPrivateNoStoreHeaders,
   createSessionToken,
   getSessionCookieOptions,
 } from "@/services/sessionService";
@@ -42,12 +41,25 @@ export async function POST(request: NextRequest) {
         ? body.document_type
         : undefined;
 
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
+    if (!name) {
+      return NextResponse.json(
+        { error: "Nome é obrigatório." },
+        { status: 400 }
+      );
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Senha deve ter no minimo 6 caracteres" }, { status: 400 });
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: "Email e senha sao obrigatorios" },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: "Senha deve ter no minimo 8 caracteres" },
+        { status: 400 }
+      );
     }
 
     if ((documentType && !documentNumber) || (!documentType && documentNumber)) {
@@ -58,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     const registerPayload = {
-      ...(name ? { name } : {}),
+      name,
       email,
       password,
       ...(phone ? { phone } : {}),
@@ -78,39 +90,48 @@ export async function POST(request: NextRequest) {
 
     const { session: authSession } = result;
 
-    const ru = authSession.user;
     if (
-      !ru?.id ||
-      !ru.email ||
-      typeof ru.type !== "string" ||
-      !ru.type.trim() ||
+      !authSession.user?.id ||
+      !authSession.user?.email ||
       !authSession.accessToken ||
       !authSession.refreshToken
     ) {
-      return NextResponse.json({ error: "Resposta de autenticacao invalida." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Resposta de autenticacao invalida." },
+        { status: 500 }
+      );
     }
 
     const sessionToken = createSessionToken({
-      id: ru.id,
-      name: ru.name,
-      email: ru.email,
-      type: ru.type,
+      id: authSession.user.id,
+      name: authSession.user.name,
+      email: authSession.user.email,
+      type: authSession.user.type,
       accessToken: authSession.accessToken,
       refreshToken: authSession.refreshToken,
     });
 
     const response = NextResponse.json({
       user: authSession.user,
-      redirect_to: resolvePostLoginRedirect(authSession.user.type, next || undefined),
+      redirect_to: resolvePostLoginRedirect(
+        authSession.user.type,
+        next || undefined
+      ),
     });
 
-    response.cookies.set(AUTH_COOKIE_NAME, sessionToken, getSessionCookieOptions());
-    applyPrivateNoStoreHeaders(response);
+    response.cookies.set(
+      AUTH_COOKIE_NAME,
+      sessionToken,
+      getSessionCookieOptions()
+    );
 
     return response;
   } catch (error) {
     console.error("POST /api/auth/register error:", error);
 
-    return NextResponse.json({ error: "Erro interno ao processar o cadastro." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erro interno ao processar o cadastro." },
+      { status: 500 }
+    );
   }
 }

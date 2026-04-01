@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 const { distribuirLead } = require("../../services/leads/leadDistribution.service");
 
@@ -45,7 +46,7 @@ async function createAlert(req, res) {
       alert,
     });
   } catch (err) {
-    console.error("Erro ao criar alerta:", err);
+    logger.error({ err: "Erro ao criar alerta:", err }, "controller error");
     res.status(500).json({
       error: "Erro interno ao criar alerta",
     });

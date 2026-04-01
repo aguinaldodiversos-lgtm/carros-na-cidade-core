@@ -15,7 +15,8 @@ const MP_PUBLIC_KEY = process.env.MP_PUBLIC_KEY || "";
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
 const MP_API_BASE = "https://api.mercadopago.com";
 
-let schemaReadyPromise = null;
+// DDL removido: tabela payment_intents criada via migration 012_billing_and_payments.sql
+// Nenhuma criação de tabela em runtime.
 
 function stripTrailingSlash(value) {
   return String(value || "").replace(/\/+$/, "");
@@ -33,34 +34,6 @@ function getBackendPublicUrl() {
   }
 
   return stripTrailingSlash(value);
-}
-
-async function ensurePaymentsSchema() {
-  if (!schemaReadyPromise) {
-    schemaReadyPromise = query(`
-      CREATE TABLE IF NOT EXISTS payment_intents (
-        id text PRIMARY KEY,
-        user_id text NOT NULL,
-        context text NOT NULL CHECK (context IN ('plan', 'boost')),
-        plan_id text REFERENCES subscription_plans(id),
-        ad_id text,
-        boost_option_id text,
-        amount numeric(12,2) NOT NULL DEFAULT 0,
-        checkout_resource_id text,
-        checkout_resource_type text CHECK (checkout_resource_type IN ('preference', 'preapproval')),
-        payment_resource_id text UNIQUE,
-        status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'canceled')),
-        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-        created_at timestamptz NOT NULL DEFAULT NOW(),
-        updated_at timestamptz NOT NULL DEFAULT NOW()
-      );
-    `).catch((error) => {
-      schemaReadyPromise = null;
-      throw error;
-    });
-  }
-
-  return schemaReadyPromise;
 }
 
 async function mpRequest(path, init) {
@@ -90,8 +63,6 @@ function serializeMetadata(value) {
 }
 
 async function insertPaymentIntent(intent) {
-  await ensurePaymentsSchema();
-
   await query(
     `
     INSERT INTO payment_intents (
@@ -128,7 +99,6 @@ async function insertPaymentIntent(intent) {
 }
 
 async function getPaymentIntentById(intentId) {
-  await ensurePaymentsSchema();
   const result = await query(
     `
     SELECT *
@@ -633,7 +603,6 @@ async function resolveIntentForWebhook(paymentData, resourceId) {
     if (byId) return byId;
   }
 
-  await ensurePaymentsSchema();
   const result = await query(
     `
     SELECT *

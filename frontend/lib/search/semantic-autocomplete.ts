@@ -1,6 +1,6 @@
 // frontend/lib/search/semantic-autocomplete.ts
 // GET /api/ads/autocomplete e GET /api/ads/autocomplete/semantic — Express: src/modules/ads/ads.routes.js (prefixo /api/ads em app.js).
-
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 export type AutocompleteSuggestionType = "brand" | "model" | "city" | "composed";
 
 export interface FlatAutocompleteSuggestion {
@@ -78,7 +78,7 @@ export interface FlatAutocompleteResponse {
 }
 
 function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "http://localhost:4000";
+  return getBackendApiBaseUrl() || "http://localhost:4000";
 }
 
 export async function fetchSemanticAutocomplete(

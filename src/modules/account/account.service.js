@@ -7,6 +7,36 @@ import { getAccountUser } from "./account.user.read.js";
 
 export { getAccountUser };
 
+/**
+ * Resolve a imagem de capa de um anúncio.
+ * Prioridade: images[0] (JSONB) → image_url (coluna legada) → null.
+ * Nunca retorna placeholder hardcoded — o frontend decide o fallback visual.
+ *
+ * @param {object} row - linha da query
+ * @returns {string|null}
+ */
+function resolveAdCoverImage(row) {
+  // Coluna images é JSONB — pode chegar como array JS ou string JSON
+  if (row.images) {
+    const arr = Array.isArray(row.images)
+      ? row.images
+      : (() => {
+          try {
+            return JSON.parse(row.images);
+          } catch {
+            return [];
+          }
+        })();
+    const first = Array.isArray(arr) ? arr.find((u) => typeof u === "string" && u.trim()) : null;
+    if (first) return first.trim();
+  }
+  // Coluna legada image_url
+  if (row.image_url && typeof row.image_url === "string" && row.image_url.trim()) {
+    return row.image_url.trim();
+  }
+  return null;
+}
+
 const DEFAULT_PLANS = [
   {
     id: "cpf-free-essential",
@@ -504,7 +534,7 @@ function normalizeDashboardAd(row) {
     ),
     title: row.title?.trim() || "Anuncio sem titulo",
     price: toNumber(row.price, 0),
-    image_url: row.image_url || "/images/banner1.jpg",
+    image_url: resolveAdCoverImage(row),
     status: row.status === "paused" ? "paused" : "active",
     is_featured: isFeatured,
     featured_until: featuredUntil,
@@ -524,6 +554,8 @@ export async function listOwnedAds(userId) {
         a.title,
         a.price,
         a.status,
+        a.images,
+        a.image_url,
         a.highlight_until,
         a.created_at,
         a.updated_at

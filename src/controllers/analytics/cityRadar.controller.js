@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -42,7 +43,7 @@ module.exports = async (req, res) => {
 
     res.json(radar.slice(0, 50));
   } catch (err) {
-    console.error("Erro no radar de cidades:", err);
+    logger.error({ err: "Erro no radar de cidades:", err }, "controller error");
     res.status(500).json({
       error: "Erro ao gerar radar de cidades",
     });

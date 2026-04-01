@@ -72,7 +72,13 @@ export async function createPasswordResetToken(email) {
       [tokenHash, expiresAt, rows[0].id]
     );
 
-    return { ok: true, token, expiresAt };
+    // TODO: Integrar com serviço de e-mail para enviar o token ao usuário.
+    // O token NÃO deve ser retornado na resposta HTTP (vetor de ataque).
+    // Exemplo: await emailService.sendPasswordReset(normalized, token, expiresAt);
+    logger?.info?.({ userId: rows[0].id }, "[password.service] reset token gerado");
+
+    // Retorna apenas ok: true — o token fica no banco e deve chegar ao usuário via e-mail.
+    return { ok: true };
   } catch (err) {
     logger?.error?.({ err }, "[password.service] createPasswordResetToken failed");
     return { ok: true };

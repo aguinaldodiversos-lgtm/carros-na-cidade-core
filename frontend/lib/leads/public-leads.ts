@@ -1,3 +1,5 @@
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+
 type SubmitVehicleLeadInput = {
   adId: string;
   buyerName: string;
@@ -12,8 +14,7 @@ type LeadApiResponse = {
 };
 
 function getApiBaseUrl() {
-  const value = process.env.NEXT_PUBLIC_API_URL?.trim() || "";
-  return value.replace(/\/+$/, "");
+  return getBackendApiBaseUrl();
 }
 
 export async function submitVehicleLead(input: SubmitVehicleLeadInput) {

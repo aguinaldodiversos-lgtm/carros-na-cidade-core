@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 import { Pool } from "pg";
 import { verifyDocument } from "../../services/documents/documentVerification.service.js";
 
@@ -52,7 +53,7 @@ export async function verifyUserDocument(req, res) {
       company_name: result.company_name || null,
     });
   } catch (err) {
-    console.error("Erro na verificação de documento:", err);
+    logger.error({ err: "Erro na verificação de documento:", err }, "controller error");
     res.status(500).json({
       error: "Erro interno",
     });

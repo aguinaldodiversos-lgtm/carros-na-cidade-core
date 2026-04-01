@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -35,7 +36,7 @@ module.exports = async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error("Erro no analytics:", err);
+    logger.error({ err: "Erro no analytics:", err }, "controller error");
     res.status(500).json({ error: "Erro interno" });
   }
 };

@@ -1,27 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
-import {
-  AUTH_COOKIE_NAME,
-  applyPrivateNoStoreHeaders,
-  getClearSessionCookieOptions,
-  getSessionDataFromRequest,
-} from "@/services/sessionService";
+import { AUTH_COOKIE_NAME } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * POST /api/auth/logout
+ *
+ * Invalida a sessão do frontend zerando o cookie cnc_session.
+ * O refreshToken do backend deve ser revogado pelo cliente antes de chamar este endpoint,
+ * ou pelo backend via POST /api/auth/logout com o refreshToken no body.
+ */
 export async function POST(request: NextRequest) {
-  const session = getSessionDataFromRequest(request);
-  const backendUrl = resolveBackendApiUrl("/api/auth/logout");
-  if (backendUrl && session?.refreshToken) {
-    await fetch(backendUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
-    }).catch(() => {});
+  // Tenta propagar o logout para o backend (revogar refresh token)
+  try {
+    const body = await request.json().catch(() => ({})) as { refreshToken?: string };
+    const refreshToken = typeof body.refreshToken === "string" ? body.refreshToken : null;
+
+    const backendUrl = process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim() || "";
+
+    if (backendUrl && refreshToken) {
+      await fetch(`${backendUrl.replace(/\/+$/, "")}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+        cache: "no-store",
+      }).catch(() => {
+        // falha silenciosa: mesmo sem revogar no backend, o cookie será removido
+      });
+    }
+  } catch {
+    // falha silenciosa: sempre prosseguir para limpar o cookie
   }
 
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(AUTH_COOKIE_NAME, "", getClearSessionCookieOptions());
-  applyPrivateNoStoreHeaders(res);
-  return res;
+  const response = NextResponse.json({ ok: true });
+
+  // Zera o cookie de sessão do BFF
+  response.cookies.set(AUTH_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  return response;
 }

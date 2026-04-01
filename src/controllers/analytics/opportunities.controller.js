@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -30,7 +31,7 @@ module.exports = async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error("Erro ao calcular oportunidades:", err);
+    logger.error({ err: "Erro ao calcular oportunidades:", err }, "controller error");
     res.status(500).json({
       error: "Erro interno no servidor",
     });

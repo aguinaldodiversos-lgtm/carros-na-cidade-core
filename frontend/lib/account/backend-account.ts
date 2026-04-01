@@ -1,21 +1,20 @@
+import { cookies } from "next/headers";
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 import type { DashboardPayload } from "@/lib/dashboard-types";
-import { normalizeDashboardPayload } from "@/lib/dashboard/normalize-dashboard-payload";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
-import { getBoostOptions } from "@/services/adService";
 import type { SubscriptionPlan } from "@/services/planStore";
 import type { SessionData } from "@/services/sessionService";
-
-type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
-
-type JsonObject = Record<string, unknown>;
+import {
+  AUTH_COOKIE_NAME,
+  createSessionToken,
+  getSessionCookieOptions,
+  getSessionDataFromCookieValue,
+} from "@/services/sessionService";
 
 type FetchInit = {
-  method?: HttpMethod;
-  body?: JsonObject;
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  body?: Record<string, unknown>;
   accessToken?: string;
   cache?: RequestCache;
-  timeoutMs?: number;
-  headers?: Record<string, string>;
 };
 
 type OwnedAdResponse = {
@@ -35,255 +34,175 @@ type PaymentCheckoutResponse = {
   boost_option_id?: string;
 };
 
-type ApiErrorPayload = {
+type BackendRefreshResponse = {
+  accessToken?: string;
+  access_token?: string;
+  token?: string;
+  refreshToken?: string;
+  refresh_token?: string;
   error?: string;
-  message?: string;
-  code?: string;
-  details?: unknown;
 };
 
-const DEFAULT_TIMEOUT_MS = 15_000;
-
-class BackendApiError extends Error {
-  public readonly status: number;
-  public readonly code?: string;
-  public readonly details?: unknown;
-  public readonly url: string;
-
-  constructor(params: {
-    message: string;
-    status: number;
-    url: string;
-    code?: string;
-    details?: unknown;
-  }) {
-    super(params.message);
-    this.name = "BackendApiError";
-    this.status = params.status;
-    this.url = params.url;
-    this.code = params.code;
-    this.details = params.details;
-  }
+function getApiBaseUrl() {
+  return getBackendApiBaseUrl();
 }
 
-function assertAccessToken(session: SessionData | null | undefined): string {
-  const token = session?.accessToken?.trim();
-  if (!token) {
-    throw new Error("Sessão inválida ou token de acesso ausente.");
-  }
-  return token;
-}
+/**
+ * Tenta silenciosamente renovar o accessToken usando o refreshToken armazenado
+ * no cookie de sessão. Se bem-sucedido, re-emite o cookie e retorna o novo
+ * accessToken. Retorna null se falhar ou se não houver refreshToken.
+ */
+async function tryRefreshAccessToken(
+  currentSession: SessionData
+): Promise<string | null> {
+  const { refreshToken } = currentSession;
+  if (!refreshToken) return null;
 
-function buildUrl(path: string): string {
-  const url = resolveBackendApiUrl(path);
-  if (!url) {
-    throw new Error("Backend API URL nao configurada.");
-  }
-  return url;
-}
-
-function isJsonResponse(contentType: string | null): boolean {
-  return !!contentType && contentType.toLowerCase().includes("application/json");
-}
-
-async function parseResponseBody<T>(response: Response): Promise<T | ApiErrorPayload | null> {
-  if (response.status === 204) {
-    return null;
-  }
-
-  const contentType = response.headers.get("content-type");
+  const apiBase = getApiBaseUrl();
+  if (!apiBase) return null;
 
   try {
-    if (isJsonResponse(contentType)) {
-      return (await response.json()) as T | ApiErrorPayload;
-    }
+    const response = await fetch(`${apiBase}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+      cache: "no-store",
+    });
 
-    const text = await response.text();
-    if (!text) return null;
+    if (!response.ok) return null;
 
+    const data = (await response
+      .json()
+      .catch(() => ({}))) as BackendRefreshResponse;
+
+    const newAccessToken =
+      data.accessToken?.trim() ||
+      data.access_token?.trim() ||
+      data.token?.trim() ||
+      "";
+
+    if (!newAccessToken) return null;
+
+    const newRefreshToken =
+      data.refreshToken?.trim() ||
+      data.refresh_token?.trim() ||
+      refreshToken;
+
+    // Re-emite o cookie de sessão com o novo accessToken
     try {
-      return JSON.parse(text) as T | ApiErrorPayload;
+      const cookieStore = cookies();
+      const updatedToken = createSessionToken({
+        id: currentSession.id,
+        name: currentSession.name,
+        email: currentSession.email,
+        type: currentSession.type,
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      });
+      cookieStore.set(
+        AUTH_COOKIE_NAME,
+        updatedToken,
+        getSessionCookieOptions()
+      );
     } catch {
-      return { message: text };
+      // cookies() pode não estar disponível em todos os contextos — prossegue sem re-emitir
     }
+
+    return newAccessToken;
   } catch {
     return null;
   }
 }
 
-function extractErrorMessage(payload: ApiErrorPayload | null, fallback: string): string {
-  if (!payload) return fallback;
-  return payload.error || payload.message || fallback;
+/**
+ * Lê o cookie de sessão atual e retorna os dados mais recentes (após possível
+ * atualização no mesmo request).
+ */
+function getCurrentSession(): SessionData | null {
+  try {
+    const cookieStore = cookies();
+    const tokenValue = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    return getSessionDataFromCookieValue(tokenValue);
+  } catch {
+    return null;
+  }
 }
 
-async function fetchBackendJson<T>(path: string, init: FetchInit = {}): Promise<T> {
-  const url = buildUrl(path);
-  const controller = new AbortController();
-  const timeoutMs = init.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+async function fetchBackendJson<T>(
+  path: string,
+  init: FetchInit = {}
+): Promise<T> {
+  const apiBase = getApiBaseUrl();
+  if (!apiBase) {
+    throw new Error("Backend API URL nao configurada.");
+  }
 
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
+  const doFetch = (token?: string) =>
+    fetch(`${apiBase}${path}`, {
       method: init.method ?? "GET",
       headers: {
-        Accept: "application/json",
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
-        ...(init.headers ?? {}),
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: init.body ? JSON.stringify(init.body) : undefined,
       cache: init.cache ?? "no-store",
-      signal: controller.signal,
     });
 
-    const payload = await parseResponseBody<T>(response);
+  let response = await doFetch(init.accessToken);
 
-    if (!response.ok) {
-      const errorPayload = (payload ?? null) as ApiErrorPayload | null;
-      throw new BackendApiError({
-        message: extractErrorMessage(errorPayload, "Falha na comunicacao com o backend."),
-        status: response.status,
-        url,
-        code: errorPayload?.code,
-        details: errorPayload?.details,
-      });
+  // Tenta renovar o token silenciosamente em caso de 401
+  if (response.status === 401 && init.accessToken) {
+    const freshSession = getCurrentSession();
+    if (freshSession?.refreshToken) {
+      const newAccessToken = await tryRefreshAccessToken(freshSession);
+      if (newAccessToken) {
+        response = await doFetch(newAccessToken);
+      }
     }
-
-    return payload as T;
-  } catch (error) {
-    if (error instanceof BackendApiError) {
-      throw error;
-    }
-
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Tempo limite excedido ao comunicar com o backend: ${path}`);
-    }
-
-    throw error instanceof Error
-      ? new Error(`Erro ao comunicar com o backend em ${path}: ${error.message}`)
-      : new Error(`Erro desconhecido ao comunicar com o backend em ${path}`);
-  } finally {
-    clearTimeout(timeout);
   }
+
+  const payload = (await response
+    .json()
+    .catch(() => ({}))) as T & { error?: string; message?: string };
+
+  if (!response.ok) {
+    throw new Error(
+      payload.error || payload.message || "Falha na comunicacao com o backend."
+    );
+  }
+
+  return payload;
 }
 
-async function fetchBackendText(
-  path: string,
-  init: Omit<FetchInit, "body"> & { body?: string }
-): Promise<{
-  ok: boolean;
-  status: number;
-  body: string;
-  contentType: string;
-}> {
-  const url = buildUrl(path);
-  const controller = new AbortController();
-  const timeoutMs = init.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      method: init.method ?? "POST",
-      headers: {
-        Accept: "*/*",
-        ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
-        ...(init.headers ?? {}),
-      },
-      body: init.body,
-      cache: init.cache ?? "no-store",
-      signal: controller.signal,
-    });
-
-    const payload = await response.text();
-
-    return {
-      ok: response.ok,
-      status: response.status,
-      body: payload,
-      contentType: response.headers.get("content-type") || "text/plain",
-    };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Tempo limite excedido ao encaminhar request para ${path}`);
-    }
-
-    throw error instanceof Error
-      ? new Error(`Erro ao encaminhar request para ${path}: ${error.message}`)
-      : new Error(`Erro desconhecido ao encaminhar request para ${path}`);
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-export async function fetchPlans(options: { type?: "CPF" | "CNPJ"; activeOnly?: boolean } = {}) {
+export async function fetchPlans(
+  options: { type?: "CPF" | "CNPJ"; activeOnly?: boolean } = {}
+) {
   const query = new URLSearchParams();
-
   if (options.type) query.set("type", options.type);
-  if (options.activeOnly !== undefined) query.set("active", String(options.activeOnly));
-
-  const suffix = query.toString() ? `?${query.toString()}` : "";
+  if (options.activeOnly !== undefined)
+    query.set("active", String(options.activeOnly));
 
   const payload = await fetchBackendJson<{ plans: SubscriptionPlan[] }>(
-    `/api/account/plans${suffix}`,
-    {
-      cache: "no-store",
-    }
+    `/api/account/plans${query.toString() ? `?${query.toString()}` : ""}`,
+    { cache: "no-store" }
   );
 
   return payload.plans;
 }
 
-function buildFallbackDashboardFromSession(session: SessionData): DashboardPayload {
-  const isCnpj = session.type === "CNPJ";
-  const freeLimit = isCnpj ? 0 : 3;
-  return {
-    user: {
-      id: session.id,
-      name: session.name,
-      email: session.email,
-      type: session.type,
-      cnpj_verified: false,
-    },
-    current_plan: null,
-    stats: {
-      active_ads: 0,
-      paused_ads: 0,
-      featured_ads: 0,
-      total_views: 0,
-      free_limit: freeLimit,
-      plan_limit: freeLimit,
-      available_limit: freeLimit,
-      plan_name: "Plano gratuito",
-      is_verified_store: false,
-    },
-    publish_eligibility: {
-      allowed: false,
-      reason:
-        session.type === "pending"
-          ? "Complete seu perfil com CPF ou CNPJ para publicar anúncios."
-          : "Resposta do servidor em formato inesperado. Atualize a página ou tente novamente.",
-    },
-    active_ads: [],
-    paused_ads: [],
-    boost_options: getBoostOptions(),
-  };
-}
-
 export async function fetchDashboard(session: SessionData) {
-  const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
-    accessToken: assertAccessToken(session),
+  return fetchBackendJson<DashboardPayload>("/api/account/dashboard", {
+    accessToken: session.accessToken,
   });
-  const normalized = normalizeDashboardPayload(raw);
-  if (normalized) return normalized;
-  return buildFallbackDashboardFromSession(session);
 }
 
 export async function fetchOwnedAd(session: SessionData, adId: string) {
-  return fetchBackendJson<OwnedAdResponse>(`/api/account/ads/${encodeURIComponent(adId)}`, {
-    accessToken: assertAccessToken(session),
-  });
+  return fetchBackendJson<OwnedAdResponse>(
+    `/api/account/ads/${encodeURIComponent(adId)}`,
+    {
+      accessToken: session.accessToken,
+    }
+  );
 }
 
 export async function fetchPlanEligibility(session: SessionData) {
@@ -294,7 +213,7 @@ export async function fetchPlanEligibility(session: SessionData) {
     suggested_plans: SubscriptionPlan[];
   }>("/api/account/plans/eligibility", {
     method: "POST",
-    accessToken: assertAccessToken(session),
+    accessToken: session.accessToken,
     body: {},
   });
 }
@@ -308,17 +227,20 @@ export async function patchOwnedAdStatus(
     `/api/account/ads/${encodeURIComponent(adId)}/status`,
     {
       method: "PATCH",
-      accessToken: assertAccessToken(session),
+      accessToken: session.accessToken,
       body: { action },
     }
   );
 }
 
 export async function deleteOwnedAd(session: SessionData, adId: string) {
-  return fetchBackendJson<{ ok: true }>(`/api/account/ads/${encodeURIComponent(adId)}`, {
-    method: "DELETE",
-    accessToken: assertAccessToken(session),
-  });
+  return fetchBackendJson<{ ok: true }>(
+    `/api/account/ads/${encodeURIComponent(adId)}`,
+    {
+      method: "DELETE",
+      accessToken: session.accessToken,
+    }
+  );
 }
 
 export async function createPaymentCheckout(
@@ -334,7 +256,7 @@ export async function createPaymentCheckout(
 ) {
   return fetchBackendJson<PaymentCheckoutResponse>("/api/payments/create", {
     method: "POST",
-    accessToken: assertAccessToken(session),
+    accessToken: session.accessToken,
     body,
   });
 }
@@ -348,27 +270,45 @@ export async function createSubscriptionCheckout(
     pending_url: string;
   }
 ) {
-  return fetchBackendJson<PaymentCheckoutResponse>("/api/payments/subscription", {
-    method: "POST",
-    accessToken: assertAccessToken(session),
-    body,
-  });
+  return fetchBackendJson<PaymentCheckoutResponse>(
+    "/api/payments/subscription",
+    {
+      method: "POST",
+      accessToken: session.accessToken,
+      body,
+    }
+  );
 }
 
 export async function forwardPaymentWebhookToBackend(
   rawBody: string,
   headers: Record<string, string>
 ) {
-  return fetchBackendText("/api/payments/webhook", {
+  const apiBase = getApiBaseUrl();
+  if (!apiBase) {
+    throw new Error("Backend API URL nao configurada.");
+  }
+
+  const response = await fetch(`${apiBase}/api/payments/webhook`, {
     method: "POST",
-    body: rawBody,
     headers: {
       "Content-Type": headers["content-type"] || "application/json",
-      ...(headers["x-signature"] ? { "x-signature": headers["x-signature"] } : {}),
-      ...(headers["x-request-id"] ? { "x-request-id": headers["x-request-id"] } : {}),
+      ...(headers["x-signature"]
+        ? { "x-signature": headers["x-signature"] }
+        : {}),
+      ...(headers["x-request-id"]
+        ? { "x-request-id": headers["x-request-id"] }
+        : {}),
     },
+    body: rawBody,
     cache: "no-store",
   });
-}
 
-export { BackendApiError };
+  const payload = await response.text();
+  return {
+    ok: response.ok,
+    status: response.status,
+    body: payload,
+    contentType: response.headers.get("content-type") || "application/json",
+  };
+}

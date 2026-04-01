@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -43,7 +44,7 @@ module.exports = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("Erro ao criar alerta:", err);
+    logger.error({ err: "Erro ao criar alerta:", err }, "controller error");
     res.status(500).json({
       error: "Erro ao criar alerta",
     });

@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const { sendResetPasswordEmail } = require("../../services/email.service");
 const { Pool } = require("pg");
 const crypto = require("crypto");
@@ -35,7 +36,7 @@ module.exports = async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("Erro no forgot password:", err);
+    logger.error({ err: "Erro no forgot password:", err }, "controller error");
     res.status(500).json({
       error: "Erro ao processar solicitação",
     });

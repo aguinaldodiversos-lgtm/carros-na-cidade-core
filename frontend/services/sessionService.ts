@@ -25,7 +25,18 @@ type SessionPayload = SessionData & {
 const DEFAULT_DURATION_SECONDS = 60 * 60 * 24 * 7;
 
 function getSessionSecret() {
-  return process.env.AUTH_SESSION_SECRET ?? "cnc-dev-session-secret";
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "[sessionService] AUTH_SESSION_SECRET não definido. " +
+          "Defina esta variável de ambiente antes de iniciar em produção."
+      );
+    }
+    // Fallback apenas para desenvolvimento local — NUNCA use em produção
+    return "cnc-dev-session-secret-local-only";
+  }
+  return secret;
 }
 
 function encodeBase64Url(value: string) {

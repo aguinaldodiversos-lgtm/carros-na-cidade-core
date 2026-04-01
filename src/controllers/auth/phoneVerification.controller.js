@@ -1,3 +1,4 @@
+import { logger } from "../../shared/logger.js";
 const {
   sendPhoneVerification,
   confirmPhoneCode,
@@ -24,7 +25,7 @@ async function sendCode(req, res) {
       message: "Código enviado para o WhatsApp",
     });
   } catch (err) {
-    console.error("Erro ao enviar código:", err);
+    logger.error({ err: "Erro ao enviar código:", err }, "controller error");
     res.status(500).json({
       error: "Erro interno",
     });
@@ -58,7 +59,7 @@ async function confirmCode(req, res) {
       message: "Telefone verificado com sucesso",
     });
   } catch (err) {
-    console.error("Erro ao confirmar código:", err);
+    logger.error({ err: "Erro ao confirmar código:", err }, "controller error");
     res.status(500).json({
       error: "Erro interno",
     });

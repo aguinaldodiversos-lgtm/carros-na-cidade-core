@@ -1,70 +1,56 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 
 export const metadata: Metadata = {
-  title: "Segurança na negociação | Carros na Cidade",
-  description:
-    "Dicas práticas para comprar ou vender veículo com mais segurança e menos risco de golpe.",
+  title: "Segurança | Carros na Cidade",
+  description: "Saiba como o Carros na Cidade protege seus dados, garante autenticidade dos anúncios e orienta sobre boas práticas de segurança nas negociações.",
+  alternates: { canonical: "/seguranca" },
 };
 
 export default function SegurancaPage() {
   return (
     <StaticPageLayout
-      eyebrow="Confiança"
-      title="Segurança na negociação"
-      description="Negociar carro envolve dinheiro e documento: abaixo estão boas práticas alinhadas ao que o Carros na Cidade é — um lugar para encontrar ofertas e contatos, não um substituto da sua cautela na hora de fechar negócio."
+      eyebrow="Proteção e boas práticas"
+      title="Segurança no Carros na Cidade"
+      description="Levamos a segurança dos nossos usuários a sério. Documentos verificados, senhas protegidas e orientações claras para negociações seguras."
       sections={[
         {
-          title: "Antes de combinar visita ou test-drive",
+          title: "Verificação de documento",
           body: [
-            "Confira se o anúncio faz sentido (preço muito abaixo do mercado, fotos genéricas ou dados incompletos merecem desconfiança).",
-            "Prefira lugares públicos e bem iluminados para primeiro encontro; leve alguém com você quando possível.",
+            "Todo anunciante cadastrado passa por verificação de CPF ou CNPJ. Isso garante que os dados do vendedor são reais e rastreáveis.",
+            "Lojas com CNPJ verificado recebem badge especial e maior credibilidade para compradores.",
           ],
         },
         {
-          title: "Documentação e histórico do veículo",
+          title: "Senhas e dados protegidos",
           body: [
-            "Exija CRLV, número do chassi conferindo com o veículo, situação de multas e gravames quando aplicável. Em dúvida, busque despachante ou serviço de checagem antes de pagar.",
-            "Nunca aceite “só transferir depois” sem contrato claro se não houver confiança plena entre as partes.",
+            "Senhas são armazenadas com hash bcrypt — nunca em texto puro. Dados pessoais são tratados conforme a LGPD.",
+            "O acesso ao dashboard e ao painel do lojista é protegido por autenticação JWT com tempo de expiração.",
           ],
         },
         {
-          title: "Pagamento",
+          title: "Boas práticas para comprar com segurança",
           body: [
-            "Evite adiantamento a desconhecidos por PIX ou transferência para “reservar” sem comprovante de identidade alinhado ao vendedor real do anúncio.",
-            "Transações em dinheiro devem ser em local seguro; para valores altos, avalie meios rastreáveis e documentação da venda.",
+            "Nunca transfira dinheiro antecipadamente sem ver o veículo pessoalmente. Desconfie de vendedores que recusam visita presencial.",
+            "Solicite laudo de procedência, verifique multas e financiamento ativo no site do DETRAN ou do banco financiador.",
+            "Confira os dados do documento do vendedor e certifique-se que o CPF/CNPJ corresponde ao proprietário no CRLV.",
           ],
         },
         {
-          title: "Golpes comuns",
+          title: "Denúncias e moderação",
           body: [
-            "Perfis que pedem pagamento fora do combinado no anúncio, links estranhos para “cadastro”, urgência excessiva (“só hoje”) ou pedido de dados bancários por mensagem são sinais de alerta.",
-            "O Carros na Cidade não pede senha de banco nem intermediário de pagamento de veículo por WhatsApp em nome do portal.",
+            "Anúncios suspeitos podem ser denunciados diretamente na página do veículo. Nossa equipe analisa e remove conteúdo indevido em até 24 horas.",
+            "Contas com atividade fraudulenta são bloqueadas sem aviso prévio e dados encaminhados quando solicitado por autoridades.",
           ],
         },
         {
-          title: "Se algo der errado",
+          title: "Canal de segurança",
           body: [
-            "Em caso de crime ou fraude, registre boletim de ocorrência e preserve prints das conversas. Para falhas técnicas do site ou denúncia de anúncio suspeito, use o contato oficial do portal.",
+            "Para reportar incidentes de segurança ou vulnerabilidades, entre em contato pelo e-mail: seguranca@carrosnacidade.com",
+            "Não divulgue vulnerabilidades publicamente antes de nos notificar. Colaboramos com pesquisadores de forma responsável.",
           ],
         },
       ]}
-      afterSections={
-        <p className="text-[15px] leading-7 text-[#5c6881]">
-          <Link href="/ajuda" className="font-semibold text-[#0e62d8] hover:underline">
-            Central de ajuda
-          </Link>
-          {" · "}
-          <Link href="/contato" className="font-semibold text-[#0e62d8] hover:underline">
-            Contato
-          </Link>
-          {" · "}
-          <Link href="/como-funciona" className="font-semibold text-[#0e62d8] hover:underline">
-            Como funciona
-          </Link>
-        </p>
-      }
     />
   );
 }

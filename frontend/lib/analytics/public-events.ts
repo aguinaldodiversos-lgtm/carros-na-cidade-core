@@ -1,3 +1,5 @@
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+
 export const AD_EVENT_TYPES = [
   "view",
   "click",
@@ -19,8 +21,7 @@ type TrackAdEventPayload = {
 };
 
 function getApiBaseUrl() {
-  const value = process.env.NEXT_PUBLIC_API_URL?.trim() || "";
-  return value.replace(/\/+$/, "");
+  return getBackendApiBaseUrl();
 }
 
 function getEventUrl() {
