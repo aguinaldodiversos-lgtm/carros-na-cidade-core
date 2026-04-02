@@ -46,6 +46,15 @@ Não substitui inspeção do banco real em produção (`npm run db:check-ads` pa
 - `npm run db:check-ads` — lista CHECKs reais e compara slugs com `ads.canonical.constants.js`.
 - Modo estrito (CI): `CHECK_ADS_STRICT=1 npm run db:check-ads` ou `node scripts/print-ads-constraints.js --strict` (exit code 1 se houver divergência ou coluna sem CHECK correspondente).
 
+## Migration 011 — `ads.images` (galeria)
+
+Arquivo: `011_ads_images.sql`.
+
+- Adiciona **`ads.images JSONB NOT NULL DEFAULT '[]'`** — array de URLs (strings); **capa = primeiro elemento** (alinhado a `ads.repository.js` e BFF de fotos).
+- O mesmo `ALTER … IF NOT EXISTS` foi incorporado ao final de `004_baseline_ads.sql` para **novas** instalações que leem o baseline num único lugar; bases que já rodaram `004` antes disso dependem de **`011`** (ou `npm run db:migrate`) para criar a coluna.
+
+Se aparecer `column "images" of relation "ads" does not exist`, o Postgres **não aplicou** essa migration: defina `RUN_MIGRATIONS=true` no boot ou execute **`npm run db:migrate`** com `DATABASE_URL` correto.
+
 ## Migration 008 — FK `advertisers` → `users` (opcional)
 
 Arquivo: `008_advertisers_user_fk.sql`.

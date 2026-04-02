@@ -29,3 +29,7 @@
 
 COMMENT ON TABLE public.ads IS
   'Contrato de enums: ver ads.canonical.constants.js e este arquivo.';
+
+-- Coluna de galeria (obrigatória no app atual): ver migration 011 e ads.repository.js
+-- ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
+-- COMMENT ON COLUMN public.ads.images IS 'URLs em JSON array; capa = índice 0.';

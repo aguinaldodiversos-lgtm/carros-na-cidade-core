@@ -45,3 +45,7 @@ ALTER TABLE ads ADD COLUMN IF NOT EXISTS search_vector tsvector;
 ALTER TABLE ads ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 1;
 ALTER TABLE ads ADD COLUMN IF NOT EXISTS gearbox TEXT;
 ALTER TABLE ads ADD COLUMN IF NOT EXISTS cambio TEXT;
+
+-- Galeria (JSON array de URLs); espelha `011_ads_images.sql` — IF NOT EXISTS é idempotente.
+ALTER TABLE ads ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
+COMMENT ON COLUMN ads.images IS 'Array JSON de URLs de imagem (capa = primeiro elemento).';
