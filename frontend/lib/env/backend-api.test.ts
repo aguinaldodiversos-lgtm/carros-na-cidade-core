@@ -11,8 +11,10 @@ function clearBackendEnv() {
 
 describe("backend-api", () => {
   const snapshot: Partial<Record<(typeof keys)[number], string | undefined>> = {};
+  let nodeEnvSnapshot: string | undefined;
 
   beforeEach(() => {
+    nodeEnvSnapshot = process.env.NODE_ENV;
     for (const k of keys) {
       snapshot[k] = process.env[k];
     }
@@ -26,10 +28,18 @@ describe("backend-api", () => {
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
+    if (nodeEnvSnapshot === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = nodeEnvSnapshot;
   });
 
   it("getBackendApiBaseUrl retorna string vazia sem variáveis", () => {
+    process.env.NODE_ENV = "production";
     expect(getBackendApiBaseUrl()).toBe("");
+  });
+
+  it("getBackendApiBaseUrl usa fallback local em dev sem variáveis", () => {
+    process.env.NODE_ENV = "development";
+    expect(getBackendApiBaseUrl()).toBe("http://127.0.0.1:4000");
   });
 
   it("getBackendApiBaseUrl prioriza AUTH_API_BASE_URL e remove barra final", () => {
@@ -39,6 +49,7 @@ describe("backend-api", () => {
   });
 
   it("resolveBackendApiUrl retorna vazio sem base", () => {
+    process.env.NODE_ENV = "production";
     expect(resolveBackendApiUrl("/api/auth/login")).toBe("");
   });
 

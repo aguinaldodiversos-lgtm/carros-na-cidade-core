@@ -3,13 +3,18 @@
  * Must match login/register (`authService`) so Render can use AUTH_API_BASE_URL / BACKEND_API_URL
  * for auth and dashboard/account calls consistently.
  */
+function getDevFallbackBaseUrl(): string {
+  if (process.env.NODE_ENV === "production") return "";
+  return "http://127.0.0.1:4000";
+}
+
 export function getBackendApiBaseUrl(): string {
   const raw =
     process.env.AUTH_API_BASE_URL?.trim() ||
     process.env.BACKEND_API_URL?.trim() ||
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    "";
+    getDevFallbackBaseUrl();
   return raw.replace(/\/+$/, "");
 }
 
