@@ -1,3 +1,6 @@
+COMANDOS PARA O PowerShell RAIZ DO PROJETO
+PS C:\WINDOWS\System32> cd C:\Users\aguin\Desktop\carros-na-cidade-core
+
 COMANDOS PARA O CDM RAIZ DO PROJETO
 
 Quando o projeto for alterado pelo curso e deve subir para o github

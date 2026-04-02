@@ -30,12 +30,60 @@ function normalizeVehicleType(value?: string): FipeVehicleType {
   return "carros";
 }
 
-function toOption(item: any): FipeOption | null {
-  const code = String(item?.codigo ?? item?.code ?? "").trim();
-  const name = String(item?.nome ?? item?.name ?? "").trim();
+function toOption(item: unknown): FipeOption | null {
+  if (!item || typeof item !== "object") return null;
+  const row = item as Record<string, unknown>;
+  const rawCode = row.codigo ?? row.code;
+  const code =
+    typeof rawCode === "string" || typeof rawCode === "number"
+      ? String(rawCode).trim()
+      : "";
+  const name = String(row.nome ?? row.name ?? "").trim();
 
   if (!code || !name) return null;
   return { code, name };
+}
+
+/**
+ * A FIPE HTTP (Parallelum) retorna modelos de dois jeitos:
+ * - lista plana: `{ nome, codigo: "123" }`
+ * - aninhada: `{ nome: "Gol", codigo: [ { nome: "1.0", codigo: "2013-1" }, ... ] }`
+ * O segundo caso quebrava o wizard (select vazio / códigos inválidos).
+ */
+export function flattenFipeModelRows(rawItems: unknown[]): FipeOption[] {
+  const out: FipeOption[] = [];
+  const seen = new Set<string>();
+
+  for (const item of rawItems) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const parentName = String(row.nome ?? row.name ?? "").trim();
+    const rawCode = row.codigo ?? row.code;
+
+    if (Array.isArray(rawCode)) {
+      for (const sub of rawCode) {
+        if (!sub || typeof sub !== "object") continue;
+        const subRow = sub as Record<string, unknown>;
+        const code = String(subRow.codigo ?? subRow.code ?? "").trim();
+        const subName = String(subRow.nome ?? subRow.name ?? "").trim();
+        if (!code || !subName) continue;
+        const label = [parentName, subName].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+        if (!seen.has(code)) {
+          seen.add(code);
+          out.push({ code, name: label || subName });
+        }
+      }
+      continue;
+    }
+
+    const opt = toOption(item);
+    if (opt && !seen.has(opt.code)) {
+      seen.add(opt.code);
+      out.push(opt);
+    }
+  }
+
+  return out;
 }
 
 async function providerFetch(path: string, revalidateSeconds = 86400) {
@@ -81,7 +129,7 @@ export async function getFipeModels(
         ? data.models
         : [];
 
-  return rawItems.map(toOption).filter(Boolean) as FipeOption[];
+  return flattenFipeModelRows(rawItems);
 }
 
 export async function getFipeYears(

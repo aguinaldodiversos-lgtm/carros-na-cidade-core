@@ -11,7 +11,6 @@ import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 
 import { SITE_FAVICON_SRC, SITE_OG_IMAGE_PATH } from "@/lib/site/brand-assets";
 
-import { LayoutChrome } from "../components/shell/LayoutChrome";
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
 
@@ -159,7 +158,6 @@ export default async function RootLayout({ children }: RootLayoutProps) {
             >
               <PublicHeader />
             </Suspense>
-            <LayoutChrome />
             <main id="main-content" className="flex-1">
               {children}
             </main>

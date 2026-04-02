@@ -58,7 +58,9 @@ export function buildAdsSearchQuery(filters = {}) {
 
   if (city_id) pushFilter(where, params, `a.city_id = ?`, Number(city_id));
   if (city_slug) pushFilter(where, params, `c.slug = ?`, city_slug);
-  if (city) pushFilter(where, params, `a.city ILIKE ?`, `%${city}%`);
+  if (city && !city_id && !city_slug) {
+    pushFilter(where, params, `a.city ILIKE ?`, `%${city}%`);
+  }
   if (state) pushFilter(where, params, `a.state = ?`, state.toUpperCase());
   if (brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${brand}%`);
   if (model) pushFilter(where, params, `a.model ILIKE ?`, `%${model}%`);
