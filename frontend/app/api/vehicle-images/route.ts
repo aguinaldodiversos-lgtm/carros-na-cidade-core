@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
 
   const localFile = await tryReadLocalUpload(safePath);
   if (localFile) {
-    return new NextResponse(localFile, {
+    const bytes = new Uint8Array(localFile);
+
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
         "Content-Type": getContentTypeFromPath(safePath),
