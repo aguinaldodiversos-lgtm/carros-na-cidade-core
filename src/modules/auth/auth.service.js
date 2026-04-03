@@ -102,6 +102,7 @@ function buildSessionUser(user) {
   }
 
   const documentVerified = Boolean(user.document_verified);
+  const emailVerified = Boolean(user.email_verified === true || user.is_email_verified === true);
 
   return {
     id: String(user.id),
@@ -113,7 +114,7 @@ function buildSessionUser(user) {
     cnpj_verified: accountType === "CNPJ" ? documentVerified : false,
     role: normalizeString(user.role) || "user",
     plan: normalizeString(user.plan) || "free",
-    email_verified: Boolean(user.email_verified ?? user.is_email_verified ?? false),
+    email_verified: emailVerified,
   };
 }
 

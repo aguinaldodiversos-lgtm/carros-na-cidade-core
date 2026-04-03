@@ -18,6 +18,18 @@ CREATE TABLE IF NOT EXISTS advertisers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS city_id BIGINT;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS company_name TEXT;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free';
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS advertisers_slug_idx ON advertisers (slug);
 CREATE INDEX IF NOT EXISTS advertisers_user_id_idx ON advertisers (user_id);
 CREATE INDEX IF NOT EXISTS advertisers_city_id_idx ON advertisers (city_id);

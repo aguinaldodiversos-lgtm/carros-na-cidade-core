@@ -7,7 +7,8 @@ import { hashRefreshToken } from "../token/token.hash.js";
 const DEFAULT_REFRESH_TTL_DAYS = 30;
 
 function normalizeString(value) {
-  return typeof value === "string" ? value.trim() : "";
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
 }
 
 function parsePositiveNumber(value, fallback) {

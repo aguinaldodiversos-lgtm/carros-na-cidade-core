@@ -22,6 +22,7 @@
     "integration:db:down": "docker compose -f docker-compose.test.yml down",
     "integration:db:wait": "node scripts/wait-for-postgres.mjs",
     "integration:db:prepare": "node scripts/integration-db-prepare.mjs",
+    "test:integration:migrations": "vitest run tests/integration/migrations-compat.integration.test.js",
     "test:integration:ads": "node scripts/run-integration-ads-tests.mjs",
     "test:integration:ads:full": "npm run integration:db:up && npm run integration:db:wait && npm run integration:db:prepare && npm run test:integration:ads",
     "ci:integration-ads": "npm run integration:db:wait && npm run integration:db:prepare && npm run test:integration:ads",

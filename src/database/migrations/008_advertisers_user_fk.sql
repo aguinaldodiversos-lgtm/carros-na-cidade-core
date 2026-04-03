@@ -7,8 +7,13 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'advertisers_user_id_fkey'
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace ns ON ns.oid = rel.relnamespace
+    WHERE c.contype = 'f'
+      AND ns.nspname = current_schema()
+      AND rel.relname = 'advertisers'
+      AND pg_get_constraintdef(c.oid) ILIKE 'FOREIGN KEY (user_id) REFERENCES users(id)%'
   ) THEN
     RETURN;
   END IF;

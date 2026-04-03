@@ -9,7 +9,25 @@ CREATE TABLE IF NOT EXISTS cities (
   slug TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS cities_slug_key ON cities (slug);
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS slug TEXT;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM cities
+    WHERE slug IS NOT NULL
+    GROUP BY slug
+    HAVING COUNT(*) > 1
+  ) THEN
+    CREATE INDEX IF NOT EXISTS cities_slug_idx ON cities (slug);
+    RAISE NOTICE '001_baseline_cities: índice único em cities.slug ignorado por slugs duplicados.';
+  ELSE
+    CREATE UNIQUE INDEX IF NOT EXISTS cities_slug_key ON cities (slug);
+  END IF;
+END $$;
 
 COMMENT ON TABLE cities IS 'Municípios; slug único usado em rotas /cidade/[slug].';
 

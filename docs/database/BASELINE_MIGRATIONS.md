@@ -4,9 +4,9 @@
 
 - **Runner:** `src/database/migrate.js` (chamado no boot por `src/index.js`).
 - **Arquivos:** `src/database/migrations/*.sql` (ordem lexicográfica: `001_…` … `008_…` e seguintes).
-- **Registro:** tabela `schema_migrations` (`id` = nome do arquivo sem `.sql`).
+- **Registro:** tabela `schema_migrations` com `filename` canônico; `id` antigo continua aceito por compatibilidade.
 
-> Existe também `src/infrastructure/database/migrate.js` com convenção diferente; o processo **principal** da API usa **`src/database/migrate.js`**.
+> `src/infrastructure/database/migrate.js` agora delega para `src/database/migrate.js`; a API usa uma única fonte de verdade.
 
 ## Objetivo desta baseline
 
@@ -22,6 +22,7 @@ Não substitui inspeção do banco real em produção (`npm run db:check-ads` pa
 - `CREATE TABLE IF NOT EXISTS` — bancos que já têm a tabela **não** são recriados.
 - `ALTER TABLE … ADD COLUMN IF NOT EXISTS` — só **acrescenta** colunas ausentes.
 - `CREATE INDEX IF NOT EXISTS` — índices auxiliares; **sem** `DROP`, **sem** truncates.
+- `schema_migrations` legado (`id SERIAL`, `filename TEXT`) é reconciliado automaticamente pelo runner atual.
 - **Sem FKs** entre `users` / `cities` / `advertisers` / `ads` nesta baseline: em deploys antigos o tipo de `users.id` pode ser **UUID** enquanto o app novo assume **BIGINT** em inserts dinâmicos; FK falharia. A integridade continua sendo responsabilidade do aplicativo até alinhar tipos.
 
 ## O que veio do código (fonte de verdade parcial)
@@ -54,6 +55,14 @@ Arquivo: `011_ads_images.sql`.
 - O mesmo `ALTER … IF NOT EXISTS` foi incorporado ao final de `004_baseline_ads.sql` para **novas** instalações que leem o baseline num único lugar; bases que já rodaram `004` antes disso dependem de **`011`** (ou `npm run db:migrate`) para criar a coluna.
 
 Se aparecer `column "images" of relation "ads" does not exist`, o Postgres **não aplicou** essa migration: defina `RUN_MIGRATIONS=true` no boot ou execute **`npm run db:migrate`** com `DATABASE_URL` correto.
+
+## Migration 012 — compatibilidade estrutural
+
+Arquivo: `012_core_schema_compatibility.sql`.
+
+- Reforça `users`, `advertisers`, `ads`, `cities` e `refresh_tokens` para bancos legados ou parcialmente migrados.
+- Cobre colunas que o código atual usa diretamente, como `ads.images`, `users.reset_token`, `users.email_verification_token`, `advertisers.slug` e campos de segurança/auth.
+- Permite que ambientes antigos continuem operando com o runner novo sem ajuste manual no banco.
 
 ## Migration 008 — FK `advertisers` → `users` (opcional)
 

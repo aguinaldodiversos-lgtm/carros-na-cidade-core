@@ -63,9 +63,12 @@ function parseEnv() {
 export const env = parseEnv();
 
 export function getDbSslConfig() {
-  const isProduction = env.NODE_ENV === "production";
+  const explicitSslConfig =
+    Object.prototype.hasOwnProperty.call(process.env, "PG_SSL_ENABLED") ||
+    /\bsslmode=(require|prefer|verify-ca|verify-full)\b/i.test(env.DATABASE_URL) ||
+    /\bssl=true\b/i.test(env.DATABASE_URL);
 
-  if (!isProduction) return false;
+  if (env.NODE_ENV !== "production" && !explicitSslConfig) return false;
   if (!env.PG_SSL_ENABLED) return false;
 
   return {
