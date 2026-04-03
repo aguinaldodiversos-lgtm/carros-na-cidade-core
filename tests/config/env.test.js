@@ -25,22 +25,25 @@ describe("getDbSslConfig", () => {
     vi.resetModules();
   });
 
-  it.each([
-    ["development", { rejectUnauthorized: false }],
-    ["production", { rejectUnauthorized: false }],
-  ])(
-    "retorna configuração SSL segura em %s para compatibilidade com Postgres gerenciado",
-    async (nodeEnv, expected) => {
-      process.env.NODE_ENV = nodeEnv;
-      process.env.DATABASE_URL = "postgresql://localhost/test";
+  it("retorna configuração SSL segura por padrão em development quando há DATABASE_URL", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://localhost/test";
 
-      const { getDbSslConfig } = await loadEnvModule();
+    const { getDbSslConfig } = await loadEnvModule();
 
-      expect(getDbSslConfig()).toEqual(expected);
-    }
-  );
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+  });
 
-  it("mantém formato estável do retorno SSL", async () => {
+  it("retorna configuração SSL segura por padrão em production quando há DATABASE_URL", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://localhost/test";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("mantém formato estável do retorno quando SSL está ativo", async () => {
     process.env.NODE_ENV = "development";
     process.env.DATABASE_URL = "postgresql://localhost/test";
 
@@ -49,5 +52,76 @@ describe("getDbSslConfig", () => {
 
     expect(result).toBeTruthy();
     expect(result).toMatchObject({ rejectUnauthorized: false });
+  });
+
+  it("retorna false quando SSL é explicitamente desativado", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://localhost/test";
+    process.env.PG_SSL = "false";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("retorna configuração SSL quando SSL é explicitamente ativado", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://localhost/test";
+    process.env.PG_SSL = "true";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("permite controlar rejectUnauthorized explicitamente", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://localhost/test";
+    process.env.PG_SSL = "true";
+    process.env.PG_SSL_REJECT_UNAUTHORIZED = "true";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: true });
+  });
+
+  it("retorna false quando não há DATABASE_URL", async () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.DATABASE_URL;
+    delete process.env.PG_SSL;
+    delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("não força SSL para banco local explicitamente desativado", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/carros_na_cidade_test";
+    process.env.PG_SSL = "false";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("permite SSL para banco local quando explicitamente ativado", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/carros_na_cidade_test";
+    process.env.PG_SSL = "true";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("mantém compatibilidade com Postgres hospedado/gerenciado", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com:5432/app_db";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
   });
 });
