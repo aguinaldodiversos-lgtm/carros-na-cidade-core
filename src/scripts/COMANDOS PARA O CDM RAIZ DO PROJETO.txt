@@ -12,7 +12,13 @@ git add .
 git commit -m "refatora fluxo de criacao de anuncio"
 git push origin main
 
+
+git fetch origin
+git status
+git log --oneline --graph --decorate --all -20
+git pull --rebase origin main
 Se o push for rejeitado, rode esta sequência:
+
 
 git fetch origin
 git pull --rebase origin main
@@ -37,3 +43,5 @@ Senha para o PostgreSQL banco de dados:
 K1Ke3jJXxq5aQrEEgGYwcXIkEYoymE81@dpg-d61cc7q4d50c739s8c70-a
 
 Internal Database URL:postgresql://carros_na_cidade_db_user:K1Ke3jJXxq5aQrEEgGYwcXIkEYoymE81@dpg-d61cc7q4d50c739s8c70-a/carros_na_cidade_db
+
+
