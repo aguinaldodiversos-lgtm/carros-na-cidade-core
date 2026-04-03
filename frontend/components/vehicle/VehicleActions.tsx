@@ -143,8 +143,7 @@ export default function VehicleActions({
             Fale com o anunciante
           </p>
           <p className="mt-2 text-[14px] leading-6 text-[#5d6880]">
-            Resposta rápida por WhatsApp e canal oficial do portal para registrar interesse no
-            veículo.
+            Entre em contato com o anunciante ou registre seu interesse pelo portal.
           </p>
 
           <div className="mt-5 rounded-[24px] border border-[#ebf6ef] bg-[#f6fbf8] p-4">
@@ -232,7 +231,7 @@ export default function VehicleActions({
         >
           <h2 className="text-[20px] font-extrabold text-[#1d2538]">Solicitar contato oficial</h2>
           <p className="mt-1 text-sm text-[#5c6880]">
-            Seu interesse entra no fluxo oficial do portal e mantém o histórico da negociação.
+            Envie seu contato para receber retorno do anunciante.
           </p>
 
           <form
@@ -274,8 +273,7 @@ export default function VehicleActions({
             </div>
 
             <p className="mt-3 text-xs text-[#66728a]">
-              O portal registra o lead e envia seu contato pelo fluxo oficial configurado para o
-              anunciante.
+              Seus dados serão enviados ao anunciante para retorno sobre este veículo.
             </p>
 
             {leadStatus ? (

@@ -43,10 +43,10 @@ function buildHeadline(vehicle: VehicleDetail) {
 
 function buildPriceSignal(priceSignal?: VehiclePriceSignal | null) {
   return {
-    label: safeText(priceSignal?.label, "") || "Análise em processamento pelo Cérebro IA",
+    label: safeText(priceSignal?.label, "") || "Análise de preço",
     reason:
       safeText(priceSignal?.reason, "") ||
-      "Estamos consolidando sinais de preço, contexto regional e comportamento de mercado para este anúncio.",
+      "Comparativo estimado com a referência de mercado do modelo anunciado.",
   };
 }
 
@@ -107,9 +107,6 @@ export default function VehicleInfo({ vehicle, priceSignal }: VehicleInfoProps) 
             <span className="inline-flex items-center rounded-full bg-[#eef5ff] px-3 py-1 text-[12px] font-bold text-[#0e62d8]">
               {safeText(vehicle.city, "Região")}
             </span>
-            <span className="inline-flex items-center rounded-full bg-[#f5f7fb] px-3 py-1 text-[12px] font-semibold text-[#5f6982]">
-              Código {safeText(vehicle.adCode, safeText(vehicle.id, "N/D"))}
-            </span>
             {vehicle.isBelowFipe ? (
               <span className="inline-flex items-center rounded-full bg-[#1f8a4a] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
                 Oportunidade abaixo da FIPE
@@ -121,15 +118,14 @@ export default function VehicleInfo({ vehicle, priceSignal }: VehicleInfoProps) 
             {headline}
           </h1>
 
-          <p className="mt-3 max-w-4xl text-[15px] leading-7 text-[#5d6880]">
-            Página premium com dados claros, contexto territorial e canais de contato consistentes
-            para apoiar uma negociação mais segura e profissional.
-          </p>
+          {vehicle.version ? (
+            <p className="mt-3 max-w-4xl text-[15px] leading-7 text-[#5d6880]">{vehicle.version}</p>
+          ) : null}
         </div>
 
         <div className="rounded-[24px] border border-[#d9e5ff] bg-[#f3f7ff] p-4 lg:max-w-[360px]">
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0c57c8]">
-            Indicador do Cérebro IA
+            Indicador de mercado
           </p>
           <p className="mt-1 text-[18px] font-extrabold leading-tight text-[#1e2f53]">{signal.label}</p>
           <p className="mt-2 text-[14px] leading-6 text-[#435372]">{signal.reason}</p>
@@ -148,8 +144,7 @@ export default function VehicleInfo({ vehicle, priceSignal }: VehicleInfoProps) 
         >
           <p className="font-bold">{fipeDelta.line}</p>
           <p className="mt-1 text-[13px] text-[#5d6880]">
-            Referência estimada: {safeText(vehicle.fipePrice, "Consulte")} para apoio de negociação
-            e leitura comercial do anúncio.
+            Referência estimada: {safeText(vehicle.fipePrice, "Consulte")}.
           </p>
         </div>
       ) : null}
@@ -166,9 +161,7 @@ export default function VehicleInfo({ vehicle, priceSignal }: VehicleInfoProps) 
             ) : null}
           </p>
         ) : (
-          <p className="text-[#8b94a6]">
-            Data de publicação será exibida quando disponível na base de anúncios.
-          </p>
+          <p className="text-[#8b94a6]">Data de publicação não informada.</p>
         )}
       </div>
 

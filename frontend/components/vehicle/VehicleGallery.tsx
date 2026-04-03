@@ -60,6 +60,7 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
 
   const isPlaceholderOnly =
     safeImages.length === 1 && safeImages[0] === VEHICLE_IMAGE_PLACEHOLDER && images.length === 0;
+  const showThumbStrip = !isPlaceholderOnly;
 
   const goPrev = () => {
     setIndex((current) => (current === 0 ? safeImages.length - 1 : current - 1));
@@ -159,8 +160,8 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
               </div>
               <p className="mt-4 text-[18px] font-bold text-[#1d2538]">Fotos em atualização</p>
               <p className="mt-2 text-[14px] leading-6 text-[#67738a]">
-                Este anúncio ainda não possui imagens válidas disponíveis. O restante das
-                informações do veículo continua acessível normalmente.
+                Este anúncio ainda não possui fotos disponíveis. As demais informações do veículo
+                continuam acessíveis normalmente.
               </p>
             </div>
           </div>
@@ -179,7 +180,7 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
               sizes="(max-width: 1024px) 100vw, 900px"
               onError={() => handleImageError(safeImages[index])}
               data-testid="vehicle-gallery-main-image"
-              className="object-cover transition duration-300"
+              className="object-contain transition duration-300"
             />
           </button>
         )}
@@ -189,33 +190,35 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {safeImages.map((image, imageIndex) => (
-          <button
-            key={`${image}-${imageIndex}`}
-            type="button"
-            data-testid={`vehicle-gallery-thumb-${imageIndex}`}
-            onClick={() => {
-              setIndex(imageIndex);
-            }}
-            className={`relative h-[78px] w-[104px] min-h-11 overflow-hidden rounded-2xl border bg-[#edf1f7] transition ${
-              index === imageIndex
-                ? "border-[#0e62d8] shadow-[0_0_0_3px_rgba(14,98,216,0.14)]"
-                : "border-[#d6ddea] hover:border-[#b5c2da]"
-            }`}
-          >
-            <Image
-              src={image}
-              alt={`${alt} miniatura ${imageIndex + 1}`}
-              fill
-              unoptimized
-              sizes="104px"
-              onError={() => handleImageError(image)}
-              className="object-cover"
-            />
-          </button>
-        ))}
-      </div>
+      {showThumbStrip ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {safeImages.map((image, imageIndex) => (
+            <button
+              key={`${image}-${imageIndex}`}
+              type="button"
+              data-testid={`vehicle-gallery-thumb-${imageIndex}`}
+              onClick={() => {
+                setIndex(imageIndex);
+              }}
+              className={`relative h-[78px] w-[104px] min-h-11 overflow-hidden rounded-2xl border bg-[#edf1f7] transition ${
+                index === imageIndex
+                  ? "border-[#0e62d8] shadow-[0_0_0_3px_rgba(14,98,216,0.14)]"
+                  : "border-[#d6ddea] hover:border-[#b5c2da]"
+              }`}
+            >
+              <Image
+                src={image}
+                alt={`${alt} miniatura ${imageIndex + 1}`}
+                fill
+                unoptimized
+                sizes="104px"
+                onError={() => handleImageError(image)}
+                className="object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {lightboxOpen ? (
         <div

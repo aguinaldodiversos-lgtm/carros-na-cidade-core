@@ -102,7 +102,7 @@ export default function SellerSection({
                 href={SITE_ROUTES.comoFunciona}
                 className="text-center text-[13px] font-semibold text-[#5c667a] hover:text-[#0e62d8]"
               >
-                Como funciona o marketplace
+                Saiba mais sobre o portal
               </Link>
             </div>
           </div>

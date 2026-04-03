@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cache } from "react";
 
 import AdEventTracker from "@/components/analytics/AdEventTracker";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
@@ -177,45 +176,43 @@ type PublicVehiclePayload = {
   vehicle: VehicleDetail;
 };
 
-const getPublicAdAndVehicle = cache(
-  async (slug: string, ref?: string): Promise<PublicVehiclePayload> => {
-    const candidates = Array.from(new Set([safeText(ref), safeText(slug)].filter(Boolean)));
+async function getPublicAdAndVehicle(slug: string, ref?: string): Promise<PublicVehiclePayload> {
+  const candidates = Array.from(new Set([safeText(ref), safeText(slug)].filter(Boolean)));
 
-    for (const candidate of candidates) {
-      try {
-        const ad = await fetchAdDetail(candidate);
-        const vehicle = adaptAdDetailToVehicle(ad);
+  for (const candidate of candidates) {
+    try {
+      const ad = await fetchAdDetail(candidate);
+      const vehicle = adaptAdDetailToVehicle(ad);
 
-        return {
-          ad,
-          vehicle: {
-            ...vehicle,
-            slug: safeText(vehicle.slug, slug),
-            adCode: safeText(vehicle.adCode, candidate),
-          },
-        };
-      } catch {
-        // tenta o próximo identificador
-      }
+      return {
+        ad,
+        vehicle: {
+          ...vehicle,
+          slug: safeText(vehicle.slug, slug),
+          adCode: safeText(vehicle.adCode, candidate),
+        },
+      };
+    } catch {
+      // tenta o próximo identificador
     }
-
-    const fallbackVehicle = buildFallbackVehicle(slug, ref);
-
-    const fallbackAd: PublicAdDetail = {
-      id: fallbackVehicle.id,
-      slug: fallbackVehicle.slug,
-      plan: "free",
-      highlight_until: null,
-      advertiser_id: null,
-      city_slug: fallbackVehicle.citySlug,
-    };
-
-    return {
-      ad: fallbackAd,
-      vehicle: fallbackVehicle,
-    };
   }
-);
+
+  const fallbackVehicle = buildFallbackVehicle(slug, ref);
+
+  const fallbackAd: PublicAdDetail = {
+    id: fallbackVehicle.id,
+    slug: fallbackVehicle.slug,
+    plan: "free",
+    highlight_until: null,
+    advertiser_id: null,
+    city_slug: fallbackVehicle.citySlug,
+  };
+
+  return {
+    ad: fallbackAd,
+    vehicle: fallbackVehicle,
+  };
+}
 
 function buildPageTitle(vehicle: VehicleDetail): string {
   const year = extractYear(vehicle.year);

@@ -135,6 +135,25 @@ function sanitizeNullableText(value: unknown) {
   return text || null;
 }
 
+function isMeaningfulVehicleText(value: unknown) {
+  const text = sanitizeText(value).toLowerCase();
+  if (!text) return false;
+
+  const blockedSnippets = [
+    "sem nenhum detalhe",
+    "sem detalhes",
+    "lorem ipsum",
+    "teste",
+    "placeholder",
+    "dummy",
+    "rascunho",
+    "em atualização",
+    "temporariamente indispon",
+  ];
+
+  return !blockedSnippets.some((snippet) => text.includes(snippet));
+}
+
 function formatPrice(value?: number | string | null) {
   const numeric =
     typeof value === "number"
@@ -313,11 +332,10 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
 
 function buildOptionalItems(ad: PublicAdDetail) {
   const items = [
-    ad.transmission ? `Câmbio ${sanitizeText(ad.transmission).toLowerCase()}` : null,
-    ad.fuel_type ? `Combustível ${sanitizeText(ad.fuel_type).toLowerCase()}` : null,
+    ad.transmission ? `Câmbio ${sanitizeText(ad.transmission)}` : null,
+    ad.fuel_type ? `Combustível ${sanitizeText(ad.fuel_type)}` : null,
+    ad.body_type ? `Carroceria ${sanitizeText(ad.body_type)}` : null,
     ad.below_fipe ? "Preço competitivo em relação à FIPE" : null,
-    "Simulação de financiamento disponível",
-    "Contato rápido com o anunciante",
   ].filter(Boolean) as string[];
 
   return Array.from(new Set(items)).slice(0, 6);
@@ -325,19 +343,17 @@ function buildOptionalItems(ad: PublicAdDetail) {
 
 function buildSafetyItems() {
   return [
-    "Confirme histórico de sinistros e origem do veículo antes de fechar qualquer pagamento",
-    "Prefira inspeção presencial, fotos reais e leitura de chassi; desconfie de anúncios genéricos ou com pressa para pix antecipado",
-    "Exija documentação em dia e considere vistoria cautelar reconhecida antes da quitação",
-    "Use os canais do portal para registrar o primeiro contato e mantenha comprovantes em caso de negociação",
+    "Veja o veículo pessoalmente e confira a documentação antes de qualquer pagamento.",
+    "Desconfie de pedidos de adiantamento e de ofertas muito abaixo do mercado.",
+    "Se possível, faça vistoria cautelar antes de concluir a compra.",
   ];
 }
 
 function buildComfortItems(ad: PublicAdDetail) {
   const items = [
-    "Atendimento digital para proposta inicial",
-    "Experiência otimizada para mobile",
-    "CTA direto para contato e financiamento",
-    ad.city ? `Anúncio com contexto regional de ${toTitleCase(sanitizeText(ad.city))}` : null,
+    ad.city ? `Disponível em ${toTitleCase(sanitizeText(ad.city))}` : null,
+    ad.transmission ? `Versão ${sanitizeText(ad.transmission)}` : null,
+    ad.fuel_type ? `Motorização ${sanitizeText(ad.fuel_type)}` : null,
   ].filter(Boolean) as string[];
 
   return Array.from(new Set(items)).slice(0, 6);
@@ -366,6 +382,9 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
 
   const isPaidListing = computeIsPaidListing(ad.plan, ad.highlight_until);
   const advertiserId = advertiserIdFromAd(ad);
+  const safeDescription = isMeaningfulVehicleText(ad.description)
+    ? sanitizeText(ad.description)
+    : "Consulte o anunciante para confirmar opcionais, histórico e disponibilidade deste veículo.";
 
   return {
     id,
@@ -396,14 +415,12 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     advertiserId,
     images,
     hasRealImages: images.length > 0,
-    description:
-      sanitizeText(ad.description) ||
-      "Anúncio publicado no Carros na Cidade com informações oficiais do backend e contexto comercial da região.",
+    description: safeDescription,
     optionalItems: buildOptionalItems(ad),
     safetyItems: buildSafetyItems(),
     comfortItems: buildComfortItems(ad),
     sellerNotes:
-      "Os dados deste anúncio foram carregados da camada pública oficial do portal. Recomendamos confirmar disponibilidade, opcionais e documentação com o anunciante.",
+      "Confirme com o anunciante as condições do veículo, opcionais, documentação e disponibilidade antes de fechar negócio.",
     seller,
   };
 }

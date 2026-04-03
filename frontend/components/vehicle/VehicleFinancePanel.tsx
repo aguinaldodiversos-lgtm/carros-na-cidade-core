@@ -51,11 +51,11 @@ export default function VehicleFinancePanel({
             Simulador de financiamento
           </p>
           <h2 className="mt-2 text-[24px] font-extrabold tracking-[-0.02em] text-[#1d2538]">
-            Financiamento integrado ao anúncio
+            Simule o financiamento
           </h2>
           <p className="mt-2 max-w-2xl text-[14px] leading-7 text-[#5d6880]">
-            Visual premium, cálculo inicial instantâneo e link direto para o simulador com o valor do
-            veículo já preenchido.
+            Faça uma estimativa inicial com base no valor do veículo e siga para o simulador
+            completo.
           </p>
         </div>
 

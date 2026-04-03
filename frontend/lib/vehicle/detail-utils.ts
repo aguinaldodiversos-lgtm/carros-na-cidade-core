@@ -2,9 +2,14 @@ const BRAZIL_COUNTRY_CODE = "55";
 
 export const VEHICLE_IMAGE_PLACEHOLDER = "/images/hero.jpeg";
 export const VEHICLE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "avif"] as const;
+export const VEHICLE_IMAGE_PROXY_PATH = "/api/vehicle-images";
 
 function safeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePathSeparators(value: string): string {
+  return value.replace(/\\/g, "/");
 }
 
 function safeUrl(value: string): string {
@@ -38,9 +43,14 @@ function joinWithBase(baseUrl: string, pathname: string): string {
   return `${baseUrl}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 }
 
+export function buildVehicleImageProxyUrl(pathname: string): string {
+  return `${VEHICLE_IMAGE_PROXY_PATH}?src=${encodeURIComponent(pathname)}`;
+}
+
 function hasSupportedExtension(pathname: string): boolean {
-  const cleanPath = pathname.split("?")[0]?.split("#")[0] || "";
-  const extension = cleanPath.split(".").pop()?.toLowerCase();
+  const cleanPath = normalizePathSeparators(pathname).split("?")[0]?.split("#")[0] || "";
+  const fileName = cleanPath.split("/").pop() || "";
+  const extension = fileName.includes(".") ? fileName.split(".").pop()?.toLowerCase() : undefined;
 
   if (!extension) {
     return true;
@@ -50,7 +60,7 @@ function hasSupportedExtension(pathname: string): boolean {
 }
 
 export function isSupportedVehicleImageUrl(value: string): boolean {
-  const url = safeText(value);
+  const url = normalizePathSeparators(safeText(value));
   if (!url) return false;
 
   if (url.startsWith("data:image/")) return true;
@@ -73,7 +83,7 @@ export function isSupportedVehicleImageUrl(value: string): boolean {
     return hasSupportedExtension(url);
   }
 
-  if (/^[a-z0-9_\-/]+(\?.*)?$/i.test(url)) {
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) {
     return hasSupportedExtension(url);
   }
 
@@ -81,7 +91,7 @@ export function isSupportedVehicleImageUrl(value: string): boolean {
 }
 
 export function normalizeVehicleImageUrl(value: unknown): string | null {
-  const raw = safeText(value);
+  const raw = normalizePathSeparators(safeText(value));
 
   if (!raw) return null;
   if (["null", "undefined", "[object Object]"].includes(raw)) return null;
@@ -100,6 +110,24 @@ export function normalizeVehicleImageUrl(value: unknown): string | null {
 
   if (raw.startsWith("/images/")) {
     return isSupportedVehicleImageUrl(raw) ? raw : null;
+  }
+
+  if (raw.startsWith("/uploads/")) {
+    return isSupportedVehicleImageUrl(raw) ? buildVehicleImageProxyUrl(raw) : null;
+  }
+
+  if (raw.startsWith("images/") || raw.startsWith("uploads/")) {
+    const normalizedLocalPath = `/${raw.replace(/^\/+/, "")}`;
+    if (!isSupportedVehicleImageUrl(normalizedLocalPath)) return null;
+    if (normalizedLocalPath.startsWith("/uploads/")) {
+      return buildVehicleImageProxyUrl(normalizedLocalPath);
+    }
+    return safeUrl(normalizedLocalPath);
+  }
+
+  if (!raw.startsWith("/") && !/^[a-z][a-z0-9+.-]*:/i.test(raw)) {
+    const normalizedLocalPath = `/${raw.replace(/^\/+/, "")}`;
+    return isSupportedVehicleImageUrl(normalizedLocalPath) ? safeUrl(normalizedLocalPath) : null;
   }
 
   const backendBaseUrl = getBackendBaseUrl();
@@ -128,6 +156,12 @@ export function collectVehicleImageCandidates(...values: unknown[]): string[] {
       const raw = input.trim();
       if (!raw) return;
 
+      const directImageUrl = normalizeVehicleImageUrl(raw);
+      if (directImageUrl) {
+        normalized.add(directImageUrl);
+        return;
+      }
+
       if (raw.startsWith("[")) {
         try {
           const parsed = JSON.parse(raw);
@@ -139,7 +173,7 @@ export function collectVehicleImageCandidates(...values: unknown[]): string[] {
       }
 
       raw
-        .split(",")
+        .split(/[\n,;]+/)
         .map((part) => part.trim())
         .filter(Boolean)
         .forEach((part) => {
@@ -162,6 +196,9 @@ export function collectVehicleImageCandidates(...values: unknown[]): string[] {
         record.photo,
         record.large,
         record.original,
+        record.path,
+        record.pathname,
+        record.file,
       ].forEach(visit);
       return;
     }

@@ -14,7 +14,7 @@ test.describe("Vehicle detail premium page", () => {
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByTestId("vehicle-gallery")).toBeVisible();
-    await expect(page.getByRole("heading", { name: /financiamento integrado ao anúncio/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /simule o financiamento/i })).toBeVisible();
 
     const mainImage = page.getByTestId("vehicle-gallery-main-image");
     await expect(mainImage).toBeVisible();

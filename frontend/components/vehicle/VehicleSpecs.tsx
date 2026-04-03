@@ -43,6 +43,8 @@ function SpecCard({ label, value }: { label: string; value: string }) {
 }
 
 export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps) {
+  const marketInsights = aiInsights.filter((item) => item && item.trim());
+
   return (
     <section className="space-y-5">
       <article className="rounded-[28px] border border-[#dfe4ef] bg-white p-5 shadow-[0_12px_32px_rgba(10,20,40,0.05)] md:p-6">
@@ -52,13 +54,9 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
               Ficha técnica
             </p>
             <h2 className="mt-2 text-[28px] font-extrabold tracking-[-0.02em] text-[#1d2538]">
-              Dados organizados para leitura rápida
+              Dados do veículo
             </h2>
           </div>
-          <p className="max-w-2xl text-[14px] leading-7 text-[#5d6880]">
-            Estrutura preparada para escalar com mais atributos do backend sem transformar a página
-            em um bloco monolítico.
-          </p>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -84,7 +82,7 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
               Descrição e diferenciais
             </p>
             <h2 className="mt-2 text-[28px] font-extrabold tracking-[-0.02em] text-[#1d2538]">
-              Leitura editorial e comercial
+              Detalhes do anúncio
             </h2>
             <p className="mt-4 text-[15px] leading-8 text-[#4f5a72]">{vehicle.description}</p>
           </div>
@@ -97,14 +95,12 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
       </article>
 
       <div className="grid gap-4 xl:grid-cols-4">
-        <ListCard title="Opcionais" items={vehicle.optionalItems} />
+        <ListCard title="Destaques" items={vehicle.optionalItems} />
         <ListCard title="Itens de segurança" items={vehicle.safetyItems} />
         <ListCard title="Conforto" items={vehicle.comfortItems} />
-        <ListCard
-          title="Insights de mercado do Cérebro IA"
-          items={aiInsights}
-          tone="highlight"
-        />
+        {marketInsights.length > 0 ? (
+          <ListCard title="Insights de mercado" items={marketInsights} tone="highlight" />
+        ) : null}
       </div>
     </section>
   );
