@@ -28,6 +28,7 @@ describe("getDbSslConfig", () => {
   it("retorna configuração SSL segura por padrão em development quando há DATABASE_URL", async () => {
     process.env.NODE_ENV = "development";
     process.env.DATABASE_URL = "postgresql://localhost/test";
+<<<<<<< HEAD
 
     const { getDbSslConfig } = await loadEnvModule();
 
@@ -61,6 +62,11 @@ describe("getDbSslConfig", () => {
 
     const { getDbSslConfig } = await loadEnvModule();
 
+=======
+    delete process.env.PG_SSL_ENABLED;
+    delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
+    const { getDbSslConfig } = await import("../../src/config/env.js");
+>>>>>>> bf113ca (Harden migrations for legacy database compatibility)
     expect(getDbSslConfig()).toBe(false);
   });
 

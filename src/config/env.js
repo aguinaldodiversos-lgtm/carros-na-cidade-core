@@ -64,7 +64,7 @@ export const env = parseEnv();
 
 export function getDbSslConfig() {
   const explicitSslConfig =
-    Object.prototype.hasOwnProperty.call(process.env, "PG_SSL_ENABLED") ||
+    coerceBoolean(process.env.PG_SSL_ENABLED, false) ||
     /\bsslmode=(require|prefer|verify-ca|verify-full)\b/i.test(env.DATABASE_URL) ||
     /\bssl=true\b/i.test(env.DATABASE_URL);
 
