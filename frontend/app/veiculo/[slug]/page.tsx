@@ -6,6 +6,7 @@ import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import VehicleActions from "@/components/vehicle/VehicleActions";
+import VehicleFinancePanel from "@/components/vehicle/VehicleFinancePanel";
 import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
@@ -17,7 +18,11 @@ import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import { fetchRelatedListingsForAdPage } from "@/lib/vehicle/related-ads";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
-import { adaptAdDetailToVehicle, buildCityVehicles } from "@/lib/vehicle/public-vehicle";
+import {
+  adaptAdDetailToVehicle,
+  buildCityVehicles,
+  formatListingDateLabels,
+} from "@/lib/vehicle/public-vehicle";
 
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import {
@@ -77,14 +82,18 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
   return {
     id: ref || slug || "fallback-vehicle",
     slug: safeText(slug, "veiculo-sem-slug"),
+    brand: "",
     model,
+    version: "",
     fullName,
     price: "R$ 0",
+    priceNumeric: null,
     condition: "Usado",
     year: `${year}/${year}`,
     km: "Km não informado",
     fuel: "Não informado",
     transmission: "Não informado",
+    bodyType: "Não informado",
     color: "Não informado",
     city: "São Paulo (SP)",
     citySlug: DEFAULT_PUBLIC_CITY_SLUG,
@@ -93,12 +102,12 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
     adUpdatedAt: null,
     isBelowFipe: false,
     fipePrice: "Consulte",
-    priceNumeric: null,
     fipeDeltaBrl: null,
     fipeDeltaPercent: null,
     isPaidListing: false,
     advertiserId: null,
     images: ["/images/banner1.jpg", "/images/banner2.jpg", "/images/hero.jpeg"],
+    hasRealImages: true,
     description:
       "As informações completas deste veículo estão temporariamente indisponíveis. Tente novamente em instantes ou volte para a listagem.",
     optionalItems: [
@@ -132,6 +141,35 @@ function buildFallbackPriceSignal(): VehiclePriceSignal {
     label: "Análise temporariamente indisponível",
     reason: "Os indicadores automáticos de preço não puderam ser carregados no momento.",
   };
+}
+
+function formatBrlAbs(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value));
+}
+
+function buildFipeDeltaLine(vehicle: VehicleDetail): string | null {
+  const brl = vehicle.fipeDeltaBrl;
+  const pct = vehicle.fipeDeltaPercent;
+
+  if (brl == null || pct == null || !Number.isFinite(brl) || !Number.isFinite(pct)) {
+    return null;
+  }
+
+  const absPct = Math.abs(pct).toFixed(1).replace(".", ",");
+
+  if (brl < 0) {
+    return `${formatBrlAbs(brl)} abaixo da FIPE (${absPct}%)`;
+  }
+
+  if (brl > 0) {
+    return `${formatBrlAbs(brl)} acima da FIPE (${absPct}%)`;
+  }
+
+  return "Alinhado à FIPE";
 }
 
 type PublicVehiclePayload = {
@@ -247,9 +285,9 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
     priceSignalResult.status === "fulfilled" ? priceSignalResult.value : buildFallbackPriceSignal();
 
   const aiInsights =
-    aiInsightsResult.status === "fulfilled"
+    aiInsightsResult.status === "fulfilled" && Array.isArray(aiInsightsResult.value)
       ? aiInsightsResult.value
-      : ({} as Awaited<ReturnType<typeof getAIVehicleInsights>>);
+      : [];
 
   let sellerVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
   let cityVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
@@ -267,6 +305,9 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
 
   const canonicalSlug = safeText(vehicle.slug, params.slug);
   const year = extractYear(vehicle.year);
+  const listingDates = formatListingDateLabels(vehicle.adPublishedAt, vehicle.adUpdatedAt);
+  const publishedLabel = [listingDates.primary, listingDates.secondary].filter(Boolean).join(" · ");
+  const fipeDeltaLine = buildFipeDeltaLine(vehicle);
 
   const schemaVehicle = {
     "@context": "https://schema.org",
@@ -344,16 +385,36 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
           className="mb-4 overflow-x-auto whitespace-nowrap"
         />
 
-        <div className="grid gap-4 md:gap-5 xl:grid-cols-[1.45fr_1fr]">
-          <VehicleGallery images={vehicle.images} alt={vehicle.fullName} />
+        <VehicleInfo vehicle={vehicle} priceSignal={priceSignal} />
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
           <div className="space-y-5">
-            <VehicleInfo vehicle={vehicle} priceSignal={priceSignal} />
+            <VehicleGallery images={vehicle.images} alt={vehicle.fullName} />
+            <VehicleFinancePanel
+              vehicleId={vehicle.id}
+              citySlug={vehicle.citySlug}
+              vehiclePriceNumeric={vehicle.priceNumeric}
+              year={vehicle.year}
+              mileage={vehicle.km}
+              transmission={vehicle.transmission}
+              fuel={vehicle.fuel}
+              city={vehicle.city}
+            />
+          </div>
+
+          <div className="space-y-5 xl:sticky xl:top-24">
             <VehicleActions
               vehicleId={vehicle.id}
               vehicleName={vehicle.fullName}
               whatsappPhone={sellerPhone}
+              sellerPhone={sellerPhone}
               financeCitySlug={vehicle.citySlug}
               vehiclePriceNumeric={vehicle.priceNumeric}
+              priceLabel={vehicle.price}
+              adCode={vehicle.adCode}
+              fipePrice={vehicle.fipePrice}
+              fipeDeltaLine={fipeDeltaLine}
+              publishedLabel={publishedLabel || null}
             />
             <VehicleTrustPanel vehicle={vehicle} />
           </div>

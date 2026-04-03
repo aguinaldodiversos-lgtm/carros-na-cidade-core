@@ -4,6 +4,7 @@ import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import { SITE_ROUTES } from "@/lib/site/site-navigation";
 import type { ListingCar } from "@/lib/car-data";
+import { formatPhoneDisplay } from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 type SellerSectionProps = {
@@ -15,22 +16,6 @@ type SellerSectionProps = {
 function toSafeCityCatalogHref(citySlug?: string) {
   const safeSlug = citySlug?.trim() || DEFAULT_PUBLIC_CITY_SLUG;
   return `/comprar?city_slug=${encodeURIComponent(safeSlug)}`;
-}
-
-function digitsOnly(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-function formatPhoneDisplay(phone?: string) {
-  const d = digitsOnly(phone || "");
-  if (d.length < 10) return null;
-  const rest = d.length >= 11 ? d.slice(-11) : d.slice(-10);
-  const ddd = rest.slice(0, 2);
-  const part =
-    rest.length === 11
-      ? `${rest.slice(2, 7)}-${rest.slice(7)}`
-      : `${rest.slice(2, 6)}-${rest.slice(6)}`;
-  return `(${ddd}) ${part}`;
 }
 
 export default function SellerSection({

@@ -2,6 +2,7 @@ import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
+import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
 
 export type SellerDealer = {
   type: "dealer";
@@ -24,7 +25,9 @@ export type SellerInfo = SellerDealer | SellerPrivate;
 export type VehicleDetail = {
   id: string;
   slug: string;
+  brand: string;
   model: string;
+  version: string;
   fullName: string;
   price: string;
   /** Valor numérico do preço (BRL), quando derivado do anúncio */
@@ -34,6 +37,7 @@ export type VehicleDetail = {
   km: string;
   fuel: string;
   transmission: string;
+  bodyType: string;
   color: string;
   city: string;
   citySlug: string;
@@ -53,6 +57,7 @@ export type VehicleDetail = {
   /** ID do anunciante na base, quando disponível */
   advertiserId: string | null;
   images: string[];
+  hasRealImages: boolean;
   description: string;
   optionalItems: string[];
   safetyItems: string[];
@@ -201,68 +206,14 @@ function deriveCitySlug(city?: string | null, state?: string | null) {
   return slugify(`${cleanCity} ${cleanState}`);
 }
 
-function normalizeImageValue(value: unknown): string | null {
-  if (typeof value === "string" && value.trim()) {
-    return value.trim();
-  }
-
-  if (value && typeof value === "object") {
-    const maybe = value as Record<string, unknown>;
-    const candidate =
-      maybe.url ?? maybe.src ?? maybe.image ?? maybe.image_url ?? maybe.cover_image ?? maybe.thumb;
-
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim();
-    }
-  }
-
-  return null;
-}
-
 function parseImages(ad: PublicAdDetail): string[] {
-  const normalized = new Set<string>();
-
-  if (Array.isArray(ad.images)) {
-    for (const item of ad.images) {
-      const image = normalizeImageValue(item);
-      if (image) normalized.add(image);
-    }
-  } else if (typeof ad.images === "string" && ad.images.trim()) {
-    const raw = ad.images.trim();
-
-    if (raw.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          for (const item of parsed) {
-            const image = normalizeImageValue(item);
-            if (image) normalized.add(image);
-          }
-        }
-      } catch {
-        raw
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .forEach((image) => normalized.add(image));
-      }
-    } else {
-      raw
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .forEach((image) => normalized.add(image));
-    }
-  }
-
-  const directImage = sanitizeNullableText(ad.image_url);
-  if (directImage) normalized.add(directImage);
-
-  const finalImages = Array.from(normalized).filter(Boolean);
-
-  if (finalImages.length > 0) return finalImages;
-
-  return [...FALLBACK_IMAGES];
+  return collectVehicleImageCandidates(
+    ad.images,
+    ad.image_url,
+    ad.cover_image,
+    ad.thumbnail,
+    ad.photo
+  );
 }
 
 function deriveVehicleNames(ad: PublicAdDetail) {
@@ -278,7 +229,9 @@ function deriveVehicleNames(ad: PublicAdDetail) {
   const safeModel = model || title || [brand, model].filter(Boolean).join(" ").trim() || "Veículo";
 
   return {
+    brand: toTitleCase(brand),
     model: toTitleCase(safeModel),
+    version,
     fullName,
   };
 }
@@ -323,8 +276,9 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
     "Anunciante no Carros na Cidade";
 
   const sellerPhone =
-    sanitizeNullableText((ad as PublicAdDetail & { phone?: string | null }).phone) ||
+    sanitizeNullableText(ad.whatsapp_number) ||
     sanitizeNullableText((ad as PublicAdDetail & { whatsapp?: string | null }).whatsapp) ||
+    sanitizeNullableText((ad as PublicAdDetail & { phone?: string | null }).phone) ||
     undefined;
 
   const plan = sanitizeText(ad.plan).toLowerCase();
@@ -395,7 +349,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
   const images = parseImages(ad);
   const priceNumber = toNumber(ad.price);
   const belowFipe = ad.below_fipe === true;
-  const { model, fullName } = deriveVehicleNames(ad);
+  const { brand, model, version, fullName } = deriveVehicleNames(ad);
   const city = deriveCityDisplay(ad.city, ad.state);
   const citySlug = sanitizeNullableText(ad.city_slug) || deriveCitySlug(ad.city, ad.state);
   const seller = buildSellerInfo(ad);
@@ -416,7 +370,9 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
   return {
     id,
     slug,
+    brand,
     model,
+    version,
     fullName,
     price: formatPrice(ad.price),
     priceNumeric: priceNumber,
@@ -425,6 +381,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     km: formatMileage(ad.mileage),
     fuel: sanitizeText(ad.fuel_type, "Não informado"),
     transmission: sanitizeText(ad.transmission, "Não informado"),
+    bodyType: sanitizeText(ad.body_type, "Não informado"),
     color: sanitizeText((ad as PublicAdDetail & { color?: string | null }).color, "Não informado"),
     city,
     citySlug,
@@ -438,6 +395,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     isPaidListing,
     advertiserId,
     images,
+    hasRealImages: images.length > 0,
     description:
       sanitizeText(ad.description) ||
       "Anúncio publicado no Carros na Cidade com informações oficiais do backend e contexto comercial da região.",
@@ -456,6 +414,7 @@ function toListingCarFromSeed(seed: ListingCar, vehicle: VehicleDetail, index: n
     id: `${seed.id}-${vehicle.id}-${index}`,
     slug: seed.slug || `${slugify(seed.model)}-${vehicle.id}-${index}`,
     city: vehicle.city,
+    image: vehicle.images[0] || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length] || seed.image,
   };
 }
 

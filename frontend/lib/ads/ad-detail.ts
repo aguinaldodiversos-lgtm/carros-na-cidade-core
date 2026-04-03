@@ -1,3 +1,5 @@
+import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
+
 export interface PublicAdDetail {
   id: number | string;
   slug?: string | null;
@@ -19,8 +21,17 @@ export interface PublicAdDetail {
   plan?: string | null;
   advertiser_id?: number | string | null;
   city_slug?: string | null;
+  seller_name?: string | null;
+  dealership_name?: string | null;
+  color?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  whatsapp_number?: string | null;
   image_url?: string | null;
-  images?: string[] | string | null;
+  cover_image?: string | null;
+  thumbnail?: string | null;
+  photo?: string | null;
+  images?: string[] | string | Record<string, unknown>[] | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -31,8 +42,6 @@ export interface AdDetailResponse {
   ad?: PublicAdDetail;
   item?: PublicAdDetail;
 }
-
-const FALLBACK_IMAGE = "/images/hero.jpeg";
 
 function getApiBaseUrl(): string {
   return (
@@ -79,86 +88,23 @@ function toBooleanOrNull(value: unknown): boolean | null {
   return null;
 }
 
-function getImageFromUnknown(value: unknown): string | null {
-  if (typeof value === "string" && value.trim()) return value.trim();
-
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    const candidates = [
-      obj.url,
-      obj.src,
-      obj.image,
-      obj.image_url,
-      obj.cover_image,
-      obj.photo,
-      obj.thumb,
-      obj.thumbnail,
-      obj.large,
-    ];
-
-    for (const candidate of candidates) {
-      if (typeof candidate === "string" && candidate.trim()) {
-        return candidate.trim();
-      }
-    }
-  }
-
-  return null;
-}
-
-function normalizeImages(value: unknown, imageUrl?: string | null): string[] {
-  if (Array.isArray(value)) {
-    const normalized = value
-      .map(getImageFromUnknown)
-      .filter((item): item is string => Boolean(item));
-
-    if (normalized.length > 0) return normalized;
-  }
-
-  if (typeof value === "string" && value.trim()) {
-    const raw = value.trim();
-
-    if (raw.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const normalized = parsed
-            .map(getImageFromUnknown)
-            .filter((item): item is string => Boolean(item));
-
-          if (normalized.length > 0) return normalized;
-        }
-      } catch {
-        // segue fluxo
-      }
-    }
-
-    const commaSeparated = raw
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    if (commaSeparated.length > 1) return commaSeparated;
-    return [raw];
-  }
-
-  if (imageUrl && imageUrl.trim()) return [imageUrl.trim()];
-
-  return [FALLBACK_IMAGE];
-}
-
 function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdDetail | null {
   if (!raw || typeof raw !== "object") return null;
 
   const item = raw as Record<string, unknown>;
 
-  const imageUrl =
-    getImageFromUnknown(item.image_url) ||
-    getImageFromUnknown(item.image) ||
-    getImageFromUnknown(item.cover_image) ||
-    getImageFromUnknown(item.photo);
+  const images = collectVehicleImageCandidates(
+    item.images,
+    item.gallery,
+    item.photos,
+    item.image_url,
+    item.image,
+    item.cover_image,
+    item.thumbnail,
+    item.photo
+  );
 
-  const images = normalizeImages(item.images ?? item.gallery ?? item.photos, imageUrl);
+  const imageUrl = images[0] || null;
 
   const titleFallback =
     [
@@ -195,7 +141,18 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
         ? toNumberOrString(item.advertiser_id)
         : null,
     city_slug: toNullableText(item.city_slug),
-    image_url: imageUrl || FALLBACK_IMAGE,
+    seller_name: toNullableText(item.seller_name ?? item.sellerName ?? item.owner_name),
+    dealership_name: toNullableText(
+      item.dealership_name ?? item.dealershipName ?? item.store_name ?? item.dealer_name
+    ),
+    color: toNullableText(item.color),
+    phone: toNullableText(item.phone ?? item.phone_number ?? item.telefone),
+    whatsapp: toNullableText(item.whatsapp ?? item.whatsappNumber ?? item.whatsapp_phone),
+    whatsapp_number: toNullableText(item.whatsapp_number ?? item.whatsappNumber ?? item.whatsapp),
+    image_url: imageUrl,
+    cover_image: toNullableText(item.cover_image),
+    thumbnail: toNullableText(item.thumbnail ?? item.thumb),
+    photo: toNullableText(item.photo),
     images,
     created_at: toNullableText(item.created_at ?? item.createdAt),
     updated_at: toNullableText(item.updated_at ?? item.updatedAt),
@@ -239,8 +196,17 @@ function buildFallbackAd(identifier: string): PublicAdDetail {
     plan: null,
     advertiser_id: null,
     city_slug: null,
-    image_url: FALLBACK_IMAGE,
-    images: [FALLBACK_IMAGE],
+    seller_name: null,
+    dealership_name: null,
+    color: null,
+    phone: null,
+    whatsapp: null,
+    whatsapp_number: null,
+    image_url: null,
+    cover_image: null,
+    thumbnail: null,
+    photo: null,
+    images: [],
     created_at: null,
     updated_at: null,
   };
