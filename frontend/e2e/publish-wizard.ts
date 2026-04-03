@@ -13,6 +13,14 @@ function debugFipe(message: string) {
   }
 }
 
+function waitForResponseSafe(
+  page: Page,
+  predicate: Parameters<Page["waitForResponse"]>[0],
+  timeout = 90_000
+) {
+  return page.waitForResponse(predicate, { timeout }).catch(() => null);
+}
+
 function isFipeResponse(url: string, fragment: string) {
   return url.includes(fragment);
 }
@@ -38,14 +46,50 @@ async function waitForSelectOptions(page: Page, index: number, minimum = 2, time
   );
 }
 
+async function safeApiJson(response: Awaited<ReturnType<Page["waitForResponse"]>>) {
+  if (!response) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function extractPublishedSlug(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const root = payload as Record<string, unknown>;
+  const result =
+    root.result && typeof root.result === "object"
+      ? (root.result as Record<string, unknown>)
+      : root;
+  const nested =
+    result.ad && typeof result.ad === "object"
+      ? (result.ad as Record<string, unknown>)
+      : result.data && typeof result.data === "object"
+        ? (result.data as Record<string, unknown>)
+        : result;
+
+  const slug = nested.slug;
+  return typeof slug === "string" && slug.trim() ? slug.trim() : null;
+}
+
 export type PublishWizardResult = {
   brandLabel: string;
   modelLabel: string;
+  publishedSlug: string | null;
+};
+
+export type PublishWizardPhoto = {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
 };
 
 export type RunPublishWizardOptions = {
   /** Se true, não navega de novo — use após `completePendingProfileIfNeeded` na mesma URL. */
   skipInitialNavigation?: boolean;
+  photos?: PublishWizardPhoto[];
 };
 
 /**
@@ -64,6 +108,15 @@ export async function runPublishWizardFlow(
     }
   }, { storageKey: WIZARD_STORAGE_KEY });
 
+  await page.evaluate(({ storageKey }) => {
+    try {
+      window.localStorage.removeItem(storageKey);
+      window.sessionStorage.clear();
+    } catch {
+      // noop
+    }
+  }, { storageKey: WIZARD_STORAGE_KEY }).catch(() => null);
+
   page.on("response", (response) => {
     const url = response.url();
     if (
@@ -76,9 +129,9 @@ export async function runPublishWizardFlow(
     }
   });
 
-  const brandsResponsePromise = page.waitForResponse(
-    (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/brands") && r.ok(),
-    { timeout: 90_000 }
+  const brandsResponsePromise = waitForResponseSafe(
+    page,
+    (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/brands") && r.ok()
   );
 
   if (!options?.skipInitialNavigation) {
@@ -100,9 +153,9 @@ export async function runPublishWizardFlow(
   let brandPicked = false;
   const brandCount = await selects.nth(0).locator("option").count();
   for (let bi = 1; bi < Math.min(brandCount, 12); bi += 1) {
-    const modelsResponsePromise = page.waitForResponse(
-      (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/models") && r.ok(),
-      { timeout: 90_000 }
+    const modelsResponsePromise = waitForResponseSafe(
+      page,
+      (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/models") && r.ok()
     );
     await selects.nth(0).selectOption({ index: bi });
     if (!(await selectHasOptions(page, 1))) {
@@ -122,9 +175,9 @@ export async function runPublishWizardFlow(
 
   const brandLabel = (await selects.nth(0).locator("option:checked").textContent())?.trim() || "";
 
-  const yearsResponsePromise = page.waitForResponse(
-    (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/years") && r.ok(),
-    { timeout: 90_000 }
+  const yearsResponsePromise = waitForResponseSafe(
+    page,
+    (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/years") && r.ok()
   );
   await selects.nth(1).selectOption({ index: 1 });
 
@@ -143,9 +196,9 @@ export async function runPublishWizardFlow(
   await allSelects.nth(2).selectOption({ index: 1 });
   await allSelects.nth(3).selectOption({ index: 1 });
 
-  const quoteResponsePromise = page.waitForResponse(
-    (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/quote") && r.ok(),
-    { timeout: 90_000 }
+  const quoteResponsePromise = waitForResponseSafe(
+    page,
+    (r) => r.request().method() === "GET" && r.url().includes("/api/fipe/quote") && r.ok()
   );
   await allSelects.nth(4).selectOption({ index: 1 });
   await quoteResponsePromise.catch(() => null);
@@ -162,11 +215,24 @@ export async function runPublishWizardFlow(
   await page.getByRole("button", { name: /Continuar/i }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: /Fotos/i })).toBeVisible();
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "e2e.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(MIN_PNG_BASE64, "base64"),
-  });
+  const photos =
+    options?.photos && options.photos.length > 0
+      ? options.photos
+      : [
+          {
+            name: "e2e.png",
+            mimeType: "image/png",
+            buffer: Buffer.from(MIN_PNG_BASE64, "base64"),
+          },
+        ];
+
+  await page.locator('input[type="file"]').setInputFiles(
+    photos.map((photo) => ({
+      name: photo.name,
+      mimeType: photo.mimeType,
+      buffer: photo.buffer,
+    }))
+  );
   await page.getByRole("button", { name: /Continuar/i }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: /Opcionais/i })).toBeVisible();
@@ -192,10 +258,9 @@ export async function runPublishWizardFlow(
   if (await selectedCityBanner.isVisible().catch(() => false)) {
     debugFipe("cidade já resolvida no wizard; reutilizando seleção existente");
   } else {
-    const citySearchResponsePromise = page.waitForResponse(
-      (r) =>
-        r.request().method() === "GET" && r.url().includes("/api/painel/cidades/search"),
-      { timeout: 90_000 }
+    const citySearchResponsePromise = waitForResponseSafe(
+      page,
+      (r) => r.request().method() === "GET" && r.url().includes("/api/painel/cidades/search")
     );
     const cityInput = page.getByPlaceholder("Digite ao menos 2 letras e escolha na lista");
     await cityInput.fill("Atibaia");
@@ -222,14 +287,18 @@ export async function runPublishWizardFlow(
     .getByRole("checkbox", { name: /informações são verdadeiras|autorizo a publicação/i })
     .check();
 
-  const publishResponsePromise = page.waitForResponse(
+  const publishResponsePromise = waitForResponseSafe(
+    page,
     (r) => r.url().includes("/api/painel/anuncios") && r.request().method() === "POST",
-    { timeout: 120_000 }
+    120_000
   );
 
   await page.getByRole("button", { name: /Publicar anúncio/i }).click();
 
   const publishRes = await publishResponsePromise;
+  if (!publishRes) {
+    throw new Error("POST /api/painel/anuncios não foi observado pelo Playwright.");
+  }
   if (!publishRes.ok()) {
     const errText = await publishRes.text();
     throw new Error(
@@ -237,7 +306,8 @@ export async function runPublishWizardFlow(
     );
   }
 
-  await page.waitForTimeout(4000);
+  const publishPayload = await safeApiJson(publishRes);
+  const publishedSlug = extractPublishedSlug(publishPayload);
 
   const bodyText = (await page.textContent("body")) ?? "";
   const published =
@@ -253,5 +323,6 @@ export async function runPublishWizardFlow(
   return {
     brandLabel: brandLabel.replace(/\s+/g, " ").trim(),
     modelLabel: modelLabel.replace(/\s+/g, " ").trim(),
+    publishedSlug,
   };
 }

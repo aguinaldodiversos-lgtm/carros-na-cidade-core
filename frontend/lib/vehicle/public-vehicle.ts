@@ -2,7 +2,7 @@ import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
-import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
+import { normalizeVehicleGalleryImages } from "@/lib/vehicle/detail-utils";
 
 export type SellerDealer = {
   type: "dealer";
@@ -226,13 +226,13 @@ function deriveCitySlug(city?: string | null, state?: string | null) {
 }
 
 function parseImages(ad: PublicAdDetail): string[] {
-  return collectVehicleImageCandidates(
+  return normalizeVehicleGalleryImages([
     ad.images,
     ad.image_url,
     ad.cover_image,
     ad.thumbnail,
-    ad.photo
-  );
+    ad.photo,
+  ]);
 }
 
 function deriveVehicleNames(ad: PublicAdDetail) {

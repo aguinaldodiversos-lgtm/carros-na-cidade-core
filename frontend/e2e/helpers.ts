@@ -20,8 +20,26 @@ export async function ensureDevServerUp(request: APIRequestContext, baseURL: str
   );
 }
 
-export async function loginAsLocalUser(page: Page, context: BrowserContext) {
+export async function prepareCleanBrowserState(page: Page, context: BrowserContext) {
   await context.clearCookies();
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    } catch {
+      // noop
+    }
+  });
+}
+
+export async function waitForVehicleGalleryReady(page: Page) {
+  await expect(page.getByTestId("vehicle-gallery")).toHaveAttribute("data-ready", "true", {
+    timeout: 30_000,
+  });
+}
+
+export async function loginAsLocalUser(page: Page, context: BrowserContext) {
+  await prepareCleanBrowserState(page, context);
 
   const loginRes = await page.request.post("/api/auth/login", {
     data: {
@@ -46,7 +64,6 @@ export async function loginAsLocalUser(page: Page, context: BrowserContext) {
     timeout: 120_000,
     waitUntil: "domcontentloaded",
   });
-  await page.waitForTimeout(800);
 }
 
 /** Aceita sucesso da API ou erro conhecido (backend ausente, 502, etc.). */
@@ -142,7 +159,6 @@ export async function registerMinimalUserViaApi(page: Page, cred: MinimalRegiste
   const payload = (await res.json()) as { redirect_to?: string };
   const dest = payload.redirect_to ?? "/dashboard";
   await page.goto(dest, { waitUntil: "domcontentloaded", timeout: 120_000 });
-  await page.waitForTimeout(800);
 }
 
 /**
@@ -210,7 +226,6 @@ export async function registerNewUserViaUi(page: Page, cred: RegisterCredentials
   const payload = (await res.json()) as { redirect_to?: string };
   const dest = payload.redirect_to ?? "/dashboard";
   await page.goto(dest, { waitUntil: "domcontentloaded", timeout: 120_000 });
-  await page.waitForTimeout(800);
 }
 
 /** Base da API backend (mesma prioridade que o BFF Next). */
@@ -239,6 +254,7 @@ export async function assertSearchApiListsVehicle(
     const url = new URL(`${apiBase}/api/ads/search`);
     url.searchParams.set("brand", brand);
     url.searchParams.set("limit", "30");
+    url.searchParams.set("sort", "recent");
 
     const res = await request.get(url.toString(), {
       headers: { Accept: "application/json" },
@@ -281,6 +297,7 @@ export async function getFirstSearchAdSlug(
     const url = new URL(`${apiBase}/api/ads/search`);
     url.searchParams.set("brand", brand);
     url.searchParams.set("limit", "15");
+    url.searchParams.set("sort", "recent");
 
     const res = await request.get(url.toString(), {
       headers: { Accept: "application/json" },

@@ -3,7 +3,11 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
-import { VEHICLE_IMAGE_PLACEHOLDER } from "@/lib/vehicle/detail-utils";
+import VehicleGalleryLightbox from "@/components/vehicle/VehicleGalleryLightbox";
+import {
+  normalizeVehicleGalleryImages,
+  VEHICLE_IMAGE_PLACEHOLDER,
+} from "@/lib/vehicle/detail-utils";
 
 type VehicleGalleryProps = {
   images: string[];
@@ -14,10 +18,11 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
   const [index, setIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [failedImages, setFailedImages] = useState<string[]>([]);
+  const [isReady, setIsReady] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
   const safeImages = useMemo(() => {
-    const uniqueImages = Array.from(new Set(images.filter(Boolean)));
+    const uniqueImages = normalizeVehicleGalleryImages(images);
     const filteredImages = uniqueImages.filter((image) => !failedImages.includes(image));
 
     if (filteredImages.length > 0) {
@@ -26,6 +31,10 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
 
     return [VEHICLE_IMAGE_PLACEHOLDER];
   }, [failedImages, images]);
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
 
   useEffect(() => {
     if (index <= safeImages.length - 1) return;
@@ -60,7 +69,7 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
 
   const isPlaceholderOnly =
     safeImages.length === 1 && safeImages[0] === VEHICLE_IMAGE_PLACEHOLDER && images.length === 0;
-  const showThumbStrip = !isPlaceholderOnly;
+  const showThumbStrip = !isPlaceholderOnly && safeImages.length > 1;
 
   const goPrev = () => {
     setIndex((current) => (current === 0 ? safeImages.length - 1 : current - 1));
@@ -95,6 +104,8 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
     <section className="rounded-2xl border border-[#dfe4ef] bg-white p-4 shadow-[0_2px_16px_rgba(10,20,40,0.05)]">
       <div
         data-testid="vehicle-gallery"
+        data-ready={isReady ? "true" : "false"}
+        data-active-index={String(index)}
         className="relative h-[320px] touch-pan-y overflow-hidden rounded-[24px] border border-[#edf1f5] bg-[#f5f7fb] md:h-[520px]"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -105,6 +116,7 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
               type="button"
               onClick={goPrev}
               aria-label="Foto anterior"
+              disabled={!isReady}
               className="absolute left-4 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-[#1f2a43] shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition hover:bg-white"
             >
               <svg
@@ -121,6 +133,7 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
               type="button"
               onClick={goNext}
               aria-label="Próxima foto"
+              disabled={!isReady}
               className="absolute right-4 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/92 text-[#1f2a43] shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition hover:bg-white"
             >
               <svg
@@ -139,6 +152,7 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
         <button
           type="button"
           onClick={() => !isPlaceholderOnly && setLightboxOpen(true)}
+          disabled={!isReady && !isPlaceholderOnly}
           className="absolute right-4 top-4 z-10 min-h-11 rounded-xl bg-[#0f172fcc] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_24px_rgba(15,23,42,0.22)]"
         >
           {isPlaceholderOnly ? "Sem fotos" : "Zoom"}
@@ -169,9 +183,12 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
+            disabled={!isReady}
+            data-testid="vehicle-gallery-main-trigger"
             className="relative block h-full w-full"
           >
             <Image
+              key={safeImages[index]}
               src={safeImages[index]}
               alt={`${alt} - foto ${index + 1}`}
               fill
@@ -180,12 +197,15 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
               sizes="(max-width: 1024px) 100vw, 900px"
               onError={() => handleImageError(safeImages[index])}
               data-testid="vehicle-gallery-main-image"
-              className="object-contain transition duration-300"
+              className="bg-[#f5f7fb] object-contain transition duration-300"
             />
           </button>
         )}
 
-        <div className="absolute bottom-4 right-4 z-10 rounded-full bg-[#0f172fcc] px-3 py-1.5 text-[12px] font-semibold text-white">
+        <div
+          data-testid="vehicle-gallery-counter"
+          className="absolute bottom-4 right-4 z-10 rounded-full bg-[#0f172fcc] px-3 py-1.5 text-[12px] font-semibold text-white"
+        >
           {isPlaceholderOnly ? "0 fotos" : `${index + 1} de ${safeImages.length}`}
         </div>
       </div>
@@ -197,9 +217,12 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
               key={`${image}-${imageIndex}`}
               type="button"
               data-testid={`vehicle-gallery-thumb-${imageIndex}`}
+              data-active={index === imageIndex ? "true" : "false"}
+              aria-pressed={index === imageIndex}
               onClick={() => {
                 setIndex(imageIndex);
               }}
+              disabled={!isReady}
               className={`relative h-[78px] w-[104px] min-h-11 overflow-hidden rounded-2xl border bg-[#edf1f7] transition ${
                 index === imageIndex
                   ? "border-[#0e62d8] shadow-[0_0_0_3px_rgba(14,98,216,0.14)]"
@@ -221,91 +244,16 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
       ) : null}
 
       {lightboxOpen ? (
-        <div
-          data-testid="vehicle-gallery-lightbox"
-          className="fixed inset-0 z-[70] bg-[#020617e6] p-4 md:p-8"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="mx-auto flex h-full w-full max-w-6xl flex-col">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-white/85">
-                {alt} · {index + 1}/{safeImages.length}
-              </p>
-              <button
-                type="button"
-                onClick={() => setLightboxOpen(false)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
-                aria-label="Fechar visualização expandida"
-              >
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="relative flex-1 overflow-hidden rounded-[28px] border border-white/10 bg-[#0f172a]">
-              {safeImages.length > 1 ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    aria-label="Foto anterior no modal"
-                    className="absolute left-4 top-1/2 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#0f172a] shadow-[0_10px_30px_rgba(2,6,23,0.4)]"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="m15 18-6-6 6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    aria-label="Próxima foto no modal"
-                    className="absolute right-4 top-1/2 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#0f172a] shadow-[0_10px_30px_rgba(2,6,23,0.4)]"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </button>
-                </>
-              ) : null}
-
-              <Image
-                src={safeImages[index]}
-                alt={`${alt} - visualização expandida ${index + 1}`}
-                fill
-                unoptimized
-                sizes="100vw"
-                onError={() => handleImageError(safeImages[index])}
-                data-testid="vehicle-gallery-lightbox-image"
-                className="object-contain"
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {safeImages.map((image, imageIndex) => (
-                <button
-                  key={`${image}-lightbox-${imageIndex}`}
-                  type="button"
-                  onClick={() => setIndex(imageIndex)}
-                  className={`relative h-16 w-24 overflow-hidden rounded-2xl border ${
-                    imageIndex === index ? "border-white" : "border-white/20"
-                  }`}
-                >
-                  <Image
-                    src={image}
-                    alt={`${alt} miniatura expandida ${imageIndex + 1}`}
-                    fill
-                    unoptimized
-                    sizes="96px"
-                    onError={() => handleImageError(image)}
-                    className="object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <VehicleGalleryLightbox
+          images={safeImages}
+          alt={alt}
+          index={index}
+          onClose={() => setLightboxOpen(false)}
+          onNext={goNext}
+          onPrev={goPrev}
+          onSelect={setIndex}
+          onImageError={handleImageError}
+        />
       ) : null}
     </section>
   );

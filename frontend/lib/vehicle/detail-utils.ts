@@ -47,6 +47,51 @@ export function buildVehicleImageProxyUrl(pathname: string): string {
   return `${VEHICLE_IMAGE_PROXY_PATH}?src=${encodeURIComponent(pathname)}`;
 }
 
+function decodeUrlComponentSafely(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizeExistingVehicleProxyUrl(value: string): string | null {
+  const raw = safeText(value);
+  if (!raw) return null;
+
+  const buildFromSrc = (src: string | null) => {
+    if (!src) return null;
+    const decodedSrc = decodeUrlComponentSafely(src);
+    return decodedSrc.startsWith("/uploads/") ? buildVehicleImageProxyUrl(decodedSrc) : null;
+  };
+
+  if (raw.startsWith(`${VEHICLE_IMAGE_PROXY_PATH}?`)) {
+    const params = new URLSearchParams(raw.split("?")[1] || "");
+    return buildFromSrc(params.get("src")) || safeUrl(raw);
+  }
+
+  if (!/^https?:\/\//i.test(raw)) return null;
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname !== VEHICLE_IMAGE_PROXY_PATH) return null;
+    return buildFromSrc(parsed.searchParams.get("src")) || safeUrl(raw);
+  } catch {
+    return null;
+  }
+}
+
+function isKnownPlaceholderImage(value: string): boolean {
+  const normalized = normalizePathSeparators(value).toLowerCase();
+
+  return [
+    VEHICLE_IMAGE_PLACEHOLDER.toLowerCase(),
+    "/images/banner1.jpg",
+    "/images/banner2.jpg",
+    "/images/vehicle-placeholder.svg",
+  ].some((placeholder) => normalized === placeholder || normalized.endsWith(placeholder));
+}
+
 function hasSupportedExtension(pathname: string): boolean {
   const cleanPath = normalizePathSeparators(pathname).split("?")[0]?.split("#")[0] || "";
   const fileName = cleanPath.split("/").pop() || "";
@@ -95,6 +140,10 @@ export function normalizeVehicleImageUrl(value: unknown): string | null {
 
   if (!raw) return null;
   if (["null", "undefined", "[object Object]"].includes(raw)) return null;
+  if (isKnownPlaceholderImage(raw)) return null;
+
+  const proxiedUrl = normalizeExistingVehicleProxyUrl(raw);
+  if (proxiedUrl) return proxiedUrl;
 
   if (raw.startsWith("data:image/") || raw.startsWith("blob:")) {
     return raw;
@@ -210,6 +259,10 @@ export function collectVehicleImageCandidates(...values: unknown[]): string[] {
   values.forEach(visit);
 
   return Array.from(normalized);
+}
+
+export function normalizeVehicleGalleryImages(images: unknown[]): string[] {
+  return collectVehicleImageCandidates(images).filter((image) => !isKnownPlaceholderImage(image));
 }
 
 export function digitsOnly(value: string): string {

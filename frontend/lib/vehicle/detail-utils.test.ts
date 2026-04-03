@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   collectVehicleImageCandidates,
+  normalizeVehicleGalleryImages,
   normalizeVehicleImageUrl,
   isSupportedVehicleImageUrl,
 } from "./detail-utils";
@@ -55,6 +56,24 @@ describe("vehicle detail image utils", () => {
     );
   });
 
+  it("preserva proxy relativo do portal sem reenviar para o host da API", () => {
+    process.env.API_URL = "https://carros-na-cidade-api.onrender.com";
+
+    expect(normalizeVehicleImageUrl("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg")).toBe(
+      "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"
+    );
+  });
+
+  it("corrige proxy absoluto no host errado e remove dupla codificação do src", () => {
+    process.env.API_URL = "https://carros-na-cidade-api.onrender.com";
+
+    expect(
+      normalizeVehicleImageUrl(
+        "https://carros-na-cidade-api.onrender.com/api/vehicle-images?src=%252Fuploads%252Fads%252Ffoto.jpg"
+      )
+    ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg");
+  });
+
   it("coleta imagens de arrays, json string e objetos de galeria", () => {
     const images = collectVehicleImageCandidates(
       ["/uploads/ads/primeira.jpg", "uploads/ads/segunda.jpeg"],
@@ -68,5 +87,17 @@ describe("vehicle detail image utils", () => {
       "/api/vehicle-images?src=%2Fuploads%2Fads%2Fterceira.png",
       "/api/vehicle-images?src=%2Fuploads%2Fads%2Fquarta.jpg",
     ]);
+  });
+
+  it("remove placeholders conhecidos da lista final da galeria", () => {
+    const images = normalizeVehicleGalleryImages([
+      "/images/hero.jpeg",
+      "/images/banner1.jpg",
+      "/uploads/ads/foto.jpg",
+      "",
+      null,
+    ]);
+
+    expect(images).toEqual(["/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"]);
   });
 });

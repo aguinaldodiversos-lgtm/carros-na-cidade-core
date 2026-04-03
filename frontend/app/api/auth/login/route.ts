@@ -68,6 +68,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("POST /api/auth/login error:", error);
 
+    if (
+      error instanceof Error &&
+      /credenciais invalidas|credenciais inválidas|nao foi possivel autenticar/i.test(error.message)
+    ) {
+      return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
+    }
+
     return NextResponse.json({ error: "Erro interno ao processar o login." }, { status: 500 });
   }
 }
