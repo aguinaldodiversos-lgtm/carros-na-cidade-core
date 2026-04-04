@@ -1,7 +1,7 @@
 const BRAZIL_COUNTRY_CODE = "55";
 
-export const VEHICLE_IMAGE_PLACEHOLDER = "/images/hero.jpeg";
-export const VEHICLE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "avif"] as const;
+export const VEHICLE_IMAGE_PLACEHOLDER = "/images/vehicle-placeholder.svg";
+export const VEHICLE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "avif", "heic", "heif"] as const;
 export const VEHICLE_IMAGE_PROXY_PATH = "/api/vehicle-images";
 
 function safeText(value: unknown): string {
@@ -86,9 +86,13 @@ function isKnownPlaceholderImage(value: string): boolean {
 
   return [
     VEHICLE_IMAGE_PLACEHOLDER.toLowerCase(),
+    "/images/hero.jpeg",
     "/images/banner1.jpg",
     "/images/banner2.jpg",
-    "/images/vehicle-placeholder.svg",
+    "/images/corolla.jpeg",
+    "/images/civic.jpeg",
+    "/images/compass.jpeg",
+    "/images/hb20.jpeg",
   ].some((placeholder) => normalized === placeholder || normalized.endsWith(placeholder));
 }
 

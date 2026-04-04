@@ -38,6 +38,9 @@ export interface AdItem {
   year_model?: string | null;
   mileage?: number;
   price?: number;
+  fuel_type?: string | null;
+  transmission?: string | null;
+  body_type?: string | null;
   below_fipe?: boolean;
   highlight_until?: string | null;
   plan?: string | null;
@@ -48,6 +51,7 @@ export interface AdItem {
   cover_image?: string | null;
   images?: string[] | null;
   seller_type?: string | null;
+  seller_name?: string | null;
   dealer_name?: string | null;
   dealership_name?: string | null;
   dealership_id?: number | null;
@@ -219,6 +223,9 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     year_model: toNullableText(item.year_model ?? item.yearLabel),
     mileage: toOptionalNumber(item.mileage ?? item.km),
     price: toOptionalNumber(item.price),
+    fuel_type: toNullableText(item.fuel_type),
+    transmission: toNullableText(item.transmission),
+    body_type: toNullableText(item.body_type),
     below_fipe: item.below_fipe === true,
     highlight_until: toNullableText(item.highlight_until),
     plan: toNullableText(item.plan),
@@ -229,6 +236,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     cover_image: toNullableText(item.cover_image),
     images,
     seller_type: toNullableText(item.seller_type),
+    seller_name: toNullableText(item.seller_name),
     dealer_name: toNullableText(item.dealer_name),
     dealership_name: toNullableText(item.dealership_name),
     dealership_id: toOptionalNumber(item.dealership_id) ?? null,

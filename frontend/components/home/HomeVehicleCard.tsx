@@ -86,13 +86,13 @@ function resolveFavoriteKey(item: VehicleItem) {
 }
 
 function resolveHref(item: VehicleItem) {
-  if (item.slug) return `/comprar/${encodeURIComponent(item.slug)}`;
+  if (item.slug) return `/veiculo/${encodeURIComponent(item.slug)}`;
 
   const fallback = [item.title, item.brand, item.model, item.year, item.id]
     .filter(Boolean)
     .join(" ");
 
-  return `/comprar/${slugify(fallback || `anuncio-${item.id}`)}`;
+  return `/veiculo/${slugify(fallback || `anuncio-${item.id}`)}`;
 }
 
 function discountLabel(item: VehicleItem, variant: "highlight" | "opportunity") {

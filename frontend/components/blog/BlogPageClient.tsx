@@ -11,8 +11,8 @@ interface BlogPageClientProps {
 
 const FALLBACK_PLANOS_HREF = "/planos";
 const FALLBACK_BLOG_CITY_HREF = `/blog/${DEFAULT_PUBLIC_CITY_SLUG}`;
-const FALLBACK_HERO_IMAGE = "/images/hero.jpeg";
-const FALLBACK_BOTTOM_BANNER_IMAGE = "/images/banner1.jpg";
+const FALLBACK_HERO_IMAGE = "/images/vehicle-placeholder.svg";
+const FALLBACK_BOTTOM_BANNER_IMAGE = "/images/vehicle-placeholder.svg";
 
 function toText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;

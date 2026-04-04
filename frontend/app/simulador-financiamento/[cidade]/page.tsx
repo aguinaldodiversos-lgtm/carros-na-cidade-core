@@ -66,8 +66,8 @@ function fallbackHero(cityName: string, state: string): AdItem {
     mileage: 28000,
     price: 105900,
     below_fipe: false,
-    image_url: "/images/hero.jpeg",
-    images: ["/images/hero.jpeg"],
+    image_url: "/images/vehicle-placeholder.svg",
+    images: ["/images/vehicle-placeholder.svg"],
   };
 }
 

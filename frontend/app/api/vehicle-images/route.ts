@@ -14,6 +14,8 @@ const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   png: "image/png",
   webp: "image/webp",
   avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
 };
 
 function getSafeUploadPath(raw: string): string | null {
@@ -89,5 +91,5 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.redirect(new URL("/images/hero.jpeg", request.url), { status: 307 });
+  return NextResponse.redirect(new URL("/images/vehicle-placeholder.svg", request.url), { status: 307 });
 }

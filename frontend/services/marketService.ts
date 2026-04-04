@@ -268,11 +268,11 @@ export function getFipeFaqByCity(cidade: string): FaqItem[] {
 
 const categoryPool = ["Mercado", "Tecnologia", "Eletricos", "Economia", "Lancamentos", "Dicas"];
 const imagePool = [
-  "/images/banner1.jpg",
-  "/images/banner2.jpg",
-  "/images/civic.jpeg",
-  "/images/compass.jpeg",
-  "/images/corolla.jpeg",
+  "/images/vehicle-placeholder.svg",
+  "/images/vehicle-placeholder.svg",
+  "/images/vehicle-placeholder.svg",
+  "/images/vehicle-placeholder.svg",
+  "/images/vehicle-placeholder.svg",
 ];
 
 export function getBlogArticlesByCity(cidade: string): BlogArticle[] {

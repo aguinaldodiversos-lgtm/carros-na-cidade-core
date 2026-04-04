@@ -1,5 +1,6 @@
 import type { AdItem } from "@/lib/search/ads-search";
 import type { ListingCar } from "@/lib/car-data";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type LegacyCarCardInput = {
   id?: string | number;
@@ -12,8 +13,6 @@ type LegacyCarCardInput = {
   discount?: number | string;
   price?: string | number | null;
 };
-
-const FALLBACK_IMAGE = "/images/hero.jpeg";
 
 function toNumber(value?: string | number | null) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -96,8 +95,7 @@ function extractMileage(km?: string) {
 }
 
 function normalizeImage(image?: string | null) {
-  const normalized = sanitizeText(image);
-  return normalized || FALLBACK_IMAGE;
+  return resolvePublicListingImageUrl({ image });
 }
 
 function inferBrand(model?: string, explicitBrand?: string) {

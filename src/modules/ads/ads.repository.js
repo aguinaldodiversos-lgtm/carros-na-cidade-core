@@ -98,13 +98,23 @@ export async function findById(id) {
 export async function findAdByIdentifier(identifier) {
   const isNumeric = /^\d+$/.test(String(identifier));
 
-  const { rows } = await db.query(
-    isNumeric
-      ? `SELECT * FROM ads WHERE id = $1 AND status = 'active' LIMIT 1`
-      : `SELECT * FROM ads WHERE slug = $1 AND status = 'active' LIMIT 1`,
-    [identifier]
-  );
+  const baseQuery = `
+    SELECT
+      a.*,
+      c.slug AS city_slug,
+      adv.name        AS seller_name,
+      adv.company_name AS dealership_name,
+      adv.phone       AS seller_phone,
+      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number
+    FROM ads a
+    LEFT JOIN cities c      ON c.id = a.city_id
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    WHERE ${isNumeric ? "a.id = $1" : "a.slug = $1"}
+      AND a.status = 'active'
+    LIMIT 1
+  `;
 
+  const { rows } = await db.query(baseQuery, [identifier]);
   return rows[0] || null;
 }
 

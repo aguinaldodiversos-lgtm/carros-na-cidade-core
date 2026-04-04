@@ -98,7 +98,7 @@ function formatMileage(value?: number | string) {
 function resolveImage(item?: AdItem) {
   if (item?.image_url) return item.image_url;
   if (Array.isArray(item?.images) && item.images[0]) return item.images[0];
-  return "/images/hero.jpeg";
+  return "/images/vehicle-placeholder.svg";
 }
 
 function resolveTitle(item?: AdItem) {
@@ -135,7 +135,7 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
       state: "SP",
       price: 89900,
       below_fipe: true,
-      image_url: "/images/hero.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
     },
     {
       id: 999102,
@@ -144,7 +144,7 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
       state: "SP",
       price: 85900,
       below_fipe: true,
-      image_url: "/images/hero.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
     },
     {
       id: 999103,
@@ -153,7 +153,7 @@ function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
       state: "SP",
       price: 97900,
       below_fipe: true,
-      image_url: "/images/hero.jpeg",
+      image_url: "/images/vehicle-placeholder.svg",
     },
   ];
 }
@@ -231,7 +231,7 @@ export function FinancingLandingPageClient({
       <section className="relative overflow-hidden border-b border-[#e7ebf3] bg-[linear-gradient(180deg,#fbfcff_0%,#f3f6fb_100%)]">
         <div
           className="absolute inset-x-0 top-0 h-[420px] bg-cover bg-center opacity-20"
-          style={{ backgroundImage: "url('/images/hero.jpeg')" }}
+          style={{ backgroundImage: "url('/images/vehicle-placeholder.svg')" }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.92),rgba(245,247,252,0.82)_44%,rgba(245,247,252,0.98)_100%)]" />
 
@@ -546,7 +546,7 @@ export function FinancingLandingPageClient({
               className="relative flex min-h-[240px] flex-col gap-6 px-6 py-8 md:min-h-[260px] md:flex-row md:items-center md:justify-between md:px-8"
               style={{
                 backgroundImage:
-                  "linear-gradient(90deg, rgba(30,37,71,0.90) 0%, rgba(30,37,71,0.74) 36%, rgba(30,37,71,0.18) 100%), url('/images/hero.jpeg')",
+                  "linear-gradient(90deg, rgba(30,37,71,0.90) 0%, rgba(30,37,71,0.74) 36%, rgba(30,37,71,0.18) 100%), url('/images/vehicle-placeholder.svg')",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }}

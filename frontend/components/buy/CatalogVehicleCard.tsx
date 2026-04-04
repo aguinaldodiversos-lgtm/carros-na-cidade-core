@@ -197,7 +197,10 @@ export default function CatalogVehicleCard({
   const image = getImage(item);
   const listedHint = getListedHint(item.created_at);
   const useUnoptimizedImage =
-    image.startsWith("/api/vehicle-images") || image.startsWith("http") || image.startsWith("data:");
+    image.startsWith("/api/vehicle-images") ||
+    image.startsWith("http") ||
+    image.startsWith("data:") ||
+    image.endsWith(".svg");
 
   const cardClasses = cx(
     "group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-16px_rgba(15,23,42,0.18)]",

@@ -98,7 +98,7 @@ export function formatListingDateLabels(
   return { primary: "" };
 }
 
-const FALLBACK_IMAGES = ["/images/hero.jpeg", "/images/banner1.jpg", "/images/banner2.jpg"];
+const FALLBACK_IMAGES = ["/images/vehicle-placeholder.svg"];
 
 function slugify(value: string) {
   return value

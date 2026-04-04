@@ -4,25 +4,25 @@ const fipe = [
   {
     title: "2022 Hyundai Creta",
     price: "R$ 89.900",
-    image: "/images/hb20.jpeg",
+    image: "/images/vehicle-placeholder.svg",
     discount: "9%",
   },
   {
     title: "2021 Volkswagen T-Cross",
     price: "R$ 97.900",
-    image: "/images/compass.jpeg",
+    image: "/images/vehicle-placeholder.svg",
     discount: "9%",
   },
   {
     title: "2023 Nissan Kicks",
     price: "R$ 96.900",
-    image: "/images/civic.jpeg",
+    image: "/images/vehicle-placeholder.svg",
     discount: "9%",
   },
   {
     title: "2020 Chevrolet Onix",
     price: "R$ 65.900",
-    image: "/images/corolla.jpeg",
+    image: "/images/vehicle-placeholder.svg",
     discount: "8%",
   },
 ];

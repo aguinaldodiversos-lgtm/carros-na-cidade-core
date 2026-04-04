@@ -43,11 +43,11 @@ export const DEFAULT_MODEL_OPTIONS = [
 ];
 
 export const DEFAULT_POPULAR_BRANDS: BrandFacet[] = [
-  { brand: "Toyota", total: 1520 },
-  { brand: "Chevrolet", total: 1320 },
-  { brand: "Honda", total: 935 },
-  { brand: "Volkswagen", total: 1210 },
-  { brand: "Jeep", total: 720 },
+  { brand: "Toyota", total: 0 },
+  { brand: "Chevrolet", total: 0 },
+  { brand: "Honda", total: 0 },
+  { brand: "Volkswagen", total: 0 },
+  { brand: "Jeep", total: 0 },
 ];
 
 export function parseNumber(value?: string | number | null) {
@@ -133,143 +133,6 @@ export function normalizeCatalogItem(item: Partial<CatalogItem>, city: BuyCityCo
   };
 }
 
-function buildFallbackCatalog(city: BuyCityContext): CatalogItem[] {
-  const seed: Array<Partial<CatalogItem>> = [
-    {
-      id: 900001,
-      slug: "byd-yuan-plus-2023",
-      title: "2023 BYD Yuan Plus",
-      brand: "BYD",
-      model: "Yuan Plus",
-      fuel_type: "Elétrico",
-      transmission: "Automático",
-      mileage: 5000,
-      city: city.name,
-      state: city.state,
-      price: 235990,
-      image_url: "/images/vehicle-placeholder.svg",
-      highlight_until: new Date().toISOString(),
-      catalogWeight: 4,
-    },
-    {
-      id: 900002,
-      slug: "nissan-kicks-2022",
-      title: "2022 Nissan Kicks",
-      brand: "Nissan",
-      model: "Kicks",
-      fuel_type: "Flex",
-      transmission: "Automático",
-      mileage: 18000,
-      city: city.name,
-      state: city.state,
-      price: 98900,
-      image_url: "/images/vehicle-placeholder.svg",
-      below_fipe: true,
-      highlight_until: new Date().toISOString(),
-      catalogWeight: 4,
-    },
-    {
-      id: 900003,
-      slug: "volkswagen-taos-highline-2022",
-      title: "Volkswagen Taos Highline",
-      brand: "Volkswagen",
-      model: "Taos",
-      fuel_type: "Gasolina",
-      transmission: "Automático",
-      mileage: 26080,
-      city: city.name,
-      state: city.state,
-      price: 159900,
-      image_url: "/images/vehicle-placeholder.svg",
-      catalogWeight: 3,
-      dealership_name: "Premium Motors",
-    },
-    {
-      id: 900004,
-      slug: "jeep-renegade-longitude-2022",
-      title: "2022 Jeep Renegade",
-      brand: "Jeep",
-      model: "Renegade",
-      fuel_type: "Flex",
-      transmission: "Automático",
-      mileage: 28000,
-      city: city.name,
-      state: city.state,
-      price: 159900,
-      image_url: "/images/vehicle-placeholder.svg",
-      dealership_name: "Prime Autos",
-      catalogWeight: 3,
-      below_fipe: true,
-    },
-    {
-      id: 900005,
-      slug: "renegade-longitude-t270-2021",
-      title: "Renegade Longitude T270",
-      brand: "Jeep",
-      model: "Renegade",
-      fuel_type: "Flex",
-      transmission: "Automático",
-      mileage: 6000,
-      city: city.name,
-      state: city.state,
-      price: 115900,
-      image_url: "/images/vehicle-placeholder.svg",
-      catalogWeight: 3,
-      dealership_name: "Revenda Premium",
-    },
-    {
-      id: 900006,
-      slug: "jeep-renegade-2022",
-      title: "2022 Renegade",
-      brand: "Jeep",
-      model: "Renegade",
-      fuel_type: "Flex",
-      transmission: "Automático",
-      mileage: 150000,
-      city: city.name,
-      state: city.state,
-      price: 115900,
-      image_url: "/images/vehicle-placeholder.svg",
-      catalogWeight: 2,
-      dealership_name: "Auto Center",
-    },
-    {
-      id: 900007,
-      slug: "honda-civic-2021",
-      title: "2021 Honda Civic",
-      brand: "Honda",
-      model: "Civic",
-      fuel_type: "Flex",
-      transmission: "Automático",
-      mileage: 22000,
-      city: city.name,
-      state: city.state,
-      price: 125900,
-      image_url: "/images/vehicle-placeholder.svg",
-      catalogWeight: 2,
-      dealership_name: "Loja Local",
-    },
-    {
-      id: 900008,
-      slug: "chevrolet-onix-2021",
-      title: "2021 Chevrolet Onix",
-      brand: "Chevrolet",
-      model: "Onix",
-      fuel_type: "Flex",
-      transmission: "Automático",
-      mileage: 50000,
-      city: city.name,
-      state: city.state,
-      price: 79900,
-      image_url: "/images/vehicle-placeholder.svg",
-      catalogWeight: 1,
-      seller_type: "private",
-    },
-  ];
-
-  return seed.map((item) => normalizeCatalogItem(item, city));
-}
-
 export function toSafeCatalogItems(
   value: AdsSearchResponse["data"] | undefined,
   city: BuyCityContext
@@ -278,7 +141,7 @@ export function toSafeCatalogItems(
     return value.map((item) => normalizeCatalogItem(item, city));
   }
 
-  return buildFallbackCatalog(city);
+  return [];
 }
 
 export function toSafeBrandFacets(value: unknown): BrandFacet[] {
@@ -384,12 +247,10 @@ export function sortCatalogItems(items: CatalogItem[], sort?: string) {
 
 export function buildCatalogStats(items: CatalogItem[]) {
   return {
-    newest: Math.max(items.length, 1520),
-    cheaper: Math.max(items.filter((item) => parseNumber(item.price) <= 100000).length, 130),
-    lessMileage: Math.max(
-      items.filter((item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000)
-        .length,
-      935
-    ),
+    newest: items.length,
+    cheaper: items.filter((item) => parseNumber(item.price) <= 100000).length,
+    lessMileage: items.filter(
+      (item) => parseNumber(item.mileage) > 0 && parseNumber(item.mileage) <= 40000
+    ).length,
   };
 }

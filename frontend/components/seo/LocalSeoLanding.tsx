@@ -99,7 +99,7 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
               {sampleAds.map((ad) => {
                 const href = buildAdHref(ad);
                 const img =
-                  ad.image_url || (Array.isArray(ad.images) && ad.images[0]) || "/images/hero.jpeg";
+                  ad.image_url || (Array.isArray(ad.images) && ad.images[0]) || "/images/vehicle-placeholder.svg";
                 const title =
                   ad.title || [ad.brand, ad.model, ad.year].filter(Boolean).join(" ") || "Veículo";
                 return (

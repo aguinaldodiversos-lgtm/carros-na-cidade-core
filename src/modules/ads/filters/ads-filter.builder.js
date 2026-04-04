@@ -109,6 +109,9 @@ export function buildAdsSearchQuery(filters = {}) {
     SELECT
       a.*,
       c.slug AS city_slug,
+      adv.name        AS seller_name,
+      adv.company_name AS dealership_name,
+      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,
       COALESCE(m.views, 0) AS views,
       COALESCE(m.clicks, 0) AS clicks,
       COALESCE(m.leads, 0) AS leads,
@@ -117,6 +120,7 @@ export function buildAdsSearchQuery(filters = {}) {
       ${hybridScoreExpr} AS hybrid_score
     FROM ads a
     LEFT JOIN cities c ON c.id = a.city_id
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
     LEFT JOIN ad_metrics m ON m.ad_id = a.id
     LEFT JOIN city_metrics cm ON cm.city_id = a.city_id
     ${whereClause}

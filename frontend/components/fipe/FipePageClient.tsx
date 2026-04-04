@@ -54,7 +54,7 @@ function normalizeAds(items: VehicleItem[], cityName: string): VehicleItem[] {
     city: cityName,
     state: "SP",
     price: 0,
-    image_url: "/images/hero.jpeg",
+    image_url: "/images/vehicle-placeholder.svg",
   }));
 }
 
@@ -460,7 +460,7 @@ export function FipePageClient({
               <section className="mt-8 overflow-hidden rounded-[26px] border border-[#dbe2ee] bg-[#0e1b3b] shadow-[0_18px_40px_rgba(16,28,58,0.12)]">
                 <div className="relative min-h-[250px] px-6 py-8 md:min-h-[300px] md:px-8 md:py-10">
                   <Image
-                    src="/images/hero.jpeg"
+                    src="/images/vehicle-placeholder.svg"
                     alt="Anuncie seu carro"
                     fill
                     className="object-cover"
@@ -503,7 +503,7 @@ export function FipePageClient({
             <div className="overflow-hidden rounded-[22px] border border-[#dfe6f2] bg-white shadow-[0_14px_28px_rgba(16,28,58,0.07)]">
               <div className="relative aspect-[1.14/0.72]">
                 <Image
-                  src="/images/hero.jpeg"
+                  src="/images/vehicle-placeholder.svg"
                   alt="Anuncie seu carro"
                   fill
                   className="object-cover"

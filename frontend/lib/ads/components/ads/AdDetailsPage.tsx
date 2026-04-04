@@ -195,7 +195,7 @@ function VehicleCard({ item }: { item: RelatedAd }) {
 }
 
 export default function AdDetailsPage({ ad }: Props) {
-  const safeImages = ad.images?.length ? ad.images : ["/images/hero.jpeg"];
+  const safeImages = ad.images?.length ? ad.images : ["/images/vehicle-placeholder.svg"];
   const [selectedImage, setSelectedImage] = useState(0);
   const [favorite, setFavorite] = useState(false);
   const [form, setForm] = useState<ContactFormState>({

@@ -119,14 +119,14 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
     heroBanner: {
       title: "Blog Carros na Cidade",
       subtitle: `Dicas e notícias de automóveis em ${city.name} e região`,
-      image: "/images/hero.jpeg",
+      image: "/images/vehicle-placeholder.svg",
     },
     bottomBanner: {
       title: "Quer vender seu carro rápido e seguro?",
       subtitle: `Anuncie grátis em ${city.name} e fale direto com compradores da sua cidade.`,
       ctaLabel: "Criar anúncio grátis",
       ctaHref: "/planos",
-      image: "/images/hero.jpeg",
+      image: "/images/vehicle-placeholder.svg",
     },
     sidebarSaleCta: {
       title: "Anuncie seu carro grátis",
@@ -148,7 +148,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: `Guia completo para comprar SUVs usados em ${city.name}`,
         excerpt:
           "Veja onde observar, quais versões valem mais a pena e como negociar melhor na hora de comprar um SUV usado com segurança.",
-        coverImage: "/images/hero.jpeg",
+        coverImage: "/images/vehicle-placeholder.svg",
         publishedAt: "2026-04-16",
         readTime: "Ver 5 min",
         category: "Comprando Carros",
@@ -161,7 +161,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: "Como conseguir as melhores taxas para financiar seu carro",
         excerpt:
           "Veja dicas práticas para obter as melhores condições de financiamento, comparar CET e negociar entrada e prazo com mais segurança.",
-        coverImage: "/images/hero.jpeg",
+        coverImage: "/images/vehicle-placeholder.svg",
         publishedAt: "2026-04-10",
         readTime: "Ver 4 min",
         category: "Manutenção e Economia",
@@ -176,7 +176,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: `Diferenças entre revisões e manutenções em ${city.name}`,
         excerpt:
           "Entenda quando fazer revisão preventiva, o que realmente precisa ser trocado e como evitar gastos desnecessários no dia a dia.",
-        coverImage: "/images/hero.jpeg",
+        coverImage: "/images/vehicle-placeholder.svg",
         publishedAt: "2026-04-16",
         readTime: "Ver 4 minutos",
         category: "Manutenção e Economia",
@@ -189,7 +189,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: "10 melhores roteiros de carro para o final de semana",
         excerpt:
           "Descubra destinos próximos, ideias de passeio e rotas urbanas para curtir mais o seu carro nos arredores da cidade.",
-        coverImage: "/images/hero.jpeg",
+        coverImage: "/images/vehicle-placeholder.svg",
         publishedAt: "2026-04-10",
         readTime: "Ver ofertas",
         category: "Notícias e Curiosidades",
@@ -202,7 +202,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         title: "Como manter a revisão em dia sem apertar o orçamento",
         excerpt:
           "Veja como planejar manutenção, separar custos previsíveis e evitar surpresas que derrubam o valor de revenda do veículo.",
-        coverImage: "/images/hero.jpeg",
+        coverImage: "/images/vehicle-placeholder.svg",
         publishedAt: "2026-04-04",
         readTime: "Ver ofertas",
         category: "Manutenção e Economia",

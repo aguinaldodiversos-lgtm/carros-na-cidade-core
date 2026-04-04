@@ -105,8 +105,8 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
     fipeDeltaPercent: null,
     isPaidListing: false,
     advertiserId: null,
-    images: ["/images/banner1.jpg", "/images/banner2.jpg", "/images/hero.jpeg"],
-    hasRealImages: true,
+    images: [],
+    hasRealImages: false,
     description:
       "As informações completas deste veículo estão temporariamente indisponíveis. Tente novamente em instantes ou volte para a listagem.",
     optionalItems: [
@@ -243,7 +243,7 @@ export async function generateMetadata({
       url: `/veiculo/${vehicle.slug || params.slug}`,
       images: [
         {
-          url: vehicle.images[0] ?? "/images/banner1.jpg",
+          url: vehicle.images[0] ?? "/images/vehicle-placeholder.svg",
           width: 1200,
           height: 630,
           alt: vehicle.fullName,

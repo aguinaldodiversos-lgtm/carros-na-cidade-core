@@ -46,7 +46,7 @@ export function mapAdItemToListingCar(item: AdItem): ListingCar {
   const badge = hasHighlight ? "destaque" : item.below_fipe ? "fipe" : undefined;
 
   const image =
-    item.image_url || (Array.isArray(item.images) && item.images[0]) || "/images/hero.jpeg";
+    item.image_url || (Array.isArray(item.images) && item.images[0]) || "/images/vehicle-placeholder.svg";
 
   return {
     id: String(item.id),

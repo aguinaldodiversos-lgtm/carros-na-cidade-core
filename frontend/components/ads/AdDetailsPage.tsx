@@ -23,7 +23,7 @@ type DetailItem = {
   value: string;
 };
 
-const FALLBACK_IMAGE = "/images/hero.jpeg";
+const FALLBACK_IMAGE = "/images/vehicle-placeholder.svg";
 const CATALOG_HREF = "/comprar";
 const DEFAULT_CITY = "São Paulo";
 const DEFAULT_STATE = "SP";

@@ -29,7 +29,7 @@ export default function CarCard(props: CarCardProps) {
       : {
           title: props.title,
           price: props.price,
-          image: "/images/corolla.jpeg",
+          image: "/images/vehicle-placeholder.svg",
         };
 
   return <AdCard item={legacyCarCardToAdItem(car)} />;
