@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import {
+  ensureBackendApiReachable,
   ensureDevServerUp,
   getBackendApiBaseUrl,
   isSlugInRecentSearchSlice,
@@ -22,6 +23,7 @@ let backendRegisterProbeOk = false;
 test.beforeAll(async ({ request, baseURL }) => {
   await ensureDevServerUp(request, baseURL);
   const apiBase = getBackendApiBaseUrl();
+  await ensureBackendApiReachable(request, apiBase);
   const probe = await request.post(`${apiBase}/api/auth/register`, {
     data: {
       email: `e2e.surface.probe.${Date.now()}@e2e.carrosnacidade.test`,
@@ -48,7 +50,7 @@ test.describe.serial("Publicação completa → superfícies do portal", () => {
   }) => {
     test.skip(
       !backendRegisterProbeOk,
-      "Backend POST /api/auth/register falhou (Postgres + DATABASE_URL + npm run e2e:prepare). Ver docs/testing/e2e.md"
+      "Backend POST /api/auth/register falhou (API no ar mas registo rejeitado? Ver DATABASE_URL, npm run e2e:prepare). docs/testing/e2e.md"
     );
 
     const fixtures = createPublishPhotoFixtures();

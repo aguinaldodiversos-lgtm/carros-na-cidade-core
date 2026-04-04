@@ -228,7 +228,11 @@ export async function registerNewUserViaUi(page: Page, cred: RegisterCredentials
   await page.goto(dest, { waitUntil: "domcontentloaded", timeout: 120_000 });
 }
 
-/** Base da API backend (mesma prioridade que o BFF Next). */
+/**
+ * Base da API Express usada pelos testes que chamam o backend direto (`request` → `apiBase`).
+ * Prioridade: `E2E_BACKEND_API_URL` → `BACKEND_API_URL` → `NEXT_PUBLIC_API_URL` → `API_URL` → fallback `http://127.0.0.1:4000`.
+ * Nota: isto **não** inicia o servidor; só escolhe o URL (deve coincidir com `npm run dev` na raiz e com o BFF Next).
+ */
 export function getBackendApiBaseUrl(): string {
   const raw =
     process.env.E2E_BACKEND_API_URL?.trim() ||
@@ -237,6 +241,51 @@ export function getBackendApiBaseUrl(): string {
     process.env.API_URL?.trim() ||
     "";
   return raw.replace(/\/+$/, "") || "http://127.0.0.1:4000";
+}
+
+const BACKEND_UNREACHABLE_HINT =
+  "Definir E2E_BACKEND_API_URL=http://127.0.0.1:4000 só aponta o Playwright para esse host — não inicia a API.";
+
+/**
+ * Falha cedo com mensagem legível quando a API Express não está a escutar (evita `apiRequestContext.post: connect ECONNREFUSED` opaco).
+ * Usa `GET /health` (src/routes/health.js). 503 = processo no ar mas Postgres provavelmente inacessível.
+ */
+export async function ensureBackendApiReachable(request: APIRequestContext, apiBase: string) {
+  const base = apiBase.replace(/\/+$/, "");
+  const healthUrl = `${base}/health`;
+  try {
+    const res = await request.get(healthUrl, { timeout: 20_000 });
+    if (res.status() === 503) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `GET ${healthUrl} retornou 503 (API no ar, mas base degradada).\n` +
+          `Verifique DATABASE_URL e Postgres (o mesmo usado em npm run e2e:prepare). Resposta: ${body.slice(0, 280)}\n` +
+          `Guia: docs/testing/e2e.md`
+      );
+    }
+    if (!res.ok()) {
+      throw new Error(
+        `GET ${healthUrl} → HTTP ${res.status()}. Confira se apiBase=${base} é a API Express (porta PORT ou 4000).`
+      );
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (
+      /ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|net::ERR_|fetch failed|socket hang up/i.test(
+        msg
+      )
+    ) {
+      throw new Error(
+        `API Express não está acessível em ${base} (${msg}).\n\n` +
+          `${BACKEND_UNREACHABLE_HINT}\n\n` +
+          `Suba o backend na raiz do monorepo: npm run dev (escuta em PORT ou 4000; HOST padrão 0.0.0.0).\n` +
+          `Confirme que responde: curl ${healthUrl}\n` +
+          `E2E com DB: npm run e2e:prepare (raiz) antes do dev, e use a mesma DATABASE_URL no processo da API.\n` +
+          `Documentação: docs/testing/e2e.md`
+      );
+    }
+    throw e;
+  }
 }
 
 /**
