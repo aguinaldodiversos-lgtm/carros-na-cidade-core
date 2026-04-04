@@ -115,9 +115,13 @@ function normalizeBuyFilters(
   const hasIdOnly =
     !explicitSlug && parsed.city_id != null && Number.isFinite(Number(parsed.city_id));
 
+  /** `parseAdsSearchFiltersFromSearchParams` injeta `sort=relevance` quando ausente; aqui o default do /comprar é `recent`. */
+  const sortInQuery = getFirstValue(searchParams.sort);
+  const hasExplicitSort = sortInQuery != null && String(sortInQuery).trim() !== "";
+
   const merged: AdsSearchFilters = {
     ...parsed,
-    sort: parsed.sort || "recent",
+    sort: hasExplicitSort ? (parsed.sort || "recent") : "recent",
     page: parsed.page || 1,
     limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
   };

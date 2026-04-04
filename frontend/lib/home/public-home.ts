@@ -1,3 +1,4 @@
+import { getBackendApiExplicitEnvUrl } from "@/lib/env/backend-api";
 import type { AdItem } from "@/lib/search/ads-search";
 
 export interface HomeDataResponse {
@@ -23,11 +24,9 @@ function stripTrailingSlash(url: string) {
 }
 
 function getApiBaseUrl(): string {
-  const api =
-    process.env.API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    OFFICIAL_PUBLIC_API_URL;
-  return stripTrailingSlash(api);
+  const explicit = getBackendApiExplicitEnvUrl();
+  if (explicit) return stripTrailingSlash(explicit);
+  return stripTrailingSlash(OFFICIAL_PUBLIC_API_URL);
 }
 
 function fallbackHome(): HomeDataResponse["data"] {

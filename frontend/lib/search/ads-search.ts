@@ -1,5 +1,6 @@
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { canonicalTerritoryForApi, clampPublicAdsSearchLimit } from "@/lib/search/ads-search-url";
+import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
 
 export interface AdsSearchFilters {
   q?: string;
@@ -149,60 +150,25 @@ function toNullableText(value: unknown) {
   return parsed || null;
 }
 
-function normalizeImages(value: unknown, imageUrl?: string | null): string[] | null {
-  const images: string[] = [];
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      if (typeof item === "string" && item.trim()) {
-        images.push(item.trim());
-      }
-    }
-  } else if (typeof value === "string" && value.trim()) {
-    const raw = value.trim();
-
-    if (raw.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          for (const item of parsed) {
-            if (typeof item === "string" && item.trim()) {
-              images.push(item.trim());
-            }
-          }
-        }
-      } catch {
-        raw
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .forEach((item) => images.push(item));
-      }
-    } else {
-      raw
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .forEach((item) => images.push(item));
-    }
-  }
-
-  if (images.length > 0) return images;
-  if (imageUrl) return [imageUrl];
-  return null;
-}
-
 function normalizeAdItem(raw: unknown, index: number): AdItem | null {
   if (!raw || typeof raw !== "object") return null;
 
   const item = raw as Record<string, unknown>;
 
-  const imageUrl =
-    toNullableText(item.image_url) ||
-    toNullableText(item.image) ||
-    toNullableText(item.cover_image);
+  const images = collectVehicleImageCandidates(
+    item.images,
+    item.gallery,
+    item.photos,
+    item.image_url,
+    item.image,
+    item.cover_image,
+    item.thumbnail,
+    item.photo,
+    item.thumb
+  );
+  const imagesList = images.length > 0 ? images : null;
 
-  const images = normalizeImages(item.images, imageUrl);
+  const imageUrl = imagesList?.[0] ?? null;
 
   const id =
     toOptionalNumber(item.id) ??
@@ -236,7 +202,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     image_url: imageUrl,
     image: toNullableText(item.image),
     cover_image: toNullableText(item.cover_image),
-    images,
+    images: imagesList,
     seller_type: toNullableText(item.seller_type),
     seller_name: toNullableText(item.seller_name),
     dealer_name: toNullableText(item.dealer_name),

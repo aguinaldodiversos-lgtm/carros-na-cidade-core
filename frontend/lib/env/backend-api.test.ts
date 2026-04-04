@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "./backend-api";
+import { getBackendApiBaseUrl, getBackendApiExplicitEnvUrl, resolveBackendApiUrl } from "./backend-api";
 
 const keys = ["AUTH_API_BASE_URL", "BACKEND_API_URL", "API_URL", "NEXT_PUBLIC_API_URL"] as const;
 
@@ -46,6 +46,13 @@ describe("backend-api", () => {
     process.env.BACKEND_API_URL = "http://old.example.com";
     process.env.AUTH_API_BASE_URL = "https://api.example.com/";
     expect(getBackendApiBaseUrl()).toBe("https://api.example.com");
+  });
+
+  it("getBackendApiExplicitEnvUrl segue a mesma prioridade e não usa fallback localhost", () => {
+    process.env.NODE_ENV = "development";
+    expect(getBackendApiExplicitEnvUrl()).toBe("");
+    process.env.BACKEND_API_URL = "https://core.example.com/";
+    expect(getBackendApiExplicitEnvUrl()).toBe("https://core.example.com");
   });
 
   it("resolveBackendApiUrl retorna vazio sem base", () => {

@@ -8,14 +8,25 @@ function getDevFallbackBaseUrl(): string {
   return "http://127.0.0.1:4000";
 }
 
-export function getBackendApiBaseUrl(): string {
+/**
+ * Mesma prioridade que `getBackendApiBaseUrl`, mas **sem** fallback localhost de dev.
+ * Útil para montar URLs absolutas de imagem quando não há env (ex.: SSR/teste): evita
+ * apontar para 127.0.0.1 por engano; o caller pode usar `window.location.origin` no cliente.
+ */
+export function getBackendApiExplicitEnvUrl(): string {
   const raw =
     process.env.AUTH_API_BASE_URL?.trim() ||
     process.env.BACKEND_API_URL?.trim() ||
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    getDevFallbackBaseUrl();
+    "";
   return raw.replace(/\/+$/, "");
+}
+
+export function getBackendApiBaseUrl(): string {
+  const explicit = getBackendApiExplicitEnvUrl();
+  if (explicit) return explicit;
+  return getDevFallbackBaseUrl().replace(/\/+$/, "");
 }
 
 /**

@@ -1,3 +1,5 @@
+import { getBackendApiExplicitEnvUrl } from "@/lib/env/backend-api";
+
 const BRAZIL_COUNTRY_CODE = "55";
 
 export const VEHICLE_IMAGE_PLACEHOLDER = "/images/vehicle-placeholder.svg";
@@ -21,11 +23,9 @@ function safeUrl(value: string): string {
 }
 
 function getBackendBaseUrl(): string {
-  const envValue =
-    process.env.NEXT_PUBLIC_API_URL?.trim() || process.env.API_URL?.trim() || "";
-
-  if (envValue) {
-    return envValue.replace(/\/+$/, "");
+  const explicit = getBackendApiExplicitEnvUrl();
+  if (explicit) {
+    return explicit;
   }
 
   if (typeof window !== "undefined" && window.location?.origin) {
