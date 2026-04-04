@@ -22,8 +22,9 @@ export type CatalogItem = AdItem & {
   year_model?: string | null;
   yearLabel?: string | null;
   mileage?: number | string;
-  transmission?: string;
-  fuel_type?: string;
+  transmission?: string | null;
+  fuel_type?: string | null;
+  body_type?: string | null;
   city?: string;
   state?: string;
   price?: number | string;
