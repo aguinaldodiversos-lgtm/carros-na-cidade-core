@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import {
   financeChipLabel,
   primaryBadgeFromWeight,
@@ -50,8 +51,6 @@ interface CatalogVehicleCardProps {
   hrefOverride?: string;
   className?: string;
 }
-
-const FALLBACK_IMAGE = "/images/vehicle-placeholder.svg";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -116,21 +115,12 @@ function extractPrimaryYear(item: CatalogItem) {
 }
 
 function getImage(item: CatalogItem) {
-  const directCandidates = [item.image_url, item.image, item.cover_image];
-
-  for (const candidate of directCandidates) {
-    const text = toText(candidate);
-    if (text) return text;
-  }
-
-  if (Array.isArray(item.images)) {
-    const firstValidImage = item.images.find(
-      (image) => typeof image === "string" && image.trim().length > 0
-    );
-    if (firstValidImage) return firstValidImage;
-  }
-
-  return FALLBACK_IMAGE;
+  return resolvePublicListingImageUrl({
+    image_url: item.image_url,
+    image: item.image,
+    cover_image: item.cover_image,
+    images: item.images,
+  });
 }
 
 function getTitle(item: CatalogItem) {
@@ -206,7 +196,8 @@ export default function CatalogVehicleCard({
   const financeLabel = financeChipLabel(weight, Boolean(item.below_fipe));
   const image = getImage(item);
   const listedHint = getListedHint(item.created_at);
-  const isLocalImage = image.startsWith("/");
+  const useUnoptimizedImage =
+    image.startsWith("/api/vehicle-images") || image.startsWith("http") || image.startsWith("data:");
 
   const cardClasses = cx(
     "group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-16px_rgba(15,23,42,0.18)]",
@@ -226,7 +217,7 @@ export default function CatalogVehicleCard({
           src={image}
           alt={title}
           fill
-          unoptimized={!isLocalImage}
+          unoptimized={useUnoptimizedImage}
           className="object-cover transition duration-500 group-hover:scale-[1.04]"
           sizes={featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw"}
           loading="lazy"

@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   collectVehicleImageCandidates,
+  LISTING_CARD_FALLBACK_IMAGE,
   normalizeVehicleGalleryImages,
   normalizeVehicleImageUrl,
+  resolvePublicListingImageUrl,
   isSupportedVehicleImageUrl,
 } from "./detail-utils";
 
@@ -99,5 +101,15 @@ describe("vehicle detail image utils", () => {
     ]);
 
     expect(images).toEqual(["/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"]);
+  });
+
+  it("resolvePublicListingImageUrl usa proxy para uploads e fallback SVG sem fotos", () => {
+    expect(
+      resolvePublicListingImageUrl({
+        images: ["/uploads/ads/card.jpg"],
+      })
+    ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fcard.jpg");
+
+    expect(resolvePublicListingImageUrl({ image_url: null, images: [] })).toBe(LISTING_CARD_FALLBACK_IMAGE);
   });
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import { isFavoriteSlug, toggleFavoriteSlug } from "@/lib/favorites/local-favorites";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type VehicleItem = {
   id: number | string;
@@ -19,6 +20,8 @@ type VehicleItem = {
   below_fipe?: boolean;
   highlight_until?: string | null;
   image_url?: string | null;
+  image?: string | null;
+  cover_image?: string | null;
   images?: string[] | null;
 };
 
@@ -56,9 +59,12 @@ function buildTitle(item: VehicleItem) {
 }
 
 function resolveImage(item: VehicleItem) {
-  if (item.image_url) return item.image_url;
-  if (Array.isArray(item.images) && item.images[0]) return item.images[0];
-  return "/images/hero.jpeg";
+  return resolvePublicListingImageUrl({
+    image_url: item.image_url,
+    image: item.image,
+    cover_image: item.cover_image,
+    images: item.images,
+  });
 }
 
 function slugify(value: string) {

@@ -265,6 +265,29 @@ export function normalizeVehicleGalleryImages(images: unknown[]): string[] {
   return collectVehicleImageCandidates(images).filter((image) => !isKnownPlaceholderImage(image));
 }
 
+/** Imagem pública de listagem quando não há foto válida (SVG leve, não hero). */
+export const LISTING_CARD_FALLBACK_IMAGE = "/images/vehicle-placeholder.svg";
+
+/**
+ * Primeira URL utilizável para cards de listagem/busca (comprar, busca, home).
+ * Converte `/uploads/...` para o proxy `/api/vehicle-images?...` como na página de detalhe.
+ */
+export function resolvePublicListingImageUrl(fields: {
+  image?: unknown;
+  image_url?: unknown;
+  cover_image?: unknown;
+  images?: unknown;
+}): string {
+  const list = normalizeVehicleGalleryImages([
+    fields.image,
+    fields.image_url,
+    fields.cover_image,
+    fields.images,
+  ]);
+  if (list.length > 0) return list[0];
+  return LISTING_CARD_FALLBACK_IMAGE;
+}
+
 export function digitsOnly(value: string): string {
   return String(value || "").replace(/\D/g, "");
 }

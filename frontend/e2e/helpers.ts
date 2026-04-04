@@ -318,6 +318,78 @@ export async function getFirstSearchAdSlug(
 }
 
 /**
+ * Aguarda o anúncio aparecer na busca pública (mesmo critério da listagem /comprar).
+ * Usa `city_slug` do território do wizard E2E (Atibaia) + marca para reduzir ruído.
+ */
+export async function waitUntilSearchApiIncludesSlug(
+  request: APIRequestContext,
+  apiBase: string,
+  slug: string,
+  options?: { brandHint?: string; citySlug?: string; timeoutMs?: number }
+) {
+  const brand =
+    options?.brandHint?.split(/\s+/)[0]?.trim() ||
+    options?.brandHint?.trim() ||
+    "";
+  const citySlug = options?.citySlug ?? "atibaia-sp";
+  const timeoutMs = options?.timeoutMs ?? 45_000;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const url = new URL(`${apiBase}/api/ads/search`);
+    if (brand) url.searchParams.set("brand", brand);
+    url.searchParams.set("city_slug", citySlug);
+    url.searchParams.set("sort", "recent");
+    url.searchParams.set("limit", "40");
+
+    const res = await request.get(url.toString(), {
+      headers: { Accept: "application/json" },
+      timeout: 60_000,
+    });
+
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Array<{ slug?: string }> };
+      const rows = Array.isArray(json?.data) ? json.data : [];
+      const hit = rows.some((row) => row?.slug && String(row.slug) === slug);
+      if (hit) return;
+    }
+
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+
+  throw new Error(
+    `Busca pública não retornou o slug "${slug}" (city_slug=${citySlug}, brand=${brand || "—"}) dentro de ~${timeoutMs}ms.`
+  );
+}
+
+/** Mesmo recorte “recente” curto usado na home (`limit` pequeno). */
+export async function isSlugInRecentSearchSlice(
+  request: APIRequestContext,
+  apiBase: string,
+  slug: string,
+  options?: { citySlug?: string; limit?: number; brandHint?: string }
+): Promise<boolean> {
+  const citySlug = options?.citySlug ?? "atibaia-sp";
+  const limit = options?.limit ?? 8;
+  const brand = options?.brandHint?.split(/\s+/)[0]?.trim() || "";
+
+  const url = new URL(`${apiBase}/api/ads/search`);
+  if (brand) url.searchParams.set("brand", brand);
+  url.searchParams.set("city_slug", citySlug);
+  url.searchParams.set("sort", "recent");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await request.get(url.toString(), {
+    headers: { Accept: "application/json" },
+    timeout: 60_000,
+  });
+  if (!res.ok()) return false;
+  const json = (await res.json()) as { data?: Array<{ slug?: string }> };
+  const rows = Array.isArray(json?.data) ? json.data : [];
+  return rows.some((row) => row?.slug && String(row.slug) === slug);
+}
+
+/**
  * Marca CPF como verificado no Postgres de teste (publicação exige `document_verified`).
  * Sem DB configurado, não faz nada.
  */

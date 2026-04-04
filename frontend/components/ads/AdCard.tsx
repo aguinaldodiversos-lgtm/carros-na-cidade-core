@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type BaseAdData = {
   id?: string | number | null;
@@ -151,13 +152,12 @@ function normalizeAdData(source?: BaseAdData): {
     yearLabel: String(item.yearLabel || item.year_model || item.year || "").trim(),
     price: parseNumber(item.price),
     mileage: parseNumber(item.mileage),
-    image: String(
-      item.image ||
-        item.image_url ||
-        (Array.isArray(item.images) && item.images[0]) ||
-        item.cover_image ||
-        "/images/hero.jpeg"
-    ),
+    image: resolvePublicListingImageUrl({
+      image: item.image,
+      image_url: item.image_url,
+      cover_image: item.cover_image,
+      images: item.images,
+    }),
     badge: resolveBadge(item),
   };
 }
