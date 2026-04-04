@@ -40,6 +40,53 @@ function validateNormalizedRanges(data) {
   return data;
 }
 
+/**
+ * Filtro canônico: highlight_only (somente anúncios com destaque ativo).
+ * highlight= (schema) é alias legado — mesmo efeito. Não confundir com sort=highlight (ordenação).
+ */
+function normalizeHighlightFilter(data) {
+  if (!data || typeof data !== "object") return data;
+
+  const ho = data.highlight_only;
+  const hl = data.highlight;
+
+  if (ho === true || hl === true) {
+    return { ...data, highlight_only: true };
+  }
+  if (ho === false || hl === false) {
+    return { ...data, highlight_only: false };
+  }
+
+  return { ...data };
+}
+
+/**
+ * Território canônico: city_slug > city_id > city+state (legado).
+ * Remove AND redundante entre slug, id e texto/UF.
+ */
+function normalizeTerritoryFilters(data) {
+  if (!data || typeof data !== "object") return data;
+
+  const slug = typeof data.city_slug === "string" ? data.city_slug.trim() : "";
+  if (slug) {
+    const next = { ...data, city_slug: slug };
+    delete next.city_id;
+    delete next.city;
+    delete next.state;
+    return next;
+  }
+
+  if (data.city_id != null && Number.isFinite(Number(data.city_id))) {
+    const next = { ...data, city_id: Number(data.city_id) };
+    delete next.city_slug;
+    delete next.city;
+    delete next.state;
+    return next;
+  }
+
+  return data;
+}
+
 export async function parseAdsFilters(raw = {}, scope = "public_global") {
   const candidate = compactObject(raw);
   const parsed = AdsFilterSchema.safeParse(candidate);
@@ -51,7 +98,9 @@ export async function parseAdsFilters(raw = {}, scope = "public_global") {
   const scoped = applyScope(scope, parsed.data);
   const inferred = await inferAdsFiltersFromFreeQuery(scoped);
 
-  return validateNormalizedRanges(inferred);
+  return validateNormalizedRanges(
+    normalizeTerritoryFilters(normalizeHighlightFilter(inferred))
+  );
 }
 
 export async function parseAdsFacetFilters(raw = {}) {
@@ -63,5 +112,5 @@ export async function parseAdsFacetFilters(raw = {}) {
   }
 
   const inferred = await inferAdsFiltersFromFreeQuery(parsed.data);
-  return inferred;
+  return normalizeTerritoryFilters(normalizeHighlightFilter(inferred));
 }

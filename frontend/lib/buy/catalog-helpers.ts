@@ -199,6 +199,10 @@ export function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {
   return 1;
 }
 
+/**
+ * Ordenação client-side do catálogo (legado). A página /comprar usa a ordem retornada pela API
+ * (`buildSortClause` no backend) para evitar divergência com paginação e com o sort selecionado.
+ */
 export function sortCatalogItems(items: CatalogItem[], sort?: string) {
   const mode = sort || "relevance";
   if (mode === "relevance" || mode === "highlight") {

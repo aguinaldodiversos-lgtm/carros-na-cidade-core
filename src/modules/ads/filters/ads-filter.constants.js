@@ -4,6 +4,7 @@ export const ADS_FILTER_LIMITS = Object.freeze({
   PAGE_MIN: 1,
   PAGE_MAX: 1000,
   LIMIT_MIN: 1,
+  /** Máximo por página na API pública; o frontend público deve usar o mesmo teto (ex.: `PUBLIC_ADS_SEARCH_LIMIT_MAX`). */
   LIMIT_MAX: 50,
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 20,
@@ -29,12 +30,14 @@ export const ADS_FILTER_LIMITS = Object.freeze({
   STATE_LENGTH: 2,
 });
 
+// Ordem canônica de território na busca: city_slug (c.slug) > city_id > city + state (legado).
 export const ADS_DEFAULTS = Object.freeze({
   page: ADS_FILTER_LIMITS.DEFAULT_PAGE,
   limit: ADS_FILTER_LIMITS.DEFAULT_LIMIT,
   sort: "relevance",
 });
 
+// "highlight" = modo de ordenação (prioriza anúncios em destaque); filtro restritivo = highlight_only
 export const ADS_ALLOWED_SORTS = new Set([
   "relevance",
   "recent",

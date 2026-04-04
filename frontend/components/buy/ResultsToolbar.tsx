@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { formatTotal } from "@/lib/buy/catalog-helpers";
+import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
 
 type ResultsToolbarProps = {
   filters: AdsSearchFilters;
@@ -20,7 +21,7 @@ export function ResultsToolbar({
   onLimitChange,
   onSortChange,
 }: ResultsToolbarProps) {
-  const limit = filters.limit || 51;
+  const limit = filters.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT;
 
   return (
     <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-5">
@@ -36,9 +37,8 @@ export function ResultsToolbar({
             onChange={(event) => onLimitChange(Number(event.target.value))}
             className="h-11 min-w-[8.5rem] rounded-xl border border-slate-200 bg-slate-50/80 px-3 text-[13px] font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
           >
-            <option value={51}>51 últimos</option>
-            <option value={100}>100 últimos</option>
-            <option value={200}>200 últimos</option>
+            <option value={20}>20 por página</option>
+            <option value={50}>50 por página</option>
           </select>
         </div>
 

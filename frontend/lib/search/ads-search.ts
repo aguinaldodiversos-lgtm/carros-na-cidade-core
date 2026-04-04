@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { canonicalTerritoryForApi, clampPublicAdsSearchLimit } from "@/lib/search/ads-search-url";
 
 export interface AdsSearchFilters {
   q?: string;
@@ -19,6 +20,7 @@ export interface AdsSearchFilters {
   transmission?: string;
   body_type?: string;
   below_fipe?: boolean;
+  /** Filtro: somente anúncios em destaque. Alias de query `highlight=true` é aceito (compat). */
   highlight_only?: boolean;
   sort?: string;
   page?: number;
@@ -350,10 +352,13 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   appendIfPresent(params, "q", filters.q);
   appendIfPresent(params, "brand", filters.brand);
   appendIfPresent(params, "model", filters.model);
-  appendIfPresent(params, "city_id", filters.city_id);
-  appendIfPresent(params, "city_slug", filters.city_slug);
-  appendIfPresent(params, "city", filters.city);
-  appendIfPresent(params, "state", filters.state);
+  const territory = canonicalTerritoryForApi(filters);
+  if (territory.city_slug) params.set("city_slug", territory.city_slug);
+  else if (territory.city_id != null) appendIfPresent(params, "city_id", territory.city_id);
+  else {
+    appendIfPresent(params, "city", territory.city);
+    appendIfPresent(params, "state", territory.state);
+  }
   appendIfPresent(params, "advertiser_id", filters.advertiser_id);
   appendIfPresent(params, "min_price", filters.min_price);
   appendIfPresent(params, "max_price", filters.max_price);
@@ -365,7 +370,9 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   appendIfPresent(params, "body_type", filters.body_type);
   appendIfPresent(params, "sort", filters.sort);
   appendIfPresent(params, "page", filters.page);
-  appendIfPresent(params, "limit", filters.limit);
+  if (filters.limit != null) {
+    appendIfPresent(params, "limit", clampPublicAdsSearchLimit(filters.limit));
+  }
 
   if (filters.below_fipe === true) {
     params.set("below_fipe", "true");
@@ -434,8 +441,10 @@ export async function fetchAdsFacets(
 ): Promise<AdsFacetsResponse> {
   const apiBase = getApiBaseUrl();
   const params = buildAdsSearchParams({
-    city_id: filters.city_id,
     city_slug: filters.city_slug,
+    city_id: filters.city_id,
+    city: filters.city,
+    state: filters.state,
     brand: filters.brand,
     model: filters.model,
     fuel_type: filters.fuel_type,

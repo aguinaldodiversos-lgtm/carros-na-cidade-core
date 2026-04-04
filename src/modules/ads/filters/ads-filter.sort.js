@@ -1,3 +1,7 @@
+/**
+ * Ordenação da listagem (sort=…). O valor "highlight" prioriza destaque na ORDER BY;
+ * não é o filtro highlight_only (WHERE highlight_until).
+ */
 export function buildSortClause(sort = "relevance", { useTextRank = false } = {}) {
   switch (sort) {
     case "recent":

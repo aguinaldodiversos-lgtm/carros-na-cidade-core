@@ -328,6 +328,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
   if (!originalQ || originalQ.length < 2) {
     return {
       ...filters,
+      min_price: filters.min_price ?? filters.price_min,
+      max_price: filters.max_price ?? filters.price_max,
       free_query_meta: {
         original_q: originalQ || null,
         parsed: false,
@@ -352,7 +354,7 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
       : filters.below_fipe;
     const highlight_only = extractBooleanByTerms(originalQ, HIGHLIGHT_TERMS)
       ? true
-      : filters.highlight_only;
+      : filters.highlight_only ?? filters.highlight;
 
     const merged = {
       ...filters,
@@ -362,8 +364,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
         Object.entries({
           brand: filters.brand || brandModel.brand,
           model: filters.model || brandModel.model,
-          min_price: filters.min_price ?? priceSignals.min_price,
-          max_price: filters.max_price ?? priceSignals.max_price,
+          min_price: filters.min_price ?? filters.price_min ?? priceSignals.min_price,
+          max_price: filters.max_price ?? filters.price_max ?? priceSignals.max_price,
           fuel_type: filters.fuel_type || fuel_type,
           transmission: filters.transmission || transmission,
           body_type: filters.body_type || body_type,
@@ -406,6 +408,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
   } catch {
     return {
       ...filters,
+      min_price: filters.min_price ?? filters.price_min,
+      max_price: filters.max_price ?? filters.price_max,
       free_query_meta: {
         original_q: originalQ,
         parsed: false,

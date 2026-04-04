@@ -2,6 +2,7 @@
 
 import { buildSortClause } from "./ads-filter.sort.js";
 import { cityDemandBoostExpr, planRankExpr } from "./ads-ranking.sql.js";
+import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
 
 function pushFilter(where, params, expression, ...values) {
   let sql = expression;
@@ -25,6 +26,9 @@ export function buildAdsSearchQuery(filters = {}) {
     model,
     min_price,
     max_price,
+    // price_min / price_max: compat com schema Zod (alias de min_price / max_price)
+    price_min,
+    price_max,
     year_min,
     year_max,
     mileage_max,
@@ -33,14 +37,22 @@ export function buildAdsSearchQuery(filters = {}) {
     body_type,
     below_fipe,
     highlight_only,
+    // highlight: alias legado do mesmo filtro (parser unifica em highlight_only)
+    highlight,
     advertiser_id,
     page = 1,
     limit = 20,
     sort = "relevance",
   } = filters;
 
+  const effectiveMinPrice = min_price !== undefined ? min_price : price_min;
+  const effectiveMaxPrice = max_price !== undefined ? max_price : price_max;
+
   const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
+  const safeLimit = Math.min(
+    ADS_FILTER_LIMITS.LIMIT_MAX,
+    Math.max(1, Number(limit) || ADS_FILTER_LIMITS.DEFAULT_LIMIT)
+  );
   const offset = (safePage - 1) * safeLimit;
 
   const where = [`a.status = 'active'`];
@@ -56,16 +68,18 @@ export function buildAdsSearchQuery(filters = {}) {
     textRankExpression = `ts_rank(a.search_vector, plainto_tsquery('portuguese', $${textIndex}))`;
   }
 
-  if (city_id) pushFilter(where, params, `a.city_id = ?`, Number(city_id));
-  if (city_slug) pushFilter(where, params, `c.slug = ?`, city_slug);
-  if (city && !city_id && !city_slug) {
-    pushFilter(where, params, `a.city ILIKE ?`, `%${city}%`);
+  if (city_slug) {
+    pushFilter(where, params, `c.slug = ?`, city_slug);
+  } else if (city_id) {
+    pushFilter(where, params, `a.city_id = ?`, Number(city_id));
+  } else {
+    if (city) pushFilter(where, params, `a.city ILIKE ?`, `%${city}%`);
+    if (state) pushFilter(where, params, `a.state = ?`, state.toUpperCase());
   }
-  if (state) pushFilter(where, params, `a.state = ?`, state.toUpperCase());
   if (brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${brand}%`);
   if (model) pushFilter(where, params, `a.model ILIKE ?`, `%${model}%`);
-  if (min_price !== undefined) pushFilter(where, params, `a.price >= ?`, Number(min_price));
-  if (max_price !== undefined) pushFilter(where, params, `a.price <= ?`, Number(max_price));
+  if (effectiveMinPrice !== undefined) pushFilter(where, params, `a.price >= ?`, Number(effectiveMinPrice));
+  if (effectiveMaxPrice !== undefined) pushFilter(where, params, `a.price <= ?`, Number(effectiveMaxPrice));
   if (year_min !== undefined) pushFilter(where, params, `a.year >= ?`, Number(year_min));
   if (year_max !== undefined) pushFilter(where, params, `a.year <= ?`, Number(year_max));
   if (mileage_max !== undefined) pushFilter(where, params, `a.mileage <= ?`, Number(mileage_max));
@@ -80,7 +94,7 @@ export function buildAdsSearchQuery(filters = {}) {
   }
   if (body_type) pushFilter(where, params, `a.body_type ILIKE ?`, `%${body_type}%`);
   if (below_fipe !== undefined) pushFilter(where, params, `a.below_fipe = ?`, Boolean(below_fipe));
-  if (highlight_only === true) where.push(`a.highlight_until > NOW()`);
+  if (highlight_only === true || highlight === true) where.push(`a.highlight_until > NOW()`);
   if (advertiser_id !== undefined && advertiser_id !== null) {
     pushFilter(where, params, `a.advertiser_id = ?`, Number(advertiser_id));
   }
@@ -153,8 +167,11 @@ export function buildAdsFacetWhere(filters = {}) {
   const where = [`a.status = 'active'`];
   const params = [];
 
-  if (filters.city_id) pushFilter(where, params, `a.city_id = ?`, Number(filters.city_id));
-  if (filters.city_slug) pushFilter(where, params, `c.slug = ?`, filters.city_slug);
+  if (filters.city_slug) {
+    pushFilter(where, params, `c.slug = ?`, filters.city_slug);
+  } else if (filters.city_id) {
+    pushFilter(where, params, `a.city_id = ?`, Number(filters.city_id));
+  }
   if (filters.brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${filters.brand}%`);
   if (filters.model) pushFilter(where, params, `a.model ILIKE ?`, `%${filters.model}%`);
   if (filters.below_fipe !== undefined)

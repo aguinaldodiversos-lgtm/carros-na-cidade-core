@@ -19,7 +19,6 @@ import {
   DEFAULT_MODEL_OPTIONS,
   DEFAULT_POPULAR_BRANDS,
   inferWeight,
-  sortCatalogItems,
   toSafeBrandFacets,
   toSafeCatalogItems,
   toSafeModelFacets,
@@ -43,14 +42,9 @@ export default function BuyMarketplacePageClient({
   const pathname = usePathname();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const rawItems = useMemo(
+  const items = useMemo(
     () => toSafeCatalogItems(initialResults?.data, city),
     [initialResults?.data, city]
-  );
-
-  const items = useMemo(
-    () => sortCatalogItems(rawItems, initialFilters.sort),
-    [rawItems, initialFilters.sort]
   );
 
   const firstRow = useMemo(() => items.slice(0, 2), [items]);

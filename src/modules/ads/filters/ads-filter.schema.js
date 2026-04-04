@@ -104,7 +104,7 @@ const adsFilterQueryBase = z.object({
   // busca livre
   q: optionalTrimmedString(ADS_FILTER_LIMITS.QUERY_MIN_LENGTH, ADS_FILTER_LIMITS.QUERY_MAX_LENGTH),
 
-  // território
+  // território (legado por texto; city_slug/city_id vêm por passthrough e são normalizados no parser)
   city: optionalTrimmedStringMax(ADS_FILTER_LIMITS.CITY_MAX_LENGTH),
   state: z
     .preprocess(
@@ -136,6 +136,9 @@ const adsFilterQueryBase = z.object({
 
   // flags
   below_fipe: boolParam().optional(),
+  // Filtro canônico: somente anúncios em destaque (highlight_until ativo)
+  highlight_only: boolParam().optional(),
+  // highlight: alias legado do mesmo filtro (compat links antigos)
   highlight: boolParam().optional(),
 
   /** Filtra anúncios do mesmo anunciante (loja) — busca pública. */
@@ -200,6 +203,7 @@ export const AdsFacetFilterSchema = adsFilterQueryBase
     mileage_min: true,
     mileage_max: true,
     below_fipe: true,
+    highlight_only: true,
     highlight: true,
   })
   .passthrough();

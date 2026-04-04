@@ -13,9 +13,10 @@ import type {
 import { fetchAdsFacets, fetchAdsSearch } from "@/lib/search/ads-search";
 import {
   buildSearchQueryString,
+  DEFAULT_COMPRAR_CATALOG_LIMIT,
   parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
-import { DEFAULT_PUBLIC_CITY_LABEL, DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
+import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -98,6 +99,10 @@ function cityFromText(city?: string, state?: string): CityContext {
   };
 }
 
+/**
+ * Território canônico em /comprar: city_slug (URL/SEO) > city_id (legado) > fallback cookie/default.
+ * Não injeta city_id do cookie junto com slug (evita AND redundante na API).
+ */
 function normalizeBuyFilters(
   searchParams: SearchParams = {},
   cookieCity?: CityRef | null
@@ -105,32 +110,53 @@ function normalizeBuyFilters(
   const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
 
   const fallbackSlug = cookieCity?.slug || DEFAULT_PUBLIC_CITY_SLUG;
-  const fallbackCityName = cookieCity?.name || DEFAULT_PUBLIC_CITY_LABEL;
-  const fallbackState = cookieCity?.state || "SP";
 
-  let city_id = parsed.city_id;
-  if (!city_id && cookieCity?.id) {
-    const slugMatches = !parsed.city_slug || parsed.city_slug === cookieCity.slug;
-    if (slugMatches) {
-      city_id = cookieCity.id;
+  const explicitSlug = parsed.city_slug?.trim();
+  const hasIdOnly =
+    !explicitSlug && parsed.city_id != null && Number.isFinite(Number(parsed.city_id));
+
+  const merged: AdsSearchFilters = {
+    ...parsed,
+    sort: parsed.sort || "recent",
+    page: parsed.page || 1,
+    limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
+  };
+
+  if (explicitSlug) {
+    merged.city_slug = explicitSlug;
+    delete merged.city_id;
+    delete merged.city;
+    delete merged.state;
+  } else if (hasIdOnly) {
+    merged.city_id = parsed.city_id;
+    delete merged.city_slug;
+    delete merged.city;
+    delete merged.state;
+  } else {
+    const hasLegacyCityText = Boolean(parsed.city?.trim() || parsed.state?.trim());
+    if (hasLegacyCityText) {
+      delete merged.city_slug;
+      delete merged.city_id;
+      merged.city = parsed.city;
+      merged.state = parsed.state;
+    } else {
+      merged.city_slug = fallbackSlug || DEFAULT_PUBLIC_CITY_SLUG;
+      delete merged.city_id;
+      delete merged.city;
+      delete merged.state;
     }
   }
 
-  return {
-    ...parsed,
-    city_slug: parsed.city_slug || fallbackSlug,
-    city_id,
-    city: parsed.city || fallbackCityName,
-    state: parsed.state || fallbackState,
-    sort: parsed.sort || "recent",
-    page: parsed.page || 1,
-    limit: parsed.limit || 51,
-  };
+  return merged;
 }
 
-function resolveCity(filters: AdsSearchFilters): CityContext {
+function resolveCity(filters: AdsSearchFilters, cookieCity?: CityRef | null): CityContext {
   if (filters.city_slug) {
     return cityFromSlug(filters.city_slug);
+  }
+
+  if (filters.city_id != null && cookieCity?.id === filters.city_id) {
+    return cityFromSlug(cookieCity.slug);
   }
 
   return cityFromText(filters.city, filters.state);
@@ -143,7 +169,7 @@ function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
     data: [],
     pagination: {
       page: filters.page || 1,
-      limit: filters.limit || 51,
+      limit: filters.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
       total: 0,
       totalPages: 1,
     },
@@ -217,7 +243,7 @@ export async function generateMetadata({ searchParams = {} }: ComprarPageProps):
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const city = resolveCity(filters);
+  const city = resolveCity(filters, cookieCity);
 
   const title = buildMetadataTitle(filters, city);
   const description = buildMetadataDescription(filters, city);
@@ -244,7 +270,7 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const city = resolveCity(filters);
+  const city = resolveCity(filters, cookieCity);
 
   const [resultsResponse, facetsResponse] = await Promise.allSettled([
     fetchAdsSearch(filters),
