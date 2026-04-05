@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useState } from "react";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type BaseAdData = {
   id?: string | number | null;
@@ -21,6 +22,7 @@ type BaseAdData = {
   image?: string | null;
   image_url?: string | null;
   cover_image?: string | null;
+  storage_key?: string | null;
   images?: string[] | null;
   badge?: string | null;
   below_fipe?: boolean | null;
@@ -157,6 +159,7 @@ function normalizeAdData(source?: BaseAdData): {
       image_url: item.image_url,
       cover_image: item.cover_image,
       images: item.images,
+      storage_key: item.storage_key,
     }),
     badge: resolveBadge(item),
   };
@@ -165,6 +168,9 @@ function normalizeAdData(source?: BaseAdData): {
 export function AdCard({ ad, item }: AdCardProps) {
   const source = ad || item || {};
   const normalized = normalizeAdData(source);
+  const [brokenImage, setBrokenImage] = useState(false);
+  const imageSrc = brokenImage ? LISTING_CARD_FALLBACK_IMAGE : normalized.image;
+  const onImgError = useCallback(() => setBrokenImage(true), []);
 
   const href = buildAdHref({
     id: normalized.id ?? undefined,
@@ -183,8 +189,9 @@ export function AdCard({ ad, item }: AdCardProps) {
     >
       <div className="aspect-[16/10] overflow-hidden bg-[#EDF2FB]">
         <img
-          src={normalized.image}
+          src={imageSrc}
           alt={normalized.title || "Veículo"}
+          onError={onImgError}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
       </div>

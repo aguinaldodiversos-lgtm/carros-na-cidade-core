@@ -191,7 +191,7 @@ async function servePlaceholder(): Promise<NextResponse> {
 function buildImageResponse(body: ArrayBuffer | Uint8Array, contentType: string): NextResponse {
   const normalizedContentType = contentType || "application/octet-stream";
 
-  return new NextResponse(body, {
+  return new NextResponse(body as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": normalizedContentType,
@@ -201,7 +201,44 @@ function buildImageResponse(body: ArrayBuffer | Uint8Array, contentType: string)
   });
 }
 
+async function fetchRemoteVehicleImageByStorageKey(key: string): Promise<Response | null> {
+  const trimmed = key.trim();
+  if (!trimmed || trimmed.includes("..")) return null;
+
+  const remoteUrl = resolveBackendApiUrl(`/api/vehicle-images?key=${encodeURIComponent(trimmed)}`);
+  if (!remoteUrl) return null;
+
+  try {
+    const response = await fetch(remoteUrl, {
+      method: "GET",
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (!response.ok) return null;
+
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    if (contentType && !contentType.startsWith("image/") && !contentType.includes("svg")) {
+      return null;
+    }
+
+    return response;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
+  const key = request.nextUrl.searchParams.get("key")?.trim();
+  if (key) {
+    const remote = await fetchRemoteVehicleImageByStorageKey(key);
+    if (remote) {
+      const body = await remote.arrayBuffer();
+      const contentType = remote.headers.get("content-type") || "application/octet-stream";
+      return buildImageResponse(new Uint8Array(body), contentType);
+    }
+    return servePlaceholder();
+  }
+
   const src = request.nextUrl.searchParams.get("src") || "";
   const safePath = getSafeUploadPath(src);
 

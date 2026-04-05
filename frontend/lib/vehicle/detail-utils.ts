@@ -47,6 +47,17 @@ export function buildVehicleImageProxyUrl(pathname: string): string {
   return `${VEHICLE_IMAGE_PROXY_PATH}?src=${encodeURIComponent(pathname)}`;
 }
 
+/**
+ * Imagens privadas no R2: o browser chama o proxy (Next ou API) com a chave do objeto — sem credenciais no cliente.
+ */
+export function buildVehicleImageProxyUrlFromStorageKey(key: string): string | null {
+  const normalized = String(key ?? "")
+    .trim()
+    .replace(/^\/+/, "");
+  if (!normalized || normalized.includes("..")) return null;
+  return `${VEHICLE_IMAGE_PROXY_PATH}?key=${encodeURIComponent(normalized)}`;
+}
+
 function decodeUrlComponentSafely(value: string): string {
   try {
     return decodeURIComponent(value);
@@ -238,6 +249,11 @@ export function collectVehicleImageCandidates(...values: unknown[]): string[] {
 
     if (typeof input === "object") {
       const record = input as Record<string, unknown>;
+      const storageKey = record.storage_key ?? record.storageKey;
+      if (typeof storageKey === "string" && storageKey.trim()) {
+        const fromKey = buildVehicleImageProxyUrlFromStorageKey(storageKey.trim());
+        if (fromKey) normalized.add(fromKey);
+      }
       [
         record.url,
         record.src,
@@ -281,14 +297,18 @@ export function resolvePublicListingImageUrl(fields: {
   image_url?: unknown;
   cover_image?: unknown;
   images?: unknown;
+  storage_key?: unknown;
 }): string {
-  const list = normalizeVehicleGalleryImages([
-    fields.image,
+  const ordered = normalizeVehicleGalleryImages([
     fields.image_url,
+    fields.image,
     fields.cover_image,
+    typeof fields.storage_key === "string" && fields.storage_key.trim()
+      ? { storage_key: fields.storage_key }
+      : null,
     fields.images,
   ]);
-  if (list.length > 0) return list[0];
+  if (ordered.length > 0) return ordered[0];
   return LISTING_CARD_FALLBACK_IMAGE;
 }
 

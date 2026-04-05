@@ -1,9 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useCallback, useState } from "react";
 
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import {
   financeChipLabel,
   primaryBadgeFromWeight,
@@ -121,6 +124,7 @@ function getImage(item: CatalogItem) {
     image: item.image,
     cover_image: item.cover_image,
     images: item.images,
+    storage_key: item.storage_key,
   });
 }
 
@@ -195,8 +199,11 @@ export default function CatalogVehicleCard({
   const meta = getMetaLine(item);
   const primaryVariant = primaryBadgeFromWeight(weight);
   const financeLabel = financeChipLabel(weight, Boolean(item.below_fipe));
-  const image = getImage(item);
+  const [brokenImage, setBrokenImage] = useState(false);
+  const resolvedSrc = getImage(item);
+  const image = brokenImage ? LISTING_CARD_FALLBACK_IMAGE : resolvedSrc;
   const listedHint = getListedHint(item.created_at);
+  const onImageError = useCallback(() => setBrokenImage(true), []);
   const useUnoptimizedImage =
     image.startsWith("/api/vehicle-images") ||
     image.startsWith("http") ||
@@ -222,6 +229,7 @@ export default function CatalogVehicleCard({
           alt={title}
           fill
           unoptimized={useUnoptimizedImage}
+          onError={onImageError}
           className="object-cover transition duration-500 group-hover:scale-[1.04]"
           sizes={featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw"}
           loading="lazy"

@@ -1,6 +1,7 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { getTableColumnSet, tableHasColumn } from "../../shared/db/table-columns.js";
 import { logger } from "../../shared/logger.js";
+import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 import { stateColumnValuesForUf } from "./brazil-state-variants.js";
 
 async function hasTable(tableName) {
@@ -176,6 +177,137 @@ export async function findCityBySlug(slug) {
     return result.rows[0] || null;
   } catch (err) {
     logger.error({ err: err?.message || String(err) }, "[cities.repository] findCityBySlug falhou");
+    return null;
+  }
+}
+
+/**
+ * Quando o catálogo público está vazio para um território, resolve slug alternativo
+ * com anúncios ativos: prioriza mesma UF (mais anúncios), depois qualquer cidade com estoque.
+ */
+export async function findCatalogAdsTerritoryFallback(slug) {
+  const normalizedSlug = String(slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (!normalizedSlug) return null;
+
+  try {
+    const cityResult = await pool.query(
+      `
+      SELECT id, name, state, slug
+      FROM cities
+      WHERE slug = $1
+      LIMIT 1
+      `,
+      [normalizedSlug]
+    );
+
+    const city = cityResult.rows[0];
+    if (!city) return null;
+
+    const countResult = await pool.query(
+      `
+      SELECT COUNT(*)::int AS n
+      FROM ads a
+      WHERE a.city_id = $1
+        AND a.status = 'active'
+      `,
+      [city.id]
+    );
+
+    const liveCount = Number(countResult.rows[0]?.n || 0);
+    if (liveCount > 0) {
+      return {
+        mode: "self",
+        slug: city.slug,
+        name: city.name,
+        state: city.state,
+        live_ads: liveCount,
+      };
+    }
+
+    let stateRef = String(city.state ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 2);
+    if (stateRef.length !== 2) {
+      stateRef = inferUfFromSlug(city.slug || normalizedSlug) || "";
+    }
+
+    if (stateRef.length === 2) {
+      const sameState = await pool.query(
+        `
+        SELECT
+          c.slug,
+          c.name,
+          c.state,
+          COUNT(a.id)::int AS live_ads
+        FROM cities c
+        INNER JOIN ads a
+          ON a.city_id = c.id
+         AND a.status = 'active'
+        WHERE UPPER(TRIM(BOTH FROM COALESCE(c.state::text, ''))) = $1
+          AND c.id <> $2
+        GROUP BY c.id, c.slug, c.name, c.state
+        ORDER BY live_ads DESC, c.name ASC
+        LIMIT 1
+        `,
+        [stateRef, city.id]
+      );
+
+      const row = sameState.rows[0];
+      if (row?.slug) {
+        return {
+          mode: "fallback",
+          slug: row.slug,
+          name: row.name,
+          state: row.state,
+          live_ads: Number(row.live_ads || 0),
+        };
+      }
+    }
+
+    const globalFallback = await pool.query(
+      `
+      SELECT
+        c.slug,
+        c.name,
+        c.state,
+        COUNT(a.id)::int AS live_ads
+      FROM cities c
+      INNER JOIN ads a
+        ON a.city_id = c.id
+       AND a.status = 'active'
+      GROUP BY c.id, c.slug, c.name, c.state
+      ORDER BY live_ads DESC, c.name ASC
+      LIMIT 1
+      `
+    );
+
+    const g = globalFallback.rows[0];
+    if (!g?.slug) {
+      return {
+        mode: "empty",
+        slug: city.slug,
+        name: city.name,
+        state: city.state,
+        live_ads: 0,
+      };
+    }
+
+    return {
+      mode: "fallback",
+      slug: g.slug,
+      name: g.name,
+      state: g.state,
+      live_ads: Number(g.live_ads || 0),
+    };
+  } catch (err) {
+    logger.error(
+      { err: err?.message || String(err), slug: normalizedSlug },
+      "[cities.repository] findCatalogAdsTerritoryFallback falhou"
+    );
     return null;
   }
 }

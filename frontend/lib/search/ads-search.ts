@@ -52,6 +52,8 @@ export interface AdItem {
   image_url?: string | null;
   image?: string | null;
   cover_image?: string | null;
+  /** Chave R2 quando `image_url` ainda não é URL pública. */
+  storage_key?: string | null;
   images?: string[] | null;
   seller_type?: string | null;
   seller_name?: string | null;
@@ -156,12 +158,13 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
   const item = raw as Record<string, unknown>;
 
   const images = collectVehicleImageCandidates(
-    item.images,
-    item.gallery,
-    item.photos,
     item.image_url,
     item.image,
     item.cover_image,
+    item.storage_key ? { storage_key: item.storage_key } : null,
+    item.images,
+    item.gallery,
+    item.photos,
     item.thumbnail,
     item.photo,
     item.thumb
@@ -202,6 +205,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     image_url: imageUrl,
     image: toNullableText(item.image),
     cover_image: toNullableText(item.cover_image),
+    storage_key: toNullableText(item.storage_key),
     images: imagesList,
     seller_type: toNullableText(item.seller_type),
     seller_name: toNullableText(item.seller_name),

@@ -45,6 +45,7 @@ import paymentsRoutes from "./modules/payments/payments.routes.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import dealerAcquisitionInboundRoutes from "./modules/dealer-acquisition/dealer-inbound.routes.js";
+import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
 
 const app = express();
 
@@ -170,6 +171,7 @@ app.use("/api/ads", adsRoutes);
 app.use("/api/ads", adsEventsRoutes);
 app.use("/api/events", adEventsRoutes);
 app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
+app.use("/api/vehicle-images", vehicleImagesRoutes);
 
 // 404
 app.use((req, _res, next) => {

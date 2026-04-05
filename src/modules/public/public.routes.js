@@ -9,7 +9,12 @@ import {
   getCityOpportunityClusterPage,
   getCityBelowFipeClusterPage,
 } from "./public-clusters.controller.js";
-import { getCityById, resolveCity, searchCities } from "./public-city-query.controller.js";
+import {
+  getCityById,
+  getCatalogAdsTerritoryFallback,
+  resolveCity,
+  searchCities,
+} from "./public-city-query.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 
 const router = express.Router();
@@ -29,6 +34,12 @@ router.get(
   "/cities/by-id/:id",
   cacheGet({ prefix: "public:city:byid", ttlSeconds: 300, varyBy: ["params"] }),
   getCityById
+);
+
+router.get(
+  "/cities/:slug/catalog-ads-fallback",
+  cacheGet({ prefix: "public:city:ads-fallback", ttlSeconds: 60, varyBy: ["params"] }),
+  getCatalogAdsTerritoryFallback
 );
 
 router.get(

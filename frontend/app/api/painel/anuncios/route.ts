@@ -8,6 +8,7 @@ import {
   type PublishWizardInput,
 } from "@/lib/painel/create-ad-backend";
 import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
+import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import {
   AUTH_COOKIE_NAME,
@@ -156,10 +157,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const photoUrls = await saveWizardPhotosToPublic(source);
     const attemptedPhotos = source
       .getAll("photos")
       .filter((f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0);
+
+    let photoUrls: string[] = [];
+    try {
+      photoUrls = await uploadPublishPhotosToBackendR2(source, ensured.session.accessToken);
+    } catch (uploadErr) {
+      const isProd = process.env.NODE_ENV === "production";
+      if (isProd) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message:
+              uploadErr instanceof Error
+                ? uploadErr.message
+                : "Falha ao enviar fotos para o armazenamento (R2). Verifique a configuração do backend.",
+          },
+          { status: 502 }
+        );
+      }
+      photoUrls = await saveWizardPhotosToPublic(source);
+    }
 
     if (photoUrls.length === 0 && attemptedPhotos.length > 0) {
       return NextResponse.json(

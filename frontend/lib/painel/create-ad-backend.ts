@@ -15,7 +15,7 @@ import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 
 /**
  * Campos do wizard usados para montar o corpo de POST /api/ads.
- * Fotos são salvas em `public/uploads/ads` pelo route handler e enviadas como `images[]`.
+ * Fotos: o BFF envia primeiro para `POST /api/ads/upload-images` (R2); em dev, fallback para `public/uploads/ads`.
  */
 export type PublishWizardInput = {
   cityId: string;

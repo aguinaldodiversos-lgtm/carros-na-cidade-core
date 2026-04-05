@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
@@ -11,9 +12,12 @@ import type {
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { fetchAdsFacets, fetchAdsSearch } from "@/lib/search/ads-search";
+import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-territory-fallback";
+import { isComprarTerritoryOnlyFilters } from "@/lib/search/comprar-territory";
 import {
   buildSearchQueryString,
   DEFAULT_COMPRAR_CATALOG_LIMIT,
+  mergeSearchFilters,
   parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
@@ -247,6 +251,11 @@ export async function generateMetadata({ searchParams = {} }: ComprarPageProps):
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
+  const slugInUrl = getFirstValue(searchParams.city_slug)?.trim();
+  if (!slugInUrl && filters.city_slug) {
+    const qs = buildSearchQueryString(filters);
+    redirect(qs ? `/comprar?${qs}` : "/comprar");
+  }
   const city = resolveCity(filters, cookieCity);
 
   const title = buildMetadataTitle(filters, city);
@@ -274,14 +283,22 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const city = resolveCity(filters, cookieCity);
+  const slugInUrl = getFirstValue(searchParams.city_slug)?.trim();
+
+  /** `city_slug` na URL é a fonte única de verdade: canoniza query quando o cookie preenche território. */
+  if (!slugInUrl && filters.city_slug) {
+    const qs = buildSearchQueryString(filters);
+    redirect(qs ? `/comprar?${qs}` : "/comprar");
+  }
+
+  let city = resolveCity(filters, cookieCity);
 
   const [resultsResponse, facetsResponse] = await Promise.allSettled([
     fetchAdsSearch(filters),
     fetchAdsFacets(filters),
   ]);
 
-  const initialResults =
+  let initialResults =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
       ? resultsResponse.value
       : buildEmptyResults(filters);
@@ -290,6 +307,20 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
     facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)
       ? facetsResponse.value.facets
       : buildEmptyFacets();
+
+  /** Cidade sem estoque (visão territorial pura): redireciona para slug com anúncios reais (API). */
+  if (
+    filters.city_slug &&
+    isComprarTerritoryOnlyFilters(filters) &&
+    initialResults.pagination.total === 0
+  ) {
+    const territory = await fetchCatalogAdsTerritoryFallback(filters.city_slug);
+    if (territory?.mode === "fallback" && territory.slug && territory.slug !== filters.city_slug) {
+      const merged = mergeSearchFilters(filters, { city_slug: territory.slug, page: 1 });
+      const qs = buildSearchQueryString(merged);
+      redirect(qs ? `/comprar?${qs}` : "/comprar");
+    }
+  }
 
   return (
     <BuyMarketplacePageClient

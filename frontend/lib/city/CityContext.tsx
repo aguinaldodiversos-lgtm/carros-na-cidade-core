@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { DEFAULT_CITY } from "@/lib/city/city-default";
 import type { CityRef, CitySource } from "@/lib/city/city-types";
@@ -58,6 +58,7 @@ function CityProviderInner({
   initialCity: CityRef;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [city, setCityState] = useState<CityRef>(initialCity);
   const [citySource, setCitySource] = useState<CitySource>("fallback");
@@ -119,9 +120,23 @@ function CityProviderInner({
       writeCityToLocalStorage(next, { userConfirmed: true });
       writeCityCookie(next);
       setPickerOpen(false);
+
+      const onComprar = (pathname.replace(/\/+$/, "") || "/") === "/comprar";
+      if (onComprar) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("city_slug", next.slug);
+        params.delete("city_id");
+        params.delete("city");
+        params.delete("state");
+        params.set("page", "1");
+        const qs = params.toString();
+        router.push(qs ? `/comprar?${qs}` : `/comprar?city_slug=${encodeURIComponent(next.slug)}`);
+        return;
+      }
+
       router.refresh();
     },
-    [router]
+    [router, pathname, searchParams]
   );
 
   useEffect(() => {

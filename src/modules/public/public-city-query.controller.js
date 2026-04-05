@@ -1,6 +1,33 @@
 import * as citiesService from "../cities/cities.service.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 
+export async function getCatalogAdsTerritoryFallback(req, res, next) {
+  try {
+    const slug = String(req.params.slug ?? "").trim().toLowerCase();
+    if (!slug) {
+      return res.status(400).json({
+        success: false,
+        message: "Slug obrigatório.",
+      });
+    }
+
+    const row = await citiesService.getCatalogAdsTerritoryFallback(slug);
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: "Cidade não encontrada.",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: row,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function resolveCity(req, res, next) {
   try {
     const q = String(req.query.q ?? "").trim();

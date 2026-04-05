@@ -82,6 +82,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",
     "mercadopago": "^1.5.17",
+    "multer": "^1.4.5-lts.1",
     "pg": "^8.11.5",
     "pino": "^9.14.0",
     "pino-pretty": "^11.3.0",

@@ -120,6 +120,7 @@ export function normalizeCatalogItem(item: Partial<CatalogItem>, city: BuyCityCo
     image_url: sanitizeText(item.image_url) || undefined,
     image: sanitizeText(item.image) || undefined,
     cover_image: sanitizeText(item.cover_image) || undefined,
+    storage_key: sanitizeText(item.storage_key) || undefined,
     images: validImages && validImages.length > 0 ? validImages : undefined,
     below_fipe: item.below_fipe === true,
     highlight_until: sanitizeText(item.highlight_until) || undefined,

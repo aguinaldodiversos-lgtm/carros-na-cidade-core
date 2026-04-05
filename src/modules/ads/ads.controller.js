@@ -1,11 +1,52 @@
 // src/modules/ads/ads.controller.js
 
+import crypto from "node:crypto";
+
+import { uploadVehicleImages } from "../../infrastructure/storage/r2.service.js";
 import * as adsService from "./ads.service.js";
 import { getFacets } from "./facets.service.js";
 import { parseAdsFacetFilters, parseAdsFilters } from "./filters/ads-filter.parser.js";
 import { validateAdIdentifier, validateAdId, validateUpdateAdPayload } from "./ads.validators.js";
 import { invalidateAdsCachesAfterMutation } from "./ads.mutation-cache.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
+import { AppError } from "../../shared/middlewares/error.middleware.js";
+
+/**
+ * Upload de fotos do wizard de publicação → Cloudflare R2 (mesmo pipeline que veículos).
+ * Retorna URLs canônicas para `images[]` em POST /api/ads (público ou proxy /api/vehicle-images?key=).
+ */
+export async function uploadPublishImages(req, res, next) {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) {
+      throw new AppError("Nenhuma imagem enviada.", 400);
+    }
+
+    const vehicleId = `publish-${req.user.id}-${crypto.randomUUID()}`;
+
+    const uploads = await uploadVehicleImages({
+      vehicleId,
+      files,
+      uploadedByUserId: req.user.id,
+      coverIndex: 0,
+    });
+
+    const urls = uploads.map((u) => {
+      if (u.publicUrl) return u.publicUrl;
+      return `/api/vehicle-images?key=${encodeURIComponent(u.key)}`;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        urls,
+        keys: uploads.map((u) => u.key),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function facets(req, res, next) {
   try {

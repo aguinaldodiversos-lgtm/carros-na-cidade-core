@@ -152,3 +152,8 @@ export async function getCityBySlug(slug) {
 export async function getCitiesForExpansion(limit = 100) {
   return citiesRepository.listCitiesForExpansion(limit);
 }
+
+/** Território alternativo para /comprar quando não há estoque na cidade pedida (dados reais de `ads`). */
+export async function getCatalogAdsTerritoryFallback(slug) {
+  return citiesRepository.findCatalogAdsTerritoryFallback(slug);
+}

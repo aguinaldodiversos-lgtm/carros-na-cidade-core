@@ -1,10 +1,18 @@
 import express from "express";
 import * as adsController from "./ads.controller.js";
 import * as autocompleteController from "./autocomplete/ads-autocomplete.controller.js";
+import { adsPublishImageUpload } from "./ads-upload.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 
 const router = express.Router();
+
+router.post(
+  "/upload-images",
+  authMiddleware,
+  adsPublishImageUpload.array("photos", 24),
+  adsController.uploadPublishImages
+);
 
 router.get(
   "/autocomplete",
