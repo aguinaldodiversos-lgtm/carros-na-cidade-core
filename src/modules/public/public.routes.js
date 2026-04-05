@@ -1,8 +1,4 @@
-// src/modules/public/public.routes.js
-
 import express from "express";
-
-import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import { getHomeData } from "./public.controller.js";
 import {
   getCityPage,
@@ -17,32 +13,11 @@ import {
   resolveCity,
   searchCities,
 } from "./public-city-query.controller.js";
-import { getPublicSitemapXml } from "./public-seo.controller.js";
+import { cacheGet } from "../../shared/cache/cache.middleware.js";
 
 const router = express.Router();
 
-/**
- * Rotas SEO e estáticas devem vir antes de qualquer rota dinâmica.
- * Isso evita que paths como `/seo/sitemap` sejam capturados por handlers genéricos.
- */
-router.get(
-  "/seo/sitemap",
-  cacheGet({ prefix: "public:seo:sitemap", ttlSeconds: 300, varyBy: ["query"] }),
-  getPublicSitemapXml
-);
-
-// Opcional, mas útil para compatibilidade com ferramentas que esperam `.xml`
-router.get(
-  "/seo/sitemap.xml",
-  cacheGet({ prefix: "public:seo:sitemap:xml", ttlSeconds: 300, varyBy: ["query"] }),
-  getPublicSitemapXml
-);
-
-router.get(
-  "/home",
-  cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }),
-  getHomeData
-);
+router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
 
 router.get(
   "/cities/resolve",
@@ -54,7 +29,7 @@ router.get(
 router.get("/cities/search", searchCities);
 
 router.get(
-  "/cities/by-id/:id(\\d+)",
+  "/cities/by-id/:id",
   cacheGet({ prefix: "public:city:byid", ttlSeconds: 300, varyBy: ["params"] }),
   getCityById
 );
@@ -65,21 +40,22 @@ router.get(
   getCatalogAdsTerritoryFallback
 );
 
-/**
- * Rotas mais específicas antes das mais genéricas.
- * Mesmo quando o Express já diferencia corretamente, essa ordem deixa a intenção mais clara
- * e reduz risco de regressão futura.
- */
 router.get(
-  "/cities/:slug/brand/:brand/model/:model",
-  cacheGet({ prefix: "public:city:model", ttlSeconds: 60, varyBy: ["params", "query"] }),
-  getCityModelClusterPage
+  "/cities/:slug",
+  cacheGet({ prefix: "public:city", ttlSeconds: 60, varyBy: ["params", "query"] }),
+  getCityPage
 );
 
 router.get(
   "/cities/:slug/brand/:brand",
   cacheGet({ prefix: "public:city:brand", ttlSeconds: 60, varyBy: ["params", "query"] }),
   getCityBrandClusterPage
+);
+
+router.get(
+  "/cities/:slug/brand/:brand/model/:model",
+  cacheGet({ prefix: "public:city:model", ttlSeconds: 60, varyBy: ["params", "query"] }),
+  getCityModelClusterPage
 );
 
 router.get(
@@ -92,12 +68,6 @@ router.get(
   "/cities/:slug/below-fipe",
   cacheGet({ prefix: "public:city:below-fipe", ttlSeconds: 60, varyBy: ["params", "query"] }),
   getCityBelowFipeClusterPage
-);
-
-router.get(
-  "/cities/:slug",
-  cacheGet({ prefix: "public:city", ttlSeconds: 60, varyBy: ["params", "query"] }),
-  getCityPage
 );
 
 export default router;
