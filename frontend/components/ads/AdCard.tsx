@@ -186,6 +186,7 @@ export function AdCard({ ad, item }: AdCardProps) {
           src={normalized.image}
           alt={normalized.title || "Veículo"}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/vehicle-placeholder.svg"; }}
         />
       </div>
 
