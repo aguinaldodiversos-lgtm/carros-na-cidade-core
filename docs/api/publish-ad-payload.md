@@ -26,12 +26,25 @@ Fonte de verdade no backend: `src/modules/ads/ads.validators.js` (`CreateAdSchem
 | `fuel_type`    | string \| null | não         | idem                                                               |
 | `transmission` | string \| null | não         | idem                                                               |
 | `below_fipe`   | boolean        | não         | default `false`                                                    |
+| `images`       | string[]       | não         | até 24 URLs; strings persistidas em `ads.images` (JSONB)           |
 
 Valores de veículo aceitam **rótulos** no JSON; o backend normaliza com `ads.storage-normalize.js` e valida contra `ads.canonical.constants.js`.
 
+Cada string em `images` deve ser uma URL utilizável no browser: URL pública do R2 (`R2_PUBLIC_BASE_URL`) ou caminho relativo do portal, ex.: `/api/vehicle-images?key=...` (bucket privado).
+
+## Upload de fotos antes do `POST /api/ads`
+
+1. **`POST /api/ads/upload-images`** (mesmo host da API, `Authorization: Bearer`, corpo `multipart/form-data`, campo **`photos`** repetido).
+2. Resposta: `{ success: true, data: { urls: string[], keys: string[] } }`.
+3. Usar `data.urls` no array `images` do `POST /api/ads`.
+
+Implementação: `uploadVehicleImages` em `src/infrastructure/storage/r2.service.js` (sem segundo pipeline paralelo).
+
 ## BFF Next.js
 
-- Rota: `frontend/app/api/painel/anuncios/route.ts` (FormData → JSON acima).
+- Rota: `frontend/app/api/painel/anuncios/route.ts` (FormData → upload R2 → JSON acima).
+- Upload: `frontend/lib/painel/upload-ad-images-backend.ts` → `POST /api/ads/upload-images`.
+- Em **`NODE_ENV=production`**, falha de upload **não** usa disco local; em desenvolvimento há fallback para `public/uploads/ads`.
 - Montagem do JSON: `frontend/lib/painel/create-ad-backend.ts` (`buildBackendCreateAdPayload`).
 - Cidade: `city_id` e `city`/`state` são confirmados via `GET /api/public/cities/by-id/:id` antes do `POST` (não confiar só no texto do formulário).
 

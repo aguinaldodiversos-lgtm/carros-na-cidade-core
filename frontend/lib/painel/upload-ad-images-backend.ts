@@ -45,8 +45,10 @@ export async function uploadPublishPhotosToBackendR2(
   }
 
   if (!res.ok) {
+    const errPayload = json as { message?: string; error?: string | boolean };
     const msg =
-      json.message ||
+      (typeof errPayload.message === "string" && errPayload.message.trim()) ||
+      (typeof errPayload.error === "string" && errPayload.error.trim()) ||
       (res.status === 401 ? "Sessão expirada. Faça login novamente." : "Falha no upload das fotos.");
     throw new Error(msg);
   }

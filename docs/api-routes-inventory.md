@@ -78,7 +78,9 @@ Ex.: `POST /whatsapp`.
 
 ### `/api/ads` — `src/modules/ads/ads.routes.js`
 
-Inclui: `GET /facets`, `/search`, `/`, `GET /:identifier`, `POST /`, `PUT/DELETE /:id`, mais autocomplete.
+Inclui: `POST /upload-images` (auth + multipart `photos[]` → R2 via `uploadVehicleImages`), `GET /facets`, `/search`, `/`, `GET /:identifier`, `POST /`, `PUT/DELETE /:id`, mais autocomplete.
+
+**Ordem:** `POST /upload-images` é registrado **antes** de `GET /:identifier`, evitando que `upload-images` seja interpretado como identificador de anúncio em **POST** (em **GET**, `/api/ads/upload-images` ainda pode cair em `/:identifier` — uso não previsto).
 
 ### Eventos de anúncio (`ad_events`)
 

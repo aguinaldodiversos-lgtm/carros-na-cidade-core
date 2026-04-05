@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* eslint-disable no-console */
 
 const RAW_BASE = String(process.env.BASE_URL || "").trim();
@@ -272,5 +273,73 @@ async function main() {
 
 main().catch((error) => {
   lineErr(error?.message || String(error));
+=======
+#!/usr/bin/env node
+/* eslint-disable no-console */
+/**
+ * Smoke mínimo da rota de upload de fotos do publish (R2).
+ * - GET /health (API viva + DB)
+ * - POST /api/ads/upload-images sem Authorization → 401 (rota montada + auth antes do multer)
+ *
+ * Uso:
+ *   node scripts/smoke-publish-upload.mjs
+ *   BASE_URL=https://sua-api.onrender.com node scripts/smoke-publish-upload.mjs
+ */
+
+const BASE = String(process.env.BASE_URL || process.env.SMOKE_API_URL || "http://127.0.0.1:4000").replace(
+  /\/+$/,
+  ""
+);
+const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 10000);
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
+
+async function fetchJson(method, path, { headers = {}, body } = {}) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = { raw: text };
+    }
+    return { res, json, text };
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function main() {
+  console.log(`[smoke-publish-upload] BASE=${BASE}`);
+
+  const health = await fetchJson("GET", "/health");
+  assert(health.res.ok, `GET /health esperado 2xx, obteve ${health.res.status}`);
+  assert(health.json?.ok !== false || health.res.status === 503, "GET /health payload inesperado");
+
+  const upload = await fetchJson("POST", "/api/ads/upload-images", {
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert(
+    upload.res.status === 401,
+    `POST /api/ads/upload-images sem token esperado 401, obteve ${upload.res.status}`
+  );
+
+  console.log("[smoke-publish-upload] OK — health + upload-images (401 sem auth)");
+}
+
+main().catch((e) => {
+  console.error("[smoke-publish-upload] FALHA:", e?.message || e);
+>>>>>>> ae5feea (refatora fluxo de criacao de anuncio)
   process.exit(1);
 });
