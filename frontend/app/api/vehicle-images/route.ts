@@ -8,6 +8,9 @@ import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Cache the placeholder SVG in memory to avoid repeated disk reads
+let cachedPlaceholderSvg: Uint8Array | null = null;
+
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -91,5 +94,22 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.redirect(new URL("/images/vehicle-placeholder.svg", request.url), { status: 307 });
+  // Serve the SVG placeholder directly to avoid redirect issues with next/image
+  try {
+    if (!cachedPlaceholderSvg) {
+      const placeholderPath = path.join(process.cwd(), "public", "images", "vehicle-placeholder.svg");
+      await access(placeholderPath);
+      cachedPlaceholderSvg = new Uint8Array(await readFile(placeholderPath));
+    }
+    return new NextResponse(cachedPlaceholderSvg, {
+      status: 200,
+      headers: {
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  } catch {
+    // last resort: redirect
+    return NextResponse.redirect(new URL("/images/vehicle-placeholder.svg", request.url), { status: 307 });
+  }
 }

@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { VehicleCardImage } from "@/components/buy/VehicleCardImage";
 import {
   financeChipLabel,
   primaryBadgeFromWeight,
@@ -197,11 +197,6 @@ export default function CatalogVehicleCard({
   const financeLabel = financeChipLabel(weight, Boolean(item.below_fipe));
   const image = getImage(item);
   const listedHint = getListedHint(item.created_at);
-  const useUnoptimizedImage =
-    image.startsWith("/api/vehicle-images") ||
-    image.startsWith("http") ||
-    image.startsWith("data:") ||
-    image.endsWith(".svg");
 
   const cardClasses = cx(
     "group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-16px_rgba(15,23,42,0.18)]",
@@ -217,14 +212,11 @@ export default function CatalogVehicleCard({
           featured ? "aspect-[16/10]" : "aspect-[4/3]"
         )}
       >
-        <Image
+        <VehicleCardImage
           src={image}
           alt={title}
-          fill
-          unoptimized={useUnoptimizedImage}
+          featured={featured}
           className="object-cover transition duration-500 group-hover:scale-[1.04]"
-          sizes={featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw"}
-          loading="lazy"
         />
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-slate-900/10" />
