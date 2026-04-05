@@ -4,65 +4,151 @@ import { env } from "../../config/env.js";
 import { logger } from "../../shared/logger.js";
 import { getPoolConfig } from "./pool-config.js";
 
+const pool = new Pool(getPoolConfig());
+
+let isPoolClosing = false;
+
 function getQueryPreview(text) {
   if (typeof text !== "string") return "";
   return text.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
-export const pool = new Pool(getPoolConfig());
+function normalizeParams(params) {
+  if (Array.isArray(params)) return params;
+  if (params == null) return [];
+  return [params];
+}
+
+function getQueryMeta(text, params) {
+  return {
+    text: getQueryPreview(text),
+    paramCount: normalizeParams(params).length,
+  };
+}
+
+function logPoolEvent(level, payload, message) {
+  const fn =
+    level === "error"
+      ? logger.error
+      : level === "warn"
+        ? logger.warn
+        : level === "info"
+          ? logger.info
+          : logger.debug;
+
+  if (typeof fn === "function") {
+    fn.call(logger, payload, message);
+  }
+}
+
+function createInstrumentedQueryExecutor(queryable, source = "pool") {
+  return async function instrumentedQuery(text, params = []) {
+    const normalizedParams = normalizeParams(params);
+    const startedAt = Date.now();
+
+    try {
+      const result = await queryable.query(text, normalizedParams);
+      const durationMs = Date.now() - startedAt;
+
+      if (durationMs >= env.PG_SLOW_QUERY_MS) {
+        logPoolEvent(
+          "warn",
+          {
+            source,
+            durationMs,
+            ...getQueryMeta(text, normalizedParams),
+          },
+          "[db] slow query"
+        );
+      }
+
+      return result;
+    } catch (error) {
+      logPoolEvent(
+        "error",
+        {
+          source,
+          error: error?.message || String(error),
+          ...getQueryMeta(text, normalizedParams),
+        },
+        "[db] query falhou"
+      );
+      throw error;
+    }
+  };
+}
 
 pool.on("connect", () => {
-  logger.debug?.("[db] conexão adquirida pelo pool");
+  logPoolEvent(
+    "debug",
+    {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount,
+    },
+    "[db] conexão adquirida pelo pool"
+  );
 });
 
 pool.on("error", (error) => {
-  logger.error({ error: error?.message || String(error) }, "[db] erro inesperado no pool");
+  logPoolEvent(
+    "error",
+    {
+      error: error?.message || String(error),
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount,
+    },
+    "[db] erro inesperado no pool"
+  );
 });
 
+const pooledQuery = createInstrumentedQueryExecutor(pool, "pool");
+
+export { pool };
+
 export async function query(text, params = []) {
-  const startedAt = Date.now();
+  return pooledQuery(text, params);
+}
 
-  try {
-    const result = await pool.query(text, params);
-    const durationMs = Date.now() - startedAt;
+export async function getClient() {
+  const client = await pool.connect();
+  const clientQuery = createInstrumentedQueryExecutor(client, "transaction");
 
-    if (durationMs >= env.PG_SLOW_QUERY_MS) {
-      logger.warn(
-        {
-          durationMs,
-          text: getQueryPreview(text),
-        },
-        "[db] slow query"
-      );
-    }
-
-    return result;
-  } catch (error) {
-    logger.error(
-      {
-        error: error?.message || String(error),
-        text: getQueryPreview(text),
-      },
-      "[db] query falhou"
-    );
-    throw error;
-  }
+  return {
+    raw: client,
+    query: clientQuery,
+    release() {
+      client.release();
+    },
+  };
 }
 
 export async function withTransaction(callback) {
   const client = await pool.connect();
+  const txQuery = createInstrumentedQueryExecutor(client, "transaction");
 
   try {
     await client.query("BEGIN");
-    const result = await callback(client);
+
+    const transactionApi = {
+      raw: client,
+      query: txQuery,
+    };
+
+    const result = await callback(transactionApi);
+
     await client.query("COMMIT");
     return result;
   } catch (error) {
     try {
       await client.query("ROLLBACK");
     } catch (rollbackError) {
-      logger.error(
-        { error: rollbackError?.message || String(rollbackError) },
+      logPoolEvent(
+        "error",
+        {
+          error: rollbackError?.message || String(rollbackError),
+        },
         "[db] rollback falhou"
       );
     }
@@ -78,17 +164,34 @@ export async function healthcheck() {
     const result = await pool.query("SELECT 1 AS ok");
     return result.rows?.[0]?.ok === 1;
   } catch (error) {
-    logger.error({ error: error?.message || String(error) }, "[db] healthcheck falhou");
+    logPoolEvent(
+      "error",
+      {
+        error: error?.message || String(error),
+      },
+      "[db] healthcheck falhou"
+    );
     return false;
   }
 }
 
 export async function closeDatabasePool() {
+  if (isPoolClosing) return;
+
+  isPoolClosing = true;
+
   try {
     await pool.end();
-    logger.info("[db] pool encerrado");
+    logPoolEvent("info", {}, "[db] pool encerrado");
   } catch (error) {
-    logger.error({ error: error?.message || String(error) }, "[db] falha ao encerrar pool");
+    isPoolClosing = false;
+    logPoolEvent(
+      "error",
+      {
+        error: error?.message || String(error),
+      },
+      "[db] falha ao encerrar pool"
+    );
     throw error;
   }
 }
