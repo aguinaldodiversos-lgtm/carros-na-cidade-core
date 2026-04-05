@@ -2,6 +2,10 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { executeAdUpdate, prepareAdUpdatePayload } from "./ads.persistence.service.js";
 import * as adsRepository from "./ads.repository.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
+import * as dbModule from "../../infrastructure/database/db.js";
+import { removeVehicleImages } from "../../infrastructure/storage/r2.service.js";
+
+const tableColumnsCache = new Map();
 
 function assertOwner(ownerContext, userId) {
   if (!ownerContext) {
@@ -16,6 +20,174 @@ function assertOwner(ownerContext, userId) {
   if (String(advertiserUserId) !== String(userId)) {
     throw new AppError("Sem permissão para alterar este anúncio", 403);
   }
+}
+
+function getDbQueryFn() {
+  const candidates = [
+    typeof dbModule.query === "function" ? dbModule.query.bind(dbModule) : null,
+    typeof dbModule.pool?.query === "function" ? dbModule.pool.query.bind(dbModule.pool) : null,
+    typeof dbModule.default?.query === "function"
+      ? dbModule.default.query.bind(dbModule.default)
+      : null,
+    typeof dbModule.default?.pool?.query === "function"
+      ? dbModule.default.pool.query.bind(dbModule.default.pool)
+      : null,
+  ].filter(Boolean);
+
+  if (candidates.length === 0) {
+    throw new Error(
+      "[ads.panel] Não foi possível localizar uma função de query em src/infrastructure/database/db.js"
+    );
+  }
+
+  return candidates[0];
+}
+
+async function dbQuery(text, params = []) {
+  const queryFn = getDbQueryFn();
+  return queryFn(text, params);
+}
+
+function normalizeScalar(value) {
+  if (value == null) return null;
+  const stringValue = String(value).trim();
+  return stringValue ? stringValue : null;
+}
+
+async function getTableColumns(tableName) {
+  const cacheKey = String(tableName || "").trim().toLowerCase();
+  if (!cacheKey) return new Set();
+
+  if (tableColumnsCache.has(cacheKey)) {
+    return tableColumnsCache.get(cacheKey);
+  }
+
+  const { rows } = await dbQuery(
+    `
+      select column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = $1
+    `,
+    [cacheKey]
+  );
+
+  const columns = new Set(rows.map((row) => row.column_name));
+  tableColumnsCache.set(cacheKey, columns);
+  return columns;
+}
+
+async function tableExists(tableName) {
+  const columns = await getTableColumns(tableName);
+  return columns.size > 0;
+}
+
+function resolveVehicleId(ownerContext, adId) {
+  const candidates = [
+    ownerContext?.vehicle_id,
+    ownerContext?.vehicleId,
+    ownerContext?.ad_vehicle_id,
+    ownerContext?.linked_vehicle_id,
+    ownerContext?.id === adId ? null : ownerContext?.id,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeScalar(candidate);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
+async function resolveVehicleImagesLink(ownerContext, adId) {
+  const hasVehicleImagesTable = await tableExists("vehicle_images");
+  if (!hasVehicleImagesTable) return null;
+
+  const columns = await getTableColumns("vehicle_images");
+
+  if (columns.has("ad_id")) {
+    return {
+      column: "ad_id",
+      value: adId,
+    };
+  }
+
+  if (columns.has("vehicle_id")) {
+    const vehicleId = resolveVehicleId(ownerContext, adId);
+    if (!vehicleId) return null;
+
+    return {
+      column: "vehicle_id",
+      value: vehicleId,
+    };
+  }
+
+  return null;
+}
+
+async function findImageStorageKeysByLink(link) {
+  if (!link) return [];
+
+  const { rows } = await dbQuery(
+    `
+      select storage_key
+      from vehicle_images
+      where ${link.column} = $1
+        and storage_key is not null
+        and btrim(storage_key) <> ''
+    `,
+    [link.value]
+  );
+
+  return Array.from(
+    new Set(
+      rows
+        .map((row) => normalizeScalar(row.storage_key))
+        .filter(Boolean)
+    )
+  );
+}
+
+async function deleteVehicleImageRowsByLink(link) {
+  if (!link) return 0;
+
+  const result = await dbQuery(
+    `
+      delete from vehicle_images
+      where ${link.column} = $1
+    `,
+    [link.value]
+  );
+
+  return Number(result?.rowCount || 0);
+}
+
+async function cleanupAdImagesAfterSoftDelete(ownerContext, adId, ctx = {}) {
+  const requestId = ctx.requestId ?? null;
+  const link = await resolveVehicleImagesLink(ownerContext, adId);
+
+  if (!link) {
+    return {
+      attempted: false,
+      removedFromStorage: 0,
+      removedFromDb: 0,
+    };
+  }
+
+  const storageKeys = await findImageStorageKeysByLink(link);
+
+  if (storageKeys.length > 0) {
+    await removeVehicleImages(storageKeys);
+  }
+
+  const deletedRows = await deleteVehicleImageRowsByLink(link);
+
+  return {
+    attempted: true,
+    removedFromStorage: storageKeys.length,
+    removedFromDb: deletedRows,
+    requestId,
+  };
 }
 
 export async function updateAd(id, data, user, ctx = {}) {
@@ -57,15 +229,56 @@ export async function updateAd(id, data, user, ctx = {}) {
   }
 }
 
-export async function removeAd(id, user) {
-  const ownerContext = await adsRepository.findOwnerContextById(id);
-  assertOwner(ownerContext, user.id);
+export async function removeAd(id, user, ctx = {}) {
+  const requestId = ctx.requestId ?? null;
+  let stage = "loadOwnerContext";
+  let advertiserId = null;
+  let cityId = null;
+  let ownerContext = null;
 
-  const removed = await adsRepository.softDeleteAd(id);
+  try {
+    ownerContext = await adsRepository.findOwnerContextById(id);
 
-  if (!removed) {
-    throw new AppError("Falha ao remover anúncio", 500);
+    if (ownerContext) {
+      advertiserId = ownerContext.advertiser_id ?? null;
+      cityId = ownerContext.city_id ?? null;
+    }
+
+    assertOwner(ownerContext, user.id);
+
+    stage = "softDeleteAd";
+    const removed = await adsRepository.softDeleteAd(id);
+
+    if (!removed) {
+      throw new AppError("Falha ao remover anúncio", 500);
+    }
+
+    stage = "cleanupImages";
+    try {
+      await cleanupAdImagesAfterSoftDelete(ownerContext, id, { requestId });
+    } catch (cleanupError) {
+      logAdsPublishFailure(cleanupError, {
+        stage: "ads.removeAd.cleanupImages",
+        requestId,
+        userId: user.id,
+        advertiserId,
+        cityId,
+        adId: id,
+        payload: sanitizeAdPayloadForLog({ ad_id: id }),
+      });
+    }
+
+    return removed;
+  } catch (err) {
+    logAdsPublishFailure(err, {
+      stage: `ads.removeAd.${stage}`,
+      requestId,
+      userId: user.id,
+      advertiserId,
+      cityId,
+      adId: id,
+      payload: sanitizeAdPayloadForLog({ ad_id: id }),
+    });
+    throw err;
   }
-
-  return removed;
 }
