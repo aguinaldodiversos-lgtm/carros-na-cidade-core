@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type BaseAdData = {
   id?: string | number | null;
@@ -165,6 +166,7 @@ function normalizeAdData(source?: BaseAdData): {
 export function AdCard({ ad, item }: AdCardProps) {
   const source = ad || item || {};
   const normalized = normalizeAdData(source);
+  const [imgSrc, setImgSrc] = useState(normalized.image);
 
   const href = buildAdHref({
     id: normalized.id ?? undefined,
@@ -183,9 +185,13 @@ export function AdCard({ ad, item }: AdCardProps) {
     >
       <div className="aspect-[16/10] overflow-hidden bg-[#EDF2FB]">
         <img
-          src={normalized.image}
+          src={imgSrc}
           alt={normalized.title || "Veículo"}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          onError={() => {
+            if (imgSrc !== LISTING_CARD_FALLBACK_IMAGE)
+              setImgSrc(LISTING_CARD_FALLBACK_IMAGE);
+          }}
         />
       </div>
 

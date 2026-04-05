@@ -1,9 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import {
   financeChipLabel,
   primaryBadgeFromWeight,
@@ -55,6 +58,32 @@ interface CatalogVehicleCardProps {
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function CardImageWithFallback({
+  src,
+  alt,
+  sizes,
+}: {
+  src: string;
+  alt: string;
+  sizes: string;
+}) {
+  const [imgSrc, setImgSrc] = useState(src);
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt}
+      fill
+      unoptimized
+      className="object-cover transition duration-500 group-hover:scale-[1.04]"
+      sizes={sizes}
+      loading="lazy"
+      onError={() => {
+        if (imgSrc !== LISTING_CARD_FALLBACK_IMAGE) setImgSrc(LISTING_CARD_FALLBACK_IMAGE);
+      }}
+    />
+  );
 }
 
 function toText(value: unknown, fallback = "") {
@@ -197,11 +226,7 @@ export default function CatalogVehicleCard({
   const financeLabel = financeChipLabel(weight, Boolean(item.below_fipe));
   const image = getImage(item);
   const listedHint = getListedHint(item.created_at);
-  const useUnoptimizedImage =
-    image.startsWith("/api/vehicle-images") ||
-    image.startsWith("http") ||
-    image.startsWith("data:") ||
-    image.endsWith(".svg");
+  const imageSizes = featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw";
 
   const cardClasses = cx(
     "group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-16px_rgba(15,23,42,0.18)]",
@@ -217,14 +242,10 @@ export default function CatalogVehicleCard({
           featured ? "aspect-[16/10]" : "aspect-[4/3]"
         )}
       >
-        <Image
+        <CardImageWithFallback
           src={image}
           alt={title}
-          fill
-          unoptimized={useUnoptimizedImage}
-          className="object-cover transition duration-500 group-hover:scale-[1.04]"
-          sizes={featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw"}
-          loading="lazy"
+          sizes={imageSizes}
         />
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-slate-900/10" />
