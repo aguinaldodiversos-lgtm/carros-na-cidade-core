@@ -3,8 +3,6 @@ import path from "node:path";
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -100,12 +98,47 @@ async function tryReadLocalUpload(relativePath: string): Promise<Buffer | null> 
   return null;
 }
 
+function normalizeBaseUrl(rawBaseUrl: string): string {
+  return rawBaseUrl.endsWith("/") ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+}
+
+function resolveBackendApiUrl(relativePath: string): string | null {
+  const candidates = [
+    process.env.BACKEND_INTERNAL_URL,
+    process.env.BACKEND_API_URL,
+    process.env.API_URL,
+    process.env.NEXT_PUBLIC_API_URL,
+  ]
+    .map((value) => value?.trim())
+    .filter(Boolean) as string[];
+
+  for (const baseUrl of candidates) {
+    try {
+      const normalizedBase = normalizeBaseUrl(baseUrl);
+      return new URL(relativePath, `${normalizedBase}/`).toString();
+    } catch (error) {
+      console.error("[vehicle-images] base URL inválida", {
+        baseUrl,
+        error,
+      });
+    }
+  }
+
+  return null;
+}
+
 async function tryFetchRemoteUpload(relativePath: string): Promise<Response | null> {
   const remoteUrl = resolveBackendApiUrl(relativePath);
 
   if (!remoteUrl) {
-    console.warn("[vehicle-images] resolveBackendApiUrl retornou vazio", {
+    console.warn("[vehicle-images] nenhuma base remota configurada", {
       relativePath,
+      envs: {
+        BACKEND_INTERNAL_URL: Boolean(process.env.BACKEND_INTERNAL_URL),
+        BACKEND_API_URL: Boolean(process.env.BACKEND_API_URL),
+        API_URL: Boolean(process.env.API_URL),
+        NEXT_PUBLIC_API_URL: Boolean(process.env.NEXT_PUBLIC_API_URL),
+      },
     });
     return null;
   }
@@ -223,7 +256,8 @@ export async function GET(request: NextRequest) {
 
   if (remoteResponse) {
     const body = await remoteResponse.arrayBuffer();
-    const contentType = remoteResponse.headers.get("content-type") || getContentTypeFromPath(safePath);
+    const contentType =
+      remoteResponse.headers.get("content-type") || getContentTypeFromPath(safePath);
 
     return buildImageResponse(body, contentType);
   }
