@@ -23,16 +23,7 @@ function safeUrl(value: string): string {
 }
 
 function getBackendBaseUrl(): string {
-  const explicit = getBackendApiExplicitEnvUrl();
-  if (explicit) {
-    return explicit;
-  }
-
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin.replace(/\/+$/, "");
-  }
-
-  return "";
+  return getBackendApiExplicitEnvUrl();
 }
 
 function joinWithBase(baseUrl: string, pathname: string): string {

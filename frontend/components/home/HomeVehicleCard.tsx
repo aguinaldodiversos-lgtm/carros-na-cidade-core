@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import { isFavoriteSlug, toggleFavoriteSlug } from "@/lib/favorites/local-favorites";
-import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type VehicleItem = {
   id: number | string;
@@ -111,6 +111,7 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
   const cityLabel = [item.city || "São Paulo", item.state || "SP"].join(" - ");
   const favKey = resolveFavoriteKey(item);
   const [fav, setFav] = useState(() => isFavoriteSlug(favKey));
+  const [imgSrc, setImgSrc] = useState(image);
 
   const badgeTop = useMemo(() => {
     if (variant === "highlight") return "Patrocinado";
@@ -141,10 +142,14 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
       <div className="relative aspect-[4/3] overflow-hidden bg-[#f1f4f9]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={image}
+          src={imgSrc}
           alt={title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           loading="lazy"
+          onError={() => {
+            if (imgSrc !== LISTING_CARD_FALLBACK_IMAGE)
+              setImgSrc(LISTING_CARD_FALLBACK_IMAGE);
+          }}
         />
 
         <div className="absolute inset-x-0 top-0 flex items-start justify-between p-2.5 sm:p-3">

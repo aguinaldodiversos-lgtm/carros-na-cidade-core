@@ -91,5 +91,17 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.redirect(new URL("/images/vehicle-placeholder.svg", request.url), { status: 307 });
+  const placeholderPath = path.join(process.cwd(), "public", "images", "vehicle-placeholder.svg");
+  try {
+    const svg = await readFile(placeholderPath);
+    return new NextResponse(svg, {
+      status: 200,
+      headers: {
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: "Imagem não encontrada." }, { status: 404 });
+  }
 }
