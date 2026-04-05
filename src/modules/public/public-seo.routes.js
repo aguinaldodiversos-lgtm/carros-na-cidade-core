@@ -2,7 +2,6 @@ import express from "express";
 import { logger } from "../../shared/logger.js";
 import {
   getInternalLinks,
-  getPublicSitemap,
   getPublicSitemapByRegion,
   getPublicSitemapByType,
 } from "./public-seo.controller.js";
@@ -60,12 +59,10 @@ function buildSitemapXml(urls) {
   );
 }
 
-router.get("/sitemap", getPublicSitemap);
-router.get("/sitemap/type/:type", getPublicSitemapByType);
-router.get("/sitemap/region/:state", getPublicSitemapByRegion);
-router.get("/internal-links", getInternalLinks);
-
-router.get("/sitemap.xml", async (req, res) => {
+/**
+ * Sitemap canônico (XML). Usado em GET /sitemap e GET /sitemap.xml — mesma origem de dados (`listPublicSitemapEntries`).
+ */
+async function sendCanonicalSitemapXml(req, res) {
   try {
     const limit = Number(req.query.limit || 50000);
     const entries = await listPublicSitemapEntries({ limit });
@@ -114,6 +111,13 @@ router.get("/sitemap.xml", async (req, res) => {
       .set("cache-control", "no-store")
       .send(xml);
   }
-});
+}
+
+router.get("/sitemap", sendCanonicalSitemapXml);
+router.get("/sitemap/type/:type", getPublicSitemapByType);
+router.get("/sitemap/region/:state", getPublicSitemapByRegion);
+router.get("/internal-links", getInternalLinks);
+
+router.get("/sitemap.xml", sendCanonicalSitemapXml);
 
 export default router;

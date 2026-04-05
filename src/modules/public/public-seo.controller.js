@@ -1,20 +1,6 @@
 import * as sitemapPublicService from "../../read-models/seo/sitemap-public.service.js";
 import * as internalLinksPublicService from "../../read-models/seo/internal-links-public.service.js";
 
-export async function getPublicSitemap(req, res, next) {
-  try {
-    const limit = Number(req.query.limit || 50000);
-    const data = await sitemapPublicService.getPublicSitemap(limit);
-
-    res.json({
-      success: true,
-      data,
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
 export async function getPublicSitemapByType(req, res, next) {
   try {
     const limit = Number(req.query.limit || 50000);

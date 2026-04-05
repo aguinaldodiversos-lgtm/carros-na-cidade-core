@@ -58,7 +58,7 @@ Prefixo efetivo: `/api/public/seo` (montado em `app.use("/api/public/seo", publi
 
 | Método | Caminho completo (exemplos)                                                                                   |
 | ------ | ------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/api/public/seo/sitemap`, `/sitemap/type/:type`, `/sitemap/region/:state`, `/internal-links`, `/sitemap.xml` |
+| `GET`  | `/api/public/seo/sitemap`, `/sitemap.xml` (XML sitemap); `/sitemap/type/:type`, `/sitemap/region/:state`, `/internal-links` (JSON) |
 
 ### `/api/auth` — `src/modules/auth/auth.routes.js`
 

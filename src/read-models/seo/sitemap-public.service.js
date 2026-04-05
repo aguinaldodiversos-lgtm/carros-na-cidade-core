@@ -12,11 +12,6 @@ function mapSitemapEntry(entry) {
   };
 }
 
-export async function getPublicSitemap(limit = 50000) {
-  const entries = await sitemapPublicRepository.listAllSitemapEntries(limit);
-  return entries.map(mapSitemapEntry);
-}
-
 export async function getPublicSitemapByType(type, limit = 50000) {
   const entries = await sitemapPublicRepository.listSitemapByType(type, limit);
   return entries.map(mapSitemapEntry);
