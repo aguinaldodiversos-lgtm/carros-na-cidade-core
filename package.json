@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
-    "axios": "^1.6.7",
+    "axios": "^1.14.0",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.70.0",
     "compression": "^1.7.4",
