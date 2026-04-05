@@ -1,14 +1,32 @@
-// scripts/smoke.mjs
 /* eslint-disable no-console */
 
-const BASE = (process.env.BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
+const RAW_BASE = String(process.env.BASE_URL || "http://localhost:4000").trim();
+
+function normalizeBaseUrl(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    throw new Error("BASE_URL não definida.");
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    throw new Error(`BASE_URL inválida: ${trimmed}`);
+  }
+}
+
+const BASE = normalizeBaseUrl(RAW_BASE);
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 8000);
 const RETRIES = Number(process.env.SMOKE_RETRIES || 1);
 const MAX_LATENCY_MS = Number(process.env.SMOKE_MAX_LATENCY_MS || 1200);
 const BURST_COUNT = Number(process.env.SMOKE_BURST_COUNT || 10);
 const BURST_CONCURRENCY = Number(process.env.SMOKE_BURST_CONCURRENCY || 5);
 
-const ORIGIN = process.env.SMOKE_ORIGIN || ""; // ex: https://carrosnacidade.com
+const ORIGIN = String(process.env.SMOKE_ORIGIN || "").trim(); // ex: https://carrosnacidade.com
 const ENABLE_AUTH = String(process.env.SMOKE_AUTH || "true").toLowerCase() === "true";
 const ENABLE_METRICS = String(process.env.SMOKE_METRICS || "true").toLowerCase() === "true";
 
@@ -17,16 +35,28 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
+
 function fmtMs(ms) {
   return `${Math.round(ms)}ms`;
 }
+
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
+}
+
+function buildUrl(path) {
+  const normalizedPath = String(path || "").trim();
+  if (!normalizedPath.startsWith("/")) {
+    throw new Error(`Path inválido no smoke: "${path}"`);
+  }
+
+  return new URL(normalizedPath, `${BASE}/`).toString();
 }
 
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -35,10 +65,13 @@ async function fetchWithTimeout(url, options = {}) {
 }
 
 async function request(path, { method = "GET", headers = {}, body } = {}) {
-  const url = `${BASE}${path}`;
+  const url = buildUrl(path);
   const reqHeaders = { ...headers };
+
   if (ORIGIN) reqHeaders.origin = ORIGIN;
-  if (body !== undefined) reqHeaders["content-type"] = "application/json";
+  if (body !== undefined && !reqHeaders["content-type"] && !reqHeaders["Content-Type"]) {
+    reqHeaders["content-type"] = "application/json";
+  }
 
   const started = Date.now();
   const res = await fetchWithTimeout(url, {
@@ -65,6 +98,7 @@ async function request(path, { method = "GET", headers = {}, body } = {}) {
     ok: res.ok,
     status: res.status,
     path,
+    url,
     durationMs,
     headers: res.headers,
     contentType,
@@ -148,13 +182,11 @@ function extractArrayFromJson(json) {
   if (!json) return null;
   if (Array.isArray(json)) return json;
 
-  // tenta padrões comuns
   const candidates = ["items", "data", "results", "ads", "rows", "list"];
   for (const key of candidates) {
     if (Array.isArray(json[key])) return json[key];
   }
 
-  // tenta achar o primeiro array em 1 nível
   for (const v of Object.values(json)) {
     if (Array.isArray(v)) return v;
   }
@@ -163,7 +195,6 @@ function extractArrayFromJson(json) {
 
 function extractIds(list) {
   if (!Array.isArray(list)) return [];
-  // tenta achar campos de id comuns
   const keys = ["id", "ad_id", "adId", "uuid"];
   const ids = [];
   for (const item of list) {
@@ -190,7 +221,6 @@ function findDuplicates(arr) {
 }
 
 function parseSitemapLocs(xmlText) {
-  // simples e suficiente para smoke
   const locs = [];
   const re = /<loc>\s*([^<]+)\s*<\/loc>/gim;
   let m;
@@ -251,10 +281,10 @@ async function run() {
     validate: (r) => {
       expectStatus(r, [200], "GET /");
       expectJson(r, "GET /");
-      // opcional: valida shape mínimo, sem ser rígido
       if (r.json && typeof r.json === "object") {
-        if (!("success" in r.json))
+        if (!("success" in r.json)) {
           warnings.push("GET /: JSON sem campo 'success' (não bloqueia).");
+        }
       }
     },
   });
@@ -270,7 +300,6 @@ async function run() {
     },
   });
 
-  // CORS Preflight (só faz sentido se ORIGIN estiver setado)
   if (ORIGIN) {
     await test(
       "OPTIONS /health/meta (CORS preflight)",
@@ -285,7 +314,6 @@ async function run() {
       {
         required: true,
         validate: (r) => {
-          // normalmente 204, mas 200 ok também
           expectStatus(r, [200, 204], "CORS preflight");
           const acao = String(r.headers.get("access-control-allow-origin") || "");
           if (!acao) warnings.push("CORS: sem access-control-allow-origin no preflight.");
@@ -307,15 +335,15 @@ async function run() {
       validate: (r) => {
         expectStatus(r, [200], "sitemap");
         expectXml(r, "sitemap");
-        // duplicidade de URLs
         const locs = parseSitemapLocs(r.text);
         if (!locs.length) warnings.push("sitemap: nenhum <loc> encontrado (estranho).");
         const dup = findDuplicates(locs);
-        if (dup.length)
+        if (dup.length) {
           warnings.push(`sitemap: URLs duplicadas detectadas (ex.: ${dup.slice(0, 3).join(", ")})`);
-        // sanity size
-        if (r.text.length > 5_000_000)
+        }
+        if (r.text.length > 5_000_000) {
           warnings.push("sitemap: XML maior que 5MB (pode ser problema).");
+        }
       },
     }
   );
@@ -333,15 +361,16 @@ async function run() {
         expectJson(r, "ads list");
 
         const arr = extractArrayFromJson(r.json);
-        if (!arr)
+        if (!arr) {
           warnings.push("ads list: resposta JSON não contém array (items/data/results/ads).");
-        else {
+        } else {
           const ids = extractIds(arr);
           const dups = findDuplicates(ids);
-          if (dups.length)
+          if (dups.length) {
             warnings.push(
               `ads list: IDs duplicados detectados (ex.: ${dups.slice(0, 3).join(", ")})`
             );
+          }
         }
       },
     }
@@ -386,7 +415,6 @@ async function run() {
 
   /* =========================
      6) Burst/concurrency stability
-     - pega erros intermitentes e requestId duplicado
   ========================= */
 
   await test("BURST /health/meta (stability)", async () => {
@@ -404,11 +432,11 @@ async function run() {
         if (idx === undefined) break;
         try {
           const r = await request("/health/meta");
-          if (r.status >= 500) any5xx++;
-          if (r.status !== 200) failures++;
+          if (r.status >= 500) any5xx += 1;
+          if (r.status !== 200) failures += 1;
           if (r.json?.requestId) ids.push(String(r.json.requestId));
         } catch {
-          failures++;
+          failures += 1;
         }
       }
     };
@@ -418,14 +446,15 @@ async function run() {
     assert(any5xx === 0, `burst: detectado ${any5xx} respostas 5xx`);
     assert(failures === 0, `burst: falhas=${failures}/${total}`);
     const dup = findDuplicates(ids);
-    if (dup.length)
+    if (dup.length) {
       warnings.push(`burst: requestId duplicado detectado (ex.: ${dup.slice(0, 3).join(", ")})`);
+    }
 
-    // retorna um res "fake" pra log padronizado
     return {
       ok: true,
       status: 200,
       path: `/health/meta x${total} (conc ${conc})`,
+      url: buildUrl("/health/meta"),
       durationMs: 0,
       contentType: "application/json",
       headers: new Headers(),
@@ -460,17 +489,16 @@ async function run() {
 
   /* =========================
      8) Metrics endpoint (optional)
-     - não força 200 (pode ser 403/404), mas nunca 5xx
   ========================= */
 
   if (ENABLE_METRICS) {
     await test("GET /metrics (optional)", () => request("/metrics"), {
       required: false,
       validate: (r) => {
-        // aceita 200/403/404, mas nunca 5xx
         expectNot5xx(r, "/metrics");
-        if (![200, 403, 404].includes(r.status))
+        if (![200, 403, 404].includes(r.status)) {
           warnings.push(`/metrics: status incomum ${r.status}`);
+        }
       },
     });
   } else {
@@ -491,13 +519,14 @@ async function run() {
   console.log(`Required: ${required.length} | Failed: ${reqFails.length}`);
   console.log(`Optional: ${optional.length} | Failed: ${optFails.length}`);
 
-  // Top slow endpoints
   const withRes = results.filter((r) => r.res && typeof r.res.durationMs === "number");
   withRes.sort((a, b) => (b.res.durationMs || 0) - (a.res.durationMs || 0));
   const topSlow = withRes.slice(0, 5);
   console.log("\nTop slow:");
   for (const t of topSlow) {
-    if (t.res.durationMs > 0) console.log(`- ${t.res.path}: ${fmtMs(t.res.durationMs)}`);
+    if (t.res.durationMs > 0) {
+      console.log(`- ${t.res.path}: ${fmtMs(t.res.durationMs)}`);
+    }
   }
 
   if (warnings.length) {
@@ -507,16 +536,19 @@ async function run() {
 
   if (reqFails.length) {
     console.log("\nRequired failures:");
-    for (const f of reqFails) console.log(`- ${f.name}: ${f.error?.message || "unknown error"}`);
+    for (const f of reqFails) {
+      console.log(`- ${f.name}: ${f.error?.message || "unknown error"}`);
+    }
     process.exit(1);
   }
 
   if (optFails.length) {
     console.log("\nOptional failures (não bloqueiam):");
-    for (const f of optFails) console.log(`- ${f.name}: ${f.error?.message || "unknown error"}`);
+    for (const f of optFails) {
+      console.log(`- ${f.name}: ${f.error?.message || "unknown error"}`);
+    }
   }
 
-  // Debug extra quando sitemap/ads retornam algo suspeito
   if (sitemapRes?.text && sitemapRes.text.length < 50) {
     console.log(lineWarn("sitemap: body muito pequeno, revise endpoint."));
   }
