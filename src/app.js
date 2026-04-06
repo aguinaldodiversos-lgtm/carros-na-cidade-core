@@ -161,8 +161,8 @@ app.get("/health/meta", (req, res) => {
 });
 
 // API routes
-app.use("/api/public", publicRoutes);
 app.use("/api/public/seo", publicSeoRoutes);
+app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
