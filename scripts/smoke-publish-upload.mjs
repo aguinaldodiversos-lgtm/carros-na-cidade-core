@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /* eslint-disable no-console */
 
 const RAW_BASE = String(process.env.BASE_URL || "").trim();
@@ -340,6 +339,5 @@ async function main() {
 
 main().catch((e) => {
   console.error("[smoke-publish-upload] FALHA:", e?.message || e);
->>>>>>> ae5feea (refatora fluxo de criacao de anuncio)
   process.exit(1);
 });
