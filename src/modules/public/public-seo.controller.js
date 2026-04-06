@@ -1,6 +1,10 @@
 import { logger } from "../../shared/logger.js";
 import * as sitemapPublicService from "../../read-models/seo/sitemap-public.service.js";
 import * as internalLinksPublicService from "../../read-models/seo/internal-links-public.service.js";
+<<<<<<< HEAD
+=======
+import { listPublicSitemapEntries } from "./public-seo.service.js";
+>>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
 
 const DEFAULT_SITEMAP_LIMIT = 50000;
 const DEFAULT_INTERNAL_LINKS_LIMIT = 200;
@@ -160,26 +164,8 @@ function toJsonPayload(entries) {
   };
 }
 
-function pickCanonicalSitemapLoader() {
-  const candidates = [
-    sitemapPublicService.listPublicSitemapEntries,
-    sitemapPublicService.getPublicSitemapEntries,
-    sitemapPublicService.getPublicSitemap,
-  ].filter((fn) => typeof fn === "function");
-
-  return candidates[0] || null;
-}
-
 async function loadCanonicalEntries(limit) {
-  const loader = pickCanonicalSitemapLoader();
-
-  if (!loader) {
-    throw new Error(
-      "[public-seo] Nenhum loader canônico encontrado em sitemap-public.service.js"
-    );
-  }
-
-  const rawEntries = await loader({ limit });
+  const rawEntries = await listPublicSitemapEntries({ limit });
   const sanitized = sanitizeEntries(rawEntries);
 
   return sanitized.length > 0 ? sanitized : buildFallbackEntries();

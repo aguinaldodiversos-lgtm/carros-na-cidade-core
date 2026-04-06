@@ -34,6 +34,7 @@
     "seed:cities": "node scripts/seed-ibge-municipios.mjs",
     "import:cities": "node scripts/import-ibge-cities.js",
     "create:test-ad": "node scripts/create-test-ad.mjs",
+    "sanitize:ad-images": "node scripts/sanitize-ad-images.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:prod": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs",

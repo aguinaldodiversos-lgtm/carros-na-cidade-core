@@ -1,4 +1,19 @@
+<<<<<<< HEAD
+=======
+#!/usr/bin/env node
+>>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
 /* eslint-disable no-console */
+
+/**
+ * Smoke da rota de upload de fotos (POST /api/ads/upload-images).
+ * - GET /health/meta (ou SMOKE_HEALTH_PATH)
+ * - POST sem token → 401/403
+ * - POST com AUTH_TOKEN opcional → 200/201 + URLs
+ *
+ * Uso:
+ *   node scripts/smoke-publish-upload.mjs
+ *   BASE_URL=https://sua-api.onrender.com AUTH_TOKEN=... node scripts/smoke-publish-upload.mjs
+ */
 
 const RAW_BASE = String(process.env.BASE_URL || "").trim();
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 15000);
@@ -100,7 +115,6 @@ async function parseResponse(response) {
 }
 
 function createTinyPngBuffer() {
-  // PNG 1x1 transparente
   const base64 =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jk5UAAAAASUVORK5CYII=";
   return Buffer.from(base64, "base64");
@@ -272,6 +286,7 @@ async function main() {
 
 main().catch((error) => {
   lineErr(error?.message || String(error));
+<<<<<<< HEAD
 =======
 #!/usr/bin/env node
 /* eslint-disable no-console */
@@ -339,5 +354,7 @@ async function main() {
 
 main().catch((e) => {
   console.error("[smoke-publish-upload] FALHA:", e?.message || e);
+=======
+>>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
   process.exit(1);
 });
