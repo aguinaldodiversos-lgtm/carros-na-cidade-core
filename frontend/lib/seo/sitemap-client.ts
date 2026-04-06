@@ -91,7 +91,7 @@ export async function fetchPublicSitemap(limit = 50000): Promise<PublicSitemapEn
   if (!apiBase) return []; // não força localhost em build
 
   const json = await fetchJsonSafe<PublicSitemapResponse>(
-    `${apiBase}/api/public/seo/sitemap?limit=${limit}`,
+    `${apiBase}/api/public/seo/sitemap.json?limit=${limit}`,
     3600
   );
 

@@ -1,6 +1,22 @@
 import { logger } from "../../shared/logger.js";
 import * as sitemapPublicService from "../../read-models/seo/sitemap-public.service.js";
 import * as internalLinksPublicService from "../../read-models/seo/internal-links-public.service.js";
+import { listPublicSitemapEntries } from "./public-seo.service.js";
+
+/** Inventário JSON (SSR/Next); o sitemap canônico em XML é GET /sitemap. */
+export async function getPublicSitemapJson(req, res, next) {
+  try {
+    const limit = Number(req.query.limit || 50000);
+    const data = await listPublicSitemapEntries({ limit });
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 const DEFAULT_SITEMAP_LIMIT = 50000;
 const DEFAULT_INTERNAL_LINKS_LIMIT = 200;

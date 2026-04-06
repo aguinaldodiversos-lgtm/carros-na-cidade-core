@@ -160,7 +160,11 @@ app.get("/health/meta", (req, res) => {
   });
 });
 
+<<<<<<< HEAD
 // API routes
+=======
+// API routes — `/api/public/seo` antes de `/api/public` para o prefixo mais específico ser resolvido primeiro
+>>>>>>> 9c3a7a1 (refatora fluxo de criacao de anuncio)
 app.use("/api/public/seo", publicSeoRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/auth", authRoutes);
