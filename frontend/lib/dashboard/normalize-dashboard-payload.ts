@@ -1,3 +1,5 @@
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+
 import type {
   BoostOption,
   DashboardAd,
@@ -127,14 +129,16 @@ function normalizeStats(raw: unknown): DashboardStats {
 }
 
 function pickDashboardAdImageUrl(raw: Record<string, unknown>): string {
-  const direct = toStr(raw.image_url, "").trim();
-  if (direct) return direct;
-  const imgs = raw.images;
-  if (Array.isArray(imgs)) {
-    const first = imgs.find((x) => typeof x === "string" && x.trim());
-    if (first) return String(first).trim();
-  }
-  return "/images/vehicle-placeholder.svg";
+  return resolvePublicListingImageUrl({
+    image_url: raw.image_url,
+    image: raw.image,
+    cover_image_url: raw.cover_image_url,
+    cover_image: raw.cover_image,
+    images: raw.images,
+    photos: raw.photos,
+    gallery: raw.gallery,
+    storage_key: raw.storage_key,
+  });
 }
 
 function normalizeAd(raw: unknown): DashboardAd | null {

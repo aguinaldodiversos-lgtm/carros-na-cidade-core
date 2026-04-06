@@ -21,8 +21,11 @@ type VehicleItem = {
   highlight_until?: string | null;
   image_url?: string | null;
   image?: string | null;
+  cover_image_url?: string | null;
   cover_image?: string | null;
   images?: string[] | null;
+  photos?: unknown;
+  gallery?: unknown;
 };
 
 interface HomeVehicleCardProps {
@@ -62,8 +65,11 @@ function resolveImage(item: VehicleItem) {
   return resolvePublicListingImageUrl({
     image_url: item.image_url,
     image: item.image,
+    cover_image_url: item.cover_image_url,
     cover_image: item.cover_image,
     images: item.images,
+    photos: item.photos,
+    gallery: item.gallery,
   });
 }
 

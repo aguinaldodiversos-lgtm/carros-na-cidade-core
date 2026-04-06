@@ -113,6 +113,26 @@ describe("vehicle detail image utils", () => {
     expect(resolvePublicListingImageUrl({ image_url: null, images: [] })).toBe(LISTING_CARD_FALLBACK_IMAGE);
   });
 
+  it("resolvePublicListingImageUrl aceita cover_image_url, photos e gallery", () => {
+    expect(
+      resolvePublicListingImageUrl({
+        cover_image_url: "/uploads/ads/capa.jpg",
+      })
+    ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fcapa.jpg");
+
+    expect(
+      resolvePublicListingImageUrl({
+        photos: [{ url: "/uploads/ads/foto-1.jpg" }],
+      })
+    ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto-1.jpg");
+
+    expect(
+      resolvePublicListingImageUrl({
+        gallery: '[{"url":"/uploads/ads/galeria.png"}]',
+      })
+    ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fgaleria.png");
+  });
+
   it("resolvePublicListingImageUrl prioriza image_url e usa storage_key (R2) via proxy key", () => {
     expect(
       resolvePublicListingImageUrl({

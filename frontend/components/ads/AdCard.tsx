@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
@@ -21,9 +21,12 @@ type BaseAdData = {
   mileage?: number | string | null;
   image?: string | null;
   image_url?: string | null;
+  cover_image_url?: string | null;
   cover_image?: string | null;
   storage_key?: string | null;
   images?: string[] | null;
+  photos?: unknown;
+  gallery?: unknown;
   badge?: string | null;
   below_fipe?: boolean | null;
   highlight_until?: string | null;
@@ -157,12 +160,26 @@ function normalizeAdData(source?: BaseAdData): {
     image: resolvePublicListingImageUrl({
       image: item.image,
       image_url: item.image_url,
+      cover_image_url: item.cover_image_url,
       cover_image: item.cover_image,
       images: item.images,
+      photos: item.photos,
+      gallery: item.gallery,
       storage_key: item.storage_key,
     }),
     badge: resolveBadge(item),
   };
+}
+
+function shouldDebugListingImages() {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("debug_images") === "1";
+  } catch {
+    return false;
+  }
 }
 
 export function AdCard({ ad, item }: AdCardProps) {
@@ -171,6 +188,44 @@ export function AdCard({ ad, item }: AdCardProps) {
   const [brokenImage, setBrokenImage] = useState(false);
   const imageSrc = brokenImage ? LISTING_CARD_FALLBACK_IMAGE : normalized.image;
   const onImgError = useCallback(() => setBrokenImage(true), []);
+
+  useEffect(() => {
+    if (!shouldDebugListingImages()) return;
+
+    const debugKey = `listing-image:${source.id ?? source.slug ?? normalized.title}`;
+    const globalWindow = window as Window & { __cncListingImageDebug?: Set<string> };
+    const seen = globalWindow.__cncListingImageDebug || new Set<string>();
+
+    if (seen.has(debugKey)) return;
+
+    seen.add(debugKey);
+    globalWindow.__cncListingImageDebug = seen;
+
+    console.info("[listing-images]", {
+      id: source.id ?? null,
+      slug: source.slug ?? null,
+      image_url: source.image_url ?? null,
+      cover_image_url: source.cover_image_url ?? null,
+      cover_image: source.cover_image ?? null,
+      images: source.images ?? null,
+      photos: source.photos ?? null,
+      gallery: source.gallery ?? null,
+      storage_key: source.storage_key ?? null,
+      resolvedSrc: normalized.image,
+    });
+  }, [
+    normalized.image,
+    normalized.title,
+    source.cover_image,
+    source.cover_image_url,
+    source.gallery,
+    source.id,
+    source.image_url,
+    source.images,
+    source.photos,
+    source.slug,
+    source.storage_key,
+  ]);
 
   const href = buildAdHref({
     id: normalized.id ?? undefined,

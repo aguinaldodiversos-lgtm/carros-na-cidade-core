@@ -51,10 +51,13 @@ export interface AdItem {
   updated_at?: string;
   image_url?: string | null;
   image?: string | null;
+  cover_image_url?: string | null;
   cover_image?: string | null;
   /** Chave R2 quando `image_url` ainda não é URL pública. */
   storage_key?: string | null;
   images?: string[] | null;
+  photos?: unknown;
+  gallery?: unknown;
   seller_type?: string | null;
   seller_name?: string | null;
   dealer_name?: string | null;
@@ -204,9 +207,12 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     updated_at: toText(item.updated_at) || undefined,
     image_url: imageUrl,
     image: toNullableText(item.image),
+    cover_image_url: toNullableText(item.cover_image_url),
     cover_image: toNullableText(item.cover_image),
     storage_key: toNullableText(item.storage_key),
     images: imagesList,
+    photos: item.photos,
+    gallery: item.gallery,
     seller_type: toNullableText(item.seller_type),
     seller_name: toNullableText(item.seller_name),
     dealer_name: toNullableText(item.dealer_name),

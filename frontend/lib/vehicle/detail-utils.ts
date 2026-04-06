@@ -295,18 +295,24 @@ export const LISTING_CARD_FALLBACK_IMAGE = "/images/vehicle-placeholder.svg";
 export function resolvePublicListingImageUrl(fields: {
   image?: unknown;
   image_url?: unknown;
+  cover_image_url?: unknown;
   cover_image?: unknown;
   images?: unknown;
+  photos?: unknown;
+  gallery?: unknown;
   storage_key?: unknown;
 }): string {
   const ordered = normalizeVehicleGalleryImages([
     fields.image_url,
+    fields.cover_image_url,
     fields.image,
     fields.cover_image,
     typeof fields.storage_key === "string" && fields.storage_key.trim()
       ? { storage_key: fields.storage_key }
       : null,
     fields.images,
+    fields.photos,
+    fields.gallery,
   ]);
   if (ordered.length > 0) return ordered[0];
   return LISTING_CARD_FALLBACK_IMAGE;
