@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS public.dealer_leads (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-<<<<<<< HEAD
 COMMENT ON TABLE public.dealer_leads
   IS 'Leads de lojistas (Google Places, campanhas, etc.); phone normalizado só dígitos.';
 
@@ -62,13 +61,12 @@ SET
   updated_at = COALESCE(updated_at, NOW());
 
 -- FK de city_id -> cities(id), adicionada apenas se ainda não existir
-=======
->>>>>>> 265f923 (refatora fluxo de criacao de anuncio)
+
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
-<<<<<<< HEAD
+
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'dealer_leads'
@@ -89,7 +87,7 @@ $$;
 CREATE UNIQUE INDEX IF NOT EXISTS dealer_leads_google_place_id_key
   ON public.dealer_leads (google_place_id)
   WHERE google_place_id IS NOT NULL AND TRIM(google_place_id) <> '';
-=======
+
     FROM dealer_leads
     WHERE google_place_id IS NOT NULL AND TRIM(google_place_id) <> ''
     GROUP BY google_place_id
