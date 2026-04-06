@@ -28,10 +28,9 @@ describe("getDbSslConfig", () => {
   it("retorna configuração SSL segura por padrão em development quando há DATABASE_URL", async () => {
     process.env.NODE_ENV = "development";
     process.env.DATABASE_URL = "postgresql://localhost/test";
-<<<<<<< HEAD
-=======
+
     process.env.PG_SSL_ENABLED = "true";
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
+
 
     const { getDbSslConfig } = await loadEnvModule();
 
@@ -65,12 +64,11 @@ describe("getDbSslConfig", () => {
     process.env.PG_SSL_ENABLED = "false";
     delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
 
-<<<<<<< HEAD
+
     delete process.env.PG_SSL_ENABLED;
     delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
 
-=======
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
+
     const { getDbSslConfig } = await loadEnvModule();
 
     expect(getDbSslConfig()).toBe(false);
