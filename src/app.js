@@ -21,11 +21,23 @@
 // Anúncios: código ativo só em src/modules/ads/. Legado CommonJS isolado em src/legacy/services-ads/.
 // =============================================================================
 
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
 import compression from "compression";
+import cors from "cors";
+import express from "express";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+
+import accountRoutes from "./modules/account/account.routes.js";
+import adsEventsRoutes from "./modules/ads/ads.events.routes.js";
+import adsRoutes from "./modules/ads/ads.routes.js";
+import adEventsRoutes from "./modules/ads/events.routes.js";
+import authRoutes from "./modules/auth/auth.routes.js";
+import dealerAcquisitionInboundRoutes from "./modules/dealer-acquisition/dealer-inbound.routes.js";
+import leadsRoutes from "./modules/leads/leads.routes.js";
+import paymentsRoutes from "./modules/payments/payments.routes.js";
+import publicRoutes from "./modules/public/public.routes.js";
+import publicSeoRoutes from "./modules/public/public-seo.routes.js";
+import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
 
 import healthRoutes from "./routes/health.js";
 import metricsRoutes from "./routes/metrics.js";
@@ -35,24 +47,13 @@ import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware
 import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js";
 import { requestMetricsMiddleware } from "./shared/observability/request.metrics.middleware.js";
 
-import adEventsRoutes from "./modules/ads/events.routes.js";
-import adsEventsRoutes from "./modules/ads/ads.events.routes.js";
-import adsRoutes from "./modules/ads/ads.routes.js";
-import leadsRoutes from "./modules/leads/leads.routes.js";
-import authRoutes from "./modules/auth/auth.routes.js";
-import accountRoutes from "./modules/account/account.routes.js";
-import paymentsRoutes from "./modules/payments/payments.routes.js";
-import publicRoutes from "./modules/public/public.routes.js";
-import publicSeoRoutes from "./modules/public/public-seo.routes.js";
-import dealerAcquisitionInboundRoutes from "./modules/dealer-acquisition/dealer-inbound.routes.js";
-import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
-
 const app = express();
 
 const APP_NAME = process.env.APP_NAME || "carros-na-cidade-core";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
-// Se quiser liberar múltiplas origens: CORS_ALLOWED_ORIGINS="https://a.com,https://b.com"
+// Se quiser liberar múltiplas origens:
+// CORS_ALLOWED_ORIGINS="https://a.com,https://b.com"
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://carrosnacidade.com",
   "https://www.carrosnacidade.com",
@@ -68,7 +69,7 @@ const allowedOrigins = new Set(
 
 app.disable("x-powered-by");
 
-// Render / proxies (Cloudflare, etc): respeita X-Forwarded-For
+// Render / Cloudflare / proxies
 app.set("trust proxy", 1);
 
 // Segurança HTTP
@@ -78,11 +79,17 @@ app.use(
   })
 );
 
-// CORS robusto (não quebra probes/healthchecks sem Origin)
+// CORS robusto: não quebra probes/healthchecks sem Origin
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.has(origin)) return callback(null, true);
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+
     return callback(new AppError("CORS não permitido para esta origem", 403));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
@@ -91,10 +98,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-// Express 5+ / Node 20: "*" pode dar warning; use regex universal
 app.options(/.*/, cors(corsOptions));
 
-// Rate limit global (aplicado em tudo; se quiser excluir /health, veja comentário abaixo)
+// Rate limit global
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -108,7 +114,9 @@ app.use(
   })
 );
 
+// Compressão e parsers
 app.use(compression());
+
 app.use(
   express.json({
     limit: process.env.JSON_BODY_LIMIT || "1mb",
@@ -117,6 +125,7 @@ app.use(
     },
   })
 );
+
 app.use(
   express.urlencoded({
     extended: true,
@@ -124,28 +133,28 @@ app.use(
   })
 );
 
-// Middlewares de observabilidade (com proteção para não derrubar a app)
+// Observabilidade
 app.use(requestIdMiddleware);
 app.use(httpLoggerMiddleware);
 app.use((req, res, next) => {
   try {
     return requestMetricsMiddleware(req, res, next);
-  } catch (err) {
-    // não derruba request por falha de auditoria/metrics
+  } catch {
     return next();
   }
 });
 
-// Probes do Render: evita 404/ruído em HEAD /
+// Probes / raiz
 app.head("/", (_req, res) => res.sendStatus(200));
-app.get("/", (req, res) =>
+
+app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     app: APP_NAME,
     env: NODE_ENV,
     requestId: req.requestId || null,
-  })
-);
+  });
+});
 
 // Rotas base
 app.use(healthRoutes);
@@ -160,20 +169,21 @@ app.get("/health/meta", (req, res) => {
   });
 });
 
-
 // API routes
-
-// API routes — `/api/public/seo` antes de `/api/public` para o prefixo mais específico ser resolvido primeiro
->>>>>>> 9c3a7a1 (refatora fluxo de criacao de anuncio)
+// `/api/public/seo` deve vir antes de `/api/public` para o prefixo mais específico
+// ser resolvido primeiro e não competir com o router mais amplo.
 app.use("/api/public/seo", publicSeoRoutes);
 app.use("/api/public", publicRoutes);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/leads", leadsRoutes);
+
 app.use("/api/ads", adsRoutes);
 app.use("/api/ads", adsEventsRoutes);
 app.use("/api/events", adEventsRoutes);
+
 app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
 app.use("/api/vehicle-images", vehicleImagesRoutes);
 
