@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -302,8 +302,7 @@ async function runMigrations() {
   }
 }
 
-=======
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
+
 import runMigrations from "../../database/migrate.js";
 
 export default runMigrations;
