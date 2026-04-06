@@ -1,7 +1,6 @@
-<<<<<<< HEAD
-=======
+
 #!/usr/bin/env node
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
+
 /* eslint-disable no-console */
 
 /**
@@ -286,8 +285,7 @@ async function main() {
 
 main().catch((error) => {
   lineErr(error?.message || String(error));
-<<<<<<< HEAD
-=======
+
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
@@ -354,7 +352,6 @@ async function main() {
 
 main().catch((e) => {
   console.error("[smoke-publish-upload] FALHA:", e?.message || e);
-=======
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
+
   process.exit(1);
 });
