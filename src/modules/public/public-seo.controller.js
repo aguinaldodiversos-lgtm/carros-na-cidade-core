@@ -1,10 +1,8 @@
 import { logger } from "../../shared/logger.js";
 import * as sitemapPublicService from "../../read-models/seo/sitemap-public.service.js";
 import * as internalLinksPublicService from "../../read-models/seo/internal-links-public.service.js";
-<<<<<<< HEAD
-=======
+
 import { listPublicSitemapEntries } from "./public-seo.service.js";
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
 
 const DEFAULT_SITEMAP_LIMIT = 50000;
 const DEFAULT_INTERNAL_LINKS_LIMIT = 200;
