@@ -61,18 +61,12 @@ SET
   updated_at = COALESCE(updated_at, NOW());
 
 -- FK de city_id -> cities(id), adicionada apenas se ainda não existir
-<<<<<<< HEAD
 
-=======
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
-<<<<<<< HEAD
 
-=======
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'dealer_leads'
@@ -89,21 +83,21 @@ BEGIN
 END
 $$;
 
-<<<<<<< HEAD
+
 -- Índices só depois de garantir as colunas
 CREATE UNIQUE INDEX IF NOT EXISTS dealer_leads_google_place_id_key
   ON public.dealer_leads (google_place_id)
   WHERE google_place_id IS NOT NULL AND TRIM(google_place_id) <> '';
 
     FROM dealer_leads
-=======
+
 -- Índice único em google_place_id apenas se não houver duplicidade legada
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM public.dealer_leads
->>>>>>> eef8a4e (refatora fluxo de criacao de anuncio)
+
     WHERE google_place_id IS NOT NULL AND TRIM(google_place_id) <> ''
     GROUP BY google_place_id
     HAVING COUNT(*) > 1
