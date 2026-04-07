@@ -21,6 +21,9 @@
 // Anúncios: código ativo só em src/modules/ads/. Legado CommonJS isolado em src/legacy/services-ads/.
 // =============================================================================
 
+import fs from "node:fs";
+import path from "node:path";
+
 import compression from "compression";
 import cors from "cors";
 import express from "express";
@@ -168,6 +171,15 @@ app.get("/health/meta", (req, res) => {
     requestId: req.requestId || null,
   });
 });
+
+// Legado `/uploads/...`: servir quando a pasta existe (dev, volume persistente ou disco montado no Render).
+// Sem arquivos no disco, o proxy do portal continua sendo o caminho; novos uploads vão para R2.
+const uploadsRoot = process.env.UPLOADS_ROOT
+  ? path.resolve(process.env.UPLOADS_ROOT)
+  : path.join(process.cwd(), "uploads");
+if (process.env.SERVE_UPLOADS_STATIC !== "false" && fs.existsSync(uploadsRoot)) {
+  app.use("/uploads", express.static(uploadsRoot));
+}
 
 // API routes
 // `/api/public/seo` deve vir antes de `/api/public` para o prefixo mais específico

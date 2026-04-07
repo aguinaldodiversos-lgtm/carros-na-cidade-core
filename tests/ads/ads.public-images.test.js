@@ -11,9 +11,13 @@ import {
 } from "../../src/modules/ads/ads.public-images.js";
 
 describe("ads public images normalization", () => {
-  it("remove caminhos legados /uploads/ads da resposta pública", () => {
-    expect(normalizePublicImageCandidate("/uploads/ads/foto.jpg")).toBeNull();
-    expect(normalizePublicImageCandidate("uploads/ads/foto.png")).toBeNull();
+  it("converte caminhos legados /uploads/ads na URL do proxy público (portal)", () => {
+    expect(normalizePublicImageCandidate("/uploads/ads/foto.jpg")).toBe(
+      "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"
+    );
+    expect(normalizePublicImageCandidate("uploads/ads/foto.png")).toBe(
+      "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.png"
+    );
   });
 
   it("mantém URLs absolutas e proxies já canônicos", () => {

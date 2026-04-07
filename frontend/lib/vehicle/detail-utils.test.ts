@@ -59,7 +59,7 @@ describe("vehicle detail image utils", () => {
   });
 
   it("preserva proxy relativo do portal sem reenviar para o host da API", () => {
-    process.env.API_URL = "https://carros-na-cidade-api.onrender.com";
+    process.env.API_URL = "https://carros-na-cidade-core.onrender.com";
 
     expect(normalizeVehicleImageUrl("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg")).toBe(
       "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"
@@ -67,11 +67,11 @@ describe("vehicle detail image utils", () => {
   });
 
   it("corrige proxy absoluto no host errado e remove dupla codificação do src", () => {
-    process.env.API_URL = "https://carros-na-cidade-api.onrender.com";
+    process.env.API_URL = "https://carros-na-cidade-core.onrender.com";
 
     expect(
       normalizeVehicleImageUrl(
-        "https://carros-na-cidade-api.onrender.com/api/vehicle-images?src=%252Fuploads%252Fads%252Ffoto.jpg"
+        "https://carros-na-cidade-core.onrender.com/api/vehicle-images?src=%252Fuploads%252Fads%252Ffoto.jpg"
       )
     ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg");
   });

@@ -42,6 +42,31 @@ function buildVehicleImageProxyUrl(key) {
   return `/api/vehicle-images?key=${encodeURIComponent(normalizeString(key))}`;
 }
 
+/** Mesmo contrato do portal Next (`/api/vehicle-images?src=`) para caminhos `/uploads/...`. */
+function buildVehicleImageProxyUrlFromSrc(uploadPath) {
+  const normalized = toForwardSlashes(uploadPath);
+  if (!normalized) return null;
+  const withLeadingSlash = normalized.startsWith("/") ? normalized : `/${normalized}`;
+  return `/api/vehicle-images?src=${encodeURIComponent(withLeadingSlash)}`;
+}
+
+/**
+ * Detecta proxy gerado a partir de legado `/uploads/ads/...` (para poder omitir quando há fontes melhores).
+ */
+function isLegacyProxySrcUrl(value) {
+  const raw = normalizeString(value);
+  if (!raw.startsWith("/api/vehicle-images?")) return false;
+
+  try {
+    const params = new URLSearchParams(raw.split("?")[1] || "");
+    const src = params.get("src");
+    if (!src) return false;
+    return isLegacyUploadPath(decodeURIComponent(src));
+  } catch {
+    return false;
+  }
+}
+
 export function buildCanonicalImageUrlFromStorageKey(key) {
   const normalizedKey = toForwardSlashes(key).replace(/^\/+/, "");
   if (!normalizedKey) return null;
@@ -65,8 +90,11 @@ export function normalizePublicImageCandidate(value) {
   if (isFrontendStaticImage(normalized)) return normalized;
   if (looksLikeStorageKey(normalized)) return buildCanonicalImageUrlFromStorageKey(normalized);
 
-  // Caminhos legados locais não existem no backend de produção.
-  if (isLegacyUploadPath(normalized)) return null;
+  // Legado em disco local: não servimos mais direto na API em produção típica (Render efêmero),
+  // mas devolvemos a URL do proxy canônico do portal para o mesmo contrato do detalhe/listagem.
+  if (isLegacyUploadPath(normalized)) {
+    return buildVehicleImageProxyUrlFromSrc(normalized);
+  }
 
   return null;
 }
@@ -111,12 +139,19 @@ function extractImageCandidates(value) {
 export function buildNormalizedPublicImages(row, vehicleImageRows = []) {
   const canonicalVehicleImages = vehicleImageRows
     .map((image) => {
-      const direct = normalizePublicImageCandidate(image.image_url);
-      if (direct) return direct;
+      const key = normalizeString(image.storage_key);
+      if (key) {
+        const fromKey = buildCanonicalImageUrlFromStorageKey(key);
+        if (fromKey) return fromKey;
+      }
 
-      return buildCanonicalImageUrlFromStorageKey(image.storage_key);
+      return normalizePublicImageCandidate(image.image_url);
     })
     .filter(Boolean);
+
+  if (canonicalVehicleImages.length > 0) {
+    return uniqueStrings(canonicalVehicleImages);
+  }
 
   const rawCandidates = extractImageCandidates(row?.images);
   if (row?.image_url != null) {
@@ -127,7 +162,12 @@ export function buildNormalizedPublicImages(row, vehicleImageRows = []) {
     .map((candidate) => normalizePublicImageCandidate(candidate))
     .filter(Boolean);
 
-  return uniqueStrings([...canonicalVehicleImages, ...normalizedRawCandidates]);
+  const hasNonLegacy = normalizedRawCandidates.some((url) => !isLegacyProxySrcUrl(url));
+  const merged = hasNonLegacy
+    ? normalizedRawCandidates.filter((url) => !isLegacyProxySrcUrl(url))
+    : normalizedRawCandidates;
+
+  return uniqueStrings(merged);
 }
 
 async function getVehicleImagesProfile() {

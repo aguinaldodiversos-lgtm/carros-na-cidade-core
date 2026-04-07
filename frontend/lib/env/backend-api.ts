@@ -133,10 +133,10 @@ export function getBackendApiOriginUrl(): string {
  *   - caminhos não-API (ex.: `/uploads/...`) vão para a origem do backend
  * - Se a base NÃO terminar em `/api`, o caminho é resolvido diretamente sobre a base
  *
- * Exemplos:
- * base = https://meu-backend.onrender.com/api
- * - /api/auth/me      -> https://meu-backend.onrender.com/api/auth/me
- * - /uploads/a.jpg    -> https://meu-backend.onrender.com/uploads/a.jpg
+ * Exemplos (produção):
+ * base = https://carros-na-cidade-core.onrender.com/api
+ * - /api/auth/me      -> https://carros-na-cidade-core.onrender.com/api/auth/me
+ * - /uploads/a.jpg    -> https://carros-na-cidade-core.onrender.com/uploads/a.jpg
  *
  * base = http://127.0.0.1:4000
  * - /api/auth/me      -> http://127.0.0.1:4000/api/auth/me

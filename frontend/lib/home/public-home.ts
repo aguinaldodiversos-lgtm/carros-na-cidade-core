@@ -17,7 +17,7 @@ export interface HomeDataResponse {
   };
 }
 
-const OFFICIAL_PUBLIC_API_URL = "https://carros-na-cidade-api.onrender.com";
+const OFFICIAL_PUBLIC_API_URL = "https://carros-na-cidade-core.onrender.com";
 
 function stripTrailingSlash(url: string) {
   return url.replace(/\/+$/, "");

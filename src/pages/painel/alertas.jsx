@@ -14,7 +14,7 @@ export default function Alertas() {
   const token = localStorage.getItem("token");
 
   const api = axios.create({
-    baseURL: "https://carros-na-cidade-api.onrender.com/api",
+    baseURL: "https://carros-na-cidade-core.onrender.com/api",
     headers: {
       Authorization: `Bearer ${token}`,
     },
