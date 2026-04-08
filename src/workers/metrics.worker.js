@@ -1,17 +1,12 @@
 import { pool } from "../infrastructure/database/db.js";
 import { logger } from "../shared/logger.js";
+import { refreshAdMetricsTable } from "./ad-metrics.refresh.js";
 
 async function runMetricsWorker() {
   logger.info("📊 Metrics Worker iniciado...");
 
   try {
-    /* =====================================================
-       1️⃣ REFRESH MATERIALIZED VIEW (CTR / LEADS)
-    ===================================================== */
-    await pool.query(`
-      REFRESH MATERIALIZED VIEW CONCURRENTLY ad_metrics
-    `);
-
+    await refreshAdMetricsTable(pool);
     logger.info("✅ ad_metrics atualizado");
 
     /* =====================================================

@@ -21,16 +21,15 @@ async function saveSEOData(rows) {
   for (const row of rows) {
     await pool.query(
       `
-      INSERT INTO city_seo_metrics
-      (city_name, impressions, clicks, ctr, avg_position)
-      VALUES ($1,$2,$3,$4,$5)
-      ON CONFLICT (city_name)
+      INSERT INTO seo_city_metrics
+      (date, city, impressions, clicks, ctr, avg_position, source)
+      VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, 'search_console')
+      ON CONFLICT (date, city)
       DO UPDATE SET
         impressions = EXCLUDED.impressions,
         clicks = EXCLUDED.clicks,
         ctr = EXCLUDED.ctr,
-        avg_position = EXCLUDED.avg_position,
-        last_updated = NOW()
+        avg_position = EXCLUDED.avg_position
       `,
       [
         row.keys?.[0] || row.city_name,
@@ -45,13 +44,16 @@ async function saveSEOData(rows) {
 
 async function saveGAData(rows) {
   for (const row of rows) {
+    const city = row.dimensionValues?.[0]?.value || row.city_name;
+    const sessions = row.metricValues?.[0]?.value || 0;
     await pool.query(
       `
-      UPDATE city_seo_metrics
-      SET sessions = $2
-      WHERE city_name = $1
+      INSERT INTO seo_city_metrics (date, city, sessions, source)
+      VALUES (CURRENT_DATE, $1, $2, 'ga4')
+      ON CONFLICT (date, city)
+      DO UPDATE SET sessions = EXCLUDED.sessions
       `,
-      [row.dimensionValues?.[0]?.value || row.city_name, row.metricValues?.[0]?.value || 0]
+      [city, sessions]
     );
   }
 }

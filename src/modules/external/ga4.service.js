@@ -44,9 +44,9 @@ export async function fetchGA4CityData(propertyId) {
 
 async function fallbackGA4() {
   const result = await pool.query(`
-    SELECT city_name, sessions
-    FROM city_seo_metrics
-    ORDER BY last_updated DESC
+    SELECT city AS city_name, sessions
+    FROM seo_city_metrics
+    ORDER BY date DESC, city
   `);
 
   logger.warn(
@@ -56,7 +56,7 @@ async function fallbackGA4() {
         result: "success",
       }),
       fallback: true,
-      source: "city_seo_metrics",
+      source: "seo_city_metrics",
     },
     "[seo] fallback GA4 local"
   );

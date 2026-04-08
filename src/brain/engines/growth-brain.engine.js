@@ -1,6 +1,7 @@
 import os from "os";
 import { pool } from "../../infrastructure/database/db.js";
 import { logger } from "../../shared/logger.js";
+import { refreshAdMetricsTable } from "../../workers/ad-metrics.refresh.js";
 
 function clampInt(n, min, max) {
   const x = Number(n);
@@ -9,11 +10,7 @@ function clampInt(n, min, max) {
 }
 
 async function refreshAdMetrics() {
-  try {
-    await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ad_metrics`);
-  } catch {
-    await pool.query(`REFRESH MATERIALIZED VIEW ad_metrics`);
-  }
+  await refreshAdMetricsTable(pool);
 }
 
 async function upsertCityDominanceTop(limit = 50) {

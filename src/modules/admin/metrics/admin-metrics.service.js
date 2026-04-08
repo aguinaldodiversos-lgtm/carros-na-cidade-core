@@ -13,12 +13,9 @@ export async function getRecentEvents(options) {
 }
 
 /**
- * SEO city metrics may come from either `seo_city_metrics` or `city_seo_metrics`,
- * depending on which table exists in the current environment.
- * The repository tries both tables and returns data from whichever is available.
- *
- * KNOWN LIMITATION: Neither table has a migration in the main SQL migration folder.
- * They are created by external workers/collectors and may not exist in fresh environments.
+ * SEO city metrics from canonical `seo_city_metrics` table.
+ * Created by migration 015. Legacy `city_seo_metrics` is a backward-compatible VIEW.
+ * Returns empty array if no data has been collected yet (fresh environment).
  */
 export async function getSeoCityMetrics(options) {
   return repo.getSeoCityMetrics(options);

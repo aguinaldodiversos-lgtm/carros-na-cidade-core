@@ -1,14 +1,11 @@
 import { pool } from "../infrastructure/database/db.js";
 import { logger } from "../shared/logger.js";
 import { enqueueUpgradeOffers } from "./upgrade_offer.worker.js";
-
-/* =====================================================
-   REFRESH MÉTRICAS
-===================================================== */
+import { refreshAdMetricsTable } from "./ad-metrics.refresh.js";
 
 async function refreshMetrics() {
   try {
-    await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ad_metrics`);
+    await refreshAdMetricsTable(pool);
     logger.info("📊 ad_metrics atualizada");
   } catch (err) {
     logger.warn("⚠️ Não foi possível atualizar ad_metrics (verifique se existe)");

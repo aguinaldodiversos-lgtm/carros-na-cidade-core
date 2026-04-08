@@ -11,15 +11,14 @@ export async function collectSEOData() {
   for (const row of searchData) {
     await pool.query(
       `
-      INSERT INTO city_seo_metrics (city_name, impressions, clicks, ctr, avg_position, last_updated)
-      VALUES ($1,$2,$3,$4,$5,NOW())
-      ON CONFLICT (city_name)
+      INSERT INTO seo_city_metrics (date, city, impressions, clicks, ctr, avg_position, source)
+      VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, 'search_console')
+      ON CONFLICT (date, city)
       DO UPDATE SET
         impressions = EXCLUDED.impressions,
         clicks = EXCLUDED.clicks,
         ctr = EXCLUDED.ctr,
-        avg_position = EXCLUDED.avg_position,
-        last_updated = NOW()
+        avg_position = EXCLUDED.avg_position
       `,
       [row.keys[0], row.impressions, row.clicks, row.ctr, row.position]
     );

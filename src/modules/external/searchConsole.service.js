@@ -44,9 +44,9 @@ export async function fetchSearchConsoleData(siteUrl) {
 
 async function fallbackSearchConsole() {
   const result = await pool.query(`
-    SELECT city_name, impressions, clicks, ctr, avg_position
-    FROM city_seo_metrics
-    ORDER BY last_updated DESC
+    SELECT city AS city_name, impressions, clicks, ctr, avg_position
+    FROM seo_city_metrics
+    ORDER BY date DESC, city
   `);
 
   logger.warn(
@@ -56,7 +56,7 @@ async function fallbackSearchConsole() {
         result: "success",
       }),
       fallback: true,
-      source: "city_seo_metrics",
+      source: "seo_city_metrics",
     },
     "[seo] fallback Search Console local"
   );

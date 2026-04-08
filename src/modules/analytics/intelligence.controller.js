@@ -11,8 +11,13 @@ export async function getCityIntelligence(req, res, next) {
       `
       SELECT cg.*, cs.impressions, cs.ctr
       FROM city_growth_metrics cg
-      LEFT JOIN city_seo_metrics cs
-      ON cg.city_id::text = cs.city_name
+      LEFT JOIN LATERAL (
+        SELECT impressions, ctr
+        FROM seo_city_metrics
+        WHERE LOWER(city) = LOWER((SELECT name FROM cities WHERE id = cg.city_id LIMIT 1))
+        ORDER BY date DESC
+        LIMIT 1
+      ) cs ON true
       WHERE cg.city_id = $1
       `,
       [cityId]

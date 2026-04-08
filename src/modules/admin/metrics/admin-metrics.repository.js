@@ -68,25 +68,15 @@ export async function getRecentEvents({ limit = 50 } = {}) {
 export async function getSeoCityMetrics({ limit = 30 } = {}) {
   try {
     const result = await query(
-      `SELECT *
+      `SELECT date, city, impressions, clicks, ctr, avg_position,
+              sessions, users_count, conversions, source, created_at
        FROM seo_city_metrics
-       ORDER BY date DESC
+       ORDER BY date DESC, city
        LIMIT $1`,
       [limit]
     );
     return result.rows;
   } catch {
-    try {
-      const result = await query(
-        `SELECT *
-         FROM city_seo_metrics
-         ORDER BY updated_at DESC
-         LIMIT $1`,
-        [limit]
-      );
-      return result.rows;
-    } catch {
-      return [];
-    }
+    return [];
   }
 }
