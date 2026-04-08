@@ -2,6 +2,7 @@ import { pool } from "../../infrastructure/database/db.js";
 import { logger } from "../../shared/logger.js";
 import * as citiesService from "../cities/cities.service.js";
 import * as marketIntelligenceService from "../market-intelligence/market-intelligence.service.js";
+import { normalizePublicAdRows } from "../ads/ads.public-images.js";
 
 async function safeQuery(label, fn) {
   try {
@@ -43,6 +44,7 @@ export async function getHomeData(req, res, next) {
           a.year,
           a.mileage,
           a.slug,
+          a.images,
           a.highlight_until,
           a.plan
         FROM ads a
@@ -71,6 +73,7 @@ export async function getHomeData(req, res, next) {
           a.year,
           a.mileage,
           a.slug,
+          a.images,
           a.below_fipe
         FROM ads a
         WHERE a.status = 'active'
@@ -93,6 +96,7 @@ export async function getHomeData(req, res, next) {
           a.year,
           a.mileage,
           a.slug,
+          a.images,
           a.created_at
         FROM ads a
         WHERE a.status = 'active'
@@ -112,14 +116,20 @@ export async function getHomeData(req, res, next) {
       ),
     ]);
 
+    const [highlightAds, opportunityAds, recentAds] = await Promise.all([
+      normalizePublicAdRows(highlightAdsResult?.rows ?? []),
+      normalizePublicAdRows(opportunityAdsResult?.rows ?? []),
+      normalizePublicAdRows(recentAdsResult?.rows ?? []),
+    ]);
+
     res.json({
       success: true,
       data: {
         featuredCities,
         topOpportunities,
-        highlightAds: highlightAdsResult?.rows ?? [],
-        opportunityAds: opportunityAdsResult?.rows ?? [],
-        recentAds: recentAdsResult?.rows ?? [],
+        highlightAds,
+        opportunityAds,
+        recentAds,
         stats: statsResult?.rows?.[0] ?? {
           total_ads: "0",
           total_cities: "0",

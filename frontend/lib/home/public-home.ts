@@ -1,4 +1,4 @@
-import { getBackendApiExplicitEnvUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 import type { AdItem } from "@/lib/search/ads-search";
 
 export interface HomeDataResponse {
@@ -17,16 +17,12 @@ export interface HomeDataResponse {
   };
 }
 
-const OFFICIAL_PUBLIC_API_URL = "https://carros-na-cidade-core.onrender.com";
-
 function stripTrailingSlash(url: string) {
   return url.replace(/\/+$/, "");
 }
 
 function getApiBaseUrl(): string {
-  const explicit = getBackendApiExplicitEnvUrl();
-  if (explicit) return stripTrailingSlash(explicit);
-  return stripTrailingSlash(OFFICIAL_PUBLIC_API_URL);
+  return stripTrailingSlash(getBackendApiBaseUrl());
 }
 
 function fallbackHome(): HomeDataResponse["data"] {

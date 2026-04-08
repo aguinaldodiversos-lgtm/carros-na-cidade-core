@@ -64,11 +64,6 @@ describe("getDbSslConfig", () => {
     process.env.PG_SSL_ENABLED = "false";
     delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
 
-
-    delete process.env.PG_SSL_ENABLED;
-    delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
-
-
     const { getDbSslConfig } = await loadEnvModule();
 
     expect(getDbSslConfig()).toBe(false);

@@ -5,6 +5,7 @@
  */
 
 const DEV_FALLBACK_BASE_URL = "http://127.0.0.1:4000";
+const PRODUCTION_FALLBACK_BASE_URL = "https://carros-na-cidade-core.onrender.com";
 
 const BACKEND_API_ENV_KEYS = [
   "AUTH_API_BASE_URL",
@@ -97,13 +98,19 @@ function getDevFallbackBaseUrl(): string {
   return normalizeBaseUrl(DEV_FALLBACK_BASE_URL);
 }
 
+function getProductionFallbackBaseUrl(): string {
+  if (process.env.NODE_ENV !== "production") return "";
+  return normalizeBaseUrl(PRODUCTION_FALLBACK_BASE_URL);
+}
+
 /**
  * Base final do backend:
  * 1. env explícita válida
  * 2. fallback local em desenvolvimento
+ * 3. fallback de produção (mesmo contrato de public-home.ts)
  */
 export function getBackendApiBaseUrl(): string {
-  return getBackendApiExplicitEnvUrl() || getDevFallbackBaseUrl();
+  return getBackendApiExplicitEnvUrl() || getDevFallbackBaseUrl() || getProductionFallbackBaseUrl();
 }
 
 /**
