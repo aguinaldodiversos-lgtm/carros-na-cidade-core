@@ -15,6 +15,7 @@
 //   /api/leads       → modules/leads/leads.routes.js
 //   /api/ads         → modules/ads/ads.routes.js + modules/ads/ads.events.routes.js (POST …/event)
 //   /api/events      → modules/ads/events.routes.js (POST / — mesmo handler que ingest de ad_events)
+//   /api/admin       → modules/admin/admin.routes.js (auth + role=admin required)
 //
 // Rotas HTTP legadas CommonJS em src/routes foram removidas; mantêm-se apenas health/metrics.
 //
@@ -41,6 +42,7 @@ import paymentsRoutes from "./modules/payments/payments.routes.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
 
 import healthRoutes from "./routes/health.js";
 import metricsRoutes from "./routes/metrics.js";
@@ -198,6 +200,7 @@ app.use("/api/events", adEventsRoutes);
 
 app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
 app.use("/api/vehicle-images", vehicleImagesRoutes);
+app.use("/api/admin", adminRoutes);
 
 // 404
 app.use((req, _res, next) => {
