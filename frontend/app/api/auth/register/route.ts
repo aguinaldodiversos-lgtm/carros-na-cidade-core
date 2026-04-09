@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { registerUser } from "@/services/authService";
-import {
-  AUTH_COOKIE_NAME,
-  applyPrivateNoStoreHeaders,
-  createSessionToken,
-  getSessionCookieOptions,
-} from "@/services/sessionService";
+import { applyPrivateNoStoreHeaders, applySessionCookiesToResponse } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +85,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Resposta de autenticacao invalida." }, { status: 500 });
     }
 
-    const sessionToken = createSessionToken({
+    const response = NextResponse.json({
+      user: authSession.user,
+      redirect_to: resolvePostLoginRedirect(authSession.user.type, next || undefined),
+    });
+
+    applySessionCookiesToResponse(response, {
       id: ru.id,
       name: ru.name,
       email: ru.email,
@@ -98,13 +98,6 @@ export async function POST(request: NextRequest) {
       accessToken: authSession.accessToken,
       refreshToken: authSession.refreshToken,
     });
-
-    const response = NextResponse.json({
-      user: authSession.user,
-      redirect_to: resolvePostLoginRedirect(authSession.user.type, next || undefined),
-    });
-
-    response.cookies.set(AUTH_COOKIE_NAME, sessionToken, getSessionCookieOptions());
     applyPrivateNoStoreHeaders(response);
 
     return response;

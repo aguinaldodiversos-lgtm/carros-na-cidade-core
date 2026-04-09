@@ -1,0 +1,1798 @@
+{
+  "categories": {
+    "ok": 0,
+    "already_migrated": 0,
+    "migratable": 0,
+    "orphan": 53,
+    "inconsistent": 0
+  },
+  "summary": {
+    "adsScanned": 53,
+    "alreadyCorrect": 0,
+    "legacyDependent": 53,
+    "binaryAvailable": 0,
+    "orphanCount": 96
+  },
+  "details": [
+    {
+      "adId": 15,
+      "slug": "gm-chevrolet-onix-sedan-plus-ltz-1-0-12v-tb-flex-aut-2025-1775185123098",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/df44adf5-c17d-40b5-865e-e0f710280978.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/df44adf5-c17d-40b5-865e-e0f710280978.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 25,
+      "slug": "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/1008c689-ad19-428d-bdca-17b3cbcd5757.jpg",
+        "/uploads/ads/7ddda75b-0c07-4f85-ac21-e091794fae81.jpg",
+        "/uploads/ads/1bb98a0b-050a-48eb-8ebb-e443a8180681.jpg",
+        "/uploads/ads/24e92ee4-e82e-4d33-b57b-8bdc78b9eaf8.jpg",
+        "/uploads/ads/05f502ef-a881-49d1-bf62-ce42d932a8d6.webp"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/1008c689-ad19-428d-bdca-17b3cbcd5757.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/7ddda75b-0c07-4f85-ac21-e091794fae81.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/1bb98a0b-050a-48eb-8ebb-e443a8180681.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/24e92ee4-e82e-4d33-b57b-8bdc78b9eaf8.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/05f502ef-a881-49d1-bf62-ce42d932a8d6.webp",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 26,
+      "slug": "acura-integra-gs-1-8-1992-1775253341583",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/278d1940-69cc-432a-b348-98aef56a1b2a.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/278d1940-69cc-432a-b348-98aef56a1b2a.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 27,
+      "slug": "acura-integra-gs-1-8-1992-1775256548864",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/ce136ec2-59e7-46f3-95d8-47cceb480304.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/ce136ec2-59e7-46f3-95d8-47cceb480304.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 28,
+      "slug": "acura-integra-gs-1-8-1992-1775256902132",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/3f7b4785-c7f4-4eb4-b23f-2af64595b845.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/3f7b4785-c7f4-4eb4-b23f-2af64595b845.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 29,
+      "slug": "acura-integra-gs-1-8-1992-1775256925735",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/8e2f13f2-6d1c-4309-a4dc-01e111010816.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/8e2f13f2-6d1c-4309-a4dc-01e111010816.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 30,
+      "slug": "acura-integra-gs-1-8-1992-1775256947506",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/750f8b17-9162-49fa-b471-d01b7d0b4935.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/750f8b17-9162-49fa-b471-d01b7d0b4935.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 31,
+      "slug": "acura-integra-gs-1-8-1992-1775256969360",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/d6725fbf-fa72-4729-aa3a-cbd1b17fb120.png",
+        "/uploads/ads/34452e11-1123-46c9-97be-cf6b215b1eed.jpg",
+        "/uploads/ads/b85b6169-7da8-43c5-96ad-253f8f5be804.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/d6725fbf-fa72-4729-aa3a-cbd1b17fb120.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/34452e11-1123-46c9-97be-cf6b215b1eed.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/b85b6169-7da8-43c5-96ad-253f8f5be804.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 32,
+      "slug": "acura-integra-gs-1-8-1992-1775257140058",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/d6db10bc-501e-4bf6-a357-7c07e6087457.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/d6db10bc-501e-4bf6-a357-7c07e6087457.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 33,
+      "slug": "acura-integra-gs-1-8-1992-1775257163922",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/93ac458a-347c-40df-986e-f2ca6de5fdaf.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/93ac458a-347c-40df-986e-f2ca6de5fdaf.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 34,
+      "slug": "acura-integra-gs-1-8-1992-1775257185784",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/1127113e-6587-4827-9294-88ad28f5a32c.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/1127113e-6587-4827-9294-88ad28f5a32c.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 35,
+      "slug": "acura-integra-gs-1-8-1992-1775257207236",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/64b4c969-d7ef-4b5c-9d18-dc359c0a9366.png",
+        "/uploads/ads/b63953ff-ba18-44d4-91d4-f5d3ddda57b6.jpg",
+        "/uploads/ads/c96831ed-81b8-4784-b093-cf1644299b2b.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/64b4c969-d7ef-4b5c-9d18-dc359c0a9366.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/b63953ff-ba18-44d4-91d4-f5d3ddda57b6.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/c96831ed-81b8-4784-b093-cf1644299b2b.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 36,
+      "slug": "acura-integra-gs-1-8-1992-1775257748408",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/35ee9cd1-3cf2-47ca-afb2-adfd3996d953.png",
+        "/uploads/ads/415b48c9-9c87-489d-84f4-27bb4a846b61.jpg",
+        "/uploads/ads/deb1d5d1-01c1-4812-bd6a-2e97baca4ee4.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/35ee9cd1-3cf2-47ca-afb2-adfd3996d953.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/415b48c9-9c87-489d-84f4-27bb4a846b61.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/deb1d5d1-01c1-4812-bd6a-2e97baca4ee4.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 37,
+      "slug": "acura-integra-gs-1-8-1992-1775258078592",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/b373f562-23bf-4006-9649-9e30bd5e2ced.png",
+        "/uploads/ads/5df07505-cf5b-441b-ae81-c7e5c4c5732c.jpg",
+        "/uploads/ads/3a3a88c9-cf5e-49ed-a115-c555eecd7aa3.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/b373f562-23bf-4006-9649-9e30bd5e2ced.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/5df07505-cf5b-441b-ae81-c7e5c4c5732c.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/3a3a88c9-cf5e-49ed-a115-c555eecd7aa3.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 38,
+      "slug": "acura-integra-gs-1-8-1992-1775258114944",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/d210ddc0-e736-41e9-bd28-abe06725dccd.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/d210ddc0-e736-41e9-bd28-abe06725dccd.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 39,
+      "slug": "acura-integra-gs-1-8-1992-1775258137654",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/650f9e73-354d-4a9e-bcef-37978741602e.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/650f9e73-354d-4a9e-bcef-37978741602e.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 40,
+      "slug": "acura-integra-gs-1-8-1992-1775258160661",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/6e723575-3209-4983-b103-73ef604b364e.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/6e723575-3209-4983-b103-73ef604b364e.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 41,
+      "slug": "acura-integra-gs-1-8-1992-1775258182329",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/c0c116f1-df3e-44d9-888e-7e660a6c6b5b.png",
+        "/uploads/ads/d7af573a-ae52-42f8-bb3d-935fb0543ac6.jpg",
+        "/uploads/ads/f4bdb98c-74a2-436f-a93e-dd8a4ecdf11a.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/c0c116f1-df3e-44d9-888e-7e660a6c6b5b.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/d7af573a-ae52-42f8-bb3d-935fb0543ac6.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/f4bdb98c-74a2-436f-a93e-dd8a4ecdf11a.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 42,
+      "slug": "acura-integra-gs-1-8-1992-1775258315165",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/074ab948-66bc-448a-bc9a-d94b4770f824.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/074ab948-66bc-448a-bc9a-d94b4770f824.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 43,
+      "slug": "acura-integra-gs-1-8-1992-1775258338013",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/c0abb002-18a2-4059-bdc3-f193abd07a0e.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/c0abb002-18a2-4059-bdc3-f193abd07a0e.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 44,
+      "slug": "acura-integra-gs-1-8-1992-1775258360155",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/08d60792-3b0e-4744-b2c3-f80681905eb6.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/08d60792-3b0e-4744-b2c3-f80681905eb6.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 45,
+      "slug": "acura-integra-gs-1-8-1992-1775258381369",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/40a274f0-8144-4efa-b027-46a670bc13be.png",
+        "/uploads/ads/80d8f3e8-1438-44bc-8430-9266ed958cad.jpg",
+        "/uploads/ads/7194654d-ba09-4023-a83f-8eaabc4a1d56.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/40a274f0-8144-4efa-b027-46a670bc13be.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/80d8f3e8-1438-44bc-8430-9266ed958cad.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/7194654d-ba09-4023-a83f-8eaabc4a1d56.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 46,
+      "slug": "acura-integra-gs-1-8-1992-1775258504525",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/e2315702-5412-4f26-8aa0-8a4a8b975a78.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/e2315702-5412-4f26-8aa0-8a4a8b975a78.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 47,
+      "slug": "acura-integra-gs-1-8-1992-1775258527499",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/f51d24e9-5abd-4cbf-a91c-672408404f7b.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/f51d24e9-5abd-4cbf-a91c-672408404f7b.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 48,
+      "slug": "acura-integra-gs-1-8-1992-1775258548824",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/41cac4b9-d065-4e65-b429-1034ff456f2e.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/41cac4b9-d065-4e65-b429-1034ff456f2e.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 49,
+      "slug": "acura-integra-gs-1-8-1992-1775258571730",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/e6e35d86-fb83-40dd-a111-d2ab4b88d8ac.png",
+        "/uploads/ads/39650793-8c45-4c92-81f0-1f61d7bae8cb.jpg",
+        "/uploads/ads/877ec662-7d62-4101-b099-3151d055d494.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/e6e35d86-fb83-40dd-a111-d2ab4b88d8ac.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/39650793-8c45-4c92-81f0-1f61d7bae8cb.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/877ec662-7d62-4101-b099-3151d055d494.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 50,
+      "slug": "acura-integra-gs-1-8-1992-1775259238535",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/a7076495-eabb-4775-9b3e-3006af1c0fff.png",
+        "/uploads/ads/43cc37aa-f67e-4cbd-86b5-383331a59a97.jpg",
+        "/uploads/ads/b995256e-3349-4ef7-8292-c6663ea09cf2.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/a7076495-eabb-4775-9b3e-3006af1c0fff.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/43cc37aa-f67e-4cbd-86b5-383331a59a97.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/b995256e-3349-4ef7-8292-c6663ea09cf2.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 51,
+      "slug": "acura-integra-gs-1-8-1992-1775259261227",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/77fbbfc0-6cab-4168-8341-3580404d3261.png",
+        "/uploads/ads/31ef25f8-6459-4374-a832-cffd76762bc4.jpg",
+        "/uploads/ads/cf424cee-884e-4ddd-b1ed-b35fedca244a.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/77fbbfc0-6cab-4168-8341-3580404d3261.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/31ef25f8-6459-4374-a832-cffd76762bc4.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/cf424cee-884e-4ddd-b1ed-b35fedca244a.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 52,
+      "slug": "acura-integra-gs-1-8-1992-1775259281058",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/08092e7c-8f45-4298-9a1a-3d747c2507ff.png",
+        "/uploads/ads/afa498b4-f9ab-4982-89ee-04450961a457.jpg",
+        "/uploads/ads/e8da1dcf-d664-4328-b5c0-edc65c2c2b5c.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/08092e7c-8f45-4298-9a1a-3d747c2507ff.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/afa498b4-f9ab-4982-89ee-04450961a457.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/e8da1dcf-d664-4328-b5c0-edc65c2c2b5c.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 53,
+      "slug": "acura-integra-gs-1-8-1992-1775259303054",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/07570dbf-9c80-4234-b67b-ba452cb8a7af.png",
+        "/uploads/ads/5ec5b1c1-327f-450d-824b-d0e1268d464f.jpg",
+        "/uploads/ads/d5de2490-f59d-48fb-ad3e-7d75247cbcbe.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/07570dbf-9c80-4234-b67b-ba452cb8a7af.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/5ec5b1c1-327f-450d-824b-d0e1268d464f.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/d5de2490-f59d-48fb-ad3e-7d75247cbcbe.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 54,
+      "slug": "acura-integra-gs-1-8-1992-1775259323794",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/23c53f8c-1551-48ff-bcc7-17625f3e27b8.png",
+        "/uploads/ads/f259d9bf-63c4-4bfd-a454-a50bb16a8b92.jpg",
+        "/uploads/ads/62da6be5-9629-424d-a621-c9423b7bea06.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/23c53f8c-1551-48ff-bcc7-17625f3e27b8.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/f259d9bf-63c4-4bfd-a454-a50bb16a8b92.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/62da6be5-9629-424d-a621-c9423b7bea06.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 55,
+      "slug": "acura-integra-gs-1-8-1992-1775259397901",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/830c3a9d-ab83-43c5-bb6f-dc210bfc02a5.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/830c3a9d-ab83-43c5-bb6f-dc210bfc02a5.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 56,
+      "slug": "acura-integra-gs-1-8-1992-1775259415181",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/3d302ea7-bb95-47ae-9f0f-a8f59360b286.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/3d302ea7-bb95-47ae-9f0f-a8f59360b286.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 57,
+      "slug": "acura-integra-gs-1-8-1992-1775259432507",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/885fa8eb-fc02-43ae-90bd-0ce6e75d70a5.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/885fa8eb-fc02-43ae-90bd-0ce6e75d70a5.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 58,
+      "slug": "acura-integra-gs-1-8-1992-1775259449476",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/c879f730-9f2f-4a3a-93be-209717bb5500.png",
+        "/uploads/ads/616eb6a1-8fd0-4d63-8bd6-e089198c049d.jpg",
+        "/uploads/ads/2b139636-fdde-4f0d-9077-3ebb19ce0701.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/c879f730-9f2f-4a3a-93be-209717bb5500.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/616eb6a1-8fd0-4d63-8bd6-e089198c049d.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/2b139636-fdde-4f0d-9077-3ebb19ce0701.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 59,
+      "slug": "acura-integra-gs-1-8-1992-1775259477400",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/8871d48e-36b4-4415-8e8f-749a81efcfc4.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/8871d48e-36b4-4415-8e8f-749a81efcfc4.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 60,
+      "slug": "acura-integra-gs-1-8-1992-1775259494642",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/e8b18aec-3fdf-4401-a465-ee29360b9049.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/e8b18aec-3fdf-4401-a465-ee29360b9049.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 61,
+      "slug": "acura-integra-gs-1-8-1992-1775259513682",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/a52d27f1-2c09-4a0b-8787-cf182800dc5a.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/a52d27f1-2c09-4a0b-8787-cf182800dc5a.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 62,
+      "slug": "acura-integra-gs-1-8-1992-1775259531639",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/1167d180-23d3-4344-a92e-46bf21f98cd8.png",
+        "/uploads/ads/fc4f7597-3e8b-4d86-8e51-497d1ac7d55b.jpg",
+        "/uploads/ads/e764656e-c4d5-48ab-8066-d22b041276cb.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/1167d180-23d3-4344-a92e-46bf21f98cd8.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/fc4f7597-3e8b-4d86-8e51-497d1ac7d55b.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/e764656e-c4d5-48ab-8066-d22b041276cb.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 63,
+      "slug": "acura-integra-gs-1-8-1992-1775259560467",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/0a75e1db-296a-426e-b828-e95bc271707c.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/0a75e1db-296a-426e-b828-e95bc271707c.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 64,
+      "slug": "acura-integra-gs-1-8-1992-1775259580143",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/9a428ca2-f89d-4508-a1c0-913f870e5e03.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/9a428ca2-f89d-4508-a1c0-913f870e5e03.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 65,
+      "slug": "acura-integra-gs-1-8-1992-1775259600453",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/55cfaebb-410b-41bc-8179-0bb2b9f819fb.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/55cfaebb-410b-41bc-8179-0bb2b9f819fb.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 66,
+      "slug": "acura-integra-gs-1-8-1992-1775259618290",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/08854edf-2ec9-4d8a-a053-737c89f7ff55.png",
+        "/uploads/ads/a0e755e1-44f8-4209-922f-c3972a767992.jpg",
+        "/uploads/ads/ed32a436-2b0d-441a-bbe6-24496f7e9101.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/08854edf-2ec9-4d8a-a053-737c89f7ff55.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/a0e755e1-44f8-4209-922f-c3972a767992.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/ed32a436-2b0d-441a-bbe6-24496f7e9101.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 67,
+      "slug": "acura-integra-gs-1-8-1992-1775259654078",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/118a7816-30fb-46a0-b4cf-d7016f5365bd.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/118a7816-30fb-46a0-b4cf-d7016f5365bd.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 68,
+      "slug": "acura-integra-gs-1-8-1992-1775259671666",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/9f8b2647-51d1-4c91-a398-66ccb4f780f0.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/9f8b2647-51d1-4c91-a398-66ccb4f780f0.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 69,
+      "slug": "acura-integra-gs-1-8-1992-1775259690891",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/70802d01-b655-4853-9865-37cd7d7be224.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/70802d01-b655-4853-9865-37cd7d7be224.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 70,
+      "slug": "acura-integra-gs-1-8-1992-1775259707875",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/87e4083e-151e-4151-a891-49bcadb20b88.png",
+        "/uploads/ads/44bf8c2e-a8b9-4492-ad71-57cda5525c17.jpg",
+        "/uploads/ads/c7a066df-4db6-43dc-b62d-1795599fae67.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/87e4083e-151e-4151-a891-49bcadb20b88.png",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/44bf8c2e-a8b9-4492-ad71-57cda5525c17.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/c7a066df-4db6-43dc-b62d-1795599fae67.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 71,
+      "slug": "bmw-320ia-2-0-tb-m-sport-a-flex-m-sport-4p-2021-1775270572995",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/e79e6d6e-3377-438d-a249-0d077c92c614.jpg",
+        "/uploads/ads/493ad1d7-bc51-4c49-905e-304f3fd345d1.jpg",
+        "/uploads/ads/ca5b5d6c-fa4c-4137-ab7d-3e31d2dd22ac.jpg",
+        "/uploads/ads/684419f5-5a3b-4c52-9627-cfb0f68dd13c.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/e79e6d6e-3377-438d-a249-0d077c92c614.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/493ad1d7-bc51-4c49-905e-304f3fd345d1.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/ca5b5d6c-fa4c-4137-ab7d-3e31d2dd22ac.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/684419f5-5a3b-4c52-9627-cfb0f68dd13c.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 72,
+      "slug": "renault-boreal-evolution-1-3-turbo-16v-5p-aut-2026-1775271219485",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/8cd52989-828c-4ba0-a5fd-91ba10fc834c.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/8cd52989-828c-4ba0-a5fd-91ba10fc834c.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 73,
+      "slug": "acura-integra-gs-1-8-1992-1775272292071",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/d9df70c3-f4d8-42d2-a2bd-ddea01e5dcf6.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/d9df70c3-f4d8-42d2-a2bd-ddea01e5dcf6.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 74,
+      "slug": "acura-integra-gs-1-8-1992-1775272434839",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/93644dd2-3b42-46a9-81fa-10ae5be720e8.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/93644dd2-3b42-46a9-81fa-10ae5be720e8.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 75,
+      "slug": "acura-integra-gs-1-8-1992-1775272528812",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/edb11cac-bffd-42a8-a2bd-ba429c002181.png"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/edb11cac-bffd-42a8-a2bd-ba429c002181.png",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    },
+    {
+      "adId": 76,
+      "slug": "fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-1775420503399",
+      "category": "orphan",
+      "rawImages": [
+        "/uploads/ads/df9e8e1f-e075-4d43-a94f-3e39b9f41c3e.jpg",
+        "/uploads/ads/f36d06f0-500c-4058-a1ca-86166e15474e.jpg",
+        "/uploads/ads/6437c9df-bdaa-406e-9404-77d06cbedf16.jpg",
+        "/uploads/ads/80d7dc8a-02f3-48ad-9be9-2a7e07170941.webp",
+        "/uploads/ads/e1781bdd-3896-4ef2-90b6-1b82b3b4c4dd.jpg"
+      ],
+      "vehicleRows": [],
+      "fileChecks": [
+        {
+          "legacyPath": "/uploads/ads/df9e8e1f-e075-4d43-a94f-3e39b9f41c3e.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/f36d06f0-500c-4058-a1ca-86166e15474e.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/6437c9df-bdaa-406e-9404-77d06cbedf16.jpg",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/80d7dc8a-02f3-48ad-9be9-2a7e07170941.webp",
+          "localPath": null,
+          "available": false
+        },
+        {
+          "legacyPath": "/uploads/ads/e1781bdd-3896-4ef2-90b6-1b82b3b4c4dd.jpg",
+          "localPath": null,
+          "available": false
+        }
+      ]
+    }
+  ],
+  "orphans": [
+    {
+      "adId": 15,
+      "slug": "gm-chevrolet-onix-sedan-plus-ltz-1-0-12v-tb-flex-aut-2025-1775185123098",
+      "legacyPath": "/uploads/ads/df44adf5-c17d-40b5-865e-e0f710280978.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 25,
+      "slug": "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+      "legacyPath": "/uploads/ads/1008c689-ad19-428d-bdca-17b3cbcd5757.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 25,
+      "slug": "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+      "legacyPath": "/uploads/ads/7ddda75b-0c07-4f85-ac21-e091794fae81.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 25,
+      "slug": "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+      "legacyPath": "/uploads/ads/1bb98a0b-050a-48eb-8ebb-e443a8180681.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 25,
+      "slug": "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+      "legacyPath": "/uploads/ads/24e92ee4-e82e-4d33-b57b-8bdc78b9eaf8.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 25,
+      "slug": "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+      "legacyPath": "/uploads/ads/05f502ef-a881-49d1-bf62-ce42d932a8d6.webp",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 26,
+      "slug": "acura-integra-gs-1-8-1992-1775253341583",
+      "legacyPath": "/uploads/ads/278d1940-69cc-432a-b348-98aef56a1b2a.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 27,
+      "slug": "acura-integra-gs-1-8-1992-1775256548864",
+      "legacyPath": "/uploads/ads/ce136ec2-59e7-46f3-95d8-47cceb480304.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 28,
+      "slug": "acura-integra-gs-1-8-1992-1775256902132",
+      "legacyPath": "/uploads/ads/3f7b4785-c7f4-4eb4-b23f-2af64595b845.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 29,
+      "slug": "acura-integra-gs-1-8-1992-1775256925735",
+      "legacyPath": "/uploads/ads/8e2f13f2-6d1c-4309-a4dc-01e111010816.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 30,
+      "slug": "acura-integra-gs-1-8-1992-1775256947506",
+      "legacyPath": "/uploads/ads/750f8b17-9162-49fa-b471-d01b7d0b4935.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 31,
+      "slug": "acura-integra-gs-1-8-1992-1775256969360",
+      "legacyPath": "/uploads/ads/d6725fbf-fa72-4729-aa3a-cbd1b17fb120.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 31,
+      "slug": "acura-integra-gs-1-8-1992-1775256969360",
+      "legacyPath": "/uploads/ads/34452e11-1123-46c9-97be-cf6b215b1eed.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 31,
+      "slug": "acura-integra-gs-1-8-1992-1775256969360",
+      "legacyPath": "/uploads/ads/b85b6169-7da8-43c5-96ad-253f8f5be804.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 32,
+      "slug": "acura-integra-gs-1-8-1992-1775257140058",
+      "legacyPath": "/uploads/ads/d6db10bc-501e-4bf6-a357-7c07e6087457.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 33,
+      "slug": "acura-integra-gs-1-8-1992-1775257163922",
+      "legacyPath": "/uploads/ads/93ac458a-347c-40df-986e-f2ca6de5fdaf.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 34,
+      "slug": "acura-integra-gs-1-8-1992-1775257185784",
+      "legacyPath": "/uploads/ads/1127113e-6587-4827-9294-88ad28f5a32c.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 35,
+      "slug": "acura-integra-gs-1-8-1992-1775257207236",
+      "legacyPath": "/uploads/ads/64b4c969-d7ef-4b5c-9d18-dc359c0a9366.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 35,
+      "slug": "acura-integra-gs-1-8-1992-1775257207236",
+      "legacyPath": "/uploads/ads/b63953ff-ba18-44d4-91d4-f5d3ddda57b6.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 35,
+      "slug": "acura-integra-gs-1-8-1992-1775257207236",
+      "legacyPath": "/uploads/ads/c96831ed-81b8-4784-b093-cf1644299b2b.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 36,
+      "slug": "acura-integra-gs-1-8-1992-1775257748408",
+      "legacyPath": "/uploads/ads/35ee9cd1-3cf2-47ca-afb2-adfd3996d953.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 36,
+      "slug": "acura-integra-gs-1-8-1992-1775257748408",
+      "legacyPath": "/uploads/ads/415b48c9-9c87-489d-84f4-27bb4a846b61.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 36,
+      "slug": "acura-integra-gs-1-8-1992-1775257748408",
+      "legacyPath": "/uploads/ads/deb1d5d1-01c1-4812-bd6a-2e97baca4ee4.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 37,
+      "slug": "acura-integra-gs-1-8-1992-1775258078592",
+      "legacyPath": "/uploads/ads/b373f562-23bf-4006-9649-9e30bd5e2ced.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 37,
+      "slug": "acura-integra-gs-1-8-1992-1775258078592",
+      "legacyPath": "/uploads/ads/5df07505-cf5b-441b-ae81-c7e5c4c5732c.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 37,
+      "slug": "acura-integra-gs-1-8-1992-1775258078592",
+      "legacyPath": "/uploads/ads/3a3a88c9-cf5e-49ed-a115-c555eecd7aa3.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 38,
+      "slug": "acura-integra-gs-1-8-1992-1775258114944",
+      "legacyPath": "/uploads/ads/d210ddc0-e736-41e9-bd28-abe06725dccd.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 39,
+      "slug": "acura-integra-gs-1-8-1992-1775258137654",
+      "legacyPath": "/uploads/ads/650f9e73-354d-4a9e-bcef-37978741602e.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 40,
+      "slug": "acura-integra-gs-1-8-1992-1775258160661",
+      "legacyPath": "/uploads/ads/6e723575-3209-4983-b103-73ef604b364e.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 41,
+      "slug": "acura-integra-gs-1-8-1992-1775258182329",
+      "legacyPath": "/uploads/ads/c0c116f1-df3e-44d9-888e-7e660a6c6b5b.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 41,
+      "slug": "acura-integra-gs-1-8-1992-1775258182329",
+      "legacyPath": "/uploads/ads/d7af573a-ae52-42f8-bb3d-935fb0543ac6.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 41,
+      "slug": "acura-integra-gs-1-8-1992-1775258182329",
+      "legacyPath": "/uploads/ads/f4bdb98c-74a2-436f-a93e-dd8a4ecdf11a.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 42,
+      "slug": "acura-integra-gs-1-8-1992-1775258315165",
+      "legacyPath": "/uploads/ads/074ab948-66bc-448a-bc9a-d94b4770f824.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 43,
+      "slug": "acura-integra-gs-1-8-1992-1775258338013",
+      "legacyPath": "/uploads/ads/c0abb002-18a2-4059-bdc3-f193abd07a0e.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 44,
+      "slug": "acura-integra-gs-1-8-1992-1775258360155",
+      "legacyPath": "/uploads/ads/08d60792-3b0e-4744-b2c3-f80681905eb6.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 45,
+      "slug": "acura-integra-gs-1-8-1992-1775258381369",
+      "legacyPath": "/uploads/ads/40a274f0-8144-4efa-b027-46a670bc13be.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 45,
+      "slug": "acura-integra-gs-1-8-1992-1775258381369",
+      "legacyPath": "/uploads/ads/80d8f3e8-1438-44bc-8430-9266ed958cad.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 45,
+      "slug": "acura-integra-gs-1-8-1992-1775258381369",
+      "legacyPath": "/uploads/ads/7194654d-ba09-4023-a83f-8eaabc4a1d56.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 46,
+      "slug": "acura-integra-gs-1-8-1992-1775258504525",
+      "legacyPath": "/uploads/ads/e2315702-5412-4f26-8aa0-8a4a8b975a78.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 47,
+      "slug": "acura-integra-gs-1-8-1992-1775258527499",
+      "legacyPath": "/uploads/ads/f51d24e9-5abd-4cbf-a91c-672408404f7b.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 48,
+      "slug": "acura-integra-gs-1-8-1992-1775258548824",
+      "legacyPath": "/uploads/ads/41cac4b9-d065-4e65-b429-1034ff456f2e.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 49,
+      "slug": "acura-integra-gs-1-8-1992-1775258571730",
+      "legacyPath": "/uploads/ads/e6e35d86-fb83-40dd-a111-d2ab4b88d8ac.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 49,
+      "slug": "acura-integra-gs-1-8-1992-1775258571730",
+      "legacyPath": "/uploads/ads/39650793-8c45-4c92-81f0-1f61d7bae8cb.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 49,
+      "slug": "acura-integra-gs-1-8-1992-1775258571730",
+      "legacyPath": "/uploads/ads/877ec662-7d62-4101-b099-3151d055d494.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 50,
+      "slug": "acura-integra-gs-1-8-1992-1775259238535",
+      "legacyPath": "/uploads/ads/a7076495-eabb-4775-9b3e-3006af1c0fff.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 50,
+      "slug": "acura-integra-gs-1-8-1992-1775259238535",
+      "legacyPath": "/uploads/ads/43cc37aa-f67e-4cbd-86b5-383331a59a97.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 50,
+      "slug": "acura-integra-gs-1-8-1992-1775259238535",
+      "legacyPath": "/uploads/ads/b995256e-3349-4ef7-8292-c6663ea09cf2.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 51,
+      "slug": "acura-integra-gs-1-8-1992-1775259261227",
+      "legacyPath": "/uploads/ads/77fbbfc0-6cab-4168-8341-3580404d3261.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 51,
+      "slug": "acura-integra-gs-1-8-1992-1775259261227",
+      "legacyPath": "/uploads/ads/31ef25f8-6459-4374-a832-cffd76762bc4.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 51,
+      "slug": "acura-integra-gs-1-8-1992-1775259261227",
+      "legacyPath": "/uploads/ads/cf424cee-884e-4ddd-b1ed-b35fedca244a.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 52,
+      "slug": "acura-integra-gs-1-8-1992-1775259281058",
+      "legacyPath": "/uploads/ads/08092e7c-8f45-4298-9a1a-3d747c2507ff.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 52,
+      "slug": "acura-integra-gs-1-8-1992-1775259281058",
+      "legacyPath": "/uploads/ads/afa498b4-f9ab-4982-89ee-04450961a457.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 52,
+      "slug": "acura-integra-gs-1-8-1992-1775259281058",
+      "legacyPath": "/uploads/ads/e8da1dcf-d664-4328-b5c0-edc65c2c2b5c.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 53,
+      "slug": "acura-integra-gs-1-8-1992-1775259303054",
+      "legacyPath": "/uploads/ads/07570dbf-9c80-4234-b67b-ba452cb8a7af.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 53,
+      "slug": "acura-integra-gs-1-8-1992-1775259303054",
+      "legacyPath": "/uploads/ads/5ec5b1c1-327f-450d-824b-d0e1268d464f.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 53,
+      "slug": "acura-integra-gs-1-8-1992-1775259303054",
+      "legacyPath": "/uploads/ads/d5de2490-f59d-48fb-ad3e-7d75247cbcbe.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 54,
+      "slug": "acura-integra-gs-1-8-1992-1775259323794",
+      "legacyPath": "/uploads/ads/23c53f8c-1551-48ff-bcc7-17625f3e27b8.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 54,
+      "slug": "acura-integra-gs-1-8-1992-1775259323794",
+      "legacyPath": "/uploads/ads/f259d9bf-63c4-4bfd-a454-a50bb16a8b92.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 54,
+      "slug": "acura-integra-gs-1-8-1992-1775259323794",
+      "legacyPath": "/uploads/ads/62da6be5-9629-424d-a621-c9423b7bea06.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 55,
+      "slug": "acura-integra-gs-1-8-1992-1775259397901",
+      "legacyPath": "/uploads/ads/830c3a9d-ab83-43c5-bb6f-dc210bfc02a5.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 56,
+      "slug": "acura-integra-gs-1-8-1992-1775259415181",
+      "legacyPath": "/uploads/ads/3d302ea7-bb95-47ae-9f0f-a8f59360b286.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 57,
+      "slug": "acura-integra-gs-1-8-1992-1775259432507",
+      "legacyPath": "/uploads/ads/885fa8eb-fc02-43ae-90bd-0ce6e75d70a5.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 58,
+      "slug": "acura-integra-gs-1-8-1992-1775259449476",
+      "legacyPath": "/uploads/ads/c879f730-9f2f-4a3a-93be-209717bb5500.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 58,
+      "slug": "acura-integra-gs-1-8-1992-1775259449476",
+      "legacyPath": "/uploads/ads/616eb6a1-8fd0-4d63-8bd6-e089198c049d.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 58,
+      "slug": "acura-integra-gs-1-8-1992-1775259449476",
+      "legacyPath": "/uploads/ads/2b139636-fdde-4f0d-9077-3ebb19ce0701.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 59,
+      "slug": "acura-integra-gs-1-8-1992-1775259477400",
+      "legacyPath": "/uploads/ads/8871d48e-36b4-4415-8e8f-749a81efcfc4.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 60,
+      "slug": "acura-integra-gs-1-8-1992-1775259494642",
+      "legacyPath": "/uploads/ads/e8b18aec-3fdf-4401-a465-ee29360b9049.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 61,
+      "slug": "acura-integra-gs-1-8-1992-1775259513682",
+      "legacyPath": "/uploads/ads/a52d27f1-2c09-4a0b-8787-cf182800dc5a.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 62,
+      "slug": "acura-integra-gs-1-8-1992-1775259531639",
+      "legacyPath": "/uploads/ads/1167d180-23d3-4344-a92e-46bf21f98cd8.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 62,
+      "slug": "acura-integra-gs-1-8-1992-1775259531639",
+      "legacyPath": "/uploads/ads/fc4f7597-3e8b-4d86-8e51-497d1ac7d55b.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 62,
+      "slug": "acura-integra-gs-1-8-1992-1775259531639",
+      "legacyPath": "/uploads/ads/e764656e-c4d5-48ab-8066-d22b041276cb.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 63,
+      "slug": "acura-integra-gs-1-8-1992-1775259560467",
+      "legacyPath": "/uploads/ads/0a75e1db-296a-426e-b828-e95bc271707c.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 64,
+      "slug": "acura-integra-gs-1-8-1992-1775259580143",
+      "legacyPath": "/uploads/ads/9a428ca2-f89d-4508-a1c0-913f870e5e03.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 65,
+      "slug": "acura-integra-gs-1-8-1992-1775259600453",
+      "legacyPath": "/uploads/ads/55cfaebb-410b-41bc-8179-0bb2b9f819fb.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 66,
+      "slug": "acura-integra-gs-1-8-1992-1775259618290",
+      "legacyPath": "/uploads/ads/08854edf-2ec9-4d8a-a053-737c89f7ff55.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 66,
+      "slug": "acura-integra-gs-1-8-1992-1775259618290",
+      "legacyPath": "/uploads/ads/a0e755e1-44f8-4209-922f-c3972a767992.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 66,
+      "slug": "acura-integra-gs-1-8-1992-1775259618290",
+      "legacyPath": "/uploads/ads/ed32a436-2b0d-441a-bbe6-24496f7e9101.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 67,
+      "slug": "acura-integra-gs-1-8-1992-1775259654078",
+      "legacyPath": "/uploads/ads/118a7816-30fb-46a0-b4cf-d7016f5365bd.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 68,
+      "slug": "acura-integra-gs-1-8-1992-1775259671666",
+      "legacyPath": "/uploads/ads/9f8b2647-51d1-4c91-a398-66ccb4f780f0.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 69,
+      "slug": "acura-integra-gs-1-8-1992-1775259690891",
+      "legacyPath": "/uploads/ads/70802d01-b655-4853-9865-37cd7d7be224.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 70,
+      "slug": "acura-integra-gs-1-8-1992-1775259707875",
+      "legacyPath": "/uploads/ads/87e4083e-151e-4151-a891-49bcadb20b88.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 70,
+      "slug": "acura-integra-gs-1-8-1992-1775259707875",
+      "legacyPath": "/uploads/ads/44bf8c2e-a8b9-4492-ad71-57cda5525c17.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 70,
+      "slug": "acura-integra-gs-1-8-1992-1775259707875",
+      "legacyPath": "/uploads/ads/c7a066df-4db6-43dc-b62d-1795599fae67.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 71,
+      "slug": "bmw-320ia-2-0-tb-m-sport-a-flex-m-sport-4p-2021-1775270572995",
+      "legacyPath": "/uploads/ads/e79e6d6e-3377-438d-a249-0d077c92c614.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 71,
+      "slug": "bmw-320ia-2-0-tb-m-sport-a-flex-m-sport-4p-2021-1775270572995",
+      "legacyPath": "/uploads/ads/493ad1d7-bc51-4c49-905e-304f3fd345d1.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 71,
+      "slug": "bmw-320ia-2-0-tb-m-sport-a-flex-m-sport-4p-2021-1775270572995",
+      "legacyPath": "/uploads/ads/ca5b5d6c-fa4c-4137-ab7d-3e31d2dd22ac.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 71,
+      "slug": "bmw-320ia-2-0-tb-m-sport-a-flex-m-sport-4p-2021-1775270572995",
+      "legacyPath": "/uploads/ads/684419f5-5a3b-4c52-9627-cfb0f68dd13c.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 72,
+      "slug": "renault-boreal-evolution-1-3-turbo-16v-5p-aut-2026-1775271219485",
+      "legacyPath": "/uploads/ads/8cd52989-828c-4ba0-a5fd-91ba10fc834c.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 73,
+      "slug": "acura-integra-gs-1-8-1992-1775272292071",
+      "legacyPath": "/uploads/ads/d9df70c3-f4d8-42d2-a2bd-ddea01e5dcf6.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 74,
+      "slug": "acura-integra-gs-1-8-1992-1775272434839",
+      "legacyPath": "/uploads/ads/93644dd2-3b42-46a9-81fa-10ae5be720e8.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 75,
+      "slug": "acura-integra-gs-1-8-1992-1775272528812",
+      "legacyPath": "/uploads/ads/edb11cac-bffd-42a8-a2bd-ba429c002181.png",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 76,
+      "slug": "fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-1775420503399",
+      "legacyPath": "/uploads/ads/df9e8e1f-e075-4d43-a94f-3e39b9f41c3e.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 76,
+      "slug": "fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-1775420503399",
+      "legacyPath": "/uploads/ads/f36d06f0-500c-4058-a1ca-86166e15474e.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 76,
+      "slug": "fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-1775420503399",
+      "legacyPath": "/uploads/ads/6437c9df-bdaa-406e-9404-77d06cbedf16.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 76,
+      "slug": "fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-1775420503399",
+      "legacyPath": "/uploads/ads/80d7dc8a-02f3-48ad-9be9-2a7e07170941.webp",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    },
+    {
+      "adId": 76,
+      "slug": "fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-1775420503399",
+      "legacyPath": "/uploads/ads/e1781bdd-3896-4ef2-90b6-1b82b3b4c4dd.jpg",
+      "reason": "file_not_found",
+      "suggestedAction": "reupload_manual_or_remove_reference"
+    }
+  ]
+}

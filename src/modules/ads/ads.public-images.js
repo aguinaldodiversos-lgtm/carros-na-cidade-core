@@ -1,3 +1,21 @@
+/**
+ * Normalização de imagens públicas para o portal.
+ *
+ * MODELO DE DADOS CANÔNICO (fonte de verdade):
+ *
+ *   1. `vehicle_images.storage_key`   → verdade binária no R2
+ *   2. `vehicle_images.image_url`     → metadado / URL pública quando aplicável
+ *   3. `ads.images`                   → lista pública canônica consumida pelo frontend
+ *   4. `/uploads/ads/...`             → legado — NÃO prioritário em produção
+ *
+ * PRIORIDADE DE RESOLUÇÃO:
+ *   storage_key → R2 public URL → /api/vehicle-images?key= → legacy proxy (transitório)
+ *
+ * FLAGS DE TRANSIÇÃO:
+ *   PUBLIC_EMIT_LEGACY_IMAGE_PROXY=true   → emite proxy para /uploads (dev / transição)
+ *   PUBLIC_EMIT_LEGACY_IMAGE_PROXY=false  → suprime legado (produção pós-migração)
+ *   (omitido)                             → suprime em production, emite em dev
+ */
 import db from "../../infrastructure/database/db.js";
 import { buildR2PublicUrl } from "../../infrastructure/storage/r2.service.js";
 
@@ -36,6 +54,17 @@ function looksLikeStorageKey(value) {
 
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+/**
+ * Em produção, por omissão não emitimos URLs do proxy para `/uploads/ads/...` (origem tipicamente ausente).
+ * Defina PUBLIC_EMIT_LEGACY_IMAGE_PROXY=true para forçar (ex.: dev com ficheiros locais).
+ */
+export function shouldEmitLegacyImageProxy() {
+  const v = process.env.PUBLIC_EMIT_LEGACY_IMAGE_PROXY;
+  if (v === "true") return true;
+  if (v === "false") return false;
+  return process.env.NODE_ENV !== "production";
 }
 
 function buildVehicleImageProxyUrl(key) {
@@ -90,9 +119,8 @@ export function normalizePublicImageCandidate(value) {
   if (isFrontendStaticImage(normalized)) return normalized;
   if (looksLikeStorageKey(normalized)) return buildCanonicalImageUrlFromStorageKey(normalized);
 
-  // Legado em disco local: não servimos mais direto na API em produção típica (Render efêmero),
-  // mas devolvemos a URL do proxy canônico do portal para o mesmo contrato do detalhe/listagem.
   if (isLegacyUploadPath(normalized)) {
+    if (!shouldEmitLegacyImageProxy()) return null;
     return buildVehicleImageProxyUrlFromSrc(normalized);
   }
 
@@ -121,8 +149,8 @@ function extractImageCandidates(value) {
     return [trimmed];
   }
 
-  if (typeof value === "object") {
-    return [
+  if (typeof value === "object" && value !== null) {
+    const nested = [
       value.url,
       value.image_url,
       value.imageUrl,
@@ -130,23 +158,36 @@ function extractImageCandidates(value) {
       value.storage_key,
       value.storageKey,
       value.loc,
-    ].flatMap((item) => extractImageCandidates(item));
+    ];
+    if (Array.isArray(value.photos)) nested.push(...value.photos);
+    if (Array.isArray(value.images)) nested.push(...value.images);
+    return nested.flatMap((item) => extractImageCandidates(item));
   }
 
   return [];
 }
 
+function publicImageFromVehicleImageRow(image) {
+  const key = normalizeString(image.storage_key);
+  if (key) {
+    const fromKey = buildCanonicalImageUrlFromStorageKey(key);
+    if (fromKey) return fromKey;
+  }
+
+  const rawUrl = normalizeString(image.image_url);
+  if (!rawUrl) return null;
+
+  // Legado em disco: em produção típica (Render) o ficheiro não existe mais; emitir proxy
+  // só mascararia 404. Sem storage_key, não forçar este caminho — permite fallback para
+  // `ads.images` (ex.: URLs R2 atualizadas no JSON sem linha correspondente em vehicle_images).
+  if (isLegacyUploadPath(toForwardSlashes(rawUrl))) return null;
+
+  return normalizePublicImageCandidate(rawUrl);
+}
+
 export function buildNormalizedPublicImages(row, vehicleImageRows = []) {
   const canonicalVehicleImages = vehicleImageRows
-    .map((image) => {
-      const key = normalizeString(image.storage_key);
-      if (key) {
-        const fromKey = buildCanonicalImageUrlFromStorageKey(key);
-        if (fromKey) return fromKey;
-      }
-
-      return normalizePublicImageCandidate(image.image_url);
-    })
+    .map((image) => publicImageFromVehicleImageRow(image))
     .filter(Boolean);
 
   if (canonicalVehicleImages.length > 0) {

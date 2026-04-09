@@ -2,12 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import type { AccountType } from "@/lib/dashboard-types";
-import {
-  AUTH_COOKIE_NAME,
-  createSessionToken,
-  getSessionCookieOptions,
-  getSessionDataFromRequest,
-} from "@/services/sessionService";
+import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +59,8 @@ export async function POST(request: NextRequest) {
     const meUrl = resolveBackendApiUrl("/api/auth/me");
     if (!meUrl) {
       const out = NextResponse.json(parsed);
-      if (ensured.newCookie) {
-        out.cookies.set(AUTH_COOKIE_NAME, ensured.newCookie, getSessionCookieOptions());
+      if (ensured.persistCookies) {
+        applySessionCookiesToResponse(out, ensured.persistCookies);
       }
       return out;
     }
@@ -93,15 +88,14 @@ export async function POST(request: NextRequest) {
         accessToken: ensured.session.accessToken,
         refreshToken: ensured.session.refreshToken,
       };
-      const token = createSessionToken(nextSession);
       const response = NextResponse.json({ success: true, user: u, ...parsed });
-      response.cookies.set(AUTH_COOKIE_NAME, token, getSessionCookieOptions());
+      applySessionCookiesToResponse(response, nextSession);
       return response;
     }
 
     const out = NextResponse.json({ success: true, ...parsed });
-    if (ensured.newCookie) {
-      out.cookies.set(AUTH_COOKIE_NAME, ensured.newCookie, getSessionCookieOptions());
+    if (ensured.persistCookies) {
+      applySessionCookiesToResponse(out, ensured.persistCookies);
     }
     return out;
   } catch (error) {

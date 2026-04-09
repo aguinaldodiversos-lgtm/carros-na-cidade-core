@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import LoginForm from "@/components/auth/LoginForm";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
-import { AUTH_COOKIE_NAME, mergeMiddlewareSessionTokens } from "@/services/sessionService";
+import { getSessionDataFromCookieStore } from "@/services/sessionService";
 
 export const metadata: Metadata = {
   title: "Login",
@@ -45,7 +45,7 @@ function normalizeNextParam(value?: string) {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const cookieStore = cookies();
-  const session = mergeMiddlewareSessionTokens(headers(), cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const session = getSessionDataFromCookieStore(cookieStore, headers());
   const next = normalizeNextParam(searchParams?.next);
   const returnedFromDashboard = searchParams?.from_dashboard === "1";
 

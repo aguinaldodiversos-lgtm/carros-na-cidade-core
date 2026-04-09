@@ -1,0 +1,14 @@
+{
+  "startedAt": "2026-04-09T19:12:04.138Z",
+  "dryRun": false,
+  "summary": {
+    "adsScanned": 0,
+    "migratedAds": 0,
+    "wouldMigrateAds": 0,
+    "imagesUpdated": 0,
+    "orphanCount": 0
+  },
+  "orphans": [],
+  "items": [],
+  "finishedAt": "2026-04-09T19:12:05.933Z"
+}

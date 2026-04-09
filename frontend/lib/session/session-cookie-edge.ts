@@ -18,6 +18,9 @@ const DEFAULT_DURATION_SECONDS = 60 * 60 * 24 * 7;
 type SessionPayload = EdgeSessionData & {
   iat: number;
   exp: number;
+  /** Legado: tokens no JSON (alinhado a `sessionService.ts`). */
+  accessToken?: string;
+  refreshToken?: string;
 };
 
 const encoder = new TextEncoder();
@@ -86,8 +89,8 @@ export async function verifySessionCookieEdge(tokenValue: string): Promise<EdgeS
       name: payload.name,
       email: payload.email,
       type: payload.type as AccountType,
-      accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken,
+      ...(payload.accessToken ? { accessToken: payload.accessToken } : {}),
+      ...(payload.refreshToken ? { refreshToken: payload.refreshToken } : {}),
     };
   } catch {
     return null;
@@ -100,7 +103,10 @@ export async function createSessionTokenEdge(
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionPayload = {
-    ...user,
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    type: user.type,
     iat: now,
     exp: now + maxAgeSeconds,
   };

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import BoostCheckout from "@/components/payments/BoostCheckout";
 import { fetchOwnedAd } from "@/lib/account/backend-account";
-import { AUTH_COOKIE_NAME, mergeMiddlewareSessionTokens } from "@/services/sessionService";
+import { getSessionDataFromCookieStore } from "@/services/sessionService";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 
 type ImpulsionarPageProps = {
@@ -37,7 +37,7 @@ function formatDate(value: string | null) {
 
 export default async function ImpulsionarPage({ params, searchParams }: ImpulsionarPageProps) {
   const cookieStore = cookies();
-  const raw = mergeMiddlewareSessionTokens(headers(), cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const raw = getSessionDataFromCookieStore(cookieStore, headers());
   if (!raw) {
     redirect("/login");
   }

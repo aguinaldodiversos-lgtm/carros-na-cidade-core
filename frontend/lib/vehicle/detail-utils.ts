@@ -269,6 +269,8 @@ export function collectVehicleImageCandidates(...values: unknown[]): string[] {
         record.pathname,
         record.file,
       ].forEach(visit);
+      if (Array.isArray(record.photos)) record.photos.forEach(visit);
+      if (Array.isArray(record.images)) record.images.forEach(visit);
       return;
     }
 

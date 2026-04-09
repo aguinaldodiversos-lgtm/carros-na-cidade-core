@@ -5,6 +5,10 @@ import { MW_ACCESS_TOKEN_HEADER, MW_REFRESH_TOKEN_HEADER } from "@/lib/auth/sess
 
 export const AUTH_COOKIE_NAME = "cnc_session";
 
+/** JWTs em cookie separado evitam ultrapassar o limite ~4KB do header Set-Cookie (sessão assinada + 2 tokens). */
+export const AUTH_ACCESS_COOKIE_NAME = "cnc_at";
+export const AUTH_REFRESH_COOKIE_NAME = "cnc_rt";
+
 export type SessionUser = {
   id: string;
   name: string;
@@ -17,9 +21,12 @@ export type SessionData = SessionUser & {
   refreshToken?: string;
 };
 
-type SessionPayload = SessionData & {
+type SessionPayload = SessionUser & {
   iat: number;
   exp: number;
+  /** Legado: tokens embutidos no JSON (antes da divisão em cookies separados). */
+  accessToken?: string;
+  refreshToken?: string;
 };
 
 const DEFAULT_DURATION_SECONDS = 60 * 60 * 24 * 7;
@@ -40,10 +47,17 @@ function signTokenBody(body: string) {
   return crypto.createHmac("sha256", getSessionSecret()).update(body).digest("base64url");
 }
 
+/**
+ * Cookie assinado só com dados do usuário (sem JWTs), para ficar bem abaixo do limite de tamanho.
+ * Os tokens vão em {@link AUTH_ACCESS_COOKIE_NAME} e {@link AUTH_REFRESH_COOKIE_NAME}.
+ */
 export function createSessionToken(user: SessionData, maxAgeSeconds = DEFAULT_DURATION_SECONDS) {
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionPayload = {
-    ...user,
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    type: user.type,
     iat: now,
     exp: now + maxAgeSeconds,
   };
@@ -52,8 +66,45 @@ export function createSessionToken(user: SessionData, maxAgeSeconds = DEFAULT_DU
   return `${body}.${signature}`;
 }
 
+export function getTokenCookieOptions(maxAgeSeconds = DEFAULT_DURATION_SECONDS) {
+  return getSessionCookieOptions(maxAgeSeconds);
+}
+
+export function getClearTokenCookieOptions() {
+  return getClearSessionCookieOptions();
+}
+
+/**
+ * Define `cnc_session` + cookies httpOnly dos JWTs (access/refresh).
+ */
+export function applySessionCookiesToResponse(
+  res: NextResponse,
+  session: SessionData,
+  maxAgeSeconds = DEFAULT_DURATION_SECONDS
+) {
+  const sessionOpts = getSessionCookieOptions(maxAgeSeconds);
+  const tokenOpts = getTokenCookieOptions(maxAgeSeconds);
+  const clear = getClearTokenCookieOptions();
+
+  res.cookies.set(AUTH_COOKIE_NAME, createSessionToken(session, maxAgeSeconds), sessionOpts);
+
+  if (session.accessToken) {
+    res.cookies.set(AUTH_ACCESS_COOKIE_NAME, session.accessToken, tokenOpts);
+  } else {
+    res.cookies.set(AUTH_ACCESS_COOKIE_NAME, "", clear);
+  }
+
+  if (session.refreshToken) {
+    res.cookies.set(AUTH_REFRESH_COOKIE_NAME, session.refreshToken, tokenOpts);
+  } else {
+    res.cookies.set(AUTH_REFRESH_COOKIE_NAME, "", clear);
+  }
+}
+
 export function getSessionDataFromCookieValue(
-  tokenValue: string | undefined | null
+  tokenValue: string | undefined | null,
+  accessTokenCookie?: string | null,
+  refreshTokenCookie?: string | null
 ): SessionData | null {
   if (!tokenValue) return null;
 
@@ -72,13 +123,25 @@ export function getSessionDataFromCookieValue(
     if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
     if (!payload.id || !payload.name || !payload.email || !payload.type) return null;
 
+    const accessFromSeparate =
+      typeof accessTokenCookie === "string" && accessTokenCookie.length > 0
+        ? accessTokenCookie
+        : undefined;
+    const refreshFromSeparate =
+      typeof refreshTokenCookie === "string" && refreshTokenCookie.length > 0
+        ? refreshTokenCookie
+        : undefined;
+
+    const accessToken = accessFromSeparate ?? payload.accessToken;
+    const refreshToken = refreshFromSeparate ?? payload.refreshToken;
+
     return {
       id: payload.id,
       name: payload.name,
       email: payload.email,
       type: payload.type,
-      accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken,
+      ...(accessToken ? { accessToken } : {}),
+      ...(refreshToken ? { refreshToken } : {}),
     };
   } catch {
     return null;
@@ -86,9 +149,11 @@ export function getSessionDataFromCookieValue(
 }
 
 export function getSessionUserFromCookieValue(
-  tokenValue: string | undefined | null
+  tokenValue: string | undefined | null,
+  accessTokenCookie?: string | null,
+  refreshTokenCookie?: string | null
 ): SessionUser | null {
-  const session = getSessionDataFromCookieValue(tokenValue);
+  const session = getSessionDataFromCookieValue(tokenValue, accessTokenCookie, refreshTokenCookie);
   if (!session) return null;
 
   return {
@@ -117,9 +182,15 @@ export function getSessionUserFromRequest(request: NextRequest) {
  */
 export function mergeMiddlewareSessionTokens(
   headersList: { get(name: string): string | null | undefined },
-  cookieValue: string | undefined | null
+  cookieValue: string | undefined | null,
+  accessTokenCookie?: string | null,
+  refreshTokenCookie?: string | null
 ): SessionData | null {
-  const cookieSession = getSessionDataFromCookieValue(cookieValue);
+  const cookieSession = getSessionDataFromCookieValue(
+    cookieValue,
+    accessTokenCookie,
+    refreshTokenCookie
+  );
   const mwAccess = headersList.get(MW_ACCESS_TOKEN_HEADER);
   const mwRefresh = headersList.get(MW_REFRESH_TOKEN_HEADER);
   if (mwAccess && cookieSession) {
@@ -134,7 +205,22 @@ export function mergeMiddlewareSessionTokens(
 
 export function getSessionDataFromRequest(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  return mergeMiddlewareSessionTokens(request.headers, cookie);
+  const at = request.cookies.get(AUTH_ACCESS_COOKIE_NAME)?.value;
+  const rt = request.cookies.get(AUTH_REFRESH_COOKIE_NAME)?.value;
+  return mergeMiddlewareSessionTokens(request.headers, cookie, at, rt);
+}
+
+/** Server Components: ler `cnc_session` + cookies de token (mesma lógica que `getSessionDataFromRequest`). */
+export function getSessionDataFromCookieStore(
+  cookieStore: { get(name: string): { value: string } | undefined },
+  headersList: { get(name: string): string | null | undefined }
+) {
+  return mergeMiddlewareSessionTokens(
+    headersList,
+    cookieStore.get(AUTH_COOKIE_NAME)?.value,
+    cookieStore.get(AUTH_ACCESS_COOKIE_NAME)?.value,
+    cookieStore.get(AUTH_REFRESH_COOKIE_NAME)?.value
+  );
 }
 
 export function getSessionCookieOptions(maxAgeSeconds = DEFAULT_DURATION_SECONDS) {
@@ -170,8 +256,15 @@ export function applyUnauthorizedWithSessionCleanup(
   body: Record<string, unknown> = { error: "Nao autenticado" }
 ) {
   const res = NextResponse.json(body, { status: 401 });
+  const clear = getClearSessionCookieOptions();
   if (request.cookies.get(AUTH_COOKIE_NAME)?.value) {
-    res.cookies.set(AUTH_COOKIE_NAME, "", getClearSessionCookieOptions());
+    res.cookies.set(AUTH_COOKIE_NAME, "", clear);
+  }
+  if (request.cookies.get(AUTH_ACCESS_COOKIE_NAME)?.value) {
+    res.cookies.set(AUTH_ACCESS_COOKIE_NAME, "", clear);
+  }
+  if (request.cookies.get(AUTH_REFRESH_COOKIE_NAME)?.value) {
+    res.cookies.set(AUTH_REFRESH_COOKIE_NAME, "", clear);
   }
   return res;
 }

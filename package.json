@@ -35,6 +35,8 @@
     "import:cities": "node scripts/import-ibge-cities.js",
     "create:test-ad": "node scripts/create-test-ad.mjs",
     "sanitize:ad-images": "node scripts/sanitize-ad-images.mjs",
+    "migrate:legacy-ad-images": "node scripts/migrate-legacy-ad-images-to-r2.mjs",
+    "cleanup:orphan-test-ads": "node scripts/cleanup-orphan-test-ads.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:prod": "node scripts/smoke.mjs",
     "smoke:local": "node scripts/smoke.mjs",

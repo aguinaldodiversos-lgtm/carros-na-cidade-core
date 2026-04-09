@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchDashboard } from "@/lib/account/backend-account";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import {
-  AUTH_COOKIE_NAME,
   applyPrivateNoStoreHeaders,
+  applySessionCookiesToResponse,
   applyUnauthorizedWithSessionCleanup,
   getSessionDataFromRequest,
-  getSessionCookieOptions,
 } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +25,8 @@ export async function GET(request: NextRequest) {
     const payload = await fetchDashboard(ensured.session);
     const res = NextResponse.json(payload);
     applyPrivateNoStoreHeaders(res);
-    if (ensured.newCookie) {
-      res.cookies.set(AUTH_COOKIE_NAME, ensured.newCookie, getSessionCookieOptions());
+    if (ensured.persistCookies) {
+      applySessionCookiesToResponse(res, ensured.persistCookies);
     }
     return res;
   } catch (error) {

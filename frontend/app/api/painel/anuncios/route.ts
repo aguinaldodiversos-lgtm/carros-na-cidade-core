@@ -10,11 +10,7 @@ import {
 import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
 import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
-import {
-  AUTH_COOKIE_NAME,
-  getSessionCookieOptions,
-  getSessionDataFromRequest,
-} from "@/services/sessionService";
+import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -221,8 +217,8 @@ export async function POST(request: NextRequest) {
     const parsed = await parseResponse(response);
 
     const setSessionCookie = (res: NextResponse) => {
-      if (ensured.newCookie) {
-        res.cookies.set(AUTH_COOKIE_NAME, ensured.newCookie, getSessionCookieOptions());
+      if (ensured.persistCookies) {
+        applySessionCookiesToResponse(res, ensured.persistCookies);
       }
     };
 

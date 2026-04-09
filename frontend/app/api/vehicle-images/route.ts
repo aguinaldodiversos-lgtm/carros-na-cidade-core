@@ -4,6 +4,7 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getSafeUploadPath } from "@/lib/vehicle/vehicle-images-src";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,30 +27,6 @@ const CACHE_CONTROL_HEADER = "public, max-age=300, stale-while-revalidate=86400"
 function getContentTypeFromPath(filePath: string): string {
   const ext = path.extname(filePath).replace(".", "").toLowerCase();
   return CONTENT_TYPE_BY_EXT[ext] || "application/octet-stream";
-}
-
-function safeDecodeURIComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function getSafeUploadPath(raw: string): string | null {
-  if (!raw) return null;
-
-  const decoded = safeDecodeURIComponent(raw).trim().replace(/\\/g, "/");
-
-  if (!decoded.startsWith("/uploads/")) return null;
-  if (decoded.includes("\0")) return null;
-
-  const normalized = path.posix.normalize(decoded);
-
-  if (!normalized.startsWith("/uploads/")) return null;
-  if (normalized.includes("..")) return null;
-
-  return normalized;
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -167,6 +144,7 @@ async function servePlaceholder(): Promise<NextResponse> {
           "Content-Type": "image/svg+xml",
           "Cache-Control": CACHE_CONTROL_HEADER,
           "X-Content-Type-Options": "nosniff",
+          "X-Vehicle-Images-Fallback": "placeholder",
         },
       });
     } catch (error) {
@@ -188,17 +166,20 @@ async function servePlaceholder(): Promise<NextResponse> {
   );
 }
 
-function buildImageResponse(body: ArrayBuffer | Uint8Array, contentType: string): NextResponse {
+function buildImageResponse(
+  body: ArrayBuffer | Uint8Array,
+  contentType: string,
+  source?: string,
+): NextResponse {
   const normalizedContentType = contentType || "application/octet-stream";
+  const headers: Record<string, string> = {
+    "Content-Type": normalizedContentType,
+    "Cache-Control": CACHE_CONTROL_HEADER,
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (source) headers["X-Vehicle-Images-Source"] = source;
 
-  return new NextResponse(body as unknown as BodyInit, {
-    status: 200,
-    headers: {
-      "Content-Type": normalizedContentType,
-      "Cache-Control": CACHE_CONTROL_HEADER,
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return new NextResponse(body as unknown as BodyInit, { status: 200, headers });
 }
 
 async function fetchRemoteVehicleImageByStorageKey(key: string): Promise<Response | null> {
@@ -234,8 +215,9 @@ export async function GET(request: NextRequest) {
     if (remote) {
       const body = await remote.arrayBuffer();
       const contentType = remote.headers.get("content-type") || "application/octet-stream";
-      return buildImageResponse(new Uint8Array(body), contentType);
+      return buildImageResponse(new Uint8Array(body), contentType, "r2-storage-key");
     }
+    console.warn("[vehicle-images] ?key= sem origem no backend; fallback placeholder", { key });
     return servePlaceholder();
   }
 
@@ -257,7 +239,11 @@ export async function GET(request: NextRequest) {
   const localFile = await tryReadLocalUpload(safePath);
 
   if (localFile) {
-    return buildImageResponse(new Uint8Array(localFile), getContentTypeFromPath(safePath));
+    return buildImageResponse(
+      new Uint8Array(localFile),
+      getContentTypeFromPath(safePath),
+      "legacy-local-disk",
+    );
   }
 
   const remoteResponse = await tryFetchRemoteUpload(safePath);
@@ -267,8 +253,11 @@ export async function GET(request: NextRequest) {
     const contentType =
       remoteResponse.headers.get("content-type") || getContentTypeFromPath(safePath);
 
-    return buildImageResponse(body, contentType);
+    return buildImageResponse(body, contentType, "legacy-remote-fetch");
   }
 
+  console.warn("[vehicle-images] origem sem ficheiro local nem remoto; fallback placeholder", {
+    safePath,
+  });
   return servePlaceholder();
 }

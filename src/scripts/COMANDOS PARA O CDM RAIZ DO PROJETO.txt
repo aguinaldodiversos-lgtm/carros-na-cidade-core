@@ -1,8 +1,5 @@
-node scripts/create-initial-admin.mjs --email admin@carrosnacidade.com --password "SuaSenhaForte123!"
-
-COMANDOS PARA O PowerShell RAIZ DO PROJETO
-PS C:\WINDOWS\System32> cd C:\Users\aguin\Desktop\carros-na-cidade-core
-
+C:\Users\aguin\Desktop\carros-na-cidade-core>node --trace-uncaught scripts/create-initial-admin.mjs --email aguinaldo.diversos@gmail.com --password "M@x150874Per"
+[create-initial-admin] Admin criado com sucesso: aguinaldo.diversos@gmail.com (id=97, role=admin).
 COMANDOS PARA O CDM RAIZ DO PROJETO
 
 Quando o projeto for alterado pelo curso e deve subir para o github

@@ -1,10 +1,9 @@
 import { accessTokenNeedsRefresh } from "@/lib/auth/jwt-access";
 import { refreshBackendTokens } from "@/lib/auth/refresh-backend-tokens";
 import type { SessionData } from "@/services/sessionService";
-import { createSessionToken } from "@/services/sessionService";
 
 export type EnsureBackendSessionResult =
-  | { ok: true; session: SessionData; newCookie?: string }
+  | { ok: true; session: SessionData; persistCookies?: SessionData }
   | { ok: false; reason: "missing_session" | "cannot_refresh" };
 
 /**
@@ -47,6 +46,6 @@ export async function ensureSessionWithFreshBackendTokens(
   return {
     ok: true,
     session: next,
-    newCookie: createSessionToken(next),
+    persistCookies: next,
   };
 }

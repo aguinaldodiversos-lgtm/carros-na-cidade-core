@@ -17,7 +17,7 @@ describe("sessionService", () => {
     else process.env.AUTH_SESSION_SECRET = prevSecret;
   });
 
-  it("createSessionToken + getSessionDataFromCookieValue roundtrip", () => {
+  it("createSessionToken + cookies de token + getSessionDataFromCookieValue roundtrip", () => {
     const token = createSessionToken({
       id: "u1",
       name: "Test",
@@ -26,7 +26,7 @@ describe("sessionService", () => {
       accessToken: "at",
       refreshToken: "rt",
     });
-    const data = getSessionDataFromCookieValue(token);
+    const data = getSessionDataFromCookieValue(token, "at", "rt");
     expect(data).toEqual({
       id: "u1",
       name: "Test",
@@ -58,7 +58,7 @@ describe("sessionService", () => {
       accessToken: "secret-at",
       refreshToken: "secret-rt",
     });
-    expect(getSessionUserFromCookieValue(token)).toEqual({
+    expect(getSessionUserFromCookieValue(token, "secret-at", "secret-rt")).toEqual({
       id: "u1",
       name: "Test",
       email: "t@example.com",
