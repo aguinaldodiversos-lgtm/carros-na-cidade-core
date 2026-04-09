@@ -44,7 +44,15 @@ export default function LoginForm({ next }: LoginFormProps) {
         }),
       });
 
-      const payload = (await response.json()) as LoginResponse;
+      let payload: LoginResponse;
+      try {
+        payload = (await response.json()) as LoginResponse;
+      } catch {
+        setError("Resposta inesperada do servidor. Tente novamente.");
+        setLoading(false);
+        return;
+      }
+
       if (!response.ok) {
         setError(payload.error ?? "Nao foi possivel autenticar.");
         setLoading(false);
@@ -56,7 +64,7 @@ export default function LoginForm({ next }: LoginFormProps) {
       router.push(destination);
       router.refresh();
     } catch {
-      setError("Falha na conexao. Tente novamente.");
+      setError("Falha na conexao. Verifique sua internet e tente novamente.");
       setLoading(false);
     }
   };

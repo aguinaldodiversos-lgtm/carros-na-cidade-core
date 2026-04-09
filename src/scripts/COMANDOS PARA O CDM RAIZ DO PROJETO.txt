@@ -1,3 +1,5 @@
+node scripts/create-initial-admin.mjs --email admin@carrosnacidade.com --password "SuaSenhaForte123!"
+
 COMANDOS PARA O PowerShell RAIZ DO PROJETO
 PS C:\WINDOWS\System32> cd C:\Users\aguin\Desktop\carros-na-cidade-core
 

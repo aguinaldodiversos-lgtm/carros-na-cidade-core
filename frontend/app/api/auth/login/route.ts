@@ -75,6 +75,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
     }
 
+    const isConnectionError =
+      error instanceof Error &&
+      /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|network/i.test(error.message);
+
+    if (isConnectionError) {
+      return NextResponse.json(
+        { error: "Servidor indisponivel. Verifique se o backend esta ativo." },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({ error: "Erro interno ao processar o login." }, { status: 500 });
   }
 }
