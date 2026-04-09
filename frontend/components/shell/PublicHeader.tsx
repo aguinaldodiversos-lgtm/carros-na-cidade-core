@@ -175,12 +175,20 @@ export function PublicHeader() {
                   Minha conta
                 </Link>
               ) : (
-                <Link
-                  href={SITE_ROUTES.login}
-                  className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:px-5 xl:text-[14px]"
-                >
-                  Entrar
-                </Link>
+                <>
+                  <Link
+                    href={SITE_ROUTES.login}
+                    className="hidden md:inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-blue-700 xl:px-3 xl:text-[14px]"
+                  >
+                    Entrar
+                  </Link>
+                  <Link
+                    href={SITE_ROUTES.login}
+                    className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:px-5 xl:text-[14px]"
+                  >
+                    Entrar
+                  </Link>
+                </>
               )}
             </nav>
 

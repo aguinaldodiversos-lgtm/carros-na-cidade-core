@@ -197,7 +197,17 @@ function extractBackendUser(payload: BackendAuthResponse | BackendMeResponse) {
 }
 
 function extractErrorMessage(payload: Partial<BackendAuthResponse>, fallback: string) {
-  return normalizeString(payload.error) || normalizeString(payload.message) || fallback;
+  const err = normalizeString(payload.error);
+  if (err) return err;
+
+  const rawMsg = payload.message;
+  if (typeof rawMsg === "string" && rawMsg.trim()) return rawMsg.trim();
+  if (rawMsg && typeof rawMsg === "object" && "message" in rawMsg) {
+    const nested = (rawMsg as { message?: unknown }).message;
+    if (typeof nested === "string" && nested.trim()) return nested.trim();
+  }
+
+  return fallback;
 }
 
 async function safeJson<T>(response: Response): Promise<T> {
@@ -261,7 +271,8 @@ async function buildAuthenticatedSessionFromResponse(
 
 async function authenticateAgainstBackend(
   email: string,
-  password: string
+  password: string,
+  forwardHeaders?: Record<string, string>
 ): Promise<AuthenticatedSession | null> {
   const normalizedEmail = normalizeEmail(email);
   if (!getBackendApiBaseUrl()) return null;
@@ -274,6 +285,7 @@ async function authenticateAgainstBackend(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...forwardHeaders,
       },
       body: JSON.stringify({
         email: normalizedEmail,
@@ -309,16 +321,20 @@ function authenticateLocally(email: string, password: string): AuthSession | nul
 
 export async function authenticateUser(
   email: string,
-  password: string
+  password: string,
+  forwardHeaders?: Record<string, string>
 ): Promise<AuthSession | null> {
   if (getBackendApiBaseUrl()) {
-    return authenticateAgainstBackend(email, password);
+    return authenticateAgainstBackend(email, password, forwardHeaders);
   }
 
   return authenticateLocally(email, password);
 }
 
-export async function registerUser(payload: RegisterPayload): Promise<RegisterResult> {
+export async function registerUser(
+  payload: RegisterPayload,
+  forwardHeaders?: Record<string, string>
+): Promise<RegisterResult> {
   const name = normalizeString(payload.name);
   const email = normalizeEmail(payload.email);
   const password = typeof payload.password === "string" ? payload.password : "";
@@ -371,7 +387,10 @@ export async function registerUser(payload: RegisterPayload): Promise<RegisterRe
 
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...forwardHeaders,
+      },
       body: JSON.stringify(body),
       cache: "no-store",
     });

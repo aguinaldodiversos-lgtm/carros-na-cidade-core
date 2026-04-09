@@ -1,5 +1,5 @@
 import express from "express";
-import { loginRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
+import { loginRateLimit, registerRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { pool } from "../../infrastructure/database/db.js";
@@ -107,6 +107,7 @@ router.post(
 /** REGISTER */
 router.post(
   "/register",
+  registerRateLimit,
   asyncHandler(async (req, res) => {
     const email = requireString(req.body?.email, "email", { lowercase: true });
     const password = requireString(req.body?.password, "password");

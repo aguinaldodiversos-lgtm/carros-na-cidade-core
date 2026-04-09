@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { authenticateUser } from "@/services/authService";
 import { applyPrivateNoStoreHeaders, applySessionCookiesToResponse } from "@/services/sessionService";
 
@@ -27,7 +28,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
     }
 
-    const authSession = await authenticateUser(email, password);
+    const forwardHeaders = buildBffBackendForwardHeaders(request);
+    const authSession = await authenticateUser(email, password, forwardHeaders);
 
     if (!authSession) {
       return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });

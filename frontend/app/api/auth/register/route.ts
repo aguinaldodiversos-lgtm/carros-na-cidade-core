@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { registerUser } from "@/services/authService";
 import { applyPrivateNoStoreHeaders, applySessionCookiesToResponse } from "@/services/sessionService";
 
@@ -62,7 +63,8 @@ export async function POST(request: NextRequest) {
       ...(documentNumber ? { document_number: documentNumber } : {}),
     };
 
-    const result = await registerUser(registerPayload);
+    const forwardHeaders = buildBffBackendForwardHeaders(request);
+    const result = await registerUser(registerPayload, forwardHeaders);
 
     if (!result.success) {
       return NextResponse.json(

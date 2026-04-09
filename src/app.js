@@ -51,6 +51,7 @@ import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.j
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js";
 import { requestMetricsMiddleware } from "./shared/observability/request.metrics.middleware.js";
+import { clientRateLimitKey } from "./shared/middlewares/rateLimit.middleware.js";
 
 const app = express();
 
@@ -105,13 +106,14 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
-// Rate limit global
+// Rate limit global (por visitante real quando o BFF envia X-Cnc-Client-Ip)
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: Number(process.env.RATE_LIMIT_GLOBAL_MAX || 1000),
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => clientRateLimitKey(req),
     message: {
       success: false,
       message: "Muitas requisições. Tente novamente em instantes.",
