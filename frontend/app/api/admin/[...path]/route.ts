@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionDataFromRequest } from "@/services/sessionService";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
+import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
+import { applySessionCookiesToResponse } from "@/services/sessionService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function proxy(request: NextRequest, { params }: { params: { path: string[] } }) {
   const session = getSessionDataFromRequest(request);
-  if (!session?.accessToken) {
+  const ensured = await ensureSessionWithFreshBackendTokens(session);
+
+  if (!ensured.ok || !ensured.session.accessToken) {
     return NextResponse.json({ ok: false, error: "Não autenticado" }, { status: 401 });
   }
 
@@ -20,8 +25,9 @@ async function proxy(request: NextRequest, { params }: { params: { path: string[
   }
 
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${session.accessToken}`,
+    Authorization: `Bearer ${ensured.session.accessToken}`,
     Accept: "application/json",
+    ...buildBffBackendForwardHeaders(request),
   };
 
   const contentType = request.headers.get("content-type");
@@ -50,11 +56,15 @@ async function proxy(request: NextRequest, { params }: { params: { path: string[
       data = { ok: false, error: "Resposta inválida do backend" };
     }
 
-    return NextResponse.json(data, {
+    const response = NextResponse.json(data, {
       status: res.status,
       headers: { "Cache-Control": "private, no-store" },
     });
-  } catch (err) {
+    if (ensured.persistCookies) {
+      applySessionCookiesToResponse(response, ensured.persistCookies);
+    }
+    return response;
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Erro de comunicação com o backend" },
       { status: 502 }

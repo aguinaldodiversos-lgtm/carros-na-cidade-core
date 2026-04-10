@@ -1,11 +1,23 @@
-# `src/controllers` — legado (CommonJS)
+# `src/controllers` — CÓDIGO MORTO (CommonJS legado)
 
-A API oficial usa handlers em **`src/modules/*`** (ESM).
+> **STATUS: CÓDIGO MORTO — zero imports ativos no projeto.**
+> Última auditoria: abril 2026.
 
-**Removido (não montados):** `controllers/ads/*` — duplicava o contrato de `modules/ads`; o código ativo é só o modular.
+A API oficial usa handlers em **`src/modules/*`** (ESM), montados em `src/app.js`.
 
-Arquivos restantes nesta pasta são carregados apenas por roteadores legado em `src/routes/*` **não montados** em `app.js` (`auth`, `analytics`, `alerts`, `integrations`, …). `integrations/createAdFromApi.controller.js` só delega a `createAdNormalized` — não duplicar regra de anúncio aqui.
+**Nenhum arquivo nesta pasta é importado por código ativo.** Os roteadores CommonJS em `src/routes/*`
+que usavam estes controllers foram removidos (exceto `health.js` e `metrics.js`, que são independentes).
 
-CommonJS antigo de ads foi isolado em `src/legacy/services-ads/`.
+## Conteúdo residual
 
-**Não usar** em novas features. Ver `docs/api-routes-inventory.md`.
+| Subpasta         | Descrição                                         | Substituto oficial                  |
+| ---------------- | ------------------------------------------------- | ----------------------------------- |
+| `auth/`          | Login, register, forgot/reset password, document  | `src/modules/auth/`                 |
+| `analytics/`     | CityRadar, opportunities, alerts                  | `src/modules/public/` (parcial)     |
+| `alerts/`        | Create, list, delete alerts                       | Sem substituto ativo (funcionalidade removida) |
+| `integrations/`  | `createAdFromApi` (delega a `createAdNormalized`) | `src/modules/ads/` (API direta)     |
+
+## Quando remover
+
+Pode ser removido com segurança — nenhum runtime, teste, ou CI depende deste diretório.
+**Não usar em novas features.** Ver `docs/api-routes-inventory.md`.

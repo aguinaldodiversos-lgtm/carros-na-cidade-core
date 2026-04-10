@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
     }
     return res;
   } catch (error) {
-    if (process.env.DASHBOARD_DEBUG === "1") {
-      console.error("[GET /api/dashboard/me]", error);
-    }
+    console.error(
+      "[GET /api/dashboard/me]",
+      error instanceof Error ? error.message : error,
+    );
     return applyPrivateNoStoreHeaders(
       NextResponse.json({ error: "Falha ao carregar dashboard" }, { status: 502 })
     );

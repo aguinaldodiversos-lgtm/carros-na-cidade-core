@@ -105,18 +105,8 @@ const EMPTY_FACETS: AdsFacetsResponse["facets"] = {
   bodyTypes: [],
 };
 
-/**
- * Mesma prioridade que login/dashboard (`getBackendApiBaseUrl`), para a listagem pública
- * não cair em localhost quando só AUTH_API_BASE_URL / BACKEND_API_URL estão definidos no Render.
- */
 function getApiBaseUrl(): string {
-  const base = getBackendApiBaseUrl();
-  if (base) return base;
-  return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
-    process.env.API_URL?.replace(/\/+$/, "") ||
-    "http://localhost:4000"
-  );
+  return getBackendApiBaseUrl();
 }
 
 function appendIfPresent(params: URLSearchParams, key: string, value: unknown) {

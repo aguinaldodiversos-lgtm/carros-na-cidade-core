@@ -4,30 +4,48 @@ import { healthcheck as dbHealthcheck } from "../infrastructure/database/db.js";
 
 const router = express.Router();
 
+async function checkRedis() {
+  try {
+    const { redis } = await import("../infrastructure/cache/redis.js");
+    if (!redis) return "disabled";
+    const pong = await Promise.race([
+      redis.ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2000)),
+    ]);
+    return pong === "PONG" ? "up" : "degraded";
+  } catch {
+    return "down";
+  }
+}
+
 router.get("/health", async (req, res) => {
   const startedAt = Date.now();
 
   try {
-    const dbOk = await dbHealthcheck();
+    const [dbOk, redisStatus] = await Promise.all([dbHealthcheck(), checkRedis()]);
+
+    const checks = {
+      db: dbOk ? "up" : "down",
+      redis: redisStatus,
+    };
+
+    const allCriticalUp = dbOk;
 
     const payload = {
-      ok: true,
-      status: "healthy",
+      ok: allCriticalUp,
+      status: allCriticalUp ? "healthy" : "degraded",
       env: process.env.NODE_ENV || "development",
       service: "carros-na-cidade-core",
       version: process.env.npm_package_version,
       commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
       uptime_s: Math.floor(process.uptime()),
-      checks: {
-        db: dbOk ? "up" : "down",
-      },
+      checks,
       latency_ms: Date.now() - startedAt,
       timestamp: new Date().toISOString(),
     };
 
-    // Se o DB estiver down, responde 503 (importante pro Render/monitor)
-    if (!dbOk) {
-      return res.status(503).json({ ...payload, ok: false, status: "degraded" });
+    if (!allCriticalUp) {
+      return res.status(503).json(payload);
     }
 
     return res.status(200).json(payload);

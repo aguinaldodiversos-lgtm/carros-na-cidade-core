@@ -1,32 +1,6 @@
-/** UFs para seleção consistente (evita texto solto na UF). */
-export const BR_UF_VALUES = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-] as const;
+import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
 
-export type BrazilUf = (typeof BR_UF_VALUES)[number];
+/** UFs derivadas da fonte canônica em `lib/city/brazil-ufs.ts`. */
+export const BR_UF_VALUES = BRAZIL_UFS.map((uf) => uf.value);
+
+export type BrazilUf = (typeof BRAZIL_UFS)[number]["value"];

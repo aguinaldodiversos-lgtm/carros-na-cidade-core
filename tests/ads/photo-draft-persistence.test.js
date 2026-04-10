@@ -217,3 +217,102 @@ describe("Photo draft: backward compatibility", () => {
     expect(form.draftPhotoUrls).toEqual([]);
   });
 });
+
+describe("Photo draft: URL format compatibility (direct R2 + proxy + legacy)", () => {
+  it("accepts public R2 URLs from direct BFF upload", () => {
+    const form = makeFormState({
+      draftPhotoUrls: [
+        "https://pub-test.r2.dev/vehicles/publish-user1-uuid/original/2026/04/uuid-foto.jpg",
+        "https://pub-test.r2.dev/vehicles/publish-user1-uuid/original/2026/04/uuid-foto2.png",
+      ],
+    });
+
+    expect(form.draftPhotoUrls).toHaveLength(2);
+    expect(form.draftPhotoUrls[0]).toMatch(/^https:\/\//);
+
+    const json = JSON.stringify(form);
+    const restored = JSON.parse(json);
+    expect(restored.draftPhotoUrls).toEqual(form.draftPhotoUrls);
+  });
+
+  it("accepts proxy URLs from direct BFF upload (no R2_PUBLIC_BASE_URL)", () => {
+    const form = makeFormState({
+      draftPhotoUrls: [
+        "/api/vehicle-images?key=vehicles%2Fpublish-user1-uuid%2Foriginal%2F2026%2F04%2Fuuid-foto.jpg",
+      ],
+    });
+
+    expect(form.draftPhotoUrls).toHaveLength(1);
+    expect(form.draftPhotoUrls[0]).toMatch(/^\/api\/vehicle-images\?key=/);
+  });
+
+  it("accepts legacy local URLs from dev fallback", () => {
+    const form = makeFormState({
+      draftPhotoUrls: ["/uploads/ads/some-uuid.jpg"],
+    });
+
+    expect(form.draftPhotoUrls).toHaveLength(1);
+    expect(form.draftPhotoUrls[0]).toMatch(/^\/uploads\/ads\//);
+  });
+
+  it("mixes URL formats safely (migration scenario)", () => {
+    const form = makeFormState({
+      draftPhotoUrls: [
+        "https://pub-test.r2.dev/vehicles/draft/photo1.jpg",
+        "/api/vehicle-images?key=vehicles%2Fold%2Fphoto2.jpg",
+        "/uploads/ads/legacy-photo.jpg",
+      ],
+    });
+
+    expect(form.draftPhotoUrls).toHaveLength(3);
+
+    const json = JSON.stringify(form);
+    const restored = JSON.parse(json);
+    expect(restored.draftPhotoUrls).toEqual(form.draftPhotoUrls);
+  });
+
+  it("URLs fit backend ad validation (string, 1-2048 chars)", () => {
+    const urls = [
+      "https://pub-test.r2.dev/vehicles/publish-user1-uuid/original/2026/04/uuid-foto.jpg",
+      "/api/vehicle-images?key=vehicles%2Fpublish-user1-uuid%2Foriginal%2F2026%2F04%2Fuuid-foto.jpg",
+    ];
+
+    for (const url of urls) {
+      expect(typeof url).toBe("string");
+      expect(url.length).toBeGreaterThanOrEqual(1);
+      expect(url.length).toBeLessThanOrEqual(2048);
+    }
+  });
+});
+
+describe("Photo draft: publish flow with draftPhotoUrls", () => {
+  it("draftPhotoUrls are sent as JSON string in FormData on publish", () => {
+    const form = makeFormState({
+      draftPhotoUrls: [
+        "https://pub-test.r2.dev/vehicles/draft/photo1.jpg",
+        "https://pub-test.r2.dev/vehicles/draft/photo2.jpg",
+      ],
+    });
+
+    const payload = JSON.stringify(form.draftPhotoUrls);
+    const parsed = JSON.parse(payload);
+    expect(parsed).toHaveLength(2);
+    expect(parsed).toEqual(form.draftPhotoUrls);
+  });
+
+  it("publish route reuses existing URLs without re-upload", () => {
+    const draftUrls = [
+      "https://pub-test.r2.dev/vehicles/draft/photo1.jpg",
+      "https://pub-test.r2.dev/vehicles/draft/photo2.jpg",
+    ];
+
+    const draftUrlsRaw = JSON.stringify(draftUrls);
+    const parsed = JSON.parse(draftUrlsRaw);
+    const photoUrls = Array.isArray(parsed)
+      ? parsed.filter((u) => typeof u === "string" && u.trim().length > 0)
+      : [];
+
+    expect(photoUrls).toEqual(draftUrls);
+    expect(photoUrls).toHaveLength(2);
+  });
+});

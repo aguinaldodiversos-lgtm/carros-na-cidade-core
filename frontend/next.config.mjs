@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
+  serverExternalPackages: ["@aws-sdk/client-s3"],
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/images/favicon.png" }];
   },

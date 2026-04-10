@@ -10,6 +10,10 @@ import {
 } from "@/lib/painel/create-ad-backend";
 import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
 import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
+import {
+  isR2ConfiguredInBff,
+  uploadDraftPhotosDirectR2,
+} from "@/lib/painel/upload-draft-photos-direct-r2";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
 
@@ -196,23 +200,33 @@ export async function POST(request: NextRequest) {
         .getAll("photos")
         .filter((f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0);
 
-      try {
-        photoUrls = await uploadPublishPhotosToBackendR2(source, ensured.session.accessToken);
-      } catch (uploadErr) {
-        const isProd = process.env.NODE_ENV === "production";
-        if (isProd) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message:
-                uploadErr instanceof Error
-                  ? uploadErr.message
-                  : "Falha ao enviar fotos para o armazenamento (R2). Verifique a configuração do backend.",
-            },
-            { status: 502 }
-          );
+      if (attemptedPhotos.length > 0) {
+        if (isR2ConfiguredInBff()) {
+          try {
+            photoUrls = await uploadDraftPhotosDirectR2(
+              attemptedPhotos,
+              ensured.session.id || "anon"
+            );
+          } catch (r2Err) {
+            console.error("[publish] Direct R2 upload failed:", r2Err instanceof Error ? r2Err.message : r2Err);
+          }
         }
-        photoUrls = await saveWizardPhotosToPublic(source);
+
+        if (photoUrls.length === 0 && getBackendApiBaseUrl()) {
+          try {
+            photoUrls = await uploadPublishPhotosToBackendR2(source, ensured.session.accessToken);
+          } catch (backendErr) {
+            console.error("[publish] Backend proxy upload failed:", backendErr instanceof Error ? backendErr.message : backendErr);
+          }
+        }
+
+        if (photoUrls.length === 0 && process.env.NODE_ENV !== "production") {
+          try {
+            photoUrls = await saveWizardPhotosToPublic(source);
+          } catch (localErr) {
+            console.error("[publish] Local save failed:", localErr instanceof Error ? localErr.message : localErr);
+          }
+        }
       }
 
       if (photoUrls.length === 0 && attemptedPhotos.length > 0) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import type { AccountType } from "@/lib/dashboard-types";
 import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Accept: "application/json",
         Authorization: `Bearer ${ensured.session.accessToken}`,
+        ...buildBffBackendForwardHeaders(request),
       },
       body: JSON.stringify(body),
       cache: "no-store",

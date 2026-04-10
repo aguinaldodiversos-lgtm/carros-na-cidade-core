@@ -4,6 +4,7 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { readImageFromR2Direct } from "@/lib/painel/upload-draft-photos-direct-r2";
 import { getSafeUploadPath } from "@/lib/vehicle/vehicle-images-src";
 
 export const runtime = "nodejs";
@@ -211,6 +212,15 @@ async function fetchRemoteVehicleImageByStorageKey(key: string): Promise<Respons
 export async function GET(request: NextRequest) {
   const key = request.nextUrl.searchParams.get("key")?.trim();
   if (key) {
+    const direct = await readImageFromR2Direct(key);
+    if (direct) {
+      return buildImageResponse(
+        new Uint8Array(direct.buffer),
+        direct.contentType,
+        "bff-direct-r2"
+      );
+    }
+
     const remote = await fetchRemoteVehicleImageByStorageKey(key);
     if (remote) {
       const body = await remote.arrayBuffer();
