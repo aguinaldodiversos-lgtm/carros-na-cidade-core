@@ -61,9 +61,10 @@ const INITIAL_FORM: WizardFormState = {
   optionalIds: [],
   conditionIds: [],
   boostOptionId: null,
+  draftPhotoUrls: [],
 };
 
-function validateStep(step: number, form: WizardFormState, photoCount: number): string | null {
+function validateStep(step: number, form: WizardFormState): string | null {
   switch (step) {
     case 0:
       if (!form.fipeBrandCode || !form.brandLabel) return "Selecione a marca.";
@@ -79,13 +80,12 @@ function validateStep(step: number, form: WizardFormState, photoCount: number): 
         return "Informe o preço do anúncio.";
       return null;
     case 2:
-      if (photoCount < 1) return "Adicione pelo menos uma foto.";
+      if (form.draftPhotoUrls.length < 1) return "Adicione pelo menos uma foto.";
       return null;
     case 3:
     case 4:
-    case 5:
       return null;
-    case 6:
+    case 5:
       if (!form.state.trim() || form.state.length !== 2) return "Selecione a UF.";
       if (form.cityId == null || !Number.isFinite(form.cityId)) {
         return "Selecione uma cidade válida da lista para continuar.";
@@ -93,6 +93,8 @@ function validateStep(step: number, form: WizardFormState, photoCount: number): 
       if (!form.city.trim()) return "Selecione uma cidade válida da lista para continuar.";
       if (!form.whatsapp.trim() && !form.phone.trim()) return "Informe WhatsApp ou telefone.";
       if (!form.acceptTerms) return "Aceite os termos para publicar.";
+      return null;
+    case 6:
       return null;
     default:
       return null;
@@ -117,9 +119,9 @@ export default function NewAdWizardClient({ initialType }: Props) {
   const searchParams = useSearchParams();
 
   const [form, setForm] = useState<WizardFormState>({ ...INITIAL_FORM, sellerType: initialType });
-  const [photos, setPhotos] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [coverIndex, setCoverIndex] = useState(0);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState("");
+  const [uploadingPreviews, setUploadingPreviews] = useState<string[]>([]);
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">(
     "idle"
   );
@@ -171,6 +173,11 @@ export default function NewAdWizardClient({ initialType }: Props) {
         ...INITIAL_FORM,
         ...parsed,
         cityId: typeof parsed.cityId === "number" ? parsed.cityId : null,
+        draftPhotoUrls: Array.isArray(parsed.draftPhotoUrls)
+          ? parsed.draftPhotoUrls.filter(
+              (u): u is string => typeof u === "string" && u.trim().length > 0
+            )
+          : [],
         sellerType:
           tipo === "lojista"
             ? "lojista"
@@ -212,9 +219,9 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   useEffect(() => {
     return () => {
-      previews.forEach((u) => URL.revokeObjectURL(u));
+      uploadingPreviews.forEach((u) => URL.revokeObjectURL(u));
     };
-  }, [previews]);
+  }, [uploadingPreviews]);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,41 +260,61 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   const title = useMemo(() => buildTitle(form), [form]);
 
-  function handlePhotoFiles(next: File[]) {
-    previews.forEach((u) => URL.revokeObjectURL(u));
-    const urls = next.map((f) => URL.createObjectURL(f));
-    setPhotos(next);
-    setPreviews(urls);
-    setCoverIndex(0);
+  async function handleAddPhotos(files: File[]) {
+    const maxNew = 10 - form.draftPhotoUrls.length - uploadingPreviews.length;
+    const toUpload = files.filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, maxNew));
+    if (!toUpload.length) return;
+
+    const newPreviews = toUpload.map((f) => URL.createObjectURL(f));
+    setUploadingPreviews((prev) => [...prev, ...newPreviews]);
+    setPhotoUploading(true);
+    setPhotoUploadError("");
+
+    const fd = new FormData();
+    toUpload.forEach((f) => fd.append("photos", f));
+
+    try {
+      const res = await fetch("/api/painel/anuncios/upload-draft-photos", {
+        method: "POST",
+        body: fd,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        urls?: string[];
+        message?: string;
+      };
+      if (!res.ok || !data.ok || !Array.isArray(data.urls)) {
+        throw new Error(data.message || "Erro ao enviar fotos.");
+      }
+      patch({
+        draftPhotoUrls: [
+          ...form.draftPhotoUrls,
+          ...data.urls.filter((u: string) => u.trim().length > 0),
+        ],
+      });
+    } catch (e) {
+      setPhotoUploadError(e instanceof Error ? e.message : "Erro ao enviar fotos.");
+    } finally {
+      newPreviews.forEach((u) => URL.revokeObjectURL(u));
+      setUploadingPreviews((prev) => prev.filter((p) => !newPreviews.includes(p)));
+      setPhotoUploading(false);
+    }
   }
 
   function removePhoto(index: number) {
-    URL.revokeObjectURL(previews[index]);
-    const nextFiles = photos.filter((_, i) => i !== index);
-    const nextPrev = previews.filter((_, i) => i !== index);
-    setPhotos(nextFiles);
-    setPreviews(nextPrev);
-    setCoverIndex(0);
+    patch({ draftPhotoUrls: form.draftPhotoUrls.filter((_, i) => i !== index) });
   }
 
-  function setCover(index: number) {
-    if (index === 0) {
-      setCoverIndex(0);
-      return;
-    }
-    const nextFiles = [...photos];
-    const [f] = nextFiles.splice(index, 1);
-    nextFiles.unshift(f);
-    const nextPrev = [...previews];
-    const [u] = nextPrev.splice(index, 1);
-    nextPrev.unshift(u);
-    setPhotos(nextFiles);
-    setPreviews(nextPrev);
-    setCoverIndex(0);
+  function setPhotoCover(index: number) {
+    if (index === 0) return;
+    const urls = [...form.draftPhotoUrls];
+    const [url] = urls.splice(index, 1);
+    urls.unshift(url);
+    patch({ draftPhotoUrls: urls });
   }
 
   function goNext() {
-    const err = validateStep(step, form, photos.length);
+    const err = validateStep(step, form);
     if (err) {
       setSubmitState("error");
       setSubmitMessage(err);
@@ -315,11 +342,17 @@ export default function NewAdWizardClient({ initialType }: Props) {
   }
 
   async function handleSubmit() {
-    const firstError = [0, 1, 2, 6].map((s) => validateStep(s, form, photos.length)).find(Boolean);
+    const firstError = [0, 1, 2, 5].map((s) => validateStep(s, form)).find(Boolean);
     const err = firstError ?? null;
     if (err) {
       setSubmitState("error");
       setSubmitMessage(err);
+      return;
+    }
+
+    if (form.draftPhotoUrls.length === 0) {
+      setSubmitState("error");
+      setSubmitMessage("Adicione pelo menos uma foto do veículo.");
       return;
     }
 
@@ -356,9 +389,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
         payload.append("boostOptionId", form.boostOptionId);
       }
 
-      photos.forEach((file, index) => {
-        payload.append("photos", file, file.name || `foto-${index + 1}.jpg`);
-      });
+      payload.append("draftPhotoUrls", JSON.stringify(form.draftPhotoUrls));
 
       const response = await fetch("/api/painel/anuncios", {
         method: "POST",
@@ -386,14 +417,22 @@ export default function NewAdWizardClient({ initialType }: Props) {
       }
 
       setSubmitState("success");
-      setSubmitMessage(result?.message || "Anúncio enviado com sucesso.");
+      setSubmitMessage(result?.message || "Anúncio publicado com sucesso!");
 
-      const redirectTo =
+      const backendRedirect =
         result?.result?.redirectTo || result?.result?.redirect_to || result?.result?.url || "";
 
-      if (typeof redirectTo === "string" && redirectTo.trim()) {
-        setTimeout(() => router.push(redirectTo), 800);
-      }
+      const defaultRedirect =
+        sessionAccountType === "CNPJ"
+          ? "/dashboard-loja/meus-anuncios"
+          : "/dashboard/meus-anuncios";
+
+      const redirectTo =
+        typeof backendRedirect === "string" && backendRedirect.trim()
+          ? backendRedirect
+          : defaultRedirect;
+
+      setTimeout(() => router.push(redirectTo), 1200);
     } catch (e) {
       setSubmitState("error");
       setSubmitMessage(e instanceof Error ? e.message : "Erro ao publicar.");
@@ -407,8 +446,8 @@ export default function NewAdWizardClient({ initialType }: Props) {
     2: "Mostre o veículo com imagens de qualidade.",
     3: "Marque os equipamentos e opcionais.",
     4: "Informe condições e histórico relevantes.",
-    5: "Escolha se deseja destacar o anúncio.",
-    6: "Revise, descreva se quiser, informe contato e publique.",
+    5: "Revise, descreva se quiser, informe contato e publique.",
+    6: "Escolha se deseja destacar o anúncio.",
   };
 
   const isAnunciarRoute = pathname.includes("/anunciar/novo");
@@ -525,18 +564,18 @@ export default function NewAdWizardClient({ initialType }: Props) {
       {step === 1 ? <StepListingInfo state={form} patch={patch} /> : null}
       {step === 2 ? (
         <StepPhotos
-          photos={photos}
-          previews={previews}
-          coverIndex={coverIndex}
-          onFiles={handlePhotoFiles}
+          uploadedUrls={form.draftPhotoUrls}
+          uploadingPreviews={uploadingPreviews}
+          uploading={photoUploading}
+          uploadError={photoUploadError}
+          onAddFiles={handleAddPhotos}
           onRemove={removePhoto}
-          onSetCover={setCover}
+          onSetCover={setPhotoCover}
         />
       ) : null}
       {step === 3 ? <StepOptionals state={form} patch={patch} /> : null}
       {step === 4 ? <StepConditions state={form} patch={patch} /> : null}
-      {step === 5 ? <StepHighlight state={form} patch={patch} boostOptions={boostOptions} /> : null}
-      {step === 6 ? (
+      {step === 5 ? (
         <StepFinalize
           state={form}
           patch={patch}
@@ -545,6 +584,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
           sessionAccountType={sessionAccountType}
         />
       ) : null}
+      {step === 6 ? <StepHighlight state={form} patch={patch} boostOptions={boostOptions} /> : null}
     </SellWizardLayout>
   );
 }

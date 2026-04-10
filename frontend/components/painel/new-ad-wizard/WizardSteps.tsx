@@ -403,79 +403,101 @@ export function StepListingInfo({ state, patch }: { state: WizardFormState; patc
 }
 
 type PhotoProps = {
-  photos: File[];
-  previews: string[];
-  coverIndex: number;
-  onFiles: (files: File[]) => void;
+  uploadedUrls: string[];
+  uploadingPreviews: string[];
+  uploading: boolean;
+  uploadError: string;
+  onAddFiles: (files: File[]) => void;
   onRemove: (index: number) => void;
   onSetCover: (index: number) => void;
 };
 
 export function StepPhotos({
-  photos,
-  previews,
-  coverIndex,
-  onFiles,
+  uploadedUrls,
+  uploadingPreviews,
+  uploading,
+  uploadError,
+  onAddFiles,
   onRemove,
   onSetCover,
 }: PhotoProps) {
   const [dragOver, setDragOver] = useState(false);
 
+  const totalCount = uploadedUrls.length + uploadingPreviews.length;
+  const canAdd = totalCount < 10;
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const list = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith("image/"));
-    if (!list.length) return;
-    mergeFiles(list);
+    if (list.length) onAddFiles(list);
   };
-
-  function mergeFiles(incoming: File[]) {
-    const next = [...photos, ...incoming].slice(0, 10);
-    onFiles(next);
-  }
 
   return (
     <div className="space-y-6">
       <p className="text-sm leading-7 text-[#6E748A]">
         Fotos claras e bem iluminadas geram mais contatos. Você pode arrastar imagens para a área
         abaixo ou clicar para selecionar.
+        As fotos são salvas automaticamente e permanecem mesmo se você voltar ou avançar entre etapas.
       </p>
 
-      <label
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed px-6 py-10 text-center transition ${
-          dragOver
-            ? "border-[#2F67F6] bg-[#F2F7FF]"
-            : "border-[#B9C8E8] bg-[#F8FBFF] hover:border-[#2F67F6]"
-        }`}
-      >
-        <span className="text-lg font-bold text-[#1D2440]">Adicionar fotos</span>
-        <span className="mt-2 max-w-md text-sm text-[#6E748A]">
-          Até 10 imagens. Formatos JPG ou PNG.
-        </span>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            const list = Array.from(e.target.files || []);
-            mergeFiles(list);
-            e.target.value = "";
+      {canAdd ? (
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
           }}
-        />
-      </label>
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed px-6 py-10 text-center transition ${
+            dragOver
+              ? "border-[#2F67F6] bg-[#F2F7FF]"
+              : "border-[#B9C8E8] bg-[#F8FBFF] hover:border-[#2F67F6]"
+          }`}
+        >
+          <span className="text-lg font-bold text-[#1D2440]">
+            {uploading ? "Enviando fotos..." : "Adicionar fotos"}
+          </span>
+          <span className="mt-2 max-w-md text-sm text-[#6E748A]">
+            {uploadedUrls.length > 0
+              ? `${uploadedUrls.length}/10 fotos adicionadas. Adicione mais ou continue.`
+              : "Até 10 imagens. Formatos JPG ou PNG."}
+          </span>
+          {uploading ? (
+            <span className="mt-3 inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#2F67F6] border-t-transparent" />
+          ) : null}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const list = Array.from(e.target.files || []);
+              if (list.length) onAddFiles(list);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      ) : (
+        <div className="rounded-[24px] border border-[#DCE6F7] bg-[#F2F7FF] px-6 py-6 text-center">
+          <span className="text-sm font-bold text-[#2F67F6]">
+            Limite de 10 fotos atingido. Remova uma foto para adicionar outra.
+          </span>
+        </div>
+      )}
 
-      {previews.length ? (
+      {uploadError ? (
+        <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {uploadError}
+        </div>
+      ) : null}
+
+      {uploadedUrls.length > 0 || uploadingPreviews.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {previews.map((src, index) => (
+          {uploadedUrls.map((src, index) => (
             <div
-              key={`${src}-${index}`}
+              key={`uploaded-${index}-${src.slice(-20)}`}
               className="overflow-hidden rounded-[22px] border border-[#E5E9F2] bg-white shadow-sm"
             >
               <div className="aspect-[4/3] bg-[#EDF2FB]">
@@ -487,10 +509,10 @@ export function StepPhotos({
                   type="button"
                   onClick={() => onSetCover(index)}
                   className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                    coverIndex === index ? "bg-[#2F67F6] text-white" : "bg-[#EEF4FF] text-[#2F67F6]"
+                    index === 0 ? "bg-[#2F67F6] text-white" : "bg-[#EEF4FF] text-[#2F67F6]"
                   }`}
                 >
-                  {coverIndex === index ? "Capa" : "Usar como capa"}
+                  {index === 0 ? "Capa" : "Usar como capa"}
                 </button>
                 <button
                   type="button"
@@ -502,7 +524,28 @@ export function StepPhotos({
               </div>
             </div>
           ))}
+          {uploadingPreviews.map((src, index) => (
+            <div
+              key={`pending-${index}`}
+              className="relative overflow-hidden rounded-[22px] border border-[#DCE6F7] bg-white opacity-70 shadow-sm"
+            >
+              <div className="aspect-[4/3] bg-[#EDF2FB]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="h-full w-full object-cover" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+                <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#2F67F6] border-t-transparent" />
+              </div>
+            </div>
+          ))}
         </div>
+      ) : null}
+
+      {uploadedUrls.length > 0 ? (
+        <p className="text-xs text-[#6E748A]">
+          Suas fotos estão salvas no servidor. Elas não serão perdidas ao navegar entre etapas
+          ou editar outros campos do anúncio.
+        </p>
       ) : null}
     </div>
   );

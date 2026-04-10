@@ -174,25 +174,40 @@ function parseResolvedCityPayload(json: unknown, fallbackUf?: string): ResolvedC
   };
 }
 
+export type CityResolutionResult =
+  | { ok: true; city: ResolvedCityRow }
+  | { ok: false; reason: "not_found" | "backend_error" | "rate_limited"; status?: number };
+
 /** GET /api/public/cities/by-id/:id — valida city_id antes do publish. */
 export async function fetchResolvedCityByIdFromBackend(
   cityId: number,
-  fallbackUf?: string
-): Promise<ResolvedCityRow | null> {
+  fallbackUf?: string,
+  extraHeaders?: Record<string, string>
+): Promise<CityResolutionResult> {
   const url = resolveBackendApiUrl(
     `/api/public/cities/by-id/${encodeURIComponent(String(cityId))}`
   );
-  if (!url) return null;
+  if (!url) return { ok: false, reason: "backend_error" };
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...extraHeaders },
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (res.status === 429) {
+      return { ok: false, reason: "rate_limited", status: 429 };
+    }
+    if (res.status === 404) {
+      return { ok: false, reason: "not_found", status: 404 };
+    }
+    if (!res.ok) {
+      return { ok: false, reason: "backend_error", status: res.status };
+    }
     const json = await res.json();
-    return parseResolvedCityPayload(json, fallbackUf);
+    const city = parseResolvedCityPayload(json, fallbackUf);
+    if (!city) return { ok: false, reason: "not_found" };
+    return { ok: true, city };
   } catch {
-    return null;
+    return { ok: false, reason: "backend_error" };
   }
 }
 

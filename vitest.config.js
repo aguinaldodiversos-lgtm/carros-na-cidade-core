@@ -1,9 +1,15 @@
+import path from "node:path";
 import { defineConfig } from "vitest/config";
 import { applyVitestIntegrationEnv } from "./tests/integration/helpers/integration-db-bootstrap.js";
 
 applyVitestIntegrationEnv();
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "frontend"),
+    },
+  },
   test: {
     environment: "node",
     include: ["src/**/*.test.js", "tests/**/*.test.js"],

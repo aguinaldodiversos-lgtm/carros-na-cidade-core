@@ -33,9 +33,11 @@ export type WizardFormState = {
   optionalIds: string[];
   conditionIds: string[];
   boostOptionId: string | null;
+  /** URLs de fotos já enviadas ao storage (persistem em localStorage). */
+  draftPhotoUrls: string[];
 };
 
-export const WIZARD_STORAGE_KEY = "carros-na-cidade:new-ad-wizard:v1";
+export const WIZARD_STORAGE_KEY = "carros-na-cidade:new-ad-wizard:v2";
 
 export const STEP_COUNT = 7;
 
@@ -45,6 +47,6 @@ export const STEP_LABELS = [
   "Fotos",
   "Opcionais",
   "Condições",
-  "Destaque",
   "Finalização",
+  "Destaque",
 ] as const;
