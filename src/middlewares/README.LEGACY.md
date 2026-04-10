@@ -1,14 +1,16 @@
-# `src/middlewares` — CÓDIGO MORTO (CommonJS legado)
+# `src/middlewares` — REMOVIDO
 
-> **STATUS: CÓDIGO MORTO — zero imports ativos no projeto.**
-> Última auditoria: abril 2026.
+> **STATUS: Todo o código CommonJS legado foi removido em abril 2026 (Sprint 2).**
 
-O middleware ativo do projeto está em **`src/shared/middlewares/`** (ESM).
+Os arquivos `apiTokenAuth.js`, `metrics.js`, e `auth.js` foram deletados
+após auditoria confirmar zero imports ativos no projeto.
 
-| Arquivo              | Substituto oficial                                 |
-| -------------------- | -------------------------------------------------- |
-| `auth.js` (removido) | `src/shared/middlewares/auth.middleware.js`         |
-| `apiTokenAuth.js`    | Sem substituto ativo (não montado)                 |
-| `metrics.js`         | `src/shared/observability/request.metrics.middleware.js` |
+O middleware ativo está em **`src/shared/middlewares/`** (ESM).
 
-**Não usar em novas features.** Este diretório pode ser removido com segurança.
+| Arquivo removido     | Substituto oficial                                        |
+| -------------------- | --------------------------------------------------------- |
+| `auth.js`            | `src/shared/middlewares/auth.middleware.js`                |
+| `apiTokenAuth.js`    | Sem substituto (funcionalidade não utilizada)              |
+| `metrics.js`         | `src/shared/observability/request.metrics.middleware.js`   |
+
+**Este diretório existe apenas para documentar a remoção.**

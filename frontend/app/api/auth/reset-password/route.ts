@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { resetPassword } from "@/services/authService";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const updated = await resetPassword(token, password);
+  const ipHeaders = buildBffBackendForwardHeaders(request);
+  const updated = await resetPassword(token, password, ipHeaders);
   if (!updated) {
     return NextResponse.json({ error: "Nao foi possivel redefinir a senha" }, { status: 400 });
   }

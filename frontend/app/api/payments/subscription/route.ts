@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSubscriptionCheckout } from "@/lib/account/backend-account";
-import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
-import {
-  applySessionCookiesToResponse,
-  getSessionDataFromRequest,
-} from "@/services/sessionService";
+import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,26 +17,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "plan_id e obrigatorio" }, { status: 400 });
     }
 
-    const session = getSessionDataFromRequest(request);
-    const ensured = await ensureSessionWithFreshBackendTokens(session);
-
-    if (!ensured.ok || !ensured.session.accessToken) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
-    }
+    const auth = await authenticateBffRequest(request);
+    if (!auth.ok) return auth.response;
 
     const origin = request.nextUrl.origin;
-    const payload = await createSubscriptionCheckout(ensured.session, {
+    const payload = await createSubscriptionCheckout(auth.ctx.session, {
       plan_id: planId,
       success_url: `${origin}/pagamento/sucesso`,
       failure_url: `${origin}/pagamento/erro`,
       pending_url: `${origin}/pagamento/erro`,
     });
 
-    const res = NextResponse.json(payload);
-    if (ensured.persistCookies) {
-      applySessionCookiesToResponse(res, ensured.persistCookies);
-    }
-    return res;
+    return applyBffCookies(NextResponse.json(payload), auth.ctx);
   } catch (error) {
     console.error("[POST /api/payments/subscription]", error instanceof Error ? error.message : error);
     return NextResponse.json(

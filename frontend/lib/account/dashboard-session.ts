@@ -37,17 +37,13 @@ export async function requireLojistaDashboardSession(): Promise<SessionData> {
 export async function loadDashboardPayload(session: SessionData): Promise<DashboardPayload | null> {
   const ensured = await ensureSessionWithFreshBackendTokens(session);
   if (!ensured.ok) {
-    if (process.env.DASHBOARD_DEBUG === "1") {
-      console.error("[loadDashboardPayload] sessão sem tokens utilizáveis", ensured);
-    }
+    console.error("[loadDashboardPayload] sessão sem tokens utilizáveis");
     return null;
   }
   try {
     return await fetchDashboard(ensured.session);
   } catch (error) {
-    if (process.env.DASHBOARD_DEBUG === "1") {
-      console.error("[loadDashboardPayload] falha ao buscar /api/account/dashboard", error);
-    }
+    console.error("[loadDashboardPayload] falha ao buscar dashboard", error instanceof Error ? error.message : error);
     return null;
   }
 }

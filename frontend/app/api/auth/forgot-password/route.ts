@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { requestPasswordReset } from "@/services/authService";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Email e obrigatorio" }, { status: 400 });
   }
 
-  await requestPasswordReset(email);
+  const ipHeaders = buildBffBackendForwardHeaders(request);
+  await requestPasswordReset(email, ipHeaders);
   return NextResponse.json({
     ok: true,
     message: "Se o email existir, enviaremos as instrucoes para recuperacao.",

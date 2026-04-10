@@ -5,6 +5,9 @@ import { defineConfig } from "vitest/config";
 const root = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  esbuild: {
+    jsx: "automatic",
+  },
   test: {
     environment: "node",
     globals: false,
@@ -12,7 +15,7 @@ export default defineConfig({
     exclude: ["node_modules", "e2e/**", ".next/**"],
     coverage: {
       provider: "v8",
-      include: ["lib/**/*.ts", "lib/**/*.tsx", "services/**/*.ts"],
+      include: ["lib/**/*.ts", "lib/**/*.tsx", "services/**/*.ts", "components/**/*.tsx"],
       exclude: ["**/*.test.ts", "**/*.test.tsx", "**/node_modules/**"],
       reporter: ["text", "json-summary", "html"],
       reportsDirectory: "./coverage/frontend",

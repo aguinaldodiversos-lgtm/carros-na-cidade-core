@@ -426,7 +426,11 @@ export function getAuthUserById(userId: string): AuthUser | null {
   return toAuthUserFromStore(userId, getLocalEmailByUserId(userId));
 }
 
-async function postAuthProxy(endpoint: string, payload: Record<string, unknown>) {
+async function postAuthProxy(
+  endpoint: string,
+  payload: Record<string, unknown>,
+  extraHeaders?: Record<string, string>
+) {
   const url = resolveBackendApiUrl(endpoint);
   if (!url) return false;
 
@@ -435,6 +439,7 @@ async function postAuthProxy(endpoint: string, payload: Record<string, unknown>)
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...extraHeaders,
       },
       body: JSON.stringify(payload),
       cache: "no-store",
@@ -446,23 +451,33 @@ async function postAuthProxy(endpoint: string, payload: Record<string, unknown>)
   }
 }
 
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(
+  email: string,
+  ipHeaders?: Record<string, string>
+) {
   const normalizedEmail = normalizeEmail(email);
-  const proxied = await postAuthProxy("/api/auth/forgot-password", {
-    email: normalizedEmail,
-  });
+  const proxied = await postAuthProxy(
+    "/api/auth/forgot-password",
+    { email: normalizedEmail },
+    ipHeaders
+  );
 
   if (proxied) return true;
 
   return Boolean(findLocalCredentialByEmail(normalizedEmail));
 }
 
-export async function resetPassword(token: string, password: string) {
+export async function resetPassword(
+  token: string,
+  password: string,
+  ipHeaders?: Record<string, string>
+) {
   const normalizedToken = normalizeString(token);
-  const proxied = await postAuthProxy("/api/auth/reset-password", {
-    token: normalizedToken,
-    password,
-  });
+  const proxied = await postAuthProxy(
+    "/api/auth/reset-password",
+    { token: normalizedToken, password },
+    ipHeaders
+  );
 
   if (proxied) return true;
 

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPaymentCheckout } from "@/lib/account/backend-account";
-import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
-import {
-  applySessionCookiesToResponse,
-  getSessionDataFromRequest,
-} from "@/services/sessionService";
+import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
 
 export const dynamic = "force-dynamic";
 
@@ -16,16 +12,12 @@ type Payload = {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticateBffRequest(request);
+    if (!auth.ok) return auth.response;
+
     const body = (await request.json()) as Payload;
-    const session = getSessionDataFromRequest(request);
-    const ensured = await ensureSessionWithFreshBackendTokens(session);
-
-    if (!ensured.ok || !ensured.session.accessToken) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
-    }
-
     const origin = request.nextUrl.origin;
-    const payload = await createPaymentCheckout(ensured.session, {
+    const payload = await createPaymentCheckout(auth.ctx.session, {
       plan_id: body.plan_id?.trim(),
       ad_id: body.ad_id?.trim(),
       boost_option_id: body.boost_option_id?.trim(),
@@ -34,11 +26,7 @@ export async function POST(request: NextRequest) {
       pending_url: `${origin}/pagamento/erro`,
     });
 
-    const res = NextResponse.json(payload);
-    if (ensured.persistCookies) {
-      applySessionCookiesToResponse(res, ensured.persistCookies);
-    }
-    return res;
+    return applyBffCookies(NextResponse.json(payload), auth.ctx);
   } catch (error) {
     console.error("[POST /api/payments/create]", error instanceof Error ? error.message : error);
     return NextResponse.json(

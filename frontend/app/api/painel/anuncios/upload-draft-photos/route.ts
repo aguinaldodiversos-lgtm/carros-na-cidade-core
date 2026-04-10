@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
 import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
 import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
 import {
   isR2ConfiguredInBff,
   uploadDraftPhotosDirectR2,
 } from "@/lib/painel/upload-draft-photos-direct-r2";
-import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
-import {
-  applySessionCookiesToResponse,
-  getSessionDataFromRequest,
-} from "@/services/sessionService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +23,7 @@ function extractPhotos(source: FormData): File[] {
 /**
  * Upload de fotos em modo rascunho — permite que o wizard envie fotos
  * imediatamente ao storage (R2 / local dev) e receba URLs persistíveis
- * antes do submit final. Isso garante que as fotos sobrevivam à navegação
- * entre etapas e recargas de página.
+ * antes do submit final.
  *
  * Estratégia de upload (fallback em cascata):
  *  1. Upload direto ao R2 a partir do BFF (se R2_* env vars presentes)
@@ -37,10 +32,8 @@ function extractPhotos(source: FormData): File[] {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = getSessionDataFromRequest(request);
-    const ensured = await ensureSessionWithFreshBackendTokens(session);
-
-    if (!ensured.ok || !ensured.session.accessToken) {
+    const auth = await authenticateBffRequest(request);
+    if (!auth.ok) {
       return NextResponse.json(
         { ok: false, message: "Faça login para enviar fotos." },
         { status: 401 }
@@ -64,12 +57,11 @@ export async function POST(request: NextRequest) {
     let photoUrls: string[] = [];
     const errors: string[] = [];
 
-    // --- Layer 1: Direct R2 upload from BFF (fastest, no backend dependency) ---
     if (isR2ConfiguredInBff()) {
       try {
         photoUrls = await uploadDraftPhotosDirectR2(
           photos,
-          ensured.session.id || "anon"
+          auth.ctx.session.id || "anon"
         );
       } catch (err) {
         const msg =
@@ -79,12 +71,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- Layer 2: Proxy through Express backend ---
     if (photoUrls.length === 0 && getBackendApiBaseUrl()) {
       try {
         photoUrls = await uploadPublishPhotosToBackendR2(
           source,
-          ensured.session.accessToken
+          auth.ctx.session.accessToken!
         );
       } catch (err) {
         const msg =
@@ -96,7 +87,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- Layer 3: Local filesystem (development only) ---
     if (photoUrls.length === 0 && process.env.NODE_ENV !== "production") {
       try {
         photoUrls = await saveWizardPhotosToPublic(source);
@@ -108,7 +98,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- All layers exhausted ---
     if (photoUrls.length === 0) {
       const detail =
         process.env.NODE_ENV !== "production" && errors.length > 0
@@ -123,11 +112,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const res = NextResponse.json({ ok: true, urls: photoUrls });
-    if (ensured.persistCookies) {
-      applySessionCookiesToResponse(res, ensured.persistCookies);
-    }
-    return res;
+    return applyBffCookies(
+      NextResponse.json({ ok: true, urls: photoUrls }),
+      auth.ctx
+    );
   } catch (error) {
     console.error("[upload-draft-photos] Unexpected error:", error);
     return NextResponse.json(

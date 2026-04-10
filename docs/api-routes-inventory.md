@@ -97,15 +97,15 @@ O frontend usa **`/api/ads/event`**. `POST /api/events` permanece por compatibil
 
 Os roteadores CommonJS que viviam em `src/routes/*` (exceto `health.js` / `metrics.js`) foram **removidos** — não havia import em `app.js`; duplicavam `src/modules/*`.
 
-### `src/controllers/` — não usados pela API oficial (`app.js`)
+### `src/controllers/` — **REMOVIDO** (Sprint 2, abril 2026)
 
-Nenhum arquivo em `src/controllers/` é importado por `src/modules/**` (a API oficial usa controllers/services dentro de `modules/`).
+Todos os 13 controller files CommonJS foram removidos após auditoria confirmar zero imports.
+Apenas `README.LEGACY.md` permanece documentando a remoção.
 
-Pasta `controllers/ads/` foi **removida** (duplicava o módulo oficial). Restantes: `auth/*`, `analytics/*`, `alerts/*`, `integrations/createAdFromApi.controller.js`.
+### `src/middlewares/` — **REMOVIDO** (Sprint 2, abril 2026)
 
-### `src/middlewares/` (legado CommonJS)
-
-Usados só pelos roteadores legado (`auth`, `apiTokenAuth`, etc.), não pelo pipeline ESM de `app.js`.
+`apiTokenAuth.js`, `metrics.js`, e `auth.js` foram removidos (zero imports).
+Middleware ativo: `src/shared/middlewares/` (ESM). `README.LEGACY.md` documenta a remoção.
 
 ### `src/legacy/services-ads/` — CommonJS morto para o servidor atual
 
@@ -122,9 +122,9 @@ Detalhes e comparação com o legado CommonJS: `src/modules/integrations/README.
 ## 4. Política para novas correções
 
 1. **Novas features e correções de API:** usar somente `src/modules/**` e montar em `src/app.js` se for rota HTTP nova.
-2. **Não adicionar** rotas em `src/routes/*` além de `health.js` / `metrics.js`; não estender `src/controllers/*` sem plano de migração para `modules/`.
+2. **Não adicionar** rotas em `src/routes/*` além de `health.js` / `metrics.js`.
 3. **Eventos de anúncio:** alterar apenas `ad-events.ingest.js`; manter os dois URLs (`/api/ads/event` e `/api/events`) ou remover o alias numa fase futura com aviso aos clientes.
-4. **Legado restante:** `src/controllers/*`, `src/middlewares/*` (CommonJS), `src/legacy/*` — não montados em `app.js` até migração explícita.
+4. **Legado restante:** `src/legacy/*` — não montado em `app.js`. `src/controllers/*` e `src/middlewares/*` foram removidos.
 
 ---
 

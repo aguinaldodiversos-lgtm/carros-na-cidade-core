@@ -26,7 +26,9 @@
     "test:e2e:register-publish": "playwright test e2e/register-minimal-to-publish.spec.ts",
     "test:e2e:publish-surface": "playwright test e2e/publish-full-surface.spec.ts",
     "test:e2e:isolation": "playwright test e2e/user-isolation-api.spec.ts",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "e2e:mock-backend": "npx tsx e2e/mock-backend/server.ts",
+    "test:e2e:mock": "E2E_MOCK_BACKEND=1 E2E_BACKEND_API_URL=http://127.0.0.1:4000 playwright test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1028.0",
@@ -42,6 +44,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.19.9",
     "@types/pg": "^8.20.0",
     "@types/react": "^18.3.12",
@@ -49,7 +54,9 @@
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
+    "jsdom": "^29.0.2",
     "pg": "^8.20.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.9"
   }
