@@ -27,7 +27,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   } as unknown as Record<string, RouteHandler>,
 
   "POST /api/auth/login": {
-    handler: (body) => {
+    handler: (body: Record<string, unknown>) => {
       const email = String(body.email || "").toLowerCase().trim();
       const user = fixtures.users.find((u) => u.email === email);
       if (!user || body.password !== user.password) {
@@ -46,7 +46,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   } as unknown as Record<string, RouteHandler>,
 
   "POST /api/auth/register": {
-    handler: (body) => {
+    handler: (body: Record<string, unknown>) => {
       const id = `mock-user-${Date.now()}`;
       return {
         status: 201,
@@ -61,7 +61,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   } as unknown as Record<string, RouteHandler>,
 
   "POST /api/auth/refresh": {
-    handler: (body) => {
+    handler: (body: Record<string, unknown>) => {
       const rt = String(body.refreshToken || "");
       if (!rt.startsWith("mock-refresh-")) {
         return { status: 401, body: { error: "Refresh token inválido" } };
@@ -92,7 +92,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   } as unknown as Record<string, RouteHandler>,
 
   "GET /api/ads/search": {
-    handler: (_body, url) => {
+    handler: (_body: Record<string, unknown>, url: URL) => {
       let ads = [...fixtures.ads];
       const brand = url.searchParams.get("brand");
       if (brand) {
@@ -140,7 +140,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   } as unknown as Record<string, RouteHandler>,
 
   "GET /api/cities/search": {
-    handler: (_body, url) => {
+    handler: (_body: Record<string, unknown>, url: URL) => {
       const q = url.searchParams.get("q") || "";
       const results = fixtures.cities.filter((c) =>
         c.name.toLowerCase().includes(q.toLowerCase())
@@ -157,7 +157,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   } as unknown as Record<string, RouteHandler>,
 
   "GET /api/v1/carros/marcas/": {
-    handler: (_body, url) => {
+    handler: (_body: Record<string, unknown>, url: URL) => {
       const parts = url.pathname.split("/");
       const brandCode = parts[5];
       const isModels = parts[6] === "modelos";

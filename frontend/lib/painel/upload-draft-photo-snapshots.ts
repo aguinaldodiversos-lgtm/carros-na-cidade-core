@@ -39,10 +39,14 @@ export async function snapshotPhotoFiles(photos: File[]): Promise<PhotoSnapshot[
   );
 }
 
+function bufferToBlobPart(buf: Buffer): BlobPart {
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength) as BlobPart;
+}
+
 export function filesFromSnapshots(snapshots: PhotoSnapshot[]): File[] {
   return snapshots.map(
     (s) =>
-      new File([s.buffer], s.name, {
+      new File([bufferToBlobPart(s.buffer)], s.name, {
         type: s.type,
       })
   );
@@ -51,7 +55,7 @@ export function filesFromSnapshots(snapshots: PhotoSnapshot[]): File[] {
 export function formDataFromSnapshots(snapshots: PhotoSnapshot[]): FormData {
   const fd = new FormData();
   for (const s of snapshots) {
-    fd.append("photos", new File([s.buffer], s.name, { type: s.type }));
+    fd.append("photos", new File([bufferToBlobPart(s.buffer)], s.name, { type: s.type }));
   }
   return fd;
 }
