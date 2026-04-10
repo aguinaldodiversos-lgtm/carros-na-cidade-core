@@ -14,6 +14,7 @@ import {
   searchCities,
 } from "./public-city-query.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
+import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 
 const router = express.Router();
 
@@ -25,8 +26,7 @@ router.get(
   resolveCity
 );
 
-// Sem cache Redis: lista depende do cadastro em `cities` e cache vazio atrapalha o painel após deploy.
-router.get("/cities/search", searchCities);
+router.get("/cities/search", autocompleteRateLimit, searchCities);
 
 router.get(
   "/cities/by-id/:id",

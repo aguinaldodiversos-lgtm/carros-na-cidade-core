@@ -49,6 +49,7 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
   const [searchError, setSearchError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<CityRow[]>([]);
   const debounceRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -61,13 +62,21 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
         setSearchError(null);
         return;
       }
+
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setLoading(true);
       setSearchError(null);
       try {
         const params = new URLSearchParams({ q: q.trim(), uf });
         const res = await fetch(`/api/painel/cidades/search?${params.toString()}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
+
         const json = (await res.json()) as {
           success?: boolean;
           data?: unknown;
@@ -75,20 +84,25 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
         };
         if (!res.ok) {
           setSuggestions([]);
-          setSearchError(
-            typeof json?.message === "string" && json.message.trim()
-              ? json.message
-              : "Não foi possível buscar cidades. Tente novamente."
-          );
+          if (res.status === 429) {
+            setSearchError("Muitas buscas em sequência. Aguarde alguns segundos e tente novamente.");
+          } else {
+            setSearchError(
+              typeof json?.message === "string" && json.message.trim()
+                ? json.message
+                : "Não foi possível buscar cidades. Tente novamente."
+            );
+          }
           return;
         }
         const rows = normalizeCitySearchRows(json?.data);
         setSuggestions(rows);
-      } catch {
+      } catch (err) {
+        if (controller.signal.aborted) return;
         setSuggestions([]);
         setSearchError("Falha de rede ao buscar cidades.");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [uf]
@@ -108,9 +122,10 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
     }
     debounceRef.current = window.setTimeout(() => {
       void fetchSuggestions(q);
-    }, 280);
+    }, 350);
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
+      if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     };
   }, [searchQuery, uf, state.cityId, fetchSuggestions]);
 

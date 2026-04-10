@@ -43,3 +43,20 @@ export const registerRateLimit = rateLimit({
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
 });
+
+/**
+ * Rate limit generoso para endpoints de autocomplete (cidades, busca).
+ * Protege contra abuso real sem bloquear digitação normal no autocomplete.
+ * 120 requests por minuto por IP é suficiente para uso intenso (debounce ≥250ms → ~4 req/s max).
+ */
+export const autocompleteRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `autocomplete:${clientRateLimitKey(req)}`,
+  message: {
+    success: false,
+    message: "Muitas buscas em sequência. Aguarde alguns segundos.",
+  },
+});

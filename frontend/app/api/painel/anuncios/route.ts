@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import type { AccountType } from "@/lib/dashboard-types";
 import {
   buildBackendCreateAdPayload,
@@ -209,6 +210,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Accept: "application/json",
         Authorization: `Bearer ${ensured.session.accessToken}`,
+        ...buildBffBackendForwardHeaders(request),
       },
       body: JSON.stringify(body),
       cache: "no-store",

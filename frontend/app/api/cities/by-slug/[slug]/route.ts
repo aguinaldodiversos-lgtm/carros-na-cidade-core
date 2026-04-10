@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { toCityRef } from "@/lib/city/city-types";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ type TerritorialPayload = {
 };
 
 /** Resolve metadados mínimos da cidade a partir do slug territorial. */
-export async function GET(_request: Request, { params }: { params: { slug: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
   const slug = String(params.slug || "").trim();
   if (!slug) {
     return NextResponse.json({ success: false, message: "Slug obrigatório." }, { status: 400 });
@@ -33,7 +34,10 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   }
 
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
+    const res = await fetch(url, {
+      headers: { Accept: "application/json", ...buildBffBackendForwardHeaders(request) },
+      cache: "no-store",
+    });
     const text = await res.text();
     let json: { success?: boolean; data?: TerritorialPayload };
     try {
