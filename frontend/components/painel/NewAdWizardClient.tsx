@@ -277,6 +277,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
       const res = await fetch("/api/painel/anuncios/upload-draft-photos", {
         method: "POST",
         body: fd,
+        credentials: "include",
       });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;

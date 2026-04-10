@@ -4,6 +4,11 @@ import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session"
 import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
 import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
 import {
+  formDataFromSnapshots,
+  filesFromSnapshots,
+  snapshotPhotoFiles,
+} from "@/lib/painel/upload-draft-photo-snapshots";
+import {
   isR2ConfiguredInBff,
   uploadDraftPhotosDirectR2,
 } from "@/lib/painel/upload-draft-photos-direct-r2";
@@ -29,6 +34,10 @@ function extractPhotos(source: FormData): File[] {
  *  1. Upload direto ao R2 a partir do BFF (se R2_* env vars presentes)
  *  2. Proxy via backend Express (se BACKEND_API_URL / NEXT_PUBLIC_API_URL existir)
  *  3. Gravação local em public/uploads/ads (somente dev)
+ *
+ * Cada ficheiro é lido uma vez para buffer (`snapshotPhotoFiles`) e recriado
+ * como `File` por camada — evita falha quando o primeiro backend lê o stream
+ * Undici e os fallbacks recebem ficheiros vazios.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -54,13 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const snapshots = await snapshotPhotoFiles(photos);
+
     let photoUrls: string[] = [];
     const errors: string[] = [];
 
     if (isR2ConfiguredInBff()) {
       try {
         photoUrls = await uploadDraftPhotosDirectR2(
-          photos,
+          filesFromSnapshots(snapshots),
           auth.ctx.session.id || "anon"
         );
       } catch (err) {
@@ -74,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (photoUrls.length === 0 && getBackendApiBaseUrl()) {
       try {
         photoUrls = await uploadPublishPhotosToBackendR2(
-          source,
+          formDataFromSnapshots(snapshots),
           auth.ctx.session.accessToken!
         );
       } catch (err) {
@@ -89,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     if (photoUrls.length === 0 && process.env.NODE_ENV !== "production") {
       try {
-        photoUrls = await saveWizardPhotosToPublic(source);
+        photoUrls = await saveWizardPhotosToPublic(formDataFromSnapshots(snapshots));
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : "Erro desconhecido no fallback local";
