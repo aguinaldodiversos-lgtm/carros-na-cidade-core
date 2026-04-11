@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { sanitizeS3MetadataValue } from "@/lib/painel/s3-metadata-sanitize";
 
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -18,6 +19,14 @@ const CACHE_CONTROL =
 
 function env(key: string): string {
   return (process.env[key] ?? "").trim();
+}
+
+/** Normaliza MIME para corresponder às chaves de ALLOWED_MIME (ex.: image/jpg → image/jpeg). */
+function normalizeMimeForR2Filter(raw: string): string {
+  const t = (raw || "").trim().toLowerCase();
+  if (t === "image/jpg" || t === "image/x-jpg") return "image/jpeg";
+  if (t === "image/pjpeg") return "image/jpeg";
+  return t;
 }
 
 type R2Cfg = {
@@ -125,7 +134,7 @@ export async function uploadDraftPhotosDirectR2(
 
   const valid = files
     .filter((f) => f.size > 0 && f.size <= MAX_FILE_BYTES)
-    .filter((f) => ALLOWED_MIME[f.type.toLowerCase()])
+    .filter((f) => ALLOWED_MIME[normalizeMimeForR2Filter(f.type)])
     .slice(0, MAX_FILES);
 
   if (valid.length === 0) return [];
@@ -139,7 +148,7 @@ export async function uploadDraftPhotosDirectR2(
 
   for (let i = 0; i < valid.length; i++) {
     const file = valid[i];
-    const mime = file.type.toLowerCase();
+    const mime = normalizeMimeForR2Filter(file.type);
     const ext = ALLOWED_MIME[mime] || "jpg";
     const stem = sanitize(path.parse(file.name || "foto").name || "foto", "foto");
     const uuid = crypto.randomUUID();
@@ -157,11 +166,11 @@ export async function uploadDraftPhotosDirectR2(
         CacheControl: CACHE_CONTROL,
         Metadata: {
           vehicle_id: draftId,
-          original_name: file.name || "foto",
+          original_name: sanitizeS3MetadataValue(file.name || "foto"),
           variant: "original",
           sort_order: String(i),
           is_cover: String(i === 0),
-          uploaded_by_user_id: userId,
+          uploaded_by_user_id: sanitizeS3MetadataValue(userId),
         },
       })
     );

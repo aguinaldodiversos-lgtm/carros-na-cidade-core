@@ -1,23 +1,26 @@
-
 #!/usr/bin/env node
-
 /* eslint-disable no-console */
 
 /**
  * Smoke da rota de upload de fotos (POST /api/ads/upload-images).
- * - GET /health/meta (ou SMOKE_HEALTH_PATH)
- * - POST sem token → 401/403
- * - POST com AUTH_TOKEN opcional → 200/201 + URLs
+ *
+ * Cenários cobertos:
+ *  1. Health check — API viva
+ *  2. Upload sem Authorization → 401 (auth protegendo antes do multer)
+ *  3. Upload com token + imagem simples PNG → 200 + URLs
+ *  4. Upload com token + nome de arquivo acentuado (veículo-frontal.jpg) → 200 + URLs
+ *  5. Upload com token + MIME image/jpg (não-canônico) → 200 + URLs (bug real corrigido)
+ *  6. Upload com token + arquivo de 7 MB → 200 + URLs (alinhamento de limite confirmado)
  *
  * Uso:
  *   node scripts/smoke-publish-upload.mjs
  *   BASE_URL=https://sua-api.onrender.com AUTH_TOKEN=... node scripts/smoke-publish-upload.mjs
  */
 
-const RAW_BASE = String(process.env.BASE_URL || "").trim();
+const RAW_BASE = String(process.env.BASE_URL || process.env.SMOKE_API_URL || "").trim();
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 15000);
 const ENDPOINT_PATH = String(process.env.SMOKE_UPLOAD_PATH || "/api/ads/upload-images").trim();
-const HEALTH_PATH = String(process.env.SMOKE_HEALTH_PATH || "/health/meta").trim();
+const HEALTH_PATH = String(process.env.SMOKE_HEALTH_PATH || "/health").trim();
 const AUTH_TOKEN = String(process.env.AUTH_TOKEN || process.env.SMOKE_AUTH_TOKEN || "").trim();
 const EXPECT_NO_AUTH_STATUSES = [401, 403];
 const EXPECT_AUTH_SUCCESS_STATUSES = [200, 201];
@@ -25,9 +28,10 @@ const EXPECT_AUTH_SUCCESS_STATUSES = [200, 201];
 function normalizeBaseUrl(value) {
   const trimmed = String(value || "").trim();
   if (!trimmed) {
-    throw new Error("BASE_URL não definida.");
+    throw new Error(
+      "BASE_URL não definida. Use: BASE_URL=http://127.0.0.1:4000 node scripts/smoke-publish-upload.mjs"
+    );
   }
-
   try {
     const url = new URL(trimmed);
     url.search = "";
@@ -47,311 +51,244 @@ function buildUrl(base, path) {
 }
 
 function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
+  if (!condition) throw new Error(message);
 }
 
 function briefText(text, max = 280) {
-  const normalized = String(text || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
   return normalized.length > max ? `${normalized.slice(0, max)}…` : normalized;
 }
 
-function lineOk(message) {
-  console.log(`✅ ${message}`);
-}
-
-function lineInfo(message) {
-  console.log(`ℹ️  ${message}`);
-}
-
-function lineWarn(message) {
-  console.log(`⚠️  ${message}`);
-}
-
-function lineErr(message) {
-  console.error(`❌ ${message}`);
-}
+function lineOk(msg) { console.log(`✅ ${msg}`); }
+function lineInfo(msg) { console.log(`ℹ️  ${msg}`); }
+function lineWarn(msg) { console.log(`⚠️  ${msg}`); }
+function lineErr(msg) { console.error(`❌ ${msg}`); }
 
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
+  const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
+    return await fetch(url, { ...options, signal: controller.signal });
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(id);
   }
 }
 
 async function parseResponse(response) {
   const contentType = String(response.headers.get("content-type") || "");
   const text = await response.text();
-
   let json = null;
   if (contentType.includes("application/json")) {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      // mantém text
-    }
+    try { json = JSON.parse(text); } catch { /* keep json null */ }
   }
-
-  return {
-    ok: response.ok,
-    status: response.status,
-    contentType,
-    headers: response.headers,
-    text,
-    json,
-  };
+  return { ok: response.ok, status: response.status, contentType, text, json };
 }
 
-function createTinyPngBuffer() {
-  const base64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jk5UAAAAASUVORK5CYII=";
-  return Buffer.from(base64, "base64");
-}
-
-function buildUploadFormData() {
-  const form = new FormData();
-  const pngBuffer = createTinyPngBuffer();
-  const blob = new Blob([pngBuffer], { type: "image/png" });
-
-  form.append("photos", blob, "smoke-upload.png");
-  return form;
-}
-
-function extractUrlsFromJson(json) {
+function extractUrls(json) {
   if (!json || typeof json !== "object") return [];
-
-  const candidates = [
-    json?.data?.urls,
-    json?.urls,
-    json?.data?.images,
-    json?.images,
-    json?.data?.items,
-    json?.items,
-  ];
-
-  for (const candidate of candidates) {
+  for (const candidate of [json?.data?.urls, json?.urls, json?.data?.images, json?.images]) {
     if (Array.isArray(candidate)) {
       return candidate
         .map((item) => {
           if (typeof item === "string") return item;
           if (item && typeof item === "object") {
-            return (
-              item.url ||
-              item.publicUrl ||
-              item.image_url ||
-              item.imageUrl ||
-              item.src ||
-              item.location ||
-              ""
-            );
+            return item.url || item.publicUrl || item.image_url || item.src || "";
           }
           return "";
         })
-        .map((value) => String(value || "").trim())
+        .map((v) => String(v || "").trim())
         .filter(Boolean);
     }
   }
-
   return [];
 }
+
+/** Cria um buffer PNG mínimo de 1×1 px (37 bytes). */
+function tinyPngBuffer() {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jk5UAAAAASUVORK5CYII=",
+    "base64"
+  );
+}
+
+/** Cria um buffer JPEG mínimo (valor de prefixo SOI correto). */
+function tinyJpegBuffer() {
+  const buf = Buffer.alloc(128);
+  buf[0] = 0xff;
+  buf[1] = 0xd8; // SOI
+  buf[2] = 0xff;
+  buf[3] = 0xe0; // APP0
+  buf[4] = 0x00;
+  buf[5] = 0x10;
+  buf.write("JFIF\x00", 6);
+  buf[126] = 0xff;
+  buf[127] = 0xd9; // EOI
+  return buf;
+}
+
+/** Cria um buffer de tamanho N preenchido com padrão de pixel válido. */
+function filledJpegBuffer(sizeBytes) {
+  const base = tinyJpegBuffer();
+  const buf = Buffer.alloc(sizeBytes, 0x00);
+  base.copy(buf, 0);
+  buf[sizeBytes - 2] = 0xff;
+  buf[sizeBytes - 1] = 0xd9;
+  return buf;
+}
+
+// ---------------------------------------------------------------------------
+// Cenário 1 — Health check
+// ---------------------------------------------------------------------------
 
 async function checkHealth(base) {
   const url = buildUrl(base, HEALTH_PATH);
   lineInfo(`Health check: ${url}`);
-
-  const response = await fetchWithTimeout(url, {
-    method: "GET",
-    headers: {
-      accept: "application/json, text/plain, */*",
-    },
-  });
-
-  const parsed = await parseResponse(response);
-
-  assert(
-    parsed.status === 200,
-    `Healthcheck falhou: esperado 200, veio ${parsed.status}. Body: ${briefText(parsed.text)}`
-  );
-
-  lineOk(`Healthcheck OK (${parsed.status})`);
-  return parsed;
+  const r = await fetchWithTimeout(url, { method: "GET", headers: { accept: "application/json, */*" } });
+  const parsed = await parseResponse(r);
+  assert(parsed.status === 200, `Health falhou: esperado 200, obteve ${parsed.status}. Body: ${briefText(parsed.text)}`);
+  lineOk(`Health OK (${parsed.status})`);
 }
+
+// ---------------------------------------------------------------------------
+// Cenário 2 — Upload sem token → 401/403
+// ---------------------------------------------------------------------------
 
 async function postWithoutAuth(base) {
   const url = buildUrl(base, ENDPOINT_PATH);
-  const form = buildUploadFormData();
-
-  lineInfo(`Teste sem Authorization: POST ${url}`);
-
-  const response = await fetchWithTimeout(url, {
-    method: "POST",
-    body: form,
-    headers: {
-      accept: "application/json, text/plain, */*",
-    },
-  });
-
-  const parsed = await parseResponse(response);
-
+  lineInfo(`Cenário 2: upload sem Authorization → espera 401/403`);
+  const form = new FormData();
+  form.append("photos", new Blob([tinyPngBuffer()], { type: "image/png" }), "smoke.png");
+  const r = await fetchWithTimeout(url, { method: "POST", body: form, headers: { accept: "application/json" } });
+  const parsed = await parseResponse(r);
   assert(
     EXPECT_NO_AUTH_STATUSES.includes(parsed.status),
-    `Sem token deveria retornar ${EXPECT_NO_AUTH_STATUSES.join("/")} e veio ${parsed.status}. Body: ${briefText(parsed.text)}`
+    `Sem token esperado ${EXPECT_NO_AUTH_STATUSES.join("/")}, obteve ${parsed.status}. Body: ${briefText(parsed.text)}`
   );
-
-  lineOk(`Rota de upload respondeu ${parsed.status} sem token (auth protegendo corretamente)`);
-  return parsed;
+  lineOk(`Upload sem token → ${parsed.status} (auth protegendo corretamente)`);
 }
 
-async function postWithAuth(base, token) {
+// ---------------------------------------------------------------------------
+// Helper compartilhado — upload autenticado e valida resposta
+// ---------------------------------------------------------------------------
+
+async function postWithAuthAndValidate(base, token, form, scenarioLabel) {
   const url = buildUrl(base, ENDPOINT_PATH);
-  const form = buildUploadFormData();
-
-  lineInfo(`Teste com Authorization: POST ${url}`);
-
-  const response = await fetchWithTimeout(url, {
+  lineInfo(`${scenarioLabel}: POST ${url}`);
+  const r = await fetchWithTimeout(url, {
     method: "POST",
     body: form,
-    headers: {
-      accept: "application/json, text/plain, */*",
-      authorization: `Bearer ${token}`,
-    },
+    headers: { accept: "application/json", authorization: `Bearer ${token}` },
   });
-
-  const parsed = await parseResponse(response);
+  const parsed = await parseResponse(r);
 
   assert(
     EXPECT_AUTH_SUCCESS_STATUSES.includes(parsed.status),
-    `Com token deveria retornar ${EXPECT_AUTH_SUCCESS_STATUSES.join("/")} e veio ${parsed.status}. Body: ${briefText(parsed.text)}`
+    `${scenarioLabel}: esperado ${EXPECT_AUTH_SUCCESS_STATUSES.join("/")}, obteve ${parsed.status}. Body: ${briefText(parsed.text)}`
   );
-
   assert(
     parsed.contentType.includes("application/json"),
-    `Upload com token deveria responder JSON. Content-Type: ${parsed.contentType || "n/a"}`
+    `${scenarioLabel}: resposta não é JSON. Content-Type: ${parsed.contentType}`
   );
+  assert(parsed.json, `${scenarioLabel}: JSON inválido. Body: ${briefText(parsed.text)}`);
 
-  assert(parsed.json, `Upload com token retornou JSON inválido. Body: ${briefText(parsed.text)}`);
+  const urls = extractUrls(parsed.json);
+  assert(urls.length > 0, `${scenarioLabel}: nenhuma URL retornada. Body: ${briefText(parsed.text)}`);
 
-  const urls = extractUrlsFromJson(parsed.json);
-  assert(urls.length > 0, `Upload com token não retornou URLs de imagem. Body: ${briefText(parsed.text)}`);
-
-  lineOk(`Upload autenticado OK (${parsed.status})`);
-  lineOk(`URLs retornadas: ${urls.length}`);
-  lineInfo(`Primeira URL: ${urls[0]}`);
-
-  return {
-    ...parsed,
-    urls,
-  };
+  lineOk(`${scenarioLabel}: OK (${parsed.status}) — ${urls.length} URL(s)`);
+  lineInfo(`  Primeira URL: ${urls[0]}`);
+  return urls;
 }
+
+// ---------------------------------------------------------------------------
+// Cenário 3 — Upload simples PNG
+// ---------------------------------------------------------------------------
+
+async function smokeSimplePng(base, token) {
+  const form = new FormData();
+  form.append("photos", new Blob([tinyPngBuffer()], { type: "image/png" }), "smoke-upload.png");
+  return postWithAuthAndValidate(base, token, form, "Cenário 3 (PNG simples)");
+}
+
+// ---------------------------------------------------------------------------
+// Cenário 4 — Nome de arquivo acentuado (veículo-frontal.jpg)
+// ---------------------------------------------------------------------------
+
+async function smokeAccentedFilename(base, token) {
+  const form = new FormData();
+  form.append(
+    "photos",
+    new Blob([tinyJpegBuffer()], { type: "image/jpeg" }),
+    "veículo-frontal.jpg"
+  );
+  return postWithAuthAndValidate(base, token, form, "Cenário 4 (nome acentuado)");
+}
+
+// ---------------------------------------------------------------------------
+// Cenário 5 — MIME image/jpg (não-canônico, bug real corrigido)
+// ---------------------------------------------------------------------------
+
+async function smokeMimeImageJpg(base, token) {
+  const form = new FormData();
+  form.append(
+    "photos",
+    // Envia o blob com MIME "image/jpg" — antes da correção seria rejeitado
+    new Blob([tinyJpegBuffer()], { type: "image/jpg" }),
+    "foto.jpg"
+  );
+  return postWithAuthAndValidate(base, token, form, "Cenário 5 (MIME image/jpg)");
+}
+
+// ---------------------------------------------------------------------------
+// Cenário 6 — Arquivo de 7 MB (dentro do limite de 10 MB)
+// ---------------------------------------------------------------------------
+
+async function smokeLargeFile(base, token) {
+  const SEVEN_MB = 7 * 1024 * 1024;
+  const form = new FormData();
+  form.append(
+    "photos",
+    new Blob([filledJpegBuffer(SEVEN_MB)], { type: "image/jpeg" }),
+    "foto-7mb.jpg"
+  );
+  return postWithAuthAndValidate(base, token, form, "Cenário 6 (arquivo 7 MB)");
+}
+
+// ---------------------------------------------------------------------------
+// Entrypoint
+// ---------------------------------------------------------------------------
 
 async function main() {
   const base = normalizeBaseUrl(RAW_BASE);
 
   console.log("");
-  console.log(`SMOKE PUBLISH UPLOAD @ ${base}`);
-  console.log(`Timeout: ${TIMEOUT_MS}ms`);
+  console.log(`=== SMOKE PUBLISH UPLOAD @ ${base} ===`);
+  console.log(`Timeout : ${TIMEOUT_MS}ms`);
   console.log(`Endpoint: ${ENDPOINT_PATH}`);
-  console.log(`Token informado: ${AUTH_TOKEN ? "sim" : "não"}`);
+  console.log(`Token   : ${AUTH_TOKEN ? "informado" : "não informado"}`);
   console.log("");
 
   await checkHealth(base);
+  await postWithoutAuth(base);
 
   if (!AUTH_TOKEN) {
-    lineWarn("AUTH_TOKEN não informado. Vou validar apenas se a rota existe e exige autenticação.");
-    await postWithoutAuth(base);
+    lineWarn("AUTH_TOKEN não informado — cenários 3-6 ignorados.");
+    lineInfo("Para validar upload real, rode com AUTH_TOKEN=<bearer_token>.");
     console.log("");
-    lineOk("Smoke básico de upload passou.");
-    lineInfo("Para validar upload real no R2, rode novamente com AUTH_TOKEN.");
+    lineOk("Smoke básico passou (health + 401 sem token).");
     process.exit(0);
   }
 
-  await postWithAuth(base, AUTH_TOKEN);
+  await smokeSimplePng(base, AUTH_TOKEN);
+  await smokeAccentedFilename(base, AUTH_TOKEN);
+  await smokeMimeImageJpg(base, AUTH_TOKEN);
+  await smokeLargeFile(base, AUTH_TOKEN);
 
   console.log("");
-  lineOk("Smoke completo de upload passou.");
+  lineOk("Todos os cenários de smoke passaram.");
   process.exit(0);
 }
 
 main().catch((error) => {
   lineErr(error?.message || String(error));
-
-#!/usr/bin/env node
-/* eslint-disable no-console */
-/**
- * Smoke mínimo da rota de upload de fotos do publish (R2).
- * - GET /health (API viva + DB)
- * - POST /api/ads/upload-images sem Authorization → 401 (rota montada + auth antes do multer)
- *
- * Uso:
- *   node scripts/smoke-publish-upload.mjs
- *   BASE_URL=https://sua-api.onrender.com node scripts/smoke-publish-upload.mjs
- */
-
-const BASE = String(process.env.BASE_URL || process.env.SMOKE_API_URL || "http://127.0.0.1:4000").replace(
-  /\/+$/,
-  ""
-);
-const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 10000);
-
-function assert(cond, msg) {
-  if (!cond) throw new Error(msg);
-}
-
-async function fetchJson(method, path, { headers = {}, body } = {}) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(`${BASE}${path}`, {
-      method,
-      headers,
-      body,
-      signal: controller.signal,
-    });
-    const text = await res.text();
-    let json = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = { raw: text };
-    }
-    return { res, json, text };
-  } finally {
-    clearTimeout(id);
-  }
-}
-
-async function main() {
-  console.log(`[smoke-publish-upload] BASE=${BASE}`);
-
-  const health = await fetchJson("GET", "/health");
-  assert(health.res.ok, `GET /health esperado 2xx, obteve ${health.res.status}`);
-  assert(health.json?.ok !== false || health.res.status === 503, "GET /health payload inesperado");
-
-  const upload = await fetchJson("POST", "/api/ads/upload-images", {
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  assert(
-    upload.res.status === 401,
-    `POST /api/ads/upload-images sem token esperado 401, obteve ${upload.res.status}`
-  );
-
-  console.log("[smoke-publish-upload] OK — health + upload-images (401 sem auth)");
-}
-
-main().catch((e) => {
-  console.error("[smoke-publish-upload] FALHA:", e?.message || e);
-
   process.exit(1);
 });

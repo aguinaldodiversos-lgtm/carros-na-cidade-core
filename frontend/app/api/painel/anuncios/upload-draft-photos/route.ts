@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
-import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
-import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
-import {
-  formDataFromSnapshots,
-  filesFromSnapshots,
-  snapshotPhotoFiles,
-} from "@/lib/painel/upload-draft-photo-snapshots";
-import {
-  isR2ConfiguredInBff,
-  uploadDraftPhotosDirectR2,
-} from "@/lib/painel/upload-draft-photos-direct-r2";
+import { snapshotPhotoFiles } from "@/lib/painel/upload-draft-photo-snapshots";
+import { runWizardPhotoUploadPipeline } from "@/lib/painel/upload-wizard-photos-pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,7 +47,7 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           message:
-            "Nenhuma foto válida enviada. Use JPG ou PNG (máx. 6 MB).",
+            "Nenhuma foto válida enviada. Use JPG ou PNG (máx. 10 MB por ficheiro).",
         },
         { status: 400 }
       );
@@ -65,62 +55,33 @@ export async function POST(request: NextRequest) {
 
     const snapshots = await snapshotPhotoFiles(photos);
 
-    let photoUrls: string[] = [];
-    const errors: string[] = [];
+    const nodeEnv = process.env.NODE_ENV || "development";
+    const pipeline = await runWizardPhotoUploadPipeline({
+      snapshots,
+      userId: auth.ctx.session.id || "anon",
+      accessToken: auth.ctx.session.accessToken!,
+      forwardHeaders: auth.ctx.backendHeaders,
+      nodeEnv,
+    });
 
-    if (isR2ConfiguredInBff()) {
-      try {
-        photoUrls = await uploadDraftPhotosDirectR2(
-          filesFromSnapshots(snapshots),
-          auth.ctx.session.id || "anon"
-        );
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Erro desconhecido no R2 direto";
-        errors.push(`direct-r2: ${msg}`);
-        console.error("[upload-draft-photos] Direct R2 failed:", msg);
-      }
-    }
-
-    if (photoUrls.length === 0 && getBackendApiBaseUrl()) {
-      try {
-        photoUrls = await uploadPublishPhotosToBackendR2(
-          formDataFromSnapshots(snapshots),
-          auth.ctx.session.accessToken!
-        );
-      } catch (err) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "Erro desconhecido no proxy backend";
-        errors.push(`backend-proxy: ${msg}`);
-        console.error("[upload-draft-photos] Backend proxy failed:", msg);
-      }
-    }
-
-    if (photoUrls.length === 0 && process.env.NODE_ENV !== "production") {
-      try {
-        photoUrls = await saveWizardPhotosToPublic(formDataFromSnapshots(snapshots));
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Erro desconhecido no fallback local";
-        errors.push(`local-fs: ${msg}`);
-        console.error("[upload-draft-photos] Local fallback failed:", msg);
-      }
-    }
+    const { photoUrls, errors, strategiesAttempted } = pipeline;
 
     if (photoUrls.length === 0) {
       const detail =
-        process.env.NODE_ENV !== "production" && errors.length > 0
-          ? ` (${errors.join("; ")})`
+        nodeEnv !== "production" && errors.length > 0
+          ? ` (${errors.map((e) => `${e.stage}: ${e.message}`).join("; ")})`
           : "";
-      return NextResponse.json(
-        {
-          ok: false,
-          message: `Falha ao enviar fotos para o armazenamento. Tente novamente.${detail}`,
-        },
-        { status: 502 }
-      );
+      const body: Record<string, unknown> = {
+        ok: false,
+        message: `Falha ao enviar fotos para o armazenamento. Tente novamente.${detail}`,
+      };
+      if (nodeEnv !== "production") {
+        body.debug = {
+          strategiesAttempted,
+          errors,
+        };
+      }
+      return NextResponse.json(body, { status: 502 });
     }
 
     return applyBffCookies(

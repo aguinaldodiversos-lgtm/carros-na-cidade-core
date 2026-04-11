@@ -37,6 +37,29 @@ function normalizeString(value) {
   return String(value ?? "").trim();
 }
 
+/**
+ * Browsers and some OS MIME-sniffers send "image/jpg" or "image/x-jpg" instead of the
+ * canonical "image/jpeg". Normalise before any validation so neither the multer filter
+ * nor r2.service rejects a semantically valid JPEG file.
+ *
+ * This is the authoritative normalisation point for the backend path; the BFF also
+ * normalises independently for the direct-R2 path.
+ */
+export function normalizeMimeType(mimeType) {
+  const t = String(mimeType ?? "").trim().toLowerCase();
+  if (t === "image/jpg" || t === "image/x-jpg" || t === "image/pjpeg") return "image/jpeg";
+  return t;
+}
+
+/** Metadados x-amz-meta-* devem ser ASCII; nomes com acentos quebram o PutObject. */
+function sanitizeS3MetadataValue(value, maxLen = 512) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "_")
+    .slice(0, maxLen);
+}
+
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -175,7 +198,7 @@ function getExtensionFromMimeType(mimeType, originalName = "") {
 }
 
 function assertAllowedMimeType(mimeType) {
-  const normalized = String(mimeType ?? "").trim().toLowerCase();
+  const normalized = normalizeMimeType(String(mimeType ?? "").trim().toLowerCase());
 
   if (!ALLOWED_IMAGE_MIME_TYPES.has(normalized)) {
     throw new Error(
@@ -326,15 +349,15 @@ function buildObjectMetadata({
   uploadedByUserId,
 }) {
   const metadata = {
-    vehicle_id: String(vehicleId),
-    original_name: String(originalName || ""),
-    variant: String(variant || "original"),
+    vehicle_id: sanitizeS3MetadataValue(String(vehicleId)),
+    original_name: sanitizeS3MetadataValue(originalName || ""),
+    variant: sanitizeS3MetadataValue(String(variant || "original"), 64),
     sort_order: String(Number.isFinite(sortOrder) ? sortOrder : 0),
     is_cover: String(Boolean(isCover)),
   };
 
   if (uploadedByUserId != null && uploadedByUserId !== "") {
-    metadata.uploaded_by_user_id = String(uploadedByUserId);
+    metadata.uploaded_by_user_id = sanitizeS3MetadataValue(String(uploadedByUserId));
   }
 
   return metadata;

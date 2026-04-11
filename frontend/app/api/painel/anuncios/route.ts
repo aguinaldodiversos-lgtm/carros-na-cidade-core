@@ -8,12 +8,8 @@ import {
   fetchResolvedCityByIdFromBackend,
   type PublishWizardInput,
 } from "@/lib/painel/create-ad-backend";
-import { saveWizardPhotosToPublic } from "@/lib/painel/save-ad-photos";
-import { uploadPublishPhotosToBackendR2 } from "@/lib/painel/upload-ad-images-backend";
-import {
-  isR2ConfiguredInBff,
-  uploadDraftPhotosDirectR2,
-} from "@/lib/painel/upload-draft-photos-direct-r2";
+import { snapshotPhotoFiles } from "@/lib/painel/upload-draft-photo-snapshots";
+import { runWizardPhotoUploadPipeline } from "@/lib/painel/upload-wizard-photos-pipeline";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
 
@@ -118,6 +114,12 @@ export async function POST(request: NextRequest) {
 
     const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
 
+    const setSessionCookie = (res: NextResponse) => {
+      if (ensured.persistCookies) {
+        applySessionCookiesToResponse(res, ensured.persistCookies);
+      }
+    };
+
     const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);
     const parsedCityId = normalized.cityId ? parseInt(normalized.cityId, 10) : NaN;
 
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     let photoUrls: string[] = [];
+    let usedDraftPhotoUrls = false;
 
     const draftUrlsRaw = firstText(source, "draftPhotoUrls");
     if (draftUrlsRaw) {
@@ -195,48 +198,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (photoUrls.length === 0) {
+    if (photoUrls.length > 0) {
+      usedDraftPhotoUrls = true;
+      console.info("[publish] draftPhotoUrls aproveitadas", { urlCount: photoUrls.length });
+    } else {
       const attemptedPhotos = source
         .getAll("photos")
         .filter((f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0);
 
       if (attemptedPhotos.length > 0) {
-        if (isR2ConfiguredInBff()) {
-          try {
-            photoUrls = await uploadDraftPhotosDirectR2(
-              attemptedPhotos,
-              ensured.session.id || "anon"
-            );
-          } catch (r2Err) {
-            console.error("[publish] Direct R2 upload failed:", r2Err instanceof Error ? r2Err.message : r2Err);
-          }
-        }
+        const snapshots = await snapshotPhotoFiles(attemptedPhotos);
+        const nodeEnv = process.env.NODE_ENV || "development";
 
-        if (photoUrls.length === 0 && getBackendApiBaseUrl()) {
-          try {
-            photoUrls = await uploadPublishPhotosToBackendR2(source, ensured.session.accessToken);
-          } catch (backendErr) {
-            console.error("[publish] Backend proxy upload failed:", backendErr instanceof Error ? backendErr.message : backendErr);
-          }
-        }
+        const pipeline = await runWizardPhotoUploadPipeline({
+          snapshots,
+          userId: ensured.session.id || "anon",
+          accessToken: ensured.session.accessToken!,
+          forwardHeaders: buildBffBackendForwardHeaders(request),
+          nodeEnv,
+        });
 
-        if (photoUrls.length === 0 && process.env.NODE_ENV !== "production") {
-          try {
-            photoUrls = await saveWizardPhotosToPublic(source);
-          } catch (localErr) {
-            console.error("[publish] Local save failed:", localErr instanceof Error ? localErr.message : localErr);
-          }
-        }
-      }
+        photoUrls = pipeline.photoUrls;
 
-      if (photoUrls.length === 0 && attemptedPhotos.length > 0) {
-        return NextResponse.json(
-          {
+        if (photoUrls.length === 0) {
+          const body: Record<string, unknown> = {
             ok: false,
-            message: "Não foi possível salvar as fotos. Use JPG ou PNG (máx. 6 MB por foto).",
-          },
-          { status: 400 }
-        );
+            message: "Não foi possível salvar as fotos. Use JPG ou PNG (máx. 10 MB por foto).",
+          };
+          if (nodeEnv !== "production") {
+            body.debug = {
+              strategiesAttempted: pipeline.strategiesAttempted,
+              errors: pipeline.errors,
+              validUrlCount: 0,
+              usedDraftPhotoUrls: false,
+            };
+          }
+          const res = NextResponse.json(body, { status: 400 });
+          setSessionCookie(res);
+          return res;
+        }
       }
     }
 
@@ -269,12 +269,6 @@ export async function POST(request: NextRequest) {
     });
 
     const parsed = await parseResponse(response);
-
-    const setSessionCookie = (res: NextResponse) => {
-      if (ensured.persistCookies) {
-        applySessionCookiesToResponse(res, ensured.persistCookies);
-      }
-    };
 
     if (response.ok) {
       const res = NextResponse.json({

@@ -3,7 +3,8 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 
 const MAX_PHOTOS = 24;
-const MAX_BYTES = 6 * 1024 * 1024;
+/** Alinhado ao limite do backend/multer e r2.service (10 MB). */
+const MAX_BYTES = 10 * 1024 * 1024;
 
 function extForMime(mime: string): string {
   const m = mime.toLowerCase();
