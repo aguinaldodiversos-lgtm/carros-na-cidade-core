@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
@@ -9,19 +10,28 @@ import {
   type PublishWizardInput,
 } from "@/lib/painel/create-ad-backend";
 import { snapshotPhotoFiles } from "@/lib/painel/upload-draft-photo-snapshots";
-import { runWizardPhotoUploadPipeline } from "@/lib/painel/upload-wizard-photos-pipeline";
+import {
+  runWizardPhotoUploadPipeline,
+  type WizardPipelineError,
+} from "@/lib/painel/upload-wizard-photos-pipeline";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
-import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
+import {
+  applySessionCookiesToResponse,
+  getSessionDataFromRequest,
+} from "@/services/sessionService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function firstText(formData: FormData, key: string) {
+const LOG_PREFIX = "[publish-ad-route]";
+const MAX_WIZARD_FILES = 10;
+
+function firstText(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
 }
 
-function toBoolean(value: string) {
+function toBoolean(value: string): boolean {
   return value === "true" || value === "1" || value === "on";
 }
 
@@ -47,7 +57,45 @@ function parsePublishWizardForm(source: FormData): PublishWizardInput {
   };
 }
 
-async function parseResponse(response: Response) {
+function uniqueNonEmptyStrings(values: string[]): string[] {
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))
+  );
+}
+
+function parseDraftPhotoUrls(raw: string): string[] {
+  if (!raw.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return uniqueNonEmptyStrings(
+      parsed.filter((value): value is string => typeof value === "string")
+    );
+  } catch {
+    return [];
+  }
+}
+
+function toSafeHttpStatus(input?: number): number {
+  const allowed = new Set([400, 401, 403, 408, 409, 413, 415, 422, 429, 500, 502, 503, 504]);
+  if (!input || !allowed.has(input)) return 502;
+  return input;
+}
+
+function sanitizePipelineError(error: WizardPipelineError): Record<string, unknown> {
+  return {
+    stage: error.stage,
+    message: error.message,
+    statusCode: error.statusCode,
+    code: error.code,
+    requestId: error.requestId,
+    backendUrl: error.backendUrl,
+  };
+}
+
+async function parseResponse(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") || "";
 
   if (contentType.includes("application/json")) {
@@ -63,13 +111,17 @@ async function parseResponse(response: Response) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = randomUUID();
+
   try {
-    if (!getBackendApiBaseUrl()) {
+    const backendBaseUrl = getBackendApiBaseUrl();
+    if (!backendBaseUrl) {
       return NextResponse.json(
         {
           ok: false,
+          requestId,
           message:
-            "API do backend não configurada (AUTH_API_BASE_URL, BACKEND_API_URL, API_URL ou NEXT_PUBLIC_API_URL).",
+            "API do backend não configurada. Configure AUTH_API_BASE_URL, BACKEND_API_URL, CNC_API_URL, API_URL ou NEXT_PUBLIC_API_URL.",
         },
         { status: 500 }
       );
@@ -82,6 +134,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
+          requestId,
           message: "É necessário aceitar os termos para publicar o anúncio.",
         },
         { status: 400 }
@@ -91,93 +144,112 @@ export async function POST(request: NextRequest) {
     const session = getSessionDataFromRequest(request);
     const ensured = await ensureSessionWithFreshBackendTokens(session);
 
+    const withSessionCookies = (response: NextResponse) => {
+      if (ensured.ok && ensured.persistCookies) {
+        applySessionCookiesToResponse(response, ensured.persistCookies);
+      }
+      return response;
+    };
+
+    const jsonWithSession = (
+      body: Record<string, unknown>,
+      status: number
+    ): NextResponse => withSessionCookies(NextResponse.json(body, { status }));
+
     if (!ensured.ok || !ensured.session.accessToken) {
-      return NextResponse.json(
+      return jsonWithSession(
         {
           ok: false,
+          requestId,
           message: "Faça login para publicar o anúncio.",
         },
-        { status: 401 }
+        401
       );
     }
 
     if (ensured.session.type === "pending") {
-      return NextResponse.json(
+      return jsonWithSession(
         {
           ok: false,
+          requestId,
           message:
             "Complete seu cadastro com CPF ou CNPJ antes de publicar. Use a etapa inicial em Novo anúncio.",
         },
-        { status: 400 }
+        400
       );
     }
 
-    const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
+    const accountType: AccountType =
+      ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
 
-    const setSessionCookie = (res: NextResponse) => {
-      if (ensured.persistCookies) {
-        applySessionCookiesToResponse(res, ensured.persistCookies);
-      }
-    };
+    const backendHeaders = buildBffBackendForwardHeaders(request);
 
     const ufForm = normalized.state.trim().toUpperCase().slice(0, 2);
     const parsedCityId = normalized.cityId ? parseInt(normalized.cityId, 10) : NaN;
 
     if (!Number.isFinite(parsedCityId) || parsedCityId <= 0) {
-      return NextResponse.json(
+      return jsonWithSession(
         {
           ok: false,
+          requestId,
           message: "Selecione uma cidade válida da lista para continuar.",
         },
-        { status: 400 }
+        400
       );
     }
 
     const cityResult = await fetchResolvedCityByIdFromBackend(
       parsedCityId,
       ufForm.length === 2 ? ufForm : undefined,
-      buildBffBackendForwardHeaders(request)
+      backendHeaders
     );
 
     if (!cityResult.ok) {
       if (cityResult.reason === "rate_limited") {
-        return NextResponse.json(
+        return jsonWithSession(
           {
             ok: false,
-            message: "Servidor temporariamente sobrecarregado. Aguarde alguns segundos e tente publicar novamente.",
+            requestId,
+            message:
+              "Servidor temporariamente sobrecarregado. Aguarde alguns segundos e tente publicar novamente.",
           },
-          { status: 429 }
+          429
         );
       }
+
       if (cityResult.reason === "backend_error") {
-        return NextResponse.json(
+        return jsonWithSession(
           {
             ok: false,
+            requestId,
             message: "Falha ao validar a cidade no servidor. Tente novamente em instantes.",
           },
-          { status: 502 }
+          502
         );
       }
-      return NextResponse.json(
+
+      return jsonWithSession(
         {
           ok: false,
+          requestId,
           message:
             "Cidade não encontrada na base. Volte ao campo Cidade e escolha novamente na lista.",
         },
-        { status: 400 }
+        400
       );
     }
 
     const resolved = cityResult.city;
-
     const ufResolved = String(resolved.state).trim().toUpperCase().slice(0, 2);
+
     if (ufForm && ufResolved && ufForm !== ufResolved) {
-      return NextResponse.json(
+      return jsonWithSession(
         {
           ok: false,
+          requestId,
           message: "A UF informada não corresponde à cidade selecionada.",
         },
-        { status: 400 }
+        400
       );
     }
 
@@ -186,25 +258,39 @@ export async function POST(request: NextRequest) {
 
     const draftUrlsRaw = firstText(source, "draftPhotoUrls");
     if (draftUrlsRaw) {
-      try {
-        const parsed = JSON.parse(draftUrlsRaw);
-        if (Array.isArray(parsed)) {
-          photoUrls = parsed.filter(
-            (u: unknown): u is string => typeof u === "string" && u.trim().length > 0
-          );
-        }
-      } catch {
-        /* ignore malformed JSON — fall through to file upload */
+      photoUrls = parseDraftPhotoUrls(draftUrlsRaw);
+      usedDraftPhotoUrls = photoUrls.length > 0;
+
+      if (usedDraftPhotoUrls) {
+        console.info(`${LOG_PREFIX} using draftPhotoUrls`, {
+          requestId,
+          urlCount: photoUrls.length,
+        });
+      } else {
+        console.warn(`${LOG_PREFIX} invalid or empty draftPhotoUrls`, {
+          requestId,
+        });
       }
     }
 
-    if (photoUrls.length > 0) {
-      usedDraftPhotoUrls = true;
-      console.info("[publish] draftPhotoUrls aproveitadas", { urlCount: photoUrls.length });
-    } else {
+    if (photoUrls.length === 0) {
       const attemptedPhotos = source
         .getAll("photos")
-        .filter((f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0);
+        .filter(
+          (file): file is File =>
+            typeof File !== "undefined" && file instanceof File && file.size > 0
+        );
+
+      if (attemptedPhotos.length > MAX_WIZARD_FILES) {
+        return jsonWithSession(
+          {
+            ok: false,
+            requestId,
+            message: `Envie no máximo ${MAX_WIZARD_FILES} fotos por vez.`,
+          },
+          400
+        );
+      }
 
       if (attemptedPhotos.length > 0) {
         const snapshots = await snapshotPhotoFiles(attemptedPhotos);
@@ -213,71 +299,114 @@ export async function POST(request: NextRequest) {
         const pipeline = await runWizardPhotoUploadPipeline({
           snapshots,
           userId: ensured.session.id || "anon",
-          accessToken: ensured.session.accessToken!,
-          forwardHeaders: buildBffBackendForwardHeaders(request),
+          accessToken: ensured.session.accessToken,
+          requestId,
+          forwardHeaders: backendHeaders,
           nodeEnv,
         });
 
         photoUrls = pipeline.photoUrls;
 
         if (photoUrls.length === 0) {
+          const status = toSafeHttpStatus(pipeline.primaryError?.statusCode);
           const body: Record<string, unknown> = {
             ok: false,
-            message: "Não foi possível salvar as fotos. Use JPG ou PNG (máx. 10 MB por foto).",
+            requestId,
+            message:
+              pipeline.primaryError?.message ||
+              "Não foi possível salvar as fotos. Tente novamente.",
           };
+
           if (nodeEnv !== "production") {
             body.debug = {
               strategiesAttempted: pipeline.strategiesAttempted,
-              errors: pipeline.errors,
+              errors: pipeline.errors.map(sanitizePipelineError),
               validUrlCount: 0,
               usedDraftPhotoUrls: false,
             };
           }
-          const res = NextResponse.json(body, { status: 400 });
-          setSessionCookie(res);
-          return res;
+
+          console.error(`${LOG_PREFIX} photo upload failed`, {
+            requestId,
+            status,
+            strategiesAttempted: pipeline.strategiesAttempted,
+            errors: pipeline.errors.map((error) => ({
+              stage: error.stage,
+              code: error.code,
+              statusCode: error.statusCode,
+              message: error.message,
+              backendUrl: error.backendUrl,
+              backendRequestId: error.requestId,
+            })),
+          });
+
+          return jsonWithSession(body, status);
         }
       }
     }
 
     if (photoUrls.length === 0) {
-      return NextResponse.json(
+      return jsonWithSession(
         {
           ok: false,
+          requestId,
           message: "Adicione pelo menos uma foto do veículo para publicar.",
         },
-        { status: 400 }
+        400
       );
     }
 
-    const body = buildBackendCreateAdPayload(normalized, resolved, accountType, photoUrls);
-    const url = resolveBackendApiUrl("/api/ads");
-    if (!url) {
-      return NextResponse.json({ ok: false, message: "URL do backend inválida." }, { status: 500 });
+    const backendPayload = buildBackendCreateAdPayload(
+      normalized,
+      resolved,
+      accountType,
+      photoUrls
+    );
+
+    const publishUrl = resolveBackendApiUrl("/api/ads");
+    if (!publishUrl) {
+      return jsonWithSession(
+        {
+          ok: false,
+          requestId,
+          message: "URL do backend inválida para publicação do anúncio.",
+        },
+        500
+      );
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(publishUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
         Authorization: `Bearer ${ensured.session.accessToken}`,
-        ...buildBffBackendForwardHeaders(request),
+        "X-Request-Id": requestId,
+        ...backendHeaders,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(backendPayload),
       cache: "no-store",
     });
 
     const parsed = await parseResponse(response);
 
     if (response.ok) {
-      const res = NextResponse.json({
-        ok: true,
-        message: "Anúncio enviado com sucesso.",
-        result: parsed,
+      console.info(`${LOG_PREFIX} publish ok`, {
+        requestId,
+        usedDraftPhotoUrls,
+        photoCount: photoUrls.length,
       });
-      setSessionCookie(res);
-      return res;
+
+      return jsonWithSession(
+        {
+          ok: true,
+          requestId,
+          message: "Anúncio enviado com sucesso.",
+          usedDraftPhotoUrls,
+          result: parsed,
+        },
+        200
+      );
     }
 
     const message = extractBackendErrorMessage(parsed, response.status);
@@ -286,23 +415,44 @@ export async function POST(request: NextRequest) {
         ? (parsed as { details: unknown }).details
         : undefined;
 
-    const status = response.status >= 400 && response.status < 600 ? response.status : 502;
+    const status =
+      response.status >= 400 && response.status < 600 ? response.status : 502;
 
-    const res = NextResponse.json(
+    console.error(`${LOG_PREFIX} publish failed`, {
+      requestId,
+      status,
+      usedDraftPhotoUrls,
+      photoCount: photoUrls.length,
+      publishUrl,
+      parsed,
+    });
+
+    return jsonWithSession(
       {
         ok: false,
+        requestId,
         message,
         ...(details !== undefined ? { details } : {}),
       },
-      { status }
+      status
     );
-    setSessionCookie(res);
-    return res;
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Erro inesperado ao processar o anúncio.";
+
+    console.error(`${LOG_PREFIX} unexpected error`, {
+      requestId,
+      message,
+      error,
+    });
+
     return NextResponse.json(
       {
         ok: false,
-        message: error instanceof Error ? error.message : "Erro inesperado ao processar o anúncio.",
+        requestId,
+        message,
       },
       { status: 500 }
     );
