@@ -1,7 +1,10 @@
 /**
  * Server-side base URL for the Carros na Cidade API.
- * Mantém a mesma prioridade usada pelo fluxo de auth para evitar divergência
- * entre login/register/me/dashboard e demais chamadas ao backend.
+ *
+ * Objetivos:
+ * - evitar divergência entre auth e demais chamadas ao backend
+ * - aceitar explicitamente CNC_API_URL no mesmo resolvedor
+ * - manter fallback previsível, mas observável
  */
 
 const DEV_FALLBACK_BASE_URL = "http://127.0.0.1:4000";
@@ -10,11 +13,26 @@ const PRODUCTION_FALLBACK_BASE_URL = "https://carros-na-cidade-core.onrender.com
 const BACKEND_API_ENV_KEYS = [
   "AUTH_API_BASE_URL",
   "BACKEND_API_URL",
+  "CNC_API_URL",
   "API_URL",
   "NEXT_PUBLIC_API_URL",
 ] as const;
 
 type BackendApiEnvKey = (typeof BACKEND_API_ENV_KEYS)[number];
+
+export type BackendApiResolutionInfo = {
+  baseUrl: string;
+  originUrl: string;
+  source:
+    | "AUTH_API_BASE_URL"
+    | "BACKEND_API_URL"
+    | "CNC_API_URL"
+    | "API_URL"
+    | "NEXT_PUBLIC_API_URL"
+    | "DEV_FALLBACK_BASE_URL"
+    | "PRODUCTION_FALLBACK_BASE_URL"
+    | "NONE";
+};
 
 function stripTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, "");
@@ -80,54 +98,98 @@ function joinUrl(base: string, pathname: string): string {
   return new URL(relativePath, normalizedBase).toString();
 }
 
-/**
- * Retorna somente a base explicitamente configurada por env, sem fallback local.
- * Útil quando você quer saber se existe uma base real configurada em produção.
- */
-export function getBackendApiExplicitEnvUrl(): string {
+function getExplicitBackendBaseUrlInfo(): BackendApiResolutionInfo {
   for (const key of BACKEND_API_ENV_KEYS) {
     const normalized = normalizeBaseUrl(getEnvValue(key));
-    if (normalized) return normalized;
+    if (normalized) {
+      return {
+        baseUrl: normalized,
+        originUrl: new URL(normalized).origin,
+        source: key,
+      };
+    }
   }
 
-  return "";
+  return {
+    baseUrl: "",
+    originUrl: "",
+    source: "NONE",
+  };
 }
 
-function getDevFallbackBaseUrl(): string {
-  if (process.env.NODE_ENV === "production") return "";
-  return normalizeBaseUrl(DEV_FALLBACK_BASE_URL);
+function getDevFallbackBaseUrlInfo(): BackendApiResolutionInfo {
+  if (process.env.NODE_ENV === "production") {
+    return {
+      baseUrl: "",
+      originUrl: "",
+      source: "NONE",
+    };
+  }
+
+  const normalized = normalizeBaseUrl(DEV_FALLBACK_BASE_URL);
+  return {
+    baseUrl: normalized,
+    originUrl: normalized ? new URL(normalized).origin : "",
+    source: normalized ? "DEV_FALLBACK_BASE_URL" : "NONE",
+  };
 }
 
-function getProductionFallbackBaseUrl(): string {
-  if (process.env.NODE_ENV !== "production") return "";
-  return normalizeBaseUrl(PRODUCTION_FALLBACK_BASE_URL);
+function getProductionFallbackBaseUrlInfo(): BackendApiResolutionInfo {
+  if (process.env.NODE_ENV !== "production") {
+    return {
+      baseUrl: "",
+      originUrl: "",
+      source: "NONE",
+    };
+  }
+
+  const normalized = normalizeBaseUrl(PRODUCTION_FALLBACK_BASE_URL);
+  return {
+    baseUrl: normalized,
+    originUrl: normalized ? new URL(normalized).origin : "",
+    source: normalized ? "PRODUCTION_FALLBACK_BASE_URL" : "NONE",
+  };
+}
+
+export function getBackendApiResolutionInfo(): BackendApiResolutionInfo {
+  const explicit = getExplicitBackendBaseUrlInfo();
+  if (explicit.baseUrl) return explicit;
+
+  const devFallback = getDevFallbackBaseUrlInfo();
+  if (devFallback.baseUrl) return devFallback;
+
+  const productionFallback = getProductionFallbackBaseUrlInfo();
+  if (productionFallback.baseUrl) return productionFallback;
+
+  return {
+    baseUrl: "",
+    originUrl: "",
+    source: "NONE",
+  };
+}
+
+/**
+ * Retorna somente a base explicitamente configurada por env, sem fallback.
+ */
+export function getBackendApiExplicitEnvUrl(): string {
+  return getExplicitBackendBaseUrlInfo().baseUrl;
 }
 
 /**
  * Base final do backend:
  * 1. env explícita válida
  * 2. fallback local em desenvolvimento
- * 3. fallback de produção (mesmo contrato de public-home.ts)
+ * 3. fallback de produção
  */
 export function getBackendApiBaseUrl(): string {
-  return getBackendApiExplicitEnvUrl() || getDevFallbackBaseUrl() || getProductionFallbackBaseUrl();
+  return getBackendApiResolutionInfo().baseUrl;
 }
 
 /**
  * Origem do backend sem path adicional.
- * Ex.:
- * - https://api.meusite.com/api -> https://api.meusite.com
- * - http://127.0.0.1:4000 -> http://127.0.0.1:4000
  */
 export function getBackendApiOriginUrl(): string {
-  const base = getBackendApiBaseUrl();
-  if (!base) return "";
-
-  try {
-    return new URL(base).origin;
-  } catch {
-    return "";
-  }
+  return getBackendApiResolutionInfo().originUrl;
 }
 
 /**
@@ -137,17 +199,8 @@ export function getBackendApiOriginUrl(): string {
  * - Se `path` já for URL absoluta, retorna como está.
  * - Se a base terminar em `/api`:
  *   - caminhos `/api/...` continuam sob essa base
- *   - caminhos não-API (ex.: `/uploads/...`) vão para a origem do backend
+ *   - caminhos não-API vão para a origem do backend
  * - Se a base NÃO terminar em `/api`, o caminho é resolvido diretamente sobre a base
- *
- * Exemplos (produção):
- * base = https://carros-na-cidade-core.onrender.com/api
- * - /api/auth/me      -> https://carros-na-cidade-core.onrender.com/api/auth/me
- * - /uploads/a.jpg    -> https://carros-na-cidade-core.onrender.com/uploads/a.jpg
- *
- * base = http://127.0.0.1:4000
- * - /api/auth/me      -> http://127.0.0.1:4000/api/auth/me
- * - /uploads/a.jpg    -> http://127.0.0.1:4000/uploads/a.jpg
  */
 export function resolveBackendApiUrl(path: string): string {
   const normalizedPath = normalizeRequestPath(path);
