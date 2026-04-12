@@ -1,10 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// ---------------------------------------------------------------------------
+// S3Client mock — shared by the forcePathStyle describe block below.
+// vi.hoisted() is required so the mock variable is available inside vi.mock()
+// (which is hoisted to the top of the file by the vitest transformer).
+// Existing tests never reach the S3Client constructor so this is safe.
+// ---------------------------------------------------------------------------
+const { S3ClientMock } = vi.hoisted(() => ({ S3ClientMock: vi.fn() }));
+vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, S3Client: S3ClientMock };
+});
+
 describe("upload-draft-photos-direct-r2", () => {
   const ORIGINAL_ENV = { ...process.env };
 
   beforeEach(() => {
     vi.resetModules();
+    S3ClientMock.mockClear();
   });
 
   afterEach(() => {
@@ -247,5 +260,63 @@ describe("Multi-layer upload fallback logic", () => {
     if (isDev) layers.push("local-fs");
 
     expect(layers).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getClient (BFF) — garante parâmetros obrigatórios do S3Client para R2.
+// Usa vi.resetModules() para limpar o singleton (_client) antes de cada teste.
+// ---------------------------------------------------------------------------
+
+describe("getClient (BFF) — configuração obrigatória para Cloudflare R2", () => {
+  const REQUIRED_VARS: Record<string, string> = {
+    R2_ACCOUNT_ID: "bff-account-id",
+    R2_ACCESS_KEY_ID: "bff-key",
+    R2_SECRET_ACCESS_KEY: "bff-secret",
+    R2_BUCKET_NAME: "bff-bucket",
+  };
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    vi.resetModules();
+    S3ClientMock.mockClear();
+    for (const [k, v] of Object.entries(REQUIRED_VARS)) {
+      saved[k] = process.env[k];
+      process.env[k] = v;
+    }
+    delete process.env.AWS_REGION;
+    delete process.env.R2_ENDPOINT;
+  });
+
+  afterEach(() => {
+    for (const k of Object.keys(REQUIRED_VARS)) {
+      if (saved[k] !== undefined) process.env[k] = saved[k];
+      else delete process.env[k];
+    }
+  });
+
+  it("forcePathStyle: true — obrigatório para R2 (sem isso: SignatureDoesNotMatch / 403)", async () => {
+    // isR2ConfiguredInBff() chama loadConfig() que instancia S3Client via getClient()
+    const mod = await import("./upload-draft-photos-direct-r2");
+    // Chamar uploadDraftPhotosDirectR2 com lista vazia para forçar getClient()
+    // sem disparar nenhuma chamada real ao bucket (valid.length === 0).
+    await mod.uploadDraftPhotosDirectR2([], "user-1");
+    expect(S3ClientMock).toHaveBeenCalledTimes(1);
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.forcePathStyle).toBe(true);
+  });
+
+  it("endpoint é derivado de R2_ACCOUNT_ID quando R2_ENDPOINT não está definido", async () => {
+    const mod = await import("./upload-draft-photos-direct-r2");
+    await mod.uploadDraftPhotosDirectR2([], "user-1");
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.endpoint).toBe("https://bff-account-id.r2.cloudflarestorage.com");
+  });
+
+  it("region padrão é 'auto'", async () => {
+    const mod = await import("./upload-draft-photos-direct-r2");
+    await mod.uploadDraftPhotosDirectR2([], "user-1");
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.region).toBe("auto");
   });
 });

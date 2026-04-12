@@ -51,6 +51,12 @@ function loadConfig(): R2Cfg | null {
   const bucketName = env("R2_BUCKET_NAME");
 
   if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
+    console.warn("[r2-bff] R2 não configurado. Variáveis ausentes:", {
+      R2_ACCOUNT_ID: accountId ? "OK" : "AUSENTE",
+      R2_ACCESS_KEY_ID: accessKeyId ? "OK" : "AUSENTE",
+      R2_SECRET_ACCESS_KEY: secretAccessKey ? "OK" : "AUSENTE",
+      R2_BUCKET_NAME: bucketName ? "OK" : "AUSENTE",
+    });
     _cfg = null;
     return null;
   }
@@ -85,6 +91,10 @@ function getClient(): S3Client | null {
   _client = new S3Client({
     region: cfg.region,
     endpoint: cfg.endpoint,
+    // R2 does not support virtual-hosted-style bucket URLs; path-style is mandatory.
+    // Without this flag the SDK rewrites the host to <bucket>.account.r2.cloudflarestorage.com
+    // and the computed signature no longer matches, returning SignatureDoesNotMatch / 403.
+    forcePathStyle: true,
     credentials: {
       accessKeyId: cfg.accessKeyId,
       secretAccessKey: cfg.secretAccessKey,

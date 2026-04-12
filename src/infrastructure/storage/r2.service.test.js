@@ -1,10 +1,22 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   normalizeMimeType,
   validateVehicleImageFile,
   validateVehicleImageFiles,
   generateVehicleImageKey,
 } from "./r2.service.js";
+
+// ---------------------------------------------------------------------------
+// S3Client constructor mock — used only in the getR2Client describe block.
+// vi.hoisted() is required so the mock variable is available inside vi.mock()
+// (which is hoisted to the top of the file by the vitest transformer).
+// Existing tests never call getR2Client so this mock has no side-effects.
+// ---------------------------------------------------------------------------
+const { S3ClientMock } = vi.hoisted(() => ({ S3ClientMock: vi.fn() }));
+vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, S3Client: S3ClientMock };
+});
 
 // ---------------------------------------------------------------------------
 // normalizeMimeType — prova objetiva do bug image/jpg
@@ -230,5 +242,77 @@ describe("validateVehicleImageFiles — quantidade de arquivos", () => {
   it("rejeita mais de 12 arquivos (acima do DEFAULT_MAX_FILES)", async () => {
     const files = Array.from({ length: 13 }, () => makeFile(1024));
     await expect(validateVehicleImageFiles(files)).rejects.toThrow(/excede o limite/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getR2Client — garante que S3Client é instanciado com os parâmetros obrigatórios
+// para o Cloudflare R2.  Usa vi.resetModules() para limpar o cache do singleton
+// (cachedClient) antes de cada teste.
+// ---------------------------------------------------------------------------
+
+describe("getR2Client — configuração obrigatória para Cloudflare R2", () => {
+  const REQUIRED_VARS = {
+    R2_ACCOUNT_ID: "test-account-123",
+    R2_ACCESS_KEY_ID: "test-access-key",
+    R2_SECRET_ACCESS_KEY: "test-secret-key",
+    R2_BUCKET_NAME: "test-bucket",
+  };
+  const saved = {};
+
+  beforeEach(() => {
+    vi.resetModules();
+    S3ClientMock.mockClear();
+    for (const [k, v] of Object.entries(REQUIRED_VARS)) {
+      saved[k] = process.env[k];
+      process.env[k] = v;
+    }
+    delete process.env.AWS_REGION;
+    delete process.env.R2_ENDPOINT;
+  });
+
+  afterEach(() => {
+    for (const k of Object.keys(REQUIRED_VARS)) {
+      if (saved[k] !== undefined) process.env[k] = saved[k];
+      else delete process.env[k];
+    }
+  });
+
+  it("forcePathStyle: true — obrigatório para R2 (sem isso: SignatureDoesNotMatch)", async () => {
+    const { getR2Client } = await import("./r2.service.js");
+    getR2Client();
+    expect(S3ClientMock).toHaveBeenCalledTimes(1);
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.forcePathStyle).toBe(true);
+  });
+
+  it("endpoint é construído a partir de R2_ACCOUNT_ID quando R2_ENDPOINT não está definido", async () => {
+    const { getR2Client } = await import("./r2.service.js");
+    getR2Client();
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.endpoint).toBe("https://test-account-123.r2.cloudflarestorage.com");
+  });
+
+  it("R2_ENDPOINT customizado prevalece sobre o endpoint derivado de R2_ACCOUNT_ID", async () => {
+    process.env.R2_ENDPOINT = "https://custom.r2endpoint.example.com";
+    const { getR2Client } = await import("./r2.service.js");
+    getR2Client();
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.endpoint).toBe("https://custom.r2endpoint.example.com");
+  });
+
+  it("region padrão é 'auto' quando AWS_REGION não está definido", async () => {
+    const { getR2Client } = await import("./r2.service.js");
+    getR2Client();
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.region).toBe("auto");
+  });
+
+  it("credenciais são passadas corretamente ao S3Client", async () => {
+    const { getR2Client } = await import("./r2.service.js");
+    getR2Client();
+    const cfg = S3ClientMock.mock.calls[0][0];
+    expect(cfg.credentials.accessKeyId).toBe("test-access-key");
+    expect(cfg.credentials.secretAccessKey).toBe("test-secret-key");
   });
 });

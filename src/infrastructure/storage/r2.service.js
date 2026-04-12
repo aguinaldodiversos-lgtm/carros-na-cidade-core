@@ -11,6 +11,11 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 
+import {
+  ACCEPTED_INPUT_MIMES,
+  normalizeVehicleImage,
+} from "./image-normalizer.js";
+
 const DEFAULT_REGION = "auto";
 const DEFAULT_MAX_FILE_SIZE_BYTES = parsePositiveInt(
   process.env.VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES,
@@ -138,6 +143,10 @@ export function getR2Client() {
   cachedClient = new S3Client({
     region: config.region,
     endpoint: config.endpoint,
+    // R2 does not support virtual-hosted-style bucket URLs; path-style is mandatory.
+    // Without this flag the SDK rewrites the host to <bucket>.account.r2.cloudflarestorage.com
+    // and the computed signature no longer matches, returning SignatureDoesNotMatch / 403.
+    forcePathStyle: true,
     credentials: {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
@@ -198,13 +207,17 @@ function getExtensionFromMimeType(mimeType, originalName = "") {
 }
 
 function assertAllowedMimeType(mimeType) {
+  // Normalize JPEG aliases (image/jpg → image/jpeg) before the whitelist check.
   const normalized = normalizeMimeType(String(mimeType ?? "").trim().toLowerCase());
 
-  if (!ALLOWED_IMAGE_MIME_TYPES.has(normalized)) {
+  // Use ACCEPTED_INPUT_MIMES from image-normalizer as the single source of truth.
+  // All types in that set are converted to WebP before storage, so the
+  // ALLOWED_IMAGE_MIME_TYPES map below is used only for output extension resolution
+  // (generateVehicleImageKey / getExtensionFromMimeType).
+  if (!ACCEPTED_INPUT_MIMES.has(normalized)) {
     throw new Error(
-      `[r2] Tipo de arquivo não permitido: ${mimeType || "desconhecido"}. Permitidos: ${[
-        ...ALLOWED_IMAGE_MIME_TYPES.keys(),
-      ].join(", ")}`
+      `[r2] Tipo de arquivo não permitido: ${mimeType || "desconhecido"}. ` +
+        `Aceitos: JPEG, PNG, WebP, HEIC/HEIF.`
     );
   }
 
@@ -375,12 +388,22 @@ export async function uploadVehicleImage({
   const client = getR2Client();
   const { bucketName } = getR2Config();
 
+  // 1. Validate input: MIME whitelist, size limit, buffer extraction.
+  //    Size is checked on the RAW input (before normalization) so we never
+  //    buffer a file larger than MAX_FILE_SIZE_BYTES in memory.
   const validated = await validateVehicleImageFile(file);
 
+  // 2. Normalize to WebP: EXIF auto-rotate, downscale to ≤2048 px longest
+  //    edge, strip metadata, encode at quality 85.  Converts any accepted
+  //    input format (JPEG, PNG, HEIC/HEIF, WebP…) to a single output format.
+  const normalized = await normalizeVehicleImage(validated.buffer);
+
+  // 3. Generate a storage key whose extension matches the normalized format
+  //    (always ".webp" after normalization).
   const key = generateVehicleImageKey({
     vehicleId,
     originalName: validated.originalName,
-    mimeType: validated.mimeType,
+    mimeType: normalized.mimeType,
     variant,
   });
 
@@ -397,9 +420,9 @@ export async function uploadVehicleImage({
     new PutObjectCommand({
       Bucket: bucketName,
       Key: key,
-      Body: validated.buffer,
-      ContentType: validated.mimeType,
-      ContentLength: validated.size,
+      Body: normalized.buffer,
+      ContentType: normalized.mimeType,        // always "image/webp"
+      ContentLength: normalized.normalizedSize,
       CacheControl: cacheControl,
       Metadata: metadata,
     })
@@ -411,8 +434,8 @@ export async function uploadVehicleImage({
     key,
     variant: normalizeVariant(variant),
     originalName: validated.originalName,
-    mimeType: validated.mimeType,
-    sizeBytes: validated.size,
+    mimeType: normalized.mimeType,             // "image/webp" — the actual stored format
+    sizeBytes: normalized.normalizedSize,
     sortOrder: Number.isFinite(sortOrder) ? Number(sortOrder) : 0,
     isCover: Boolean(isCover),
     etag: result?.ETag ? String(result.ETag).replace(/"/g, "") : null,
