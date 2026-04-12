@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
 import {
   UploadBackendError,
@@ -113,7 +114,7 @@ export type RunWizardPhotoUploadPipelineInput = {
   snapshots: PhotoSnapshot[];
   userId: string;
   accessToken: string;
-  requestId: string;
+  requestId?: string;
   /** Headers do BFF (Authorization, Accept, X-Cnc-Client-Ip, …) */
   forwardHeaders?: Record<string, string>;
   nodeEnv: string;
@@ -161,6 +162,7 @@ export async function runWizardPhotoUploadPipeline(
   const deps = mergeDeps(input.deps);
   const errors: WizardPipelineError[] = [];
   const strategiesAttempted: string[] = [];
+  const requestId = input.requestId?.trim() || randomUUID();
   let items: UploadedPhotoItem[] = [];
 
   const photoCount = input.snapshots.length;
@@ -169,7 +171,7 @@ export async function runWizardPhotoUploadPipeline(
   const localFallbackEnabled = shouldEnableLocalFallback(input.nodeEnv);
 
   console.info(`${LOG_PREFIX} start`, {
-    requestId: input.requestId,
+    requestId,
     photoCount,
     nodeEnv: input.nodeEnv,
     hasBackendBaseUrl: Boolean(backendBase),
@@ -177,10 +179,6 @@ export async function runWizardPhotoUploadPipeline(
     localFallbackEnabled,
   });
 
-  /**
-   * Estratégia principal: backend-proxy.
-   * Mantém um único ponto de verdade para validação, normalização e persistência.
-   */
   if (backendBase) {
     strategiesAttempted.push("backend-proxy");
 
@@ -188,7 +186,7 @@ export async function runWizardPhotoUploadPipeline(
       const formData = formDataFromSnapshots(input.snapshots);
       items = await deps.uploadBackend(formData, input.accessToken, {
         forwardHeaders: input.forwardHeaders,
-        requestId: input.requestId,
+        requestId,
       });
 
       items = normalizeUploadedItems(items);
@@ -197,11 +195,11 @@ export async function runWizardPhotoUploadPipeline(
         const message = "Proxy backend devolveu 0 itens de imagem válidos.";
         errors.push({ stage: "backend-proxy", message });
         console.warn(`${LOG_PREFIX} backend-proxy returned 0 items`, {
-          requestId: input.requestId,
+          requestId,
         });
       } else {
         console.info(`${LOG_PREFIX} backend-proxy ok`, {
-          requestId: input.requestId,
+          requestId,
           itemCount: items.length,
         });
       }
@@ -210,7 +208,7 @@ export async function runWizardPhotoUploadPipeline(
       errors.push(mapped);
 
       console.error(`${LOG_PREFIX} backend-proxy failed`, {
-        requestId: input.requestId,
+        requestId,
         statusCode: mapped.statusCode,
         code: mapped.code,
         message: mapped.message,
@@ -228,15 +226,10 @@ export async function runWizardPhotoUploadPipeline(
     });
 
     console.error(`${LOG_PREFIX} backend base missing`, {
-      requestId: input.requestId,
+      requestId,
     });
   }
 
-  /**
-   * Fallback opcional de laboratório.
-   * Em produção, só habilita se ENABLE_BFF_DIRECT_R2_UPLOAD=true.
-   * Ele NÃO é o writer preferencial.
-   */
   if (items.length === 0 && directR2Enabled) {
     strategiesAttempted.push("direct-r2");
 
@@ -253,11 +246,11 @@ export async function runWizardPhotoUploadPipeline(
         errors.push({ stage: "direct-r2", message });
 
         console.warn(`${LOG_PREFIX} direct-r2 returned 0 urls`, {
-          requestId: input.requestId,
+          requestId,
         });
       } else {
         console.warn(`${LOG_PREFIX} direct-r2 fallback used`, {
-          requestId: input.requestId,
+          requestId,
           itemCount: items.length,
         });
       }
@@ -266,15 +259,12 @@ export async function runWizardPhotoUploadPipeline(
       errors.push(mapped);
 
       console.error(`${LOG_PREFIX} direct-r2 failed`, {
-        requestId: input.requestId,
+        requestId,
         message: mapped.message,
       });
     }
   }
 
-  /**
-   * Fallback local só para desenvolvimento, via flag explícita.
-   */
   if (items.length === 0 && localFallbackEnabled) {
     strategiesAttempted.push("local-fs");
 
@@ -289,11 +279,11 @@ export async function runWizardPhotoUploadPipeline(
         errors.push({ stage: "local-fs", message });
 
         console.warn(`${LOG_PREFIX} local-fs returned 0 urls`, {
-          requestId: input.requestId,
+          requestId,
         });
       } else {
         console.warn(`${LOG_PREFIX} local-fs fallback used`, {
-          requestId: input.requestId,
+          requestId,
           itemCount: items.length,
         });
       }
@@ -302,7 +292,7 @@ export async function runWizardPhotoUploadPipeline(
       errors.push(mapped);
 
       console.error(`${LOG_PREFIX} local-fs failed`, {
-        requestId: input.requestId,
+        requestId,
         message: mapped.message,
       });
     }
@@ -312,7 +302,7 @@ export async function runWizardPhotoUploadPipeline(
   const primaryError = errors[0];
 
   console.info(`${LOG_PREFIX} finish`, {
-    requestId: input.requestId,
+    requestId,
     strategiesAttempted,
     validItemCount: items.length,
     errorStages: errors.map((error) => error.stage),
