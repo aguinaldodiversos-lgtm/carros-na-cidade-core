@@ -501,6 +501,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
         type="button"
         onClick={goBack}
         disabled={step === 0}
+        data-testid="wizard-back-btn"
         className="inline-flex items-center justify-center rounded-[20px] border border-[#E5E9F2] bg-white px-6 py-3.5 text-base font-bold text-[#1D2440] transition hover:bg-[#F9FBFF] disabled:cursor-not-allowed disabled:opacity-40"
       >
         ← Voltar
@@ -511,6 +512,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
           <button
             type="button"
             onClick={goNext}
+            data-testid="wizard-next-btn"
             className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
           >
             Continuar →
@@ -520,6 +522,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
             type="button"
             onClick={handleSubmit}
             disabled={submitState === "submitting"}
+            data-testid="wizard-submit-btn"
             className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5] disabled:opacity-60"
           >
             {submitState === "submitting" ? "Publicando..." : "Publicar anúncio"}

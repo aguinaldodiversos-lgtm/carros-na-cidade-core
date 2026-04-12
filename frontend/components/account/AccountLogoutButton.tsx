@@ -34,6 +34,7 @@ export function AccountLogoutButton({ className }: AccountLogoutButtonProps) {
       onClick={handleLogout}
       disabled={busy}
       className={className}
+      data-testid="logout-btn"
     >
       {busy ? "Saindo..." : "Sair"}
     </button>

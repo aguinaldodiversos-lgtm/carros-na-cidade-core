@@ -449,6 +449,7 @@ export function StepPhotos({
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
+          data-testid="photos-upload-area"
           className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed px-6 py-10 text-center transition ${
             dragOver
               ? "border-[#2F67F6] bg-[#F2F7FF]"
@@ -472,6 +473,7 @@ export function StepPhotos({
             multiple
             className="hidden"
             disabled={uploading}
+            data-testid="photos-file-input"
             onChange={(e) => {
               const list = Array.from(e.target.files || []);
               if (list.length) onAddFiles(list);
@@ -494,7 +496,11 @@ export function StepPhotos({
       ) : null}
 
       {uploadedUrls.length > 0 || uploadingPreviews.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          data-testid="photos-grid"
+          data-count={uploadedUrls.length}
+        >
           {uploadedUrls.map((src, index) => (
             <div
               key={`uploaded-${index}-${src.slice(-20)}`}

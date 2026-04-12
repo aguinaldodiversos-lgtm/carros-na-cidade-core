@@ -1,6 +1,20 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
+// ---------------------------------------------------------------------------
+// Credentials for the two isolated E2E users used in full-flow.spec.ts
+// ---------------------------------------------------------------------------
+export const USERS = {
+  A: {
+    email: process.env.TEST_USER_A_EMAIL ?? "testa@carrosnacidade.com",
+    password: process.env.TEST_USER_A_PASS ?? "SenhaTesteA123!",
+  },
+  B: {
+    email: process.env.TEST_USER_B_EMAIL ?? "testb@carrosnacidade.com",
+    password: process.env.TEST_USER_B_PASS ?? "SenhaTesteB123!",
+  },
+} as const;
+
 export const LOCAL_EMAIL = process.env.E2E_EMAIL ?? "cpf@carrosnacidade.com";
 export const LOCAL_PASSWORD = process.env.E2E_PASSWORD ?? "123456";
 
@@ -495,4 +509,60 @@ export async function assertLatestAdPersistedForEmail(email: string, brandHint: 
   } finally {
     await pool.end().catch(() => null);
   }
+}
+
+// ---------------------------------------------------------------------------
+// New helpers for full-flow.spec.ts
+// ---------------------------------------------------------------------------
+
+export type UserCredentials = { email: string; password: string };
+
+/**
+ * UI login: fills the login form and waits for redirection to /dashboard.
+ * Requires data-testid="login-email", "login-password", "login-submit" on the form.
+ */
+export async function login(page: Page, user: UserCredentials) {
+  await page.goto("/login");
+  await page.waitForSelector('[data-testid="login-email"]', { timeout: 10_000 });
+  await page.fill('[data-testid="login-email"]', user.email);
+  await page.fill('[data-testid="login-password"]', user.password);
+  await page.click('[data-testid="login-submit"]');
+  await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+}
+
+/**
+ * Clicks the logout button and waits for navigation away from the dashboard.
+ * Requires data-testid="logout-btn" on AccountLogoutButton.
+ */
+export async function logout(page: Page) {
+  const btn = page.locator('[data-testid="logout-btn"]');
+  await expect(btn, '[data-testid="logout-btn"] deve estar visível para fazer logout').toBeVisible({
+    timeout: 8_000,
+  });
+  await btn.click();
+  await page.waitForURL(/\/(login|$)/, { timeout: 10_000 });
+}
+
+/**
+ * Asserts the dashboard container is loaded and shows no error overlay.
+ * Requires data-testid="dashboard-content" on AccountDashboardView.
+ */
+export async function waitForDashboard(page: Page) {
+  await page.waitForSelector('[data-testid="dashboard-content"]', { timeout: 15_000 });
+  const error = page.locator("text=DASHBOARD INDISPONÍVEL");
+  if (await error.isVisible()) {
+    throw new Error(
+      "Dashboard exibiu tela de erro (DASHBOARD INDISPONÍVEL) — API pode estar indisponível."
+    );
+  }
+}
+
+/**
+ * Navigates to /anunciar/novo and returns once the wizard step container is visible.
+ * Returns empty string: this wizard stores draft state in localStorage, not in the URL.
+ */
+export async function createAdDraft(page: Page): Promise<string> {
+  await page.goto("/anunciar/novo");
+  await page.waitForSelector('[data-testid="wizard-step-container"]', { timeout: 10_000 });
+  return "";
 }

@@ -62,6 +62,7 @@
     "test:e2e:dashboard": "npm run test:e2e:dashboard --prefix frontend",
     "e2e": "npm run test:e2e --prefix frontend",
     "e2e:smoke": "npm run test:e2e:smoke --prefix frontend",
+    "e2e:full-flow": "npm run test:e2e:full-flow --prefix frontend",
     "e2e:prepare": "npm run integration:db:up && npm run integration:db:wait && npm run integration:db:prepare && node scripts/e2e-seed.mjs",
     "test:frontend": "npm run test --prefix frontend",
     "test:frontend:coverage": "npm run test:coverage --prefix frontend"

@@ -127,3 +127,85 @@ jobs:
       - name: Job summary
         if: success()
         run: echo "### Frontend checks passed" >> "$GITHUB_STEP_SUMMARY"
+
+  e2e:
+    name: E2E (Playwright — full-flow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Bloqueia deploy se falhar: este job está no mesmo workflow que o build frontend.
+    needs: [backend, frontend]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carros_na_cidade_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d carros_na_cidade_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+      E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      E2E_BACKEND_API_URL: http://127.0.0.1:4000
+      BACKEND_API_URL: http://127.0.0.1:4000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+      TEST_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
+      TEST_USER_A_PASS: ${{ secrets.E2E_USER_A_PASS }}
+      TEST_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
+      TEST_USER_B_PASS: ${{ secrets.E2E_USER_B_PASS }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-jwt-secret-placeholder' }}
+      AUTH_SESSION_SECRET: ${{ secrets.AUTH_SESSION_SECRET || 'ci-session-secret-placeholder' }}
+      PW_START_SERVER: "1"
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Install root dependencies
+        working-directory: ${{ github.workspace }}
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare DB (migrations + seed)
+        working-directory: ${{ github.workspace }}
+        run: node scripts/e2e-seed.mjs
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+
+      - name: Run E2E full-flow suite
+        run: npm run test:e2e:full-flow
+        env:
+          CI: "true"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-full-flow
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Job summary
+        if: success()
+        run: echo "### E2E full-flow passed" >> "$GITHUB_STEP_SUMMARY"

@@ -68,7 +68,7 @@ export default function AccountDashboardView({
       : "Lojista · CNPJ";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-testid="dashboard-content" data-user-id={data.user.id}>
       {mode === "home" && (
         <header className="space-y-2">
           <p className="text-sm font-semibold text-[#6b7280]">{accountBadge}</p>
@@ -164,7 +164,7 @@ export default function AccountDashboardView({
       )}
 
       {/* Lista */}
-      <section id="meus-anuncios" className="space-y-4">
+      <section id="meus-anuncios" className="space-y-4" data-testid="dashboard-ads-list">
         {mode === "home" && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl font-extrabold text-[#0f172a]">Meus anúncios</h2>

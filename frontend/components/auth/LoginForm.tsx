@@ -78,16 +78,18 @@ export default function LoginForm({ next }: LoginFormProps) {
         <h1 className="mt-1 text-2xl font-extrabold text-[#1c253a]">Entrar</h1>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4" data-testid="login-form">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold text-[#37425d]">Email</span>
           <input
             type="email"
+            name="email"
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="cnc-input"
             placeholder="voce@exemplo.com"
+            data-testid="login-email"
             required
           />
         </label>
@@ -96,17 +98,22 @@ export default function LoginForm({ next }: LoginFormProps) {
           <span className="mb-1 block text-sm font-semibold text-[#37425d]">Senha</span>
           <input
             type="password"
+            name="password"
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="cnc-input"
             placeholder="******"
+            data-testid="login-password"
             required
           />
         </label>
 
         {error && (
-          <p className="rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]">
+          <p
+            className="rounded-xl border border-[#f1c7cf] bg-[#fff2f5] px-3 py-2 text-sm text-[#bb2f47]"
+            data-testid="login-error"
+          >
             {error}
           </p>
         )}
@@ -115,6 +122,7 @@ export default function LoginForm({ next }: LoginFormProps) {
           type="submit"
           disabled={loading}
           className="cnc-btn-primary h-12 w-full text-base disabled:cursor-not-allowed disabled:opacity-70"
+          data-testid="login-submit"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
