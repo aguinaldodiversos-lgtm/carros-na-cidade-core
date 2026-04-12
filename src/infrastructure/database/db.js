@@ -159,6 +159,45 @@ export async function withTransaction(callback) {
   }
 }
 
+/**
+ * Transação autenticada: define `app.current_user_id` via `set_config` para que
+ * as políticas de RLS na tabela `ads` possam verificar o proprietário no banco.
+ * O parâmetro `true` em set_config limita o valor ao escopo da transação (SET LOCAL).
+ */
+export async function withUserTransaction(userId, callback) {
+  const client = await pool.connect();
+  const txQuery = createInstrumentedQueryExecutor(client, "transaction");
+
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_user_id', $1, true)", [String(userId)]);
+
+    const transactionApi = {
+      raw: client,
+      query: txQuery,
+    };
+
+    const result = await callback(transactionApi);
+
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      logPoolEvent(
+        "error",
+        { error: rollbackError?.message || String(rollbackError) },
+        "[db] rollback falhou"
+      );
+    }
+
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function healthcheck() {
   try {
     const result = await pool.query("SELECT 1 AS ok");

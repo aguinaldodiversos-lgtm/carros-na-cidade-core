@@ -22,5 +22,5 @@ export default async function DashboardLojaPage() {
     return <DashboardClientRecovery variant="lojista" mode="home" />;
   }
 
-  return <AccountDashboardView initialData={payload} variant="lojista" mode="home" />;
+  return <AccountDashboardView key={payload.user.id} initialData={payload} variant="lojista" mode="home" />;
 }

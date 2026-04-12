@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
 
@@ -9,7 +8,6 @@ type AccountLogoutButtonProps = {
 };
 
 export function AccountLogoutButton({ className }: AccountLogoutButtonProps) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function handleLogout() {
@@ -21,9 +19,11 @@ export function AccountLogoutButton({ className }: AccountLogoutButtonProps) {
         credentials: "include",
       });
       clearClientAuthArtifacts();
-      router.push("/");
-      router.refresh();
-    } finally {
+      // Hard navigation: clears all Next.js Router Cache, React state, and
+      // in-memory component data so no previous user's data bleeds into the
+      // next session.
+      window.location.assign("/");
+    } catch {
       setBusy(false);
     }
   }

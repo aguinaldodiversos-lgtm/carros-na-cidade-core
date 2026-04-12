@@ -22,5 +22,5 @@ export default async function LojaMeusAnunciosPage() {
     return <DashboardClientRecovery variant="lojista" mode="ads" />;
   }
 
-  return <AccountDashboardView initialData={payload} variant="lojista" mode="ads" />;
+  return <AccountDashboardView key={payload.user.id} initialData={payload} variant="lojista" mode="ads" />;
 }

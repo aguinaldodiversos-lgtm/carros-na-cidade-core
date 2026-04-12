@@ -19,5 +19,5 @@ export default async function MeusAnunciosPage() {
     return <DashboardClientRecovery variant="pf" mode="ads" />;
   }
 
-  return <AccountDashboardView initialData={payload} variant="pf" mode="ads" />;
+  return <AccountDashboardView key={payload.user.id} initialData={payload} variant="pf" mode="ads" />;
 }

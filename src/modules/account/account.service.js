@@ -1,4 +1,4 @@
-import { pool } from "../../infrastructure/database/db.js";
+import { pool, withUserTransaction } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import * as adsRepository from "../ads/ads.repository.js";
@@ -834,7 +834,16 @@ export async function updateOwnedAdStatus(userId, adId, action) {
   }
 
   const status = action === "pause" ? "paused" : "active";
-  const updated = await adsRepository.updateAd(adId, { status });
+
+  // withUserTransaction sets app.current_user_id so the RLS write policy
+  // on ads can verify the owner at the database level (second defence layer).
+  const updated = await withUserTransaction(String(userId), async (tx) => {
+    const { rows } = await tx.query(
+      `UPDATE ads SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id`,
+      [status, adId]
+    );
+    return rows[0] || null;
+  });
 
   if (!updated) {
     throw new AppError("Falha ao atualizar anuncio", 500);
@@ -851,7 +860,16 @@ export async function deleteOwnedAd(userId, adId) {
     throw new AppError("Anuncio nao encontrado", 404);
   }
 
-  const removed = await adsRepository.softDeleteAd(adId);
+  // withUserTransaction sets app.current_user_id so the RLS write policy
+  // on ads can verify the owner at the database level (second defence layer).
+  const removed = await withUserTransaction(String(userId), async (tx) => {
+    const { rows } = await tx.query(
+      `UPDATE ads SET status = 'deleted', updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [adId]
+    );
+    return rows[0] || null;
+  });
+
   if (!removed) {
     throw new AppError("Falha ao excluir anuncio", 500);
   }
