@@ -1,0 +1,1 @@
+C:\Users\aguin\Desktop\carros-na-cidade-core\frontend\node_modules\@smithy\eventstream-codec\dist-types\Int64.d.ts 
