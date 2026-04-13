@@ -20,7 +20,6 @@ import {
   mergeSearchFilters,
   parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
-import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -104,28 +103,39 @@ function cityFromText(city?: string, state?: string): CityContext {
 }
 
 /**
- * Território canônico em /comprar: city_slug (URL/SEO) > city_id (legado) > fallback cookie/default.
- * Não injeta city_id do cookie junto com slug (evita AND redundante na API).
+ * Em /comprar, não forçar mais um território padrão global.
+ *
+ * Prioridade:
+ * 1. city_slug explícito na URL
+ * 2. city_id explícito na URL (legado)
+ * 3. city/state explícitos na URL (legado)
+ * 4. sem território => busca aberta
+ *
+ * O cookie continua útil para contexto visual quando compatível,
+ * mas não deve zerar a listagem por impor uma cidade padrão.
  */
 function normalizeBuyFilters(
   searchParams: SearchParams = {},
-  cookieCity?: CityRef | null
+  _cookieCity?: CityRef | null
 ): AdsSearchFilters {
   const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
-
-  const fallbackSlug = cookieCity?.slug || DEFAULT_PUBLIC_CITY_SLUG;
 
   const explicitSlug = parsed.city_slug?.trim();
   const hasIdOnly =
     !explicitSlug && parsed.city_id != null && Number.isFinite(Number(parsed.city_id));
 
-  /** `parseAdsSearchFiltersFromSearchParams` injeta `sort=relevance` quando ausente; aqui o default do /comprar é `recent`. */
+  const hasLegacyCityText = Boolean(parsed.city?.trim() || parsed.state?.trim());
+
+  /**
+   * parseAdsSearchFiltersFromSearchParams injeta sort=relevance quando ausente;
+   * em /comprar, o default desejado é recent.
+   */
   const sortInQuery = getFirstValue(searchParams.sort);
   const hasExplicitSort = sortInQuery != null && String(sortInQuery).trim() !== "";
 
   const merged: AdsSearchFilters = {
     ...parsed,
-    sort: hasExplicitSort ? (parsed.sort || "recent") : "recent",
+    sort: hasExplicitSort ? parsed.sort || "recent" : "recent",
     page: parsed.page || 1,
     limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
   };
@@ -135,25 +145,32 @@ function normalizeBuyFilters(
     delete merged.city_id;
     delete merged.city;
     delete merged.state;
-  } else if (hasIdOnly) {
+    return merged;
+  }
+
+  if (hasIdOnly) {
     merged.city_id = parsed.city_id;
     delete merged.city_slug;
     delete merged.city;
     delete merged.state;
-  } else {
-    const hasLegacyCityText = Boolean(parsed.city?.trim() || parsed.state?.trim());
-    if (hasLegacyCityText) {
-      delete merged.city_slug;
-      delete merged.city_id;
-      merged.city = parsed.city;
-      merged.state = parsed.state;
-    } else {
-      merged.city_slug = fallbackSlug || DEFAULT_PUBLIC_CITY_SLUG;
-      delete merged.city_id;
-      delete merged.city;
-      delete merged.state;
-    }
+    return merged;
   }
+
+  if (hasLegacyCityText) {
+    delete merged.city_slug;
+    delete merged.city_id;
+    merged.city = parsed.city;
+    merged.state = parsed.state;
+    return merged;
+  }
+
+  /**
+   * Busca aberta: não injeta city_slug padrão.
+   */
+  delete merged.city_slug;
+  delete merged.city_id;
+  delete merged.city;
+  delete merged.state;
 
   return merged;
 }
@@ -167,7 +184,15 @@ function resolveCity(filters: AdsSearchFilters, cookieCity?: CityRef | null): Ci
     return cityFromSlug(cookieCity.slug);
   }
 
-  return cityFromText(filters.city, filters.state);
+  if (filters.city?.trim() || filters.state?.trim()) {
+    return cityFromText(filters.city, filters.state);
+  }
+
+  if (cookieCity?.slug) {
+    return cityFromSlug(cookieCity.slug);
+  }
+
+  return cityFromText("São Paulo", "SP");
 }
 
 function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
@@ -232,7 +257,11 @@ function buildMetadataTitle(filters: AdsSearchFilters, city: CityContext) {
     return `${filters.brand} em ${city.name} | Comprar`;
   }
 
-  return `Carros usados e seminovos em ${city.name} | Comprar`;
+  if (filters.city_slug || filters.city || filters.city_id != null) {
+    return `Carros usados e seminovos em ${city.name} | Comprar`;
+  }
+
+  return "Carros usados e seminovos | Comprar";
 }
 
 function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) {
@@ -244,18 +273,19 @@ function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) 
     return `Carros ${filters.brand} em ${city.name}: listagem focada no seu território, com filtros rápidos e ofertas reais na região — Carros na Cidade.`;
   }
 
-  return `Usados e seminovos em ${city.name} (${city.state}): marketplace regional onde cada anúncio nasce na cidade — compare preços e negocie com contexto local no Carros na Cidade.`;
+  if (filters.city_slug || filters.city || filters.city_id != null) {
+    return `Usados e seminovos em ${city.name} (${city.state}): marketplace regional onde cada anúncio nasce na cidade — compare preços e negocie com contexto local no Carros na Cidade.`;
+  }
+
+  return "Usados e seminovos em várias cidades: compare preços, filtre por marca, modelo e versão e encontre anúncios reais no Carros na Cidade.";
 }
 
-export async function generateMetadata({ searchParams = {} }: ComprarPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  searchParams = {},
+}: ComprarPageProps): Promise<Metadata> {
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const slugInUrl = getFirstValue(searchParams.city_slug)?.trim();
-  if (!slugInUrl && filters.city_slug) {
-    const qs = buildSearchQueryString(filters);
-    redirect(qs ? `/comprar?${qs}` : "/comprar");
-  }
   const city = resolveCity(filters, cookieCity);
 
   const title = buildMetadataTitle(filters, city);
@@ -283,22 +313,14 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const slugInUrl = getFirstValue(searchParams.city_slug)?.trim();
-
-  /** `city_slug` na URL é a fonte única de verdade: canoniza query quando o cookie preenche território. */
-  if (!slugInUrl && filters.city_slug) {
-    const qs = buildSearchQueryString(filters);
-    redirect(qs ? `/comprar?${qs}` : "/comprar");
-  }
-
-  let city = resolveCity(filters, cookieCity);
+  const city = resolveCity(filters, cookieCity);
 
   const [resultsResponse, facetsResponse] = await Promise.allSettled([
     fetchAdsSearch(filters),
     fetchAdsFacets(filters),
   ]);
 
-  let initialResults =
+  const initialResults =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
       ? resultsResponse.value
       : buildEmptyResults(filters);
@@ -308,13 +330,18 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
       ? facetsResponse.value.facets
       : buildEmptyFacets();
 
-  /** Cidade sem estoque (visão territorial pura): redireciona para slug com anúncios reais (API). */
+  /**
+   * Se houver filtros puramente territoriais com city_slug e a cidade não tiver estoque,
+   * tenta fallback para outra cidade com anúncios.
+   * Em busca aberta (sem city_slug), não redireciona.
+   */
   if (
     filters.city_slug &&
     isComprarTerritoryOnlyFilters(filters) &&
     initialResults.pagination.total === 0
   ) {
     const territory = await fetchCatalogAdsTerritoryFallback(filters.city_slug);
+
     if (territory?.mode === "fallback" && territory.slug && territory.slug !== filters.city_slug) {
       const merged = mergeSearchFilters(filters, { city_slug: territory.slug, page: 1 });
       const qs = buildSearchQueryString(merged);
