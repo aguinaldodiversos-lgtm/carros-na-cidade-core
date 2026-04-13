@@ -20,6 +20,7 @@ import {
   mergeSearchFilters,
   parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
+import { getPublicDefaultCity } from "@/lib/site/public-config";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -34,6 +35,12 @@ type CityContext = {
   state: string;
   slug: string;
   label: string;
+};
+
+type TerritoryResolution = {
+  filters: AdsSearchFilters;
+  city: CityContext;
+  source: "explicit" | "preferred" | "open";
 };
 
 function getFirstValue(value: string | string[] | undefined): string | null {
@@ -102,28 +109,49 @@ function cityFromText(city?: string, state?: string): CityContext {
   };
 }
 
+function cityFromRef(city?: CityRef | null): CityContext | null {
+  if (!city?.slug) return null;
+  return {
+    name: city.name,
+    state: city.state,
+    slug: city.slug,
+    label: `${city.name} - ${city.state}`,
+  };
+}
+
+function getPublicDefaultCityContext(): CityContext {
+  const publicCity = getPublicDefaultCity();
+  return {
+    name: publicCity.name,
+    state: publicCity.state,
+    slug: publicCity.slug,
+    label: `${publicCity.name} - ${publicCity.state}`,
+  };
+}
+
+function hasExplicitTerritoryInSearchParams(searchParams: SearchParams): boolean {
+  const citySlug = getFirstValue(searchParams.city_slug)?.trim();
+  const cityId = getFirstValue(searchParams.city_id)?.trim();
+  const city = getFirstValue(searchParams.city)?.trim();
+  const state = getFirstValue(searchParams.state)?.trim();
+
+  return Boolean(citySlug || cityId || city || state);
+}
+
 /**
- * Em /comprar, não forçar mais um território padrão global.
+ * Em /comprar:
+ * - território explícito na URL = obrigatório
+ * - sem território explícito = catálogo aberto por padrão no filtro
  *
- * Prioridade:
- * 1. city_slug explícito na URL
- * 2. city_id explícito na URL (legado)
- * 3. city/state explícitos na URL (legado)
- * 4. sem território => busca aberta
- *
- * O cookie continua útil para contexto visual quando compatível,
- * mas não deve zerar a listagem por impor uma cidade padrão.
+ * O comportamento regional por padrão é resolvido depois, no nível da busca:
+ * tenta cidade preferencial primeiro, e só abre o catálogo se essa cidade não tiver estoque.
  */
-function normalizeBuyFilters(
-  searchParams: SearchParams = {},
-  _cookieCity?: CityRef | null
-): AdsSearchFilters {
+function normalizeBuyFilters(searchParams: SearchParams = {}): AdsSearchFilters {
   const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
 
   const explicitSlug = parsed.city_slug?.trim();
   const hasIdOnly =
     !explicitSlug && parsed.city_id != null && Number.isFinite(Number(parsed.city_id));
-
   const hasLegacyCityText = Boolean(parsed.city?.trim() || parsed.state?.trim());
 
   /**
@@ -165,7 +193,8 @@ function normalizeBuyFilters(
   }
 
   /**
-   * Busca aberta: não injeta city_slug padrão.
+   * Sem território explícito => não injeta cidade no filtro.
+   * A preferência regional será aplicada em fase posterior, com fallback inteligente.
    */
   delete merged.city_slug;
   delete merged.city_id;
@@ -173,26 +202,6 @@ function normalizeBuyFilters(
   delete merged.state;
 
   return merged;
-}
-
-function resolveCity(filters: AdsSearchFilters, cookieCity?: CityRef | null): CityContext {
-  if (filters.city_slug) {
-    return cityFromSlug(filters.city_slug);
-  }
-
-  if (filters.city_id != null && cookieCity?.id === filters.city_id) {
-    return cityFromSlug(cookieCity.slug);
-  }
-
-  if (filters.city?.trim() || filters.state?.trim()) {
-    return cityFromText(filters.city, filters.state);
-  }
-
-  if (cookieCity?.slug) {
-    return cityFromSlug(cookieCity.slug);
-  }
-
-  return cityFromText("São Paulo", "SP");
 }
 
 function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
@@ -248,7 +257,11 @@ function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
   );
 }
 
-function buildMetadataTitle(filters: AdsSearchFilters, city: CityContext) {
+function buildMetadataTitle(
+  filters: AdsSearchFilters,
+  city: CityContext,
+  hasExplicitTerritory: boolean
+) {
   if (filters.brand && filters.model) {
     return `${filters.brand} ${filters.model} em ${city.name} | Comprar`;
   }
@@ -257,14 +270,18 @@ function buildMetadataTitle(filters: AdsSearchFilters, city: CityContext) {
     return `${filters.brand} em ${city.name} | Comprar`;
   }
 
-  if (filters.city_slug || filters.city || filters.city_id != null) {
+  if (hasExplicitTerritory) {
     return `Carros usados e seminovos em ${city.name} | Comprar`;
   }
 
-  return "Carros usados e seminovos | Comprar";
+  return "Carros usados e seminovos por cidade | Comprar";
 }
 
-function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) {
+function buildMetadataDescription(
+  filters: AdsSearchFilters,
+  city: CityContext,
+  hasExplicitTerritory: boolean
+) {
   if (filters.brand && filters.model) {
     return `${filters.brand} ${filters.model} em ${city.name} (${city.state}): catálogo regional com filtros por cidade, anúncios com contexto local e oportunidades no Carros na Cidade.`;
   }
@@ -273,11 +290,120 @@ function buildMetadataDescription(filters: AdsSearchFilters, city: CityContext) 
     return `Carros ${filters.brand} em ${city.name}: listagem focada no seu território, com filtros rápidos e ofertas reais na região — Carros na Cidade.`;
   }
 
-  if (filters.city_slug || filters.city || filters.city_id != null) {
+  if (hasExplicitTerritory) {
     return `Usados e seminovos em ${city.name} (${city.state}): marketplace regional onde cada anúncio nasce na cidade — compare preços e negocie com contexto local no Carros na Cidade.`;
   }
 
-  return "Usados e seminovos em várias cidades: compare preços, filtre por marca, modelo e versão e encontre anúncios reais no Carros na Cidade.";
+  return "Catálogo automotivo regional com anúncios reais por cidade, filtros inteligentes e navegação territorial no Carros na Cidade.";
+}
+
+async function resolveComprarData(params: {
+  filters: AdsSearchFilters;
+  hasExplicitTerritory: boolean;
+  cookieCity?: CityRef | null;
+}) {
+  const { filters, hasExplicitTerritory, cookieCity } = params;
+
+  const publicDefaultCity = getPublicDefaultCityContext();
+  const preferredCity = cityFromRef(cookieCity) || publicDefaultCity;
+
+  /**
+   * Se o território foi explicitamente pedido pelo utilizador, respeitamos.
+   */
+  if (hasExplicitTerritory) {
+    const explicitCity = filters.city_slug
+      ? cityFromSlug(filters.city_slug)
+      : filters.city?.trim() || filters.state?.trim()
+        ? cityFromText(filters.city, filters.state)
+        : preferredCity;
+
+    const [resultsResponse, facetsResponse] = await Promise.allSettled([
+      fetchAdsSearch(filters),
+      fetchAdsFacets(filters),
+    ]);
+
+    const initialResults =
+      resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
+        ? resultsResponse.value
+        : buildEmptyResults(filters);
+
+    const initialFacets =
+      facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)
+        ? facetsResponse.value.facets
+        : buildEmptyFacets();
+
+    return {
+      filters,
+      city: explicitCity,
+      source: "explicit" as const,
+      initialResults,
+      initialFacets,
+    };
+  }
+
+  /**
+   * Sem território explícito:
+   * 1. tenta a cidade preferencial (cookie > default público)
+   * 2. se não houver estoque, cai para catálogo aberto
+   */
+  const preferredFilters = mergeSearchFilters(filters, {
+    city_slug: preferredCity.slug,
+    page: 1,
+  });
+
+  const [preferredResultsResponse, preferredFacetsResponse] = await Promise.allSettled([
+    fetchAdsSearch(preferredFilters),
+    fetchAdsFacets(preferredFilters),
+  ]);
+
+  const preferredResults =
+    preferredResultsResponse.status === "fulfilled" &&
+    isValidResultsResponse(preferredResultsResponse.value)
+      ? preferredResultsResponse.value
+      : buildEmptyResults(preferredFilters);
+
+  const preferredFacets =
+    preferredFacetsResponse.status === "fulfilled" &&
+    isValidFacetsResponse(preferredFacetsResponse.value)
+      ? preferredFacetsResponse.value.facets
+      : buildEmptyFacets();
+
+  if (preferredResults.pagination.total > 0) {
+    return {
+      filters: preferredFilters,
+      city: preferredCity,
+      source: "preferred" as const,
+      initialResults: preferredResults,
+      initialFacets: preferredFacets,
+    };
+  }
+
+  /**
+   * Fallback sem território obrigatório:
+   * mantém o contexto regional do portal, mas não zera a vitrine.
+   */
+  const [openResultsResponse, openFacetsResponse] = await Promise.allSettled([
+    fetchAdsSearch(filters),
+    fetchAdsFacets(filters),
+  ]);
+
+  const openResults =
+    openResultsResponse.status === "fulfilled" && isValidResultsResponse(openResultsResponse.value)
+      ? openResultsResponse.value
+      : buildEmptyResults(filters);
+
+  const openFacets =
+    openFacetsResponse.status === "fulfilled" && isValidFacetsResponse(openFacetsResponse.value)
+      ? openFacetsResponse.value.facets
+      : buildEmptyFacets();
+
+  return {
+    filters,
+    city: preferredCity,
+    source: "open" as const,
+    initialResults: openResults,
+    initialFacets: openFacets,
+  };
 }
 
 export async function generateMetadata({
@@ -285,11 +411,20 @@ export async function generateMetadata({
 }: ComprarPageProps): Promise<Metadata> {
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
-  const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const city = resolveCity(filters, cookieCity);
 
-  const title = buildMetadataTitle(filters, city);
-  const description = buildMetadataDescription(filters, city);
+  const filters = normalizeBuyFilters(searchParams);
+  const hasExplicitTerritory = hasExplicitTerritoryInSearchParams(searchParams);
+  const publicDefaultCity = getPublicDefaultCityContext();
+  const preferredCity = cityFromRef(cookieCity) || publicDefaultCity;
+
+  const city = filters.city_slug
+    ? cityFromSlug(filters.city_slug)
+    : filters.city?.trim() || filters.state?.trim()
+      ? cityFromText(filters.city, filters.state)
+      : preferredCity;
+
+  const title = buildMetadataTitle(filters, city, hasExplicitTerritory);
+  const description = buildMetadataDescription(filters, city, hasExplicitTerritory);
   const canonicalQs = buildSearchQueryString(filters);
   const canonicalPath = canonicalQs ? `/comprar?${canonicalQs}` : "/comprar";
 
@@ -312,38 +447,40 @@ export async function generateMetadata({
 export default async function ComprarPage({ searchParams = {} }: ComprarPageProps) {
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
-  const filters = normalizeBuyFilters(searchParams, cookieCity);
-  const city = resolveCity(filters, cookieCity);
 
-  const [resultsResponse, facetsResponse] = await Promise.allSettled([
-    fetchAdsSearch(filters),
-    fetchAdsFacets(filters),
-  ]);
+  const filters = normalizeBuyFilters(searchParams);
+  const hasExplicitTerritory = hasExplicitTerritoryInSearchParams(searchParams);
 
-  const initialResults =
-    resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
-      ? resultsResponse.value
-      : buildEmptyResults(filters);
-
-  const initialFacets =
-    facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)
-      ? facetsResponse.value.facets
-      : buildEmptyFacets();
+  const resolved = await resolveComprarData({
+    filters,
+    hasExplicitTerritory,
+    cookieCity,
+  });
 
   /**
-   * Se houver filtros puramente territoriais com city_slug e a cidade não tiver estoque,
-   * tenta fallback para outra cidade com anúncios.
-   * Em busca aberta (sem city_slug), não redireciona.
+   * Se houver território explícito e ele estiver vazio sob filtros puramente territoriais,
+   * tenta redirecionar para outra cidade com estoque.
+   *
+   * Não redireciona quando a página está em modo aberto/preferencial,
+   * para evitar loops e preservar a vitrine viva.
    */
   if (
-    filters.city_slug &&
-    isComprarTerritoryOnlyFilters(filters) &&
-    initialResults.pagination.total === 0
+    hasExplicitTerritory &&
+    resolved.filters.city_slug &&
+    isComprarTerritoryOnlyFilters(resolved.filters) &&
+    resolved.initialResults.pagination.total === 0
   ) {
-    const territory = await fetchCatalogAdsTerritoryFallback(filters.city_slug);
+    const territory = await fetchCatalogAdsTerritoryFallback(resolved.filters.city_slug);
 
-    if (territory?.mode === "fallback" && territory.slug && territory.slug !== filters.city_slug) {
-      const merged = mergeSearchFilters(filters, { city_slug: territory.slug, page: 1 });
+    if (
+      territory?.mode === "fallback" &&
+      territory.slug &&
+      territory.slug !== resolved.filters.city_slug
+    ) {
+      const merged = mergeSearchFilters(resolved.filters, {
+        city_slug: territory.slug,
+        page: 1,
+      });
       const qs = buildSearchQueryString(merged);
       redirect(qs ? `/comprar?${qs}` : "/comprar");
     }
@@ -351,10 +488,10 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
 
   return (
     <BuyMarketplacePageClient
-      initialResults={initialResults}
-      initialFacets={initialFacets}
-      initialFilters={filters}
-      city={city}
+      initialResults={resolved.initialResults}
+      initialFacets={resolved.initialFacets}
+      initialFilters={resolved.filters}
+      city={resolved.city}
     />
   );
 }
