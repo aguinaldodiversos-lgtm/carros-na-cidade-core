@@ -35,7 +35,7 @@ export async function requireLojistaDashboardSession(): Promise<SessionData> {
 }
 
 export async function loadDashboardPayload(session: SessionData): Promise<DashboardPayload | null> {
-  const ensured = await ensureSessionWithFreshBackendTokens(session);
+  const ensured = await ensureSessionWithFreshBackendTokens(session, { allowRefresh: false });
   if (!ensured.ok) {
     console.error("[loadDashboardPayload] sessão sem tokens utilizáveis");
     return null;

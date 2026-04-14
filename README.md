@@ -37,6 +37,11 @@ Copie o exemplo e ajuste:
 cp .env.example .env
 ```
 
+Variaveis obrigatorias para o frontend em producao:
+
+- `AUTH_SESSION_SECRET` - assinatura do cookie `cnc_session`; deve ser aleatorio, longo e diferente do fallback de desenvolvimento. Trocar este valor invalida as sessoes atuais e deve ser feito com janela de rollout e comunicacao de reentrada.
+- `BACKEND_API_URL` / `NEXT_PUBLIC_API_URL` - base do backend usado pelos BFFs e pelo cliente.
+
 Variáveis obrigatórias para o backend:
 
 - `DATABASE_URL` – conexão PostgreSQL

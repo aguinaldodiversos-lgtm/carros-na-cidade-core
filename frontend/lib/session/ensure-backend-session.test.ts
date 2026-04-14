@@ -43,6 +43,7 @@ describe("ensureSessionWithFreshBackendTokens", () => {
       expect(result.session).toBe(session);
       expect(result.persistCookies).toBeUndefined();
     }
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it("returns failure for null session", async () => {
@@ -82,6 +83,49 @@ describe("ensureSessionWithFreshBackendTokens", () => {
       expect(result.persistCookies).toBeDefined();
       expect(result.persistCookies?.accessToken).toBe("new-at");
     }
+  });
+
+  it("force refreshes even when access token still looks fresh", async () => {
+    mockNeedsRefresh.mockReturnValue(false);
+    mockRefresh.mockResolvedValue({
+      accessToken: "forced-at",
+      refreshToken: "forced-rt",
+    });
+
+    const session = makeSession();
+    const result = await ensureSessionWithFreshBackendTokens(session, { forceRefresh: true });
+
+    expect(mockNeedsRefresh).not.toHaveBeenCalled();
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).toHaveBeenCalledWith("valid-rt");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.session.accessToken).toBe("forced-at");
+      expect(result.persistCookies?.refreshToken).toBe("forced-rt");
+    }
+  });
+
+  it("does not refresh in a non-persistent context when access token exists", async () => {
+    mockNeedsRefresh.mockReturnValue(true);
+
+    const session = makeSession();
+    const result = await ensureSessionWithFreshBackendTokens(session, { allowRefresh: false });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.session).toBe(session);
+      expect(result.persistCookies).toBeUndefined();
+    }
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("fails in a non-persistent context when no access token is available", async () => {
+    const session = makeSession({ accessToken: undefined });
+    const result = await ensureSessionWithFreshBackendTokens(session, { allowRefresh: false });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("cannot_refresh");
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it("returns failure when refresh fails and no access token", async () => {

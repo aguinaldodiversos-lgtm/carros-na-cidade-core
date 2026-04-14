@@ -7,6 +7,7 @@ import {
 
 describe("sessionService", () => {
   const prevSecret = process.env.AUTH_SESSION_SECRET;
+  const prevNodeEnv = process.env.NODE_ENV;
 
   beforeEach(() => {
     process.env.AUTH_SESSION_SECRET = "unit-test-session-secret-32chars!!";
@@ -15,6 +16,8 @@ describe("sessionService", () => {
   afterEach(() => {
     if (prevSecret === undefined) delete process.env.AUTH_SESSION_SECRET;
     else process.env.AUTH_SESSION_SECRET = prevSecret;
+    if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = prevNodeEnv;
   });
 
   it("createSessionToken + cookies de token + getSessionDataFromCookieValue roundtrip", () => {
@@ -64,5 +67,19 @@ describe("sessionService", () => {
       email: "t@example.com",
       type: "CPF",
     });
+  });
+
+  it("falha fechado em producao sem AUTH_SESSION_SECRET", () => {
+    delete process.env.AUTH_SESSION_SECRET;
+    process.env.NODE_ENV = "production";
+
+    expect(() =>
+      createSessionToken({
+        id: "u1",
+        name: "Test",
+        email: "t@example.com",
+        type: "CPF",
+      })
+    ).toThrow(/AUTH_SESSION_SECRET/);
   });
 });

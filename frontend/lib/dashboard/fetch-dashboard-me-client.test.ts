@@ -77,16 +77,57 @@ describe("fetchDashboardPayloadClient", () => {
     }
   });
 
-  it("retorna ok:false com status quando não autorizado", async () => {
+  it("retorna erro estruturado quando BFF devolve 401", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
+      json: async () => ({
+        ok: false,
+        error: { code: "backend_unauthorized", message: "Sessao invalida" },
+      }),
     } as Response);
 
     const result = await fetchDashboardPayloadClient();
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.status).toBe(401);
+      expect(result.code).toBe("backend_unauthorized");
+      expect(result.message).toBe("Sessao invalida");
+    }
+  });
+
+  it("preserva codigo e upstreamStatus quando BFF devolve 5xx real", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({
+        ok: false,
+        error: {
+          code: "backend_unavailable",
+          message: "Backend indisponivel",
+          upstreamStatus: 500,
+        },
+      }),
+    } as Response);
+
+    const result = await fetchDashboardPayloadClient();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(502);
+      expect(result.code).toBe("backend_unavailable");
+      expect(result.upstreamStatus).toBe(500);
+    }
+  });
+
+  it("retorna erro de rede sem lancar excecao", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("fetch failed"));
+
+    const result = await fetchDashboardPayloadClient();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(0);
+      expect(result.code).toBe("network_error");
+      expect(result.message).toContain("fetch failed");
     }
   });
 });

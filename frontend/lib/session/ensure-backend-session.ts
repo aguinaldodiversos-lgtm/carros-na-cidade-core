@@ -6,13 +6,21 @@ export type EnsureBackendSessionResult =
   | { ok: true; session: SessionData; persistCookies?: SessionData }
   | { ok: false; reason: "missing_session" | "cannot_refresh" };
 
+export type EnsureBackendSessionOptions = {
+  forceRefresh?: boolean;
+  allowRefresh?: boolean;
+};
+
 /**
  * Garante access token utilizável para chamadas ao backend (Node / Route Handlers).
  * Usado quando o middleware não rodou ou como fallback após 401.
  */
 export async function ensureSessionWithFreshBackendTokens(
-  session: SessionData | null | undefined
+  session: SessionData | null | undefined,
+  options: EnsureBackendSessionOptions = {}
 ): Promise<EnsureBackendSessionResult> {
+  const allowRefresh = options.allowRefresh ?? true;
+
   if (!session?.id) {
     return { ok: false, reason: "missing_session" };
   }
@@ -21,8 +29,15 @@ export async function ensureSessionWithFreshBackendTokens(
     return { ok: false, reason: "cannot_refresh" };
   }
 
-  if (!accessTokenNeedsRefresh(session.accessToken)) {
+  if (!options.forceRefresh && session.accessToken && !accessTokenNeedsRefresh(session.accessToken)) {
     return { ok: true, session };
+  }
+
+  if (!allowRefresh) {
+    if (session.accessToken) {
+      return { ok: true, session };
+    }
+    return { ok: false, reason: "cannot_refresh" };
   }
 
   if (!session.refreshToken) {

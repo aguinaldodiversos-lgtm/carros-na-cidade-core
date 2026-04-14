@@ -32,7 +32,12 @@ type SessionPayload = SessionUser & {
 const DEFAULT_DURATION_SECONDS = 60 * 60 * 24 * 7;
 
 function getSessionSecret() {
-  return process.env.AUTH_SESSION_SECRET ?? "cnc-dev-session-secret";
+  const secret = process.env.AUTH_SESSION_SECRET?.trim();
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SESSION_SECRET deve ser definido em producao.");
+  }
+  return "cnc-dev-session-secret";
 }
 
 function encodeBase64Url(value: string) {

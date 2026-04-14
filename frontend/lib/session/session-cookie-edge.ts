@@ -26,7 +26,12 @@ type SessionPayload = EdgeSessionData & {
 const encoder = new TextEncoder();
 
 function getSessionSecret() {
-  return process.env.AUTH_SESSION_SECRET ?? "cnc-dev-session-secret";
+  const secret = process.env.AUTH_SESSION_SECRET?.trim();
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SESSION_SECRET deve ser definido em producao.");
+  }
+  return "cnc-dev-session-secret";
 }
 
 function uint8ArrayToBase64Url(bytes: Uint8Array): string {

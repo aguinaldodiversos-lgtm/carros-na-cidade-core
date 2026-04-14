@@ -15,3 +15,5 @@ services:
         value: https://carros-na-cidade-core.onrender.com
       - key: BACKEND_API_URL
         value: https://carros-na-cidade-core.onrender.com
+      - key: AUTH_SESSION_SECRET
+        sync: false
