@@ -49,6 +49,36 @@ function requireString(value, fieldName, { lowercase = false } = {}) {
   return lowercase ? normalized.toLowerCase() : normalized;
 }
 
+let usersColumnsPromise = null;
+
+function normalizeOptionalString(value) {
+  return String(value ?? "").trim();
+}
+
+function onlyDigits(value) {
+  return normalizeOptionalString(value).replace(/\D/g, "");
+}
+
+async function getUsersColumnSet() {
+  if (!usersColumnsPromise) {
+    usersColumnsPromise = pool
+      .query(
+        `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'users'
+        `
+      )
+      .then((result) => new Set(result.rows.map((row) => row.column_name)))
+      .catch((error) => {
+        usersColumnsPromise = null;
+        throw error;
+      });
+  }
+  return usersColumnsPromise;
+}
+
 /** LOGIN */
 router.post(
   "/login",
@@ -181,19 +211,56 @@ router.post(
       throw new AppError("Este documento já está cadastrado em outra conta.", 409);
     }
 
-    const displayName = String(req.body?.name ?? "").trim();
+    const displayName = normalizeOptionalString(req.body?.name);
+    const address = normalizeOptionalString(req.body?.address);
+    const phone = onlyDigits(req.body?.phone).slice(0, 11);
+    const whatsapp = onlyDigits(req.body?.whatsapp || req.body?.phone).slice(0, 11);
+    const contact = whatsapp || phone;
 
+    if (displayName.length < 3) {
+      throw new AppError("Nome completo e obrigatorio.", 400);
+    }
+
+    if (address.length < 8) {
+      throw new AppError("Endereco do anunciante e obrigatorio.", 400);
+    }
+
+    if (contact.length < 10) {
+      throw new AppError("Telefone ou WhatsApp do anunciante e obrigatorio.", 400);
+    }
+
+    const usersColumns = await getUsersColumnSet();
+    if (!usersColumns.has("document_type") || !usersColumns.has("document_number")) {
+      throw new AppError('Tabela "users" sem colunas de documento.', 500);
+    }
+
+    const assignments = [];
+    const values = [];
+    const setIfColumnExists = (column, value) => {
+      if (!usersColumns.has(column)) return;
+      values.push(value);
+      assignments.push(`${column} = $${values.length}`);
+    };
+
+    setIfColumnExists("document_type", document_type);
+    setIfColumnExists("document_number", document_number);
+    setIfColumnExists("document_verified", true);
+    setIfColumnExists("name", displayName);
+    setIfColumnExists("address", address);
+    setIfColumnExists("phone", phone || contact);
+    setIfColumnExists("whatsapp", whatsapp || contact);
+    if (usersColumns.has("updated_at")) {
+      assignments.push("updated_at = NOW()");
+    }
+
+    values.push(req.user.id);
     await pool.query(
       `
       UPDATE users
-      SET
-        document_type = $1,
-        document_number = $2,
-        document_verified = true,
-        name = COALESCE(NULLIF($4, ''), name)
-      WHERE id = $3
+      SET ${assignments.join(", ")}
+      WHERE id = $${values.length}
       `,
-      [document_type, document_number, req.user.id, displayName]
+      values
     );
 
     return res.status(200).json({

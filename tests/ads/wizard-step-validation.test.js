@@ -47,8 +47,6 @@ function validateStep(step, form) {
         return "Selecione uma cidade válida da lista para continuar.";
       if (!form.city.trim())
         return "Selecione uma cidade válida da lista para continuar.";
-      if (!form.whatsapp.trim() && !form.phone.trim())
-        return "Informe WhatsApp ou telefone.";
       if (!form.acceptTerms) return "Aceite os termos para publicar.";
       return null;
     case 6:
@@ -79,8 +77,6 @@ const VALID_FINALIZE = {
   state: "SP",
   cityId: 42,
   city: "Atibaia",
-  whatsapp: "(11) 99999-9999",
-  phone: "",
   acceptTerms: true,
 };
 
@@ -191,18 +187,6 @@ describe("Wizard step validation", () => {
 
     it("fails without city name", () => {
       expect(validateStep(5, makeForm({ city: "" }))).toContain("cidade");
-    });
-
-    it("fails without any contact info", () => {
-      expect(
-        validateStep(5, makeForm({ whatsapp: "", phone: "" }))
-      ).toContain("WhatsApp");
-    });
-
-    it("passes with only phone (no whatsapp)", () => {
-      expect(
-        validateStep(5, makeForm({ whatsapp: "", phone: "(11) 3333-3333" }))
-      ).toBeNull();
     });
 
     it("fails without acceptTerms", () => {

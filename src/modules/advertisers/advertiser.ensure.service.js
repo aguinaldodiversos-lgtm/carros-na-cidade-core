@@ -25,6 +25,9 @@ const ADVERTISER_CONTACT_COLUMN_PRIORITY = [
   "telefone",
 ];
 
+const USER_ADDRESS_COLUMN_PRIORITY = ["address", "endereco"];
+const ADVERTISER_ADDRESS_COLUMN_PRIORITY = ["address", "endereco"];
+
 let advertisersColumnsPromise = null;
 let usersColumnsPromise = null;
 
@@ -93,6 +96,30 @@ function buildContactFieldsForAdvertiser(contact, advertiserCols) {
   for (const col of ADVERTISER_CONTACT_COLUMN_PRIORITY) {
     if (advertiserCols.has(col)) {
       out[col] = contact;
+    }
+  }
+  return out;
+}
+
+function pickAddressFromUserRow(row, usersCols) {
+  for (const col of USER_ADDRESS_COLUMN_PRIORITY) {
+    if (!usersCols.has(col)) continue;
+    const v = row[col];
+    if (v != null && String(v).trim()) {
+      return String(v).trim();
+    }
+  }
+  return null;
+}
+
+function buildAddressFieldsForAdvertiser(address, advertiserCols) {
+  if (!address) {
+    return {};
+  }
+  const out = {};
+  for (const col of ADVERTISER_ADDRESS_COLUMN_PRIORITY) {
+    if (advertiserCols.has(col)) {
+      out[col] = address;
     }
   }
   return out;
@@ -189,7 +216,10 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
       return existing.rows[0];
     }
 
-    const contactCols = USER_CONTACT_COLUMN_PRIORITY.filter((c) => usersCols.has(c));
+    const contactCols = [
+      ...USER_CONTACT_COLUMN_PRIORITY,
+      ...USER_ADDRESS_COLUMN_PRIORITY,
+    ].filter((c, index, arr) => usersCols.has(c) && arr.indexOf(c) === index);
     let contactRow = {};
     if (contactCols.length) {
       const cr = await client.query(
@@ -206,6 +236,8 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
 
     const contact = pickContactFromUserRow(contactRow, usersCols);
     const contactFields = buildContactFieldsForAdvertiser(contact, advertiserCols);
+    const address = pickAddressFromUserRow(contactRow, usersCols);
+    const addressFields = buildAddressFieldsForAdvertiser(address, advertiserCols);
 
     const displayName = account.name?.trim() || "Anunciante";
     const baseSlug = (slugify(`${displayName}-${userId}`) || `anunciante-${userId}`).slice(0, 120);
@@ -225,6 +257,7 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
       status: "active",
       verified: false,
       ...contactFields,
+      ...addressFields,
     };
 
     const fieldNames = [];

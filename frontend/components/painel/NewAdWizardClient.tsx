@@ -91,7 +91,6 @@ function validateStep(step: number, form: WizardFormState): string | null {
         return "Selecione uma cidade válida da lista para continuar.";
       }
       if (!form.city.trim()) return "Selecione uma cidade válida da lista para continuar.";
-      if (!form.whatsapp.trim() && !form.phone.trim()) return "Informe WhatsApp ou telefone.";
       if (!form.acceptTerms) return "Aceite os termos para publicar.";
       return null;
     case 6:
@@ -111,6 +110,23 @@ function buildTitle(form: WizardFormState) {
 
 function clampStep(value: number) {
   return Math.min(Math.max(value, 0), STEP_COUNT - 1);
+}
+
+function publishReasonRequiresProfileCompletion(reason: string | null | undefined) {
+  const normalized = String(reason || "").toLowerCase();
+  if (!normalized) return false;
+  if (/(limite|plano|vaga|pagamento|checkout)/i.test(normalized)) return false;
+  return /(cpf|cnpj|documento|cadastro|verificar|verificado)/i.test(normalized);
+}
+
+function dashboardRequiresProfileCompletion(dashboard: DashboardPayload | null) {
+  if (!dashboard) return false;
+  if (dashboard.user.type === "pending") return true;
+  if (dashboard.user.document_verified === false) return true;
+  return (
+    dashboard.publish_eligibility?.allowed === false &&
+    publishReasonRequiresProfileCompletion(dashboard.publish_eligibility.reason)
+  );
 }
 
 export default function NewAdWizardClient({ initialType }: Props) {
@@ -380,8 +396,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
       payload.append("plateFinal", form.plateFinal);
       payload.append("title", title);
       payload.append("description", form.description);
-      payload.append("whatsapp", form.whatsapp);
-      payload.append("phone", form.phone);
       payload.append("acceptTerms", form.acceptTerms ? "true" : "false");
       payload.append("armored", form.armored ? "true" : "false");
       payload.append("optionalFeatures", JSON.stringify(form.optionalIds));
@@ -540,7 +554,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
     );
   }
 
-  if (dashboard?.user?.type === "pending") {
+  if (dashboardRequiresProfileCompletion(dashboard)) {
     return (
       <div className="min-h-screen bg-[#F5F7FB] px-4 py-10">
         <div className="mx-auto max-w-7xl">

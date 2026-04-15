@@ -16,11 +16,17 @@ export default function CompleteProfileGate({ onCompleted }: Props) {
   const [docType, setDocType] = useState<BrazilianDocumentType>("cpf");
   const [doc, setDoc] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [address, setAddress] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const displayNameOk = displayName.trim().length >= 3;
+  const addressOk = address.trim().length >= 8;
+  const contactPhoneDigits = onlyDigits(contactPhone);
+  const contactPhoneOk = contactPhoneDigits.length >= 10 && contactPhoneDigits.length <= 11;
   const docOk = useMemo(() => isValidBrazilianDocument(doc, docType), [doc, docType]);
-  const canSubmit = docOk && !submitting;
+  const canSubmit = displayNameOk && addressOk && contactPhoneOk && docOk && !submitting;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -37,7 +43,10 @@ export default function CompleteProfileGate({ onCompleted }: Props) {
         body: JSON.stringify({
           document_type: docType,
           document_number: onlyDigits(doc),
-          ...(displayName.trim() ? { name: displayName.trim() } : {}),
+          name: displayName.trim(),
+          address: address.trim(),
+          phone: contactPhoneDigits,
+          whatsapp: contactPhoneDigits,
         }),
       });
 
@@ -71,20 +80,77 @@ export default function CompleteProfileGate({ onCompleted }: Props) {
         Complete seu cadastro para anunciar
       </h1>
       <p className="mt-3 text-sm leading-7 text-[#64748b]">
-        Informe CPF ou CNPJ válido. Você só precisa fazer isso uma vez; depois os dados ficam
-        salvos na sua conta.
+        Informe seus dados pessoais e um CPF ou CNPJ válido. Você só precisa fazer isso uma vez;
+        depois os dados ficam salvos na sua conta.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4" data-testid="complete-profile-form">
         <label className="block">
           <span className="mb-2 block text-sm font-semibold text-[#33405A]">Nome completo</span>
           <input
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Como aparecerá nos anúncios"
+            placeholder="Nome do anunciante ou responsável"
+            data-testid="profile-name"
             className="h-[52px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
           />
+          {displayName ? (
+            <p
+              className={`mt-2 text-[13px] font-semibold ${
+                displayNameOk ? "text-[#15803D]" : "text-[#C2410C]"
+              }`}
+            >
+              {displayNameOk ? "Nome informado" : "Informe pelo menos 3 caracteres."}
+            </p>
+          ) : null}
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-[#33405A]">
+            Endereço do anunciante
+          </span>
+          <input
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Rua, número, bairro"
+            data-testid="profile-address"
+            className="h-[52px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
+          />
+          {address ? (
+            <p
+              className={`mt-2 text-[13px] font-semibold ${
+                addressOk ? "text-[#15803D]" : "text-[#C2410C]"
+              }`}
+            >
+              {addressOk ? "Endereço informado" : "Informe um endereço mais completo."}
+            </p>
+          ) : null}
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-[#33405A]">
+            Telefone / WhatsApp
+          </span>
+          <input
+            type="tel"
+            inputMode="tel"
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            placeholder="(11) 99999-9999"
+            data-testid="profile-phone"
+            className="h-[52px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
+          />
+          {contactPhone ? (
+            <p
+              className={`mt-2 text-[13px] font-semibold ${
+                contactPhoneOk ? "text-[#15803D]" : "text-[#C2410C]"
+              }`}
+            >
+              {contactPhoneOk ? "Contato informado" : "Informe DDD + telefone."}
+            </p>
+          ) : null}
         </label>
 
         <div>
@@ -126,6 +192,7 @@ export default function CompleteProfileGate({ onCompleted }: Props) {
             value={doc}
             onChange={(e) => setDoc(formatBrazilianDocument(e.target.value, docType))}
             placeholder={docType === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"}
+            data-testid="profile-document"
             className="h-[52px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
           />
           {doc ? (
@@ -148,6 +215,7 @@ export default function CompleteProfileGate({ onCompleted }: Props) {
         <button
           type="submit"
           disabled={!canSubmit}
+          data-testid="profile-submit"
           className="inline-flex h-[52px] w-full items-center justify-center rounded-[16px] bg-[#1F66E5] px-6 text-[16px] font-extrabold text-white transition hover:bg-[#1758CC] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Validando..." : "Salvar e continuar"}

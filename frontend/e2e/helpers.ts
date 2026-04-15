@@ -195,9 +195,11 @@ export async function completePendingProfileIfNeeded(page: Page) {
     return;
   }
 
-  await page.getByPlaceholder(/Como aparecerá nos anúncios/i).fill(`E2E mínimo ${Date.now()}`);
+  await page.getByTestId("profile-name").fill(`E2E minimo ${Date.now()}`);
+  await page.getByTestId("profile-address").fill("Rua E2E, 123 - Centro");
+  await page.getByTestId("profile-phone").fill("(11) 99999-9999");
   const cpf = generateValidCpfDigits();
-  await page.getByPlaceholder("000.000.000-00").fill(formatCpfMask(cpf));
+  await page.getByTestId("profile-document").fill(formatCpfMask(cpf));
 
   const verifyPromise = page.waitForResponse(
     (r) =>

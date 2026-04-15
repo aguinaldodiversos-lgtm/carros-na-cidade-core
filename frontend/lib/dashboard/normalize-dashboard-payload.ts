@@ -63,6 +63,9 @@ function normalizeUser(raw: unknown): DashboardUser | null {
     email,
     type,
     cnpj_verified: Boolean(raw.cnpj_verified),
+    ...(raw.document_verified !== undefined
+      ? { document_verified: Boolean(raw.document_verified) }
+      : {}),
   };
 }
 

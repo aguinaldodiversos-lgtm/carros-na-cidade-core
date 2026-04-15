@@ -2,7 +2,6 @@ import { pool, withUserTransaction } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import * as adsRepository from "../ads/ads.repository.js";
-import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
 import { getAccountUser } from "./account.user.read.js";
 
 export { getAccountUser };
@@ -661,6 +660,7 @@ export async function getDashboardPayload(userId, options = {}) {
         email: user.email,
         type: user.type,
         cnpj_verified: user.cnpj_verified,
+        document_verified: user.document_verified,
       },
       advertiser: null,
       current_plan: currentPlan
@@ -721,6 +721,7 @@ export async function getDashboardPayload(userId, options = {}) {
         email: "",
         type: fallbackAccountType,
         cnpj_verified: false,
+        document_verified: fallbackAccountType !== "pending",
       },
       advertiser: null,
       current_plan: null,

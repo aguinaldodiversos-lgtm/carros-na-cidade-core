@@ -795,25 +795,9 @@ export function StepFinalize({
 
       <FinalizeLocationFields state={state} patch={patch} />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block">
-          <span className={labelClass}>WhatsApp</span>
-          <input
-            className={selectClass}
-            value={state.whatsapp}
-            onChange={(e) => patch({ whatsapp: e.target.value })}
-            placeholder="(11) 99999-9999"
-          />
-        </label>
-        <label className="block">
-          <span className={labelClass}>Telefone</span>
-          <input
-            className={selectClass}
-            value={state.phone}
-            onChange={(e) => patch({ phone: e.target.value })}
-            placeholder="(11) 3333-3333"
-          />
-        </label>
+      <div className="rounded-[18px] border border-[#DCE6F7] bg-[#F8FBFF] px-4 py-3 text-sm leading-7 text-[#5C647C]">
+        O contato do anunciante vem do cadastro preenchido no primeiro anúncio. Para alterar nome,
+        endereço ou telefone, atualize os dados da conta antes de publicar.
       </div>
 
       <label className="flex items-start gap-3 rounded-[18px] border border-[#E5E9F2] bg-[#FBFCFF] p-4">

@@ -7,6 +7,7 @@ export type DashboardUser = {
   email: string;
   type: AccountType;
   cnpj_verified: boolean;
+  document_verified?: boolean;
 };
 
 export type DashboardPlanSummary = {
