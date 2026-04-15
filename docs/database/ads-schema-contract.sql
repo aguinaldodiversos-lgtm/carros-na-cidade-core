@@ -1,5 +1,5 @@
 -- Contrato documentado da tabela `public.ads` (alinhamento app ↔ Postgres).
--- Baseline versionada (CREATE incremental): `src/database/migrations/004_baseline_ads.sql` + `docs/database/BASELINE_MIGRATIONS.md`.
+-- Schema consolidado em `src/database/migrations/001_baseline.sql`.
 -- Ajuste CHECKs reais no banco para coincidir com `src/modules/ads/ads.canonical.constants.js`.
 -- Use `npm run db:check-ads` em staging: lista CHECKs reais e compara slugs com `ads.canonical.constants.js`.
 -- Modo CI: `CHECK_ADS_STRICT=1 npm run db:check-ads` ou `node scripts/print-ads-constraints.js --strict` (exit 1 se divergir).
@@ -30,6 +30,6 @@
 COMMENT ON TABLE public.ads IS
   'Contrato de enums: ver ads.canonical.constants.js e este arquivo.';
 
--- Coluna de galeria (obrigatória no app atual): ver migration 011 e ads.repository.js
+-- Coluna de galeria (obrigatória no app atual): ver 001_baseline.sql e ads.repository.js
 -- ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
 -- COMMENT ON COLUMN public.ads.images IS 'URLs em JSON array; capa = índice 0.';

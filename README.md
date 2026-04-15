@@ -15,7 +15,7 @@ Portal de anúncios automotivos com simulador de financiamento, tabela FIPE e ca
 ## Pré-requisitos
 
 - Node.js >=20 <21
-- PostgreSQL
+- Docker (para PostgreSQL local)
 - Redis (opcional, para filas/cache)
 
 ## Setup
@@ -29,33 +29,39 @@ npm install
 cd frontend && npm install && cd ..
 ```
 
-### 2. Variáveis de ambiente
+### 2. Banco de dados
 
-Copie o exemplo e ajuste:
+```bash
+docker compose -f docker-compose.test.yml up -d
+```
+
+### 3. Variáveis de ambiente
 
 ```bash
 cp .env.example .env
 ```
 
-Variaveis obrigatorias para o frontend em producao:
-
-- `AUTH_SESSION_SECRET` - assinatura do cookie `cnc_session`; deve ser aleatorio, longo e diferente do fallback de desenvolvimento. Trocar este valor invalida as sessoes atuais e deve ser feito com janela de rollout e comunicacao de reentrada.
-- `BACKEND_API_URL` / `NEXT_PUBLIC_API_URL` - base do backend usado pelos BFFs e pelo cliente.
-
-Variáveis obrigatórias para o backend:
+O `.env.example` já vem configurado para o Postgres local (porta 5433). Variáveis obrigatórias:
 
 - `DATABASE_URL` – conexão PostgreSQL
 - `JWT_SECRET` / `JWT_REFRESH_SECRET` – autenticação
 
-### 3. Migrações e execução
+Para o frontend em produção:
+
+- `AUTH_SESSION_SECRET` – assinatura do cookie `cnc_session`
+- `NEXT_PUBLIC_API_URL` – URL do backend
+
+### 4. Execução
 
 ```bash
-# Backend (API + workers opcional)
-RUN_MIGRATIONS=true RUN_WORKERS=false npm run dev
+# Backend (aplica migrations automaticamente no boot)
+npm run dev
 
 # Frontend (em outro terminal)
 cd frontend && npm run dev
 ```
+
+O schema do banco é mantido em `src/database/migrations/001_baseline.sql` e aplicado automaticamente quando `RUN_MIGRATIONS=true` (padrão). Ver `docs/database/BASELINE_MIGRATIONS.md`.
 
 ## Scripts
 

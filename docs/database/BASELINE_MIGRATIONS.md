@@ -1,78 +1,65 @@
-# Baseline de schema (migrations versionadas)
+# Database Schema — Carros na Cidade
 
-## Onde ficam
+## Arquivo único de migração
 
-- **Runner:** `src/database/migrate.js` (chamado no boot por `src/index.js`).
-- **Arquivos:** `src/database/migrations/*.sql` (ordem lexicográfica: `001_…` … `008_…` e seguintes).
-- **Registro:** tabela `schema_migrations` com `filename` canônico; `id` antigo continua aceito por compatibilidade.
+O schema completo do banco está consolidado em um único arquivo:
 
-> `src/infrastructure/database/migrate.js` agora delega para `src/database/migrate.js`; a API usa uma única fonte de verdade.
+```
+src/database/migrations/001_baseline.sql
+```
 
-## Objetivo desta baseline
+Este arquivo é **idempotente** — usa `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS` e blocos `DO $$ ... $$` condicionais para FKs. Pode ser executado em banco novo ou existente sem efeitos colaterais.
 
-Fornecer uma **fonte versionada mínima** das tabelas **cities**, **users**, **advertisers**, **ads** para:
+## Motor de migração
 
-- novos ambientes (CI, dev local, staging vazio);
-- documentar o contrato esperado pelo código em `src/modules/ads`, `auth`, `advertisers`, `cities`.
+O runner em `src/database/migrate.js`:
 
-Não substitui inspeção do banco real em produção (`npm run db:check-ads` para CHECKs em `ads`).
+1. Adquire advisory lock (`pg_advisory_lock`)
+2. Cria `schema_migrations` se não existir (colunas: `id`, `filename`, `checksum`, `executed_at`)
+3. Lê arquivos `.sql` de `src/database/migrations/` em ordem lexicográfica
+4. Para cada arquivo não aplicado: `BEGIN` → executa SQL → insere registro → `COMMIT`
+5. Valida checksum SHA-256 para impedir alteração de migrações já aplicadas
+6. Libera advisory lock
 
-## Princípios (não destrutivo)
+## Como rodar
 
-- `CREATE TABLE IF NOT EXISTS` — bancos que já têm a tabela **não** são recriados.
-- `ALTER TABLE … ADD COLUMN IF NOT EXISTS` — só **acrescenta** colunas ausentes.
-- `CREATE INDEX IF NOT EXISTS` — índices auxiliares; **sem** `DROP`, **sem** truncates.
-- `schema_migrations` legado (`id SERIAL`, `filename TEXT`) é reconciliado automaticamente pelo runner atual.
-- **Sem FKs** entre `users` / `cities` / `advertisers` / `ads` nesta baseline: em deploys antigos o tipo de `users.id` pode ser **UUID** enquanto o app novo assume **BIGINT** em inserts dinâmicos; FK falharia. A integridade continua sendo responsabilidade do aplicativo até alinhar tipos.
+```bash
+# No boot (padrão — RUN_MIGRATIONS=true no .env)
+npm run dev
 
-## O que veio do código (fonte de verdade parcial)
+# Manualmente
+npm run db:migrate
+```
 
-| Tabela        | Origem principal no repo                                                                        |
-| ------------- | ----------------------------------------------------------------------------------------------- |
-| `ads`         | `src/modules/ads/ads.repository.js` (INSERT/UPDATE), `ads.storage-normalize.js`                 |
-| `users`       | `src/modules/auth/auth.service.js` (insert dinâmico + `password_hash` ou `password`)            |
-| `cities`      | `src/modules/cities/ibge-municipios.service.js` (`INSERT INTO cities (name, state, slug)`)      |
-| `advertisers` | `src/modules/advertisers/advertiser.ensure.service.js` (insert dinâmico por colunas existentes) |
+## Tabelas
 
-## O que foi assumido na baseline
+| Tabela | Propósito |
+|---|---|
+| `cities` | Municípios com slug para rotas territoriais |
+| `users` | Contas de usuário (auth, perfil) |
+| `advertisers` | Anunciantes vinculados a usuários |
+| `ads` | Anúncios de veículos (RLS habilitado) |
+| `ad_metrics` | Métricas por anúncio |
+| `city_metrics` | Métricas agregadas por cidade |
+| `seo_city_metrics` | Métricas SEO por cidade/data |
+| `refresh_tokens` | Tokens de refresh JWT |
+| `dealer_leads` | Leads de aquisição de lojistas |
+| `dealer_lead_interactions` | Interações com dealer leads |
+| `dealer_followups` | Follow-ups programados |
+| `admin_actions` | Log de ações administrativas |
 
-- **Tipos de chave:** `BIGSERIAL` em tabelas novas para `id` — comum em instalações novas; **produção pode usar UUID** ou outros tipos; nesse caso o `CREATE TABLE IF NOT EXISTS` é ignorado e apenas os `ADD COLUMN IF NOT EXISTS` podem aplicar.
-- **`users.password_hash`:** preferido pelo auth; coluna `password` incluída como compatibilidade com legado.
-- **`ads.slug`:** índice **não único** na baseline para evitar falha da migration se existirem slugs duplicados em dados legados; unicidade pode ser regra de negócio + rotas, não constraint forçada aqui.
-- **Colunas opcionais em `ads`:** `latitude`, `longitude`, `search_vector`, `priority`, `gearbox`, `cambio` — referenciadas em filtros ou legado; adicionadas com `IF NOT EXISTS`.
-- **CHECKs de enums** (`body_type`, `fuel_type`, `transmission`): documentados em `docs/database/ads-schema-contract.sql` e constantes canônicas; **não** são recriados nesta baseline para não conflitar com CHECKs já existentes no banco.
+## Views
 
-## Auditoria de CHECKs vs código
+| View | Propósito |
+|---|---|
+| `city_seo_metrics` | Último registro SEO por cidade |
 
-- `npm run db:check-ads` — lista CHECKs reais e compara slugs com `ads.canonical.constants.js`.
-- Modo estrito (CI): `CHECK_ADS_STRICT=1 npm run db:check-ads` ou `node scripts/print-ads-constraints.js --strict` (exit code 1 se houver divergência ou coluna sem CHECK correspondente).
+## Novas migrações
 
-## Migration 011 — `ads.images` (galeria)
+Para alterações no schema, crie um novo arquivo em `src/database/migrations/` com numeração sequencial:
 
-Arquivo: `011_ads_images.sql`.
+```
+002_descricao_da_alteracao.sql
+```
 
-- Adiciona **`ads.images JSONB NOT NULL DEFAULT '[]'`** — array de URLs (strings); **capa = primeiro elemento** (alinhado a `ads.repository.js` e BFF de fotos).
-- O mesmo `ALTER … IF NOT EXISTS` foi incorporado ao final de `004_baseline_ads.sql` para **novas** instalações que leem o baseline num único lugar; bases que já rodaram `004` antes disso dependem de **`011`** (ou `npm run db:migrate`) para criar a coluna.
-
-Se aparecer `column "images" of relation "ads" does not exist`, o Postgres **não aplicou** essa migration: defina `RUN_MIGRATIONS=true` no boot ou execute **`npm run db:migrate`** com `DATABASE_URL` correto.
-
-## Migration 012 — compatibilidade estrutural
-
-Arquivo: `012_core_schema_compatibility.sql`.
-
-- Reforça `users`, `advertisers`, `ads`, `cities` e `refresh_tokens` para bancos legados ou parcialmente migrados.
-- Cobre colunas que o código atual usa diretamente, como `ads.images`, `users.reset_token`, `users.email_verification_token`, `advertisers.slug` e campos de segurança/auth.
-- Permite que ambientes antigos continuem operando com o runner novo sem ajuste manual no banco.
-
-## Migration 008 — FK `advertisers` → `users` (opcional)
-
-Arquivo: `008_advertisers_user_fk.sql`.
-
-- Declara `advertisers_user_id_fkey` (`user_id` → `users.id`, `ON DELETE RESTRICT`) quando os tipos são compatíveis e não há dados órfãos.
-- Se o `ALTER` falhar (tipos legados divergentes, linhas órfãs, etc.), a migration **não aborta**: registra `NOTICE` no log do Postgres e segue.
-- Antes de exigir a FK em produção: `node scripts/report-advertiser-integrity.mjs` e corrigir anunciantes sem usuário.
-
-## Próximos passos sugeridos (fora do escopo mínimo)
-
-- Migration dedicada só a CHECKs alinhados a `ads.canonical.constants.js`, após comparar com `db:check-ads`.
-- Declarar FKs adicionais (`ads` → `advertisers`, etc.) quando alinhados em todos os ambientes.
+O runner aplicará automaticamente no próximo boot ou `npm run db:migrate`.
