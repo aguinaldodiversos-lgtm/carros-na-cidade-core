@@ -102,6 +102,18 @@ type RegisterCompatPayload = RegisterPayload & {
   next?: string;
 };
 
+export class BackendAuthError extends Error {
+  public readonly status: number;
+  public readonly upstreamStatus: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "BackendAuthError";
+    this.status = Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502;
+    this.upstreamStatus = status;
+  }
+}
+
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -297,11 +309,23 @@ async function authenticateAgainstBackend(
     const payload = await safeJson<BackendAuthResponse>(response);
 
     if (!response.ok) {
-      throw new Error(extractErrorMessage(payload, "Nao foi possivel autenticar."));
+      throw new BackendAuthError(
+        extractErrorMessage(payload, "Nao foi possivel autenticar."),
+        response.status
+      );
     }
 
-    return buildAuthenticatedSessionFromResponse(payload, normalizedEmail);
+    const session = await buildAuthenticatedSessionFromResponse(payload, normalizedEmail);
+    if (!session) {
+      throw new BackendAuthError("Resposta de autenticacao invalida.", 502);
+    }
+
+    return session;
   } catch (error) {
+    if (error instanceof BackendAuthError) {
+      throw error;
+    }
+
     if (error instanceof Error) {
       throw error;
     }

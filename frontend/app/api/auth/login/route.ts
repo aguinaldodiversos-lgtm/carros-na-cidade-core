@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
-import { authenticateUser } from "@/services/authService";
+import { authenticateUser, BackendAuthError } from "@/services/authService";
 import { applyPrivateNoStoreHeaders, applySessionCookiesToResponse } from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,63 @@ type Payload = {
 
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function safeBackendAuthMessage(message: string, fallback: string) {
+  const normalized = normalizeString(message);
+  if (!normalized || normalized.length > 180) return fallback;
+
+  if (/password_hash|jwt_secret|database|postgres|select\s|insert\s|update\s|stack|trace/i.test(normalized)) {
+    return fallback;
+  }
+
+  return normalized;
+}
+
+function responseFromBackendAuthError(error: BackendAuthError) {
+  const status = error.status;
+
+  if (status === 401) {
+    return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
+  }
+
+  if (status === 403) {
+    return NextResponse.json(
+      { error: safeBackendAuthMessage(error.message, "Acesso negado.") },
+      { status: 403 }
+    );
+  }
+
+  if (status === 429) {
+    return NextResponse.json(
+      {
+        error: safeBackendAuthMessage(
+          error.message,
+          "Muitas tentativas. Tente novamente mais tarde."
+        ),
+      },
+      { status: 429 }
+    );
+  }
+
+  if (status >= 400 && status < 500) {
+    return NextResponse.json(
+      { error: safeBackendAuthMessage(error.message, "Nao foi possivel autenticar.") },
+      { status }
+    );
+  }
+
+  return NextResponse.json(
+    { error: "Servico de autenticacao indisponivel. Tente novamente em instantes." },
+    { status: 502 }
+  );
+}
+
+function isConnectionError(error: unknown) {
+  return (
+    error instanceof Error &&
+    /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|network|socket|EAI_AGAIN/i.test(error.message)
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -63,6 +120,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("POST /api/auth/login error:", error);
 
+    if (error instanceof BackendAuthError) {
+      return responseFromBackendAuthError(error);
+    }
+
     if (
       error instanceof Error &&
       /credenciais invalidas|credenciais inválidas|nao foi possivel autenticar/i.test(error.message)
@@ -70,11 +131,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciais invalidas" }, { status: 401 });
     }
 
-    const isConnectionError =
-      error instanceof Error &&
-      /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|network/i.test(error.message);
-
-    if (isConnectionError) {
+    if (isConnectionError(error)) {
       return NextResponse.json(
         { error: "Servidor indisponivel. Verifique se o backend esta ativo." },
         { status: 502 }

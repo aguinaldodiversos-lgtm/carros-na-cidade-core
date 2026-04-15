@@ -1,0 +1,84 @@
+
+> frontend@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ⚠ Invalid next.config.mjs options detected: 
+ ⚠     Unrecognized key(s) in object: 'serverExternalPackages'
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+ ✓ Ready in 6.4s
+ ○ Compiling / ...
+ ✓ Compiled / in 5.7s (653 modules)
+ GET / 200 in 2861ms
+ GET / 200 in 884ms
+ GET / 200 in 55ms
+ GET / 200 in 46ms
+ GET / 200 in 60ms
+ GET / 200 in 59ms
+ GET / 200 in 72ms
+ GET / 200 in 79ms
+ GET / 200 in 63ms
+ GET / 200 in 65ms
+ GET / 200 in 38ms
+ GET / 200 in 66ms
+ GET / 200 in 52ms
+ GET / 200 in 64ms
+ GET / 200 in 53ms
+ GET / 200 in 87ms
+ GET / 200 in 68ms
+ GET / 200 in 66ms
+ GET / 200 in 60ms
+ GET / 200 in 39ms
+ GET / 200 in 50ms
+ GET / 200 in 58ms
+ GET / 200 in 75ms
+ GET / 200 in 46ms
+ GET / 200 in 52ms
+ GET / 200 in 59ms
+ GET / 200 in 58ms
+ GET / 200 in 47ms
+ GET / 200 in 43ms
+ GET / 200 in 51ms
+ GET / 200 in 59ms
+ GET / 200 in 81ms
+ GET / 200 in 58ms
+ GET / 200 in 59ms
+ GET / 200 in 66ms
+ GET / 200 in 104ms
+ GET / 200 in 67ms
+ GET / 200 in 73ms
+ GET / 200 in 59ms
+ GET / 200 in 56ms
+ GET / 200 in 68ms
+ GET / 200 in 38ms
+ GET / 200 in 42ms
+ GET / 200 in 66ms
+ GET / 200 in 76ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1919ms (670 modules)
+ GET /login 200 in 2351ms
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ ✓ Compiled /api/auth/me in 397ms (366 modules)
+ ✓ Compiled (368 modules)
+ GET /api/auth/me 401 in 873ms
+ GET /api/auth/me 401 in 872ms
+ POST /api/auth/login 400 in 925ms
+ GET /login 200 in 292ms
+ GET /api/auth/me 401 in 110ms
+ GET /api/auth/me 401 in 108ms
+ GET /login 200 in 73ms
+ GET /login 200 in 95ms
+ GET /api/auth/me 401 in 106ms
+ GET /api/auth/me 401 in 104ms
+ POST /api/auth/login 200 in 1257ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 3s (714 modules)
+ ✓ Compiled in 968ms (322 modules)
+ GET /dashboard?_rsc=tu1zy 200 in 1244ms
+ GET /dashboard?_rsc=tu1zy 200 in 1191ms
+ GET /dashboard?_rsc=tu1zy 200 in 1061ms
