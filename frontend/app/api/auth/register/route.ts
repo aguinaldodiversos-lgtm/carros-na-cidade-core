@@ -67,9 +67,25 @@ export async function POST(request: NextRequest) {
     const result = await registerUser(registerPayload, forwardHeaders);
 
     if (!result.success) {
+      // Conta criada no backend mas sessão automática falhou: redirecionar para login.
+      if (result.created) {
+        const res = NextResponse.json({ redirect_to: "/login" });
+        applyPrivateNoStoreHeaders(res);
+        return res;
+      }
+
+      // Propagar o status real do backend (4xx) ou mapear 5xx para 502 (gateway).
+      const backendStatus = result.status ?? 400;
+      const httpStatus =
+        backendStatus >= 500 && backendStatus <= 599
+          ? 502
+          : backendStatus >= 400 && backendStatus <= 499
+            ? backendStatus
+            : 400;
+
       return NextResponse.json(
         { error: result.error ?? "Nao foi possivel criar a conta." },
-        { status: 400 }
+        { status: httpStatus }
       );
     }
 

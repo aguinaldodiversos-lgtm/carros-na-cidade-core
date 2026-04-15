@@ -90,7 +90,7 @@ export type RegisterPayload = {
 
 export type RegisterResult =
   | { success: true; session: AuthenticatedSession }
-  | { success: false; error?: string };
+  | { success: false; error?: string; status?: number; created?: boolean };
 
 type LoginCompatPayload = {
   email?: string;
@@ -425,6 +425,7 @@ export async function registerUser(
       return {
         success: false,
         error: extractErrorMessage(data, "Nao foi possivel criar a conta."),
+        status: response.status,
       };
     }
 
@@ -434,6 +435,8 @@ export async function registerUser(
       return {
         success: false,
         error: "Cadastro realizado, mas nao foi possivel iniciar a sessao automaticamente.",
+        status: 201,
+        created: true,
       };
     }
 
