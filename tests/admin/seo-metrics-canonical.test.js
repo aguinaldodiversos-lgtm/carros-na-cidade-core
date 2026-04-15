@@ -15,13 +15,13 @@ describe("seo_city_metrics canonical decision", () => {
     vi.clearAllMocks();
   });
 
-  it("migration 015 creates seo_city_metrics with (date, city) PK", () => {
+  it("baseline creates seo_city_metrics with (date, city) PK", () => {
     const sql = readFileSync(
-      join(__dirname, "../../src/database/migrations/015_seo_city_metrics_canonical.sql"),
+      join(__dirname, "../../src/database/migrations/001_baseline.sql"),
       "utf-8"
     );
 
-    expect(sql).toContain("CREATE TABLE IF NOT EXISTS seo_city_metrics");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.seo_city_metrics");
     expect(sql).toContain("PRIMARY KEY (date, city)");
     expect(sql).toContain("impressions");
     expect(sql).toContain("clicks");
@@ -31,14 +31,14 @@ describe("seo_city_metrics canonical decision", () => {
     expect(sql).toContain("source");
   });
 
-  it("migration 015 creates backward-compatible city_seo_metrics VIEW", () => {
+  it("baseline creates backward-compatible city_seo_metrics VIEW", () => {
     const sql = readFileSync(
-      join(__dirname, "../../src/database/migrations/015_seo_city_metrics_canonical.sql"),
+      join(__dirname, "../../src/database/migrations/001_baseline.sql"),
       "utf-8"
     );
 
     expect(sql).toContain("city_seo_metrics");
-    expect(sql).toContain("CREATE VIEW");
+    expect(sql).toContain("CREATE OR REPLACE VIEW");
   });
 
   it("admin repository queries seo_city_metrics directly (not city_seo_metrics)", async () => {

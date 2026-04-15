@@ -40,4 +40,4 @@ Métricas:
 
 Não faz parte da elegibilidade de documento/plano. No fluxo de **criar anúncio**, depois de `resolvePublishEligibility` aprovar, `ensureAdvertiserForPublishing` cria ou reutiliza o registro em `advertisers` com a `city_id` do anúncio (idempotente; lock por usuário).
 
-Integridade DB opcional: migration `008_advertisers_user_fk.sql` (FK `advertisers.user_id` → `users.id`, pode ser ignorada em bancos incompatíveis). Auditoria: `node scripts/report-advertiser-integrity.mjs`.
+Integridade DB: FK `advertisers.user_id` → `users.id` está incluída em `001_baseline.sql`. Auditoria: `node scripts/report-advertiser-integrity.mjs`.
