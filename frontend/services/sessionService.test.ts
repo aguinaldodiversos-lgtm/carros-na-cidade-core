@@ -9,15 +9,20 @@ describe("sessionService", () => {
   const prevSecret = process.env.AUTH_SESSION_SECRET;
   const prevNodeEnv = process.env.NODE_ENV;
 
+  function envRecord() {
+    return process.env as Record<string, string | undefined>;
+  }
+
   beforeEach(() => {
-    process.env.AUTH_SESSION_SECRET = "unit-test-session-secret-32chars!!";
+    envRecord().AUTH_SESSION_SECRET = "unit-test-session-secret-32chars!!";
   });
 
   afterEach(() => {
-    if (prevSecret === undefined) delete process.env.AUTH_SESSION_SECRET;
-    else process.env.AUTH_SESSION_SECRET = prevSecret;
-    if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = prevNodeEnv;
+    const env = envRecord();
+    if (prevSecret === undefined) delete env.AUTH_SESSION_SECRET;
+    else env.AUTH_SESSION_SECRET = prevSecret;
+    if (prevNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = prevNodeEnv;
   });
 
   it("createSessionToken + cookies de token + getSessionDataFromCookieValue roundtrip", () => {
@@ -69,17 +74,23 @@ describe("sessionService", () => {
     });
   });
 
-  it("falha fechado em producao sem AUTH_SESSION_SECRET", () => {
-    delete process.env.AUTH_SESSION_SECRET;
-    process.env.NODE_ENV = "production";
+  it("usa segredo efemero em producao sem AUTH_SESSION_SECRET", () => {
+    const env = envRecord();
+    delete env.AUTH_SESSION_SECRET;
+    env.NODE_ENV = "production";
 
-    expect(() =>
-      createSessionToken({
-        id: "u1",
-        name: "Test",
-        email: "t@example.com",
-        type: "CPF",
-      })
-    ).toThrow(/AUTH_SESSION_SECRET/);
+    const token = createSessionToken({
+      id: "u1",
+      name: "Test",
+      email: "t@example.com",
+      type: "CPF",
+    });
+
+    expect(getSessionDataFromCookieValue(token)).toMatchObject({
+      id: "u1",
+      name: "Test",
+      email: "t@example.com",
+      type: "CPF",
+    });
   });
 });

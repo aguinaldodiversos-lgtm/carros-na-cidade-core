@@ -165,7 +165,7 @@ describe("POST /api/auth/login", () => {
     expect(setCookie).toContain("cnc_rt=refresh-token");
   });
 
-  it("falha como erro interno real quando AUTH_SESSION_SECRET esta ausente em producao", async () => {
+  it("cria sessao com segredo efemero quando AUTH_SESSION_SECRET esta ausente em producao", async () => {
     delete envRecord().AUTH_SESSION_SECRET;
     mocks.authenticateUser.mockResolvedValueOnce(validAuthSession());
 
@@ -173,8 +173,12 @@ describe("POST /api/auth/login", () => {
       fakeRequest({ email: "valid@test.com", password: "correct-pass" })
     );
     const body = await readJson(response);
+    const setCookie = response.headers.get("set-cookie") ?? "";
 
-    expect(response.status).toBe(500);
-    expect(body).toEqual({ error: "Erro interno ao processar o login." });
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ redirect_to: "/dashboard" });
+    expect(setCookie).toContain("cnc_session=");
+    expect(setCookie).toContain("cnc_at=access-token");
+    expect(setCookie).toContain("cnc_rt=refresh-token");
   });
 });

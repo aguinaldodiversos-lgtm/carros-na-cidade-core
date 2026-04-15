@@ -108,15 +108,25 @@ export async function POST(request: NextRequest) {
       redirect_to: resolvePostLoginRedirect(authSession.user.type, next || undefined),
     });
 
-    applySessionCookiesToResponse(response, {
-      id: ru.id,
-      name: ru.name,
-      email: ru.email,
-      type: ru.type,
-      accessToken: authSession.accessToken,
-      refreshToken: authSession.refreshToken,
-    });
-    applyPrivateNoStoreHeaders(response);
+    try {
+      applySessionCookiesToResponse(response, {
+        id: ru.id,
+        name: ru.name,
+        email: ru.email,
+        type: ru.type,
+        accessToken: authSession.accessToken,
+        refreshToken: authSession.refreshToken,
+      });
+      applyPrivateNoStoreHeaders(response);
+    } catch (error) {
+      console.error(
+        "POST /api/auth/register session cookie error:",
+        error instanceof Error ? error.message : error
+      );
+      const fallback = NextResponse.json({ redirect_to: "/login" });
+      applyPrivateNoStoreHeaders(fallback);
+      return fallback;
+    }
 
     return response;
   } catch (error) {

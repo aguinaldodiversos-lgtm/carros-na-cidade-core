@@ -30,12 +30,20 @@ type SessionPayload = SessionUser & {
 };
 
 const DEFAULT_DURATION_SECONDS = 60 * 60 * 24 * 7;
+const RUNTIME_FALLBACK_SESSION_SECRET = crypto.randomBytes(32).toString("base64url");
+let warnedAboutRuntimeSessionSecret = false;
 
 function getSessionSecret() {
   const secret = process.env.AUTH_SESSION_SECRET?.trim();
   if (secret) return secret;
   if (process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SESSION_SECRET deve ser definido em producao.");
+    if (!warnedAboutRuntimeSessionSecret) {
+      warnedAboutRuntimeSessionSecret = true;
+      console.error(
+        "AUTH_SESSION_SECRET ausente em producao; usando segredo efemero por processo. Configure AUTH_SESSION_SECRET no Render para manter sessoes apos restart/deploy."
+      );
+    }
+    return RUNTIME_FALLBACK_SESSION_SECRET;
   }
   return "cnc-dev-session-secret";
 }
