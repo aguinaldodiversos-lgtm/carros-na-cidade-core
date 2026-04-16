@@ -180,6 +180,12 @@ async function fetchTerritorialPage(
     },
   });
 
+  if (response.status === 404) {
+    const err = new Error("Cidade não encontrada");
+    (err as Record<string, unknown>).statusCode = 404;
+    throw err;
+  }
+
   if (!response.ok) {
     throw new Error(`Falha ao carregar página territorial (${response.status})`);
   }

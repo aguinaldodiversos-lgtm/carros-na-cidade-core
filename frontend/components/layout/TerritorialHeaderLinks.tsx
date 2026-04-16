@@ -15,9 +15,8 @@ interface TerritorialHeaderLinksProps {
 
 const DEFAULT_ITEMS: TerritorialHeaderLinkItem[] = [
   { label: "Comprar carros", href: "/anuncios" },
-  { label: "Explorar cidades", href: "/cidade/atibaia" },
-  { label: "Oportunidades", href: "/cidade/atibaia/oportunidades" },
-  { label: "Abaixo da FIPE", href: "/cidade/atibaia/abaixo-da-fipe" },
+  { label: "Explorar cidades", href: "/comprar" },
+  { label: "Anunciar", href: "/anunciar" },
 ];
 
 export function TerritorialHeaderLinks({ items = DEFAULT_ITEMS }: TerritorialHeaderLinksProps) {

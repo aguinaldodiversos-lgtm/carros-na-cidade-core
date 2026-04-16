@@ -149,7 +149,10 @@ export function buildTerritorialMetadata(
   const siteUrl = getSiteUrl();
   const title = buildMetadataTitle(data);
   const description = buildMetadataDescription(data);
-  const canonical = toAbsoluteUrl(data.seo?.canonicalPath || "/");
+  const canonicalPath =
+    data.seo?.canonicalPath ||
+    (data.city?.slug ? `/cidade/${data.city.slug}` : "/");
+  const canonical = toAbsoluteUrl(canonicalPath);
   const ogImage = resolveOgImage(data);
   const indexable = shouldIndexTerritorialPage(data, mode);
   const followable = data.seo?.robots !== "noindex,nofollow";
@@ -216,7 +219,10 @@ export function buildTerritorialJsonLd(
   data: TerritorialPagePayload,
   mode: TerritorialSeoMode
 ): Record<string, unknown> {
-  const canonical = toAbsoluteUrl(data.seo?.canonicalPath || "/");
+  const canonicalPath =
+    data.seo?.canonicalPath ||
+    (data.city?.slug ? `/cidade/${data.city.slug}` : "/");
+  const canonical = toAbsoluteUrl(canonicalPath);
   const city = sanitizeText(data.city?.name);
   const state = sanitizeText(data.city?.state);
   const title = buildMetadataTitle(data);
