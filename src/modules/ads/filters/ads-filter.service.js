@@ -68,7 +68,7 @@ export async function getFacetsWithFilters(rawFilters = {}, options = {}) {
   const safeMode = options.safeMode !== false;
 
   try {
-    const filters = await parseAdsFacetFilters(rawFilters);
+    const filters = options._alreadyParsed ? rawFilters : await parseAdsFacetFilters(rawFilters);
     const facets = await getAdsFacets(filters);
 
     return {

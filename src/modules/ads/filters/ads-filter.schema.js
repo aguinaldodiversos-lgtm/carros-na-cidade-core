@@ -216,20 +216,9 @@ export const AdsFilterQuerySchema = adsFilterQuerySchema; // compat
 export const AdsFilterSchema = adsFilterQuerySchema; // compat (ads-filter.parser.js)
 export const adsFilterSchema = adsFilterQuerySchema; // compat
 
-/**
- * Parse + aplica "scope force"
- * - scope vem do código (ex: rota territorial)
- */
-export function parseAdsFilterQuery(rawQuery, scope = "public_global") {
-  const parsed = adsFilterQuerySchema.parse(rawQuery);
-  const forced = getAdsScopeConfig(scope)?.force || {};
-  return { ...parsed, ...forced };
-}
-
 export default {
   adsFilterQuerySchema,
   AdsFilterQuerySchema,
   AdsFilterSchema,
   AdsFacetFilterSchema,
-  parseAdsFilterQuery,
 };

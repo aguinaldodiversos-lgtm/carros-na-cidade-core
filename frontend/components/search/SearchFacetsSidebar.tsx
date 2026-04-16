@@ -92,15 +92,15 @@ export function SearchFacetsSidebar({
 
   const [brandValue, setBrandValue] = useState(filters.brand || "");
   const [modelValue, setModelValue] = useState(filters.model || "");
-  const [maxPrice, setMaxPrice] = useState(filters.max_price?.toString() || "");
-  const [cityValue, setCityValue] = useState(filters.city || "São Paulo - SP");
+  const [maxPrice, setMaxPrice] = useState((filters.price_max ?? filters.max_price)?.toString() || "");
+  const [citySlugValue, setCitySlugValue] = useState(filters.city_slug || "");
 
   useEffect(() => {
     setBrandValue(filters.brand || "");
     setModelValue(filters.model || "");
-    setMaxPrice(filters.max_price?.toString() || "");
-    setCityValue(filters.city || "São Paulo - SP");
-  }, [filters.brand, filters.model, filters.max_price, filters.city]);
+    setMaxPrice((filters.price_max ?? filters.max_price)?.toString() || "");
+    setCitySlugValue(filters.city_slug || "");
+  }, [filters.brand, filters.model, filters.max_price, filters.city_slug]);
 
   const topBrands = useMemo(() => facets?.brands?.slice(0, 6) || [], [facets]);
   const topModels = useMemo(() => {
@@ -166,7 +166,7 @@ export function SearchFacetsSidebar({
             value={maxPrice}
             onChange={(value) => {
               setMaxPrice(value);
-              onChange({ max_price: value ? parseNumberInput(value) : undefined, page: 1 });
+                onChange({ price_max: value ? parseNumberInput(value) : undefined, page: 1 });
             }}
             placeholder="Preço até"
             options={priceOptions}
@@ -191,17 +191,23 @@ export function SearchFacetsSidebar({
 
       <Section title="Localização">
         <InputSelect
-          value={cityValue}
+          value={citySlugValue}
           onChange={(value) => {
-            setCityValue(value);
-            onChange({ city: value || undefined, page: 1 });
+            setCitySlugValue(value);
+            onChange({
+              city_slug: value || undefined,
+              city: undefined,
+              city_id: undefined,
+              state: undefined,
+              page: 1,
+            });
           }}
-          placeholder="São Paulo - SP"
+          placeholder="Todas as cidades"
           options={[
-            { label: "São Paulo - SP", value: "São Paulo - SP" },
-            { label: "Campinas - SP", value: "Campinas - SP" },
-            { label: "Atibaia - SP", value: "Atibaia - SP" },
-            { label: "Sorocaba - SP", value: "Sorocaba - SP" },
+            { label: "São Paulo - SP", value: "sao-paulo" },
+            { label: "Campinas - SP", value: "campinas" },
+            { label: "Atibaia - SP", value: "atibaia" },
+            { label: "Sorocaba - SP", value: "sorocaba" },
           ]}
         />
       </Section>

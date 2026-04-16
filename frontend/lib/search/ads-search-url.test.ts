@@ -102,10 +102,16 @@ describe("parseAdsSearchFiltersFromSearchParams", () => {
     expect(parseAdsSearchFiltersFromSearchParams(makeParams({ highlight_only: "true" })).highlight_only).toBe(true);
   });
 
-  it("accepts price_min/price_max aliases", () => {
+  it("accepts price_min/price_max as canonical names", () => {
     const result = parseAdsSearchFiltersFromSearchParams(makeParams({ price_min: "10000", price_max: "50000" }));
-    expect(result.min_price).toBe(10000);
-    expect(result.max_price).toBe(50000);
+    expect(result.price_min).toBe(10000);
+    expect(result.price_max).toBe(50000);
+  });
+
+  it("accepts min_price/max_price aliases for backward compat", () => {
+    const result = parseAdsSearchFiltersFromSearchParams(makeParams({ min_price: "10000", max_price: "50000" }));
+    expect(result.price_min).toBe(10000);
+    expect(result.price_max).toBe(50000);
   });
 });
 
