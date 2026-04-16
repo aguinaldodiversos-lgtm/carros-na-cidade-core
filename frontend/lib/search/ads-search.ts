@@ -12,10 +12,15 @@ export interface AdsSearchFilters {
   state?: string;
   /** Anúncios do mesmo anunciante (ex.: loja). */
   advertiser_id?: number;
+  price_min?: number;
+  price_max?: number;
+  /** @deprecated Use price_min/price_max. Mantido para compat com links antigos. */
   min_price?: number;
+  /** @deprecated Use price_min/price_max. Mantido para compat com links antigos. */
   max_price?: number;
   year_min?: number;
   year_max?: number;
+  mileage_min?: number;
   mileage_max?: number;
   fuel_type?: string;
   transmission?: string;
@@ -326,10 +331,11 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
     appendIfPresent(params, "state", territory.state);
   }
   appendIfPresent(params, "advertiser_id", filters.advertiser_id);
-  appendIfPresent(params, "min_price", filters.min_price);
-  appendIfPresent(params, "max_price", filters.max_price);
+  appendIfPresent(params, "price_min", filters.price_min ?? filters.min_price);
+  appendIfPresent(params, "price_max", filters.price_max ?? filters.max_price);
   appendIfPresent(params, "year_min", filters.year_min);
   appendIfPresent(params, "year_max", filters.year_max);
+  appendIfPresent(params, "mileage_min", filters.mileage_min);
   appendIfPresent(params, "mileage_max", filters.mileage_max);
   appendIfPresent(params, "fuel_type", filters.fuel_type);
   appendIfPresent(params, "transmission", filters.transmission);

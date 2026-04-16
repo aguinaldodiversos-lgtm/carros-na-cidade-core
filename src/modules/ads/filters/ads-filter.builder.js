@@ -24,29 +24,28 @@ export function buildAdsSearchQuery(filters = {}) {
     state,
     brand,
     model,
-    min_price,
-    max_price,
-    // price_min / price_max: compat com schema Zod (alias de min_price / max_price)
     price_min,
     price_max,
+    // Compat: free-query parser legado pode usar min_price/max_price
+    min_price,
+    max_price,
     year_min,
     year_max,
+    mileage_min,
     mileage_max,
     fuel_type,
     transmission,
     body_type,
     below_fipe,
     highlight_only,
-    // highlight: alias legado do mesmo filtro (parser unifica em highlight_only)
-    highlight,
     advertiser_id,
     page = 1,
     limit = 20,
     sort = "relevance",
   } = filters;
 
-  const effectiveMinPrice = min_price !== undefined ? min_price : price_min;
-  const effectiveMaxPrice = max_price !== undefined ? max_price : price_max;
+  const effectiveMinPrice = price_min ?? min_price;
+  const effectiveMaxPrice = price_max ?? max_price;
 
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(
@@ -82,6 +81,7 @@ export function buildAdsSearchQuery(filters = {}) {
   if (effectiveMaxPrice !== undefined) pushFilter(where, params, `a.price <= ?`, Number(effectiveMaxPrice));
   if (year_min !== undefined) pushFilter(where, params, `a.year >= ?`, Number(year_min));
   if (year_max !== undefined) pushFilter(where, params, `a.year <= ?`, Number(year_max));
+  if (mileage_min !== undefined) pushFilter(where, params, `a.mileage >= ?`, Number(mileage_min));
   if (mileage_max !== undefined) pushFilter(where, params, `a.mileage <= ?`, Number(mileage_max));
   if (fuel_type) pushFilter(where, params, `a.fuel_type ILIKE ?`, `%${fuel_type}%`);
   if (transmission) {
@@ -94,7 +94,7 @@ export function buildAdsSearchQuery(filters = {}) {
   }
   if (body_type) pushFilter(where, params, `a.body_type ILIKE ?`, `%${body_type}%`);
   if (below_fipe !== undefined) pushFilter(where, params, `a.below_fipe = ?`, Boolean(below_fipe));
-  if (highlight_only === true || highlight === true) where.push(`a.highlight_until > NOW()`);
+  if (highlight_only === true) where.push(`a.highlight_until > NOW()`);
   if (advertiser_id !== undefined && advertiser_id !== null) {
     pushFilter(where, params, `a.advertiser_id = ?`, Number(advertiser_id));
   }

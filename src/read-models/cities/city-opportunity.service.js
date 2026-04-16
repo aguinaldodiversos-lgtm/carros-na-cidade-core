@@ -20,7 +20,7 @@ export async function getCityOpportunityPage(citySlug, query = {}) {
       limit: 24,
       sort: "recent",
     },
-    "public_city_opportunities",
+    "public_city_below_fipe",
     { safeMode: true }
   );
 

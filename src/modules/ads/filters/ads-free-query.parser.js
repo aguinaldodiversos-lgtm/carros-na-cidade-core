@@ -328,8 +328,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
   if (!originalQ || originalQ.length < 2) {
     return {
       ...filters,
-      min_price: filters.min_price ?? filters.price_min,
-      max_price: filters.max_price ?? filters.price_max,
+      price_min: filters.price_min ?? filters.min_price,
+      price_max: filters.price_max ?? filters.max_price,
       free_query_meta: {
         original_q: originalQ || null,
         parsed: false,
@@ -364,8 +364,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
         Object.entries({
           brand: filters.brand || brandModel.brand,
           model: filters.model || brandModel.model,
-          min_price: filters.min_price ?? filters.price_min ?? priceSignals.min_price,
-          max_price: filters.max_price ?? filters.price_max ?? priceSignals.max_price,
+          price_min: filters.price_min ?? filters.min_price ?? priceSignals.min_price,
+          price_max: filters.price_max ?? filters.max_price ?? priceSignals.max_price,
           fuel_type: filters.fuel_type || fuel_type,
           transmission: filters.transmission || transmission,
           body_type: filters.body_type || body_type,
@@ -393,8 +393,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
         brand: merged.brand || null,
         model: merged.model || null,
         city_slug: merged.city_slug || null,
-        min_price: merged.min_price ?? null,
-        max_price: merged.max_price ?? null,
+        price_min: merged.price_min ?? null,
+        price_max: merged.price_max ?? null,
         year_min: merged.year_min ?? null,
         year_max: merged.year_max ?? null,
         fuel_type: merged.fuel_type || null,
@@ -408,8 +408,8 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
   } catch {
     return {
       ...filters,
-      min_price: filters.min_price ?? filters.price_min,
-      max_price: filters.max_price ?? filters.price_max,
+      price_min: filters.price_min ?? filters.min_price,
+      price_max: filters.price_max ?? filters.max_price,
       free_query_meta: {
         original_q: originalQ,
         parsed: false,

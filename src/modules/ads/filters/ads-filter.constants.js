@@ -55,7 +55,6 @@ export const ADS_SCOPE_CONFIG = Object.freeze({
   public_city: Object.freeze({ force: Object.freeze({}) }),
   public_city_brand: Object.freeze({ force: Object.freeze({}) }),
   public_city_brand_model: Object.freeze({ force: Object.freeze({}) }),
-  public_city_opportunities: Object.freeze({ force: Object.freeze({ below_fipe: true }) }),
   public_city_below_fipe: Object.freeze({ force: Object.freeze({ below_fipe: true }) }),
   panel_inventory: Object.freeze({ force: Object.freeze({}) }),
 });
