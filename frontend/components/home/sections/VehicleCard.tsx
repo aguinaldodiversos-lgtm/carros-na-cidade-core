@@ -16,7 +16,7 @@ export type VehicleCardItem = {
   version?: string;
   year?: number | string;
   mileage?: number | string;
-  transmission?: string;
+  transmission?: string | null;
   city?: string;
   state?: string;
   price?: number | string;
