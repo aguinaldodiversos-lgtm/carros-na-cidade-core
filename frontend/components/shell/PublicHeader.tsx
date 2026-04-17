@@ -73,8 +73,8 @@ function HeaderNavLink({
       onClick={onClick}
       className={`inline-flex h-10 max-w-full items-center rounded-lg px-2.5 text-[13px] font-semibold transition xl:px-3 xl:text-[14px] ${
         active
-          ? "bg-slate-100/90 text-blue-800 shadow-sm"
-          : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
+          ? "bg-[#eef1f9] text-[#1f2b7e] shadow-sm"
+          : "text-slate-600 hover:bg-[#f5f7fb] hover:text-[#2d3a9c]"
       } ${className}`}
     >
       {children}
@@ -150,38 +150,33 @@ export function PublicHeader() {
               aria-label="Ações da conta"
             >
               <Link
-                href="/anunciar"
-                className="inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-blue-700 xl:px-3 xl:text-[14px]"
-              >
-                Anunciar
-              </Link>
-              <Link href={SITE_ROUTES.favoritos} className="hidden sm:inline-flex">
-                <span className="inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-blue-700 xl:px-3 xl:text-[14px]">
-                  Favoritos
-                </span>
-              </Link>
-              <Link
                 href={SITE_ROUTES.favoritos}
                 aria-label="Favoritos"
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-rose-600"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-[#f5f7fb] hover:text-[#2d3a9c]"
               >
                 <HeartIcon />
               </Link>
               {sessionUser ? (
                 <Link
                   href={dashboardHrefForAccountType(sessionUser.type)}
-                  className="ml-1 inline-flex h-10 max-w-[160px] items-center justify-center truncate rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:max-w-[200px] xl:px-5 xl:text-[14px]"
+                  className="inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-[#f5f7fb] hover:text-[#2d3a9c] xl:px-3 xl:text-[14px]"
                 >
                   Minha conta
                 </Link>
               ) : (
                 <Link
                   href={SITE_ROUTES.login}
-                  className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-800 xl:px-5 xl:text-[14px]"
+                  className="inline-flex h-10 items-center rounded-lg px-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-[#f5f7fb] hover:text-[#2d3a9c] xl:px-3 xl:text-[14px]"
                 >
                   Entrar
                 </Link>
               )}
+              <Link
+                href="/anunciar/novo"
+                className="ml-1 inline-flex h-10 items-center justify-center rounded-lg bg-[#2d3a9c] px-4 text-[13px] font-bold text-white shadow-[0_6px_16px_rgba(45, 58, 156,0.28)] transition hover:bg-[#1f2b7e] xl:px-5 xl:text-[14px]"
+              >
+                Anunciar grátis
+              </Link>
             </nav>
 
             <div className="flex items-center gap-2 md:hidden">
@@ -195,14 +190,14 @@ export function PublicHeader() {
               {sessionUser ? (
                 <Link
                   href={dashboardHrefForAccountType(sessionUser.type)}
-                  className="inline-flex h-10 max-w-[120px] items-center justify-center truncate rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
+                  className="inline-flex h-10 max-w-[120px] items-center justify-center truncate rounded-lg bg-[#2d3a9c] px-3 text-sm font-semibold text-white"
                 >
                   Conta
                 </Link>
               ) : (
                 <Link
                   href={SITE_ROUTES.login}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-[#2d3a9c] px-3 text-sm font-semibold text-white"
                 >
                   Entrar
                 </Link>

@@ -3,20 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --cnc-bg: #f2f3f7;
+  --cnc-bg: #f7f7fb;
   --cnc-surface: #ffffff;
-  --cnc-line: #dde2ec;
-  --cnc-line-strong: #cfd6e4;
-  --cnc-text: #161f34;
-  --cnc-text-strong: #0f172a;
-  --cnc-muted: #5d667d;
-  --cnc-muted-soft: #7c879f;
-  --cnc-primary: #0e62d8;
-  --cnc-primary-strong: #0c4fb0;
-  --cnc-primary-soft: #eaf2ff;
-  --cnc-footer-a: #152954;
-  --cnc-footer-b: #0e1b3b;
-  --cnc-success: #0f9f6e;
+  --cnc-line: #e5e7f0;
+  --cnc-line-strong: #d4d7e4;
+  --cnc-text: #1a1f36;
+  --cnc-text-strong: #0f1430;
+  --cnc-muted: #5b6079;
+  --cnc-muted-soft: #858aa0;
+  --cnc-primary: #2d3a9c;
+  --cnc-primary-strong: #1f2b7e;
+  --cnc-primary-soft: #e8ebf5;
+  --cnc-primary-lilac: #eef1f9;
+  --cnc-primary-lilac-strong: #dbe0ee;
+  --cnc-footer-a: #0f1430;
+  --cnc-footer-b: #0b0f24;
+  --cnc-success: #059669;
+  --cnc-success-soft: #d1fae5;
   --cnc-danger: #d14343;
   --cnc-warning: #d18a12;
   --header-height: 78px;
@@ -104,7 +107,7 @@ b {
 }
 
 ::selection {
-  background: rgba(14, 98, 216, 0.16);
+  background: rgba(45, 58, 156, 0.16);
   color: var(--cnc-text);
 }
 
@@ -113,7 +116,7 @@ b {
 }
 
 :focus-visible {
-  outline: 2px solid rgba(14, 98, 216, 0.22);
+  outline: 2px solid rgba(45, 58, 156, 0.28);
   outline-offset: 2px;
 }
 
@@ -237,8 +240,8 @@ b {
   .cnc-input:focus {
     border-color: var(--cnc-primary);
     box-shadow:
-      0 0 0 4px rgba(14, 98, 216, 0.09),
-      0 2px 12px rgba(14, 98, 216, 0.06);
+      0 0 0 4px rgba(45, 58, 156, 0.12),
+      0 2px 12px rgba(45, 58, 156, 0.08);
   }
 
   .cnc-select {
@@ -256,14 +259,14 @@ b {
 
   .cnc-btn-primary {
     @apply inline-flex items-center justify-center rounded-xl border border-transparent px-6 py-3 text-[15px] font-semibold text-white transition focus:outline-none disabled:opacity-60;
-    background: linear-gradient(180deg, #1670ee 0%, #0e62d8 100%);
-    box-shadow: 0 10px 24px rgba(14, 98, 216, 0.22);
+    background: linear-gradient(180deg, #3d4bb8 0%, #2d3a9c 100%);
+    box-shadow: 0 10px 24px rgba(45, 58, 156, 0.22);
     letter-spacing: -0.01em;
   }
 
   .cnc-btn-primary:hover {
-    background: linear-gradient(180deg, #1568de 0%, #0c4fb0 100%);
-    box-shadow: 0 12px 28px rgba(14, 98, 216, 0.28);
+    background: linear-gradient(180deg, #2d3a9c 0%, #1f2b7e 100%);
+    box-shadow: 0 12px 28px rgba(45, 58, 156, 0.3);
   }
 
   .cnc-btn-secondary {

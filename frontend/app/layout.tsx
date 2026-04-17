@@ -62,7 +62,7 @@ const siteUrl = resolveSiteUrl();
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0e62d8",
+  themeColor: "#2d3a9c",
   colorScheme: "light",
 };
 
