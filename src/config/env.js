@@ -3,6 +3,7 @@
  * Base única para app, workers, migrations e integrações.
  */
 import { z } from "zod";
+import { resolveSslConfig } from "../infrastructure/database/ssl-config.js";
 
 function coerceBoolean(value, defaultValue = false) {
   if (value === undefined || value === null || value === "") {
@@ -62,16 +63,12 @@ function parseEnv() {
 
 export const env = parseEnv();
 
+/**
+ * Compat: delega ao helper centralizado em infrastructure/database/ssl-config.js.
+ * Mantido para não quebrar importações existentes. A regra de decisão não
+ * depende mais de NODE_ENV — considera host local, overrides explícitos e
+ * query string do DATABASE_URL.
+ */
 export function getDbSslConfig() {
-  const explicitSslConfig =
-    coerceBoolean(process.env.PG_SSL_ENABLED, false) ||
-    /\bsslmode=(require|prefer|verify-ca|verify-full)\b/i.test(env.DATABASE_URL) ||
-    /\bssl=true\b/i.test(env.DATABASE_URL);
-
-  if (env.NODE_ENV !== "production" && !explicitSslConfig) return false;
-  if (!env.PG_SSL_ENABLED) return false;
-
-  return {
-    rejectUnauthorized: env.PG_SSL_REJECT_UNAUTHORIZED,
-  };
+  return resolveSslConfig(env.DATABASE_URL, process.env);
 }

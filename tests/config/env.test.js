@@ -14,9 +14,21 @@ async function loadEnvModule() {
   return import("../../src/config/env.js");
 }
 
-describe("getDbSslConfig", () => {
+/**
+ * Estes testes cobrem o shim `getDbSslConfig` que delega ao helper
+ * centralizado `resolveSslConfig` (src/infrastructure/database/ssl-config.js).
+ * A regra não depende mais de NODE_ENV: considera override explícito,
+ * query string do DATABASE_URL e detecção de host local.
+ */
+describe("getDbSslConfig (compat via resolveSslConfig)", () => {
   beforeEach(() => {
     restoreEnv();
+    // Remove variáveis que podem influenciar a decisão de SSL
+    delete process.env.PG_SSL_ENABLED;
+    delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
+    delete process.env.PG_SSL_MODE;
+    delete process.env.PGSSLMODE;
+    delete process.env.PGSSL;
   });
 
   afterEach(() => {
@@ -25,65 +37,86 @@ describe("getDbSslConfig", () => {
     vi.resetModules();
   });
 
-  it("retorna configuração SSL segura por padrão em development quando há DATABASE_URL", async () => {
+  it("desliga SSL por padrão para host local (sem override)", async () => {
     process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = "postgresql://localhost/test";
-
-    process.env.PG_SSL_ENABLED = "true";
-
-
-    const { getDbSslConfig } = await loadEnvModule();
-
-    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
-  });
-
-  it("retorna configuração SSL segura por padrão em production quando há DATABASE_URL", async () => {
-    process.env.NODE_ENV = "production";
-    process.env.DATABASE_URL = "postgresql://localhost/test";
-    process.env.PG_SSL_ENABLED = "true";
-
-    const { getDbSslConfig } = await loadEnvModule();
-
-    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
-  });
-
-  it("mantém formato estável do retorno quando SSL está ativo", async () => {
-    process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = "postgresql://localhost/test";
-    process.env.PG_SSL_ENABLED = "true";
-
-    const { getDbSslConfig } = await loadEnvModule();
-    const result = getDbSslConfig();
-
-    expect(result).toBeTruthy();
-    expect(result).toMatchObject({ rejectUnauthorized: false });
-  });
-    it("retorna false quando SSL é explicitamente desativado", async () => {
-    process.env.NODE_ENV = "production";
-    process.env.DATABASE_URL = "postgresql://localhost/test";
-    process.env.PG_SSL_ENABLED = "false";
-    delete process.env.PG_SSL_REJECT_UNAUTHORIZED;
+    process.env.DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/app";
 
     const { getDbSslConfig } = await loadEnvModule();
 
     expect(getDbSslConfig()).toBe(false);
   });
-  
 
-  it("retorna configuração SSL quando SSL é explicitamente ativado", async () => {
-    process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = "postgresql://localhost/test";
-    process.env.PG_SSL_ENABLED = "true";
+  it("liga SSL para host remoto por padrão", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com:5432/app_db";
 
     const { getDbSslConfig } = await loadEnvModule();
 
     expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
   });
 
-  it("permite controlar rejectUnauthorized explicitamente", async () => {
+  it("respeita sslmode=require na query string mesmo em host local", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/app?sslmode=require";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("respeita sslmode=disable na query string mesmo em host remoto", async () => {
     process.env.NODE_ENV = "production";
-    process.env.DATABASE_URL = "postgresql://localhost/test";
+    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com/app?sslmode=disable";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("desliga SSL quando PG_SSL_ENABLED=false explicitamente", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com/app";
+    process.env.PG_SSL_ENABLED = "false";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("PG_SSL_ENABLED=true NÃO força SSL em host local (usar PG_SSL_MODE=require para forçar)", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/app";
     process.env.PG_SSL_ENABLED = "true";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("PG_SSL_MODE=require força SSL mesmo em host local", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/app";
+    process.env.PG_SSL_MODE = "require";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("PG_SSL_MODE=disable vence qualquer outra config", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com/app?sslmode=require";
+    process.env.PG_SSL_ENABLED = "true";
+    process.env.PG_SSL_MODE = "disable";
+
+    const { getDbSslConfig } = await loadEnvModule();
+
+    expect(getDbSslConfig()).toBe(false);
+  });
+
+  it("permite controlar rejectUnauthorized via PG_SSL_REJECT_UNAUTHORIZED", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com/app";
     process.env.PG_SSL_REJECT_UNAUTHORIZED = "true";
 
     const { getDbSslConfig } = await loadEnvModule();
@@ -91,40 +124,19 @@ describe("getDbSslConfig", () => {
     expect(getDbSslConfig()).toEqual({ rejectUnauthorized: true });
   });
 
-  it("rejeita carregamento do módulo quando DATABASE_URL está ausente", async () => {
-    process.env.NODE_ENV = "development";
-    delete process.env.DATABASE_URL;
-
-    await expect(loadEnvModule()).rejects.toThrow(/DATABASE_URL/i);
-  });
-
-  it("não força SSL para banco local explicitamente desativado", async () => {
-    process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/carros_na_cidade_test";
-    process.env.PG_SSL_ENABLED = "false";
+  it("desliga SSL para alias de service container (host 'postgres')", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.DATABASE_URL = "postgresql://postgres:postgres@postgres:5432/app";
 
     const { getDbSslConfig } = await loadEnvModule();
 
     expect(getDbSslConfig()).toBe(false);
   });
 
-  it("permite SSL para banco local quando explicitamente ativado", async () => {
+  it("rejeita carregamento do módulo quando DATABASE_URL está ausente", async () => {
     process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/carros_na_cidade_test";
-    process.env.PG_SSL_ENABLED = "true";
+    delete process.env.DATABASE_URL;
 
-    const { getDbSslConfig } = await loadEnvModule();
-
-    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
-  });
-
-  it("mantém compatibilidade com Postgres hospedado/gerenciado", async () => {
-    process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = "postgresql://user:pass@db.example.com:5432/app_db";
-    process.env.PG_SSL_ENABLED = "true";
-
-    const { getDbSslConfig } = await loadEnvModule();
-
-    expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
+    await expect(loadEnvModule()).rejects.toThrow(/DATABASE_URL/i);
   });
 });

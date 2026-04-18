@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { INTEGRATION_TEST_DATABASE_URL_DEFAULT } from "./helpers/integration-test-constants.js";
+import { resolveSslConfig } from "../../src/infrastructure/database/ssl-config.js";
 
 dotenv.config({ override: false });
 
@@ -22,25 +23,10 @@ const adminUrl = new URL(baseDatabaseUrl);
 adminUrl.pathname = "/postgres";
 
 function buildPoolConfig(connectionString) {
-  const url = new URL(connectionString);
-  const sslMode = String(url.searchParams.get("sslmode") || "").toLowerCase();
-  const explicitSsl =
-    sslMode === "require" ||
-    sslMode === "prefer" ||
-    sslMode === "verify-ca" ||
-    sslMode === "verify-full" ||
-    String(process.env.PG_SSL_ENABLED || "").trim().toLowerCase() === "true";
-
-  if (explicitSsl) {
-    return {
-      connectionString,
-      ssl: {
-        rejectUnauthorized: false,
-      },
-    };
-  }
-
-  return { connectionString };
+  return {
+    connectionString,
+    ssl: resolveSslConfig(connectionString, process.env),
+  };
 }
 
 const adminPool = new Pool(buildPoolConfig(adminUrl.toString()));
