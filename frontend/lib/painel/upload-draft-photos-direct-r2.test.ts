@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // ---------------------------------------------------------------------------
 const { S3ClientMock } = vi.hoisted(() => ({ S3ClientMock: vi.fn() }));
 vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<object>();
   return { ...actual, S3Client: S3ClientMock };
 });
 

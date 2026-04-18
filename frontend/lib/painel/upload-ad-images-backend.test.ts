@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import {
-  extractUploadImageUrlsFromResponse,
+  extractUploadImageItemsFromResponse,
   uploadPublishPhotosToBackendR2,
 } from "./upload-ad-images-backend";
 
@@ -11,27 +11,28 @@ function clearBackendEnv() {
   for (const k of keys) delete env[k];
 }
 
-describe("extractUploadImageUrlsFromResponse", () => {
+describe("extractUploadImageItemsFromResponse", () => {
   it("lê data.urls (contrato Express)", () => {
-    expect(
-      extractUploadImageUrlsFromResponse({
-        success: true,
-        data: { urls: ["https://x/a.jpg", "  "] },
-      })
-    ).toEqual(["https://x/a.jpg"]);
+    const items = extractUploadImageItemsFromResponse({
+      success: true,
+      data: { urls: ["https://x/a.jpg", "  "] },
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].url).toBe("https://x/a.jpg");
+    expect(items[0].source).toBe("backend-r2");
   });
 
   it("aceita urls no topo (defensivo)", () => {
-    expect(
-      extractUploadImageUrlsFromResponse({
-        urls: ["/api/vehicle-images?key=k"],
-      })
-    ).toEqual(["/api/vehicle-images?key=k"]);
+    const items = extractUploadImageItemsFromResponse({
+      urls: ["/api/vehicle-images?key=k"],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].url).toBe("/api/vehicle-images?key=k");
   });
 
   it("retorna vazio para payload inválido", () => {
-    expect(extractUploadImageUrlsFromResponse(null)).toEqual([]);
-    expect(extractUploadImageUrlsFromResponse({ data: {} })).toEqual([]);
+    expect(extractUploadImageItemsFromResponse(null)).toEqual([]);
+    expect(extractUploadImageItemsFromResponse({ data: {} })).toEqual([]);
   });
 });
 
@@ -65,8 +66,10 @@ describe("uploadPublishPhotosToBackendR2", () => {
     const fd = new FormData();
     fd.append("photos", new File([new Uint8Array([1, 2, 3])], "a.jpg", { type: "image/jpeg" }));
 
-    const urls = await uploadPublishPhotosToBackendR2(fd, "token-test");
-    expect(urls).toEqual(["https://pub/1.jpg"]);
+    const items = await uploadPublishPhotosToBackendR2(fd, "token-test");
+    expect(items).toHaveLength(1);
+    expect(items[0].url).toBe("https://pub/1.jpg");
+    expect(items[0].source).toBe("backend-r2");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const call = fetchSpy.mock.calls[0];
     expect(String(call[0])).toContain("/api/ads/upload-images");
