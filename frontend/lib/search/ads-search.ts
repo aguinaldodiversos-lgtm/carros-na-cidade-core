@@ -366,7 +366,6 @@ export async function fetchAdsSearch(
         "Content-Type": "application/json",
       },
       signal,
-      cache: "no-store",
       next: { revalidate: 60 },
     });
 
@@ -427,7 +426,6 @@ export async function fetchAdsFacets(
         "Content-Type": "application/json",
       },
       signal,
-      cache: "no-store",
       next: { revalidate: 60 },
     });
 

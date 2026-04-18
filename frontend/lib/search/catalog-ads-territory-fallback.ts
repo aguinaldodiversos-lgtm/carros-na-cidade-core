@@ -26,7 +26,10 @@ export async function fetchCatalogAdsTerritoryFallback(
   if (!url) return null;
 
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 60 },
+    });
     const json = (await res.json()) as {
       success?: boolean;
       data?: CatalogAdsTerritoryFallback;
