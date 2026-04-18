@@ -11,6 +11,18 @@ git add .
 git commit -m "refatora fluxo de criacao de anuncio"
 git push origin main
 
+-----------------------------------------------------------------------------------------
+New-Item -ItemType SymbolicLink `
+  -Path "C:\Users\aguin\Desktop\carros-na-cidade-core\.claude\worktrees\agitated-lalande-08a87a\frontend\node_modules" `
+  -Target "C:\Users\aguin\Desktop\carros-na-cidade-core\frontend\node_modules"
+
+
+cd "C:\Users\aguin\Desktop\carros-na-cidade-core\.claude\worktrees\agitated-lalande-08a87a\frontend"
+npm run dev
+
+
+git push origin claude/agitated-bhaskara-7d9fdb
+-------------------------------------------------------------------------------------------------------
 
 git fetch origin
 git status
