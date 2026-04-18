@@ -4,3 +4,4 @@ frontend/node_modules/
 dist/
 coverage/
 report/
+.env
