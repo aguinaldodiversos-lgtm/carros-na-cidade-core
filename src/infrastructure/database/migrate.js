@@ -301,6 +301,6 @@ async function runMigrations() {
   }
 }
 
-import runMigrations from "../../database/migrate.js";
+import runMigrationsLegacy from "../../database/migrate.js";
 
-export default runMigrations;
+export default runMigrationsLegacy;

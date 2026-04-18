@@ -322,7 +322,8 @@ export async function uploadPublishPhotosToBackendR2(
         ? summarizeBodyForLog(rawText)
         : `HTTP ${response.status} sem corpo.`;
 
-    const message = extractErrorMessage(json, fallbackText);
+    const baseMessage = extractErrorMessage(json, fallbackText);
+    const message = `HTTP ${response.status}: ${baseMessage}`;
 
     console.error(`${LOG_PREFIX} backend returned non-2xx`, {
       requestId: options?.requestId,
@@ -357,7 +358,7 @@ export async function uploadPublishPhotosToBackendR2(
       body: bodySummary,
     });
 
-    throw new UploadBackendError("Resposta de upload inválida: JSON sem itens/URLs utilizáveis.", {
+    throw new UploadBackendError("Resposta de upload inválida: sem URLs utilizáveis.", {
       statusCode: 502,
       code: "INVALID_UPLOAD_RESPONSE",
       requestId: backendRequestId,
