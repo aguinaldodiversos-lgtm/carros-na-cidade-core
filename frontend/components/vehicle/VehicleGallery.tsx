@@ -165,7 +165,13 @@ export default function VehicleGallery({ images, alt }: VehicleGalleryProps) {
           >
             <div className="max-w-sm">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#0e62d8] shadow-sm">
-                <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-8 w-8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
                   <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z" />
                   <path d="m8 14 2.2-2.2a1 1 0 0 1 1.4 0L16 16" />
                   <path d="m14 13 1.2-1.2a1 1 0 0 1 1.4 0L20 15" />

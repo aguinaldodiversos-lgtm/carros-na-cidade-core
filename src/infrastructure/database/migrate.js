@@ -1,4 +1,3 @@
-
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -301,7 +300,6 @@ async function runMigrations() {
     client.release();
   }
 }
-
 
 import runMigrations from "../../database/migrate.js";
 

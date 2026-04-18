@@ -22,9 +22,7 @@ describe("Post-publish redirect logic", () => {
 
   describe("sanitizeInternalRedirect", () => {
     it("accepts valid internal paths", () => {
-      expect(sanitizeInternalRedirect("/dashboard/meus-anuncios")).toBe(
-        "/dashboard/meus-anuncios"
-      );
+      expect(sanitizeInternalRedirect("/dashboard/meus-anuncios")).toBe("/dashboard/meus-anuncios");
       expect(sanitizeInternalRedirect("/dashboard-loja/meus-anuncios")).toBe(
         "/dashboard-loja/meus-anuncios"
       );
@@ -70,9 +68,7 @@ describe("Post-publish redirect destinations", () => {
     const sessionAccountType = "CPF";
     const backendRedirect = "";
     const defaultRedirect =
-      sessionAccountType === "CNPJ"
-        ? "/dashboard-loja/meus-anuncios"
-        : "/dashboard/meus-anuncios";
+      sessionAccountType === "CNPJ" ? "/dashboard-loja/meus-anuncios" : "/dashboard/meus-anuncios";
     const redirectTo = backendRedirect.trim() || defaultRedirect;
 
     expect(redirectTo).toBe("/dashboard/meus-anuncios");
@@ -82,9 +78,7 @@ describe("Post-publish redirect destinations", () => {
     const sessionAccountType = "CNPJ";
     const backendRedirect = "";
     const defaultRedirect =
-      sessionAccountType === "CNPJ"
-        ? "/dashboard-loja/meus-anuncios"
-        : "/dashboard/meus-anuncios";
+      sessionAccountType === "CNPJ" ? "/dashboard-loja/meus-anuncios" : "/dashboard/meus-anuncios";
     const redirectTo = backendRedirect.trim() || defaultRedirect;
 
     expect(redirectTo).toBe("/dashboard-loja/meus-anuncios");

@@ -90,7 +90,7 @@ describe("ACCEPTED_INPUT_MIMES — whitelist de entrada", () => {
 
 describe("OUTPUT_MIME e OUTPUT_EXT — formato de saída", () => {
   it("OUTPUT_MIME é image/webp", () => expect(OUTPUT_MIME).toBe("image/webp"));
-  it("OUTPUT_EXT  é webp",       () => expect(OUTPUT_EXT).toBe("webp"));
+  it("OUTPUT_EXT  é webp", () => expect(OUTPUT_EXT).toBe("webp"));
 });
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ describe("normalizeVehicleImage — conversão de formato", () => {
 
     // Verifica que o buffer de saída é realmente um WebP (signature RIFF...WEBP)
     const webpSignature = result.buffer.slice(0, 4).toString("ascii");
-    const webpFormat    = result.buffer.slice(8, 12).toString("ascii");
+    const webpFormat = result.buffer.slice(8, 12).toString("ascii");
     expect(webpSignature).toBe("RIFF");
     expect(webpFormat).toBe("WEBP");
   });
@@ -190,9 +190,7 @@ describe("normalizeVehicleImage — redimensionamento", () => {
 
 describe("normalizeVehicleImage — casos de erro", () => {
   it("buffer vazio lança erro descritivo", async () => {
-    await expect(normalizeVehicleImage(Buffer.alloc(0))).rejects.toThrow(
-      /Buffer de entrada vazio/
-    );
+    await expect(normalizeVehicleImage(Buffer.alloc(0))).rejects.toThrow(/Buffer de entrada vazio/);
   });
 
   it("Uint8Array é aceito como entrada (além de Buffer)", async () => {

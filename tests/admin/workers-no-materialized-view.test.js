@@ -23,10 +23,7 @@ describe("no worker uses REFRESH MATERIALIZED VIEW for ad_metrics", () => {
   }
 
   it("ad-metrics.refresh.js uses INSERT INTO ad_metrics ... ON CONFLICT", () => {
-    const code = readFileSync(
-      join(__dirname, "../../src/workers/ad-metrics.refresh.js"),
-      "utf-8"
-    );
+    const code = readFileSync(join(__dirname, "../../src/workers/ad-metrics.refresh.js"), "utf-8");
 
     expect(code).toContain("INSERT INTO ad_metrics");
     expect(code).toContain("ON CONFLICT (ad_id)");

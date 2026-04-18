@@ -26,12 +26,17 @@ export function AdminChartCard({
             <div key={i}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-cnc-muted">{b.label}</span>
-                <span className="text-xs font-semibold text-cnc-text">{b.value.toLocaleString("pt-BR")}</span>
+                <span className="text-xs font-semibold text-cnc-text">
+                  {b.value.toLocaleString("pt-BR")}
+                </span>
               </div>
               <div className="h-2 w-full rounded-full bg-cnc-bg">
                 <div
                   className="h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min((b.value / max) * 100, 100)}%`, backgroundColor: b.color ?? "#1a56db" }}
+                  style={{
+                    width: `${Math.min((b.value / max) * 100, 100)}%`,
+                    backgroundColor: b.color ?? "#1a56db",
+                  }}
                 />
               </div>
             </div>
@@ -83,7 +88,16 @@ export function AdminMiniBarChart({
                   <div
                     key={vi}
                     className="h-2 transition-all"
-                    style={{ width: `${w}%`, backgroundColor: v.color, borderRadius: vi === 0 ? "9999px 0 0 9999px" : vi === item.values.length - 1 ? "0 9999px 9999px 0" : "0" }}
+                    style={{
+                      width: `${w}%`,
+                      backgroundColor: v.color,
+                      borderRadius:
+                        vi === 0
+                          ? "9999px 0 0 9999px"
+                          : vi === item.values.length - 1
+                            ? "0 9999px 9999px 0"
+                            : "0",
+                    }}
                   />
                 );
               })}

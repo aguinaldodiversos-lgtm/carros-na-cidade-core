@@ -38,7 +38,9 @@ async function acquireMigrationLock(client) {
 }
 
 async function releaseMigrationLock(client) {
-  await client.query(`SELECT pg_advisory_unlock(hashtext($1))`, [MIGRATIONS_LOCK_KEY]).catch(() => {});
+  await client
+    .query(`SELECT pg_advisory_unlock(hashtext($1))`, [MIGRATIONS_LOCK_KEY])
+    .catch(() => {});
 }
 
 async function getMigrationsTableProfile(client) {

@@ -14,7 +14,10 @@ export function useAdminGuard() {
 
     (async () => {
       try {
-        const res = await fetch("/api/admin/dashboard/overview", { credentials: "include", cache: "no-store" });
+        const res = await fetch("/api/admin/dashboard/overview", {
+          credentials: "include",
+          cache: "no-store",
+        });
         if (cancelled) return;
         if (res.ok) {
           setState({ status: "ok" });
@@ -30,7 +33,9 @@ export function useAdminGuard() {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   return state;
@@ -55,7 +60,9 @@ export function useAdminFetch<T>(fetcher: () => Promise<T>, deps: unknown[] = []
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return { data, loading, error, reload: load };
 }

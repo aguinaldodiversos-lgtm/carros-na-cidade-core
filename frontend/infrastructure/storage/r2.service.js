@@ -153,7 +153,9 @@ function assertVehicleId(vehicleId) {
 }
 
 function assertStorageKey(key) {
-  const normalized = String(key ?? "").trim().replace(/^\/+/, "");
+  const normalized = String(key ?? "")
+    .trim()
+    .replace(/^\/+/, "");
   if (!normalized) {
     throw new Error("[r2] storage key ausente.");
   }
@@ -166,7 +168,9 @@ function assertStorageKey(key) {
 }
 
 function assertAllowedMimeType(mimeType) {
-  const normalized = String(mimeType ?? "").toLowerCase().trim();
+  const normalized = String(mimeType ?? "")
+    .toLowerCase()
+    .trim();
   if (!ALLOWED_IMAGE_MIME_TYPES.has(normalized)) {
     throw new Error(
       `[r2] Tipo de arquivo não permitido: ${mimeType || "desconhecido"}. Permitidos: ${[
@@ -184,9 +188,7 @@ function assertFileSize(sizeInBytes, maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES) {
   }
 
   if (size > maxBytes) {
-    throw new Error(
-      `[r2] Arquivo excede o limite permitido (${size} bytes > ${maxBytes} bytes).`
-    );
+    throw new Error(`[r2] Arquivo excede o limite permitido (${size} bytes > ${maxBytes} bytes).`);
   }
 
   return size;
@@ -262,10 +264,7 @@ function buildObjectMetadata({
   return metadata;
 }
 
-export function validateVehicleImageFile(
-  file,
-  { maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES } = {}
-) {
+export function validateVehicleImageFile(file, { maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES } = {}) {
   const originalName = String(file?.originalname || file?.name || "arquivo").trim();
   const mimeType = assertAllowedMimeType(file?.mimetype || file?.mimeType);
   const buffer = extractFileBuffer(file);
@@ -281,10 +280,7 @@ export function validateVehicleImageFile(
 
 export function validateVehicleImageFiles(
   files,
-  {
-    maxFiles = DEFAULT_MAX_FILES,
-    maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES,
-  } = {}
+  { maxFiles = DEFAULT_MAX_FILES, maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES } = {}
 ) {
   if (!Array.isArray(files) || files.length === 0) {
     throw new Error("[r2] Nenhuma imagem enviada.");
@@ -327,10 +323,7 @@ export function buildR2PublicUrl(key) {
   const { publicBaseUrl } = getR2Config();
   if (!publicBaseUrl) return "";
 
-  const normalizedKey = assertStorageKey(key)
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const normalizedKey = assertStorageKey(key).split("/").map(encodeURIComponent).join("/");
 
   return `${publicBaseUrl}/${normalizedKey}`;
 }
@@ -439,9 +432,7 @@ export async function readVehicleImage(key) {
     buffer,
     contentType: response.ContentType || "application/octet-stream",
     contentLength:
-      typeof response.ContentLength === "number"
-        ? response.ContentLength
-        : buffer.length,
+      typeof response.ContentLength === "number" ? response.ContentLength : buffer.length,
     cacheControl: response.CacheControl || DEFAULT_CACHE_CONTROL,
     etag: response.ETag ? String(response.ETag).replace(/"/g, "") : null,
     lastModified: response.LastModified || null,
@@ -464,8 +455,7 @@ export async function headVehicleImage(key) {
   return {
     key: safeKey,
     contentType: response.ContentType || "application/octet-stream",
-    contentLength:
-      typeof response.ContentLength === "number" ? response.ContentLength : null,
+    contentLength: typeof response.ContentLength === "number" ? response.ContentLength : null,
     cacheControl: response.CacheControl || DEFAULT_CACHE_CONTROL,
     etag: response.ETag ? String(response.ETag).replace(/"/g, "") : null,
     lastModified: response.LastModified || null,

@@ -31,9 +31,10 @@ function dashboardErrorKind(result: Extract<FetchDashboardPayloadResult, { ok: f
 export function DashboardClientRecovery({ variant, mode = "home" }: DashboardClientRecoveryProps) {
   const [phase, setPhase] = useState<"loading" | "ok" | "fail">("loading");
   const [data, setData] = useState<DashboardPayload | null>(null);
-  const [failure, setFailure] = useState<Extract<FetchDashboardPayloadResult, { ok: false }> | null>(
-    null
-  );
+  const [failure, setFailure] = useState<Extract<
+    FetchDashboardPayloadResult,
+    { ok: false }
+  > | null>(null);
   const pathname = usePathname() ?? "/dashboard";
 
   useEffect(() => {
@@ -93,5 +94,7 @@ export function DashboardClientRecovery({ variant, mode = "home" }: DashboardCli
     return <AccountDashboardView initialData={data} variant={variant} mode={mode} />;
   }
 
-  return <DashboardLoadError kind={dashboardErrorKind(failure)} status={failure?.status || undefined} />;
+  return (
+    <DashboardLoadError kind={dashboardErrorKind(failure)} status={failure?.status || undefined} />
+  );
 }

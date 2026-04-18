@@ -127,7 +127,9 @@ export default function VehicleInfo({ vehicle, priceSignal }: VehicleInfoProps) 
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#0c57c8]">
             Indicador de mercado
           </p>
-          <p className="mt-1 text-[18px] font-extrabold leading-tight text-[#1e2f53]">{signal.label}</p>
+          <p className="mt-1 text-[18px] font-extrabold leading-tight text-[#1e2f53]">
+            {signal.label}
+          </p>
           <p className="mt-2 text-[14px] leading-6 text-[#435372]">{signal.reason}</p>
         </div>
       </div>

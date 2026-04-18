@@ -37,7 +37,9 @@ if (!process.env.DATABASE_URL?.trim()) {
 }
 
 function toForwardSlashes(value) {
-  return String(value ?? "").trim().replace(/\\/g, "/");
+  return String(value ?? "")
+    .trim()
+    .replace(/\\/g, "/");
 }
 
 function isLegacyUpload(value) {
@@ -54,7 +56,8 @@ function isCanonicalPublicImage(value) {
 }
 
 function parseImages(rawValue) {
-  if (Array.isArray(rawValue)) return rawValue.map((item) => String(item ?? "").trim()).filter(Boolean);
+  if (Array.isArray(rawValue))
+    return rawValue.map((item) => String(item ?? "").trim()).filter(Boolean);
   if (!rawValue) return [];
 
   if (typeof rawValue === "string") {
@@ -76,7 +79,8 @@ function classifyBreakPoint(rawImages, vehicleRows, normalizedImages) {
   const hasLegacyAdsImages = rawImages.some((image) => isLegacyUpload(image));
   const hasVehicleRows = Array.isArray(vehicleRows) && vehicleRows.length > 0;
   const hasCanonicalVehicleRows = vehicleRows.some(
-    (row) => isCanonicalPublicImage(row.image_url) || /^vehicles\//i.test(String(row.storage_key || ""))
+    (row) =>
+      isCanonicalPublicImage(row.image_url) || /^vehicles\//i.test(String(row.storage_key || ""))
   );
   const hasCanonicalNormalized = normalizedImages.some((image) => isCanonicalPublicImage(image));
 
@@ -164,7 +168,9 @@ async function inspectCandidates() {
       vehicleRows,
       normalizedImages,
       breakPoint,
-      canRewrite: normalizedImages.length > 0 && JSON.stringify(rawImages) !== JSON.stringify(normalizedImages),
+      canRewrite:
+        normalizedImages.length > 0 &&
+        JSON.stringify(rawImages) !== JSON.stringify(normalizedImages),
     };
   });
 
@@ -255,7 +261,9 @@ export async function main() {
   return 0;
 }
 
-const entryArg = process.argv[1] ? new URL(`file://${process.argv[1].replace(/\\/g, "/")}`).href : "";
+const entryArg = process.argv[1]
+  ? new URL(`file://${process.argv[1].replace(/\\/g, "/")}`).href
+  : "";
 
 if (import.meta.url === entryArg) {
   try {

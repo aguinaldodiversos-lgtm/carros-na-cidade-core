@@ -166,7 +166,13 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
         <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-5 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:gap-6 xl:px-8">
           <div className="rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
                 <path d="M12 3l7 3v5c0 5-3.3 8.8-7 10-3.7-1.2-7-5-7-10V6l7-3Z" />
                 <path d="m9.5 12 1.7 1.7 3.6-3.9" />
               </svg>
@@ -179,7 +185,13 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
 
           <div className="rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
                 <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
                 <path d="M12 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
               </svg>
@@ -192,7 +204,13 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
 
           <div className="rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
                 <path d="M4 7h16M7 4v6M17 4v6M5 11h14v8H5z" />
                 <path d="M8 15h8M8 18h5" />
               </svg>
@@ -205,7 +223,13 @@ export function HomePageClient({ data, activeCitySlug, activeCityName }: HomePag
 
           <div className="flex flex-col rounded-[16px] border border-[#eef1f6] bg-white px-5 py-6 shadow-[0_8px_30px_rgba(15,23,42,0.07)] sm:px-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#0e62d8]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
                 <path d="M3 11h3l2-6h8l2 6h3v2h-2l-1 9H6l-1-9H3z" />
                 <path d="M10 19a2 2 0 1 0 4 0" />
               </svg>

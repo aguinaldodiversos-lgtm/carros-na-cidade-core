@@ -78,14 +78,30 @@ export default function AdminAnunciantes() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-cnc-bg/50 border-b border-cnc-line">
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Nome</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Email</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Empresa</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Plano</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Anúncios</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Data</th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Nome
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Empresa
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Plano
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Anúncios
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Data
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -100,8 +116,12 @@ export default function AdminAnunciantes() {
                     <td className="px-4 py-2.5 text-cnc-muted">{adv.email}</td>
                     <td className="px-4 py-2.5 text-cnc-muted">{adv.company_name || "—"}</td>
                     <td className="px-4 py-2.5 capitalize text-cnc-muted">{adv.plan || "—"}</td>
-                    <td className="px-4 py-2.5 text-center font-semibold text-cnc-text">{adv.active_ads_count ?? adv.total_ads_count ?? "—"}</td>
-                    <td className="px-4 py-2.5"><AdminStatusBadge status={adv.status} /></td>
+                    <td className="px-4 py-2.5 text-center font-semibold text-cnc-text">
+                      {adv.active_ads_count ?? adv.total_ads_count ?? "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <AdminStatusBadge status={adv.status} />
+                    </td>
                     <td className="px-4 py-2.5 text-cnc-muted whitespace-nowrap">
                       {new Date(adv.created_at).toLocaleDateString("pt-BR")}
                     </td>

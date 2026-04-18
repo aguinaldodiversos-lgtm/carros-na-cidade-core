@@ -1,5 +1,8 @@
 import express from "express";
-import { loginRateLimit, registerRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
+import {
+  loginRateLimit,
+  registerRateLimit,
+} from "../../shared/middlewares/rateLimit.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { pool } from "../../infrastructure/database/db.js";

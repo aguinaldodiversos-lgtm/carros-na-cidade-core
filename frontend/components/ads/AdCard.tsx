@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import {
+  LISTING_CARD_FALLBACK_IMAGE,
+  resolvePublicListingImageUrl,
+} from "@/lib/vehicle/detail-utils";
 
 type BaseAdData = {
   id?: string | number | null;

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { registerUser } from "@/services/authService";
-import { applyPrivateNoStoreHeaders, applySessionCookiesToResponse } from "@/services/sessionService";
+import {
+  applyPrivateNoStoreHeaders,
+  applySessionCookiesToResponse,
+} from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 

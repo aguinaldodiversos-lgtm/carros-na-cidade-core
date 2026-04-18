@@ -68,6 +68,9 @@ test.describe.serial("Isolamento — dashboard por usuário", () => {
       await ctxB.dispose();
     }
 
-    expect(idA && idB && idA !== idB, `Esperado ids distintos, obtido A=${idA} B=${idB}`).toBeTruthy();
+    expect(
+      idA && idB && idA !== idB,
+      `Esperado ids distintos, obtido A=${idA} B=${idB}`
+    ).toBeTruthy();
   });
 });

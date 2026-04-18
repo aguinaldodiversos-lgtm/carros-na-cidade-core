@@ -31,7 +31,6 @@ describe("getDbSslConfig", () => {
 
     process.env.PG_SSL_ENABLED = "true";
 
-
     const { getDbSslConfig } = await loadEnvModule();
 
     expect(getDbSslConfig()).toEqual({ rejectUnauthorized: false });
@@ -58,7 +57,7 @@ describe("getDbSslConfig", () => {
     expect(result).toBeTruthy();
     expect(result).toMatchObject({ rejectUnauthorized: false });
   });
-    it("retorna false quando SSL é explicitamente desativado", async () => {
+  it("retorna false quando SSL é explicitamente desativado", async () => {
     process.env.NODE_ENV = "production";
     process.env.DATABASE_URL = "postgresql://localhost/test";
     process.env.PG_SSL_ENABLED = "false";
@@ -68,7 +67,6 @@ describe("getDbSslConfig", () => {
 
     expect(getDbSslConfig()).toBe(false);
   });
-  
 
   it("retorna configuração SSL quando SSL é explicitamente ativado", async () => {
     process.env.NODE_ENV = "development";

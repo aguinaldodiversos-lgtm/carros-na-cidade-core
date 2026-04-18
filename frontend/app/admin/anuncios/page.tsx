@@ -59,7 +59,12 @@ export default function AdminAnuncios() {
           { key: "search", label: "Busca", type: "text", placeholder: "ID ou título…" },
           { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
           { key: "city", label: "Cidade", type: "text", placeholder: "Nome da cidade…" },
-          { key: "advertiser", label: "Anunciante", type: "text", placeholder: "Nome do anunciante…" },
+          {
+            key: "advertiser",
+            label: "Anunciante",
+            type: "text",
+            placeholder: "Nome do anunciante…",
+          },
         ]}
         values={filters}
         onChange={setFilters}
@@ -81,15 +86,33 @@ export default function AdminAnuncios() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-cnc-bg/50 border-b border-cnc-line">
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Título</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Cidade</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Anunciante</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Preço</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Plano</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Prioridade</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Data</th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Título
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Cidade
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Anunciante
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Preço
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Plano
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Prioridade
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Data
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -100,15 +123,26 @@ export default function AdminAnuncios() {
                     className="border-t border-cnc-line/60 cursor-pointer hover:bg-primary-soft/30 transition-colors"
                   >
                     <td className="px-4 py-2.5 font-mono text-cnc-muted">#{ad.id}</td>
-                    <td className="px-4 py-2.5 font-medium text-cnc-text max-w-[220px] truncate">{ad.title}</td>
-                    <td className="px-4 py-2.5 text-cnc-muted">{ad.city}/{ad.state}</td>
+                    <td className="px-4 py-2.5 font-medium text-cnc-text max-w-[220px] truncate">
+                      {ad.title}
+                    </td>
+                    <td className="px-4 py-2.5 text-cnc-muted">
+                      {ad.city}/{ad.state}
+                    </td>
                     <td className="px-4 py-2.5 text-cnc-muted">{ad.advertiser_name || "—"}</td>
                     <td className="px-4 py-2.5 font-semibold text-cnc-text">
-                      {Number(ad.price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      {Number(ad.price).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
                     </td>
-                    <td className="px-4 py-2.5"><AdminStatusBadge status={ad.status} /></td>
+                    <td className="px-4 py-2.5">
+                      <AdminStatusBadge status={ad.status} />
+                    </td>
                     <td className="px-4 py-2.5 capitalize text-cnc-muted">{ad.plan || "—"}</td>
-                    <td className="px-4 py-2.5 text-center font-mono text-cnc-muted">{ad.priority}</td>
+                    <td className="px-4 py-2.5 text-center font-mono text-cnc-muted">
+                      {ad.priority}
+                    </td>
                     <td className="px-4 py-2.5 text-cnc-muted whitespace-nowrap">
                       {new Date(ad.created_at).toLocaleDateString("pt-BR")}
                     </td>

@@ -30,8 +30,10 @@ function parseArgs(argv) {
 
   for (const raw of argv) {
     if (raw === "--execute") args.execute = true;
-    else if (raw.startsWith("--audit-file=")) args.auditFile = path.resolve(raw.split("=").slice(1).join("="));
-    else if (raw.startsWith("--report-dir=")) args.reportDir = path.resolve(raw.split("=").slice(1).join("="));
+    else if (raw.startsWith("--audit-file="))
+      args.auditFile = path.resolve(raw.split("=").slice(1).join("="));
+    else if (raw.startsWith("--report-dir="))
+      args.reportDir = path.resolve(raw.split("=").slice(1).join("="));
   }
 
   return args;
@@ -70,10 +72,7 @@ async function columnExistsInTable(tableName, columnName) {
 }
 
 async function snapshotAds(adIds) {
-  const { rows } = await pool.query(
-    `SELECT * FROM ads WHERE id = ANY($1::bigint[])`,
-    [adIds]
-  );
+  const { rows } = await pool.query(`SELECT * FROM ads WHERE id = ANY($1::bigint[])`, [adIds]);
   return rows;
 }
 
@@ -98,10 +97,9 @@ async function snapshotRelatedTable(tableName, adIds) {
   const hasAdId = await columnExistsInTable(tableName, "ad_id");
   if (!hasAdId) return { exists: true, hasAdId: false, rows: [] };
 
-  const { rows } = await pool.query(
-    `SELECT * FROM ${tableName} WHERE ad_id = ANY($1::bigint[])`,
-    [adIds]
-  );
+  const { rows } = await pool.query(`SELECT * FROM ${tableName} WHERE ad_id = ANY($1::bigint[])`, [
+    adIds,
+  ]);
   return { exists: true, hasAdId: true, rows };
 }
 
@@ -142,27 +140,26 @@ async function executeCleanup(adIds) {
 
   await withTransaction(async (tx) => {
     // 1. vehicle_images
-    if (await tableExists("vehicle_images") && await columnExistsInTable("vehicle_images", "ad_id")) {
-      const res = await tx.query(
-        `DELETE FROM vehicle_images WHERE ad_id = ANY($1::bigint[])`,
-        [adIds]
-      );
+    if (
+      (await tableExists("vehicle_images")) &&
+      (await columnExistsInTable("vehicle_images", "ad_id"))
+    ) {
+      const res = await tx.query(`DELETE FROM vehicle_images WHERE ad_id = ANY($1::bigint[])`, [
+        adIds,
+      ]);
       deletionReport.vehicleImages = Number(res.rowCount || 0);
       if (deletionReport.vehicleImages > 0) deletionReport.tablesAffected.push("vehicle_images");
     }
 
     // 2. ad_events
-    if (await tableExists("ad_events") && await columnExistsInTable("ad_events", "ad_id")) {
-      const res = await tx.query(
-        `DELETE FROM ad_events WHERE ad_id = ANY($1::bigint[])`,
-        [adIds]
-      );
+    if ((await tableExists("ad_events")) && (await columnExistsInTable("ad_events", "ad_id"))) {
+      const res = await tx.query(`DELETE FROM ad_events WHERE ad_id = ANY($1::bigint[])`, [adIds]);
       deletionReport.adEvents = Number(res.rowCount || 0);
       if (deletionReport.adEvents > 0) deletionReport.tablesAffected.push("ad_events");
     }
 
     // 3. leads — verificar se há leads reais (não de teste)
-    if (await tableExists("leads") && await columnExistsInTable("leads", "ad_id")) {
+    if ((await tableExists("leads")) && (await columnExistsInTable("leads", "ad_id"))) {
       const { rows: leadRows } = await tx.query(
         `SELECT id, ad_id, created_at FROM leads WHERE ad_id = ANY($1::bigint[]) LIMIT 100`,
         [adIds]
@@ -173,40 +170,34 @@ async function executeCleanup(adIds) {
           message: `${leadRows.length} lead(s) encontrado(s) vinculado(s) a anúncios órfãos — removidos como dados de teste`,
           sampleIds: leadRows.slice(0, 10).map((r) => r.id),
         });
-        const res = await tx.query(
-          `DELETE FROM leads WHERE ad_id = ANY($1::bigint[])`,
-          [adIds]
-        );
+        const res = await tx.query(`DELETE FROM leads WHERE ad_id = ANY($1::bigint[])`, [adIds]);
         deletionReport.leads = Number(res.rowCount || 0);
         if (deletionReport.leads > 0) deletionReport.tablesAffected.push("leads");
       }
     }
 
     // 4. notification_queue
-    if (await tableExists("notification_queue") && await columnExistsInTable("notification_queue", "ad_id")) {
-      const res = await tx.query(
-        `DELETE FROM notification_queue WHERE ad_id = ANY($1::bigint[])`,
-        [adIds]
-      );
+    if (
+      (await tableExists("notification_queue")) &&
+      (await columnExistsInTable("notification_queue", "ad_id"))
+    ) {
+      const res = await tx.query(`DELETE FROM notification_queue WHERE ad_id = ANY($1::bigint[])`, [
+        adIds,
+      ]);
       deletionReport.notificationQueue = Number(res.rowCount || 0);
-      if (deletionReport.notificationQueue > 0) deletionReport.tablesAffected.push("notification_queue");
+      if (deletionReport.notificationQueue > 0)
+        deletionReport.tablesAffected.push("notification_queue");
     }
 
     // 5. ad_metrics (CASCADE cuida, mas limpamos explicitamente por segurança)
-    if (await tableExists("ad_metrics") && await columnExistsInTable("ad_metrics", "ad_id")) {
-      const res = await tx.query(
-        `DELETE FROM ad_metrics WHERE ad_id = ANY($1::bigint[])`,
-        [adIds]
-      );
+    if ((await tableExists("ad_metrics")) && (await columnExistsInTable("ad_metrics", "ad_id"))) {
+      const res = await tx.query(`DELETE FROM ad_metrics WHERE ad_id = ANY($1::bigint[])`, [adIds]);
       deletionReport.adMetrics = Number(res.rowCount || 0);
       if (deletionReport.adMetrics > 0) deletionReport.tablesAffected.push("ad_metrics");
     }
 
     // 6. ads — hard delete (último, após limpar dependências)
-    const res = await tx.query(
-      `DELETE FROM ads WHERE id = ANY($1::bigint[])`,
-      [adIds]
-    );
+    const res = await tx.query(`DELETE FROM ads WHERE id = ANY($1::bigint[])`, [adIds]);
     deletionReport.ads = Number(res.rowCount || 0);
     if (deletionReport.ads > 0) deletionReport.tablesAffected.push("ads");
   });
@@ -220,9 +211,15 @@ async function validateCleanup(adIds) {
     [adIds]
   );
 
-  const viCheck = await tableExists("vehicle_images") && await columnExistsInTable("vehicle_images", "ad_id")
-    ? (await pool.query(`SELECT COUNT(*) as c FROM vehicle_images WHERE ad_id = ANY($1::bigint[])`, [adIds])).rows[0].c
-    : 0;
+  const viCheck =
+    (await tableExists("vehicle_images")) && (await columnExistsInTable("vehicle_images", "ad_id"))
+      ? (
+          await pool.query(
+            `SELECT COUNT(*) as c FROM vehicle_images WHERE ad_id = ANY($1::bigint[])`,
+            [adIds]
+          )
+        ).rows[0].c
+      : 0;
 
   return {
     adsRemaining: remainingAds.length,
@@ -275,7 +272,9 @@ async function main() {
   console.log(`\n  snapshot salvo: ${snapshotPath}`);
 
   if (snapshot.leads.rows?.length > 0) {
-    console.log(`\n  ⚠ ${snapshot.leads.rows.length} lead(s) encontrado(s) — serão removidos como dados de teste`);
+    console.log(
+      `\n  ⚠ ${snapshot.leads.rows.length} lead(s) encontrado(s) — serão removidos como dados de teste`
+    );
   }
 
   if (!args.execute) {
@@ -347,7 +346,9 @@ async function main() {
     return 1;
   }
 
-  console.log("\n[cleanup] Limpeza concluída com sucesso. Base pronta para novos anúncios de teste via R2.");
+  console.log(
+    "\n[cleanup] Limpeza concluída com sucesso. Base pronta para novos anúncios de teste via R2."
+  );
   return 0;
 }
 

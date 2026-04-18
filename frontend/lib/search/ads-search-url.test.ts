@@ -93,17 +93,27 @@ describe("parseAdsSearchFiltersFromSearchParams", () => {
   });
 
   it("handles below_fipe boolean", () => {
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ below_fipe: "true" })).below_fipe).toBe(true);
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ below_fipe: "false" })).below_fipe).toBe(false);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ below_fipe: "true" })).below_fipe
+    ).toBe(true);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ below_fipe: "false" })).below_fipe
+    ).toBe(false);
   });
 
   it("merges highlight and highlight_only", () => {
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ highlight: "true" })).highlight_only).toBe(true);
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ highlight_only: "true" })).highlight_only).toBe(true);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ highlight: "true" })).highlight_only
+    ).toBe(true);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ highlight_only: "true" })).highlight_only
+    ).toBe(true);
   });
 
   it("accepts price_min/price_max aliases", () => {
-    const result = parseAdsSearchFiltersFromSearchParams(makeParams({ price_min: "10000", price_max: "50000" }));
+    const result = parseAdsSearchFiltersFromSearchParams(
+      makeParams({ price_min: "10000", price_max: "50000" })
+    );
     expect(result.min_price).toBe(10000);
     expect(result.max_price).toBe(50000);
   });
@@ -134,19 +144,13 @@ describe("buildSearchQueryString", () => {
 
 describe("mergeSearchFilters", () => {
   it("merges patch over current", () => {
-    const result = mergeSearchFilters(
-      { brand: "Fiat", page: 1 },
-      { brand: "VW", page: 2 }
-    );
+    const result = mergeSearchFilters({ brand: "Fiat", page: 1 }, { brand: "VW", page: 2 });
     expect(result.brand).toBe("VW");
     expect(result.page).toBe(2);
   });
 
   it("removes undefined/null/empty values", () => {
-    const result = mergeSearchFilters(
-      { brand: "Fiat", model: "Uno" },
-      { model: undefined }
-    );
+    const result = mergeSearchFilters({ brand: "Fiat", model: "Uno" }, { model: undefined });
     expect(result.brand).toBe("Fiat");
     expect(result.model).toBeUndefined();
   });

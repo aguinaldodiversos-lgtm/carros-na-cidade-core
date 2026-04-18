@@ -28,7 +28,9 @@ const routes: Record<string, Record<string, RouteHandler>> = {
 
   "POST /api/auth/login": {
     handler: (body: Record<string, unknown>) => {
-      const email = String(body.email || "").toLowerCase().trim();
+      const email = String(body.email || "")
+        .toLowerCase()
+        .trim();
       const user = fixtures.users.find((u) => u.email === email);
       if (!user || body.password !== user.password) {
         return { status: 401, body: { error: "Credenciais invalidas" } };
@@ -38,7 +40,12 @@ const routes: Record<string, Record<string, RouteHandler>> = {
         body: {
           accessToken: `mock-access-${user.id}`,
           refreshToken: `mock-refresh-${user.id}`,
-          user: { id: user.id, email: user.email, name: user.name, account_type: user.account_type },
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            account_type: user.account_type,
+          },
           redirect_to: user.account_type === "cnpj" ? "/dashboard-loja" : "/dashboard",
         },
       };
@@ -142,9 +149,7 @@ const routes: Record<string, Record<string, RouteHandler>> = {
   "GET /api/cities/search": {
     handler: (_body: Record<string, unknown>, url: URL) => {
       const q = url.searchParams.get("q") || "";
-      const results = fixtures.cities.filter((c) =>
-        c.name.toLowerCase().includes(q.toLowerCase())
-      );
+      const results = fixtures.cities.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()));
       return { status: 200, body: { data: results.slice(0, 20) } };
     },
   } as unknown as Record<string, RouteHandler>,

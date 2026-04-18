@@ -106,8 +106,7 @@ export function HomeSearchShell({
   );
 
   const offerHint = formatOfferCount(totalAdsHint);
-  const ctaLabel =
-    offerHint != null ? `Ver ofertas (${offerHint})` : "Ver ofertas";
+  const ctaLabel = offerHint != null ? `Ver ofertas (${offerHint})` : "Ver ofertas";
 
   return (
     <section
@@ -139,7 +138,11 @@ export function HomeSearchShell({
             />
           </div>
 
-          <SearchQuickChips chips={HOME_QUICK_CHIPS} selected={selectedChips} onToggle={toggleChip} />
+          <SearchQuickChips
+            chips={HOME_QUICK_CHIPS}
+            selected={selectedChips}
+            onToggle={toggleChip}
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[13px] text-slate-500">

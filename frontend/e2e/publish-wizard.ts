@@ -99,23 +99,31 @@ export async function runPublishWizardFlow(
   page: Page,
   options?: RunPublishWizardOptions
 ): Promise<PublishWizardResult> {
-  await page.addInitScript(({ storageKey }) => {
-    try {
-      window.localStorage.removeItem(storageKey);
-      window.sessionStorage.clear();
-    } catch {
-      // noop
-    }
-  }, { storageKey: WIZARD_STORAGE_KEY });
+  await page.addInitScript(
+    ({ storageKey }) => {
+      try {
+        window.localStorage.removeItem(storageKey);
+        window.sessionStorage.clear();
+      } catch {
+        // noop
+      }
+    },
+    { storageKey: WIZARD_STORAGE_KEY }
+  );
 
-  await page.evaluate(({ storageKey }) => {
-    try {
-      window.localStorage.removeItem(storageKey);
-      window.sessionStorage.clear();
-    } catch {
-      // noop
-    }
-  }, { storageKey: WIZARD_STORAGE_KEY }).catch(() => null);
+  await page
+    .evaluate(
+      ({ storageKey }) => {
+        try {
+          window.localStorage.removeItem(storageKey);
+          window.sessionStorage.clear();
+        } catch {
+          // noop
+        }
+      },
+      { storageKey: WIZARD_STORAGE_KEY }
+    )
+    .catch(() => null);
 
   page.on("response", (response) => {
     const url = response.url();

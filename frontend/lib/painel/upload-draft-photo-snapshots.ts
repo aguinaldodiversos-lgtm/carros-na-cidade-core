@@ -28,8 +28,7 @@ export async function snapshotPhotoFiles(photos: File[]): Promise<PhotoSnapshot[
   return Promise.all(
     photos.map(async (f) => {
       const buffer = Buffer.from(await f.arrayBuffer());
-      const type =
-        (f.type && f.type.trim()) || inferMimeFromFileName(f.name || "") || "image/jpeg";
+      const type = (f.type && f.type.trim()) || inferMimeFromFileName(f.name || "") || "image/jpeg";
       return {
         name: f.name || "foto.jpg",
         type: type.toLowerCase(),

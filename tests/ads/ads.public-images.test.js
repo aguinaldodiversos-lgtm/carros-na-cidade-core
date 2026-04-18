@@ -30,9 +30,9 @@ describe("ads public images normalization", () => {
       expect(normalizePublicImageCandidate("https://cdn.example.com/foto.webp")).toBe(
         "https://cdn.example.com/foto.webp"
       );
-      expect(normalizePublicImageCandidate("/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp")).toBe(
-        "/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp"
-      );
+      expect(
+        normalizePublicImageCandidate("/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp")
+      ).toBe("/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp");
     });
 
     it("converte storage_key cru em URL canônica", () => {
@@ -198,13 +198,10 @@ describe("ads public images normalization", () => {
     });
 
     it("lida com vehicle_images múltiplas com storage_key", () => {
-      const images = buildNormalizedPublicImages(
-        { id: 70, images: [] },
-        [
-          { storage_key: "vehicles/70/cover.webp", image_url: "" },
-          { storage_key: "vehicles/70/gallery-1.webp", image_url: "" },
-        ]
-      );
+      const images = buildNormalizedPublicImages({ id: 70, images: [] }, [
+        { storage_key: "vehicles/70/cover.webp", image_url: "" },
+        { storage_key: "vehicles/70/gallery-1.webp", image_url: "" },
+      ]);
       expect(images).toHaveLength(2);
       expect(images[0]).toContain("cover.webp");
       expect(images[1]).toContain("gallery-1.webp");

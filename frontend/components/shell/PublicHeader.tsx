@@ -85,9 +85,9 @@ function HeaderNavLink({
 export function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { city, openCityPicker } = useCity();
-  const [sessionUser, setSessionUser] = useState<{ name: string; type: AccountType } | null | undefined>(
-    undefined
-  );
+  const [sessionUser, setSessionUser] = useState<
+    { name: string; type: AccountType } | null | undefined
+  >(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +115,11 @@ export function PublicHeader() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-[64px] items-center gap-2 md:h-[68px] md:gap-3">
           <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
-            <Link href="/" aria-label="Carros na Cidade" className="inline-flex shrink-0 items-center">
+            <Link
+              href="/"
+              aria-label="Carros na Cidade"
+              className="inline-flex shrink-0 items-center"
+            >
               <Image
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"

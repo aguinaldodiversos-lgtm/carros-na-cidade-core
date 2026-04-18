@@ -4,12 +4,10 @@ export default function NotFound() {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-16 text-center">
       <h1 className="text-6xl font-bold text-blue-600">404</h1>
-      <h2 className="mt-4 text-2xl font-semibold text-gray-900">
-        Página não encontrada
-      </h2>
+      <h2 className="mt-4 text-2xl font-semibold text-gray-900">Página não encontrada</h2>
       <p className="mt-2 max-w-md text-gray-500">
-        A página que você procura não existe ou foi movida. Verifique o endereço
-        ou volte para a página inicial.
+        A página que você procura não existe ou foi movida. Verifique o endereço ou volte para a
+        página inicial.
       </p>
       <div className="mt-8 flex gap-4">
         <Link

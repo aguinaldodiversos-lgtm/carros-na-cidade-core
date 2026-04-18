@@ -38,8 +38,7 @@ router.get(
   "/dashboard",
   asyncHandler(async (req, res) => {
     const at = req.user?.account_type;
-    const accountType =
-      at === "CNPJ" ? "CNPJ" : at === "pending" ? "pending" : "CPF";
+    const accountType = at === "CNPJ" ? "CNPJ" : at === "pending" ? "pending" : "CPF";
     const payload = await getDashboardPayload(req.user.id, { accountType });
     res.json(payload);
   })

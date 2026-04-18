@@ -12,7 +12,15 @@ import { AdminActionDialog } from "@/components/admin/AdminActionDialog";
 
 function fmtDate(d: string | undefined | null) {
   if (!d) return "—";
-  try { return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }); } catch { return "—"; }
+  try {
+    return new Date(d).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
 }
 
 function money(n: number | string | undefined | null) {
@@ -27,8 +35,14 @@ export default function AdminAnuncianteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const adv = useAdminFetch<{ ok: boolean; data: AdvDetail }>(() => adminApi.advertisers.get(id), [id]);
-  const ads = useAdminFetch<{ ok: boolean; data: AdRow[] }>(() => adminApi.advertisers.ads(id), [id]);
+  const adv = useAdminFetch<{ ok: boolean; data: AdvDetail }>(
+    () => adminApi.advertisers.get(id),
+    [id]
+  );
+  const ads = useAdminFetch<{ ok: boolean; data: AdRow[] }>(
+    () => adminApi.advertisers.ads(id),
+    [id]
+  );
 
   const [dialog, setDialog] = useState<DialogState>({ type: "none" });
 
@@ -51,12 +65,17 @@ export default function AdminAnuncianteDetalhe() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.push("/admin/anunciantes")} className="rounded-lg border border-cnc-line px-3 py-1.5 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors">
+        <button
+          onClick={() => router.push("/admin/anunciantes")}
+          className="rounded-lg border border-cnc-line px-3 py-1.5 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors"
+        >
           ← Voltar
         </button>
         <div className="flex-1">
           <h1 className="text-lg font-bold text-cnc-text">{d.name}</h1>
-          <p className="text-xs text-cnc-muted">#{d.id} · {d.email}</p>
+          <p className="text-xs text-cnc-muted">
+            #{d.id} · {d.email}
+          </p>
         </div>
         <AdminStatusBadge status={d.status} />
       </div>
@@ -97,13 +116,25 @@ export default function AdminAnuncianteDetalhe() {
             <h2 className="text-sm font-bold text-cnc-text mb-3">Ações</h2>
             <div className="flex flex-wrap gap-2">
               {d.status !== "active" && (
-                <ActionBtn label="Reativar" color="bg-cnc-success text-white" onClick={() => setDialog({ type: "status", target: "active" })} />
+                <ActionBtn
+                  label="Reativar"
+                  color="bg-cnc-success text-white"
+                  onClick={() => setDialog({ type: "status", target: "active" })}
+                />
               )}
               {d.status !== "suspended" && d.status !== "blocked" && (
-                <ActionBtn label="Suspender" color="bg-cnc-warning text-white" onClick={() => setDialog({ type: "status", target: "suspended" })} />
+                <ActionBtn
+                  label="Suspender"
+                  color="bg-cnc-warning text-white"
+                  onClick={() => setDialog({ type: "status", target: "suspended" })}
+                />
               )}
               {d.status !== "blocked" && (
-                <ActionBtn label="Bloquear" color="bg-cnc-danger text-white" onClick={() => setDialog({ type: "status", target: "blocked" })} />
+                <ActionBtn
+                  label="Bloquear"
+                  color="bg-cnc-danger text-white"
+                  onClick={() => setDialog({ type: "status", target: "blocked" })}
+                />
               )}
             </div>
           </div>
@@ -132,12 +163,24 @@ export default function AdminAnuncianteDetalhe() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-cnc-bg/50 border-t border-cnc-line">
-                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">Título</th>
-                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">Cidade</th>
-                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">Preço</th>
-                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">Data</th>
+                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Título
+                  </th>
+                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Cidade
+                  </th>
+                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Preço
+                  </th>
+                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Data
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -148,10 +191,16 @@ export default function AdminAnuncianteDetalhe() {
                     className="border-t border-cnc-line/60 cursor-pointer hover:bg-primary-soft/30 transition-colors"
                   >
                     <td className="px-4 py-2.5 font-mono text-cnc-muted">#{ad.id}</td>
-                    <td className="px-4 py-2.5 font-medium text-cnc-text max-w-[220px] truncate">{ad.title}</td>
-                    <td className="px-4 py-2.5 text-cnc-muted">{ad.city}/{ad.state}</td>
+                    <td className="px-4 py-2.5 font-medium text-cnc-text max-w-[220px] truncate">
+                      {ad.title}
+                    </td>
+                    <td className="px-4 py-2.5 text-cnc-muted">
+                      {ad.city}/{ad.state}
+                    </td>
                     <td className="px-4 py-2.5 font-semibold text-cnc-text">{money(ad.price)}</td>
-                    <td className="px-4 py-2.5"><AdminStatusBadge status={ad.status} /></td>
+                    <td className="px-4 py-2.5">
+                      <AdminStatusBadge status={ad.status} />
+                    </td>
                     <td className="px-4 py-2.5 text-cnc-muted">{fmtDate(ad.created_at)}</td>
                   </tr>
                 ))}
@@ -167,7 +216,9 @@ export default function AdminAnuncianteDetalhe() {
         title={`Alterar status para "${dialog.type === "status" ? dialog.target : ""}"?`}
         description={`Anunciante #${d.id} — ${d.name}`}
         confirmLabel="Confirmar"
-        confirmColor={dialog.type === "status" && dialog.target === "blocked" ? "danger" : "primary"}
+        confirmColor={
+          dialog.type === "status" && dialog.target === "blocked" ? "danger" : "primary"
+        }
         showReason
         onConfirm={handleStatusChange}
         onCancel={() => setDialog({ type: "none" })}
@@ -179,7 +230,9 @@ export default function AdminAnuncianteDetalhe() {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">
+        {label}
+      </span>
       <p className="text-cnc-text font-medium">{value}</p>
     </div>
   );
@@ -194,9 +247,20 @@ function StatBox({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
+function ActionBtn({
+  label,
+  color,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${color}`}>
+    <button
+      onClick={onClick}
+      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${color}`}
+    >
       {label}
     </button>
   );

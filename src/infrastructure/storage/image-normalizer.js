@@ -40,7 +40,7 @@ import sharp from "sharp";
 
 /** Format written to R2 and served to all browsers. */
 export const OUTPUT_MIME = "image/webp";
-export const OUTPUT_EXT  = "webp";
+export const OUTPUT_EXT = "webp";
 
 /**
  * Maximum dimension (px) for the longest edge.
@@ -77,14 +77,14 @@ const WEBP_QUALITY = 85;
  * directly accept them before any normalization step runs.
  */
 export const ACCEPTED_INPUT_MIMES = new Set([
-  "image/jpeg",  // canonical JPEG
-  "image/jpg",   // non-canonical alias — Android, many old browsers
+  "image/jpeg", // canonical JPEG
+  "image/jpg", // non-canonical alias — Android, many old browsers
   "image/x-jpg", // very old alias (some cameras / HTTP servers)
   "image/pjpeg", // progressive JPEG (legacy IE)
   "image/png",
   "image/webp",
-  "image/heic",  // iPhone HEVC photo format (iOS 11+)
-  "image/heif",  // iPhone HEVC, alternative MIME declaration
+  "image/heic", // iPhone HEVC photo format (iOS 11+)
+  "image/heif", // iPhone HEVC, alternative MIME declaration
 ]);
 
 /**
@@ -102,21 +102,19 @@ export const ACCEPTED_INPUT_MIMES = new Set([
  * }>}
  */
 export async function normalizeVehicleImage(inputBuffer) {
-  const buf = Buffer.isBuffer(inputBuffer)
-    ? inputBuffer
-    : Buffer.from(inputBuffer);
+  const buf = Buffer.isBuffer(inputBuffer) ? inputBuffer : Buffer.from(inputBuffer);
 
   if (buf.length === 0) {
     throw new Error("[normalizer] Buffer de entrada vazio.");
   }
 
   const { data, info } = await sharp(buf)
-    .rotate()                                        // step 1: EXIF auto-rotate + strip orientation
+    .rotate() // step 1: EXIF auto-rotate + strip orientation
     .resize(MAX_DIMENSION, MAX_DIMENSION, {
       fit: "inside",
-      withoutEnlargement: true,                      // step 2: downscale only, preserve aspect ratio
+      withoutEnlargement: true, // step 2: downscale only, preserve aspect ratio
     })
-    .webp({ quality: WEBP_QUALITY, effort: 4 })      // step 3: encode to WebP
+    .webp({ quality: WEBP_QUALITY, effort: 4 }) // step 3: encode to WebP
     .toBuffer({ resolveWithObject: true });
 
   return {

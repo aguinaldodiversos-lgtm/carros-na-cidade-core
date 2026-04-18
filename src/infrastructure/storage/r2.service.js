@@ -11,10 +11,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 
-import {
-  ACCEPTED_INPUT_MIMES,
-  normalizeVehicleImage,
-} from "./image-normalizer.js";
+import { ACCEPTED_INPUT_MIMES, normalizeVehicleImage } from "./image-normalizer.js";
 
 const DEFAULT_REGION = "auto";
 const DEFAULT_MAX_FILE_SIZE_BYTES = parsePositiveInt(
@@ -51,7 +48,9 @@ function normalizeString(value) {
  * normalises independently for the direct-R2 path.
  */
 export function normalizeMimeType(mimeType) {
-  const t = String(mimeType ?? "").trim().toLowerCase();
+  const t = String(mimeType ?? "")
+    .trim()
+    .toLowerCase();
   if (t === "image/jpg" || t === "image/x-jpg" || t === "image/pjpeg") return "image/jpeg";
   return t;
 }
@@ -116,8 +115,7 @@ export function getR2Config() {
   const secretAccessKey = getRequiredEnv("R2_SECRET_ACCESS_KEY");
   const bucketName = getRequiredEnv("R2_BUCKET_NAME");
 
-  const endpoint =
-    normalizeHttpUrl(process.env.R2_ENDPOINT) || buildDefaultEndpoint(accountId);
+  const endpoint = normalizeHttpUrl(process.env.R2_ENDPOINT) || buildDefaultEndpoint(accountId);
 
   const region = normalizeString(process.env.AWS_REGION) || DEFAULT_REGION;
   const publicBaseUrl = normalizeHttpUrl(process.env.R2_PUBLIC_BASE_URL);
@@ -186,7 +184,9 @@ function normalizeVehicleId(vehicleId) {
 }
 
 function normalizeStorageKey(key) {
-  const normalized = String(key ?? "").trim().replace(/^\/+/, "");
+  const normalized = String(key ?? "")
+    .trim()
+    .replace(/^\/+/, "");
   if (!normalized) {
     throw new Error("[r2] storage key ausente.");
   }
@@ -208,7 +208,11 @@ function getExtensionFromMimeType(mimeType, originalName = "") {
 
 function assertAllowedMimeType(mimeType) {
   // Normalize JPEG aliases (image/jpg → image/jpeg) before the whitelist check.
-  const normalized = normalizeMimeType(String(mimeType ?? "").trim().toLowerCase());
+  const normalized = normalizeMimeType(
+    String(mimeType ?? "")
+      .trim()
+      .toLowerCase()
+  );
 
   // Use ACCEPTED_INPUT_MIMES from image-normalizer as the single source of truth.
   // All types in that set are converted to WebP before storage, so the
@@ -232,9 +236,7 @@ function assertFileSize(sizeInBytes, maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES) {
   }
 
   if (size > maxBytes) {
-    throw new Error(
-      `[r2] Arquivo excede o limite permitido (${size} bytes > ${maxBytes} bytes).`
-    );
+    throw new Error(`[r2] Arquivo excede o limite permitido (${size} bytes > ${maxBytes} bytes).`);
   }
 
   return size;
@@ -304,10 +306,7 @@ export async function validateVehicleImageFile(
 
 export async function validateVehicleImageFiles(
   files,
-  {
-    maxFiles = DEFAULT_MAX_FILES,
-    maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES,
-  } = {}
+  { maxFiles = DEFAULT_MAX_FILES, maxBytes = DEFAULT_MAX_FILE_SIZE_BYTES } = {}
 ) {
   if (!Array.isArray(files) || files.length === 0) {
     throw new Error("[r2] Nenhuma imagem enviada.");
@@ -345,10 +344,7 @@ export function buildR2PublicUrl(key) {
   const { publicBaseUrl } = getR2Config();
   if (!publicBaseUrl) return "";
 
-  const normalizedKey = normalizeStorageKey(key)
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const normalizedKey = normalizeStorageKey(key).split("/").map(encodeURIComponent).join("/");
 
   return `${publicBaseUrl}/${normalizedKey}`;
 }
@@ -421,7 +417,7 @@ export async function uploadVehicleImage({
       Bucket: bucketName,
       Key: key,
       Body: normalized.buffer,
-      ContentType: normalized.mimeType,        // always "image/webp"
+      ContentType: normalized.mimeType, // always "image/webp"
       ContentLength: normalized.normalizedSize,
       CacheControl: cacheControl,
       Metadata: metadata,
@@ -434,7 +430,7 @@ export async function uploadVehicleImage({
     key,
     variant: normalizeVariant(variant),
     originalName: validated.originalName,
-    mimeType: normalized.mimeType,             // "image/webp" — the actual stored format
+    mimeType: normalized.mimeType, // "image/webp" — the actual stored format
     sizeBytes: normalized.normalizedSize,
     sortOrder: Number.isFinite(sortOrder) ? Number(sortOrder) : 0,
     isCover: Boolean(isCover),
@@ -544,8 +540,7 @@ export async function headVehicleImage(key) {
   return {
     key: safeKey,
     contentType: response.ContentType || "application/octet-stream",
-    contentLength:
-      typeof response.ContentLength === "number" ? response.ContentLength : null,
+    contentLength: typeof response.ContentLength === "number" ? response.ContentLength : null,
     cacheControl: response.CacheControl || DEFAULT_CACHE_CONTROL,
     etag: response.ETag ? String(response.ETag).replace(/"/g, "") : null,
     lastModified: response.LastModified || null,

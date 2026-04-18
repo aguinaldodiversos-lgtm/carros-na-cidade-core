@@ -235,9 +235,7 @@ export async function runWizardPhotoUploadPipeline(
 
     try {
       const files = filesFromSnapshots(input.snapshots);
-      const urls = uniqueNonEmptyStrings(
-        await deps.uploadDirectR2(files, input.userId)
-      );
+      const urls = uniqueNonEmptyStrings(await deps.uploadDirectR2(files, input.userId));
 
       items = normalizeUploadedItems(urls.map((url) => toUploadedPhotoItem(url, "bff-direct-r2")));
 

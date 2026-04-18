@@ -20,16 +20,14 @@ export function buildComprarUrlFromHomeSearch(options: {
     ...parsed.filters,
   };
 
-  merged.city_slug =
-    parsed.filters.city_slug ?? chipFilters.city_slug ?? defaultCitySlug;
+  merged.city_slug = parsed.filters.city_slug ?? chipFilters.city_slug ?? defaultCitySlug;
 
   const qBits: string[] = [];
   if (parsed.remainderText?.trim()) {
     qBits.push(parsed.remainderText.trim());
   }
 
-  const needMoto =
-    vehicleType === "motorcycle" || parsed.detectedMotoInText;
+  const needMoto = vehicleType === "motorcycle" || parsed.detectedMotoInText;
   if (needMoto) {
     const blob = qBits.join(" ").toLowerCase();
     if (!/\bmoto\b/.test(blob)) {

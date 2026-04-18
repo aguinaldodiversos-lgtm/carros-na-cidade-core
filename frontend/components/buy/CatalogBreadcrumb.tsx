@@ -22,7 +22,10 @@ export function CatalogBreadcrumb({ items }: CatalogBreadcrumbProps) {
                   {item.label}
                 </Link>
               ) : (
-                <span aria-current={isLast ? "page" : undefined} className={isLast ? "font-semibold text-slate-700" : ""}>
+                <span
+                  aria-current={isLast ? "page" : undefined}
+                  className={isLast ? "font-semibold text-slate-700" : ""}
+                >
                   {item.label}
                 </span>
               )}

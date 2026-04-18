@@ -151,10 +151,8 @@ export async function POST(request: NextRequest) {
       return response;
     };
 
-    const jsonWithSession = (
-      body: Record<string, unknown>,
-      status: number
-    ): NextResponse => withSessionCookies(NextResponse.json(body, { status }));
+    const jsonWithSession = (body: Record<string, unknown>, status: number): NextResponse =>
+      withSessionCookies(NextResponse.json(body, { status }));
 
     if (!ensured.ok || !ensured.session.accessToken) {
       return jsonWithSession(
@@ -179,8 +177,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const accountType: AccountType =
-      ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
+    const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
 
     const backendHeaders = buildBffBackendForwardHeaders(request);
 
@@ -415,8 +412,7 @@ export async function POST(request: NextRequest) {
         ? (parsed as { details: unknown }).details
         : undefined;
 
-    const status =
-      response.status >= 400 && response.status < 600 ? response.status : 502;
+    const status = response.status >= 400 && response.status < 600 ? response.status : 502;
 
     console.error(`${LOG_PREFIX} publish failed`, {
       requestId,
@@ -438,9 +434,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Erro inesperado ao processar o anúncio.";
+      error instanceof Error ? error.message : "Erro inesperado ao processar o anúncio.";
 
     console.error(`${LOG_PREFIX} unexpected error`, {
       requestId,

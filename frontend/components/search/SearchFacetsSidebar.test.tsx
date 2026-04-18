@@ -37,18 +37,14 @@ describe("SearchFacetsSidebar", () => {
   });
 
   it("renders brand select with facet options", () => {
-    render(
-      <SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />
-    );
+    render(<SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />);
 
     const selects = screen.getAllByRole("combobox");
     expect(selects.length).toBeGreaterThanOrEqual(3);
   });
 
   it("calls onChange with brand when brand is selected", () => {
-    render(
-      <SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />
-    );
+    render(<SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />);
 
     const selects = screen.getAllByRole("combobox");
     const brandSelect = selects[0];
@@ -62,23 +58,17 @@ describe("SearchFacetsSidebar", () => {
   });
 
   it("calls onChange with sort when sort pill is clicked", () => {
-    render(
-      <SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />
-    );
+    render(<SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />);
 
     fireEvent.click(screen.getByText("Mais barato"));
     expect(onChange).toHaveBeenCalledWith({ sort: "price_asc", page: 1 });
   });
 
   it("calls onChange when popular brand is clicked", () => {
-    render(
-      <SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />
-    );
+    render(<SearchFacetsSidebar facets={baseFacets} filters={{}} onChange={onChange} />);
 
     const fiatElements = screen.getAllByText("Fiat");
-    const fiatButton = fiatElements.find(
-      (el) => el.closest("button") && !el.closest("select")
-    );
+    const fiatButton = fiatElements.find((el) => el.closest("button") && !el.closest("select"));
     expect(fiatButton).toBeDefined();
     fireEvent.click(fiatButton!.closest("button")!);
     expect(onChange).toHaveBeenCalledWith({
@@ -94,11 +84,7 @@ describe("SearchFacetsSidebar", () => {
     );
 
     rerender(
-      <SearchFacetsSidebar
-        facets={baseFacets}
-        filters={{ brand: "VW" }}
-        onChange={onChange}
-      />
+      <SearchFacetsSidebar facets={baseFacets} filters={{ brand: "VW" }} onChange={onChange} />
     );
 
     const selects = screen.getAllByRole("combobox");
@@ -124,9 +110,7 @@ describe("SearchFacetsSidebar", () => {
   });
 
   it("renders with null facets without crashing", () => {
-    render(
-      <SearchFacetsSidebar facets={null} filters={{}} onChange={onChange} />
-    );
+    render(<SearchFacetsSidebar facets={null} filters={{}} onChange={onChange} />);
     expect(screen.getAllByText("Filtros rápidos").length).toBeGreaterThan(0);
   });
 });

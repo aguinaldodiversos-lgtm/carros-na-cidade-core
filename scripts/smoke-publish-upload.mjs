@@ -55,14 +55,24 @@ function assert(condition, message) {
 }
 
 function briefText(text, max = 280) {
-  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  const normalized = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
   return normalized.length > max ? `${normalized.slice(0, max)}…` : normalized;
 }
 
-function lineOk(msg) { console.log(`✅ ${msg}`); }
-function lineInfo(msg) { console.log(`ℹ️  ${msg}`); }
-function lineWarn(msg) { console.log(`⚠️  ${msg}`); }
-function lineErr(msg) { console.error(`❌ ${msg}`); }
+function lineOk(msg) {
+  console.log(`✅ ${msg}`);
+}
+function lineInfo(msg) {
+  console.log(`ℹ️  ${msg}`);
+}
+function lineWarn(msg) {
+  console.log(`⚠️  ${msg}`);
+}
+function lineErr(msg) {
+  console.error(`❌ ${msg}`);
+}
 
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
@@ -79,7 +89,11 @@ async function parseResponse(response) {
   const text = await response.text();
   let json = null;
   if (contentType.includes("application/json")) {
-    try { json = JSON.parse(text); } catch { /* keep json null */ }
+    try {
+      json = JSON.parse(text);
+    } catch {
+      /* keep json null */
+    }
   }
   return { ok: response.ok, status: response.status, contentType, text, json };
 }
@@ -143,9 +157,15 @@ function filledJpegBuffer(sizeBytes) {
 async function checkHealth(base) {
   const url = buildUrl(base, HEALTH_PATH);
   lineInfo(`Health check: ${url}`);
-  const r = await fetchWithTimeout(url, { method: "GET", headers: { accept: "application/json, */*" } });
+  const r = await fetchWithTimeout(url, {
+    method: "GET",
+    headers: { accept: "application/json, */*" },
+  });
   const parsed = await parseResponse(r);
-  assert(parsed.status === 200, `Health falhou: esperado 200, obteve ${parsed.status}. Body: ${briefText(parsed.text)}`);
+  assert(
+    parsed.status === 200,
+    `Health falhou: esperado 200, obteve ${parsed.status}. Body: ${briefText(parsed.text)}`
+  );
   lineOk(`Health OK (${parsed.status})`);
 }
 
@@ -158,7 +178,11 @@ async function postWithoutAuth(base) {
   lineInfo(`Cenário 2: upload sem Authorization → espera 401/403`);
   const form = new FormData();
   form.append("photos", new Blob([tinyPngBuffer()], { type: "image/png" }), "smoke.png");
-  const r = await fetchWithTimeout(url, { method: "POST", body: form, headers: { accept: "application/json" } });
+  const r = await fetchWithTimeout(url, {
+    method: "POST",
+    body: form,
+    headers: { accept: "application/json" },
+  });
   const parsed = await parseResponse(r);
   assert(
     EXPECT_NO_AUTH_STATUSES.includes(parsed.status),
@@ -192,7 +216,10 @@ async function postWithAuthAndValidate(base, token, form, scenarioLabel) {
   assert(parsed.json, `${scenarioLabel}: JSON inválido. Body: ${briefText(parsed.text)}`);
 
   const urls = extractUrls(parsed.json);
-  assert(urls.length > 0, `${scenarioLabel}: nenhuma URL retornada. Body: ${briefText(parsed.text)}`);
+  assert(
+    urls.length > 0,
+    `${scenarioLabel}: nenhuma URL retornada. Body: ${briefText(parsed.text)}`
+  );
 
   lineOk(`${scenarioLabel}: OK (${parsed.status}) — ${urls.length} URL(s)`);
   lineInfo(`  Primeira URL: ${urls[0]}`);

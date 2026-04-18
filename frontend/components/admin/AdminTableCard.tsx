@@ -24,7 +24,10 @@ export function AdminTableCard<T extends Record<string, unknown>>({
       <div className="flex items-center justify-between px-5 pt-4 pb-3">
         <h3 className="text-sm font-bold text-cnc-text">{title}</h3>
         {onViewAll && (
-          <button onClick={onViewAll} className="text-xs font-semibold text-primary hover:underline">
+          <button
+            onClick={onViewAll}
+            className="text-xs font-semibold text-primary hover:underline"
+          >
             Ver todos →
           </button>
         )}
@@ -37,7 +40,10 @@ export function AdminTableCard<T extends Record<string, unknown>>({
             <thead>
               <tr className="border-t border-cnc-line bg-cnc-bg/50">
                 {columns.map((col) => (
-                  <th key={col.key} className="px-5 py-2 font-semibold text-cnc-muted uppercase tracking-wider whitespace-nowrap">
+                  <th
+                    key={col.key}
+                    className="px-5 py-2 font-semibold text-cnc-muted uppercase tracking-wider whitespace-nowrap"
+                  >
                     {col.label}
                   </th>
                 ))}
@@ -45,7 +51,10 @@ export function AdminTableCard<T extends Record<string, unknown>>({
             </thead>
             <tbody>
               {visible.map((row, i) => (
-                <tr key={i} className="border-t border-cnc-line/70 hover:bg-cnc-bg/30 transition-colors">
+                <tr
+                  key={i}
+                  className="border-t border-cnc-line/70 hover:bg-cnc-bg/30 transition-colors"
+                >
                   {columns.map((col) => (
                     <td key={col.key} className="px-5 py-2.5 whitespace-nowrap text-cnc-text">
                       {col.render ? col.render(row) : String(row[col.key] ?? "—")}

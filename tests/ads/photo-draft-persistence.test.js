@@ -155,7 +155,11 @@ describe("Photo draft persistence model", () => {
 
   it("enforces max 10 photos limit", () => {
     const existing = Array.from({ length: 8 }, (_, i) => `https://r2.example.com/${i}.jpg`);
-    const incoming = ["https://r2.example.com/new1.jpg", "https://r2.example.com/new2.jpg", "https://r2.example.com/new3.jpg"];
+    const incoming = [
+      "https://r2.example.com/new1.jpg",
+      "https://r2.example.com/new2.jpg",
+      "https://r2.example.com/new3.jpg",
+    ];
 
     const maxNew = 10 - existing.length;
     const toAdd = incoming.slice(0, Math.max(0, maxNew));
@@ -182,9 +186,7 @@ describe("Photo draft persistence model", () => {
     };
 
     const restored = Array.isArray(parsed.draftPhotoUrls)
-      ? parsed.draftPhotoUrls.filter(
-          (u) => typeof u === "string" && u.trim().length > 0
-        )
+      ? parsed.draftPhotoUrls.filter((u) => typeof u === "string" && u.trim().length > 0)
       : [];
 
     expect(restored).toEqual([

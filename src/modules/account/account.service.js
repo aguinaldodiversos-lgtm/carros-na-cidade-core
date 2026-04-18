@@ -619,11 +619,7 @@ export async function getDashboardPayload(userId, options = {}) {
   const uid = String(userId);
   const emptyBoost = BOOST_OPTIONS.map((option) => ({ ...option }));
   const fallbackAccountType =
-    options.accountType === "CNPJ"
-      ? "CNPJ"
-      : options.accountType === "pending"
-        ? "pending"
-        : "CPF";
+    options.accountType === "CNPJ" ? "CNPJ" : options.accountType === "pending" ? "pending" : "CPF";
 
   try {
     const user = await getAccountUser(userId);
@@ -652,8 +648,7 @@ export async function getDashboardPayload(userId, options = {}) {
 
     return {
       ok: true,
-      accountType:
-        user.type === "CNPJ" ? "PJ" : user.type === "CPF" ? "PF" : null,
+      accountType: user.type === "CNPJ" ? "PJ" : user.type === "CPF" ? "PF" : null,
       user: {
         id: user.id,
         name: user.name,
@@ -707,7 +702,11 @@ export async function getDashboardPayload(userId, options = {}) {
     );
 
     const freeLimit = getFreeLimit(
-      fallbackAccountType === "pending" ? "pending" : fallbackAccountType === "CNPJ" ? "CNPJ" : "CPF",
+      fallbackAccountType === "pending"
+        ? "pending"
+        : fallbackAccountType === "CNPJ"
+          ? "CNPJ"
+          : "CPF",
       false
     );
 

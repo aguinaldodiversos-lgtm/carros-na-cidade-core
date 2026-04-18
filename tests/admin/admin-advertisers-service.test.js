@@ -30,14 +30,16 @@ describe("admin advertisers service", () => {
 
   describe("changeAdvertiserStatus", () => {
     it("rejects invalid status", async () => {
-      await expect(changeAdvertiserStatus("admin1", "1", "paused"))
-        .rejects.toThrow(/Status inválido/);
+      await expect(changeAdvertiserStatus("admin1", "1", "paused")).rejects.toThrow(
+        /Status inválido/
+      );
     });
 
     it("rejects when advertiser not found", async () => {
       vi.mocked(repo.findById).mockResolvedValue(null);
-      await expect(changeAdvertiserStatus("admin1", "999", "active"))
-        .rejects.toThrow(/não encontrado/);
+      await expect(changeAdvertiserStatus("admin1", "999", "active")).rejects.toThrow(
+        /não encontrado/
+      );
     });
 
     it("successfully suspends advertiser", async () => {

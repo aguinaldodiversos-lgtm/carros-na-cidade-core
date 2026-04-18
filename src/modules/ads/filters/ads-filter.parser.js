@@ -98,9 +98,7 @@ export async function parseAdsFilters(raw = {}, scope = "public_global") {
   const scoped = applyScope(scope, parsed.data);
   const inferred = await inferAdsFiltersFromFreeQuery(scoped);
 
-  return validateNormalizedRanges(
-    normalizeTerritoryFilters(normalizeHighlightFilter(inferred))
-  );
+  return validateNormalizedRanges(normalizeTerritoryFilters(normalizeHighlightFilter(inferred)));
 }
 
 export async function parseAdsFacetFilters(raw = {}) {

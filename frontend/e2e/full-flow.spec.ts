@@ -74,7 +74,9 @@ test.describe.serial("1 — Dashboard carrega após login [P1]", () => {
           loginRes.status() >= 500 || /ECONNREFUSED/i.test(body),
           `API/DB indisponível (HTTP ${loginRes.status()}). Suba Postgres + API. ${body.slice(0, 160)}`
         );
-        throw new Error(`POST /api/auth/login falhou: HTTP ${loginRes.status()} — ${body.slice(0, 500)}`);
+        throw new Error(
+          `POST /api/auth/login falhou: HTTP ${loginRes.status()} — ${body.slice(0, 500)}`
+        );
       }
 
       await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -151,7 +153,10 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
       test.skip(!regA.ok(), "Registro indisponível (backend/Postgres). Suba a API.");
 
       const meA = await ctxA.get("/api/dashboard/me");
-      expect(meA.ok(), `GET /api/dashboard/me falhou para usuário A: ${await meA.text()}`).toBeTruthy();
+      expect(
+        meA.ok(),
+        `GET /api/dashboard/me falhou para usuário A: ${await meA.text()}`
+      ).toBeTruthy();
       const jsonA = (await meA.json()) as { user?: { id?: string } };
       idA = jsonA.user?.id;
     } finally {
@@ -168,7 +173,10 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
       test.skip(!regB.ok(), "Registro indisponível (backend/Postgres). Suba a API.");
 
       const meB = await ctxB.get("/api/dashboard/me");
-      expect(meB.ok(), `GET /api/dashboard/me falhou para usuário B: ${await meB.text()}`).toBeTruthy();
+      expect(
+        meB.ok(),
+        `GET /api/dashboard/me falhou para usuário B: ${await meB.text()}`
+      ).toBeTruthy();
       const jsonB = (await meB.json()) as { user?: { id?: string } };
       idB = jsonB.user?.id;
     } finally {
@@ -330,13 +338,16 @@ test.describe.serial("3 — Upload de fotos no wizard [P2]", () => {
     await page.goto("/anunciar/novo?step=3", { waitUntil: "domcontentloaded", timeout: 60_000 });
 
     // Aguarda o container do step 3 (Fotos, step 1-based = 3)
-    await expect(
-      page.locator('[data-testid="wizard-step-container"][data-step="3"]')
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-testid="wizard-step-container"][data-step="3"]')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // A área de upload deve estar visível e ativa.
     const uploadArea = page.locator('[data-testid="photos-upload-area"]');
-    await expect(uploadArea, '[data-testid="photos-upload-area"] não encontrado no step de fotos').toBeVisible({
+    await expect(
+      uploadArea,
+      '[data-testid="photos-upload-area"] não encontrado no step de fotos'
+    ).toBeVisible({
       timeout: 10_000,
     });
 
@@ -355,10 +366,10 @@ test.describe.serial("3 — Upload de fotos no wizard [P2]", () => {
     if (uploadResponse && uploadResponse.ok()) {
       // Upload bem-sucedido: o grid de fotos deve aparecer com pelo menos 1 foto.
       await expect(page.locator('[data-testid="photos-grid"]')).toBeVisible({ timeout: 10_000 });
-      const count = await page
-        .locator('[data-testid="photos-grid"]')
-        .getAttribute("data-count");
-      expect(Number(count), "Esperada ao menos 1 foto no grid após upload").toBeGreaterThanOrEqual(1);
+      const count = await page.locator('[data-testid="photos-grid"]').getAttribute("data-count");
+      expect(Number(count), "Esperada ao menos 1 foto no grid após upload").toBeGreaterThanOrEqual(
+        1
+      );
 
       // Avança para step 4 e volta para step 3 — a foto deve persistir.
       await page.click('[data-testid="wizard-next-btn"]');
@@ -464,10 +475,9 @@ test.describe.serial("4 — Fluxo completo: login → wizard → publicação �
         .locator('[data-testid="dashboard-content"]')
         .getAttribute("data-user-id");
 
-      expect(
-        dashboardUserIdAfter,
-        "user-id no painel não deve mudar após publicação"
-      ).toBe(dashboardUserId);
+      expect(dashboardUserIdAfter, "user-id no painel não deve mudar após publicação").toBe(
+        dashboardUserId
+      );
     }
   );
 

@@ -91,9 +91,7 @@ describe("POST /api/auth/login", () => {
       new mocks.MockBackendAuthError("Credenciais invalidas", 401)
     );
 
-    const response = await POST(
-      fakeRequest({ email: "invalid@test.com", password: "wrong-pass" })
-    );
+    const response = await POST(fakeRequest({ email: "invalid@test.com", password: "wrong-pass" }));
     const body = await readJson(response);
 
     expect(response.status).toBe(401);
@@ -119,9 +117,7 @@ describe("POST /api/auth/login", () => {
       new mocks.MockBackendAuthError("Muitas tentativas. Tente novamente mais tarde.", 429)
     );
 
-    const response = await POST(
-      fakeRequest({ email: "rate@test.com", password: "correct-pass" })
-    );
+    const response = await POST(fakeRequest({ email: "rate@test.com", password: "correct-pass" }));
     const body = await readJson(response);
 
     expect(response.status).toBe(429);
@@ -131,9 +127,7 @@ describe("POST /api/auth/login", () => {
   it("retorna 502 para falha real de conexao com upstream", async () => {
     mocks.authenticateUser.mockRejectedValueOnce(new Error("fetch failed"));
 
-    const response = await POST(
-      fakeRequest({ email: "valid@test.com", password: "correct-pass" })
-    );
+    const response = await POST(fakeRequest({ email: "valid@test.com", password: "correct-pass" }));
     const body = await readJson(response);
 
     expect(response.status).toBe(502);
@@ -169,9 +163,7 @@ describe("POST /api/auth/login", () => {
     delete envRecord().AUTH_SESSION_SECRET;
     mocks.authenticateUser.mockResolvedValueOnce(validAuthSession());
 
-    const response = await POST(
-      fakeRequest({ email: "valid@test.com", password: "correct-pass" })
-    );
+    const response = await POST(fakeRequest({ email: "valid@test.com", password: "correct-pass" }));
     const body = await readJson(response);
     const setCookie = response.headers.get("set-cookie") ?? "";
 

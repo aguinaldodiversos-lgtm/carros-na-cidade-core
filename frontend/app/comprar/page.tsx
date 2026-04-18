@@ -408,9 +408,7 @@ async function resolveComprarData(params: {
   };
 }
 
-export async function generateMetadata({
-  searchParams = {},
-}: ComprarPageProps): Promise<Metadata> {
+export async function generateMetadata({ searchParams = {} }: ComprarPageProps): Promise<Metadata> {
   const cookieStore = await cookies();
   const cookieCity = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
 

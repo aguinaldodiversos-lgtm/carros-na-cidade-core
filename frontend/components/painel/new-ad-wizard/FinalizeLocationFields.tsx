@@ -85,7 +85,9 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
         if (!res.ok) {
           setSuggestions([]);
           if (res.status === 429) {
-            setSearchError("Muitas buscas em sequência. Aguarde alguns segundos e tente novamente.");
+            setSearchError(
+              "Muitas buscas em sequência. Aguarde alguns segundos e tente novamente."
+            );
           } else {
             setSearchError(
               typeof json?.message === "string" && json.message.trim()
@@ -125,7 +127,10 @@ export function FinalizeLocationFields({ state, patch }: { state: WizardFormStat
     }, 350);
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
     };
   }, [searchQuery, uf, state.cityId, fetchSuggestions]);
 

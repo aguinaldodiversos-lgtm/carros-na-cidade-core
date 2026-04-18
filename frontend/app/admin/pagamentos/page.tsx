@@ -19,7 +19,17 @@ function money(n: number | string | undefined | null) {
 
 function fmtDate(d: string | undefined | null) {
   if (!d) return "—";
-  try { return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return "—"; }
+  try {
+    return new Date(d).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
 }
 
 const STATUS_OPTIONS = [
@@ -79,8 +89,18 @@ export default function AdminPagamentos() {
       {/* Summary KPIs */}
       {s && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <AdminKpiCard label="Aprovados" value={String(s.approved_count)} subtitle={money(s.total_approved_amount)} color="#0f9f6e" />
-          <AdminKpiCard label="Pendentes" value={String(s.pending_count)} subtitle={money(s.total_pending_amount)} color="#d18a12" />
+          <AdminKpiCard
+            label="Aprovados"
+            value={String(s.approved_count)}
+            subtitle={money(s.total_approved_amount)}
+            color="#0f9f6e"
+          />
+          <AdminKpiCard
+            label="Pendentes"
+            value={String(s.pending_count)}
+            subtitle={money(s.total_pending_amount)}
+            color="#d18a12"
+          />
           <AdminKpiCard label="Rejeitados" value={String(s.rejected_count)} color="#d14343" />
           <AdminKpiCard label="Cancelados" value={String(s.canceled_count)} color="#5d667d" />
         </div>
@@ -112,32 +132,61 @@ export default function AdminPagamentos() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-cnc-bg/50 border-b border-cnc-line">
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Usuário</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Valor</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Contexto</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">Data</th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Usuário
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Valor
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Contexto
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Data
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((p) => (
-                  <tr key={p.id} className="border-t border-cnc-line/60 hover:bg-cnc-bg/30 transition-colors">
+                  <tr
+                    key={p.id}
+                    className="border-t border-cnc-line/60 hover:bg-cnc-bg/30 transition-colors"
+                  >
                     <td className="px-4 py-2.5 font-mono text-cnc-muted">#{p.id}</td>
                     <td className="px-4 py-2.5">
-                      <span className="font-medium text-cnc-text">{p.user_name || p.user_email || "—"}</span>
+                      <span className="font-medium text-cnc-text">
+                        {p.user_name || p.user_email || "—"}
+                      </span>
                       {p.user_email && p.user_name && (
-                        <span className="block text-[11px] text-cnc-muted-soft">{p.user_email}</span>
+                        <span className="block text-[11px] text-cnc-muted-soft">
+                          {p.user_email}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2.5 font-semibold text-cnc-text">{money(p.amount)}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${p.context === "plan" ? "bg-blue-100 text-blue-700" : "bg-violet-100 text-violet-700"}`}>
-                        {p.context === "plan" ? "Plano" : p.context === "boost" ? "Boost" : p.context}
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${p.context === "plan" ? "bg-blue-100 text-blue-700" : "bg-violet-100 text-violet-700"}`}
+                      >
+                        {p.context === "plan"
+                          ? "Plano"
+                          : p.context === "boost"
+                            ? "Boost"
+                            : p.context}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5"><AdminStatusBadge status={p.status} /></td>
-                    <td className="px-4 py-2.5 text-cnc-muted whitespace-nowrap">{fmtDate(p.created_at)}</td>
+                    <td className="px-4 py-2.5">
+                      <AdminStatusBadge status={p.status} />
+                    </td>
+                    <td className="px-4 py-2.5 text-cnc-muted whitespace-nowrap">
+                      {fmtDate(p.created_at)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

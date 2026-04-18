@@ -12,9 +12,9 @@ Arquivos aqui **não fazem parte da API HTTP oficial** montada em `src/app.js`,
 
 ## Conteúdo
 
-| Pasta           | Descrição                                                                                                                                                     | Substituto                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `services-ads/` | CommonJS antigo (`create`, limites, IA de texto). Sem imports ativos; substituído por `modules/ads`. **Não executável** no estado atual (ver `README.md` lá). | `src/modules/ads/` (ESM, montado)      |
+| Pasta           | Descrição                                                                                                                                                     | Substituto                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `services-ads/` | CommonJS antigo (`create`, limites, IA de texto). Sem imports ativos; substituído por `modules/ads`. **Não executável** no estado atual (ver `README.md` lá). | `src/modules/ads/` (ESM, montado) |
 
 ## Quando remover
 

@@ -236,7 +236,11 @@ function parseSlugToVehicle(slug: string): VehicleDetail {
     adCode: id,
     isBelowFipe: false,
     fipePrice: "R$ 134.000",
-    images: ["/images/vehicle-placeholder.svg", "/images/vehicle-placeholder.svg", "/images/vehicle-placeholder.svg"],
+    images: [
+      "/images/vehicle-placeholder.svg",
+      "/images/vehicle-placeholder.svg",
+      "/images/vehicle-placeholder.svg",
+    ],
     description:
       "Veiculo com bom historico de manutencao, pronto para uso e com documentacao regularizada.",
     optionalItems: ["Midia touchscreen", "Sensor de estacionamento"],

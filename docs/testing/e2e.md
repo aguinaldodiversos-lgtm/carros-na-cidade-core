@@ -79,15 +79,15 @@ Na raiz: `npm run e2e:smoke`. Ver também [coverage-and-integration.md](./covera
 
 ## Specs
 
-| Ficheiro                       | Conteúdo                                                                                      |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `main-flow.spec.ts`            | **PF**: cadastro → painel → wizard → busca API → painel → `/anuncios` → **`/veiculo/[slug]`** |
-| `10-login-ad-publish.spec.ts`  | Login fixo → wizard → publicar                                                                |
-| `register-minimal-to-publish.spec.ts` | **Cadastro mínimo** (e-mail+senha) → gate CPF → wizard → publicar (`npm run test:e2e:register-publish`) |
-| `user-isolation-api.spec.ts` | Dois cadastros → `GET /api/dashboard/me` com `user.id` distinto por cookie (`npm run test:e2e:isolation`) |
-| `20-login-ad-checkout.spec.ts` | Login → wizard → planos/checkout                                                              |
-| `anunciar-redirect.spec.ts`    | Redirect legado `/painel/anuncios/novo`                                                       |
-| `critical-pj-flow.spec.ts`     | PJ opcional (skipped sem credenciais)                                                         |
+| Ficheiro                              | Conteúdo                                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `main-flow.spec.ts`                   | **PF**: cadastro → painel → wizard → busca API → painel → `/anuncios` → **`/veiculo/[slug]`**             |
+| `10-login-ad-publish.spec.ts`         | Login fixo → wizard → publicar                                                                            |
+| `register-minimal-to-publish.spec.ts` | **Cadastro mínimo** (e-mail+senha) → gate CPF → wizard → publicar (`npm run test:e2e:register-publish`)   |
+| `user-isolation-api.spec.ts`          | Dois cadastros → `GET /api/dashboard/me` com `user.id` distinto por cookie (`npm run test:e2e:isolation`) |
+| `20-login-ad-checkout.spec.ts`        | Login → wizard → planos/checkout                                                                          |
+| `anunciar-redirect.spec.ts`           | Redirect legado `/painel/anuncios/novo`                                                                   |
+| `critical-pj-flow.spec.ts`            | PJ opcional (skipped sem credenciais)                                                                     |
 
 ## Relatório da última execução automatizada
 

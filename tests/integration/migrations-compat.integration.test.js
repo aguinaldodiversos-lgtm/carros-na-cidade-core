@@ -29,7 +29,9 @@ function buildPoolConfig(connectionString) {
     sslMode === "prefer" ||
     sslMode === "verify-ca" ||
     sslMode === "verify-full" ||
-    String(process.env.PG_SSL_ENABLED || "").trim().toLowerCase() === "true";
+    String(process.env.PG_SSL_ENABLED || "")
+      .trim()
+      .toLowerCase() === "true";
 
   if (explicitSsl) {
     return {

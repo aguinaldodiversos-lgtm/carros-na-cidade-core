@@ -29,7 +29,9 @@ export function AdminFiltersBar({ filters, values, onChange, onSearch, onClear }
       <div className="flex flex-wrap items-end gap-3">
         {visibleFilters.map((f) => (
           <div key={f.key} className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">{f.label}</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">
+              {f.label}
+            </label>
             {f.type === "select" ? (
               <select
                 value={values[f.key] || ""}
@@ -38,7 +40,9 @@ export function AdminFiltersBar({ filters, values, onChange, onSearch, onClear }
               >
                 <option value="">Todos</option>
                 {f.options?.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
             ) : (
@@ -55,14 +59,23 @@ export function AdminFiltersBar({ filters, values, onChange, onSearch, onClear }
         ))}
 
         <div className="flex items-end gap-2">
-          <button onClick={onSearch} className="h-9 rounded-lg bg-primary px-4 text-xs font-semibold text-white hover:bg-primary-strong transition-colors">
+          <button
+            onClick={onSearch}
+            className="h-9 rounded-lg bg-primary px-4 text-xs font-semibold text-white hover:bg-primary-strong transition-colors"
+          >
             Buscar
           </button>
-          <button onClick={onClear} className="h-9 rounded-lg border border-cnc-line px-3 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors">
+          <button
+            onClick={onClear}
+            className="h-9 rounded-lg border border-cnc-line px-3 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors"
+          >
             Limpar
           </button>
           {hasMore && (
-            <button onClick={() => setExpanded(!expanded)} className="h-9 px-2 text-xs font-medium text-primary hover:underline">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="h-9 px-2 text-xs font-medium text-primary hover:underline"
+            >
               {expanded ? "Menos filtros" : "Mais filtros"}
             </button>
           )}

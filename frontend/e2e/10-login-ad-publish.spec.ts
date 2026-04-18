@@ -24,7 +24,11 @@ test.beforeAll(async ({ request, baseURL }) => {
 });
 
 test.describe.serial("Login → publicar anúncio", () => {
-  test("faz login, publica e valida painel + portal público", async ({ page, context, request }) => {
+  test("faz login, publica e valida painel + portal público", async ({
+    page,
+    context,
+    request,
+  }) => {
     await loginAsLocalUser(page, context);
 
     const { brandLabel, modelLabel } = await runPublishWizardFlow(page);

@@ -31,11 +31,7 @@ export default function DashboardStats({ stats, accountType }: DashboardStatsPro
         value={String(stats.active_ads)}
         helper={`Pausados: ${stats.paused_ads}`}
       />
-      <StatCard
-        label="Limite disponivel"
-        value={limitLabel}
-        helper={limitHelper}
-      />
+      <StatCard label="Limite disponivel" value={limitLabel} helper={limitHelper} />
       <StatCard
         label="Plano atual"
         value={stats.plan_name}

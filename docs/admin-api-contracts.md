@@ -73,6 +73,7 @@ KPIs for a configurable period (default 30 days).
 ```
 
 **Notes:**
+
 - `revenue` may have `_warning: "payment_intents not available"` if the table doesn't exist yet.
 - Revenue amounts are GROSS checkout values (see financial limitations below).
 
@@ -315,6 +316,7 @@ List of ads belonging to this advertiser.
 ```
 
 **FINANCIAL LIMITATIONS:**
+
 - All amounts are GROSS checkout values from local `payment_intents`.
 - No Mercado Pago reconciliation (no net/fee data).
 - No refund tracking.

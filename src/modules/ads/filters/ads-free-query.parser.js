@@ -354,7 +354,7 @@ export async function inferAdsFiltersFromFreeQuery(filters = {}) {
       : filters.below_fipe;
     const highlight_only = extractBooleanByTerms(originalQ, HIGHLIGHT_TERMS)
       ? true
-      : filters.highlight_only ?? filters.highlight;
+      : (filters.highlight_only ?? filters.highlight);
 
     const merged = {
       ...filters,

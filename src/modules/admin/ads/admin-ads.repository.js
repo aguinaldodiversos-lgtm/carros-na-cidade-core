@@ -36,10 +36,7 @@ export async function listAds({ limit = 50, offset = 0, status, city_id, adverti
     [...params, limit, offset]
   );
 
-  const countResult = await query(
-    `SELECT COUNT(*)::int AS total FROM ads a ${where}`,
-    params
-  );
+  const countResult = await query(`SELECT COUNT(*)::int AS total FROM ads a ${where}`, params);
 
   return {
     data: result.rows,
@@ -68,11 +65,12 @@ export async function findById(id) {
 }
 
 export async function updateStatus(id, status) {
-  const extra = status === "blocked"
-    ? ", blocked_at = NOW()"
-    : status === "active"
-      ? ", blocked_at = NULL, blocked_reason = NULL"
-      : "";
+  const extra =
+    status === "blocked"
+      ? ", blocked_at = NOW()"
+      : status === "active"
+        ? ", blocked_at = NULL, blocked_reason = NULL"
+        : "";
 
   const result = await query(
     `UPDATE ads SET status = $2, updated_at = NOW() ${extra} WHERE id = $1 RETURNING *`,
@@ -106,10 +104,7 @@ export async function updateBlockedReason(id, reason) {
 }
 
 export async function getAdMetrics(adId) {
-  const result = await query(
-    `SELECT * FROM ad_metrics WHERE ad_id = $1 LIMIT 1`,
-    [adId]
-  );
+  const result = await query(`SELECT * FROM ad_metrics WHERE ad_id = $1 LIMIT 1`, [adId]);
   return result.rows[0] || { ad_id: adId, views: 0, clicks: 0, leads: 0, ctr: 0 };
 }
 

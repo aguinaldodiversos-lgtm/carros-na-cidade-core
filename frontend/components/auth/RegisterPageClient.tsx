@@ -74,12 +74,7 @@ function IconMegaphone() {
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
-      <path
-        d="M18 8a6 6 0 0 1 0 8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M18 8a6 6 0 0 1 0 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }

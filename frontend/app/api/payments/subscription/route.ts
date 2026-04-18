@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
 
     return applyBffCookies(NextResponse.json(payload), auth.ctx);
   } catch (error) {
-    console.error("[POST /api/payments/subscription]", error instanceof Error ? error.message : error);
+    console.error(
+      "[POST /api/payments/subscription]",
+      error instanceof Error ? error.message : error
+    );
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Falha ao iniciar assinatura." },
       { status: 400 }

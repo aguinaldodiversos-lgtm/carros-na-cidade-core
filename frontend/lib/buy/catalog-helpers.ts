@@ -74,7 +74,10 @@ export function formatTotal(total?: number) {
   return new Intl.NumberFormat("pt-BR").format(total || 0);
 }
 
-export function normalizeCatalogItem(item: Partial<CatalogItem>, city: BuyCityContext): CatalogItem {
+export function normalizeCatalogItem(
+  item: Partial<CatalogItem>,
+  city: BuyCityContext
+): CatalogItem {
   const validImages = Array.isArray(item.images)
     ? item.images.filter(
         (image): image is string => typeof image === "string" && image.trim().length > 0

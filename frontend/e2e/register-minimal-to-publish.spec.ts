@@ -36,7 +36,11 @@ test.beforeAll(async ({ request, baseURL }) => {
 });
 
 test.describe.serial("Cadastro mínimo → completar perfil → publicar", () => {
-  test("publica com uma foto .png e valida a galeria pública", async ({ page, context, request }) => {
+  test("publica com uma foto .png e valida a galeria pública", async ({
+    page,
+    context,
+    request,
+  }) => {
     test.skip(
       !backendRegisterProbeOk,
       "Backend POST /api/auth/register falhou (subir Postgres, definir DATABASE_URL no processo da API e rodar npm run e2e:prepare na raiz). Ver docs/testing/e2e.md"
@@ -54,10 +58,17 @@ test.describe.serial("Cadastro mínimo → completar perfil → publicar", () =>
     await expect(page.getByTestId("vehicle-gallery-main-image")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("vehicle-gallery-empty")).toHaveCount(0);
     await expect(page.locator('[data-testid^="vehicle-gallery-thumb-"]')).toHaveCount(0);
-    await expect(page.getByTestId("vehicle-gallery-main-image")).toHaveAttribute("src", /vehicle-images/);
+    await expect(page.getByTestId("vehicle-gallery-main-image")).toHaveAttribute(
+      "src",
+      /vehicle-images/
+    );
   });
 
-  test("publica com uma foto .jpg e valida a galeria pública", async ({ page, context, request }) => {
+  test("publica com uma foto .jpg e valida a galeria pública", async ({
+    page,
+    context,
+    request,
+  }) => {
     test.skip(!backendRegisterProbeOk);
     const fixtures = createPublishPhotoFixtures();
     await publishAdWithPhotosAndOpenDetail({
@@ -73,7 +84,11 @@ test.describe.serial("Cadastro mínimo → completar perfil → publicar", () =>
     await expect(page.locator('[data-testid^="vehicle-gallery-thumb-"]')).toHaveCount(0);
   });
 
-  test("publica com uma foto .jpeg e valida a galeria pública", async ({ page, context, request }) => {
+  test("publica com uma foto .jpeg e valida a galeria pública", async ({
+    page,
+    context,
+    request,
+  }) => {
     test.skip(!backendRegisterProbeOk);
     const fixtures = createPublishPhotoFixtures();
     await publishAdWithPhotosAndOpenDetail({
@@ -89,7 +104,11 @@ test.describe.serial("Cadastro mínimo → completar perfil → publicar", () =>
     await expect(page.locator('[data-testid^="vehicle-gallery-thumb-"]')).toHaveCount(0);
   });
 
-  test("publica com várias fotos e valida miniaturas + lightbox + navegação", async ({ page, context, request }) => {
+  test("publica com várias fotos e valida miniaturas + lightbox + navegação", async ({
+    page,
+    context,
+    request,
+  }) => {
     test.skip(!backendRegisterProbeOk);
     const fixtures = createPublishPhotoFixtures();
     await publishAdWithPhotosAndOpenDetail({
@@ -109,7 +128,10 @@ test.describe.serial("Cadastro mínimo → completar perfil → publicar", () =>
     await expect(initialSrc, "Imagem principal inicial deve estar presente").toBeTruthy();
 
     await page.getByTestId("vehicle-gallery-thumb-1").click();
-    await expect(page.getByTestId("vehicle-gallery-thumb-1")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("vehicle-gallery-thumb-1")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     await expect(page.getByTestId("vehicle-gallery-counter")).toHaveText("2 de 3");
     await expect
       .poll(async () => mainImage.getAttribute("src"), {
@@ -127,10 +149,9 @@ test.describe.serial("Cadastro mínimo → completar perfil → publicar", () =>
     await page.getByRole("button", { name: /próxima foto no modal/i }).click();
     await expect(page.getByTestId("vehicle-gallery-lightbox-counter")).toContainText("3/3");
     await expect
-      .poll(
-        async () => lightboxImage.getAttribute("src"),
-        { message: "O lightbox deve navegar entre as fotos." }
-      )
+      .poll(async () => lightboxImage.getAttribute("src"), {
+        message: "O lightbox deve navegar entre as fotos.",
+      })
       .not.toBe(lightboxInitialSrc);
 
     await page.keyboard.press("Escape");

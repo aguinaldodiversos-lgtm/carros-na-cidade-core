@@ -270,11 +270,7 @@ async function getVehicleImagesProfile() {
 
 export async function listVehicleImagesByAdIds(adIds) {
   const normalizedIds = Array.from(
-    new Set(
-      adIds
-        .map((id) => Number(id))
-        .filter((id) => Number.isInteger(id) && id > 0)
-    )
+    new Set(adIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))
   );
 
   if (normalizedIds.length === 0) {

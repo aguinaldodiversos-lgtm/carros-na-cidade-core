@@ -13,7 +13,9 @@ const MAX_FILES = 24;
  * Exemplos: "image/jpg" → "image/jpeg", "IMAGE/PJPEG" → "image/jpeg".
  */
 function normalizeMime(mime) {
-  const t = String(mime || "").trim().toLowerCase();
+  const t = String(mime || "")
+    .trim()
+    .toLowerCase();
   if (t === "image/jpg" || t === "image/x-jpg" || t === "image/pjpeg") return "image/jpeg";
   return t;
 }
