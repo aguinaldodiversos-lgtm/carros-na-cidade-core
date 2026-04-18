@@ -8,7 +8,13 @@ type SmartSearchInputProps = {
   placeholder: string;
 };
 
-export function SmartSearchInput({ id, name = "q", value, onChange, placeholder }: SmartSearchInputProps) {
+export function SmartSearchInput({
+  id,
+  name = "q",
+  value,
+  onChange,
+  placeholder,
+}: SmartSearchInputProps) {
   return (
     <div className="relative">
       <span

@@ -181,9 +181,7 @@ async function fetchDashboardWithOptionalRefresh(
     }
 
     if (ensured.persistCookies) {
-      console.warn(
-        "[GET /api/dashboard/me] backend 401 apos refresh inicial; encerrando com 401"
-      );
+      console.warn("[GET /api/dashboard/me] backend 401 apos refresh inicial; encerrando com 401");
       return dashboardUnauthorizedResponse(
         request,
         "backend_unauthorized",

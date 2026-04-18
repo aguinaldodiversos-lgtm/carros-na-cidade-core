@@ -31,7 +31,9 @@ process.env.DATABASE_URL = url;
 
 const { pool, closeDatabasePool } = await import("../src/infrastructure/database/db.js");
 const { createAdNormalized } = await import("../src/modules/ads/ads.create.pipeline.service.js");
-const { ensurePublishEligibility } = await import("../src/modules/ads/ads.publish.eligibility.service.js");
+const { ensurePublishEligibility } = await import(
+  "../src/modules/ads/ads.publish.eligibility.service.js"
+);
 const {
   assertIntegrationDatabaseReady,
   getFirstCity,
@@ -75,28 +77,34 @@ try {
     below_fipe: false,
   };
 
-  const row = await createAdNormalized(payload, { id: String(user.id), plan: "free" }, {
-    requestId: "create-test-ad-script",
-  });
+  const row = await createAdNormalized(
+    payload,
+    { id: String(user.id), plan: "free" },
+    {
+      requestId: "create-test-ad-script",
+    }
+  );
 
   adId = row?.id ?? null;
 
   const { rows: slugRows } = await pool.query(`SELECT slug, status FROM ads WHERE id = $1`, [adId]);
 
-  console.log(JSON.stringify(
-    {
-      ok: true,
-      adId,
-      slug: slugRows[0]?.slug,
-      status: slugRows[0]?.status,
-      userEmail: user.email,
-      password: "Integration1!",
-      cityId: city.id,
-      hint: "Faça login com o email acima (senha fixa de integração) para ver no painel.",
-    },
-    null,
-    2
-  ));
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        adId,
+        slug: slugRows[0]?.slug,
+        status: slugRows[0]?.status,
+        userEmail: user.email,
+        password: "Integration1!",
+        cityId: city.id,
+        hint: "Faça login com o email acima (senha fixa de integração) para ver no painel.",
+      },
+      null,
+      2
+    )
+  );
 } catch (err) {
   console.error("[create-test-ad] Falha:", err?.message || err);
   if (err?.stack) console.error(err.stack);

@@ -78,8 +78,10 @@ export function buildAdsSearchQuery(filters = {}) {
   }
   if (brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${brand}%`);
   if (model) pushFilter(where, params, `a.model ILIKE ?`, `%${model}%`);
-  if (effectiveMinPrice !== undefined) pushFilter(where, params, `a.price >= ?`, Number(effectiveMinPrice));
-  if (effectiveMaxPrice !== undefined) pushFilter(where, params, `a.price <= ?`, Number(effectiveMaxPrice));
+  if (effectiveMinPrice !== undefined)
+    pushFilter(where, params, `a.price >= ?`, Number(effectiveMinPrice));
+  if (effectiveMaxPrice !== undefined)
+    pushFilter(where, params, `a.price <= ?`, Number(effectiveMaxPrice));
   if (year_min !== undefined) pushFilter(where, params, `a.year >= ?`, Number(year_min));
   if (year_max !== undefined) pushFilter(where, params, `a.year <= ?`, Number(year_max));
   if (mileage_max !== undefined) pushFilter(where, params, `a.mileage <= ?`, Number(mileage_max));

@@ -74,10 +74,7 @@ describe("buildBackendCreateAdPayload", () => {
   };
 
   it("builds correct payload for CPF account with photo URLs", () => {
-    const urls = [
-      "https://r2.example.com/photo-1.jpg",
-      "https://r2.example.com/photo-2.jpg",
-    ];
+    const urls = ["https://r2.example.com/photo-1.jpg", "https://r2.example.com/photo-2.jpg"];
     const payload = buildBackendCreateAdPayload(wizardInput, resolvedCity, "CPF", urls);
 
     expect(payload.title).toBe("2021 VW Gol 1.0 MPI");
@@ -139,7 +136,12 @@ describe("buildBackendCreateAdPayload", () => {
   });
 
   it("filters empty URLs from images", () => {
-    const urls = ["https://r2.example.com/photo-1.jpg", "", "  ", "https://r2.example.com/photo-2.jpg"];
+    const urls = [
+      "https://r2.example.com/photo-1.jpg",
+      "",
+      "  ",
+      "https://r2.example.com/photo-2.jpg",
+    ];
     const payload = buildBackendCreateAdPayload(wizardInput, resolvedCity, "CPF", urls);
 
     expect(payload.images).toEqual([

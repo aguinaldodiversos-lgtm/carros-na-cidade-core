@@ -181,10 +181,11 @@ export async function registerMinimalUserViaApi(page: Page, cred: MinimalRegiste
 export async function completePendingProfileIfNeeded(page: Page) {
   await page.waitForFunction(
     () => {
-      const headings = Array.from(document.querySelectorAll("h1")).map((el) => el.textContent || "");
+      const headings = Array.from(document.querySelectorAll("h1")).map(
+        (el) => el.textContent || ""
+      );
       return headings.some(
-        (t) =>
-          /Dados do veículo/i.test(t) || /Complete seu cadastro para anunciar/i.test(t)
+        (t) => /Dados do veículo/i.test(t) || /Complete seu cadastro para anunciar/i.test(t)
       );
     },
     { timeout: 120_000 }
@@ -203,18 +204,16 @@ export async function completePendingProfileIfNeeded(page: Page) {
 
   const verifyPromise = page.waitForResponse(
     (r) =>
-      r.url().includes("/api/auth/verify-document") &&
-      r.request().method() === "POST" &&
-      r.ok(),
+      r.url().includes("/api/auth/verify-document") && r.request().method() === "POST" && r.ok(),
     { timeout: 120_000 }
   );
 
   await page.getByRole("button", { name: /Salvar e continuar/i }).click();
   await verifyPromise;
 
-  await expect(
-    page.getByRole("heading", { level: 1, name: /Dados do veículo/i })
-  ).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByRole("heading", { level: 1, name: /Dados do veículo/i })).toBeVisible({
+    timeout: 120_000,
+  });
 }
 
 export async function registerNewUserViaUi(page: Page, cred: RegisterCredentials) {
@@ -392,10 +391,7 @@ export async function waitUntilSearchApiIncludesSlug(
   slug: string,
   options?: { brandHint?: string; citySlug?: string; timeoutMs?: number }
 ) {
-  const brand =
-    options?.brandHint?.split(/\s+/)[0]?.trim() ||
-    options?.brandHint?.trim() ||
-    "";
+  const brand = options?.brandHint?.split(/\s+/)[0]?.trim() || options?.brandHint?.trim() || "";
   const citySlug = options?.citySlug ?? "atibaia-sp";
   const timeoutMs = options?.timeoutMs ?? 45_000;
   const deadline = Date.now() + timeoutMs;

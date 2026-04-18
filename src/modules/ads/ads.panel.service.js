@@ -55,7 +55,9 @@ function normalizeScalar(value) {
 }
 
 async function getTableColumns(tableName) {
-  const cacheKey = String(tableName || "").trim().toLowerCase();
+  const cacheKey = String(tableName || "")
+    .trim()
+    .toLowerCase();
   if (!cacheKey) return new Set();
 
   if (tableColumnsCache.has(cacheKey)) {
@@ -139,13 +141,7 @@ async function findImageStorageKeysByLink(link) {
     [link.value]
   );
 
-  return Array.from(
-    new Set(
-      rows
-        .map((row) => normalizeScalar(row.storage_key))
-        .filter(Boolean)
-    )
-  );
+  return Array.from(new Set(rows.map((row) => normalizeScalar(row.storage_key)).filter(Boolean)));
 }
 
 async function deleteVehicleImageRowsByLink(link) {

@@ -198,7 +198,10 @@ function parseBrandModel(working: string): { filters: Partial<AdsSearchFilters>;
   return { filters, rest };
 }
 
-function parseTransmissionFuelBody(working: string): { filters: Partial<AdsSearchFilters>; rest: string } {
+function parseTransmissionFuelBody(working: string): {
+  filters: Partial<AdsSearchFilters>;
+  rest: string;
+} {
   let rest = working;
   const f: Partial<AdsSearchFilters> = {};
 
@@ -245,7 +248,10 @@ function stripBelowFipe(working: string): { flag: boolean; rest: string } {
   if (/\b(abaixo\s*da\s*fipe|abaixo\s+fipe)\b/i.test(working)) {
     return {
       flag: true,
-      rest: working.replace(/\b(abaixo\s*da\s*fipe|abaixo\s+fipe)\b/gi, " ").replace(/\s+/g, " ").trim(),
+      rest: working
+        .replace(/\b(abaixo\s*da\s*fipe|abaixo\s+fipe)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
     };
   }
   return { flag: false, rest: working };
@@ -255,7 +261,10 @@ function stripMotoWords(working: string): { isMoto: boolean; rest: string } {
   if (/\b(moto|motocicleta)\b/i.test(working)) {
     return {
       isMoto: true,
-      rest: working.replace(/\b(moto|motocicleta)\b/gi, " ").replace(/\s+/g, " ").trim(),
+      rest: working
+        .replace(/\b(moto|motocicleta)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
     };
   }
   return { isMoto: false, rest: working };

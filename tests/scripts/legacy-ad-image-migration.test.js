@@ -175,7 +175,9 @@ describe("legacy-ad-image-migration helpers", () => {
       expect(suggestOrphanAction("unsupported_extension")).toBe("convert_and_reupload_or_remove");
       expect(suggestOrphanAction("source_unreachable")).toBe("retry_later_or_reupload_manual");
       expect(suggestOrphanAction("inconsistent_metadata")).toBe("inspect_and_fix_metadata");
-      expect(suggestOrphanAction("vehicle_images_row_file_not_found")).toBe("reupload_manual_or_cleanup_row");
+      expect(suggestOrphanAction("vehicle_images_row_file_not_found")).toBe(
+        "reupload_manual_or_cleanup_row"
+      );
     });
 
     it("retorna manual_inspection para razão desconhecida", () => {

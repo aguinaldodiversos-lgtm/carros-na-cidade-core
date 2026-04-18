@@ -170,7 +170,7 @@ async function servePlaceholder(): Promise<NextResponse> {
 function buildImageResponse(
   body: ArrayBuffer | Uint8Array,
   contentType: string,
-  source?: string,
+  source?: string
 ): NextResponse {
   const normalizedContentType = contentType || "application/octet-stream";
   const headers: Record<string, string> = {
@@ -214,11 +214,7 @@ export async function GET(request: NextRequest) {
   if (key) {
     const direct = await readImageFromR2Direct(key);
     if (direct) {
-      return buildImageResponse(
-        new Uint8Array(direct.buffer),
-        direct.contentType,
-        "bff-direct-r2"
-      );
+      return buildImageResponse(new Uint8Array(direct.buffer), direct.contentType, "bff-direct-r2");
     }
 
     const remote = await fetchRemoteVehicleImageByStorageKey(key);
@@ -252,7 +248,7 @@ export async function GET(request: NextRequest) {
     return buildImageResponse(
       new Uint8Array(localFile),
       getContentTypeFromPath(safePath),
-      "legacy-local-disk",
+      "legacy-local-disk"
     );
   }
 

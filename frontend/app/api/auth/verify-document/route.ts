@@ -3,7 +3,10 @@ import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import type { AccountType } from "@/lib/dashboard-types";
-import { applySessionCookiesToResponse, getSessionDataFromRequest } from "@/services/sessionService";
+import {
+  applySessionCookiesToResponse,
+  getSessionDataFromRequest,
+} from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +88,8 @@ export async function POST(request: NextRequest) {
         ...ensured.session,
         id: String(u.id),
         name: typeof u.name === "string" && u.name.trim() ? u.name.trim() : ensured.session.name,
-        email: typeof u.email === "string" && u.email.trim() ? u.email.trim() : ensured.session.email,
+        email:
+          typeof u.email === "string" && u.email.trim() ? u.email.trim() : ensured.session.email,
         type: parseBackendUserType(u.type),
         accessToken: ensured.session.accessToken,
         refreshToken: ensured.session.refreshToken,

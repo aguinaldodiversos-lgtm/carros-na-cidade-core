@@ -14,7 +14,9 @@ export type CatalogAdsTerritoryFallback = {
 export async function fetchCatalogAdsTerritoryFallback(
   slug: string
 ): Promise<CatalogAdsTerritoryFallback | null> {
-  const normalized = String(slug ?? "").trim().toLowerCase();
+  const normalized = String(slug ?? "")
+    .trim()
+    .toLowerCase();
   if (!normalized) return null;
 
   const base = getBackendApiBaseUrl();

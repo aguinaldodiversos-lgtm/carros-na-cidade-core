@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   normalizeMimeType,
   validateVehicleImageFile,
@@ -179,6 +179,7 @@ describe("generateVehicleImageKey — sanitização de nomes acentuados", () => 
       mimeType: "image/jpeg",
     });
 
+    // eslint-disable-next-line no-control-regex
     expect(key).not.toMatch(/[^\x00-\x7F]/);
     expect(key).toContain("veiculo-frontal");
   });
@@ -190,6 +191,7 @@ describe("generateVehicleImageKey — sanitização de nomes acentuados", () => 
       mimeType: "image/jpeg",
     });
 
+    // eslint-disable-next-line no-control-regex
     expect(key).not.toMatch(/[^\x00-\x7F]/);
     expect(key).toContain("acao-lateral");
   });

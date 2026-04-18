@@ -35,8 +35,9 @@ const mocks = vi.hoisted(() => {
       res.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
       return res;
     }),
-    applyUnauthorizedWithSessionCleanup: vi.fn((_request: unknown, body?: Record<string, unknown>) =>
-      Response.json(body ?? { error: "Nao autenticado" }, { status: 401 })
+    applyUnauthorizedWithSessionCleanup: vi.fn(
+      (_request: unknown, body?: Record<string, unknown>) =>
+        Response.json(body ?? { error: "Nao autenticado" }, { status: 401 })
     ),
   };
 });
@@ -142,7 +143,11 @@ describe("GET /api/dashboard/me", () => {
     });
     mocks.ensureSessionWithFreshBackendTokens
       .mockResolvedValueOnce({ ok: true, session: staleSession })
-      .mockResolvedValueOnce({ ok: true, session: refreshedSession, persistCookies: refreshedSession });
+      .mockResolvedValueOnce({
+        ok: true,
+        session: refreshedSession,
+        persistCookies: refreshedSession,
+      });
     mocks.fetchDashboard.mockRejectedValueOnce(backendError(401, "Access token invalido"));
     mocks.fetchDashboard.mockResolvedValueOnce(minimalPayload());
 

@@ -16,11 +16,7 @@ describe("sanitize ad images script helpers", () => {
 
   it("detecta vehicle_images sem fonte canônica", () => {
     expect(
-      classifyBreakPoint(
-        ["/uploads/ads/a.jpg"],
-        [{ image_url: "", storage_key: "" }],
-        []
-      )
+      classifyBreakPoint(["/uploads/ads/a.jpg"], [{ image_url: "", storage_key: "" }], [])
     ).toBe("vehicle_images_without_canonical_source");
   });
 

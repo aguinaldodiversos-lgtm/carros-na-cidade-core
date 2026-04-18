@@ -16,13 +16,7 @@ describe("AppliedFilterChips", () => {
   });
 
   it("renders brand chip", () => {
-    render(
-      <AppliedFilterChips
-        filters={{ brand: "Fiat" }}
-        onRemove={noop}
-        onClearAll={noop}
-      />
-    );
+    render(<AppliedFilterChips filters={{ brand: "Fiat" }} onRemove={noop} onClearAll={noop} />);
     expect(screen.getByText(/Marca: Fiat/)).toBeDefined();
   });
 
@@ -33,9 +27,7 @@ describe("AppliedFilterChips", () => {
       fuel_type: "Flex",
       below_fipe: true,
     };
-    render(
-      <AppliedFilterChips filters={filters} onRemove={noop} onClearAll={noop} />
-    );
+    render(<AppliedFilterChips filters={filters} onRemove={noop} onClearAll={noop} />);
     expect(screen.getByText(/Marca: VW/)).toBeDefined();
     expect(screen.getByText(/Modelo: Gol/)).toBeDefined();
     expect(screen.getByText(/Combustível: Flex/)).toBeDefined();
@@ -97,24 +89,14 @@ describe("AppliedFilterChips", () => {
   });
 
   it("shows clear all button when removable chips exist", () => {
-    render(
-      <AppliedFilterChips
-        filters={{ brand: "Fiat" }}
-        onRemove={noop}
-        onClearAll={noop}
-      />
-    );
+    render(<AppliedFilterChips filters={{ brand: "Fiat" }} onRemove={noop} onClearAll={noop} />);
     expect(screen.getByText("Limpar filtros")).toBeDefined();
   });
 
   it("calls onClearAll when clear button clicked", () => {
     const onClearAll = vi.fn();
     render(
-      <AppliedFilterChips
-        filters={{ brand: "Fiat" }}
-        onRemove={noop}
-        onClearAll={onClearAll}
-      />
+      <AppliedFilterChips filters={{ brand: "Fiat" }} onRemove={noop} onClearAll={onClearAll} />
     );
 
     fireEvent.click(screen.getByText("Limpar filtros"));

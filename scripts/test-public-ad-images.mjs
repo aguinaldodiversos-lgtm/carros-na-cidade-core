@@ -56,4 +56,6 @@ for (const { name, row, vehicleRows } of samples) {
   console.log("");
 }
 
-console.log("Conclusão: se `images` no banco estiver vazio, mal formatado ou só legado /uploads/… sem arquivo no R2, o card cai no placeholder.");
+console.log(
+  "Conclusão: se `images` no banco estiver vazio, mal formatado ou só legado /uploads/… sem arquivo no R2, o card cai no placeholder."
+);

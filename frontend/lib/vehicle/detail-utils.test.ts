@@ -110,7 +110,9 @@ describe("vehicle detail image utils", () => {
       })
     ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fcard.jpg");
 
-    expect(resolvePublicListingImageUrl({ image_url: null, images: [] })).toBe(LISTING_CARD_FALLBACK_IMAGE);
+    expect(resolvePublicListingImageUrl({ image_url: null, images: [] })).toBe(
+      LISTING_CARD_FALLBACK_IMAGE
+    );
   });
 
   it("resolvePublicListingImageUrl aceita cover_image_url, photos e gallery", () => {

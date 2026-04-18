@@ -9,7 +9,9 @@ import path from "node:path";
 export const LEGACY_UPLOADS_ADS = /^\/?uploads\/ads\//i;
 
 export function toForwardSlashes(value) {
-  return String(value ?? "").trim().replace(/\\/g, "/");
+  return String(value ?? "")
+    .trim()
+    .replace(/\\/g, "/");
 }
 
 export function normalizeLegacyUploadPath(raw) {

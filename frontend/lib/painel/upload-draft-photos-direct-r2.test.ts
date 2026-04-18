@@ -69,9 +69,9 @@ describe("upload-draft-photos-direct-r2", () => {
         type: "image/jpeg",
       });
 
-      await expect(
-        mod.uploadDraftPhotosDirectR2([file], "user-1")
-      ).rejects.toThrow("R2 not configured");
+      await expect(mod.uploadDraftPhotosDirectR2([file], "user-1")).rejects.toThrow(
+        "R2 not configured"
+      );
     });
 
     it("returns empty array for empty file list", async () => {
@@ -90,10 +90,7 @@ describe("upload-draft-photos-direct-r2", () => {
         type: "text/plain",
       });
 
-      const result = await mod.uploadDraftPhotosDirectR2(
-        [textFile],
-        "user-1"
-      );
+      const result = await mod.uploadDraftPhotosDirectR2([textFile], "user-1");
       expect(result).toEqual([]);
     });
 
@@ -103,10 +100,7 @@ describe("upload-draft-photos-direct-r2", () => {
 
       const emptyFile = new File([], "empty.jpg", { type: "image/jpeg" });
 
-      const result = await mod.uploadDraftPhotosDirectR2(
-        [emptyFile],
-        "user-1"
-      );
+      const result = await mod.uploadDraftPhotosDirectR2([emptyFile], "user-1");
       expect(result).toEqual([]);
     });
 
@@ -119,10 +113,7 @@ describe("upload-draft-photos-direct-r2", () => {
         type: "image/jpeg",
       });
 
-      const result = await mod.uploadDraftPhotosDirectR2(
-        [bigFile],
-        "user-1"
-      );
+      const result = await mod.uploadDraftPhotosDirectR2([bigFile], "user-1");
       expect(result).toEqual([]);
     });
   });

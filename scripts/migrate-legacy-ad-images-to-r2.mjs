@@ -94,7 +94,8 @@ async function getVehicleImagesSchema() {
     `
   );
 
-  cachedViSchema = rows.length === 0 ? null : new Set(rows.map((r) => String(r.column_name || "").trim()));
+  cachedViSchema =
+    rows.length === 0 ? null : new Set(rows.map((r) => String(r.column_name || "").trim()));
   return cachedViSchema;
 }
 
@@ -111,10 +112,13 @@ function parseArgs(argv) {
   for (const raw of argv) {
     if (raw === "--audit") args.audit = true;
     else if (raw === "--execute") args.execute = true;
-    else if (raw.startsWith("--limit=")) args.limit = Math.max(1, Number.parseInt(raw.split("=")[1], 10) || 500);
+    else if (raw.startsWith("--limit="))
+      args.limit = Math.max(1, Number.parseInt(raw.split("=")[1], 10) || 500);
     else if (raw.startsWith("--ad-id=")) args.adId = Number.parseInt(raw.split("=")[1], 10);
-    else if (raw.startsWith("--report-dir=")) args.reportDir = path.resolve(raw.split("=").slice(1).join("="));
-    else if (raw.startsWith("--uploads-root=")) args.uploadsRootExtra.push(path.resolve(raw.split("=").slice(1).join("=")));
+    else if (raw.startsWith("--report-dir="))
+      args.reportDir = path.resolve(raw.split("=").slice(1).join("="));
+    else if (raw.startsWith("--uploads-root="))
+      args.uploadsRootExtra.push(path.resolve(raw.split("=").slice(1).join("=")));
   }
 
   return args;
@@ -197,7 +201,10 @@ function canonicalUrlFromUpload(upload) {
   return buildCanonicalImageUrlFromStorageKey(upload.key);
 }
 
-async function upsertVehicleImageRow(client, { adId, legacyPath, storageKey, canonicalUrl, sortIndex, isCover }) {
+async function upsertVehicleImageRow(
+  client,
+  { adId, legacyPath, storageKey, canonicalUrl, sortIndex, isCover }
+) {
   const schema = await getVehicleImagesSchema();
   if (!schema?.has("ad_id")) return { attempted: false };
 
@@ -273,7 +280,11 @@ async function upsertVehicleImageRow(client, { adId, legacyPath, storageKey, can
 
 function buildCandidateWhere(filterAdId) {
   const params = [];
-  const where = [`a.status != 'deleted'`, `a.images IS NOT NULL`, `jsonb_typeof(a.images) = 'array'`];
+  const where = [
+    `a.status != 'deleted'`,
+    `a.images IS NOT NULL`,
+    `jsonb_typeof(a.images) = 'array'`,
+  ];
 
   const legacyJson = `
     EXISTS (
@@ -448,7 +459,8 @@ export async function runAudit({ limit = 500, adId = null, extraRoots = [] } = {
     if (categories[cat] !== undefined) categories[cat] += 1;
 
     if (cat === "ok" || cat === "already_migrated") summary.alreadyCorrect += 1;
-    if (cat === "migratable" || cat === "orphan" || cat === "inconsistent") summary.legacyDependent += 1;
+    if (cat === "migratable" || cat === "orphan" || cat === "inconsistent")
+      summary.legacyDependent += 1;
     if (cat === "orphan") summary.orphanCount += 1;
 
     details.push({
@@ -652,8 +664,7 @@ export async function migrateAdRow(adRow, { execute, extraRoots, report }) {
   }
 
   const jsonChanged = JSON.stringify(rawImages) !== JSON.stringify(newImages);
-  const needsDbWrite =
-    jsonChanged || dbOps.length > 0 || pendingViUpdates.length > 0;
+  const needsDbWrite = jsonChanged || dbOps.length > 0 || pendingViUpdates.length > 0;
 
   if (execute && needsDbWrite) {
     await withTransaction(async (tx) => {
@@ -706,7 +717,10 @@ async function main() {
     try {
       getR2Config();
     } catch (e) {
-      console.error("[migrate-legacy-ad-images] R2 não configurado. --execute requer R2_* no ambiente.", e?.message || e);
+      console.error(
+        "[migrate-legacy-ad-images] R2 não configurado. --execute requer R2_* no ambiente.",
+        e?.message || e
+      );
       process.exit(1);
     }
   }
@@ -725,7 +739,11 @@ async function main() {
   };
 
   if (args.audit) {
-    const audit = await runAudit({ limit: args.limit, adId: args.adId, extraRoots: args.uploadsRootExtra });
+    const audit = await runAudit({
+      limit: args.limit,
+      adId: args.adId,
+      extraRoots: args.uploadsRootExtra,
+    });
     console.log("\n[migrate-legacy-ad-images] ═══ RELATÓRIO DE AUDITORIA ═══\n");
     console.log("Categorias:");
     console.table(audit.categories);
@@ -739,7 +757,9 @@ async function main() {
     if (audit.orphans.length > 0) {
       console.log("\nÓrfãos:");
       for (const o of audit.orphans) {
-        console.log(`  ad=${o.adId}  ${o.legacyPath}  razão=${o.reason}  ação=${o.suggestedAction}`);
+        console.log(
+          `  ad=${o.adId}  ${o.legacyPath}  razão=${o.reason}  ação=${o.suggestedAction}`
+        );
       }
     }
 
@@ -780,7 +800,9 @@ async function main() {
   report.finishedAt = new Date().toISOString();
   report.summary.orphanCount = report.orphans.length;
 
-  console.log(`\n[migrate-legacy-ad-images] ═══ RELATÓRIO ${args.execute ? "EXECUÇÃO" : "DRY-RUN"} ═══\n`);
+  console.log(
+    `\n[migrate-legacy-ad-images] ═══ RELATÓRIO ${args.execute ? "EXECUÇÃO" : "DRY-RUN"} ═══\n`
+  );
   console.log(`  anúncios escaneados:  ${report.summary.adsScanned}`);
   console.log(`  migrados (execute):   ${report.summary.migratedAds}`);
   console.log(`  migraria (dry-run):   ${report.summary.wouldMigrateAds}`);
@@ -789,7 +811,9 @@ async function main() {
   if (report.orphans.length > 0) {
     console.log("\n  Órfãos:");
     for (const o of report.orphans) {
-      console.log(`    ad=${o.adId}  ${o.legacyPath}  razão=${o.reason}  ação=${o.suggestedAction || "manual_inspection"}`);
+      console.log(
+        `    ad=${o.adId}  ${o.legacyPath}  razão=${o.reason}  ação=${o.suggestedAction || "manual_inspection"}`
+      );
     }
   }
 
@@ -809,7 +833,9 @@ async function main() {
   return 0;
 }
 
-const entryArg = process.argv[1] ? new URL(`file://${process.argv[1].replace(/\\/g, "/")}`).href : "";
+const entryArg = process.argv[1]
+  ? new URL(`file://${process.argv[1].replace(/\\/g, "/")}`).href
+  : "";
 
 if (import.meta.url === entryArg) {
   try {

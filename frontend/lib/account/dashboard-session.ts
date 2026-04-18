@@ -43,7 +43,10 @@ export async function loadDashboardPayload(session: SessionData): Promise<Dashbo
   try {
     return await fetchDashboard(ensured.session);
   } catch (error) {
-    console.error("[loadDashboardPayload] falha ao buscar dashboard", error instanceof Error ? error.message : error);
+    console.error(
+      "[loadDashboardPayload] falha ao buscar dashboard",
+      error instanceof Error ? error.message : error
+    );
     return null;
   }
 }

@@ -213,7 +213,8 @@ export function normalizeDashboardPayload(raw: unknown): DashboardPayload | null
 
   return {
     ok: typeof root.ok === "boolean" ? root.ok : undefined,
-    accountType: root.accountType === "PF" || root.accountType === "PJ" ? root.accountType : undefined,
+    accountType:
+      root.accountType === "PF" || root.accountType === "PJ" ? root.accountType : undefined,
     metrics: isRecord(root.metrics)
       ? {
           activeAds: toNum(root.metrics.activeAds, 0),

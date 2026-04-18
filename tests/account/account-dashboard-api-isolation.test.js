@@ -181,9 +181,7 @@ describe("isolamento HTTP — /api/account (rota → serviço)", () => {
     vi.mocked(updateOwnedAdStatus).mockResolvedValue({ id: "ad-1", status: "paused" });
 
     const app = buildApp(USER_A);
-    const res = await request(app)
-      .patch(`/api/account/ads/ad-1/status`)
-      .send({ action: "pause" });
+    const res = await request(app).patch(`/api/account/ads/ad-1/status`).send({ action: "pause" });
 
     expect(res.status).toBe(200);
     const [calledUserId] = vi.mocked(updateOwnedAdStatus).mock.calls[0];
@@ -202,9 +200,7 @@ describe("isolamento HTTP — /api/account (rota → serviço)", () => {
     const app = buildApp(USER_A);
 
     // Tentativa de forçar outro userId pelo body — deve ser ignorado
-    const res = await request(app)
-      .get("/api/account/dashboard")
-      .send({ user_id: USER_B.id });
+    const res = await request(app).get("/api/account/dashboard").send({ user_id: USER_B.id });
 
     expect(res.status).toBe(200);
     const calledUserId = vi.mocked(getDashboardPayload).mock.calls[0][0];

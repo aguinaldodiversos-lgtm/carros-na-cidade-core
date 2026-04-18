@@ -76,7 +76,9 @@ function normalizeLastmod(value) {
 }
 
 function normalizeChangefreq(value) {
-  const normalized = String(value ?? "").trim().toLowerCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
 
   if (!normalized) return null;
   if (!ALLOWED_CHANGEFREQ.has(normalized)) return null;

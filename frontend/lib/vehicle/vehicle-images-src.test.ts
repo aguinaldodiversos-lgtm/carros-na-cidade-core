@@ -21,9 +21,9 @@ describe("vehicle-images-src", () => {
     });
 
     it("extrai pathname de URL absoluta do mesmo site", () => {
-      expect(
-        getSafeUploadPath("https://carrosnacidade.com/uploads/ads/foo.png")
-      ).toBe("/uploads/ads/foo.png");
+      expect(getSafeUploadPath("https://carrosnacidade.com/uploads/ads/foo.png")).toBe(
+        "/uploads/ads/foo.png"
+      );
     });
 
     it("rejeita path traversal", () => {
@@ -56,9 +56,7 @@ describe("vehicle-images-src", () => {
     });
 
     it("decodifica %2F", () => {
-      expect(normalizeUploadSrcParam("%2Fuploads%2Fads%2Ffoo.png")).toBe(
-        "/uploads/ads/foo.png"
-      );
+      expect(normalizeUploadSrcParam("%2Fuploads%2Fads%2Ffoo.png")).toBe("/uploads/ads/foo.png");
     });
 
     it("adiciona / antes de uploads/ sem barra", () => {

@@ -45,7 +45,9 @@ describe("runWizardPhotoUploadPipeline", () => {
         uploadDirectR2: vi.fn(async () => {
           throw new Error("R2 PutObject recusado");
         }),
-        uploadBackend: vi.fn(async () => [{ url: "https://api.example/1.jpg", source: "backend-r2" as const }]),
+        uploadBackend: vi.fn(async () => [
+          { url: "https://api.example/1.jpg", source: "backend-r2" as const },
+        ]),
         saveLocal: vi.fn(),
         getBackendBaseUrl: () => "http://127.0.0.1:4000",
       },
@@ -222,4 +224,3 @@ describe("runWizardPhotoUploadPipeline", () => {
     expect(r.photoUrls).toEqual([]);
   });
 });
-

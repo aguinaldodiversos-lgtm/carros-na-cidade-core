@@ -20,13 +20,62 @@ import { inferUfFromSlug } from "../../src/shared/utils/inferUfFromSlug.js";
 import { slugify } from "../../src/shared/utils/slugify.js";
 
 const SP_CITIES = [
-  { id: 1, name: "Atibaia", slug: "atibaia-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 2, name: "São Paulo", slug: "sao-paulo-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 3, name: "Campinas", slug: "campinas-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 4, name: "São José do Rio Preto", slug: "sao-jose-do-rio-preto-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 5, name: "São José dos Campos", slug: "sao-jose-dos-campos-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 6, name: "Santo André", slug: "santo-andre-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
-  { id: 7, name: "Guarulhos", slug: "guarulhos-sp", state: "SP", ranking_priority: 0, territorial_score: 0 },
+  {
+    id: 1,
+    name: "Atibaia",
+    slug: "atibaia-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 2,
+    name: "São Paulo",
+    slug: "sao-paulo-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 3,
+    name: "Campinas",
+    slug: "campinas-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 4,
+    name: "São José do Rio Preto",
+    slug: "sao-jose-do-rio-preto-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 5,
+    name: "São José dos Campos",
+    slug: "sao-jose-dos-campos-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 6,
+    name: "Santo André",
+    slug: "santo-andre-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
+  {
+    id: 7,
+    name: "Guarulhos",
+    slug: "guarulhos-sp",
+    state: "SP",
+    ranking_priority: 0,
+    territorial_score: 0,
+  },
 ];
 
 describe("normalizeSearchText – accent-insensitive + case-insensitive", () => {

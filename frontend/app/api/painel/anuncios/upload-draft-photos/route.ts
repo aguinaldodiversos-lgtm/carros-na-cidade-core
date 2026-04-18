@@ -17,8 +17,7 @@ function extractPhotos(source: FormData): File[] {
   return source
     .getAll("photos")
     .filter(
-      (file): file is File =>
-        typeof File !== "undefined" && file instanceof File && file.size > 0
+      (file): file is File => typeof File !== "undefined" && file instanceof File && file.size > 0
     );
 }
 
@@ -85,8 +84,7 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           requestId,
-          message:
-            "Nenhuma foto válida enviada. Use JPG, PNG, WebP, HEIC ou HEIF.",
+          message: "Nenhuma foto válida enviada. Use JPG, PNG, WebP, HEIC ou HEIF.",
         },
         { status: 400 }
       );
@@ -123,8 +121,7 @@ export async function POST(request: NextRequest) {
         ok: false,
         requestId,
         message:
-          primaryError?.message ||
-          "Falha ao enviar fotos para o armazenamento. Tente novamente.",
+          primaryError?.message || "Falha ao enviar fotos para o armazenamento. Tente novamente.",
       };
 
       if (nodeEnv !== "production") {
@@ -168,8 +165,7 @@ export async function POST(request: NextRequest) {
       auth.ctx
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro inesperado ao enviar fotos.";
+    const message = error instanceof Error ? error.message : "Erro inesperado ao enviar fotos.";
 
     console.error(`${LOG_PREFIX} unexpected error`, {
       requestId,

@@ -437,8 +437,8 @@ export function StepPhotos({
     <div className="space-y-6">
       <p className="text-sm leading-7 text-[#6E748A]">
         Fotos claras e bem iluminadas geram mais contatos. Você pode arrastar imagens para a área
-        abaixo ou clicar para selecionar.
-        As fotos são salvas automaticamente e permanecem mesmo se você voltar ou avançar entre etapas.
+        abaixo ou clicar para selecionar. As fotos são salvas automaticamente e permanecem mesmo se
+        você voltar ou avançar entre etapas.
       </p>
 
       {canAdd ? (
@@ -549,8 +549,8 @@ export function StepPhotos({
 
       {uploadedUrls.length > 0 ? (
         <p className="text-xs text-[#6E748A]">
-          Suas fotos estão salvas no servidor. Elas não serão perdidas ao navegar entre etapas
-          ou editar outros campos do anúncio.
+          Suas fotos estão salvas no servidor. Elas não serão perdidas ao navegar entre etapas ou
+          editar outros campos do anúncio.
         </p>
       ) : null}
     </div>

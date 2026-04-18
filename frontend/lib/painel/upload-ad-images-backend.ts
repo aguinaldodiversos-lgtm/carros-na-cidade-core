@@ -107,9 +107,7 @@ function normalizeItem(raw: unknown): UploadedPhotoItem | null {
   if (!isRecord(raw)) return null;
 
   const url =
-    asNonEmptyString(raw.url) ||
-    asNonEmptyString(raw.image_url) ||
-    asNonEmptyString(raw.imageUrl);
+    asNonEmptyString(raw.url) || asNonEmptyString(raw.image_url) || asNonEmptyString(raw.imageUrl);
 
   if (!url) return null;
 
@@ -173,9 +171,7 @@ export function extractUploadImageItemsFromResponse(json: unknown): UploadedPhot
   }));
 }
 
-function pickForwardHeaders(
-  source?: Record<string, string>
-): Record<string, string> {
+function pickForwardHeaders(source?: Record<string, string>): Record<string, string> {
   if (!source) return {};
 
   const result: Record<string, string> = {};
@@ -257,8 +253,7 @@ export async function uploadPublishPhotosToBackendR2(
   const photos = formData
     .getAll("photos")
     .filter(
-      (file): file is File =>
-        typeof File !== "undefined" && file instanceof File && file.size > 0
+      (file): file is File => typeof File !== "undefined" && file instanceof File && file.size > 0
     );
 
   if (photos.length === 0) return [];
@@ -327,7 +322,7 @@ export async function uploadPublishPhotosToBackendR2(
         ? summarizeBodyForLog(rawText)
         : `HTTP ${response.status} sem corpo.`;
 
-    const message = extractErrorMessage(json, fallbackText);
+    const message = `HTTP ${response.status}: ${extractErrorMessage(json, fallbackText)}`;
 
     console.error(`${LOG_PREFIX} backend returned non-2xx`, {
       requestId: options?.requestId,
@@ -362,18 +357,15 @@ export async function uploadPublishPhotosToBackendR2(
       body: bodySummary,
     });
 
-    throw new UploadBackendError(
-      "Resposta de upload inválida: JSON sem itens/URLs utilizáveis.",
-      {
-        statusCode: 502,
-        code: "INVALID_UPLOAD_RESPONSE",
-        requestId: backendRequestId,
-        backendUrl: url,
-        details: safeDetails({
-          body: bodySummary,
-        }),
-      }
-    );
+    throw new UploadBackendError("Resposta sem URLs válidas: JSON sem itens ou URLs utilizáveis.", {
+      statusCode: 502,
+      code: "INVALID_UPLOAD_RESPONSE",
+      requestId: backendRequestId,
+      backendUrl: url,
+      details: safeDetails({
+        body: bodySummary,
+      }),
+    });
   }
 
   console.info(`${LOG_PREFIX} backend upload ok`, {

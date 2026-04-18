@@ -5,9 +5,7 @@ function normalizeAccountType(input) {
   if (input == null || String(input).trim() === "") {
     return "pending";
   }
-  const raw = String(input)
-    .trim()
-    .toLowerCase();
+  const raw = String(input).trim().toLowerCase();
   return raw === "cnpj" ? "CNPJ" : "CPF";
 }
 

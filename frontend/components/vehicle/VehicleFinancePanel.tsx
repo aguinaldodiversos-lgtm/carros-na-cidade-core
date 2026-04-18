@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 
-import {
-  buildFinanceLink,
-  estimateMonthlyPayment,
-  formatBrl,
-} from "@/lib/vehicle/detail-utils";
+import { buildFinanceLink, estimateMonthlyPayment, formatBrl } from "@/lib/vehicle/detail-utils";
 
 type VehicleFinancePanelProps = {
   vehicleId: string;
@@ -41,7 +37,9 @@ export default function VehicleFinancePanel({
   const financeLink = buildFinanceLink(vehicleId, citySlug, vehiclePriceNumeric);
   const hasPrice = vehiclePriceNumeric != null && vehiclePriceNumeric > 0;
   const suggestedEntry = hasPrice ? vehiclePriceNumeric * 0.2 : null;
-  const estimatedInstallment = hasPrice ? estimateMonthlyPayment(vehiclePriceNumeric, 60, 0.2) : null;
+  const estimatedInstallment = hasPrice
+    ? estimateMonthlyPayment(vehiclePriceNumeric, 60, 0.2)
+    : null;
 
   return (
     <section className="rounded-[28px] border border-[#e1e7f0] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)] md:p-6">
@@ -80,7 +78,9 @@ export default function VehicleFinancePanel({
           <div className="grid grid-cols-2 gap-3 text-[13px] text-[#45606f]">
             <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
               <p className="font-bold text-[#1d2538]">Entrada sugerida</p>
-              <p className="mt-1">{suggestedEntry ? formatBrl(suggestedEntry) : "Defina no simulador"}</p>
+              <p className="mt-1">
+                {suggestedEntry ? formatBrl(suggestedEntry) : "Defina no simulador"}
+              </p>
             </div>
             <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
               <p className="font-bold text-[#1d2538]">Banco base</p>

@@ -60,16 +60,9 @@ function normalizeUploadedItems(items: UploadedPhotoItem[]): UploadedPhotoItem[]
   return normalized;
 }
 
-function shouldEnableDirectR2Fallback(nodeEnv: string): boolean {
-  if (nodeEnv === "production") {
-    return envBool("ENABLE_BFF_DIRECT_R2_UPLOAD", false);
-  }
-  return envBool("ENABLE_BFF_DIRECT_R2_UPLOAD", false);
-}
-
 function shouldEnableLocalFallback(nodeEnv: string): boolean {
   if (nodeEnv === "production") return false;
-  return envBool("ALLOW_LOCAL_UPLOAD_FALLBACK", false);
+  return envBool("ALLOW_LOCAL_UPLOAD_FALLBACK", true);
 }
 
 export type WizardPhotoUploadDeps = {
@@ -147,14 +140,10 @@ function toPipelineError(stage: string, error: unknown): WizardPipelineError {
 }
 
 /**
- * Produção:
- *   backend-proxy é o writer canônico
- *   direct-r2 só entra com flag explícita
- *   local-fs nunca entra
- *
- * Desenvolvimento:
- *   backend-proxy continua sendo o writer preferencial
- *   direct-r2 e local-fs são opcionais, via flags explícitas
+ * Estratégia de upload (em ordem de prioridade):
+ *   1. direct-r2  — quando R2 está configurado (isR2Configured)
+ *   2. backend-proxy — fallback canônico
+ *   3. local-fs   — apenas em desenvolvimento (ALLOW_LOCAL_UPLOAD_FALLBACK, default true)
  */
 export async function runWizardPhotoUploadPipeline(
   input: RunWizardPhotoUploadPipelineInput
@@ -167,120 +156,97 @@ export async function runWizardPhotoUploadPipeline(
 
   const photoCount = input.snapshots.length;
   const backendBase = deps.getBackendBaseUrl();
-  const directR2Enabled = shouldEnableDirectR2Fallback(input.nodeEnv) && deps.isR2Configured();
+  const r2Configured = deps.isR2Configured();
   const localFallbackEnabled = shouldEnableLocalFallback(input.nodeEnv);
 
   console.info(`${LOG_PREFIX} start`, {
     requestId,
     photoCount,
     nodeEnv: input.nodeEnv,
+    r2Configured,
     hasBackendBaseUrl: Boolean(backendBase),
-    directR2Enabled,
     localFallbackEnabled,
   });
 
-  if (backendBase) {
-    strategiesAttempted.push("backend-proxy");
-
-    try {
-      const formData = formDataFromSnapshots(input.snapshots);
-      items = await deps.uploadBackend(formData, input.accessToken, {
-        forwardHeaders: input.forwardHeaders,
-        requestId,
-      });
-
-      items = normalizeUploadedItems(items);
-
-      if (items.length === 0) {
-        const message = "Proxy backend devolveu 0 itens de imagem válidos.";
-        errors.push({ stage: "backend-proxy", message });
-        console.warn(`${LOG_PREFIX} backend-proxy returned 0 items`, {
-          requestId,
-        });
-      } else {
-        console.info(`${LOG_PREFIX} backend-proxy ok`, {
-          requestId,
-          itemCount: items.length,
-        });
-      }
-    } catch (error) {
-      const mapped = toPipelineError("backend-proxy", error);
-      errors.push(mapped);
-
-      console.error(`${LOG_PREFIX} backend-proxy failed`, {
-        requestId,
-        statusCode: mapped.statusCode,
-        code: mapped.code,
-        message: mapped.message,
-        backendUrl: mapped.backendUrl,
-        backendRequestId: mapped.requestId,
-      });
-    }
-  } else {
-    const message =
-      "Base do backend não resolvida. Configure AUTH_API_BASE_URL, BACKEND_API_URL, CNC_API_URL, API_URL ou NEXT_PUBLIC_API_URL.";
-    errors.push({
-      stage: "backend-proxy",
-      message,
-      code: "BACKEND_BASE_URL_MISSING",
-    });
-
-    console.error(`${LOG_PREFIX} backend base missing`, {
-      requestId,
-    });
-  }
-
-  if (items.length === 0 && directR2Enabled) {
+  // --- Strategy 1: direct-r2 (primary when configured) ---
+  if (r2Configured) {
     strategiesAttempted.push("direct-r2");
 
     try {
       const files = filesFromSnapshots(input.snapshots);
-      const urls = uniqueNonEmptyStrings(
-        await deps.uploadDirectR2(files, input.userId)
-      );
-
+      const urls = uniqueNonEmptyStrings(await deps.uploadDirectR2(files, input.userId));
       items = normalizeUploadedItems(urls.map((url) => toUploadedPhotoItem(url, "bff-direct-r2")));
 
       if (items.length === 0) {
-        const message = "R2 direto devolveu 0 URLs válidas.";
-        errors.push({ stage: "direct-r2", message });
-
-        console.warn(`${LOG_PREFIX} direct-r2 returned 0 urls`, {
-          requestId,
-        });
+        errors.push({ stage: "direct-r2", message: "R2 direto devolveu 0 URLs válidas." });
+        console.warn(`${LOG_PREFIX} direct-r2 returned 0 urls`, { requestId });
       } else {
-        console.warn(`${LOG_PREFIX} direct-r2 fallback used`, {
-          requestId,
-          itemCount: items.length,
-        });
+        console.info(`${LOG_PREFIX} direct-r2 ok`, { requestId, itemCount: items.length });
       }
     } catch (error) {
       const mapped = toPipelineError("direct-r2", error);
       errors.push(mapped);
-
-      console.error(`${LOG_PREFIX} direct-r2 failed`, {
-        requestId,
-        message: mapped.message,
-      });
+      console.error(`${LOG_PREFIX} direct-r2 failed`, { requestId, message: mapped.message });
     }
   }
 
+  // --- Strategy 2: backend-proxy (fallback when direct-r2 fails or not configured) ---
+  if (items.length === 0) {
+    if (backendBase) {
+      strategiesAttempted.push("backend-proxy");
+
+      try {
+        const formData = formDataFromSnapshots(input.snapshots);
+        items = await deps.uploadBackend(formData, input.accessToken, {
+          forwardHeaders: input.forwardHeaders,
+          requestId,
+        });
+        items = normalizeUploadedItems(items);
+
+        if (items.length === 0) {
+          errors.push({
+            stage: "backend-proxy",
+            message: "Proxy backend devolveu 0 itens de imagem válidos.",
+          });
+          console.warn(`${LOG_PREFIX} backend-proxy returned 0 items`, { requestId });
+        } else {
+          console.info(`${LOG_PREFIX} backend-proxy ok`, { requestId, itemCount: items.length });
+        }
+      } catch (error) {
+        const mapped = toPipelineError("backend-proxy", error);
+        errors.push(mapped);
+        console.error(`${LOG_PREFIX} backend-proxy failed`, {
+          requestId,
+          statusCode: mapped.statusCode,
+          code: mapped.code,
+          message: mapped.message,
+          backendUrl: mapped.backendUrl,
+          backendRequestId: mapped.requestId,
+        });
+      }
+    } else {
+      errors.push({
+        stage: "backend-proxy",
+        message:
+          "Base do backend não resolvida. Configure AUTH_API_BASE_URL, BACKEND_API_URL, CNC_API_URL, API_URL ou NEXT_PUBLIC_API_URL.",
+        code: "BACKEND_BASE_URL_MISSING",
+      });
+      console.error(`${LOG_PREFIX} backend base missing`, { requestId });
+    }
+  }
+
+  // --- Strategy 3: local-fs (development only) ---
   if (items.length === 0 && localFallbackEnabled) {
     strategiesAttempted.push("local-fs");
 
     try {
       const formData = formDataFromSnapshots(input.snapshots);
       const urls = uniqueNonEmptyStrings(await deps.saveLocal(formData));
-
       items = normalizeUploadedItems(urls.map((url) => toUploadedPhotoItem(url, "local-fs")));
 
       if (items.length === 0) {
-        const message = "Fallback local devolveu 0 URLs válidas.";
-        errors.push({ stage: "local-fs", message });
-
-        console.warn(`${LOG_PREFIX} local-fs returned 0 urls`, {
-          requestId,
-        });
+        errors.push({ stage: "local-fs", message: "Fallback local devolveu 0 URLs válidas." });
+        console.warn(`${LOG_PREFIX} local-fs returned 0 urls`, { requestId });
       } else {
         console.warn(`${LOG_PREFIX} local-fs fallback used`, {
           requestId,
@@ -290,11 +256,7 @@ export async function runWizardPhotoUploadPipeline(
     } catch (error) {
       const mapped = toPipelineError("local-fs", error);
       errors.push(mapped);
-
-      console.error(`${LOG_PREFIX} local-fs failed`, {
-        requestId,
-        message: mapped.message,
-      });
+      console.error(`${LOG_PREFIX} local-fs failed`, { requestId, message: mapped.message });
     }
   }
 

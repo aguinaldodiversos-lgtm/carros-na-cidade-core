@@ -14,8 +14,7 @@ const ALLOWED_MIME: Record<string, string> = {
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 24;
-const CACHE_CONTROL =
-  "public, max-age=31536000, stale-while-revalidate=86400";
+const CACHE_CONTROL = "public, max-age=31536000, stale-while-revalidate=86400";
 
 function env(key: string): string {
   return (process.env[key] ?? "").trim();
@@ -132,10 +131,7 @@ export function isR2ConfiguredInBff(): boolean {
  * Each file is placed under `vehicles/<draftId>/original/<year>/<month>/<uuid>-<stem>.<ext>`.
  * Returns an array of public URLs (or proxy fallback URLs).
  */
-export async function uploadDraftPhotosDirectR2(
-  files: File[],
-  userId: string
-): Promise<string[]> {
+export async function uploadDraftPhotosDirectR2(files: File[], userId: string): Promise<string[]> {
   const cfg = loadConfig();
   const client = getClient();
   if (!cfg || !client) {
@@ -217,9 +213,7 @@ export async function readImageFromR2Direct(
     let buffer: Buffer;
     if (typeof (body as any).transformToByteArray === "function") {
       buffer = Buffer.from(await (body as any).transformToByteArray());
-    } else if (
-      typeof (body as any)[Symbol.asyncIterator] === "function"
-    ) {
+    } else if (typeof (body as any)[Symbol.asyncIterator] === "function") {
       const chunks: Buffer[] = [];
       for await (const chunk of body as AsyncIterable<Uint8Array>) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));

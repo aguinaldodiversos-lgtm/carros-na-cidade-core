@@ -18,7 +18,17 @@ function money(n: number | string | undefined | null) {
 
 function fmtDate(d: string | undefined | null) {
   if (!d) return "—";
-  try { return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return "—"; }
+  try {
+    return new Date(d).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
 }
 
 type DialogState =
@@ -32,8 +42,14 @@ export default function AdminAnuncioDetalhe() {
   const router = useRouter();
 
   const ad = useAdminFetch<{ ok: boolean; data: AdDetail }>(() => adminApi.ads.get(id), [id]);
-  const metrics = useAdminFetch<{ ok: boolean; data: AdMetrics }>(() => adminApi.ads.metrics(id), [id]);
-  const events = useAdminFetch<{ ok: boolean; data: AdEvent[] }>(() => adminApi.ads.events(id, 30), [id]);
+  const metrics = useAdminFetch<{ ok: boolean; data: AdMetrics }>(
+    () => adminApi.ads.metrics(id),
+    [id]
+  );
+  const events = useAdminFetch<{ ok: boolean; data: AdEvent[] }>(
+    () => adminApi.ads.events(id, 30),
+    [id]
+  );
 
   const [dialog, setDialog] = useState<DialogState>({ type: "none" });
   const [highlightDays, setHighlightDays] = useState(7);
@@ -71,12 +87,17 @@ export default function AdminAnuncioDetalhe() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.push("/admin/anuncios")} className="rounded-lg border border-cnc-line px-3 py-1.5 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors">
+        <button
+          onClick={() => router.push("/admin/anuncios")}
+          className="rounded-lg border border-cnc-line px-3 py-1.5 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors"
+        >
           ← Voltar
         </button>
         <div className="flex-1">
           <h1 className="text-lg font-bold text-cnc-text">{d.title}</h1>
-          <p className="text-xs text-cnc-muted">#{d.id} · {d.city}/{d.state} · {d.brand} {d.model} {d.year}</p>
+          <p className="text-xs text-cnc-muted">
+            #{d.id} · {d.city}/{d.state} · {d.brand} {d.model} {d.year}
+          </p>
         </div>
         <AdminStatusBadge status={d.status} />
       </div>
@@ -90,11 +111,17 @@ export default function AdminAnuncioDetalhe() {
             <InfoRow label="Preço" value={money(d.price)} />
             <InfoRow label="Plano" value={d.plan || "—"} />
             <InfoRow label="Prioridade" value={String(d.priority)} />
-            <InfoRow label="Destaque até" value={d.highlight_until ? fmtDate(d.highlight_until) : "Sem destaque"} />
+            <InfoRow
+              label="Destaque até"
+              value={d.highlight_until ? fmtDate(d.highlight_until) : "Sem destaque"}
+            />
             <InfoRow label="Combustível" value={d.fuel_type || "—"} />
             <InfoRow label="Câmbio" value={d.transmission || "—"} />
             <InfoRow label="Carroceria" value={d.body_type || "—"} />
-            <InfoRow label="Km" value={d.mileage ? d.mileage.toLocaleString("pt-BR") + " km" : "—"} />
+            <InfoRow
+              label="Km"
+              value={d.mileage ? d.mileage.toLocaleString("pt-BR") + " km" : "—"}
+            />
             <InfoRow label="Slug" value={d.slug || "—"} />
             <InfoRow label="Criado" value={fmtDate(d.created_at)} />
             <InfoRow label="Atualizado" value={fmtDate(d.updated_at)} />
@@ -103,8 +130,12 @@ export default function AdminAnuncioDetalhe() {
 
           {d.description && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted mb-1">Descrição</p>
-              <p className="text-xs text-cnc-text leading-relaxed whitespace-pre-wrap">{d.description}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted mb-1">
+                Descrição
+              </p>
+              <p className="text-xs text-cnc-text leading-relaxed whitespace-pre-wrap">
+                {d.description}
+              </p>
             </div>
           )}
 
@@ -127,19 +158,50 @@ export default function AdminAnuncioDetalhe() {
             <h2 className="text-sm font-bold text-cnc-text mb-3">Ações</h2>
             <div className="flex flex-wrap gap-2">
               {d.status !== "active" && (
-                <ActionBtn label="Ativar" color="bg-cnc-success text-white" onClick={() => setDialog({ type: "status", target: "active" })} />
+                <ActionBtn
+                  label="Ativar"
+                  color="bg-cnc-success text-white"
+                  onClick={() => setDialog({ type: "status", target: "active" })}
+                />
               )}
               {d.status !== "paused" && d.status !== "blocked" && (
-                <ActionBtn label="Pausar" color="bg-cnc-warning text-white" onClick={() => setDialog({ type: "status", target: "paused" })} />
+                <ActionBtn
+                  label="Pausar"
+                  color="bg-cnc-warning text-white"
+                  onClick={() => setDialog({ type: "status", target: "paused" })}
+                />
               )}
               {d.status !== "blocked" && (
-                <ActionBtn label="Bloquear" color="bg-cnc-danger text-white" onClick={() => setDialog({ type: "status", target: "blocked" })} />
+                <ActionBtn
+                  label="Bloquear"
+                  color="bg-cnc-danger text-white"
+                  onClick={() => setDialog({ type: "status", target: "blocked" })}
+                />
               )}
               {d.status === "blocked" && (
-                <ActionBtn label="Desbloquear" color="bg-cnc-success text-white" onClick={() => setDialog({ type: "status", target: "active" })} />
+                <ActionBtn
+                  label="Desbloquear"
+                  color="bg-cnc-success text-white"
+                  onClick={() => setDialog({ type: "status", target: "active" })}
+                />
               )}
-              <ActionBtn label="Destacar" color="bg-purple-600 text-white" onClick={() => { setPriorityVal(d.priority); setHighlightDays(7); setDialog({ type: "highlight" }); }} />
-              <ActionBtn label="Prioridade" color="bg-indigo-600 text-white" onClick={() => { setPriorityVal(d.priority); setDialog({ type: "priority" }); }} />
+              <ActionBtn
+                label="Destacar"
+                color="bg-purple-600 text-white"
+                onClick={() => {
+                  setPriorityVal(d.priority);
+                  setHighlightDays(7);
+                  setDialog({ type: "highlight" });
+                }}
+              />
+              <ActionBtn
+                label="Prioridade"
+                color="bg-indigo-600 text-white"
+                onClick={() => {
+                  setPriorityVal(d.priority);
+                  setDialog({ type: "priority" });
+                }}
+              />
             </div>
           </div>
 
@@ -185,37 +247,83 @@ export default function AdminAnuncioDetalhe() {
         title={`Alterar status para "${dialog.type === "status" ? dialog.target : ""}"?`}
         description={`Anúncio #${d.id} — ${d.title}`}
         confirmLabel="Confirmar"
-        confirmColor={dialog.type === "status" && dialog.target === "blocked" ? "danger" : "primary"}
+        confirmColor={
+          dialog.type === "status" && dialog.target === "blocked" ? "danger" : "primary"
+        }
         showReason
         onConfirm={handleStatusChange}
         onCancel={() => setDialog({ type: "none" })}
       />
 
       {dialog.type === "highlight" && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setDialog({ type: "none" })}>
-          <div className="w-full max-w-sm rounded-xl border border-cnc-line bg-white p-6 shadow-premium" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => setDialog({ type: "none" })}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-cnc-line bg-white p-6 shadow-premium"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-base font-bold text-cnc-text">Destacar anúncio</h3>
             <p className="mt-1 text-sm text-cnc-muted">Dias de destaque:</p>
-            <input type="number" min={1} max={365} value={highlightDays} onChange={(e) => setHighlightDays(Number(e.target.value))}
-              className="mt-2 w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30" />
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={highlightDays}
+              onChange={(e) => setHighlightDays(Number(e.target.value))}
+              className="mt-2 w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+            />
             <div className="mt-4 flex justify-end gap-3">
-              <button onClick={() => setDialog({ type: "none" })} className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors">Cancelar</button>
-              <button onClick={handleHighlight} className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 transition-colors">Destacar</button>
+              <button
+                onClick={() => setDialog({ type: "none" })}
+                className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleHighlight}
+                className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 transition-colors"
+              >
+                Destacar
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {dialog.type === "priority" && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setDialog({ type: "none" })}>
-          <div className="w-full max-w-sm rounded-xl border border-cnc-line bg-white p-6 shadow-premium" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => setDialog({ type: "none" })}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-cnc-line bg-white p-6 shadow-premium"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-base font-bold text-cnc-text">Ajustar prioridade</h3>
             <p className="mt-1 text-sm text-cnc-muted">Prioridade (0 = normal):</p>
-            <input type="number" min={0} max={1000} value={priorityVal} onChange={(e) => setPriorityVal(Number(e.target.value))}
-              className="mt-2 w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30" />
+            <input
+              type="number"
+              min={0}
+              max={1000}
+              value={priorityVal}
+              onChange={(e) => setPriorityVal(Number(e.target.value))}
+              className="mt-2 w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+            />
             <div className="mt-4 flex justify-end gap-3">
-              <button onClick={() => setDialog({ type: "none" })} className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors">Cancelar</button>
-              <button onClick={handlePriority} className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors">Salvar</button>
+              <button
+                onClick={() => setDialog({ type: "none" })}
+                className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handlePriority}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              >
+                Salvar
+              </button>
             </div>
           </div>
         </div>
@@ -227,7 +335,9 @@ export default function AdminAnuncioDetalhe() {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">
+        {label}
+      </span>
       <p className="text-cnc-text font-medium">{value}</p>
     </div>
   );
@@ -237,14 +347,27 @@ function MetricBox({ label, value }: { label: string; value: number | string }) 
   return (
     <div className="rounded-lg bg-cnc-bg p-3 text-center">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted">{label}</p>
-      <p className="text-lg font-extrabold text-cnc-text">{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</p>
+      <p className="text-lg font-extrabold text-cnc-text">
+        {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
+      </p>
     </div>
   );
 }
 
-function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
+function ActionBtn({
+  label,
+  color,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${color}`}>
+    <button
+      onClick={onClick}
+      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${color}`}
+    >
       {label}
     </button>
   );

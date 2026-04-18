@@ -40,9 +40,15 @@ export default function AdminConfiguracoes() {
             <AdminLoadingState />
           ) : (
             <div className="space-y-3 text-xs">
-              <InfoItem label="Ambiente" value={process.env.NODE_ENV === "production" ? "Produção" : "Desenvolvimento"} />
+              <InfoItem
+                label="Ambiente"
+                value={process.env.NODE_ENV === "production" ? "Produção" : "Desenvolvimento"}
+              />
               <InfoItem label="Total de Anúncios" value={String(ov?.ads?.total ?? "—")} />
-              <InfoItem label="Total de Anunciantes" value={String(ov?.advertisers?.total ?? "—")} />
+              <InfoItem
+                label="Total de Anunciantes"
+                value={String(ov?.advertisers?.total ?? "—")}
+              />
               <InfoItem label="Total de Usuários" value={String(ov?.users?.total ?? "—")} />
               <InfoItem label="Admins" value={String(ov?.users?.admins ?? "—")} />
               <InfoItem label="Cidades Ativas" value={String(ov?.cities?.total ?? "—")} />
@@ -82,11 +88,21 @@ export default function AdminConfiguracoes() {
                 className="flex items-center justify-between rounded-lg border border-cnc-line px-4 py-3 hover:bg-cnc-bg transition-colors group"
               >
                 <div>
-                  <p className="text-xs font-semibold text-cnc-text group-hover:text-primary transition-colors">{link.label}</p>
+                  <p className="text-xs font-semibold text-cnc-text group-hover:text-primary transition-colors">
+                    {link.label}
+                  </p>
                   <p className="text-[11px] text-cnc-muted-soft">{link.description}</p>
                 </div>
-                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-cnc-muted-soft group-hover:text-primary transition-colors">
-                  <path fillRule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z" clipRule="evenodd" />
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-4 w-4 text-cnc-muted-soft group-hover:text-primary transition-colors"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </a>
             ))}
@@ -97,8 +113,9 @@ export default function AdminConfiguracoes() {
         <div className="rounded-xl border border-dashed border-cnc-line bg-white/50 p-5">
           <h2 className="text-sm font-bold text-cnc-muted mb-2">Área reservada</h2>
           <p className="text-xs text-cnc-muted-soft leading-relaxed">
-            Espaço para futuras configurações operacionais: regras de moderação, limites de anúncios por plano,
-            templates de email, configuração de webhooks, parâmetros de SEO e ajustes de integrações.
+            Espaço para futuras configurações operacionais: regras de moderação, limites de anúncios
+            por plano, templates de email, configuração de webhooks, parâmetros de SEO e ajustes de
+            integrações.
           </p>
         </div>
       </div>

@@ -45,8 +45,7 @@ function validateStep(step, form) {
       if (!form.state.trim() || form.state.length !== 2) return "Selecione a UF.";
       if (form.cityId == null || !Number.isFinite(form.cityId))
         return "Selecione uma cidade válida da lista para continuar.";
-      if (!form.city.trim())
-        return "Selecione uma cidade válida da lista para continuar.";
+      if (!form.city.trim()) return "Selecione uma cidade válida da lista para continuar.";
       if (!form.acceptTerms) return "Aceite os termos para publicar.";
       return null;
     case 6:

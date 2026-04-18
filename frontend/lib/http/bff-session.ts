@@ -5,7 +5,10 @@
  * Prevents the class of bugs where routes forget token refresh or IP forwarding.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSessionWithFreshBackendTokens, type EnsureBackendSessionResult } from "@/lib/session/ensure-backend-session";
+import {
+  ensureSessionWithFreshBackendTokens,
+  type EnsureBackendSessionResult,
+} from "@/lib/session/ensure-backend-session";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import {
   applySessionCookiesToResponse,

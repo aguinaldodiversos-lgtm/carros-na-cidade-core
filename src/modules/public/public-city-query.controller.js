@@ -3,7 +3,9 @@ import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 
 export async function getCatalogAdsTerritoryFallback(req, res, next) {
   try {
-    const slug = String(req.params.slug ?? "").trim().toLowerCase();
+    const slug = String(req.params.slug ?? "")
+      .trim()
+      .toLowerCase();
     if (!slug) {
       return res.status(400).json({
         success: false,

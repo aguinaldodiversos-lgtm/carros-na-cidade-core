@@ -19,5 +19,7 @@ export default async function DashboardPage() {
     return <DashboardClientRecovery variant="pf" mode="home" />;
   }
 
-  return <AccountDashboardView key={payload.user.id} initialData={payload} variant="pf" mode="home" />;
+  return (
+    <AccountDashboardView key={payload.user.id} initialData={payload} variant="pf" mode="home" />
+  );
 }

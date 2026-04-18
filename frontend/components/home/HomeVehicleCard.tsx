@@ -203,7 +203,13 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
         <div className="mt-3 flex items-center justify-between text-[12px] text-[#7b8497] sm:text-[13px]">
           <span>{mileage || "—"}</span>
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-[9px] bg-[#f2f5fa] text-[#46536f] transition group-hover:bg-[#0e62d8] group-hover:text-white">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="m9 6 6 6-6 6" />
             </svg>
           </span>

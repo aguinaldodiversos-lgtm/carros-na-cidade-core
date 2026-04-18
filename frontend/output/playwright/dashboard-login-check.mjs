@@ -1,6 +1,9 @@
 import { chromium } from "playwright";
 
-const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+const stamp = new Date()
+  .toISOString()
+  .replace(/[-:.TZ]/g, "")
+  .slice(0, 14);
 const email = `codex.dashboard.${stamp}@example.com`;
 const password = `Probe_${stamp}_Aa1!`;
 const backend = "https://carros-na-cidade-core.onrender.com";
@@ -131,7 +134,10 @@ try {
 }
 
 console.log("LOGIN_REQUESTS", JSON.stringify(loginRequests));
-console.log("LOGIN_RESPONSE", JSON.stringify({ status: loginResp.status(), body: safe(loginJson) }));
+console.log(
+  "LOGIN_RESPONSE",
+  JSON.stringify({ status: loginResp.status(), body: safe(loginJson) })
+);
 
 await page.waitForURL(/\/dashboard(?:\?|$)/, { timeout: 120000 });
 
@@ -159,7 +165,10 @@ const cookieNames = cookies
   .map((cookie) => cookie.name)
   .filter((name) => name.startsWith("cnc_"))
   .sort();
-const headerLoginCount = await page.getByRole("link", { name: "Entrar" }).count().catch(() => -1);
+const headerLoginCount = await page
+  .getByRole("link", { name: "Entrar" })
+  .count()
+  .catch(() => -1);
 const minhaContaCount = await page
   .getByRole("link", { name: /Minha conta|Conta/ })
   .count()

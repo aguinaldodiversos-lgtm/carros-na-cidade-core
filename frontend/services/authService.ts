@@ -478,10 +478,7 @@ async function postAuthProxy(
   }
 }
 
-export async function requestPasswordReset(
-  email: string,
-  ipHeaders?: Record<string, string>
-) {
+export async function requestPasswordReset(email: string, ipHeaders?: Record<string, string>) {
   const normalizedEmail = normalizeEmail(email);
   const proxied = await postAuthProxy(
     "/api/auth/forgot-password",

@@ -224,9 +224,7 @@ export function resolveBackendApiUrl(path: string): string {
 
     if (isApiPath(normalizedPath)) {
       const pathWithoutApiPrefix =
-        normalizedPath === "/api"
-          ? "/"
-          : normalizedPath.replace(/^\/api(?=\/|$)/, "");
+        normalizedPath === "/api" ? "/" : normalizedPath.replace(/^\/api(?=\/|$)/, "");
 
       return joinUrl(base, pathWithoutApiPrefix);
     }

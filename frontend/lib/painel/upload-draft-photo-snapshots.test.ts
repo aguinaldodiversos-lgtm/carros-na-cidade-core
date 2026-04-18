@@ -24,9 +24,7 @@ describe("upload-draft-photo-snapshots", () => {
   });
 
   it("filesFromSnapshots and formDataFromSnapshots produce readable files", async () => {
-    const snaps = [
-      { name: "a.jpg", type: "image/jpeg", buffer: Buffer.from([9, 9]) },
-    ];
+    const snaps = [{ name: "a.jpg", type: "image/jpeg", buffer: Buffer.from([9, 9]) }];
     const files = filesFromSnapshots(snaps);
     expect(files[0].size).toBe(2);
     const buf = Buffer.from(await files[0].arrayBuffer());

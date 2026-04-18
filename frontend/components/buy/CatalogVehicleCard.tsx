@@ -6,7 +6,10 @@ import { useCallback, useState } from "react";
 
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import {
+  LISTING_CARD_FALLBACK_IMAGE,
+  resolvePublicListingImageUrl,
+} from "@/lib/vehicle/detail-utils";
 import {
   primaryBadgeFromWeight,
   primaryBadgeLabel,
@@ -257,7 +260,14 @@ export default function CatalogVehicleCard({
         <p className="mt-1.5 text-[13px] font-medium text-slate-500">{subtitle}</p>
 
         <p className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-slate-500">
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden
+          >
             <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
             <circle cx="12" cy="11" r="2.5" />
           </svg>

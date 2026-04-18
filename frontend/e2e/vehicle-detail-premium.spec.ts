@@ -10,8 +10,13 @@ async function readImageSrc(locator: Locator) {
 }
 
 test.describe("Vehicle detail premium page", () => {
-  test("multiple photos: thumbnails, lightbox, persistence and whatsapp fallback", async ({ page }) => {
-    await page.goto(`/veiculo/${multiPhotoSlug}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  test("multiple photos: thumbnails, lightbox, persistence and whatsapp fallback", async ({
+    page,
+  }) => {
+    await page.goto(`/veiculo/${multiPhotoSlug}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
 
     await waitForVehicleGalleryReady(page);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -23,7 +28,10 @@ test.describe("Vehicle detail premium page", () => {
 
     const initialSrc = await readImageSrc(mainImage);
     await page.getByTestId("vehicle-gallery-thumb-1").click();
-    await expect(page.getByTestId("vehicle-gallery-thumb-1")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("vehicle-gallery-thumb-1")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     await expect(page.getByTestId("vehicle-gallery-counter")).toHaveText("2 de 5");
     await expect
       .poll(async () => readImageSrc(mainImage), {
@@ -55,7 +63,10 @@ test.describe("Vehicle detail premium page", () => {
   });
 
   test("single photo: gallery stays stable without broken empty states", async ({ page }) => {
-    await page.goto(`/veiculo/${singlePhotoSlug}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.goto(`/veiculo/${singlePhotoSlug}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
 
     await waitForVehicleGalleryReady(page);
     await expect(page.getByTestId("vehicle-gallery")).toBeVisible();
@@ -78,7 +89,10 @@ test.describe("Vehicle detail premium page", () => {
 
   test("mobile layout remains usable", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`/veiculo/${multiPhotoSlug}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.goto(`/veiculo/${multiPhotoSlug}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
 
     await waitForVehicleGalleryReady(page);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

@@ -37,20 +37,17 @@ describe("admin ads service", () => {
 
   describe("changeAdStatus", () => {
     it("rejects invalid status", async () => {
-      await expect(changeAdStatus("admin1", "1", "nonexistent"))
-        .rejects.toThrow(/Status inválido/);
+      await expect(changeAdStatus("admin1", "1", "nonexistent")).rejects.toThrow(/Status inválido/);
     });
 
     it("rejects when ad not found", async () => {
       vi.mocked(repo.findById).mockResolvedValue(null);
-      await expect(changeAdStatus("admin1", "999", "active"))
-        .rejects.toThrow(/não encontrado/);
+      await expect(changeAdStatus("admin1", "999", "active")).rejects.toThrow(/não encontrado/);
     });
 
     it("blocks restoration of deleted ads", async () => {
       vi.mocked(repo.findById).mockResolvedValue({ id: "1", status: "deleted" });
-      await expect(changeAdStatus("admin1", "1", "active"))
-        .rejects.toThrow(/deletados/);
+      await expect(changeAdStatus("admin1", "1", "active")).rejects.toThrow(/deletados/);
     });
 
     it("successfully changes status and records audit", async () => {
@@ -74,10 +71,8 @@ describe("admin ads service", () => {
 
   describe("setAdPriority", () => {
     it("rejects priority out of range", async () => {
-      await expect(setAdPriority("admin1", "1", 200))
-        .rejects.toThrow(/Priority/);
-      await expect(setAdPriority("admin1", "1", -5))
-        .rejects.toThrow(/Priority/);
+      await expect(setAdPriority("admin1", "1", 200)).rejects.toThrow(/Priority/);
+      await expect(setAdPriority("admin1", "1", -5)).rejects.toThrow(/Priority/);
     });
 
     it("successfully updates priority", async () => {
@@ -91,16 +86,13 @@ describe("admin ads service", () => {
 
   describe("grantManualBoost", () => {
     it("rejects invalid days", async () => {
-      await expect(grantManualBoost("admin1", "1", 0))
-        .rejects.toThrow(/Dias de boost/);
-      await expect(grantManualBoost("admin1", "1", 500))
-        .rejects.toThrow(/Dias de boost/);
+      await expect(grantManualBoost("admin1", "1", 0)).rejects.toThrow(/Dias de boost/);
+      await expect(grantManualBoost("admin1", "1", 500)).rejects.toThrow(/Dias de boost/);
     });
 
     it("rejects boost on deleted ad", async () => {
       vi.mocked(repo.findById).mockResolvedValue({ id: "1", status: "deleted" });
-      await expect(grantManualBoost("admin1", "1", 7))
-        .rejects.toThrow(/deletado ou bloqueado/);
+      await expect(grantManualBoost("admin1", "1", 7)).rejects.toThrow(/deletado ou bloqueado/);
     });
 
     it("successfully grants boost and records audit", async () => {

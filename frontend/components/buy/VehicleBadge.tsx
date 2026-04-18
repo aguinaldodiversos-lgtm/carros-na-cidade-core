@@ -50,10 +50,7 @@ export function VehiclePrimaryBadge({
   );
 }
 
-export function VehicleBelowFipeBadge({
-  className,
-  ...rest
-}: HTMLAttributes<HTMLSpanElement>) {
+export function VehicleBelowFipeBadge({ className, ...rest }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cx(

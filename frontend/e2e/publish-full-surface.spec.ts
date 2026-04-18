@@ -94,9 +94,10 @@ test.describe.serial("Publicação completa → superfícies do portal", () => {
         }
         await page.waitForTimeout(2000);
       }
-      expect(found, "Card do anúncio deve aparecer em /comprar após indexação (pode levar alguns segundos por cache SSR).").toBe(
-        true
-      );
+      expect(
+        found,
+        "Card do anúncio deve aparecer em /comprar após indexação (pode levar alguns segundos por cache SSR)."
+      ).toBe(true);
     });
 
     await test.step("Feed ‘recente’ da home (paridade por API — a UI da home tem ISR/caching)", async () => {
@@ -122,7 +123,9 @@ test.describe.serial("Publicação completa → superfícies do portal", () => {
       await expect(page.getByRole("heading", { name: /meus anúncios/i })).toBeVisible({
         timeout: 30_000,
       });
-      await expect(page.getByText(new RegExp(brandToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")).first()).toBeVisible({
+      await expect(
+        page.getByText(new RegExp(brandToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")).first()
+      ).toBeVisible({
         timeout: 30_000,
       });
     });

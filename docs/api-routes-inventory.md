@@ -56,8 +56,8 @@ Todas as integrações novas devem usar **exclusivamente** estes prefixos e mód
 
 Prefixo efetivo: `/api/public/seo` (montado em `app.use("/api/public/seo", publicSeoRoutes)`).
 
-| Método | Caminho completo (exemplos)                                                                                   |
-| ------ | ------------------------------------------------------------------------------------------------------------- |
+| Método | Caminho completo (exemplos)                                                                                                                                            |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/api/public/seo/sitemap`, `/sitemap.xml` (XML); `/sitemap.json` (inventário JSON para SSR); `/sitemap/type/:type`, `/sitemap/region/:state`, `/internal-links` (JSON) |
 
 ### `/api/auth` — `src/modules/auth/auth.routes.js`

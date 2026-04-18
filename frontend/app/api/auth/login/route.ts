@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { authenticateUser, BackendAuthError } from "@/services/authService";
-import { applyPrivateNoStoreHeaders, applySessionCookiesToResponse } from "@/services/sessionService";
+import {
+  applyPrivateNoStoreHeaders,
+  applySessionCookiesToResponse,
+} from "@/services/sessionService";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +23,11 @@ function safeBackendAuthMessage(message: string, fallback: string) {
   const normalized = normalizeString(message);
   if (!normalized || normalized.length > 180) return fallback;
 
-  if (/password_hash|jwt_secret|database|postgres|select\s|insert\s|update\s|stack|trace/i.test(normalized)) {
+  if (
+    /password_hash|jwt_secret|database|postgres|select\s|insert\s|update\s|stack|trace/i.test(
+      normalized
+    )
+  ) {
     return fallback;
   }
 

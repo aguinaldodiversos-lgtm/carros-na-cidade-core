@@ -29,7 +29,11 @@ export async function ensureSessionWithFreshBackendTokens(
     return { ok: false, reason: "cannot_refresh" };
   }
 
-  if (!options.forceRefresh && session.accessToken && !accessTokenNeedsRefresh(session.accessToken)) {
+  if (
+    !options.forceRefresh &&
+    session.accessToken &&
+    !accessTokenNeedsRefresh(session.accessToken)
+  ) {
     return { ok: true, session };
   }
 

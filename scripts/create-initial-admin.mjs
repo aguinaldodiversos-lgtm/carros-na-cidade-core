@@ -66,11 +66,11 @@ function parseArgs() {
     else if (arg === "--help" || arg === "-h") {
       console.log(
         "Usage:\n" +
-        "  node scripts/create-initial-admin.mjs --email EMAIL --password PASSWORD [--name NAME] [--force-password]\n\n" +
-        "Or via env:\n" +
-        "  ADMIN_SEED_EMAIL=... ADMIN_SEED_PASSWORD=... node scripts/create-initial-admin.mjs\n\n" +
-        "Flags:\n" +
-        "  --force-password   Also update password when promoting an existing user\n"
+          "  node scripts/create-initial-admin.mjs --email EMAIL --password PASSWORD [--name NAME] [--force-password]\n\n" +
+          "Or via env:\n" +
+          "  ADMIN_SEED_EMAIL=... ADMIN_SEED_PASSWORD=... node scripts/create-initial-admin.mjs\n\n" +
+          "Flags:\n" +
+          "  --force-password   Also update password when promoting an existing user\n"
       );
       process.exit(0);
     }
@@ -97,16 +97,16 @@ async function main() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes("localhost") || process.env.DATABASE_URL.includes("127.0.0.1")
-      ? false
-      : { rejectUnauthorized: false },
+    ssl:
+      process.env.DATABASE_URL.includes("localhost") ||
+      process.env.DATABASE_URL.includes("127.0.0.1")
+        ? false
+        : { rejectUnauthorized: false },
   });
 
   try {
     // 1. Check if any admin already exists
-    const adminCheck = await pool.query(
-      "SELECT id, email FROM users WHERE role = 'admin' LIMIT 1"
-    );
+    const adminCheck = await pool.query("SELECT id, email FROM users WHERE role = 'admin' LIMIT 1");
 
     if (adminCheck.rows.length > 0) {
       const existing = adminCheck.rows[0];
@@ -117,7 +117,8 @@ async function main() {
 
     // 2. Hash password (same bcrypt config as auth.service.js)
     const parsedRounds = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
-    const rounds = Number.isInteger(parsedRounds) && parsedRounds >= 4 && parsedRounds <= 15 ? parsedRounds : 10;
+    const rounds =
+      Number.isInteger(parsedRounds) && parsedRounds >= 4 && parsedRounds <= 15 ? parsedRounds : 10;
     const passwordHash = await bcrypt.hash(password.trim(), rounds);
 
     // 3. Check if user with this email already exists
@@ -141,12 +142,13 @@ async function main() {
           `UPDATE users SET role = 'admin', ${pwCol} = $2, updated_at = NOW() WHERE id = $1`,
           [user.id, passwordHash]
         );
-        info(`Usuário existente ${user.email} (id=${user.id}) promovido a admin com senha atualizada.`);
-      } else {
-        await pool.query(
-          "UPDATE users SET role = 'admin', updated_at = NOW() WHERE id = $1",
-          [user.id]
+        info(
+          `Usuário existente ${user.email} (id=${user.id}) promovido a admin com senha atualizada.`
         );
+      } else {
+        await pool.query("UPDATE users SET role = 'admin', updated_at = NOW() WHERE id = $1", [
+          user.id,
+        ]);
         info(`Usuário existente ${user.email} (id=${user.id}) promovido a admin (senha mantida).`);
         info("Use --force-password para também redefinir a senha.");
       }

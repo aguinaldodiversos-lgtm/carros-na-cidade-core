@@ -50,9 +50,9 @@ async function main() {
   if (!email && !userId) {
     console.error(
       "Usage:\n" +
-      "  node scripts/promote-admin.js --email admin@example.com\n" +
-      "  node scripts/promote-admin.js --user-id 42\n" +
-      "  ADMIN_SEED_EMAIL=admin@example.com node scripts/promote-admin.js"
+        "  node scripts/promote-admin.js --email admin@example.com\n" +
+        "  node scripts/promote-admin.js --user-id 42\n" +
+        "  ADMIN_SEED_EMAIL=admin@example.com node scripts/promote-admin.js"
     );
     process.exit(1);
   }
@@ -64,19 +64,16 @@ async function main() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes("localhost")
-      ? false
-      : { rejectUnauthorized: false },
+    ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
   });
 
   try {
     const where = email ? "email = $1" : "id = $1";
     const param = email || userId;
 
-    const check = await pool.query(
-      `SELECT id, email, role FROM users WHERE ${where} LIMIT 1`,
-      [param]
-    );
+    const check = await pool.query(`SELECT id, email, role FROM users WHERE ${where} LIMIT 1`, [
+      param,
+    ]);
 
     if (!check.rows[0]) {
       console.error(`User not found: ${email || userId}`);
@@ -90,10 +87,7 @@ async function main() {
       process.exit(0);
     }
 
-    await pool.query(
-      `UPDATE users SET role = 'admin' WHERE id = $1`,
-      [user.id]
-    );
+    await pool.query(`UPDATE users SET role = 'admin' WHERE id = $1`, [user.id]);
 
     console.log(`SUCCESS: User ${user.email} (id=${user.id}) promoted to admin.`);
     console.log("They can now access /api/admin/* endpoints with their existing credentials.");

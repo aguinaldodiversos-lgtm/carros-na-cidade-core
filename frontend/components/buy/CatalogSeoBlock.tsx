@@ -34,7 +34,9 @@ function buildColumns(city: BuyCityContext, data: CatalogSeoBlockProps): SeoColu
     data.popularModels && data.popularModels.length > 0
       ? data.popularModels.map((m) => ({
           label: m.label,
-          href: m.slug || `/comprar?city_slug=${encodeURIComponent(city.slug)}&model=${encodeURIComponent(m.label)}`,
+          href:
+            m.slug ||
+            `/comprar?city_slug=${encodeURIComponent(city.slug)}&model=${encodeURIComponent(m.label)}`,
         }))
       : [
           { label: "Volkswagen T-Cross", slug: "Volkswagen T-Cross" },
@@ -86,9 +88,18 @@ function buildColumns(city: BuyCityContext, data: CatalogSeoBlockProps): SeoColu
       intro: "Filtre o catálogo pela carroceria que faz sentido pra você.",
       items: [
         { label: "SUV", href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=SUV` },
-        { label: "Sedã", href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=Sedan` },
-        { label: "Hatch", href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=Hatch` },
-        { label: "Picape", href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=Picape` },
+        {
+          label: "Sedã",
+          href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=Sedan`,
+        },
+        {
+          label: "Hatch",
+          href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=Hatch`,
+        },
+        {
+          label: "Picape",
+          href: `/comprar?city_slug=${encodeURIComponent(city.slug)}&body_type=Picape`,
+        },
       ],
     },
     {
@@ -109,10 +120,7 @@ export function CatalogSeoBlock(props: CatalogSeoBlockProps) {
   const columns = buildColumns(city, props);
 
   return (
-    <section
-      aria-labelledby="catalog-seo-title"
-      className="border-t border-slate-200/80 bg-white"
-    >
+    <section aria-labelledby="catalog-seo-title" className="border-t border-slate-200/80 bg-white">
       <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
         <header className="mb-8 max-w-3xl">
           <h2
@@ -122,10 +130,10 @@ export function CatalogSeoBlock(props: CatalogSeoBlockProps) {
             Comprar carros usados em {city.name} é fácil e seguro
           </h2>
           <p className="mt-3 text-[15px] leading-relaxed text-slate-600">
-            O Carros na Cidade é o portal regional para quem compra e vende veículos em {city.name} e
-            nas principais cidades de {city.state}. Aqui você encontra ofertas atualizadas, filtros
-            inteligentes por território e contexto local em cada anúncio — tudo para você negociar
-            com segurança e decidir com informação.
+            O Carros na Cidade é o portal regional para quem compra e vende veículos em {city.name}{" "}
+            e nas principais cidades de {city.state}. Aqui você encontra ofertas atualizadas,
+            filtros inteligentes por território e contexto local em cada anúncio — tudo para você
+            negociar com segurança e decidir com informação.
           </p>
         </header>
 

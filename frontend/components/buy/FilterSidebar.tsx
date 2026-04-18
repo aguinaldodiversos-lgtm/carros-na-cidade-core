@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
-import {
-  formatTotal,
-  type BrandFacet,
-  type BuyCityContext,
-} from "@/lib/buy/catalog-helpers";
+import { formatTotal, type BrandFacet, type BuyCityContext } from "@/lib/buy/catalog-helpers";
 
 type SelectOption = { label: string; value: string };
 
@@ -72,7 +68,15 @@ const COLOR_OPTIONS: SelectOption[] = [
   { label: "Azul", value: "Azul" },
 ];
 
-function FieldGroup({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+function FieldGroup({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <label
@@ -339,9 +343,7 @@ export function FilterSidebar({
           >
             Ver {formatTotal(totalResults)} ofertas
           </button>
-          <p className="mt-2 text-center text-[11px] text-slate-500">
-            {city.label}
-          </p>
+          <p className="mt-2 text-center text-[11px] text-slate-500">{city.label}</p>
         </div>
       </div>
 
@@ -351,7 +353,14 @@ export function FilterSidebar({
       >
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_8px_20px_-8px_rgba(14,98,216,0.8)]">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
               <path d="M3 13h13l-2-4H5l-2 4Z" />
               <circle cx="7.5" cy="16.5" r="1.5" />
               <circle cx="16.5" cy="16.5" r="1.5" />

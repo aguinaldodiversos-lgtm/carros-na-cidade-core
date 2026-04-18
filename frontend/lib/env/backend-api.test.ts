@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { getBackendApiBaseUrl, getBackendApiExplicitEnvUrl, resolveBackendApiUrl } from "./backend-api";
+import {
+  getBackendApiBaseUrl,
+  getBackendApiExplicitEnvUrl,
+  resolveBackendApiUrl,
+} from "./backend-api";
 
 const keys = ["AUTH_API_BASE_URL", "BACKEND_API_URL", "API_URL", "NEXT_PUBLIC_API_URL"] as const;
 

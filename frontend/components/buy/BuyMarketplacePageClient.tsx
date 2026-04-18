@@ -142,7 +142,12 @@ export default function BuyMarketplacePageClient({
           </button>
 
           {mobileFiltersOpen ? (
-            <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Filtros">
+            <div
+              className="fixed inset-0 z-50 lg:hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Filtros"
+            >
               <button
                 type="button"
                 className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"

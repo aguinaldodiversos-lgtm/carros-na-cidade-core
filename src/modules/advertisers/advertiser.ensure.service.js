@@ -216,10 +216,9 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
       return existing.rows[0];
     }
 
-    const contactCols = [
-      ...USER_CONTACT_COLUMN_PRIORITY,
-      ...USER_ADDRESS_COLUMN_PRIORITY,
-    ].filter((c, index, arr) => usersCols.has(c) && arr.indexOf(c) === index);
+    const contactCols = [...USER_CONTACT_COLUMN_PRIORITY, ...USER_ADDRESS_COLUMN_PRIORITY].filter(
+      (c, index, arr) => usersCols.has(c) && arr.indexOf(c) === index
+    );
     let contactRow = {};
     if (contactCols.length) {
       const cr = await client.query(

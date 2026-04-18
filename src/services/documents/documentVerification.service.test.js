@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  validateCPF,
-  validateCNPJ,
-  verifyDocument,
-} from "./documentVerification.service.js";
+import { validateCPF, validateCNPJ, verifyDocument } from "./documentVerification.service.js";
 
 describe("documentVerification.service", () => {
   describe("validateCPF", () => {
@@ -32,21 +28,22 @@ describe("documentVerification.service", () => {
 
   describe("verifyDocument", () => {
     it("valida cpf e cnpj via API assíncrona", async () => {
-      await expect(
-        verifyDocument({ type: "cpf", number: "52998224725" })
-      ).resolves.toEqual({ valid: true });
+      await expect(verifyDocument({ type: "cpf", number: "52998224725" })).resolves.toEqual({
+        valid: true,
+      });
 
-      await expect(
-        verifyDocument({ type: "cnpj", number: "26263257000120" })
-      ).resolves.toEqual({ valid: true, company_name: null });
+      await expect(verifyDocument({ type: "cnpj", number: "26263257000120" })).resolves.toEqual({
+        valid: true,
+        company_name: null,
+      });
 
-      await expect(
-        verifyDocument({ type: "cpf", number: "11111111111" })
-      ).resolves.toEqual({ valid: false });
+      await expect(verifyDocument({ type: "cpf", number: "11111111111" })).resolves.toEqual({
+        valid: false,
+      });
 
-      await expect(
-        verifyDocument({ type: "nope", number: "52998224725" })
-      ).resolves.toEqual({ valid: false });
+      await expect(verifyDocument({ type: "nope", number: "52998224725" })).resolves.toEqual({
+        valid: false,
+      });
     });
   });
 });

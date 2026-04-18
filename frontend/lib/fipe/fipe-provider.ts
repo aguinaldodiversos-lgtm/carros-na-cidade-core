@@ -35,9 +35,7 @@ function toOption(item: unknown): FipeOption | null {
   const row = item as Record<string, unknown>;
   const rawCode = row.codigo ?? row.code;
   const code =
-    typeof rawCode === "string" || typeof rawCode === "number"
-      ? String(rawCode).trim()
-      : "";
+    typeof rawCode === "string" || typeof rawCode === "number" ? String(rawCode).trim() : "";
   const name = String(row.nome ?? row.name ?? "").trim();
 
   if (!code || !name) return null;

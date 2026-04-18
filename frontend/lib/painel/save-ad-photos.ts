@@ -20,7 +20,9 @@ function extForMime(mime: string): string {
  */
 export async function saveWizardPhotosToPublic(formData: FormData): Promise<string[]> {
   const raw = formData.getAll("photos");
-  const files = raw.filter((f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0);
+  const files = raw.filter(
+    (f): f is File => typeof File !== "undefined" && f instanceof File && f.size > 0
+  );
 
   if (files.length === 0) return [];
 

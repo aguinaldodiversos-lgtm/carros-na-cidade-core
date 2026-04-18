@@ -44,7 +44,13 @@ export async function listPaymentIntents({ limit = 50, offset = 0, status, conte
       offset,
     };
   } catch {
-    return { data: [], total: 0, limit, offset, _warning: "payment_intents table may not exist yet" };
+    return {
+      data: [],
+      total: 0,
+      limit,
+      offset,
+      _warning: "payment_intents table may not exist yet",
+    };
   }
 }
 

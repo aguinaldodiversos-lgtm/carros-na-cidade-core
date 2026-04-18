@@ -3,7 +3,15 @@ import { getBackendApiExplicitEnvUrl } from "@/lib/env/backend-api";
 const BRAZIL_COUNTRY_CODE = "55";
 
 export const VEHICLE_IMAGE_PLACEHOLDER = "/images/vehicle-placeholder.svg";
-export const VEHICLE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "avif", "heic", "heif"] as const;
+export const VEHICLE_IMAGE_EXTENSIONS = [
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "avif",
+  "heic",
+  "heif",
+] as const;
 export const VEHICLE_IMAGE_PROXY_PATH = "/api/vehicle-images";
 
 function safeText(value: unknown): string {
@@ -394,7 +402,11 @@ export function buildFinanceLink(
   return `/simulador-financiamento/${encodeURIComponent(citySlug)}?${params.toString()}`;
 }
 
-export function estimateMonthlyPayment(vehicleValue: number, months = 60, entryRatio = 0.2): number {
+export function estimateMonthlyPayment(
+  vehicleValue: number,
+  months = 60,
+  entryRatio = 0.2
+): number {
   const entry = vehicleValue * entryRatio;
   const financed = Math.max(vehicleValue - entry, 0);
   const monthlyRate = 1.99 / 100;

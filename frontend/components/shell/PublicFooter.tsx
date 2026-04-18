@@ -114,8 +114,8 @@ export function PublicFooter() {
             </Link>
 
             <p className="mt-5 max-w-md text-sm leading-relaxed text-white/80">
-              Marketplace automotivo regional: catálogo por cidade, referência FIPE local e negociação
-              com contexto — sem estoque genérico nacional.
+              Marketplace automotivo regional: catálogo por cidade, referência FIPE local e
+              negociação com contexto — sem estoque genérico nacional.
             </p>
 
             <div className="mt-6 space-y-2 text-sm">
@@ -156,7 +156,9 @@ export function PublicFooter() {
         </div>
 
         <div className="flex flex-col gap-4 pt-8 text-sm text-white/55 md:flex-row md:items-center md:justify-between">
-          <p className="font-medium">© {currentYear} Carros na Cidade. Todos os direitos reservados.</p>
+          <p className="font-medium">
+            © {currentYear} Carros na Cidade. Todos os direitos reservados.
+          </p>
 
           <FooterLegalLinks className="flex flex-wrap gap-x-6 gap-y-2" />
         </div>

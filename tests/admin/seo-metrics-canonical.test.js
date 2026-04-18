@@ -43,9 +43,7 @@ describe("seo_city_metrics canonical decision", () => {
 
   it("admin repository queries seo_city_metrics directly (not city_seo_metrics)", async () => {
     vi.mocked(query).mockResolvedValue({
-      rows: [
-        { date: "2026-04-07", city: "São Paulo", impressions: 100, clicks: 10 },
-      ],
+      rows: [{ date: "2026-04-07", city: "São Paulo", impressions: 100, clicks: 10 }],
     });
 
     const result = await getSeoCityMetrics({ limit: 10 });

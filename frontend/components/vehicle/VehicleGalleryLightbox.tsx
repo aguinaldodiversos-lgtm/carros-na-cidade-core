@@ -49,7 +49,13 @@ export default function VehicleGalleryLightbox({
             className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
             aria-label="Fechar visualização expandida"
           >
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
           </button>
@@ -64,7 +70,13 @@ export default function VehicleGalleryLightbox({
                 aria-label="Foto anterior no modal"
                 className="absolute left-4 top-1/2 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#0f172a] shadow-[0_10px_30px_rgba(2,6,23,0.4)]"
               >
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="m15 18-6-6 6-6" />
                 </svg>
               </button>
@@ -74,7 +86,13 @@ export default function VehicleGalleryLightbox({
                 aria-label="Próxima foto no modal"
                 className="absolute right-4 top-1/2 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#0f172a] shadow-[0_10px_30px_rgba(2,6,23,0.4)]"
               >
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="m9 18 6-6-6-6" />
                 </svg>
               </button>
