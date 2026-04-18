@@ -3,9 +3,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import type { CityRef } from "@/lib/city/city-types";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
+import { toAbsoluteUrl } from "@/lib/seo/site";
 import type {
   AdsFacetsResponse,
   AdsSearchFilters,
@@ -486,12 +488,38 @@ export default async function ComprarPage({ searchParams = {} }: ComprarPageProp
     }
   }
 
+  const breadcrumbItems = [
+    { name: "Home", href: "/" },
+    { name: "Comprar", href: "/comprar" },
+    { name: hasExplicitTerritory ? resolved.city.name : "Catálogo" },
+  ];
+
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `Catálogo de veículos em ${resolved.city.name}`,
+    numberOfItems: resolved.initialResults.pagination.total,
+    itemListElement: resolved.initialResults.data.slice(0, 20).map((ad, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
+      name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
+    })),
+  };
+
   return (
-    <BuyMarketplacePageClient
-      initialResults={resolved.initialResults}
-      initialFacets={resolved.initialFacets}
-      initialFilters={resolved.filters}
-      city={resolved.city}
-    />
+    <>
+      <BreadcrumbJsonLd items={breadcrumbItems} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
+      <BuyMarketplacePageClient
+        initialResults={resolved.initialResults}
+        initialFacets={resolved.initialFacets}
+        initialFilters={resolved.filters}
+        city={resolved.city}
+      />
+    </>
   );
 }

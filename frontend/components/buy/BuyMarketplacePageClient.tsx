@@ -4,8 +4,9 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { BuyPageShell } from "@/components/buy/BuyPageShell";
+import { CatalogPageHeader } from "@/components/buy/CatalogPageHeader";
+import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
-import { ResultsToolbar } from "@/components/buy/ResultsToolbar";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import type {
   AdsFacetsResponse,
@@ -14,7 +15,6 @@ import type {
 } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import {
-  buildCatalogStats,
   DEFAULT_BRAND_OPTIONS,
   DEFAULT_MODEL_OPTIONS,
   DEFAULT_POPULAR_BRANDS,
@@ -47,9 +47,6 @@ export default function BuyMarketplacePageClient({
     [initialResults?.data, city]
   );
 
-  const firstRow = useMemo(() => items.slice(0, 2), [items]);
-  const remaining = useMemo(() => items.slice(2), [items]);
-
   const brandFacets = useMemo(
     () => toSafeBrandFacets(initialFacets?.brands),
     [initialFacets?.brands]
@@ -61,13 +58,13 @@ export default function BuyMarketplacePageClient({
   );
 
   const brandOptions = useMemo(() => {
-    const options = brandFacets.slice(0, 12).map((item) => ({
+    const options = brandFacets.slice(0, 20).map((item) => ({
       label: item.brand,
       value: item.brand,
     }));
 
     return options.length > 0
-      ? [{ label: "Selecionar marca", value: "" }, ...options]
+      ? [{ label: "Todas as marcas", value: "" }, ...options]
       : DEFAULT_BRAND_OPTIONS;
   }, [brandFacets]);
 
@@ -76,21 +73,19 @@ export default function BuyMarketplacePageClient({
       ? modelFacets.filter((item) => item.brand === initialFilters.brand)
       : modelFacets;
 
-    const options = filtered.slice(0, 12).map((item) => ({
+    const options = filtered.slice(0, 20).map((item) => ({
       label: item.model,
       value: item.model,
     }));
 
     return options.length > 0
-      ? [{ label: "Selecionar modelo", value: "" }, ...options]
+      ? [{ label: "Todos os modelos", value: "" }, ...options]
       : DEFAULT_MODEL_OPTIONS;
   }, [initialFilters.brand, modelFacets]);
 
   const popularBrands = useMemo(() => {
-    return brandFacets.length > 0 ? brandFacets.slice(0, 5) : DEFAULT_POPULAR_BRANDS;
+    return brandFacets.length > 0 ? brandFacets.slice(0, 8) : DEFAULT_POPULAR_BRANDS;
   }, [brandFacets]);
-
-  const catalogStats = useMemo(() => buildCatalogStats(items), [items]);
 
   const pushFilters = useCallback(
     (patch: Partial<AdsSearchFilters>, resetPage = true) => {
@@ -106,17 +101,22 @@ export default function BuyMarketplacePageClient({
     [initialFilters, pathname, router]
   );
 
-  const totalAds = initialResults?.pagination?.total || items.length || 0;
-  const mapHref = `/cidade/${encodeURIComponent(city.slug)}`;
+  const clearFilters = useCallback(() => {
+    router.push(pathname);
+    setMobileFiltersOpen(false);
+  }, [pathname, router]);
 
-  const filterSidebarProps = {
+  const totalAds = initialResults?.pagination?.total || items.length || 0;
+
+  const sidebarProps = {
     filters: initialFilters,
     city,
     brandOptions,
     modelOptions,
     popularBrands,
-    catalogStats,
+    totalResults: totalAds,
     onPatch: (patch: Partial<AdsSearchFilters>) => pushFilters(patch),
+    onClear: clearFilters,
   };
 
   return (
@@ -160,8 +160,8 @@ export default function BuyMarketplacePageClient({
                     Fechar
                   </button>
                 </div>
-                <div className="max-h-[calc(90vh-52px)] overflow-y-auto overscroll-contain px-2 pb-8 pt-2">
-                  <FilterSidebar {...filterSidebarProps} className="border-0 shadow-none" />
+                <div className="max-h-[calc(90vh-52px)] overflow-y-auto overscroll-contain px-3 pb-8 pt-3">
+                  <FilterSidebar {...sidebarProps} />
                 </div>
               </div>
             </div>
@@ -169,39 +169,28 @@ export default function BuyMarketplacePageClient({
         </>
       }
     >
+      <CatalogPageHeader
+        city={city}
+        filters={initialFilters}
+        totalResults={totalAds}
+        onPatch={(patch) => pushFilters(patch)}
+      />
+
       <main>
-        <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-5 lg:px-8 lg:pb-10 lg:pt-6">
-          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] lg:items-start lg:gap-10">
+        <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 sm:pb-12 lg:px-8">
+          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:items-start lg:gap-8">
             <aside className="hidden lg:sticky lg:top-[76px] lg:block lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pb-8 lg:pr-1">
-              <FilterSidebar {...filterSidebarProps} />
+              <FilterSidebar {...sidebarProps} />
             </aside>
 
             <div className="min-w-0 flex-1">
-              <div className="mb-4 flex items-center justify-between rounded-xl border border-dashed border-slate-200/90 bg-white/60 px-3 py-2.5 lg:hidden">
-                <p className="text-sm font-semibold text-slate-700">Refinar listagem</p>
-                <button
-                  type="button"
-                  onClick={() => setMobileFiltersOpen(true)}
-                  className="text-sm font-bold text-blue-700"
-                >
-                  Abrir filtros
-                </button>
-              </div>
-
-              <ResultsToolbar
-                filters={initialFilters}
-                totalResults={totalAds}
-                cityLabel={city.label}
-                mapHref={mapHref}
-                onLimitChange={(limit) => pushFilters({ limit })}
-                onSortChange={(value) => pushFilters({ sort: value })}
-              />
-
-              <VehicleGrid featured={firstRow} rest={remaining} inferWeight={inferWeight} />
+              <VehicleGrid items={items} inferWeight={inferWeight} />
             </div>
           </div>
         </div>
       </main>
+
+      <CatalogSeoBlock city={city} brands={brandFacets} />
     </BuyPageShell>
   );
 }

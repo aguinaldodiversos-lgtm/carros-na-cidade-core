@@ -8,11 +8,9 @@ import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { LISTING_CARD_FALLBACK_IMAGE, resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import {
-  financeChipLabel,
   primaryBadgeFromWeight,
   primaryBadgeLabel,
   VehicleBelowFipeBadge,
-  VehicleFinanceChip,
   VehiclePrimaryBadge,
 } from "@/components/buy/VehicleBadge";
 
@@ -83,7 +81,7 @@ function parseMoney(value: number | string | null | undefined) {
 }
 
 function formatCurrency(value: number) {
-  if (!value) return "R$ 0";
+  if (!value) return "Sob consulta";
 
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -101,9 +99,14 @@ function parseMileage(value?: number | string | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatMileage(value?: number | string | null) {
+function formatMileageShort(value?: number | string | null) {
   const parsed = parseMileage(value);
   if (!parsed) return null;
+  if (parsed >= 1000) {
+    const k = parsed / 1000;
+    const rounded = k >= 100 ? Math.round(k) : Number(k.toFixed(1));
+    return `${rounded.toLocaleString("pt-BR")} mil km`;
+  }
   return `${parsed.toLocaleString("pt-BR")} km`;
 }
 
@@ -138,12 +141,18 @@ function getTitle(item: CatalogItem) {
   const explicitTitle = toText(item.title);
   if (explicitTitle) return explicitTitle;
 
+  const pieces = [toText(item.brand), toText(item.model)].filter(Boolean);
+  return pieces.join(" ") || "Veículo";
+}
+
+function getSubtitle(item: CatalogItem) {
   const year = extractPrimaryYear(item);
-  const pieces = [year, toText(item.brand), toText(item.model), toText(item.version)].filter(
+  const pieces = [year, formatMileageShort(item.mileage), toText(item.transmission)].filter(
     Boolean
   );
 
-  return pieces.join(" ") || "Veículo";
+  if (pieces.length > 0) return pieces.join(" · ");
+  return "Informações sob consulta";
 }
 
 function getHref(item: CatalogItem, resolvedTitle: string) {
@@ -158,36 +167,10 @@ function getHref(item: CatalogItem, resolvedTitle: string) {
   });
 }
 
-function getMetaLine(item: CatalogItem) {
-  const pieces = [
-    toText(item.fuel_type),
-    formatMileage(item.mileage),
-    toText(item.transmission),
-  ].filter(Boolean);
-
-  if (pieces.length > 0) return pieces.join("  ·  ");
-  return "Informações sob consulta";
-}
-
 function getLocation(item: CatalogItem) {
   const city = toText(item.city, "São Paulo");
   const state = toText(item.state, "SP").toUpperCase();
   return `${city} - ${state}`;
-}
-
-function getListedHint(createdAt?: string | null) {
-  if (!createdAt) return null;
-  const d = new Date(createdAt);
-  if (!Number.isFinite(d.getTime())) return null;
-
-  const diffMs = Date.now() - d.getTime();
-  const days = Math.floor(diffMs / 86_400_000);
-
-  if (days < 1) return "Publicado hoje";
-  if (days === 1) return "Publicado há 1 dia";
-  if (days < 7) return `Publicado há ${days} dias`;
-  if (days < 30) return `Publicado há ${Math.floor(days / 7)} semanas`;
-  return `Desde ${d.toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
 export default function CatalogVehicleCard({
@@ -202,13 +185,11 @@ export default function CatalogVehicleCard({
   const href = hrefOverride || getHref(item, title);
   const price = parseMoney(item.price);
   const location = getLocation(item);
-  const meta = getMetaLine(item);
+  const subtitle = getSubtitle(item);
   const primaryVariant = primaryBadgeFromWeight(weight);
-  const financeLabel = financeChipLabel(weight, Boolean(item.below_fipe));
   const [brokenImage, setBrokenImage] = useState(false);
   const resolvedSrc = getImage(item);
   const image = brokenImage ? LISTING_CARD_FALLBACK_IMAGE : resolvedSrc;
-  const listedHint = getListedHint(item.created_at);
   const onImageError = useCallback(() => setBrokenImage(true), []);
   const useUnoptimizedImage =
     image.startsWith("/api/vehicle-images") ||
@@ -217,8 +198,7 @@ export default function CatalogVehicleCard({
     image.endsWith(".svg");
 
   const cardClasses = cx(
-    "group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-16px_rgba(15,23,42,0.18)]",
-    featured ? "ring-1 ring-slate-200/60" : "",
+    "group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_20px_-10px_rgba(15,23,42,0.15)] transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_36px_-18px_rgba(14,98,216,0.35)]",
     className
   );
 
@@ -241,18 +221,21 @@ export default function CatalogVehicleCard({
           loading="lazy"
         />
 
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-slate-900/10" />
-
-        <div className="absolute left-3 top-3 z-[1] flex max-w-[calc(100%-4rem)] flex-col items-start gap-1.5">
-          <VehiclePrimaryBadge variant={primaryVariant}>
-            {primaryBadgeLabel(primaryVariant)}
-          </VehiclePrimaryBadge>
-          {item.below_fipe ? <VehicleBelowFipeBadge /> : null}
+        <div className="absolute left-3 top-3 z-[1] flex max-w-[calc(100%-3.5rem)] flex-col items-start gap-1.5">
+          {item.below_fipe ? (
+            <VehicleBelowFipeBadge />
+          ) : (
+            <VehiclePrimaryBadge variant={primaryVariant}>
+              {primaryBadgeLabel(primaryVariant)}
+            </VehiclePrimaryBadge>
+          )}
         </div>
 
-        <span
-          aria-hidden="true"
-          className="absolute right-3 top-3 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-400 shadow-md ring-1 ring-white/80 backdrop-blur-sm"
+        <button
+          type="button"
+          aria-label="Salvar nos favoritos"
+          onClick={(event) => event.preventDefault()}
+          className="absolute right-3 top-3 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-500 shadow-md ring-1 ring-white/80 backdrop-blur-sm transition hover:text-rose-500"
         >
           <svg
             viewBox="0 0 24 24"
@@ -263,44 +246,34 @@ export default function CatalogVehicleCard({
           >
             <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
           </svg>
-        </span>
+        </button>
       </div>
 
-      <div className={cx("flex flex-1 flex-col px-4 pb-4 pt-4", featured && "md:px-5 md:pb-5 md:pt-5")}>
-        <h3
-          className={cx(
-            "line-clamp-2 min-h-[2.75rem] font-bold leading-snug tracking-tight text-slate-900",
-            featured ? "text-lg md:text-xl" : "text-[15px] md:text-base"
-          )}
-        >
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
+        <h3 className="line-clamp-1 text-[16px] font-extrabold leading-tight tracking-tight text-slate-900">
           {title}
         </h3>
 
-        <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-slate-600">{meta}</p>
-        <p className="mt-1 text-[13px] font-medium text-slate-500">{location}</p>
-        {listedHint ? (
-          <p className="mt-1 text-[12px] font-medium text-slate-400">{listedHint}</p>
-        ) : null}
+        <p className="mt-1.5 text-[13px] font-medium text-slate-500">{subtitle}</p>
 
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-2 border-t border-slate-100 pt-4">
-          <div
-            className={cx(
-              "font-extrabold leading-none tracking-tight text-blue-700",
-              featured ? "text-2xl" : "text-xl"
-            )}
-          >
+        <p className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-slate-500">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
+            <circle cx="12" cy="11" r="2.5" />
+          </svg>
+          <span className="truncate">{location}</span>
+        </p>
+
+        <div className="mt-auto flex items-end justify-between gap-2 pt-4">
+          <div className="text-[20px] font-extrabold leading-none tracking-tight text-blue-700">
             {formatCurrency(price)}
           </div>
-          <VehicleFinanceChip>{financeLabel}</VehicleFinanceChip>
-        </div>
-
-        <div
-          className={cx(
-            "mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-700 text-center text-sm font-semibold text-white transition group-hover:bg-blue-800",
-            featured ? "min-h-[3rem] text-base" : "min-h-[2.75rem]"
-          )}
-        >
-          Ver detalhes
+          <span className="inline-flex items-center gap-1 text-[13px] font-bold text-blue-700 transition group-hover:text-blue-800">
+            Ver detalhes
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden>
+              <path d="M7.5 4 13 10l-5.5 6-1.4-1.4L10.2 10 6.1 5.4Z" />
+            </svg>
+          </span>
         </div>
       </div>
     </>

@@ -9,7 +9,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
  */
 export type VehiclePrimaryBadgeVariant = "destaque" | "loja_premium" | "loja" | "anuncio";
 
-export type VehicleAuxiliaryBadgeVariant = "below_fipe" | "finance";
+export type VehicleAuxiliaryBadgeVariant = "below_fipe";
 
 const primaryVariants: Record<VehiclePrimaryBadgeVariant, string> = {
   destaque:
@@ -21,7 +21,6 @@ const primaryVariants: Record<VehiclePrimaryBadgeVariant, string> = {
 
 const auxiliaryVariants: Record<VehicleAuxiliaryBadgeVariant, string> = {
   below_fipe: "bg-blue-700 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white",
-  finance: "bg-slate-50 text-slate-600 ring-1 ring-slate-200/80",
 };
 
 export function primaryBadgeFromWeight(weight: 1 | 2 | 3 | 4): VehiclePrimaryBadgeVariant {
@@ -69,25 +68,6 @@ export function VehicleBelowFipeBadge({
   );
 }
 
-export function VehicleFinanceChip({
-  children,
-  className,
-  ...rest
-}: HTMLAttributes<HTMLSpanElement>) {
-  return (
-    <span
-      className={cx(
-        "inline-flex max-w-[9rem] items-center justify-end rounded-lg px-2 py-1.5 text-[11px] font-semibold leading-tight text-slate-600",
-        auxiliaryVariants.finance,
-        className
-      )}
-      {...rest}
-    >
-      {children}
-    </span>
-  );
-}
-
 export function primaryBadgeLabel(variant: VehiclePrimaryBadgeVariant): string {
   switch (variant) {
     case "destaque":
@@ -97,15 +77,6 @@ export function primaryBadgeLabel(variant: VehiclePrimaryBadgeVariant): string {
     case "loja":
       return "Loja";
     default:
-      return "Anúncio";
+      return "Patrocinado";
   }
-}
-
-/** Texto do chip inferior — evita repetir o selo “Abaixo da FIPE” já exibido na foto. */
-export function financeChipLabel(weight: 1 | 2 | 3 | 4, belowFipe: boolean): string {
-  if (belowFipe) return "Oportunidade regional";
-  if (weight === 4) return "Alta visibilidade";
-  if (weight === 3) return "Revenda premium";
-  if (weight === 2) return "Loja verificada";
-  return "Oferta local";
 }
