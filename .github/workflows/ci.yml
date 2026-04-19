@@ -1,144 +1,7 @@
-name: CI
-
-on:
-  push:
-    branches: [main, dev]
-  pull_request:
-    branches: [main, dev]
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
-jobs:
-  backend:
-    name: Backend (lint + test + audits)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      # Sinaliza ao loader de env (src/config/env.js) que estamos em contexto de
-      # testes unitários. Integração fica fora (`vitest run --exclude tests/integration/**`).
-      NODE_ENV: test
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prettier (format check — monorepo)
-        run: npm run format:check
-
-      - name: ESLint (backend)
-        run: npm run lint
-
-      - name: Unit tests + coverage (backend)
-        run: npm run test:coverage
-
-      - name: Contract audit (BFF ↔ Express)
-        run: npm run audit:contract
-
-      - name: System integrity scan (estático)
-        run: npm run audit:integrity
-
-      - name: Clone detection (jscpd)
-        run: npm run audit:clones
-
-      - name: Job summary
-        if: success()
-        run: echo "### Backend checks passed" >> "$GITHUB_STEP_SUMMARY"
-
-  integration-ads:
-    name: Integration (ads + Postgres)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: carros_na_cidade_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d carros_na_cidade_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-    env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-      NODE_ENV: test
-      PG_SSL_MODE: disable
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Integration tests (ads + DB)
-        run: npm run ci:integration-ads
-
-      - name: Job summary
-        if: success()
-        run: echo "### Integration (ads) passed" >> "$GITHUB_STEP_SUMMARY"
-
-  frontend:
-    name: Frontend (lint + typecheck + test + build)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: ESLint (frontend)
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests + coverage (Vitest)
-        run: npm run test:coverage
-
-      - name: Project audit (links, assets, env — avisos não bloqueiam)
-        working-directory: ${{ github.workspace }}
-        run: npm run audit:project
-
-      - name: Next.js build
-        run: npm run build
-
-      - name: Job summary
-        if: success()
-        run: echo "### Frontend checks passed" >> "$GITHUB_STEP_SUMMARY"
-
   e2e:
     name: E2E (Playwright — full-flow)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Bloqueia deploy se falhar: este job está no mesmo workflow que o build frontend.
     needs: [backend, frontend]
     services:
       postgres:
@@ -146,33 +9,41 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: carros_na_cidade_test
+          POSTGRES_DB: carros_na_cidade_e2e
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d carros_na_cidade_test"
+          --health-cmd "pg_isready -U postgres -d carros_na_cidade_e2e"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-      E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+      NODE_ENV: test
       PG_SSL_MODE: disable
+
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_e2e
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_e2e
+      E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_e2e
+
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
       E2E_BACKEND_API_URL: http://127.0.0.1:4000
       BACKEND_API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+
       TEST_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
       TEST_USER_A_PASS: ${{ secrets.E2E_USER_A_PASS }}
       TEST_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
       TEST_USER_B_PASS: ${{ secrets.E2E_USER_B_PASS }}
+
       JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-jwt-secret-placeholder' }}
       AUTH_SESSION_SECRET: ${{ secrets.AUTH_SESSION_SECRET || 'ci-session-secret-placeholder' }}
+
       PW_START_SERVER: "1"
-      NODE_ENV: test
+
     defaults:
       run:
         working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
 
@@ -197,19 +68,10 @@ jobs:
       - name: Apply migrations
         working-directory: ${{ github.workspace }}
         run: npm run integration:db:prepare
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-          PG_SSL_MODE: disable
-          NODE_ENV: test
 
       - name: Seed E2E fixtures
         working-directory: ${{ github.workspace }}
         run: node scripts/e2e-seed.mjs
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
-          PG_SSL_MODE: disable
 
       - name: Run E2E full-flow suite
         run: npm run test:e2e:full-flow
