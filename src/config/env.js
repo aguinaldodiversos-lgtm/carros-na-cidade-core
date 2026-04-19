@@ -51,6 +51,18 @@ const envSchema = z.object({
 });
 
 function parseEnv() {
+  // Contexto de teste (NODE_ENV=test explicitamente): env.js é carregado
+  // transitivamente durante o bootstrap do vitest.config (brain-stack → ai.audit
+  // → db → env), antes do `integration-db-bootstrap.js` rodar. Jobs que não
+  // usam banco (ex.: Backend unit tests com integração excluída) não definem
+  // DATABASE_URL — um placeholder seguro aqui evita quebrar a carga do módulo.
+  // Produção (NODE_ENV=production) e development permanecem estritos.
+  // O gate usa NODE_ENV==="test" explicitamente (e não VITEST) para não
+  // mascarar o teste que valida esse fail-fast em cenário development.
+  if (process.env.NODE_ENV === "test" && !String(process.env.DATABASE_URL || "").trim()) {
+    process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:5432/test_placeholder";
+  }
+
   const result = envSchema.safeParse(process.env);
 
   if (!result.success) {

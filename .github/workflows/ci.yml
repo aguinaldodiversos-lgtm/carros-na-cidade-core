@@ -18,6 +18,10 @@ jobs:
     name: Backend (lint + test + audits)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      # Sinaliza ao loader de env (src/config/env.js) que estamos em contexto de
+      # testes unitários. Integração fica fora (`vitest run --exclude tests/integration/**`).
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
 

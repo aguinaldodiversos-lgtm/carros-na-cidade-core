@@ -84,14 +84,9 @@ END
 $$;
 
 
--- Índices só depois de garantir as colunas
-CREATE UNIQUE INDEX IF NOT EXISTS dealer_leads_google_place_id_key
-  ON public.dealer_leads (google_place_id)
-  WHERE google_place_id IS NOT NULL AND TRIM(google_place_id) <> '';
-
-    FROM dealer_leads
-
--- Índice único em google_place_id apenas se não houver duplicidade legada
+-- Índices só depois de garantir as colunas.
+-- Índice único em google_place_id apenas se não houver duplicidade legada;
+-- o bloco DO abaixo é a única fonte de verdade (evita falhar em bases sujas).
 DO $$
 BEGIN
   IF EXISTS (
