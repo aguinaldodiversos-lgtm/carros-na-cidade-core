@@ -605,16 +605,37 @@ function auditJsxInTs(findings) {
   }
 }
 
+function shouldSkipAssetAuditFile(filePath) {
+  const r = rel(filePath);
+  const raw = String(filePath || "");
+  if (/\.(test|spec)\.(js|mjs|cjs|ts|tsx|jsx)$/i.test(r)) return true;
+  if (/\.(test|spec)\.(js|mjs|cjs|ts|tsx|jsx)$/i.test(raw)) return true;
+  if (/(^|[\\/])__tests__([\\/]|$)/.test(r)) return true;
+  if (/(^|[\\/])__tests__([\\/]|$)/.test(raw)) return true;
+  return false;
+}
+
+function isDynamicAssetPath(assetPath) {
+  if (assetPath.startsWith("/api/")) return true;
+  if (assetPath.startsWith("/uploads/")) return true;
+  return false;
+}
+
 function auditFrontendAssets(findings) {
   const publicDir = path.join(ROOT, config.frontendPublicDir);
-  const assetRegex = /["'`]((\/[^"'`]+\.(png|jpg|jpeg|webp|svg|gif|ico|avif)))["'`]/g;
+  const assetRegex = /["'`]((\/[^"'`]+\.(png|jpg|jpeg|webp|svg|gif|ico|avif)))(?:\?[^"'`]*)?(?:#[^"'`]*)?["'`]/g;
 
   for (const file of frontendFiles) {
+    if (shouldSkipAssetAuditFile(file)) continue;
     const content = readFileSafe(file);
     const matches = Array.from(content.matchAll(assetRegex));
 
     for (const match of matches) {
-      const assetPath = match[1];
+      const rawPath = match[1];
+      const assetPath = rawPath.split("?")[0].split("#")[0];
+
+      if (isDynamicAssetPath(assetPath)) continue;
+
       const full = path.join(publicDir, assetPath.replace(/^\//, ""));
 
       if (!exists(full)) {
