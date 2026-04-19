@@ -623,7 +623,8 @@ function isDynamicAssetPath(assetPath) {
 
 function auditFrontendAssets(findings) {
   const publicDir = path.join(ROOT, config.frontendPublicDir);
-  const assetRegex = /["'`]((\/[^"'`]+\.(png|jpg|jpeg|webp|svg|gif|ico|avif)))(?:\?[^"'`]*)?(?:#[^"'`]*)?["'`]/g;
+  const assetRegex =
+    /["'`]((\/[^"'`]+\.(png|jpg|jpeg|webp|svg|gif|ico|avif)))(?:\?[^"'`]*)?(?:#[^"'`]*)?["'`]/g;
 
   for (const file of frontendFiles) {
     if (shouldSkipAssetAuditFile(file)) continue;
