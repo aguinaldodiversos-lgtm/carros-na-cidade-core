@@ -194,11 +194,22 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Prepare DB (migrations + seed)
+      - name: Apply migrations
+        working-directory: ${{ github.workspace }}
+        run: npm run integration:db:prepare
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+          PG_SSL_MODE: disable
+          NODE_ENV: test
+
+      - name: Seed E2E fixtures
         working-directory: ${{ github.workspace }}
         run: node scripts/e2e-seed.mjs
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
+          PG_SSL_MODE: disable
 
       - name: Run E2E full-flow suite
         run: npm run test:e2e:full-flow
