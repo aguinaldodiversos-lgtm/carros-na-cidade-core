@@ -121,16 +121,22 @@ function CityProviderInner({
       writeCityCookie(next);
       setPickerOpen(false);
 
-      const onComprar = (pathname.replace(/\/+$/, "") || "/") === "/comprar";
+      const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+      const onComprar =
+        normalizedPath === "/comprar" ||
+        normalizedPath.startsWith("/comprar/estado/") ||
+        normalizedPath.startsWith("/comprar/cidade/");
+
       if (onComprar) {
         const params = new URLSearchParams(searchParams.toString());
-        params.set("city_slug", next.slug);
+        params.delete("city_slug");
         params.delete("city_id");
         params.delete("city");
         params.delete("state");
-        params.set("page", "1");
+        params.delete("page");
         const qs = params.toString();
-        router.push(qs ? `/comprar?${qs}` : `/comprar?city_slug=${encodeURIComponent(next.slug)}`);
+        const target = `/comprar/cidade/${encodeURIComponent(next.slug)}`;
+        router.push(qs ? `${target}?${qs}` : target);
         return;
       }
 

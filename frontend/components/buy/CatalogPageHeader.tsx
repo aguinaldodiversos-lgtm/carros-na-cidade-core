@@ -1,12 +1,18 @@
 "use client";
 
 import { useCallback, useId, useMemo, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import { formatTotal, type BuyCityContext } from "@/lib/buy/catalog-helpers";
+import {
+  buildStatePath,
+  type ComprarVariant,
+  stateNameFromUf,
+} from "@/lib/buy/territory-variant";
 
 import { CatalogBreadcrumb } from "./CatalogBreadcrumb";
 
@@ -43,6 +49,10 @@ type CatalogPageHeaderProps = {
   filters: AdsSearchFilters;
   totalResults: number;
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
+  /** Define papel da página no funil Comprar Estadual x Comprar na Cidade. */
+  variant?: ComprarVariant;
+  /** UF ativa quando a variante é estadual (ex.: "SP"). */
+  stateUf?: string;
 };
 
 export function CatalogPageHeader({
@@ -50,6 +60,8 @@ export function CatalogPageHeader({
   filters,
   totalResults,
   onPatch,
+  variant = "estadual",
+  stateUf,
 }: CatalogPageHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -57,14 +69,23 @@ export function CatalogPageHeader({
 
   const [query, setQuery] = useState(filters.q || filters.brand || "");
 
-  const breadcrumbItems = useMemo(
-    () => [
+  const activeStateUf = stateUf || filters.state || city.state || "SP";
+  const stateName = stateNameFromUf(activeStateUf);
+
+  const breadcrumbItems = useMemo(() => {
+    if (variant === "cidade") {
+      return [
+        { label: "Home", href: "/" },
+        { label: "Comprar", href: "/comprar" },
+        { label: `${city.name} (${city.state})` },
+      ];
+    }
+    return [
       { label: "Home", href: "/" },
       { label: "Comprar", href: "/comprar" },
       { label: "Catálogo" },
-    ],
-    []
-  );
+    ];
+  }, [variant, city.name, city.state]);
 
   const handleStateChange = useCallback(
     (uf: string) => {
@@ -72,9 +93,13 @@ export function CatalogPageHeader({
         onPatch({ state: undefined, city: undefined, city_slug: undefined, city_id: undefined });
         return;
       }
+      if (variant === "cidade" || uf !== activeStateUf) {
+        router.push(buildStatePath(uf, { ...filters, page: 1 }));
+        return;
+      }
       onPatch({ state: uf, city: undefined, city_slug: undefined, city_id: undefined });
     },
-    [onPatch]
+    [onPatch, variant, activeStateUf, filters, router]
   );
 
   const handleSubmit = useCallback(
@@ -91,6 +116,36 @@ export function CatalogPageHeader({
     [query, filters, pathname, router]
   );
 
+  const title =
+    variant === "cidade" ? (
+      <>
+        Carros usados em <span className="text-blue-700">{city.name}</span>
+      </>
+    ) : (
+      <>
+        Catálogo de veículos em <span className="text-blue-700">{stateName}</span>
+      </>
+    );
+
+  const subtitle =
+    variant === "cidade" ? (
+      <>
+        Encontre{" "}
+        <span className="font-semibold tabular-nums text-slate-700">
+          {formatTotal(totalResults)}
+        </span>{" "}
+        carros usados à venda em {city.name}, {stateName}. Ofertas atualizadas e preços atrativos
+        para você encontrar o carro ideal na sua cidade.
+      </>
+    ) : (
+      <>
+        <span className="font-semibold tabular-nums text-slate-700">
+          {formatTotal(totalResults)}
+        </span>{" "}
+        ofertas disponíveis perto de você.
+      </>
+    );
+
   return (
     <div className="border-b border-slate-200/70 bg-white">
       <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-6 sm:px-6 sm:pt-8 lg:px-8">
@@ -98,19 +153,42 @@ export function CatalogPageHeader({
 
         <div className="mt-4 flex flex-col gap-1.5">
           <h1 className="text-[28px] font-extrabold leading-tight tracking-tight text-slate-900 md:text-[34px]">
-            Catálogo de veículos em <span className="text-blue-700">{city.name}</span>
+            {title}
           </h1>
-          <p className="text-[15px] text-slate-500">
-            <span className="font-semibold tabular-nums text-slate-700">
-              {formatTotal(totalResults)}
-            </span>{" "}
-            ofertas disponíveis perto de você.
-          </p>
+          <p className="text-[15px] text-slate-500">{subtitle}</p>
         </div>
+
+        {variant === "cidade" ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]">
+            <Link
+              href={buildStatePath(activeStateUf, filters)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-50"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path d="M5 12h14M13 6l-8 6 8 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Ampliar busca para {stateName}
+            </Link>
+            <span className="text-slate-400">
+              Quer ampliar a busca? Veja também os anúncios do estado.
+            </span>
+          </div>
+        ) : (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-slate-500">
+            <span>Para uma experiência mais precisa, escolha sua cidade:</span>
+          </div>
+        )}
 
         <form
           onSubmit={handleSubmit}
-          className="mt-6 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.25)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]"
+          className="mt-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.25)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]"
           role="search"
           aria-label="Buscar no catálogo"
         >
@@ -143,24 +221,51 @@ export function CatalogPageHeader({
             />
           </div>
 
-          <div>
-            <label htmlFor={`${formId}-state`} className="sr-only">
-              Estado
-            </label>
-            <select
-              id={`${formId}-state`}
-              value={filters.state || city.state || ""}
-              onChange={(event) => handleStateChange(event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-semibold text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
-            >
-              <option value="">Todos os estados</option>
-              {BRAZIL_UFS.map((uf) => (
-                <option key={uf.value} value={uf.value}>
-                  {uf.label} - {uf.value}
-                </option>
-              ))}
-            </select>
-          </div>
+          {variant === "cidade" ? (
+            <div className="relative">
+              <label htmlFor={`${formId}-city`} className="sr-only">
+                Cidade
+              </label>
+              <div
+                id={`${formId}-city`}
+                className="flex h-12 w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-semibold text-slate-800 shadow-sm"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden
+                >
+                  <path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+                <span className="truncate">
+                  <span className="text-slate-500">Filtrar por cidade: </span>
+                  {city.name} ({city.state})
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label htmlFor={`${formId}-state`} className="sr-only">
+                Estado
+              </label>
+              <select
+                id={`${formId}-state`}
+                value={activeStateUf}
+                onChange={(event) => handleStateChange(event.target.value)}
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-semibold text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              >
+                {BRAZIL_UFS.map((uf) => (
+                  <option key={uf.value} value={uf.value}>
+                    {uf.label} - {uf.value}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label htmlFor={`${formId}-body`} className="sr-only">

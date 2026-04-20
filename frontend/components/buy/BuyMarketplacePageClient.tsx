@@ -5,8 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { BuyPageShell } from "@/components/buy/BuyPageShell";
 import { CatalogPageHeader } from "@/components/buy/CatalogPageHeader";
+import { CatalogPagination } from "@/components/buy/CatalogPagination";
 import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
+import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import type {
   AdsFacetsResponse,
@@ -24,12 +26,17 @@ import {
   toSafeModelFacets,
   type BuyCityContext,
 } from "@/lib/buy/catalog-helpers";
+import type { ComprarVariant } from "@/lib/buy/territory-variant";
 
 interface BuyMarketplacePageClientProps {
   initialResults: AdsSearchResponse;
   initialFacets: AdsFacetsResponse["facets"];
   initialFilters: AdsSearchFilters;
   city: BuyCityContext;
+  variant?: ComprarVariant;
+  stateUf?: string;
+  /** Ativa GeoToCityRedirect apenas em páginas estaduais. */
+  enableGeoRedirect?: boolean;
 }
 
 export default function BuyMarketplacePageClient({
@@ -37,6 +44,9 @@ export default function BuyMarketplacePageClient({
   initialFacets,
   initialFilters,
   city,
+  variant = "estadual",
+  stateUf,
+  enableGeoRedirect = false,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -101,12 +111,26 @@ export default function BuyMarketplacePageClient({
     [initialFilters, pathname, router]
   );
 
+  const pushPage = useCallback(
+    (patch: Partial<AdsSearchFilters>) => {
+      const merged = mergeSearchFilters(initialFilters, patch);
+      const queryString = buildSearchQueryString(merged);
+      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    [initialFilters, pathname, router]
+  );
+
   const clearFilters = useCallback(() => {
     router.push(pathname);
     setMobileFiltersOpen(false);
   }, [pathname, router]);
 
   const totalAds = initialResults?.pagination?.total || items.length || 0;
+  const currentPage = initialResults?.pagination?.page || initialFilters.page || 1;
+  const totalPages = initialResults?.pagination?.totalPages || 1;
 
   const sidebarProps = {
     filters: initialFilters,
@@ -174,11 +198,17 @@ export default function BuyMarketplacePageClient({
         </>
       }
     >
+      {enableGeoRedirect && variant === "estadual" && stateUf ? (
+        <GeoToCityRedirect stateUf={stateUf} filters={initialFilters} />
+      ) : null}
+
       <CatalogPageHeader
         city={city}
         filters={initialFilters}
         totalResults={totalAds}
         onPatch={(patch) => pushFilters(patch)}
+        variant={variant}
+        stateUf={stateUf}
       />
 
       <main>
@@ -190,6 +220,11 @@ export default function BuyMarketplacePageClient({
 
             <div className="min-w-0 flex-1">
               <VehicleGrid items={items} inferWeight={inferWeight} />
+              <CatalogPagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPatch={(patch) => pushPage(patch)}
+              />
             </div>
           </div>
         </div>
