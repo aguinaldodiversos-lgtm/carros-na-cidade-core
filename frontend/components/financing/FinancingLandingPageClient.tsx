@@ -54,7 +54,7 @@ function formatCurrencyPrecise(value: number) {
   }).format(value);
 }
 
-const HERO_IMAGE_SRC = "/images/carro_pagina_simulador.png";
+const HERO_IMAGE_SRC = "/images/dolphin.webp";
 
 function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
   if (financedAmount <= 0 || months <= 0) return 0;
@@ -124,24 +124,24 @@ export function FinancingLandingPageClient({
         />
 
         {/* HERO */}
-        <section className="relative grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,600px)]">
+        <section className="relative grid items-center gap-10 md:grid-cols-[minmax(0,1.1fr)_minmax(0,560px)]">
           <div className="relative z-10 py-4 md:py-8">
-            <h1 className="text-[40px] font-extrabold leading-[1.02] tracking-[-0.035em] text-[#0f1a38] md:text-[60px] lg:text-[68px]">
+            <h1 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] text-[#0f1a38] md:whitespace-nowrap md:text-[44px] lg:text-[52px]">
               Simulador de Financiamento
             </h1>
-            <p className="mt-5 max-w-[560px] text-[17px] leading-[1.6] text-[#5b6683] md:text-[19px]">
+            <p className="mt-5 max-w-[560px] text-[16px] leading-[1.6] text-[#5b6683] md:text-[18px]">
               Simule suas parcelas de financiamento automotivo e descubra as melhores condições
               para comprar o carro dos seus sonhos.
             </p>
           </div>
 
           <div className="relative flex items-center justify-end">
-            <div className="pointer-events-none absolute inset-x-10 bottom-4 h-6 rounded-[999px] bg-[#0e62d8]/15 blur-2xl" />
+            <div className="pointer-events-none absolute inset-x-8 bottom-3 h-6 rounded-[999px] bg-[#0e62d8]/12 blur-2xl" />
             <img
               src={HERO_IMAGE_SRC}
               alt="Simulador de financiamento Carros na Cidade"
-              className="relative z-10 w-full max-w-[600px] object-contain drop-shadow-[0_24px_28px_rgba(14,40,80,0.18)]"
-              style={{ height: "clamp(220px, 28vw, 340px)" }}
+              className="relative z-10 w-full max-w-[560px] object-contain drop-shadow-[0_28px_32px_rgba(14,40,80,0.16)]"
+              style={{ height: "clamp(240px, 30vw, 360px)" }}
             />
           </div>
         </section>
