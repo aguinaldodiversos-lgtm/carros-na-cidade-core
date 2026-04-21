@@ -54,18 +54,7 @@ function formatCurrencyPrecise(value: number) {
   }).format(value);
 }
 
-function resolveImage(item?: AdItem) {
-  if (item?.image_url) return item.image_url;
-  if (Array.isArray(item?.images) && item.images[0]) return item.images[0];
-  return "/images/vehicle-placeholder.svg";
-}
-
-function resolveTitle(item?: AdItem) {
-  if (!item) return "Veículo";
-  if (item.title) return item.title;
-  const pieces = [item.year, item.brand, item.model].filter(Boolean);
-  return pieces.join(" ") || "Veículo";
-}
+const HERO_IMAGE_SRC = "/images/carro_pagina_simulador.png";
 
 function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
   if (financedAmount <= 0 || months <= 0) return 0;
@@ -97,9 +86,6 @@ export function FinancingLandingPageClient({
   const [monthlyRate, setMonthlyRate] = useState(1.49);
   const [selectedTerm, setSelectedTerm] = useState<(typeof TERMS)[number]>(36);
 
-  const heroImage = resolveImage(heroVehicle);
-  const heroTitle = resolveTitle(heroVehicle);
-
   const effectiveFinanced = Math.max(financedValue - downPayment, 0);
 
   const summary = useMemo(() => {
@@ -127,52 +113,48 @@ export function FinancingLandingPageClient({
 
   return (
     <main className="bg-white text-[#1e2547]">
-      <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-6 sm:px-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-20 pt-6 sm:px-8 lg:px-10">
         <PageBreadcrumbs
           items={[
             { name: "Home", href: "/" },
             { name: "Comprar", href: `/comprar?city_slug=${citySlug}` },
             { name: "Simulador de Financiamento" },
           ]}
-          className="mb-6"
+          className="mb-8"
         />
 
         {/* HERO */}
-        <section className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,520px)]">
-          <div>
-            <h1 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.03em] text-[#13203f] md:text-[48px]">
+        <section className="relative grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,600px)]">
+          <div className="relative z-10 py-4 md:py-8">
+            <h1 className="text-[40px] font-extrabold leading-[1.02] tracking-[-0.035em] text-[#0f1a38] md:text-[60px] lg:text-[68px]">
               Simulador de Financiamento
             </h1>
-            <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#5b6683] md:text-[17px]">
+            <p className="mt-5 max-w-[560px] text-[17px] leading-[1.6] text-[#5b6683] md:text-[19px]">
               Simule suas parcelas de financiamento automotivo e descubra as melhores condições
               para comprar o carro dos seus sonhos.
             </p>
           </div>
 
-          <div className="relative ml-auto w-full max-w-[520px]">
-            <div className="absolute inset-x-6 bottom-2 h-6 rounded-full bg-[#0e62d8]/10 blur-xl" />
-            <div className="relative overflow-hidden rounded-[22px] bg-white">
-              <img
-                src={heroImage}
-                alt={heroTitle}
-                className="h-[230px] w-full object-contain md:h-[260px]"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/images/vehicle-placeholder.svg";
-                }}
-              />
-            </div>
+          <div className="relative flex items-center justify-end">
+            <div className="pointer-events-none absolute inset-x-10 bottom-4 h-6 rounded-[999px] bg-[#0e62d8]/15 blur-2xl" />
+            <img
+              src={HERO_IMAGE_SRC}
+              alt="Simulador de financiamento Carros na Cidade"
+              className="relative z-10 w-full max-w-[600px] object-contain drop-shadow-[0_24px_28px_rgba(14,40,80,0.18)]"
+              style={{ height: "clamp(220px, 28vw, 340px)" }}
+            />
           </div>
         </section>
 
         {/* MAIN SIMULATOR */}
-        <section className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(0,0.9fr)]">
+        <section className="mt-12 grid gap-7 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)]">
           {/* LEFT CARD */}
-          <div className="rounded-[20px] border border-[#e6eaf2] bg-white p-6 shadow-[0_10px_30px_rgba(14,40,80,0.06)] md:p-7">
-            <h2 className="text-[20px] font-extrabold text-[#13203f] md:text-[22px]">
+          <div className="rounded-[22px] border border-[#e6eaf2] bg-white p-7 shadow-[0_14px_36px_rgba(14,40,80,0.07)] md:p-8">
+            <h2 className="text-[22px] font-extrabold text-[#0f1a38] md:text-[24px]">
               Simule as Parcelas do Seu Financiamento
             </h2>
 
-            <div className="mt-6 space-y-6">
+            <div className="mt-7 space-y-7">
               <SliderField
                 label="Valor Financiado (R$)"
                 value={financedValue}
@@ -213,27 +195,42 @@ export function FinancingLandingPageClient({
               />
             </div>
 
-            <div className="mt-6 rounded-[12px] bg-[#fff8e6] px-4 py-3 text-[13px] leading-5 text-[#8a6a16] ring-1 ring-[#f4e4b3]">
-              Valores simulados. As condições finais dependem de análise de crédito da financeira
-              parceira. Consulte a taxa CET antes de contratar.
+            <div className="mt-7 flex items-start gap-3 rounded-[14px] bg-[#f1faf4] px-4 py-3 text-[13px] leading-5 text-[#2f6a45] ring-1 ring-[#cfe7d8]">
+              <svg
+                viewBox="0 0 24 24"
+                className="mt-0.5 h-5 w-5 shrink-0 text-[#2f6a45]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v5" />
+                <path d="M12 16.5v.01" />
+              </svg>
+              <span>
+                Valores simulados. As condições finais dependem de análise de crédito da
+                financeira parceira. Consulte a taxa CET antes de contratar.
+              </span>
             </div>
           </div>
 
           {/* MIDDLE SUMMARY */}
-          <div className="flex flex-col gap-5 rounded-[20px] border border-[#e6eaf2] bg-white p-6 shadow-[0_10px_30px_rgba(14,40,80,0.06)] md:p-7">
+          <div className="flex flex-col gap-5 rounded-[22px] border border-[#e6eaf2] bg-white p-7 shadow-[0_14px_36px_rgba(14,40,80,0.07)] md:p-8">
             <div>
-              <p className="text-[14px] font-semibold uppercase tracking-wider text-[#5b6683]">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#7a8398]">
                 Parcelas
               </p>
-              <p className="mt-2 text-[34px] font-extrabold leading-none text-[#0e62d8] md:text-[40px]">
+              <p className="mt-2 text-[40px] font-extrabold leading-none text-[#0e62d8] md:text-[48px]">
                 {formatCurrency(summary.monthlyPayment)}
               </p>
-              <p className="mt-2 text-[14px] text-[#5b6683]">
+              <p className="mt-3 text-[14px] text-[#5b6683]">
                 em {selectedTerm}x · taxa de {monthlyRate.toFixed(2)}% a.m.
               </p>
             </div>
 
-            <dl className="space-y-3 rounded-[14px] bg-[#f6f8fc] p-4">
+            <dl className="space-y-3 rounded-[16px] bg-[#f6f8fc] p-5">
               <SummaryRow label="Entrada" value={formatCurrency(downPayment)} />
               <SummaryRow
                 label="Valor financiado"
@@ -244,7 +241,7 @@ export function FinancingLandingPageClient({
 
             <button
               type="button"
-              className="inline-flex h-[52px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-5 text-[16px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(14,98,216,0.25)] transition hover:bg-[#0c4fb0]"
+              className="inline-flex h-[58px] w-full items-center justify-center rounded-[14px] bg-[#0e62d8] px-5 text-[17px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(14,98,216,0.32)] transition hover:bg-[#0c4fb0]"
             >
               Calcular Parcelas
             </button>
@@ -266,41 +263,45 @@ export function FinancingLandingPageClient({
           <div className="flex flex-col gap-5">
             <Link
               href={`/comprar?city_slug=${citySlug}&valor=${financedValue}`}
-              className="group relative inline-flex h-[72px] w-full items-center justify-between gap-3 overflow-hidden rounded-[14px] bg-gradient-to-r from-[#0e62d8] to-[#1271ef] px-5 text-left text-white shadow-[0_12px_30px_rgba(14,98,216,0.28)] transition hover:from-[#0c4fb0] hover:to-[#0e62d8]"
+              className="group relative inline-flex h-[84px] w-full items-center justify-between gap-3 overflow-hidden rounded-[16px] bg-gradient-to-r from-[#0e62d8] to-[#1271ef] px-6 text-left text-white shadow-[0_16px_38px_rgba(14,98,216,0.32)] transition hover:from-[#0c4fb0] hover:to-[#0e62d8]"
             >
               <div>
-                <div className="text-[12px] font-semibold uppercase tracking-wider text-white/80">
+                <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/80">
                   Continuar com este valor
                 </div>
-                <div className="text-[17px] font-extrabold leading-tight">
+                <div className="mt-1 text-[19px] font-extrabold leading-tight">
                   Verificar Crédito Agora
                 </div>
               </div>
-              <svg
-                viewBox="0 0 24 24"
-                className="h-6 w-6 shrink-0 transition group-hover:translate-x-1"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
-              </svg>
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 transition group-hover:translate-x-1">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m13 6 6 6-6 6" />
+                </svg>
+              </span>
             </Link>
 
-            <div className="overflow-hidden rounded-[16px] border border-[#e6eaf2] bg-white shadow-[0_10px_30px_rgba(14,40,80,0.06)]">
-              <div className="border-b border-[#e6eaf2] bg-[#f6f8fc] px-5 py-3">
-                <h3 className="text-[15px] font-bold text-[#13203f]">Opções de Parcelamento</h3>
+            <div className="overflow-hidden rounded-[18px] border border-[#e6eaf2] bg-white shadow-[0_14px_36px_rgba(14,40,80,0.07)]">
+              <div className="border-b border-[#e6eaf2] bg-[#f6f8fc] px-6 py-4">
+                <h3 className="text-[16px] font-extrabold text-[#0f1a38]">
+                  Opções de Parcelamento
+                </h3>
               </div>
 
               <table className="w-full text-[14px]">
                 <thead>
-                  <tr className="text-left text-[12px] font-semibold uppercase tracking-wider text-[#5b6683]">
-                    <th className="px-4 py-2 font-semibold">Prazo</th>
-                    <th className="px-4 py-2 text-right font-semibold">Mensal</th>
-                    <th className="px-4 py-2 text-right font-semibold">Total</th>
+                  <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a8398]">
+                    <th className="px-5 py-3 font-semibold">Prazo</th>
+                    <th className="px-5 py-3 text-right font-semibold">Valor Mensal</th>
+                    <th className="px-5 py-3 text-right font-semibold">Total Pago</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -315,20 +316,20 @@ export function FinancingLandingPageClient({
                         }`}
                       >
                         <td
-                          className={`px-4 py-2.5 font-semibold ${
-                            isActive ? "text-[#0e62d8]" : "text-[#13203f]"
+                          className={`px-5 py-3.5 font-semibold ${
+                            isActive ? "text-[#0e62d8]" : "text-[#0f1a38]"
                           }`}
                         >
                           {row.term} meses
                         </td>
                         <td
-                          className={`px-4 py-2.5 text-right font-semibold ${
-                            isActive ? "text-[#0e62d8]" : "text-[#13203f]"
+                          className={`px-5 py-3.5 text-right font-semibold ${
+                            isActive ? "text-[#0e62d8]" : "text-[#0f1a38]"
                           }`}
                         >
                           {formatCurrencyPrecise(row.monthly)}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-[#5b6683]">
+                        <td className="px-5 py-3.5 text-right text-[#5b6683]">
                           {formatCurrency(row.total)}
                         </td>
                       </tr>
@@ -336,7 +337,7 @@ export function FinancingLandingPageClient({
                   })}
                 </tbody>
               </table>
-              <p className="border-t border-[#eef1f7] px-4 py-3 text-[12px] leading-5 text-[#7a8398]">
+              <p className="border-t border-[#eef1f7] px-5 py-3 text-[12px] leading-5 text-[#7a8398]">
                 Valores aproximados calculados sobre a tabela Price. Clique em um prazo para
                 atualizar o resumo.
               </p>
@@ -345,31 +346,32 @@ export function FinancingLandingPageClient({
         </section>
 
         {/* CONFIGURE + SIDEBAR */}
-        <section className="mt-14 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="mt-16 grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
-            <h2 className="text-[22px] font-extrabold text-[#13203f] md:text-[26px]">
+            <h2 className="text-[24px] font-extrabold text-[#0f1a38] md:text-[28px]">
               Configure Suas Parcelas do Financiamento
             </h2>
-            <p className="mt-2 text-[15px] text-[#5b6683]">
+            <p className="mt-2 max-w-2xl text-[15px] text-[#5b6683]">
               Explore veículos com parcelas próximas às que você simulou e continue ajustando seu
               financiamento.
             </p>
 
-            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {configureList.map((item, index) => (
                 <AdCard key={`${item.id ?? item.slug ?? index}-cfg`} item={item} />
               ))}
             </div>
           </div>
 
-          <aside className="flex h-fit flex-col items-center overflow-hidden rounded-[20px] border border-[#e6eaf2] bg-gradient-to-b from-[#eaf2ff] to-white p-6 text-center shadow-[0_10px_30px_rgba(14,40,80,0.06)]">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0e62d8]/10 text-[#0e62d8]">
+          <aside className="relative flex h-fit flex-col items-center overflow-hidden rounded-[22px] border border-[#d9e6fb] bg-gradient-to-b from-[#e8f1ff] via-[#f2f7ff] to-white p-7 text-center shadow-[0_14px_36px_rgba(14,40,80,0.08)]">
+            <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-[#0e62d8]/10 blur-2xl" />
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-[22px] bg-[#0e62d8] text-white shadow-[0_10px_24px_rgba(14,98,216,0.35)]">
               <svg
                 viewBox="0 0 24 24"
-                className="h-8 w-8"
+                className="h-10 w-10"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -378,16 +380,16 @@ export function FinancingLandingPageClient({
                 <path d="M18 5a9 9 0 0 1 0 14" />
               </svg>
             </div>
-            <h3 className="mt-4 text-[20px] font-extrabold text-[#13203f]">
+            <h3 className="mt-5 text-[22px] font-extrabold leading-tight text-[#0f1a38]">
               Anuncie seu carro grátis!
             </h3>
-            <p className="mt-2 text-[14px] leading-6 text-[#5b6683]">
+            <p className="mt-3 text-[14px] leading-6 text-[#5b6683]">
               Cadastre seu veículo em poucos minutos e alcance compradores da sua cidade sem pagar
               taxa.
             </p>
             <Link
               href="/planos"
-              className="mt-5 inline-flex h-[48px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-5 text-[15px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(14,98,216,0.25)] transition hover:bg-[#0c4fb0]"
+              className="mt-6 inline-flex h-[52px] w-full items-center justify-center rounded-[14px] bg-[#0e62d8] px-5 text-[15px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(14,98,216,0.3)] transition hover:bg-[#0c4fb0]"
             >
               Anunciar Grátis
             </Link>
@@ -395,9 +397,9 @@ export function FinancingLandingPageClient({
         </section>
 
         {/* CITY OFFERS */}
-        <section className="mt-14">
+        <section className="mt-16">
           <div className="flex items-end justify-between gap-4">
-            <h2 className="text-[22px] font-extrabold text-[#13203f] md:text-[26px]">
+            <h2 className="text-[24px] font-extrabold text-[#0f1a38] md:text-[28px]">
               Ofertas de carros usados em {cityName}
             </h2>
             <Link
@@ -408,7 +410,7 @@ export function FinancingLandingPageClient({
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {cityOffers.map((item, index) => (
               <AdCard key={`${item.id ?? item.slug ?? index}-offer`} item={item} />
             ))}
