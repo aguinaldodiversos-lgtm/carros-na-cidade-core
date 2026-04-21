@@ -4,6 +4,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { AdItem } from "@/lib/search/ads-search";
+import AdCard from "@/components/ads/AdCard";
+import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 
 interface FinancingLandingPageClientProps {
   citySlug: string;
@@ -12,62 +14,25 @@ interface FinancingLandingPageClientProps {
   heroVehicle: AdItem;
   highlightAds: AdItem[];
   opportunityAds: AdItem[];
-  /** Preenchimento vindo do anúncio (query `valor`) */
   initialVehicleValue?: number;
 }
 
-type VehicleTypeOption = "SUV" | "Hatch" | "Sedã" | "Picape" | "Utilitário";
-type VehicleConditionOption = "Novo" | "Novo ou semi" | "Seminovo" | "Usado";
-type TermOption = 12 | 24 | 36 | 48 | 60 | 72;
+const TERMS = [12, 24, 36, 48, 60] as const;
 
-type FormState = {
-  vehicleType: VehicleTypeOption;
-  pricePreset: string;
-  vehicleValue: number;
-  downPayment: number;
-  condition: VehicleConditionOption;
-  term: TermOption;
-  monthlyRate: number;
-};
-
-const VEHICLE_TYPES: VehicleTypeOption[] = ["SUV", "Hatch", "Sedã", "Picape", "Utilitário"];
-
-const VALUE_PRESETS = [
-  { label: "Valor do Veículo", value: "" },
-  { label: "Até R$ 60.000", value: "60000" },
-  { label: "Até R$ 80.000", value: "80000" },
-  { label: "Até R$ 100.000", value: "100000" },
-  { label: "Até R$ 120.000", value: "120000" },
-  { label: "Até R$ 150.000", value: "150000" },
-  { label: "Até R$ 200.000", value: "200000" },
-];
-
-const DOWN_PAYMENT_PRESETS = [
-  { label: "R$ 10.000", value: 10000 },
-  { label: "R$ 15.000", value: 15000 },
-  { label: "R$ 20.000", value: 20000 },
-  { label: "R$ 30.000", value: 30000 },
-  { label: "R$ 40.000", value: 40000 },
-];
-
-const VEHICLE_CONDITIONS: VehicleConditionOption[] = ["Novo", "Novo ou semi", "Seminovo", "Usado"];
-
-const TERMS: TermOption[] = [12, 24, 36, 48, 60, 72];
-const RATES = [1.29, 1.39, 1.59, 1.79, 1.99, 2.19, 2.39];
-
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
+const VALUE_MIN = 5000;
+const VALUE_MAX = 500000;
+const DOWN_MIN = 0;
+const DOWN_MAX = 100000;
+const RATE_MIN = 0.99;
+const RATE_MAX = 2.99;
 
 function parseMoney(value: number | string | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (!value) return 0;
-
   const cleaned = String(value)
     .replace(/[^\d,.-]/g, "")
     .replace(/\./g, "")
     .replace(",", ".");
-
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -89,12 +54,6 @@ function formatCurrencyPrecise(value: number) {
   }).format(value);
 }
 
-function formatMileage(value?: number | string) {
-  const numeric = parseMoney(value);
-  if (!numeric) return "28.856 km";
-  return `${Math.round(numeric).toLocaleString("pt-BR")} km`;
-}
-
 function resolveImage(item?: AdItem) {
   if (item?.image_url) return item.image_url;
   if (Array.isArray(item?.images) && item.images[0]) return item.images[0];
@@ -102,81 +61,21 @@ function resolveImage(item?: AdItem) {
 }
 
 function resolveTitle(item?: AdItem) {
-  if (!item) return "2022/2023 Volkswagen T-Cross";
+  if (!item) return "Veículo";
   if (item.title) return item.title;
   const pieces = [item.year, item.brand, item.model].filter(Boolean);
-  return pieces.join(" ") || "Volkswagen T-Cross";
-}
-
-function resolveLink(item?: AdItem) {
-  if (!item) return "/comprar";
-  if (item.slug) return `/veiculo/${item.slug}`;
-  return `/anuncios/${item.id}`;
+  return pieces.join(" ") || "Veículo";
 }
 
 function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
   if (financedAmount <= 0 || months <= 0) return 0;
-
   const monthlyRate = monthlyRatePct / 100;
-
   if (monthlyRate === 0) return financedAmount / months;
-
   return (financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
 }
 
-function buildOpportunityItems(items: AdItem[], cityName: string): AdItem[] {
-  if (items.length > 0) return items.slice(0, 3);
-
-  return [
-    {
-      id: 999101,
-      title: "2022 Hyundai Creta",
-      city: cityName,
-      state: "SP",
-      price: 89900,
-      below_fipe: true,
-      image_url: "/images/vehicle-placeholder.svg",
-    },
-    {
-      id: 999102,
-      title: "2021 Volkswagen T-Cross",
-      city: cityName,
-      state: "SP",
-      price: 85900,
-      below_fipe: true,
-      image_url: "/images/vehicle-placeholder.svg",
-    },
-    {
-      id: 999103,
-      title: "2023 Nissan Kicks",
-      city: cityName,
-      state: "SP",
-      price: 97900,
-      below_fipe: true,
-      image_url: "/images/vehicle-placeholder.svg",
-    },
-  ];
-}
-
-function buildInitialFormState(heroVehicle: AdItem, initialVehicleValue?: number): FormState {
-  const fromHero = parseMoney(heroVehicle.price);
-  const vehicleValue =
-    initialVehicleValue != null && initialVehicleValue > 0
-      ? Math.round(initialVehicleValue)
-      : fromHero > 0
-        ? Math.round(fromHero)
-        : 100000;
-  const downPayment = Math.min(Math.max(Math.round(vehicleValue * 0.2), 0), vehicleValue);
-
-  return {
-    vehicleType: "SUV",
-    pricePreset: "",
-    vehicleValue,
-    downPayment,
-    condition: "Novo ou semi",
-    term: 36,
-    monthlyRate: 1.99,
-  };
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 export function FinancingLandingPageClient({
@@ -184,629 +83,447 @@ export function FinancingLandingPageClient({
   cityName,
   cityLabel,
   heroVehicle,
+  highlightAds,
   opportunityAds,
   initialVehicleValue,
 }: FinancingLandingPageClientProps) {
-  const [form, setForm] = useState<FormState>(() =>
-    buildInitialFormState(heroVehicle, initialVehicleValue)
-  );
-
-  const initialPrice =
+  const initialFinanced =
     initialVehicleValue != null && initialVehicleValue > 0
-      ? Math.round(initialVehicleValue)
-      : parseMoney(heroVehicle.price) || form.vehicleValue;
+      ? clamp(Math.round(initialVehicleValue), VALUE_MIN, VALUE_MAX)
+      : clamp(Math.round(parseMoney(heroVehicle.price) || 80000), VALUE_MIN, VALUE_MAX);
 
-  const displayHeroTitle = resolveTitle(heroVehicle);
-  const displayHeroImage = resolveImage(heroVehicle);
+  const [financedValue, setFinancedValue] = useState(initialFinanced);
+  const [downPayment, setDownPayment] = useState(0);
+  const [monthlyRate, setMonthlyRate] = useState(1.49);
+  const [selectedTerm, setSelectedTerm] = useState<(typeof TERMS)[number]>(36);
 
-  const simulated = useMemo(() => {
-    const entry = Math.min(form.downPayment, form.vehicleValue);
-    const financedAmount = Math.max(form.vehicleValue - entry, 0);
-    const monthlyPayment = calculateMonthlyPayment(financedAmount, form.monthlyRate, form.term);
-    const totalPaid = monthlyPayment * form.term + entry;
-    const financedPct = form.vehicleValue > 0 ? (entry / form.vehicleValue) * 100 : 0;
+  const heroImage = resolveImage(heroVehicle);
+  const heroTitle = resolveTitle(heroVehicle);
 
-    const localDiscount =
-      initialPrice > 0
-        ? Math.max(0, Math.round(((initialPrice - form.vehicleValue) / initialPrice) * 100))
-        : 20;
+  const effectiveFinanced = Math.max(financedValue - downPayment, 0);
 
-    return {
-      entry,
-      financedAmount,
-      monthlyPayment,
-      totalPaid,
-      financedPct,
-      localDiscount: localDiscount || 20,
-    };
-  }, [form, initialPrice]);
+  const summary = useMemo(() => {
+    const monthlyPayment = calculateMonthlyPayment(effectiveFinanced, monthlyRate, selectedTerm);
+    const totalPaid = monthlyPayment * selectedTerm + downPayment;
+    const financingCost = Math.max(totalPaid - financedValue, 0);
+    return { monthlyPayment, totalPaid, financingCost };
+  }, [effectiveFinanced, monthlyRate, selectedTerm, downPayment, financedValue]);
 
-  const cards = useMemo(
-    () => buildOpportunityItems(opportunityAds, cityName),
-    [opportunityAds, cityName]
+  const installmentTable = useMemo(
+    () =>
+      TERMS.map((term) => {
+        const monthly = calculateMonthlyPayment(effectiveFinanced, monthlyRate, term);
+        return {
+          term,
+          monthly,
+          total: monthly * term + downPayment,
+        };
+      }),
+    [effectiveFinanced, monthlyRate, downPayment]
   );
+
+  const configureList = highlightAds?.length ? highlightAds.slice(0, 4) : opportunityAds.slice(0, 4);
+  const cityOffers = opportunityAds?.slice(0, 4) ?? [];
 
   return (
-    <main className="bg-[#f5f7fc]">
-      <section className="relative overflow-hidden border-b border-[#e7ebf3] bg-[linear-gradient(180deg,#fbfcff_0%,#f3f6fb_100%)]">
-        <div
-          className="absolute inset-x-0 top-0 h-[420px] bg-cover bg-center opacity-20"
-          style={{ backgroundImage: "url('/images/vehicle-placeholder.svg')" }}
+    <main className="bg-white text-[#1e2547]">
+      <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-6 sm:px-6">
+        <PageBreadcrumbs
+          items={[
+            { name: "Home", href: "/" },
+            { name: "Comprar", href: `/comprar?city_slug=${citySlug}` },
+            { name: "Simulador de Financiamento" },
+          ]}
+          className="mb-6"
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.92),rgba(245,247,252,0.82)_44%,rgba(245,247,252,0.98)_100%)]" />
 
-        <div className="relative mx-auto w-full max-w-7xl px-4 pb-10 pt-10 sm:px-6 md:pb-14 md:pt-12">
-          <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_430px]">
-            <div>
-              <h1 className="max-w-4xl text-[40px] font-extrabold leading-[1.06] tracking-[-0.035em] text-[#1e2547] md:text-[64px]">
-                Simule o financiamento do seu carro
-              </h1>
+        {/* HERO */}
+        <section className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,520px)]">
+          <div>
+            <h1 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.03em] text-[#13203f] md:text-[48px]">
+              Simulador de Financiamento
+            </h1>
+            <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#5b6683] md:text-[17px]">
+              Simule suas parcelas de financiamento automotivo e descubra as melhores condições
+              para comprar o carro dos seus sonhos.
+            </p>
+          </div>
 
-              <p className="mt-5 max-w-3xl text-[18px] leading-8 text-[#5f6780] md:text-[22px]">
-                Descubra as parcelas, taxas e condições para realizar o sonho do carro novo ou
-                usado.
-              </p>
+          <div className="relative ml-auto w-full max-w-[520px]">
+            <div className="absolute inset-x-6 bottom-2 h-6 rounded-full bg-[#0e62d8]/10 blur-xl" />
+            <div className="relative overflow-hidden rounded-[22px] bg-white">
+              <img
+                src={heroImage}
+                alt={heroTitle}
+                className="h-[230px] w-full object-contain md:h-[260px]"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/images/vehicle-placeholder.svg";
+                }}
+              />
+            </div>
+          </div>
+        </section>
 
-              <div className="mt-8 rounded-[24px] border border-[#e6eaf2] bg-white p-6 shadow-[0_18px_40px_rgba(30,37,71,0.08)] md:p-7">
-                <h2 className="text-[26px] font-extrabold text-[#1e2547]">
-                  Simulador de Financiamento
-                </h2>
+        {/* MAIN SIMULATOR */}
+        <section className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(0,0.9fr)]">
+          {/* LEFT CARD */}
+          <div className="rounded-[20px] border border-[#e6eaf2] bg-white p-6 shadow-[0_10px_30px_rgba(14,40,80,0.06)] md:p-7">
+            <h2 className="text-[20px] font-extrabold text-[#13203f] md:text-[22px]">
+              Simule as Parcelas do Seu Financiamento
+            </h2>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <FieldLabel label="Tipo de Veículo">
-                    <select
-                      value={form.vehicleType}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          vehicleType: e.target.value as VehicleTypeOption,
-                        }))
-                      }
-                      className={selectClassName}
-                    >
-                      {VEHICLE_TYPES.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldLabel>
+            <div className="mt-6 space-y-6">
+              <SliderField
+                label="Valor Financiado (R$)"
+                value={financedValue}
+                min={VALUE_MIN}
+                max={VALUE_MAX}
+                step={500}
+                onChange={(v) => {
+                  setFinancedValue(v);
+                  if (downPayment > v) setDownPayment(v);
+                }}
+                format={formatCurrency}
+                minLabel={formatCurrency(VALUE_MIN)}
+                maxLabel={formatCurrency(VALUE_MAX)}
+              />
 
-                  <FieldLabel label="Valor do Veículo">
-                    <select
-                      value={form.pricePreset}
-                      onChange={(e) => {
-                        const nextValue = e.target.value;
-                        setForm((current) => ({
-                          ...current,
-                          pricePreset: nextValue,
-                          vehicleValue: nextValue ? Number(nextValue) : current.vehicleValue,
-                        }));
-                      }}
-                      className={selectClassName}
-                    >
-                      {VALUE_PRESETS.map((item) => (
-                        <option key={item.label} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldLabel>
+              <SliderField
+                label="Entrada (R$)"
+                value={downPayment}
+                min={DOWN_MIN}
+                max={Math.min(DOWN_MAX, financedValue)}
+                step={500}
+                onChange={(v) => setDownPayment(v)}
+                format={formatCurrency}
+                minLabel={formatCurrency(DOWN_MIN)}
+                maxLabel={formatCurrency(Math.min(DOWN_MAX, financedValue))}
+              />
 
-                  <FieldLabel label="">
-                    <input
-                      value={formatCurrency(form.vehicleValue)}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          vehicleValue: parseMoney(e.target.value),
-                          pricePreset: "",
-                        }))
-                      }
-                      className={inputClassName}
-                    />
-                  </FieldLabel>
-
-                  <FieldLabel label="">
-                    <select
-                      value={String(form.downPayment)}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          downPayment: Number(e.target.value),
-                        }))
-                      }
-                      className={selectClassName}
-                    >
-                      {DOWN_PAYMENT_PRESETS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {formatCurrency(item.value)}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldLabel>
-
-                  <FieldLabel label="Entrada">
-                    <input
-                      value={formatCurrency(form.downPayment)}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          downPayment: parseMoney(e.target.value),
-                        }))
-                      }
-                      className={inputClassName}
-                    />
-                  </FieldLabel>
-
-                  <FieldLabel label="">
-                    <select
-                      value={form.condition}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          condition: e.target.value as VehicleConditionOption,
-                        }))
-                      }
-                      className={selectClassName}
-                    >
-                      {VEHICLE_CONDITIONS.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldLabel>
-
-                  <FieldLabel label="Prazo de Pagamento">
-                    <div className="grid grid-cols-[1fr_150px] gap-0 rounded-[14px] border border-[#e6eaf2] bg-white">
-                      <div className="flex items-center px-4 text-[16px] font-medium text-[#1e2547]">
-                        Prazo de Pagamento
-                      </div>
-                      <select
-                        value={String(form.term)}
-                        onChange={(e) =>
-                          setForm((current) => ({
-                            ...current,
-                            term: Number(e.target.value) as TermOption,
-                          }))
-                        }
-                        className="h-[58px] rounded-r-[14px] border-l border-[#e6eaf2] bg-white px-4 text-[16px] font-semibold text-[#1e2547] outline-none"
-                      >
-                        {TERMS.map((item) => (
-                          <option key={item} value={item}>
-                            {item} meses
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </FieldLabel>
-
-                  <div />
-                </div>
-
-                <div className="mt-5 grid items-center gap-4 rounded-[16px] bg-[#fafbfe] p-4 ring-1 ring-[#eef1f6] md:grid-cols-[1fr_180px]">
-                  <div className="text-[18px] font-semibold text-[#3a4561]">
-                    Taxa de Juros (a.m.)
-                  </div>
-
-                  <select
-                    value={String(form.monthlyRate)}
-                    onChange={(e) =>
-                      setForm((current) => ({
-                        ...current,
-                        monthlyRate: Number(e.target.value),
-                      }))
-                    }
-                    className="h-[54px] rounded-[12px] border border-[#e6eaf2] bg-white px-4 text-right text-[18px] font-extrabold text-[#1e2547] outline-none"
-                  >
-                    {RATES.map((rate) => (
-                      <option key={rate} value={rate}>
-                        {rate.toFixed(2)} %
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  className="mt-5 inline-flex h-[56px] w-full items-center justify-center rounded-[14px] bg-[#f5a623] px-6 text-[22px] font-extrabold text-white shadow-[0_14px_28px_rgba(245,166,35,0.26)] transition hover:bg-[#eb9e16]"
-                >
-                  Simular parcelas
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <FeatureMiniCard
-                  iconColor="orange"
-                  title="Compra segura"
-                  description="Negociar direto sem intermediadores, anúncios verificados"
-                  ctaLabel="Anuncie agora"
-                  ctaHref="/planos"
-                  ctaVariant="orange"
-                />
-
-                <FeatureMiniCard
-                  iconColor="blue"
-                  title="Foco na sua cidade"
-                  description={`Encontre o veículo perfeito, perto de você em ${cityName}`}
-                  ctaLabel="Ver ofertas"
-                  ctaHref={`/comprar?city_slug=${citySlug}`}
-                  ctaVariant="blue"
-                />
-              </div>
+              <SliderField
+                label="Taxa de juros (a.m.)"
+                value={monthlyRate}
+                min={RATE_MIN}
+                max={RATE_MAX}
+                step={0.01}
+                onChange={(v) => setMonthlyRate(Number(v.toFixed(2)))}
+                format={(v) => `${v.toFixed(2)} %`}
+                minLabel={`${RATE_MIN.toFixed(2)} %`}
+                maxLabel={`${RATE_MAX.toFixed(2)} %`}
+              />
             </div>
 
-            <div className="relative">
-              <div className="overflow-hidden rounded-[28px] border border-[#e6eaf2] bg-white shadow-[0_24px_52px_rgba(30,37,71,0.10)]">
-                <div className="relative aspect-[1.16/0.84] overflow-hidden bg-[#eef2f8]">
-                  <img
-                    src={displayHeroImage}
-                    alt={displayHeroTitle}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-
-                <div className="px-6 pb-6 pt-4">
-                  <h3 className="text-[18px] font-extrabold text-[#1e2547] md:text-[22px]">
-                    {displayHeroTitle}
-                  </h3>
-
-                  <p className="mt-2 text-[16px] text-[#646d83]">{cityLabel}</p>
-
-                  <div className="mt-5 flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-[34px] font-extrabold leading-none text-[#153e9f] md:text-[46px]">
-                        {formatCurrency(form.vehicleValue)}
-                      </div>
-                      <p className="mt-2 text-[16px] text-[#5c6580]">
-                        em {form.term}x {form.downPayment > 0 ? "com entrada" : "sem entrada"} (
-                        {form.monthlyRate.toFixed(2)}% a.m.)
-                      </p>
-                    </div>
-
-                    <div className="inline-flex h-[58px] items-center justify-center rounded-[14px] bg-[#3fae7b] px-5 text-[18px] font-extrabold text-white shadow-[0_12px_24px_rgba(63,174,123,0.22)]">
-                      – {simulated.localDiscount}%
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-4 rounded-[18px] border border-[#ebeff6] bg-[#fbfcff] p-4">
-                    <FinanceRow
-                      label="Entrada"
-                      value={formatCurrency(simulated.entry)}
-                      icon="calendar"
-                    />
-                    <FinanceRow
-                      label="Financiamento"
-                      value={formatCurrency(simulated.financedAmount)}
-                      icon="dot"
-                    />
-                    <FinanceRow label="Prazo" value={`${form.term} meses`} icon="doc" />
-                    <FinanceRow
-                      label="Valor da Parcela"
-                      value={formatCurrencyPrecise(simulated.monthlyPayment)}
-                      icon="clock"
-                      strong
-                    />
-
-                    <div className="rounded-[12px] bg-[#f2f7f3] px-4 py-3 text-[14px] text-[#52705b]">
-                      Condição promocional local com taxa a partir de{" "}
-                      <span className="font-bold">{form.monthlyRate.toFixed(2)}% a.m.</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="mt-6 rounded-[12px] bg-[#fff8e6] px-4 py-3 text-[13px] leading-5 text-[#8a6a16] ring-1 ring-[#f4e4b3]">
+              Valores simulados. As condições finais dependem de análise de crédito da financeira
+              parceira. Consulte a taxa CET antes de contratar.
             </div>
           </div>
 
-          <section className="mt-10">
-            <h2 className="text-[28px] font-extrabold text-[#1e2547] md:text-[34px]">
-              Algumas ofertas de oportunidades
-            </h2>
-
-            <div className="mt-5 grid gap-5 lg:grid-cols-3">
-              {cards.map((item, index) => {
-                const price = parseMoney(item.price) || 89900 + index * 5000;
-                const entry = price * 0.2;
-                const financed = price - entry;
-                const parcel = calculateMonthlyPayment(financed, 1.39, 60);
-
-                return (
-                  <OpportunityCard
-                    key={`${item.id}-${index}`}
-                    item={item}
-                    cityLabel={cityLabel}
-                    parcel={parcel}
-                  />
-                );
-              })}
+          {/* MIDDLE SUMMARY */}
+          <div className="flex flex-col gap-5 rounded-[20px] border border-[#e6eaf2] bg-white p-6 shadow-[0_10px_30px_rgba(14,40,80,0.06)] md:p-7">
+            <div>
+              <p className="text-[14px] font-semibold uppercase tracking-wider text-[#5b6683]">
+                Parcelas
+              </p>
+              <p className="mt-2 text-[34px] font-extrabold leading-none text-[#0e62d8] md:text-[40px]">
+                {formatCurrency(summary.monthlyPayment)}
+              </p>
+              <p className="mt-2 text-[14px] text-[#5b6683]">
+                em {selectedTerm}x · taxa de {monthlyRate.toFixed(2)}% a.m.
+              </p>
             </div>
 
-            <div className="mt-5">
-              <Link
-                href={`/comprar?city_slug=${citySlug}&below_fipe=true`}
-                className="inline-flex items-center gap-2 text-[18px] font-semibold text-[#2f67f6] transition hover:text-[#214fca]"
-              >
-                <span>Ver mais oportunidades abaixo da tabela Fipe</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="m9 6 6 6-6 6" />
-                </svg>
-              </Link>
-            </div>
-          </section>
+            <dl className="space-y-3 rounded-[14px] bg-[#f6f8fc] p-4">
+              <SummaryRow label="Entrada" value={formatCurrency(downPayment)} />
+              <SummaryRow
+                label="Valor financiado"
+                value={formatCurrency(effectiveFinanced)}
+              />
+              <SummaryRow label="Taxa de juros" value={`${monthlyRate.toFixed(2)} % a.m.`} />
+            </dl>
 
-          <section className="mt-10 overflow-hidden rounded-[28px] border border-[#dfe5f0] bg-[#1e2547] shadow-[0_22px_50px_rgba(30,37,71,0.16)]">
-            <div
-              className="relative flex min-h-[240px] flex-col gap-6 px-6 py-8 md:min-h-[260px] md:flex-row md:items-center md:justify-between md:px-8"
-              style={{
-                backgroundImage:
-                  "linear-gradient(90deg, rgba(30,37,71,0.90) 0%, rgba(30,37,71,0.74) 36%, rgba(30,37,71,0.18) 100%), url('/images/vehicle-placeholder.svg')",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
+            <button
+              type="button"
+              className="inline-flex h-[52px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-5 text-[16px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(14,98,216,0.25)] transition hover:bg-[#0c4fb0]"
             >
-              <div className="max-w-[660px]">
-                <h3 className="text-[28px] font-extrabold leading-tight text-white md:text-[42px]">
-                  Simule o financiamento, veja ofertas ou anuncie grátis seu carro!
-                </h3>
-              </div>
+              Calcular Parcelas
+            </button>
 
-              <div className="flex w-full max-w-[320px] flex-col gap-3">
-                <Link
-                  href={`/comprar?city_slug=${citySlug}`}
-                  className="inline-flex h-[58px] items-center justify-center rounded-[14px] bg-[#3f455f] px-5 text-[20px] font-bold text-white transition hover:bg-[#353b53]"
-                >
-                  Ver ofertas de carros
-                </Link>
-
-                <Link
-                  href="/planos"
-                  className="inline-flex h-[58px] items-center justify-center rounded-[14px] bg-[#2f67f6] px-5 text-[20px] font-bold text-white transition hover:bg-[#2457dc]"
-                >
-                  Anunciar grátis agora!
-                </Link>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <MiniStat
+                label="Total a pagar"
+                value={formatCurrency(summary.totalPaid)}
+              />
+              <MiniStat
+                label="Custo do financiamento"
+                value={formatCurrency(summary.financingCost)}
+                muted
+              />
             </div>
-          </section>
-        </div>
-      </section>
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="flex flex-col gap-5">
+            <Link
+              href={`/comprar?city_slug=${citySlug}&valor=${financedValue}`}
+              className="group relative inline-flex h-[72px] w-full items-center justify-between gap-3 overflow-hidden rounded-[14px] bg-gradient-to-r from-[#0e62d8] to-[#1271ef] px-5 text-left text-white shadow-[0_12px_30px_rgba(14,98,216,0.28)] transition hover:from-[#0c4fb0] hover:to-[#0e62d8]"
+            >
+              <div>
+                <div className="text-[12px] font-semibold uppercase tracking-wider text-white/80">
+                  Continuar com este valor
+                </div>
+                <div className="text-[17px] font-extrabold leading-tight">
+                  Verificar Crédito Agora
+                </div>
+              </div>
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6 shrink-0 transition group-hover:translate-x-1"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
+            </Link>
+
+            <div className="overflow-hidden rounded-[16px] border border-[#e6eaf2] bg-white shadow-[0_10px_30px_rgba(14,40,80,0.06)]">
+              <div className="border-b border-[#e6eaf2] bg-[#f6f8fc] px-5 py-3">
+                <h3 className="text-[15px] font-bold text-[#13203f]">Opções de Parcelamento</h3>
+              </div>
+
+              <table className="w-full text-[14px]">
+                <thead>
+                  <tr className="text-left text-[12px] font-semibold uppercase tracking-wider text-[#5b6683]">
+                    <th className="px-4 py-2 font-semibold">Prazo</th>
+                    <th className="px-4 py-2 text-right font-semibold">Mensal</th>
+                    <th className="px-4 py-2 text-right font-semibold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {installmentTable.map((row) => {
+                    const isActive = row.term === selectedTerm;
+                    return (
+                      <tr
+                        key={row.term}
+                        onClick={() => setSelectedTerm(row.term)}
+                        className={`cursor-pointer border-t border-[#eef1f7] transition hover:bg-[#f6f8fc] ${
+                          isActive ? "bg-[#eaf2ff]" : "bg-white"
+                        }`}
+                      >
+                        <td
+                          className={`px-4 py-2.5 font-semibold ${
+                            isActive ? "text-[#0e62d8]" : "text-[#13203f]"
+                          }`}
+                        >
+                          {row.term} meses
+                        </td>
+                        <td
+                          className={`px-4 py-2.5 text-right font-semibold ${
+                            isActive ? "text-[#0e62d8]" : "text-[#13203f]"
+                          }`}
+                        >
+                          {formatCurrencyPrecise(row.monthly)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-[#5b6683]">
+                          {formatCurrency(row.total)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="border-t border-[#eef1f7] px-4 py-3 text-[12px] leading-5 text-[#7a8398]">
+                Valores aproximados calculados sobre a tabela Price. Clique em um prazo para
+                atualizar o resumo.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* CONFIGURE + SIDEBAR */}
+        <section className="mt-14 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div>
+            <h2 className="text-[22px] font-extrabold text-[#13203f] md:text-[26px]">
+              Configure Suas Parcelas do Financiamento
+            </h2>
+            <p className="mt-2 text-[15px] text-[#5b6683]">
+              Explore veículos com parcelas próximas às que você simulou e continue ajustando seu
+              financiamento.
+            </p>
+
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {configureList.map((item, index) => (
+                <AdCard key={`${item.id ?? item.slug ?? index}-cfg`} item={item} />
+              ))}
+            </div>
+          </div>
+
+          <aside className="flex h-fit flex-col items-center overflow-hidden rounded-[20px] border border-[#e6eaf2] bg-gradient-to-b from-[#eaf2ff] to-white p-6 text-center shadow-[0_10px_30px_rgba(14,40,80,0.06)]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0e62d8]/10 text-[#0e62d8]">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-8 w-8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 11v2a2 2 0 0 0 2 2h2l4 3V6L7 9H5a2 2 0 0 0-2 2Z" />
+                <path d="M15 8a5 5 0 0 1 0 8" />
+                <path d="M18 5a9 9 0 0 1 0 14" />
+              </svg>
+            </div>
+            <h3 className="mt-4 text-[20px] font-extrabold text-[#13203f]">
+              Anuncie seu carro grátis!
+            </h3>
+            <p className="mt-2 text-[14px] leading-6 text-[#5b6683]">
+              Cadastre seu veículo em poucos minutos e alcance compradores da sua cidade sem pagar
+              taxa.
+            </p>
+            <Link
+              href="/planos"
+              className="mt-5 inline-flex h-[48px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-5 text-[15px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(14,98,216,0.25)] transition hover:bg-[#0c4fb0]"
+            >
+              Anunciar Grátis
+            </Link>
+          </aside>
+        </section>
+
+        {/* CITY OFFERS */}
+        <section className="mt-14">
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-[22px] font-extrabold text-[#13203f] md:text-[26px]">
+              Ofertas de carros usados em {cityName}
+            </h2>
+            <Link
+              href={`/comprar?city_slug=${citySlug}`}
+              className="hidden text-[14px] font-semibold text-[#0e62d8] hover:text-[#0c4fb0] md:inline-flex"
+            >
+              Ver todas &rarr;
+            </Link>
+          </div>
+
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {cityOffers.map((item, index) => (
+              <AdCard key={`${item.id ?? item.slug ?? index}-offer`} item={item} />
+            ))}
+          </div>
+
+          {cityOffers.length === 0 ? (
+            <p className="mt-6 rounded-[14px] border border-dashed border-[#e6eaf2] bg-[#f6f8fc] px-5 py-8 text-center text-[14px] text-[#5b6683]">
+              Ainda não há ofertas carregadas para {cityLabel}. Volte em breve ou explore outras
+              regiões.
+            </p>
+          ) : null}
+
+          <div className="mt-6 flex justify-center md:hidden">
+            <Link
+              href={`/comprar?city_slug=${citySlug}`}
+              className="inline-flex h-[48px] items-center justify-center rounded-[12px] border border-[#0e62d8] px-6 text-[15px] font-bold text-[#0e62d8]"
+            >
+              Ver todas as ofertas
+            </Link>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
 
-function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      {label ? (
-        <span className="mb-2 block text-[15px] font-semibold text-[#59627a]">{label}</span>
-      ) : null}
-      {children}
-    </label>
-  );
-}
-
-function FeatureMiniCard({
-  iconColor,
-  title,
-  description,
-  ctaLabel,
-  ctaHref,
-  ctaVariant,
+function SliderField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  format,
+  minLabel,
+  maxLabel,
 }: {
-  iconColor: "orange" | "blue";
-  title: string;
-  description: string;
-  ctaLabel: string;
-  ctaHref: string;
-  ctaVariant: "orange" | "blue";
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  format: (value: number) => string;
+  minLabel: string;
+  maxLabel: string;
 }) {
-  return (
-    <div className="rounded-[22px] border border-[#e6eaf2] bg-white p-5 shadow-[0_16px_32px_rgba(30,37,71,0.06)]">
-      <div className="flex items-start gap-4">
-        <div
-          className={cn(
-            "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-            iconColor === "orange" ? "bg-[#fff3df] text-[#f5a623]" : "bg-[#eaf1ff] text-[#2f67f6]"
-          )}
-        >
-          {iconColor === "orange" ? (
-            <svg
-              viewBox="0 0 24 24"
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-            >
-              <path d="M12 3l8 3v5c0 5.25-3.1 9.1-8 11-4.9-1.9-8-5.75-8-11V6l8-3Z" />
-            </svg>
-          ) : (
-            <svg
-              viewBox="0 0 24 24"
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-            >
-              <path d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z" />
-              <path d="M12 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-            </svg>
-          )}
-        </div>
+  const pct = max - min > 0 ? ((value - min) / (max - min)) * 100 : 0;
 
-        <div className="min-w-0">
-          <h4 className="text-[18px] font-extrabold text-[#1e2547] md:text-[20px]">{title}</h4>
-          <p className="mt-2 text-[15px] leading-6 text-[#646d83]">{description}</p>
-        </div>
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <label className="text-[14px] font-semibold text-[#5b6683]">{label}</label>
+        <span className="text-[16px] font-extrabold text-[#0e62d8]">{format(value)}</span>
       </div>
 
-      <Link
-        href={ctaHref}
-        className={cn(
-          "mt-5 inline-flex h-[52px] w-full items-center justify-center rounded-[14px] text-[20px] font-bold text-white transition",
-          ctaVariant === "orange"
-            ? "bg-[#f5a623] hover:bg-[#eb9e16]"
-            : "bg-[#2f67f6] hover:bg-[#2457dc]"
-        )}
-      >
-        {ctaLabel}
-      </Link>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="mt-2 block w-full cursor-pointer appearance-none bg-transparent
+          [&::-webkit-slider-runnable-track]:h-[6px] [&::-webkit-slider-runnable-track]:rounded-full
+          [&::-webkit-slider-runnable-track]:bg-[length:100%_100%] [&::-webkit-slider-runnable-track]:bg-no-repeat
+          [&::-moz-range-track]:h-[6px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[#e6eaf2]
+          [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#0e62d8] [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(14,98,216,0.45)]
+          [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#0e62d8] [&::-moz-range-thumb]:shadow-[0_2px_6px_rgba(14,98,216,0.45)]"
+        style={{
+          backgroundImage: `linear-gradient(to right, #0e62d8 ${pct}%, #e6eaf2 ${pct}%)`,
+          backgroundSize: "100% 6px",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
+
+      <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#8791a7]">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
     </div>
   );
 }
 
-function FinanceRow({
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="text-[14px] text-[#5b6683]">{label}</dt>
+      <dd className="text-[15px] font-semibold text-[#13203f]">{value}</dd>
+    </div>
+  );
+}
+
+function MiniStat({
   label,
   value,
-  icon,
-  strong = false,
+  muted = false,
 }: {
   label: string;
   value: string;
-  icon: "calendar" | "dot" | "doc" | "clock";
-  strong?: boolean;
+  muted?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#edf1f7] pb-3 last:border-b-0 last:pb-0">
-      <div className="flex items-center gap-3 text-[17px] text-[#505a73]">
-        <span className="inline-flex h-5 w-5 items-center justify-center text-[#8b95aa]">
-          {icon === "calendar" ? (
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path d="M4 7h16M7 4v6M17 4v6M5 11h14v8H5z" />
-            </svg>
-          ) : icon === "dot" ? (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-              <circle cx="12" cy="12" r="6" />
-            </svg>
-          ) : icon === "doc" ? (
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path d="M7 3h7l5 5v13H7z" />
-              <path d="M14 3v5h5" />
-            </svg>
-          ) : (
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path d="M12 8v5l3 2" />
-              <path d="M21 12a9 9 0 1 1-9-9" />
-            </svg>
-          )}
-        </span>
-        <span>{label}</span>
-      </div>
-
-      <div
-        className={cn(
-          "text-right text-[18px] font-semibold text-[#1e2547]",
-          strong && "text-[22px] font-extrabold"
-        )}
+    <div className="rounded-[12px] border border-[#eef1f7] bg-white px-3 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a8398]">{label}</p>
+      <p
+        className={`mt-1 text-[15px] font-extrabold leading-tight ${
+          muted ? "text-[#13203f]" : "text-[#0e62d8]"
+        }`}
       >
         {value}
-      </div>
+      </p>
     </div>
   );
 }
 
-function OpportunityCard({
-  item,
-  cityLabel,
-  parcel,
-}: {
-  item: AdItem;
-  cityLabel: string;
-  parcel: number;
-}) {
-  const title =
-    item.title || [item.year, item.brand, item.model].filter(Boolean).join(" ") || "Veículo";
-  const image = resolveImage(item);
-  const href = resolveLink(item);
-  const price = parseMoney(item.price) || 0;
-
-  return (
-    <Link
-      href={href}
-      className="group overflow-hidden rounded-[22px] border border-[#e6eaf2] bg-white shadow-[0_16px_34px_rgba(30,37,71,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_rgba(30,37,71,0.10)]"
-    >
-      <div className="relative aspect-[1.28/0.86] overflow-hidden">
-        <img
-          src={image}
-          alt={title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-        />
-
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
-          <span className="inline-flex rounded-full bg-[#3fae7b] px-3 py-1 text-[12px] font-extrabold text-white shadow-sm">
-            -9% abaixo da FIPE
-          </span>
-
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/92 text-[#8892a7] shadow-sm">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-[16px] w-[16px]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-            </svg>
-          </span>
-        </div>
-      </div>
-
-      <div className="px-5 pb-5 pt-4">
-        <h3 className="text-[18px] font-extrabold text-[#1e2547] md:text-[20px]">{title}</h3>
-
-        <p className="mt-2 text-[16px] text-[#646d83]">{cityLabel}</p>
-
-        <div className="mt-4 flex items-end justify-between gap-3">
-          <div className="text-[28px] font-extrabold leading-none text-[#153e9f]">
-            {formatCurrency(price)}
-          </div>
-
-          <div className="rounded-[10px] bg-[#f2f4fa] px-3 py-2 text-[12px] font-bold text-[#6b7489]">
-            {formatMileage(item.mileage)}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className="mt-4 inline-flex h-[50px] w-full items-center justify-center rounded-[14px] bg-[#eef1f7] px-5 text-[18px] font-semibold text-[#47526f] transition hover:bg-[#e6ebf5]"
-        >
-          Ver parcelas
-        </button>
-
-        <div className="mt-3 rounded-[12px] bg-[#f8fafd] px-4 py-3 text-[13px] text-[#5d6780] ring-1 ring-[#edf1f7]">
-          a partir de{" "}
-          <span className="font-bold text-[#153e9f]">{formatCurrencyPrecise(parcel)}</span> a.m.
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-const inputClassName =
-  "h-[58px] w-full rounded-[14px] border border-[#e6eaf2] bg-white px-4 text-[16px] font-semibold text-[#1e2547] outline-none transition focus:border-[#2f67f6]";
-
-const selectClassName =
-  "h-[58px] w-full rounded-[14px] border border-[#e6eaf2] bg-white px-4 text-[16px] font-semibold text-[#1e2547] outline-none transition focus:border-[#2f67f6]";
+export default FinancingLandingPageClient;
