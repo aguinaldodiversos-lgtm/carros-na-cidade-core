@@ -124,7 +124,7 @@ export function FinancingLandingPageClient({
         />
 
         {/* HERO */}
-        <section className="relative grid items-center gap-10 md:grid-cols-[minmax(0,1.1fr)_minmax(0,560px)]">
+        <section className="relative grid items-center gap-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,420px)]">
           <div className="relative z-10 py-4 md:py-8">
             <h1 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] text-[#0f1a38] md:whitespace-nowrap md:text-[44px] lg:text-[52px]">
               Simulador de Financiamento
@@ -136,12 +136,12 @@ export function FinancingLandingPageClient({
           </div>
 
           <div className="relative flex items-center justify-end">
-            <div className="pointer-events-none absolute inset-x-8 bottom-3 h-6 rounded-[999px] bg-[#0e62d8]/12 blur-2xl" />
+            <div className="pointer-events-none absolute inset-x-6 bottom-2 h-5 rounded-[999px] bg-[#0e62d8]/12 blur-2xl" />
             <img
               src={HERO_IMAGE_SRC}
               alt="Simulador de financiamento Carros na Cidade"
-              className="relative z-10 w-full max-w-[560px] object-contain drop-shadow-[0_28px_32px_rgba(14,40,80,0.16)]"
-              style={{ height: "clamp(240px, 30vw, 360px)" }}
+              className="relative z-10 w-full max-w-[420px] object-contain drop-shadow-[0_22px_26px_rgba(14,40,80,0.16)]"
+              style={{ height: "clamp(180px, 22vw, 260px)" }}
             />
           </div>
         </section>
@@ -261,19 +261,16 @@ export function FinancingLandingPageClient({
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-5">
-            <Link
-              href={`/comprar?city_slug=${citySlug}&valor=${financedValue}`}
-              className="group relative inline-flex h-[84px] w-full items-center justify-between gap-3 overflow-hidden rounded-[16px] bg-gradient-to-r from-[#0e62d8] to-[#1271ef] px-6 text-left text-white shadow-[0_16px_38px_rgba(14,98,216,0.32)] transition hover:from-[#0c4fb0] hover:to-[#0e62d8]"
-            >
+            <div className="relative flex h-[84px] w-full items-center justify-between gap-3 overflow-hidden rounded-[16px] bg-gradient-to-r from-[#0e62d8] to-[#1271ef] px-6 text-left text-white shadow-[0_16px_38px_rgba(14,98,216,0.32)]">
               <div>
                 <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/80">
                   Continuar com este valor
                 </div>
                 <div className="mt-1 text-[19px] font-extrabold leading-tight">
-                  Verificar Crédito Agora
+                  Valor das Parcelas
                 </div>
               </div>
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 transition group-hover:translate-x-1">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15">
                 <svg
                   viewBox="0 0 24 24"
                   className="h-5 w-5"
@@ -287,7 +284,7 @@ export function FinancingLandingPageClient({
                   <path d="m13 6 6 6-6 6" />
                 </svg>
               </span>
-            </Link>
+            </div>
 
             <div className="overflow-hidden rounded-[18px] border border-[#e6eaf2] bg-white shadow-[0_14px_36px_rgba(14,40,80,0.07)]">
               <div className="border-b border-[#e6eaf2] bg-[#f6f8fc] px-6 py-4">
