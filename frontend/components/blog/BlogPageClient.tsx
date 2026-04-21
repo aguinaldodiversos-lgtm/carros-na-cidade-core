@@ -17,7 +17,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import type { BlogPageContent, BlogPost } from "@/lib/blog/blog-page";
-import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type OfferItem = {
   id: number | string;
@@ -129,6 +129,96 @@ function MegaphoneArt() {
       <circle cx="10" cy="18" r="1.5" fill="#f7a400" />
       <path d="M48 10l2 4 4 0-3 3 1 4-4-2-4 2 1-4-3-3 4 0 2-4z" fill="#f7a400" />
     </svg>
+  );
+}
+
+function parseOfferNumber(value?: number | string) {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatOfferPrice(value?: number | string) {
+  const numeric = parseOfferNumber(value);
+  if (!numeric) return "Sob consulta";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(numeric);
+}
+
+function slugifyFallback(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildOfferHref(offer: OfferItem) {
+  if (offer.slug) return `/veiculo/${encodeURIComponent(offer.slug)}`;
+  const fallback = [offer.title, offer.brand, offer.model, offer.year, offer.id]
+    .filter(Boolean)
+    .join(" ");
+  return `/veiculo/${slugifyFallback(fallback || `anuncio-${offer.id}`)}`;
+}
+
+function buildOfferTitle(offer: OfferItem) {
+  if (offer.title) {
+    return offer.title.length > 36 ? `${offer.title.slice(0, 36).trim()}…` : offer.title;
+  }
+  return [offer.brand, offer.model].filter(Boolean).join(" ") || "Veículo";
+}
+
+function buildOfferSubline(offer: OfferItem, cityName: string) {
+  const parts = [offer.year, offer.model, offer.mileage ? `${offer.mileage} km` : null]
+    .filter(Boolean)
+    .map(String);
+  const cityLabel = offer.city || cityName;
+  return {
+    specs: parts.slice(0, 3).join(" · "),
+    cityLabel,
+  };
+}
+
+function SidebarOfferCard({ offer, cityName }: { offer: OfferItem; cityName: string }) {
+  const href = buildOfferHref(offer);
+  const title = buildOfferTitle(offer);
+  const { specs, cityLabel } = buildOfferSubline(offer, cityName);
+  const price = formatOfferPrice(offer.price);
+  const image = resolvePublicListingImageUrl({
+    image_url: offer.image_url,
+    images: offer.images,
+  });
+
+  return (
+    <Link
+      href={href}
+      className="flex gap-3 rounded-[10px] p-1 transition hover:bg-[#f5f8fc]"
+    >
+      <div className="relative h-[68px] w-[96px] shrink-0 overflow-hidden rounded-[8px] bg-[#f1f4f9]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image} alt={title} className="h-full w-full object-cover" loading="lazy" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-extrabold leading-[1.2] text-[#17213a]">
+          {title}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-[#6f7a90]">
+          {specs || cityLabel}
+        </p>
+        <p className="mt-1.5 text-[14px] font-extrabold text-[#0e62d8]">{price}</p>
+        <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-[#6f7a90]">
+          <span className="tracking-[0.06em]">Por 469 FIPE</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#eef4ff] px-2 py-0.5 text-[#0e62d8]">
+            80+ ATBV
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -586,18 +676,18 @@ export function BlogPageClient({ content, offers }: BlogPageClientProps) {
             {offers.length > 0 ? (
               <section className="rounded-[16px] border border-[#e3e8f1] bg-white p-5 shadow-[0_10px_26px_rgba(14,30,66,0.06)]">
                 <h3 className="text-[15px] font-extrabold text-[#17213a]">Ofertas em destaque</h3>
-                <div className="mt-4 space-y-4">
+                <div className="mt-4 space-y-3">
                   {offers.slice(0, 3).map((offer) => (
-                    <HomeVehicleCard
+                    <SidebarOfferCard
                       key={`offer-${offer.id}`}
-                      item={offer}
-                      variant="highlight"
+                      offer={offer}
+                      cityName={cityName}
                     />
                   ))}
                 </div>
                 <Link
                   href={`/comprar/${citySlug}`}
-                  className="mt-5 inline-flex h-[40px] w-full items-center justify-center rounded-[10px] border border-[#dbe3f0] bg-white px-4 text-[13px] font-extrabold text-[#0e62d8] transition hover:bg-[#f5f8fc]"
+                  className="mt-4 inline-flex h-[40px] w-full items-center justify-center rounded-[10px] border border-[#0e62d8] bg-white px-4 text-[13px] font-extrabold text-[#0e62d8] transition hover:bg-[#eef4ff]"
                 >
                   Ver mais ofertas
                 </Link>
