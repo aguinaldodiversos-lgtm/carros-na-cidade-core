@@ -18,7 +18,10 @@ type DashboardClientRecoveryProps = {
   mode?: AccountDashboardViewMode;
 };
 
-const RETRY_DELAYS_MS = [800, 2000];
+// Janela de retry alinhada com cold start do backend (Render free, até ~45s).
+// A chamada ao /api/dashboard/me do servidor já tem timeout interno de 45s e 1 retry,
+// aqui adicionamos tolerância adicional no cliente para cobrir picos transientes.
+const RETRY_DELAYS_MS = [1500, 4000, 8000];
 
 function shouldRetry(result: Extract<FetchDashboardPayloadResult, { ok: false }>) {
   return result.status === 0 || result.status >= 500;

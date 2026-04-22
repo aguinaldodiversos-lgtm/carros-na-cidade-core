@@ -44,6 +44,21 @@ type ApiErrorPayload = {
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+/**
+ * Timeout ampliado para chamadas autenticadas ao backend do painel.
+ *
+ * Motivo: o backend roda em Render (free tier) e pode levar 20-45s para
+ * responder após um período de ociosidade (cold start). 15s é insuficiente
+ * e gera AbortError → o BFF mapeia como 502 "network_error" → o usuário
+ * logado enxerga "Painel indisponivel ... Codigo: 502".
+ *
+ * 45s cobre cold start com margem. Se o backend realmente estiver fora,
+ * o AbortError continua subindo e a UI exibe estado de erro normalmente.
+ */
+const DASHBOARD_TIMEOUT_MS = 45_000;
+
+const DASHBOARD_RETRY_DELAY_MS = 1_200;
+
 class BackendApiError extends Error {
   public readonly status: number;
   public readonly code?: string;
@@ -271,13 +286,44 @@ function buildFallbackDashboardFromSession(session: SessionData): DashboardPaylo
   };
 }
 
+function shouldRetryDashboardError(error: unknown): boolean {
+  if (error instanceof BackendApiError) {
+    return error.status === 0 || error.status >= 500;
+  }
+  if (error instanceof Error) {
+    return /Tempo limite|fetch failed|network|ECONNREFUSED|ENOTFOUND|ETIMEDOUT/i.test(
+      error.message
+    );
+  }
+  return false;
+}
+
 export async function fetchDashboard(session: SessionData) {
-  const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
-    accessToken: assertAccessToken(session),
-  });
-  const normalized = normalizeDashboardPayload(raw);
-  if (normalized) return normalized;
-  return buildFallbackDashboardFromSession(session);
+  const token = assertAccessToken(session);
+
+  // Uma tentativa a mais, tolerante a cold start do Render. Se o backend
+  // estiver realmente fora, a segunda chamada também falha e o erro sobe
+  // normalmente para o BFF/SSR tratar.
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
+        accessToken: token,
+        timeoutMs: DASHBOARD_TIMEOUT_MS,
+      });
+      const normalized = normalizeDashboardPayload(raw);
+      if (normalized) return normalized;
+      return buildFallbackDashboardFromSession(session);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0 && shouldRetryDashboardError(error)) {
+        await new Promise((resolve) => setTimeout(resolve, DASHBOARD_RETRY_DELAY_MS));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Falha ao buscar dashboard");
 }
 
 export async function fetchOwnedAd(session: SessionData, adId: string) {
