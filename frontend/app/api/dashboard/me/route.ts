@@ -173,7 +173,7 @@ async function fetchDashboardWithOptionalRefresh(
   ensured: Extract<EnsureBackendSessionResult, { ok: true }>
 ) {
   try {
-    const payload = await fetchDashboard(ensured.session);
+    const payload = await fetchDashboard(ensured.session, { allowRetry: true });
     return dashboardSuccessResponse(payload, ensured.persistCookies);
   } catch (error) {
     if (!(error instanceof BackendApiError) || error.status !== 401) {
@@ -206,6 +206,7 @@ async function fetchDashboardWithOptionalRefresh(
 
     try {
       console.info("[GET /api/dashboard/me] refresh bem-sucedido; repetindo dashboard uma vez");
+      // Aqui já é a retentativa pós-refresh, sem retry interno adicional.
       const payload = await fetchDashboard(refreshed.session);
       return dashboardSuccessResponse(payload, refreshed.persistCookies);
     } catch (retryError) {

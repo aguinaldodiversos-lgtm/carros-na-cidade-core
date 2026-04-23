@@ -298,14 +298,24 @@ function shouldRetryDashboardError(error: unknown): boolean {
   return false;
 }
 
-export async function fetchDashboard(session: SessionData) {
-  const token = assertAccessToken(session);
+export type FetchDashboardOptions = {
+  /**
+   * Permite 1 retentativa interna em caso de timeout/5xx/erro de rede.
+   * Deve ser usado SOMENTE pelo BFF (`/api/dashboard/me`). No SSR, o retry
+   * interno é desligado para não estourar o gateway do frontend (~100s).
+   * Recovery do SSR fica a cargo do client component (DashboardClientRecovery).
+   */
+  allowRetry?: boolean;
+};
 
-  // Uma tentativa a mais, tolerante a cold start do Render. Se o backend
-  // estiver realmente fora, a segunda chamada também falha e o erro sobe
-  // normalmente para o BFF/SSR tratar.
+export async function fetchDashboard(session: SessionData, options: FetchDashboardOptions = {}) {
+  const token = assertAccessToken(session);
+  const allowRetry = options.allowRetry === true;
+
   let lastError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const maxAttempts = allowRetry ? 2 : 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
         accessToken: token,
@@ -316,7 +326,7 @@ export async function fetchDashboard(session: SessionData) {
       return buildFallbackDashboardFromSession(session);
     } catch (error) {
       lastError = error;
-      if (attempt === 0 && shouldRetryDashboardError(error)) {
+      if (allowRetry && attempt === 0 && shouldRetryDashboardError(error)) {
         await new Promise((resolve) => setTimeout(resolve, DASHBOARD_RETRY_DELAY_MS));
         continue;
       }

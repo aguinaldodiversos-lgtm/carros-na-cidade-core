@@ -158,7 +158,8 @@ describe("GET /api/dashboard/me", () => {
     expect(mocks.ensureSessionWithFreshBackendTokens).toHaveBeenNthCalledWith(2, staleSession, {
       forceRefresh: true,
     });
-    expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(1, staleSession);
+    expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(1, staleSession, { allowRetry: true });
+    // Após refresh, não repetimos retry interno (backend já está quente).
     expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(2, refreshedSession);
     expect(mocks.applySessionCookiesToResponse).toHaveBeenCalledWith(
       expect.anything(),

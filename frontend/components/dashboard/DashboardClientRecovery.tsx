@@ -18,10 +18,18 @@ type DashboardClientRecoveryProps = {
   mode?: AccountDashboardViewMode;
 };
 
-// Janela de retry alinhada com cold start do backend (Render free, até ~45s).
-// A chamada ao /api/dashboard/me do servidor já tem timeout interno de 45s e 1 retry,
-// aqui adicionamos tolerância adicional no cliente para cobrir picos transientes.
-const RETRY_DELAYS_MS = [1500, 4000, 8000];
+// Orçamento de retry do client.
+//
+// O BFF /api/dashboard/me já faz internamente:
+//   refresh (20s max) + fetchDashboard com 1 retry (45s + 1.2s + 45s = 91.2s)
+// ou seja, cada chamada do client pode custar até ~111s quando o token
+// precisa ser renovado. Por isso o retry aqui é único e curto — serve só
+// para cobrir blip de rede entre client e frontend Render (não cold start,
+// que já está coberto no servidor).
+//
+// 1 retry após 2.5s → orçamento total do recovery: ~ 2 × 111s + 2.5s ≈ 3.7min
+// (pior caso teórico; em prática quase sempre resolve na 1ª tentativa).
+const RETRY_DELAYS_MS = [2500];
 
 function shouldRetry(result: Extract<FetchDashboardPayloadResult, { ok: false }>) {
   return result.status === 0 || result.status >= 500;
