@@ -33,11 +33,17 @@ export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"] }) {
       // Monkey patch res.json para gravar no cache
       const originalJson = res.json.bind(res);
       res.json = (body) => {
-        Promise.resolve()
-          .then(() => redis.set(key, JSON.stringify(body), "EX", ttlSeconds))
-          .catch(() => {});
+        // Só cacheia respostas de sucesso: status 2xx e sem indicador de erro no payload.
+        // Evita persistir fallback de safeMode (ok:false) ou respostas de erro do handler.
+        const statusOk = res.statusCode >= 200 && res.statusCode < 400;
+        const bodyOk = !body || body.ok !== false;
+        if (statusOk && bodyOk) {
+          Promise.resolve()
+            .then(() => redis.set(key, JSON.stringify(body), "EX", ttlSeconds))
+            .catch(() => {});
+        }
         res.setHeader("X-Cache", "MISS");
-        res.setHeader("Cache-Control", `public, max-age=${ttlSeconds}`);
+        res.setHeader("Cache-Control", statusOk ? `public, max-age=${ttlSeconds}` : "no-store");
         return originalJson(body);
       };
 

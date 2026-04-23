@@ -126,7 +126,8 @@ export async function create(req, res, next) {
         adId: ad?.id ?? null,
         payload: sanitizeAdPayloadForLog(req.body),
       });
-      throw cacheErr;
+      // Falha de cache não deve reverter o INSERT já confirmado no banco.
+      // O anúncio foi criado com sucesso; o cache expira naturalmente no TTL.
     }
 
     res.status(201).json({

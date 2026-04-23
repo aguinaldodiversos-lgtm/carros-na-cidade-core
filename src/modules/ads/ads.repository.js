@@ -53,11 +53,16 @@ export async function createAd(data) {
       status,
       plan,
       slug,
+      search_vector,
       created_at,
       updated_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,NOW(),NOW()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,
+      to_tsvector('portuguese',
+        COALESCE($9,'') || ' ' || COALESCE($10,'') || ' ' || COALESCE($2,'') || ' ' || COALESCE($3,'')
+      ),
+      NOW(),NOW()
     )
     RETURNING *;
   `;
