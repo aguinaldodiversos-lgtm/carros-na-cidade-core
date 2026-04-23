@@ -218,6 +218,21 @@ describe("GET /api/dashboard/me", () => {
     expect(mocks.ensureSessionWithFreshBackendTokens).toHaveBeenCalledTimes(1);
   });
 
+  it("preserva 429 do backend transparente (nao mascara como 502)", async () => {
+    // Regressão: antes o BFF caía no fallback e virava 502 "backend_unavailable",
+    // fazendo a UI exibir "Codigo 502" mesmo o backend respondendo "muitas tentativas".
+    mocks.fetchDashboard.mockRejectedValueOnce(backendError(429, "Muitas tentativas"));
+
+    const response = await GET(fakeRequest());
+    const body = await readJson(response);
+
+    expect(response.status).toBe(429);
+    expect(body).toMatchObject({
+      ok: false,
+      error: { code: "backend_rate_limited", upstreamStatus: 429 },
+    });
+  });
+
   it("mapeia 5xx real do backend para 502 com upstreamStatus", async () => {
     mocks.fetchDashboard.mockRejectedValueOnce(backendError(500, "Database down"));
 

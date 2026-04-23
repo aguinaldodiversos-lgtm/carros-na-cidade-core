@@ -19,6 +19,7 @@ type DashboardErrorCode =
   | "missing_session"
   | "backend_unauthorized"
   | "backend_forbidden"
+  | "backend_rate_limited"
   | "backend_unavailable"
   | "network_error"
   | "bff_unexpected";
@@ -96,6 +97,13 @@ function logBackendFailure(error: BackendApiError) {
     });
     return;
   }
+  if (error.status === 429) {
+    console.warn("[GET /api/dashboard/me] backend 429 (rate limited)", {
+      upstreamStatus: error.status,
+      code: error.code,
+    });
+    return;
+  }
   if (error.status >= 500) {
     console.error("[GET /api/dashboard/me] backend 5xx ao buscar dashboard", {
       upstreamStatus: error.status,
@@ -127,6 +135,17 @@ function responseFromDashboardFetchError(request: NextRequest, error: unknown) {
         "backend_forbidden",
         "Esta conta nao tem permissao para acessar este painel.",
         403
+      );
+    }
+    if (error.status === 429) {
+      // Rate limit do backend: propaga 429 transparente ao client com
+      // mensagem clara. Antes caía no fallback 502 "backend_unavailable"
+      // mascarando o sintoma e fazendo o recovery client exibir "Codigo 502".
+      return dashboardErrorResponse(
+        429,
+        "backend_rate_limited",
+        "Muitas solicitacoes ao painel em curto intervalo. Aguarde alguns minutos e tente novamente.",
+        429
       );
     }
     if (error.status >= 500) {
