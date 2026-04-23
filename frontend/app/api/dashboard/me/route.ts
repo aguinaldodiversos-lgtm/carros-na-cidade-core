@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BackendApiError, fetchDashboard } from "@/lib/account/backend-account";
+import { getClientIpFromNextRequest } from "@/lib/http/client-ip";
 import {
   ensureSessionWithFreshBackendTokens,
   type EnsureBackendSessionResult,
@@ -191,8 +192,9 @@ async function fetchDashboardWithOptionalRefresh(
   request: NextRequest,
   ensured: Extract<EnsureBackendSessionResult, { ok: true }>
 ) {
+  const clientIp = getClientIpFromNextRequest(request) || undefined;
   try {
-    const payload = await fetchDashboard(ensured.session, { allowRetry: true });
+    const payload = await fetchDashboard(ensured.session, { allowRetry: true, clientIp });
     return dashboardSuccessResponse(payload, ensured.persistCookies);
   } catch (error) {
     if (!(error instanceof BackendApiError) || error.status !== 401) {
@@ -226,7 +228,7 @@ async function fetchDashboardWithOptionalRefresh(
     try {
       console.info("[GET /api/dashboard/me] refresh bem-sucedido; repetindo dashboard uma vez");
       // Aqui já é a retentativa pós-refresh, sem retry interno adicional.
-      const payload = await fetchDashboard(refreshed.session);
+      const payload = await fetchDashboard(refreshed.session, { clientIp });
       return dashboardSuccessResponse(payload, refreshed.persistCookies);
     } catch (retryError) {
       return responseFromDashboardFetchError(request, retryError);

@@ -5,6 +5,31 @@ import type { DashboardPayload } from "@/lib/dashboard-types";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import { getSessionDataFromCookieStore, type SessionData } from "@/services/sessionService";
 
+/**
+ * Lê o IP real do visitante a partir dos headers do SSR.
+ * Prioridade: x-vercel-forwarded-for → cf-connecting-ip → x-forwarded-for → x-real-ip.
+ * Sem isso, o rate limit do backend usa o IP do servidor Render (compartilhado
+ * por todos os usuários) — causa real de 429 coletivo no painel.
+ */
+function readClientIpFromSSRHeaders(): string | undefined {
+  const headersList = headers();
+  const vercel = headersList.get("x-vercel-forwarded-for");
+  if (vercel) {
+    const first = vercel.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const cf = headersList.get("cf-connecting-ip");
+  if (cf?.trim()) return cf.trim();
+  const xff = headersList.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const xri = headersList.get("x-real-ip");
+  if (xri?.trim()) return xri.trim();
+  return undefined;
+}
+
 export function getLoginRedirect(nextPath: string) {
   return `/login?next=${encodeURIComponent(nextPath)}`;
 }
@@ -41,7 +66,8 @@ export async function loadDashboardPayload(session: SessionData): Promise<Dashbo
     return null;
   }
   try {
-    return await fetchDashboard(ensured.session);
+    const clientIp = readClientIpFromSSRHeaders();
+    return await fetchDashboard(ensured.session, { clientIp });
   } catch (error) {
     console.error(
       "[loadDashboardPayload] falha ao buscar dashboard",

@@ -306,11 +306,26 @@ export type FetchDashboardOptions = {
    * Recovery do SSR fica a cargo do client component (DashboardClientRecovery).
    */
   allowRetry?: boolean;
+  /**
+   * IP do visitante real (repassado ao backend via X-Cnc-Client-Ip).
+   *
+   * Sem isso, o rate limit do backend usa `req.ip` = IP do servidor frontend
+   * (Render), fazendo TODOS os usuários do /dashboard compartilharem a mesma
+   * quota de 1000 req/15min. Em qualquer pico, todos recebem 429 simultaneamente.
+   *
+   * SSR e BFF devem preencher esse campo lendo o IP real do request original.
+   */
+  clientIp?: string;
 };
 
 export async function fetchDashboard(session: SessionData, options: FetchDashboardOptions = {}) {
   const token = assertAccessToken(session);
   const allowRetry = options.allowRetry === true;
+
+  const forwardHeaders: Record<string, string> = {};
+  if (options.clientIp) {
+    forwardHeaders["X-Cnc-Client-Ip"] = options.clientIp;
+  }
 
   let lastError: unknown = null;
   const maxAttempts = allowRetry ? 2 : 1;
@@ -320,6 +335,7 @@ export async function fetchDashboard(session: SessionData, options: FetchDashboa
       const raw = await fetchBackendJson<unknown>("/api/account/dashboard", {
         accessToken: token,
         timeoutMs: DASHBOARD_TIMEOUT_MS,
+        headers: forwardHeaders,
       });
       const normalized = normalizeDashboardPayload(raw);
       if (normalized) return normalized;
