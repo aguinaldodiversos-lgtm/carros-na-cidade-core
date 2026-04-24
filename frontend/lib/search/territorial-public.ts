@@ -1,3 +1,5 @@
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
+
 import type { AdItem, AdsFacetsResponse, AdsPagination } from "./ads-search";
 
 export interface TerritorialCityIdentity {
@@ -170,14 +172,11 @@ async function fetchTerritorialPage(
   const params = toSearchParams(searchParams);
   const suffix = params.toString() ? `?${params.toString()}` : "";
 
-  const response = await fetch(`${apiBase}${routePath}${suffix}`, {
+  const response = await ssrResilientFetch(`${apiBase}${routePath}${suffix}`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    next: {
-      revalidate: 60,
-    },
+    headers: { "Content-Type": "application/json" },
+    logTag: "territorial",
+    next: { revalidate: 60 },
   });
 
   if (!response.ok) {

@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 export type CatalogAdsTerritoryFallback = {
   mode: "self" | "fallback" | "empty";
@@ -28,8 +29,9 @@ export async function fetchCatalogAdsTerritoryFallback(
   if (!url) return null;
 
   try {
-    const res = await fetch(url, {
+    const res = await ssrResilientFetch(url, {
       headers: { Accept: "application/json" },
+      logTag: "territory-fallback",
       next: { revalidate: 60 },
     });
     const json = (await res.json()) as {

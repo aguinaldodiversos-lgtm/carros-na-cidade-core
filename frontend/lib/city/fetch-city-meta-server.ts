@@ -1,5 +1,6 @@
 import { normalizeCityId } from "@/lib/city/city-types";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 type CityPayload = {
   city?: { id?: number | string; name?: string; state?: string | null; slug?: string };
@@ -22,8 +23,9 @@ export async function fetchCityMetaBySlug(slug: string): Promise<CityMetaLite | 
   if (!url) return null;
 
   try {
-    const res = await fetch(url, {
+    const res = await ssrResilientFetch(url, {
       headers: { Accept: "application/json" },
+      logTag: "city-meta",
       next: { revalidate: 300, tags: [`city-meta:${s}`, "city-meta"] },
     });
     const text = await res.text();

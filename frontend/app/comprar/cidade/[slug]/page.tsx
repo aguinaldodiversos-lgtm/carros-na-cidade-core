@@ -14,6 +14,7 @@ import {
   type AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-territory-fallback";
 import {
   buildCityPath,
@@ -109,8 +110,9 @@ async function resolveCityMeta(slug: string): Promise<CityRef | null> {
     const url = resolveBackendApiUrl(`/api/public/cities/${encodeURIComponent(slug)}`);
     if (!url) return null;
 
-    const res = await fetch(url, {
+    const res = await ssrResilientFetch(url, {
       headers: { Accept: "application/json" },
+      logTag: "city-meta-comprar",
       next: { revalidate: 300 },
     });
 

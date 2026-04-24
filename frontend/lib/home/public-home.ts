@@ -163,6 +163,11 @@ export type HomeCarouselsData = {
 /**
  * Fetch pesado dos carrosseis de veiculos — renderizado dentro de <Suspense>
  * para permitir stream do HTML acima da dobra antes destes dados chegarem.
+ *
+ * Cada carrossel tem fallback global: se a cidade do usuario nao tem ads
+ * para aquele criterio (ex.: Sao Paulo capital sem highlight), cai para
+ * busca nacional do mesmo criterio. Isso evita home totalmente vazia
+ * quando o estoque regional esta zerado — comum em lancamento do portal.
  */
 export async function fetchHomeCarousels(
   citySlug?: string,
@@ -179,15 +184,36 @@ export async function fetchHomeCarousels(
     return o;
   };
 
-  const [highlightAds, opportunityAds, recentAds] = await Promise.all([
-    fetchAdsCollection(
-      apiBase,
-      withTerritory({ highlight_only: true, limit: 12, sort: "highlight" }),
-      tags
-    ),
-    fetchAdsCollection(apiBase, withTerritory({ below_fipe: true, limit: 4 }), tags),
-    fetchAdsCollection(apiBase, withTerritory({ limit: 8, sort: "recent" }), tags),
+  const HIGHLIGHT = { highlight_only: true, limit: 12, sort: "highlight" };
+  const OPPORTUNITY = { below_fipe: true, limit: 4 };
+  const RECENT = { limit: 8, sort: "recent" };
+
+  // 1a onda: busca territorial.
+  const [localHighlight, localOpportunity, localRecent] = await Promise.all([
+    fetchAdsCollection(apiBase, withTerritory(HIGHLIGHT), tags),
+    fetchAdsCollection(apiBase, withTerritory(OPPORTUNITY), tags),
+    fetchAdsCollection(apiBase, withTerritory(RECENT), tags),
   ]);
 
-  return { highlightAds, opportunityAds, recentAds };
+  // 2a onda: fallback global apenas para carrosseis que vieram vazios.
+  // Nao dispara fallback se nao ha filtro territorial — evita round-trip.
+  const needsHighlightFallback = cs && localHighlight.length === 0;
+  const needsOpportunityFallback = cs && localOpportunity.length === 0;
+  const needsRecentFallback = cs && localRecent.length === 0;
+
+  const [globalHighlight, globalOpportunity, globalRecent] = await Promise.all([
+    needsHighlightFallback
+      ? fetchAdsCollection(apiBase, HIGHLIGHT, tags)
+      : Promise.resolve([]),
+    needsOpportunityFallback
+      ? fetchAdsCollection(apiBase, OPPORTUNITY, tags)
+      : Promise.resolve([]),
+    needsRecentFallback ? fetchAdsCollection(apiBase, RECENT, tags) : Promise.resolve([]),
+  ]);
+
+  return {
+    highlightAds: localHighlight.length ? localHighlight : globalHighlight,
+    opportunityAds: localOpportunity.length ? localOpportunity : globalOpportunity,
+    recentAds: localRecent.length ? localRecent : globalRecent,
+  };
 }

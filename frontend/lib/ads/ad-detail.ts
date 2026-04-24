@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
 
 export interface PublicAdDetail {
@@ -231,19 +232,17 @@ function buildCandidatePaths(identifier: string): string[] {
 
 async function tryFetchJson(url: string): Promise<unknown | null> {
   try {
-    const response = await fetch(url, {
+    const response = await ssrResilientFetch(url, {
       method: "GET",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      next: {
-        revalidate: 300,
-      },
+      logTag: "ad-detail",
+      next: { revalidate: 300 },
     });
 
     if (!response.ok) return null;
-
     return await response.json();
   } catch {
     return null;
