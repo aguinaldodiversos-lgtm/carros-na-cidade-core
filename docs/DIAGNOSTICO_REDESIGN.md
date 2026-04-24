@@ -1,16 +1,23 @@
 # DIAGNÓSTICO — Redesign Mobile-First do Portal Carros na Cidade
 
-**Data**: 2026-04-24
-**Versão**: 2 (endurecida)
-**Branch**: `claude/sad-elbakyan-8155e1`
-**Etapa**: 1 — Diagnóstico e contrato operacional (sem edição de código)
-**Escopo**: Frontend Next.js 14 App Router
+| Campo | Valor |
+|---|---|
+| **Versão** | 3 (contrato operacional final) |
+| **Data** | 2026-04-24 |
+| **Branch** | `claude/sad-elbakyan-8155e1` |
+| **Etapa** | 1 — Diagnóstico e contrato operacional (sem edição de código) |
+| **Status** | ⏳ Aguardando aprovação final para virar contrato oficial da reconstrução |
+| **Escopo** | Frontend Next.js 14 App Router |
+| **Relação com v1** | Diagnóstico amplo inicial, aprovado como ponto de partida mas operacionalmente frouxo (commit `da3e163`). |
+| **Relação com v2** | Primeira versão endurecida com 11 ajustes de estrutura (commit `96ebe63`). |
+| **Mudanças desta v3** | Separa PR O (auth visual) de backlog Trilha 2 (admin/security); adiciona obrigação de snapshot automatizado de rotas; adiciona obrigação de screenshot antes/depois em PRs visuais; adiciona bateria de testes de imagem; deixa §19 explícito sobre o que pode começar e o que está bloqueado. |
+| **Próximo passo após aprovação** | Execução do **PR A — Contratos de estabilidade** e do **PR 0.4A — Inventário de `services/`**. |
 
 ---
 
 ## 📋 Checklist de endurecimento aplicado
 
-Esta versão 2 corrige a versão 1 com 11 ajustes obrigatórios:
+### V2 — 11 ajustes de estrutura (commit `96ebe63`)
 
 | # | Ajuste | Endereçado em |
 |---|---|---|
@@ -25,6 +32,18 @@ Esta versão 2 corrige a versão 1 com 11 ajustes obrigatórios:
 | 9 | Contrato de performance mobile (metas como obrigações) | §12 |
 | 10 | Estimativa em 3 camadas (MVP / pública / completa) | §18 |
 | 11 | "O que pode começar agora vs o que está bloqueado" | §19 |
+
+### V3 — 7 ajustes finais (este commit)
+
+| # | Ajuste | Endereçado em |
+|---|---|---|
+| 1 | Entregar conteúdo completo do diagnóstico (não mais plano de reescrita) | Este documento inteiro |
+| 2 | Separar PR O (auth visual) de Trilha 2 (admin/security) — backlog T2.1 a T2.10 | §14 (PR O), §Trilha 2 (backlog) |
+| 3 | Snapshot automatizado de rotas antes/depois em PRs de catálogo/cidade/redirects/SEO | §8.2, §16 (nova subseção) |
+| 4 | Screenshot obrigatório antes/depois em TODOS os PRs visuais (D em diante) | §16 (nova subseção + tabela por PR) |
+| 5 | Bateria de testes de imagem (R2, `/api/vehicle-images`, sem imagem, quebrada, fallback) | §8.5.1 (nova, 12 casos IMG-1 a IMG-12) |
+| 6 | Header com versão, data, branch, status, relação com diagnósticos anteriores | Topo do documento (tabela metadata) |
+| 7 | §19 com categorias explícitas: documento/contratos/testes/inventários vs visual/deleção/services/canônicas/auth/detalhe | §19 reescrita |
 
 ---
 
@@ -372,16 +391,65 @@ Documento novo em `docs/ROUTE_CANONICAL_MAP.md`. Estrutura obrigatória:
 
 **Regra**: qualquer mudança de rota em qualquer PR **obriga** atualização desse mapa e teste E2E do redirect.
 
-### 8.2. Snapshot de rotas públicas (pré-mudança)
+### 8.2. Snapshot automatizado de rotas públicas (antes/depois obrigatório)
 
-Antes de executar qualquer PR que altere rota ou conteúdo público, gerar snapshot:
+**Regra obrigatória para qualquer PR que altere catálogo, cidade, redirects ou SEO**:
 
-- Lista de URLs públicas indexáveis (extraída de `sitemap.xml`).
-- Para cada URL: status HTTP, canonical, `<h1>`, presença de JSON-LD, presença de breadcrumb.
-- Formato: JSON em `tests/snapshots/public-routes-YYYYMMDD.json`.
-- Gerador: script novo em `scripts/snapshot-public-routes.mjs` (backlog do PR B).
+> Toda mudança que toque rota pública, middleware, metadata, sitemap, canonical ou conteúdo indexável **exige snapshot antes e depois**, com diff automatizado no pipeline. PR sem evidência de diff zero (ou diff explicado) não passa.
 
-Snapshot é referência para **diff pós-PR**. Qualquer quebra em metadata aparece.
+**PRs que disparam obrigatoriamente**:
+- PR A (baseline inicial)
+- PR C (se tocar `middleware.ts` ou `/painel/anuncios/novo`)
+- PR G (home)
+- PR H (`/cidade/**`)
+- PR I (`/veiculo/[slug]`)
+- PR J (`/comprar/*`, redirects 301)
+- PR K (FIPE/sim)
+- PR L (blog)
+- Qualquer PR da Trilha 2 que toque `/favoritos`, `/admin` ou middleware
+
+**Gerador**: script `scripts/snapshot-public-routes.mjs` (entrega no **PR B**).
+
+**Entrada**: lista fixa de 30-50 URLs representativas — home, 5 cidades, 5 detalhes, 5 territoriais, todos os sub-sitemaps, principais blog posts, FIPE, simulador, páginas institucionais.
+
+**Saída por URL**:
+
+```json
+{
+  "url": "/cidade/atibaia-sp",
+  "status": 200,
+  "canonical": "https://carrosnacidade.com/cidade/atibaia-sp",
+  "title": "Carros em Atibaia (SP) | Carros na Cidade",
+  "description": "...",
+  "h1": "Carros em Atibaia",
+  "h1_count": 1,
+  "breadcrumb_jsonld_present": true,
+  "og_image_present": true,
+  "og_image_url": "...",
+  "twitter_card": "summary_large_image",
+  "robots": "index, follow",
+  "meta_description_length": 148,
+  "html_size_bytes": 145023,
+  "server_timing_total_ms": 420,
+  "redirects": [],
+  "jsonld_types": ["BreadcrumbList", "ItemList"],
+  "internal_links_count": 42
+}
+```
+
+**Formato**: JSON em `tests/snapshots/public-routes-YYYYMMDD-HHMM.json`.
+
+**Workflow em cada PR que dispara**:
+
+1. **Antes do PR**: rodar `npm run snapshot:public-routes > tests/snapshots/before-PR-<id>.json`.
+2. **Depois do PR** (em staging ou build local): rodar novamente → `after-PR-<id>.json`.
+3. **Diff**: `npm run snapshot:diff before-PR-<id>.json after-PR-<id>.json` — script compara e reporta mudanças.
+4. **Regras de aprovação**:
+   - **Bloqueia merge automaticamente**: mudança em `canonical`, `status` ≠ 200 para rota antes 200, `h1_count` ≠ 1, `robots` mudou sem justificativa, `jsonld_types` perdeu tipo.
+   - **Exige explicação no PR**: mudança em `title`, `description`, `og_image`, `internal_links_count` (>10% variação).
+   - **Informativa**: `html_size_bytes`, `server_timing_total_ms` (rastreia performance).
+
+**CI**: adicionar step no GitHub Actions que roda diff e comenta no PR.
 
 ### 8.3. Contrato SEO
 
@@ -461,6 +529,42 @@ Imagem falha carregar
 ```
 
 Nunca deixar layout quebrar porque imagem caiu.
+
+### 8.5.1. Bateria obrigatória de testes de imagem
+
+**Entrega no PR E** (componente) com testes unitários e E2E. Todo PR que mexer em `<VehicleImage>` ou `<AdCard>` roda essa bateria.
+
+#### Casos de teste obrigatórios
+
+| # | Cenário | Expectativa | Validação |
+|---|---|---|---|
+| IMG-1 | URL R2 válida (`https://r2.carrosnacidade.com/ads/xyz.jpg`) | Imagem carrega via `next/image`, LCP aceitável, sem CLS | Unit + Lighthouse |
+| IMG-2 | Upload novo via `/api/vehicle-images` | Imagem aparece em tela após upload; URL R2 é retornada; preview funciona | E2E (Playwright) |
+| IMG-3 | Anúncio sem imagem (`images: []`) | Renderiza `<VehicleImagePlaceholder>` no lugar, sem erro, sem layout shift | Unit |
+| IMG-4 | Imagem quebrada (URL 404 ou timeout) | `onError` dispara → `<VehicleImagePlaceholder>` substitui; log enviado; nenhum crash do componente pai | Unit + E2E |
+| IMG-5 | Fallback sem quebrar layout | `width`/`height` preservados no placeholder; grid/card não colapsa; CLS = 0 | E2E + Lighthouse |
+| IMG-6 | Imagem com `sizes` ausente (regressão) | Teste de CI falha (guardrail no eslint ou script) | CI check |
+| IMG-7 | Domínio não permitido (`https://evil.com/x.jpg`) | `next/image` bloqueia (config `remotePatterns` restrito) | Unit + config |
+| IMG-8 | SVG injetado como URL de imagem de anúncio | Bloqueado (remover `dangerouslyAllowSVG: true`) | Config |
+| IMG-9 | Lazy load abaixo da dobra | Imagem só carrega ao fazer scroll (via IntersectionObserver do `next/image`) | E2E com scroll |
+| IMG-10 | `priority` acima da dobra | Primeira imagem da home/detalhe tem `fetchpriority="high"` | Unit (DOM snapshot) |
+| IMG-11 | Múltiplos tamanhos responsivos | `srcset` gerado corretamente para breakpoints mobile/tablet/desktop | Unit (DOM snapshot) |
+| IMG-12 | Galeria em detalhe (swipe) | Trocar imagem ativa mantém CLS = 0; lazy load das imagens não visíveis | E2E mobile |
+
+#### Arquivos de teste (a criar no PR E)
+
+| Arquivo | Escopo |
+|---|---|
+| `frontend/components/ui/__tests__/VehicleImage.test.tsx` | IMG-1, 3, 4, 7, 10, 11 (unit) |
+| `frontend/components/ui/__tests__/VehicleImagePlaceholder.test.tsx` | IMG-3, 4, 5 (unit) |
+| `frontend/e2e/image-upload-flow.spec.ts` | IMG-2 (E2E com upload real em mock backend) |
+| `frontend/e2e/image-error-fallback.spec.ts` | IMG-4, 5 (E2E simulando 404) |
+| `frontend/e2e/image-lazy-load.spec.ts` | IMG-9, 12 (E2E com scroll) |
+| `scripts/lint-images.mjs` | IMG-6 (CI guardrail — grep por `<img` e `next/image` sem `sizes`) |
+
+#### Regra de merge
+
+Nenhum PR que afete imagem merge sem **os 12 casos passando**. PR que remover um caso exige justificativa e aprovação explícita.
 
 ---
 
@@ -963,28 +1067,50 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Risco**: médio
 **Teste**: `dashboard-login-pf-pj.spec.ts`
 
-### Trilha 2 — Segurança, auth, admin
+#### PR O — Auth visual (login, cadastro, recuperar senha) 🔐
 
-#### PR O — Auth/Admin em trilha separada 🔐
+**Objetivo**: **apenas visual** — `/login`, `/cadastro`, `/recuperar-senha` com padrão premium do design system. **Não toca em auth logic, cookies, middleware, guards, isolamento ou qualquer aspecto de segurança.**
 
-**Objetivo**: login/cadastro com padrão visual novo **+ backlog de segurança**.
+**Entregáveis**:
+- `/login` redesenhado (minimalista premium, mobile-first)
+- `/cadastro` redesenhado (mesmo padrão)
+- `/recuperar-senha` redesenhado
+- Social login (se aplicável) — apenas UI
+- Preservar toda a logic existente de BFF, cookies, validação, fluxo
 
-**Entregáveis visuais**:
-- `/login`, `/cadastro`, `/recuperar-senha` redesenhados (minimalista premium)
-- Social login (se aplicável)
-
-**Backlog de segurança** (PRs subsequentes sem bloqueio):
-- `/favoritos`: migrar de client para server com Suspense
-- `useAdminGuard()` → middleware server
-- Dashboard PF/PJ: avaliar unificação de rotas
-- Banner LGPD + consentimento
-- Cookies review
-- Isolamento de dados no BFF (code review completo)
+**Proibido neste PR**:
+- ❌ Tocar em `lib/auth/`, `lib/session/`, `services/authService.ts`, `services/sessionService.ts`
+- ❌ Mudar cookies, headers, tokens, middleware
+- ❌ Mudar validação de formulário (manter comportamento)
+- ❌ Qualquer mudança em `/favoritos`, `/dashboard`, `/admin`
 
 **Pré-requisito**: PR D (primitivos)
 **Bloqueia**: nenhum
-**Risco**: médio (visual) / alto (segurança)
-**Teste**: E2E auth, `user-isolation-api.spec.ts`
+**Risco**: médio (são fluxos sensíveis mas apenas UI)
+**Teste**: E2E auth (`main-flow.spec.ts`, `dashboard-login-pf-pj.spec.ts`, `10-login-ad-publish.spec.ts`), validação manual de cookies em DevTools
+
+---
+
+### Trilha 2 — Segurança, auth, admin (backlog independente)
+
+**Trilha 2 é isolada. Não aparece na sequência A–O. Tem ritmo e prioridade próprios.** Cada item abaixo vira um PR dedicado quando puder ser atacado. Nenhum bloqueia a Trilha 1.
+
+#### Backlog de segurança (lista, não PRs numerados)
+
+| # | Item | Escopo | Risco |
+|---|---|---|---|
+| T2.1 | `useAdminGuard()` → middleware server | Substitui guard client-side por `middleware.ts` com verificação real de sessão. Retorna 403/redirect antes do render. | Altíssimo — se quebrar, admin abre para qualquer um ou fecha para ninguém |
+| T2.2 | `/admin/*` de client para server | Converter 8 páginas de `"use client"` para Server Components. Mover lógica interativa para ilhas menores. | Alto |
+| T2.3 | `/favoritos` de client para server | Converter para server + Suspense; preservar estado de favoritos via context. | Médio |
+| T2.4 | Dashboard PF/PJ: avaliar unificação | Decisão arquitetural: manter `/dashboard` + `/dashboard-loja` ou unificar em `/dashboard?role=...`. Se unificar, 301 redirects obrigatórios. | Alto |
+| T2.5 | Refresh token silencioso — telemetria | Adicionar logs explícitos quando refresh falha; hoje morre sem feedback. | Baixo |
+| T2.6 | Isolamento de dados no BFF | Code review completo em `/app/api/painel/**` e `/app/api/dashboard/**`. Garantir que toda rota valida `session.accessToken` contra o recurso pedido. | Altíssimo |
+| T2.7 | Banner LGPD + consentimento | Implementar antes de adicionar qualquer tracking (GTM, GA, pixels). | Médio (legal) |
+| T2.8 | Cookies review | Auditar `cnc_session`, `cnc_at`, `cnc_rt`, `city_cookie`: flags, scope, expiração, rotação. | Médio |
+| T2.9 | `AUTH_SESSION_SECRET` em prod | Verificar no Render. Se ausente, cada restart invalida todas sessões. | Crítico (pode já estar quebrado) |
+| T2.10 | Permissões granulares | Revisar matriz de permissões PF/PJ/lojista/admin. | Médio |
+
+**Regra de separação rígida**: nenhum item da Trilha 2 pode ser misturado em PRs da Trilha 1. Cada item vira PR próprio com sua própria validação.
 
 ---
 
@@ -1107,6 +1233,48 @@ Cada PR deve responder SIM a todas as perguntas aplicáveis antes do merge.
 - [ ] Oculto em login/cadastro/recuperação
 - [ ] Não compete com wizard no fluxo de publicação
 
+### Snapshot automatizado de rotas (PRs que mexem em catálogo/cidade/redirects/SEO)
+
+Aplicável a: PR A (baseline), C (se tocar middleware), G, H, I, J, K, L, qualquer PR de Trilha 2 que mexa em rota.
+
+- [ ] Snapshot ANTES do PR gerado e commitado em `tests/snapshots/`
+- [ ] Snapshot DEPOIS do PR gerado (staging ou build local)
+- [ ] Diff anexado na descrição do PR
+- [ ] Nenhuma regressão bloqueante (canonical mudou sem intenção, status ≠ 200 virou, h1_count ≠ 1, jsonld perdido)
+- [ ] Variações > 10% em `internal_links_count`, `html_size_bytes` explicadas
+
+### Screenshot antes/depois (TODOS os PRs visuais — D em diante)
+
+**Obrigatório**. PR sem screenshots não entra em revisão.
+
+Para cada mudança visual, anexar na descrição do PR:
+
+- [ ] Screenshot **ANTES** — mobile (375×812) e desktop (1280×800)
+- [ ] Screenshot **DEPOIS** — mesmas dimensões
+- [ ] Screenshot de estados adicionais quando aplicável: hover, focus, loading, empty, error
+- [ ] Comparação lado-a-lado em pelo menos 3 páginas afetadas
+- [ ] Screenshot em dark mode (quando implementado)
+- [ ] Screenshot em tela pequena (320px) confirmando que não quebra
+
+**Ferramenta sugerida**: Playwright `page.screenshot()` em spec dedicado `e2e/visual-snapshots.spec.ts` que roda on-demand e gera imagens em `test-results/visual/`.
+
+**PRs com screenshots obrigatórios**:
+
+| PR | Páginas mínimas para screenshot |
+|---|---|
+| PR D | Storybook-like doc de cada primitivo |
+| PR E | `<VehicleImage>` em card, galeria, thumb |
+| PR F | `<AdCard>` em todas as 8 variantes |
+| PR G | Home (mobile + desktop) |
+| PR H | `/cidade/atibaia-sp` e 1 territorial profunda |
+| PR I | `/veiculo/[slug]` incluindo galeria, sticky CTA, similares |
+| PR J | `/anuncios` + 1 redirect de alias |
+| PR K | FIPE e simulador |
+| PR L | Blog lista + artigo |
+| PR M | 3 passos do wizard |
+| PR N | Dashboard PF + lojista |
+| PR O | Login, cadastro, recuperar senha |
+
 ---
 
 ## 17. Métricas de acompanhamento
@@ -1185,41 +1353,97 @@ Faixas, não pontos. Refletem incerteza real.
 
 ## 19. O que pode começar agora vs o que está bloqueado
 
-### ✅ Desbloqueado AGORA
+Categorias explícitas. Não há zona cinza — cada item pertence a um grupo.
 
-| Item | Por quê |
+### ✅ PODE COMEÇAR AGORA (zero código de produção)
+
+Tudo que é **documento, contrato, teste ou inventário**:
+
+| Categoria | Itens |
 |---|---|
-| **PR A — Contratos de estabilidade** | Nenhuma dependência. Entrega documentação pura. Ganha confiança. |
-| **PR 0.4A — Inventário de services/** | Independente da Trilha 1. Só produz mapa. Zero risco. |
-| **Finalizar identidade visual** (paleta, tipografia, logo) | Paralelo ao PR A. Feito pelo usuário (não é código). |
+| **Documentos** | Este diagnóstico (aprovação final), `ROUTE_CANONICAL_MAP.md`, `DESIGN_SYSTEM.md` (skeleton), `SERVICES_MIGRATION_MAP.md`, baselines de métricas |
+| **Contratos** | Contrato SEO (§8.3), SSR (§8.4), Imagens (§8.5), Design System (§9), `<AdCard>` (§10), BottomNav (§11), Performance (§12) — todos como especificação, sem implementação |
+| **Testes** | Bateria de testes de imagem (§8.5.1) como spec, snapshot script (§8.2), guardrails de CI (lint para `fetch` cru, `<img>` cru, import de `services/`) |
+| **Inventários** | `services/` → `lib/` (inventário PR 0.4A), componentes candidatos a órfão (classificação §13), rotas canônicas (§8.1), páginas intocáveis (§5) |
+| **Identidade visual** | Paleta, tipografia, logo — decisão de produto, feita pelo usuário |
+| **Baseline de métricas** | Lighthouse mobile em 10 páginas-chave (captura inicial) |
+
+**PRs desbloqueados agora**:
+- **PR A** — Contratos de estabilidade
+- **PR 0.4A** — Inventário de `services/`
+
+### 🚫 BLOQUEADO ATÉ OS CONTRATOS ESTAREM MERGEADOS
+
+Nada abaixo pode começar até PR A passar.
+
+#### 🔴 Redesign visual
+
+Qualquer mudança de layout, componente, página ou estilo.
+
+- PRs D, E, F, G, H, I, J, K, L, M, N, O
+- Bloqueio: precisam de design system, tokens, primitivos e contratos (§9, §10, §11, §12)
+
+#### 🔴 Deleção de código
+
+Nenhum arquivo pode ser deletado sem os 7 checks do §13.
+
+- PR C — shell e órfãos confirmados
+- Bloqueio: precisa de PR B (testes de proteção) passando antes
+
+#### 🔴 Migração `services/` → `lib/`
+
+Sub-PRs de refactor estrutural.
+
+- PR 0.4B (market, plans) — bloqueado até 0.4A documentado
+- PR 0.4C (ads, vehicle) — bloqueado até testes cobrindo home, catálogo, cidade, detalhe, publicação
+- PR 0.4D (auth, session) — bloqueado até testes de auth, cookies, sessão, isolamento
+
+#### 🔴 Rotas canônicas (mudanças reais)
+
+Adicionar/remover redirects, renomear rotas, alterar canonical em produção.
+
+- PR J (comprar estadual), qualquer PR que mexa em middleware
+- Bloqueio: ROUTE_CANONICAL_MAP.md aprovado (parte do PR A) + snapshot automatizado rodando (PR B)
+
+#### 🔴 Auth / Session / Middleware
+
+Qualquer alteração em fluxos autenticados, cookies, guards, sessão ou isolamento.
+
+- PR O (apenas visual, mas ainda precisa de PR A e D)
+- Todos os itens T2.1 a T2.10 da Trilha 2
+- Bloqueio: contratos aprovados + testes de isolamento reforçados (PR B)
+
+#### 🔴 Detalhe do veículo
+
+Não pode ser tocado enquanto não houver:
+
+- PR F (`<AdCard>` para similares)
+- Extração de AI logic de `page.tsx` (refactor isolado, anterior ao PR I)
+- Snapshot automatizado funcionando (PR B)
+- Testes de imagem passando (PR E)
 
 ### 🟡 Desbloqueado condicionalmente
 
 | Item | Condição |
 |---|---|
-| **PR B — Testes de proteção** | Após PR A mergeado |
-| **PR C — Órfãos** | Após PR B passando |
+| **PR B — Testes de proteção** | Após PR A mergeado e aprovado |
+| **PR C — Órfãos confirmados** | Após PR B passando; apenas "órfão confirmado" (nunca "suspeito" ou "legado") |
 | **PR 0.4B** (market, plans) | Após PR 0.4A documentado |
+| **PR D — Design system aditivo** | Após PR A mergeado |
 
-### 🔴 Bloqueado até contratos
+### 🔵 Trilha 2 — data livre (não bloqueia Trilha 1)
 
-| Item | Bloqueio |
-|---|---|
-| PRs D – N (visuais) | Precisam PR A mergeado |
-| PR F (AdCard) | Precisa PRs D + E |
-| PR I (detalhe) | Precisa PR F + extração de AI de `/veiculo/[slug]/page.tsx` |
-| PR J (comprar estadual) | Precisa ROUTE_CANONICAL_MAP finalizado |
-| PR 0.4C (ads, vehicle) | Precisa testes de home, catálogo, cidade, detalhe, publicação |
-| PR 0.4D (auth, session) | Precisa testes específicos de auth/cookie/isolamento |
+Itens T2.1 a T2.10 (§Trilha 2). Cada um vira PR próprio quando puder ser atacado. Ordem sugerida por risco:
 
-### 🔵 Trilha 2 — data livre
-
-| Item | Observação |
-|---|---|
-| `useAdminGuard()` → middleware | Não bloqueia Trilha 1 |
-| `/favoritos` → server | Não bloqueia Trilha 1 |
-| Banner LGPD | Necessário antes de adicionar tracking |
-| Unificação dashboard PF/lojista | Decisão arquitetural, não visual |
+1. **T2.9** — Verificar `AUTH_SESSION_SECRET` em prod (pode ser o primeiro, é trivial verificar)
+2. **T2.5** — Telemetria de refresh token (preparação)
+3. **T2.6** — Code review de isolamento no BFF (antes de qualquer redesign de painel)
+4. **T2.7** — Banner LGPD (antes de qualquer tracking)
+5. **T2.1** + **T2.2** — `useAdminGuard()` → middleware + `/admin/*` server
+6. **T2.3** — `/favoritos` server
+7. **T2.8** — Cookies review
+8. **T2.4** — Unificação dashboard (decisão arquitetural grande)
+9. **T2.10** — Matriz de permissões
 
 ---
 
