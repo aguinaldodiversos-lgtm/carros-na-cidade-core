@@ -148,14 +148,14 @@ export function CatalogPageHeader({
 
   return (
     <div className="border-b border-slate-200/70 bg-white">
-      <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-6 sm:px-6 sm:pt-8 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8 lg:pt-8">
         <CatalogBreadcrumb items={breadcrumbItems} />
 
-        <div className="mt-4 flex flex-col gap-1.5">
-          <h1 className="text-[28px] font-extrabold leading-tight tracking-tight text-slate-900 md:text-[34px]">
+        <div className="mt-3 flex flex-col gap-1 sm:mt-4 sm:gap-1.5">
+          <h1 className="text-[22px] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-[28px] md:text-[34px]">
             {title}
           </h1>
-          <p className="text-[15px] text-slate-500">{subtitle}</p>
+          <p className="text-[13px] text-slate-500 sm:text-[15px]">{subtitle}</p>
         </div>
 
         {variant === "cidade" ? (
@@ -188,7 +188,7 @@ export function CatalogPageHeader({
 
         <form
           onSubmit={handleSubmit}
-          className="mt-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.25)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]"
+          className="mt-3 grid grid-cols-1 gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/80 p-2.5 shadow-[0_6px_22px_-18px_rgba(15,23,42,0.25)] sm:mt-4 sm:gap-3 sm:rounded-2xl sm:p-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]"
           role="search"
           aria-label="Buscar no catálogo"
         >
@@ -217,7 +217,7 @@ export function CatalogPageHeader({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar marca ou modelo"
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 sm:h-12"
             />
           </div>
 
@@ -256,7 +256,7 @@ export function CatalogPageHeader({
                 id={`${formId}-state`}
                 value={activeStateUf}
                 onChange={(event) => handleStateChange(event.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-semibold text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white sm:h-12 px-3 text-[14px] font-semibold text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
               >
                 {BRAZIL_UFS.map((uf) => (
                   <option key={uf.value} value={uf.value}>
@@ -275,7 +275,7 @@ export function CatalogPageHeader({
               id={`${formId}-body`}
               value={filters.body_type || ""}
               onChange={(event) => onPatch({ body_type: event.target.value || undefined, page: 1 })}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white sm:h-12 px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
             >
               {BODY_OPTIONS.map((opt) => (
                 <option key={`body-${opt.value}`} value={opt.value}>
@@ -298,7 +298,7 @@ export function CatalogPageHeader({
                   page: 1,
                 })
               }
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white sm:h-12 px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
             >
               {MILEAGE_OPTIONS.map((opt) => (
                 <option key={`km-${opt.value}`} value={opt.value}>
@@ -319,7 +319,7 @@ export function CatalogPageHeader({
               id={`${formId}-sort`}
               value={filters.sort || "relevance"}
               onChange={(event) => onPatch({ sort: event.target.value, page: 1 })}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-semibold text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white sm:h-12 px-3 text-[14px] font-semibold text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={`sort-${opt.value}`} value={opt.value}>

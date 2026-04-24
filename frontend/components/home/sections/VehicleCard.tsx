@@ -1,11 +1,8 @@
-"use client";
-
 import Link from "next/link";
-import { useCallback, useState } from "react";
 
-import { IconHeart, IconPin } from "@/components/home/icons";
-import { isFavoriteSlug, toggleFavoriteSlug } from "@/lib/favorites/local-favorites";
+import { IconPin } from "@/components/home/icons";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { VehicleFavoriteButton } from "./VehicleFavoriteButton";
 
 export type VehicleCardItem = {
   id: number | string;
@@ -119,16 +116,6 @@ export function VehicleCard({ item, variant }: VehicleCardProps) {
     gallery: item.gallery,
   });
   const favKey = resolveFavoriteKey(item);
-  const [fav, setFav] = useState(() => isFavoriteSlug(favKey));
-
-  const onToggleFav = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setFav(toggleFavoriteSlug(favKey));
-    },
-    [favKey]
-  );
 
   const year = item.year ? String(item.year) : null;
   const transmission = item.transmission || null;
@@ -145,7 +132,7 @@ export function VehicleCard({ item, variant }: VehicleCardProps) {
   return (
     <Link
       href={href}
-      className="group flex min-w-[260px] flex-col overflow-hidden rounded-[14px] border border-[#e7e8f1] bg-white shadow-[0_6px_18px_rgba(15,10,40,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(15,10,40,0.10)] sm:min-w-[280px]"
+      className="group flex min-w-[240px] flex-col overflow-hidden rounded-[12px] border border-[#e7e8f1] bg-white shadow-[0_4px_14px_rgba(15,10,40,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(15,10,40,0.10)] sm:min-w-[280px] sm:rounded-[14px]"
     >
       <div className="relative aspect-[16/11] overflow-hidden bg-[#eef0f6]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -154,52 +141,47 @@ export function VehicleCard({ item, variant }: VehicleCardProps) {
           alt={title}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           loading="lazy"
+          decoding="async"
         />
 
         <span
-          className={`absolute left-2.5 top-2.5 inline-flex items-center rounded-[8px] px-2 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-sm ${
+          className={`absolute left-2 top-2 inline-flex items-center rounded-[7px] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm sm:left-2.5 sm:top-2.5 sm:rounded-[8px] sm:px-2 sm:py-1 sm:text-[11px] ${
             isOpportunity ? "bg-[#059669]" : "bg-[#2d3a9c]"
           }`}
         >
           {topBadge}
         </span>
 
-        <button
-          type="button"
-          onClick={onToggleFav}
-          aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-          aria-pressed={fav}
-          className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#2d3a9c] shadow-md ring-1 ring-black/5 transition hover:scale-105"
-        >
-          <IconHeart className="h-4 w-4" fill={fav ? "currentColor" : "none"} />
-        </button>
+        <VehicleFavoriteButton favKey={favKey} />
       </div>
 
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
-        <h3 className="line-clamp-1 text-[15px] font-extrabold leading-tight text-[#1a1f36]">
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5 sm:px-4 sm:pb-4 sm:pt-3">
+        <h3 className="line-clamp-1 text-[14px] font-extrabold leading-tight text-[#1a1f36] sm:text-[15px]">
           {title}
         </h3>
         {version ? (
-          <p className="mt-0.5 line-clamp-1 text-[12.5px] text-[#5b6079]">{version}</p>
+          <p className="mt-0.5 line-clamp-1 text-[12px] text-[#5b6079] sm:text-[12.5px]">
+            {version}
+          </p>
         ) : null}
 
-        <p className="mt-1.5 line-clamp-1 text-[12.5px] text-[#5b6079]">
+        <p className="mt-1 line-clamp-1 text-[12px] text-[#5b6079] sm:mt-1.5 sm:text-[12.5px]">
           {[year, mileage, transmission].filter(Boolean).join(" · ")}
         </p>
 
         {location ? (
-          <p className="mt-1.5 inline-flex items-center gap-1 text-[12.5px] text-[#5b6079]">
-            <IconPin className="h-3.5 w-3.5 text-[#2d3a9c]" />
+          <p className="mt-1 inline-flex items-center gap-1 text-[12px] text-[#5b6079] sm:mt-1.5 sm:text-[12.5px]">
+            <IconPin className="h-3 w-3 text-[#2d3a9c] sm:h-3.5 sm:w-3.5" />
             {location}
           </p>
         ) : null}
 
-        <div className="mt-3 flex items-end justify-between">
-          <span className="text-[18px] font-extrabold text-[#1a1f36]">
+        <div className="mt-2.5 flex items-end justify-between sm:mt-3">
+          <span className="text-[16px] font-extrabold text-[#1a1f36] sm:text-[18px]">
             {formatPrice(item.price)}
           </span>
           {isOpportunity && item.fipe_price ? (
-            <span className="inline-flex items-center rounded-[6px] bg-[#d1fae5] px-2 py-1 text-[11px] font-bold text-[#047857]">
+            <span className="inline-flex items-center rounded-[6px] bg-[#d1fae5] px-1.5 py-0.5 text-[10px] font-bold text-[#047857] sm:px-2 sm:py-1 sm:text-[11px]">
               FIPE {formatPrice(item.fipe_price)}
             </span>
           ) : null}

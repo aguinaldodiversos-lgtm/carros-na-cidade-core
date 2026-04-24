@@ -150,7 +150,7 @@ export default function BuyMarketplacePageClient({
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(true)}
-            className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-900 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.35)] transition hover:bg-slate-50 lg:hidden"
+            className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-bold text-slate-900 shadow-[0_6px_24px_-6px_rgba(15,23,42,0.35)] transition hover:bg-slate-50 lg:hidden"
           >
             <svg
               viewBox="0 0 24 24"
@@ -212,8 +212,8 @@ export default function BuyMarketplacePageClient({
       />
 
       <main>
-        <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 sm:pb-12 lg:px-8">
-          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="mx-auto w-full max-w-7xl px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12">
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:items-start lg:gap-8">
             <aside className="hidden lg:sticky lg:top-[76px] lg:block lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pb-8 lg:pr-1">
               <FilterSidebar {...sidebarProps} />
             </aside>

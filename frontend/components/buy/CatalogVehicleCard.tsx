@@ -1,21 +1,15 @@
-"use client";
-
-import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useState } from "react";
 
 import type { AdItem } from "@/lib/search/ads-search";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
-import {
-  LISTING_CARD_FALLBACK_IMAGE,
-  resolvePublicListingImageUrl,
-} from "@/lib/vehicle/detail-utils";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import {
   primaryBadgeFromWeight,
   primaryBadgeLabel,
   VehicleBelowFipeBadge,
   VehiclePrimaryBadge,
 } from "@/components/buy/VehicleBadge";
+import CatalogVehicleCardImage from "@/components/buy/CatalogVehicleCardImage";
 
 export type CatalogItem = AdItem & {
   title?: string;
@@ -58,6 +52,7 @@ interface CatalogVehicleCardProps {
   linkMode?: "self" | "none";
   hrefOverride?: string;
   className?: string;
+  priority?: boolean;
 }
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -183,6 +178,7 @@ export default function CatalogVehicleCard({
   linkMode = "self",
   hrefOverride,
   className = "",
+  priority = false,
 }: CatalogVehicleCardProps) {
   const title = getTitle(item);
   const href = hrefOverride || getHref(item, title);
@@ -190,41 +186,39 @@ export default function CatalogVehicleCard({
   const location = getLocation(item);
   const subtitle = getSubtitle(item);
   const primaryVariant = primaryBadgeFromWeight(weight);
-  const [brokenImage, setBrokenImage] = useState(false);
-  const resolvedSrc = getImage(item);
-  const image = brokenImage ? LISTING_CARD_FALLBACK_IMAGE : resolvedSrc;
-  const onImageError = useCallback(() => setBrokenImage(true), []);
-  const useUnoptimizedImage =
+  const image = getImage(item);
+  const unoptimized =
     image.startsWith("/api/vehicle-images") ||
     image.startsWith("http") ||
     image.startsWith("data:") ||
     image.endsWith(".svg");
 
   const cardClasses = cx(
-    "group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_20px_-10px_rgba(15,23,42,0.15)] transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_36px_-18px_rgba(14,98,216,0.35)]",
+    "group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_3px_14px_-8px_rgba(15,23,42,0.15)] transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_30px_-18px_rgba(14,98,216,0.35)] sm:rounded-2xl",
     className
   );
+
+  const sizes = featured
+    ? "(min-width: 1024px) 50vw, 100vw"
+    : "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw";
 
   const content = (
     <>
       <div
         className={cx(
           "relative overflow-hidden bg-slate-100",
-          featured ? "aspect-[16/10]" : "aspect-[4/3]"
+          featured ? "aspect-[16/10]" : "aspect-[16/11]"
         )}
       >
-        <Image
+        <CatalogVehicleCardImage
           src={image}
           alt={title}
-          fill
-          unoptimized={useUnoptimizedImage}
-          onError={onImageError}
-          className="object-cover transition duration-500 group-hover:scale-[1.04]"
-          sizes={featured ? "(min-width: 1024px) 50vw, 100vw" : "(min-width: 1280px) 33vw, 50vw"}
-          loading="lazy"
+          sizes={sizes}
+          unoptimized={unoptimized}
+          priority={priority}
         />
 
-        <div className="absolute left-3 top-3 z-[1] flex max-w-[calc(100%-3.5rem)] flex-col items-start gap-1.5">
+        <div className="absolute left-2.5 top-2.5 z-[1] flex max-w-[calc(100%-3rem)] flex-col items-start gap-1 sm:left-3 sm:top-3 sm:gap-1.5">
           {item.below_fipe ? (
             <VehicleBelowFipeBadge />
           ) : (
@@ -233,36 +227,21 @@ export default function CatalogVehicleCard({
             </VehiclePrimaryBadge>
           )}
         </div>
-
-        <button
-          type="button"
-          aria-label="Salvar nos favoritos"
-          onClick={(event) => event.preventDefault()}
-          className="absolute right-3 top-3 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-500 shadow-md ring-1 ring-white/80 backdrop-blur-sm transition hover:text-rose-500"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-[17px] w-[17px]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
-          </svg>
-        </button>
       </div>
 
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
-        <h3 className="line-clamp-1 text-[16px] font-extrabold leading-tight tracking-tight text-slate-900">
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4">
+        <h3 className="line-clamp-1 text-[14.5px] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-[16px]">
           {title}
         </h3>
 
-        <p className="mt-1.5 text-[13px] font-medium text-slate-500">{subtitle}</p>
+        <p className="mt-1 text-[12px] font-medium text-slate-500 sm:mt-1.5 sm:text-[13px]">
+          {subtitle}
+        </p>
 
-        <p className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-slate-500">
+        <p className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-medium text-slate-500 sm:mt-2 sm:text-[12.5px]">
           <svg
             viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 text-slate-400"
+            className="h-3 w-3 text-slate-400 sm:h-3.5 sm:w-3.5"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.8"
@@ -274,13 +253,13 @@ export default function CatalogVehicleCard({
           <span className="truncate">{location}</span>
         </p>
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-4">
-          <div className="text-[20px] font-extrabold leading-none tracking-tight text-blue-700">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3 sm:pt-4">
+          <div className="text-[17px] font-extrabold leading-none tracking-tight text-blue-700 sm:text-[20px]">
             {formatCurrency(price)}
           </div>
-          <span className="inline-flex items-center gap-1 text-[13px] font-bold text-blue-700 transition group-hover:text-blue-800">
+          <span className="inline-flex items-center gap-1 text-[12px] font-bold text-blue-700 transition group-hover:text-blue-800 sm:text-[13px]">
             Ver detalhes
-            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden>
+            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="currentColor" aria-hidden>
               <path d="M7.5 4 13 10l-5.5 6-1.4-1.4L10.2 10 6.1 5.4Z" />
             </svg>
           </span>

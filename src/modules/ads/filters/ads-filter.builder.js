@@ -74,7 +74,9 @@ export function buildAdsSearchQuery(filters = {}) {
     pushFilter(where, params, `a.city_id = ?`, Number(city_id));
   } else {
     if (city) pushFilter(where, params, `a.city ILIKE ?`, `%${city}%`);
-    if (state) pushFilter(where, params, `a.state = ?`, state.toUpperCase());
+    // Tolerante: fallback para cities.state quando ads.state está nulo/minusculo.
+    // Evita zerar /comprar/estado/* por inconsistencia de casing na gravacao.
+    if (state) pushFilter(where, params, `UPPER(COALESCE(a.state, c.state)) = ?`, state.toUpperCase());
   }
   if (brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${brand}%`);
   if (model) pushFilter(where, params, `a.model ILIKE ?`, `%${model}%`);

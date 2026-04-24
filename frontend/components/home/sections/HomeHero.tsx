@@ -74,46 +74,47 @@ export function HomeHero({ featuredCities, defaultCitySlug }: HomeHeroProps) {
   );
 
   return (
-    <section className="relative mx-auto w-full max-w-[1240px] px-4 pt-5 sm:px-6 lg:px-8 lg:pt-8">
-      <div className="relative overflow-hidden rounded-[22px] bg-[#0b1020] shadow-[0_24px_60px_-20px_rgba(15,10,40,0.35)]">
+    <section className="relative mx-auto w-full max-w-[1240px] px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+      <div className="relative overflow-hidden rounded-[16px] bg-[#0b1020] shadow-[0_18px_44px_-20px_rgba(15,10,40,0.35)] sm:rounded-[22px]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={HOME_HERO_BANNER}
           alt="Carros na Cidade — portal automotivo regional"
           className="absolute inset-0 h-full w-full object-cover object-center"
           loading="eager"
-          decoding="sync"
+          decoding="async"
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0b1020]/85 via-[#0b1020]/55 to-transparent" />
 
-        <div className="relative grid min-h-[420px] items-center px-6 py-10 sm:px-10 md:min-h-[460px] md:py-14 lg:px-14">
+        <div className="relative grid min-h-[280px] items-center px-5 py-7 sm:min-h-[380px] sm:px-10 sm:py-10 md:min-h-[440px] md:py-14 lg:px-14">
           <div className="max-w-xl">
-            <h1 className="text-[30px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[38px] md:text-[44px]">
+            <h1 className="text-[24px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[34px] md:text-[44px]">
               O portal de carros usados
               <br />
               que <span className="text-[#8fa0eb]">entende a sua cidade</span>
             </h1>
-            <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/85 sm:text-base">
+            <p className="mt-3 max-w-md text-[13.5px] leading-relaxed text-white/85 sm:mt-4 sm:text-base">
               Conectamos compradores e vendedores com foco regional.
               <br className="hidden sm:inline" />
               Mais oportunidades, melhores negócios e confiança perto de você.
             </p>
             <Link
               href="/comprar"
-              className="mt-7 inline-flex h-12 items-center justify-center rounded-xl bg-[#2d3a9c] px-7 text-[15px] font-bold text-white shadow-[0_12px_28px_rgba(45, 58, 156,0.4)] transition hover:bg-[#1f2b7e]"
+              className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#2d3a9c] px-6 text-[14px] font-bold text-white shadow-[0_10px_22px_rgba(45,58,156,0.4)] transition hover:bg-[#1f2b7e] sm:mt-7 sm:h-12 sm:px-7 sm:text-[15px]"
             >
               Começar agora
             </Link>
           </div>
         </div>
 
-        <div className="relative z-10 mx-4 -mt-8 sm:mx-6 sm:-mt-10 md:mx-8">
-          <p className="mb-2 pl-2 text-[11.5px] text-white/80 sm:text-[12px]">
+        <div className="relative z-10 mx-3 -mt-6 sm:mx-6 sm:-mt-10 md:mx-8">
+          <p className="mb-1.5 pl-2 text-[11px] text-white/80 sm:mb-2 sm:text-[12px]">
             Ex.: Honda Civic, Fiat Strada…
           </p>
           <form
             onSubmit={handleSubmit}
-            className="rounded-[18px] border border-[#e7e8f1] bg-white p-3 shadow-[0_18px_44px_rgba(15,10,40,0.12)] sm:p-4"
+            className="rounded-[14px] border border-[#e7e8f1] bg-white p-2.5 shadow-[0_14px_34px_rgba(15,10,40,0.12)] sm:rounded-[18px] sm:p-4"
           >
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.6fr_1fr_1fr_auto] md:items-end md:gap-3">
               <div>
@@ -130,7 +131,7 @@ export function HomeHero({ featuredCities, defaultCitySlug }: HomeHeroProps) {
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Busque por marca ou modelo"
                     aria-label="Busque por marca ou modelo"
-                    className="h-12 w-full rounded-[12px] border border-[#e7e8f1] bg-white pl-11 pr-3 text-[14px] font-medium text-[#1a1f36] outline-none transition placeholder:text-[#9ea3b8] hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
+                    className="h-11 w-full sm:h-12 rounded-[12px] border border-[#e7e8f1] bg-white pl-11 pr-3 text-[14px] font-medium text-[#1a1f36] outline-none transition placeholder:text-[#9ea3b8] hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
                   />
                 </div>
               </div>
@@ -146,7 +147,7 @@ export function HomeHero({ featuredCities, defaultCitySlug }: HomeHeroProps) {
                   setCitySlug("");
                 }}
                 aria-label="Estado"
-                className="h-12 w-full appearance-none rounded-[12px] border border-[#e7e8f1] bg-white px-3 text-[14px] font-medium text-[#1a1f36] outline-none transition hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
+                className="h-11 w-full sm:h-12 appearance-none rounded-[12px] border border-[#e7e8f1] bg-white px-3 text-[14px] font-medium text-[#1a1f36] outline-none transition hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
                 style={{
                   backgroundImage:
                     "linear-gradient(45deg,transparent 50%,#2d3a9c 50%),linear-gradient(135deg,#2d3a9c 50%,transparent 50%)",
@@ -174,7 +175,7 @@ export function HomeHero({ featuredCities, defaultCitySlug }: HomeHeroProps) {
                 value={citySlug}
                 onChange={(e) => setCitySlug(e.target.value)}
                 aria-label="Cidade"
-                className="h-12 w-full appearance-none rounded-[12px] border border-[#e7e8f1] bg-white px-3 text-[14px] font-medium text-[#1a1f36] outline-none transition hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
+                className="h-11 w-full sm:h-12 appearance-none rounded-[12px] border border-[#e7e8f1] bg-white px-3 text-[14px] font-medium text-[#1a1f36] outline-none transition hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
                 style={{
                   backgroundImage:
                     "linear-gradient(45deg,transparent 50%,#2d3a9c 50%),linear-gradient(135deg,#2d3a9c 50%,transparent 50%)",

@@ -95,7 +95,7 @@ export function PromoCarousel() {
   };
 
   return (
-    <section className="mx-auto w-full max-w-[1240px] px-4 pt-8 sm:px-6 sm:pt-10 lg:px-8">
+    <section className="mx-auto w-full max-w-[1240px] px-4 pt-5 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
       <div className="relative">
         <button
           type="button"
@@ -116,29 +116,29 @@ export function PromoCarousel() {
 
         <div
           ref={scrollerRef}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-3 md:gap-5 md:overflow-visible [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible [&::-webkit-scrollbar]:hidden"
         >
           {CARDS.map((card) => (
             <article
               key={card.id}
-              className={`${accentClasses(card.accent)} flex min-w-[85%] snap-center flex-col justify-between rounded-[18px] border border-[#dbe0ee] px-5 py-6 shadow-[0_6px_22px_rgba(45, 58, 156,0.06)] md:min-w-0 md:px-6 md:py-7`}
+              className={`${accentClasses(card.accent)} flex min-w-[82%] snap-center flex-col justify-between rounded-[14px] border border-[#dbe0ee] px-4 py-4 shadow-[0_4px_16px_rgba(45,58,156,0.06)] sm:min-w-[85%] sm:rounded-[18px] sm:px-5 sm:py-6 md:min-w-0 md:px-6 md:py-7`}
             >
-              <div className="flex items-start gap-4">
-                <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-white/80 text-[#2d3a9c] shadow-[0_4px_12px_rgba(45, 58, 156,0.12)]">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white/80 text-[#2d3a9c] shadow-[0_3px_10px_rgba(45,58,156,0.12)] sm:h-12 sm:w-12 sm:rounded-[14px]">
                   {card.icon}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-[17px] font-extrabold leading-tight text-[#1a1f36] md:text-[18px]">
+                  <h3 className="text-[15px] font-extrabold leading-tight text-[#1a1f36] sm:text-[17px] md:text-[18px]">
                     {card.title}
                   </h3>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#5b6079]">
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-[#5b6079] sm:mt-1.5 sm:text-[13.5px]">
                     {card.description}
                   </p>
                 </div>
               </div>
               <Link
                 href={card.href}
-                className="mt-5 inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[#2d3a9c] transition hover:text-[#1f2b7e]"
+                className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#2d3a9c] transition hover:text-[#1f2b7e] sm:mt-5 sm:text-[13.5px]"
               >
                 {card.cta}
                 <IconArrowUpRight className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function PromoCarousel() {
           ))}
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-2 md:hidden">
+        <div className="mt-3 flex items-center justify-center gap-2 sm:mt-4 md:hidden">
           {CARDS.map((card, idx) => (
             <button
               key={card.id}

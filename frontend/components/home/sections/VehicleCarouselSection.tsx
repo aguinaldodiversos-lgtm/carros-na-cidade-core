@@ -35,7 +35,7 @@ export function VehicleCarouselSection({
   }, []);
 
   return (
-    <section className="mx-auto w-full max-w-[1240px] px-4 pt-10 sm:px-6 sm:pt-12 lg:px-8">
+    <section className="mx-auto w-full max-w-[1240px] px-4 pt-6 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12">
       <SectionHeader icon={icon} title={title} subtitle={subtitle} link={link} />
 
       <div className="relative">
@@ -59,20 +59,20 @@ export function VehicleCarouselSection({
         {items.length > 0 ? (
           <div
             ref={scrollerRef}
-            className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
           >
             {items.map((item, idx) => (
               <div
                 key={`${variant}-${item.id}-${idx}`}
-                className="w-[260px] shrink-0 snap-start sm:w-[280px] md:w-[calc((100%-3rem)/4)] md:min-w-0"
+                className="w-[230px] shrink-0 snap-start sm:w-[270px] md:w-[calc((100%-3rem)/4)] md:min-w-0"
               >
                 <VehicleCard item={item} variant={variant} />
               </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-[14px] border border-dashed border-[#d4d7e4] bg-white px-6 py-12 text-center">
-            <p className="text-[14px] text-[#5b6079]">{emptyMessage}</p>
+          <div className="rounded-[14px] border border-dashed border-[#d4d7e4] bg-white px-6 py-10 text-center sm:py-12">
+            <p className="text-[13.5px] text-[#5b6079]">{emptyMessage}</p>
           </div>
         )}
       </div>

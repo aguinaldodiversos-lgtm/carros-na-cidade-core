@@ -38,7 +38,7 @@ function MiniMapIcon({ uf }: { uf: string }) {
 
 export function ExploreByState({ items = DEFAULT_STATES }: { items?: StateItem[] }) {
   return (
-    <section className="mx-auto w-full max-w-[1240px] px-4 pt-10 sm:px-6 sm:pt-12 lg:px-8">
+    <section className="mx-auto w-full max-w-[1240px] px-4 pt-6 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12">
       <SectionHeader
         icon={<IconBook className="h-6 w-6" />}
         title="Explore por estado"
@@ -46,21 +46,21 @@ export function ExploreByState({ items = DEFAULT_STATES }: { items?: StateItem[]
         link={{ label: "Ver todos os estados", href: "/comprar" }}
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 md:gap-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-5 md:gap-4">
         {items.map((state) => (
           <Link
             key={state.uf}
-            href={`/comprar?uf=${encodeURIComponent(state.uf)}`}
-            className="group flex items-center gap-3 rounded-[14px] border border-[#e7e8f1] bg-white px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-[#a5b0dd] hover:shadow-[0_10px_24px_rgba(45, 58, 156,0.08)]"
+            href={`/comprar/estado/${state.uf.toLowerCase()}`}
+            className="group flex items-center gap-2.5 rounded-[12px] border border-[#e7e8f1] bg-white px-3 py-2.5 transition hover:-translate-y-0.5 hover:border-[#a5b0dd] hover:shadow-[0_10px_24px_rgba(45,58,156,0.08)] sm:gap-3 sm:rounded-[14px] sm:px-4 sm:py-3.5"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#eef1f9]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#eef1f9] sm:h-10 sm:w-10">
               <MiniMapIcon uf={state.uf} />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[13.5px] font-bold leading-tight text-[#1a1f36]">
+              <p className="truncate text-[12.5px] font-bold leading-tight text-[#1a1f36] sm:text-[13.5px]">
                 {state.name}
               </p>
-              <p className="mt-0.5 text-[12px] text-[#2d3a9c]">
+              <p className="mt-0.5 text-[11.5px] text-[#2d3a9c] sm:text-[12px]">
                 {state.offers.toLocaleString("pt-BR")} ofertas
               </p>
             </div>
