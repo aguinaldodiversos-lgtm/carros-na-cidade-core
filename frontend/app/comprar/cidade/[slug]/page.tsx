@@ -14,6 +14,7 @@ import {
   type AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
+import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-territory-fallback";
 import {
   buildCityPath,
   cityContextFromRef,
@@ -72,6 +73,29 @@ function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
     Array.isArray(response.facets.models) &&
     Array.isArray(response.facets.fuelTypes) &&
     Array.isArray(response.facets.bodyTypes)
+  );
+}
+
+/**
+ * Só aciona fallback territorial se o usuário NÃO filtrou nada específico.
+ * Se ele escolheu brand=Honda e a cidade não tem Honda, manter vazio é o certo —
+ * empurrar Atibaia como fallback mascararia a ausência do filtro dele.
+ */
+function hasRestrictiveFilters(filters: AdsSearchFilters): boolean {
+  return Boolean(
+    filters.q ||
+      filters.brand ||
+      filters.model ||
+      filters.min_price ||
+      filters.max_price ||
+      filters.year_min ||
+      filters.year_max ||
+      filters.mileage_max ||
+      filters.fuel_type ||
+      filters.transmission ||
+      filters.body_type ||
+      filters.below_fipe === true ||
+      filters.highlight_only === true
   );
 }
 
@@ -167,15 +191,57 @@ export default async function ComprarCidadePage({
     fetchAdsFacets(filters),
   ]);
 
-  const initialResults =
+  let initialResults =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
       ? resultsResponse.value
       : buildEmptyResults(filters);
 
-  const initialFacets =
+  let initialFacets =
     facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)
       ? facetsResponse.value.facets
       : buildEmptyFacets();
+
+  /**
+   * Fallback territorial: se a cidade pedida não tem estoque ativo e o usuário
+   * não aplicou filtros específicos, consultamos o backend para descobrir a
+   * cidade-vizinha mais forte no mesmo UF e refazemos a busca. Mantemos os
+   * metadados da cidade original (ctx/SEO/canonical) e informamos o cliente
+   * via `fallbackTerritory` para exibir aviso amarelo "mostrando ofertas em X".
+   */
+  let fallbackTerritory:
+    | { requestedName: string; actualName: string; actualState: string; actualSlug: string }
+    | undefined;
+
+  if (initialResults.pagination.total === 0 && !hasRestrictiveFilters(filters)) {
+    const fallback = await fetchCatalogAdsTerritoryFallback(slug);
+    if (fallback && fallback.mode === "fallback" && fallback.slug && fallback.slug !== slug) {
+      const fallbackFilters: AdsSearchFilters = { ...filters, city_slug: fallback.slug };
+      const [fbResults, fbFacets] = await Promise.allSettled([
+        fetchAdsSearch(fallbackFilters),
+        fetchAdsFacets(fallbackFilters),
+      ]);
+
+      const fbResultsOk =
+        fbResults.status === "fulfilled" && isValidResultsResponse(fbResults.value)
+          ? fbResults.value
+          : null;
+      const fbFacetsOk =
+        fbFacets.status === "fulfilled" && isValidFacetsResponse(fbFacets.value)
+          ? fbFacets.value.facets
+          : null;
+
+      if (fbResultsOk && fbResultsOk.pagination.total > 0) {
+        initialResults = fbResultsOk;
+        initialFacets = fbFacetsOk ?? initialFacets;
+        fallbackTerritory = {
+          requestedName: ctx.name,
+          actualName: fallback.name,
+          actualState: fallback.state,
+          actualSlug: fallback.slug,
+        };
+      }
+    }
+  }
 
   const breadcrumbItems = [
     { name: "Home", href: "/" },
@@ -183,26 +249,33 @@ export default async function ComprarCidadePage({
     { name: `${ctx.name} (${ctx.state})` },
   ];
 
-  const itemListJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: `Carros usados em ${ctx.name}`,
-    numberOfItems: initialResults.pagination.total,
-    itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
-      name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
-    })),
-  };
+  // Em modo fallback (URL da cidade pedida, resultados de uma vizinha) nao
+  // emitimos ItemList JSON-LD: googlebot cruzaria o schema de "São Paulo"
+  // com URLs de anuncios de "Atibaia" — poluiria sinal de conteudo local.
+  const itemListJsonLd = fallbackTerritory
+    ? null
+    : {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: `Carros usados em ${ctx.name}`,
+        numberOfItems: initialResults.pagination.total,
+        itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
+          name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
+        })),
+      };
 
   return (
     <>
       <BreadcrumbJsonLd items={breadcrumbItems} />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
+      {itemListJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+        />
+      ) : null}
       <BuyMarketplacePageClient
         initialResults={initialResults}
         initialFacets={initialFacets}
@@ -210,6 +283,7 @@ export default async function ComprarCidadePage({
         city={ctx}
         variant="cidade"
         stateUf={ctx.state}
+        fallbackTerritory={fallbackTerritory}
       />
     </>
   );

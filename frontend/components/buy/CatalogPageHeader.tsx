@@ -53,6 +53,13 @@ type CatalogPageHeaderProps = {
   variant?: ComprarVariant;
   /** UF ativa quando a variante é estadual (ex.: "SP"). */
   stateUf?: string;
+  /** Cidade-origem vs. cidade efetiva quando o SSR fez fallback territorial. */
+  fallbackTerritory?: {
+    requestedName: string;
+    actualName: string;
+    actualState: string;
+    actualSlug: string;
+  };
 };
 
 export function CatalogPageHeader({
@@ -62,6 +69,7 @@ export function CatalogPageHeader({
   onPatch,
   variant = "estadual",
   stateUf,
+  fallbackTerritory,
 }: CatalogPageHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -150,6 +158,43 @@ export function CatalogPageHeader({
     <div className="border-b border-slate-200/70 bg-white">
       <div className="mx-auto w-full max-w-7xl px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8 lg:pt-8">
         <CatalogBreadcrumb items={breadcrumbItems} />
+
+        {fallbackTerritory ? (
+          <div
+            role="status"
+            className="mt-3 flex flex-col gap-1.5 rounded-xl border border-amber-200 bg-amber-50/90 px-3.5 py-3 text-[13px] text-amber-900 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:text-[13.5px]"
+          >
+            <div className="flex items-start gap-2">
+              <svg
+                viewBox="0 0 24 24"
+                className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path d="M12 9v4m0 4h.01M10.3 3.86l-8.55 14.8A1.5 1.5 0 0 0 3 21h18a1.5 1.5 0 0 0 1.25-2.34l-8.55-14.8a1.5 1.5 0 0 0-2.4 0Z" />
+              </svg>
+              <p className="leading-snug">
+                Ainda não há anúncios em <strong>{fallbackTerritory.requestedName}</strong>.
+                Mostrando ofertas em{" "}
+                <strong>
+                  {fallbackTerritory.actualName} ({fallbackTerritory.actualState})
+                </strong>
+                .
+              </p>
+            </div>
+            <Link
+              href={buildStatePath(activeStateUf, filters)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600/90 px-3 py-1.5 text-[12.5px] font-bold text-white transition hover:bg-amber-700 sm:text-[13px]"
+            >
+              Ver todas de {stateNameFromUf(activeStateUf)}
+              <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                <path d="M7.5 4 13 10l-5.5 6-1.4-1.4L10.2 10 6.1 5.4Z" />
+              </svg>
+            </Link>
+          </div>
+        ) : null}
 
         <div className="mt-3 flex flex-col gap-1 sm:mt-4 sm:gap-1.5">
           <h1 className="text-[22px] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-[28px] md:text-[34px]">

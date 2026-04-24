@@ -28,6 +28,13 @@ import {
 } from "@/lib/buy/catalog-helpers";
 import type { ComprarVariant } from "@/lib/buy/territory-variant";
 
+export type FallbackTerritoryInfo = {
+  requestedName: string;
+  actualName: string;
+  actualState: string;
+  actualSlug: string;
+};
+
 interface BuyMarketplacePageClientProps {
   initialResults: AdsSearchResponse;
   initialFacets: AdsFacetsResponse["facets"];
@@ -37,6 +44,8 @@ interface BuyMarketplacePageClientProps {
   stateUf?: string;
   /** Ativa GeoToCityRedirect apenas em páginas estaduais. */
   enableGeoRedirect?: boolean;
+  /** Preenchido quando SSR fez fallback automatico para outra cidade do mesmo UF. */
+  fallbackTerritory?: FallbackTerritoryInfo;
 }
 
 export default function BuyMarketplacePageClient({
@@ -47,6 +56,7 @@ export default function BuyMarketplacePageClient({
   variant = "estadual",
   stateUf,
   enableGeoRedirect = false,
+  fallbackTerritory,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -209,6 +219,7 @@ export default function BuyMarketplacePageClient({
         onPatch={(patch) => pushFilters(patch)}
         variant={variant}
         stateUf={stateUf}
+        fallbackTerritory={fallbackTerritory}
       />
 
       <main>
