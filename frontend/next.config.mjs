@@ -3,7 +3,12 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
-  serverExternalPackages: ["@aws-sdk/client-s3"],
+  // Em Next 14.x, a chave correta e experimental.serverComponentsExternalPackages.
+  // (serverExternalPackages so existe a partir do Next 15; mantinhamos a
+  // legacy gerando warning no build do Render.)
+  experimental: {
+    serverComponentsExternalPackages: ["@aws-sdk/client-s3"],
+  },
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/images/favicon.png" }];
   },

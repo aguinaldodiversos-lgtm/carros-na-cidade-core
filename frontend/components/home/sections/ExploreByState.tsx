@@ -43,16 +43,17 @@ type RawStateAggregation = { uf: string; offers: number | string };
 function normalizeItems(raw: RawStateAggregation[] | undefined): StateItem[] {
   if (!Array.isArray(raw) || raw.length === 0) return FALLBACK_STATES;
 
-  const normalized = raw
-    .map((entry) => {
-      const uf = String(entry?.uf || "").toUpperCase().trim();
-      if (!/^[A-Z]{2}$/.test(uf)) return null;
-      const match = BRAZIL_UFS.find((item) => item.value === uf);
-      if (!match) return null;
-      const offers = Number(entry?.offers || 0);
-      return { uf, name: match.label, offers: Number.isFinite(offers) ? offers : 0 };
-    })
-    .filter((x): x is StateItem => x != null);
+  const normalized: StateItem[] = [];
+  for (const entry of raw) {
+    const uf = String(entry?.uf || "").toUpperCase().trim();
+    if (!/^[A-Z]{2}$/.test(uf)) continue;
+    const match = BRAZIL_UFS.find((item) => item.value === uf);
+    if (!match) continue;
+    const offersRaw = Number(entry?.offers || 0);
+    const offers = Number.isFinite(offersRaw) ? offersRaw : 0;
+    // Alargamos match.label (union literal de BRAZIL_UFS) para string no StateItem.
+    normalized.push({ uf, name: String(match.label), offers });
+  }
 
   return normalized.length > 0 ? normalized.slice(0, 6) : FALLBACK_STATES;
 }
