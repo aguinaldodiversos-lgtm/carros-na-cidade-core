@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import type { AdItem } from "@/lib/search/ads-search";
 
 export interface HomeDataResponse {
@@ -43,18 +44,12 @@ function homeCacheTags(citySlug?: string): string[] {
 }
 
 async function fetchJson<T>(url: string, tags: string[]): Promise<T | null> {
-  const controller = new AbortController();
-  // 25s acomoda cold start do backend em plano free do Render. Antes era 8s,
-  // o que fazia TODO SSR da home cair em timeout na primeira subida do dia
-  // e a resposta vazia ficava cacheada por revalidate=300.
-  const timer = setTimeout(() => controller.abort(), 25_000);
-
   try {
-    const response = await fetch(url, {
+    const response = await ssrResilientFetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
+      logTag: "public-home",
       next: { revalidate: 300, tags },
-      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -64,14 +59,8 @@ async function fetchJson<T>(url: string, tags: string[]): Promise<T | null> {
       return null;
     }
     return (await response.json()) as T;
-  } catch (error) {
-    if (typeof window === "undefined") {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[public-home] fetch falhou em ${url}: ${message}`);
-    }
+  } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

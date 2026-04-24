@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { canonicalTerritoryForApi, clampPublicAdsSearchLimit } from "@/lib/search/ads-search-url";
 import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
 
@@ -351,13 +352,6 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   return params;
 }
 
-/**
- * Timeout de 25s acomoda cold start do backend em plano free do Render
- * (primeiro wakeup leva 20-40s). Sem isto o SSR aborta, o resultado vazio
- * vai pro cache ISR e o catálogo fica zerado ate o proximo revalidate.
- */
-const SSR_FETCH_TIMEOUT_MS = 25_000;
-
 function buildEmptyAdsSearchResponse(
   filters: AdsSearchFilters,
   error: string
@@ -387,20 +381,15 @@ export async function fetchAdsSearch(
   const params = buildAdsSearchParams(filters);
   const url = `${apiBase}/api/ads/search?${params.toString()}`;
 
-  const controller = signal ? null : new AbortController();
-  const effectiveSignal = signal ?? controller?.signal;
-  const timer = controller
-    ? setTimeout(() => controller.abort(), SSR_FETCH_TIMEOUT_MS)
-    : null;
-
   try {
-    const response = await fetch(url, {
+    const response = await ssrResilientFetch(url, {
       method: "GET",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      signal: effectiveSignal,
+      signal,
+      logTag: "ads-search",
       next: { revalidate: 60 },
     });
 
@@ -421,12 +410,7 @@ export async function fetchAdsSearch(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Falha inesperada ao buscar anúncios.";
-    if (isServer()) {
-      console.error(`[ads-search] fetch falhou em ${url}: ${message}`);
-    }
     return buildEmptyAdsSearchResponse(filters, message);
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
 
@@ -449,20 +433,15 @@ export async function fetchAdsFacets(
   });
   const url = `${apiBase}/api/ads/facets?${params.toString()}`;
 
-  const controller = signal ? null : new AbortController();
-  const effectiveSignal = signal ?? controller?.signal;
-  const timer = controller
-    ? setTimeout(() => controller.abort(), SSR_FETCH_TIMEOUT_MS)
-    : null;
-
   try {
-    const response = await fetch(url, {
+    const response = await ssrResilientFetch(url, {
       method: "GET",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      signal: effectiveSignal,
+      signal,
+      logTag: "ads-facets",
       next: { revalidate: 60 },
     });
 
@@ -477,13 +456,7 @@ export async function fetchAdsFacets(
 
     const json = await response.json();
     return normalizeFacetsPayload(json);
-  } catch (error) {
-    if (isServer()) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[ads-facets] fetch falhou em ${url}: ${message}`);
-    }
+  } catch {
     return { success: false, facets: EMPTY_FACETS };
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
