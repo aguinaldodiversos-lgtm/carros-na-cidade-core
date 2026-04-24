@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import {
@@ -10,11 +11,11 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Endpoint de diagnóstico: expõe qual BACKEND_API_URL o SSR resolveu em tempo
- * de execução e testa uma chamada leve. Útil quando em produção o catálogo
- * aparece vazio — permite confirmar se o frontend está falando com o backend.
+ * Endpoint de diagnostico: expoe qual BACKEND_API_URL o SSR resolveu em tempo
+ * de execucao e testa chamadas com e sem o header X-Cnc-Client-Ip, para
+ * confirmar o comportamento do rate limit global do backend.
  *
- * Não expõe secrets: só base URL + status de fetch + latência.
+ * Nao expoe secrets: so base URL + status de fetch + latencia.
  */
 type BackendProbe = {
   url: string | null;
@@ -26,7 +27,11 @@ type BackendProbe = {
   error: string | null;
 };
 
-async function probeBackend(pathname: string, timeoutMs: number): Promise<BackendProbe> {
+async function probeBackend(
+  pathname: string,
+  timeoutMs: number,
+  extraHeaders: Record<string, string> = {}
+): Promise<BackendProbe> {
   const url = resolveBackendApiUrl(pathname);
   if (!url) {
     return {
@@ -47,7 +52,7 @@ async function probeBackend(pathname: string, timeoutMs: number): Promise<Backen
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...extraHeaders },
       signal: controller.signal,
       cache: "no-store",
     });
@@ -79,19 +84,50 @@ async function probeBackend(pathname: string, timeoutMs: number): Promise<Backen
   }
 }
 
+function readClientIp(h: ReturnType<typeof headers>): string {
+  const candidates = [
+    "x-vercel-forwarded-for",
+    "cf-connecting-ip",
+    "x-forwarded-for",
+    "x-real-ip",
+  ];
+  for (const name of candidates) {
+    const raw = h.get(name);
+    if (!raw) continue;
+    const first = String(raw).split(",")[0].trim();
+    if (first) return first;
+  }
+  return "";
+}
+
 export async function GET() {
   const resolution = getBackendApiResolutionInfo();
   const baseUrl = getBackendApiBaseUrl();
+  const h = headers();
+  const clientIp = readClientIp(h);
+  const withIpHeader: Record<string, string> = clientIp
+    ? { "X-Cnc-Client-Ip": clientIp }
+    : {};
 
+  // Probes COM X-Cnc-Client-Ip (comportamento real do SSR pos-fix).
+  // Se retornar 200 aqui, o rate limit global por IP do container Render
+  // foi contornado corretamente.
   const [adsSearchProbe, homeProbe, healthProbe] = await Promise.all([
-    probeBackend("/api/ads/search?state=SP&limit=1", 20_000),
-    probeBackend("/api/public/home", 20_000),
-    probeBackend("/health", 20_000),
+    probeBackend("/api/ads/search?state=SP&limit=1", 20_000, withIpHeader),
+    probeBackend("/api/public/home", 20_000, withIpHeader),
+    probeBackend("/health", 20_000, withIpHeader),
   ]);
+
+  // Probe de CONTRASTE sem X-Cnc-Client-Ip: revela se o rate limit
+  // compartilhado pelo IP do container esta estorado (429) ou nao.
+  const adsSearchNoIp = await probeBackend(
+    "/api/ads/search?state=SP&limit=1&_diag=no-ip",
+    20_000
+  );
 
   return NextResponse.json(
     {
-      diagnostic: "carros-na-cidade frontend ↔ backend connectivity",
+      diagnostic: "carros-na-cidade frontend <-> backend connectivity",
       runtime: {
         nodeEnv: process.env.NODE_ENV,
         site: process.env.NEXT_PUBLIC_SITE_URL || null,
@@ -108,17 +144,20 @@ export async function GET() {
         API_URL: Boolean(process.env.API_URL),
         NEXT_PUBLIC_API_URL: Boolean(process.env.NEXT_PUBLIC_API_URL),
       },
+      clientIp: {
+        detected: clientIp || null,
+        source: clientIp ? "next/headers()" : null,
+      },
       probes: {
         adsSearch_SP: adsSearchProbe,
         publicHome: homeProbe,
         backendHealth: healthProbe,
+        adsSearch_SP_withoutClientIp: adsSearchNoIp,
       },
     },
     {
       status: 200,
-      headers: {
-        "Cache-Control": "no-store, must-revalidate",
-      },
+      headers: { "Cache-Control": "no-store, must-revalidate" },
     }
   );
 }

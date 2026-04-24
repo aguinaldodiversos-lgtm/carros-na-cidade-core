@@ -1,16 +1,23 @@
 /**
  * Fetch resiliente para SSR no frontend <-> backend no mesmo Render.
  *
- * Motivo: no plano free do Render, o backend dorme apos 15min sem trafego
- * e o primeiro request apos o sleep leva 20-40s para acordar. Sem retry
- * automatico, todo SSR no primeiro acesso do dia cai em timeout, renderiza
- * vazio e o Next guarda esse vazio no cache ISR ate o proximo revalidate —
- * cenario que deixou /comprar, home e /veiculo sem dados em producao.
+ * Dois problemas que esta funcao resolve em producao:
  *
- * Estrategia:
- *   - 1a tentativa: 12s de timeout (cobre backend acordado)
- *   - 2a tentativa (so se AbortError/rede): 30s (cobre cold start confirmado)
- *   - Mais que isso nao faz sentido: usuario desiste antes.
+ * 1) Rate limit global do backend por IP (src/shared/middlewares/
+ *    rateLimit.middleware.js): como todos os SSRs do frontend saem do
+ *    mesmo IP de container do Render, o limite de 1000 req/15min era
+ *    atingido em minutos e o backend passava a devolver 429 para TODO
+ *    SSR publico (home, /comprar, /veiculo). Solucao: injetar
+ *    X-Cnc-Client-Ip com o IP do visitante real, lido via headers() do
+ *    Next.js quando disponivel; o backend ja tem suporte a esse header
+ *    (clientRateLimitKey) mas o BFF so estava propagando para rotas de
+ *    conta/painel — nao para catalogo publico.
+ *
+ * 2) Cold start do backend no plano free do Render (20-40s). Retry
+ *    automatico com timeouts crescentes evita cache poisoning do ISR.
+ *      - 1a tentativa: 12s (backend acordado)
+ *      - 2a tentativa: 30s (apenas se AbortError/rede/5xx)
+ *      - 4xx NAO refaz (exceto 429: o usuario real nao tem culpa).
  */
 
 type NextCacheConfig = { revalidate?: number | false; tags?: string[] };
@@ -47,6 +54,51 @@ function isRetriableError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Le o IP do visitante real do request Next.js em curso, apenas em SSR.
+ * Usa dynamic import para evitar que next/headers quebre build/testes
+ * fora de um request-scope. Retorna string vazia se nao houver header.
+ */
+async function readClientIpFromNextHeaders(): Promise<string> {
+  if (!isServer()) return "";
+  try {
+    // `next/headers` so funciona dentro de um request SSR. Fora dele
+    // (build, tests), a import pode ate funcionar mas headers() joga.
+    const mod = await import("next/headers");
+    const h = mod.headers();
+    // headers() retorna ReadonlyHeaders no Next 14 (sync).
+    const anyH = h as { get?: (name: string) => string | null };
+    if (typeof anyH.get !== "function") return "";
+
+    const candidates = [
+      "x-vercel-forwarded-for",
+      "cf-connecting-ip",
+      "x-forwarded-for",
+      "x-real-ip",
+    ];
+    for (const name of candidates) {
+      const raw = anyH.get(name);
+      if (!raw) continue;
+      const first = String(raw).split(",")[0].trim();
+      if (first) return first;
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+function mergeHeaders(
+  base: HeadersInit | undefined,
+  extra: Record<string, string>
+): HeadersInit {
+  const merged = new Headers(base);
+  for (const [key, value] of Object.entries(extra)) {
+    if (value) merged.set(key, value);
+  }
+  return merged;
+}
+
 function composeSignals(
   external: AbortSignal | null | undefined,
   internal: AbortController
@@ -73,8 +125,17 @@ export async function ssrResilientFetch(
     retryTimeoutMs = 30_000,
     signal: externalSignal,
     next: nextCache,
+    headers: extraHeaders,
     ...init
   } = options;
+
+  // Descobre o IP do visitante UMA vez (a resposta do Next/headers() nao
+  // muda entre tentativas). Vira header X-Cnc-Client-Ip para o backend
+  // rate-limitar por usuario final em vez de pelo IP do container.
+  const clientIp = await readClientIpFromNextHeaders();
+  const mergedHeaders = clientIp
+    ? mergeHeaders(extraHeaders, { "X-Cnc-Client-Ip": clientIp })
+    : extraHeaders;
 
   let lastError: unknown = null;
 
@@ -86,17 +147,19 @@ export async function ssrResilientFetch(
     const signal = composeSignals(externalSignal, controller);
 
     try {
-      // `next` do Next.js precisa ser passado como propriedade top-level da 2a arg;
-      // aqui propagamos via spread + anexo explicito.
       const response = await fetch(url, {
         ...init,
+        headers: mergedHeaders,
         signal,
         ...(nextCache ? { next: nextCache } : {}),
       } as RequestInit);
 
-      // 5xx tambem merece retry — backend pode ter acordado mas ainda
-      // subindo conexoes do pool. 4xx nao: e input do usuario, nao melhora.
-      if (response.status >= 500 && attempt < maxAttempts) {
+      // 5xx: backend pode ter acordado mas pool nao pronto.
+      // 429: rate limit — se veio sem X-Cnc-Client-Ip, o retry nao adianta,
+      // mas se veio com IP do visitante, pode ter sido picos e retry ajuda.
+      const shouldRetryStatus =
+        response.status >= 500 || response.status === 429;
+      if (shouldRetryStatus && attempt < maxAttempts) {
         logServer(
           logTag,
           `${response.status} em ${url} (tentativa ${attempt}/${maxAttempts}), retry`
