@@ -351,52 +351,82 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   return params;
 }
 
+/**
+ * Timeout de 25s acomoda cold start do backend em plano free do Render
+ * (primeiro wakeup leva 20-40s). Sem isto o SSR aborta, o resultado vazio
+ * vai pro cache ISR e o catálogo fica zerado ate o proximo revalidate.
+ */
+const SSR_FETCH_TIMEOUT_MS = 25_000;
+
+function buildEmptyAdsSearchResponse(
+  filters: AdsSearchFilters,
+  error: string
+): AdsSearchResponse {
+  return {
+    success: false,
+    ok: false,
+    data: [],
+    pagination: normalizePagination(
+      null,
+      filters.page || EMPTY_PAGINATION.page,
+      filters.limit || EMPTY_PAGINATION.limit
+    ),
+    error,
+  };
+}
+
+function isServer() {
+  return typeof window === "undefined";
+}
+
 export async function fetchAdsSearch(
   filters: AdsSearchFilters,
   signal?: AbortSignal
 ): Promise<AdsSearchResponse> {
   const apiBase = getApiBaseUrl();
   const params = buildAdsSearchParams(filters);
+  const url = `${apiBase}/api/ads/search?${params.toString()}`;
+
+  const controller = signal ? null : new AbortController();
+  const effectiveSignal = signal ?? controller?.signal;
+  const timer = controller
+    ? setTimeout(() => controller.abort(), SSR_FETCH_TIMEOUT_MS)
+    : null;
 
   try {
-    const response = await fetch(`${apiBase}/api/ads/search?${params.toString()}`, {
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      signal,
+      signal: effectiveSignal,
       next: { revalidate: 60 },
     });
 
     if (!response.ok) {
-      return {
-        success: false,
-        ok: false,
-        data: [],
-        pagination: normalizePagination(
-          null,
-          filters.page || EMPTY_PAGINATION.page,
-          filters.limit || EMPTY_PAGINATION.limit
-        ),
-        error: `Falha ao buscar anúncios (${response.status})`,
-      };
+      if (isServer()) {
+        console.error(
+          `[ads-search] backend ${response.status} on ${url} — retornando vazio`
+        );
+      }
+      return buildEmptyAdsSearchResponse(
+        filters,
+        `Falha ao buscar anúncios (${response.status})`
+      );
     }
 
     const json = await response.json();
     return normalizeSearchPayload(json, filters);
   } catch (error) {
-    return {
-      success: false,
-      ok: false,
-      data: [],
-      pagination: normalizePagination(
-        null,
-        filters.page || EMPTY_PAGINATION.page,
-        filters.limit || EMPTY_PAGINATION.limit
-      ),
-      error: error instanceof Error ? error.message : "Falha inesperada ao buscar anúncios.",
-    };
+    const message =
+      error instanceof Error ? error.message : "Falha inesperada ao buscar anúncios.";
+    if (isServer()) {
+      console.error(`[ads-search] fetch falhou em ${url}: ${message}`);
+    }
+    return buildEmptyAdsSearchResponse(filters, message);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -417,31 +447,43 @@ export async function fetchAdsFacets(
     body_type: filters.body_type,
     below_fipe: filters.below_fipe,
   });
+  const url = `${apiBase}/api/ads/facets?${params.toString()}`;
+
+  const controller = signal ? null : new AbortController();
+  const effectiveSignal = signal ?? controller?.signal;
+  const timer = controller
+    ? setTimeout(() => controller.abort(), SSR_FETCH_TIMEOUT_MS)
+    : null;
 
   try {
-    const response = await fetch(`${apiBase}/api/ads/facets?${params.toString()}`, {
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      signal,
+      signal: effectiveSignal,
       next: { revalidate: 60 },
     });
 
     if (!response.ok) {
-      return {
-        success: false,
-        facets: EMPTY_FACETS,
-      };
+      if (isServer()) {
+        console.error(
+          `[ads-facets] backend ${response.status} on ${url} — retornando vazio`
+        );
+      }
+      return { success: false, facets: EMPTY_FACETS };
     }
 
     const json = await response.json();
     return normalizeFacetsPayload(json);
-  } catch {
-    return {
-      success: false,
-      facets: EMPTY_FACETS,
-    };
+  } catch (error) {
+    if (isServer()) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[ads-facets] fetch falhou em ${url}: ${message}`);
+    }
+    return { success: false, facets: EMPTY_FACETS };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

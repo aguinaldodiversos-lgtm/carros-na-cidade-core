@@ -43,21 +43,35 @@ function homeCacheTags(citySlug?: string): string[] {
 }
 
 async function fetchJson<T>(url: string, tags: string[]): Promise<T | null> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+  const controller = new AbortController();
+  // 25s acomoda cold start do backend em plano free do Render. Antes era 8s,
+  // o que fazia TODO SSR da home cair em timeout na primeira subida do dia
+  // e a resposta vazia ficava cacheada por revalidate=300.
+  const timer = setTimeout(() => controller.abort(), 25_000);
 
+  try {
     const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       next: { revalidate: 300, tags },
       signal: controller.signal,
-    }).finally(() => clearTimeout(timer));
+    });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (typeof window === "undefined") {
+        console.error(`[public-home] backend ${response.status} on ${url}`);
+      }
+      return null;
+    }
     return (await response.json()) as T;
-  } catch {
+  } catch (error) {
+    if (typeof window === "undefined") {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[public-home] fetch falhou em ${url}: ${message}`);
+    }
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
