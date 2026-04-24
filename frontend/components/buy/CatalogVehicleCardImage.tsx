@@ -4,13 +4,13 @@ import Image from "next/image";
 import { useCallback, useState } from "react";
 
 import { LISTING_CARD_FALLBACK_IMAGE } from "@/lib/vehicle/detail-utils";
+import { shouldSkipNextImageOptimizer } from "@/lib/images/image-optimization";
 
 type Props = {
   src: string;
   alt: string;
   priority?: boolean;
   sizes: string;
-  unoptimized?: boolean;
 };
 
 export default function CatalogVehicleCardImage({
@@ -18,11 +18,11 @@ export default function CatalogVehicleCardImage({
   alt,
   priority = false,
   sizes,
-  unoptimized = false,
 }: Props) {
   const [broken, setBroken] = useState(false);
   const onError = useCallback(() => setBroken(true), []);
   const resolved = broken ? LISTING_CARD_FALLBACK_IMAGE : src;
+  const unoptimized = shouldSkipNextImageOptimizer(resolved);
 
   return (
     <Image

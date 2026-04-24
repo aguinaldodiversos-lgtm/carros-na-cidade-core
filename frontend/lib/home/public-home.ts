@@ -8,6 +8,7 @@ export interface HomeDataResponse {
     highlightAds: AdItem[];
     opportunityAds: AdItem[];
     recentAds: AdItem[];
+    adsByState?: Array<{ uf: string; offers: number | string }>;
     stats: {
       total_ads?: number | string;
       total_cities?: number | string;
@@ -31,6 +32,7 @@ function fallbackHome(): HomeDataResponse["data"] {
     highlightAds: [],
     opportunityAds: [],
     recentAds: [],
+    adsByState: [],
     stats: { total_ads: 0, total_cities: 0, total_advertisers: 0, total_users: 0 },
   };
 }
@@ -119,6 +121,70 @@ export async function fetchPublicHomeData(
       ? opportunityAds
       : homeData.opportunityAds || empty.opportunityAds,
     recentAds: recentAds.length ? recentAds : homeData.recentAds || empty.recentAds,
+    adsByState: homeData.adsByState || empty.adsByState,
     stats: homeData.stats || empty.stats,
   };
+}
+
+export type HomeAboveFoldData = Pick<
+  HomeDataResponse["data"],
+  "featuredCities" | "adsByState" | "stats"
+>;
+
+/**
+ * Fetch leve para conteudo acima da dobra (hero + promo + explore por estado).
+ * Nao inclui os carrosseis de veiculos — esses sao carregados por Suspense
+ * em HomeCarousels, permitindo streaming do HTML e TTFB menor.
+ */
+export async function fetchHomeAboveFold(): Promise<HomeAboveFoldData> {
+  const apiBase = getApiBaseUrl();
+  const empty = fallbackHome();
+  const tags = homeCacheTags(undefined);
+
+  const homeJson = await fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`, tags);
+  const homeData = homeJson?.success && homeJson.data ? homeJson.data : empty;
+
+  return {
+    featuredCities: homeData.featuredCities || empty.featuredCities,
+    adsByState: homeData.adsByState || empty.adsByState,
+    stats: homeData.stats || empty.stats,
+  };
+}
+
+export type HomeCarouselsData = {
+  highlightAds: AdItem[];
+  opportunityAds: AdItem[];
+  recentAds: AdItem[];
+};
+
+/**
+ * Fetch pesado dos carrosseis de veiculos — renderizado dentro de <Suspense>
+ * para permitir stream do HTML acima da dobra antes destes dados chegarem.
+ */
+export async function fetchHomeCarousels(
+  citySlug?: string,
+  cityId?: number
+): Promise<HomeCarouselsData> {
+  const apiBase = getApiBaseUrl();
+  const cs = citySlug?.trim();
+  const tags = homeCacheTags(cs);
+
+  const withTerritory = (base: Record<string, string | number | boolean>) => {
+    const o: Record<string, string | number | boolean> = { ...base };
+    if (cs) o.city_slug = cs;
+    if (cityId && Number.isFinite(cityId) && cityId > 0) o.city_id = cityId;
+    return o;
+  };
+
+  const [highlightAds, opportunityAds, recentAds] = await Promise.all([
+    fetchAdsCollection(
+      apiBase,
+      withTerritory({ highlight_only: true, limit: 12, sort: "highlight" }),
+      tags
+    ),
+    fetchAdsCollection(apiBase, withTerritory({ below_fipe: true, limit: 4 }), tags),
+    fetchAdsCollection(apiBase, withTerritory({ limit: 8, sort: "recent" }), tags),
+  ]);
+
+  return { highlightAds, opportunityAds, recentAds };
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
-import { isFavoriteSlug, toggleFavoriteSlug } from "@/lib/favorites/local-favorites";
+import { useFavorites } from "@/lib/favorites/FavoritesContext";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 
 type VehicleItem = {
@@ -116,7 +116,8 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
   const mileage = formatMileage(item.mileage);
   const cityLabel = [item.city || "São Paulo", item.state || "SP"].join(" - ");
   const favKey = resolveFavoriteKey(item);
-  const [fav, setFav] = useState(() => isFavoriteSlug(favKey));
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const fav = isFavorite(favKey);
 
   const badgeTop = useMemo(() => {
     if (variant === "highlight") return "Patrocinado";
@@ -134,9 +135,9 @@ export function HomeVehicleCard({ item, variant }: HomeVehicleCardProps) {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setFav(toggleFavoriteSlug(favKey));
+      toggleFavorite(favKey);
     },
-    [favKey]
+    [favKey, toggleFavorite]
   );
 
   return (

@@ -10,6 +10,8 @@ import {
   VehiclePrimaryBadge,
 } from "@/components/buy/VehicleBadge";
 import CatalogVehicleCardImage from "@/components/buy/CatalogVehicleCardImage";
+// Mantemos o helper de otimizacao centralizado em lib/images para reuso.
+// Aqui o card apenas delega para CatalogVehicleCardImage que toma a decisao.
 
 export type CatalogItem = AdItem & {
   title?: string;
@@ -187,11 +189,6 @@ export default function CatalogVehicleCard({
   const subtitle = getSubtitle(item);
   const primaryVariant = primaryBadgeFromWeight(weight);
   const image = getImage(item);
-  const unoptimized =
-    image.startsWith("/api/vehicle-images") ||
-    image.startsWith("http") ||
-    image.startsWith("data:") ||
-    image.endsWith(".svg");
 
   const cardClasses = cx(
     "group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_3px_14px_-8px_rgba(15,23,42,0.15)] transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_30px_-18px_rgba(14,98,216,0.35)] sm:rounded-2xl",
@@ -214,7 +211,6 @@ export default function CatalogVehicleCard({
           src={image}
           alt={title}
           sizes={sizes}
-          unoptimized={unoptimized}
           priority={priority}
         />
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -76,14 +77,13 @@ export function HomeHero({ featuredCities, defaultCitySlug }: HomeHeroProps) {
   return (
     <section className="relative mx-auto w-full max-w-[1240px] px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
       <div className="relative overflow-hidden rounded-[16px] bg-[#0b1020] shadow-[0_18px_44px_-20px_rgba(15,10,40,0.35)] sm:rounded-[22px]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={HOME_HERO_BANNER}
           alt="Carros na Cidade — portal automotivo regional"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
+          fill
+          priority
+          sizes="(min-width: 1280px) 1240px, 100vw"
+          className="object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0b1020]/85 via-[#0b1020]/55 to-transparent" />
 

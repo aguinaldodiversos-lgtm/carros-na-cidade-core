@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { IconPin } from "@/components/home/icons";
+import { shouldSkipNextImageOptimizer } from "@/lib/images/image-optimization";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import { VehicleFavoriteButton } from "./VehicleFavoriteButton";
 
@@ -135,13 +137,14 @@ export function VehicleCard({ item, variant }: VehicleCardProps) {
       className="group flex min-w-[240px] flex-col overflow-hidden rounded-[12px] border border-[#e7e8f1] bg-white shadow-[0_4px_14px_rgba(15,10,40,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(15,10,40,0.10)] sm:min-w-[280px] sm:rounded-[14px]"
     >
       <div className="relative aspect-[16/11] overflow-hidden bg-[#eef0f6]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={image}
           alt={title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          fill
+          sizes="(min-width: 1024px) 280px, (min-width: 640px) 45vw, 80vw"
+          unoptimized={shouldSkipNextImageOptimizer(image)}
+          className="object-cover transition duration-500 group-hover:scale-[1.03]"
           loading="lazy"
-          decoding="async"
         />
 
         <span

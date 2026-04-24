@@ -1,20 +1,21 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 
 import { IconHeart } from "@/components/home/icons";
-import { isFavoriteSlug, toggleFavoriteSlug } from "@/lib/favorites/local-favorites";
+import { useFavorites } from "@/lib/favorites/FavoritesContext";
 
 export function VehicleFavoriteButton({ favKey }: { favKey: string }) {
-  const [fav, setFav] = useState(() => isFavoriteSlug(favKey));
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const fav = isFavorite(favKey);
 
   const onToggle = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setFav(toggleFavoriteSlug(favKey));
+      toggleFavorite(favKey);
     },
-    [favKey]
+    [favKey, toggleFavorite]
   );
 
   return (

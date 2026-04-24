@@ -17,7 +17,15 @@ const CreateAdSchema = z.object({
   price: z.coerce.number().positive(),
   city_id: z.coerce.number().int().positive(),
   city: z.string().min(2),
-  state: z.string().min(2).max(2),
+  // UF canonica: 2 letras, SEMPRE uppercase. O fallback UPPER(...) no filtro
+  // ainda protege anuncios antigos; aqui garantimos consistencia no insert.
+  state: z
+    .string()
+    .trim()
+    .min(2)
+    .max(2)
+    .transform((v) => v.toUpperCase())
+    .refine((v) => /^[A-Z]{2}$/.test(v), { message: "UF inválida" }),
   brand: z.string().min(1),
   model: z.string().min(1),
   year: z.coerce.number().int().min(1900).max(2100),

@@ -25,6 +25,7 @@ export async function getHomeData(req, res, next) {
       opportunityAdsResult,
       recentAdsResult,
       statsResult,
+      adsByStateResult,
     ] = await Promise.all([
       safeQuery("featuredCities", () => citiesService.getTopCitiesByDemand(8)).then((r) => r ?? []),
       safeQuery("topOpportunities", () => marketIntelligenceService.getTopOpportunities(8)).then(
@@ -107,11 +108,29 @@ export async function getHomeData(req, res, next) {
 
       safeQuery("stats", () =>
         pool.query(`
-        SELECT 
+        SELECT
           (SELECT COUNT(*) FROM ads WHERE status = 'active') AS total_ads,
           (SELECT COUNT(*) FROM cities) AS total_cities,
           (SELECT COUNT(*) FROM advertisers) AS total_advertisers,
           (SELECT COUNT(*) FROM users) AS total_users
+      `)
+      ),
+
+      // Agregacao de ofertas por UF para a secao "Explore por estado" da home.
+      // Usa COALESCE(a.state, c.state) pela mesma razao do filtro estadual:
+      // tolera anuncios antigos sem UF gravada, caindo para cities.state.
+      safeQuery("adsByState", () =>
+        pool.query(`
+        SELECT
+          UPPER(COALESCE(a.state, c.state)) AS uf,
+          COUNT(*)::int AS offers
+        FROM ads a
+        LEFT JOIN cities c ON c.id = a.city_id
+        WHERE a.status = 'active'
+          AND COALESCE(a.state, c.state) IS NOT NULL
+        GROUP BY UPPER(COALESCE(a.state, c.state))
+        ORDER BY offers DESC, uf ASC
+        LIMIT 10
       `)
       ),
     ]);
@@ -130,6 +149,7 @@ export async function getHomeData(req, res, next) {
         highlightAds,
         opportunityAds,
         recentAds,
+        adsByState: adsByStateResult?.rows ?? [],
         stats: statsResult?.rows?.[0] ?? {
           total_ads: "0",
           total_cities: "0",
