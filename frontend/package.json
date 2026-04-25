@@ -28,8 +28,18 @@
     "test:e2e:isolation": "playwright test e2e/user-isolation-api.spec.ts",
     "test:e2e:full-flow": "playwright test e2e/full-flow.spec.ts",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:seo": "playwright test --grep \"@seo-canonical|@seo-jsonld|@seo-sitemap\"",
+    "test:e2e:seo:canonical": "playwright test e2e/seo-canonical.spec.ts",
+    "test:e2e:seo:jsonld": "playwright test e2e/seo-jsonld.spec.ts",
+    "test:e2e:seo:sitemap": "playwright test e2e/seo-sitemap.spec.ts",
     "e2e:mock-backend": "npx tsx e2e/mock-backend/server.ts",
-    "test:e2e:mock": "E2E_MOCK_BACKEND=1 E2E_BACKEND_API_URL=http://127.0.0.1:4000 playwright test"
+    "test:e2e:mock": "E2E_MOCK_BACKEND=1 E2E_BACKEND_API_URL=http://127.0.0.1:4000 playwright test",
+    "snapshot:public-routes": "node ./scripts/snapshot-public-routes.mjs",
+    "snapshot:diff": "node ./scripts/snapshot-diff.mjs",
+    "lint:public-fetch": "node ./scripts/lint-public-fetch.mjs",
+    "lint:services-imports": "node ./scripts/lint-services-imports.mjs --baseline=tests/snapshots/services-imports-baseline.txt",
+    "lint:services-imports:strict": "node ./scripts/lint-services-imports.mjs --strict",
+    "lint:guardrails": "npm run lint:public-fetch && npm run lint:services-imports"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1028.0",
