@@ -19,6 +19,24 @@ import type { ReactNode } from "react";
  *
  * Variant `with-fab`: destaca o item central (Anunciar) como FAB
  * arredondado e elevado.
+ *
+ * IMPORTANTE — RESPONSABILIDADE DO CONSUMIDOR
+ *
+ * 1. SAFE AREA: este componente já aplica `pb-[env(safe-area-inset-bottom)]`
+ *    para iPhones com home indicator. Não há nada extra a fazer.
+ *
+ * 2. PADDING DE CONTEÚDO: como BottomNav é `position: fixed`, ele
+ *    cobre conteúdo se a página não reservar espaço inferior. A página
+ *    que monta o BottomNav DEVE adicionar `pb-20` (80px) ou maior no
+ *    container principal em mobile, p.ex.:
+ *
+ *      <main className="pb-20 md:pb-0">{children}</main>
+ *
+ *    A altura nominal é 64px + safe-area. Use `pb-20` (80px) com
+ *    folga e desativar em desktop com `md:pb-0`.
+ *
+ * 3. Z-INDEX: usa `z-40`. Modais/drawers do app devem usar `z-50+`
+ *    para ficar acima do BottomNav.
  */
 
 type BottomNavVariant = "default" | "with-fab";

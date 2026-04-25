@@ -440,7 +440,73 @@ Todos os 11 primitivos esperados foram criados em `frontend/components/ui/`.
 - **Acessibilidade**: `aria-pressed` em chips, `aria-current="page"` em BottomNav, `aria-label` em ações sem texto, `aria-invalid` em inputs com erro, `aria-describedby` linkando hint/error.
 - **Mobile-first**: tamanhos default são mobile (Input/Button 48px). `md:` reduz no desktop.
 
-### 7.4. O que NÃO foi feito neste PR (intencional)
+### 7.4. Fronteiras entre primitivos com sobreposição aparente
+
+Documenta quando usar cada um quando há ambiguidade.
+
+#### `<Chip>` vs `<FilterChip>`
+
+| Caso | Use |
+|---|---|
+| Filtro rápido togglável no topo da home ("Até R$ 50 mil", "SUV") com estado próprio gerenciado pela página | **`<Chip variant="filter">`** |
+| Filtro removível qualquer (badge de aplicação solta) | **`<Chip variant="removable">`** |
+| Tag estática, não clicável (cidade, status) | **`<Chip variant="static">`** |
+| Filtro APLICADO mostrado no topo de uma listagem (dentro de uma barra `[X SUV] [X Até 50k] [X Auto]`) | **`<FilterChip variant="removable">`** |
+| Filtro ativo mostrado de forma compacta (sem X — clique remove via parent) | **`<FilterChip variant="active">`** |
+
+**Regra**: `Chip` é o primitivo genérico (altura 36px, padding maior). `FilterChip` é especialização visual para barras de filtros aplicados (altura 32px, padding menor, sempre fundo soft) — escolhido porque listagens podem ter 5+ filtros lado-a-lado.
+
+#### `<Input>` vs `<SearchBar>`
+
+| Caso | Use |
+|---|---|
+| Campo de texto único (email, nome, descrição, valor numérico) | **`<Input>`** |
+| Campo de busca isolado dentro de um form maior (ex: filtros laterais com vários campos) | **`<Input variant="search">`** |
+| Caixa de busca primária da página, com botão de filtros ao lado, possivelmente sticky no scroll | **`<SearchBar>`** |
+| Caixa de busca em header global | **`<SearchBar variant="compact">`** |
+
+**Regra**: `<Input variant="search">` é apenas um Input com ícone de lupa. `<SearchBar>` é um **form completo** (composição de Input + Button) que dispara `onSubmit` e pode hospedar um `filterButton` ao lado.
+
+#### `<Select>` vs autocomplete/combobox
+
+`<Select>` desta versão é **`<select>` nativo**. Razão: melhor UX em mobile (picker do SO), zero JS extra, acessibilidade gratuita.
+
+**Não usar `<Select>` quando**:
+- Há mais de ~30 opções e usuário precisa filtrar enquanto digita.
+- Backend precisa receber a query do usuário (autocomplete server-side).
+
+**Para esses casos**: aguardar primitivo `<Combobox>` em PR futuro (fora do escopo do PR D conforme aprovação do usuário). Solução temporária: `<Input>` com sugestões via lista controlada pelo parent.
+
+#### `<Button>` vs `<a>` direto
+
+| Caso | Use |
+|---|---|
+| Ação que dispara handler (submit, abrir modal, salvar) | **`<Button>`** sem `href` |
+| Navegação interna (`/anuncios`, `/cidade/...`) com aparência de botão | **`<Button href="/...">`** (renderiza `<Link>`) |
+| Navegação externa (WhatsApp, parceiro) com aparência de botão | **`<Button href="https://..." target="_blank">`** |
+| Link textual em meio a parágrafo | `<Link>` direto (não usar Button — `variant="link"` é para casos específicos com aparência de link mas espaçamento de botão) |
+
+**Regra**: o Button toma a decisão `<button>` vs `<a>` baseado na presença da prop `href`. Se `href` está presente, automaticamente vira `<Link>` do Next.js (com `target="_blank" rel="noopener"` quando aplicável).
+
+#### `<Card>` vs `<div>` puro
+
+`<Card>` traz: borda + sombra + padding consistentes + border-radius do sistema.
+
+**Use `<Card>` quando** o container precisa de hierarquia visual (anúncio, painel de form, seção destacada).
+**Use `<div>` puro quando** o container é apenas estrutural (wrapping para flex/grid/spacing).
+
+#### `<ActionShortcut>` vs `<Button>` circular
+
+| Caso | Use |
+|---|---|
+| Atalho destacado para uma seção (Comprar, Vender, Blog, Ofertas) com **ícone + label embaixo** | **`<ActionShortcut>`** |
+| Botão de ação circular (ex: FAB, fechar modal, voltar) com **só ícone** | `<Button>` com classes para circular ou ícone-only |
+
+`<ActionShortcut>` é **navegação**, não ação. Sempre vira `<Link>` para outra rota.
+
+---
+
+### 7.5. O que NÃO foi feito neste PR (intencional)
 
 - ❌ Substituição de componentes existentes (AdCard, PublicHeader, etc.)
 - ❌ Aplicação em qualquer página
