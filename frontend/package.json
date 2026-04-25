@@ -39,7 +39,10 @@
     "lint:public-fetch": "node ./scripts/lint-public-fetch.mjs",
     "lint:services-imports": "node ./scripts/lint-services-imports.mjs --baseline=tests/snapshots/services-imports-baseline.txt",
     "lint:services-imports:strict": "node ./scripts/lint-services-imports.mjs --strict",
-    "lint:guardrails": "npm run lint:public-fetch && npm run lint:services-imports"
+    "lint:images": "node ./scripts/lint-images-sizes.mjs",
+    "lint:images:strict": "node ./scripts/lint-images-sizes.mjs --strict",
+    "lint:guardrails": "npm run lint:public-fetch && npm run lint:services-imports && npm run lint:images",
+    "test:e2e:images": "playwright test --grep \"@img-fallback\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1028.0",
