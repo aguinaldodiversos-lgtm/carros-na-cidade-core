@@ -20,6 +20,7 @@
  */
 
 import path from "path";
+import { fileURLToPath } from "node:url";
 import { test, expect, request } from "@playwright/test";
 import {
   ensureDevServerUp,
@@ -32,6 +33,11 @@ import {
   createAdDraft,
 } from "./helpers";
 import { runPublishWizardFlow } from "./publish-wizard";
+
+// ESM equivalent of CommonJS __dirname. Required because frontend/package.json
+// declares "type": "module" — __dirname is not defined in ESM scope.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Minimal 1×1 pixel JPEG used in the photo-upload test.
 // Stored as base64 to avoid binary file issues across platforms.
