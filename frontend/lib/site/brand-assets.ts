@@ -8,7 +8,7 @@ export const SITE_LOGO_SRC = "/images/logo-carros-na-cidade.png";
 export const SITE_FAVICON_SRC = "/images/favicon.png";
 
 /** Banner principal da Home (layout premium). */
-export const HOME_HERO_BANNER: string = "/images/home-hero-banner.png";
+export const HOME_HERO_BANNER: string = "/images/banner-home.png";
 
 /** Mantido por compatibilidade com pontos que ainda importam a lista. */
 export const HOME_HERO_BANNER_IMAGES: readonly string[] = [HOME_HERO_BANNER];

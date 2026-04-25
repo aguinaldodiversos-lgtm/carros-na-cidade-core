@@ -2,8 +2,13 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * URLs legadas com hífen → canônico com barra (SEO local).
- * As rotas /carros-*-em/[slug] são SSR; não redirecionar para /comprar.
+ * URLs legadas → canônico (SEO local + rotas legadas).
+ *
+ * 1. /carros-{em,baratos-em,automaticos-em}-[slug] → /carros-{...}/[slug]
+ *    (URLs antigas com hífen único; preservadas para SEO local).
+ * 2. /painel/anuncios/novo → /anunciar/novo
+ *    (rota legada do painel; fluxo oficial agora é /anunciar/novo).
+ *    Preserva query params via clone().
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -38,9 +43,21 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Rota legada do painel (preserva query string).
+  if (pathname === "/painel/anuncios/novo") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/anunciar/novo";
+    return NextResponse.redirect(url, 301);
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/carros-em-:slug", "/carros-baratos-em-:slug", "/carros-automaticos-em-:slug"],
+  matcher: [
+    "/carros-em-:slug",
+    "/carros-baratos-em-:slug",
+    "/carros-automaticos-em-:slug",
+    "/painel/anuncios/novo",
+  ],
 };
