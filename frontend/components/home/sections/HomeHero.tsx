@@ -1,12 +1,30 @@
+// frontend/components/home/sections/HomeHero.tsx
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { SearchBar } from "@/components/ui/SearchBar";
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
-import { IconSearch } from "@/components/home/icons";
+
+/**
+ * PR G — HomeHero redesenhado.
+ *
+ * Mobile-first. Banner regional como hero, search bar protagonista
+ * com chips de filtro rápido (Até R$ 50 mil, SUV, Abaixo da FIPE,
+ * Lojas). Mantém H1 único, contrato funcional (submit para /comprar)
+ * e priority/sizes corretos. Sem hex hardcoded — tokens DS.
+ *
+ * Substituí o form de 3 dropdowns (busca + estado + cidade) por
+ * uma SearchBar limpa. Filtros avançados são cobertos em /comprar
+ * (página de catálogo). Estado e cidade ficam no header global
+ * (PublicHeader.CityHeaderSelector). Esta home é mobile-first e
+ * busca regional acontece via cookie de cidade que já é resolvido
+ * no Server Component pai.
+ */
 
 type FeaturedCity = {
   id: number;
@@ -18,191 +36,128 @@ type FeaturedCity = {
 interface HomeHeroProps {
   featuredCities: FeaturedCity[];
   defaultCitySlug: string;
+  /** Nome da cidade ativa (para personalizar microtexto). */
+  cityName?: string;
 }
 
-const STATES: Array<{ uf: string; name: string }> = [
-  { uf: "AC", name: "Acre" },
-  { uf: "AL", name: "Alagoas" },
-  { uf: "AP", name: "Amapá" },
-  { uf: "AM", name: "Amazonas" },
-  { uf: "BA", name: "Bahia" },
-  { uf: "CE", name: "Ceará" },
-  { uf: "DF", name: "Distrito Federal" },
-  { uf: "ES", name: "Espírito Santo" },
-  { uf: "GO", name: "Goiás" },
-  { uf: "MA", name: "Maranhão" },
-  { uf: "MT", name: "Mato Grosso" },
-  { uf: "MS", name: "Mato Grosso do Sul" },
-  { uf: "MG", name: "Minas Gerais" },
-  { uf: "PA", name: "Pará" },
-  { uf: "PB", name: "Paraíba" },
-  { uf: "PR", name: "Paraná" },
-  { uf: "PE", name: "Pernambuco" },
-  { uf: "PI", name: "Piauí" },
-  { uf: "RJ", name: "Rio de Janeiro" },
-  { uf: "RN", name: "Rio Grande do Norte" },
-  { uf: "RS", name: "Rio Grande do Sul" },
-  { uf: "RO", name: "Rondônia" },
-  { uf: "RR", name: "Roraima" },
-  { uf: "SC", name: "Santa Catarina" },
-  { uf: "SP", name: "São Paulo" },
-  { uf: "SE", name: "Sergipe" },
-  { uf: "TO", name: "Tocantins" },
+const QUICK_FILTERS: Array<{ key: string; label: string; query: string }> = [
+  { key: "below-fipe", label: "Abaixo da FIPE", query: "below_fipe=true" },
+  { key: "suv", label: "SUV", query: "body_type=SUV" },
+  { key: "auto", label: "Automático", query: "transmission=automatic" },
+  { key: "ate-50", label: "Até R$ 50 mil", query: "price_max=50000" },
 ];
 
-export function HomeHero({ featuredCities, defaultCitySlug }: HomeHeroProps) {
+export function HomeHero({ featuredCities: _f, defaultCitySlug, cityName }: HomeHeroProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [uf, setUf] = useState("");
-  const [citySlug, setCitySlug] = useState("");
 
-  const citiesForUf = useMemo(() => {
-    if (!uf) return featuredCities;
-    return featuredCities.filter((c) => (c.state || "").toUpperCase() === uf);
-  }, [uf, featuredCities]);
-
-  const handleSubmit = useCallback(
-    (event: FormEvent) => {
-      event.preventDefault();
+  const submit = useCallback(
+    (value: string) => {
       const params = new URLSearchParams();
-      if (query.trim()) params.set("q", query.trim());
-      if (citySlug) params.set("city_slug", citySlug);
-      else if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
-      if (uf) params.set("uf", uf);
+      if (value.trim()) params.set("q", value.trim());
+      if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
       router.push(`/comprar?${params.toString()}`);
     },
-    [query, uf, citySlug, defaultCitySlug, router]
+    [defaultCitySlug, router]
+  );
+
+  const goWithFilter = useCallback(
+    (filterQuery: string) => {
+      const params = new URLSearchParams(filterQuery);
+      if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
+      router.push(`/comprar?${params.toString()}`);
+    },
+    [defaultCitySlug, router]
   );
 
   return (
-    <section className="relative mx-auto w-full max-w-[1240px] px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
-      <div className="relative overflow-hidden rounded-[16px] bg-[#0b1020] shadow-[0_18px_44px_-20px_rgba(15,10,40,0.35)] sm:rounded-[22px]">
+    <section className="mx-auto w-full max-w-8xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+      <div className="relative overflow-hidden rounded-2xl bg-cnc-footer-a shadow-premium md:rounded-3xl">
         <Image
           src={HOME_HERO_BANNER}
-          alt="Carros na Cidade — portal automotivo regional"
+          alt={
+            cityName
+              ? `Carros usados em ${cityName} no Carros na Cidade`
+              : "Carros na Cidade — portal automotivo regional"
+          }
           fill
           priority
-          sizes="(min-width: 1280px) 1240px, 100vw"
+          sizes="(min-width: 1280px) 1440px, 100vw"
           className="object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0b1020]/85 via-[#0b1020]/55 to-transparent" />
+        {/* Overlay para legibilidade do texto branco */}
+        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a/85 via-cnc-footer-a/55 to-transparent" />
 
-        <div className="relative grid min-h-[280px] items-center px-5 py-7 sm:min-h-[380px] sm:px-10 sm:py-10 md:min-h-[440px] md:py-14 lg:px-14">
+        <div className="relative grid min-h-[260px] items-center px-5 py-7 sm:min-h-[340px] sm:px-8 sm:py-10 md:min-h-[400px] lg:px-12">
           <div className="max-w-xl">
-            <h1 className="text-[24px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[34px] md:text-[44px]">
+            <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl md:text-4xl">
               O portal de carros usados
               <br />
-              que <span className="text-[#8fa0eb]">entende a sua cidade</span>
+              que <span className="text-primary-soft">entende a sua cidade</span>
             </h1>
-            <p className="mt-3 max-w-md text-[13.5px] leading-relaxed text-white/85 sm:mt-4 sm:text-base">
-              Conectamos compradores e vendedores com foco regional.
-              <br className="hidden sm:inline" />
-              Mais oportunidades, melhores negócios e confiança perto de você.
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
+              Conectamos compradores e vendedores com foco regional.{" "}
+              <span className="hidden sm:inline">
+                Mais oportunidades, melhores negócios e confiança perto de você.
+              </span>
             </p>
-            <Link
-              href="/comprar"
-              className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#2d3a9c] px-6 text-[14px] font-bold text-white shadow-[0_10px_22px_rgba(45,58,156,0.4)] transition hover:bg-[#1f2b7e] sm:mt-7 sm:h-12 sm:px-7 sm:text-[15px]"
-            >
+            <Button href="/comprar" variant="primary" size="lg" className="mt-5 sm:mt-6">
               Começar agora
-            </Link>
+            </Button>
           </div>
         </div>
+      </div>
 
-        <div className="relative z-10 mx-3 -mt-6 sm:mx-6 sm:-mt-10 md:mx-8">
-          <p className="mb-1.5 pl-2 text-[11px] text-white/80 sm:mb-2 sm:text-[12px]">
-            Ex.: Honda Civic, Fiat Strada…
-          </p>
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-[14px] border border-[#e7e8f1] bg-white p-2.5 shadow-[0_14px_34px_rgba(15,10,40,0.12)] sm:rounded-[18px] sm:p-4"
+      {/* Busca + chips em card flutuante (mobile-first).
+          SearchBar do DS já é um <form role="search">; usamos seu onSubmit. */}
+      <div className="relative z-10 mt-3 sm:-mt-6 sm:mx-3">
+        <div className="rounded-2xl border border-cnc-line bg-cnc-surface p-3 shadow-card sm:p-4">
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            onSubmit={submit}
+            placeholder="Busque por marca ou modelo"
+            ariaLabel="Buscar veículos"
+            filterButton={
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                aria-label="Ver ofertas"
+                className="hidden sm:inline-flex"
+              >
+                Ver ofertas
+              </Button>
+            }
+          />
+          {/* Mobile: botão dispara submit programaticamente via clique
+              no botão dentro do form do SearchBar acima.
+              Como o SearchBar é um <form>, qualquer <button type="submit">
+              dentro dele dispara o submit. Aqui usamos um botão fora do
+              form, então chamamos submit() direto. */}
+          <Button
+            type="button"
+            onClick={() => submit(query)}
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-2 sm:hidden"
           >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.6fr_1fr_1fr_auto] md:items-end md:gap-3">
-              <div>
-                <label className="mb-1 block pl-1 text-[11px] font-semibold uppercase tracking-wide text-[#2d3a9c]">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center text-[#2d3a9c]">
-                    <IconSearch className="h-full w-full" />
-                  </span>
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Busque por marca ou modelo"
-                    aria-label="Busque por marca ou modelo"
-                    className="h-11 w-full sm:h-12 rounded-[12px] border border-[#e7e8f1] bg-white pl-11 pr-3 text-[14px] font-medium text-[#1a1f36] outline-none transition placeholder:text-[#9ea3b8] hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
-                  />
-                </div>
-              </div>
+            Ver ofertas
+          </Button>
 
-              <div>
-                <label className="mb-1 block pl-1 text-[11px] font-semibold uppercase tracking-wide text-[#2d3a9c]">
-                  Estado
-                </label>
-              <select
-                value={uf}
-                onChange={(e) => {
-                  setUf(e.target.value);
-                  setCitySlug("");
-                }}
-                aria-label="Estado"
-                className="h-11 w-full sm:h-12 appearance-none rounded-[12px] border border-[#e7e8f1] bg-white px-3 text-[14px] font-medium text-[#1a1f36] outline-none transition hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(45deg,transparent 50%,#2d3a9c 50%),linear-gradient(135deg,#2d3a9c 50%,transparent 50%)",
-                  backgroundPosition:
-                    "calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px)",
-                  backgroundSize: "6px 6px, 6px 6px",
-                  backgroundRepeat: "no-repeat",
-                  paddingRight: "2.25rem",
-                }}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="sr-only">Filtros rápidos</span>
+            {QUICK_FILTERS.map((f) => (
+              <Chip
+                key={f.key}
+                variant="filter"
+                onClick={() => goWithFilter(f.query)}
               >
-                <option value="">Selecione</option>
-                {STATES.map((s) => (
-                  <option key={s.uf} value={s.uf}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block pl-1 text-[11px] font-semibold uppercase tracking-wide text-[#2d3a9c]">
-                Cidade
-              </label>
-              <select
-                value={citySlug}
-                onChange={(e) => setCitySlug(e.target.value)}
-                aria-label="Cidade"
-                className="h-11 w-full sm:h-12 appearance-none rounded-[12px] border border-[#e7e8f1] bg-white px-3 text-[14px] font-medium text-[#1a1f36] outline-none transition hover:border-[#d4d7e4] focus:border-[#2d3a9c] focus:shadow-[0_0_0_4px_rgba(45, 58, 156,0.12)]"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(45deg,transparent 50%,#2d3a9c 50%),linear-gradient(135deg,#2d3a9c 50%,transparent 50%)",
-                  backgroundPosition:
-                    "calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px)",
-                  backgroundSize: "6px 6px, 6px 6px",
-                  backgroundRepeat: "no-repeat",
-                  paddingRight: "2.25rem",
-                }}
-              >
-                <option value="">Selecione</option>
-                {citiesForUf.map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="inline-flex h-12 items-center justify-center rounded-[12px] bg-[#2d3a9c] px-7 text-[14px] font-bold text-white shadow-[0_10px_26px_rgba(45, 58, 156,0.3)] transition hover:bg-[#1f2b7e] md:self-end"
-            >
-              Ver ofertas
-            </button>
+                {f.label}
+              </Chip>
+            ))}
           </div>
-        </form>
         </div>
       </div>
     </section>

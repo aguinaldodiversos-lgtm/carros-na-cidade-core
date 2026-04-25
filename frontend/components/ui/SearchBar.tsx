@@ -17,7 +17,10 @@ import type { FormHTMLAttributes, ReactNode } from "react";
 
 type SearchBarVariant = "default" | "sticky" | "compact";
 
-export type SearchBarProps = Omit<FormHTMLAttributes<HTMLFormElement>, "onSubmit"> & {
+export type SearchBarProps = Omit<
+  FormHTMLAttributes<HTMLFormElement>,
+  "onSubmit" | "onChange" | "defaultValue"
+> & {
   variant?: SearchBarVariant;
   placeholder?: string;
   defaultValue?: string;

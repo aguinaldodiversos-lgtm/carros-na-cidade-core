@@ -1,8 +1,11 @@
+// frontend/components/home/sections/PromoCarousel.tsx
 "use client";
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import {
   IconArrowUpRight,
   IconCalculator,
@@ -12,6 +15,22 @@ import {
   IconPriceTag,
 } from "@/components/home/icons";
 
+/**
+ * PR G — PromoCarousel reescrito usando primitivos do DS.
+ *
+ * Mantém 3 cards de proposta de valor (FIPE, Financiamento, Anunciar)
+ * mas sem hex hardcoded. Cada card é um <Card variant="elevated"> com
+ * <Button variant="link"> apontando para destino canônico.
+ *
+ * Anti-duplicação:
+ *   - "Carros abaixo da FIPE" leva para /comprar?below_fipe=true (não
+ *     duplica a tabela FIPE, que tem atalho próprio em HomeShortcuts)
+ *   - "Financiamento facilitado" leva para /simulador-financiamento
+ *     (mesmo destino do shortcut Simulador — coexistência intencional:
+ *     shortcut é micro, esta seção é convite com proposta clara)
+ *   - "Anuncie seu carro grátis" leva para /anunciar/novo (CTA principal)
+ */
+
 type PromoCard = {
   id: string;
   icon: ReactNode;
@@ -19,52 +38,34 @@ type PromoCard = {
   description: string;
   cta: string;
   href: string;
-  accent: "lilac" | "soft" | "strong";
 };
 
 const CARDS: PromoCard[] = [
   {
     id: "below-fipe",
-    icon: <IconPriceTag className="h-7 w-7" />,
+    icon: <IconPriceTag className="h-6 w-6" />,
     title: "Carros abaixo da FIPE",
-    description:
-      "Encontre oportunidades com preços imperdíveis na sua região.",
+    description: "Encontre oportunidades com preços imperdíveis na sua região.",
     cta: "Ver oportunidades",
     href: "/comprar?below_fipe=true",
-    accent: "lilac",
   },
   {
     id: "financing",
-    icon: <IconCalculator className="h-7 w-7" />,
+    icon: <IconCalculator className="h-6 w-6" />,
     title: "Financiamento facilitado",
-    description:
-      "Compare, simule e realize seu sonho com as melhores condições.",
+    description: "Compare, simule e realize seu sonho com as melhores condições.",
     cta: "Simular financiamento",
-    href: "/financiamento",
-    accent: "soft",
+    href: "/simulador-financiamento",
   },
   {
     id: "announce",
-    icon: <IconKey className="h-7 w-7" />,
+    icon: <IconKey className="h-6 w-6" />,
     title: "Anuncie seu carro grátis",
-    description:
-      "Divulgue para milhares de pessoas e venda mais rápido.",
+    description: "Divulgue para milhares de pessoas e venda mais rápido.",
     cta: "Quero anunciar",
     href: "/anunciar/novo",
-    accent: "strong",
   },
 ];
-
-function accentClasses(accent: PromoCard["accent"]) {
-  switch (accent) {
-    case "lilac":
-      return "bg-[#eef1f9]";
-    case "soft":
-      return "bg-[#e5e9f3]";
-    case "strong":
-      return "bg-[#dbe0ee]";
-  }
-}
 
 export function PromoCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -95,13 +96,13 @@ export function PromoCarousel() {
   };
 
   return (
-    <section className="mx-auto w-full max-w-[1240px] px-4 pt-5 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
+    <section className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
       <div className="relative">
         <button
           type="button"
           onClick={() => shift(-1)}
           aria-label="Cards anteriores"
-          className="absolute -left-2 top-1/2 z-[2] hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#e7e8f1] bg-white text-[#2d3a9c] shadow-md transition hover:bg-[#eef1f9] md:inline-flex"
+          className="absolute -left-2 top-1/2 z-[2] hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-cnc-line bg-cnc-surface text-primary shadow-card transition hover:bg-primary-soft md:inline-flex"
         >
           <IconChevronLeft className="h-5 w-5" />
         </button>
@@ -109,7 +110,7 @@ export function PromoCarousel() {
           type="button"
           onClick={() => shift(1)}
           aria-label="Próximos cards"
-          className="absolute -right-2 top-1/2 z-[2] hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#e7e8f1] bg-white text-[#2d3a9c] shadow-md transition hover:bg-[#eef1f9] md:inline-flex"
+          className="absolute -right-2 top-1/2 z-[2] hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-cnc-line bg-cnc-surface text-primary shadow-card transition hover:bg-primary-soft md:inline-flex"
         >
           <IconChevronRight className="h-5 w-5" />
         </button>
@@ -119,31 +120,33 @@ export function PromoCarousel() {
           className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible [&::-webkit-scrollbar]:hidden"
         >
           {CARDS.map((card) => (
-            <article
+            <div
               key={card.id}
-              className={`${accentClasses(card.accent)} flex min-w-[82%] snap-center flex-col justify-between rounded-[14px] border border-[#dbe0ee] px-4 py-4 shadow-[0_4px_16px_rgba(45,58,156,0.06)] sm:min-w-[85%] sm:rounded-[18px] sm:px-5 sm:py-6 md:min-w-0 md:px-6 md:py-7`}
+              className="flex min-w-[82%] snap-center sm:min-w-[85%] md:min-w-0"
             >
-              <div className="flex items-start gap-3 sm:gap-4">
-                <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white/80 text-[#2d3a9c] shadow-[0_3px_10px_rgba(45,58,156,0.12)] sm:h-12 sm:w-12 sm:rounded-[14px]">
-                  {card.icon}
+              <Card variant="elevated" padding="lg" className="flex h-full w-full flex-col">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary sm:h-12 sm:w-12">
+                    {card.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-extrabold leading-tight text-cnc-text-strong sm:text-lg">
+                      {card.title}
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-cnc-muted">
+                      {card.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-[15px] font-extrabold leading-tight text-[#1a1f36] sm:text-[17px] md:text-[18px]">
-                    {card.title}
-                  </h3>
-                  <p className="mt-1 text-[12.5px] leading-relaxed text-[#5b6079] sm:mt-1.5 sm:text-[13.5px]">
-                    {card.description}
-                  </p>
-                </div>
-              </div>
-              <Link
-                href={card.href}
-                className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#2d3a9c] transition hover:text-[#1f2b7e] sm:mt-5 sm:text-[13.5px]"
-              >
-                {card.cta}
-                <IconArrowUpRight className="h-4 w-4" />
-              </Link>
-            </article>
+                <Link
+                  href={card.href}
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-primary transition hover:text-primary-strong"
+                >
+                  {card.cta}
+                  <IconArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Card>
+            </div>
           ))}
         </div>
 
@@ -155,7 +158,7 @@ export function PromoCarousel() {
               onClick={() => goTo(idx)}
               aria-label={`Ir para card ${idx + 1}`}
               className={`h-2 rounded-full transition ${
-                idx === activeIndex ? "w-6 bg-[#2d3a9c]" : "w-2 bg-[#b8c2e0]"
+                idx === activeIndex ? "w-6 bg-primary" : "w-2 bg-cnc-line-strong"
               }`}
             />
           ))}
