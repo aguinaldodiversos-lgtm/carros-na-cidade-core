@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BackendApiError, fetchDashboard } from "@/lib/account/backend-account";
+import { getClientIpFromNextRequest } from "@/lib/http/client-ip";
 import {
   ensureSessionWithFreshBackendTokens,
   type EnsureBackendSessionResult,
@@ -19,6 +20,7 @@ type DashboardErrorCode =
   | "missing_session"
   | "backend_unauthorized"
   | "backend_forbidden"
+  | "backend_rate_limited"
   | "backend_unavailable"
   | "network_error"
   | "bff_unexpected";
@@ -96,6 +98,13 @@ function logBackendFailure(error: BackendApiError) {
     });
     return;
   }
+  if (error.status === 429) {
+    console.warn("[GET /api/dashboard/me] backend 429 (rate limited)", {
+      upstreamStatus: error.status,
+      code: error.code,
+    });
+    return;
+  }
   if (error.status >= 500) {
     console.error("[GET /api/dashboard/me] backend 5xx ao buscar dashboard", {
       upstreamStatus: error.status,
@@ -127,6 +136,17 @@ function responseFromDashboardFetchError(request: NextRequest, error: unknown) {
         "backend_forbidden",
         "Esta conta nao tem permissao para acessar este painel.",
         403
+      );
+    }
+    if (error.status === 429) {
+      // Rate limit do backend: propaga 429 transparente ao client com
+      // mensagem clara. Antes caía no fallback 502 "backend_unavailable"
+      // mascarando o sintoma e fazendo o recovery client exibir "Codigo 502".
+      return dashboardErrorResponse(
+        429,
+        "backend_rate_limited",
+        "Muitas solicitacoes ao painel em curto intervalo. Aguarde alguns minutos e tente novamente.",
+        429
       );
     }
     if (error.status >= 500) {
@@ -172,8 +192,9 @@ async function fetchDashboardWithOptionalRefresh(
   request: NextRequest,
   ensured: Extract<EnsureBackendSessionResult, { ok: true }>
 ) {
+  const clientIp = getClientIpFromNextRequest(request) || undefined;
   try {
-    const payload = await fetchDashboard(ensured.session);
+    const payload = await fetchDashboard(ensured.session, { allowRetry: true, clientIp });
     return dashboardSuccessResponse(payload, ensured.persistCookies);
   } catch (error) {
     if (!(error instanceof BackendApiError) || error.status !== 401) {
@@ -206,7 +227,8 @@ async function fetchDashboardWithOptionalRefresh(
 
     try {
       console.info("[GET /api/dashboard/me] refresh bem-sucedido; repetindo dashboard uma vez");
-      const payload = await fetchDashboard(refreshed.session);
+      // Aqui já é a retentativa pós-refresh, sem retry interno adicional.
+      const payload = await fetchDashboard(refreshed.session, { clientIp });
       return dashboardSuccessResponse(payload, refreshed.persistCookies);
     } catch (retryError) {
       return responseFromDashboardFetchError(request, retryError);

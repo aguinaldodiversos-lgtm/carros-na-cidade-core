@@ -165,19 +165,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (ensured.session.type === "pending") {
-      return jsonWithSession(
-        {
-          ok: false,
-          requestId,
-          message:
-            "Complete seu cadastro com CPF ou CNPJ antes de publicar. Use a etapa inicial em Novo anúncio.",
-        },
-        400
-      );
+    // Antes havia um short-circuit aqui que bloqueava publicação quando
+    // ensured.session.type === "pending", mas esse valor vem do cookie
+    // cnc_session — que pode estar stale se o verify-document concluiu e o
+    // browser disparou o publish antes de persistir o cookie atualizado.
+    // Resultado: usuário já validado via CompleteProfileGate recebia erro
+    // "Complete seu cadastro com CPF ou CNPJ" mesmo com CPF verified=true.
+    //
+    // Correção: se cookie diz "pending", buscamos o tipo real do backend via
+    // /api/auth/me antes de decidir. O backend sempre reflete o DB fresco
+    // (authMiddleware lê document_type da tabela users em cada request).
+    // Se o usuário realmente for pending no DB, o POST /api/ads subsequente
+    // falha com a mensagem correta do próprio backend (fonte de verdade),
+    // em vez de bloquearmos aqui com informação desatualizada.
+    let resolvedSessionType: AccountType = ensured.session.type;
+    if (resolvedSessionType === "pending") {
+      const meUrl = resolveBackendApiUrl("/api/auth/me");
+      if (meUrl) {
+        try {
+          const meRes = await fetch(meUrl, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${ensured.session.accessToken}`,
+            },
+            cache: "no-store",
+          });
+          if (meRes.ok) {
+            const meJson = (await meRes.json().catch(() => null)) as {
+              user?: { type?: string };
+            } | null;
+            const freshType = meJson?.user?.type;
+            if (freshType === "CPF" || freshType === "CNPJ") {
+              resolvedSessionType = freshType;
+            }
+          }
+        } catch {
+          // Falha ao consultar /api/auth/me: seguimos adiante e deixamos o
+          // backend /api/ads decidir elegibilidade com base no token + DB.
+        }
+      }
     }
 
-    const accountType: AccountType = ensured.session.type === "CNPJ" ? "CNPJ" : "CPF";
+    const accountType: AccountType = resolvedSessionType === "CNPJ" ? "CNPJ" : "CPF";
 
     const backendHeaders = buildBffBackendForwardHeaders(request);
 

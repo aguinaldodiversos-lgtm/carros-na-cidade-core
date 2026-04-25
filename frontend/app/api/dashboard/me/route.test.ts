@@ -158,8 +158,14 @@ describe("GET /api/dashboard/me", () => {
     expect(mocks.ensureSessionWithFreshBackendTokens).toHaveBeenNthCalledWith(2, staleSession, {
       forceRefresh: true,
     });
-    expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(1, staleSession);
-    expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(2, refreshedSession);
+    expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(1, staleSession, {
+      allowRetry: true,
+      clientIp: undefined,
+    });
+    // Após refresh, não repetimos retry interno (backend já está quente).
+    expect(mocks.fetchDashboard).toHaveBeenNthCalledWith(2, refreshedSession, {
+      clientIp: undefined,
+    });
     expect(mocks.applySessionCookiesToResponse).toHaveBeenCalledWith(
       expect.anything(),
       refreshedSession
@@ -215,6 +221,21 @@ describe("GET /api/dashboard/me", () => {
       error: { code: "backend_forbidden", upstreamStatus: 403 },
     });
     expect(mocks.ensureSessionWithFreshBackendTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserva 429 do backend transparente (nao mascara como 502)", async () => {
+    // Regressão: antes o BFF caía no fallback e virava 502 "backend_unavailable",
+    // fazendo a UI exibir "Codigo 502" mesmo o backend respondendo "muitas tentativas".
+    mocks.fetchDashboard.mockRejectedValueOnce(backendError(429, "Muitas tentativas"));
+
+    const response = await GET(fakeRequest());
+    const body = await readJson(response);
+
+    expect(response.status).toBe(429);
+    expect(body).toMatchObject({
+      ok: false,
+      error: { code: "backend_rate_limited", upstreamStatus: 429 },
+    });
   });
 
   it("mapeia 5xx real do backend para 502 com upstreamStatus", async () => {
