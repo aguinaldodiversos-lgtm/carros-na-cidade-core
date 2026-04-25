@@ -161,7 +161,21 @@ O shell público oficial está no `app/layout.tsx`.
 
 ### Regra obrigatória
 
-Novas integrações públicas devem usar a camada `lib/*`, não criar `services/*` paralelos para páginas públicas novas.
+Novas integrações devem usar a camada `lib/*`. **A pasta `services/` é considerada legado em migração** — ver [docs/SERVICES_MIGRATION_MAP.md](docs/SERVICES_MIGRATION_MAP.md).
+
+#### Proibido (a partir de 2026-04-24)
+
+- ❌ Criar novos arquivos em `frontend/services/`
+- ❌ Adicionar novas funções a arquivos existentes em `frontend/services/` (apenas correções de bug são permitidas)
+- ❌ Importar de `services/` em código novo — usar o equivalente em `lib/` quando existir
+
+#### Migração planejada (PRs 0.4A → 0.4D)
+
+A pasta `services/` será extinta em 4 sub-PRs:
+- **0.4A** — Inventário (entregue: [SERVICES_MIGRATION_MAP.md](docs/SERVICES_MIGRATION_MAP.md))
+- **0.4B** — `marketService`, `planService`, `planStore` → `lib/market/`, `lib/plans/`, `lib/account/`, `lib/validation/`
+- **0.4C** — `aiService`, `vehicleService`, `adService` → `lib/ai/`, consolidação em `lib/vehicle/`, `lib/ads/`
+- **0.4D** — `authService`, `sessionService` → `lib/auth/`, `lib/session/` (último, com testes específicos de auth/cookie/isolamento)
 
 ---
 
