@@ -3,7 +3,7 @@ import {
   getFinancingStatsByCity,
   getFipeStatsByCity,
   type MarketStat,
-} from "@/services/marketService";
+} from "@/lib/market/market-data";
 import { type ListingCar } from "@/lib/car-data";
 import { buildSimilarVehicles, type VehicleDetail } from "@/lib/vehicle/public-vehicle";
 

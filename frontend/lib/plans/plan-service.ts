@@ -1,6 +1,6 @@
 import { fetchPlans } from "@/lib/account/backend-account";
-import type { PlanType, SubscriptionPlan } from "@/services/planStore";
-import { getPlans } from "@/services/planStore";
+import type { PlanType, SubscriptionPlan } from "@/lib/plans/plan-store";
+import { getPlans } from "@/lib/plans/plan-store";
 
 type GetPlansOptions = {
   type?: PlanType;

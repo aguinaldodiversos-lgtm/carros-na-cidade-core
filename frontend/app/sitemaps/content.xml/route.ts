@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStaticCitySlugs } from "../../../services/marketService";
+import { getStaticCitySlugs } from "../../../lib/market/market-data";
 import { buildSitemapXml } from "../../../lib/seo/sitemap-xml";
 
 export const dynamic = "force-static";

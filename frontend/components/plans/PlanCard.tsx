@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { SubscriptionPlan } from "@/services/planStore";
+import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import PlanCheckoutButton from "@/components/plans/PlanCheckoutButton";
 
 type PlanCardProps = {

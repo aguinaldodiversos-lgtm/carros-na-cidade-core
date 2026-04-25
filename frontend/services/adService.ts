@@ -1,5 +1,5 @@
 import type { BoostOption, DashboardAd, DashboardAdStatus } from "@/lib/dashboard-types";
-import type { PaymentStatus } from "@/services/planStore";
+import type { PaymentStatus } from "@/lib/plans/plan-store";
 
 type MutableAd = DashboardAd & {
   created_at: string;

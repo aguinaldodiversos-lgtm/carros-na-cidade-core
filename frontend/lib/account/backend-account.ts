@@ -2,7 +2,7 @@ import type { DashboardPayload } from "@/lib/dashboard-types";
 import { normalizeDashboardPayload } from "@/lib/dashboard/normalize-dashboard-payload";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { getBoostOptions } from "@/services/adService";
-import type { SubscriptionPlan } from "@/services/planStore";
+import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import type { SessionData } from "@/services/sessionService";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";

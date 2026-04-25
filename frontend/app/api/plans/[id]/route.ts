@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPlanById, updatePlanById } from "@/services/planStore";
+import { getPlanById, updatePlanById } from "@/lib/plans/plan-store";
 
 export const dynamic = "force-dynamic";
 

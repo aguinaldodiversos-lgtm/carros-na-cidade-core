@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchPlans } from "@/lib/account/backend-account";
-import { getPlans, type PlanType } from "@/services/planStore";
+import { getPlans, type PlanType } from "@/lib/plans/plan-store";
 
 export const dynamic = "force-dynamic";
 

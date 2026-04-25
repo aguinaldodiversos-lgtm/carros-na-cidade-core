@@ -1,7 +1,7 @@
 import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
-import { getCityProfile } from "@/services/marketService";
+import { getCityProfile } from "@/lib/market/market-data";
 
 export type SellerDealer = {
   type: "dealer";

@@ -1,6 +1,6 @@
 import type { AccountType } from "@/lib/dashboard-types";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
-import { getUserById } from "@/services/planStore";
+import { getUserById } from "@/lib/plans/plan-store";
 
 export type AuthUser = {
   id: string;

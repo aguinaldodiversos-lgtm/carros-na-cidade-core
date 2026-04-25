@@ -2,7 +2,7 @@ import Link from "next/link";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
-import { getCityProfile, getStaticCitySlugs } from "@/services/marketService";
+import { getCityProfile, getStaticCitySlugs } from "@/lib/market/market-data";
 
 type RegionalEntryHubProps = {
   eyebrow: string;

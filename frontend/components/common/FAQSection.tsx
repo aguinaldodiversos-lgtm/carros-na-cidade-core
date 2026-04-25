@@ -1,4 +1,4 @@
-import type { FaqItem } from "@/services/marketService";
+import type { FaqItem } from "@/lib/market/market-data";
 
 type FAQSectionProps = {
   title: string;

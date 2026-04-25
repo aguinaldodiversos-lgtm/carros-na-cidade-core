@@ -1,4 +1,4 @@
-import type { MarketStat } from "@/services/marketService";
+import type { MarketStat } from "@/lib/market/market-data";
 
 type StatsSectionProps = {
   title: string;

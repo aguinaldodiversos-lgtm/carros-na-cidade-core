@@ -3,7 +3,7 @@ import PlanCard from "@/components/plans/PlanCard";
 import PlanComparison from "@/components/plans/PlanComparison";
 import PlanCTA from "@/components/plans/PlanCTA";
 import PlanHero from "@/components/plans/PlanHero";
-import { getPlansByType } from "@/services/planService";
+import { getPlansByType } from "@/lib/plans/plan-service";
 
 export const metadata: Metadata = {
   title: "Planos de assinatura para anunciar carros",
