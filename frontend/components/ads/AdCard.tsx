@@ -1,14 +1,43 @@
+// frontend/components/ads/AdCard.tsx
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { buildAdHref } from "@/lib/ads/build-ad-href";
-import {
-  LISTING_CARD_FALLBACK_IMAGE,
-  resolvePublicListingImageUrl,
-} from "@/lib/vehicle/detail-utils";
+import { useCallback, type ReactNode } from "react";
 
-type BaseAdData = {
+import { Badge } from "@/components/ui/Badge";
+import { VehicleImage } from "@/components/ui/VehicleImage";
+import { buildAdHref } from "@/lib/ads/build-ad-href";
+import { useFavorites } from "@/lib/favorites/FavoritesContext";
+import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+
+/**
+ * AdCard — componente OFICIAL e ÚNICO de card de anúncio.
+ *
+ * 8 variantes (DIAGNOSTICO_REDESIGN.md §10):
+ *   - compact     — sidebar/resultados pequenos, 4:3, mínimo
+ *   - featured    — hero/destaques, 16:9, com favorito
+ *   - grid        — listagem catálogo, 4:3, com favorito
+ *   - carousel    — home carrosséis, 4:3, com favorito
+ *   - horizontal  — similares no detalhe, layout lateral
+ *   - related     — após blog, 4:3, sem favorito
+ *   - dashboard   — painel "meus anúncios", com status/actions
+ *   - admin       — moderação, layout lateral com flags/actions
+ *
+ * Substitui as reimplementações paralelas:
+ *   - HomeVehicleCard → adapter chama AdCard variant="featured"|"carousel"
+ *   - CatalogVehicleCard → adapter chama AdCard variant="grid"
+ *   - sections/VehicleCard → eliminado (era órfão)
+ *
+ * Adapters legados mantidos:
+ *   - components/ads/CarCard.tsx
+ *   - components/common/VehicleCard.tsx
+ */
+
+// ---------------------------------------------------------------------------
+// Tipos
+// ---------------------------------------------------------------------------
+
+export type BaseAdData = {
   id?: string | number | null;
   slug?: string | null;
   title?: string | null;
@@ -41,21 +70,172 @@ type BaseAdData = {
   seller_type?: string | null;
 };
 
-type AdCardProps = {
+export type AdCardVariant =
+  | "compact"
+  | "featured"
+  | "grid"
+  | "carousel"
+  | "horizontal"
+  | "related"
+  | "dashboard"
+  | "admin";
+
+export type AdCardProps = {
+  /** Alias de `item` (compat retroativa). */
   ad?: BaseAdData;
   item?: BaseAdData;
+  variant?: AdCardVariant;
+  /** Apenas para imagem acima da dobra. Default: false. */
   priority?: boolean;
-  variant?: "default" | "home" | string;
+  /** Override de href. Default: rota canônica /veiculo/[slug]. */
+  href?: string;
+  /** Status (dashboard/admin): "ativo", "pausado", "rejeitado", etc. */
+  status?: string;
+  /** Flags de moderação (admin). */
+  flags?: ReadonlyArray<string>;
+  /** Slot de ações custom (dashboard/admin). Botões devem chamar
+   *  e.preventDefault()/stopPropagation() se não desejarem navegar. */
+  actions?: ReactNode;
+  className?: string;
 };
 
-function parseNumber(value?: string | number | null) {
+// ---------------------------------------------------------------------------
+// Configuração por variante
+// ---------------------------------------------------------------------------
+
+type VariantConfig = {
+  imgVariant: "card" | "gallery" | "thumb" | "hero";
+  imgWidth: number;
+  imgHeight: number;
+  aspectClass: string;
+  layout: "vertical" | "horizontal";
+  showFavorite: boolean;
+  showMileageBadge: boolean;
+  showLocation: boolean;
+  showYearLabel: boolean;
+  showStatus: boolean;
+  showAdminFlags: boolean;
+};
+
+const VARIANTS: Record<AdCardVariant, VariantConfig> = {
+  compact: {
+    imgVariant: "card",
+    imgWidth: 320,
+    imgHeight: 240,
+    aspectClass: "aspect-[4/3]",
+    layout: "vertical",
+    showFavorite: false,
+    showMileageBadge: true,
+    showLocation: true,
+    showYearLabel: true,
+    showStatus: false,
+    showAdminFlags: false,
+  },
+  featured: {
+    imgVariant: "hero",
+    imgWidth: 800,
+    imgHeight: 450,
+    aspectClass: "aspect-[16/9]",
+    layout: "vertical",
+    showFavorite: true,
+    showMileageBadge: true,
+    showLocation: true,
+    showYearLabel: true,
+    showStatus: false,
+    showAdminFlags: false,
+  },
+  grid: {
+    imgVariant: "card",
+    imgWidth: 400,
+    imgHeight: 300,
+    aspectClass: "aspect-[4/3]",
+    layout: "vertical",
+    showFavorite: true,
+    showMileageBadge: true,
+    showLocation: true,
+    showYearLabel: true,
+    showStatus: false,
+    showAdminFlags: false,
+  },
+  carousel: {
+    imgVariant: "card",
+    imgWidth: 400,
+    imgHeight: 300,
+    aspectClass: "aspect-[4/3]",
+    layout: "vertical",
+    showFavorite: true,
+    showMileageBadge: true,
+    showLocation: true,
+    showYearLabel: true,
+    showStatus: false,
+    showAdminFlags: false,
+  },
+  horizontal: {
+    imgVariant: "thumb",
+    imgWidth: 160,
+    imgHeight: 160,
+    aspectClass: "aspect-square",
+    layout: "horizontal",
+    showFavorite: false,
+    showMileageBadge: false,
+    showLocation: true,
+    showYearLabel: true,
+    showStatus: false,
+    showAdminFlags: false,
+  },
+  related: {
+    imgVariant: "card",
+    imgWidth: 320,
+    imgHeight: 240,
+    aspectClass: "aspect-[4/3]",
+    layout: "vertical",
+    showFavorite: false,
+    showMileageBadge: false,
+    showLocation: true,
+    showYearLabel: true,
+    showStatus: false,
+    showAdminFlags: false,
+  },
+  dashboard: {
+    imgVariant: "card",
+    imgWidth: 320,
+    imgHeight: 240,
+    aspectClass: "aspect-[4/3]",
+    layout: "vertical",
+    showFavorite: false,
+    showMileageBadge: true,
+    showLocation: false,
+    showYearLabel: true,
+    showStatus: true,
+    showAdminFlags: false,
+  },
+  admin: {
+    imgVariant: "thumb",
+    imgWidth: 120,
+    imgHeight: 90,
+    aspectClass: "aspect-[4/3]",
+    layout: "horizontal",
+    showFavorite: false,
+    showMileageBadge: false,
+    showLocation: false,
+    showYearLabel: true,
+    showStatus: true,
+    showAdminFlags: true,
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Helpers de formatação
+// ---------------------------------------------------------------------------
+
+function parseNumber(value?: string | number | null): number {
   if (typeof value === "number") return value;
   if (!value) return 0;
   const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatCurrency(value?: number | string | null) {
+function formatCurrency(value?: number | string | null): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -63,15 +243,13 @@ function formatCurrency(value?: number | string | null) {
   }).format(parseNumber(value));
 }
 
-function formatNumber(value?: number | string | null) {
+function formatNumber(value?: number | string | null): string {
   return new Intl.NumberFormat("pt-BR").format(parseNumber(value));
 }
 
 function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   if (item.catalogWeight) return item.catalogWeight;
-
   if (item.highlight_until) return 4;
-
   const plan = String(item.plan || "").toLowerCase();
   if (
     ["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) =>
@@ -80,7 +258,6 @@ function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   ) {
     return 3;
   }
-
   const isDealer = Boolean(
     item.dealership_id ||
       item.dealership_name ||
@@ -90,41 +267,45 @@ function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
       item.seller_type === "basic" ||
       item.seller_type === "premium"
   );
-
   if (isDealer) return 2;
   return 1;
 }
 
-function resolveBadge(item: BaseAdData) {
-  if (item.badge) return String(item.badge);
-  if (item.below_fipe) return "Abaixo da FIPE";
-
+function resolveBadge(item: BaseAdData): { label: string; variant: "success" | "warning" | "info" | "premium" } | null {
+  if (item.badge) {
+    const label = String(item.badge);
+    const lower = label.toLowerCase();
+    if (lower.includes("abaixo")) return { label, variant: "success" };
+    if (lower.includes("destaque")) return { label, variant: "warning" };
+    if (lower.includes("premium")) return { label, variant: "premium" };
+    return { label, variant: "info" };
+  }
+  if (item.below_fipe) return { label: "Abaixo da FIPE", variant: "success" };
   const weight = inferWeight(item);
-  if (weight === 4) return "Destaque";
-  if (weight === 3) return "Loja Premium";
-
-  return undefined;
+  if (weight === 4) return { label: "Destaque", variant: "warning" };
+  if (weight === 3) return { label: "Loja Premium", variant: "premium" };
+  return null;
 }
 
-function badgeClasses(label?: string) {
-  const normalized = String(label || "").toLowerCase();
-
-  if (normalized.includes("abaixo")) {
-    return "border-green-200 bg-green-50 text-green-700";
-  }
-
-  if (normalized.includes("destaque")) {
-    return "border-orange-200 bg-orange-50 text-orange-700";
-  }
-
-  if (normalized.includes("premium")) {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-700";
+function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
 }
 
-function normalizeAdData(source?: BaseAdData): {
+function resolveFavoriteKey(item: BaseAdData): string {
+  if (item.slug && String(item.slug).trim()) return String(item.slug).trim();
+  const fallback = [item.title, item.brand, item.model, item.year, item.id]
+    .filter(Boolean)
+    .join(" ");
+  return slugify(fallback || `anuncio-${item.id ?? "sem-id"}`);
+}
+
+type NormalizedAd = {
   id?: string | number | null;
   slug: string;
   title: string;
@@ -138,15 +319,15 @@ function normalizeAdData(source?: BaseAdData): {
   price: number;
   mileage: number;
   image: string;
-  badge?: string;
-} {
-  const item = source || {};
+  badge: { label: string; variant: "success" | "warning" | "info" | "premium" } | null;
+};
 
+function normalizeAdData(source?: BaseAdData): NormalizedAd {
+  const item = source || {};
   const title =
     item.title ||
     [item.brand, item.model, item.version].filter(Boolean).join(" ").trim() ||
     "Veículo";
-
   return {
     id: item.id,
     slug: String(item.slug || "").trim(),
@@ -174,117 +355,270 @@ function normalizeAdData(source?: BaseAdData): {
   };
 }
 
-function shouldDebugListingImages() {
-  if (typeof window === "undefined") return false;
+// ---------------------------------------------------------------------------
+// Sub-componentes internos
+// ---------------------------------------------------------------------------
 
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("debug_images") === "1";
-  } catch {
-    return false;
-  }
+type FavoriteButtonProps = {
+  itemKey: string;
+};
+
+function FavoriteButton({ itemKey }: FavoriteButtonProps) {
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const fav = isFavorite(itemKey);
+  const onClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFavorite(itemKey);
+    },
+    [itemKey, toggleFavorite]
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={fav}
+      aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+      className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-cnc-danger shadow-card ring-1 ring-black/5 transition hover:scale-105"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-4 w-4"
+        fill={fav ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
+        <path d="M12 20.5s-7.25-4.35-7.25-10.1a4.2 4.2 0 0 1 7.25-2.7 4.2 4.2 0 0 1 7.25 2.7c0 5.75-7.25 10.1-7.25 10.1Z" />
+      </svg>
+    </button>
+  );
 }
 
-export function AdCard({ ad, item }: AdCardProps) {
-  const source = ad || item || {};
-  const normalized = normalizeAdData(source);
-  const [brokenImage, setBrokenImage] = useState(false);
-  const imageSrc = brokenImage ? LISTING_CARD_FALLBACK_IMAGE : normalized.image;
-  const onImgError = useCallback(() => setBrokenImage(true), []);
+function MileageBadge({ value }: { value: number }) {
+  if (!value) return null;
+  return (
+    <span className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3" fill="currentColor">
+        <circle cx="12" cy="12" r="9" opacity="0.3" />
+        <path d="M12 12V6m0 6 4 2" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+      </svg>
+      {formatNumber(value)} km
+    </span>
+  );
+}
 
-  useEffect(() => {
-    if (!shouldDebugListingImages()) return;
+function StatusPill({ status }: { status: string }) {
+  const lower = status.toLowerCase();
+  let variant: "success" | "warning" | "danger" | "info" = "info";
+  if (lower.includes("ativo") || lower.includes("publicado")) variant = "success";
+  else if (lower.includes("pausa")) variant = "warning";
+  else if (lower.includes("rejeit") || lower.includes("bloqu") || lower.includes("expir"))
+    variant = "danger";
+  return <Badge variant={variant}>{status}</Badge>;
+}
 
-    const debugKey = `listing-image:${source.id ?? source.slug ?? normalized.title}`;
-    const globalWindow = window as Window & { __cncListingImageDebug?: Set<string> };
-    const seen = globalWindow.__cncListingImageDebug || new Set<string>();
+// ---------------------------------------------------------------------------
+// Layouts internos por variant
+// ---------------------------------------------------------------------------
 
-    if (seen.has(debugKey)) return;
+type LayoutProps = {
+  normalized: NormalizedAd;
+  config: VariantConfig;
+  href: string;
+  variant: AdCardVariant;
+  priority: boolean;
+  status?: string;
+  flags?: ReadonlyArray<string>;
+  actions?: ReactNode;
+  favKey: string;
+};
 
-    seen.add(debugKey);
-    globalWindow.__cncListingImageDebug = seen;
-
-    console.info("[listing-images]", {
-      id: source.id ?? null,
-      slug: source.slug ?? null,
-      image_url: source.image_url ?? null,
-      cover_image_url: source.cover_image_url ?? null,
-      cover_image: source.cover_image ?? null,
-      images: source.images ?? null,
-      photos: source.photos ?? null,
-      gallery: source.gallery ?? null,
-      storage_key: source.storage_key ?? null,
-      resolvedSrc: normalized.image,
-    });
-  }, [
-    normalized.image,
-    normalized.title,
-    source.cover_image,
-    source.cover_image_url,
-    source.gallery,
-    source.id,
-    source.image_url,
-    source.images,
-    source.photos,
-    source.slug,
-    source.storage_key,
-  ]);
-
-  const href = buildAdHref({
-    id: normalized.id ?? undefined,
-    slug: normalized.slug || undefined,
-    title: normalized.title,
-    brand: normalized.brand ?? undefined,
-    model: normalized.model ?? undefined,
-    version: normalized.version ?? undefined,
-    year: normalized.year ?? undefined,
-  });
-
+function VerticalLayout({
+  normalized,
+  config,
+  href,
+  variant,
+  priority,
+  status,
+  actions,
+  favKey,
+}: LayoutProps) {
   return (
     <Link
       href={href}
-      className="group block overflow-hidden rounded-[24px] border border-[#E5E9F2] bg-white shadow-[0_12px_30px_rgba(30,41,59,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(30,41,59,0.10)]"
+      className="group flex h-full flex-col overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium"
     >
-      <div className="aspect-[16/10] overflow-hidden bg-[#EDF2FB]">
-        <img
-          src={imageSrc}
-          alt={normalized.title || "Veículo"}
-          onError={onImgError}
+      <div className={`relative ${config.aspectClass} overflow-hidden bg-cnc-bg`}>
+        <VehicleImage
+          src={normalized.image}
+          alt={normalized.title}
+          width={config.imgWidth}
+          height={config.imgHeight}
+          variant={config.imgVariant}
+          priority={priority}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
         />
+        {config.showFavorite && <FavoriteButton itemKey={favKey} />}
+        {config.showMileageBadge && <MileageBadge value={normalized.mileage} />}
       </div>
 
-      <div className="space-y-2 p-4">
-        {normalized.badge ? (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClasses(
-              normalized.badge
-            )}`}
-          >
-            {normalized.badge}
-          </span>
-        ) : null}
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <div className="flex items-center gap-1.5">
+          {normalized.badge && (
+            <Badge variant={normalized.badge.variant} size="sm">
+              {normalized.badge.label}
+            </Badge>
+          )}
+          {config.showStatus && status && <StatusPill status={status} />}
+        </div>
 
-        <h3 className="line-clamp-2 min-h-[44px] text-[18px] font-semibold leading-6 text-[#1D2440]">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-base font-semibold leading-tight text-cnc-text-strong md:text-[17px]">
           {normalized.title}
         </h3>
 
-        <p className="text-sm text-[#6E748A]">
-          {normalized.city} - {normalized.state}
-        </p>
+        {config.showLocation && (
+          <p className="text-sm text-cnc-muted">
+            {normalized.city} - {normalized.state}
+          </p>
+        )}
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <strong className="text-[20px] font-extrabold text-[#1F66E5]">
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          <strong className="text-lg font-extrabold text-primary md:text-xl">
             {formatCurrency(normalized.price)}
           </strong>
-          <span className="text-xs font-medium text-[#6E748A]">{normalized.yearLabel}</span>
+          {config.showYearLabel && normalized.yearLabel && (
+            <span className="text-xs font-medium text-cnc-muted">
+              {normalized.yearLabel}
+            </span>
+          )}
         </div>
 
-        {!!normalized.mileage && (
-          <div className="text-xs text-[#6E748A]">{formatNumber(normalized.mileage)} km</div>
-        )}
+        {actions && <div className="pt-2">{actions}</div>}
       </div>
     </Link>
+  );
+}
+
+function HorizontalLayout({
+  normalized,
+  config,
+  href,
+  variant,
+  priority,
+  status,
+  flags,
+  actions,
+}: LayoutProps) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-stretch gap-3 overflow-hidden rounded-lg border border-cnc-line bg-cnc-surface p-2 shadow-card transition hover:shadow-premium"
+    >
+      <div
+        className={`relative ${config.aspectClass} shrink-0 overflow-hidden rounded-md bg-cnc-bg`}
+        style={{ width: `${config.imgWidth}px` }}
+      >
+        <VehicleImage
+          src={normalized.image}
+          alt={normalized.title}
+          width={config.imgWidth}
+          height={config.imgHeight}
+          variant={config.imgVariant}
+          priority={priority}
+          className="h-full w-full object-cover"
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {normalized.badge && (
+            <Badge variant={normalized.badge.variant} size="sm">
+              {normalized.badge.label}
+            </Badge>
+          )}
+          {config.showStatus && status && <StatusPill status={status} />}
+          {config.showAdminFlags &&
+            flags?.map((flag) => (
+              <Badge key={flag} variant="danger" size="sm">
+                {flag}
+              </Badge>
+            ))}
+        </div>
+
+        <h3 className="line-clamp-1 text-sm font-semibold text-cnc-text-strong md:text-base">
+          {normalized.title}
+        </h3>
+
+        {config.showYearLabel && normalized.yearLabel && (
+          <span className="text-xs text-cnc-muted">{normalized.yearLabel}</span>
+        )}
+
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <strong className="text-base font-bold text-primary">
+            {formatCurrency(normalized.price)}
+          </strong>
+          {actions && <div onClick={(e) => e.stopPropagation()}>{actions}</div>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Componente principal
+// ---------------------------------------------------------------------------
+
+export function AdCard({
+  ad,
+  item,
+  variant = "carousel",
+  priority = false,
+  href,
+  status,
+  flags,
+  actions,
+  className = "",
+}: AdCardProps) {
+  const source = ad || item || {};
+  const normalized = normalizeAdData(source);
+  const config = VARIANTS[variant];
+  const favKey = resolveFavoriteKey(source);
+
+  const computedHref =
+    href ??
+    buildAdHref({
+      id: normalized.id ?? undefined,
+      slug: normalized.slug || undefined,
+      title: normalized.title,
+      brand: normalized.brand ?? undefined,
+      model: normalized.model ?? undefined,
+      version: normalized.version ?? undefined,
+      year: normalized.year ?? undefined,
+    });
+
+  const layoutProps: LayoutProps = {
+    normalized,
+    config,
+    href: computedHref,
+    variant,
+    priority,
+    status,
+    flags,
+    actions,
+    favKey,
+  };
+
+  return (
+    <div className={className} data-variant={variant}>
+      {config.layout === "horizontal" ? (
+        <HorizontalLayout {...layoutProps} />
+      ) : (
+        <VerticalLayout {...layoutProps} />
+      )}
+    </div>
   );
 }
 

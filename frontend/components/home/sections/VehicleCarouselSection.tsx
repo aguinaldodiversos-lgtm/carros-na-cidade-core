@@ -4,7 +4,8 @@ import { useCallback, useRef, type ReactNode } from "react";
 
 import { IconChevronLeft, IconChevronRight } from "@/components/home/icons";
 import { SectionHeader } from "./SectionHeader";
-import { VehicleCard, type VehicleCardItem } from "./VehicleCard";
+import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
+import type { VehicleCardItem } from "./types";
 
 interface VehicleCarouselSectionProps {
   icon: ReactNode;
@@ -66,7 +67,7 @@ export function VehicleCarouselSection({
                 key={`${variant}-${item.id}-${idx}`}
                 className="w-[230px] shrink-0 snap-start sm:w-[270px] md:w-[calc((100%-3rem)/4)] md:min-w-0"
               >
-                <VehicleCard item={item} variant={variant} />
+                <HomeVehicleCard item={item} variant={variant} />
               </div>
             ))}
           </div>

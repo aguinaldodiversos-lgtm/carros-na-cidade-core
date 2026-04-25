@@ -1,12 +1,29 @@
 import type { AdItem } from "@/lib/search/ads-search";
-import AdCard from "./AdCard";
+import AdCard, { type AdCardVariant } from "./AdCard";
+
+/**
+ * `variant` legado:
+ *   - "default" → AdCard variant="grid"
+ *   - "home"    → AdCard variant="carousel"
+ *
+ * Mapeamento mantido para não quebrar consumidores que ainda passam
+ * o nome antigo. Consumidores novos devem passar a variante de AdCard
+ * direta via prop `cardVariant`.
+ */
+type AdGridLegacyVariant = "default" | "home";
 
 interface AdGridProps {
   items: AdItem[];
   priorityFirstRow?: boolean;
   priorityCount?: number;
-  variant?: "default" | "home";
+  variant?: AdGridLegacyVariant;
+  /** Override direto da variante do AdCard (sobrepõe `variant`). */
+  cardVariant?: AdCardVariant;
   className?: string;
+}
+
+function mapLegacyVariant(legacy: AdGridLegacyVariant): AdCardVariant {
+  return legacy === "home" ? "carousel" : "grid";
 }
 
 export function AdGrid({
@@ -14,6 +31,7 @@ export function AdGrid({
   priorityFirstRow = false,
   priorityCount = 3,
   variant = "default",
+  cardVariant,
   className = "",
 }: AdGridProps) {
   if (!items.length) {
@@ -27,6 +45,8 @@ export function AdGrid({
       </div>
     );
   }
+
+  const resolvedCardVariant = cardVariant ?? mapLegacyVariant(variant);
 
   return (
     <div
@@ -44,7 +64,7 @@ export function AdGrid({
           key={`${item.id}-${item.slug || index}`}
           item={item}
           priority={priorityFirstRow && index < priorityCount}
-          variant={variant}
+          variant={resolvedCardVariant}
         />
       ))}
     </div>

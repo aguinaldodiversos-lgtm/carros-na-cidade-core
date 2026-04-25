@@ -560,6 +560,75 @@ Documenta quando usar cada um quando há ambiguidade.
 - [x] Tailwind 100%, zero CSS inline
 - [x] Documentação atualizada com inventário e interfaces resumidas
 
+### 9.3. `<VehicleImage>` (PR E — entregue)
+
+Componente oficial e único de imagem de veículo/anúncio. Detalhes completos
+em [docs/IMAGES.md](./IMAGES.md). Resumo:
+
+- [x] `frontend/components/ui/VehicleImage.tsx` (Client) + `VehicleImagePlaceholder.tsx` (Server)
+- [x] 4 variants: `card`, `gallery`, `thumb`, `hero` (sizes default por variant)
+- [x] Compatibilidade total: R2, `/api/vehicle-images`, `/uploads`, externa, `data:`, SVG
+- [x] Fallback com zero CLS (placeholder mantém width/height inline)
+- [x] Reuso de `shouldSkipNextImageOptimizer` e `LISTING_CARD_FALLBACK_IMAGE` existentes
+- [x] 17 testes unit (IMG-1, IMG-3, IMG-4, IMG-10, IMG-11)
+- [x] 2 testes E2E (IMG-5, IMG-9 — skip-on-empty até PR G)
+- [x] Guardrail CI `lint:images` (modo warn — strict após PR F+)
+
+### 9.4. `<AdCard>` (PR F — entregue)
+
+Componente OFICIAL e ÚNICO de card de anúncio. 8 variantes via prop `variant`.
+
+- [x] `frontend/components/ads/AdCard.tsx` refatorado com 8 variantes:
+  - `compact` (4:3, mínimo, sidebar)
+  - `featured` (16:9, hero/destaques, com favorito)
+  - `grid` (4:3, listagem catálogo, com favorito)
+  - `carousel` (4:3, home/scroll horizontal, com favorito) — **default**
+  - `horizontal` (1:1 thumb lateral, similares no detalhe)
+  - `related` (4:3, após blog, sem favorito)
+  - `dashboard` (4:3, painel "meus anúncios", com status/actions)
+  - `admin` (4:3 thumb lateral, moderação, com flags/actions)
+- [x] Integra `<VehicleImage>` em todas as variantes (sem `<img>` cru)
+- [x] Usa tokens do design system (`primary`, `cnc-line`, `cnc-text-strong` etc.) em vez de hex hardcoded
+- [x] Usa `<Badge>` do design system para selo "Abaixo da FIPE"/"Destaque"/"Loja Premium"
+- [x] Layouts internos: `VerticalLayout` (default) e `HorizontalLayout` (variants `horizontal` e `admin`)
+- [x] Sub-componentes internos privados: `FavoriteButton`, `MileageBadge`, `StatusPill`
+- [x] **32 testes unit** cobrindo:
+  - Renderização das 8 variantes
+  - showFavorite por variant (3 com, 5 sem)
+  - showLocation por variant
+  - Status pill (dashboard/admin)
+  - Flags admin
+  - Uso de `<VehicleImage>` (sem `<img>` cru)
+  - Badge "Abaixo da FIPE" condicional
+  - Preço formatado em BRL
+  - Compat retroativa: prop `ad` (alias)
+  - `href` override
+  - Resiliência sem dados
+  - Default `variant="carousel"`
+
+### 9.5. Reorganização de cards (PR F)
+
+Após o PR F, a hierarquia de cards é:
+
+```
+AdCard (componente único, 8 variantes)
+├── ads/CarCard (adapter legado — formato antigo CarData) ✓ mantido
+├── common/VehicleCard (adapter legado — formato ListingCar) ✓ mantido
+├── home/HomeVehicleCard (adapter — VehicleItem → variant featured/carousel) ✓ refatorado
+└── buy/CatalogVehicleCard (adapter — CatalogItem → variant grid/featured) ✓ refatorado
+```
+
+**Removidos** (órfãos confirmados):
+- `home/sections/VehicleCard.tsx` — substituído pelo AdCard via HomeVehicleCard
+- `home/sections/VehicleFavoriteButton.tsx` — usado apenas pelo VehicleCard removido
+
+**Tipo movido**:
+- `VehicleCardItem` (era export de `sections/VehicleCard.tsx`) → `home/sections/types.ts`
+
+**Pendências** (PRs futuros):
+- `buy/CatalogVehicleCardImage.tsx` — pode ser deletado após confirmar zero uso fora do CatalogVehicleCard refatorado (que agora usa `<VehicleImage>` indiretamente via AdCard)
+- `buy/VehicleBadge.tsx` — funcionalidade absorvida pelo `<Badge>` do design system; deletar em PR de cleanup quando confirmar zero uso
+
 ---
 
-**Fim da v2 do design system. Próximo: PR E (`<VehicleImage>` com bateria de 12 testes).**
+**Fim da v3 do design system. Próximo: PR G — Home redesenhada usando AdCard + VehicleImage + primitivos.**

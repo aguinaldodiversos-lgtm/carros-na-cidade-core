@@ -1,6 +1,6 @@
 import { IconPriceTag, IconStar } from "@/components/home/icons";
 import { VehicleCarouselSection } from "@/components/home/sections/VehicleCarouselSection";
-import type { VehicleCardItem } from "@/components/home/sections/VehicleCard";
+import type { VehicleCardItem } from "@/components/home/sections/types";
 import { fetchHomeCarousels } from "@/lib/home/public-home";
 
 interface HomeCarouselsProps {
