@@ -2,12 +2,13 @@
 
 | Campo | Valor |
 |---|---|
-| **Versão** | 1 (skeleton) |
+| **Versão** | 2 (PR D — primitivos implementados, aditivo) |
 | **Data** | 2026-04-24 |
 | **Branch** | `claude/sad-elbakyan-8155e1` |
-| **Status** | 📜 PR A — Skeleton aprovado como contrato. Detalhamento e implementação no PR D. |
+| **Status** | ✅ PR D — 11 primitivos disponíveis em `components/ui/`. **Nenhuma página atualizada ainda** (PRs E, F, G em diante). |
 | **Referência** | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §9 |
 | **Imagens de referência** | `frontend/public/images/` — pagina Comprar Estadual.png, pagina Comprar na cidade.png, banner-home.png, blog.png, pagina-simulador-de-financiamento.png |
+| **Tokens alterados em PR D** | **Nenhum** — `tailwind.config.ts` e `globals.css` não foram tocados. Os primitivos usam apenas tokens existentes (`primary`, `cnc-*`). Cores propostas em §1.2 entram quando forem efetivamente usadas (PR G). |
 
 ---
 
@@ -334,9 +335,129 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §11](./DIAGNOSTICO_REDESIGN.md#11-regr
 
 ---
 
-## 7. O que NÃO está coberto neste skeleton (vai para PR D)
+## 7. PR D — Primitivos implementados
 
-- Implementação real dos primitivos em `frontend/components/ui/`
+Todos os 11 primitivos esperados foram criados em `frontend/components/ui/`.
+**Nenhuma página foi atualizada** — primitivos ficam disponíveis para PRs E, F, G+ usarem.
+
+### 7.1. Inventário de arquivos
+
+| Arquivo | Server/Client | Linhas | Variantes |
+|---|---|---:|---|
+| `Button.tsx` | Client | ~155 | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp`, `link` × `sm`, `md`, `lg` |
+| `Input.tsx` | Client | ~110 | `default`, `search`, `error` |
+| `Select.tsx` | Client | ~110 | `default`, `error` (native, mobile-friendly) |
+| `Chip.tsx` | Client | ~95 | `filter` (toggle), `removable`, `static` |
+| `Badge.tsx` | Server | ~50 | `info`, `success`, `danger`, `warning`, `premium`, `neutral` × `sm`, `md` |
+| `Card.tsx` | Server | ~65 | `default`, `elevated`, `flat`, `interactive` × padding `none`, `sm`, `md`, `lg` |
+| `SectionHeader.tsx` | Server | ~70 | `default`, `with-icon`, `compact` |
+| `BottomNav.tsx` | Client | ~115 | `default`, `with-fab` |
+| `SearchBar.tsx` | Client | ~115 | `default`, `sticky`, `compact` |
+| `FilterChip.tsx` | Client | ~95 | `active`, `removable` |
+| `ActionShortcut.tsx` | Server | ~70 | `default`, `highlight`, `muted` |
+
+**Total**: 11 arquivos, ~1.050 linhas.
+**Server Components**: 4 (`Badge`, `Card`, `SectionHeader`, `ActionShortcut`).
+**Client Components**: 7 (todos com interação real ou estado de pathname).
+
+### 7.2. Interfaces resumidas
+
+```ts
+// Button.tsx
+<Button variant="primary" size="md" onClick={...}>Texto</Button>
+<Button variant="whatsapp" href="https://wa.me/...">Chamar</Button>
+<Button loading iconLeft={<Icon />}>Salvando...</Button>
+
+// Input.tsx
+<Input label="Email" type="email" hint="Não será compartilhado" />
+<Input variant="search" placeholder="Buscar carros" />
+<Input error="Campo obrigatório" />
+
+// Select.tsx
+<Select label="Estado" options={[{value:"sp",label:"SP"}]} placeholder="Selecione" />
+
+// Chip.tsx
+<Chip variant="filter" selected={true} onClick={...}>SUV</Chip>
+<Chip variant="removable" onRemove={...}>Honda</Chip>
+<Chip variant="static">Em Atibaia</Chip>
+
+// Badge.tsx
+<Badge variant="success">Abaixo da FIPE</Badge>
+<Badge variant="premium">Destaque</Badge>
+
+// Card.tsx
+<Card variant="elevated" padding="lg" as="article">...</Card>
+
+// SectionHeader.tsx
+<SectionHeader
+  title="Destaques em Atibaia"
+  variant="with-icon"
+  icon={<StarIcon />}
+  seeAllHref="/anuncios?city=atibaia-sp"
+/>
+
+// BottomNav.tsx (apenas em mobile via classe md:hidden)
+<BottomNav
+  variant="with-fab"
+  items={[
+    { id:"home", label:"Início", href:"/", icon:<HomeIcon /> },
+    { id:"buscar", label:"Buscar", href:"/anuncios", icon:<SearchIcon /> },
+    { id:"anunciar", label:"Anunciar", href:"/anunciar/novo", icon:<PlusIcon />, primary:true },
+    { id:"favoritos", label:"Favoritos", href:"/favoritos", icon:<HeartIcon />, badge: 2 },
+    { id:"conta", label:"Conta", href:"/dashboard", icon:<UserIcon /> },
+  ]}
+/>
+
+// SearchBar.tsx
+<SearchBar
+  variant="sticky"
+  placeholder="Buscar por marca, modelo ou cidade"
+  onSubmit={(value) => router.push(`/anuncios?q=${value}`)}
+  filterButton={<Button variant="primary" size="md">Filtros</Button>}
+/>
+
+// FilterChip.tsx
+<FilterChip variant="removable" label="Preço" value="Até R$ 50 mil" onRemove={...} />
+<FilterChip variant="active" label="SUV" />
+
+// ActionShortcut.tsx
+<ActionShortcut
+  href="/anuncios?type=suv"
+  label="SUVs"
+  icon={<SuvIcon />}
+  variant="highlight"
+  hint="42 ofertas"
+/>
+```
+
+### 7.3. Convenções aplicadas
+
+- **Client/Server**: server-first. `"use client"` apenas em componentes com hook (BottomNav usa `usePathname`), evento (Button onClick), ou estado controlado (Input value).
+- **Tailwind 100%**: zero CSS inline, zero CSS modules. Todas as variantes via classes condicionais.
+- **Tipos estritos**: cada variant é union literal explícita; nada de `string` solto.
+- **Sem ícones embutidos**: cada componente que precisa de ícone (Search no Input, Close no Chip, Chevron no Select) traz a versão mínima inline. Para ícones de domínio (carro, casa, coração) o consumidor passa via prop `icon`/`iconLeft`/`iconRight`.
+- **forwardRef** onde fizer sentido (Button, Input, Select, Chip, SearchBar, FilterChip).
+- **Acessibilidade**: `aria-pressed` em chips, `aria-current="page"` em BottomNav, `aria-label` em ações sem texto, `aria-invalid` em inputs com erro, `aria-describedby` linkando hint/error.
+- **Mobile-first**: tamanhos default são mobile (Input/Button 48px). `md:` reduz no desktop.
+
+### 7.4. O que NÃO foi feito neste PR (intencional)
+
+- ❌ Substituição de componentes existentes (AdCard, PublicHeader, etc.)
+- ❌ Aplicação em qualquer página
+- ❌ `<VehicleImage>` (vai no PR E com bateria de 12 testes)
+- ❌ `<AdCard>` redesenhado (vai no PR F)
+- ❌ `<ArticleCard>` (vai no PR L com blog)
+- ❌ `<TrustStrip>` (vai no PR I com detalhe)
+- ❌ `<EmptyState>`, `<Spinner>`, `<Skeleton>` (vão conforme demanda real)
+- ❌ Adição dos 4 tokens propostos em §1.2 (orange/purple/success-bg/danger-bg) — entram quando forem realmente usados
+- ❌ Storybook ou doc visual — primitivos ficam documentados aqui via interfaces resumidas
+- ❌ Dark mode
+
+---
+
+## 8. O que ainda está pendente para versões futuras
+
+- Implementação visual real em páginas (PRs E, F, G+)
 - Storybook ou doc visual com todos os estados (hover, focus, disabled, error)
 - Migração concreta de `globals.css` para reduzir custom CSS
 - Decisão final sobre alturas (header 56/72 vs `--header-height: 78px`)
@@ -345,7 +466,9 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §11](./DIAGNOSTICO_REDESIGN.md#11-regr
 
 ---
 
-## 8. Critérios de aceitação do skeleton (PR A)
+## 9. Critérios de aceitação
+
+### 9.1. Skeleton (PR A — entregue)
 
 - [x] Tokens existentes mapeados e documentados
 - [x] Tokens faltantes identificados (4 cores propostas)
@@ -357,6 +480,20 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §11](./DIAGNOSTICO_REDESIGN.md#11-regr
 - [x] Mockups de referência mapeados a PRs
 - [x] Imagens duplicadas em `public/images/` flagadas para PR C
 
+### 9.2. Primitivos (PR D — entregue)
+
+- [x] 11 primitivos criados em `frontend/components/ui/`
+- [x] Sem alteração em `tailwind.config.ts` (zero impacto em tokens)
+- [x] Sem alteração em `globals.css`
+- [x] Server-first: 4 dos 11 são Server Components (Badge, Card, SectionHeader, ActionShortcut)
+- [x] Sem substituição de componentes existentes (AdCard, PublicHeader etc. intactos)
+- [x] Tipos estritos com union literals para variants
+- [x] `forwardRef` em primitivos formulario/clicáveis
+- [x] Acessibilidade: aria-pressed, aria-current, aria-invalid, aria-describedby
+- [x] Mobile-first: alturas default mobile (48px input/button)
+- [x] Tailwind 100%, zero CSS inline
+- [x] Documentação atualizada com inventário e interfaces resumidas
+
 ---
 
-**Fim do skeleton de design system.**
+**Fim da v2 do design system. Próximo: PR E (`<VehicleImage>` com bateria de 12 testes).**
