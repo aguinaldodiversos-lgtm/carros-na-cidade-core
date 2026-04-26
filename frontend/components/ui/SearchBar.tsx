@@ -57,74 +57,73 @@ const SIZES: Record<SearchBarVariant, { wrap: string; input: string }> = {
   compact: { wrap: "h-10", input: "text-sm" },
 };
 
-export const SearchBar = forwardRef<HTMLFormElement, SearchBarProps>(function SearchBar(
-  props,
-  ref
-) {
-  const {
-    variant = "default",
-    placeholder = "Buscar por marca, modelo ou cidade",
-    defaultValue,
-    value,
-    onChange,
-    onSubmit,
-    name = "q",
-    filterButton,
-    ariaLabel = "Buscar",
-    className = "",
-    ...rest
-  } = props;
+export const SearchBar = forwardRef<HTMLFormElement, SearchBarProps>(
+  function SearchBar(props, ref) {
+    const {
+      variant = "default",
+      placeholder = "Buscar por marca, modelo ou cidade",
+      defaultValue,
+      value,
+      onChange,
+      onSubmit,
+      name = "q",
+      filterButton,
+      ariaLabel = "Buscar",
+      className = "",
+      ...rest
+    } = props;
 
-  const reactId = useId();
-  const id = `searchbar-${reactId}`;
-  const sizes = SIZES[variant];
+    const reactId = useId();
+    const id = `searchbar-${reactId}`;
+    const sizes = SIZES[variant];
 
-  const containerClass =
-    variant === "sticky"
-      ? "sticky top-0 z-30 -mx-4 bg-cnc-bg/90 px-4 py-2 backdrop-blur md:mx-0 md:px-0"
-      : "";
+    const containerClass =
+      variant === "sticky"
+        ? "sticky top-0 z-30 -mx-4 bg-cnc-bg/90 px-4 py-2 backdrop-blur md:mx-0 md:px-0"
+        : "";
 
-  return (
-    <form
-      ref={ref}
-      role="search"
-      onSubmit={(event) => {
-        if (onSubmit) {
-          event.preventDefault();
-          const formData = new FormData(event.currentTarget);
-          const v = String(formData.get(name) ?? value ?? "");
-          onSubmit(v);
-        }
-      }}
-      className={`${containerClass} ${className}`.trim()}
-      {...rest}
-    >
-      <div className="flex items-stretch gap-2">
-        <label htmlFor={id} className="sr-only">
-          {ariaLabel}
-        </label>
-        <div
-          className={`flex flex-1 items-center gap-2 rounded-md border border-cnc-line bg-white px-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 ${sizes.wrap}`}
-        >
-          <span aria-hidden="true" className="flex shrink-0 items-center">
-            <SearchIcon />
-          </span>
-          <input
-            id={id}
-            type="search"
-            name={name}
-            placeholder={placeholder}
-            defaultValue={defaultValue}
-            value={value}
-            onChange={(event) => onChange?.(event.target.value)}
-            autoComplete="off"
-            inputMode="search"
-            className={`flex-1 bg-transparent text-cnc-text outline-none placeholder:text-cnc-muted-soft ${sizes.input}`}
-            aria-label={ariaLabel}
-          />
+    return (
+      <form
+        ref={ref}
+        role="search"
+        onSubmit={(event) => {
+          if (onSubmit) {
+            event.preventDefault();
+            const formData = new FormData(event.currentTarget);
+            const v = String(formData.get(name) ?? value ?? "");
+            onSubmit(v);
+          }
+        }}
+        className={`${containerClass} ${className}`.trim()}
+        {...rest}
+      >
+        <div className="flex items-stretch gap-2">
+          <label htmlFor={id} className="sr-only">
+            {ariaLabel}
+          </label>
+          <div
+            className={`flex flex-1 items-center gap-2 rounded-md border border-cnc-line bg-white px-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 ${sizes.wrap}`}
+          >
+            <span aria-hidden="true" className="flex shrink-0 items-center">
+              <SearchIcon />
+            </span>
+            <input
+              id={id}
+              type="search"
+              name={name}
+              placeholder={placeholder}
+              defaultValue={defaultValue}
+              value={value}
+              onChange={(event) => onChange?.(event.target.value)}
+              autoComplete="off"
+              inputMode="search"
+              className={`flex-1 bg-transparent text-cnc-text outline-none placeholder:text-cnc-muted-soft ${sizes.input}`}
+              aria-label={ariaLabel}
+            />
+          </div>
+          {filterButton}
         </div>
-        {filterButton}
-      </div>
-    </form>
-  );
-});
+      </form>
+    );
+  }
+);

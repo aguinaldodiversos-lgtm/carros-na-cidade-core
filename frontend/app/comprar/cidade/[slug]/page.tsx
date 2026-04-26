@@ -149,17 +149,19 @@ export async function generateMetadata({
   const brand = filters.brand?.trim();
   const model = filters.model?.trim();
 
-  const title = brand && model
-    ? `${brand} ${model} em ${ctx.name} - ${ctx.state} | Comprar`
-    : brand
-      ? `${brand} em ${ctx.name} - ${ctx.state} | Comprar`
-      : `Carros usados em ${ctx.name} - ${ctx.state} | Comprar`;
+  const title =
+    brand && model
+      ? `${brand} ${model} em ${ctx.name} - ${ctx.state} | Comprar`
+      : brand
+        ? `${brand} em ${ctx.name} - ${ctx.state} | Comprar`
+        : `Carros usados em ${ctx.name} - ${ctx.state} | Comprar`;
 
-  const description = brand && model
-    ? `${brand} ${model} em ${ctx.name} (${ctx.state}): anúncios locais, filtros inteligentes e oportunidades atualizadas no Carros na Cidade.`
-    : brand
-      ? `Carros ${brand} em ${ctx.name} (${ctx.state}): catálogo focado na sua cidade com ofertas reais e contexto local — Carros na Cidade.`
-      : `Encontre carros usados à venda em ${ctx.name}, ${stateName}. Anúncios locais com filtros, preços e contexto da sua cidade no Carros na Cidade.`;
+  const description =
+    brand && model
+      ? `${brand} ${model} em ${ctx.name} (${ctx.state}): anúncios locais, filtros inteligentes e oportunidades atualizadas no Carros na Cidade.`
+      : brand
+        ? `Carros ${brand} em ${ctx.name} (${ctx.state}): catálogo focado na sua cidade com ofertas reais e contexto local — Carros na Cidade.`
+        : `Encontre carros usados à venda em ${ctx.name}, ${stateName}. Anúncios locais com filtros, preços e contexto da sua cidade no Carros na Cidade.`;
 
   const canonicalPath = buildCityPath(slug, filters);
 

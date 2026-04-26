@@ -79,9 +79,7 @@ export default async function BlogCityPage({ params }: PageProps) {
       headline: post.title,
       url: `${siteUrl}/blog/${params.cidade}/${post.slug}`,
       datePublished: post.publishedAt,
-      image: post.coverImage?.startsWith("http")
-        ? post.coverImage
-        : `${siteUrl}${post.coverImage}`,
+      image: post.coverImage?.startsWith("http") ? post.coverImage : `${siteUrl}${post.coverImage}`,
       articleSection: post.category,
     })),
   };

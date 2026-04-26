@@ -248,12 +248,7 @@ describe("VehicleImage", () => {
   // ---------------------------------------------------------------------------
   it("URL /api/vehicle-images?key=... renderiza via next/image (vai pelo otimizador)", () => {
     const { container } = render(
-      <VehicleImage
-        src="/api/vehicle-images?key=ads/abc.jpg"
-        alt="x"
-        width={400}
-        height={300}
-      />
+      <VehicleImage src="/api/vehicle-images?key=ads/abc.jpg" alt="x" width={400} height={300} />
     );
     expect(container.querySelector("img")).toBeTruthy();
   });
@@ -267,12 +262,7 @@ describe("VehicleImage", () => {
 
   it("URL .svg passa por skipOptimizer (unoptimized)", () => {
     const { container } = render(
-      <VehicleImage
-        src="https://example.com/icon.svg"
-        alt="x"
-        width={100}
-        height={100}
-      />
+      <VehicleImage src="https://example.com/icon.svg" alt="x" width={100} height={100} />
     );
     const img = container.querySelector("img");
     expect(img).toBeTruthy();
@@ -283,9 +273,7 @@ describe("VehicleImage", () => {
   it("data: URI passa por skipOptimizer", () => {
     const dataUri =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
-    const { container } = render(
-      <VehicleImage src={dataUri} alt="x" width={100} height={100} />
-    );
+    const { container } = render(<VehicleImage src={dataUri} alt="x" width={100} height={100} />);
     const img = container.querySelector("img");
     expect(img?.getAttribute("src")).toBe(dataUri);
   });

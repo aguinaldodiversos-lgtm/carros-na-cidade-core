@@ -49,13 +49,17 @@ export function BlogPostPageClient({
                   Home
                 </Link>
               </li>
-              <li aria-hidden className="text-cnc-line">›</li>
+              <li aria-hidden className="text-cnc-line">
+                ›
+              </li>
               <li>
                 <Link href={blogHref} className="transition hover:text-primary">
                   Blog
                 </Link>
               </li>
-              <li aria-hidden className="text-cnc-line">›</li>
+              <li aria-hidden className="text-cnc-line">
+                ›
+              </li>
               <li className="font-semibold text-cnc-text-strong">{post.category || "Artigo"}</li>
             </ol>
           </nav>

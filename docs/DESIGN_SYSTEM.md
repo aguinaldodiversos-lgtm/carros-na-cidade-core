@@ -1,13 +1,13 @@
 # DESIGN_SYSTEM — Carros na Cidade
 
-| Campo | Valor |
-|---|---|
-| **Versão** | 2 (PR D — primitivos implementados, aditivo) |
-| **Data** | 2026-04-24 |
-| **Branch** | `claude/sad-elbakyan-8155e1` |
-| **Status** | ✅ PR D — 11 primitivos disponíveis em `components/ui/`. **Nenhuma página atualizada ainda** (PRs E, F, G em diante). |
-| **Referência** | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §9 |
-| **Imagens de referência** | `frontend/public/images/` — pagina Comprar Estadual.png, pagina Comprar na cidade.png, banner-home.png, blog.png, pagina-simulador-de-financiamento.png |
+| Campo                        | Valor                                                                                                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Versão**                   | 2 (PR D — primitivos implementados, aditivo)                                                                                                                                                                   |
+| **Data**                     | 2026-04-24                                                                                                                                                                                                     |
+| **Branch**                   | `claude/sad-elbakyan-8155e1`                                                                                                                                                                                   |
+| **Status**                   | ✅ PR D — 11 primitivos disponíveis em `components/ui/`. **Nenhuma página atualizada ainda** (PRs E, F, G em diante).                                                                                          |
+| **Referência**               | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §9                                                                                                                                                        |
+| **Imagens de referência**    | `frontend/public/images/` — pagina Comprar Estadual.png, pagina Comprar na cidade.png, banner-home.png, blog.png, pagina-simulador-de-financiamento.png                                                        |
 | **Tokens alterados em PR D** | **Nenhum** — `tailwind.config.ts` e `globals.css` não foram tocados. Os primitivos usam apenas tokens existentes (`primary`, `cnc-*`). Cores propostas em §1.2 entram quando forem efetivamente usadas (PR G). |
 
 ---
@@ -28,58 +28,60 @@
 
 Tokens já presentes em `frontend/tailwind.config.ts` + `frontend/app/globals.css`. **Nesta v1, mantemos os tokens existentes**. PR D pode propor reorganização.
 
-| Token Tailwind | CSS var | Hex | Uso |
-|---|---|---|---|
-| `primary` | `--cnc-primary` | `#0e62d8` | CTAs, links, ativos |
-| `primary-strong` | `--cnc-primary-strong` | `#0c4fb0` | Hover de CTA |
-| `primary-soft` | `--cnc-primary-soft` | `#eaf2ff` | Backgrounds suaves de destaque |
-| `cnc-bg` | `--cnc-bg` | `#f2f3f7` | Fundo geral da página |
-| `cnc-surface` | `--cnc-surface` | `#ffffff` | Fundo de card / surface |
-| `cnc-line` | `--cnc-line` | `#dde2ec` | Bordas padrão |
-| `cnc-line-strong` | `--cnc-line-strong` | `#cfd6e4` | Bordas de input em foco |
-| `cnc-text` | `--cnc-text` | `#161f34` | Texto principal |
-| `cnc-text-strong` | `--cnc-text-strong` | `#0f172a` | Títulos h1/h2 |
-| `cnc-muted` | `--cnc-muted` | `#5d667d` | Labels e meta |
-| `cnc-muted-soft` | `--cnc-muted-soft` | `#7c879f` | Hints e secundário |
-| `cnc-success` | `--cnc-success` | `#0f9f6e` | "Abaixo da FIPE", verificado, **WhatsApp** |
-| `cnc-danger` | `--cnc-danger` | `#d14343` | Erros, urgência, "Imperdível" |
-| `cnc-warning` | `--cnc-warning` | `#d18a12` | Alertas, atenção |
-| `cnc-footer-a` | `--cnc-footer-a` | `#152954` | Footer gradiente topo |
-| `cnc-footer-b` | `--cnc-footer-b` | `#0e1b3b` | Footer gradiente fundo |
+| Token Tailwind    | CSS var                | Hex       | Uso                                        |
+| ----------------- | ---------------------- | --------- | ------------------------------------------ |
+| `primary`         | `--cnc-primary`        | `#0e62d8` | CTAs, links, ativos                        |
+| `primary-strong`  | `--cnc-primary-strong` | `#0c4fb0` | Hover de CTA                               |
+| `primary-soft`    | `--cnc-primary-soft`   | `#eaf2ff` | Backgrounds suaves de destaque             |
+| `cnc-bg`          | `--cnc-bg`             | `#f2f3f7` | Fundo geral da página                      |
+| `cnc-surface`     | `--cnc-surface`        | `#ffffff` | Fundo de card / surface                    |
+| `cnc-line`        | `--cnc-line`           | `#dde2ec` | Bordas padrão                              |
+| `cnc-line-strong` | `--cnc-line-strong`    | `#cfd6e4` | Bordas de input em foco                    |
+| `cnc-text`        | `--cnc-text`           | `#161f34` | Texto principal                            |
+| `cnc-text-strong` | `--cnc-text-strong`    | `#0f172a` | Títulos h1/h2                              |
+| `cnc-muted`       | `--cnc-muted`          | `#5d667d` | Labels e meta                              |
+| `cnc-muted-soft`  | `--cnc-muted-soft`     | `#7c879f` | Hints e secundário                         |
+| `cnc-success`     | `--cnc-success`        | `#0f9f6e` | "Abaixo da FIPE", verificado, **WhatsApp** |
+| `cnc-danger`      | `--cnc-danger`         | `#d14343` | Erros, urgência, "Imperdível"              |
+| `cnc-warning`     | `--cnc-warning`        | `#d18a12` | Alertas, atenção                           |
+| `cnc-footer-a`    | `--cnc-footer-a`       | `#152954` | Footer gradiente topo                      |
+| `cnc-footer-b`    | `--cnc-footer-b`       | `#0e1b3b` | Footer gradiente fundo                     |
 
 ### 1.2. Cores faltantes (a criar no PR D)
 
 Análise das mockups indica necessidade de:
 
-| Token proposto | Uso | Hex sugerido |
-|---|---|---|
-| `cnc-accent-orange` | Selo "Ofertas da semana", urgência leve | `#ef6c1c` |
-| `cnc-accent-purple` | Badge "DESTAQUE", "Top oferta" (referência mockup home) | `#6b46c1` |
-| `success-bg` | Fundo do badge "Abaixo da FIPE" | `#e6f7f1` |
-| `danger-bg` | Fundo de selo de urgência | `#fde8e8` |
+| Token proposto      | Uso                                                     | Hex sugerido |
+| ------------------- | ------------------------------------------------------- | ------------ |
+| `cnc-accent-orange` | Selo "Ofertas da semana", urgência leve                 | `#ef6c1c`    |
+| `cnc-accent-purple` | Badge "DESTAQUE", "Top oferta" (referência mockup home) | `#6b46c1`    |
+| `success-bg`        | Fundo do badge "Abaixo da FIPE"                         | `#e6f7f1`    |
+| `danger-bg`         | Fundo de selo de urgência                               | `#fde8e8`    |
 
 ### 1.3. Tipografia
 
 Configuração atual (manter):
+
 - `font-sans`: `var(--font-sans), system-ui, sans-serif`
 - Carregamento via `next/font/google` no layout root
 - `font-feature-settings: "cv02", "cv03", "cv04", "cv11"` ativadas
 
 Escala (Tailwind) — **a usar como contrato**:
 
-| Token | rem | px | Line-height | Uso |
-|---|---|---|---|---|
-| `text-xs` | 0.75 | 12 | 1.35rem | Meta, timestamps, badges |
-| `text-sm` | 0.875 | 14 | 1.5rem | Labels, secondary text |
-| `text-base` | 1.0 | 16 | 1.75rem | Corpo de texto |
-| `text-lg` | 1.125 | 18 | 1.8rem | Subtítulos |
-| `text-xl` | 1.25 | 20 | 1.9rem | Títulos de seção |
-| `text-2xl` | 1.5 | 24 | 2rem | h2 |
-| `text-3xl` | 1.875 | 30 | 2.25rem | h1 mobile / h2 desktop |
-| `text-4xl` | 2.25 | 36 | 2.7rem | h1 desktop |
-| `text-5xl` | 3.0 | 48 | 3.15rem | Hero display |
+| Token       | rem   | px  | Line-height | Uso                      |
+| ----------- | ----- | --- | ----------- | ------------------------ |
+| `text-xs`   | 0.75  | 12  | 1.35rem     | Meta, timestamps, badges |
+| `text-sm`   | 0.875 | 14  | 1.5rem      | Labels, secondary text   |
+| `text-base` | 1.0   | 16  | 1.75rem     | Corpo de texto           |
+| `text-lg`   | 1.125 | 18  | 1.8rem      | Subtítulos               |
+| `text-xl`   | 1.25  | 20  | 1.9rem      | Títulos de seção         |
+| `text-2xl`  | 1.5   | 24  | 2rem        | h2                       |
+| `text-3xl`  | 1.875 | 30  | 2.25rem     | h1 mobile / h2 desktop   |
+| `text-4xl`  | 2.25  | 36  | 2.7rem      | h1 desktop               |
+| `text-5xl`  | 3.0   | 48  | 3.15rem     | Hero display             |
 
 Letter-spacing extras:
+
 - `tracking-tighter` (-0.04em) — display
 - `tracking-tight` (-0.025em) — h1
 - `tracking-normalish` (-0.01em) — body (default)
@@ -87,25 +89,25 @@ Letter-spacing extras:
 
 ### 1.4. Raio (border-radius)
 
-| Token | Valor | Uso |
-|---|---|---|
-| `rounded-sm` | 0.125rem (2px) | Badges minúsculos |
-| `rounded` | 0.25rem (4px) | Inputs pequenos |
-| `rounded-md` | 0.375rem (6px) | Chips |
-| `rounded-lg` | 0.5rem (8px) | Cards padrão |
-| `rounded-xl` | 0.75rem (12px) | Cards destaque |
-| `rounded-xl2` | 1rem (16px) | Hero, painéis principais |
-| `rounded-xl3` | 1.5rem (24px) | Banners promocionais |
-| `rounded-xl4` | 2rem (32px) | Cards premium grandes |
-| `rounded-full` | 9999px | Avatares, atalhos circulares |
+| Token          | Valor          | Uso                          |
+| -------------- | -------------- | ---------------------------- |
+| `rounded-sm`   | 0.125rem (2px) | Badges minúsculos            |
+| `rounded`      | 0.25rem (4px)  | Inputs pequenos              |
+| `rounded-md`   | 0.375rem (6px) | Chips                        |
+| `rounded-lg`   | 0.5rem (8px)   | Cards padrão                 |
+| `rounded-xl`   | 0.75rem (12px) | Cards destaque               |
+| `rounded-xl2`  | 1rem (16px)    | Hero, painéis principais     |
+| `rounded-xl3`  | 1.5rem (24px)  | Banners promocionais         |
+| `rounded-xl4`  | 2rem (32px)    | Cards premium grandes        |
+| `rounded-full` | 9999px         | Avatares, atalhos circulares |
 
 ### 1.5. Sombra (box-shadow)
 
-| Token | Valor | Uso |
-|---|---|---|
-| `shadow-card` | `0 2px 18px rgba(20,30,60,0.06)` | Cards padrão |
-| `shadow-soft` | `0 10px 30px rgba(15,23,42,0.08)` | Modais, drawers |
-| `shadow-premium` | `0 12px 30px rgba(16,28,58,0.12)` | Hero, hover de card destaque |
+| Token               | Valor                             | Uso                               |
+| ------------------- | --------------------------------- | --------------------------------- |
+| `shadow-card`       | `0 2px 18px rgba(20,30,60,0.06)`  | Cards padrão                      |
+| `shadow-soft`       | `0 10px 30px rgba(15,23,42,0.08)` | Modais, drawers                   |
+| `shadow-premium`    | `0 12px 30px rgba(16,28,58,0.12)` | Hero, hover de card destaque      |
 | `shadow-premium-lg` | `0 18px 42px rgba(16,28,58,0.14)` | Hover desktop, painéis flutuantes |
 
 ### 1.6. Espaçamento
@@ -113,6 +115,7 @@ Letter-spacing extras:
 Escala Tailwind padrão (4-based): `0.5 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 8 / 10 / 12 / 16 / 20`
 
 **Não criar tokens customizados** sem justificativa. Padronizar uso em:
+
 - Padding interno de card: `p-4` (mobile), `p-6` (desktop)
 - Gap entre cards em grid: `gap-4` (mobile), `gap-6` (desktop)
 - Padding de seção: `py-8` (mobile), `py-12` (desktop)
@@ -121,26 +124,26 @@ Escala Tailwind padrão (4-based): `0.5 / 1 / 1.5 / 2 / 3 / 4 / 5 / 6 / 8 / 10 /
 
 ### 1.7. Breakpoints (Tailwind padrão)
 
-| Token | px | Uso |
-|---|---|---|
-| `sm` | 640 | Tablet pequeno |
-| `md` | 768 | Tablet |
-| `lg` | 1024 | Desktop |
-| `xl` | 1280 | Desktop grande |
-| `2xl` | 1536 | Wide |
+| Token | px            | Uso                           |
+| ----- | ------------- | ----------------------------- |
+| `sm`  | 640           | Tablet pequeno                |
+| `md`  | 768           | Tablet                        |
+| `lg`  | 1024          | Desktop                       |
+| `xl`  | 1280          | Desktop grande                |
+| `2xl` | 1536          | Wide                          |
 | `8xl` | 1440 (custom) | Container max-width principal |
 
 **Mobile-first**: estilo base aplica para mobile; prefixos `sm:`, `md:`, etc. adicionam breakpoint up.
 
 ### 1.8. Alturas fixas (contrato — referenciado em PR D)
 
-| Elemento | Mobile | Desktop |
-|---|---|---|
-| Header | 56px | 72px |
-| Bottom navigation | 64px + safe-area | n/a |
-| Input | 48px | 40px |
-| Button primário | 48px | 44px |
-| Chip / FilterChip | 36px | 32px |
+| Elemento                         | Mobile                | Desktop      |
+| -------------------------------- | --------------------- | ------------ |
+| Header                           | 56px                  | 72px         |
+| Bottom navigation                | 64px + safe-area      | n/a          |
+| Input                            | 48px                  | 40px         |
+| Button primário                  | 48px                  | 44px         |
+| Chip / FilterChip                | 36px                  | 32px         |
 | ActionShortcut (atalho circular) | 64px diâmetro + label | 80px + label |
 
 `--header-height: 78px` (CSS var) atual contradiz alturas acima (56/72). **PR D harmoniza** — ou ajustar var, ou ajustar contrato. Em v1 desta especificação, **prevalecem 56/72**.
@@ -153,25 +156,25 @@ Componentes base. Vivem em `frontend/components/ui/` (a criar no PR D). **Nenhum
 
 ### 2.1. Lista oficial
 
-| Primitivo | Propósito | Variantes |
-|---|---|---|
-| `<Button>` | Ação primária/secundária | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp`, `link` |
-| `<Input>` | Entrada de texto | `default`, `search`, `error`, `password` |
-| `<Select>` | Seleção de opção | `default`, `native` (mobile-friendly), `searchable` |
-| `<Chip>` | Pílula clicável | `filter` (toggle), `removable`, `static` |
-| `<Badge>` | Selo informativo (não clicável) | `info`, `success`, `danger`, `warning`, `premium`, `neutral` |
-| `<Card>` | Container genérico | `default`, `elevated`, `flat`, `interactive` |
-| `<SectionHeader>` | Título + "ver todos" + ícone | `default`, `with-icon`, `compact` |
-| `<BottomNav>` | Navegação inferior mobile | `default`, `with-fab` |
-| `<SearchBar>` | Campo de busca + botão de filtros | `default`, `sticky`, `compact` |
-| `<FilterChip>` | Filtro aplicado em listagem | `active`, `removable` |
-| `<ActionShortcut>` | Atalho circular tipo "stories" | `default`, `highlight`, `muted` |
-| `<VehicleImage>` | Imagem de anúncio (com fallback) | `card`, `gallery`, `thumb`, `hero` |
-| `<AdCard>` | Card de anúncio canônico (§3) | 8 variantes |
-| `<ArticleCard>` | Card de blog | `default`, `featured`, `compact` |
-| `<TrustStrip>` | Faixa de confiança | `compact` (4 colunas), `full` (com texto) |
-| `<EmptyState>` | Estado vazio reutilizável | `default`, `error`, `not-found` |
-| `<Spinner>` / `<Skeleton>` | Loading | tamanhos `sm`, `md`, `lg` |
+| Primitivo                  | Propósito                         | Variantes                                                          |
+| -------------------------- | --------------------------------- | ------------------------------------------------------------------ |
+| `<Button>`                 | Ação primária/secundária          | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp`, `link` |
+| `<Input>`                  | Entrada de texto                  | `default`, `search`, `error`, `password`                           |
+| `<Select>`                 | Seleção de opção                  | `default`, `native` (mobile-friendly), `searchable`                |
+| `<Chip>`                   | Pílula clicável                   | `filter` (toggle), `removable`, `static`                           |
+| `<Badge>`                  | Selo informativo (não clicável)   | `info`, `success`, `danger`, `warning`, `premium`, `neutral`       |
+| `<Card>`                   | Container genérico                | `default`, `elevated`, `flat`, `interactive`                       |
+| `<SectionHeader>`          | Título + "ver todos" + ícone      | `default`, `with-icon`, `compact`                                  |
+| `<BottomNav>`              | Navegação inferior mobile         | `default`, `with-fab`                                              |
+| `<SearchBar>`              | Campo de busca + botão de filtros | `default`, `sticky`, `compact`                                     |
+| `<FilterChip>`             | Filtro aplicado em listagem       | `active`, `removable`                                              |
+| `<ActionShortcut>`         | Atalho circular tipo "stories"    | `default`, `highlight`, `muted`                                    |
+| `<VehicleImage>`           | Imagem de anúncio (com fallback)  | `card`, `gallery`, `thumb`, `hero`                                 |
+| `<AdCard>`                 | Card de anúncio canônico (§3)     | 8 variantes                                                        |
+| `<ArticleCard>`            | Card de blog                      | `default`, `featured`, `compact`                                   |
+| `<TrustStrip>`             | Faixa de confiança                | `compact` (4 colunas), `full` (com texto)                          |
+| `<EmptyState>`             | Estado vazio reutilizável         | `default`, `error`, `not-found`                                    |
+| `<Spinner>` / `<Skeleton>` | Loading                           | tamanhos `sm`, `md`, `lg`                                          |
 
 ### 2.2. Regras arquiteturais
 
@@ -253,20 +256,20 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §8.5](./DIAGNOSTICO_REDESIGN.md#85-con
 
 12 casos `IMG-1` a `IMG-12` no §8.5.1 do diagnóstico. Resumo:
 
-| ID | Cenário | Tipo |
-|---|---|---|
-| IMG-1 | URL R2 válida | Unit |
-| IMG-2 | Upload via `/api/vehicle-images` | E2E |
-| IMG-3 | Anúncio sem imagem | Unit |
-| IMG-4 | Imagem 404/timeout | Unit + E2E |
-| IMG-5 | Fallback sem CLS | E2E |
-| IMG-6 | `sizes` ausente | CI lint |
-| IMG-7 | Domínio não permitido | Config |
-| IMG-8 | SVG bloqueado | Config |
-| IMG-9 | Lazy load abaixo da dobra | E2E |
-| IMG-10 | `priority` acima da dobra | Unit |
-| IMG-11 | `srcset` responsivo | Unit |
-| IMG-12 | Galeria swipe sem CLS | E2E |
+| ID     | Cenário                          | Tipo       |
+| ------ | -------------------------------- | ---------- |
+| IMG-1  | URL R2 válida                    | Unit       |
+| IMG-2  | Upload via `/api/vehicle-images` | E2E        |
+| IMG-3  | Anúncio sem imagem               | Unit       |
+| IMG-4  | Imagem 404/timeout               | Unit + E2E |
+| IMG-5  | Fallback sem CLS                 | E2E        |
+| IMG-6  | `sizes` ausente                  | CI lint    |
+| IMG-7  | Domínio não permitido            | Config     |
+| IMG-8  | SVG bloqueado                    | Config     |
+| IMG-9  | Lazy load abaixo da dobra        | E2E        |
+| IMG-10 | `priority` acima da dobra        | Unit       |
+| IMG-11 | `srcset` responsivo              | Unit       |
+| IMG-12 | Galeria swipe sem CLS            | E2E        |
 
 ---
 
@@ -276,24 +279,24 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §11](./DIAGNOSTICO_REDESIGN.md#11-regr
 
 ### Resumo
 
-| Estado | Páginas |
-|---|---|
-| **Aparece** | Home, `/anuncios`, `/cidade/**`, `/blog`, `/tabela-fipe`, `/simulador-financiamento`, `/favoritos`, `/dashboard*` |
-| **Substituído por `<StickyCTA>`** | `/veiculo/[slug]` (preço + WhatsApp) |
-| **Não aparece** | `/login`, `/cadastro`, `/recuperar-senha`, checkout crítico, `/admin/*` |
-| **Caso especial** | `/anunciar/novo` — case-by-case, nunca compete com wizard |
+| Estado                            | Páginas                                                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Aparece**                       | Home, `/anuncios`, `/cidade/**`, `/blog`, `/tabela-fipe`, `/simulador-financiamento`, `/favoritos`, `/dashboard*` |
+| **Substituído por `<StickyCTA>`** | `/veiculo/[slug]` (preço + WhatsApp)                                                                              |
+| **Não aparece**                   | `/login`, `/cadastro`, `/recuperar-senha`, checkout crítico, `/admin/*`                                           |
+| **Caso especial**                 | `/anunciar/novo` — case-by-case, nunca compete com wizard                                                         |
 
 ### Itens da bottom nav
 
 5 ícones, ordem fixa:
 
-| Posição | Ícone | Rota | Estado ativo |
-|---|---|---|---|
-| 1 | 🏠 Home | `/` | Quando rota = `/` |
-| 2 | 🔍 Buscar | `/anuncios` ou cidade ativa | Quando rota = `/anuncios`, `/cidade/**` |
-| 3 | ❤️ Favoritos | `/favoritos` | Quando rota = `/favoritos` |
-| 4 | ➕ Anunciar (FAB centralizado) | `/anunciar/novo` | Sempre destaque |
-| 5 | 👤 Conta / Menu | `/dashboard` (logado) ou `/login` | Quando rota dashboard |
+| Posição | Ícone                          | Rota                              | Estado ativo                            |
+| ------- | ------------------------------ | --------------------------------- | --------------------------------------- |
+| 1       | 🏠 Home                        | `/`                               | Quando rota = `/`                       |
+| 2       | 🔍 Buscar                      | `/anuncios` ou cidade ativa       | Quando rota = `/anuncios`, `/cidade/**` |
+| 3       | ❤️ Favoritos                   | `/favoritos`                      | Quando rota = `/favoritos`              |
+| 4       | ➕ Anunciar (FAB centralizado) | `/anunciar/novo`                  | Sempre destaque                         |
+| 5       | 👤 Conta / Menu                | `/dashboard` (logado) ou `/login` | Quando rota dashboard                   |
 
 ---
 
@@ -301,23 +304,24 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §11](./DIAGNOSTICO_REDESIGN.md#11-regr
 
 ### 6.1. Imagens em `frontend/public/images/`
 
-| Arquivo | Tamanho | Uso aprovado | Observação |
-|---|---:|---|---|
-| `pagina Comprar Estadual.png` | 4.8 MB | Mockup PR J | Referência visual |
-| `pagina Comprar na cidade.png` | 2.6 MB | Mockup PR H | Referência visual |
-| `banner-home.png` | 2.0 MB | Mockup PR G | **Duplicado** com `home-hero-banner.png` (MD5 idêntico) |
-| `home-hero-banner.png` | 2.0 MB | — | **Remover no PR C** após confirmar referências |
-| `blog.png` | 1.0 MB | Mockup PR L | Referência visual |
-| `pagina-simulador-de-financiamento.png` | 1.0 MB | Mockup PR K | Referência visual |
-| `carro_pagina_simulador.png` | 35 KB | Asset PR K | Imagem de carro do simulador |
-| `dolphin.webp` | 55 KB | Asset placeholder? | Verificar uso em PR C |
-| `gla.avif` | 13 KB | Asset placeholder? | Verificar uso em PR C |
-| `icones.png` | 685 KB | — | **Duplicado** com `icons.png` (MD5 idêntico) |
-| `icons.png` | 685 KB | Sprite de ícones | Manter um, remover o outro no PR C |
-| `logo-carros-na-cidade.png` | 601 KB | Logo oficial — usado | Manter |
-| `logo.png` | 2.1 MB | Logo grande — verificar uso | Avaliar tamanho em PR C |
+| Arquivo                                 | Tamanho | Uso aprovado                | Observação                                              |
+| --------------------------------------- | ------: | --------------------------- | ------------------------------------------------------- |
+| `pagina Comprar Estadual.png`           |  4.8 MB | Mockup PR J                 | Referência visual                                       |
+| `pagina Comprar na cidade.png`          |  2.6 MB | Mockup PR H                 | Referência visual                                       |
+| `banner-home.png`                       |  2.0 MB | Mockup PR G                 | **Duplicado** com `home-hero-banner.png` (MD5 idêntico) |
+| `home-hero-banner.png`                  |  2.0 MB | —                           | **Remover no PR C** após confirmar referências          |
+| `blog.png`                              |  1.0 MB | Mockup PR L                 | Referência visual                                       |
+| `pagina-simulador-de-financiamento.png` |  1.0 MB | Mockup PR K                 | Referência visual                                       |
+| `carro_pagina_simulador.png`            |   35 KB | Asset PR K                  | Imagem de carro do simulador                            |
+| `dolphin.webp`                          |   55 KB | Asset placeholder?          | Verificar uso em PR C                                   |
+| `gla.avif`                              |   13 KB | Asset placeholder?          | Verificar uso em PR C                                   |
+| `icones.png`                            |  685 KB | —                           | **Duplicado** com `icons.png` (MD5 idêntico)            |
+| `icons.png`                             |  685 KB | Sprite de ícones            | Manter um, remover o outro no PR C                      |
+| `logo-carros-na-cidade.png`             |  601 KB | Logo oficial — usado        | Manter                                                  |
+| `logo.png`                              |  2.1 MB | Logo grande — verificar uso | Avaliar tamanho em PR C                                 |
 
 **Ação imediata** (será capturada no PR C com checklist §13):
+
 1. Confirmar nenhum import a `home-hero-banner.png` ou `icones.png` (com 'e').
 2. Deletar `home-hero-banner.png` (manter `banner-home.png`).
 3. Deletar `icones.png` (manter `icons.png`).
@@ -325,13 +329,13 @@ Detalhamento em [DIAGNOSTICO_REDESIGN.md §11](./DIAGNOSTICO_REDESIGN.md#11-regr
 
 ### 6.2. Mockups de referência aprovados
 
-| Mockup | Referência para PR | Características |
-|---|---|---|
-| `pagina Comprar na cidade.png` | PR H | Cidade com identidade regional, cards locais, filtros |
-| `pagina Comprar Estadual.png` | PR J | Catálogo estadual, faixa de SEO |
-| `banner-home.png` | PR G | Hero da nova home mobile-first |
-| `blog.png` | PR L | Lista do blog estilo editorial |
-| `pagina-simulador-de-financiamento.png` | PR K | Simulador com integração de listagem |
+| Mockup                                  | Referência para PR | Características                                       |
+| --------------------------------------- | ------------------ | ----------------------------------------------------- |
+| `pagina Comprar na cidade.png`          | PR H               | Cidade com identidade regional, cards locais, filtros |
+| `pagina Comprar Estadual.png`           | PR J               | Catálogo estadual, faixa de SEO                       |
+| `banner-home.png`                       | PR G               | Hero da nova home mobile-first                        |
+| `blog.png`                              | PR L               | Lista do blog estilo editorial                        |
+| `pagina-simulador-de-financiamento.png` | PR K               | Simulador com integração de listagem                  |
 
 ---
 
@@ -342,19 +346,19 @@ Todos os 11 primitivos esperados foram criados em `frontend/components/ui/`.
 
 ### 7.1. Inventário de arquivos
 
-| Arquivo | Server/Client | Linhas | Variantes |
-|---|---|---:|---|
-| `Button.tsx` | Client | ~155 | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp`, `link` × `sm`, `md`, `lg` |
-| `Input.tsx` | Client | ~110 | `default`, `search`, `error` |
-| `Select.tsx` | Client | ~110 | `default`, `error` (native, mobile-friendly) |
-| `Chip.tsx` | Client | ~95 | `filter` (toggle), `removable`, `static` |
-| `Badge.tsx` | Server | ~50 | `info`, `success`, `danger`, `warning`, `premium`, `neutral` × `sm`, `md` |
-| `Card.tsx` | Server | ~65 | `default`, `elevated`, `flat`, `interactive` × padding `none`, `sm`, `md`, `lg` |
-| `SectionHeader.tsx` | Server | ~70 | `default`, `with-icon`, `compact` |
-| `BottomNav.tsx` | Client | ~115 | `default`, `with-fab` |
-| `SearchBar.tsx` | Client | ~115 | `default`, `sticky`, `compact` |
-| `FilterChip.tsx` | Client | ~95 | `active`, `removable` |
-| `ActionShortcut.tsx` | Server | ~70 | `default`, `highlight`, `muted` |
+| Arquivo              | Server/Client | Linhas | Variantes                                                                             |
+| -------------------- | ------------- | -----: | ------------------------------------------------------------------------------------- |
+| `Button.tsx`         | Client        |   ~155 | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp`, `link` × `sm`, `md`, `lg` |
+| `Input.tsx`          | Client        |   ~110 | `default`, `search`, `error`                                                          |
+| `Select.tsx`         | Client        |   ~110 | `default`, `error` (native, mobile-friendly)                                          |
+| `Chip.tsx`           | Client        |    ~95 | `filter` (toggle), `removable`, `static`                                              |
+| `Badge.tsx`          | Server        |    ~50 | `info`, `success`, `danger`, `warning`, `premium`, `neutral` × `sm`, `md`             |
+| `Card.tsx`           | Server        |    ~65 | `default`, `elevated`, `flat`, `interactive` × padding `none`, `sm`, `md`, `lg`       |
+| `SectionHeader.tsx`  | Server        |    ~70 | `default`, `with-icon`, `compact`                                                     |
+| `BottomNav.tsx`      | Client        |   ~115 | `default`, `with-fab`                                                                 |
+| `SearchBar.tsx`      | Client        |   ~115 | `default`, `sticky`, `compact`                                                        |
+| `FilterChip.tsx`     | Client        |    ~95 | `active`, `removable`                                                                 |
+| `ActionShortcut.tsx` | Server        |    ~70 | `default`, `highlight`, `muted`                                                       |
 
 **Total**: 11 arquivos, ~1.050 linhas.
 **Server Components**: 4 (`Badge`, `Card`, `SectionHeader`, `ActionShortcut`).
@@ -446,24 +450,24 @@ Documenta quando usar cada um quando há ambiguidade.
 
 #### `<Chip>` vs `<FilterChip>`
 
-| Caso | Use |
-|---|---|
-| Filtro rápido togglável no topo da home ("Até R$ 50 mil", "SUV") com estado próprio gerenciado pela página | **`<Chip variant="filter">`** |
-| Filtro removível qualquer (badge de aplicação solta) | **`<Chip variant="removable">`** |
-| Tag estática, não clicável (cidade, status) | **`<Chip variant="static">`** |
-| Filtro APLICADO mostrado no topo de uma listagem (dentro de uma barra `[X SUV] [X Até 50k] [X Auto]`) | **`<FilterChip variant="removable">`** |
-| Filtro ativo mostrado de forma compacta (sem X — clique remove via parent) | **`<FilterChip variant="active">`** |
+| Caso                                                                                                       | Use                                    |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Filtro rápido togglável no topo da home ("Até R$ 50 mil", "SUV") com estado próprio gerenciado pela página | **`<Chip variant="filter">`**          |
+| Filtro removível qualquer (badge de aplicação solta)                                                       | **`<Chip variant="removable">`**       |
+| Tag estática, não clicável (cidade, status)                                                                | **`<Chip variant="static">`**          |
+| Filtro APLICADO mostrado no topo de uma listagem (dentro de uma barra `[X SUV] [X Até 50k] [X Auto]`)      | **`<FilterChip variant="removable">`** |
+| Filtro ativo mostrado de forma compacta (sem X — clique remove via parent)                                 | **`<FilterChip variant="active">`**    |
 
 **Regra**: `Chip` é o primitivo genérico (altura 36px, padding maior). `FilterChip` é especialização visual para barras de filtros aplicados (altura 32px, padding menor, sempre fundo soft) — escolhido porque listagens podem ter 5+ filtros lado-a-lado.
 
 #### `<Input>` vs `<SearchBar>`
 
-| Caso | Use |
-|---|---|
-| Campo de texto único (email, nome, descrição, valor numérico) | **`<Input>`** |
-| Campo de busca isolado dentro de um form maior (ex: filtros laterais com vários campos) | **`<Input variant="search">`** |
-| Caixa de busca primária da página, com botão de filtros ao lado, possivelmente sticky no scroll | **`<SearchBar>`** |
-| Caixa de busca em header global | **`<SearchBar variant="compact">`** |
+| Caso                                                                                            | Use                                 |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Campo de texto único (email, nome, descrição, valor numérico)                                   | **`<Input>`**                       |
+| Campo de busca isolado dentro de um form maior (ex: filtros laterais com vários campos)         | **`<Input variant="search">`**      |
+| Caixa de busca primária da página, com botão de filtros ao lado, possivelmente sticky no scroll | **`<SearchBar>`**                   |
+| Caixa de busca em header global                                                                 | **`<SearchBar variant="compact">`** |
 
 **Regra**: `<Input variant="search">` é apenas um Input com ícone de lupa. `<SearchBar>` é um **form completo** (composição de Input + Button) que dispara `onSubmit` e pode hospedar um `filterButton` ao lado.
 
@@ -472,6 +476,7 @@ Documenta quando usar cada um quando há ambiguidade.
 `<Select>` desta versão é **`<select>` nativo**. Razão: melhor UX em mobile (picker do SO), zero JS extra, acessibilidade gratuita.
 
 **Não usar `<Select>` quando**:
+
 - Há mais de ~30 opções e usuário precisa filtrar enquanto digita.
 - Backend precisa receber a query do usuário (autocomplete server-side).
 
@@ -479,12 +484,12 @@ Documenta quando usar cada um quando há ambiguidade.
 
 #### `<Button>` vs `<a>` direto
 
-| Caso | Use |
-|---|---|
-| Ação que dispara handler (submit, abrir modal, salvar) | **`<Button>`** sem `href` |
-| Navegação interna (`/anuncios`, `/cidade/...`) com aparência de botão | **`<Button href="/...">`** (renderiza `<Link>`) |
-| Navegação externa (WhatsApp, parceiro) com aparência de botão | **`<Button href="https://..." target="_blank">`** |
-| Link textual em meio a parágrafo | `<Link>` direto (não usar Button — `variant="link"` é para casos específicos com aparência de link mas espaçamento de botão) |
+| Caso                                                                  | Use                                                                                                                          |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Ação que dispara handler (submit, abrir modal, salvar)                | **`<Button>`** sem `href`                                                                                                    |
+| Navegação interna (`/anuncios`, `/cidade/...`) com aparência de botão | **`<Button href="/...">`** (renderiza `<Link>`)                                                                              |
+| Navegação externa (WhatsApp, parceiro) com aparência de botão         | **`<Button href="https://..." target="_blank">`**                                                                            |
+| Link textual em meio a parágrafo                                      | `<Link>` direto (não usar Button — `variant="link"` é para casos específicos com aparência de link mas espaçamento de botão) |
 
 **Regra**: o Button toma a decisão `<button>` vs `<a>` baseado na presença da prop `href`. Se `href` está presente, automaticamente vira `<Link>` do Next.js (com `target="_blank" rel="noopener"` quando aplicável).
 
@@ -497,10 +502,10 @@ Documenta quando usar cada um quando há ambiguidade.
 
 #### `<ActionShortcut>` vs `<Button>` circular
 
-| Caso | Use |
-|---|---|
-| Atalho destacado para uma seção (Comprar, Vender, Blog, Ofertas) com **ícone + label embaixo** | **`<ActionShortcut>`** |
-| Botão de ação circular (ex: FAB, fechar modal, voltar) com **só ícone** | `<Button>` com classes para circular ou ícone-only |
+| Caso                                                                                           | Use                                                |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Atalho destacado para uma seção (Comprar, Vender, Blog, Ofertas) com **ícone + label embaixo** | **`<ActionShortcut>`**                             |
+| Botão de ação circular (ex: FAB, fechar modal, voltar) com **só ícone**                        | `<Button>` com classes para circular ou ícone-only |
 
 `<ActionShortcut>` é **navegação**, não ação. Sempre vira `<Link>` para outra rota.
 
@@ -619,13 +624,16 @@ AdCard (componente único, 8 variantes)
 ```
 
 **Removidos** (órfãos confirmados):
+
 - `home/sections/VehicleCard.tsx` — substituído pelo AdCard via HomeVehicleCard
 - `home/sections/VehicleFavoriteButton.tsx` — usado apenas pelo VehicleCard removido
 
 **Tipo movido**:
+
 - `VehicleCardItem` (era export de `sections/VehicleCard.tsx`) → `home/sections/types.ts`
 
 **Pendências** (PRs futuros):
+
 - `buy/CatalogVehicleCardImage.tsx` — pode ser deletado após confirmar zero uso fora do CatalogVehicleCard refatorado (que agora usa `<VehicleImage>` indiretamente via AdCard)
 - `buy/VehicleBadge.tsx` — funcionalidade absorvida pelo `<Badge>` do design system; deletar em PR de cleanup quando confirmar zero uso
 

@@ -13,13 +13,7 @@ import type { ButtonHTMLAttributes, ReactNode, AnchorHTMLAttributes } from "reac
  * Usar como <button> ou como <a>/Link com prop href.
  */
 
-type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "ghost"
-  | "destructive"
-  | "whatsapp"
-  | "link";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "whatsapp" | "link";
 
 type ButtonSize = "sm" | "md" | "lg";
 
@@ -49,15 +43,12 @@ type ButtonAsLink = CommonProps &
 export type ButtonProps = ButtonAsButton | ButtonAsLink;
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary:
-    "bg-primary text-white hover:bg-primary-strong active:bg-primary-strong shadow-sm",
+  primary: "bg-primary text-white hover:bg-primary-strong active:bg-primary-strong shadow-sm",
   secondary:
     "bg-white text-cnc-text border border-cnc-line hover:border-cnc-line-strong hover:bg-cnc-bg",
   ghost: "bg-transparent text-cnc-text hover:bg-cnc-bg",
-  destructive:
-    "bg-cnc-danger text-white hover:bg-cnc-danger/90 active:bg-cnc-danger/95 shadow-sm",
-  whatsapp:
-    "bg-cnc-success text-white hover:bg-cnc-success/90 active:bg-cnc-success/95 shadow-sm",
+  destructive: "bg-cnc-danger text-white hover:bg-cnc-danger/90 active:bg-cnc-danger/95 shadow-sm",
+  whatsapp: "bg-cnc-success text-white hover:bg-cnc-success/90 active:bg-cnc-success/95 shadow-sm",
   link: "bg-transparent text-primary hover:text-primary-strong underline-offset-4 hover:underline px-0",
 };
 
@@ -132,7 +123,7 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
         ...rest
       } = props as ButtonAsLink;
       const cls = buildClassName({ variant, size, fullWidth, className });
-      const computedRel = target === "_blank" ? rel ?? "noopener noreferrer" : rel;
+      const computedRel = target === "_blank" ? (rel ?? "noopener noreferrer") : rel;
       return (
         <Link
           href={href}

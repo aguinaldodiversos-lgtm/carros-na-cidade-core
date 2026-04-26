@@ -202,12 +202,8 @@ export async function fetchHomeCarousels(
   const needsRecentFallback = cs && localRecent.length === 0;
 
   const [globalHighlight, globalOpportunity, globalRecent] = await Promise.all([
-    needsHighlightFallback
-      ? fetchAdsCollection(apiBase, HIGHLIGHT, tags)
-      : Promise.resolve([]),
-    needsOpportunityFallback
-      ? fetchAdsCollection(apiBase, OPPORTUNITY, tags)
-      : Promise.resolve([]),
+    needsHighlightFallback ? fetchAdsCollection(apiBase, HIGHLIGHT, tags) : Promise.resolve([]),
+    needsOpportunityFallback ? fetchAdsCollection(apiBase, OPPORTUNITY, tags) : Promise.resolve([]),
     needsRecentFallback ? fetchAdsCollection(apiBase, RECENT, tags) : Promise.resolve([]),
   ]);
 

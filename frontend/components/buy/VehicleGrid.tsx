@@ -38,7 +38,11 @@ function EmptyState() {
           stroke="currentColor"
           strokeWidth="1.5"
         >
-          <path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
       <h3 className="mt-4 text-lg font-bold text-cnc-text-strong sm:text-xl">

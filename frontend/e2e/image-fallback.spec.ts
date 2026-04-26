@@ -49,7 +49,10 @@ test.describe("@img-fallback VehicleImage — comportamento de imagem", () => {
     const count = await placeholders.count();
 
     if (count === 0) {
-      test.skip(true, "Sem placeholders na home — IMG-5 será revalidado em PR G/I quando UI usar VehicleImage");
+      test.skip(
+        true,
+        "Sem placeholders na home — IMG-5 será revalidado em PR G/I quando UI usar VehicleImage"
+      );
       return;
     }
 

@@ -280,7 +280,9 @@ function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   return 1;
 }
 
-function resolveBadge(item: BaseAdData): { label: string; variant: "success" | "warning" | "info" | "premium" } | null {
+function resolveBadge(
+  item: BaseAdData
+): { label: string; variant: "success" | "warning" | "info" | "premium" } | null {
   if (item.badge) {
     const label = String(item.badge);
     const lower = label.toLowerCase();
@@ -416,7 +418,13 @@ function MileageBadge({ value }: { value: number }) {
     <span className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3" fill="currentColor">
         <circle cx="12" cy="12" r="9" opacity="0.3" />
-        <path d="M12 12V6m0 6 4 2" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+        <path
+          d="M12 12V6m0 6 4 2"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+        />
       </svg>
       {formatNumber(value)} km
     </span>
@@ -426,8 +434,19 @@ function MileageBadge({ value }: { value: number }) {
 function DealerPill({ name }: { name: string }) {
   return (
     <span className="absolute bottom-2 right-2 z-10 inline-flex max-w-[55%] items-center gap-1 rounded-full bg-cnc-warning px-2 py-1 text-[11px] font-bold text-white shadow-card backdrop-blur-sm">
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4">
-        <path d="M3 9l1.5-4h15L21 9M3 9v10a1 1 0 0 0 1 1h2v-7h12v7h2a1 1 0 0 0 1-1V9M3 9h18" strokeLinecap="round" strokeLinejoin="round" />
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-3 w-3 shrink-0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+      >
+        <path
+          d="M3 9l1.5-4h15L21 9M3 9v10a1 1 0 0 0 1 1h2v-7h12v7h2a1 1 0 0 0 1-1V9M3 9h18"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
       <span className="truncate">{name}</span>
     </span>
@@ -438,9 +457,11 @@ function isDealerListing(item: BaseAdData): boolean {
   if (item.dealership_name && String(item.dealership_name).trim()) return true;
   if (item.dealer_name && String(item.dealer_name).trim()) return true;
   const sellerType = String(item.seller_type || "").toLowerCase();
-  if (sellerType === "dealer" || sellerType === "dealership" || sellerType === "premium") return true;
+  if (sellerType === "dealer" || sellerType === "dealership" || sellerType === "premium")
+    return true;
   const plan = String(item.plan || "").toLowerCase();
-  if (["premium", "pro", "plus", "master", "dealer"].some((token) => plan.includes(token))) return true;
+  if (["premium", "pro", "plus", "master", "dealer"].some((token) => plan.includes(token)))
+    return true;
   return false;
 }
 
@@ -533,9 +554,7 @@ function VerticalLayout({
             {formatCurrency(normalized.price)}
           </strong>
           {config.showYearLabel && normalized.yearLabel && (
-            <span className="text-xs font-medium text-cnc-muted">
-              {normalized.yearLabel}
-            </span>
+            <span className="text-xs font-medium text-cnc-muted">{normalized.yearLabel}</span>
           )}
         </div>
 

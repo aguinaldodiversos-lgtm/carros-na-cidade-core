@@ -149,11 +149,7 @@ export function HomeHero({ featuredCities: _f, defaultCitySlug, cityName }: Home
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="sr-only">Filtros rápidos</span>
             {QUICK_FILTERS.map((f) => (
-              <Chip
-                key={f.key}
-                variant="filter"
-                onClick={() => goWithFilter(f.query)}
-              >
+              <Chip key={f.key} variant="filter" onClick={() => goWithFilter(f.query)}>
                 {f.label}
               </Chip>
             ))}

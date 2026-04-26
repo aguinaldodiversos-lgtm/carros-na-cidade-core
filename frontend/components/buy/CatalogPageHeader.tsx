@@ -15,11 +15,7 @@ import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import { formatTotal, type BuyCityContext } from "@/lib/buy/catalog-helpers";
-import {
-  buildStatePath,
-  type ComprarVariant,
-  stateNameFromUf,
-} from "@/lib/buy/territory-variant";
+import { buildStatePath, type ComprarVariant, stateNameFromUf } from "@/lib/buy/territory-variant";
 
 import { CatalogBreadcrumb } from "./CatalogBreadcrumb";
 
@@ -366,9 +362,7 @@ export function CatalogPageHeader({
                 ))}
               </>
             ) : (
-              <span className="text-xs text-cnc-muted-soft">
-                Sem filtros avançados aplicados.
-              </span>
+              <span className="text-xs text-cnc-muted-soft">Sem filtros avançados aplicados.</span>
             )}
           </div>
 

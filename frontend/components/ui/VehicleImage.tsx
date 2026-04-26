@@ -3,9 +3,7 @@
 
 import Image from "next/image";
 import { useState, useCallback } from "react";
-import {
-  shouldSkipNextImageOptimizer,
-} from "@/lib/images/image-optimization";
+import { shouldSkipNextImageOptimizer } from "@/lib/images/image-optimization";
 import { LISTING_CARD_FALLBACK_IMAGE } from "@/lib/vehicle/detail-utils";
 import { VehicleImagePlaceholder } from "./VehicleImagePlaceholder";
 
@@ -101,7 +99,7 @@ export function VehicleImage({
       <VehicleImagePlaceholder
         width={width}
         height={height}
-        label={errored ? fallbackLabel ?? "Imagem indisponível" : fallbackLabel ?? "Sem foto"}
+        label={errored ? (fallbackLabel ?? "Imagem indisponível") : (fallbackLabel ?? "Sem foto")}
         className={className}
       />
     );

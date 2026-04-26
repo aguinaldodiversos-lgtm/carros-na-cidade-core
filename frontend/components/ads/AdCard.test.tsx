@@ -78,13 +78,7 @@ describe("AdCard", () => {
   // ---------------------------------------------------------------------------
   describe("favorito por variant", () => {
     const WITH_FAV: AdCardVariant[] = ["featured", "grid", "carousel"];
-    const WITHOUT_FAV: AdCardVariant[] = [
-      "compact",
-      "horizontal",
-      "related",
-      "dashboard",
-      "admin",
-    ];
+    const WITHOUT_FAV: AdCardVariant[] = ["compact", "horizontal", "related", "dashboard", "admin"];
 
     for (const variant of WITH_FAV) {
       it(`variant="${variant}" mostra botão de favoritar`, () => {
@@ -128,9 +122,7 @@ describe("AdCard", () => {
   // ---------------------------------------------------------------------------
   describe("status pill", () => {
     it("variant='dashboard' com status='Ativo' mostra pill verde (success)", () => {
-      const { container } = render(
-        <AdCard item={SAMPLE_AD} variant="dashboard" status="Ativo" />
-      );
+      const { container } = render(<AdCard item={SAMPLE_AD} variant="dashboard" status="Ativo" />);
       expect(screen.getByText("Ativo")).toBeTruthy();
     });
 
@@ -150,24 +142,14 @@ describe("AdCard", () => {
   // ---------------------------------------------------------------------------
   it("variant='admin' com flags renderiza badges de moderação", () => {
     render(
-      <AdCard
-        item={SAMPLE_AD}
-        variant="admin"
-        flags={["Imagem suspeita", "Preço fora da faixa"]}
-      />
+      <AdCard item={SAMPLE_AD} variant="admin" flags={["Imagem suspeita", "Preço fora da faixa"]} />
     );
     expect(screen.getByText("Imagem suspeita")).toBeTruthy();
     expect(screen.getByText("Preço fora da faixa")).toBeTruthy();
   });
 
   it("variant='dashboard' ignora flags (somente admin tem showAdminFlags)", () => {
-    render(
-      <AdCard
-        item={SAMPLE_AD}
-        variant="dashboard"
-        flags={["Não deveria aparecer"]}
-      />
-    );
+    render(<AdCard item={SAMPLE_AD} variant="dashboard" flags={["Não deveria aparecer"]} />);
     expect(screen.queryByText("Não deveria aparecer")).toBeNull();
   });
 
@@ -224,9 +206,7 @@ describe("AdCard", () => {
   // 10. href override é respeitado
   // ---------------------------------------------------------------------------
   it("href prop tem precedência sobre buildAdHref automático", () => {
-    const { container } = render(
-      <AdCard item={SAMPLE_AD} variant="grid" href="/custom/path" />
-    );
+    const { container } = render(<AdCard item={SAMPLE_AD} variant="grid" href="/custom/path" />);
     const link = container.querySelector("a");
     expect(link?.getAttribute("href")).toBe("/custom/path");
   });

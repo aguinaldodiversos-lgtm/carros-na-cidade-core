@@ -1,13 +1,13 @@
 # ROUTE_CANONICAL_MAP — Mapa de rotas canônicas e redirects
 
-| Campo | Valor |
-|---|---|
-| **Versão** | 2 |
-| **Data** | 2026-04-26 |
-| **Branch** | `claude/pr-j-comprar-estadual` |
-| **Status** | 📜 PR J — Comprar estadual (auditoria + ajuste de aliases vs. consolidação prévia) |
-| **Referência** | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §8.1 |
-| **Aplicação** | Toda mudança de rota em qualquer PR exige atualização deste mapa + teste E2E do redirect |
+| Campo          | Valor                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| **Versão**     | 2                                                                                        |
+| **Data**       | 2026-04-26                                                                               |
+| **Branch**     | `claude/pr-j-comprar-estadual`                                                           |
+| **Status**     | 📜 PR J — Comprar estadual (auditoria + ajuste de aliases vs. consolidação prévia)       |
+| **Referência** | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §8.1                                |
+| **Aplicação**  | Toda mudança de rota em qualquer PR exige atualização deste mapa + teste E2E do redirect |
 
 ---
 
@@ -25,29 +25,30 @@
 
 ### 1.1. Home
 
-| Rota | Função | Indexável | Canonical | Aliases | Redirects | Removível |
-|---|---|---|---|---|---|---|
-| `/` | Home pública | ✓ | `https://carrosnacidade.com/` | — | — | ❌ Nunca |
+| Rota | Função       | Indexável | Canonical                     | Aliases | Redirects | Removível |
+| ---- | ------------ | --------- | ----------------------------- | ------- | --------- | --------- |
+| `/`  | Home pública | ✓         | `https://carrosnacidade.com/` | —       | —         | ❌ Nunca  |
 
 ### 1.2. Listagem geral
 
-| Rota | Função | Indexável | Canonical | Aliases | Redirects | Removível |
-|---|---|---|---|---|---|---|
-| `/anuncios` | Listagem canônica geral | ✓ | self | — | — | ❌ Nunca |
-| `/anuncios/[identifier]` | Redirect legado | ✗ | — | — | → `/veiculo/[slug]` (já existente) | ✅ Após PR I confirmar zero referências |
+| Rota                     | Função                  | Indexável | Canonical | Aliases | Redirects                          | Removível                               |
+| ------------------------ | ----------------------- | --------- | --------- | ------- | ---------------------------------- | --------------------------------------- |
+| `/anuncios`              | Listagem canônica geral | ✓         | self      | —       | —                                  | ❌ Nunca                                |
+| `/anuncios/[identifier]` | Redirect legado         | ✗         | —         | —       | → `/veiculo/[slug]` (já existente) | ✅ Após PR I confirmar zero referências |
 
 ### 1.3. Comprar (alias operacional)
 
 `/comprar/*` continua sendo **família navegável**. A consolidação agressiva proposta na v1 (todas as rotas → `/anuncios`/`/cidade/`) **foi reavaliada no PR J** e parcialmente adiada para preservar PR H (cidade redesenhada) e a personalização SSR por cookie de cidade.
 
-| Rota | Função | Indexável | Canonical | Aliases | Redirects (status PR J) | Removível |
-|---|---|---|---|---|---|---|
-| `/comprar` | Entry territorial via redirect SSR (cookie → cidade; default → estado UF padrão) | ✗ (sempre redireciona) | — | — | **Mantido como SSR redirect** (cookie-based). Consolidação para `/anuncios` adiada. | ❌ Não no PR J |
-| `/comprar/[slug]` | Alias **legado de detalhe**: redirect SSR para `/veiculo/{slug}` (rota servia URLs antigas que apontavam diretamente para anúncio individual) | ✗ | — | — | **Mantido**. Trocar destino para `/cidade/{slug}` quebraria URLs históricas que esperam detalhe. | ❌ Não no PR J |
-| `/comprar/cidade/[slug]` | Comprar na Cidade (página redesenhada no PR H) | ✓ | self | — | **Mantido como canônica navegável**. Consolidação para `/cidade/{slug}` adiada — escopo do PR J era explícito em "não mexer em Comprar por cidade". | ❌ Não no PR J |
-| `/comprar/estado/[uf]` | Catálogo estadual (canônica do PR J) | ✓ | self | — | — | ❌ Nunca (PROJECT_RULES) |
+| Rota                     | Função                                                                                                                                        | Indexável              | Canonical | Aliases | Redirects (status PR J)                                                                                                                             | Removível                |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | --------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `/comprar`               | Entry territorial via redirect SSR (cookie → cidade; default → estado UF padrão)                                                              | ✗ (sempre redireciona) | —         | —       | **Mantido como SSR redirect** (cookie-based). Consolidação para `/anuncios` adiada.                                                                 | ❌ Não no PR J           |
+| `/comprar/[slug]`        | Alias **legado de detalhe**: redirect SSR para `/veiculo/{slug}` (rota servia URLs antigas que apontavam diretamente para anúncio individual) | ✗                      | —         | —       | **Mantido**. Trocar destino para `/cidade/{slug}` quebraria URLs históricas que esperam detalhe.                                                    | ❌ Não no PR J           |
+| `/comprar/cidade/[slug]` | Comprar na Cidade (página redesenhada no PR H)                                                                                                | ✓                      | self      | —       | **Mantido como canônica navegável**. Consolidação para `/cidade/{slug}` adiada — escopo do PR J era explícito em "não mexer em Comprar por cidade". | ❌ Não no PR J           |
+| `/comprar/estado/[uf]`   | Catálogo estadual (canônica do PR J)                                                                                                          | ✓                      | self      | —       | —                                                                                                                                                   | ❌ Nunca (PROJECT_RULES) |
 
 **Decisão PR J (v2)**: nenhum 301 novo foi adicionado em `middleware.ts` para a família `/comprar/*`. Os redirects SSR existentes em `/comprar/page.tsx` (cookie/UF) e `/comprar/[slug]/page.tsx` (→ /veiculo/) continuam ativos. A consolidação `/comprar/cidade/{slug} → /cidade/{slug}` exige:
+
 1. Confirmar que `/cidade/{slug}` tem paridade visual com a página redesenhada do PR H.
 2. Migrar conteúdo único do PR H (vitrine local) para `/cidade/{slug}`.
 3. Snapshot SEO antes/depois.
@@ -56,106 +57,106 @@ Esses passos são **escopo de um PR específico (PR J.2 ou consolidação SEO)**
 
 ### 1.4. Páginas territoriais (canônicas)
 
-| Rota | Função | Indexável | Canonical | Removível |
-|---|---|---|---|---|
-| `/cidade/[slug]` | Cidade — listagem | ✓ | self | ❌ Nunca |
-| `/cidade/[slug]/marca/[brand]` | Cidade + marca | ✓ | self | ❌ Nunca |
-| `/cidade/[slug]/marca/[brand]/modelo/[model]` | Cidade + marca + modelo | ✓ | self | ❌ Nunca |
-| `/cidade/[slug]/oportunidades` | Oportunidades por cidade | ✓ | self | ❌ Nunca |
-| `/cidade/[slug]/abaixo-da-fipe` | Abaixo da FIPE por cidade | ✓ | self | ❌ Nunca |
+| Rota                                          | Função                    | Indexável | Canonical | Removível |
+| --------------------------------------------- | ------------------------- | --------- | --------- | --------- |
+| `/cidade/[slug]`                              | Cidade — listagem         | ✓         | self      | ❌ Nunca  |
+| `/cidade/[slug]/marca/[brand]`                | Cidade + marca            | ✓         | self      | ❌ Nunca  |
+| `/cidade/[slug]/marca/[brand]/modelo/[model]` | Cidade + marca + modelo   | ✓         | self      | ❌ Nunca  |
+| `/cidade/[slug]/oportunidades`                | Oportunidades por cidade  | ✓         | self      | ❌ Nunca  |
+| `/cidade/[slug]/abaixo-da-fipe`               | Abaixo da FIPE por cidade | ✓         | self      | ❌ Nunca  |
 
 **Volume**: ~5.500 páginas indexáveis na primeira fase, crescendo para 20.000+. Qualquer alteração precisa snapshot automatizado.
 
 ### 1.5. SEO de palavra-chave (coexistem com canônicas)
 
-| Rota | Função | Indexável | Canonical | Conteúdo | Removível |
-|---|---|---|---|---|---|
-| `/carros-em/[slug]` | "carros em [cidade]" | ✓ | self | Próprio (não pode duplicar `/cidade/{slug}`) | ❌ Nunca |
-| `/carros-baratos-em/[slug]` | "carros baratos em [cidade]" | ✓ | self | Próprio | ❌ Nunca |
-| `/carros-automaticos-em/[slug]` | "carros automáticos em [cidade]" | ✓ | self | Próprio | ❌ Nunca |
-| `/carros-em-[slug]` (hifenizado) | Legado | ✗ | — | — (redirecionado) | redirect existe em `middleware.ts` |
-| `/carros-baratos-em-[slug]` (hifenizado) | Legado | ✗ | — | — | redirect existe |
-| `/carros-automaticos-em-[slug]` (hifenizado) | Legado | ✗ | — | — | redirect existe |
+| Rota                                         | Função                           | Indexável | Canonical | Conteúdo                                     | Removível                          |
+| -------------------------------------------- | -------------------------------- | --------- | --------- | -------------------------------------------- | ---------------------------------- |
+| `/carros-em/[slug]`                          | "carros em [cidade]"             | ✓         | self      | Próprio (não pode duplicar `/cidade/{slug}`) | ❌ Nunca                           |
+| `/carros-baratos-em/[slug]`                  | "carros baratos em [cidade]"     | ✓         | self      | Próprio                                      | ❌ Nunca                           |
+| `/carros-automaticos-em/[slug]`              | "carros automáticos em [cidade]" | ✓         | self      | Próprio                                      | ❌ Nunca                           |
+| `/carros-em-[slug]` (hifenizado)             | Legado                           | ✗         | —         | — (redirecionado)                            | redirect existe em `middleware.ts` |
+| `/carros-baratos-em-[slug]` (hifenizado)     | Legado                           | ✗         | —         | —                                            | redirect existe                    |
+| `/carros-automaticos-em-[slug]` (hifenizado) | Legado                           | ✗         | —         | —                                            | redirect existe                    |
 
 **Regra**: estas páginas **devem ter conteúdo distinto** das canônicas territoriais para evitar duplicate content penalty. Auditar conteúdo no PR A (parte do snapshot).
 
 ### 1.6. Detalhe do veículo
 
-| Rota | Função | Indexável | Canonical | Aliases | Redirects | Removível |
-|---|---|---|---|---|---|---|
-| `/veiculo/[slug]` | Detalhe canônico | ✓ | self | — | — | ❌ Nunca |
-| `/anuncios/[identifier]` | Redirect legado | ✗ | — | — | → `/veiculo/[slug]` | Confirmar e remover no PR I |
+| Rota                     | Função           | Indexável | Canonical | Aliases | Redirects           | Removível                   |
+| ------------------------ | ---------------- | --------- | --------- | ------- | ------------------- | --------------------------- |
+| `/veiculo/[slug]`        | Detalhe canônico | ✓         | self      | —       | —                   | ❌ Nunca                    |
+| `/anuncios/[identifier]` | Redirect legado  | ✗         | —         | —       | → `/veiculo/[slug]` | Confirmar e remover no PR I |
 
 ### 1.7. Conteúdo / iscas digitais
 
-| Rota | Função | Indexável | Canonical | Removível |
-|---|---|---|---|---|
-| `/blog` | Blog index | ✓ | self | ❌ Nunca |
-| `/blog/[cidade]` | Blog regional | ✓ | self | ❌ Nunca |
-| `/tabela-fipe` | FIPE root | ✓ | self | ❌ Nunca |
-| `/tabela-fipe/[cidade]` | FIPE regional | ✓ | self | ❌ Nunca |
-| `/simulador-financiamento` | Simulador root | ✓ | self | ❌ Nunca |
-| `/simulador-financiamento/[cidade]` | Simulador regional | ✓ | self | ❌ Nunca |
-| `/planos` | Planos | ✓ | self | ❌ Nunca |
+| Rota                                | Função             | Indexável | Canonical | Removível |
+| ----------------------------------- | ------------------ | --------- | --------- | --------- |
+| `/blog`                             | Blog index         | ✓         | self      | ❌ Nunca  |
+| `/blog/[cidade]`                    | Blog regional      | ✓         | self      | ❌ Nunca  |
+| `/tabela-fipe`                      | FIPE root          | ✓         | self      | ❌ Nunca  |
+| `/tabela-fipe/[cidade]`             | FIPE regional      | ✓         | self      | ❌ Nunca  |
+| `/simulador-financiamento`          | Simulador root     | ✓         | self      | ❌ Nunca  |
+| `/simulador-financiamento/[cidade]` | Simulador regional | ✓         | self      | ❌ Nunca  |
+| `/planos`                           | Planos             | ✓         | self      | ❌ Nunca  |
 
 ### 1.8. Institucionais
 
-| Rota | Indexável | Removível |
-|---|---|---|
-| `/sobre` | ✓ | ❌ Nunca |
-| `/como-funciona` | ✓ | ❌ Nunca |
-| `/contato` | ✓ | ❌ Nunca |
-| `/ajuda` | ✓ | ❌ Nunca |
-| `/seguranca` | ✓ | ❌ Nunca |
-| `/politica-de-privacidade` | ✓ | ❌ Nunca |
-| `/termos-de-uso` | ✓ | ❌ Nunca |
-| `/lgpd` | ✓ | ❌ Nunca |
+| Rota                       | Indexável | Removível |
+| -------------------------- | --------- | --------- |
+| `/sobre`                   | ✓         | ❌ Nunca  |
+| `/como-funciona`           | ✓         | ❌ Nunca  |
+| `/contato`                 | ✓         | ❌ Nunca  |
+| `/ajuda`                   | ✓         | ❌ Nunca  |
+| `/seguranca`               | ✓         | ❌ Nunca  |
+| `/politica-de-privacidade` | ✓         | ❌ Nunca  |
+| `/termos-de-uso`           | ✓         | ❌ Nunca  |
+| `/lgpd`                    | ✓         | ❌ Nunca  |
 
 ### 1.9. Autenticação
 
-| Rota | Indexável | Canonical | Removível |
-|---|---|---|---|
-| `/login` | ✓ | self | ❌ Nunca |
-| `/cadastro` | ✓ | self | ❌ Nunca |
-| `/recuperar-senha` | ✓ | self | ❌ Nunca |
-| `/favoritos` | ⚠️ (depende de logado) | self | ❌ Nunca |
+| Rota               | Indexável              | Canonical | Removível |
+| ------------------ | ---------------------- | --------- | --------- |
+| `/login`           | ✓                      | self      | ❌ Nunca  |
+| `/cadastro`        | ✓                      | self      | ❌ Nunca  |
+| `/recuperar-senha` | ✓                      | self      | ❌ Nunca  |
+| `/favoritos`       | ⚠️ (depende de logado) | self      | ❌ Nunca  |
 
 ### 1.10. Fluxo de anúncio
 
-| Rota | Função | Indexável | Removível |
-|---|---|---|---|
-| `/anunciar` | Landing | ✓ | ❌ Nunca |
-| `/anunciar/novo` | Wizard oficial (force-dynamic) | ✗ (privada) | ❌ Nunca |
-| `/anunciar/publicar` | ⚠️ Auditar — pode ser redundante | ✗ | ⚠️ **Verificar no PR A** |
-| `/painel/anuncios/novo` | Redirect legado | ✗ | ✅ **Pode remover no PR C** após confirmar redirect coberto pelo middleware |
+| Rota                    | Função                           | Indexável   | Removível                                                                   |
+| ----------------------- | -------------------------------- | ----------- | --------------------------------------------------------------------------- |
+| `/anunciar`             | Landing                          | ✓           | ❌ Nunca                                                                    |
+| `/anunciar/novo`        | Wizard oficial (force-dynamic)   | ✗ (privada) | ❌ Nunca                                                                    |
+| `/anunciar/publicar`    | ⚠️ Auditar — pode ser redundante | ✗           | ⚠️ **Verificar no PR A**                                                    |
+| `/painel/anuncios/novo` | Redirect legado                  | ✗           | ✅ **Pode remover no PR C** após confirmar redirect coberto pelo middleware |
 
 ### 1.11. Painel / Dashboards
 
-| Rota | Função | Indexável | Removível |
-|---|---|---|---|
-| `/dashboard` (PF) | Painel PF | ✗ | ❌ Nunca (Trilha 2 decide unificação) |
-| `/dashboard/conta`, `/meus-anuncios`, `/senha` | Sub-páginas | ✗ | ❌ Nunca |
-| `/dashboard-loja` (lojista) | Painel lojista | ✗ | ❌ Nunca (Trilha 2 decide) |
-| `/dashboard-loja/meus-anuncios`, `/mensagens`, `/plano` | Sub-páginas | ✗ | ❌ Nunca |
-| `/painel/*` | Legado (1 redirect conhecido em `/painel/anuncios/novo`) | ✗ | Auditar no PR A |
-| `/impulsionar/[adId]` | Boost de anúncio | ✗ | ❌ Nunca |
-| `/pagamento/sucesso`, `/pagamento/erro` | Post-checkout | ✗ | ❌ Nunca |
+| Rota                                                    | Função                                                   | Indexável | Removível                             |
+| ------------------------------------------------------- | -------------------------------------------------------- | --------- | ------------------------------------- |
+| `/dashboard` (PF)                                       | Painel PF                                                | ✗         | ❌ Nunca (Trilha 2 decide unificação) |
+| `/dashboard/conta`, `/meus-anuncios`, `/senha`          | Sub-páginas                                              | ✗         | ❌ Nunca                              |
+| `/dashboard-loja` (lojista)                             | Painel lojista                                           | ✗         | ❌ Nunca (Trilha 2 decide)            |
+| `/dashboard-loja/meus-anuncios`, `/mensagens`, `/plano` | Sub-páginas                                              | ✗         | ❌ Nunca                              |
+| `/painel/*`                                             | Legado (1 redirect conhecido em `/painel/anuncios/novo`) | ✗         | Auditar no PR A                       |
+| `/impulsionar/[adId]`                                   | Boost de anúncio                                         | ✗         | ❌ Nunca                              |
+| `/pagamento/sucesso`, `/pagamento/erro`                 | Post-checkout                                            | ✗         | ❌ Nunca                              |
 
 ### 1.12. Admin (Trilha 2)
 
-| Rota | Indexável | Removível |
-|---|---|---|
-| `/admin/*` (8 páginas client-only) | ✗ | ❌ Nunca (Trilha 2 trata) |
+| Rota                               | Indexável | Removível                 |
+| ---------------------------------- | --------- | ------------------------- |
+| `/admin/*` (8 páginas client-only) | ✗         | ❌ Nunca (Trilha 2 trata) |
 
 ### 1.13. Sitemaps e infra
 
-| Rota | Função | Removível |
-|---|---|---|
-| `/sitemap.xml` | Index dos sitemaps | ❌ Nunca |
-| `/sitemaps/core.xml`, `/cities.xml`, `/brands.xml`, `/models.xml`, `/content.xml`, `/below-fipe.xml`, `/opportunities.xml`, `/local-seo.xml` | Sitemaps temáticos | ❌ Nunca |
-| `/sitemaps/regiao/[state].xml` | Sitemap por estado | ❌ Nunca |
-| `/robots.ts` | Robots | ❌ Nunca |
-| `/api/diag` | Healthcheck | Avaliar — pode mover para `/api/health` se PR de infra |
+| Rota                                                                                                                                         | Função             | Removível                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------ |
+| `/sitemap.xml`                                                                                                                               | Index dos sitemaps | ❌ Nunca                                               |
+| `/sitemaps/core.xml`, `/cities.xml`, `/brands.xml`, `/models.xml`, `/content.xml`, `/below-fipe.xml`, `/opportunities.xml`, `/local-seo.xml` | Sitemaps temáticos | ❌ Nunca                                               |
+| `/sitemaps/regiao/[state].xml`                                                                                                               | Sitemap por estado | ❌ Nunca                                               |
+| `/robots.ts`                                                                                                                                 | Robots             | ❌ Nunca                                               |
+| `/api/diag`                                                                                                                                  | Healthcheck        | Avaliar — pode mover para `/api/health` se PR de infra |
 
 ---
 
@@ -213,6 +214,7 @@ São rotas **distintas** com **conteúdo distinto** voltado a SEO de palavra-cha
 ### 2.3. `/anuncios/[identifier]` → `/veiculo/[slug]`
 
 Redirect legado existente. Ao fazer PR I (detalhe), confirmar:
+
 - Redirect ainda está no código.
 - Sitemaps não listam `/anuncios/[identifier]`.
 - Search Console não acusa erro.
@@ -227,29 +229,31 @@ Após confirmação, **pode remover a rota** `/anuncios/[identifier]` (deixando 
 
 ```typescript
 config.matcher = [
-  "/carros-em-:slug",            // → /carros-em/:slug
-  "/carros-baratos-em-:slug",    // → /carros-baratos-em/:slug
-  "/carros-automaticos-em-:slug" // → /carros-automaticos-em/:slug
-]
+  "/carros-em-:slug", // → /carros-em/:slug
+  "/carros-baratos-em-:slug", // → /carros-baratos-em/:slug
+  "/carros-automaticos-em-:slug", // → /carros-automaticos-em/:slug
+];
 ```
 
 ### 3.2. Redirects necessários (a adicionar)
 
-| Origem | Destino | Status no PR J | PR responsável |
-|---|---|---|---|
-| `/comprar` | `/anuncios` | ⏸️ Adiado (SSR cookie-based mantido) | PR de consolidação SEO futura |
-| `/comprar/{slug}` | `/cidade/{slug}` | ⏸️ Adiado (rota é alias legado de detalhe; hoje SSR → `/veiculo/{slug}`) | PR de consolidação SEO futura (precisa snapshot de tráfego antes) |
-| `/comprar/cidade/{slug}` | `/cidade/{slug}` | ⏸️ Adiado (PR H redesenhou; precisa migrar conteúdo antes de depreciar) | PR de consolidação SEO futura |
-| `/painel/anuncios/novo` | `/anunciar/novo` | ✅ Já ativo no `middleware.ts` | — |
+| Origem                   | Destino          | Status no PR J                                                           | PR responsável                                                    |
+| ------------------------ | ---------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `/comprar`               | `/anuncios`      | ⏸️ Adiado (SSR cookie-based mantido)                                     | PR de consolidação SEO futura                                     |
+| `/comprar/{slug}`        | `/cidade/{slug}` | ⏸️ Adiado (rota é alias legado de detalhe; hoje SSR → `/veiculo/{slug}`) | PR de consolidação SEO futura (precisa snapshot de tráfego antes) |
+| `/comprar/cidade/{slug}` | `/cidade/{slug}` | ⏸️ Adiado (PR H redesenhou; precisa migrar conteúdo antes de depreciar)  | PR de consolidação SEO futura                                     |
+| `/painel/anuncios/novo`  | `/anunciar/novo` | ✅ Já ativo no `middleware.ts`                                           | —                                                                 |
 
 ### 3.3. Redirects condicionais
 
 Se `/anunciar/publicar` for confirmado redundante (auditoria PR A pendente):
+
 - `/anunciar/publicar` → `/anunciar/novo`
 
 ### 3.4. Política de redirects históricos
 
 **Antes de remover qualquer rota**:
+
 1. Buscar nos logs do Render últimas 24h de tráfego.
 2. Se >0 hits/dia → manter redirect 301 indefinidamente.
 3. Se 0 hits por 30 dias → pode remover redirect.
@@ -314,10 +318,10 @@ Esta seção espelha §5 do diagnóstico — qualquer remoção exige aprovaçã
 
 Lista de candidatas a remoção, em ordem decrescente de confiança:
 
-| Rota | Confiança | Pré-requisito | PR |
-|---|---|---|---|
-| `/painel/anuncios/novo` | Alta (redirect puro confirmado) | Verificar middleware | PR C |
-| `/anunciar/publicar` | Pendente auditoria | Auditar fluxo no PR A | PR C ou M |
+| Rota                    | Confiança                       | Pré-requisito         | PR        |
+| ----------------------- | ------------------------------- | --------------------- | --------- |
+| `/painel/anuncios/novo` | Alta (redirect puro confirmado) | Verificar middleware  | PR C      |
+| `/anunciar/publicar`    | Pendente auditoria              | Auditar fluxo no PR A | PR C ou M |
 
 ---
 
@@ -346,11 +350,11 @@ Auditoria de `/comprar`, `/comprar/estado/[uf]`, `/anuncios` e aliases. Mudança
 
 ### 8.2. Correções aplicadas
 
-| Arquivo | Mudança | Motivo |
-|---|---|---|
-| `frontend/components/search/VehicleSearchResultsPage.tsx` | Importa e renderiza `<SiteBottomNav />` | `/anuncios` não tinha BottomNav mobile (regra do PR J: "BottomNav com Buscar ativo no mobile") |
-| `frontend/components/shell/SiteBottomNav.tsx` | `activePattern` do item Buscar agora cobre `/(comprar\|anuncios\|carros-em\|carros-baratos-em\|carros-automaticos-em\|cidade)/` | Antes só ativava em `/comprar/*`. Agora "Buscar" fica destacado em qualquer rota de listagem |
-| `frontend/components/buy/FilterSidebar.tsx:342` | `bg-[#0e62d8]` → `bg-primary`, shadow custom → `shadow-card`, hover hex → `bg-primary-strong` | Único hex hardcoded restante em `components/buy/` |
+| Arquivo                                                   | Mudança                                                                                                                         | Motivo                                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `frontend/components/search/VehicleSearchResultsPage.tsx` | Importa e renderiza `<SiteBottomNav />`                                                                                         | `/anuncios` não tinha BottomNav mobile (regra do PR J: "BottomNav com Buscar ativo no mobile") |
+| `frontend/components/shell/SiteBottomNav.tsx`             | `activePattern` do item Buscar agora cobre `/(comprar\|anuncios\|carros-em\|carros-baratos-em\|carros-automaticos-em\|cidade)/` | Antes só ativava em `/comprar/*`. Agora "Buscar" fica destacado em qualquer rota de listagem   |
+| `frontend/components/buy/FilterSidebar.tsx:342`           | `bg-[#0e62d8]` → `bg-primary`, shadow custom → `shadow-card`, hover hex → `bg-primary-strong`                                   | Único hex hardcoded restante em `components/buy/`                                              |
 
 ### 8.3. Achados adiados (não cabem no PR J)
 

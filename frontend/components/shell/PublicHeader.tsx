@@ -214,8 +214,18 @@ export function PublicHeader() {
                 aria-label={`Cidade selecionada: ${city.label}. Tocar para trocar.`}
                 className="inline-flex max-w-[140px] items-center gap-1 truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300"
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M12 22s-7-7.5-7-13a7 7 0 1 1 14 0c0 5.5-7 13-7 13Z" strokeLinejoin="round" />
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 shrink-0 text-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                >
+                  <path
+                    d="M12 22s-7-7.5-7-13a7 7 0 1 1 14 0c0 5.5-7 13-7 13Z"
+                    strokeLinejoin="round"
+                  />
                   <circle cx="12" cy="9" r="2.5" />
                 </svg>
                 <span className="truncate">{city.label}</span>

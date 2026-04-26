@@ -41,9 +41,7 @@ export function SectionHeader({
   as: Heading = "h2",
 }: SectionHeaderProps) {
   return (
-    <header
-      className={`flex items-center justify-between gap-3 ${className}`}
-    >
+    <header className={`flex items-center justify-between gap-3 ${className}`}>
       <div className="flex min-w-0 items-center gap-2.5">
         {variant === "with-icon" && icon && (
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
@@ -52,9 +50,7 @@ export function SectionHeader({
         )}
         <div className="min-w-0">
           <Heading className={`${TITLE_CLASSES[variant]} truncate`}>{title}</Heading>
-          {description && (
-            <p className="mt-0.5 truncate text-sm text-cnc-muted">{description}</p>
-          )}
+          {description && <p className="mt-0.5 truncate text-sm text-cnc-muted">{description}</p>}
         </div>
       </div>
       {seeAllHref && (

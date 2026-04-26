@@ -57,17 +57,14 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     [version]
   );
 
-  const toggleFavorite = useCallback(
-    (slug: string) => {
-      const next = toggleFavoriteSlugRaw(slug);
-      // O evento cnc-favorites-changed disparado dentro de toggleFavoriteSlugRaw
-      // re-hidrata via listener; forcamos aqui para nao depender da ordem.
-      favoritesRef.current = new Set(getFavoriteSlugs());
-      setVersion((v) => v + 1);
-      return next;
-    },
-    []
-  );
+  const toggleFavorite = useCallback((slug: string) => {
+    const next = toggleFavoriteSlugRaw(slug);
+    // O evento cnc-favorites-changed disparado dentro de toggleFavoriteSlugRaw
+    // re-hidrata via listener; forcamos aqui para nao depender da ordem.
+    favoritesRef.current = new Set(getFavoriteSlugs());
+    setVersion((v) => v + 1);
+    return next;
+  }, []);
 
   const value = useMemo<FavoritesContextValue>(
     () => ({

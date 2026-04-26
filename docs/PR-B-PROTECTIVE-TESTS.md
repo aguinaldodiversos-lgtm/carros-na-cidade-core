@@ -1,14 +1,14 @@
 # PR B — Testes de proteção
 
-| Campo | Valor |
-|---|---|
-| **Versão** | 1 |
-| **Data** | 2026-04-24 |
-| **Branch** | `claude/sad-elbakyan-8155e1` |
-| **Status** | ✅ Entregue (zero código de produção alterado) |
-| **Pré-requisito** | PR A mergeado |
-| **Bloqueia** | PR C (remoção de órfãos) e todos PRs visuais |
-| **Referência** | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §14 PR B |
+| Campo             | Valor                                                         |
+| ----------------- | ------------------------------------------------------------- |
+| **Versão**        | 1                                                             |
+| **Data**          | 2026-04-24                                                    |
+| **Branch**        | `claude/sad-elbakyan-8155e1`                                  |
+| **Status**        | ✅ Entregue (zero código de produção alterado)                |
+| **Pré-requisito** | PR A mergeado                                                 |
+| **Bloqueia**      | PR C (remoção de órfãos) e todos PRs visuais                  |
+| **Referência**    | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §14 PR B |
 
 ---
 
@@ -28,27 +28,27 @@ Cada deliverable é **invocável standalone**, sem afetar comportamento da aplic
 
 ### 1.1. Scripts (`frontend/scripts/`)
 
-| Arquivo | Comando | Função |
-|---|---|---|
-| `snapshot-public-routes.mjs` | `npm run snapshot:public-routes` | Captura snapshot de 30+ URLs com metadata SEO |
-| `snapshot-diff.mjs` | `npm run snapshot:diff` | Compara dois snapshots, classifica diffs |
-| `lint-public-fetch.mjs` | `npm run lint:public-fetch` | Falha se houver `fetch` cru em Server Component público |
-| `lint-services-imports.mjs` | `npm run lint:services-imports` | Falha em novos imports de `services/` (baseline-driven) |
+| Arquivo                      | Comando                          | Função                                                  |
+| ---------------------------- | -------------------------------- | ------------------------------------------------------- |
+| `snapshot-public-routes.mjs` | `npm run snapshot:public-routes` | Captura snapshot de 30+ URLs com metadata SEO           |
+| `snapshot-diff.mjs`          | `npm run snapshot:diff`          | Compara dois snapshots, classifica diffs                |
+| `lint-public-fetch.mjs`      | `npm run lint:public-fetch`      | Falha se houver `fetch` cru em Server Component público |
+| `lint-services-imports.mjs`  | `npm run lint:services-imports`  | Falha em novos imports de `services/` (baseline-driven) |
 
 ### 1.2. Specs E2E (`frontend/e2e/`)
 
-| Arquivo | Tag | Comando | Cobertura |
-|---|---|---|---|
-| `seo-canonical.spec.ts` | `@seo-canonical` | `npm run test:e2e:seo:canonical` | Canonical, h1 único, description, OG em 10 páginas públicas |
-| `seo-jsonld.spec.ts` | `@seo-jsonld` | `npm run test:e2e:seo:jsonld` | BreadcrumbList em 4 territoriais; Article em blog; Product/Vehicle em detalhe (opt-in) |
-| `seo-sitemap.spec.ts` | `@seo-sitemap` | `npm run test:e2e:seo:sitemap` | sitemap.xml index + 8 sitemaps temáticos + regional + robots.txt |
+| Arquivo                 | Tag              | Comando                          | Cobertura                                                                              |
+| ----------------------- | ---------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| `seo-canonical.spec.ts` | `@seo-canonical` | `npm run test:e2e:seo:canonical` | Canonical, h1 único, description, OG em 10 páginas públicas                            |
+| `seo-jsonld.spec.ts`    | `@seo-jsonld`    | `npm run test:e2e:seo:jsonld`    | BreadcrumbList em 4 territoriais; Article em blog; Product/Vehicle em detalhe (opt-in) |
+| `seo-sitemap.spec.ts`   | `@seo-sitemap`   | `npm run test:e2e:seo:sitemap`   | sitemap.xml index + 8 sitemaps temáticos + regional + robots.txt                       |
 
 Comando combinado: `npm run test:e2e:seo` (roda os 3 acima).
 
 ### 1.3. Baselines (`frontend/tests/snapshots/`)
 
-| Arquivo | Função |
-|---|---|
+| Arquivo                         | Função                                                                                 |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
 | `services-imports-baseline.txt` | Lista atual de 35 imports de `services/`. Adições novas são bloqueadas pelo guardrail. |
 
 ### 1.4. Package.json scripts adicionados
@@ -96,21 +96,23 @@ npm run snapshot:diff -- tests/snapshots/before-PR-G.json tests/snapshots/after-
 ```
 
 Exit codes:
+
 - `0` — sem diferenças bloqueantes (pode mergear)
 - `1` — diferenças bloqueantes (não mergear sem corrigir)
 - `2` — erro fatal (snapshot inválido, etc.)
 
 ### 2.3. Classificação de diffs
 
-| Severidade | Critério | Ação |
-|---|---|---|
-| 🔴 Bloqueante | canonical mudou, status virou ≠ 200, h1_count ≠ 1, robots mudou, jsonld_types perdeu tipo, breadcrumb removido, redirect destino mudou | **Bloqueia merge** automaticamente |
-| 🟡 Exige explicar | title/description/og_image mudaram, internal_links_count >10% variação | Exige justificativa na descrição do PR |
-| 🔵 Informativo | html_size_bytes >5% variação, h1_count corrigido para 1, jsonld_types adicionado | Apenas informativo |
+| Severidade        | Critério                                                                                                                               | Ação                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 🔴 Bloqueante     | canonical mudou, status virou ≠ 200, h1_count ≠ 1, robots mudou, jsonld_types perdeu tipo, breadcrumb removido, redirect destino mudou | **Bloqueia merge** automaticamente     |
+| 🟡 Exige explicar | title/description/og_image mudaram, internal_links_count >10% variação                                                                 | Exige justificativa na descrição do PR |
+| 🔵 Informativo    | html_size_bytes >5% variação, h1_count corrigido para 1, jsonld_types adicionado                                                       | Apenas informativo                     |
 
 ### 2.4. URLs cobertas
 
 Por padrão, ~38 URLs incluindo:
+
 - Home + listagem canônica + 3 cidades sample (`atibaia-sp`, `campinas-sp`, `sao-paulo-sp`)
 - Territoriais profundidade 1, 2, 3 + oportunidades + abaixo-da-fipe
 - Aliases `/comprar/*`, SEO de palavra-chave (`/carros-em/*`)
@@ -156,10 +158,10 @@ npm run lint:services-imports:strict
 
 **Comportamento**:
 
-| Modo | Quando | Ação |
-|---|---|---|
-| Baseline | PR B → 0.4C | Falha apenas em **novos** imports, tolera os 35 existentes |
-| Strict | Após 0.4D | Falha em **qualquer** import de `services/` — pasta deve estar vazia |
+| Modo     | Quando      | Ação                                                                 |
+| -------- | ----------- | -------------------------------------------------------------------- |
+| Baseline | PR B → 0.4C | Falha apenas em **novos** imports, tolera os 35 existentes           |
+| Strict   | Após 0.4D   | Falha em **qualquer** import de `services/` — pasta deve estar vazia |
 
 **Atualizar baseline** (após uma migração 0.4B/C/D):
 
@@ -207,15 +209,18 @@ npm run test:e2e:seo:sitemap
 ### 4.3. Cobertura
 
 **Canonical (10 URLs)**:
+
 - `/`, `/anuncios`, `/sobre`, `/como-funciona`, `/blog`, `/tabela-fipe`, `/simulador-financiamento`, `/planos`, `/login`, `/cadastro`
 - Asserts: canonical presente, h1 único, description 40-220 chars, og:title presente
 
 **JSON-LD (6 URLs)**:
+
 - 4 territoriais: `/cidade/atibaia-sp`, `/cidade/atibaia-sp/marca/honda`, `/cidade/atibaia-sp/oportunidades`, `/cidade/atibaia-sp/abaixo-da-fipe` — esperam BreadcrumbList
 - `/blog`, `/blog/atibaia-sp` — esperam pelo menos 1 bloco JSON-LD
 - `/veiculo/<slug>` — opt-in via `VEHICLE_SLUG_FOR_E2E`. Esperam BreadcrumbList + Product/Vehicle
 
 **Sitemap (10 URLs)**:
+
 - `/sitemap.xml` — index com referência aos 8 sitemaps temáticos
 - 8 sitemaps temáticos: core, cities, brands, models, content, below-fipe, opportunities, local-seo
 - `/sitemaps/regiao/sp.xml` — sample regional (aceita 200 ou 404, não 5xx)

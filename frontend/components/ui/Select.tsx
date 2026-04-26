@@ -51,10 +51,7 @@ function ChevronDownIcon() {
   );
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  props,
-  ref
-) {
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(props, ref) {
   const {
     variant = "default",
     label,
@@ -76,10 +73,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   return (
     <div className={`${fullWidth ? "w-full" : ""} ${containerClassName}`.trim()}>
       {label && (
-        <label
-          htmlFor={id}
-          className="mb-1.5 block text-sm font-medium text-cnc-text-strong"
-        >
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-cnc-text-strong">
           {label}
         </label>
       )}
@@ -89,9 +83,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           id={id}
           className={`h-12 w-full appearance-none rounded-md border bg-white px-3 pr-9 text-base text-cnc-text outline-none transition focus:ring-2 md:h-10 md:text-sm ${VARIANT_CLASSES[effectiveVariant]} ${className}`}
           aria-invalid={effectiveVariant === "error" || undefined}
-          aria-describedby={
-            error ? `${id}-error` : hint ? `${id}-hint` : undefined
-          }
+          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
           {...rest}
         >
           {placeholder && (
