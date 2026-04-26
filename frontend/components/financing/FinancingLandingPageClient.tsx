@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type { AdItem } from "@/lib/search/ads-search";
 import AdCard from "@/components/ads/AdCard";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
+import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 
 interface FinancingLandingPageClientProps {
   citySlug: string;
@@ -112,7 +113,8 @@ export function FinancingLandingPageClient({
   const cityOffers = opportunityAds?.slice(0, 4) ?? [];
 
   return (
-    <main className="bg-white text-[#1e2547]">
+    <>
+    <main className="bg-white pb-24 text-[#1e2547] md:pb-20">
       <div className="mx-auto w-full max-w-[1280px] px-4 pb-20 pt-6 sm:px-8 lg:px-10">
         <PageBreadcrumbs
           items={[
@@ -431,6 +433,8 @@ export function FinancingLandingPageClient({
         </section>
       </div>
     </main>
+    <SiteBottomNav />
+    </>
   );
 }
 
