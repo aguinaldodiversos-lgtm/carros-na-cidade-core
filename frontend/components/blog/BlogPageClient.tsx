@@ -39,7 +39,7 @@ const CATEGORY_LABELS = [
   "Cidades",
 ] as const;
 
-function readingMinutesLabel(rawLabel: string | undefined): string {
+export function readingMinutesLabel(rawLabel: string | undefined): string {
   if (!rawLabel) return "5 min de leitura";
   const cleaned = rawLabel.replace(/^Ver\s+/i, "").trim();
   if (/leitura/i.test(cleaned)) return cleaned;
@@ -47,7 +47,7 @@ function readingMinutesLabel(rawLabel: string | undefined): string {
   return cleaned;
 }
 
-function ClockIcon() {
+export function ClockIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="12" r="9" />
@@ -56,7 +56,7 @@ function ClockIcon() {
   );
 }
 
-function ArrowRightIcon() {
+export function ArrowRightIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -112,7 +112,7 @@ function HeroFeaturedCard({ post, citySlug }: { post: BlogPost; citySlug: string
   );
 }
 
-function BlogPostCard({ post, citySlug }: { post: BlogPost; citySlug: string }) {
+export function BlogPostCard({ post, citySlug }: { post: BlogPost; citySlug: string }) {
   return (
     <Link
       href={`/blog/${citySlug}/${post.slug}`}
