@@ -1,7 +1,7 @@
 // frontend/components/home/HomePageClient.tsx
 import { Suspense, type ReactNode } from "react";
 
-import { HomeBottomNav } from "@/components/home/HomeBottomNav";
+import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { ContentCardsSection } from "@/components/home/sections/ContentCardsSection";
 import { ExploreByState } from "@/components/home/sections/ExploreByState";
 import { HomeCarouselsSkeleton } from "@/components/home/sections/HomeCarouselsSkeleton";
@@ -87,7 +87,7 @@ export function HomePageClient({
         <ContentCardsSection />
       </main>
 
-      <HomeBottomNav />
+      <SiteBottomNav />
     </>
   );
 }

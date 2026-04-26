@@ -8,7 +8,7 @@ type BuyPageShellProps = {
 
 export function BuyPageShell({ children, mobileFilterTrigger }: BuyPageShellProps) {
   return (
-    <div className="min-h-screen bg-slate-100/80">
+    <div className="min-h-screen bg-cnc-bg pb-20 md:pb-0">
       {children}
       {mobileFilterTrigger}
     </div>

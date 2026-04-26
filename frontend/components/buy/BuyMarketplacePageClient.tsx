@@ -10,6 +10,7 @@ import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
+import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import type {
   AdsFacetsResponse,
   AdsSearchFilters,
@@ -157,20 +158,24 @@ export default function BuyMarketplacePageClient({
     <BuyPageShell
       mobileFilterTrigger={
         <>
+          {/* Botão flutuante "Filtros" — fica acima do BottomNav (z-30
+              vs BottomNav z-40). Acima de bottom-20 para não colidir
+              com a barra inferior fixa. */}
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(true)}
-            className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-bold text-slate-900 shadow-[0_6px_24px_-6px_rgba(15,23,42,0.35)] transition hover:bg-slate-50 lg:hidden"
+            className="fixed bottom-20 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-cnc-line bg-cnc-surface px-4 py-2.5 text-sm font-bold text-cnc-text-strong shadow-premium transition hover:bg-cnc-bg lg:hidden"
+            aria-label="Abrir filtros"
           >
             <svg
               viewBox="0 0 24 24"
-              className="h-5 w-5 text-blue-700"
+              className="h-5 w-5 text-primary"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              aria-hidden
+              aria-hidden="true"
             >
-              <path d="M4 6h16M7 12h10M10 18h4" />
+              <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
             </svg>
             Filtros
           </button>
@@ -184,17 +189,17 @@ export default function BuyMarketplacePageClient({
             >
               <button
                 type="button"
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
+                className="absolute inset-0 bg-cnc-text-strong/50 backdrop-blur-[2px]"
                 aria-label="Fechar filtros"
                 onClick={() => setMobileFiltersOpen(false)}
               />
-              <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-hidden rounded-t-2xl bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                  <span className="text-base font-bold text-slate-900">Filtros</span>
+              <div className="absolute inset-x-0 bottom-0 max-h-[90vh] overflow-hidden rounded-t-2xl bg-cnc-surface shadow-premium-lg">
+                <div className="flex items-center justify-between border-b border-cnc-line px-4 py-3">
+                  <span className="text-base font-bold text-cnc-text-strong">Filtros</span>
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen(false)}
-                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-700"
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-primary hover:text-primary-strong"
                   >
                     Fechar
                   </button>
@@ -205,6 +210,10 @@ export default function BuyMarketplacePageClient({
               </div>
             </div>
           ) : null}
+
+          {/* BottomNav mobile — "Buscar" ativo automaticamente em
+              /comprar/* via pathname matching do <BottomNav>. */}
+          <SiteBottomNav />
         </>
       }
     >

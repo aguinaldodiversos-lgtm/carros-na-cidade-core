@@ -1,17 +1,32 @@
-// frontend/components/home/HomeBottomNav.tsx
+// frontend/components/shell/SiteBottomNav.tsx
 "use client";
 
 import { BottomNav, type BottomNavItem } from "@/components/ui/BottomNav";
 
 /**
- * PR G — Bottom navigation mobile da Home.
+ * Bottom navigation mobile compartilhada de TODAS as páginas públicas
+ * (home, catálogo, cidade, blog, FIPE, simulador, favoritos, painel) —
+ * DIAGNOSTICO_REDESIGN.md §11.
  *
- * Wrapper específico que define os 5 itens canônicos com o "+"
- * (Anunciar) destacado como FAB ao centro. Em mobile a nav fica
- * fixa no rodapé; em desktop ela some (regra do <BottomNav>: md:hidden).
+ * 5 itens canônicos com o "+" (Anunciar) destacado como FAB central.
+ * Em mobile fica fixa no rodapé; em desktop some (regra do <BottomNav>:
+ * md:hidden).
  *
- * Item "Início" usa activePattern para casar exatamente "/" — assim
- * não fica ativo quando o usuário sai para /comprar, /favoritos etc.
+ * O BottomNav do DS calcula o item ativo via `usePathname()`. Aqui
+ * apenas declaramos os 5 itens com seus `activePattern` apropriados —
+ * cada página renderiza o mesmo SiteBottomNav e o estado ativo é
+ * automático.
+ *
+ *   - Início (home): activePattern = ^/$ (somente "/" exato)
+ *   - Buscar:        href "/comprar" — ativo em /comprar e
+ *                    /comprar/cidade/[slug] e /comprar/estado/[uf]
+ *   - Anunciar:      FAB; ativo em /anunciar/*
+ *   - Favoritos:     ativo em /favoritos
+ *   - Conta:         ativo em /dashboard/* e /dashboard-loja/*
+ *
+ * Originalmente nasceu como `HomeBottomNav` no PR G; renomeado para
+ * `SiteBottomNav` no PR H quando passou a ser reusado em
+ * /comprar/cidade/[slug].
  */
 
 function HomeIcon() {
@@ -92,6 +107,6 @@ const ITEMS: ReadonlyArray<BottomNavItem> = [
   },
 ];
 
-export function HomeBottomNav() {
+export function SiteBottomNav() {
   return <BottomNav items={ITEMS} variant="with-fab" ariaLabel="Navegação principal" />;
 }
