@@ -1,8 +1,14 @@
 // frontend/app/blog/[cidade]/page.tsx
+//
+// PR L — /blog/[cidade] vira LISTAGEM editorial premium (mobile-first)
+// alinhada com a mockup blog.png. O conteúdo do antigo "artigo simulador"
+// foi movido para a rota dedicada /simulador-financiamento/[cidade]; aqui
+// o usuário entra na vitrine de artigos.
+//
+// SEO: schema Blog (não Article), canonical self, breadcrumb, generateMetadata.
 import type { Metadata } from "next";
 import { BlogPageClient } from "@/components/blog/BlogPageClient";
 import { fetchBlogPageContent, prettifyCitySlug } from "@/lib/blog/blog-page";
-import { fetchAdsSearch } from "@/lib/search/ads-search";
 
 type PageProps = {
   params: {
@@ -14,8 +20,8 @@ export const revalidate = 300;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = prettifyCitySlug(params.cidade);
-  const title = `Simulador de Financiamento de Carros em ${city.name} | Blog Carros na Cidade`;
-  const description = `Guia completo para simular financiamento de veículos em ${city.name}: como funciona, como usar o simulador, melhores taxas e perguntas frequentes. Dicas locais para economizar na compra do seu carro.`;
+  const title = `Blog automotivo em ${city.name} — guias, dicas e notícias | Carros na Cidade`;
+  const description = `Blog automotivo de ${city.name}: guias para comprar e vender, dicas de manutenção, mercado, financiamento e cuidados com seu carro. Conteúdo local e atualizado.`;
 
   return {
     title,
@@ -27,7 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       url: `/blog/${params.cidade}`,
-      type: "article",
+      type: "website",
       locale: "pt_BR",
     },
     twitter: {
@@ -40,41 +46,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BlogCityPage({ params }: PageProps) {
   const city = prettifyCitySlug(params.cidade);
-
-  const [content, offersResult] = await Promise.all([
-    fetchBlogPageContent(params.cidade),
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      sort: "highlight",
-      limit: 3,
-      page: 1,
-    }).catch(() => ({ data: [] as unknown[] })),
-  ]);
-
-  const offers = Array.isArray((offersResult as { data?: unknown[] }).data)
-    ? (offersResult as { data: unknown[] }).data
-    : [];
+  const content = await fetchBlogPageContent(params.cidade);
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.carrosnacidade.com").replace(
     /\/+$/,
     ""
   );
   const pageUrl = `${siteUrl}/blog/${params.cidade}`;
-  const datePublished = "2024-05-15";
 
-  const articleLd = {
+  // schema Blog: Google entende como hub editorial.
+  const blogLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: `Simulador de Financiamento de Carros: como usar e encontrar as melhores condições em ${city.name}`,
-    description: `Guia completo para simular financiamento de veículos em ${city.name}: como funciona, como usar o simulador, melhores taxas e perguntas frequentes.`,
-    image: `${siteUrl}/images/blog.png`,
-    datePublished,
-    dateModified: datePublished,
+    "@type": "Blog",
+    name: `Blog automotivo em ${city.name}`,
+    description: `Guias, dicas e notícias sobre carros em ${city.name}: compra, venda, manutenção, financiamento e mercado local.`,
+    url: pageUrl,
     inLanguage: "pt-BR",
-    author: {
-      "@type": "Person",
-      name: "Lucas Andrade",
-    },
     publisher: {
       "@type": "Organization",
       name: "Carros na Cidade",
@@ -83,14 +70,20 @@ export default async function BlogCityPage({ params }: PageProps) {
         url: `${siteUrl}/images/logo-carros-na-cidade.png`,
       },
     },
-    mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": pageUrl,
-    },
     about: {
       "@type": "Place",
       name: city.label,
     },
+    blogPost: (content.featuredPosts || []).slice(0, 6).map((post) => ({
+      "@type": "BlogPosting",
+      headline: post.title,
+      url: `${siteUrl}/blog/${params.cidade}/${post.slug}`,
+      datePublished: post.publishedAt,
+      image: post.coverImage?.startsWith("http")
+        ? post.coverImage
+        : `${siteUrl}${post.coverImage}`,
+      articleSection: post.category,
+    })),
   };
 
   const breadcrumbLd = {
@@ -98,14 +91,7 @@ export default async function BlogCityPage({ params }: PageProps) {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: `${siteUrl}/` },
-      { "@type": "ListItem", position: 2, name: "Blog", item: `${siteUrl}/blog/${params.cidade}` },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: "Financiamento",
-        item: `${siteUrl}/blog/${params.cidade}?categoria=financiamento`,
-      },
-      { "@type": "ListItem", position: 4, name: "Simulador de Financiamento", item: pageUrl },
+      { "@type": "ListItem", position: 2, name: "Blog", item: pageUrl },
     ],
   };
 
@@ -113,16 +99,13 @@ export default async function BlogCityPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogLd) }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
-      <BlogPageClient
-        content={content}
-        offers={offers as Parameters<typeof BlogPageClient>[0]["offers"]}
-      />
+      <BlogPageClient content={content} />
     </>
   );
 }
