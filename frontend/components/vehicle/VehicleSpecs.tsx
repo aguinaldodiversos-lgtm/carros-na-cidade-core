@@ -1,44 +1,58 @@
+// frontend/components/vehicle/VehicleSpecs.tsx
+
+import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
+
+/**
+ * PR I — VehicleSpecs refatorado para tokens DS.
+ * Organiza dados técnicos em cards/chips conforme regra 10 do PR I.
+ *
+ * Mantém a função (ficha técnica + descrição + listas), apenas troca
+ * hex/sombras hardcoded por <Card>, <Chip variant="static"> e tokens
+ * (cnc-line, cnc-text-strong, cnc-muted, primary).
+ */
 
 type VehicleSpecsProps = {
   vehicle: VehicleDetail;
   aiInsights: string[];
 };
 
-function ListCard({
-  title,
-  items,
-  tone = "default",
-}: {
-  title: string;
-  items: string[];
-  tone?: "default" | "highlight";
-}) {
+function SpecRow({ label, value }: { label: string; value: string }) {
   return (
-    <article
-      className={`rounded-[24px] border p-5 ${
-        tone === "highlight" ? "border-[#d9e5ff] bg-[#edf4ff]" : "border-[#e1e5ef] bg-[#f8fafe]"
-      }`}
-    >
-      <h3 className="text-base font-extrabold text-[#1f2a43]">{title}</h3>
-      <ul className="mt-3 space-y-2 text-sm text-[#4e5870]">
-        {items.map((item) => (
-          <li key={item} className="inline-flex items-start gap-2">
-            <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-[#0e62d8]" />
-            {item}
-          </li>
-        ))}
-      </ul>
-    </article>
+    <div className="rounded-lg border border-cnc-line bg-cnc-surface px-4 py-3 shadow-card">
+      <p className="text-[11px] font-bold uppercase tracking-wideish text-cnc-muted">{label}</p>
+      <p className="mt-1 text-base font-semibold leading-snug text-cnc-text-strong">{value}</p>
+    </div>
   );
 }
 
-function SpecCard({ label, value }: { label: string; value: string }) {
+function ItemList({
+  title,
+  items,
+  highlight = false,
+}: {
+  title: string;
+  items: string[];
+  highlight?: boolean;
+}) {
+  if (items.length === 0) return null;
   return (
-    <div className="rounded-[22px] border border-[#e6ebf2] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#7b869d]">{label}</p>
-      <p className="mt-1 text-[16px] font-semibold leading-snug text-[#1d2538]">{value}</p>
-    </div>
+    <Card
+      variant="flat"
+      padding="lg"
+      as="article"
+      className={highlight ? "bg-primary-soft" : ""}
+    >
+      <h3 className="text-base font-extrabold text-cnc-text-strong">{title}</h3>
+      <ul className="mt-3 flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <li key={item}>
+            <Chip variant="static">{item}</Chip>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -47,59 +61,59 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
 
   return (
     <section className="space-y-5">
-      <article className="rounded-[28px] border border-[#dfe4ef] bg-white p-5 shadow-[0_12px_32px_rgba(10,20,40,0.05)] md:p-6">
+      <Card variant="elevated" padding="lg" as="article">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#0e62d8]">
+            <p className="text-xs font-bold uppercase tracking-wideish text-primary">
               Ficha técnica
             </p>
-            <h2 className="mt-2 text-[28px] font-extrabold tracking-[-0.02em] text-[#1d2538]">
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-cnc-text-strong md:text-3xl">
               Dados do veículo
             </h2>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SpecCard label="Marca" value={vehicle.brand || "Não informado"} />
-          <SpecCard label="Modelo" value={vehicle.model} />
-          <SpecCard label="Versão" value={vehicle.version || "Não informada"} />
-          <SpecCard label="Ano" value={vehicle.year} />
-          <SpecCard label="Quilometragem" value={vehicle.km} />
-          <SpecCard label="Combustível" value={vehicle.fuel} />
-          <SpecCard label="Câmbio" value={vehicle.transmission} />
-          <SpecCard label="Carroceria" value={vehicle.bodyType} />
-          <SpecCard label="Cor" value={vehicle.color} />
-          <SpecCard label="Local" value={vehicle.city} />
-          <SpecCard label="FIPE" value={vehicle.fipePrice} />
-          <SpecCard label="Código" value={vehicle.adCode} />
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SpecRow label="Marca" value={vehicle.brand || "Não informado"} />
+          <SpecRow label="Modelo" value={vehicle.model} />
+          <SpecRow label="Versão" value={vehicle.version || "Não informada"} />
+          <SpecRow label="Ano" value={vehicle.year} />
+          <SpecRow label="Quilometragem" value={vehicle.km} />
+          <SpecRow label="Combustível" value={vehicle.fuel} />
+          <SpecRow label="Câmbio" value={vehicle.transmission} />
+          <SpecRow label="Carroceria" value={vehicle.bodyType} />
+          <SpecRow label="Cor" value={vehicle.color} />
+          <SpecRow label="Local" value={vehicle.city} />
+          <SpecRow label="FIPE" value={vehicle.fipePrice} />
+          <SpecRow label="Código" value={vehicle.adCode} />
         </div>
-      </article>
+      </Card>
 
-      <article className="rounded-[28px] border border-[#dfe4ef] bg-white p-5 shadow-[0_12px_32px_rgba(10,20,40,0.05)] md:p-6">
+      <Card variant="elevated" padding="lg" as="article">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <div>
-            <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#0e62d8]">
+            <p className="text-xs font-bold uppercase tracking-wideish text-primary">
               Descrição e diferenciais
             </p>
-            <h2 className="mt-2 text-[28px] font-extrabold tracking-[-0.02em] text-[#1d2538]">
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-cnc-text-strong md:text-3xl">
               Detalhes do anúncio
             </h2>
-            <p className="mt-4 text-[15px] leading-8 text-[#4f5a72]">{vehicle.description}</p>
+            <p className="mt-4 text-base leading-relaxed text-cnc-text">{vehicle.description}</p>
           </div>
 
-          <article className="rounded-[24px] border border-[#e1e5ef] bg-[#f8fafe] p-5">
-            <h3 className="text-base font-extrabold text-[#1f2a43]">Observações do vendedor</h3>
-            <p className="mt-3 text-sm leading-7 text-[#4f5a72]">{vehicle.sellerNotes}</p>
-          </article>
+          <Card variant="flat" padding="lg">
+            <h3 className="text-base font-extrabold text-cnc-text-strong">Observações do vendedor</h3>
+            <p className="mt-3 text-sm leading-relaxed text-cnc-muted">{vehicle.sellerNotes}</p>
+          </Card>
         </div>
-      </article>
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-4">
-        <ListCard title="Destaques" items={vehicle.optionalItems} />
-        <ListCard title="Itens de segurança" items={vehicle.safetyItems} />
-        <ListCard title="Conforto" items={vehicle.comfortItems} />
+        <ItemList title="Destaques" items={vehicle.optionalItems} />
+        <ItemList title="Itens de segurança" items={vehicle.safetyItems} />
+        <ItemList title="Conforto" items={vehicle.comfortItems} />
         {marketInsights.length > 0 ? (
-          <ListCard title="Insights de mercado" items={marketInsights} tone="highlight" />
+          <ItemList title="Insights de mercado" items={marketInsights} highlight />
         ) : null}
       </div>
     </section>

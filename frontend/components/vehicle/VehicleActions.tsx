@@ -291,38 +291,56 @@ export default function VehicleActions({
         </article>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[#d8dfeb] bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(16,28,58,0.14)] backdrop-blur md:hidden">
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
+      {/*
+        PR I — Sticky CTA mobile redesenhado.
+        Regra 8 do PR I: "preço + 'Chamar no WhatsApp'" como prioridade.
+        Regra 9: substitui BottomNav nesta página (foco em contato).
+        Layout: preço à esquerda (destaque) + botão WhatsApp grande à
+        direita. Simular fica como link secundário menor abaixo.
+        Quando não há WhatsApp, troca por "Solicitar contato"
+        (rola para form de lead). Tokens DS — sem hex hardcoded.
+      */}
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-cnc-line bg-cnc-surface/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+        <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-extrabold leading-tight text-primary">
+              {priceLabel}
+            </p>
+            <Link
+              href={financeLink}
+              onClick={handleFinanceClick}
+              className="text-[11px] font-semibold text-cnc-muted underline-offset-2 hover:text-primary hover:underline"
+            >
+              Simular financiamento
+            </Link>
+          </div>
+
           {waLink ? (
             <Link
               href={waLink}
               target="_blank"
               rel="noreferrer"
               onClick={handleWhatsappClick}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#25D366] px-2 text-[14px] font-extrabold leading-tight text-white shadow-[0_10px_22px_rgba(37,211,102,0.35)] ring-1 ring-[#128C7E]/40"
+              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-cnc-success px-4 text-sm font-bold text-white shadow-card transition hover:bg-cnc-success/90"
             >
-              WhatsApp
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="currentColor"
+              >
+                <path d="M20.5 3.5A11.4 11.4 0 0 0 12 0a11.5 11.5 0 0 0-9.7 17.5L1 24l6.7-1.8A11.5 11.5 0 0 0 23.5 12a11.4 11.4 0 0 0-3-8.5ZM12 21.5a9.4 9.4 0 0 1-4.8-1.3l-.3-.2-3.6 1 1-3.5-.2-.3A9.5 9.5 0 1 1 12 21.5Zm5.5-7.1c-.3-.2-1.8-.9-2-1s-.5-.2-.7.1l-1 1.3c-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.4-1.5a9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.4-.5.3-.4.1-.4 0-.4-.7-1.7c-.2-.4-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.4-.3.3-1 1-1 2.4 0 1.4 1 2.7 1.2 2.9.2.2 2 3 4.7 4.2 1.6.7 2.3.8 3.2.7.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4l-.5-.3Z" />
+              </svg>
+              <span>Chamar no WhatsApp</span>
             </Link>
           ) : (
-            <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[#d8dfeb] bg-[#f8fafc] px-2 text-[13px] font-bold leading-tight text-[#64748b]">
-              Sem WhatsApp
-            </span>
+            <Link
+              href="#lead-form"
+              className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-white shadow-card transition hover:bg-primary-strong"
+            >
+              Solicitar contato
+            </Link>
           )}
-
-          <Link
-            href={financeLink}
-            onClick={handleFinanceClick}
-            className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-[#0e62d8] bg-white px-2 text-[13px] font-bold leading-tight text-[#0e62d8]"
-          >
-            Simular
-          </Link>
-
-          <Link
-            href="#lead-form"
-            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#0f172a] px-2 text-[13px] font-bold leading-tight text-white"
-          >
-            Contato
-          </Link>
         </div>
       </div>
     </>

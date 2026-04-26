@@ -158,13 +158,15 @@ export default function BuyMarketplacePageClient({
     <BuyPageShell
       mobileFilterTrigger={
         <>
-          {/* Botão flutuante "Filtros" — fica acima do BottomNav (z-30
-              vs BottomNav z-40). Acima de bottom-20 para não colidir
-              com a barra inferior fixa. */}
+          {/* Botão flutuante "Filtros" — fica acima do BottomNav
+              (z-30 vs BottomNav z-40) e ancorado no canto direito
+              (não centralizado) para não colidir com CTAs centrais
+              de EmptyState/SectionHeader em telas estreitas (320-375).
+              `bottom-20` deixa espaço para os 64px do BottomNav. */}
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(true)}
-            className="fixed bottom-20 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-cnc-line bg-cnc-surface px-4 py-2.5 text-sm font-bold text-cnc-text-strong shadow-premium transition hover:bg-cnc-bg lg:hidden"
+            className="fixed bottom-20 right-4 z-30 inline-flex items-center gap-2 rounded-full border border-cnc-line bg-cnc-surface px-4 py-2.5 text-sm font-bold text-cnc-text-strong shadow-premium transition hover:bg-cnc-bg lg:hidden"
             aria-label="Abrir filtros"
           >
             <svg
