@@ -111,6 +111,7 @@ type VariantConfig = {
   layout: "vertical" | "horizontal";
   showFavorite: boolean;
   showMileageBadge: boolean;
+  showDealerPill: boolean;
   showLocation: boolean;
   showYearLabel: boolean;
   showStatus: boolean;
@@ -126,6 +127,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "vertical",
     showFavorite: false,
     showMileageBadge: true,
+    showDealerPill: true,
     showLocation: true,
     showYearLabel: true,
     showStatus: false,
@@ -139,6 +141,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "vertical",
     showFavorite: true,
     showMileageBadge: true,
+    showDealerPill: true,
     showLocation: true,
     showYearLabel: true,
     showStatus: false,
@@ -152,6 +155,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "vertical",
     showFavorite: true,
     showMileageBadge: true,
+    showDealerPill: true,
     showLocation: true,
     showYearLabel: true,
     showStatus: false,
@@ -165,6 +169,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "vertical",
     showFavorite: true,
     showMileageBadge: true,
+    showDealerPill: true,
     showLocation: true,
     showYearLabel: true,
     showStatus: false,
@@ -178,6 +183,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "horizontal",
     showFavorite: false,
     showMileageBadge: false,
+    showDealerPill: false,
     showLocation: true,
     showYearLabel: true,
     showStatus: false,
@@ -191,6 +197,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "vertical",
     showFavorite: false,
     showMileageBadge: false,
+    showDealerPill: true,
     showLocation: true,
     showYearLabel: true,
     showStatus: false,
@@ -204,6 +211,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "vertical",
     showFavorite: false,
     showMileageBadge: true,
+    showDealerPill: false,
     showLocation: false,
     showYearLabel: true,
     showStatus: true,
@@ -217,6 +225,7 @@ const VARIANTS: Record<AdCardVariant, VariantConfig> = {
     layout: "horizontal",
     showFavorite: false,
     showMileageBadge: false,
+    showDealerPill: false,
     showLocation: false,
     showYearLabel: true,
     showStatus: true,
@@ -320,6 +329,8 @@ type NormalizedAd = {
   mileage: number;
   image: string;
   badge: { label: string; variant: "success" | "warning" | "info" | "premium" } | null;
+  isDealer: boolean;
+  dealerLabel: string;
 };
 
 function normalizeAdData(source?: BaseAdData): NormalizedAd {
@@ -352,6 +363,8 @@ function normalizeAdData(source?: BaseAdData): NormalizedAd {
       storage_key: item.storage_key,
     }),
     badge: resolveBadge(item),
+    isDealer: isDealerListing(item),
+    dealerLabel: dealerLabelFor(item),
   };
 }
 
@@ -410,6 +423,33 @@ function MileageBadge({ value }: { value: number }) {
   );
 }
 
+function DealerPill({ name }: { name: string }) {
+  return (
+    <span className="absolute bottom-2 right-2 z-10 inline-flex max-w-[55%] items-center gap-1 rounded-full bg-cnc-warning px-2 py-1 text-[11px] font-bold text-white shadow-card backdrop-blur-sm">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4">
+        <path d="M3 9l1.5-4h15L21 9M3 9v10a1 1 0 0 0 1 1h2v-7h12v7h2a1 1 0 0 0 1-1V9M3 9h18" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+function isDealerListing(item: BaseAdData): boolean {
+  if (item.dealership_name && String(item.dealership_name).trim()) return true;
+  if (item.dealer_name && String(item.dealer_name).trim()) return true;
+  const sellerType = String(item.seller_type || "").toLowerCase();
+  if (sellerType === "dealer" || sellerType === "dealership" || sellerType === "premium") return true;
+  const plan = String(item.plan || "").toLowerCase();
+  if (["premium", "pro", "plus", "master", "dealer"].some((token) => plan.includes(token))) return true;
+  return false;
+}
+
+function dealerLabelFor(item: BaseAdData): string {
+  const name = String(item.dealership_name || item.dealer_name || "").trim();
+  if (name && name.length <= 18) return name;
+  return "Loja parceira";
+}
+
 function StatusPill({ status }: { status: string }) {
   const lower = status.toLowerCase();
   let variant: "success" | "warning" | "danger" | "info" = "info";
@@ -463,6 +503,9 @@ function VerticalLayout({
         />
         {config.showFavorite && <FavoriteButton itemKey={favKey} />}
         {config.showMileageBadge && <MileageBadge value={normalized.mileage} />}
+        {config.showDealerPill && normalized.isDealer && (
+          <DealerPill name={normalized.dealerLabel} />
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">

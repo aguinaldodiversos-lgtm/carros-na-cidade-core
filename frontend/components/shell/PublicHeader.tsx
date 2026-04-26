@@ -36,6 +36,22 @@ function HeartIcon() {
   );
 }
 
+function UserAvatarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-[18px] w-[18px] shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-7 8-7s8 3 8 7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function MenuIcon({ open }: { open: boolean }) {
   return (
     <svg
@@ -118,7 +134,7 @@ export function PublicHeader() {
             <Link
               href="/"
               aria-label="Carros na Cidade"
-              className="inline-flex shrink-0 items-center"
+              className="inline-flex shrink-0 flex-col items-start leading-tight"
             >
               <Image
                 src={SITE_LOGO_SRC}
@@ -126,8 +142,11 @@ export function PublicHeader() {
                 width={220}
                 height={52}
                 priority
-                className="h-[34px] w-auto max-w-[200px] object-contain object-left sm:h-[38px]"
+                className="h-[28px] w-auto max-w-[180px] object-contain object-left sm:h-[34px]"
               />
+              <span className="mt-0.5 hidden text-[10px] font-medium leading-tight text-cnc-muted sm:inline md:text-[11px]">
+                Ofertas locais e confiança perto de você
+              </span>
             </Link>
 
             <div className="hidden min-w-0 sm:block">
@@ -188,33 +207,32 @@ export function PublicHeader() {
               )}
             </nav>
 
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-1.5 md:hidden">
               <button
                 type="button"
                 onClick={() => openCityPicker()}
-                className="inline-flex max-w-[120px] truncate rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700"
+                aria-label={`Cidade selecionada: ${city.label}. Tocar para trocar.`}
+                className="inline-flex max-w-[140px] items-center gap-1 truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300"
               >
-                {city.label}
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M12 22s-7-7.5-7-13a7 7 0 1 1 14 0c0 5.5-7 13-7 13Z" strokeLinejoin="round" />
+                  <circle cx="12" cy="9" r="2.5" />
+                </svg>
+                <span className="truncate">{city.label}</span>
               </button>
-              {sessionUser ? (
-                <Link
-                  href={dashboardHrefForAccountType(sessionUser.type)}
-                  className="inline-flex h-10 max-w-[120px] items-center justify-center truncate rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
-                >
-                  Conta
-                </Link>
-              ) : (
-                <Link
-                  href={SITE_ROUTES.login}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-sm font-semibold text-white"
-                >
-                  Entrar
-                </Link>
-              )}
+              <Link
+                href={
+                  sessionUser ? dashboardHrefForAccountType(sessionUser.type) : SITE_ROUTES.login
+                }
+                aria-label={sessionUser ? "Minha conta" : "Entrar"}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary"
+              >
+                <UserAvatarIcon />
+              </Link>
               <button
                 type="button"
                 onClick={() => setMobileOpen((s) => !s)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary"
                 aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={mobileOpen}
               >
