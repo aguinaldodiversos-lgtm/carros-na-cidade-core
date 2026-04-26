@@ -120,10 +120,7 @@ export function PromoCarousel() {
           className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible [&::-webkit-scrollbar]:hidden"
         >
           {CARDS.map((card) => (
-            <div
-              key={card.id}
-              className="flex min-w-[82%] snap-center sm:min-w-[85%] md:min-w-0"
-            >
+            <div key={card.id} className="flex min-w-[82%] snap-center sm:min-w-[85%] md:min-w-0">
               <Card variant="elevated" padding="lg" className="flex h-full w-full flex-col">
                 <div className="flex items-start gap-3 sm:gap-4">
                   <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary sm:h-12 sm:w-12">

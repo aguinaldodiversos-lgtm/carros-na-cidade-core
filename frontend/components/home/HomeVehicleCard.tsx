@@ -78,7 +78,5 @@ function toBaseAdData(item: VehicleItem): BaseAdData {
 
 export function HomeVehicleCard({ item, variant, priority = false }: HomeVehicleCardProps) {
   const adVariant = variant === "highlight" ? "featured" : "carousel";
-  return (
-    <AdCard item={toBaseAdData(item)} variant={adVariant} priority={priority} />
-  );
+  return <AdCard item={toBaseAdData(item)} variant={adVariant} priority={priority} />;
 }

@@ -119,7 +119,10 @@ function classifyDiff(before, after) {
   }
 
   // Redirect destino mudou
-  if (before.redirected_to !== after.redirected_to && (before.redirected_to || after.redirected_to)) {
+  if (
+    before.redirected_to !== after.redirected_to &&
+    (before.redirected_to || after.redirected_to)
+  ) {
     issues.push({
       severity: "blocking",
       field: "redirect_target",
@@ -180,7 +183,11 @@ function classifyDiff(before, after) {
   }
   for (const t of afterTypes) {
     if (!beforeTypes.has(t)) {
-      issues.push({ severity: "info", field: "jsonld_types", msg: `Tipo JSON-LD adicionado: ${t}` });
+      issues.push({
+        severity: "info",
+        field: "jsonld_types",
+        msg: `Tipo JSON-LD adicionado: ${t}`,
+      });
     }
   }
 
@@ -310,7 +317,9 @@ async function main() {
   }
 
   if (blockingCount > 0) {
-    console.error(`❌ ${blockingCount} diferença(s) bloqueante(s) — PR não pode mergear sem correção.`);
+    console.error(
+      `❌ ${blockingCount} diferença(s) bloqueante(s) — PR não pode mergear sem correção.`
+    );
     process.exit(1);
   }
   if (explainCount > 0) {

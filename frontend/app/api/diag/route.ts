@@ -85,12 +85,7 @@ async function probeBackend(
 }
 
 function readClientIp(h: ReturnType<typeof headers>): string {
-  const candidates = [
-    "x-vercel-forwarded-for",
-    "cf-connecting-ip",
-    "x-forwarded-for",
-    "x-real-ip",
-  ];
+  const candidates = ["x-vercel-forwarded-for", "cf-connecting-ip", "x-forwarded-for", "x-real-ip"];
   for (const name of candidates) {
     const raw = h.get(name);
     if (!raw) continue;
@@ -105,9 +100,7 @@ export async function GET() {
   const baseUrl = getBackendApiBaseUrl();
   const h = headers();
   const clientIp = readClientIp(h);
-  const withIpHeader: Record<string, string> = clientIp
-    ? { "X-Cnc-Client-Ip": clientIp }
-    : {};
+  const withIpHeader: Record<string, string> = clientIp ? { "X-Cnc-Client-Ip": clientIp } : {};
 
   // Probes COM X-Cnc-Client-Ip (comportamento real do SSR pos-fix).
   // Se retornar 200 aqui, o rate limit global por IP do container Render
@@ -120,10 +113,7 @@ export async function GET() {
 
   // Probe de CONTRASTE sem X-Cnc-Client-Ip: revela se o rate limit
   // compartilhado pelo IP do container esta estorado (429) ou nao.
-  const adsSearchNoIp = await probeBackend(
-    "/api/ads/search?state=SP&limit=1&_diag=no-ip",
-    20_000
-  );
+  const adsSearchNoIp = await probeBackend("/api/ads/search?state=SP&limit=1&_diag=no-ip", 20_000);
 
   return NextResponse.json(
     {

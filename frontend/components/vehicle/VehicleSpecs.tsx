@@ -38,12 +38,7 @@ function ItemList({
 }) {
   if (items.length === 0) return null;
   return (
-    <Card
-      variant="flat"
-      padding="lg"
-      as="article"
-      className={highlight ? "bg-primary-soft" : ""}
-    >
+    <Card variant="flat" padding="lg" as="article" className={highlight ? "bg-primary-soft" : ""}>
       <h3 className="text-base font-extrabold text-cnc-text-strong">{title}</h3>
       <ul className="mt-3 flex flex-wrap gap-1.5">
         {items.map((item) => (
@@ -102,7 +97,9 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
           </div>
 
           <Card variant="flat" padding="lg">
-            <h3 className="text-base font-extrabold text-cnc-text-strong">Observações do vendedor</h3>
+            <h3 className="text-base font-extrabold text-cnc-text-strong">
+              Observações do vendedor
+            </h3>
             <p className="mt-3 text-sm leading-relaxed text-cnc-muted">{vehicle.sellerNotes}</p>
           </Card>
         </div>

@@ -72,8 +72,7 @@ function findServiceImports(content) {
   //   import ... from "@/services/..."
   //   import ... from "services/..."  (alguns aliases)
   //   const x = require('@/services/...')
-  const re =
-    /(?:from|require\()\s*["'](?:\.\.\/)*(?:@\/)?services\/([a-zA-Z0-9_-]+)["']/;
+  const re = /(?:from|require\()\s*["'](?:\.\.\/)*(?:@\/)?services\/([a-zA-Z0-9_-]+)["']/;
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(re);
     if (m) {
@@ -137,7 +136,9 @@ async function main() {
       const text = await readFile(BASELINE_PATH, "utf8");
       baseline = new Set(text.split(/\r?\n/).filter(Boolean));
     } catch {
-      console.warn(`⚠️  Baseline não encontrado em ${BASELINE_PATH}. Use --update-baseline para criar.`);
+      console.warn(
+        `⚠️  Baseline não encontrado em ${BASELINE_PATH}. Use --update-baseline para criar.`
+      );
     }
     const newViolations = violations.filter(
       (v) => !baseline.has(`${v.file}:${v.line}:${v.target}`)

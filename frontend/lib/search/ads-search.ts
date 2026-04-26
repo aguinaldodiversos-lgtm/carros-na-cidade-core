@@ -352,10 +352,7 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   return params;
 }
 
-function buildEmptyAdsSearchResponse(
-  filters: AdsSearchFilters,
-  error: string
-): AdsSearchResponse {
+function buildEmptyAdsSearchResponse(filters: AdsSearchFilters, error: string): AdsSearchResponse {
   return {
     success: false,
     ok: false,
@@ -395,21 +392,15 @@ export async function fetchAdsSearch(
 
     if (!response.ok) {
       if (isServer()) {
-        console.error(
-          `[ads-search] backend ${response.status} on ${url} — retornando vazio`
-        );
+        console.error(`[ads-search] backend ${response.status} on ${url} — retornando vazio`);
       }
-      return buildEmptyAdsSearchResponse(
-        filters,
-        `Falha ao buscar anúncios (${response.status})`
-      );
+      return buildEmptyAdsSearchResponse(filters, `Falha ao buscar anúncios (${response.status})`);
     }
 
     const json = await response.json();
     return normalizeSearchPayload(json, filters);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Falha inesperada ao buscar anúncios.";
+    const message = error instanceof Error ? error.message : "Falha inesperada ao buscar anúncios.";
     return buildEmptyAdsSearchResponse(filters, message);
   }
 }
@@ -447,9 +438,7 @@ export async function fetchAdsFacets(
 
     if (!response.ok) {
       if (isServer()) {
-        console.error(
-          `[ads-facets] backend ${response.status} on ${url} — retornando vazio`
-        );
+        console.error(`[ads-facets] backend ${response.status} on ${url} — retornando vazio`);
       }
       return { success: false, facets: EMPTY_FACETS };
     }

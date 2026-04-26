@@ -25,10 +25,7 @@ import type { ButtonHTMLAttributes } from "react";
 
 type FilterChipVariant = "active" | "removable";
 
-export type FilterChipProps = Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  "type" | "children"
-> & {
+export type FilterChipProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "children"> & {
   variant?: FilterChipVariant;
   /** Rótulo curto: "SUV", "Até R$ 50 mil". */
   label: string;
@@ -87,13 +84,7 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
 
     // active (toggle por clique do parent)
     return (
-      <button
-        ref={ref}
-        type="button"
-        aria-pressed
-        className={`${BASE} ${className}`}
-        {...rest}
-      >
+      <button ref={ref} type="button" aria-pressed className={`${BASE} ${className}`} {...rest}>
         <span className="truncate">
           {value ? (
             <>

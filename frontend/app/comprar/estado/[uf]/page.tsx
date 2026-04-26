@@ -88,17 +88,19 @@ export async function generateMetadata({
   const brand = filters.brand?.trim();
   const model = filters.model?.trim();
 
-  const title = brand && model
-    ? `${brand} ${model} em ${stateName} | Comprar`
-    : brand
-      ? `${brand} em ${stateName} | Comprar`
-      : `Catálogo de veículos em ${stateName} | Comprar`;
+  const title =
+    brand && model
+      ? `${brand} ${model} em ${stateName} | Comprar`
+      : brand
+        ? `${brand} em ${stateName} | Comprar`
+        : `Catálogo de veículos em ${stateName} | Comprar`;
 
-  const description = brand && model
-    ? `${brand} ${model} em ${stateName}: catálogo estadual com filtros e oportunidades por cidade no Carros na Cidade.`
-    : brand
-      ? `Carros ${brand} em ${stateName}: vitrine estadual com filtros inteligentes e anúncios reais em todas as cidades — Carros na Cidade.`
-      : `Catálogo de veículos em ${stateName}: explore anúncios do estado inteiro e refine pela sua cidade no Carros na Cidade.`;
+  const description =
+    brand && model
+      ? `${brand} ${model} em ${stateName}: catálogo estadual com filtros e oportunidades por cidade no Carros na Cidade.`
+      : brand
+        ? `Carros ${brand} em ${stateName}: vitrine estadual com filtros inteligentes e anúncios reais em todas as cidades — Carros na Cidade.`
+        : `Catálogo de veículos em ${stateName}: explore anúncios do estado inteiro e refine pela sua cidade no Carros na Cidade.`;
 
   const canonicalPath = buildStatePath(uf, filters);
 

@@ -27,8 +27,7 @@ const BASE =
 
 const FILTER_DEFAULT =
   "border-cnc-line bg-white text-cnc-text hover:border-cnc-line-strong hover:bg-cnc-bg";
-const FILTER_SELECTED =
-  "border-primary bg-primary-soft text-primary-strong shadow-sm";
+const FILTER_SELECTED = "border-primary bg-primary-soft text-primary-strong shadow-sm";
 const STATIC = "border-cnc-line bg-cnc-bg text-cnc-text cursor-default";
 const REMOVABLE = "border-primary/30 bg-primary-soft text-primary-strong";
 

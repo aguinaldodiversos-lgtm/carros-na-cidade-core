@@ -93,7 +93,11 @@ const URLS_TEMPLATE = [
   { path: "/sitemaps/models.xml", label: "sitemap-models", expectedContentType: "xml" },
   { path: "/sitemaps/content.xml", label: "sitemap-content", expectedContentType: "xml" },
   { path: "/sitemaps/below-fipe.xml", label: "sitemap-below-fipe", expectedContentType: "xml" },
-  { path: "/sitemaps/opportunities.xml", label: "sitemap-opportunities", expectedContentType: "xml" },
+  {
+    path: "/sitemaps/opportunities.xml",
+    label: "sitemap-opportunities",
+    expectedContentType: "xml",
+  },
   { path: "/sitemaps/local-seo.xml", label: "sitemap-local-seo", expectedContentType: "xml" },
   { path: "/robots.txt", label: "robots", expectedContentType: "text" },
 ];
@@ -233,8 +237,7 @@ function extractMetadata(html) {
   }
 
   // JSON-LD: extrair todos os scripts type=application/ld+json
-  const jsonldRegex =
-    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const jsonldRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m;
   while ((m = jsonldRegex.exec(html)) !== null) {
     try {
@@ -345,9 +348,7 @@ async function captureAll(urls, baseUrl, parallel) {
       const result = await captureUrl(target, baseUrl);
       out.push(result);
       console.log(
-        `[${result.status ?? "ERR"}] ${result.path} ${
-          result.error ? `— ${result.error}` : ""
-        }`
+        `[${result.status ?? "ERR"}] ${result.path} ${result.error ? `— ${result.error}` : ""}`
       );
     }
   });
@@ -359,7 +360,9 @@ async function captureAll(urls, baseUrl, parallel) {
 async function main() {
   console.log(`📸 Snapshot público — base=${BASE_URL}, label=${LABEL}`);
   const expanded = expandUrls(URLS_TEMPLATE);
-  console.log(`Total: ${expanded.length} URLs (${expanded.filter((u) => u.skipped).length} skipped)`);
+  console.log(
+    `Total: ${expanded.length} URLs (${expanded.filter((u) => u.skipped).length} skipped)`
+  );
 
   const startedAt = Date.now();
   const results = await captureAll(expanded, BASE_URL, MAX_PARALLEL);

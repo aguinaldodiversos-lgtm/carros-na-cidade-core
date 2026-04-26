@@ -25,8 +25,7 @@ const VARIANT_CLASSES: Record<BadgeVariant, string> = {
   success: "bg-cnc-success/10 text-cnc-success",
   danger: "bg-cnc-danger/10 text-cnc-danger",
   warning: "bg-cnc-warning/10 text-cnc-warning",
-  premium:
-    "bg-gradient-to-r from-cnc-footer-a to-cnc-footer-b text-white shadow-sm",
+  premium: "bg-gradient-to-r from-cnc-footer-a to-cnc-footer-b text-white shadow-sm",
   neutral: "bg-cnc-bg text-cnc-text border border-cnc-line",
 };
 
@@ -35,12 +34,7 @@ const SIZE_CLASSES: Record<BadgeSize, string> = {
   md: "h-6 px-2.5 text-xs",
 };
 
-export function Badge({
-  variant = "neutral",
-  size = "sm",
-  children,
-  className = "",
-}: BadgeProps) {
+export function Badge({ variant = "neutral", size = "sm", children, className = "" }: BadgeProps) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full font-semibold uppercase tracking-wideish ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}

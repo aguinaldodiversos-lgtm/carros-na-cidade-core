@@ -50,9 +50,7 @@ test.describe("@pr-f-visual PR F — screenshots de páginas com adapters refato
             fullPage: true,
           });
           // Log para o operador
-          console.log(
-            `[pr-f-visual] ${page.name} ${vp.name} status=${response?.status()}`
-          );
+          console.log(`[pr-f-visual] ${page.name} ${vp.name} status=${response?.status()}`);
         } finally {
           await ctx.close();
         }

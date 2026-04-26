@@ -49,7 +49,14 @@ export function readingMinutesLabel(rawLabel: string | undefined): string {
 
 export function ClockIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" strokeLinecap="round" />
     </svg>
@@ -58,7 +65,14 @@ export function ClockIcon() {
 
 export function ArrowRightIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+    >
       <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -177,7 +191,11 @@ function MarketplaceCta({ cityName, citySlug }: { cityName: string; citySlug: st
 function ToolsRow({ citySlug }: { citySlug: string }) {
   const tools = [
     { label: "Tabela FIPE", href: `/tabela-fipe/${citySlug}`, hint: "Consulta valor de mercado" },
-    { label: "Simulador", href: `/simulador-financiamento/${citySlug}`, hint: "Calcule sua parcela" },
+    {
+      label: "Simulador",
+      href: `/simulador-financiamento/${citySlug}`,
+      hint: "Calcule sua parcela",
+    },
     { label: "Anunciar", href: "/anunciar", hint: "Publique seu carro" },
   ];
 
@@ -239,7 +257,9 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
                   Home
                 </Link>
               </li>
-              <li aria-hidden className="text-cnc-line">›</li>
+              <li aria-hidden className="text-cnc-line">
+                ›
+              </li>
               <li className="font-semibold text-cnc-text-strong">Blog</li>
             </ol>
           </nav>

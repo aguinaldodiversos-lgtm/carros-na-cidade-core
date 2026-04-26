@@ -172,6 +172,7 @@ Novas integrações devem usar a camada `lib/*`. **A pasta `services/` é consid
 #### Migração planejada (PRs 0.4A → 0.4D)
 
 A pasta `services/` será extinta em 4 sub-PRs:
+
 - **0.4A** — Inventário (entregue: [SERVICES_MIGRATION_MAP.md](docs/SERVICES_MIGRATION_MAP.md))
 - **0.4B** — `marketService`, `planService`, `planStore` → `lib/market/`, `lib/plans/`, `lib/account/`, `lib/validation/`
 - **0.4C** — `aiService`, `vehicleService`, `adService` → `lib/ai/`, consolidação em `lib/vehicle/`, `lib/ads/`

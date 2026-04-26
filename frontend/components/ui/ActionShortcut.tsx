@@ -68,9 +68,7 @@ export function ActionShortcut({
         {label}
       </span>
       {hint && (
-        <span className="block w-full text-[10px] leading-tight text-cnc-muted">
-          {hint}
-        </span>
+        <span className="block w-full text-[10px] leading-tight text-cnc-muted">{hint}</span>
       )}
     </Link>
   );

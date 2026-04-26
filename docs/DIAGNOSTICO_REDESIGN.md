@@ -1,17 +1,17 @@
 # DIAGNÓSTICO — Redesign Mobile-First do Portal Carros na Cidade
 
-| Campo | Valor |
-|---|---|
-| **Versão** | 3 (contrato operacional final) |
-| **Data** | 2026-04-24 |
-| **Branch** | `claude/sad-elbakyan-8155e1` |
-| **Etapa** | 1 — Diagnóstico e contrato operacional (sem edição de código) |
-| **Status** | ⏳ Aguardando aprovação final para virar contrato oficial da reconstrução |
-| **Escopo** | Frontend Next.js 14 App Router |
-| **Relação com v1** | Diagnóstico amplo inicial, aprovado como ponto de partida mas operacionalmente frouxo (commit `da3e163`). |
-| **Relação com v2** | Primeira versão endurecida com 11 ajustes de estrutura (commit `96ebe63`). |
-| **Mudanças desta v3** | Separa PR O (auth visual) de backlog Trilha 2 (admin/security); adiciona obrigação de snapshot automatizado de rotas; adiciona obrigação de screenshot antes/depois em PRs visuais; adiciona bateria de testes de imagem; deixa §19 explícito sobre o que pode começar e o que está bloqueado. |
-| **Próximo passo após aprovação** | Execução do **PR A — Contratos de estabilidade** e do **PR 0.4A — Inventário de `services/`**. |
+| Campo                            | Valor                                                                                                                                                                                                                                                                                          |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Versão**                       | 3 (contrato operacional final)                                                                                                                                                                                                                                                                 |
+| **Data**                         | 2026-04-24                                                                                                                                                                                                                                                                                     |
+| **Branch**                       | `claude/sad-elbakyan-8155e1`                                                                                                                                                                                                                                                                   |
+| **Etapa**                        | 1 — Diagnóstico e contrato operacional (sem edição de código)                                                                                                                                                                                                                                  |
+| **Status**                       | ⏳ Aguardando aprovação final para virar contrato oficial da reconstrução                                                                                                                                                                                                                      |
+| **Escopo**                       | Frontend Next.js 14 App Router                                                                                                                                                                                                                                                                 |
+| **Relação com v1**               | Diagnóstico amplo inicial, aprovado como ponto de partida mas operacionalmente frouxo (commit `da3e163`).                                                                                                                                                                                      |
+| **Relação com v2**               | Primeira versão endurecida com 11 ajustes de estrutura (commit `96ebe63`).                                                                                                                                                                                                                     |
+| **Mudanças desta v3**            | Separa PR O (auth visual) de backlog Trilha 2 (admin/security); adiciona obrigação de snapshot automatizado de rotas; adiciona obrigação de screenshot antes/depois em PRs visuais; adiciona bateria de testes de imagem; deixa §19 explícito sobre o que pode começar e o que está bloqueado. |
+| **Próximo passo após aprovação** | Execução do **PR A — Contratos de estabilidade** e do **PR 0.4A — Inventário de `services/`**.                                                                                                                                                                                                 |
 
 ---
 
@@ -19,31 +19,31 @@
 
 ### V2 — 11 ajustes de estrutura (commit `96ebe63`)
 
-| # | Ajuste | Endereçado em |
-|---|---|---|
-| 1 | Reclassificar `services/` → `lib/` como refactor estrutural em 4 sub-PRs | §15 |
-| 2 | Criar Fase 0A — Contratos de estabilidade antes da limpeza | §8 |
-| 3 | Corrigir ordem dos PRs (A–O) | §14 |
-| 4 | Separar redesign público (Trilha 1) de segurança/admin (Trilha 2) | §7, §14 |
-| 5 | Endurecer critérios para deletar código morto | §13 |
-| 6 | Design system como contrato (tokens + primitivos + regras) | §9 |
-| 7 | Contrato do `<AdCard>` com 8 variantes | §10 |
-| 8 | Regra de BottomNav (onde aparece, onde não, exceções) | §11 |
-| 9 | Contrato de performance mobile (metas como obrigações) | §12 |
-| 10 | Estimativa em 3 camadas (MVP / pública / completa) | §18 |
-| 11 | "O que pode começar agora vs o que está bloqueado" | §19 |
+| #   | Ajuste                                                                   | Endereçado em |
+| --- | ------------------------------------------------------------------------ | ------------- |
+| 1   | Reclassificar `services/` → `lib/` como refactor estrutural em 4 sub-PRs | §15           |
+| 2   | Criar Fase 0A — Contratos de estabilidade antes da limpeza               | §8            |
+| 3   | Corrigir ordem dos PRs (A–O)                                             | §14           |
+| 4   | Separar redesign público (Trilha 1) de segurança/admin (Trilha 2)        | §7, §14       |
+| 5   | Endurecer critérios para deletar código morto                            | §13           |
+| 6   | Design system como contrato (tokens + primitivos + regras)               | §9            |
+| 7   | Contrato do `<AdCard>` com 8 variantes                                   | §10           |
+| 8   | Regra de BottomNav (onde aparece, onde não, exceções)                    | §11           |
+| 9   | Contrato de performance mobile (metas como obrigações)                   | §12           |
+| 10  | Estimativa em 3 camadas (MVP / pública / completa)                       | §18           |
+| 11  | "O que pode começar agora vs o que está bloqueado"                       | §19           |
 
 ### V3 — 7 ajustes finais (este commit)
 
-| # | Ajuste | Endereçado em |
-|---|---|---|
-| 1 | Entregar conteúdo completo do diagnóstico (não mais plano de reescrita) | Este documento inteiro |
-| 2 | Separar PR O (auth visual) de Trilha 2 (admin/security) — backlog T2.1 a T2.10 | §14 (PR O), §Trilha 2 (backlog) |
-| 3 | Snapshot automatizado de rotas antes/depois em PRs de catálogo/cidade/redirects/SEO | §8.2, §16 (nova subseção) |
-| 4 | Screenshot obrigatório antes/depois em TODOS os PRs visuais (D em diante) | §16 (nova subseção + tabela por PR) |
-| 5 | Bateria de testes de imagem (R2, `/api/vehicle-images`, sem imagem, quebrada, fallback) | §8.5.1 (nova, 12 casos IMG-1 a IMG-12) |
-| 6 | Header com versão, data, branch, status, relação com diagnósticos anteriores | Topo do documento (tabela metadata) |
-| 7 | §19 com categorias explícitas: documento/contratos/testes/inventários vs visual/deleção/services/canônicas/auth/detalhe | §19 reescrita |
+| #   | Ajuste                                                                                                                  | Endereçado em                          |
+| --- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | Entregar conteúdo completo do diagnóstico (não mais plano de reescrita)                                                 | Este documento inteiro                 |
+| 2   | Separar PR O (auth visual) de Trilha 2 (admin/security) — backlog T2.1 a T2.10                                          | §14 (PR O), §Trilha 2 (backlog)        |
+| 3   | Snapshot automatizado de rotas antes/depois em PRs de catálogo/cidade/redirects/SEO                                     | §8.2, §16 (nova subseção)              |
+| 4   | Screenshot obrigatório antes/depois em TODOS os PRs visuais (D em diante)                                               | §16 (nova subseção + tabela por PR)    |
+| 5   | Bateria de testes de imagem (R2, `/api/vehicle-images`, sem imagem, quebrada, fallback)                                 | §8.5.1 (nova, 12 casos IMG-1 a IMG-12) |
+| 6   | Header com versão, data, branch, status, relação com diagnósticos anteriores                                            | Topo do documento (tabela metadata)    |
+| 7   | §19 com categorias explícitas: documento/contratos/testes/inventários vs visual/deleção/services/canônicas/auth/detalhe | §19 reescrita                          |
 
 ---
 
@@ -61,6 +61,7 @@ O portal tem **arquitetura madura, mas acúmulo crítico de dívida técnica** q
 1. **Redesign é viável, mas bloqueado por contratos**. Antes de qualquer PR que altere código ou visual, é obrigatório consolidar 5 contratos (rotas canônicas, SEO, SSR, imagens, design system). Sem isso, redesign cresce sobre fundação duplicada e quebra SEO silenciosamente.
 
 2. **Duas trilhas paralelas, uma não bloqueia a outra**:
+
    - **Trilha 1** — Redesign público (SEO + conversão): home, comprar, cidade, detalhe, FIPE, simulador, blog, publicação, cards, imagens.
    - **Trilha 2** — Segurança/auth/admin: admin client-only, middleware server, dashboard PF/PJ, sessão, cookies, isolamento, permissões.
 
@@ -74,16 +75,16 @@ O portal tem **arquitetura madura, mas acúmulo crítico de dívida técnica** q
 
 ## 1. Stack oficial (sem mudança)
 
-| Camada | Tecnologia | Versão |
-|---|---|---|
-| Framework | Next.js | 14.2.35 (App Router) |
-| Runtime | React | 18.3.1 |
-| Linguagem | TypeScript | ✓ |
-| CSS | Tailwind CSS | 3.4.19 |
-| Testes | Playwright + Vitest | ✓ |
-| Imagens | Sharp + next/image + R2 (AWS S3 SDK) | ✓ |
-| Cache | ioredis (instalado, **não usado em BFF**) | 5.9.3 |
-| Carousel | embla-carousel-react | 8.6.0 |
+| Camada    | Tecnologia                                | Versão               |
+| --------- | ----------------------------------------- | -------------------- |
+| Framework | Next.js                                   | 14.2.35 (App Router) |
+| Runtime   | React                                     | 18.3.1               |
+| Linguagem | TypeScript                                | ✓                    |
+| CSS       | Tailwind CSS                              | 3.4.19               |
+| Testes    | Playwright + Vitest                       | ✓                    |
+| Imagens   | Sharp + next/image + R2 (AWS S3 SDK)      | ✓                    |
+| Cache     | ioredis (instalado, **não usado em BFF**) | 5.9.3                |
+| Carousel  | embla-carousel-react                      | 8.6.0                |
 
 Stack é adequada. Nenhuma atualização de framework é necessária.
 
@@ -93,20 +94,20 @@ Stack é adequada. Nenhuma atualização de framework é necessária.
 
 ### 2.1. Páginas públicas indexáveis (SEO-críticas)
 
-| Rota | Renderização | Metadata | Linhas | Status |
-|---|---|---|---|---|
-| `/` | ISR 300s | ✓ | 50 | ✓ OK |
-| `/anuncios` | ISR 60s | ✓ | 87 | ✓ **Canônica** |
-| `/veiculo/[slug]` | ISR 1800s | ✓ | **456** | ⚠️ Gigante — extrair AI para `lib/vehicle/ai/` antes do redesign |
-| `/cidade/[slug]` + sub-rotas | Server (no-cache) | ✓ | 32-42 | ✓ OK |
-| `/comprar/[slug]` | ISR 60s | ✓ | ~80 | ⚠️ Alias duplicado |
-| `/comprar/cidade/[slug]` | ISR 60s | ✓ | 292 | ⚠️ Paralelo — ROUTE_CANONICAL_MAP resolve |
-| `/comprar/estado/[uf]` | ISR 60s | ✓ | 188 | ⚠️ Paralelo |
-| `/carros-em/[slug]`, `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]` | ISR LOCAL_SEO | ✓ | 8 (factory) | ✓ OK |
-| `/blog` + `/blog/[cidade]` | Server + ISR 300s | ✓ | ~30 / 128 | ✓ OK |
-| `/tabela-fipe` + `/tabela-fipe/[cidade]` | Server + ISR 300s | ✓ | ~20 / 102 | ✓ OK |
-| `/simulador-financiamento` + `[cidade]` | Server + ISR 300s | ✓ | ~20 / 151 | ✓ OK |
-| `/planos` | ISR 900s | ✓ | 109 | ✓ OK |
+| Rota                                                                              | Renderização      | Metadata | Linhas      | Status                                                           |
+| --------------------------------------------------------------------------------- | ----------------- | -------- | ----------- | ---------------------------------------------------------------- |
+| `/`                                                                               | ISR 300s          | ✓        | 50          | ✓ OK                                                             |
+| `/anuncios`                                                                       | ISR 60s           | ✓        | 87          | ✓ **Canônica**                                                   |
+| `/veiculo/[slug]`                                                                 | ISR 1800s         | ✓        | **456**     | ⚠️ Gigante — extrair AI para `lib/vehicle/ai/` antes do redesign |
+| `/cidade/[slug]` + sub-rotas                                                      | Server (no-cache) | ✓        | 32-42       | ✓ OK                                                             |
+| `/comprar/[slug]`                                                                 | ISR 60s           | ✓        | ~80         | ⚠️ Alias duplicado                                               |
+| `/comprar/cidade/[slug]`                                                          | ISR 60s           | ✓        | 292         | ⚠️ Paralelo — ROUTE_CANONICAL_MAP resolve                        |
+| `/comprar/estado/[uf]`                                                            | ISR 60s           | ✓        | 188         | ⚠️ Paralelo                                                      |
+| `/carros-em/[slug]`, `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]` | ISR LOCAL_SEO     | ✓        | 8 (factory) | ✓ OK                                                             |
+| `/blog` + `/blog/[cidade]`                                                        | Server + ISR 300s | ✓        | ~30 / 128   | ✓ OK                                                             |
+| `/tabela-fipe` + `/tabela-fipe/[cidade]`                                          | Server + ISR 300s | ✓        | ~20 / 102   | ✓ OK                                                             |
+| `/simulador-financiamento` + `[cidade]`                                           | Server + ISR 300s | ✓        | ~20 / 151   | ✓ OK                                                             |
+| `/planos`                                                                         | ISR 900s          | ✓        | 109         | ✓ OK                                                             |
 
 ### 2.2. Páginas institucionais
 
@@ -115,18 +116,18 @@ Todas com `generateMetadata`, Server Components, estrutura consistente:
 
 ### 2.3. Autenticação
 
-| Rota | Issue |
-|---|---|
-| `/login`, `/cadastro`, `/recuperar-senha` | ✓ Server, com metadata |
-| `/favoritos` | 🚨 `"use client"` no topo — única página pública client-only. **Trilha 2 resolve**. |
+| Rota                                      | Issue                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| `/login`, `/cadastro`, `/recuperar-senha` | ✓ Server, com metadata                                                              |
+| `/favoritos`                              | 🚨 `"use client"` no topo — única página pública client-only. **Trilha 2 resolve**. |
 
 ### 2.4. Fluxo de anúncio
 
-| Rota | Status |
-|---|---|
-| `/anunciar` | Landing |
-| `/anunciar/novo` | Wizard oficial (force-dynamic) |
-| `/anunciar/publicar` | ⚠️ Redundante? Auditar no PR A |
+| Rota                    | Status                                          |
+| ----------------------- | ----------------------------------------------- |
+| `/anunciar`             | Landing                                         |
+| `/anunciar/novo`        | Wizard oficial (force-dynamic)                  |
+| `/anunciar/publicar`    | ⚠️ Redundante? Auditar no PR A                  |
 | `/painel/anuncios/novo` | 🚨 Redirect puro — remover no PR C (após prova) |
 
 ### 2.5. Dashboards (2 arquiteturas paralelas)
@@ -168,28 +169,28 @@ components/shell/PublicHeader.tsx  (10.5 KB — OFICIAL, usado em app/layout.tsx
 
 ### 3.2. Duplicação crítica #2 — 5 cards de anúncio
 
-| Card | Usa AdCard? | Propósito | Tratamento |
-|---|---|---|---|
-| `ads/AdCard.tsx` | — (base) | Canônico com `BaseAdData` | ✓ Manter |
-| `ads/CarCard.tsx` | ✓ adapter | Compat legado | ✓ Manter (adapter) |
-| `common/VehicleCard.tsx` | ✓ adapter | `ListingCar → AdCard` | ✓ Manter (adapter) |
-| `home/HomeVehicleCard.tsx` | ✗ reimplementa | Home com variantes | PR F — refatorar como variante |
-| `buy/CatalogVehicleCard.tsx` | ✗ reimplementa | Catálogo com `weight` | PR F — refatorar como variante |
-| `home/sections/VehicleCard.tsx` | ✗ sexta cópia | Duplicação de HomeVehicleCard | PR F — eliminar |
+| Card                            | Usa AdCard?    | Propósito                     | Tratamento                     |
+| ------------------------------- | -------------- | ----------------------------- | ------------------------------ |
+| `ads/AdCard.tsx`                | — (base)       | Canônico com `BaseAdData`     | ✓ Manter                       |
+| `ads/CarCard.tsx`               | ✓ adapter      | Compat legado                 | ✓ Manter (adapter)             |
+| `common/VehicleCard.tsx`        | ✓ adapter      | `ListingCar → AdCard`         | ✓ Manter (adapter)             |
+| `home/HomeVehicleCard.tsx`      | ✗ reimplementa | Home com variantes            | PR F — refatorar como variante |
+| `buy/CatalogVehicleCard.tsx`    | ✗ reimplementa | Catálogo com `weight`         | PR F — refatorar como variante |
+| `home/sections/VehicleCard.tsx` | ✗ sexta cópia  | Duplicação de HomeVehicleCard | PR F — eliminar                |
 
 Contrato de variantes em §10.
 
 ### 3.3. Duplicação crítica #3 — `lib/*` vs `services/*`
 
-| Função | `lib/` | `services/` | Destino canônico |
-|---|---|---|---|
-| Ads | ✓ `lib/ads/` | ✓ `adService.ts` | `lib/ads/` |
-| Auth | ✓ `lib/auth/` | ✓ `authService.ts` | `lib/auth/` |
-| Session | ✓ `lib/session/` | ✓ `sessionService.ts` | `lib/session/` |
-| Vehicle | ✓ `lib/vehicle/` | ✓ `vehicleService.ts` | `lib/vehicle/` |
-| Plans | ✗ | ✓ `planService.ts` + `planStore.ts` | criar `lib/plans/` |
-| AI | ✗ | ✓ `aiService.ts` | criar `lib/ai/` |
-| Market | ✗ | ✓ `marketService.ts` | criar `lib/market/` |
+| Função  | `lib/`           | `services/`                         | Destino canônico    |
+| ------- | ---------------- | ----------------------------------- | ------------------- |
+| Ads     | ✓ `lib/ads/`     | ✓ `adService.ts`                    | `lib/ads/`          |
+| Auth    | ✓ `lib/auth/`    | ✓ `authService.ts`                  | `lib/auth/`         |
+| Session | ✓ `lib/session/` | ✓ `sessionService.ts`               | `lib/session/`      |
+| Vehicle | ✓ `lib/vehicle/` | ✓ `vehicleService.ts`               | `lib/vehicle/`      |
+| Plans   | ✗                | ✓ `planService.ts` + `planStore.ts` | criar `lib/plans/`  |
+| AI      | ✗                | ✓ `aiService.ts`                    | criar `lib/ai/`     |
+| Market  | ✗                | ✓ `marketService.ts`                | criar `lib/market/` |
 
 **Violação explícita** do PROJECT_RULES. Migração em §15 — **refactor estrutural**, não limpeza.
 
@@ -222,43 +223,43 @@ Lista inicial (a ser validada pelo checklist de §13):
 
 ### 🔴 CRÍTICO
 
-| # | Risco | Trilha | Mitigação |
-|---|---|---|---|
-| 1 | SSR cold start (Next default 10s, backend 20-40s) | 1 e 2 | **Contrato SSR §8.4** — toda página pública SSR usa `ssrResilientFetch` |
-| 2 | Rate limit 429 global (container IP) | 1 e 2 | Verificar `AUTH_SESSION_SECRET` em prod; monitorar 429 |
-| 3 | Sitemap falha silenciosa | 1 | **Contrato SEO §8.3** — logar fallback, não engolir com `try/catch` mudo |
-| 4 | Auth isolation breach (BFF) | 2 | Code review em todo `/app/api/painel/**`; E2E `user-isolation-api.spec.ts` |
-| 5 | URLs com mudança sem redirect 301 | 1 | **ROUTE_CANONICAL_MAP §8.1** — mapear antes de qualquer renomeação |
-| 6 | `services/` → `lib/` como refactor amplo | 1 e 2 | **§15 — 4 sub-PRs fatiados**, nunca um PR único |
+| #   | Risco                                             | Trilha | Mitigação                                                                  |
+| --- | ------------------------------------------------- | ------ | -------------------------------------------------------------------------- |
+| 1   | SSR cold start (Next default 10s, backend 20-40s) | 1 e 2  | **Contrato SSR §8.4** — toda página pública SSR usa `ssrResilientFetch`    |
+| 2   | Rate limit 429 global (container IP)              | 1 e 2  | Verificar `AUTH_SESSION_SECRET` em prod; monitorar 429                     |
+| 3   | Sitemap falha silenciosa                          | 1      | **Contrato SEO §8.3** — logar fallback, não engolir com `try/catch` mudo   |
+| 4   | Auth isolation breach (BFF)                       | 2      | Code review em todo `/app/api/painel/**`; E2E `user-isolation-api.spec.ts` |
+| 5   | URLs com mudança sem redirect 301                 | 1      | **ROUTE_CANONICAL_MAP §8.1** — mapear antes de qualquer renomeação         |
+| 6   | `services/` → `lib/` como refactor amplo          | 1 e 2  | **§15 — 4 sub-PRs fatiados**, nunca um PR único                            |
 
 ### 🟠 ALTA
 
-| # | Risco | Trilha | Mitigação |
-|---|---|---|---|
-| 7 | Breadcrumb/JSON-LD removido no redesign | 1 | Contrato SEO; teste E2E de presença |
-| 8 | Canonical quebrado | 1 | Contrato SEO; validar em cada PR |
-| 9 | `/favoritos` client-only | 2 | Migrar para server com Suspense (Trilha 2) |
-| 10 | Admin client-only + guard fraco | 2 | Migrar `useAdminGuard()` → middleware server (Trilha 2) |
-| 11 | `/veiculo/[slug]` 456 linhas + AI embutida | 1 | Extrair para `lib/vehicle/ai/` antes do PR I |
+| #   | Risco                                      | Trilha | Mitigação                                               |
+| --- | ------------------------------------------ | ------ | ------------------------------------------------------- |
+| 7   | Breadcrumb/JSON-LD removido no redesign    | 1      | Contrato SEO; teste E2E de presença                     |
+| 8   | Canonical quebrado                         | 1      | Contrato SEO; validar em cada PR                        |
+| 9   | `/favoritos` client-only                   | 2      | Migrar para server com Suspense (Trilha 2)              |
+| 10  | Admin client-only + guard fraco            | 2      | Migrar `useAdminGuard()` → middleware server (Trilha 2) |
+| 11  | `/veiculo/[slug]` 456 linhas + AI embutida | 1      | Extrair para `lib/vehicle/ai/` antes do PR I            |
 
 ### 🟡 MÉDIA
 
-| # | Risco | Trilha | Mitigação |
-|---|---|---|---|
-| 12 | Bundle sem análise | 1 | Adicionar `next/bundle-analyzer` em dev (PR B) |
-| 13 | Zero `dynamic()` import | 1 | Contrato de performance §12 |
-| 14 | `sizes` ausente em imagens | 1 | **Contrato de imagens §8.5** |
-| 15 | `remotePatterns: **` permissivo | 1 e 2 | Restringir em PR B |
-| 16 | Sem banner LGPD | 1 e 2 | Implementar antes de tracking |
-| 17 | Redis instalado mas não usado | 1 e 2 | Opcional — cache de FIPE, facets, cidades |
+| #   | Risco                           | Trilha | Mitigação                                      |
+| --- | ------------------------------- | ------ | ---------------------------------------------- |
+| 12  | Bundle sem análise              | 1      | Adicionar `next/bundle-analyzer` em dev (PR B) |
+| 13  | Zero `dynamic()` import         | 1      | Contrato de performance §12                    |
+| 14  | `sizes` ausente em imagens      | 1      | **Contrato de imagens §8.5**                   |
+| 15  | `remotePatterns: **` permissivo | 1 e 2  | Restringir em PR B                             |
+| 16  | Sem banner LGPD                 | 1 e 2  | Implementar antes de tracking                  |
+| 17  | Redis instalado mas não usado   | 1 e 2  | Opcional — cache de FIPE, facets, cidades      |
 
 ### 🟢 BAIXA
 
-| # | Risco |
-|---|---|
-| 18 | `globals.css` 362 linhas — possível duplicação de cores |
-| 19 | E2E sem testes de falha SSR |
-| 20 | Revalidate times inconsistentes sem justificativa |
+| #   | Risco                                                   |
+| --- | ------------------------------------------------------- |
+| 18  | `globals.css` 362 linhas — possível duplicação de cores |
+| 19  | E2E sem testes de falha SSR                             |
+| 20  | Revalidate times inconsistentes sem justificativa       |
 
 ---
 
@@ -285,19 +286,19 @@ Cada página intocável tem pelo menos um E2E spec que a valida (§6). PR que al
 
 **11 specs Playwright**, 9 invioláveis:
 
-| Spec | @smoke | Fluxo | Página intocável coberta |
-|---|---|---|---|
-| `main-flow.spec.ts` | ✓ | Cadastro → publicação → detalhe | /, /anuncios, /veiculo/[slug], /anunciar/novo |
-| `full-flow.spec.ts` | ✓ | Variante estendida | Idem |
-| `dashboard-login-pf-pj.spec.ts` | ✓ | Login PF + PJ | /dashboard/meus-anuncios |
-| `10-login-ad-publish.spec.ts` | — | Login → publicar | /api/auth/login, /anunciar/novo |
-| `20-login-ad-checkout.spec.ts` | — | Login → checkout | /api/auth/login |
-| `register-minimal-to-publish.spec.ts` | — | Cadastro mínimo | /anunciar/novo |
-| `publish-full-surface.spec.ts` | — | Publicação completa | /anunciar/novo |
-| `user-isolation-api.spec.ts` | — | 🔒 Isolamento | BFF painel |
-| `anunciar-redirect.spec.ts` | — | Redirect legado | Middleware |
-| `vehicle-detail-premium.spec.ts` | — | Detalhe premium | /veiculo/[slug] |
-| `critical-pj-flow.spec.ts` | — | Placeholder | — |
+| Spec                                  | @smoke | Fluxo                           | Página intocável coberta                      |
+| ------------------------------------- | ------ | ------------------------------- | --------------------------------------------- |
+| `main-flow.spec.ts`                   | ✓      | Cadastro → publicação → detalhe | /, /anuncios, /veiculo/[slug], /anunciar/novo |
+| `full-flow.spec.ts`                   | ✓      | Variante estendida              | Idem                                          |
+| `dashboard-login-pf-pj.spec.ts`       | ✓      | Login PF + PJ                   | /dashboard/meus-anuncios                      |
+| `10-login-ad-publish.spec.ts`         | —      | Login → publicar                | /api/auth/login, /anunciar/novo               |
+| `20-login-ad-checkout.spec.ts`        | —      | Login → checkout                | /api/auth/login                               |
+| `register-minimal-to-publish.spec.ts` | —      | Cadastro mínimo                 | /anunciar/novo                                |
+| `publish-full-surface.spec.ts`        | —      | Publicação completa             | /anunciar/novo                                |
+| `user-isolation-api.spec.ts`          | —      | 🔒 Isolamento                   | BFF painel                                    |
+| `anunciar-redirect.spec.ts`           | —      | Redirect legado                 | Middleware                                    |
+| `vehicle-detail-premium.spec.ts`      | —      | Detalhe premium                 | /veiculo/[slug]                               |
+| `critical-pj-flow.spec.ts`            | —      | Placeholder                     | —                                             |
 
 ### Cobertura faltante (adicionar no PR B — Testes de proteção)
 
@@ -316,6 +317,7 @@ Redesign tem **duas trilhas independentes que podem correr em paralelo**. Admin 
 ### 7.1. Trilha 1 — Redesign público (SEO + conversão)
 
 **Escopo**:
+
 - Home
 - Comprar estadual
 - Comprar por cidade
@@ -336,6 +338,7 @@ Redesign tem **duas trilhas independentes que podem correr em paralelo**. Admin 
 ### 7.2. Trilha 2 — Segurança, auth, admin (paralela)
 
 **Escopo**:
+
 - `useAdminGuard()` → middleware server
 - `/favoritos` client-only → server com Suspense
 - Dashboard PF/PJ: arquitetura duplicada → avaliação de unificação
@@ -362,25 +365,25 @@ Redesign tem **duas trilhas independentes que podem correr em paralelo**. Admin 
 
 Documento novo em `docs/ROUTE_CANONICAL_MAP.md`. Estrutura obrigatória:
 
-| Rota atual | Função | Indexável? | Canonical esperado | Aliases | Redirects 301 necessários | Pode ser removida? |
-|---|---|---|---|---|---|---|
-| `/anuncios` | Listagem canônica | ✓ | `/anuncios?...` | — | — | Nunca |
-| `/comprar` | Entry territorial | ✓ | `/anuncios` ou `/cidade/{slug}` | — | resolver | Após mapeamento |
-| `/comprar/[slug]` | Alias cidade | ⚠️ | `/cidade/{slug}` | `/comprar/cidade/{slug}` | `/comprar/[slug]` → `/cidade/[slug]` | Depois de redirect |
-| `/comprar/cidade/[slug]` | Paralelo cidade | ⚠️ | `/cidade/{slug}` | `/comprar/[slug]` | idem | Depois de redirect |
-| `/comprar/estado/[uf]` | Busca por estado | ✓ | `/comprar/estado/{uf}` | — | — | Não |
-| `/cidade/[slug]` | Territorial | ✓ | `/cidade/{slug}` | — | — | Nunca |
-| `/cidade/[slug]/marca/[brand]` | Territorial | ✓ | idem | — | — | Nunca |
-| `/cidade/[slug]/marca/[brand]/modelo/[model]` | Territorial | ✓ | idem | — | — | Nunca |
-| `/cidade/[slug]/oportunidades` | Territorial | ✓ | idem | — | — | Nunca |
-| `/cidade/[slug]/abaixo-da-fipe` | Territorial | ✓ | idem | — | — | Nunca |
-| `/carros-em/[slug]`, `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]` | SEO local | ✓ | idem | hifenizados `/carros-em-{slug}` já têm redirect | manter | Nunca |
-| `/veiculo/[slug]` | Detalhe canônico | ✓ | `/veiculo/{slug}` | — | — | Nunca |
-| `/anuncios/[identifier]` | Redirect legado | ✗ | — | — | → `/veiculo/{slug}` (já existe) | Depois de confirmação |
-| `/painel/anuncios/novo` | Redirect legado | ✗ | — | — | → `/anunciar/novo` (já existe) | **Pode remover** (PR C, após prova) |
-| `/anunciar/publicar` | Redundante? | — | — | — | — | Auditar no PR A |
-| `/dashboard`, `/dashboard-loja` | Painéis | ✗ | — | — | — | Nunca (Trilha 2 decide unificação) |
-| `/admin/*` | Admin | ✗ | — | — | — | Nunca (Trilha 2) |
+| Rota atual                                                                        | Função            | Indexável? | Canonical esperado              | Aliases                                         | Redirects 301 necessários            | Pode ser removida?                  |
+| --------------------------------------------------------------------------------- | ----------------- | ---------- | ------------------------------- | ----------------------------------------------- | ------------------------------------ | ----------------------------------- |
+| `/anuncios`                                                                       | Listagem canônica | ✓          | `/anuncios?...`                 | —                                               | —                                    | Nunca                               |
+| `/comprar`                                                                        | Entry territorial | ✓          | `/anuncios` ou `/cidade/{slug}` | —                                               | resolver                             | Após mapeamento                     |
+| `/comprar/[slug]`                                                                 | Alias cidade      | ⚠️         | `/cidade/{slug}`                | `/comprar/cidade/{slug}`                        | `/comprar/[slug]` → `/cidade/[slug]` | Depois de redirect                  |
+| `/comprar/cidade/[slug]`                                                          | Paralelo cidade   | ⚠️         | `/cidade/{slug}`                | `/comprar/[slug]`                               | idem                                 | Depois de redirect                  |
+| `/comprar/estado/[uf]`                                                            | Busca por estado  | ✓          | `/comprar/estado/{uf}`          | —                                               | —                                    | Não                                 |
+| `/cidade/[slug]`                                                                  | Territorial       | ✓          | `/cidade/{slug}`                | —                                               | —                                    | Nunca                               |
+| `/cidade/[slug]/marca/[brand]`                                                    | Territorial       | ✓          | idem                            | —                                               | —                                    | Nunca                               |
+| `/cidade/[slug]/marca/[brand]/modelo/[model]`                                     | Territorial       | ✓          | idem                            | —                                               | —                                    | Nunca                               |
+| `/cidade/[slug]/oportunidades`                                                    | Territorial       | ✓          | idem                            | —                                               | —                                    | Nunca                               |
+| `/cidade/[slug]/abaixo-da-fipe`                                                   | Territorial       | ✓          | idem                            | —                                               | —                                    | Nunca                               |
+| `/carros-em/[slug]`, `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]` | SEO local         | ✓          | idem                            | hifenizados `/carros-em-{slug}` já têm redirect | manter                               | Nunca                               |
+| `/veiculo/[slug]`                                                                 | Detalhe canônico  | ✓          | `/veiculo/{slug}`               | —                                               | —                                    | Nunca                               |
+| `/anuncios/[identifier]`                                                          | Redirect legado   | ✗          | —                               | —                                               | → `/veiculo/{slug}` (já existe)      | Depois de confirmação               |
+| `/painel/anuncios/novo`                                                           | Redirect legado   | ✗          | —                               | —                                               | → `/anunciar/novo` (já existe)       | **Pode remover** (PR C, após prova) |
+| `/anunciar/publicar`                                                              | Redundante?       | —          | —                               | —                                               | —                                    | Auditar no PR A                     |
+| `/dashboard`, `/dashboard-loja`                                                   | Painéis           | ✗          | —                               | —                                               | —                                    | Nunca (Trilha 2 decide unificação)  |
+| `/admin/*`                                                                        | Admin             | ✗          | —                               | —                                               | —                                    | Nunca (Trilha 2)                    |
 
 **Relação crítica entre `/anuncios`, `/comprar/*`, `/cidade/*`, `/carros-em/*`**:
 
@@ -398,6 +401,7 @@ Documento novo em `docs/ROUTE_CANONICAL_MAP.md`. Estrutura obrigatória:
 > Toda mudança que toque rota pública, middleware, metadata, sitemap, canonical ou conteúdo indexável **exige snapshot antes e depois**, com diff automatizado no pipeline. PR sem evidência de diff zero (ou diff explicado) não passa.
 
 **PRs que disparam obrigatoriamente**:
+
 - PR A (baseline inicial)
 - PR C (se tocar `middleware.ts` ou `/painel/anuncios/novo`)
 - PR G (home)
@@ -455,21 +459,21 @@ Documento novo em `docs/ROUTE_CANONICAL_MAP.md`. Estrutura obrigatória:
 
 **Obrigatório em toda página pública indexável**:
 
-| Item | Regra |
-|---|---|
-| `generateMetadata` | Presente. Não usar valores hardcoded. |
-| `title` | Padrão `"<Conteúdo> \| Carros na Cidade"` via template. |
-| `description` | 140-160 caracteres, específico por página. |
-| `alternates.canonical` | Obrigatório. Respeita ROUTE_CANONICAL_MAP. |
-| `openGraph` | `title`, `description`, `url`, `image` (com fallback). |
-| `twitter.card` | `"summary_large_image"` em detalhe; `"summary"` no resto. |
-| `robots` | `index, follow` em canônicas; `noindex` em aliases. |
-| `<h1>` | Único por página. Conteúdo primário. |
-| Breadcrumb | Obrigatório em páginas com profundidade ≥2. JSON-LD `BreadcrumbList`. |
-| JSON-LD | `Article` em blog, `Product` em detalhe, `BreadcrumbList` em territorial. |
-| Sitemap | Presença em `/sitemap.xml` ou sub-sitemap específico. |
-| Redirects 301 | Toda rota removida ou renomeada tem entrada em `middleware.ts`. |
-| Cache sitemap | Endurecer de 300s → **900s com stale-while-revalidate=3600**. Logar falhas explicitamente. |
+| Item                   | Regra                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `generateMetadata`     | Presente. Não usar valores hardcoded.                                                      |
+| `title`                | Padrão `"<Conteúdo> \| Carros na Cidade"` via template.                                    |
+| `description`          | 140-160 caracteres, específico por página.                                                 |
+| `alternates.canonical` | Obrigatório. Respeita ROUTE_CANONICAL_MAP.                                                 |
+| `openGraph`            | `title`, `description`, `url`, `image` (com fallback).                                     |
+| `twitter.card`         | `"summary_large_image"` em detalhe; `"summary"` no resto.                                  |
+| `robots`               | `index, follow` em canônicas; `noindex` em aliases.                                        |
+| `<h1>`                 | Único por página. Conteúdo primário.                                                       |
+| Breadcrumb             | Obrigatório em páginas com profundidade ≥2. JSON-LD `BreadcrumbList`.                      |
+| JSON-LD                | `Article` em blog, `Product` em detalhe, `BreadcrumbList` em territorial.                  |
+| Sitemap                | Presença em `/sitemap.xml` ou sub-sitemap específico.                                      |
+| Redirects 301          | Toda rota removida ou renomeada tem entrada em `middleware.ts`.                            |
+| Cache sitemap          | Endurecer de 300s → **900s com stale-while-revalidate=3600**. Logar falhas explicitamente. |
 
 ### 8.4. Contrato SSR
 
@@ -478,6 +482,7 @@ Documento novo em `docs/ROUTE_CANONICAL_MAP.md`. Estrutura obrigatória:
 > Toda página pública SSR/ISR que busca dados no backend deve usar `ssrResilientFetch` ou wrapper equivalente. É proibido introduzir `fetch` cru para backend em páginas públicas críticas.
 
 **Helpers oficiais**:
+
 - `frontend/lib/net/ssr-resilient-fetch.ts` — wrapper com retry + timeout escalonado + propagação de `X-Cnc-Client-Ip`.
 
 **Cobertura obrigatória** (verificada no PR B):
@@ -506,18 +511,18 @@ Documento novo em `docs/ROUTE_CANONICAL_MAP.md`. Estrutura obrigatória:
 
 **Regras**:
 
-| Item | Regra |
-|---|---|
-| Componente base | `next/image` sempre (exceto SVG puro). |
-| `sizes` | Obrigatório em toda instância. Padrão: `"(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"`. |
-| `priority` | Apenas em imagem acima da dobra (hero, primeiro card do grid). Máximo 1-2 por página. |
-| Loading | `lazy` (default). `eager` apenas com `priority`. |
-| Placeholder | `blur` com `blurDataURL` gerado no backend ou fallback estático. |
-| Fallback de erro | Componente `<VehicleImagePlaceholder>` — nunca broken image. |
-| Compatibilidade | `/api/vehicle-images` (upload) e R2 (storage). |
-| Domínios | `remotePatterns` restrito: R2, Unsplash (dev), localhost (dev). **Remover `**`**. |
-| SVG | Bloqueado (remove `dangerouslyAllowSVG: true` no `next.config.mjs`). |
-| CLS | `width` e `height` obrigatórios. |
+| Item             | Regra                                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------------------------- |
+| Componente base  | `next/image` sempre (exceto SVG puro).                                                               |
+| `sizes`          | Obrigatório em toda instância. Padrão: `"(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"`. |
+| `priority`       | Apenas em imagem acima da dobra (hero, primeiro card do grid). Máximo 1-2 por página.                |
+| Loading          | `lazy` (default). `eager` apenas com `priority`.                                                     |
+| Placeholder      | `blur` com `blurDataURL` gerado no backend ou fallback estático.                                     |
+| Fallback de erro | Componente `<VehicleImagePlaceholder>` — nunca broken image.                                         |
+| Compatibilidade  | `/api/vehicle-images` (upload) e R2 (storage).                                                       |
+| Domínios         | `remotePatterns` restrito: R2, Unsplash (dev), localhost (dev). **Remover `**`\*\*.                  |
+| SVG              | Bloqueado (remove `dangerouslyAllowSVG: true` no `next.config.mjs`).                                 |
+| CLS              | `width` e `height` obrigatórios.                                                                     |
 
 **Tratamento de erro**:
 
@@ -536,31 +541,31 @@ Nunca deixar layout quebrar porque imagem caiu.
 
 #### Casos de teste obrigatórios
 
-| # | Cenário | Expectativa | Validação |
-|---|---|---|---|
-| IMG-1 | URL R2 válida (`https://r2.carrosnacidade.com/ads/xyz.jpg`) | Imagem carrega via `next/image`, LCP aceitável, sem CLS | Unit + Lighthouse |
-| IMG-2 | Upload novo via `/api/vehicle-images` | Imagem aparece em tela após upload; URL R2 é retornada; preview funciona | E2E (Playwright) |
-| IMG-3 | Anúncio sem imagem (`images: []`) | Renderiza `<VehicleImagePlaceholder>` no lugar, sem erro, sem layout shift | Unit |
-| IMG-4 | Imagem quebrada (URL 404 ou timeout) | `onError` dispara → `<VehicleImagePlaceholder>` substitui; log enviado; nenhum crash do componente pai | Unit + E2E |
-| IMG-5 | Fallback sem quebrar layout | `width`/`height` preservados no placeholder; grid/card não colapsa; CLS = 0 | E2E + Lighthouse |
-| IMG-6 | Imagem com `sizes` ausente (regressão) | Teste de CI falha (guardrail no eslint ou script) | CI check |
-| IMG-7 | Domínio não permitido (`https://evil.com/x.jpg`) | `next/image` bloqueia (config `remotePatterns` restrito) | Unit + config |
-| IMG-8 | SVG injetado como URL de imagem de anúncio | Bloqueado (remover `dangerouslyAllowSVG: true`) | Config |
-| IMG-9 | Lazy load abaixo da dobra | Imagem só carrega ao fazer scroll (via IntersectionObserver do `next/image`) | E2E com scroll |
-| IMG-10 | `priority` acima da dobra | Primeira imagem da home/detalhe tem `fetchpriority="high"` | Unit (DOM snapshot) |
-| IMG-11 | Múltiplos tamanhos responsivos | `srcset` gerado corretamente para breakpoints mobile/tablet/desktop | Unit (DOM snapshot) |
-| IMG-12 | Galeria em detalhe (swipe) | Trocar imagem ativa mantém CLS = 0; lazy load das imagens não visíveis | E2E mobile |
+| #      | Cenário                                                     | Expectativa                                                                                            | Validação           |
+| ------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------- |
+| IMG-1  | URL R2 válida (`https://r2.carrosnacidade.com/ads/xyz.jpg`) | Imagem carrega via `next/image`, LCP aceitável, sem CLS                                                | Unit + Lighthouse   |
+| IMG-2  | Upload novo via `/api/vehicle-images`                       | Imagem aparece em tela após upload; URL R2 é retornada; preview funciona                               | E2E (Playwright)    |
+| IMG-3  | Anúncio sem imagem (`images: []`)                           | Renderiza `<VehicleImagePlaceholder>` no lugar, sem erro, sem layout shift                             | Unit                |
+| IMG-4  | Imagem quebrada (URL 404 ou timeout)                        | `onError` dispara → `<VehicleImagePlaceholder>` substitui; log enviado; nenhum crash do componente pai | Unit + E2E          |
+| IMG-5  | Fallback sem quebrar layout                                 | `width`/`height` preservados no placeholder; grid/card não colapsa; CLS = 0                            | E2E + Lighthouse    |
+| IMG-6  | Imagem com `sizes` ausente (regressão)                      | Teste de CI falha (guardrail no eslint ou script)                                                      | CI check            |
+| IMG-7  | Domínio não permitido (`https://evil.com/x.jpg`)            | `next/image` bloqueia (config `remotePatterns` restrito)                                               | Unit + config       |
+| IMG-8  | SVG injetado como URL de imagem de anúncio                  | Bloqueado (remover `dangerouslyAllowSVG: true`)                                                        | Config              |
+| IMG-9  | Lazy load abaixo da dobra                                   | Imagem só carrega ao fazer scroll (via IntersectionObserver do `next/image`)                           | E2E com scroll      |
+| IMG-10 | `priority` acima da dobra                                   | Primeira imagem da home/detalhe tem `fetchpriority="high"`                                             | Unit (DOM snapshot) |
+| IMG-11 | Múltiplos tamanhos responsivos                              | `srcset` gerado corretamente para breakpoints mobile/tablet/desktop                                    | Unit (DOM snapshot) |
+| IMG-12 | Galeria em detalhe (swipe)                                  | Trocar imagem ativa mantém CLS = 0; lazy load das imagens não visíveis                                 | E2E mobile          |
 
 #### Arquivos de teste (a criar no PR E)
 
-| Arquivo | Escopo |
-|---|---|
-| `frontend/components/ui/__tests__/VehicleImage.test.tsx` | IMG-1, 3, 4, 7, 10, 11 (unit) |
-| `frontend/components/ui/__tests__/VehicleImagePlaceholder.test.tsx` | IMG-3, 4, 5 (unit) |
-| `frontend/e2e/image-upload-flow.spec.ts` | IMG-2 (E2E com upload real em mock backend) |
-| `frontend/e2e/image-error-fallback.spec.ts` | IMG-4, 5 (E2E simulando 404) |
-| `frontend/e2e/image-lazy-load.spec.ts` | IMG-9, 12 (E2E com scroll) |
-| `scripts/lint-images.mjs` | IMG-6 (CI guardrail — grep por `<img` e `next/image` sem `sizes`) |
+| Arquivo                                                             | Escopo                                                            |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `frontend/components/ui/__tests__/VehicleImage.test.tsx`            | IMG-1, 3, 4, 7, 10, 11 (unit)                                     |
+| `frontend/components/ui/__tests__/VehicleImagePlaceholder.test.tsx` | IMG-3, 4, 5 (unit)                                                |
+| `frontend/e2e/image-upload-flow.spec.ts`                            | IMG-2 (E2E com upload real em mock backend)                       |
+| `frontend/e2e/image-error-fallback.spec.ts`                         | IMG-4, 5 (E2E simulando 404)                                      |
+| `frontend/e2e/image-lazy-load.spec.ts`                              | IMG-9, 12 (E2E com scroll)                                        |
+| `scripts/lint-images.mjs`                                           | IMG-6 (CI guardrail — grep por `<img` e `next/image` sem `sizes`) |
 
 #### Regra de merge
 
@@ -576,35 +581,35 @@ Entregue no **PR D** como aditivo — não remove nada existente até PR F+.
 
 **Cores** (paleta mínima):
 
-| Token | Uso | Valor referencial |
-|---|---|---|
-| `primary-50..900` | CTAs, links, ativos | Azul (manter marca) |
-| `success-500` | Abaixo da FIPE, verificado, WhatsApp | Verde |
-| `warning-500` | Alertas, selos "Imperdível" | Laranja |
-| `danger-500` | Erros, urgência | Vermelho |
-| `neutral-0..900` | Textos, bordas, fundos | Escala cinza |
-| `surface-base` | Fundo de card | Branco / dark equivalent |
-| `surface-muted` | Trust bar, sections secundárias | Cinza muito claro |
-| `border-default` | Bordas de card e input | Cinza claro |
-| `text-primary` | Conteúdo principal | neutral-900 |
-| `text-secondary` | Labels, meta | neutral-600 |
-| `text-muted` | Hints | neutral-400 |
+| Token             | Uso                                  | Valor referencial        |
+| ----------------- | ------------------------------------ | ------------------------ |
+| `primary-50..900` | CTAs, links, ativos                  | Azul (manter marca)      |
+| `success-500`     | Abaixo da FIPE, verificado, WhatsApp | Verde                    |
+| `warning-500`     | Alertas, selos "Imperdível"          | Laranja                  |
+| `danger-500`      | Erros, urgência                      | Vermelho                 |
+| `neutral-0..900`  | Textos, bordas, fundos               | Escala cinza             |
+| `surface-base`    | Fundo de card                        | Branco / dark equivalent |
+| `surface-muted`   | Trust bar, sections secundárias      | Cinza muito claro        |
+| `border-default`  | Bordas de card e input               | Cinza claro              |
+| `text-primary`    | Conteúdo principal                   | neutral-900              |
+| `text-secondary`  | Labels, meta                         | neutral-600              |
+| `text-muted`      | Hints                                | neutral-400              |
 
 **Raio**:
 
-| Token | Uso |
-|---|---|
-| `rounded-sm` (4px) | Badges, chips pequenos |
-| `rounded-md` (8px) | Cards padrão, inputs |
-| `rounded-lg` (12px) | Cards destaque |
-| `rounded-2xl` (16px) | Hero, painéis |
-| `rounded-full` | Atalhos circulares, avatars |
+| Token                | Uso                         |
+| -------------------- | --------------------------- |
+| `rounded-sm` (4px)   | Badges, chips pequenos      |
+| `rounded-md` (8px)   | Cards padrão, inputs        |
+| `rounded-lg` (12px)  | Cards destaque              |
+| `rounded-2xl` (16px) | Hero, painéis               |
+| `rounded-full`       | Atalhos circulares, avatars |
 
 **Sombra**:
 
-| Token | Uso |
-|---|---|
-| `shadow-sm` | Cards padrão |
+| Token       | Uso                    |
+| ----------- | ---------------------- |
+| `shadow-sm` | Cards padrão           |
 | `shadow-md` | Cards em hover, modals |
 | `shadow-lg` | Drawers, bottom sheets |
 
@@ -614,44 +619,44 @@ Entregue no **PR D** como aditivo — não remove nada existente até PR F+.
 
 **Breakpoints**:
 
-| Token | px |
-|---|---|
-| `sm` | 640 |
-| `md` | 768 |
-| `lg` | 1024 |
-| `xl` | 1280 |
+| Token | px   |
+| ----- | ---- |
+| `sm`  | 640  |
+| `md`  | 768  |
+| `lg`  | 1024 |
+| `xl`  | 1280 |
 
 **Alturas fixas**:
 
-| Elemento | Valor |
-|---|---|
-| Input | 48px (mobile), 40px (desktop) |
-| Button primário | 48px (mobile), 44px (desktop) |
-| Chip/filtro | 36px |
-| Bottom navigation | 64px + safe-area |
-| Header | 56px (mobile), 72px (desktop) |
+| Elemento          | Valor                         |
+| ----------------- | ----------------------------- |
+| Input             | 48px (mobile), 40px (desktop) |
+| Button primário   | 48px (mobile), 44px (desktop) |
+| Chip/filtro       | 36px                          |
+| Bottom navigation | 64px + safe-area              |
+| Header            | 56px (mobile), 72px (desktop) |
 
 ### 9.2. Primitivos (lista fechada)
 
 Criados em `components/ui/` como aditivos no PR D. Cada um com tests + Storybook-like doc em `docs/DESIGN_SYSTEM.md`:
 
-| Primitivo | Propósito | Variantes |
-|---|---|---|
-| `<Button>` | Ação | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp` |
-| `<Input>` | Entrada de texto | `default`, `search`, `error` |
-| `<Select>` | Seleção de opção | `default`, `native`, `searchable` |
-| `<Chip>` | Pílula clicável | `filter`, `removable`, `toggle` |
-| `<Badge>` | Selo pequeno | `info`, `success`, `danger`, `premium` |
-| `<Card>` | Container genérico | `default`, `elevated`, `flat` |
-| `<SectionHeader>` | Título + "ver todos" | `default`, `with-icon` |
-| `<BottomNav>` | Navegação inferior mobile | `default`, `with-fab` |
-| `<SearchBar>` | Campo de busca + filtros | `default`, `sticky` |
-| `<FilterChip>` | Filtro aplicado | `active`, `removable` |
-| `<ActionShortcut>` | Atalho circular "stories-like" | `default`, `highlight` |
-| `<VehicleImage>` | Imagem de anúncio | `card`, `gallery`, `thumb` |
-| `<AdCard>` | Card de anúncio canônico | 8 variantes (§10) |
-| `<ArticleCard>` | Card de blog | `default`, `featured` |
-| `<TrustStrip>` | Faixa de confiança | `compact`, `full` |
+| Primitivo          | Propósito                      | Variantes                                                  |
+| ------------------ | ------------------------------ | ---------------------------------------------------------- |
+| `<Button>`         | Ação                           | `primary`, `secondary`, `ghost`, `destructive`, `whatsapp` |
+| `<Input>`          | Entrada de texto               | `default`, `search`, `error`                               |
+| `<Select>`         | Seleção de opção               | `default`, `native`, `searchable`                          |
+| `<Chip>`           | Pílula clicável                | `filter`, `removable`, `toggle`                            |
+| `<Badge>`          | Selo pequeno                   | `info`, `success`, `danger`, `premium`                     |
+| `<Card>`           | Container genérico             | `default`, `elevated`, `flat`                              |
+| `<SectionHeader>`  | Título + "ver todos"           | `default`, `with-icon`                                     |
+| `<BottomNav>`      | Navegação inferior mobile      | `default`, `with-fab`                                      |
+| `<SearchBar>`      | Campo de busca + filtros       | `default`, `sticky`                                        |
+| `<FilterChip>`     | Filtro aplicado                | `active`, `removable`                                      |
+| `<ActionShortcut>` | Atalho circular "stories-like" | `default`, `highlight`                                     |
+| `<VehicleImage>`   | Imagem de anúncio              | `card`, `gallery`, `thumb`                                 |
+| `<AdCard>`         | Card de anúncio canônico       | 8 variantes (§10)                                          |
+| `<ArticleCard>`    | Card de blog                   | `default`, `featured`                                      |
+| `<TrustStrip>`     | Faixa de confiança             | `compact`, `full`                                          |
 
 ### 9.3. Regras arquiteturais
 
@@ -682,16 +687,16 @@ Card oficial de anúncio. Entregue no **PR F**. Todas as variantes renderizadas 
 
 ### Matriz de variantes
 
-| Variante | Uso | Img ratio | Campos principais | Mobile | Desktop | Fallback img | Favorito | Km | Preço | Localização | CTA |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| **compact** | Resultados pequenos, sidebar | 4:3 | Marca, modelo, ano, km, preço | 1 col | 2-3 col | placeholder | ✓ inline | badge na foto | pequeno | inline abaixo | clique em tudo |
-| **featured** | Hero, destaques | 16:9 | Tudo + badge "Destaque" | Full-width | 1 col principal | placeholder + badge erro | ✓ topo direito | badge na foto | grande azul | pin + cidade | "Ver oferta" |
-| **grid** | Listagem catálogo | 4:3 | Marca, modelo, ano, versão, km, preço, localização, badge FIPE | 1-2 col | 3-4 col | placeholder | ✓ topo direito | badge na foto | médio azul | inline | clique em tudo |
-| **carousel** | Home carrosséis | 4:3 | Marca, modelo, ano, km, preço, localização | scroll horizontal | scroll horizontal | placeholder | ✓ topo direito | badge na foto | médio azul | inline | clique em tudo |
-| **horizontal** | "Similares" em detalhe | 1:1 (thumb lateral) | Marca, modelo, ano, preço | Full-width | 2 col | placeholder | — | inline | médio | inline | clique em tudo |
-| **related** | Após artigo de blog | 4:3 | Marca, modelo, ano, preço, cidade | 1-2 col | 2-3 col | placeholder | — | — | médio | inline | clique em tudo |
-| **dashboard** | Painel "meus anúncios" | 4:3 | Foto, modelo, ano, km, preço, **status** (ativo/pausado), métricas (views/contatos) | 1 col | 2 col | placeholder | — | inline | médio | inline | ação do painel (editar, pausar) |
-| **admin** | Admin moderation | 4:3 | Foto, modelo, ano, **status admin**, **flags**, vendedor | 1 col | tabela | placeholder | — | — | médio | inline | ações de moderação |
+| Variante       | Uso                          | Img ratio           | Campos principais                                                                   | Mobile            | Desktop           | Fallback img             | Favorito       | Km            | Preço       | Localização   | CTA                             |
+| -------------- | ---------------------------- | ------------------- | ----------------------------------------------------------------------------------- | ----------------- | ----------------- | ------------------------ | -------------- | ------------- | ----------- | ------------- | ------------------------------- |
+| **compact**    | Resultados pequenos, sidebar | 4:3                 | Marca, modelo, ano, km, preço                                                       | 1 col             | 2-3 col           | placeholder              | ✓ inline       | badge na foto | pequeno     | inline abaixo | clique em tudo                  |
+| **featured**   | Hero, destaques              | 16:9                | Tudo + badge "Destaque"                                                             | Full-width        | 1 col principal   | placeholder + badge erro | ✓ topo direito | badge na foto | grande azul | pin + cidade  | "Ver oferta"                    |
+| **grid**       | Listagem catálogo            | 4:3                 | Marca, modelo, ano, versão, km, preço, localização, badge FIPE                      | 1-2 col           | 3-4 col           | placeholder              | ✓ topo direito | badge na foto | médio azul  | inline        | clique em tudo                  |
+| **carousel**   | Home carrosséis              | 4:3                 | Marca, modelo, ano, km, preço, localização                                          | scroll horizontal | scroll horizontal | placeholder              | ✓ topo direito | badge na foto | médio azul  | inline        | clique em tudo                  |
+| **horizontal** | "Similares" em detalhe       | 1:1 (thumb lateral) | Marca, modelo, ano, preço                                                           | Full-width        | 2 col             | placeholder              | —              | inline        | médio       | inline        | clique em tudo                  |
+| **related**    | Após artigo de blog          | 4:3                 | Marca, modelo, ano, preço, cidade                                                   | 1-2 col           | 2-3 col           | placeholder              | —              | —             | médio       | inline        | clique em tudo                  |
+| **dashboard**  | Painel "meus anúncios"       | 4:3                 | Foto, modelo, ano, km, preço, **status** (ativo/pausado), métricas (views/contatos) | 1 col             | 2 col             | placeholder              | —              | inline        | médio       | inline        | ação do painel (editar, pausar) |
+| **admin**      | Admin moderation             | 4:3                 | Foto, modelo, ano, **status admin**, **flags**, vendedor                            | 1 col             | tabela            | placeholder              | —              | —             | médio       | inline        | ações de moderação              |
 
 ### Regras comuns
 
@@ -717,38 +722,39 @@ Componente: `<BottomNav>` (§9.2). Comportamento fixo:
 
 ### Aparece em
 
-| Página | Por quê |
-|---|---|
-| Home (`/`) | Navegação principal |
-| Comprar estadual (`/anuncios`) | Navegação principal |
-| Comprar por cidade (`/cidade/**`) | Navegação principal |
-| Tabela FIPE | Isca digital com navegação |
-| Simulador | Isca digital com navegação |
-| Blog (lista e artigos) | Conteúdo permanente |
-| Favoritos | Navegação principal |
-| Painel público / usuário | Acesso rápido a seções |
+| Página                            | Por quê                    |
+| --------------------------------- | -------------------------- |
+| Home (`/`)                        | Navegação principal        |
+| Comprar estadual (`/anuncios`)    | Navegação principal        |
+| Comprar por cidade (`/cidade/**`) | Navegação principal        |
+| Tabela FIPE                       | Isca digital com navegação |
+| Simulador                         | Isca digital com navegação |
+| Blog (lista e artigos)            | Conteúdo permanente        |
+| Favoritos                         | Navegação principal        |
+| Painel público / usuário          | Acesso rápido a seções     |
 
 ### Substituído por CTA fixo em
 
-| Página | CTA |
-|---|---|
+| Página                                 | CTA                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Detalhe do veículo (`/veiculo/[slug]`) | `<StickyCTA>`: preço à esquerda, botão verde WhatsApp à direita. Exemplo: `R$ 109.900 \| 💬 Chamar no WhatsApp` |
 
 Motivo: detalhe é página de conversão. A única ação que importa é contatar vendedor.
 
 ### NÃO aparece em
 
-| Página | Por quê |
-|---|---|
-| `/login` | Fluxo focado, sem distração |
-| `/cadastro` | Idem |
-| `/recuperar-senha` | Idem |
-| Checkout/pagamento crítico (quando existir) | Fluxo focado |
-| `/admin/*` | Área privada com navegação própria |
+| Página                                      | Por quê                            |
+| ------------------------------------------- | ---------------------------------- |
+| `/login`                                    | Fluxo focado, sem distração        |
+| `/cadastro`                                 | Idem                               |
+| `/recuperar-senha`                          | Idem                               |
+| Checkout/pagamento crítico (quando existir) | Fluxo focado                       |
+| `/admin/*`                                  | Área privada com navegação própria |
 
 ### Caso especial — publicação (`/anunciar/novo`)
 
 **Avaliar por passo**. Se bottom nav aparecer, **não pode competir** com:
+
 - Barra de progresso (topo, sticky).
 - Botões "Voltar" / "Continuar" (footer sticky do wizard).
 
@@ -760,15 +766,15 @@ Motivo: detalhe é página de conversão. A única ação que importa é contata
 
 Metas **obrigatórias** para merge de qualquer PR visual (D–N):
 
-| Métrica | Meta | Medição |
-|---|---|---|
-| LCP mobile | **< 2.5s** | Lighthouse mobile, página real em staging |
-| CLS mobile | **< 0.1** | Lighthouse mobile |
-| TBT mobile | **< 200ms** | Lighthouse mobile |
-| Lighthouse Performance (mobile) | **> 80** | Lighthouse CI opcional |
-| Lighthouse SEO | **> 95** | Lighthouse CI |
-| Lighthouse Accessibility | **> 90** | Lighthouse CI |
-| Bundle JS crítico | **< 200 KB** (gzip) | `next build --profile` |
+| Métrica                         | Meta                | Medição                                   |
+| ------------------------------- | ------------------- | ----------------------------------------- |
+| LCP mobile                      | **< 2.5s**          | Lighthouse mobile, página real em staging |
+| CLS mobile                      | **< 0.1**           | Lighthouse mobile                         |
+| TBT mobile                      | **< 200ms**         | Lighthouse mobile                         |
+| Lighthouse Performance (mobile) | **> 80**            | Lighthouse CI opcional                    |
+| Lighthouse SEO                  | **> 95**            | Lighthouse CI                             |
+| Lighthouse Accessibility        | **> 90**            | Lighthouse CI                             |
+| Bundle JS crítico               | **< 200 KB** (gzip) | `next build --profile`                    |
 
 ### Práticas obrigatórias
 
@@ -793,36 +799,36 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 
 ### 7 checks obrigatórios antes de remover qualquer arquivo
 
-| # | Check | Comando |
-|---|---|---|
-| 1 | Busca pelo nome do arquivo | `grep -r "nomeArquivo" frontend/` (sem extensão) |
-| 2 | Busca pelo nome do componente/export | `grep -r "NomeComponente" frontend/` |
-| 3 | Busca por exports indiretos (barrel `index.ts`) | Inspecionar `components/*/index.ts`, `lib/*/index.ts` |
-| 4 | Busca por import dinâmico | `grep -rE "import\(.*nomeArquivo.*\)" frontend/` |
-| 5 | Verificação em re-exports | `grep -r "export.*from.*nomeArquivo" frontend/` |
-| 6 | Build passa sem o arquivo | `npm run build` (rodar com arquivo removido em branch de teste) |
-| 7 | Typecheck + e2e:smoke passam | `npm run typecheck && npm run test:e2e:smoke` |
+| #   | Check                                           | Comando                                                         |
+| --- | ----------------------------------------------- | --------------------------------------------------------------- |
+| 1   | Busca pelo nome do arquivo                      | `grep -r "nomeArquivo" frontend/` (sem extensão)                |
+| 2   | Busca pelo nome do componente/export            | `grep -r "NomeComponente" frontend/`                            |
+| 3   | Busca por exports indiretos (barrel `index.ts`) | Inspecionar `components/*/index.ts`, `lib/*/index.ts`           |
+| 4   | Busca por import dinâmico                       | `grep -rE "import\(.*nomeArquivo.*\)" frontend/`                |
+| 5   | Verificação em re-exports                       | `grep -r "export.*from.*nomeArquivo" frontend/`                 |
+| 6   | Build passa sem o arquivo                       | `npm run build` (rodar com arquivo removido em branch de teste) |
+| 7   | Typecheck + e2e:smoke passam                    | `npm run typecheck && npm run test:e2e:smoke`                   |
 
 ### Classificação dos 13 órfãos candidatos (§3.4)
 
-| Candidato | Status até prova |
-|---|---|
-| `ads/AdDetailsPage.tsx` | **Suspeito, manter por enquanto** — nome sugere página inteira, pode ter referências indiretas |
-| `ads/AdListingCard.tsx` | Suspeito — verificar se é legado com adapter ativo |
-| `common/CTASection.tsx` | Suspeito — genérico, pode ser usado em landing futura |
-| `common/FAQSection.tsx` | Suspeito — idem |
-| `common/FinancingSimulator.tsx` | Suspeito — simulador tem rota própria, confirmar |
-| `common/RegionalEntryHub.tsx` | Suspeito |
-| `common/StatsSection.tsx` | Suspeito |
-| `buy/BuyPageShell.tsx` | Órfão provável — verificar se `BuyMarketplacePageClient` não importa indireto |
-| `buy/VehicleBadge.tsx` | Suspeito |
-| `fipe/FipeVehicleCarousel.tsx` | Suspeito |
-| `modal/ExitIntentModal.tsx` | **Manter por enquanto** — pode ser MVP abandonado útil |
-| `painel/new-ad-wizard/WizardSteps.tsx` | **Legado com adapter — não remover ainda** — wizard de publicação é fluxo crítico |
-| `admin/Admin{ActionDialog,EmptyState,ErrorState,LoadingState}.tsx` | Suspeitos — admin é Trilha 2, **não tocar em PRs A–O** |
-| `layout/TerritorialHeaderLinks.tsx` | Órfão provável — verificar junto com remoção de `layout/` |
-| `components/Header.tsx` | **Órfão confirmado** (54 bytes re-export) — candidato #1 a deletar no PR C |
-| `components/layout/Header.tsx` | Suspeito — confirmar no PR C antes de remover |
+| Candidato                                                          | Status até prova                                                                               |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `ads/AdDetailsPage.tsx`                                            | **Suspeito, manter por enquanto** — nome sugere página inteira, pode ter referências indiretas |
+| `ads/AdListingCard.tsx`                                            | Suspeito — verificar se é legado com adapter ativo                                             |
+| `common/CTASection.tsx`                                            | Suspeito — genérico, pode ser usado em landing futura                                          |
+| `common/FAQSection.tsx`                                            | Suspeito — idem                                                                                |
+| `common/FinancingSimulator.tsx`                                    | Suspeito — simulador tem rota própria, confirmar                                               |
+| `common/RegionalEntryHub.tsx`                                      | Suspeito                                                                                       |
+| `common/StatsSection.tsx`                                          | Suspeito                                                                                       |
+| `buy/BuyPageShell.tsx`                                             | Órfão provável — verificar se `BuyMarketplacePageClient` não importa indireto                  |
+| `buy/VehicleBadge.tsx`                                             | Suspeito                                                                                       |
+| `fipe/FipeVehicleCarousel.tsx`                                     | Suspeito                                                                                       |
+| `modal/ExitIntentModal.tsx`                                        | **Manter por enquanto** — pode ser MVP abandonado útil                                         |
+| `painel/new-ad-wizard/WizardSteps.tsx`                             | **Legado com adapter — não remover ainda** — wizard de publicação é fluxo crítico              |
+| `admin/Admin{ActionDialog,EmptyState,ErrorState,LoadingState}.tsx` | Suspeitos — admin é Trilha 2, **não tocar em PRs A–O**                                         |
+| `layout/TerritorialHeaderLinks.tsx`                                | Órfão provável — verificar junto com remoção de `layout/`                                      |
+| `components/Header.tsx`                                            | **Órfão confirmado** (54 bytes re-export) — candidato #1 a deletar no PR C                     |
+| `components/layout/Header.tsx`                                     | Suspeito — confirmar no PR C antes de remover                                                  |
 
 **Regra final**: nenhum arquivo classificado como "suspeito" ou "legado" é removido no PR C. Só "órfãos confirmados" pelos 7 checks.
 
@@ -845,6 +851,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: entregar 5 contratos + 1 mapa, sem mudança funcional.
 
 **Entregáveis**:
+
 - `docs/ROUTE_CANONICAL_MAP.md` completo (§8.1)
 - `docs/DESIGN_SYSTEM.md` (skeleton com §9)
 - Baseline de métricas (Lighthouse mobile em 10 páginas-chave) gravado em `docs/baseline-metrics-YYYYMMDD.md`
@@ -861,6 +868,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: adicionar cobertura que detecta regressão antes dela acontecer.
 
 **Entregáveis**:
+
 - Teste: `sitemap.xml` gera todas as 9 seções sem erro
 - Teste: canonical URL presente em 10 páginas públicas (lista fixa)
 - Teste: JSON-LD + breadcrumb preservados em `/veiculo/[slug]`, `/cidade/**`, blog
@@ -879,6 +887,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: remover **apenas** o que passou pelo checklist §13.
 
 **Entregáveis**:
+
 - Deletar `components/Header.tsx` (órfão confirmado)
 - Deletar `components/layout/` inteira **somente se** checklist §13 confirmar
 - Deletar `/painel/anuncios/novo` (redirect puro coberto por middleware)
@@ -894,6 +903,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: introduzir tokens e primitivos **sem remover** nada existente.
 
 **Entregáveis**:
+
 - `tailwind.config.ts` com tokens de §9.1
 - Primitivos de §9.2 em `components/ui/` (exceto `<VehicleImage>` e `<AdCard>` que têm PRs próprios)
 - `docs/DESIGN_SYSTEM.md` com exemplos de uso de cada primitivo
@@ -908,6 +918,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: `<VehicleImage>` oficial e `<VehicleImagePlaceholder>`.
 
 **Entregáveis**:
+
 - `components/ui/VehicleImage.tsx` conforme §8.5
 - Placeholder/skeleton + fallback de erro
 - Restringir `remotePatterns` em `next.config.mjs` (remover `**`)
@@ -923,6 +934,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: consolidar todos os cards de anúncio em `<AdCard>` com 8 variantes (§10).
 
 **Entregáveis**:
+
 - `components/ads/AdCard.tsx` refatorado com prop `variant`
 - `HomeVehicleCard` vira adapter → `<AdCard variant="carousel">` ou `variant="featured">`
 - `CatalogVehicleCard` vira adapter → `<AdCard variant="grid">`
@@ -939,6 +951,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: home mobile-first conforme mockup aprovado.
 
 **Entregáveis**:
+
 - Header com localização clicável (`<PublicHeader>` refinado — não duplicar)
 - `<SearchBar>` protagonista + `<Button>` de filtros
 - `<FilterChip>` rápidos ("Até R$ 50k", "SUV", etc.)
@@ -959,6 +972,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: `/cidade/[slug]` e sub-rotas com novo padrão, **sem mudar URLs**.
 
 **Entregáveis**:
+
 - Chips de filtro ativos
 - `<AdCard variant="grid">`
 - `<FilterDrawer>` (bottom sheet) com filtros avançados
@@ -975,6 +989,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: `/veiculo/[slug]` com novo padrão mobile-first + conversão.
 
 **Entregáveis**:
+
 - **Antes**: extrair AI logic de `page.tsx` (456 linhas) para `lib/vehicle/ai/` (refactor isolado)
 - `<PhotoGallery>` mobile-first (swipeable, lightbox)
 - `<StickyPrice>` no scroll
@@ -995,6 +1010,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: unificar `/comprar/*` e `/anuncios` conforme ROUTE_CANONICAL_MAP.
 
 **Entregáveis**:
+
 - Decidir canônica definitiva (PROJECT_RULES diz `/anuncios`)
 - Adicionar redirects 301 no `middleware.ts` para aliases
 - Nova listagem mobile-first (reuso de PR H)
@@ -1009,6 +1025,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: iscas digitais redesenhadas.
 
 **Entregáveis**:
+
 - Interface simplificada (3 dropdowns + resultado)
 - `<AdCard variant="carousel">` com "carros deste modelo em [cidade]"
 - Integração com territorial (link para busca filtrada)
@@ -1024,6 +1041,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: blog como motor de aquisição orgânica.
 
 **Entregáveis**:
+
 - Lista com hero editorial + categorias em `<Chip>`
 - `<ArticleCard>` grid
 - Artigo individual: reading progress, inline CTAs (`<AdCard>` contextual), artigos relacionados
@@ -1040,6 +1058,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: `/anunciar/novo` wizard moderno.
 
 **Entregáveis**:
+
 - Multi-step com progress bar fixa
 - Cada passo em 1 tela sem scroll vertical excessivo
 - `<PhotoUploader>` com reorder
@@ -1058,6 +1077,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: dashboard PF + lojista com novo design.
 
 **Entregáveis**:
+
 - `<AdCard variant="dashboard">` com status + métricas
 - Navegação unificada (decisão de unificar rotas fica na Trilha 2)
 - `<BottomNav>` ou sidebar adaptativa
@@ -1072,6 +1092,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: **apenas visual** — `/login`, `/cadastro`, `/recuperar-senha` com padrão premium do design system. **Não toca em auth logic, cookies, middleware, guards, isolamento ou qualquer aspecto de segurança.**
 
 **Entregáveis**:
+
 - `/login` redesenhado (minimalista premium, mobile-first)
 - `/cadastro` redesenhado (mesmo padrão)
 - `/recuperar-senha` redesenhado
@@ -1079,6 +1100,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 - Preservar toda a logic existente de BFF, cookies, validação, fluxo
 
 **Proibido neste PR**:
+
 - ❌ Tocar em `lib/auth/`, `lib/session/`, `services/authService.ts`, `services/sessionService.ts`
 - ❌ Mudar cookies, headers, tokens, middleware
 - ❌ Mudar validação de formulário (manter comportamento)
@@ -1097,18 +1119,18 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 
 #### Backlog de segurança (lista, não PRs numerados)
 
-| # | Item | Escopo | Risco |
-|---|---|---|---|
-| T2.1 | `useAdminGuard()` → middleware server | Substitui guard client-side por `middleware.ts` com verificação real de sessão. Retorna 403/redirect antes do render. | Altíssimo — se quebrar, admin abre para qualquer um ou fecha para ninguém |
-| T2.2 | `/admin/*` de client para server | Converter 8 páginas de `"use client"` para Server Components. Mover lógica interativa para ilhas menores. | Alto |
-| T2.3 | `/favoritos` de client para server | Converter para server + Suspense; preservar estado de favoritos via context. | Médio |
-| T2.4 | Dashboard PF/PJ: avaliar unificação | Decisão arquitetural: manter `/dashboard` + `/dashboard-loja` ou unificar em `/dashboard?role=...`. Se unificar, 301 redirects obrigatórios. | Alto |
-| T2.5 | Refresh token silencioso — telemetria | Adicionar logs explícitos quando refresh falha; hoje morre sem feedback. | Baixo |
-| T2.6 | Isolamento de dados no BFF | Code review completo em `/app/api/painel/**` e `/app/api/dashboard/**`. Garantir que toda rota valida `session.accessToken` contra o recurso pedido. | Altíssimo |
-| T2.7 | Banner LGPD + consentimento | Implementar antes de adicionar qualquer tracking (GTM, GA, pixels). | Médio (legal) |
-| T2.8 | Cookies review | Auditar `cnc_session`, `cnc_at`, `cnc_rt`, `city_cookie`: flags, scope, expiração, rotação. | Médio |
-| T2.9 | `AUTH_SESSION_SECRET` em prod | Verificar no Render. Se ausente, cada restart invalida todas sessões. | Crítico (pode já estar quebrado) |
-| T2.10 | Permissões granulares | Revisar matriz de permissões PF/PJ/lojista/admin. | Médio |
+| #     | Item                                  | Escopo                                                                                                                                               | Risco                                                                     |
+| ----- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| T2.1  | `useAdminGuard()` → middleware server | Substitui guard client-side por `middleware.ts` com verificação real de sessão. Retorna 403/redirect antes do render.                                | Altíssimo — se quebrar, admin abre para qualquer um ou fecha para ninguém |
+| T2.2  | `/admin/*` de client para server      | Converter 8 páginas de `"use client"` para Server Components. Mover lógica interativa para ilhas menores.                                            | Alto                                                                      |
+| T2.3  | `/favoritos` de client para server    | Converter para server + Suspense; preservar estado de favoritos via context.                                                                         | Médio                                                                     |
+| T2.4  | Dashboard PF/PJ: avaliar unificação   | Decisão arquitetural: manter `/dashboard` + `/dashboard-loja` ou unificar em `/dashboard?role=...`. Se unificar, 301 redirects obrigatórios.         | Alto                                                                      |
+| T2.5  | Refresh token silencioso — telemetria | Adicionar logs explícitos quando refresh falha; hoje morre sem feedback.                                                                             | Baixo                                                                     |
+| T2.6  | Isolamento de dados no BFF            | Code review completo em `/app/api/painel/**` e `/app/api/dashboard/**`. Garantir que toda rota valida `session.accessToken` contra o recurso pedido. | Altíssimo                                                                 |
+| T2.7  | Banner LGPD + consentimento           | Implementar antes de adicionar qualquer tracking (GTM, GA, pixels).                                                                                  | Médio (legal)                                                             |
+| T2.8  | Cookies review                        | Auditar `cnc_session`, `cnc_at`, `cnc_rt`, `city_cookie`: flags, scope, expiração, rotação.                                                          | Médio                                                                     |
+| T2.9  | `AUTH_SESSION_SECRET` em prod         | Verificar no Render. Se ausente, cada restart invalida todas sessões.                                                                                | Crítico (pode já estar quebrado)                                          |
+| T2.10 | Permissões granulares                 | Revisar matriz de permissões PF/PJ/lojista/admin.                                                                                                    | Médio                                                                     |
 
 **Regra de separação rígida**: nenhum item da Trilha 2 pode ser misturado em PRs da Trilha 1. Cada item vira PR próprio com sua própria validação.
 
@@ -1123,6 +1145,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Objetivo**: zero mudança funcional. Produz documento de mapeamento.
 
 **Entregáveis**:
+
 - `docs/SERVICES_MIGRATION_MAP.md` com:
   - Tabela de todos os arquivos em `frontend/services/`
   - Tabela de equivalentes em `frontend/lib/`
@@ -1148,6 +1171,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Domínios**: `ads` → `lib/ads/`, `vehicle` → `lib/vehicle/`
 
 **Pré-requisito**: testes cobrindo:
+
 - Home
 - Catálogo
 - Comprar por cidade
@@ -1162,6 +1186,7 @@ PR que degrada **qualquer uma** dessas métricas vs baseline não passa. Snapsho
 **Domínios**: `auth` → `lib/auth/`, `session` → `lib/session/`
 
 **Pré-requisito**: testes específicos de:
+
 - Login
 - Cadastro
 - Cookies (httpOnly, secure, sameSite)
@@ -1260,20 +1285,20 @@ Para cada mudança visual, anexar na descrição do PR:
 
 **PRs com screenshots obrigatórios**:
 
-| PR | Páginas mínimas para screenshot |
-|---|---|
-| PR D | Storybook-like doc de cada primitivo |
-| PR E | `<VehicleImage>` em card, galeria, thumb |
-| PR F | `<AdCard>` em todas as 8 variantes |
-| PR G | Home (mobile + desktop) |
-| PR H | `/cidade/atibaia-sp` e 1 territorial profunda |
+| PR   | Páginas mínimas para screenshot                            |
+| ---- | ---------------------------------------------------------- |
+| PR D | Storybook-like doc de cada primitivo                       |
+| PR E | `<VehicleImage>` em card, galeria, thumb                   |
+| PR F | `<AdCard>` em todas as 8 variantes                         |
+| PR G | Home (mobile + desktop)                                    |
+| PR H | `/cidade/atibaia-sp` e 1 territorial profunda              |
 | PR I | `/veiculo/[slug]` incluindo galeria, sticky CTA, similares |
-| PR J | `/anuncios` + 1 redirect de alias |
-| PR K | FIPE e simulador |
-| PR L | Blog lista + artigo |
-| PR M | 3 passos do wizard |
-| PR N | Dashboard PF + lojista |
-| PR O | Login, cadastro, recuperar senha |
+| PR J | `/anuncios` + 1 redirect de alias                          |
+| PR K | FIPE e simulador                                           |
+| PR L | Blog lista + artigo                                        |
+| PR M | 3 passos do wizard                                         |
+| PR N | Dashboard PF + lojista                                     |
+| PR O | Login, cadastro, recuperar senha                           |
 
 ---
 
@@ -1281,19 +1306,19 @@ Para cada mudança visual, anexar na descrição do PR:
 
 Coletadas antes e depois de cada PR visual.
 
-| Métrica | Alvo | Ferramenta |
-|---|---|---|
-| LCP mobile | < 2.5s | Lighthouse mobile |
-| CLS mobile | < 0.1 | Lighthouse mobile |
-| TBT mobile | < 200ms | Lighthouse mobile |
-| Lighthouse Performance | > 80 | Lighthouse mobile |
-| Lighthouse SEO | > 95 | Lighthouse |
-| Lighthouse A11y | > 90 | Lighthouse |
-| Bundle JS crítico (gzip) | < 200 KB | `next build --profile` |
-| Páginas indexadas | manter ou crescer | Google Search Console |
-| 429 rate limit (7d) | 0 | Render logs |
-| Tempo médio SSR | < 2s | BFF logs |
-| Taxa de 5xx SSR | < 0.5% | BFF logs |
+| Métrica                  | Alvo              | Ferramenta             |
+| ------------------------ | ----------------- | ---------------------- |
+| LCP mobile               | < 2.5s            | Lighthouse mobile      |
+| CLS mobile               | < 0.1             | Lighthouse mobile      |
+| TBT mobile               | < 200ms           | Lighthouse mobile      |
+| Lighthouse Performance   | > 80              | Lighthouse mobile      |
+| Lighthouse SEO           | > 95              | Lighthouse             |
+| Lighthouse A11y          | > 90              | Lighthouse             |
+| Bundle JS crítico (gzip) | < 200 KB          | `next build --profile` |
+| Páginas indexadas        | manter ou crescer | Google Search Console  |
+| 429 rate limit (7d)      | 0                 | Render logs            |
+| Tempo médio SSR          | < 2s              | BFF logs               |
+| Taxa de 5xx SSR          | < 0.5%            | BFF logs               |
 
 Baseline coletado no **PR A**. Cada PR subsequente compara contra baseline.
 
@@ -1307,16 +1332,16 @@ Faixas, não pontos. Refletem incerteza real.
 
 **Escopo**: PRs A → G
 
-| PR | Dias |
-|---|---|
-| PR A — Contratos | 2-3 |
-| PR B — Testes de proteção | 3-4 |
-| PR C — Shell e órfãos | 1-2 |
-| PR D — Design system aditivo | 3-4 |
-| PR E — `<VehicleImage>` | 1-2 |
-| PR F — `<AdCard>` unificado | 2-3 |
-| PR G — Nova home | 3-5 |
-| Buffer | 2-3 |
+| PR                           | Dias |
+| ---------------------------- | ---- |
+| PR A — Contratos             | 2-3  |
+| PR B — Testes de proteção    | 3-4  |
+| PR C — Shell e órfãos        | 1-2  |
+| PR D — Design system aditivo | 3-4  |
+| PR E — `<VehicleImage>`      | 1-2  |
+| PR F — `<AdCard>` unificado  | 2-3  |
+| PR G — Nova home             | 3-5  |
+| Buffer                       | 2-3  |
 
 **Entrega**: home nova sobre fundação limpa, sem mexer em conversão nem SEO territorial massivo. Já dá para compartilhar e medir impacto.
 
@@ -1324,15 +1349,15 @@ Faixas, não pontos. Refletem incerteza real.
 
 **Escopo**: PRs A → M (tudo público redesenhado exceto painel visual e auth/admin)
 
-| PR adicional | Dias |
-|---|---|
-| PR H — Comprar por cidade | 3-4 |
-| PR I — Detalhe do veículo | 4-5 |
-| PR J — Comprar estadual | 2-3 |
-| PR K — FIPE e simulador | 2-3 |
-| PR L — Blog | 2-3 |
-| PR M — Publicação | 4-5 |
-| Buffer | 3-5 |
+| PR adicional              | Dias |
+| ------------------------- | ---- |
+| PR H — Comprar por cidade | 3-4  |
+| PR I — Detalhe do veículo | 4-5  |
+| PR J — Comprar estadual   | 2-3  |
+| PR K — FIPE e simulador   | 2-3  |
+| PR L — Blog               | 2-3  |
+| PR M — Publicação         | 4-5  |
+| Buffer                    | 3-5  |
 
 **Entrega**: portal público inteiro redesenhado. Conversão e SEO massivo no novo padrão.
 
@@ -1340,12 +1365,12 @@ Faixas, não pontos. Refletem incerteza real.
 
 **Escopo**: PRs A → O + migração `services/`
 
-| PR adicional | Dias |
-|---|---|
-| PR N — Painel visual | 4-5 |
-| PR O — Auth + backlog Trilha 2 | 5-8 |
+| PR adicional                   | Dias                      |
+| ------------------------------ | ------------------------- |
+| PR N — Painel visual           | 4-5                       |
+| PR O — Auth + backlog Trilha 2 | 5-8                       |
 | PRs 0.4A–D — Migração services | 5-8 (paralelo com visual) |
-| Buffer | 3-5 |
+| Buffer                         | 3-5                       |
 
 **Entrega**: portal completo, trilha 2 endereçada, arquitetura consolidada.
 
@@ -1359,16 +1384,17 @@ Categorias explícitas. Não há zona cinza — cada item pertence a um grupo.
 
 Tudo que é **documento, contrato, teste ou inventário**:
 
-| Categoria | Itens |
-|---|---|
-| **Documentos** | Este diagnóstico (aprovação final), `ROUTE_CANONICAL_MAP.md`, `DESIGN_SYSTEM.md` (skeleton), `SERVICES_MIGRATION_MAP.md`, baselines de métricas |
-| **Contratos** | Contrato SEO (§8.3), SSR (§8.4), Imagens (§8.5), Design System (§9), `<AdCard>` (§10), BottomNav (§11), Performance (§12) — todos como especificação, sem implementação |
-| **Testes** | Bateria de testes de imagem (§8.5.1) como spec, snapshot script (§8.2), guardrails de CI (lint para `fetch` cru, `<img>` cru, import de `services/`) |
-| **Inventários** | `services/` → `lib/` (inventário PR 0.4A), componentes candidatos a órfão (classificação §13), rotas canônicas (§8.1), páginas intocáveis (§5) |
-| **Identidade visual** | Paleta, tipografia, logo — decisão de produto, feita pelo usuário |
-| **Baseline de métricas** | Lighthouse mobile em 10 páginas-chave (captura inicial) |
+| Categoria                | Itens                                                                                                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Documentos**           | Este diagnóstico (aprovação final), `ROUTE_CANONICAL_MAP.md`, `DESIGN_SYSTEM.md` (skeleton), `SERVICES_MIGRATION_MAP.md`, baselines de métricas                         |
+| **Contratos**            | Contrato SEO (§8.3), SSR (§8.4), Imagens (§8.5), Design System (§9), `<AdCard>` (§10), BottomNav (§11), Performance (§12) — todos como especificação, sem implementação |
+| **Testes**               | Bateria de testes de imagem (§8.5.1) como spec, snapshot script (§8.2), guardrails de CI (lint para `fetch` cru, `<img>` cru, import de `services/`)                    |
+| **Inventários**          | `services/` → `lib/` (inventário PR 0.4A), componentes candidatos a órfão (classificação §13), rotas canônicas (§8.1), páginas intocáveis (§5)                          |
+| **Identidade visual**    | Paleta, tipografia, logo — decisão de produto, feita pelo usuário                                                                                                       |
+| **Baseline de métricas** | Lighthouse mobile em 10 páginas-chave (captura inicial)                                                                                                                 |
 
 **PRs desbloqueados agora**:
+
 - **PR A** — Contratos de estabilidade
 - **PR 0.4A** — Inventário de `services/`
 
@@ -1424,12 +1450,12 @@ Não pode ser tocado enquanto não houver:
 
 ### 🟡 Desbloqueado condicionalmente
 
-| Item | Condição |
-|---|---|
-| **PR B — Testes de proteção** | Após PR A mergeado e aprovado |
-| **PR C — Órfãos confirmados** | Após PR B passando; apenas "órfão confirmado" (nunca "suspeito" ou "legado") |
-| **PR 0.4B** (market, plans) | Após PR 0.4A documentado |
-| **PR D — Design system aditivo** | Após PR A mergeado |
+| Item                             | Condição                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| **PR B — Testes de proteção**    | Após PR A mergeado e aprovado                                                |
+| **PR C — Órfãos confirmados**    | Após PR B passando; apenas "órfão confirmado" (nunca "suspeito" ou "legado") |
+| **PR 0.4B** (market, plans)      | Após PR 0.4A documentado                                                     |
+| **PR D — Design system aditivo** | Após PR A mergeado                                                           |
 
 ### 🔵 Trilha 2 — data livre (não bloqueia Trilha 1)
 
@@ -1449,32 +1475,32 @@ Itens T2.1 a T2.10 (§Trilha 2). Cada um vira PR próprio quando puder ser ataca
 
 ## 20. Apêndice A — Arquivos-chave
 
-| Propósito | Arquivo |
-|---|---|
-| Regras de projeto | [PROJECT_RULES.md](../PROJECT_RULES.md) |
-| Contexto de IA | [AI_CONTEXT.md](../AI_CONTEXT.md) |
-| Shell oficial | `frontend/components/shell/PublicHeader.tsx`, `PublicFooter.tsx` |
-| Layout raiz | `frontend/app/layout.tsx` |
-| Card canônico | `frontend/components/ads/AdCard.tsx` |
-| SSR resiliente | `frontend/lib/net/ssr-resilient-fetch.ts` |
-| Middleware | `frontend/middleware.ts` |
-| Next config | `frontend/next.config.mjs` |
-| Tailwind config | `frontend/tailwind.config.ts` |
-| Globals CSS | `frontend/app/globals.css` |
-| Sitemap index | `frontend/app/sitemap.xml/route.ts` |
-| Referência arquitetural | `frontend/components/search/TerritorialResultsPageClient.tsx` |
+| Propósito               | Arquivo                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| Regras de projeto       | [PROJECT_RULES.md](../PROJECT_RULES.md)                          |
+| Contexto de IA          | [AI_CONTEXT.md](../AI_CONTEXT.md)                                |
+| Shell oficial           | `frontend/components/shell/PublicHeader.tsx`, `PublicFooter.tsx` |
+| Layout raiz             | `frontend/app/layout.tsx`                                        |
+| Card canônico           | `frontend/components/ads/AdCard.tsx`                             |
+| SSR resiliente          | `frontend/lib/net/ssr-resilient-fetch.ts`                        |
+| Middleware              | `frontend/middleware.ts`                                         |
+| Next config             | `frontend/next.config.mjs`                                       |
+| Tailwind config         | `frontend/tailwind.config.ts`                                    |
+| Globals CSS             | `frontend/app/globals.css`                                       |
+| Sitemap index           | `frontend/app/sitemap.xml/route.ts`                              |
+| Referência arquitetural | `frontend/components/search/TerritorialResultsPageClient.tsx`    |
 
 ---
 
 ## Apêndice B — Documentos a serem criados
 
-| Documento | Onde | Quando |
-|---|---|---|
-| `ROUTE_CANONICAL_MAP.md` | `docs/` | PR A |
-| `DESIGN_SYSTEM.md` | `docs/` | PR A (skeleton) + PR D (detalhado) |
-| `SERVICES_MIGRATION_MAP.md` | `docs/` | PR 0.4A |
-| `baseline-metrics-YYYYMMDD.md` | `docs/` | PR A |
-| `public-routes-YYYYMMDD.json` | `tests/snapshots/` | PR B |
+| Documento                      | Onde               | Quando                             |
+| ------------------------------ | ------------------ | ---------------------------------- |
+| `ROUTE_CANONICAL_MAP.md`       | `docs/`            | PR A                               |
+| `DESIGN_SYSTEM.md`             | `docs/`            | PR A (skeleton) + PR D (detalhado) |
+| `SERVICES_MIGRATION_MAP.md`    | `docs/`            | PR 0.4A                            |
+| `baseline-metrics-YYYYMMDD.md` | `docs/`            | PR A                               |
+| `public-routes-YYYYMMDD.json`  | `tests/snapshots/` | PR B                               |
 
 ---
 

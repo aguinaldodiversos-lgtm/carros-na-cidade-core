@@ -33,7 +33,12 @@ const FALLBACK_STATES: StateItem[] = [
 
 function MiniMapIcon({ uf }: { uf: string }) {
   return (
-    <svg viewBox="0 0 48 40" className="h-8 w-10 text-cnc-line-strong" fill="currentColor" aria-hidden>
+    <svg
+      viewBox="0 0 48 40"
+      className="h-8 w-10 text-cnc-line-strong"
+      fill="currentColor"
+      aria-hidden
+    >
       <path d="M5 10c3-4 7-6 12-6 4 0 7 2 10 3 4 1 8-1 12 1s4 6 3 10-4 6-5 10c-1 3-3 6-7 7-5 1-9-1-14-2s-9 0-12-4c-2-3-2-8-1-12 0-3 1-5 2-7Z" />
       <text
         x="24"
@@ -57,7 +62,9 @@ function normalizeItems(raw: RawStateAggregation[] | undefined): StateItem[] {
 
   const normalized: StateItem[] = [];
   for (const entry of raw) {
-    const uf = String(entry?.uf || "").toUpperCase().trim();
+    const uf = String(entry?.uf || "")
+      .toUpperCase()
+      .trim();
     if (!/^[A-Z]{2}$/.test(uf)) continue;
     const match = BRAZIL_UFS.find((item) => item.value === uf);
     if (!match) continue;

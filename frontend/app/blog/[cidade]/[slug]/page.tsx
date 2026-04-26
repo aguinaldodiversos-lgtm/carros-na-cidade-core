@@ -7,11 +7,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogPostPageClient } from "@/components/blog/BlogPostPageClient";
-import {
-  fetchBlogPageContent,
-  prettifyCitySlug,
-  type BlogPost,
-} from "@/lib/blog/blog-page";
+import { fetchBlogPageContent, prettifyCitySlug, type BlogPost } from "@/lib/blog/blog-page";
 
 type PageProps = {
   params: {
@@ -24,10 +20,7 @@ export const revalidate = 300;
 
 async function findPost(citySlug: string, postSlug: string) {
   const content = await fetchBlogPageContent(citySlug);
-  const allPosts: BlogPost[] = [
-    ...(content.featuredPosts || []),
-    ...(content.popularPosts || []),
-  ];
+  const allPosts: BlogPost[] = [...(content.featuredPosts || []), ...(content.popularPosts || [])];
 
   const post = allPosts.find((item) => item.slug === postSlug);
   if (!post) return null;
@@ -53,8 +46,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const city = prettifyCitySlug(params.cidade);
   const { post } = found;
   const description =
-    post.excerpt?.trim() ||
-    `Conteúdo automotivo em ${city.name} no Blog Carros na Cidade.`;
+    post.excerpt?.trim() || `Conteúdo automotivo em ${city.name} no Blog Carros na Cidade.`;
 
   return {
     title: `${post.title} | Blog Carros na Cidade`,

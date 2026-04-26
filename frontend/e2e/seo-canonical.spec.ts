@@ -50,9 +50,7 @@ test.describe("@seo-canonical canonical em páginas públicas", () => {
       expect(h1Count, `Quantidade de <h1> em ${target.path}`).toBe(1);
 
       // 3. Meta description presente
-      const description = await page
-        .locator('meta[name="description"]')
-        .getAttribute("content");
+      const description = await page.locator('meta[name="description"]').getAttribute("content");
       expect(description, `Description em ${target.path}`).toBeTruthy();
       expect((description || "").length).toBeGreaterThan(40);
       expect((description || "").length).toBeLessThan(220);

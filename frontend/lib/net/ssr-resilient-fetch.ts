@@ -88,10 +88,7 @@ async function readClientIpFromNextHeaders(): Promise<string> {
   }
 }
 
-function mergeHeaders(
-  base: HeadersInit | undefined,
-  extra: Record<string, string>
-): HeadersInit {
+function mergeHeaders(base: HeadersInit | undefined, extra: Record<string, string>): HeadersInit {
   const merged = new Headers(base);
   for (const [key, value] of Object.entries(extra)) {
     if (value) merged.set(key, value);
@@ -157,8 +154,7 @@ export async function ssrResilientFetch(
       // 5xx: backend pode ter acordado mas pool nao pronto.
       // 429: rate limit — se veio sem X-Cnc-Client-Ip, o retry nao adianta,
       // mas se veio com IP do visitante, pode ter sido picos e retry ajuda.
-      const shouldRetryStatus =
-        response.status >= 500 || response.status === 429;
+      const shouldRetryStatus = response.status >= 500 || response.status === 429;
       if (shouldRetryStatus && attempt < maxAttempts) {
         logServer(
           logTag,
@@ -181,10 +177,7 @@ export async function ssrResilientFetch(
         continue;
       }
 
-      logServer(
-        logTag,
-        `fetch falhou definitivamente em ${url} apos ${elapsedMs}ms: ${message}`
-      );
+      logServer(logTag, `fetch falhou definitivamente em ${url} apos ${elapsedMs}ms: ${message}`);
       throw error;
     } finally {
       clearTimeout(timer);

@@ -73,12 +73,7 @@ export function HomeShortcuts() {
       <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
         {SHORTCUTS.map((s) => (
           <li key={s.href} className="snap-start">
-            <ActionShortcut
-              href={s.href}
-              label={s.label}
-              icon={s.icon}
-              variant={s.variant}
-            />
+            <ActionShortcut href={s.href} label={s.label} icon={s.icon} variant={s.variant} />
           </li>
         ))}
       </ul>

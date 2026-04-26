@@ -50,9 +50,7 @@ const args = parseArgs();
 const STRICT = Boolean(args.strict);
 
 const SCAN_DIRS = ["app", "components", "lib", "hooks"];
-const EXCLUDED_FILES = [
-  /components[\\/]ui[\\/]VehicleImage(Placeholder)?\.tsx$/,
-];
+const EXCLUDED_FILES = [/components[\\/]ui[\\/]VehicleImage(Placeholder)?\.tsx$/];
 
 async function walk(dir) {
   const out = [];

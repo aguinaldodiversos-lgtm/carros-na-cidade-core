@@ -46,10 +46,7 @@ function SearchIcon() {
   );
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  props,
-  ref
-) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(props, ref) {
   const {
     variant = "default",
     label,
@@ -72,10 +69,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div className={`${fullWidth ? "w-full" : ""} ${containerClassName}`.trim()}>
       {label && (
-        <label
-          htmlFor={id}
-          className="mb-1.5 block text-sm font-medium text-cnc-text-strong"
-        >
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-cnc-text-strong">
           {label}
         </label>
       )}
@@ -92,9 +86,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           id={id}
           className={`flex-1 bg-transparent text-base text-cnc-text outline-none placeholder:text-cnc-muted-soft md:text-sm ${className}`}
           aria-invalid={effectiveVariant === "error" || undefined}
-          aria-describedby={
-            error ? `${id}-error` : hint ? `${id}-hint` : undefined
-          }
+          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
           {...rest}
         />
         {iconRight && (
