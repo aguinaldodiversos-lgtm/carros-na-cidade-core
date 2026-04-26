@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FipeCombobox } from "@/components/fipe/FipeCombobox";
 import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
+import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import {
   fetchFipeQuote,
   listFipeBrands,
@@ -183,7 +184,8 @@ export function FipePageClient({
   const hasResult = Boolean(quote);
 
   return (
-    <main className="bg-white">
+    <>
+    <main className="bg-white pb-24 md:pb-16">
       <div className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-6 sm:px-6 md:pt-8">
         <nav aria-label="Breadcrumb" className="mb-4 text-sm text-[#6f7a90]">
           <ol className="flex flex-wrap items-center gap-2">
@@ -447,5 +449,7 @@ export function FipePageClient({
         </section>
       </div>
     </main>
+    <SiteBottomNav />
+    </>
   );
 }
