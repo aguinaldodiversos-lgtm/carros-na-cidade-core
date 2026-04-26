@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| **Versão** | 1 |
-| **Data** | 2026-04-24 |
-| **Branch** | `claude/sad-elbakyan-8155e1` |
-| **Status** | 📜 PR A — Contrato de estabilidade (sem mudança funcional) |
+| **Versão** | 2 |
+| **Data** | 2026-04-26 |
+| **Branch** | `claude/pr-j-comprar-estadual` |
+| **Status** | 📜 PR J — Comprar estadual (auditoria + ajuste de aliases vs. consolidação prévia) |
 | **Referência** | [DIAGNOSTICO_REDESIGN.md](./DIAGNOSTICO_REDESIGN.md) §8.1 |
 | **Aplicação** | Toda mudança de rota em qualquer PR exige atualização deste mapa + teste E2E do redirect |
 
@@ -38,16 +38,21 @@
 
 ### 1.3. Comprar (alias operacional)
 
-`/comprar/*` é **alias operacional** que **deve consolidar** em `/anuncios` ou `/cidade/{slug}`. Decisão final no PR J.
+`/comprar/*` continua sendo **família navegável**. A consolidação agressiva proposta na v1 (todas as rotas → `/anuncios`/`/cidade/`) **foi reavaliada no PR J** e parcialmente adiada para preservar PR H (cidade redesenhada) e a personalização SSR por cookie de cidade.
 
-| Rota | Função | Indexável | Canonical | Aliases | Redirects (PR J) | Removível |
+| Rota | Função | Indexável | Canonical | Aliases | Redirects (status PR J) | Removível |
 |---|---|---|---|---|---|---|
-| `/comprar` | Entry territorial (atual: redirect interno) | ⚠️ Avaliar | → `/anuncios` ou home | — | considerar 301 → `/anuncios` | ✅ Após PR J |
-| `/comprar/[slug]` | Alias cidade | ⚠️ | `/cidade/{slug}` | `/comprar/cidade/{slug}` | 301 → `/cidade/{slug}` | ✅ Após PR J + redirect ativo |
-| `/comprar/cidade/[slug]` | Paralelo cidade | ⚠️ | `/cidade/{slug}` | `/comprar/{slug}` | 301 → `/cidade/{slug}` | ✅ Após PR J + redirect ativo |
-| `/comprar/estado/[uf]` | Busca por estado | ✓ | self | — | — | ❌ Nunca (PROJECT_RULES) |
+| `/comprar` | Entry territorial via redirect SSR (cookie → cidade; default → estado UF padrão) | ✗ (sempre redireciona) | — | — | **Mantido como SSR redirect** (cookie-based). Consolidação para `/anuncios` adiada. | ❌ Não no PR J |
+| `/comprar/[slug]` | Alias **legado de detalhe**: redirect SSR para `/veiculo/{slug}` (rota servia URLs antigas que apontavam diretamente para anúncio individual) | ✗ | — | — | **Mantido**. Trocar destino para `/cidade/{slug}` quebraria URLs históricas que esperam detalhe. | ❌ Não no PR J |
+| `/comprar/cidade/[slug]` | Comprar na Cidade (página redesenhada no PR H) | ✓ | self | — | **Mantido como canônica navegável**. Consolidação para `/cidade/{slug}` adiada — escopo do PR J era explícito em "não mexer em Comprar por cidade". | ❌ Não no PR J |
+| `/comprar/estado/[uf]` | Catálogo estadual (canônica do PR J) | ✓ | self | — | — | ❌ Nunca (PROJECT_RULES) |
 
-**Regra para PR J**: redirects 301 entram em `middleware.ts` **antes** de qualquer mudança de UI. Snapshot automatizado precisa confirmar que rotas antigas devolvem 301 e canônicas devolvem 200.
+**Decisão PR J (v2)**: nenhum 301 novo foi adicionado em `middleware.ts` para a família `/comprar/*`. Os redirects SSR existentes em `/comprar/page.tsx` (cookie/UF) e `/comprar/[slug]/page.tsx` (→ /veiculo/) continuam ativos. A consolidação `/comprar/cidade/{slug} → /cidade/{slug}` exige:
+1. Confirmar que `/cidade/{slug}` tem paridade visual com a página redesenhada do PR H.
+2. Migrar conteúdo único do PR H (vitrine local) para `/cidade/{slug}`.
+3. Snapshot SEO antes/depois.
+
+Esses passos são **escopo de um PR específico (PR J.2 ou consolidação SEO)**, não cabem no PR J atual.
 
 ### 1.4. Páginas territoriais (canônicas)
 
@@ -181,12 +186,16 @@
    /comprar/{slug}, /comprar/cidade/{slug}
 ```
 
-**Plano de consolidação (PR J)**:
-1. Adicionar 301 no `middleware.ts` para `/comprar/{slug}` → `/cidade/{slug}`.
-2. Adicionar 301 para `/comprar/cidade/{slug}` → `/cidade/{slug}`.
-3. Adicionar 301 para `/comprar` → `/anuncios` (entry point genérico).
-4. Manter `/comprar/estado/[uf]` (PROJECT_RULES marca como canônica).
-5. Snapshot automatizado confirma 301 antes de mergear.
+**Plano de consolidação (revisado em PR J — v2)**:
+
+A consolidação foi **adiada parcialmente**. Estado atual após PR J:
+
+1. ⏸️ **Adiado**: `/comprar/{slug}` → `/cidade/{slug}` 301. Motivo: hoje `/comprar/[slug]` é redirect SSR para `/veiculo/{slug}` (alias legado de detalhe). Trocar destino quebraria URLs históricas com slug de veículo.
+2. ⏸️ **Adiado**: `/comprar/cidade/{slug}` → `/cidade/{slug}` 301. Motivo: a página foi redesenhada no PR H como vitrine local com conteúdo único; depreciar antes de migrar conteúdo é perda visual.
+3. ⏸️ **Adiado**: `/comprar` → `/anuncios` 301. Motivo: a lógica SSR atual personaliza por cookie de cidade (cookie → `/comprar/cidade/{slug}`). Substituir por redirect estático perde a personalização do funil.
+4. ✅ **Mantido**: `/comprar/estado/[uf]` é canônica (PROJECT_RULES).
+
+**Regra para PRs futuros**: a consolidação em `/cidade/{slug}` é tecnicamente desejável mas exige um PR dedicado que migre conteúdo do PR H para `/cidade/{slug}` antes do redirect — não pode ser feita "puxando o tapete" da página redesenhada.
 
 ### 2.2. `/cidade/{slug}` ↔ `/carros-em/{slug}`, `/carros-baratos-em/{slug}`, `/carros-automaticos-em/{slug}`
 
@@ -226,12 +235,12 @@ config.matcher = [
 
 ### 3.2. Redirects necessários (a adicionar)
 
-| Origem | Destino | PR responsável |
-|---|---|---|
-| `/comprar` | `/anuncios` | PR J |
-| `/comprar/{slug}` | `/cidade/{slug}` | PR J |
-| `/comprar/cidade/{slug}` | `/cidade/{slug}` | PR J |
-| `/painel/anuncios/novo` | `/anunciar/novo` | Já existe (confirmar — está em `app/painel/anuncios/novo/page.tsx`, não middleware) |
+| Origem | Destino | Status no PR J | PR responsável |
+|---|---|---|---|
+| `/comprar` | `/anuncios` | ⏸️ Adiado (SSR cookie-based mantido) | PR de consolidação SEO futura |
+| `/comprar/{slug}` | `/cidade/{slug}` | ⏸️ Adiado (rota é alias legado de detalhe; hoje SSR → `/veiculo/{slug}`) | PR de consolidação SEO futura (precisa snapshot de tráfego antes) |
+| `/comprar/cidade/{slug}` | `/cidade/{slug}` | ⏸️ Adiado (PR H redesenhou; precisa migrar conteúdo antes de depreciar) | PR de consolidação SEO futura |
+| `/painel/anuncios/novo` | `/anunciar/novo` | ✅ Já ativo no `middleware.ts` | — |
 
 ### 3.3. Redirects condicionais
 
@@ -322,6 +331,36 @@ Toda alteração deste mapa em qualquer PR exige:
 - [ ] E2E spec confirmando 301 status quando aplicável
 - [ ] Atualização do `sitemap.xml` correspondente
 - [ ] Verificação manual em Search Console se a rota tinha tráfego significativo
+
+---
+
+## 8. Mudanças aplicadas no PR J (2026-04-26)
+
+Auditoria de `/comprar`, `/comprar/estado/[uf]`, `/anuncios` e aliases. Mudanças mínimas e cirúrgicas — nenhum redirect 301 novo, nenhuma rota removida.
+
+### 8.1. Achados positivos (estado já bom)
+
+- `/comprar/estado/[uf]` já tem `generateMetadata` dinâmica (por UF + brand + model), `canonical` self via `buildStatePath`, breadcrumbs, JSON-LD `ItemList`, `revalidate=60`, `notFound` para UF inválido.
+- `BuyMarketplacePageClient` (consumido por `/comprar/estado` e `/comprar/cidade`) usa **DS tokens, AdCard canônico, VehicleImage e SiteBottomNav**. Zero `<img>` cru e zero hex hardcoded em `components/buy/`.
+- H1 único confirmado via inspeção JS em `/comprar/estado/sp` ("Catálogo de veículos em São Paulo") e `/anuncios` ("carros usados e seminovos").
+
+### 8.2. Correções aplicadas
+
+| Arquivo | Mudança | Motivo |
+|---|---|---|
+| `frontend/components/search/VehicleSearchResultsPage.tsx` | Importa e renderiza `<SiteBottomNav />` | `/anuncios` não tinha BottomNav mobile (regra do PR J: "BottomNav com Buscar ativo no mobile") |
+| `frontend/components/shell/SiteBottomNav.tsx` | `activePattern` do item Buscar agora cobre `/(comprar\|anuncios\|carros-em\|carros-baratos-em\|carros-automaticos-em\|cidade)/` | Antes só ativava em `/comprar/*`. Agora "Buscar" fica destacado em qualquer rota de listagem |
+| `frontend/components/buy/FilterSidebar.tsx:342` | `bg-[#0e62d8]` → `bg-primary`, shadow custom → `shadow-card`, hover hex → `bg-primary-strong` | Único hex hardcoded restante em `components/buy/` |
+
+### 8.3. Achados adiados (não cabem no PR J)
+
+- `components/search/*` (consumidos só por `/anuncios`) tem **73 hex hardcoded em 7 arquivos**. Migração para DS tokens requer PR próprio de redesign de `/anuncios` (escopo grande, não pedido aqui).
+- Filtro por cidade dentro do estado (regra do escopo do PR J) não existe na `FilterSidebar` atual. Precisa endpoint `GET /api/cities?state=...` + Combobox/Select. Marcar TODO.
+- `/comprar/{slug}` permanece como redirect SSR para `/veiculo/{slug}` — para mudá-lo conforme §3.2, precisa snapshot de tráfego histórico para evitar 404 em URLs antigas.
+
+### 8.4. Validações
+
+Comandos rodados na worktree do PR J — ver descrição do commit para resultados.
 
 ---
 

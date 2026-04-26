@@ -339,7 +339,7 @@ export function FilterSidebar({
           <button
             type="button"
             onClick={() => undefined}
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_-10px_rgba(14,98,216,0.6)] transition hover:bg-[#0c4fb0]"
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
           >
             Ver {formatTotal(totalResults)} ofertas
           </button>

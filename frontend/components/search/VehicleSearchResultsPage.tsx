@@ -15,6 +15,7 @@ import {
   mergeSearchFilters,
   parseAdsSearchFiltersFromSearchParams,
 } from "../../lib/search/ads-search-url";
+import { SiteBottomNav } from "../shell/SiteBottomNav";
 import { AppliedFilterChips } from "./AppliedFilterChips";
 import { SearchFacetsSidebar } from "./SearchFacetsSidebar";
 import { SearchPagination } from "./SearchPagination";
@@ -184,7 +185,8 @@ export function VehicleSearchResultsPage({
   }, [cityProfile, filters.brand, filters.model]);
 
   return (
-    <main className="min-h-screen bg-[#f3f4f7]">
+    <>
+    <main className="min-h-screen bg-[#f3f4f7] pb-20 md:pb-0">
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
         <section className="grid gap-5 lg:grid-cols-[1fr_1.05fr]">
           <div className="rounded-[28px] border border-[#e1e7f0] bg-white px-6 py-8 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
@@ -318,5 +320,7 @@ export function VehicleSearchResultsPage({
         </div>
       </div>
     </main>
+    <SiteBottomNav />
+    </>
   );
 }

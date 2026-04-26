@@ -85,6 +85,7 @@ const ITEMS: ReadonlyArray<BottomNavItem> = [
     label: "Buscar",
     href: "/comprar",
     icon: <SearchIcon />,
+    activePattern: /^\/(comprar|anuncios|carros-em|carros-baratos-em|carros-automaticos-em|cidade)(\/|$)/,
   },
   {
     id: "anunciar",
