@@ -20,16 +20,11 @@ import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
  *   - Indicador "+N mil ofertas ativas" com avatares quando há totalAds.
  *   - Dots decorativos (carousel visual).
  *
- * O asset `banner-home.png` carrega texto antigo embutido APENAS no lado
- * esquerdo da imagem (frase + botão). Para casar com o mockup (que mostra
- * a cidade + carro à direita visíveis e gradient escuro só à esquerda),
- * usamos:
- *   - `object-position: right` no <Image>, que ancora a imagem ao lado
- *     direito e empurra o texto antigo do PNG para fora do viewport útil
- *     em telas estreitas/médias.
- *   - Um gradient horizontal forte na esquerda
- *     (`from-cnc-footer-a via-cnc-footer-a/90 to-cnc-footer-a/30`) que
- *     cobre o texto remanescente em desktops largos sem apagar a imagem.
+ * O banner agora é `home-hero-banner.png` (asset limpo, sem texto
+ * pré-renderizado), extraído do sprite enviado pelo usuário. Aplicamos
+ * apenas um gradient suave da esquerda (forte) para o centro
+ * (transparente) para dar contraste ao H1 + CTA — a imagem da cidade +
+ * SUV continua visível à direita, igual ao mockup.
  */
 
 interface HomeHeroProps {
@@ -98,8 +93,8 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
   }, [defaultCitySlug]);
 
   const handleCtaClick = useCallback(() => {
-    // Mantém SSR-friendly via <Link>; este onClick é só fallback de
-    // analytics se algum dia houver tracker — por ora não faz nada.
+    // Mantém SSR-friendly via Link do next; este onClick é só fallback
+    // de analytics se algum dia houver tracker — por ora não faz nada.
   }, []);
 
   const offersBadge = formatActiveOffers(totalAds);
@@ -117,14 +112,14 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
           fill
           priority
           sizes="(min-width: 1280px) 1440px, 100vw"
-          className="object-cover [object-position:80%_center]"
+          className="object-cover object-right"
         />
         {/*
-         * Gradient forte na esquerda (cobre texto antigo do PNG) e leve
-         * à direita (deixa a cidade + carro aparecerem). Casa com mockup
-         * `pagina Home.png` onde a foto é claramente visível.
+         * Gradient suave da esquerda (forte) para o centro (transparente)
+         * para dar contraste ao H1 + CTA — a foto da cidade + SUV fica
+         * visível à direita.
          */}
-        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a via-cnc-footer-a/85 to-cnc-footer-a/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a via-cnc-footer-a/70 to-transparent" />
 
         <div
           className="relative grid min-h-[280px] items-center px-5 py-7 sm:min-h-[340px] sm:px-8 sm:py-10 md:min-h-[400px] lg:px-12"
