@@ -3,8 +3,8 @@
 import { ActionShortcut } from "@/components/ui/ActionShortcut";
 import {
   IconBook,
-  IconCalculator,
   IconCarFront,
+  IconHeart,
   IconKey,
   IconPriceTag,
   IconShield,
@@ -14,13 +14,18 @@ import {
  * Faixa de atalhos circulares — equivalente "stories" mas com ações
  * úteis (sem FOMO, sem badge automática "novo").
  *
- * Destinos canônicos (sem duplicar):
+ * Set canônico (contrato visual oficial — mockup `pagina Home.png`):
  *   - Comprar    → /comprar
  *   - Vender     → /anunciar
- *   - FIPE       → /tabela-fipe   (1 ponto de entrada)
- *   - Simulador  → /simulador-financiamento  (1 ponto de entrada)
- *   - Blog       → /blog          (1 ponto de entrada)
- *   - Lojas      → /comprar?seller_type=dealer  (lojistas)
+ *   - Blog       → /blog
+ *   - Ofertas    → /comprar?below_fipe=true   (oportunidades destacadas)
+ *   - Lojas      → /comprar?seller_type=dealer
+ *   - Favoritos  → /favoritos
+ *
+ * FIPE e Simulador NÃO aparecem aqui — ficam nos cards quick-action
+ * (HomePrimaryActions) abaixo desta faixa, e também no header desktop.
+ * Regra do redesign: 1 só ponto canônico por função, sem duplicar perto
+ * da dobra.
  *
  * Server Component — apenas composição.
  */
@@ -39,27 +44,27 @@ const SHORTCUTS = [
     variant: "default" as const,
   },
   {
-    href: "/tabela-fipe",
-    label: "FIPE",
-    icon: <IconPriceTag className="h-7 w-7" />,
-    variant: "default" as const,
-  },
-  {
-    href: "/simulador-financiamento",
-    label: "Simulador",
-    icon: <IconCalculator className="h-7 w-7" />,
-    variant: "default" as const,
-  },
-  {
     href: "/blog",
     label: "Blog",
     icon: <IconBook className="h-7 w-7" />,
     variant: "default" as const,
   },
   {
+    href: "/comprar?below_fipe=true",
+    label: "Ofertas",
+    icon: <IconPriceTag className="h-7 w-7" />,
+    variant: "highlight" as const,
+  },
+  {
     href: "/comprar?seller_type=dealer",
     label: "Lojas",
     icon: <IconShield className="h-7 w-7" />,
+    variant: "default" as const,
+  },
+  {
+    href: "/favoritos",
+    label: "Favoritos",
+    icon: <IconHeart className="h-7 w-7" />,
     variant: "default" as const,
   },
 ];

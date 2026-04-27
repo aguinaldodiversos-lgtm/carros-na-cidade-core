@@ -6,28 +6,28 @@ import { ContentCardsSection } from "@/components/home/sections/ContentCardsSect
 import { ExploreByState } from "@/components/home/sections/ExploreByState";
 import { HomeCarouselsSkeleton } from "@/components/home/sections/HomeCarouselsSkeleton";
 import { HomeHero } from "@/components/home/sections/HomeHero";
+import { HomePrimaryActions } from "@/components/home/sections/HomePrimaryActions";
 import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
-import { PromoCarousel } from "@/components/home/sections/PromoCarousel";
 
 /**
- * PR G — Orquestrador da Home reescrito.
+ * Orquestrador da Home — alinhado ao contrato visual oficial em
+ * `frontend/public/images/pagina Home.png`.
  *
  * Ordem das seções (mobile-first, carros aparecem cedo):
- *   1. HomeHero          — banner + busca + chips de filtro (acima da dobra)
- *   2. HomeShortcuts     — atalhos circulares (Comprar, Vender, FIPE,
- *                          Simulador, Blog, Lojas) — equivalente "stories"
- *                          mas com semântica útil
- *   3. HomeCarousels     — Suspense com destaques + oportunidades (carros
- *                          aparecem CEDO, ainda above-the-fold em desktop)
- *   4. PromoCarousel     — 3 cards de proposta de valor (FIPE/Sim/Anuncio)
- *   5. ExploreByState    — atalhos por estado
+ *   1. HomeHero            — banner regional + busca + chips de filtro
+ *   2. HomeShortcuts       — 6 atalhos circulares: Comprar, Vender, Blog,
+ *                            Ofertas, Lojas, Favoritos (set do mockup)
+ *   3. HomePrimaryActions  — 3 cards quick-action: Anunciar grátis, Tabela
+ *                            FIPE, Simulador (substituiu o PromoCarousel)
+ *   4. HomeCarousels       — Suspense com destaques + oportunidades
+ *   5. ExploreByState      — atalhos por estado
  *   6. ContentCardsSection — blog integrado (motor de aquisição)
  *
  * Padding-bottom no main = 20 (80px) para mobile não cobrir conteúdo com
  * BottomNav (regra documentada em frontend/components/ui/BottomNav.tsx).
  *
  * Server Component — render-tree pura, sem hooks. Client Components estão
- * somente em ilhas (HomeHero, PromoCarousel, HomeBottomNav).
+ * somente em ilhas (HomeHero, HomeBottomNav).
  */
 
 type FeaturedCity = {
@@ -78,9 +78,9 @@ export function HomePageClient({
 
         <HomeShortcuts />
 
-        <Suspense fallback={<HomeCarouselsSkeleton />}>{carousels}</Suspense>
+        <HomePrimaryActions />
 
-        <PromoCarousel />
+        <Suspense fallback={<HomeCarouselsSkeleton />}>{carousels}</Suspense>
 
         <ExploreByState items={data.adsByState} />
 

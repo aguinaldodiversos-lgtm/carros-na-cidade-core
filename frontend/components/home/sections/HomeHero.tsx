@@ -11,19 +11,22 @@ import { SearchBar } from "@/components/ui/SearchBar";
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
 
 /**
- * PR G — HomeHero redesenhado.
+ * HomeHero — alinhado ao contrato visual `pagina Home.png`.
  *
- * Mobile-first. Banner regional como hero, search bar protagonista
- * com chips de filtro rápido (Até R$ 50 mil, SUV, Abaixo da FIPE,
- * Lojas). Mantém H1 único, contrato funcional (submit para /comprar)
- * e priority/sizes corretos. Sem hex hardcoded — tokens DS.
+ * Mobile-first. Banner regional como hero com título "Encontre
+ * oportunidades na sua cidade", search bar protagonista com chips
+ * de filtro rápido (Abaixo da FIPE, SUV, Automático, Até R$ 50 mil)
+ * e CTA único "Ver ofertas" (submit do form). H1 único, contrato
+ * funcional (submit para /comprar). Sem hex hardcoded — tokens DS.
  *
- * Substituí o form de 3 dropdowns (busca + estado + cidade) por
- * uma SearchBar limpa. Filtros avançados são cobertos em /comprar
- * (página de catálogo). Estado e cidade ficam no header global
- * (PublicHeader.CityHeaderSelector). Esta home é mobile-first e
- * busca regional acontece via cookie de cidade que já é resolvido
- * no Server Component pai.
+ * Decisão anti-duplicação:
+ *   - Removido o CTA "Começar agora" sobre o banner; o único CTA
+ *     primário aqui é o submit "Ver ofertas" do SearchBar — evita
+ *     dois botões com mesma função (busca/explorar). O destino do
+ *     "Começar agora" antigo (/comprar) já é coberto pelo atalho
+ *     "Comprar" da faixa HomeShortcuts e pelo submit da busca.
+ *   - Estado e cidade ficam no header global; busca regional usa o
+ *     cookie de cidade resolvido no Server Component pai.
  */
 
 type FeaturedCity = {
@@ -88,22 +91,22 @@ export function HomeHero({ featuredCities: _f, defaultCitySlug, cityName }: Home
         {/* Overlay para legibilidade do texto branco */}
         <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a/85 via-cnc-footer-a/55 to-transparent" />
 
-        <div className="relative grid min-h-[260px] items-center px-5 py-7 sm:min-h-[340px] sm:px-8 sm:py-10 md:min-h-[400px] lg:px-12">
+        <div className="relative grid min-h-[220px] items-center px-5 py-7 sm:min-h-[300px] sm:px-8 sm:py-10 md:min-h-[360px] lg:px-12">
           <div className="max-w-xl">
             <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl md:text-4xl">
-              O portal de carros usados
+              Encontre oportunidades
               <br />
-              que <span className="text-primary-soft">entende a sua cidade</span>
+              <span className="text-primary-soft">
+                {cityName ? `em ${cityName}` : "na sua cidade"}
+              </span>
             </h1>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
-              Conectamos compradores e vendedores com foco regional.{" "}
+              Carros, lojas e ofertas{cityName ? ` em ${cityName} e região` : " perto de você"}.
               <span className="hidden sm:inline">
-                Mais oportunidades, melhores negócios e confiança perto de você.
+                {" "}
+                Mais oportunidades, melhores negócios e confiança regional.
               </span>
             </p>
-            <Button href="/comprar" variant="primary" size="lg" className="mt-5 sm:mt-6">
-              Começar agora
-            </Button>
           </div>
         </div>
       </div>
