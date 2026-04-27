@@ -4,6 +4,7 @@ import AdEventTracker from "@/components/analytics/AdEventTracker";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import VehicleCarousel from "@/components/common/VehicleCarousel";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import VehicleActions from "@/components/vehicle/VehicleActions";
 import VehicleFinancePanel from "@/components/vehicle/VehicleFinancePanel";
 import VehicleGallery from "@/components/vehicle/VehicleGallery";
@@ -376,7 +377,7 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
 
   return (
     <>
-      <main className="mx-auto w-full max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pb-8 md:pt-9 xl:px-8">
+      <main className="cnc-pb-bottomnav mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-9 xl:px-8">
         <PageBreadcrumbs
           items={breadcrumbItems}
           className="mb-4 overflow-x-auto whitespace-nowrap"
@@ -435,6 +436,8 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
           vehicles={similarVehicles}
         />
       </main>
+
+      <SiteBottomNav />
 
       <AdEventTracker adId={vehicle.id} eventType="view" />
       <BreadcrumbJsonLd items={breadcrumbItems} />

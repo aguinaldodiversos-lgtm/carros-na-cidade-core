@@ -338,6 +338,22 @@ b {
   .cnc-stack-section {
     @apply py-8 md:py-10 lg:py-11;
   }
+
+  /**
+   * Padding-bottom canônico para `<main>` em páginas que renderizam
+   * SiteBottomNav (mobile-only). Substitui hardcodes do tipo
+   * `pb-[calc(6.5rem+env(safe-area-inset-bottom))]`. Em desktop o
+   * BottomNav some (md:hidden) e o padding extra deixa de ser necessário.
+   */
+  .cnc-pb-bottomnav {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 768px) {
+  .cnc-pb-bottomnav {
+    padding-bottom: 0;
+  }
 }
 
 @media (max-width: 768px) {
