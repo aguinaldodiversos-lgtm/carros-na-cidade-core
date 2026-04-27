@@ -64,6 +64,14 @@ const INITIAL_FORM: WizardFormState = {
   draftPhotoUrls: [],
 };
 
+/**
+ * Validação por passo no novo fluxo de 5 passos (mockup `pag1 anuncios.png`):
+ *   0 — Veículo   (StepVehicle)
+ *   1 — Preço     (StepListingInfo)
+ *   2 — Fotos     (StepPhotos)
+ *   3 — Descrição (StepOptionals + StepConditions — sem campos obrigatórios)
+ *   4 — Revisão   (StepFinalize + StepHighlight — exige UF/cidade/termos)
+ */
 function validateStep(step: number, form: WizardFormState): string | null {
   switch (step) {
     case 0:
@@ -83,17 +91,15 @@ function validateStep(step: number, form: WizardFormState): string | null {
       if (form.draftPhotoUrls.length < 1) return "Adicione pelo menos uma foto.";
       return null;
     case 3:
-    case 4:
+      // Opcionais e condições não são obrigatórios.
       return null;
-    case 5:
+    case 4:
       if (!form.state.trim() || form.state.length !== 2) return "Selecione a UF.";
       if (form.cityId == null || !Number.isFinite(form.cityId)) {
         return "Selecione uma cidade válida da lista para continuar.";
       }
       if (!form.city.trim()) return "Selecione uma cidade válida da lista para continuar.";
       if (!form.acceptTerms) return "Aceite os termos para publicar.";
-      return null;
-    case 6:
       return null;
     default:
       return null;
@@ -359,7 +365,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
   }
 
   async function handleSubmit() {
-    const firstError = [0, 1, 2, 5].map((s) => validateStep(s, form)).find(Boolean);
+    const firstError = [0, 1, 2, 3, 4].map((s) => validateStep(s, form)).find(Boolean);
     const err = firstError ?? null;
     if (err) {
       setSubmitState("error");
@@ -456,26 +462,24 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   const stepTitle = STEP_LABELS[step];
   const stepSubtitle: Record<number, string> = {
-    0: "Selecione os dados estruturais do veículo para continuar.",
+    0: "Informe os principais dados do seu carro.",
     1: "Defina preço e quilometragem com apoio da referência de mercado.",
-    2: "Mostre o veículo com imagens de qualidade.",
-    3: "Marque os equipamentos e opcionais.",
-    4: "Informe condições e histórico relevantes.",
-    5: "Revise, descreva se quiser, informe contato e publique.",
-    6: "Escolha se deseja destacar o anúncio.",
+    2: "Adicione fotos para destacar seu anúncio.",
+    3: "Marque os opcionais e a condição do veículo, e descreva se quiser.",
+    4: "Revise os dados, escolha como destacar e publique.",
   };
 
   const isAnunciarRoute = pathname.includes("/anunciar/novo");
 
   const breadcrumb = (
-    <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#6E748A]">
+    <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-cnc-muted">
       {isAnunciarRoute ? (
         <>
-          <Link href="/" className="transition hover:text-[#1F66E5]">
+          <Link href="/" className="transition hover:text-primary">
             Início
           </Link>
           <span>›</span>
-          <Link href="/anunciar" className="transition hover:text-[#1F66E5]">
+          <Link href="/anunciar" className="transition hover:text-primary">
             Anunciar
           </Link>
           <span>›</span>
@@ -483,11 +487,11 @@ export default function NewAdWizardClient({ initialType }: Props) {
         </>
       ) : (
         <>
-          <Link href="/painel" className="transition hover:text-[#1F66E5]">
+          <Link href="/painel" className="transition hover:text-primary">
             Painel
           </Link>
           <span>›</span>
-          <Link href="/painel/anuncios" className="transition hover:text-[#1F66E5]">
+          <Link href="/painel/anuncios" className="transition hover:text-primary">
             Anúncios
           </Link>
           <span>›</span>
@@ -501,8 +505,8 @@ export default function NewAdWizardClient({ initialType }: Props) {
     <div
       className={`mt-6 rounded-[18px] border px-4 py-3 text-sm leading-7 ${
         submitState === "success"
-          ? "border-green-200 bg-green-50 text-green-800"
-          : "border-red-200 bg-red-50 text-red-800"
+          ? "border-cnc-success/30 bg-cnc-success/5 text-cnc-success"
+          : "border-cnc-danger/30 bg-cnc-danger/5 text-cnc-danger"
       }`}
     >
       {submitMessage}
@@ -510,13 +514,13 @@ export default function NewAdWizardClient({ initialType }: Props) {
   ) : null;
 
   const footer = (
-    <div className="mt-10 flex flex-col-reverse gap-3 border-t border-[#EEF2F7] pt-8 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-10 flex flex-col-reverse gap-3 border-t border-cnc-line pt-8 sm:flex-row sm:items-center sm:justify-between">
       <button
         type="button"
         onClick={goBack}
         disabled={step === 0}
         data-testid="wizard-back-btn"
-        className="inline-flex items-center justify-center rounded-[20px] border border-[#E5E9F2] bg-white px-6 py-3.5 text-base font-bold text-[#1D2440] transition hover:bg-[#F9FBFF] disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex items-center justify-center rounded-2xl border border-cnc-line bg-cnc-surface px-6 py-3.5 text-base font-bold text-cnc-text-strong transition hover:bg-cnc-bg disabled:cursor-not-allowed disabled:opacity-40"
       >
         ← Voltar
       </button>
@@ -527,7 +531,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
             type="button"
             onClick={goNext}
             data-testid="wizard-next-btn"
-            className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5]"
+            className="cnc-btn-primary px-8 py-3.5 text-base"
           >
             Continuar →
           </button>
@@ -537,7 +541,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
             onClick={handleSubmit}
             disabled={submitState === "submitting"}
             data-testid="wizard-submit-btn"
-            className="inline-flex items-center justify-center rounded-[20px] bg-[#2F67F6] px-8 py-3.5 text-base font-bold text-white shadow-[0_12px_30px_rgba(47,103,246,0.24)] transition hover:bg-[#1F66E5] disabled:opacity-60"
+            className="cnc-btn-primary px-8 py-3.5 text-base"
           >
             {submitState === "submitting" ? "Publicando..." : "Publicar anúncio"}
           </button>
@@ -548,7 +552,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   if (!dashboardFetchDone) {
     return (
-      <div className="min-h-[40vh] bg-[#F5F7FB] px-4 py-16 text-center text-sm text-[#6E748A]">
+      <div className="min-h-[40vh] bg-cnc-bg px-4 py-16 text-center text-sm text-cnc-muted">
         Carregando fluxo de anúncio…
       </div>
     );
@@ -556,7 +560,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   if (dashboardRequiresProfileCompletion(dashboard)) {
     return (
-      <div className="min-h-screen bg-[#F5F7FB] px-4 py-10">
+      <div className="min-h-screen bg-cnc-bg px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <CompleteProfileGate
             onCompleted={() => {
@@ -578,6 +582,12 @@ export default function NewAdWizardClient({ initialType }: Props) {
       messageSlot={messageSlot}
       footer={footer}
     >
+      {/*
+        Renderização agrupada — 5 passos visuais (mockup `pag1 anuncios.png`)
+        sobre os 7 componentes existentes em WizardSteps.tsx. Mudar
+        STEP_COUNT em types.ts mantém a navegação coerente; o agrupamento
+        físico acontece aqui.
+      */}
       {step === 0 ? <StepVehicle state={form} patch={patch} /> : null}
       {step === 1 ? <StepListingInfo state={form} patch={patch} /> : null}
       {step === 2 ? (
@@ -591,18 +601,24 @@ export default function NewAdWizardClient({ initialType }: Props) {
           onSetCover={setPhotoCover}
         />
       ) : null}
-      {step === 3 ? <StepOptionals state={form} patch={patch} /> : null}
-      {step === 4 ? <StepConditions state={form} patch={patch} /> : null}
-      {step === 5 ? (
-        <StepFinalize
-          state={form}
-          patch={patch}
-          dashboard={dashboard}
-          dashboardError={dashboardError}
-          sessionAccountType={sessionAccountType}
-        />
+      {step === 3 ? (
+        <div className="space-y-10">
+          <StepOptionals state={form} patch={patch} />
+          <StepConditions state={form} patch={patch} />
+        </div>
       ) : null}
-      {step === 6 ? <StepHighlight state={form} patch={patch} boostOptions={boostOptions} /> : null}
+      {step === 4 ? (
+        <div className="space-y-10">
+          <StepFinalize
+            state={form}
+            patch={patch}
+            dashboard={dashboard}
+            dashboardError={dashboardError}
+            sessionAccountType={sessionAccountType}
+          />
+          <StepHighlight state={form} patch={patch} boostOptions={boostOptions} />
+        </div>
+      ) : null}
     </SellWizardLayout>
   );
 }

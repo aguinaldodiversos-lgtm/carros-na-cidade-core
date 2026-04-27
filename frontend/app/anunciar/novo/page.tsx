@@ -19,7 +19,7 @@ type PageProps = {
 
 function WizardFallback() {
   return (
-    <div className="min-h-[40vh] bg-[#F5F7FB] px-4 py-16 text-center text-sm text-[#6E748A]">
+    <div className="min-h-[40vh] bg-cnc-bg px-4 py-16 text-center text-sm text-cnc-muted">
       Carregando fluxo de anúncio…
     </div>
   );

@@ -8,8 +8,8 @@ type Props = {
 
 export default function SellWizardProgress({ currentStep }: Props) {
   return (
-    <div className="w-full overflow-x-auto border-b border-[#E5E9F2] bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex min-w-[720px] max-w-[1100px] items-stretch justify-between gap-1 px-4 py-4 sm:px-6">
+    <div className="w-full overflow-x-auto border-b border-cnc-line bg-white/95 backdrop-blur-md">
+      <div className="mx-auto flex min-w-[480px] max-w-[1100px] items-stretch justify-between gap-1 px-4 py-4 sm:px-6">
         {Array.from({ length: STEP_COUNT }, (_, index) => {
           const active = index === currentStep;
           const done = index < currentStep;
@@ -23,29 +23,29 @@ export default function SellWizardProgress({ currentStep }: Props) {
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${
                     active
-                      ? "bg-[#2F67F6] text-white shadow-[0_8px_20px_rgba(47,103,246,0.35)]"
+                      ? "bg-primary text-white shadow-card"
                       : done
-                        ? "bg-[#E8F0FF] text-[#2F67F6]"
-                        : "bg-[#F0F3FA] text-[#6E748A]"
+                        ? "bg-primary-soft text-primary"
+                        : "border border-cnc-line bg-cnc-surface text-cnc-muted"
                   }`}
                 >
                   {index + 1}
                 </span>
                 <span
                   className={`line-clamp-2 text-[11px] font-bold leading-tight sm:text-xs ${
-                    active ? "text-[#1D2440]" : "text-[#6E748A]"
+                    active ? "text-cnc-text-strong" : "text-cnc-muted"
                   }`}
                 >
                   {STEP_LABELS[index]}
                 </span>
                 <span
                   className={`h-1 w-full max-w-[72px] rounded-full ${
-                    active ? "bg-[#2F67F6]" : done ? "bg-[#C7D7F8]" : "bg-[#E5E9F2]"
+                    active ? "bg-primary" : done ? "bg-primary/40" : "bg-cnc-line"
                   }`}
                 />
               </div>
               {index < STEP_COUNT - 1 ? (
-                <span className="mb-6 hidden text-[#C5D1E8] sm:inline" aria-hidden>
+                <span className="mb-6 hidden text-cnc-line-strong sm:inline" aria-hidden>
                   ›
                 </span>
               ) : null}
