@@ -188,38 +188,6 @@ function MarketplaceCta({ cityName, citySlug }: { cityName: string; citySlug: st
   );
 }
 
-function ToolsRow({ citySlug }: { citySlug: string }) {
-  const tools = [
-    { label: "Tabela FIPE", href: `/tabela-fipe/${citySlug}`, hint: "Consulta valor de mercado" },
-    {
-      label: "Simulador",
-      href: `/simulador-financiamento/${citySlug}`,
-      hint: "Calcule sua parcela",
-    },
-    { label: "Anunciar", href: "/anunciar", hint: "Publique seu carro" },
-  ];
-
-  return (
-    <section aria-label="Ferramentas relacionadas" className="grid gap-3 sm:grid-cols-3">
-      {tools.map((tool) => (
-        <Link
-          key={tool.href}
-          href={tool.href}
-          className="flex items-center justify-between rounded-xl border border-cnc-line bg-cnc-surface p-4 shadow-card transition hover:border-primary/40 hover:shadow-premium"
-        >
-          <div className="min-w-0">
-            <p className="text-[13px] font-extrabold text-cnc-text-strong">{tool.label}</p>
-            <p className="text-[12px] text-cnc-muted">{tool.hint}</p>
-          </div>
-          <span className="text-primary">
-            <ArrowRightIcon />
-          </span>
-        </Link>
-      ))}
-    </section>
-  );
-}
-
 export function BlogPageClient({ content }: BlogPageClientProps) {
   const cityName = content.cityName;
   const citySlug = content.citySlug;
@@ -320,37 +288,14 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
             )}
           </section>
 
+          {/* Promo único no rodapé do blog (mockup `blog.png`): leva ao catálogo
+              da cidade ativa. Anti-duplicação: ToolsRow (FIPE/Simulador/Anunciar)
+              e o banner extra "Anunciar grátis" foram removidos — esses
+              destinos já são canônicos em HomePrimaryActions, no atalho
+              "Vender" da home, no header desktop e no FAB do SiteBottomNav. */}
           <div className="mt-7">
             <MarketplaceCta cityName={cityName} citySlug={citySlug} />
           </div>
-
-          <div className="mt-6">
-            <ToolsRow citySlug={citySlug} />
-          </div>
-
-          <section
-            aria-label="Anuncie seu carro"
-            className="mt-7 flex flex-col gap-4 rounded-2xl border border-cnc-line bg-cnc-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-6"
-          >
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-cnc-muted">
-                {content.sidebarSaleCta?.title ? "Loja parceira" : "Vender carro"}
-              </p>
-              <h3 className="mt-1 text-[16px] font-extrabold leading-tight text-cnc-text-strong sm:text-[18px]">
-                {content.bottomBanner?.title ?? "Quer vender seu carro rápido e seguro?"}
-              </h3>
-              <p className="mt-1 text-[13px] leading-snug text-cnc-muted sm:text-[14px]">
-                {content.bottomBanner?.subtitle ?? `Anuncie grátis em ${cityName}.`}
-              </p>
-            </div>
-
-            <Link
-              href={content.bottomBanner?.ctaHref ?? "/anunciar"}
-              className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-5 text-[13px] font-extrabold text-white shadow-card transition hover:bg-primary-strong"
-            >
-              {content.bottomBanner?.ctaLabel ?? "Anunciar grátis"}
-            </Link>
-          </section>
         </div>
       </main>
 
