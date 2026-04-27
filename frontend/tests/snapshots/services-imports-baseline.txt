@@ -14,8 +14,8 @@ app/api/dashboard/me/route.ts:15:sessionService
 app/api/painel/anuncios/route.ts:21:sessionService
 app/impulsionar/[adId]/page.tsx:7:sessionService
 app/login/page.tsx:6:sessionService
-app/veiculo/[slug]/page.tsx:31:aiService
 app/veiculo/[slug]/page.tsx:32:aiService
+app/veiculo/[slug]/page.tsx:33:aiService
 components/vehicle/VehicleInfo.tsx:3:aiService
 lib/account/backend-account.ts:4:adService
 lib/account/backend-account.ts:6:sessionService

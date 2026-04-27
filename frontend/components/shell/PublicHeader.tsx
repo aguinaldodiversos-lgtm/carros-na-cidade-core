@@ -148,14 +148,24 @@ export function PublicHeader() {
               aria-label="Carros na Cidade"
               className="inline-flex shrink-0 flex-col items-start leading-tight"
             >
-              <Image
-                src={SITE_LOGO_SRC}
-                alt="Carros na Cidade"
-                width={220}
-                height={52}
-                priority
-                className="h-[28px] w-auto max-w-[180px] object-contain object-left brightness-0 invert sm:h-[34px] md:brightness-100 md:invert-0"
-              />
+              {/*
+               * Logo:
+               * - mobile (< md): fundo navy do header. O PNG tem fundo branco
+               *   opaco; usamos uma pílula branca arredondada para preservar
+               *   as cores originais do logo e ganhar contraste premium.
+               * - desktop (>= md): header já tem fundo branco, logo segue
+               *   sem container extra.
+               */}
+              <span className="inline-flex items-center rounded-md bg-white/95 px-2 py-1 shadow-sm md:bg-transparent md:p-0 md:shadow-none">
+                <Image
+                  src={SITE_LOGO_SRC}
+                  alt="Carros na Cidade"
+                  width={220}
+                  height={52}
+                  priority
+                  className="h-[26px] w-auto max-w-[160px] object-contain object-left sm:h-[30px] md:h-[34px] md:max-w-[180px]"
+                />
+              </span>
               <span className="mt-0.5 hidden text-[10px] font-medium leading-tight text-white/80 sm:inline md:text-[11px] md:text-cnc-muted">
                 Ofertas locais e confiança perto de você
               </span>

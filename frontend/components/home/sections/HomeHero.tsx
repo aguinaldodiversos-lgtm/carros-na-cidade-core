@@ -2,79 +2,105 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useState } from "react";
+import Link from "next/link";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
-import { SearchBar } from "@/components/ui/SearchBar";
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
 
 /**
- * HomeHero — alinhado ao contrato visual `pagina Home.png`.
+ * HomeHero — banner regional alinhado ao mockup `pagina Home.png`.
  *
- * Mobile-first. Banner regional como hero com título "Encontre
- * oportunidades na sua cidade", search bar protagonista com chips
- * de filtro rápido (Abaixo da FIPE, SUV, Automático, Até R$ 50 mil)
- * e CTA único "Ver ofertas" (submit do form). H1 único, contrato
- * funcional (submit para /comprar). Sem hex hardcoded — tokens DS.
+ * Renderiza o card herói abaixo da `HomeSearchCard` e da `HomeShortcuts`:
+ *   - Pílula com pin: "<cidade> e região"
+ *   - H1 "Encontre oportunidades / na sua cidade"
+ *   - Linha curta de copy regional
+ *   - CTA primário "Ver ofertas →" (links direto para /comprar com a cidade
+ *     ativa) — único CTA dentro do banner; busca mora em HomeSearchCard.
+ *   - Indicador "+N mil ofertas ativas" com avatares quando há totalAds.
+ *   - Dots decorativos (carousel visual).
  *
- * Decisão anti-duplicação:
- *   - Removido o CTA "Começar agora" sobre o banner; o único CTA
- *     primário aqui é o submit "Ver ofertas" do SearchBar — evita
- *     dois botões com mesma função (busca/explorar). O destino do
- *     "Começar agora" antigo (/comprar) já é coberto pelo atalho
- *     "Comprar" da faixa HomeShortcuts e pelo submit da busca.
- *   - Estado e cidade ficam no header global; busca regional usa o
- *     cookie de cidade resolvido no Server Component pai.
+ * O asset `banner-home.png` carrega texto antigo embutido. Para evitar
+ * "texto fantasma", aplicamos overlay sólido escuro suficiente para cobrir
+ * o texto do PNG (`bg-cnc-footer-a/85`) em vez de gradient transparente,
+ * mantendo o tom navy premium e deixando aparecer apenas a textura da
+ * cidade ao fundo.
  */
 
-type FeaturedCity = {
-  id: number;
-  name: string;
-  slug: string;
-  state?: string;
-};
-
 interface HomeHeroProps {
-  featuredCities: FeaturedCity[];
   defaultCitySlug: string;
-  /** Nome da cidade ativa (para personalizar microtexto). */
+  /** Nome da cidade ativa (para personalizar pílula e microtexto). */
   cityName?: string;
+  /** Total de anúncios ativos (para a "+N mil ofertas ativas"). */
+  totalAds?: number;
 }
 
-const QUICK_FILTERS: Array<{ key: string; label: string; query: string }> = [
-  { key: "below-fipe", label: "Abaixo da FIPE", query: "below_fipe=true" },
-  { key: "suv", label: "SUV", query: "body_type=SUV" },
-  { key: "auto", label: "Automático", query: "transmission=automatic" },
-  { key: "ate-50", label: "Até R$ 50 mil", query: "price_max=50000" },
-];
+function PinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
+      <circle cx="12" cy="9" r="2.5" />
+    </svg>
+  );
+}
 
-export function HomeHero({ featuredCities: _f, defaultCitySlug, cityName }: HomeHeroProps) {
+function ArrowRightIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function formatActiveOffers(total: number | undefined): string | null {
+  if (!total || total < 100) return null;
+  if (total >= 1000) {
+    const mil = Math.floor(total / 1000);
+    return `+${mil} mil ofertas ativas`;
+  }
+  const rounded = Math.floor(total / 100) * 100;
+  return `+${rounded} ofertas ativas`;
+}
+
+export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const cityLabel = cityName || "sua região";
 
-  const submit = useCallback(
-    (value: string) => {
-      const params = new URLSearchParams();
-      if (value.trim()) params.set("q", value.trim());
-      if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
-      router.push(`/comprar?${params.toString()}`);
-    },
-    [defaultCitySlug, router]
-  );
+  const offersHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
+    const qs = params.toString();
+    return qs ? `/comprar?${qs}` : "/comprar";
+  }, [defaultCitySlug]);
 
-  const goWithFilter = useCallback(
-    (filterQuery: string) => {
-      const params = new URLSearchParams(filterQuery);
-      if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
-      router.push(`/comprar?${params.toString()}`);
-    },
-    [defaultCitySlug, router]
-  );
+  const handleCtaClick = useCallback(() => {
+    // Mantém SSR-friendly via <Link>; este onClick é só fallback de
+    // analytics se algum dia houver tracker — por ora não faz nada.
+  }, []);
+
+  const offersBadge = formatActiveOffers(totalAds);
 
   return (
-    <section className="mx-auto w-full max-w-8xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+    <section className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8">
       <div className="relative overflow-hidden rounded-2xl bg-cnc-footer-a shadow-premium md:rounded-3xl">
         <Image
           src={HOME_HERO_BANNER}
@@ -86,77 +112,70 @@ export function HomeHero({ featuredCities: _f, defaultCitySlug, cityName }: Home
           fill
           priority
           sizes="(min-width: 1280px) 1440px, 100vw"
-          className="object-cover object-center"
+          className="object-cover object-right"
         />
-        {/* Overlay para legibilidade do texto branco */}
-        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a/85 via-cnc-footer-a/55 to-transparent" />
+        {/*
+         * Overlay opaco navy (não gradiente transparente) para esconder
+         * texto pré-renderizado do asset banner-home.png. Mantém leitura
+         * branca consistente do H1 e CTA.
+         */}
+        <div className="absolute inset-0 bg-cnc-footer-a/85" />
+        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a/40 to-transparent" />
 
-        <div className="relative grid min-h-[220px] items-center px-5 py-7 sm:min-h-[300px] sm:px-8 sm:py-10 md:min-h-[360px] lg:px-12">
+        <div
+          className="relative grid min-h-[280px] items-center px-5 py-7 sm:min-h-[340px] sm:px-8 sm:py-10 md:min-h-[400px] lg:px-12"
+          onClick={handleCtaClick}
+        >
           <div className="max-w-xl">
-            <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl md:text-4xl">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
+              <PinIcon />
+              {cityName ? `${cityName} e região` : "Sua região"}
+            </span>
+
+            <h1 className="mt-4 text-[28px] font-extrabold leading-tight tracking-tight text-white sm:text-[34px] md:text-[40px]">
               Encontre oportunidades
               <br />
-              <span className="text-primary-soft">
-                {cityName ? `em ${cityName}` : "na sua cidade"}
-              </span>
+              <span className="text-primary-soft">na sua cidade</span>
             </h1>
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
-              Carros, lojas e ofertas{cityName ? ` em ${cityName} e região` : " perto de você"}.
-              <span className="hidden sm:inline">
-                {" "}
-                Mais oportunidades, melhores negócios e confiança regional.
-              </span>
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* Busca + chips em card flutuante (mobile-first).
-          SearchBar do DS já é um <form role="search">; usamos seu onSubmit. */}
-      <div className="relative z-10 mt-3 sm:-mt-6 sm:mx-3">
-        <div className="rounded-2xl border border-cnc-line bg-cnc-surface p-3 shadow-card sm:p-4">
-          <SearchBar
-            value={query}
-            onChange={setQuery}
-            onSubmit={submit}
-            placeholder="Busque por marca ou modelo"
-            ariaLabel="Buscar veículos"
-            filterButton={
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                aria-label="Ver ofertas"
-                className="hidden sm:inline-flex"
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
+              Carros, lojas e ofertas reais em {cityLabel}.
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3 sm:gap-4">
+              <Link
+                href={offersHref}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[15px] font-extrabold text-white shadow-card transition hover:bg-primary-strong sm:px-6 sm:py-3"
               >
                 Ver ofertas
-              </Button>
-            }
-          />
-          {/* Mobile: botão dispara submit programaticamente via clique
-              no botão dentro do form do SearchBar acima.
-              Como o SearchBar é um <form>, qualquer <button type="submit">
-              dentro dele dispara o submit. Aqui usamos um botão fora do
-              form, então chamamos submit() direto. */}
-          <Button
-            type="button"
-            onClick={() => submit(query)}
-            variant="primary"
-            size="md"
-            fullWidth
-            className="mt-2 sm:hidden"
-          >
-            Ver ofertas
-          </Button>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/15">
+                  <ArrowRightIcon />
+                </span>
+              </Link>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="sr-only">Filtros rápidos</span>
-            {QUICK_FILTERS.map((f) => (
-              <Chip key={f.key} variant="filter" onClick={() => goWithFilter(f.query)}>
-                {f.label}
-              </Chip>
-            ))}
+              {offersBadge ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white backdrop-blur-sm">
+                  <span aria-hidden="true" className="flex -space-x-1.5">
+                    <span className="inline-block h-5 w-5 rounded-full border-2 border-cnc-footer-a bg-primary" />
+                    <span className="inline-block h-5 w-5 rounded-full border-2 border-cnc-footer-a bg-cnc-success" />
+                    <span className="inline-block h-5 w-5 rounded-full border-2 border-cnc-footer-a bg-cnc-warning" />
+                  </span>
+                  {offersBadge}
+                </span>
+              ) : null}
+            </div>
           </div>
+        </div>
+
+        {/*
+         * Dots decorativos (carousel visual). Sem mecânica de troca — só
+         * sinalização visual conforme mockup. 1 ativo, 3 inativos.
+         */}
+        <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 sm:bottom-5">
+          <span aria-hidden="true" className="h-1.5 w-6 rounded-full bg-white/90" />
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/40" />
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/40" />
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/40" />
         </div>
       </div>
     </section>

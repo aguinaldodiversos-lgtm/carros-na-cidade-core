@@ -10,10 +10,16 @@ import type { ReactNode } from "react";
  * atalhos circulares: Anunciar grátis / Tabela FIPE / Simulador). Também
  * pode ser usado como CTA de bottom em FIPE/Simulador/Blog.
  *
- * Server Component — apenas Link + composição visual. Sem hex hardcoded:
- * usa tokens DS (cnc-surface, cnc-line, primary-soft, primary, cnc-text-strong,
- * cnc-muted).
+ * `accent` controla o tom do ícone circular sem alterar o resto do card —
+ * mantém o sistema de tokens canônico:
+ *   - "primary" (default) → azul (cnc-primary)
+ *   - "success"           → verde (cnc-success), uso em "Tabela FIPE"
+ *   - "violet"            → roxo, uso em "Simulador de financiamento"
+ *
+ * Server Component — apenas Link + composição visual. Sem hex hardcoded.
  */
+
+type Accent = "primary" | "success" | "violet";
 
 export type QuickActionTileProps = {
   href: string;
@@ -21,8 +27,16 @@ export type QuickActionTileProps = {
   /** Subtítulo curto opcional (1 linha). */
   subtitle?: string;
   icon: ReactNode;
+  /** Tom do ícone circular. */
+  accent?: Accent;
   ariaLabel?: string;
   className?: string;
+};
+
+const ACCENT_CLASSES: Record<Accent, string> = {
+  primary: "bg-primary text-white",
+  success: "bg-cnc-success text-white",
+  violet: "bg-[#7c3aed] text-white",
 };
 
 function ChevronRightIcon() {
@@ -47,6 +61,7 @@ export function QuickActionTile({
   title,
   subtitle,
   icon,
+  accent = "primary",
   ariaLabel,
   className = "",
 }: QuickActionTileProps) {
@@ -58,7 +73,7 @@ export function QuickActionTile({
     >
       <span
         aria-hidden="true"
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary sm:h-12 sm:w-12"
+        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${ACCENT_CLASSES[accent]}`}
       >
         <span className="flex h-5 w-5 items-center justify-center sm:h-6 sm:w-6">{icon}</span>
       </span>

@@ -20,9 +20,10 @@ import { BottomNav, type BottomNavItem } from "@/components/ui/BottomNav";
  *   - Início (home): activePattern = ^/$ (somente "/" exato)
  *   - Buscar:        href "/comprar" — ativo em /comprar e
  *                    /comprar/cidade/[slug] e /comprar/estado/[uf]
- *   - Anunciar:      FAB; ativo em /anunciar/*
  *   - Favoritos:     ativo em /favoritos
- *   - Conta:         ativo em /dashboard/* e /dashboard-loja/*
+ *   - Anunciar:      FAB; ativo em /anunciar/*
+ *   - Menu:          ativo em /dashboard/* e /dashboard-loja/* (link para
+ *                    o painel; rótulo "Menu" segue o mockup pagina Home.png)
  *
  * Originalmente nasceu como `HomeBottomNav` no PR G; renomeado para
  * `SiteBottomNav` no PR H quando passou a ser reusado em
@@ -98,7 +99,7 @@ function PlusIcon() {
   );
 }
 
-function UserIcon() {
+function MenuBarsIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -108,8 +109,7 @@ function UserIcon() {
       stroke="currentColor"
       strokeWidth="2"
     >
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 4-7 8-7s8 3 8 7" strokeLinecap="round" />
+      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
     </svg>
   );
 }
@@ -131,6 +131,12 @@ const ITEMS: ReadonlyArray<BottomNavItem> = [
       /^\/(comprar|anuncios|carros-em|carros-baratos-em|carros-automaticos-em|cidade)(\/|$)/,
   },
   {
+    id: "favoritos",
+    label: "Favoritos",
+    href: "/favoritos",
+    icon: <HeartIcon />,
+  },
+  {
     id: "anunciar",
     label: "Anunciar",
     href: "/anunciar/novo",
@@ -138,16 +144,10 @@ const ITEMS: ReadonlyArray<BottomNavItem> = [
     primary: true,
   },
   {
-    id: "favoritos",
-    label: "Favoritos",
-    href: "/favoritos",
-    icon: <HeartIcon />,
-  },
-  {
-    id: "conta",
-    label: "Conta",
+    id: "menu",
+    label: "Menu",
     href: "/dashboard",
-    icon: <UserIcon />,
+    icon: <MenuBarsIcon />,
   },
 ];
 
