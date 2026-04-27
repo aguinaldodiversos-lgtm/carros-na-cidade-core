@@ -41,13 +41,13 @@ const SHORTCUTS = [
     href: "/anunciar",
     label: "Vender",
     icon: <IconKey className="h-7 w-7" />,
-    variant: "default" as const,
+    variant: "teal" as const,
   },
   {
     href: "/blog",
     label: "Blog",
     icon: <IconBook className="h-7 w-7" />,
-    variant: "default" as const,
+    variant: "violet" as const,
   },
   {
     href: "/comprar?below_fipe=true",
@@ -59,13 +59,13 @@ const SHORTCUTS = [
     href: "/comprar?seller_type=dealer",
     label: "Lojas",
     icon: <IconShield className="h-7 w-7" />,
-    variant: "default" as const,
+    variant: "fuchsia" as const,
   },
   {
     href: "/favoritos",
     label: "Favoritos",
     icon: <IconHeart className="h-7 w-7" />,
-    variant: "default" as const,
+    variant: "sky" as const,
   },
 ];
 

@@ -72,37 +72,25 @@ function HeaderNavLink({
   children,
   className = "",
   onClick,
-  variant = "desktop",
 }: {
   href: string;
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
-  /**
-   * "desktop" — usado na nav horizontal (>= md), fundo branco translúcido.
-   * "mobile" — usado dentro do drawer mobile, sobre fundo navy.
-   */
-  variant?: "desktop" | "mobile";
 }) {
   const pathname = usePathname() || "/";
   const searchParams = useSearchParams();
 
   const active = isNavLinkActive(pathname, searchParams, href);
 
-  const desktopClasses = active
-    ? "bg-slate-100/90 text-blue-800 shadow-sm"
-    : "text-slate-600 hover:bg-slate-50 hover:text-blue-700";
-
-  const mobileClasses = active
-    ? "bg-white/15 text-white shadow-sm"
-    : "text-white/85 hover:bg-white/10 hover:text-white";
-
   return (
     <Link
       href={href}
       onClick={onClick}
       className={`inline-flex h-10 max-w-full items-center rounded-lg px-2.5 text-[13px] font-semibold transition xl:px-3 xl:text-[14px] ${
-        variant === "mobile" ? mobileClasses : desktopClasses
+        active
+          ? "bg-slate-100/90 text-blue-800 shadow-sm"
+          : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
       } ${className}`}
     >
       {children}
@@ -139,7 +127,7 @@ export function PublicHeader() {
   const routes = useMemo(() => getTerritorialRoutesForCity(city.slug), [city.slug]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-cnc-footer-b/40 bg-cnc-footer-a shadow-sm md:border-slate-200/90 md:bg-white/95 md:backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-[64px] items-center gap-2 md:h-[68px] md:gap-3">
           <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
@@ -148,25 +136,15 @@ export function PublicHeader() {
               aria-label="Carros na Cidade"
               className="inline-flex shrink-0 flex-col items-start leading-tight"
             >
-              {/*
-               * Logo:
-               * - mobile (< md): fundo navy do header. O PNG tem fundo branco
-               *   opaco; usamos uma pílula branca arredondada para preservar
-               *   as cores originais do logo e ganhar contraste premium.
-               * - desktop (>= md): header já tem fundo branco, logo segue
-               *   sem container extra.
-               */}
-              <span className="inline-flex items-center rounded-md bg-white/95 px-2 py-1 shadow-sm md:bg-transparent md:p-0 md:shadow-none">
-                <Image
-                  src={SITE_LOGO_SRC}
-                  alt="Carros na Cidade"
-                  width={220}
-                  height={52}
-                  priority
-                  className="h-[26px] w-auto max-w-[160px] object-contain object-left sm:h-[30px] md:h-[34px] md:max-w-[180px]"
-                />
-              </span>
-              <span className="mt-0.5 hidden text-[10px] font-medium leading-tight text-white/80 sm:inline md:text-[11px] md:text-cnc-muted">
+              <Image
+                src={SITE_LOGO_SRC}
+                alt="Carros na Cidade"
+                width={220}
+                height={52}
+                priority
+                className="h-[28px] w-auto max-w-[180px] object-contain object-left sm:h-[34px]"
+              />
+              <span className="mt-0.5 hidden text-[10px] font-medium leading-tight text-cnc-muted sm:inline md:text-[11px]">
                 Ofertas locais e confiança perto de você
               </span>
             </Link>
@@ -234,12 +212,12 @@ export function PublicHeader() {
                 type="button"
                 onClick={() => openCityPicker()}
                 aria-label={`Cidade selecionada: ${city.label}. Tocar para trocar.`}
-                className="inline-flex max-w-[140px] items-center gap-1 truncate rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white backdrop-blur-sm transition hover:border-white/30 hover:bg-white/15"
+                className="inline-flex max-w-[140px] items-center gap-1 truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300"
               >
                 <svg
                   viewBox="0 0 24 24"
                   aria-hidden="true"
-                  className="h-3.5 w-3.5 shrink-0 text-white"
+                  className="h-3.5 w-3.5 shrink-0 text-primary"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.2"
@@ -257,14 +235,14 @@ export function PublicHeader() {
                   sessionUser ? dashboardHrefForAccountType(sessionUser.type) : SITE_ROUTES.login
                 }
                 aria-label={sessionUser ? "Minha conta" : "Entrar"}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:border-white/30 hover:bg-white/15"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary"
               >
                 <UserAvatarIcon />
               </Link>
               <button
                 type="button"
                 onClick={() => setMobileOpen((s) => !s)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-white/30 hover:bg-white/10"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary"
                 aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={mobileOpen}
               >
@@ -275,7 +253,7 @@ export function PublicHeader() {
         </div>
 
         {mobileOpen ? (
-          <div className="border-t border-white/10 py-4 md:hidden">
+          <div className="border-t border-slate-100 py-4 md:hidden">
             <nav className="grid gap-1" aria-label="Menu">
               <button
                 type="button"
@@ -283,14 +261,13 @@ export function PublicHeader() {
                   setMobileOpen(false);
                   openCityPicker();
                 }}
-                className="inline-flex h-11 w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/15"
+                className="inline-flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800"
               >
                 Cidade: {city.label}
               </button>
               <HeaderNavLink
                 href={routes.comprar}
                 onClick={() => setMobileOpen(false)}
-                variant="mobile"
                 className="w-full justify-start px-4"
               >
                 Comprar
@@ -298,7 +275,6 @@ export function PublicHeader() {
               <HeaderNavLink
                 href={routes.financing}
                 onClick={() => setMobileOpen(false)}
-                variant="mobile"
                 className="w-full justify-start px-4"
               >
                 Simulador de Financiamento
@@ -306,7 +282,6 @@ export function PublicHeader() {
               <HeaderNavLink
                 href={routes.fipe}
                 onClick={() => setMobileOpen(false)}
-                variant="mobile"
                 className="w-full justify-start px-4"
               >
                 FIPE
@@ -314,7 +289,6 @@ export function PublicHeader() {
               <HeaderNavLink
                 href={routes.blog}
                 onClick={() => setMobileOpen(false)}
-                variant="mobile"
                 className="w-full justify-start px-4"
               >
                 Blog
@@ -322,14 +296,14 @@ export function PublicHeader() {
               <Link
                 href="/anunciar"
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white"
+                className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Anunciar
               </Link>
               <Link
                 href={SITE_ROUTES.favoritos}
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white"
+                className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 <HeartIcon />
                 Favoritos

@@ -9,10 +9,15 @@ import type { ReactNode } from "react";
  * Usado na home e seções de descoberta para levar a categorias/funções
  * úteis (Comprar, Vender, Blog, Ofertas, Lojas, Favoritos, etc.).
  *
- * Variants:
- *   - default   → anel padrão azul claro
- *   - highlight → anel mais saturado, leve gradiente (uso em "Ofertas")
- *   - muted     → anel cinza, conteúdo secundário
+ * Variants — alinhados ao mockup `pagina Home.png` que usa anéis
+ * coloridos distintos para diferenciar cada atalho à primeira vista:
+ *   - default   → azul (Comprar) — primary do DS
+ *   - teal      → ciano/turquesa (Vender)
+ *   - violet    → roxo (Blog)
+ *   - highlight → laranja/vermelho (Ofertas) — anel "flame"
+ *   - fuchsia   → magenta (Lojas)
+ *   - sky       → azul claro (Favoritos)
+ *   - muted     → cinza neutro (uso secundário)
  *
  * Server Component — apenas Link + composição visual.
  *
@@ -22,7 +27,14 @@ import type { ReactNode } from "react";
  * Badge externamente.
  */
 
-type ActionShortcutVariant = "default" | "highlight" | "muted";
+type ActionShortcutVariant =
+  | "default"
+  | "teal"
+  | "violet"
+  | "highlight"
+  | "fuchsia"
+  | "sky"
+  | "muted";
 
 export type ActionShortcutProps = {
   href: string;
@@ -36,9 +48,13 @@ export type ActionShortcutProps = {
 };
 
 const RING_CLASSES: Record<ActionShortcutVariant, string> = {
-  default: "ring-2 ring-primary/40 bg-primary-soft text-primary",
+  default: "ring-2 ring-primary/50 bg-white text-primary",
+  teal: "ring-2 ring-cyan-400/70 bg-white text-cyan-600",
+  violet: "ring-2 ring-violet-500/60 bg-white text-violet-600",
   highlight:
-    "ring-2 ring-cnc-warning/50 bg-gradient-to-br from-cnc-warning/15 to-cnc-danger/10 text-cnc-warning",
+    "ring-2 ring-orange-400/70 bg-gradient-to-br from-orange-100 to-rose-100 text-orange-600",
+  fuchsia: "ring-2 ring-fuchsia-500/60 bg-white text-fuchsia-600",
+  sky: "ring-2 ring-sky-300/70 bg-white text-sky-500",
   muted: "ring-2 ring-cnc-line bg-cnc-bg text-cnc-muted",
 };
 

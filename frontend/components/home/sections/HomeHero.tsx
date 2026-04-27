@@ -20,11 +20,16 @@ import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
  *   - Indicador "+N mil ofertas ativas" com avatares quando há totalAds.
  *   - Dots decorativos (carousel visual).
  *
- * O asset `banner-home.png` carrega texto antigo embutido. Para evitar
- * "texto fantasma", aplicamos overlay sólido escuro suficiente para cobrir
- * o texto do PNG (`bg-cnc-footer-a/85`) em vez de gradient transparente,
- * mantendo o tom navy premium e deixando aparecer apenas a textura da
- * cidade ao fundo.
+ * O asset `banner-home.png` carrega texto antigo embutido APENAS no lado
+ * esquerdo da imagem (frase + botão). Para casar com o mockup (que mostra
+ * a cidade + carro à direita visíveis e gradient escuro só à esquerda),
+ * usamos:
+ *   - `object-position: right` no <Image>, que ancora a imagem ao lado
+ *     direito e empurra o texto antigo do PNG para fora do viewport útil
+ *     em telas estreitas/médias.
+ *   - Um gradient horizontal forte na esquerda
+ *     (`from-cnc-footer-a via-cnc-footer-a/90 to-cnc-footer-a/30`) que
+ *     cobre o texto remanescente em desktops largos sem apagar a imagem.
  */
 
 interface HomeHeroProps {
@@ -112,15 +117,14 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
           fill
           priority
           sizes="(min-width: 1280px) 1440px, 100vw"
-          className="object-cover object-right"
+          className="object-cover [object-position:80%_center]"
         />
         {/*
-         * Overlay opaco navy (não gradiente transparente) para esconder
-         * texto pré-renderizado do asset banner-home.png. Mantém leitura
-         * branca consistente do H1 e CTA.
+         * Gradient forte na esquerda (cobre texto antigo do PNG) e leve
+         * à direita (deixa a cidade + carro aparecerem). Casa com mockup
+         * `pagina Home.png` onde a foto é claramente visível.
          */}
-        <div className="absolute inset-0 bg-cnc-footer-a/85" />
-        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a via-cnc-footer-a/85 to-cnc-footer-a/20" />
 
         <div
           className="relative grid min-h-[280px] items-center px-5 py-7 sm:min-h-[340px] sm:px-8 sm:py-10 md:min-h-[400px] lg:px-12"
@@ -133,9 +137,11 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
             </span>
 
             <h1 className="mt-4 text-[28px] font-extrabold leading-tight tracking-tight text-white sm:text-[34px] md:text-[40px]">
-              Encontre oportunidades
+              Encontre
               <br />
-              <span className="text-primary-soft">na sua cidade</span>
+              oportunidades
+              <br />
+              na sua cidade
             </h1>
 
             <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
