@@ -11,6 +11,8 @@ import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
+import { QuickActionTile } from "@/components/ui/QuickActionTile";
+import { IconTable } from "@/components/home/icons";
 import type {
   AdsFacetsResponse,
   AdsSearchFilters,
@@ -247,6 +249,17 @@ export default function BuyMarketplacePageClient({
                 totalPages={totalPages}
                 onPatch={(patch) => pushPage(patch)}
               />
+
+              {/* Promo bottom (mockup `pagina catalogo.png`): convida o usuário
+                  a consultar a FIPE da cidade ativa antes de fechar negócio. */}
+              <div className="mt-6 sm:mt-8">
+                <QuickActionTile
+                  href={`/tabela-fipe/${encodeURIComponent(city.slug)}`}
+                  title="Consulte a FIPE em segundos"
+                  subtitle={`Compare valores em ${city.name}`}
+                  icon={<IconTable className="h-full w-full" />}
+                />
+              </div>
             </div>
           </div>
         </div>

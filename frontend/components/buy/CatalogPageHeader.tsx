@@ -35,6 +35,13 @@ import { CatalogBreadcrumb } from "./CatalogBreadcrumb";
  * pai.
  */
 
+/**
+ * Ordem espelhada do mockup `pagina catalogo.png`:
+ * Até R$ 50 mil • SUV • Automático • Abaixo da FIPE.
+ *
+ * "Em destaque" foi tirado dos chips rápidos (não consta no mockup) — o
+ * filtro continua disponível via FilterSidebar / drawer mobile.
+ */
 const QUICK_FILTERS: ReadonlyArray<{
   key: string;
   label: string;
@@ -43,18 +50,11 @@ const QUICK_FILTERS: ReadonlyArray<{
   remove: () => Partial<AdsSearchFilters>;
 }> = [
   {
-    key: "below-fipe",
-    label: "Abaixo da FIPE",
-    matches: (f) => f.below_fipe === true,
-    apply: () => ({ below_fipe: true, page: 1 }),
-    remove: () => ({ below_fipe: undefined, page: 1 }),
-  },
-  {
-    key: "auto",
-    label: "Automático",
-    matches: (f) => (f.transmission || "").toLowerCase() === "automatic",
-    apply: () => ({ transmission: "automatic", page: 1 }),
-    remove: () => ({ transmission: undefined, page: 1 }),
+    key: "ate-50k",
+    label: "Até R$ 50 mil",
+    matches: (f) => Number(f.max_price) === 50000,
+    apply: () => ({ max_price: 50000, page: 1 }),
+    remove: () => ({ max_price: undefined, page: 1 }),
   },
   {
     key: "suv",
@@ -64,18 +64,18 @@ const QUICK_FILTERS: ReadonlyArray<{
     remove: () => ({ body_type: undefined, page: 1 }),
   },
   {
-    key: "ate-50k",
-    label: "Até R$ 50 mil",
-    matches: (f) => Number(f.max_price) === 50000,
-    apply: () => ({ max_price: 50000, page: 1 }),
-    remove: () => ({ max_price: undefined, page: 1 }),
+    key: "auto",
+    label: "Automático",
+    matches: (f) => (f.transmission || "").toLowerCase() === "automatic",
+    apply: () => ({ transmission: "automatic", page: 1 }),
+    remove: () => ({ transmission: undefined, page: 1 }),
   },
   {
-    key: "highlight",
-    label: "Em destaque",
-    matches: (f) => f.highlight_only === true,
-    apply: () => ({ highlight_only: true, page: 1 }),
-    remove: () => ({ highlight_only: undefined, page: 1 }),
+    key: "below-fipe",
+    label: "Abaixo da FIPE",
+    matches: (f) => f.below_fipe === true,
+    apply: () => ({ below_fipe: true, page: 1 }),
+    remove: () => ({ below_fipe: undefined, page: 1 }),
   },
 ];
 
