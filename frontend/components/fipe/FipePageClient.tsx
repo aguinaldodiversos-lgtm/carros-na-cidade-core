@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FipeCombobox } from "@/components/fipe/FipeCombobox";
 import { HomeVehicleCard } from "@/components/home/HomeVehicleCard";
+import { IconPriceTag } from "@/components/home/icons";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
+import { QuickActionTile } from "@/components/ui/QuickActionTile";
 import {
   fetchFipeQuote,
   listFipeBrands,
@@ -35,7 +37,6 @@ type VehicleItem = {
 interface FipePageClientProps {
   citySlug: string;
   cityName: string;
-  cityLabel: string;
   highlightAds: VehicleItem[];
   opportunityAds: VehicleItem[];
 }
@@ -56,7 +57,6 @@ function normalizeAds(items: VehicleItem[], cityName: string): VehicleItem[] {
 export function FipePageClient({
   citySlug,
   cityName,
-  cityLabel,
   highlightAds,
   opportunityAds,
 }: FipePageClientProps) {
@@ -187,36 +187,36 @@ export function FipePageClient({
     <>
       <main className="bg-white pb-24 md:pb-16">
         <div className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-6 sm:px-6 md:pt-8">
-          <nav aria-label="Breadcrumb" className="mb-4 text-sm text-[#6f7a90]">
+          <nav aria-label="Breadcrumb" className="mb-4 text-sm text-cnc-muted">
             <ol className="flex flex-wrap items-center gap-2">
               <li>
-                <Link href="/" className="transition hover:text-[#0e62d8]">
+                <Link href="/" className="transition hover:text-primary">
                   Home
                 </Link>
               </li>
-              <li aria-hidden className="text-[#b7bfd0]">
+              <li aria-hidden className="text-cnc-muted-soft">
                 ›
               </li>
               <li>
-                <Link href="/comprar" className="transition hover:text-[#0e62d8]">
+                <Link href="/comprar" className="transition hover:text-primary">
                   Comprar
                 </Link>
               </li>
-              <li aria-hidden className="text-[#b7bfd0]">
+              <li aria-hidden className="text-cnc-muted-soft">
                 ›
               </li>
-              <li className="font-semibold text-[#0e62d8]">Consulta Fipe</li>
+              <li className="font-semibold text-primary">Consulta Fipe</li>
             </ol>
           </nav>
 
           <section className="relative overflow-hidden">
             <div className="grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <div className="relative z-10">
-                <h1 className="text-[42px] font-extrabold leading-[1.05] tracking-[-0.02em] text-[#17213a] md:text-[56px]">
-                  Consulta <span className="text-[#0e62d8]">Fipe</span>
+                <h1 className="text-[42px] font-extrabold leading-[1.05] tracking-[-0.02em] text-cnc-text-strong md:text-[56px]">
+                  Consulta <span className="text-primary">Fipe</span>
                 </h1>
 
-                <p className="mt-4 max-w-[520px] text-[17px] leading-7 text-[#5c6781] md:text-[18px]">
+                <p className="mt-4 max-w-[520px] text-[17px] leading-7 text-cnc-muted md:text-[18px]">
                   Pesquise o valor de mercado dos veículos na Tabela Fipe de forma prática e rápida.
                 </p>
               </div>
@@ -241,8 +241,8 @@ export function FipePageClient({
           </section>
 
           <section className="mt-10 grid gap-6 lg:grid-cols-2">
-            <div className="rounded-[20px] border border-[#e3e8f1] bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)] md:p-8">
-              <h2 className="text-[22px] font-extrabold text-[#17213a] md:text-[24px]">
+            <div className="rounded-[20px] border border-cnc-line bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)] md:p-8">
+              <h2 className="text-[22px] font-extrabold text-cnc-text-strong md:text-[24px]">
                 Pesquise o Valor Fipe do seu Veículo
               </h2>
 
@@ -281,63 +281,63 @@ export function FipePageClient({
                 type="button"
                 onClick={handleQuote}
                 disabled={quoteLoading}
-                className="mt-6 inline-flex h-[54px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-6 text-[17px] font-extrabold text-white shadow-[0_12px_24px_rgba(14,98,216,0.22)] transition hover:bg-[#0b52b8] disabled:cursor-not-allowed disabled:opacity-70"
+                className="mt-6 inline-flex h-[54px] w-full items-center justify-center rounded-[12px] bg-primary px-6 text-[17px] font-extrabold text-white shadow-[0_12px_24px_rgba(14,98,216,0.22)] transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {quoteLoading ? "Consultando..." : "Consultar Valor Fipe"}
               </button>
 
               {error ? (
-                <div className="mt-4 rounded-[12px] border border-[#ffd3d1] bg-[#fff5f5] px-4 py-3 text-sm text-[#c24141]">
+                <div className="mt-4 rounded-[12px] border border-cnc-danger/30 bg-cnc-danger/5 px-4 py-3 text-sm text-cnc-danger">
                   {error}
                 </div>
               ) : null}
 
-              <p className="mt-5 text-[13px] leading-6 text-[#7a849c]">
+              <p className="mt-5 text-[13px] leading-6 text-cnc-muted-soft">
                 Tabela Fipe atualizada diariamente com as cotações mais recentes.
                 <br />
                 Veículos até 20 anos atrás.
               </p>
             </div>
 
-            <div className="rounded-[20px] border border-[#e3e8f1] bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)] md:p-8">
-              <h2 className="text-[22px] font-extrabold text-[#17213a] md:text-[24px]">
+            <div className="rounded-[20px] border border-cnc-line bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)] md:p-8">
+              <h2 className="text-[22px] font-extrabold text-cnc-text-strong md:text-[24px]">
                 Valor Fipe do Veículo Consultado
               </h2>
 
-              <div className="mt-4 h-px w-full bg-[#e6ebf3]" />
+              <div className="mt-4 h-px w-full bg-cnc-line" />
 
               {hasResult && quote ? (
                 <div className="mt-5">
-                  <h3 className="text-[22px] font-extrabold leading-tight text-[#17213a] md:text-[24px]">
+                  <h3 className="text-[22px] font-extrabold leading-tight text-cnc-text-strong md:text-[24px]">
                     {quote.brand} {quote.model}
                   </h3>
 
-                  <p className="mt-3 text-[15px] text-[#5c6781]">Ano: {quote.modelYear}</p>
-                  <p className="mt-1 text-[15px] text-[#5c6781]">{quote.fuel}</p>
+                  <p className="mt-3 text-[15px] text-cnc-muted">Ano: {quote.modelYear}</p>
+                  <p className="mt-1 text-[15px] text-cnc-muted">{quote.fuel}</p>
 
-                  <div className="mt-6 rounded-[16px] bg-[#eef4ff] px-6 py-7 text-center">
-                    <div className="text-[34px] font-extrabold tracking-tight text-[#0e62d8] md:text-[40px]">
+                  <div className="mt-6 rounded-[16px] bg-primary-soft px-6 py-7 text-center">
+                    <div className="text-[34px] font-extrabold tracking-tight text-primary md:text-[40px]">
                       {quote.price}
                     </div>
-                    <div className="mt-2 text-[14px] text-[#5c6781]">
+                    <div className="mt-2 text-[14px] text-cnc-muted">
                       Valor de mercado na Tabela Fipe
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="mt-5">
-                  <h3 className="text-[22px] font-extrabold leading-tight text-[#17213a] md:text-[24px]">
+                  <h3 className="text-[22px] font-extrabold leading-tight text-cnc-text-strong md:text-[24px]">
                     Selecione um veículo ao lado
                   </h3>
 
-                  <p className="mt-3 text-[15px] text-[#5c6781]">Preencha marca, modelo e ano</p>
-                  <p className="mt-1 text-[15px] text-[#5c6781]">para ver o valor da Tabela Fipe</p>
+                  <p className="mt-3 text-[15px] text-cnc-muted">Preencha marca, modelo e ano</p>
+                  <p className="mt-1 text-[15px] text-cnc-muted">para ver o valor da Tabela Fipe</p>
 
-                  <div className="mt-6 rounded-[16px] bg-[#eef4ff] px-6 py-7 text-center">
-                    <div className="text-[34px] font-extrabold tracking-tight text-[#0e62d8] md:text-[40px]">
+                  <div className="mt-6 rounded-[16px] bg-primary-soft px-6 py-7 text-center">
+                    <div className="text-[34px] font-extrabold tracking-tight text-primary md:text-[40px]">
                       R$ ---
                     </div>
-                    <div className="mt-2 text-[14px] text-[#5c6781]">
+                    <div className="mt-2 text-[14px] text-cnc-muted">
                       Valor de mercado na Tabela Fipe
                     </div>
                   </div>
@@ -347,8 +347,8 @@ export function FipePageClient({
           </section>
 
           <section className="mt-14">
-            <h2 className="text-[24px] font-extrabold text-[#17213a] md:text-[28px]">
-              Configure Sua Parcelas do Financiamento
+            <h2 className="text-[24px] font-extrabold text-cnc-text-strong md:text-[28px]">
+              Destaques em {cityName}
             </h2>
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -362,8 +362,8 @@ export function FipePageClient({
                 ))}
               </div>
 
-              <aside className="rounded-[20px] border border-[#e3e8f1] bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)]">
-                <div className="flex h-[140px] w-full items-center justify-center rounded-[16px] bg-[#eef4ff]">
+              <aside className="rounded-[20px] border border-cnc-line bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)]">
+                <div className="flex h-[140px] w-full items-center justify-center rounded-[16px] bg-primary-soft">
                   <svg viewBox="0 0 64 64" className="h-20 w-20" fill="none">
                     <path d="M12 32l18-6v20l-18-6V32z" fill="#0e62d8" />
                     <path d="M30 24l20-8v32l-20-8V24z" fill="#0e62d8" opacity="0.85" />
@@ -375,13 +375,13 @@ export function FipePageClient({
                   </svg>
                 </div>
 
-                <h3 className="mt-5 text-[22px] font-extrabold leading-tight text-[#17213a]">
+                <h3 className="mt-5 text-[22px] font-extrabold leading-tight text-cnc-text-strong">
                   Anuncie seu
                   <br />
                   carro grátis!
                 </h3>
 
-                <p className="mt-4 text-[14px] leading-6 text-[#5c6781]">
+                <p className="mt-4 text-[14px] leading-6 text-cnc-muted">
                   Venda o seu carro rapidamente! Anuncie grátis na maior vitrine de veículos usados
                   da sua cidade. Cadastro simples, anúncio rápido e contato direto com compradores
                   em {cityName}.
@@ -389,7 +389,7 @@ export function FipePageClient({
 
                 <Link
                   href="/planos"
-                  className="mt-5 inline-flex h-[48px] w-full items-center justify-center rounded-[10px] bg-[#0e62d8] px-5 text-[15px] font-extrabold text-white shadow-[0_10px_20px_rgba(14,98,216,0.22)] transition hover:bg-[#0b52b8]"
+                  className="mt-5 inline-flex h-[48px] w-full items-center justify-center rounded-[10px] bg-primary px-5 text-[15px] font-extrabold text-white shadow-[0_10px_20px_rgba(14,98,216,0.22)] transition hover:bg-primary-strong"
                 >
                   Anunciar Grátis
                 </Link>
@@ -398,7 +398,7 @@ export function FipePageClient({
           </section>
 
           <section className="mt-14">
-            <h2 className="text-[24px] font-extrabold text-[#17213a] md:text-[28px]">
+            <h2 className="text-[24px] font-extrabold text-cnc-text-strong md:text-[28px]">
               Ofertas de carros usados em {cityName}
             </h2>
 
@@ -413,25 +413,16 @@ export function FipePageClient({
             </div>
           </section>
 
-          <section className="mt-14 rounded-[20px] border border-[#e3e8f1] bg-white p-6 shadow-[0_10px_30px_rgba(14,30,66,0.06)] md:p-8">
-            <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-              <div>
-                <h3 className="text-[20px] font-extrabold text-[#17213a] md:text-[22px]">
-                  Simule o financiamento em {cityLabel}
-                </h3>
-                <p className="mt-2 text-[15px] text-[#5c6781]">
-                  Compare o valor FIPE com parcelas reais e entenda o melhor momento para comprar ou
-                  vender.
-                </p>
-              </div>
-
-              <Link
-                href={`/simulador-financiamento/${citySlug}`}
-                className="inline-flex h-[48px] items-center justify-center rounded-[10px] bg-[#0e62d8] px-6 text-[15px] font-extrabold text-white shadow-[0_10px_20px_rgba(14,98,216,0.22)] transition hover:bg-[#0b52b8]"
-              >
-                Simular Financiamento
-              </Link>
-            </div>
+          {/* Promo bottom (mockup `fipe.png`): leva a /comprar abaixo da FIPE
+              na cidade ativa. QuickActionTile é o mesmo primitivo da Home/
+              Catálogo, mantendo o contrato visual. */}
+          <section className="mt-14">
+            <QuickActionTile
+              href={`/comprar/cidade/${encodeURIComponent(citySlug)}?below_fipe=true`}
+              title="Ver carros abaixo da FIPE"
+              subtitle={`Oportunidades em ${cityName} — preço imperdível`}
+              icon={<IconPriceTag className="h-full w-full" />}
+            />
           </section>
         </div>
       </main>

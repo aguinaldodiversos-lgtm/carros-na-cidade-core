@@ -94,7 +94,6 @@ export default async function TabelaFipeCidadePage({ params }: PageProps) {
     <FipePageClient
       citySlug={params.cidade}
       cityName={city.name}
-      cityLabel={city.label}
       highlightAds={highlightAds}
       opportunityAds={opportunityAds}
     />
