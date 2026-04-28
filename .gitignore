@@ -9,3 +9,5 @@ report/
 # Worktrees locais do Claude Code — nunca versionar.
 # Evita falsos submodules e warnings de git submodule foreach no CI.
 .claude/worktrees/
+# Permissões/settings do Claude Code são por-máquina, não compartilhar.
+.claude/settings.local.json
