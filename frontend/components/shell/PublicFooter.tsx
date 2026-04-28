@@ -105,10 +105,16 @@ export function PublicFooter() {
         <div className="grid gap-12 border-b border-white/12 pb-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
           <div>
             <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
+              {/*
+                Footer tem fundo navy escuro. O logo oficial é dark
+                (texto/carro navy + acentos azuis) e some no escuro;
+                aplicamos `brightness-0 invert` para virar uma silhueta
+                branca legível, preservando o formato.
+              */}
               <img
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
-                className="h-12 w-auto max-w-[240px] object-contain object-left"
+                className="h-14 w-auto max-w-[240px] object-contain object-left brightness-0 invert"
                 loading="lazy"
               />
             </Link>

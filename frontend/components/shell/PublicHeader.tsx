@@ -133,20 +133,23 @@ export function PublicHeader() {
           <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
             <Link
               href="/"
-              aria-label="Carros na Cidade"
-              className="inline-flex shrink-0 flex-col items-start leading-tight"
+              aria-label="Carros na Cidade — Ofertas locais e confiança perto de você"
+              className="inline-flex shrink-0 items-center"
             >
+              {/*
+                Logo oficial inclui marca + tagline embutidas. PNG é
+                2508×627 (≈4:1). Renderizamos com alturas que mantêm a
+                tagline legível: 40px mobile / 48px desktop. NÃO renderizar
+                tagline em <span> separado — geraria duplicação visual.
+              */}
               <Image
                 src={SITE_LOGO_SRC}
-                alt="Carros na Cidade"
-                width={220}
-                height={52}
+                alt="Carros na Cidade — Ofertas locais e confiança perto de você"
+                width={400}
+                height={100}
                 priority
-                className="h-[28px] w-auto max-w-[180px] object-contain object-left sm:h-[34px]"
+                className="h-[40px] w-auto max-w-[200px] object-contain object-left sm:h-[44px] md:h-[48px] md:max-w-[220px]"
               />
-              <span className="mt-0.5 inline text-[10px] font-medium leading-tight text-cnc-muted md:text-[11px]">
-                Ofertas locais e confiança perto de você
-              </span>
             </Link>
 
             <div className="hidden min-w-0 md:block">
