@@ -280,9 +280,9 @@ function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   return 1;
 }
 
-function resolveBadge(
-  item: BaseAdData
-): { label: string; variant: "success" | "warning" | "info" | "premium" } | null {
+type BadgeChip = { label: string; variant: "success" | "warning" | "info" | "premium" };
+
+function resolveBadge(item: BaseAdData): BadgeChip | null {
   if (item.badge) {
     const label = String(item.badge);
     const lower = label.toLowerCase();
@@ -296,6 +296,25 @@ function resolveBadge(
   if (weight === 4) return { label: "Destaque", variant: "warning" };
   if (weight === 3) return { label: "Loja Premium", variant: "premium" };
   return null;
+}
+
+/**
+ * Combina sinais "destaque" e "abaixo da FIPE" em até 2 chips coloridos
+ * lado a lado — padrão Webmotors. Ordem fixa: destaque (warning) primeiro,
+ * abaixo-da-fipe (success) depois.
+ */
+function resolveBadges(item: BaseAdData): BadgeChip[] {
+  const out: BadgeChip[] = [];
+  const weight = inferWeight(item);
+  if (weight === 4) out.push({ label: "OFERTA DESTAQUE", variant: "warning" });
+  else if (weight === 3) out.push({ label: "LOJA PREMIUM", variant: "premium" });
+  if (item.below_fipe) out.push({ label: "ABAIXO DA FIPE", variant: "success" });
+  // Se o backend mandou um item.badge custom e ainda não temos nada, usa.
+  if (out.length === 0 && item.badge) {
+    const single = resolveBadge(item);
+    if (single) out.push({ ...single, label: single.label.toUpperCase() });
+  }
+  return out;
 }
 
 function slugify(value: string): string {
@@ -330,7 +349,8 @@ type NormalizedAd = {
   price: number;
   mileage: number;
   image: string;
-  badge: { label: string; variant: "success" | "warning" | "info" | "premium" } | null;
+  badge: BadgeChip | null;
+  badges: BadgeChip[];
   isDealer: boolean;
   dealerLabel: string;
 };
@@ -365,6 +385,7 @@ function normalizeAdData(source?: BaseAdData): NormalizedAd {
       storage_key: item.storage_key,
     }),
     badge: resolveBadge(item),
+    badges: resolveBadges(item),
     isDealer: isDealerListing(item),
     dealerLabel: dealerLabelFor(item),
   };
@@ -507,12 +528,33 @@ function VerticalLayout({
   actions,
   favKey,
 }: LayoutProps) {
+  // Brand+modelo separados para hierarquia tipo Webmotors. Fallback no
+  // title já normalizado quando brand/model não vieram do backend.
+  const brandLabel = (normalized.brand || "").trim().toUpperCase();
+  const modelLabel = (normalized.model || "").trim();
+  const headTitle = brandLabel
+    ? modelLabel
+      ? `${brandLabel} ${modelLabel}`
+      : brandLabel
+    : normalized.title;
+  const versionLabel = (normalized.version || "").trim();
+  const showVersion = versionLabel && versionLabel.toLowerCase() !== modelLabel.toLowerCase();
+
+  // Variantes "showcase" (públicas) ganham o footer com CTA "Ver parcelas".
+  // dashboard/admin usam o slot `actions` que vem de fora.
+  const isShowcase =
+    variant === "grid" || variant === "carousel" || variant === "featured" || variant === "compact";
+
   return (
     <Link
       href={href}
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium"
     >
-      <div className={`relative ${config.aspectClass} overflow-hidden bg-cnc-bg`}>
+      {/*
+        Container da foto: bg neutro e object-contain — preserva proporção
+        original do veículo (não corta SUVs/sedans wide), padrão Webmotors.
+      */}
+      <div className={`relative ${config.aspectClass} overflow-hidden bg-[#f4f5f7]`}>
         <VehicleImage
           src={normalized.image}
           alt={normalized.title}
@@ -520,49 +562,166 @@ function VerticalLayout({
           height={config.imgHeight}
           variant={config.imgVariant}
           priority={priority}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+          className="h-full w-full object-contain p-1.5 transition duration-300 group-hover:scale-[1.02] sm:p-2"
         />
         {config.showFavorite && <FavoriteButton itemKey={favKey} />}
-        {config.showMileageBadge && <MileageBadge value={normalized.mileage} />}
+        {/*
+          Mileage não é mais badge sobre a foto — desce pra linha de
+          specs. DealerPill mantida (sinaliza loja parceira no rodapé da
+          foto).
+        */}
         {config.showDealerPill && normalized.isDealer && (
           <DealerPill name={normalized.dealerLabel} />
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-2 sm:p-4">
-        <div className="flex items-center gap-1.5">
-          {normalized.badge && (
-            <Badge variant={normalized.badge.variant} size="sm">
-              {normalized.badge.label}
-            </Badge>
-          )}
-          {config.showStatus && status && <StatusPill status={status} />}
-        </div>
+      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5">
+        {/* Linha de badges (até 2): OFERTA DESTAQUE + ABAIXO DA FIPE */}
+        {(normalized.badges.length > 0 || (config.showStatus && status)) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {normalized.badges.map((b) => (
+              <BadgeChipPill key={b.label} chip={b} />
+            ))}
+            {config.showStatus && status && <StatusPill status={status} />}
+          </div>
+        )}
 
-        <h3 className="line-clamp-2 min-h-[2.25rem] text-[14px] font-semibold leading-snug text-cnc-text-strong sm:text-[15px] md:text-base">
-          {normalized.title}
+        {/* Título: BRAND uppercase + Modelo */}
+        <h3 className="line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]">
+          {headTitle}
         </h3>
 
+        {/* Subtítulo: versão/trim (line-clamp 2) */}
+        {showVersion ? (
+          <p className="line-clamp-2 min-h-[2rem] text-[12px] leading-snug text-cnc-muted sm:text-[12.5px]">
+            {versionLabel}
+          </p>
+        ) : null}
+
+        {/* Specs row: ano + km com ícones */}
+        <SpecRow yearLabel={normalized.yearLabel} mileage={normalized.mileage} />
+
+        {/* Localização com pin */}
         {config.showLocation && (
-          <p className="text-[12px] text-cnc-muted sm:text-[13px]">
-            {normalized.city} - {normalized.state}
+          <p className="inline-flex items-center gap-1 text-[12px] text-cnc-muted sm:text-[12.5px]">
+            <PinIcon />
+            {normalized.city} ({normalized.state})
           </p>
         )}
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <strong className="text-[16px] font-extrabold text-primary sm:text-[17px] md:text-[19px]">
-            {formatCurrency(normalized.price)}
-          </strong>
-          {config.showYearLabel && normalized.yearLabel && (
-            <span className="text-[11px] font-medium text-cnc-muted sm:text-xs">
-              {normalized.yearLabel}
-            </span>
-          )}
-        </div>
+        {/* Preço */}
+        <strong className="mt-1 text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]">
+          {formatCurrency(normalized.price)}
+        </strong>
 
-        {actions && <div className="pt-2">{actions}</div>}
+        {/* CTA / actions slot */}
+        {actions ? (
+          <div className="mt-2">{actions}</div>
+        ) : isShowcase ? (
+          <span className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12.5px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]">
+            Ver parcelas
+          </span>
+        ) : null}
       </div>
     </Link>
+  );
+}
+
+/**
+ * Chip colorido estilo "OFERTA DESTAQUE" / "ABAIXO DA FIPE" do Webmotors.
+ * Mais denso e tipográfico que o Badge genérico (uppercase + tracking +
+ * cores do DS).
+ */
+function BadgeChipPill({ chip }: { chip: BadgeChip }) {
+  const palette: Record<BadgeChip["variant"], string> = {
+    success: "bg-cnc-success/12 text-cnc-success ring-cnc-success/35",
+    warning: "bg-cnc-warning/15 text-cnc-warning ring-cnc-warning/40",
+    info: "bg-primary-soft text-primary ring-primary/30",
+    premium: "bg-violet-100 text-violet-700 ring-violet-300/60",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] ring-1 ring-inset ${palette[chip.variant]}`}
+    >
+      {chip.label}
+    </span>
+  );
+}
+
+function SpecRow({ yearLabel, mileage }: { yearLabel: string; mileage: number }) {
+  const hasYear = yearLabel && yearLabel.trim().length > 0;
+  const hasMileage = mileage > 0;
+  if (!hasYear && !hasMileage) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-cnc-muted sm:text-[12.5px]">
+      {hasYear ? (
+        <span className="inline-flex items-center gap-1">
+          <CalendarIcon />
+          <span className="tabular-nums">{yearLabel}</span>
+        </span>
+      ) : null}
+      {hasMileage ? (
+        <span className="inline-flex items-center gap-1">
+          <GaugeIcon />
+          <span className="tabular-nums">{formatNumber(mileage)} km</span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+function GaugeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 14a8 8 0 1 0-8 0" />
+      <path d="m13.5 10.5-3 3" />
+      <circle cx="12" cy="14" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
+      <circle cx="12" cy="9" r="2.2" />
+    </svg>
   );
 }
 
