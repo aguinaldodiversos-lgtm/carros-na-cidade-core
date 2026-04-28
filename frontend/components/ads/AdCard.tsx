@@ -576,27 +576,35 @@ function VerticalLayout({
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5">
-        {/* Linha de badges (até 2): OFERTA DESTAQUE + ABAIXO DA FIPE */}
-        {(normalized.badges.length > 0 || (config.showStatus && status)) && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {normalized.badges.map((b) => (
-              <BadgeChipPill key={b.label} chip={b} />
-            ))}
-            {config.showStatus && status && <StatusPill status={status} />}
-          </div>
-        )}
+        {/*
+          Linha de badges SEMPRE reservada com min-h fixo — assim cards
+          sem destaque/fipe não sobem o footer (CTAs alinhados em grid).
+          OFERTA DESTAQUE (warning) + ABAIXO DA FIPE (success) em até 2 chips.
+        */}
+        <div className="flex min-h-[1.25rem] flex-wrap items-center gap-1.5">
+          {normalized.badges.map((b) => (
+            <BadgeChipPill key={b.label} chip={b} />
+          ))}
+          {config.showStatus && status && <StatusPill status={status} />}
+        </div>
 
         {/* Título: BRAND uppercase + Modelo */}
         <h3 className="line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]">
           {headTitle}
         </h3>
 
-        {/* Subtítulo: versão/trim (line-clamp 2) */}
+        {/*
+          Subtítulo: versão/trim (line-clamp 2). Sempre reservamos
+          min-h-2rem mesmo quando o veículo não tem versão — mantém os
+          cards alinhados em grid.
+        */}
         {showVersion ? (
           <p className="line-clamp-2 min-h-[2rem] text-[12px] leading-snug text-cnc-muted sm:text-[12.5px]">
             {versionLabel}
           </p>
-        ) : null}
+        ) : (
+          <p className="min-h-[2rem]" aria-hidden="true" />
+        )}
 
         {/* Specs row: ano + km com ícones */}
         <SpecRow yearLabel={normalized.yearLabel} mileage={normalized.mileage} />
@@ -609,19 +617,24 @@ function VerticalLayout({
           </p>
         )}
 
-        {/* Preço */}
-        <strong className="mt-1 text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]">
-          {formatCurrency(normalized.price)}
-        </strong>
+        {/*
+          Footer wrapper com `mt-auto` — empurra preço + CTA pra base do
+          card mesmo quando o conteúdo acima varia. Garante o alinhamento
+          horizontal dos botões entre cards do mesmo grid row.
+        */}
+        <div className="mt-auto flex flex-col gap-2 pt-2">
+          <strong className="text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]">
+            {formatCurrency(normalized.price)}
+          </strong>
 
-        {/* CTA / actions slot */}
-        {actions ? (
-          <div className="mt-2">{actions}</div>
-        ) : isShowcase ? (
-          <span className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12.5px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]">
-            Ver parcelas
-          </span>
-        ) : null}
+          {actions ? (
+            <div>{actions}</div>
+          ) : isShowcase ? (
+            <span className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12.5px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]">
+              Ver Detalhes
+            </span>
+          ) : null}
+        </div>
       </div>
     </Link>
   );
