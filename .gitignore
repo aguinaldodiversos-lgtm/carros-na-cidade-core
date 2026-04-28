@@ -11,3 +11,4 @@ report/
 .claude/worktrees/
 # Permissões/settings do Claude Code são por-máquina, não compartilhar.
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
