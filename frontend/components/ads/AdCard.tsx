@@ -529,7 +529,7 @@ function VerticalLayout({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:gap-2 sm:p-4">
         <div className="flex items-center gap-1.5">
           {normalized.badge && (
             <Badge variant={normalized.badge.variant} size="sm">
@@ -539,22 +539,24 @@ function VerticalLayout({
           {config.showStatus && status && <StatusPill status={status} />}
         </div>
 
-        <h3 className="line-clamp-2 min-h-[2.5rem] text-base font-semibold leading-tight text-cnc-text-strong md:text-[17px]">
+        <h3 className="line-clamp-2 min-h-[2.25rem] text-[14px] font-semibold leading-snug text-cnc-text-strong sm:text-[15px] md:text-base">
           {normalized.title}
         </h3>
 
         {config.showLocation && (
-          <p className="text-sm text-cnc-muted">
+          <p className="text-[12px] text-cnc-muted sm:text-[13px]">
             {normalized.city} - {normalized.state}
           </p>
         )}
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <strong className="text-lg font-extrabold text-primary md:text-xl">
+          <strong className="text-[16px] font-extrabold text-primary sm:text-[17px] md:text-[19px]">
             {formatCurrency(normalized.price)}
           </strong>
           {config.showYearLabel && normalized.yearLabel && (
-            <span className="text-xs font-medium text-cnc-muted">{normalized.yearLabel}</span>
+            <span className="text-[11px] font-medium text-cnc-muted sm:text-xs">
+              {normalized.yearLabel}
+            </span>
           )}
         </div>
 

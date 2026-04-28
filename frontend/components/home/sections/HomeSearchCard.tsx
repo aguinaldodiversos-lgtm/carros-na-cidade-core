@@ -173,7 +173,7 @@ export function HomeSearchCard({ defaultCitySlug }: HomeSearchCardProps) {
         }
       />
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
         <span className="sr-only">Filtros rápidos</span>
         {QUICK_FILTERS.map((f) => (
           <Chip
@@ -181,6 +181,7 @@ export function HomeSearchCard({ defaultCitySlug }: HomeSearchCardProps) {
             variant="filter"
             iconLeft={f.icon}
             onClick={() => goWithFilter(f.query)}
+            className="shrink-0"
           >
             {f.label}
           </Chip>

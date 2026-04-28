@@ -233,10 +233,10 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
           </nav>
 
           <header className="mt-3 sm:mt-4">
-            <h1 className="text-[28px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[34px] md:text-[40px]">
+            <h1 className="text-[22px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[28px] md:text-[34px]">
               Blog automotivo
             </h1>
-            <p className="mt-2 max-w-2xl text-[14px] leading-snug text-cnc-muted sm:text-[15px]">
+            <p className="mt-1.5 max-w-2xl text-[13px] leading-snug text-cnc-muted sm:mt-2 sm:text-[14.5px]">
               Guias, dicas e notícias para comprar, vender e cuidar do seu carro em {cityName}.
             </p>
           </header>

@@ -65,7 +65,7 @@ export function BlogPostPageClient({
                 {post.category || "BLOG"}
               </span>
 
-              <h1 className="mt-3 text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[30px] md:text-[36px]">
+              <h1 className="mt-2.5 text-[20px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:mt-3 sm:text-[26px] md:text-[32px]">
                 {post.title}
               </h1>
 

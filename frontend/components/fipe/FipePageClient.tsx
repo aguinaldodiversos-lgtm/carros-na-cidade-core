@@ -212,11 +212,11 @@ export function FipePageClient({
           <section className="relative overflow-hidden">
             <div className="grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <div className="relative z-10">
-                <h1 className="text-[42px] font-extrabold leading-[1.05] tracking-[-0.02em] text-cnc-text-strong md:text-[56px]">
+                <h1 className="text-[24px] font-extrabold leading-[1.1] tracking-tight text-cnc-text-strong sm:text-[32px] md:text-[44px]">
                   Consulta <span className="text-primary">Fipe</span>
                 </h1>
 
-                <p className="mt-4 max-w-[520px] text-[17px] leading-7 text-cnc-muted md:text-[18px]">
+                <p className="mt-2.5 max-w-[520px] text-[13px] leading-snug text-cnc-muted sm:mt-3 sm:text-[15px] md:text-[17px]">
                   Pesquise o valor de mercado dos veículos na Tabela Fipe de forma prática e rápida.
                 </p>
               </div>
@@ -307,37 +307,37 @@ export function FipePageClient({
               <div className="mt-4 h-px w-full bg-cnc-line" />
 
               {hasResult && quote ? (
-                <div className="mt-5">
-                  <h3 className="text-[22px] font-extrabold leading-tight text-cnc-text-strong md:text-[24px]">
+                <div className="mt-4 sm:mt-5">
+                  <h3 className="text-[17px] font-extrabold leading-tight text-cnc-text-strong sm:text-[20px] md:text-[22px]">
                     {quote.brand} {quote.model}
                   </h3>
 
-                  <p className="mt-3 text-[15px] text-cnc-muted">Ano: {quote.modelYear}</p>
-                  <p className="mt-1 text-[15px] text-cnc-muted">{quote.fuel}</p>
+                  <p className="mt-2 text-[13px] text-cnc-muted sm:text-[14px]">Ano: {quote.modelYear}</p>
+                  <p className="mt-0.5 text-[13px] text-cnc-muted sm:text-[14px]">{quote.fuel}</p>
 
-                  <div className="mt-6 rounded-[16px] bg-primary-soft px-6 py-7 text-center">
-                    <div className="text-[34px] font-extrabold tracking-tight text-primary md:text-[40px]">
+                  <div className="mt-4 rounded-[16px] bg-primary-soft px-5 py-5 text-center sm:mt-5 sm:px-6 sm:py-6">
+                    <div className="text-[24px] font-extrabold tracking-tight text-primary sm:text-[30px] md:text-[36px]">
                       {quote.price}
                     </div>
-                    <div className="mt-2 text-[14px] text-cnc-muted">
+                    <div className="mt-1.5 text-[12px] text-cnc-muted sm:text-[13px]">
                       Valor de mercado na Tabela Fipe
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="mt-5">
-                  <h3 className="text-[22px] font-extrabold leading-tight text-cnc-text-strong md:text-[24px]">
+                <div className="mt-4 sm:mt-5">
+                  <h3 className="text-[17px] font-extrabold leading-tight text-cnc-text-strong sm:text-[20px] md:text-[22px]">
                     Selecione um veículo ao lado
                   </h3>
 
-                  <p className="mt-3 text-[15px] text-cnc-muted">Preencha marca, modelo e ano</p>
-                  <p className="mt-1 text-[15px] text-cnc-muted">para ver o valor da Tabela Fipe</p>
+                  <p className="mt-2 text-[13px] text-cnc-muted sm:text-[14px]">Preencha marca, modelo e ano</p>
+                  <p className="mt-0.5 text-[13px] text-cnc-muted sm:text-[14px]">para ver o valor da Tabela Fipe</p>
 
-                  <div className="mt-6 rounded-[16px] bg-primary-soft px-6 py-7 text-center">
-                    <div className="text-[34px] font-extrabold tracking-tight text-primary md:text-[40px]">
+                  <div className="mt-4 rounded-[16px] bg-primary-soft px-5 py-5 text-center sm:mt-5 sm:px-6 sm:py-6">
+                    <div className="text-[24px] font-extrabold tracking-tight text-primary sm:text-[30px] md:text-[36px]">
                       R$ ---
                     </div>
-                    <div className="mt-2 text-[14px] text-cnc-muted">
+                    <div className="mt-1.5 text-[12px] text-cnc-muted sm:text-[13px]">
                       Valor de mercado na Tabela Fipe
                     </div>
                   </div>
@@ -347,7 +347,7 @@ export function FipePageClient({
           </section>
 
           <section className="mt-14">
-            <h2 className="text-[24px] font-extrabold text-cnc-text-strong md:text-[28px]">
+            <h2 className="text-[18px] font-extrabold leading-tight text-cnc-text-strong sm:text-[22px] md:text-[26px]">
               Destaques em {cityName}
             </h2>
 
@@ -398,7 +398,7 @@ export function FipePageClient({
           </section>
 
           <section className="mt-14">
-            <h2 className="text-[24px] font-extrabold text-cnc-text-strong md:text-[28px]">
+            <h2 className="text-[18px] font-extrabold leading-tight text-cnc-text-strong sm:text-[22px] md:text-[26px]">
               Ofertas de carros usados em {cityName}
             </h2>
 

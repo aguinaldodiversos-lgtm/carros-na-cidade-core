@@ -237,7 +237,7 @@ export function CatalogPageHeader({
 
   return (
     <div className="border-b border-cnc-line bg-cnc-surface">
-      <div className="mx-auto w-full max-w-7xl px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
+      <div className="mx-auto w-full max-w-7xl px-4 pb-3 pt-3 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
         <CatalogBreadcrumb items={breadcrumbItems} />
 
         {fallbackTerritory ? (
@@ -264,8 +264,8 @@ export function CatalogPageHeader({
           </div>
         ) : null}
 
-        <div className="mt-3 flex flex-col gap-1 sm:mt-4 sm:gap-1.5">
-          <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-3xl md:text-4xl">
+        <div className="mt-2.5 flex flex-col gap-1 sm:mt-4 sm:gap-1.5">
+          <h1 className="text-[20px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[26px] md:text-[32px] lg:text-[36px]">
             {variant === "cidade" ? (
               <>
                 Carros usados em <span className="text-primary">{city.name}</span>
@@ -276,7 +276,7 @@ export function CatalogPageHeader({
               </>
             )}
           </h1>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-cnc-muted sm:text-base">
+          <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-cnc-muted sm:text-sm md:text-base">
             <Badge variant="info" size="md">
               <span className="tabular-nums">{formatTotal(totalResults)}</span>
               {variant === "cidade" ? " ofertas locais" : " ofertas no estado"}

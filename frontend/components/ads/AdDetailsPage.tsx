@@ -178,7 +178,7 @@ function SectionCard({
   return (
     <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
       <div className="mb-5">
-        <h2 className="text-[28px] font-bold tracking-[-0.03em] text-[#1D2440]">{title}</h2>
+        <h2 className="text-[18px] font-bold leading-tight tracking-[-0.02em] text-[#1D2440] sm:text-[22px] md:text-[26px]">{title}</h2>
         {subtitle ? <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p> : null}
       </div>
       {children}
@@ -451,7 +451,7 @@ export default function AdDetailsPage({ ad }: Props) {
               ))}
             </div>
 
-            <h1 className="max-w-[920px] text-[34px] font-extrabold leading-[1.08] tracking-[-0.04em] text-[#1D2440] sm:text-[46px]">
+            <h1 className="max-w-[920px] text-[20px] font-extrabold leading-[1.15] tracking-[-0.025em] text-[#1D2440] sm:text-[28px] md:text-[36px] lg:text-[42px]">
               {safeTitle}
             </h1>
 
@@ -474,7 +474,7 @@ export default function AdDetailsPage({ ad }: Props) {
           <div className="flex shrink-0 flex-col gap-3 xl:items-end">
             <div className="text-left xl:text-right">
               <div className="text-sm font-medium text-[#6E748A]">Preço do veículo</div>
-              <div className="text-[42px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
+              <div className="text-[26px] font-extrabold tracking-[-0.025em] text-[#1D2440] sm:text-[32px] md:text-[38px]">
                 {formatCurrency(price)}
               </div>
               <div
@@ -624,7 +624,7 @@ export default function AdDetailsPage({ ad }: Props) {
               <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
                 <div className="rounded-[24px] border border-[#D8E8D8] bg-[#F5FCF5] p-5">
                   <div className="text-sm font-semibold text-[#4B536A]">Valor FIPE</div>
-                  <div className="mt-2 text-[34px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
+                  <div className="mt-1.5 text-[22px] font-extrabold tracking-[-0.025em] text-[#1D2440] sm:text-[26px] md:text-[30px]">
                     {formatCurrency(fipeValue)}
                   </div>
                   <div
@@ -642,7 +642,7 @@ export default function AdDetailsPage({ ad }: Props) {
 
                 <div className="rounded-[24px] border border-[#E5E9F2] bg-[#FBFCFF] p-5">
                   <div className="text-sm font-semibold text-[#4B536A]">Preço do anúncio</div>
-                  <div className="mt-2 text-[28px] font-extrabold tracking-[-0.04em] text-[#1F66E5]">
+                  <div className="mt-1.5 text-[20px] font-extrabold tracking-[-0.025em] text-[#1F66E5] sm:text-[24px] md:text-[28px]">
                     {formatCurrency(price)}
                   </div>
                   <div className="mt-2 text-sm text-[#6E748A]">
@@ -708,7 +708,7 @@ export default function AdDetailsPage({ ad }: Props) {
                 </div>
 
                 <div className="min-w-0">
-                  <div className="text-[28px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
+                  <div className="text-[18px] font-extrabold tracking-[-0.02em] text-[#1D2440] sm:text-[22px] md:text-[26px]">
                     {toText(ad.seller.name, "Anunciante")}
                   </div>
                   <div className="mt-1 text-base font-medium text-[#6E748A]">

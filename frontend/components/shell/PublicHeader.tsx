@@ -129,8 +129,8 @@ export function PublicHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-[64px] items-center gap-2 md:h-[68px] md:gap-3">
-          <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
+        <div className="flex h-14 items-center gap-1.5 md:h-[68px] md:gap-3">
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-4">
             <Link
               href="/"
               aria-label="Carros na Cidade — Ofertas locais e confiança perto de você"
@@ -148,7 +148,7 @@ export function PublicHeader() {
                 width={400}
                 height={100}
                 priority
-                className="h-[40px] w-auto max-w-[200px] object-contain object-left sm:h-[44px] md:h-[48px] md:max-w-[220px]"
+                className="h-9 w-auto max-w-[170px] object-contain object-left sm:h-10 sm:max-w-[190px] md:h-12 md:max-w-[220px]"
               />
             </Link>
 
@@ -210,12 +210,12 @@ export function PublicHeader() {
               )}
             </nav>
 
-            <div className="flex items-center gap-1.5 md:hidden">
+            <div className="flex items-center gap-1 md:hidden">
               <button
                 type="button"
                 onClick={() => openCityPicker()}
                 aria-label={`Cidade selecionada: ${city.label}. Tocar para trocar.`}
-                className="inline-flex max-w-[140px] items-center gap-1 truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300"
+                className="inline-flex max-w-[112px] items-center gap-1 truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 transition hover:border-slate-300"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -238,14 +238,14 @@ export function PublicHeader() {
                   sessionUser ? dashboardHrefForAccountType(sessionUser.type) : SITE_ROUTES.login
                 }
                 aria-label={sessionUser ? "Minha conta" : "Entrar"}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-primary hover:text-primary"
               >
                 <UserAvatarIcon />
               </Link>
               <button
                 type="button"
                 onClick={() => setMobileOpen((s) => !s)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-primary hover:text-primary"
                 aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={mobileOpen}
               >

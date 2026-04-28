@@ -122,16 +122,16 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
         <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a via-cnc-footer-a/70 to-transparent" />
 
         <div
-          className="relative grid min-h-[280px] items-center px-5 py-7 sm:min-h-[340px] sm:px-8 sm:py-10 md:min-h-[400px] lg:px-12"
+          className="relative grid min-h-[220px] items-center px-5 py-6 sm:min-h-[300px] sm:px-8 sm:py-9 md:min-h-[380px] lg:px-12"
           onClick={handleCtaClick}
         >
           <div className="max-w-xl">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm sm:text-[12px]">
               <PinIcon />
               {cityName ? `${cityName} e região` : "Sua região"}
             </span>
 
-            <h1 className="mt-4 text-[28px] font-extrabold leading-tight tracking-tight text-white sm:text-[34px] md:text-[40px]">
+            <h1 className="mt-3 text-[22px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[28px] md:text-[36px]">
               Encontre
               <br />
               oportunidades
@@ -139,23 +139,23 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
               na sua cidade
             </h1>
 
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
+            <p className="mt-2 max-w-md text-[13px] leading-snug text-white/85 sm:mt-3 sm:text-[15px]">
               Carros, lojas e ofertas reais em {cityLabel}.
             </p>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="mt-4 flex flex-wrap items-center gap-2.5 sm:mt-5 sm:gap-4">
               <Link
                 href={offersHref}
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[15px] font-extrabold text-white shadow-card transition hover:bg-primary-strong sm:px-6 sm:py-3"
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13.5px] font-extrabold text-white shadow-card transition hover:bg-primary-strong sm:px-6 sm:py-3 sm:text-[15px]"
               >
                 Ver ofertas
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/15">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/15 sm:h-6 sm:w-6">
                   <ArrowRightIcon />
                 </span>
               </Link>
 
               {offersBadge ? (
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white backdrop-blur-sm">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm sm:text-[12px]">
                   <span aria-hidden="true" className="flex -space-x-1.5">
                     <span className="inline-block h-5 w-5 rounded-full border-2 border-cnc-footer-a bg-primary" />
                     <span className="inline-block h-5 w-5 rounded-full border-2 border-cnc-footer-a bg-cnc-success" />
