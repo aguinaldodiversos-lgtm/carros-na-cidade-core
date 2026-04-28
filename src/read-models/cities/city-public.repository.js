@@ -16,9 +16,13 @@ export async function getCityPublicSnapshot(slug) {
       c.population,
       c.region,
       COALESCE(cm.demand_score, 0) AS demand_score,
-      COALESCE(cm.total_leads, 0) AS total_leads_metric,
-      COALESCE(cm.total_ads, 0) AS total_ads_metric,
-      COALESCE(cm.total_dealers, 0) AS total_dealers_metric,
+      -- Os nomes canônicos das colunas em city_metrics são leads/ads_count/
+      -- advertisers_count (ver migration 014_admin_structural_sanitation.sql
+      -- e worker city_metrics.worker.js). Aliases mantidos para não
+      -- quebrar consumidores downstream.
+      COALESCE(cm.leads, 0) AS total_leads_metric,
+      COALESCE(cm.ads_count, 0) AS total_ads_metric,
+      COALESCE(cm.advertisers_count, 0) AS total_dealers_metric,
       COALESCE(cd.dominance_score, 0) AS dominance_score,
       COALESCE(cd.total_ads, 0) AS dominance_total_ads,
       COALESCE(cd.leads, 0) AS dominance_total_leads,

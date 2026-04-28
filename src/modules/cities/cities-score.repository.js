@@ -72,9 +72,11 @@ export async function listCitiesForScoring(limit = 1000) {
       c.slug,
       c.stage,
       COALESCE(cm.demand_score, 0) AS demand_score,
-      COALESCE(cm.total_leads, 0) AS metric_total_leads,
-      COALESCE(cm.total_ads, 0) AS metric_total_ads,
-      COALESCE(cm.total_dealers, 0) AS metric_total_dealers,
+      -- Schema canônico em migration 014_admin_structural_sanitation.sql:
+      -- leads / ads_count / advertisers_count. Aliases preservados.
+      COALESCE(cm.leads, 0) AS metric_total_leads,
+      COALESCE(cm.ads_count, 0) AS metric_total_ads,
+      COALESCE(cm.advertisers_count, 0) AS metric_total_dealers,
       COALESCE(cd.dominance_score, 0) AS dominance_score,
       COALESCE(cd.total_ads, 0) AS dominance_total_ads,
       COALESCE(cd.leads, 0) AS dominance_total_leads,

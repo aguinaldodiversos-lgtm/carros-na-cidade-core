@@ -6,12 +6,17 @@ import { calculateCityScore } from "../ai/cityScore.service.js";
 export async function getHeatmap(req, res, next) {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         c.id,
         c.name,
         cm.demand_score,
-        cm.total_leads,
-        cm.roi_score,
+        -- Schema canônico: cm.leads (não cm.total_leads). Migration 014
+        -- adiciona leads/ads_count/advertisers_count.
+        cm.leads AS total_leads,
+        -- TODO(roi_score): coluna não existe em city_metrics; manter como
+        -- NULL para o frontend tratar como ausente. Quando vierem as
+        -- métricas de ROI, definir tabela e migrar.
+        NULL::numeric AS roi_score,
         cm.updated_at,
         cg.conversion_rate,
         cg.growth_score,
