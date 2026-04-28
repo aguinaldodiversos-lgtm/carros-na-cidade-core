@@ -2,42 +2,57 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import type { AdItem } from "@/lib/search/ads-search";
-import AdCard from "@/components/ads/AdCard";
-import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
+import {
+  IconCalculator,
+  IconCarFront,
+  IconChevronRight,
+  IconHeart,
+  IconPin,
+  IconShield,
+} from "@/components/home/icons";
+import { FinancingSimulatorBottomDock } from "@/components/financing/FinancingSimulatorBottomDock";
+import {
+  computeMonthlyInstallment,
+  computeTotalPaid,
+  FINANCING_TERM_OPTIONS,
+  type FinancingTerm,
+} from "@/components/financing/financing-math";
+import { getTerritorialRoutesForCity } from "@/lib/site/site-navigation";
 interface FinancingLandingPageClientProps {
   citySlug: string;
   cityName: string;
-  cityLabel: string;
-  heroVehicle: AdItem;
-  highlightAds: AdItem[];
-  opportunityAds: AdItem[];
+  cityState: string;
   initialVehicleValue?: number;
 }
 
-const TERMS = [12, 24, 36, 48, 60] as const;
+const VALUE_MIN = 5_000;
+const VALUE_MAX = 2_000_000;
 
-const VALUE_MIN = 5000;
-const VALUE_MAX = 500000;
-const DOWN_MIN = 0;
-const DOWN_MAX = 100000;
-const RATE_MIN = 0.99;
-const RATE_MAX = 2.99;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
-function parseMoney(value: number | string | null | undefined) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
-  const cleaned = String(value)
+function parseBrlInput(raw: string): number {
+  const cleaned = raw
     .replace(/[^\d,.-]/g, "")
     .replace(/\./g, "")
     .replace(",", ".");
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
 }
 
-function formatCurrency(value: number) {
+function formatBrlInput(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatBrlCompact(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -45,7 +60,7 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function formatCurrencyPrecise(value: number) {
+function formatBrlPrecise(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -54,474 +69,458 @@ function formatCurrencyPrecise(value: number) {
   }).format(value);
 }
 
-function resolveImage(item?: AdItem) {
-  if (item?.image_url) return item.image_url;
-  if (Array.isArray(item?.images) && item.images[0]) return item.images[0];
-  return "/images/vehicle-placeholder.svg";
+function parseRateInput(raw: string): number {
+  const cleaned = raw.replace(/%/g, "").replace(/\s/g, "").replace(",", ".");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
 }
 
-function resolveTitle(item?: AdItem) {
-  if (!item) return "Veículo";
-  if (item.title) return item.title;
-  const pieces = [item.year, item.brand, item.model].filter(Boolean);
-  return pieces.join(" ") || "Veículo";
+function formatRateInput(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  return value.toFixed(2).replace(".", ",");
 }
 
-function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
-  if (financedAmount <= 0 || months <= 0) return 0;
-  const monthlyRate = monthlyRatePct / 100;
-  if (monthlyRate === 0) return financedAmount / months;
-  return (financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
+type ShowcaseCardConfig = {
+  id: string;
+  title: string;
+  subtitle: string;
+  price: number;
+  mileage: number;
+  image: string;
+};
+
+const SHOWCASE_VEHICLES: ShowcaseCardConfig[] = [
+  {
+    id: "jeep-compass-showcase",
+    title: "Jeep Compass",
+    subtitle: "2022 · Limited 2.0 Flex · Automático",
+    price: 129_900,
+    mileage: 23_000,
+    image: "/images/vehicle-placeholder.svg",
+  },
+  {
+    id: "honda-civic-showcase",
+    title: "Honda Civic",
+    subtitle: "2020 · EXL 2.0 Flex · Automático",
+    price: 109_900,
+    mileage: 41_000,
+    image: "/images/vehicle-placeholder.svg",
+  },
+  {
+    id: "corolla-cross-showcase",
+    title: "Toyota Corolla Cross",
+    subtitle: "2023 · XRE 2.0 Flex · Automático",
+    price: 139_900,
+    mileage: 28_500,
+    image: "/images/vehicle-placeholder.svg",
+  },
+];
+
+function InfoHintIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 16v-5M12 8h.01" strokeLinecap="round" />
+    </svg>
+  );
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
+function FieldShell({
+  label,
+  children,
+  hint,
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-[12px] font-bold tracking-tight text-[#4a556d]">{label}</span>
+      {children}
+      {hint ? <div className="min-h-[18px]">{hint}</div> : null}
+    </div>
+  );
+}
+
+function CompatibleVehicleCard({
+  item,
+  locationLabel,
+  exploreHref,
+}: {
+  item: ShowcaseCardConfig;
+  locationLabel: string;
+  exploreHref: string;
+}) {
+  const km = `${item.mileage.toLocaleString("pt-BR")} km`;
+
+  return (
+    <Link
+      href={exploreHref}
+      className="group flex w-[260px] shrink-0 snap-start flex-col overflow-hidden rounded-[14px] border border-[#e7e8f1] bg-white shadow-[0_6px_18px_rgba(15,10,40,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(15,10,40,0.1)] sm:w-[280px]"
+    >
+      <div className="relative aspect-[16/11] overflow-hidden bg-[#eef0f6]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.image}
+          alt={item.title}
+          width={640}
+          height={440}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+        />
+        <span className="pointer-events-none absolute bottom-2.5 left-2.5 inline-flex rounded-lg bg-black/72 px-2 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-[2px]">
+          {km}
+        </span>
+        <span
+          className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#2d3a9c] shadow-md ring-1 ring-black/5"
+          aria-hidden
+        >
+          <IconHeart className="h-4 w-4" />
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
+        <h3 className="line-clamp-1 text-[15px] font-extrabold leading-tight text-[#1a2b4c]">{item.title}</h3>
+        <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-[#5d667d]">{item.subtitle}</p>
+        <p className="mt-3 text-[18px] font-extrabold text-[var(--cnc-primary)]">{formatBrlCompact(item.price)}</p>
+        <p className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#5d667d]">
+          <IconPin className="h-3.5 w-3.5 shrink-0 text-[var(--cnc-primary)]" aria-hidden />
+          {locationLabel}
+        </p>
+      </div>
+    </Link>
+  );
 }
 
 export function FinancingLandingPageClient({
   citySlug,
   cityName,
-  cityLabel,
-  heroVehicle,
-  highlightAds,
-  opportunityAds,
+  cityState,
   initialVehicleValue,
 }: FinancingLandingPageClientProps) {
-  const initialFinanced =
+  const router = useRouter();
+  const installmentsRef = useRef<HTMLElement | null>(null);
+  const formId = useId();
+
+  const routes = useMemo(() => getTerritorialRoutesForCity(citySlug), [citySlug]);
+  const comprarHref = routes.comprar;
+  const locationLabel = cityState ? `${cityName} (${cityState})` : cityName;
+
+  const initialV =
     initialVehicleValue != null && initialVehicleValue > 0
       ? clamp(Math.round(initialVehicleValue), VALUE_MIN, VALUE_MAX)
-      : clamp(Math.round(parseMoney(heroVehicle.price) || 80000), VALUE_MIN, VALUE_MAX);
+      : 120_000;
 
-  const [financedValue, setFinancedValue] = useState(initialFinanced);
-  const [downPayment, setDownPayment] = useState(0);
-  const [monthlyRate, setMonthlyRate] = useState(1.49);
-  const [selectedTerm, setSelectedTerm] = useState<(typeof TERMS)[number]>(36);
+  const [vehicleValue, setVehicleValue] = useState(initialV);
+  const [downPayment, setDownPayment] = useState(Math.round(initialV * 0.2));
+  const [monthlyRatePct, setMonthlyRatePct] = useState(1.29);
+  const [selectedTerm, setSelectedTerm] = useState<FinancingTerm>(36);
 
-  const heroImage = resolveImage(heroVehicle);
-  const heroTitle = resolveTitle(heroVehicle);
+  const [vehicleRaw, setVehicleRaw] = useState(formatBrlInput(initialV));
+  const [downRaw, setDownRaw] = useState(formatBrlInput(Math.round(initialV * 0.2)));
+  const [rateRaw, setRateRaw] = useState(formatRateInput(1.29));
 
-  const effectiveFinanced = Math.max(financedValue - downPayment, 0);
+  useEffect(() => {
+    if (initialVehicleValue == null || initialVehicleValue <= 0) return;
+    const v = clamp(Math.round(initialVehicleValue), VALUE_MIN, VALUE_MAX);
+    setVehicleValue(v);
+    const d = Math.round(v * 0.2);
+    setDownPayment(d);
+    setVehicleRaw(formatBrlInput(v));
+    setDownRaw(formatBrlInput(d));
+  }, [initialVehicleValue]);
 
-  const summary = useMemo(() => {
-    const monthlyPayment = calculateMonthlyPayment(effectiveFinanced, monthlyRate, selectedTerm);
-    const totalPaid = monthlyPayment * selectedTerm + downPayment;
-    const financingCost = Math.max(totalPaid - financedValue, 0);
-    return { monthlyPayment, totalPaid, financingCost };
-  }, [effectiveFinanced, monthlyRate, selectedTerm, downPayment, financedValue]);
+  useEffect(() => {
+    setDownPayment((dp) => Math.min(dp, vehicleValue));
+  }, [vehicleValue]);
 
-  const installmentTable = useMemo(
-    () =>
-      TERMS.map((term) => {
-        const monthly = calculateMonthlyPayment(effectiveFinanced, monthlyRate, term);
-        return {
-          term,
-          monthly,
-          total: monthly * term + downPayment,
-        };
-      }),
-    [effectiveFinanced, monthlyRate, downPayment]
-  );
+  useEffect(() => {
+    setDownRaw(formatBrlInput(downPayment));
+  }, [downPayment]);
 
-  const configureList = highlightAds?.length ? highlightAds.slice(0, 4) : opportunityAds.slice(0, 4);
-  const cityOffers = opportunityAds?.slice(0, 4) ?? [];
+  const financed = Math.max(vehicleValue - downPayment, 0);
+
+  const installments = useMemo(() => {
+    return FINANCING_TERM_OPTIONS.map((term) => {
+      const monthly = computeMonthlyInstallment(financed, monthlyRatePct, term);
+      const totalPaid = computeTotalPaid(monthly, term, downPayment);
+      return { term, monthly, totalPaid };
+    });
+  }, [financed, monthlyRatePct, downPayment]);
+
+  const entryPercent =
+    vehicleValue > 0 ? Math.min(999, Math.round((downPayment / vehicleValue) * 100)) : 0;
+
+  const syncVehicleFromRaw = useCallback(() => {
+    const v = clamp(parseBrlInput(vehicleRaw || "0"), VALUE_MIN, VALUE_MAX);
+    setVehicleValue(v);
+    setVehicleRaw(formatBrlInput(v));
+  }, [vehicleRaw]);
+
+  const syncDownFromRaw = useCallback(() => {
+    const parsed = clamp(parseBrlInput(downRaw || "0"), 0, vehicleValue);
+    setDownPayment(parsed);
+  }, [downRaw, vehicleValue]);
+
+  const syncRateFromRaw = useCallback(() => {
+    const r = clamp(parseRateInput(rateRaw || "0"), 0, 15);
+    setMonthlyRatePct(Number(r.toFixed(4)));
+    setRateRaw(formatRateInput(r));
+  }, [rateRaw]);
+
+  const applySimulate = useCallback(() => {
+    syncVehicleFromRaw();
+    syncDownFromRaw();
+    syncRateFromRaw();
+    installmentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [syncDownFromRaw, syncRateFromRaw, syncVehicleFromRaw]);
 
   return (
-    <main className="bg-white text-[#1e2547]">
-      <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-6 sm:px-6">
-        <PageBreadcrumbs
-          items={[
-            { name: "Home", href: "/" },
-            { name: "Comprar", href: `/comprar?city_slug=${citySlug}` },
-            { name: "Simulador de Financiamento" },
-          ]}
-          className="mb-6"
-        />
-
-        {/* HERO */}
-        <section className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,520px)]">
-          <div>
-            <h1 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.03em] text-[#13203f] md:text-[48px]">
-              Simulador de Financiamento
-            </h1>
-            <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#5b6683] md:text-[17px]">
-              Simule suas parcelas de financiamento automotivo e descubra as melhores condições
-              para comprar o carro dos seus sonhos.
-            </p>
-          </div>
-
-          <div className="relative ml-auto w-full max-w-[520px]">
-            <div className="absolute inset-x-6 bottom-2 h-6 rounded-full bg-[#0e62d8]/10 blur-xl" />
-            <div className="relative overflow-hidden rounded-[22px] bg-white">
-              <img
-                src={heroImage}
-                alt={heroTitle}
-                className="h-[230px] w-full object-contain md:h-[260px]"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/images/vehicle-placeholder.svg";
-                }}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* MAIN SIMULATOR */}
-        <section className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(0,0.9fr)]">
-          {/* LEFT CARD */}
-          <div className="rounded-[20px] border border-[#e6eaf2] bg-white p-6 shadow-[0_10px_30px_rgba(14,40,80,0.06)] md:p-7">
-            <h2 className="text-[20px] font-extrabold text-[#13203f] md:text-[22px]">
-              Simule as Parcelas do Seu Financiamento
-            </h2>
-
-            <div className="mt-6 space-y-6">
-              <SliderField
-                label="Valor Financiado (R$)"
-                value={financedValue}
-                min={VALUE_MIN}
-                max={VALUE_MAX}
-                step={500}
-                onChange={(v) => {
-                  setFinancedValue(v);
-                  if (downPayment > v) setDownPayment(v);
-                }}
-                format={formatCurrency}
-                minLabel={formatCurrency(VALUE_MIN)}
-                maxLabel={formatCurrency(VALUE_MAX)}
-              />
-
-              <SliderField
-                label="Entrada (R$)"
-                value={downPayment}
-                min={DOWN_MIN}
-                max={Math.min(DOWN_MAX, financedValue)}
-                step={500}
-                onChange={(v) => setDownPayment(v)}
-                format={formatCurrency}
-                minLabel={formatCurrency(DOWN_MIN)}
-                maxLabel={formatCurrency(Math.min(DOWN_MAX, financedValue))}
-              />
-
-              <SliderField
-                label="Taxa de juros (a.m.)"
-                value={monthlyRate}
-                min={RATE_MIN}
-                max={RATE_MAX}
-                step={0.01}
-                onChange={(v) => setMonthlyRate(Number(v.toFixed(2)))}
-                format={(v) => `${v.toFixed(2)} %`}
-                minLabel={`${RATE_MIN.toFixed(2)} %`}
-                maxLabel={`${RATE_MAX.toFixed(2)} %`}
-              />
-            </div>
-
-            <div className="mt-6 rounded-[12px] bg-[#fff8e6] px-4 py-3 text-[13px] leading-5 text-[#8a6a16] ring-1 ring-[#f4e4b3]">
-              Valores simulados. As condições finais dependem de análise de crédito da financeira
-              parceira. Consulte a taxa CET antes de contratar.
-            </div>
-          </div>
-
-          {/* MIDDLE SUMMARY */}
-          <div className="flex flex-col gap-5 rounded-[20px] border border-[#e6eaf2] bg-white p-6 shadow-[0_10px_30px_rgba(14,40,80,0.06)] md:p-7">
-            <div>
-              <p className="text-[14px] font-semibold uppercase tracking-wider text-[#5b6683]">
-                Parcelas
-              </p>
-              <p className="mt-2 text-[34px] font-extrabold leading-none text-[#0e62d8] md:text-[40px]">
-                {formatCurrency(summary.monthlyPayment)}
-              </p>
-              <p className="mt-2 text-[14px] text-[#5b6683]">
-                em {selectedTerm}x · taxa de {monthlyRate.toFixed(2)}% a.m.
-              </p>
-            </div>
-
-            <dl className="space-y-3 rounded-[14px] bg-[#f6f8fc] p-4">
-              <SummaryRow label="Entrada" value={formatCurrency(downPayment)} />
-              <SummaryRow
-                label="Valor financiado"
-                value={formatCurrency(effectiveFinanced)}
-              />
-              <SummaryRow label="Taxa de juros" value={`${monthlyRate.toFixed(2)} % a.m.`} />
-            </dl>
-
+    <div className="relative bg-[#f5f7fb] text-[#1a2b4c]">
+      <main className="mx-auto w-full max-w-[640px] px-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 lg:max-w-[960px] lg:px-6 lg:pb-12">
+        {/* Page heading */}
+        <header className="mb-6">
+          <div className="flex items-start gap-3">
             <button
               type="button"
-              className="inline-flex h-[52px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-5 text-[16px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(14,98,216,0.25)] transition hover:bg-[#0c4fb0]"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) router.back();
+                else router.push("/");
+              }}
+              className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-[#edf0f7] bg-white text-[#1a2b4c] shadow-[0_6px_18px_rgba(15,23,42,0.07)] transition hover:border-[#dce4f4] hover:shadow-[0_8px_22px_rgba(15,23,42,0.09)]"
+              aria-label="Voltar"
             >
-              Calcular Parcelas
-            </button>
-
-            <div className="grid grid-cols-2 gap-3">
-              <MiniStat
-                label="Total a pagar"
-                value={formatCurrency(summary.totalPaid)}
-              />
-              <MiniStat
-                label="Custo do financiamento"
-                value={formatCurrency(summary.financingCost)}
-                muted
-              />
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="flex flex-col gap-5">
-            <Link
-              href={`/comprar?city_slug=${citySlug}&valor=${financedValue}`}
-              className="group relative inline-flex h-[72px] w-full items-center justify-between gap-3 overflow-hidden rounded-[14px] bg-gradient-to-r from-[#0e62d8] to-[#1271ef] px-5 text-left text-white shadow-[0_12px_30px_rgba(14,98,216,0.28)] transition hover:from-[#0c4fb0] hover:to-[#0e62d8]"
-            >
-              <div>
-                <div className="text-[12px] font-semibold uppercase tracking-wider text-white/80">
-                  Continuar com este valor
-                </div>
-                <div className="text-[17px] font-extrabold leading-tight">
-                  Verificar Crédito Agora
-                </div>
-              </div>
-              <svg
-                viewBox="0 0 24 24"
-                className="h-6 w-6 shrink-0 transition group-hover:translate-x-1"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
+              <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="m15 6-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-            </Link>
-
-            <div className="overflow-hidden rounded-[16px] border border-[#e6eaf2] bg-white shadow-[0_10px_30px_rgba(14,40,80,0.06)]">
-              <div className="border-b border-[#e6eaf2] bg-[#f6f8fc] px-5 py-3">
-                <h3 className="text-[15px] font-bold text-[#13203f]">Opções de Parcelamento</h3>
-              </div>
-
-              <table className="w-full text-[14px]">
-                <thead>
-                  <tr className="text-left text-[12px] font-semibold uppercase tracking-wider text-[#5b6683]">
-                    <th className="px-4 py-2 font-semibold">Prazo</th>
-                    <th className="px-4 py-2 text-right font-semibold">Mensal</th>
-                    <th className="px-4 py-2 text-right font-semibold">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {installmentTable.map((row) => {
-                    const isActive = row.term === selectedTerm;
-                    return (
-                      <tr
-                        key={row.term}
-                        onClick={() => setSelectedTerm(row.term)}
-                        className={`cursor-pointer border-t border-[#eef1f7] transition hover:bg-[#f6f8fc] ${
-                          isActive ? "bg-[#eaf2ff]" : "bg-white"
-                        }`}
-                      >
-                        <td
-                          className={`px-4 py-2.5 font-semibold ${
-                            isActive ? "text-[#0e62d8]" : "text-[#13203f]"
-                          }`}
-                        >
-                          {row.term} meses
-                        </td>
-                        <td
-                          className={`px-4 py-2.5 text-right font-semibold ${
-                            isActive ? "text-[#0e62d8]" : "text-[#13203f]"
-                          }`}
-                        >
-                          {formatCurrencyPrecise(row.monthly)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-[#5b6683]">
-                          {formatCurrency(row.total)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <p className="border-t border-[#eef1f7] px-4 py-3 text-[12px] leading-5 text-[#7a8398]">
-                Valores aproximados calculados sobre a tabela Price. Clique em um prazo para
-                atualizar o resumo.
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[24px] font-extrabold leading-[1.15] tracking-[-0.03em] text-[#12203e] sm:text-[28px]">
+                Simulador de financiamento
+              </h1>
+              <p className="mt-2 text-[14px] font-medium leading-relaxed text-[#6b7894] sm:text-[15px]">
+                Simule parcelas e encontre carros dentro do seu orçamento.
               </p>
             </div>
           </div>
-        </section>
+        </header>
 
-        {/* CONFIGURE + SIDEBAR */}
-        <section className="mt-14 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div>
-            <h2 className="text-[22px] font-extrabold text-[#13203f] md:text-[26px]">
-              Configure Suas Parcelas do Financiamento
-            </h2>
-            <p className="mt-2 text-[15px] text-[#5b6683]">
-              Explore veículos com parcelas próximas às que você simulou e continue ajustando seu
-              financiamento.
-            </p>
+        {/* Simulator card */}
+        <section
+          aria-labelledby={`${formId}-title`}
+          className="rounded-[22px] border border-[#dce8ff] bg-white p-4 shadow-[0_18px_48px_rgba(14,40,80,0.07)] sm:p-5"
+        >
+          <h2 id={`${formId}-title`} className="sr-only">
+            Parâmetros do financiamento
+          </h2>
 
-            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {configureList.map((item, index) => (
-                <AdCard key={`${item.id ?? item.slug ?? index}-cfg`} item={item} />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FieldShell label="Valor do veículo">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a869f]">
+                  <IconCarFront className="h-5 w-5" />
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={vehicleRaw}
+                  onChange={(e) => setVehicleRaw(e.target.value)}
+                  onBlur={syncVehicleFromRaw}
+                  className="h-12 w-full rounded-[14px] border border-[#e3e9f5] bg-[#fbfcff] pl-12 pr-3 text-[15px] font-bold text-[#1a2b4c] outline-none ring-0 transition placeholder:text-[#9aa3b8] focus:border-[var(--cnc-primary)] focus:bg-white focus:shadow-[0_0_0_4px_rgba(14,98,216,0.12)]"
+                  aria-label="Valor do veículo"
+                  autoComplete="off"
+                />
+              </div>
+            </FieldShell>
+
+            <FieldShell
+              label="Entrada"
+              hint={
+                <span className="inline-flex w-fit rounded-lg bg-[#eaf2ff] px-2.5 py-1 text-[11px] font-bold text-[var(--cnc-primary)]">
+                  {entryPercent}% do valor do veículo
+                </span>
+              }
+            >
+              <input
+                inputMode="decimal"
+                value={downRaw}
+                onChange={(e) => setDownRaw(e.target.value)}
+                onBlur={syncDownFromRaw}
+                className="h-12 w-full rounded-[14px] border border-[#e3e9f5] bg-[#fbfcff] px-3 text-[15px] font-bold text-[#1a2b4c] outline-none transition focus:border-[var(--cnc-primary)] focus:bg-white focus:shadow-[0_0_0_4px_rgba(14,98,216,0.12)]"
+                aria-label="Entrada"
+                autoComplete="off"
+              />
+            </FieldShell>
+
+            <FieldShell label="Taxa de juros (a.m.)">
+              <div className="relative">
+                <input
+                  inputMode="decimal"
+                  value={rateRaw}
+                  onChange={(e) => setRateRaw(e.target.value)}
+                  onBlur={syncRateFromRaw}
+                  className="h-12 w-full rounded-[14px] border border-[#e3e9f5] bg-[#fbfcff] pr-10 pl-3 text-[15px] font-bold text-[#1a2b4c] outline-none transition focus:border-[var(--cnc-primary)] focus:bg-white focus:shadow-[0_0_0_4px_rgba(14,98,216,0.12)]"
+                  aria-label="Taxa de juros mensal"
+                  autoComplete="off"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-[#8893ad]">
+                  %
+                </span>
+              </div>
+            </FieldShell>
+
+            <FieldShell label="Prazo">
+              <div className="relative">
+                <select
+                  value={selectedTerm}
+                  onChange={(e) => setSelectedTerm(Number(e.target.value) as FinancingTerm)}
+                  className="h-12 w-full appearance-none rounded-[14px] border border-[#e3e9f5] bg-[#fbfcff] px-3 pr-10 text-[15px] font-bold text-[#1a2b4c] outline-none transition focus:border-[var(--cnc-primary)] focus:bg-white focus:shadow-[0_0_0_4px_rgba(14,98,216,0.12)]"
+                  aria-label="Prazo do financiamento"
+                >
+                  {FINANCING_TERM_OPTIONS.map((t) => (
+                    <option key={t} value={t}>
+                      {t} meses
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6b7894]">
+                  <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="m5 7 5 6 5-6" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </div>
+            </FieldShell>
           </div>
 
-          <aside className="flex h-fit flex-col items-center overflow-hidden rounded-[20px] border border-[#e6eaf2] bg-gradient-to-b from-[#eaf2ff] to-white p-6 text-center shadow-[0_10px_30px_rgba(14,40,80,0.06)]">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0e62d8]/10 text-[#0e62d8]">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-8 w-8"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 11v2a2 2 0 0 0 2 2h2l4 3V6L7 9H5a2 2 0 0 0-2 2Z" />
-                <path d="M15 8a5 5 0 0 1 0 8" />
-                <path d="M18 5a9 9 0 0 1 0 14" />
-              </svg>
-            </div>
-            <h3 className="mt-4 text-[20px] font-extrabold text-[#13203f]">
-              Anuncie seu carro grátis!
-            </h3>
-            <p className="mt-2 text-[14px] leading-6 text-[#5b6683]">
-              Cadastre seu veículo em poucos minutos e alcance compradores da sua cidade sem pagar
-              taxa.
-            </p>
-            <Link
-              href="/planos"
-              className="mt-5 inline-flex h-[48px] w-full items-center justify-center rounded-[12px] bg-[#0e62d8] px-5 text-[15px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(14,98,216,0.25)] transition hover:bg-[#0c4fb0]"
-            >
-              Anunciar Grátis
-            </Link>
-          </aside>
+          <button
+            type="button"
+            onClick={applySimulate}
+            className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--cnc-primary)] text-[15px] font-extrabold text-white shadow-[0_18px_36px_rgba(14,98,216,0.28)] transition hover:bg-[var(--cnc-primary-strong)] active:scale-[0.99]"
+          >
+            <IconCalculator className="h-5 w-5 text-white" />
+            Simular parcelas
+          </button>
         </section>
 
-        {/* CITY OFFERS */}
-        <section className="mt-14">
-          <div className="flex items-end justify-between gap-4">
-            <h2 className="text-[22px] font-extrabold text-[#13203f] md:text-[26px]">
-              Ofertas de carros usados em {cityName}
-            </h2>
+        {/* Installments table */}
+        <section
+          ref={installmentsRef}
+          className="mt-5 rounded-[22px] border border-[#e7ecf5] bg-white p-4 shadow-[0_16px_44px_rgba(14,40,80,0.06)] sm:p-5"
+          aria-label="Parcelas simuladas"
+        >
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#eef4ff] text-[var(--cnc-primary)]">
+              <IconCarFront className="h-5 w-5" />
+            </span>
+            <h2 className="text-[16px] font-extrabold tracking-tight text-[#12203e] sm:text-[17px]">Parcelas simuladas</h2>
+            <InfoHintIcon className="ml-0.5 h-[18px] w-[18px] text-[#a0abbf]" />
+          </div>
+
+          <div className="mt-4 overflow-x-auto rounded-[16px] border border-[#eef1f7] [-ms-overflow-style:none] [scrollbar-width:thin]">
+            <table className="w-full min-w-[340px] border-collapse text-left text-[12px] sm:text-[13px]">
+              <thead>
+                <tr className="border-b border-[#eef1f7] bg-[#fafbfd] text-[11px] font-extrabold uppercase tracking-wide text-[#7a869f]">
+                  <th className="w-10 px-2 py-2.5 sm:px-3" scope="col">
+                    <span className="sr-only">Selecionar</span>
+                  </th>
+                  <th className="px-2 py-2.5 sm:px-3" scope="col">
+                    Prazo
+                  </th>
+                  <th className="px-2 py-2.5 text-right sm:px-3" scope="col">
+                    Valor da parcela
+                  </th>
+                  <th className="px-2 py-2.5 text-right sm:px-3" scope="col">
+                    Total pago
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {installments.map((row) => {
+                  const active = row.term === selectedTerm;
+                  return (
+                    <tr
+                      key={row.term}
+                      className={`border-b border-[#f0f3f9] transition last:border-b-0 ${
+                        active ? "bg-[#eef6ff]" : "bg-white hover:bg-[#fafbfd]"
+                      }`}
+                    >
+                      <td className="px-2 py-2.5 sm:px-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTerm(row.term as FinancingTerm)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full"
+                          aria-label={`Selecionar ${row.term} parcelas`}
+                          aria-pressed={active}
+                        >
+                          <span
+                            className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 ${
+                              active ? "border-[var(--cnc-primary)] bg-white" : "border-[#cfd7e8] bg-white"
+                            }`}
+                          >
+                            {active ? (
+                              <span className="h-2.5 w-2.5 rounded-full bg-[var(--cnc-primary)]" />
+                            ) : null}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="px-2 py-2.5 font-extrabold text-[#1a2b4c] sm:px-3">{row.term}x</td>
+                      <td
+                        className={`px-2 py-2.5 text-right font-extrabold sm:px-3 ${
+                          active ? "text-[var(--cnc-primary)]" : "text-[#1a2b4c]"
+                        }`}
+                      >
+                        {formatBrlPrecise(row.monthly)}
+                      </td>
+                      <td className="px-2 py-2.5 text-right font-semibold text-[#5d667d] sm:px-3">
+                        {formatBrlPrecise(row.totalPaid)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 flex items-start gap-2.5 rounded-[14px] border border-[#eef1f7] bg-[#f8fafc] px-3.5 py-3 text-[12px] font-medium leading-relaxed text-[#6b7894] sm:text-[13px]">
+            <IconShield className="mt-0.5 h-5 w-5 shrink-0 text-[var(--cnc-primary)]" aria-hidden />
+            <p>Cálculo estimado. Valores sujeitos à análise de crédito.</p>
+          </div>
+        </section>
+
+        {/* Compatible vehicles */}
+        <section className="mt-8 pb-2" aria-label="Carros compatíveis com sua parcela">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eef4ff] text-[var(--cnc-primary)]">
+                <IconCarFront className="h-5 w-5" />
+              </span>
+              <h2 className="text-[16px] font-extrabold leading-tight tracking-tight text-[#12203e] sm:text-[17px]">
+                Carros compatíveis com sua parcela
+              </h2>
+            </div>
             <Link
-              href={`/comprar?city_slug=${citySlug}`}
-              className="hidden text-[14px] font-semibold text-[#0e62d8] hover:text-[#0c4fb0] md:inline-flex"
+              href={comprarHref}
+              className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-extrabold text-[var(--cnc-primary)] transition hover:text-[var(--cnc-primary-strong)]"
             >
-              Ver todas &rarr;
+              Ver todos
+              <IconChevronRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {cityOffers.map((item, index) => (
-              <AdCard key={`${item.id ?? item.slug ?? index}-offer`} item={item} />
+          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {SHOWCASE_VEHICLES.map((vehicle) => (
+              <CompatibleVehicleCard key={vehicle.id} item={vehicle} locationLabel={locationLabel} exploreHref={comprarHref} />
             ))}
           </div>
-
-          {cityOffers.length === 0 ? (
-            <p className="mt-6 rounded-[14px] border border-dashed border-[#e6eaf2] bg-[#f6f8fc] px-5 py-8 text-center text-[14px] text-[#5b6683]">
-              Ainda não há ofertas carregadas para {cityLabel}. Volte em breve ou explore outras
-              regiões.
-            </p>
-          ) : null}
-
-          <div className="mt-6 flex justify-center md:hidden">
-            <Link
-              href={`/comprar?city_slug=${citySlug}`}
-              className="inline-flex h-[48px] items-center justify-center rounded-[12px] border border-[#0e62d8] px-6 text-[15px] font-bold text-[#0e62d8]"
-            >
-              Ver todas as ofertas
-            </Link>
-          </div>
         </section>
-      </div>
-    </main>
-  );
-}
+      </main>
 
-function SliderField({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  format,
-  minLabel,
-  maxLabel,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (value: number) => void;
-  format: (value: number) => string;
-  minLabel: string;
-  maxLabel: string;
-}) {
-  const pct = max - min > 0 ? ((value - min) / (max - min)) * 100 : 0;
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <label className="text-[14px] font-semibold text-[#5b6683]">{label}</label>
-        <span className="text-[16px] font-extrabold text-[#0e62d8]">{format(value)}</span>
-      </div>
-
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-2 block w-full cursor-pointer appearance-none bg-transparent
-          [&::-webkit-slider-runnable-track]:h-[6px] [&::-webkit-slider-runnable-track]:rounded-full
-          [&::-webkit-slider-runnable-track]:bg-[length:100%_100%] [&::-webkit-slider-runnable-track]:bg-no-repeat
-          [&::-moz-range-track]:h-[6px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[#e6eaf2]
-          [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#0e62d8] [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(14,98,216,0.45)]
-          [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#0e62d8] [&::-moz-range-thumb]:shadow-[0_2px_6px_rgba(14,98,216,0.45)]"
-        style={{
-          backgroundImage: `linear-gradient(to right, #0e62d8 ${pct}%, #e6eaf2 ${pct}%)`,
-          backgroundSize: "100% 6px",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      />
-
-      <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#8791a7]">
-        <span>{minLabel}</span>
-        <span>{maxLabel}</span>
-      </div>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-[14px] text-[#5b6683]">{label}</dt>
-      <dd className="text-[15px] font-semibold text-[#13203f]">{value}</dd>
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  muted = false,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="rounded-[12px] border border-[#eef1f7] bg-white px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a8398]">{label}</p>
-      <p
-        className={`mt-1 text-[15px] font-extrabold leading-tight ${
-          muted ? "text-[#13203f]" : "text-[#0e62d8]"
-        }`}
-      >
-        {value}
-      </p>
+      <FinancingSimulatorBottomDock />
     </div>
   );
 }

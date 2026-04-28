@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { CityHeaderSelector } from "@/components/city/CityHeaderSelector";
+import { FinancingSimulatorAppHeader } from "@/components/financing/FinancingSimulatorAppHeader";
 import { useCity } from "@/lib/city/CityContext";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import {
@@ -83,6 +84,9 @@ function HeaderNavLink({
 }
 
 export function PublicHeader() {
+  const pathname = usePathname() || "";
+  const isSimulatorRoute = pathname.startsWith("/simulador-financiamento");
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const { city, openCityPicker } = useCity();
   const [sessionUser, setSessionUser] = useState<
@@ -109,6 +113,10 @@ export function PublicHeader() {
   }, []);
 
   const routes = useMemo(() => getTerritorialRoutesForCity(city.slug), [city.slug]);
+
+  if (isSimulatorRoute) {
+    return <FinancingSimulatorAppHeader />;
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">

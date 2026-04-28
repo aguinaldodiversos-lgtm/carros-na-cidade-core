@@ -1,8 +1,6 @@
 // frontend/app/simulador-financiamento/[cidade]/page.tsx
 import type { Metadata } from "next";
 import { FinancingLandingPageClient } from "@/components/financing/FinancingLandingPageClient";
-import { fetchAdsSearch } from "@/lib/search/ads-search";
-import type { AdItem } from "@/lib/search/ads-search";
 
 type PageProps = {
   params: {
@@ -53,24 +51,6 @@ function prettifyCitySlug(slug: string) {
   };
 }
 
-function fallbackHero(cityName: string, state: string): AdItem {
-  return {
-    id: 999001,
-    slug: "volkswagen-t-cross-2022-2023",
-    title: "2022/2023 Volkswagen T-Cross",
-    brand: "Volkswagen",
-    model: "T-Cross",
-    city: cityName,
-    state,
-    year: 2023,
-    mileage: 28000,
-    price: 105900,
-    below_fipe: false,
-    image_url: "/images/vehicle-placeholder.svg",
-    images: ["/images/vehicle-placeholder.svg"],
-  };
-}
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = prettifyCitySlug(params.cidade);
 
@@ -100,51 +80,11 @@ export default async function SimuladorFinanciamentoCidadePage({
   const city = prettifyCitySlug(params.cidade);
   const initialVehicleValue = parseValorFromSearch(searchParams);
 
-  const [opportunitiesResult, highlightResult, recentResult] = await Promise.allSettled([
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      below_fipe: true,
-      sort: "relevance",
-      limit: 6,
-      page: 1,
-    }),
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      highlight_only: true,
-      sort: "highlight",
-      limit: 4,
-      page: 1,
-    }),
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      sort: "recent",
-      limit: 6,
-      page: 1,
-    }),
-  ]);
-
-  const recentAds = recentResult.status === "fulfilled" ? recentResult.value.data || [] : [];
-
-  const opportunityAds =
-    opportunitiesResult.status === "fulfilled" && opportunitiesResult.value.data?.length > 0
-      ? opportunitiesResult.value.data
-      : recentAds.slice(0, 6);
-
-  const highlightAds =
-    highlightResult.status === "fulfilled" && highlightResult.value.data?.length > 0
-      ? highlightResult.value.data
-      : recentAds.slice(0, 4);
-
-  const heroVehicle = highlightAds[0] || opportunityAds[0] || fallbackHero(city.name, city.state);
-
   return (
     <FinancingLandingPageClient
       citySlug={params.cidade}
       cityName={city.name}
-      cityLabel={city.label}
-      heroVehicle={heroVehicle}
-      highlightAds={highlightAds}
-      opportunityAds={opportunityAds}
+      cityState={city.state}
       initialVehicleValue={initialVehicleValue}
     />
   );
