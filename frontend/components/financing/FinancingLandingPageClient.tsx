@@ -5,8 +5,30 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { AdItem } from "@/lib/search/ads-search";
 import AdCard from "@/components/ads/AdCard";
-import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
+
+/**
+ * Simulador de financiamento — mobile-first, contrato visual oficial em
+ * `frontend/public/images/simulador.png`.
+ *
+ * Estrutura (de cima para baixo):
+ *  1. Header da página: ← back + h1 + sub
+ *  2. Card de formulário: 2x2 grid (Valor / Entrada — Taxa / Prazo) + botão azul
+ *  3. Card "Parcelas simuladas": 5 linhas radio (12/24/36/48/60x) + aviso azul
+ *  4. Seção "Carros compatíveis com sua parcela": 3 AdCards
+ *  5. SiteBottomNav (já fora do <main>)
+ *
+ * Antes era 3 colunas desktop com sliders, hero com imagem dolphin e
+ * seção duplicada "Ofertas em [cidade]". Tudo isso saiu — o usuário
+ * acessa ofertas pelo /comprar (atalho na home, FAB do BottomNav,
+ * header desktop) então não precisa duplicar aqui.
+ *
+ * IMPORTANTE: a regra anti-duplicação do redesign (memory
+ * project_visual_contract) — não renderizar dois CTAs de mesma função
+ * — é respeitada: nada de "Anuncie seu carro grátis" aside, nada de
+ * "Ver todas as ofertas em [cidade]" extra além do "Ver todos →" do
+ * header da seção.
+ */
 
 interface FinancingLandingPageClientProps {
   citySlug: string;
@@ -19,13 +41,13 @@ interface FinancingLandingPageClientProps {
 }
 
 const TERMS = [12, 24, 36, 48, 60] as const;
+type TermOption = (typeof TERMS)[number];
 
-const VALUE_MIN = 5000;
-const VALUE_MAX = 500000;
+const VALUE_MIN = 5_000;
+const VALUE_MAX = 500_000;
 const DOWN_MIN = 0;
-const DOWN_MAX = 100000;
-const RATE_MIN = 0.99;
-const RATE_MAX = 2.99;
+const RATE_MIN = 0.5;
+const RATE_MAX = 3.5;
 
 function parseMoney(value: number | string | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -38,24 +60,14 @@ function parseMoney(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatCurrency(value: number) {
+function formatBRL(value: number, fractionDigits: number = 2) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(value);
 }
-
-function formatCurrencyPrecise(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-const HERO_IMAGE_SRC = "/images/dolphin.webp";
 
 function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
   if (financedAmount <= 0 || months <= 0) return 0;
@@ -68,33 +80,171 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function ArrowLeftIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function CarPrefixIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 14V12l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+      <path d="M6 11h12" />
+      <circle cx="7.5" cy="14" r="1" />
+      <circle cx="16.5" cy="14" r="1" />
+    </svg>
+  );
+}
+
+function CalculatorIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8 7h8M8 11h2M12 11h4M8 15h2M12 15h4M8 19h2M12 19h4" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v.01M12 11v5" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3 5 6v6c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6l-7-3Z" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function CarSectionIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 14V12l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+      <path d="M6 11h12" />
+      <circle cx="7.5" cy="14" r="1" />
+      <circle cx="16.5" cy="14" r="1" />
+    </svg>
+  );
+}
+
 export function FinancingLandingPageClient({
   citySlug,
   cityName,
-  cityLabel,
-  heroVehicle,
   highlightAds,
   opportunityAds,
   initialVehicleValue,
 }: FinancingLandingPageClientProps) {
-  const initialFinanced =
+  const initialValue =
     initialVehicleValue != null && initialVehicleValue > 0
       ? clamp(Math.round(initialVehicleValue), VALUE_MIN, VALUE_MAX)
-      : clamp(Math.round(parseMoney(heroVehicle.price) || 80000), VALUE_MIN, VALUE_MAX);
+      : 120_000;
 
-  const [financedValue, setFinancedValue] = useState(initialFinanced);
-  const [downPayment, setDownPayment] = useState(0);
-  const [monthlyRate, setMonthlyRate] = useState(1.49);
-  const [selectedTerm, setSelectedTerm] = useState<(typeof TERMS)[number]>(36);
+  const [vehicleValue, setVehicleValue] = useState(initialValue);
+  const [downPayment, setDownPayment] = useState(Math.round(initialValue * 0.2));
+  const [monthlyRate, setMonthlyRate] = useState(1.29);
+  const [selectedTerm, setSelectedTerm] = useState<TermOption>(12);
 
-  const effectiveFinanced = Math.max(financedValue - downPayment, 0);
-
-  const summary = useMemo(() => {
-    const monthlyPayment = calculateMonthlyPayment(effectiveFinanced, monthlyRate, selectedTerm);
-    const totalPaid = monthlyPayment * selectedTerm + downPayment;
-    const financingCost = Math.max(totalPaid - financedValue, 0);
-    return { monthlyPayment, totalPaid, financingCost };
-  }, [effectiveFinanced, monthlyRate, selectedTerm, downPayment, financedValue]);
+  const effectiveFinanced = Math.max(vehicleValue - downPayment, 0);
+  const downPaymentPct = vehicleValue > 0 ? Math.round((downPayment / vehicleValue) * 100) : 0;
 
   const installmentTable = useMemo(
     () =>
@@ -109,391 +259,299 @@ export function FinancingLandingPageClient({
     [effectiveFinanced, monthlyRate, downPayment]
   );
 
-  const configureList = highlightAds?.length
-    ? highlightAds.slice(0, 4)
-    : opportunityAds.slice(0, 4);
-  const cityOffers = opportunityAds?.slice(0, 4) ?? [];
+  const compatibleAds = (highlightAds?.length ? highlightAds : opportunityAds).slice(0, 3);
+  const seeAllHref = `/comprar?city_slug=${citySlug}`;
 
   return (
     <>
-      <main className="bg-white pb-24 text-cnc-text md:pb-20">
-        <div className="mx-auto w-full max-w-[1280px] px-4 pb-20 pt-6 sm:px-8 lg:px-10">
-          <PageBreadcrumbs
-            items={[
-              { name: "Home", href: "/" },
-              { name: "Comprar", href: `/comprar?city_slug=${citySlug}` },
-              { name: "Simulador de Financiamento" },
-            ]}
-            className="mb-8"
-          />
-
-          {/* HERO */}
-          <section className="relative grid items-center gap-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,420px)]">
-            <div className="relative z-10 py-4 md:py-8">
-              <h1 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.025em] text-cnc-text-strong md:whitespace-nowrap md:text-[44px] lg:text-[52px]">
-                Simulador de Financiamento
+      <main className="bg-cnc-bg pb-24 text-cnc-text">
+        <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 sm:pt-6 lg:max-w-4xl lg:px-8">
+          {/* Page header: back button + title + sub */}
+          <div className="flex items-start gap-3">
+            <Link
+              href="/"
+              aria-label="Voltar para a Home"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cnc-line bg-white text-cnc-text-strong transition hover:border-primary hover:text-primary"
+            >
+              <ArrowLeftIcon />
+            </Link>
+            <div className="min-w-0">
+              <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[28px]">
+                Simulador de financiamento
               </h1>
-              <p className="mt-5 max-w-[560px] text-[16px] leading-[1.6] text-cnc-muted md:text-[18px]">
-                Simule suas parcelas de financiamento automotivo e descubra as melhores condições
-                para comprar o carro dos seus sonhos.
+              <p className="mt-1 text-[14px] leading-snug text-cnc-muted">
+                Simule parcelas e encontre carros dentro do seu orçamento.
               </p>
             </div>
+          </div>
 
-            <div className="relative flex items-center justify-end">
-              <div className="pointer-events-none absolute inset-x-6 bottom-2 h-5 rounded-[999px] bg-primary/12 blur-2xl" />
-              <img
-                src={HERO_IMAGE_SRC}
-                alt="Simulador de financiamento Carros na Cidade"
-                className="relative z-10 w-full max-w-[420px] object-contain drop-shadow-[0_22px_26px_rgba(14,40,80,0.16)]"
-                style={{ height: "clamp(180px, 22vw, 260px)" }}
+          {/* Form card */}
+          <section
+            aria-label="Parâmetros do financiamento"
+            className="mt-5 rounded-2xl border border-cnc-line bg-white p-4 shadow-card sm:p-5"
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <CurrencyField
+                label="Valor do veículo"
+                value={vehicleValue}
+                onChange={(v) => {
+                  const next = clamp(v, VALUE_MIN, VALUE_MAX);
+                  setVehicleValue(next);
+                  if (downPayment > next) setDownPayment(next);
+                }}
+              />
+
+              <div>
+                <CurrencyField
+                  label="Entrada"
+                  value={downPayment}
+                  onChange={(v) => setDownPayment(clamp(v, DOWN_MIN, vehicleValue))}
+                />
+                <p className="mt-1 inline-flex rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold leading-tight text-primary">
+                  {downPaymentPct}% do valor do veículo
+                </p>
+              </div>
+
+              <RateField
+                label="Taxa de juros (a.m.)"
+                value={monthlyRate}
+                onChange={(v) => setMonthlyRate(clamp(Number(v.toFixed(2)), RATE_MIN, RATE_MAX))}
+              />
+
+              <SelectField
+                label="Prazo"
+                value={selectedTerm}
+                onChange={(v) => setSelectedTerm(v as TermOption)}
+                options={TERMS.map((t) => ({ value: t, label: `${t} meses` }))}
               />
             </div>
+
+            <button
+              type="button"
+              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-bold text-white shadow-card transition hover:bg-primary-strong"
+            >
+              <CalculatorIcon />
+              Simular parcelas
+            </button>
           </section>
 
-          {/* MAIN SIMULATOR */}
-          <section className="mt-12 grid gap-7 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            {/* LEFT CARD */}
-            <div className="rounded-[22px] border border-cnc-line bg-white p-7 shadow-[0_14px_36px_rgba(14,40,80,0.07)] md:p-8">
-              <h2 className="text-[22px] font-extrabold text-cnc-text-strong md:text-[24px]">
-                Simule as Parcelas do Seu Financiamento
+          {/* Parcelas simuladas card */}
+          <section
+            aria-label="Parcelas simuladas"
+            className="mt-5 rounded-2xl border border-cnc-line bg-white p-4 shadow-card sm:p-5"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-cnc-text-strong">
+                <CarSectionIcon />
+              </span>
+              <h2 className="text-[16px] font-extrabold leading-tight text-cnc-text-strong sm:text-[18px]">
+                Parcelas simuladas
               </h2>
-
-              <div className="mt-7 space-y-7">
-                <SliderField
-                  label="Valor Financiado (R$)"
-                  value={financedValue}
-                  min={VALUE_MIN}
-                  max={VALUE_MAX}
-                  step={500}
-                  onChange={(v) => {
-                    setFinancedValue(v);
-                    if (downPayment > v) setDownPayment(v);
-                  }}
-                  format={formatCurrency}
-                  minLabel={formatCurrency(VALUE_MIN)}
-                  maxLabel={formatCurrency(VALUE_MAX)}
-                />
-
-                <SliderField
-                  label="Entrada (R$)"
-                  value={downPayment}
-                  min={DOWN_MIN}
-                  max={Math.min(DOWN_MAX, financedValue)}
-                  step={500}
-                  onChange={(v) => setDownPayment(v)}
-                  format={formatCurrency}
-                  minLabel={formatCurrency(DOWN_MIN)}
-                  maxLabel={formatCurrency(Math.min(DOWN_MAX, financedValue))}
-                />
-
-                <SliderField
-                  label="Taxa de juros (a.m.)"
-                  value={monthlyRate}
-                  min={RATE_MIN}
-                  max={RATE_MAX}
-                  step={0.01}
-                  onChange={(v) => setMonthlyRate(Number(v.toFixed(2)))}
-                  format={(v) => `${v.toFixed(2)} %`}
-                  minLabel={`${RATE_MIN.toFixed(2)} %`}
-                  maxLabel={`${RATE_MAX.toFixed(2)} %`}
-                />
-              </div>
-
-              <div className="mt-7 flex items-start gap-3 rounded-[14px] bg-cnc-success/5 px-4 py-3 text-[13px] leading-5 text-cnc-success ring-1 ring-cnc-success/30">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="mt-0.5 h-5 w-5 shrink-0 text-cnc-success"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.9"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 8v5" />
-                  <path d="M12 16.5v.01" />
-                </svg>
-                <span>
-                  Valores simulados. As condições finais dependem de análise de crédito da
-                  financeira parceira. Consulte a taxa CET antes de contratar.
-                </span>
-              </div>
-            </div>
-
-            {/* MIDDLE SUMMARY */}
-            <div className="flex flex-col gap-5 rounded-[22px] border border-cnc-line bg-white p-7 shadow-[0_14px_36px_rgba(14,40,80,0.07)] md:p-8">
-              <div>
-                <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-cnc-muted-soft">
-                  Parcelas
-                </p>
-                <p className="mt-2 text-[40px] font-extrabold leading-none text-primary md:text-[48px]">
-                  {formatCurrency(summary.monthlyPayment)}
-                </p>
-                <p className="mt-3 text-[14px] text-cnc-muted">
-                  em {selectedTerm}x · taxa de {monthlyRate.toFixed(2)}% a.m.
-                </p>
-              </div>
-
-              <dl className="space-y-3 rounded-[16px] bg-cnc-bg p-5">
-                <SummaryRow label="Entrada" value={formatCurrency(downPayment)} />
-                <SummaryRow label="Valor financiado" value={formatCurrency(effectiveFinanced)} />
-                <SummaryRow label="Taxa de juros" value={`${monthlyRate.toFixed(2)} % a.m.`} />
-              </dl>
-
               <button
                 type="button"
-                className="inline-flex h-[58px] w-full items-center justify-center rounded-[14px] bg-primary px-5 text-[17px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(14,98,216,0.32)] transition hover:bg-primary-strong"
+                aria-label="Como o cálculo é feito"
+                className="text-cnc-muted-soft transition hover:text-cnc-text-strong"
               >
-                Calcular Parcelas
+                <InfoIcon />
               </button>
-
-              <div className="grid grid-cols-2 gap-3">
-                <MiniStat label="Total a pagar" value={formatCurrency(summary.totalPaid)} />
-                <MiniStat
-                  label="Custo do financiamento"
-                  value={formatCurrency(summary.financingCost)}
-                  muted
-                />
-              </div>
             </div>
 
-            {/* RIGHT COLUMN */}
-            <div className="flex flex-col gap-5">
-              <div className="relative flex h-[84px] w-full items-center justify-between gap-3 overflow-hidden rounded-[16px] bg-gradient-to-r from-primary to-primary-strong px-6 text-left text-white shadow-[0_16px_38px_rgba(14,98,216,0.32)]">
-                <div>
-                  <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/80">
-                    Continuar com este valor
-                  </div>
-                  <div className="mt-1 text-[19px] font-extrabold leading-tight">
-                    Valor das Parcelas
-                  </div>
-                </div>
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            {/* Header row */}
+            <div className="mt-3 grid grid-cols-[2.25rem_minmax(0,0.7fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-x-2 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-cnc-muted-soft">
+              <span aria-hidden="true" />
+              <span>Prazo</span>
+              <span>Valor da parcela</span>
+              <span className="text-right">Total pago</span>
+            </div>
+
+            {/* Rows */}
+            <div className="space-y-1">
+              {installmentTable.map((row) => {
+                const isActive = row.term === selectedTerm;
+                return (
+                  <button
+                    key={row.term}
+                    type="button"
+                    onClick={() => setSelectedTerm(row.term)}
+                    aria-pressed={isActive}
+                    className={`grid w-full grid-cols-[2.25rem_minmax(0,0.7fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-x-2 rounded-xl px-1 py-3 text-left transition ${
+                      isActive ? "bg-primary-soft" : "hover:bg-cnc-bg"
+                    }`}
                   >
-                    <path d="M5 12h14" />
-                    <path d="m13 6 6 6-6 6" />
-                  </svg>
-                </span>
-              </div>
-
-              <div className="overflow-hidden rounded-[18px] border border-cnc-line bg-white shadow-[0_14px_36px_rgba(14,40,80,0.07)]">
-                <div className="border-b border-cnc-line bg-cnc-bg px-6 py-4">
-                  <h3 className="text-[16px] font-extrabold text-cnc-text-strong">
-                    Opções de Parcelamento
-                  </h3>
-                </div>
-
-                <table className="w-full text-[14px]">
-                  <thead>
-                    <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-cnc-muted-soft">
-                      <th className="px-5 py-3 font-semibold">Prazo</th>
-                      <th className="px-5 py-3 text-right font-semibold">Valor Mensal</th>
-                      <th className="px-5 py-3 text-right font-semibold">Total Pago</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {installmentTable.map((row) => {
-                      const isActive = row.term === selectedTerm;
-                      return (
-                        <tr
-                          key={row.term}
-                          onClick={() => setSelectedTerm(row.term)}
-                          className={`cursor-pointer border-t border-cnc-line transition hover:bg-cnc-bg ${
-                            isActive ? "bg-primary-soft" : "bg-white"
-                          }`}
-                        >
-                          <td
-                            className={`px-5 py-3.5 font-semibold ${
-                              isActive ? "text-primary" : "text-cnc-text-strong"
-                            }`}
-                          >
-                            {row.term} meses
-                          </td>
-                          <td
-                            className={`px-5 py-3.5 text-right font-semibold ${
-                              isActive ? "text-primary" : "text-cnc-text-strong"
-                            }`}
-                          >
-                            {formatCurrencyPrecise(row.monthly)}
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-cnc-muted">
-                            {formatCurrency(row.total)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <p className="border-t border-cnc-line px-5 py-3 text-[12px] leading-5 text-cnc-muted-soft">
-                  Valores aproximados calculados sobre a tabela Price. Clique em um prazo para
-                  atualizar o resumo.
-                </p>
-              </div>
+                    <span
+                      aria-hidden="true"
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full border-2 transition ${
+                        isActive ? "border-primary bg-white" : "border-cnc-muted-soft bg-white"
+                      }`}
+                    >
+                      {isActive ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                      ) : null}
+                    </span>
+                    <span
+                      className={`text-[14px] font-semibold ${
+                        isActive ? "text-primary" : "text-cnc-text-strong"
+                      }`}
+                    >
+                      {row.term}x
+                    </span>
+                    <span
+                      className={`text-[15px] font-extrabold tabular-nums ${
+                        isActive ? "text-primary" : "text-cnc-text-strong"
+                      }`}
+                    >
+                      {formatBRL(row.monthly)}
+                    </span>
+                    <span className="text-right text-[13px] tabular-nums text-cnc-muted">
+                      {formatBRL(row.total)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </section>
 
-          {/* Carros compatíveis (mockup `simulador.png`).
-              Nota anti-duplicação: o aside "Anuncie seu carro grátis" do
-              layout antigo foi removido — o acesso ao /anunciar já existe no
-              header desktop, no atalho "Vender" da home e no FAB do
-              SiteBottomNav. Manter aqui era CTA duplicado. */}
-          <section className="mt-16">
-            <h2 className="text-[24px] font-extrabold text-cnc-text-strong md:text-[28px]">
-              Carros compatíveis com sua parcela
-            </h2>
-            <p className="mt-2 max-w-2xl text-[15px] text-cnc-muted">
-              Explore veículos com parcelas próximas às que você simulou e continue ajustando seu
-              financiamento.
+            {/* Disclaimer */}
+            <p className="mt-3 flex items-center gap-2 rounded-xl bg-primary-soft px-3 py-2.5 text-[12.5px] leading-snug text-cnc-muted">
+              <span className="text-primary">
+                <ShieldIcon />
+              </span>
+              <span>Cálculo estimado. Valores sujeitos à análise de crédito.</span>
             </p>
-
-            <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {configureList.map((item, index) => (
-                <AdCard key={`${item.id ?? item.slug ?? index}-cfg`} item={item} />
-              ))}
-            </div>
           </section>
 
-          {/* CITY OFFERS */}
-          <section className="mt-16">
-            <div className="flex items-end justify-between gap-4">
-              <h2 className="text-[24px] font-extrabold text-cnc-text-strong md:text-[28px]">
-                Ofertas de carros usados em {cityName}
-              </h2>
-              <Link
-                href={`/comprar?city_slug=${citySlug}`}
-                className="hidden text-[14px] font-semibold text-primary hover:text-primary-strong md:inline-flex"
-              >
-                Ver todas &rarr;
-              </Link>
-            </div>
+          {/* Carros compatíveis com sua parcela */}
+          {compatibleAds.length > 0 ? (
+            <section aria-label="Carros compatíveis com sua parcela" className="mt-7">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="text-cnc-text-strong">
+                    <CarSectionIcon />
+                  </span>
+                  <h2 className="truncate text-[16px] font-extrabold leading-tight text-cnc-text-strong sm:text-[18px]">
+                    Carros compatíveis com sua parcela
+                  </h2>
+                </div>
+                <Link
+                  href={seeAllHref}
+                  className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-primary hover:text-primary-strong"
+                >
+                  Ver todos
+                  <ArrowRightIcon />
+                </Link>
+              </div>
 
-            <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {cityOffers.map((item, index) => (
-                <AdCard key={`${item.id ?? item.slug ?? index}-offer`} item={item} />
-              ))}
-            </div>
-
-            {cityOffers.length === 0 ? (
-              <p className="mt-6 rounded-[14px] border border-dashed border-cnc-line bg-cnc-bg px-5 py-8 text-center text-[14px] text-cnc-muted">
-                Ainda não há ofertas carregadas para {cityLabel}. Volte em breve ou explore outras
-                regiões.
-              </p>
-            ) : null}
-
-            <div className="mt-6 flex justify-center md:hidden">
-              <Link
-                href={`/comprar?city_slug=${citySlug}`}
-                className="inline-flex h-[48px] items-center justify-center rounded-[12px] border border-primary px-6 text-[15px] font-bold text-primary"
-              >
-                Ver todas as ofertas
-              </Link>
-            </div>
-          </section>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {compatibleAds.map((item, index) => (
+                  <AdCard key={`${item.id ?? item.slug ?? index}-cfg`} item={item} />
+                ))}
+              </div>
+            </section>
+          ) : (
+            <p className="mt-7 rounded-xl border border-dashed border-cnc-line bg-white px-5 py-6 text-center text-[14px] text-cnc-muted">
+              Ainda não há ofertas carregadas para {cityName}. Volte em breve.
+            </p>
+          )}
         </div>
       </main>
+
       <SiteBottomNav />
     </>
   );
 }
 
-function SliderField({
+/* ----------------------------------------------------------------------
+ * Inputs
+ * ---------------------------------------------------------------------- */
+
+function CurrencyField({
   label,
   value,
-  min,
-  max,
-  step,
   onChange,
-  format,
-  minLabel,
-  maxLabel,
 }: {
   label: string;
   value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (value: number) => void;
-  format: (value: number) => string;
-  minLabel: string;
-  maxLabel: string;
+  onChange: (next: number) => void;
 }) {
-  const pct = max - min > 0 ? ((value - min) / (max - min)) * 100 : 0;
-
   return (
-    <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <label className="text-[14px] font-semibold text-cnc-muted">{label}</label>
-        <span className="text-[16px] font-extrabold text-primary">{format(value)}</span>
-      </div>
-
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-2 block w-full cursor-pointer appearance-none bg-transparent
-          [&::-webkit-slider-runnable-track]:h-[6px] [&::-webkit-slider-runnable-track]:rounded-full
-          [&::-webkit-slider-runnable-track]:bg-[length:100%_100%] [&::-webkit-slider-runnable-track]:bg-no-repeat
-          [&::-moz-range-track]:h-[6px] [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-cnc-line
-          [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(14,98,216,0.45)]
-          [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:shadow-[0_2px_6px_rgba(14,98,216,0.45)]"
-        style={{
-          backgroundImage: `linear-gradient(to right, var(--cnc-primary) ${pct}%, var(--cnc-line) ${pct}%)`,
-          backgroundSize: "100% 6px",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      />
-
-      <div className="mt-1.5 flex justify-between text-[11px] font-medium text-cnc-muted-soft">
-        <span>{minLabel}</span>
-        <span>{maxLabel}</span>
-      </div>
-    </div>
+    <label className="block">
+      <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
+      <span className="mt-1.5 flex items-center gap-2 rounded-xl border border-cnc-line bg-white px-3 py-2.5 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+        <span className="shrink-0 text-cnc-muted-soft">
+          <CarPrefixIcon />
+        </span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={formatBRL(value, 2)}
+          onChange={(e) => onChange(parseMoney(e.target.value))}
+          className="w-full bg-transparent text-[15px] font-bold tabular-nums text-cnc-text-strong outline-none placeholder:text-cnc-muted-soft"
+        />
+      </span>
+    </label>
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-[14px] text-cnc-muted">{label}</dt>
-      <dd className="text-[15px] font-semibold text-cnc-text-strong">{value}</dd>
-    </div>
-  );
-}
-
-function MiniStat({
+function RateField({
   label,
   value,
-  muted = false,
+  onChange,
 }: {
   label: string;
-  value: string;
-  muted?: boolean;
+  value: number;
+  onChange: (next: number) => void;
 }) {
   return (
-    <div className="rounded-[12px] border border-cnc-line bg-white px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-cnc-muted-soft">
-        {label}
-      </p>
-      <p
-        className={`mt-1 text-[15px] font-extrabold leading-tight ${
-          muted ? "text-cnc-text-strong" : "text-primary"
-        }`}
-      >
-        {value}
-      </p>
-    </div>
+    <label className="block">
+      <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
+      <span className="mt-1.5 flex items-center gap-2 rounded-xl border border-cnc-line bg-white px-3 py-2.5 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={`${value.toFixed(2).replace(".", ",")}%`}
+          onChange={(e) => {
+            const cleaned = e.target.value.replace(/[^\d,.-]/g, "").replace(",", ".");
+            const n = Number(cleaned);
+            if (Number.isFinite(n)) onChange(n);
+          }}
+          className="w-full bg-transparent text-[15px] font-bold tabular-nums text-cnc-text-strong outline-none placeholder:text-cnc-muted-soft"
+        />
+        <span className="shrink-0 text-[13px] font-semibold text-cnc-muted-soft">%</span>
+      </span>
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+  options: ReadonlyArray<{ value: number; label: string }>;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
+      <span className="relative mt-1.5 flex items-center gap-2 rounded-xl border border-cnc-line bg-white px-3 py-2.5 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+        <select
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full appearance-none bg-transparent pr-6 text-[15px] font-bold text-cnc-text-strong outline-none"
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <span aria-hidden="true" className="pointer-events-none absolute right-3 text-cnc-muted-soft">
+          <ChevronDownIcon />
+        </span>
+      </span>
+    </label>
   );
 }
 
