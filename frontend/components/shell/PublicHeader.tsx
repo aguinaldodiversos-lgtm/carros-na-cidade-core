@@ -144,7 +144,7 @@ export function PublicHeader() {
                 priority
                 className="h-[28px] w-auto max-w-[180px] object-contain object-left sm:h-[34px]"
               />
-              <span className="mt-0.5 hidden text-[10px] font-medium leading-tight text-cnc-muted sm:inline md:text-[11px]">
+              <span className="mt-0.5 inline text-[10px] font-medium leading-tight text-cnc-muted md:text-[11px]">
                 Ofertas locais e confiança perto de você
               </span>
             </Link>

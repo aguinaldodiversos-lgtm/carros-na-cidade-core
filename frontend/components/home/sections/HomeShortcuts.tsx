@@ -1,14 +1,7 @@
 // frontend/components/home/sections/HomeShortcuts.tsx
 
-import { ActionShortcut } from "@/components/ui/ActionShortcut";
-import {
-  IconBook,
-  IconCarFront,
-  IconHeart,
-  IconKey,
-  IconPriceTag,
-  IconShield,
-} from "@/components/home/icons";
+import Image from "next/image";
+import Link from "next/link";
 
 /**
  * Faixa de atalhos circulares — equivalente "stories" mas com ações
@@ -24,49 +17,29 @@ import {
  *
  * FIPE e Simulador NÃO aparecem aqui — ficam nos cards quick-action
  * (HomePrimaryActions) abaixo desta faixa, e também no header desktop.
- * Regra do redesign: 1 só ponto canônico por função, sem duplicar perto
- * da dobra.
+ *
+ * Os badges são PNGs extraídos diretamente do sprite oficial
+ * (`banner e icones.png`) — preservam o anel com gradiente colorido
+ * e o glifo dark navy idênticos ao mockup `pagina Home.png`.
  *
  * Server Component — apenas composição.
  */
 
 const SHORTCUTS = [
-  {
-    href: "/comprar",
-    label: "Comprar",
-    icon: <IconCarFront className="h-7 w-7" />,
-    variant: "default" as const,
-  },
-  {
-    href: "/anunciar",
-    label: "Vender",
-    icon: <IconKey className="h-7 w-7" />,
-    variant: "teal" as const,
-  },
-  {
-    href: "/blog",
-    label: "Blog",
-    icon: <IconBook className="h-7 w-7" />,
-    variant: "violet" as const,
-  },
+  { href: "/comprar", label: "Comprar", iconSrc: "/images/home-icons/comprar.png" },
+  { href: "/anunciar", label: "Vender", iconSrc: "/images/home-icons/vender.png" },
+  { href: "/blog", label: "Blog", iconSrc: "/images/home-icons/blog.png" },
   {
     href: "/comprar?below_fipe=true",
     label: "Ofertas",
-    icon: <IconPriceTag className="h-7 w-7" />,
-    variant: "highlight" as const,
+    iconSrc: "/images/home-icons/ofertas.png",
   },
   {
     href: "/comprar?seller_type=dealer",
     label: "Lojas",
-    icon: <IconShield className="h-7 w-7" />,
-    variant: "fuchsia" as const,
+    iconSrc: "/images/home-icons/lojas.png",
   },
-  {
-    href: "/favoritos",
-    label: "Favoritos",
-    icon: <IconHeart className="h-7 w-7" />,
-    variant: "sky" as const,
-  },
+  { href: "/favoritos", label: "Favoritos", iconSrc: "/images/home-icons/favoritos.png" },
 ];
 
 export function HomeShortcuts() {
@@ -78,7 +51,22 @@ export function HomeShortcuts() {
       <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
         {SHORTCUTS.map((s) => (
           <li key={s.href} className="snap-start">
-            <ActionShortcut href={s.href} label={s.label} icon={s.icon} variant={s.variant} />
+            <Link
+              href={s.href}
+              aria-label={s.label}
+              className="flex w-16 shrink-0 flex-col items-center gap-1.5 text-center md:w-20"
+            >
+              <Image
+                src={s.iconSrc}
+                alt=""
+                width={80}
+                height={80}
+                className="h-16 w-16 object-contain md:h-20 md:w-20"
+              />
+              <span className="block w-full text-[11px] font-semibold leading-tight text-cnc-text md:text-xs">
+                {s.label}
+              </span>
+            </Link>
           </li>
         ))}
       </ul>

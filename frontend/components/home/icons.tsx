@@ -191,3 +191,31 @@ export function IconCheck(props: IconProps) {
     </svg>
   );
 }
+
+export function IconFlame(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 2c1.4 3.4 4.5 5.1 4.5 9.5a4.5 4.5 0 1 1-9 0c0-1.6.7-2.7 1.5-4 .9 1 1.4 1.6 2 1.6.7 0 .9-.7.7-2.4-.2-1.7.1-3 .3-4.7Z" />
+      <path d="M12 22a3 3 0 0 0 3-3c0-1.6-1.2-2.5-1.7-4-.5.7-.9 1.2-1.3 1.2s-.7-.4-1-1c-.6 1-1 1.7-1 2.8a3 3 0 0 0 3 3Z" />
+    </svg>
+  );
+}
+
+export function IconStore(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 9h16l-1.3-3.9a1.5 1.5 0 0 0-1.4-1H6.7a1.5 1.5 0 0 0-1.4 1L4 9Z" />
+      <path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+      <path d="M9 20v-5h6v5" />
+      <path d="M8 9c0 1.4-.9 2.4-2 2.4M12 11.4c-1.1 0-2-1-2-2.4M16 9c0 1.4-.9 2.4-2 2.4M20 11.4c-1.1 0-2-1-2-2.4" />
+    </svg>
+  );
+}
+
+export function IconPlus(props: IconProps) {
+  return (
+    <svg {...base} {...props} strokeWidth={2.4}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}

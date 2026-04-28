@@ -1,7 +1,7 @@
 // frontend/components/home/sections/HomePrimaryActions.tsx
 
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
-import { IconCalculator, IconMegaphone, IconTable } from "@/components/home/icons";
+import { IconCalculator, IconPlus, IconTable } from "@/components/home/icons";
 
 /**
  * 3 cards quick-action lado a lado (1 col mobile, 3 col >= sm) abaixo do
@@ -22,7 +22,7 @@ const ACTIONS = [
     href: "/anunciar/novo",
     title: "Anunciar grátis",
     subtitle: "É rápido e fácil",
-    icon: <IconMegaphone className="h-full w-full" />,
+    icon: <IconPlus className="h-full w-full" />,
     accent: "primary" as const,
   },
   {
