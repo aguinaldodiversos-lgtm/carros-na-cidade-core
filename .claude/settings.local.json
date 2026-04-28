@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git log *)",
+      "Bash(npx tsc *)",
+      "Bash(python -c \"from PIL import Image; print\\('PIL OK', Image.__version__\\)\")",
+      "Bash(where magick *)",
+      "Bash(where convert *)",
+      "Bash(node -e \"try { require\\('sharp'\\); console.log\\('sharp OK', require\\('sharp/package.json'\\).version\\); } catch\\(e\\) { console.log\\('no sharp:', e.message\\); }\")",
+      "Bash(node -e \"try { require\\('sharp'\\); console.log\\('sharp OK in frontend', require\\('sharp/package.json'\\).version\\); } catch\\(e\\) { console.log\\('no sharp:', e.message\\); }\")",
+      "Bash(py --version)",
+      "Bash(py -c \"from PIL import Image; print\\('PIL', Image.__version__\\)\")",
+      "Bash(node -e \"const s=require\\('sharp'\\); s\\('C:/Users/aguin/Desktop/carros-na-cidade-core/frontend/public/images/banner e icones.png'\\).metadata\\(\\).then\\(m => console.log\\(JSON.stringify\\(m\\)\\)\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(npm run *)",
+      "Bash(\"C:/Users/aguin/Desktop/carros-na-cidade-core/frontend/node_modules/.bin/tsc\" --noEmit)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}

@@ -164,6 +164,52 @@ function toSearchParams(input?: TerritorialFetchInput): URLSearchParams {
   return params;
 }
 
+/**
+ * Payload mínimo de fallback quando o backend está indisponível ou
+ * sob rate limit (429). Mantém a página renderizando com estado vazio
+ * em vez de derrubar com 500 — usuário vê "sem ofertas" ao invés de
+ * tela de erro.
+ *
+ * Extrai o slug da cidade do routePath quando possível para que ao
+ * menos a heading regional seja preenchida.
+ */
+function buildEmptyTerritorialPayload(routePath: string): TerritorialPagePayload {
+  // routePath: /api/public/cities/{slug}[/brand/{brand}[/model/{model}]]
+  //          | /api/public/cities/{slug}/opportunities
+  //          | /api/public/cities/{slug}/below-fipe
+  const match = routePath.match(/\/cities\/([^/]+)/);
+  const slug = match ? decodeURIComponent(match[1]) : undefined;
+  const cityName = slug
+    ? slug
+        .split("-")
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(" ")
+    : undefined;
+
+  return {
+    city: slug && cityName ? { id: 0, name: cityName, slug } : undefined,
+    brand: null,
+    model: null,
+    stats: {},
+    signals: {},
+    seo: {},
+    filters: {},
+    sections: {
+      ads: [],
+      highlightAds: [],
+      opportunityAds: [],
+      recentAds: [],
+      belowFipeAds: [],
+      relatedBrands: [],
+      relatedModels: [],
+      models: [],
+    },
+    pagination: {},
+    facets: null,
+    internalLinks: {},
+  };
+}
+
 async function fetchTerritorialPage(
   routePath: string,
   searchParams?: TerritorialFetchInput
@@ -180,6 +226,16 @@ async function fetchTerritorialPage(
   });
 
   if (!response.ok) {
+    // 429 persistente após retries: o rate-limiter do backend está
+    // saturado (tipicamente em SSG/build paralelo). Fazemos graceful
+    // degradation — a página renderiza vazia em vez de quebrar com 500.
+    if (response.status === 429) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[territorial] 429 persistente em ${routePath} — retornando payload vazio para não derrubar a página`
+      );
+      return buildEmptyTerritorialPayload(routePath);
+    }
     throw new Error(`Falha ao carregar página territorial (${response.status})`);
   }
 

@@ -16,8 +16,13 @@
  * 2) Cold start do backend no plano free do Render (20-40s). Retry
  *    automatico com timeouts crescentes evita cache poisoning do ISR.
  *      - 1a tentativa: 12s (backend acordado)
- *      - 2a tentativa: 30s (apenas se AbortError/rede/5xx)
+ *      - 2a+ tentativa: 30s (apenas se AbortError/rede/5xx/429)
  *      - 4xx NAO refaz (exceto 429: o usuario real nao tem culpa).
+ *
+ * 3) Backoff entre tentativas: durante SSG/build paralelo, multiplos
+ *    fetches saem juntos e martelam o backend. Adicionamos espera
+ *    exponencial (com jitter) entre tentativas — especialmente para
+ *    429, dando ao rate-limiter tempo de janela rodar.
  */
 
 type NextCacheConfig = { revalidate?: number | false; tags?: string[] };
@@ -52,6 +57,25 @@ function isRetriableError(error: unknown): boolean {
   if (error.name === "TypeError" && /fetch failed/i.test(error.message)) return true;
   if (/ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED/.test(error.message)) return true;
   return false;
+}
+
+/**
+ * Backoff exponencial com jitter (ms) entre tentativas, bem maior para
+ * 429 (rate limit) — ali precisamos esperar a janela do limiter rodar.
+ */
+function backoffDelayMs(attempt: number, isRateLimit: boolean): number {
+  // attempt = numero da tentativa que ACABOU de falhar (1-based).
+  // 429: 800ms, 2400ms, 6000ms (com jitter ±25%).
+  // outros: 200ms, 600ms, 1500ms (com jitter ±25%).
+  const base = isRateLimit ? [800, 2400, 6000] : [200, 600, 1500];
+  const idx = Math.min(attempt - 1, base.length - 1);
+  const center = base[idx];
+  const jitter = center * 0.25;
+  return Math.round(center + (Math.random() * 2 - 1) * jitter);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -117,7 +141,7 @@ export async function ssrResilientFetch(
 ): Promise<Response> {
   const {
     logTag = "ssr-fetch",
-    maxAttempts = 2,
+    maxAttempts = 3,
     initialTimeoutMs = 12_000,
     retryTimeoutMs = 30_000,
     signal: externalSignal,
@@ -156,10 +180,12 @@ export async function ssrResilientFetch(
       // mas se veio com IP do visitante, pode ter sido picos e retry ajuda.
       const shouldRetryStatus = response.status >= 500 || response.status === 429;
       if (shouldRetryStatus && attempt < maxAttempts) {
+        const delay = backoffDelayMs(attempt, response.status === 429);
         logServer(
           logTag,
-          `${response.status} em ${url} (tentativa ${attempt}/${maxAttempts}), retry`
+          `${response.status} em ${url} (tentativa ${attempt}/${maxAttempts}), retry em ${delay}ms`
         );
+        await sleep(delay);
         continue;
       }
 
@@ -170,10 +196,12 @@ export async function ssrResilientFetch(
       const elapsedMs = Date.now() - started;
 
       if (attempt < maxAttempts && isRetriableError(error)) {
+        const delay = backoffDelayMs(attempt, false);
         logServer(
           logTag,
-          `erro retriavel em ${url} apos ${elapsedMs}ms (tentativa ${attempt}/${maxAttempts}): ${message} — retry com timeout ${retryTimeoutMs}ms`
+          `erro retriavel em ${url} apos ${elapsedMs}ms (tentativa ${attempt}/${maxAttempts}): ${message} — retry em ${delay}ms com timeout ${retryTimeoutMs}ms`
         );
+        await sleep(delay);
         continue;
       }
 
