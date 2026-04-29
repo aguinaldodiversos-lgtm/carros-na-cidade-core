@@ -1,7 +1,7 @@
 // frontend/components/fipe/FipeCombobox.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FipeOption } from "@/lib/fipe/fipe-provider";
 
 interface FipeComboboxProps {
@@ -13,6 +13,10 @@ interface FipeComboboxProps {
   disabled?: boolean;
   loading?: boolean;
   emptyMessage?: string;
+  /** Ícone à esquerda do input (gabarito Fipe.png usa logo de marca, lupa e calendário). */
+  leftIcon?: ReactNode;
+  /** Mostra um botão de limpar quando há valor selecionado (gabarito mostra X no campo Modelo). */
+  clearable?: boolean;
 }
 
 export function FipeCombobox({
@@ -24,6 +28,8 @@ export function FipeCombobox({
   disabled = false,
   loading = false,
   emptyMessage = "Nenhuma opção encontrada",
+  leftIcon,
+  clearable = false,
 }: FipeComboboxProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -52,11 +58,24 @@ export function FipeCombobox({
     return options.filter((item) => item.name.toLowerCase().includes(normalizedQuery)).slice(0, 12);
   }, [options, query]);
 
+  const showClear = clearable && !disabled && Boolean(value);
+
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="mb-2 block text-sm font-bold text-[#22304a]">{label}</label>
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-cnc-text-strong">
+        {label}
+      </label>
 
       <div className="relative">
+        {leftIcon ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-3 inline-flex items-center text-cnc-muted"
+          >
+            {leftIcon}
+          </span>
+        ) : null}
+
         <input
           type="text"
           value={query}
@@ -71,10 +90,39 @@ export function FipeCombobox({
             }
           }}
           placeholder={placeholder}
-          className="h-[54px] w-full rounded-[12px] border border-[#d9e1ee] bg-white px-4 pr-12 text-[16px] text-[#23314b] outline-none transition focus:border-[#0e62d8] disabled:cursor-not-allowed disabled:bg-[#f4f7fb] disabled:text-[#98a2b6]"
+          className={`h-[48px] w-full rounded-xl border border-cnc-line bg-white text-[14.5px] text-cnc-text-strong outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-cnc-bg disabled:text-cnc-muted-soft sm:h-[52px] sm:text-[15px] ${
+            leftIcon ? "pl-10" : "pl-4"
+          } ${showClear ? "pr-16" : "pr-10"}`}
         />
 
-        <span className="pointer-events-none absolute inset-y-0 right-4 inline-flex items-center text-[#7d879b]">
+        {showClear ? (
+          <button
+            type="button"
+            aria-label="Limpar seleção"
+            onClick={(event) => {
+              event.stopPropagation();
+              onChange(null);
+              setQuery("");
+              setOpen(false);
+            }}
+            className="absolute inset-y-0 right-9 inline-flex w-6 items-center justify-center text-cnc-muted hover:text-cnc-text"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="m5 5 10 10M15 5 5 15" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : null}
+
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-cnc-muted"
+        >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
             <path d="m5 7 5 6 5-6H5Z" />
           </svg>
@@ -82,13 +130,13 @@ export function FipeCombobox({
       </div>
 
       {open && !disabled && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-[14px] border border-[#dce3ef] bg-white shadow-[0_18px_40px_rgba(16,28,58,0.12)]">
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-xl border border-cnc-line bg-white shadow-[0_18px_40px_rgba(16,28,58,0.12)]">
           {loading ? (
-            <div className="px-4 py-4 text-sm text-[#667085]">Carregando...</div>
+            <div className="px-4 py-3 text-[13px] text-cnc-muted">Carregando…</div>
           ) : filteredOptions.length === 0 ? (
-            <div className="px-4 py-4 text-sm text-[#667085]">{emptyMessage}</div>
+            <div className="px-4 py-3 text-[13px] text-cnc-muted">{emptyMessage}</div>
           ) : (
-            <div className="max-h-[260px] overflow-y-auto py-2">
+            <div className="max-h-[260px] overflow-y-auto py-1.5">
               {filteredOptions.map((option) => (
                 <button
                   key={option.code}
@@ -98,10 +146,10 @@ export function FipeCombobox({
                     setQuery(option.name);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] text-[#24324b] transition hover:bg-[#f4f8ff]"
+                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-[14px] text-cnc-text-strong transition hover:bg-primary-soft"
                 >
                   <span className="truncate">{option.name}</span>
-                  <span className="ml-3 shrink-0 text-xs font-semibold text-[#8a94a8]">
+                  <span className="ml-3 shrink-0 text-[11px] font-semibold text-cnc-muted-soft">
                     {option.code}
                   </span>
                 </button>

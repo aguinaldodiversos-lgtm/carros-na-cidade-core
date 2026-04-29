@@ -84,21 +84,61 @@ export function flattenFipeModelRows(rawItems: unknown[]): FipeOption[] {
   return out;
 }
 
+/**
+ * O provider público (parallelum.com.br) tem rate limit agressivo e
+ * frequentemente devolve 429 quando o tráfego de SEO da /tabela-fipe
+ * sobe. Em 429/5xx fazemos retry com backoff curto (200/600/1200ms);
+ * esgotadas as tentativas, traduzimos o status para mensagem PT-BR
+ * amigável em vez do críptico "FIPE provider error (429)". O Next.js
+ * cacheia (revalidate=86400 listas / 3600 cotação), então o retry
+ * afeta apenas a primeira chamada de cada tupla cacheada.
+ */
 async function providerFetch(path: string, revalidateSeconds = 86400) {
-  const response = await fetch(`${getBaseUrl()}${path}`, {
-    headers: {
-      Accept: "application/json",
-    },
-    next: {
-      revalidate: revalidateSeconds,
-    },
-  });
+  const url = `${getBaseUrl()}${path}`;
+  const retriableStatus = new Set([429, 500, 502, 503, 504]);
+  const delaysMs = [200, 600, 1200];
+  let lastStatus: number | null = null;
 
-  if (!response.ok) {
-    throw new Error(`FIPE provider error (${response.status})`);
+  for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        next: { revalidate: revalidateSeconds },
+      });
+    } catch {
+      if (attempt >= delaysMs.length) {
+        throw new Error(
+          "Não foi possível consultar a FIPE no momento. Tente novamente em alguns instantes."
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, delaysMs[attempt]));
+      continue;
+    }
+
+    if (response.ok) return response.json();
+
+    lastStatus = response.status;
+
+    if (!retriableStatus.has(response.status) || attempt >= delaysMs.length) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delaysMs[attempt]));
   }
 
-  return response.json();
+  if (lastStatus === 429) {
+    throw new Error(
+      "A consulta FIPE está temporariamente saturada. Aguarde alguns segundos e tente novamente."
+    );
+  }
+
+  if (lastStatus === 404) {
+    throw new Error("Não encontramos esse veículo na Tabela FIPE. Revise marca, modelo e ano.");
+  }
+
+  throw new Error("A FIPE está indisponível no momento. Tente novamente em alguns instantes.");
 }
 
 export async function getFipeBrands(vehicleType?: string): Promise<FipeOption[]> {
