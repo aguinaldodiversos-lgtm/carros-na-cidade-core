@@ -127,7 +127,10 @@ export function PublicHeader() {
   const routes = useMemo(() => getTerritorialRoutesForCity(city.slug), [city.slug]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
+    <header
+      data-public-header
+      className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md"
+    >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center gap-1.5 md:h-[68px] md:gap-3">
           <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-4">

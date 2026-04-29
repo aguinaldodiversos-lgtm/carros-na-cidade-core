@@ -2,16 +2,14 @@ import type { Metadata } from "next";
 
 import AdEventTracker from "@/components/analytics/AdEventTracker";
 import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
-import VehicleCarousel from "@/components/common/VehicleCarousel";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import VehicleActions from "@/components/vehicle/VehicleActions";
-import VehicleFinancePanel from "@/components/vehicle/VehicleFinancePanel";
 import VehicleGallery from "@/components/vehicle/VehicleGallery";
 import VehicleInfo from "@/components/vehicle/VehicleInfo";
 import SellerSection from "@/components/vehicle/SellerSection";
 import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
-import VehicleTrustPanel from "@/components/vehicle/VehicleTrustPanel";
+import VehicleDetailMobileShell from "@/components/vehicle/mobile/VehicleDetailMobileShell";
 
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
@@ -25,12 +23,6 @@ import {
 } from "@/lib/vehicle/public-vehicle";
 
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
-import {
-  getAISimilarVehicles,
-  getAIVehicleInsights,
-  getAIVehiclePriceSignal,
-} from "@/services/aiService";
-import type { VehiclePriceSignal } from "@/services/aiService";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -132,14 +124,6 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
       name: "Anunciante no Carros na Cidade",
       phone: "",
     },
-  };
-}
-
-function buildFallbackPriceSignal(): VehiclePriceSignal {
-  return {
-    score: 0,
-    label: "Análise temporariamente indisponível",
-    reason: "Os indicadores automáticos de preço não puderam ser carregados no momento.",
   };
 }
 
@@ -271,21 +255,15 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
   const ref = getFirstValue(searchParams.ref);
   const { ad, vehicle } = await getPublicAdAndVehicle(params.slug, ref);
 
-  const [priceSignalResult, aiInsightsResult, similarVehiclesResult, relatedResult] =
-    await Promise.allSettled([
-      getAIVehiclePriceSignal(vehicle),
-      getAIVehicleInsights(vehicle),
-      getAISimilarVehicles(vehicle),
-      fetchRelatedListingsForAdPage(ad, vehicle),
-    ]);
+  // O redesign da rota /veiculo (mockup detalhes.png) não usa mais
+  // "Indicador de mercado", "Insights IA" nem o carrossel de veículos
+  // sugeridos por IA — então não pagamos a latência dessas chamadas
+  // no SSR. Mantemos apenas relatedResult para "Mais carros em [Cidade]".
+  const [relatedResult] = await Promise.allSettled([
+    fetchRelatedListingsForAdPage(ad, vehicle),
+  ]);
 
-  const priceSignal: VehiclePriceSignal =
-    priceSignalResult.status === "fulfilled" ? priceSignalResult.value : buildFallbackPriceSignal();
-
-  const aiInsights =
-    aiInsightsResult.status === "fulfilled" && Array.isArray(aiInsightsResult.value)
-      ? aiInsightsResult.value
-      : [];
+  const aiInsights: string[] = [];
 
   let sellerVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
   let cityVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
@@ -293,13 +271,6 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
   if (relatedResult.status !== "fulfilled") {
     cityVehicles = buildCityVehicles(vehicle);
   }
-
-  const similarVehicles =
-    similarVehiclesResult.status === "fulfilled" &&
-    Array.isArray(similarVehiclesResult.value) &&
-    similarVehiclesResult.value.length > 0
-      ? similarVehiclesResult.value
-      : buildCityVehicles(vehicle, 6);
 
   const canonicalSlug = safeText(vehicle.slug, params.slug);
   const year = extractYear(vehicle.year);
@@ -374,30 +345,53 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
   });
 
   const sellerPhone = safeText(vehicle.seller.phone);
+  const shareUrl = `https://carrosnacidade.com/veiculo/${canonicalSlug}`;
 
   return (
     <>
-      <main className="cnc-pb-bottomnav mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-9 xl:px-8">
+      {/*
+        Esconde PublicHeader/PublicFooter globais e a sticky bottom bar
+        do VehicleActions na rota /veiculo em telas < lg, para a
+        experiência mobile dedicada (mockup detalhes.png) ocupar 100%
+        da tela. CSS escopado pela presença do data-vehicle-detail-mobile-shell.
+      */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media (max-width: 1023px) {
+              body:has([data-vehicle-detail-mobile-shell]) [data-public-header],
+              body:has([data-vehicle-detail-mobile-shell]) [data-public-footer],
+              body:has([data-vehicle-detail-mobile-shell]) [data-vehicle-mobile-sticky] {
+                display: none !important;
+              }
+              body:has([data-vehicle-detail-mobile-shell]) #main-content { padding: 0 !important; }
+            }
+          `,
+        }}
+      />
+
+      {/* ---------- Experiência mobile (< lg) ---------- */}
+      <div className="block lg:hidden">
+        <VehicleDetailMobileShell
+          vehicle={vehicle}
+          shareUrl={shareUrl}
+          cityVehicles={cityVehicles}
+          sellerVehicles={sellerVehicles}
+        />
+      </div>
+
+      {/* ---------- Experiência desktop (≥ lg) ---------- */}
+      <main className="cnc-pb-bottomnav mx-auto hidden w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-9 lg:block xl:px-8">
         <PageBreadcrumbs
           items={breadcrumbItems}
           className="mb-4 overflow-x-auto whitespace-nowrap"
         />
 
-        <VehicleInfo vehicle={vehicle} priceSignal={priceSignal} />
+        <VehicleInfo vehicle={vehicle} />
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
           <div className="space-y-5">
             <VehicleGallery images={vehicle.images} alt={vehicle.fullName} />
-            <VehicleFinancePanel
-              vehicleId={vehicle.id}
-              citySlug={vehicle.citySlug}
-              vehiclePriceNumeric={vehicle.priceNumeric}
-              year={vehicle.year}
-              mileage={vehicle.km}
-              transmission={vehicle.transmission}
-              fuel={vehicle.fuel}
-              city={vehicle.city}
-            />
           </div>
 
           <div className="space-y-5 xl:sticky xl:top-24">
@@ -414,7 +408,6 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
               fipeDeltaLine={fipeDeltaLine}
               publishedLabel={publishedLabel || null}
             />
-            <VehicleTrustPanel vehicle={vehicle} />
           </div>
         </div>
 
@@ -429,12 +422,6 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
             cityVehicles={cityVehicles}
           />
         </div>
-
-        <VehicleCarousel
-          title="Veículos semelhantes sugeridos pelo Cérebro IA"
-          subtitle="Modelos com perfil de preço, liquidez e procura parecidos com este anúncio."
-          vehicles={similarVehicles}
-        />
       </main>
 
       <SiteBottomNav />

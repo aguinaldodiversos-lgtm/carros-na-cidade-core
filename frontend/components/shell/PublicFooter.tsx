@@ -100,7 +100,10 @@ export function PublicFooter() {
   );
 
   return (
-    <footer className="mt-auto border-t border-white/10 bg-[linear-gradient(165deg,#1a3a7a_0%,#0f2249_45%,#0a1833_100%)] text-white">
+    <footer
+      data-public-footer
+      className="mt-auto border-t border-white/10 bg-[linear-gradient(165deg,#1a3a7a_0%,#0f2249_45%,#0a1833_100%)] text-white"
+    >
       <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
         <div className="grid gap-12 border-b border-white/12 pb-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
           <div>
