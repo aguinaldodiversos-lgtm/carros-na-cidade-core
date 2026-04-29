@@ -241,14 +241,21 @@ function HeroFeaturedCard({ post, citySlug }: { post: BlogPost; citySlug: string
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 text-white sm:p-6">
+      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 sm:p-6">
+        {/*
+          IMPORTANTE: text-white EXPLÍCITO em todos os textos do overlay.
+          O globals.css aplica `h2 { color: var(--cnc-text-strong) }`
+          via @apply em element selectors — isso sobrepõe a herança de
+          text-white do pai. Sem text-white na própria tag, h2 fica preto
+          (lutando contra o background escuro do banner).
+        */}
         <span className="inline-flex w-fit items-center rounded-md bg-primary/90 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white">
           {post.category || "GUIA"}
         </span>
-        <h2 className="line-clamp-3 text-[18px] font-extrabold leading-[1.15] tracking-tight sm:text-[22px] md:text-[26px]">
+        <h2 className="line-clamp-3 text-[18px] font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-[22px] md:text-[26px]">
           {post.title}
         </h2>
-        <p className="inline-flex items-center gap-1.5 text-[12px] font-medium text-white/90">
+        <p className="inline-flex items-center gap-1.5 text-[12px] font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]">
           <ClockIcon /> {readingMinutesLabel(post.readTime)}
         </p>
       </div>

@@ -87,13 +87,13 @@ export function prettifyCitySlug(slug: string) {
   };
 }
 
-// Imagens locais extraídas do mockup oficial em
-// `frontend/public/images/blog.png` — todas com tema 100% automotivo
-// (handshake com chave, SUV escuro, pneus close-up, calc+chave em mesa
-// de financiamento). Quando o admin CRUD subir, essas paths migram para
-// uploads S3/R2 e o backend serve a lista. Hero usa o banner já
-// extraído do sprite (Jeep Compass + cidade).
-const POST_IMAGE_HERO = "/images/home-hero-banner.jpg";
+// Imagens locais — todas com tema 100% automotivo. Hero do blog tem seu
+// PRÓPRIO banner (banner-blog.jpg, twilight cityscape com SUV prata em
+// movimento), separado do banner da Home. Posts populares usam as 4
+// imagens extraídas do mockup oficial blog.png (handshake com chave,
+// SUV escuro, pneus close-up, calc+chave em mesa de financiamento).
+// Quando o admin CRUD subir, essas paths migram para uploads S3/R2.
+const POST_IMAGE_HERO = "/images/blog/banner-blog.jpg";
 const POST_IMAGE_VENDA = "/images/blog/venda-handshake.jpg";
 const POST_IMAGE_MERCADO = "/images/blog/mercado-suv.jpg";
 const POST_IMAGE_MANUTENCAO = "/images/blog/manutencao-pneus.jpg";
@@ -149,7 +149,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
     heroBanner: {
       title: `Melhores carros usados para comprar em ${city.name}`,
       subtitle: `Guia completo com modelos, preços e o que avaliar antes de fechar negócio em ${city.name}.`,
-      image: "/images/home-hero-banner.png",
+      image: POST_IMAGE_HERO,
       ctaLabel: "Ler guia",
       ctaHref: `/blog/${citySlug}/melhores-carros-usados-${citySlug}`,
     },
