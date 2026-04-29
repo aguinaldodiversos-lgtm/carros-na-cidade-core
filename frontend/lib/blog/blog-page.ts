@@ -87,26 +87,60 @@ export function prettifyCitySlug(slug: string) {
   };
 }
 
+// Imagens Unsplash hot-link (CDN gratuito, alta qualidade). Os IDs são
+// fotos consagradas e duráveis. Quando o admin CRUD ficar pronto, estas
+// URLs migram para upload S3/R2 e o backend passa a servir a lista.
+const POST_IMAGE_HERO =
+  "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=1200&q=80&auto=format&fit=crop";
+const POST_IMAGE_VENDA =
+  "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=900&q=80&auto=format&fit=crop";
+const POST_IMAGE_MERCADO =
+  "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900&q=80&auto=format&fit=crop";
+const POST_IMAGE_MANUTENCAO =
+  "https://images.unsplash.com/photo-1626668893632-6f3a4466d109?w=900&q=80&auto=format&fit=crop";
+const POST_IMAGE_FINANCIAMENTO =
+  "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=900&q=80&auto=format&fit=crop";
+const POST_IMAGE_CIDADES =
+  "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=900&q=80&auto=format&fit=crop";
+
 function buildFallbackContent(citySlug: string): BlogPageContent {
   const city = prettifyCitySlug(citySlug);
 
   const categories: BlogCategory[] = [
     {
-      id: "comprando-carros",
-      label: "Comprando Carros",
-      href: `/blog/${citySlug}?categoria=comprando-carros`,
+      id: "compra",
+      label: "Compra",
+      href: `/blog/${citySlug}?categoria=compra`,
       icon: "buy",
     },
     {
-      id: "manutencao-economia",
-      label: "Manutenção e Economia",
-      href: `/blog/${citySlug}?categoria=manutencao-economia`,
+      id: "venda",
+      label: "Venda",
+      href: `/blog/${citySlug}?categoria=venda`,
+      icon: "buy",
+    },
+    {
+      id: "manutencao",
+      label: "Manutenção",
+      href: `/blog/${citySlug}?categoria=manutencao`,
       icon: "maintenance",
     },
     {
-      id: "noticias-curiosidades",
-      label: "Notícias e Curiosidades",
-      href: `/blog/${citySlug}?categoria=noticias-curiosidades`,
+      id: "mercado",
+      label: "Mercado",
+      href: `/blog/${citySlug}?categoria=mercado`,
+      icon: "news",
+    },
+    {
+      id: "financiamento",
+      label: "Financiamento",
+      href: `/blog/${citySlug}?categoria=financiamento`,
+      icon: "buy",
+    },
+    {
+      id: "cidades",
+      label: "Cidades",
+      href: `/blog/${citySlug}?categoria=cidades`,
       icon: "news",
     },
   ];
@@ -117,22 +151,24 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
     cityState: city.state,
     cityLabel: city.label,
     heroBanner: {
-      title: "Blog Carros na Cidade",
-      subtitle: `Dicas e notícias de automóveis em ${city.name} e região`,
-      image: "/images/vehicle-placeholder.svg",
+      title: `Melhores carros usados para comprar em ${city.name}`,
+      subtitle: `Guia completo com modelos, preços e o que avaliar antes de fechar negócio em ${city.name}.`,
+      image: "/images/home-hero-banner.png",
+      ctaLabel: "Ler guia",
+      ctaHref: `/blog/${citySlug}/melhores-carros-usados-${citySlug}`,
     },
     bottomBanner: {
-      title: "Quer vender seu carro rápido e seguro?",
-      subtitle: `Anuncie grátis em ${city.name} e fale direto com compradores da sua cidade.`,
-      ctaLabel: "Criar anúncio grátis",
-      ctaHref: "/planos",
-      image: "/images/vehicle-placeholder.svg",
+      title: `Encontre o carro ideal na sua região`,
+      subtitle: `Explore ofertas de veículos em ${city.name} e região.`,
+      ctaLabel: `Ver carros em ${city.name}`,
+      ctaHref: `/comprar/cidade/${citySlug}`,
+      image: "/images/home-hero-banner.png",
     },
     sidebarSaleCta: {
       title: "Anuncie seu carro grátis",
-      subtitle: `Venda fácil e segura na sua cidade. 5.0/5`,
+      subtitle: `Venda fácil e segura na sua cidade.`,
       ctaLabel: "Criar anúncio grátis",
-      ctaHref: "/planos",
+      ctaHref: "/anunciar/novo",
     },
     newsletter: {
       title: "Receba as últimas",
@@ -143,71 +179,78 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
     categories,
     featuredPosts: [
       {
-        id: "featured-1",
-        slug: "guia-completo-para-comprar-suvs-usados",
-        title: `Guia completo para comprar SUVs usados em ${city.name}`,
+        id: "featured-hero",
+        slug: `melhores-carros-usados-${citySlug}`,
+        title: `Melhores carros usados para comprar em ${city.name}`,
         excerpt:
-          "Veja onde observar, quais versões valem mais a pena e como negociar melhor na hora de comprar um SUV usado com segurança.",
-        coverImage: "/images/vehicle-placeholder.svg",
-        publishedAt: "2026-04-16",
-        readTime: "Ver 5 min",
-        category: "Comprando Carros",
+          `Selecionamos os modelos com melhor custo-benefício para quem vai comprar usado em ${city.name} e região: SUVs urbanos, sedãs eficientes e hatches econômicos. Confira o que avaliar em cada categoria, faixa de preço justa e onde negociar com segurança.`,
+        coverImage: POST_IMAGE_HERO,
+        publishedAt: "2026-04-26",
+        readTime: "6 min",
+        category: "Guia",
         cityLabel: city.label,
-        ctaLabel: "Ver 5 min",
-      },
-      {
-        id: "featured-2",
-        slug: "como-conseguir-melhores-taxas-financiamento",
-        title: "Como conseguir as melhores taxas para financiar seu carro",
-        excerpt:
-          "Veja dicas práticas para obter as melhores condições de financiamento, comparar CET e negociar entrada e prazo com mais segurança.",
-        coverImage: "/images/vehicle-placeholder.svg",
-        publishedAt: "2026-04-10",
-        readTime: "Ver 4 min",
-        category: "Manutenção e Economia",
-        cityLabel: city.label,
-        ctaLabel: "Ver 4 min",
       },
     ],
     popularPosts: [
       {
-        id: "popular-1",
-        slug: "diferencas-entre-revisoes-e-manutencoes",
-        title: `Diferenças entre revisões e manutenções em ${city.name}`,
+        id: "post-venda",
+        slug: `como-vender-carro-${citySlug}-com-seguranca`,
+        title: `Como vender seu carro em ${city.name} com segurança`,
         excerpt:
-          "Entenda quando fazer revisão preventiva, o que realmente precisa ser trocado e como evitar gastos desnecessários no dia a dia.",
-        coverImage: "/images/vehicle-placeholder.svg",
-        publishedAt: "2026-04-16",
-        readTime: "Ver 4 minutos",
-        category: "Manutenção e Economia",
+          `Da documentação ao test-drive, veja o passo a passo profissional para anunciar, negociar e transferir seu veículo sem dor de cabeça em ${city.name}. Inclui modelo de proposta e checklist de transferência.`,
+        coverImage: POST_IMAGE_VENDA,
+        publishedAt: "2026-04-22",
+        readTime: "4 min",
+        category: "Dicas",
         cityLabel: city.label,
-        ctaLabel: "Ver 4 minutos",
       },
       {
-        id: "popular-2",
-        slug: "melhores-roteiros-para-test-drive-final-semana",
-        title: "10 melhores roteiros de carro para o final de semana",
+        id: "post-mercado",
+        slug: "suvs-mais-buscados-na-regiao",
+        title: "SUVs mais buscados na região",
         excerpt:
-          "Descubra destinos próximos, ideias de passeio e rotas urbanas para curtir mais o seu carro nos arredores da cidade.",
-        coverImage: "/images/vehicle-placeholder.svg",
-        publishedAt: "2026-04-10",
-        readTime: "Ver ofertas",
-        category: "Notícias e Curiosidades",
+          `Compass, T-Cross, Creta e Corolla Cross lideram a procura no portal. Veja a faixa de preço média, os anos com melhor revenda e qual versão tem o melhor custo-benefício hoje.`,
+        coverImage: POST_IMAGE_MERCADO,
+        publishedAt: "2026-04-19",
+        readTime: "5 min",
+        category: "Mercado",
         cityLabel: city.label,
-        ctaLabel: "Ver ofertas",
       },
       {
-        id: "popular-3",
-        slug: "como-manter-revisao-em-dia",
-        title: "Como manter a revisão em dia sem apertar o orçamento",
+        id: "post-manutencao",
+        slug: "quando-trocar-os-pneus-do-seu-carro",
+        title: "Quando trocar os pneus do seu carro",
         excerpt:
-          "Veja como planejar manutenção, separar custos previsíveis e evitar surpresas que derrubam o valor de revenda do veículo.",
-        coverImage: "/images/vehicle-placeholder.svg",
-        publishedAt: "2026-04-04",
-        readTime: "Ver ofertas",
-        category: "Manutenção e Economia",
+          `Saiba identificar os sinais de desgaste, entender as marcações TWI e calcular o ponto certo de troca. Pneus em bom estado reduzem o consumo e evitam multas em revisões.`,
+        coverImage: POST_IMAGE_MANUTENCAO,
+        publishedAt: "2026-04-15",
+        readTime: "3 min",
+        category: "Manutenção",
         cityLabel: city.label,
-        ctaLabel: "Ver ofertas",
+      },
+      {
+        id: "post-financiamento",
+        slug: "financiamento-de-veiculos-vale-a-pena",
+        title: "Financiamento de veículos: vale a pena?",
+        excerpt:
+          `Análise completa de CET, prazo, entrada e cenários: quando financiar é mais inteligente que comprar à vista, e como negociar a taxa diretamente com o banco antes de fechar com a loja.`,
+        coverImage: POST_IMAGE_FINANCIAMENTO,
+        publishedAt: "2026-04-12",
+        readTime: "4 min",
+        category: "Financiamento",
+        cityLabel: city.label,
+      },
+      {
+        id: "post-cidades",
+        slug: `mercado-automotivo-${citySlug}`,
+        title: `Mercado automotivo em ${city.name}: tendências de 2026`,
+        excerpt:
+          `Como o perfil de compra mudou em ${city.name} e região: maior procura por híbridos, queda dos sedãs grandes e a virada dos SUVs compactos como liderança absoluta. Dados do portal nos últimos 90 dias.`,
+        coverImage: POST_IMAGE_CIDADES,
+        publishedAt: "2026-04-08",
+        readTime: "5 min",
+        category: "Cidades",
+        cityLabel: city.label,
       },
     ],
   };
