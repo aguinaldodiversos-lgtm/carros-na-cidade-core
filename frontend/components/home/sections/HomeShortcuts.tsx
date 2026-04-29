@@ -48,24 +48,22 @@ export function HomeShortcuts() {
       aria-label="Atalhos rápidos"
       className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8"
     >
-      <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
+      <ul className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
         {SHORTCUTS.map((s) => (
           <li key={s.href} className="snap-start">
             <Link
               href={s.href}
               aria-label={s.label}
-              className="flex w-16 shrink-0 flex-col items-center gap-1.5 text-center md:w-20"
+              className="flex shrink-0 items-center justify-center"
             >
               <Image
                 src={s.iconSrc}
-                alt=""
-                width={80}
-                height={80}
-                className="h-16 w-16 object-contain md:h-20 md:w-20"
+                alt={s.label}
+                width={240}
+                height={240}
+                className="h-24 w-24 object-contain md:h-28 md:w-28"
+                priority
               />
-              <span className="block w-full text-[11px] font-semibold leading-tight text-cnc-text md:text-xs">
-                {s.label}
-              </span>
             </Link>
           </li>
         ))}
