@@ -87,21 +87,17 @@ export function prettifyCitySlug(slug: string) {
   };
 }
 
-// Imagens Unsplash hot-link (CDN gratuito, alta qualidade). Os IDs são
-// fotos consagradas e duráveis. Quando o admin CRUD ficar pronto, estas
-// URLs migram para upload S3/R2 e o backend passa a servir a lista.
-const POST_IMAGE_HERO =
-  "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=1200&q=80&auto=format&fit=crop";
-const POST_IMAGE_VENDA =
-  "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=900&q=80&auto=format&fit=crop";
-const POST_IMAGE_MERCADO =
-  "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900&q=80&auto=format&fit=crop";
-const POST_IMAGE_MANUTENCAO =
-  "https://images.unsplash.com/photo-1626668893632-6f3a4466d109?w=900&q=80&auto=format&fit=crop";
-const POST_IMAGE_FINANCIAMENTO =
-  "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=900&q=80&auto=format&fit=crop";
-const POST_IMAGE_CIDADES =
-  "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=900&q=80&auto=format&fit=crop";
+// Imagens locais extraídas do mockup oficial em
+// `frontend/public/images/blog.png` — todas com tema 100% automotivo
+// (handshake com chave, SUV escuro, pneus close-up, calc+chave em mesa
+// de financiamento). Quando o admin CRUD subir, essas paths migram para
+// uploads S3/R2 e o backend serve a lista. Hero usa o banner já
+// extraído do sprite (Jeep Compass + cidade).
+const POST_IMAGE_HERO = "/images/home-hero-banner.png";
+const POST_IMAGE_VENDA = "/images/blog/venda-handshake.jpg";
+const POST_IMAGE_MERCADO = "/images/blog/mercado-suv.jpg";
+const POST_IMAGE_MANUTENCAO = "/images/blog/manutencao-pneus.jpg";
+const POST_IMAGE_FINANCIAMENTO = "/images/blog/financiamento-calc.jpg";
 
 function buildFallbackContent(citySlug: string): BlogPageContent {
   const city = prettifyCitySlug(citySlug);
@@ -238,18 +234,6 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
         publishedAt: "2026-04-12",
         readTime: "4 min",
         category: "Financiamento",
-        cityLabel: city.label,
-      },
-      {
-        id: "post-cidades",
-        slug: `mercado-automotivo-${citySlug}`,
-        title: `Mercado automotivo em ${city.name}: tendências de 2026`,
-        excerpt:
-          `Como o perfil de compra mudou em ${city.name} e região: maior procura por híbridos, queda dos sedãs grandes e a virada dos SUVs compactos como liderança absoluta. Dados do portal nos últimos 90 dias.`,
-        coverImage: POST_IMAGE_CIDADES,
-        publishedAt: "2026-04-08",
-        readTime: "5 min",
-        category: "Cidades",
         cityLabel: city.label,
       },
     ],
