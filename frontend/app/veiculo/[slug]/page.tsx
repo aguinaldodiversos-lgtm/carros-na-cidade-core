@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
 
 import AdEventTracker from "@/components/analytics/AdEventTracker";
-import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
-import VehicleActions from "@/components/vehicle/VehicleActions";
-import VehicleGallery from "@/components/vehicle/VehicleGallery";
-import VehicleInfo from "@/components/vehicle/VehicleInfo";
-import SellerSection from "@/components/vehicle/SellerSection";
-import VehicleSpecs from "@/components/vehicle/VehicleSpecs";
 import VehicleDetailMobileShell from "@/components/vehicle/mobile/VehicleDetailMobileShell";
 
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
@@ -344,16 +338,16 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
     about: vehicle.fullName,
   });
 
-  const sellerPhone = safeText(vehicle.seller.phone);
   const shareUrl = `https://carrosnacidade.com/veiculo/${canonicalSlug}`;
 
   return (
     <>
       {/*
-        Esconde PublicHeader/PublicFooter globais e a sticky bottom bar
-        do VehicleActions na rota /veiculo em telas < lg, para a
-        experiência mobile dedicada (mockup detalhes.png) ocupar 100%
-        da tela. CSS escopado pela presença do data-vehicle-detail-mobile-shell.
+        Mobile: esconde PublicHeader/PublicFooter globais para a shell
+        ocupar 100% da viewport (estilo app, igual ao mockup detalhes.png).
+        Desktop: mantém PublicHeader/PublicFooter, mas a mesma shell
+        renderiza com largura de coluna controlada — fidelidade ao
+        mockup também em desktop, sem sidebar e sem layout legado.
       */}
       <style
         dangerouslySetInnerHTML={{
@@ -370,8 +364,7 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
         }}
       />
 
-      {/* ---------- Experiência mobile (< lg) ---------- */}
-      <div className="block lg:hidden">
+      <div className="mx-auto w-full max-w-[680px] lg:max-w-3xl">
         <VehicleDetailMobileShell
           vehicle={vehicle}
           shareUrl={shareUrl}
@@ -379,50 +372,6 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
           sellerVehicles={sellerVehicles}
         />
       </div>
-
-      {/* ---------- Experiência desktop (≥ lg) ---------- */}
-      <main className="cnc-pb-bottomnav mx-auto hidden w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-9 lg:block xl:px-8">
-        <PageBreadcrumbs
-          items={breadcrumbItems}
-          className="mb-4 overflow-x-auto whitespace-nowrap"
-        />
-
-        <VehicleInfo vehicle={vehicle} />
-
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
-          <div className="space-y-5">
-            <VehicleGallery images={vehicle.images} alt={vehicle.fullName} />
-          </div>
-
-          <div className="space-y-5 xl:sticky xl:top-24">
-            <VehicleActions
-              vehicleId={vehicle.id}
-              vehicleName={vehicle.fullName}
-              whatsappPhone={sellerPhone}
-              sellerPhone={sellerPhone}
-              financeCitySlug={vehicle.citySlug}
-              vehiclePriceNumeric={vehicle.priceNumeric}
-              priceLabel={vehicle.price}
-              adCode={vehicle.adCode}
-              fipePrice={vehicle.fipePrice}
-              fipeDeltaLine={fipeDeltaLine}
-              publishedLabel={publishedLabel || null}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <VehicleSpecs vehicle={vehicle} aiInsights={aiInsights} />
-        </div>
-
-        <div className="mt-5">
-          <SellerSection
-            vehicle={vehicle}
-            sellerVehicles={sellerVehicles}
-            cityVehicles={cityVehicles}
-          />
-        </div>
-      </main>
 
       <SiteBottomNav />
 
