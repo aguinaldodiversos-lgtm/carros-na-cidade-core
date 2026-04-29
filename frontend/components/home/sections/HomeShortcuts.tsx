@@ -26,20 +26,20 @@ import Link from "next/link";
  */
 
 const SHORTCUTS = [
-  { href: "/comprar", label: "Comprar", iconSrc: "/images/home-icons/comprar.png" },
-  { href: "/anunciar", label: "Vender", iconSrc: "/images/home-icons/vender.png" },
-  { href: "/blog", label: "Blog", iconSrc: "/images/home-icons/blog.png" },
+  { href: "/comprar", label: "Comprar", iconSrc: "/images/comprar.png" },
+  { href: "/anunciar", label: "Vender", iconSrc: "/images/vender.png" },
+  { href: "/blog", label: "Blog", iconSrc: "/images/blog.png" },
   {
     href: "/comprar?below_fipe=true",
     label: "Ofertas",
-    iconSrc: "/images/home-icons/ofertas.png",
+    iconSrc: "/images/ofertas.png",
   },
   {
     href: "/comprar?seller_type=dealer",
     label: "Lojas",
-    iconSrc: "/images/home-icons/lojas.png",
+    iconSrc: "/images/lojas.png",
   },
-  { href: "/favoritos", label: "Favoritos", iconSrc: "/images/home-icons/favoritos.png" },
+  { href: "/favoritos", label: "Favoritos", iconSrc: "/images/favoritos.png" },
 ];
 
 export function HomeShortcuts() {
