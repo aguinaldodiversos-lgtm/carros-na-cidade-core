@@ -2,8 +2,9 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
+import VehicleGalleryLightbox from "@/components/vehicle/VehicleGalleryLightbox";
 import {
   normalizeVehicleGalleryImages,
   VEHICLE_IMAGE_PLACEHOLDER,
@@ -34,12 +35,16 @@ type MobileHeroProps = {
 };
 
 export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: MobileHeroProps) {
+  const [failedImages, setFailedImages] = useState<string[]>([]);
+
   const safeImages = useMemo(() => {
     const normalized = normalizeVehicleGalleryImages(images);
-    return normalized.length > 0 ? normalized : [VEHICLE_IMAGE_PLACEHOLDER];
-  }, [images]);
+    const filtered = normalized.filter((src) => !failedImages.includes(src));
+    return filtered.length > 0 ? filtered : [VEHICLE_IMAGE_PLACEHOLDER];
+  }, [images, failedImages]);
 
   const [index, setIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
   const total = safeImages.length;
@@ -53,10 +58,10 @@ export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: M
     setIndex((i) => (i === total - 1 ? 0 : i + 1));
   }
 
-  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
+  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
     touchStartX.current = event.touches[0]?.clientX ?? null;
   }
-  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
+  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
     const start = touchStartX.current;
     touchStartX.current = null;
     if (start == null) return;
@@ -67,10 +72,30 @@ export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: M
     else goPrev();
   }
 
+  // Fechamento por Esc + lock de scroll quando lightbox aberto
+  useEffect(() => {
+    if (!lightboxOpen) return undefined;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+      else if (e.key === "ArrowLeft") goPrev();
+      else if (e.key === "ArrowRight") goNext();
+    };
+    window.addEventListener("keydown", handler);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxOpen]);
+
   return (
     <section aria-label="Fotos do veículo" className="px-3">
-      <div
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-100"
+      <button
+        type="button"
+        onClick={() => setLightboxOpen(true)}
+        aria-label={`Expandir foto ${currentIndex + 1} de ${total}`}
+        className="relative block aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-[#0e62d8]"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -79,8 +104,13 @@ export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: M
           src={currentImage}
           alt={alt}
           fill
-          sizes="(max-width: 1024px) 100vw, 600px"
-          className="object-cover"
+          sizes="(max-width: 1024px) 100vw, 680px"
+          className="object-contain"
+          onError={() =>
+            setFailedImages((prev) =>
+              prev.includes(currentImage) ? prev : [...prev, currentImage]
+            )
+          }
           priority
         />
 
@@ -99,19 +129,18 @@ export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: M
           ) : null}
         </div>
 
-        {/* Counter canto superior direito */}
-        {total > 1 ? (
-          <span
-            aria-label={`Foto ${currentIndex + 1} de ${total}`}
-            className="absolute right-3 top-3 inline-flex items-center rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white"
-          >
-            {currentIndex + 1}/{total}
-          </span>
-        ) : null}
+        {/* Counter + ícone de expandir canto superior direito */}
+        <span
+          aria-hidden="true"
+          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white"
+        >
+          <ExpandIcon />
+          {total > 1 ? `${currentIndex + 1}/${total}` : "Ampliar"}
+        </span>
 
         {/* Dots inferior centralizados */}
         {total > 1 ? (
-          <div
+          <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5"
           >
@@ -119,13 +148,45 @@ export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: M
               <span
                 key={`${src}-${i}`}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === currentIndex ? "w-5 bg-white" : "w-1.5 bg-white/60"
+                  i === currentIndex ? "w-5 bg-white shadow" : "w-1.5 bg-white/70 shadow"
                 }`}
               />
             ))}
-          </div>
+          </span>
         ) : null}
-      </div>
+      </button>
+
+      {lightboxOpen ? (
+        <VehicleGalleryLightbox
+          images={safeImages}
+          alt={alt}
+          index={currentIndex}
+          onClose={() => setLightboxOpen(false)}
+          onNext={goNext}
+          onPrev={goPrev}
+          onSelect={setIndex}
+          onImageError={(src) =>
+            setFailedImages((prev) => (prev.includes(src) ? prev : [...prev, src]))
+          }
+        />
+      ) : null}
     </section>
+  );
+}
+
+function ExpandIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3 w-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
   );
 }
