@@ -93,7 +93,7 @@ export function prettifyCitySlug(slug: string) {
 // de financiamento). Quando o admin CRUD subir, essas paths migram para
 // uploads S3/R2 e o backend serve a lista. Hero usa o banner já
 // extraído do sprite (Jeep Compass + cidade).
-const POST_IMAGE_HERO = "/images/home-hero-banner.png";
+const POST_IMAGE_HERO = "/images/home-hero-banner.jpg";
 const POST_IMAGE_VENDA = "/images/blog/venda-handshake.jpg";
 const POST_IMAGE_MERCADO = "/images/blog/mercado-suv.jpg";
 const POST_IMAGE_MANUTENCAO = "/images/blog/manutencao-pneus.jpg";
