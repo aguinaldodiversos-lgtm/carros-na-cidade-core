@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import type { AdItem } from "@/lib/search/ads-search";
 import AdCard from "@/components/ads/AdCard";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
@@ -463,6 +463,41 @@ export function FinancingLandingPageClient({
  * Inputs
  * ---------------------------------------------------------------------- */
 
+/**
+ * Hook auxiliar: mantém uma string-rascunho enquanto o input está focado
+ * para que o cursor não pule a cada keystroke por causa de re-formatação.
+ *
+ * - Quando NÃO focado: o input mostra o valor formatado (canônico).
+ * - Quando focado: o input mostra exatamente o que o usuário digita
+ *   (sem reformatação a cada tecla).
+ * - A cada keystroke, o draft é parseado e comitado em tempo real para
+ *   o estado do pai — assim valores derivados (parcelas, totais) seguem
+ *   atualizados, sem mexer no DOM do input em si (que segue mostrando o
+ *   draft, não o formatado).
+ * - No blur: o draft é descartado, e o input volta a mostrar o valor
+ *   canônico formatado.
+ */
+function useDraftValue<T>(
+  formatted: string,
+  parse: (raw: string) => T | null,
+  commit: (next: T) => void
+) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const display = draft !== null ? draft : formatted;
+
+  return {
+    value: display,
+    onChange: (e: ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      setDraft(raw);
+      const parsed = parse(raw);
+      if (parsed !== null) commit(parsed);
+    },
+    onFocus: () => setDraft(formatted),
+    onBlur: () => setDraft(null),
+  };
+}
+
 function CurrencyField({
   label,
   value,
@@ -472,6 +507,15 @@ function CurrencyField({
   value: number;
   onChange: (next: number) => void;
 }) {
+  const draft = useDraftValue<number>(
+    formatBRL(value, 2),
+    (raw) => {
+      const parsed = parseMoney(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    },
+    onChange
+  );
+
   return (
     <label className="block">
       <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
@@ -482,8 +526,10 @@ function CurrencyField({
         <input
           type="text"
           inputMode="numeric"
-          value={formatBRL(value, 2)}
-          onChange={(e) => onChange(parseMoney(e.target.value))}
+          value={draft.value}
+          onChange={draft.onChange}
+          onFocus={draft.onFocus}
+          onBlur={draft.onBlur}
           className="w-full bg-transparent text-[15px] font-bold tabular-nums text-cnc-text-strong outline-none placeholder:text-cnc-muted-soft"
         />
       </span>
@@ -500,6 +546,16 @@ function RateField({
   value: number;
   onChange: (next: number) => void;
 }) {
+  const draft = useDraftValue<number>(
+    value.toFixed(2).replace(".", ","),
+    (raw) => {
+      const cleaned = raw.replace(/[^\d,.-]/g, "").replace(",", ".");
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : null;
+    },
+    onChange
+  );
+
   return (
     <label className="block">
       <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
@@ -507,12 +563,10 @@ function RateField({
         <input
           type="text"
           inputMode="decimal"
-          value={`${value.toFixed(2).replace(".", ",")}%`}
-          onChange={(e) => {
-            const cleaned = e.target.value.replace(/[^\d,.-]/g, "").replace(",", ".");
-            const n = Number(cleaned);
-            if (Number.isFinite(n)) onChange(n);
-          }}
+          value={draft.value}
+          onChange={draft.onChange}
+          onFocus={draft.onFocus}
+          onBlur={draft.onBlur}
           className="w-full bg-transparent text-[15px] font-bold tabular-nums text-cnc-text-strong outline-none placeholder:text-cnc-muted-soft"
         />
         <span className="shrink-0 text-[13px] font-semibold text-cnc-muted-soft">%</span>
