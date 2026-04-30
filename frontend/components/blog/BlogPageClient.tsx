@@ -149,16 +149,16 @@ function CategoryButton({ category }: { category: BlogCategory }) {
   return (
     <Link
       href={normalizeHref(category.href, FALLBACK_BLOG_CITY_HREF)}
-      className="group flex flex-col items-center gap-2 outline-none"
+      className="group flex shrink-0 flex-col items-center gap-1.5 outline-none md:gap-2"
     >
       <span
-        className={`flex h-[68px] w-[68px] items-center justify-center rounded-full ${styles.bg} ring-2 ${styles.ring} transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_18px_rgba(20,30,60,0.10)] md:h-[80px] md:w-[80px]`}
+        className={`flex h-[52px] w-[52px] items-center justify-center rounded-full ${styles.bg} ring-2 ${styles.ring} transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_18px_rgba(20,30,60,0.10)] md:h-[72px] md:w-[72px]`}
       >
-        <span className={styles.icon}>
+        <span className={`${styles.icon} [&_svg]:h-5 [&_svg]:w-5 md:[&_svg]:h-7 md:[&_svg]:w-7`}>
           <CategoryGlyph id={category.id} />
         </span>
       </span>
-      <span className={`text-[13px] font-semibold ${styles.label} md:text-[15px]`}>
+      <span className={`text-[11px] font-semibold ${styles.label} md:text-[14px]`}>
         {category.label}
       </span>
     </Link>
@@ -201,8 +201,7 @@ function FeaturedHeroBanner({
     >
       <div className="relative aspect-[1.6/1] w-full sm:aspect-[2/1] md:aspect-[2.4/1]">
         <img src={image} alt={title} className="h-full w-full object-cover" loading="eager" />
-        <div className="absolute inset-0 bg-[rgba(10,21,48,0.35)]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[rgba(10,21,48,0.85)] via-[rgba(10,21,48,0.55)] to-transparent md:from-[rgba(10,21,48,0.78)] md:via-[rgba(10,21,48,0.35)] md:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 md:from-white/95 md:via-white/65 md:to-transparent" />
       </div>
 
       <div className="absolute inset-0 flex flex-col justify-center px-5 py-6 md:px-12 md:py-10">
@@ -212,16 +211,16 @@ function FeaturedHeroBanner({
           </span>
         ) : null}
 
-        <h2 className="max-w-[260px] text-[22px] font-extrabold leading-[1.1] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] sm:max-w-[460px] sm:text-[26px] sm:leading-[1.12] md:max-w-[520px] md:text-[40px] md:leading-[1.08]">
+        <h2 className="max-w-[260px] text-[22px] font-extrabold leading-[1.1] text-[#0F1A2E] sm:max-w-[460px] sm:text-[26px] sm:leading-[1.12] md:max-w-[520px] md:text-[40px] md:leading-[1.08]">
           {title}
         </h2>
 
-        <p className="mt-3 max-w-[300px] text-[13px] leading-5 text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] sm:max-w-[460px] sm:text-[14px] sm:leading-6 md:max-w-[520px] md:text-[17px] md:leading-7">
+        <p className="mt-3 max-w-[300px] text-[13px] leading-5 text-[#3D4660] sm:max-w-[460px] sm:text-[14px] sm:leading-6 md:max-w-[520px] md:text-[17px] md:leading-7">
           {subtitle}
         </p>
 
         {readTime ? (
-          <p className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-white/90 sm:text-[13px] md:mt-4 md:text-[14px]">
+          <p className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-[#5D667D] sm:text-[13px] md:mt-4 md:text-[14px]">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
@@ -293,14 +292,14 @@ function FeaturedPostCard({ post, citySlug }: { post: BlogPost; citySlug: string
           </button>
         </div>
 
-        <div className="px-4 pb-4 pt-4 md:px-5 md:pb-5">
-          <h3 className="line-clamp-2 text-[16px] font-extrabold leading-[1.25] text-[#1D2440] md:text-[18px]">
+        <div className="px-3 pb-3 pt-3 md:px-5 md:pb-5 md:pt-4">
+          <h3 className="line-clamp-2 text-[14px] font-extrabold leading-[1.22] text-[#1D2440] md:text-[18px]">
             {title}
           </h3>
 
           {readTime ? (
-            <p className="mt-3 inline-flex items-center gap-2 text-[13px] font-medium text-[#7A8197]">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#7A8197] md:mt-3 md:gap-2 md:text-[13px]">
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 md:h-4 md:w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
@@ -441,7 +440,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
           {safeCategories.length > 0 ? (
             <nav
               aria-label="Categorias do blog"
-              className="mt-6 grid grid-cols-3 gap-4 sm:gap-5 md:mt-8 md:grid-cols-6"
+              className="-mx-4 mt-6 flex gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6 md:mx-0 md:mt-8 md:grid md:grid-cols-6 md:gap-5 md:overflow-visible md:px-0"
             >
               {safeCategories.map((category) => (
                 <CategoryButton key={category.id} category={category} />
@@ -478,7 +477,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
           </Link>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {safeFeatured.map((post) => (
             <FeaturedPostCard key={post.id} post={post} citySlug={citySlug} />
           ))}
