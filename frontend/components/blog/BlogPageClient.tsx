@@ -1,453 +1,568 @@
-// frontend/components/blog/BlogPageClient.tsx
-//
-// /blog/[cidade] — listagem editorial premium mobile-first.
-// Contrato visual oficial em frontend/public/images/blog.png:
-//
-//   1. Page header: h1 "Blog automotivo" + sub
-//   2. Chips de categoria (com ícones, scroll horizontal mobile)
-//   3. Hero card editorial (1 destaque com pill GUIA + título + tempo)
-//   4. Section "Destaques do blog" + "Ver todos →" + grid 2x2 de cards
-//      (chip de categoria colorido por tipo: DICAS=violet, MERCADO=success,
-//      MANUTENÇÃO=warning, FINANCIAMENTO=primary, CIDADES=info, GUIA=warning)
-//   5. Promo card "Encontre o carro ideal na sua região" → /comprar
-//   6. SiteBottomNav (fora do <main>)
-//
-// Removido vs versão anterior:
-//   - Breadcrumb (header já cobre navegação)
-//   - MarketplaceCta gradient blue (substituído por promo card uniforme,
-//     mesma linguagem visual da página FIPE — anti-divergência)
-//
-// Conteúdo dos posts vem de `frontend/lib/blog/blog-page.ts`. O fallback
-// local serve enquanto o backend admin de blog não estiver pronto. Para
-// produção: gerenciamento via /admin/blog (backlog).
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
-
-import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
-import type { BlogPageContent, BlogPost } from "@/lib/blog/blog-page";
+import type {
+  BlogCategory,
+  BlogCategoryId,
+  BlogPageContent,
+  BlogPost,
+  BlogTrendingItem,
+} from "@/lib/blog/blog-page";
+import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogPageClientProps {
   content: BlogPageContent;
 }
 
-const PLACEHOLDER_IMAGE = "/images/vehicle-placeholder.svg";
+const FALLBACK_BLOG_CITY_HREF = `/blog/${DEFAULT_PUBLIC_CITY_SLUG}`;
+const FALLBACK_HERO_IMAGE = "/images/imagem_banner_blog.png";
+const FALLBACK_POST_IMAGE = "/images/blog/banner-blog.jpg";
 
-/* ----------------------------------------------------------------------
- * Categorias (label + ícone + cor) — UI catálogo do mockup blog.png
- * ---------------------------------------------------------------------- */
+function toText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
 
-type CategoryChipDef = {
-  id: string;
-  label: string;
-  icon: () => JSX.Element;
+function toSafeImage(value: unknown, fallback: string) {
+  return toText(value, fallback);
+}
+
+function normalizeHref(value: unknown, fallback: string) {
+  const href = toText(value, fallback);
+  return href.startsWith("/") || href.startsWith("http") ? href : fallback;
+}
+
+function normalizePostHref(post: BlogPost, citySlug?: string) {
+  const slug = toText(post.slug, "");
+  if (!slug) {
+    return citySlug ? `/blog/${citySlug}` : FALLBACK_BLOG_CITY_HREF;
+  }
+  return citySlug ? `/blog/${citySlug}/${slug}` : `/blog/post/${slug}`;
+}
+
+const CATEGORY_STYLES: Record<
+  BlogCategoryId,
+  { ring: string; bg: string; icon: string; label: string }
+> = {
+  compra: {
+    ring: "ring-[#3F8CFF]/40",
+    bg: "bg-[#EAF2FF]",
+    icon: "text-[#2F67F6]",
+    label: "text-[#1D2440]",
+  },
+  venda: {
+    ring: "ring-[#9C7BFF]/40",
+    bg: "bg-[#F1ECFF]",
+    icon: "text-[#7E5BEF]",
+    label: "text-[#1D2440]",
+  },
+  manutencao: {
+    ring: "ring-[#FFB050]/40",
+    bg: "bg-[#FFF1DD]",
+    icon: "text-[#F59A1A]",
+    label: "text-[#1D2440]",
+  },
+  mercado: {
+    ring: "ring-[#3CC68A]/40",
+    bg: "bg-[#E3F8EE]",
+    icon: "text-[#1FAE6A]",
+    label: "text-[#1D2440]",
+  },
+  financiamento: {
+    ring: "ring-[#3CC0CF]/40",
+    bg: "bg-[#E2F6F8]",
+    icon: "text-[#1AA3B2]",
+    label: "text-[#1D2440]",
+  },
+  cidades: {
+    ring: "ring-[#3F8CFF]/40",
+    bg: "bg-[#E5F0FF]",
+    icon: "text-[#2F67F6]",
+    label: "text-[#1D2440]",
+  },
 };
 
-const CATEGORY_CHIPS: ReadonlyArray<CategoryChipDef> = [
-  { id: "compra", label: "Compra", icon: () => <CartIcon /> },
-  { id: "venda", label: "Venda", icon: () => <TagIcon /> },
-  { id: "manutencao", label: "Manutenção", icon: () => <WrenchIcon /> },
-  { id: "mercado", label: "Mercado", icon: () => <BarsIcon /> },
-  { id: "financiamento", label: "Financiamento", icon: () => <DollarIcon /> },
-  { id: "cidades", label: "Cidades", icon: () => <PinIcon /> },
-];
-
-/**
- * Cor do chip de categoria nos cards do grid (e do hero). Mapeamento
- * lowercase do `category` do post para tom DS. Defaults para `info` se
- * desconhecido.
- */
-type ChipTone = "primary" | "success" | "warning" | "violet" | "info" | "neutral";
-
-function categoryTone(category: string | undefined): ChipTone {
-  const c = (category || "").toLowerCase();
-  if (c === "dicas" || c === "venda") return "violet";
-  if (c === "mercado") return "success";
-  if (c === "manutenção" || c === "manutencao") return "warning";
-  if (c === "financiamento") return "primary";
-  if (c === "cidades") return "info";
-  if (c === "guia" || c === "compra") return "warning";
-  return "neutral";
-}
-
-const CHIP_TONE_CLASS: Record<ChipTone, string> = {
-  primary: "bg-primary-soft text-primary ring-primary/30",
-  success: "bg-cnc-success/10 text-cnc-success ring-cnc-success/30",
-  warning: "bg-cnc-warning/15 text-cnc-warning ring-cnc-warning/35",
-  violet: "bg-violet-100 text-violet-700 ring-violet-300/60",
-  info: "bg-sky-100 text-sky-700 ring-sky-300/60",
-  neutral: "bg-cnc-bg text-cnc-text ring-cnc-line",
+const CATEGORY_BADGE_COLORS: Record<BlogCategoryId, string> = {
+  compra: "bg-[#2F67F6] text-white",
+  venda: "bg-[#7E5BEF] text-white",
+  manutencao: "bg-[#F59A1A] text-white",
+  mercado: "bg-[#1FAE6A] text-white",
+  financiamento: "bg-[#1AA3B2] text-white",
+  cidades: "bg-[#2F67F6] text-white",
 };
 
-/* ----------------------------------------------------------------------
- * Helpers
- * ---------------------------------------------------------------------- */
+function CategoryGlyph({ id }: { id: BlogCategoryId }) {
+  const className = "h-7 w-7";
+  const stroke = 1.8;
 
-export function readingMinutesLabel(rawLabel: string | undefined): string {
-  if (!rawLabel) return "5 min de leitura";
-  const cleaned = rawLabel.replace(/^Ver\s+/i, "").trim();
-  if (/leitura/i.test(cleaned)) return cleaned;
-  if (/min/i.test(cleaned)) return `${cleaned} de leitura`;
-  return cleaned;
+  switch (id) {
+    case "compra":
+      return (
+        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6" />
+          <circle cx="9" cy="20" r="1.4" />
+          <circle cx="17" cy="20" r="1.4" />
+        </svg>
+      );
+    case "venda":
+      return (
+        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.5 13.5 13 21a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h7.4a2 2 0 0 1 1.4.6l7.3 7.3a2 2 0 0 1 0 2.6Z" />
+          <circle cx="8.5" cy="8.5" r="1.4" />
+        </svg>
+      );
+    case "manutencao":
+      return (
+        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14.7 6.3a4 4 0 0 1 5.4 5.3l-3 3 5.6 5.6-2.1 2.1-5.6-5.6-3 3a4 4 0 0 1-5.4-5.3l3.4 3.4 2.1-2.1-3.4-3.4a4 4 0 0 1 5.3-5.4" />
+        </svg>
+      );
+    case "mercado":
+      return (
+        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19V9" />
+          <path d="M10 19V5" />
+          <path d="M16 19v-7" />
+          <path d="M22 19V3" />
+        </svg>
+      );
+    case "financiamento":
+      return (
+        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3v18" />
+          <path d="M16.5 7.5h-6a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5h-6" />
+        </svg>
+      );
+    case "cidades":
+      return (
+        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s7-7.6 7-13A7 7 0 1 0 5 9c0 5.4 7 13 7 13Z" />
+          <circle cx="12" cy="9" r="2.5" />
+        </svg>
+      );
+  }
 }
 
-/* ----------------------------------------------------------------------
- * Ícones inline (lucide-style, stroke 1.8)
- * ---------------------------------------------------------------------- */
+function CategoryButton({ category }: { category: BlogCategory }) {
+  const styles = CATEGORY_STYLES[category.id];
 
-function svgBase(extra: string = "h-3.5 w-3.5") {
-  return {
-    viewBox: "0 0 24 24",
-    "aria-hidden": true,
-    className: extra,
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-}
-
-export function ClockIcon() {
   return (
-    <svg {...svgBase()}>
+    <Link
+      href={normalizeHref(category.href, FALLBACK_BLOG_CITY_HREF)}
+      className="group flex flex-col items-center gap-2 outline-none"
+    >
+      <span
+        className={`flex h-[68px] w-[68px] items-center justify-center rounded-full ${styles.bg} ring-2 ${styles.ring} transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_18px_rgba(20,30,60,0.10)] md:h-[80px] md:w-[80px]`}
+      >
+        <span className={styles.icon}>
+          <CategoryGlyph id={category.id} />
+        </span>
+      </span>
+      <span className={`text-[13px] font-semibold ${styles.label} md:text-[15px]`}>
+        {category.label}
+      </span>
+    </Link>
+  );
+}
+
+function CategoryBadge({ post }: { post: BlogPost }) {
+  const colorClass = post.categoryId
+    ? CATEGORY_BADGE_COLORS[post.categoryId]
+    : "bg-[#2F67F6] text-white";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${colorClass}`}
+    >
+      {toText(post.category, "Conteúdo")}
+    </span>
+  );
+}
+
+function FeaturedHeroBanner({
+  badge,
+  title,
+  subtitle,
+  image,
+  readTime,
+  href,
+}: {
+  badge?: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  readTime?: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="relative block overflow-hidden rounded-[24px] border border-[#E7EAF3] shadow-[0_18px_40px_rgba(20,30,60,0.12)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(20,30,60,0.16)]"
+    >
+      <div className="relative aspect-[1.6/1] w-full sm:aspect-[2/1] md:aspect-[2.4/1]">
+        <img src={image} alt={title} className="h-full w-full object-cover" loading="eager" />
+        <div className="absolute inset-0 bg-[rgba(10,21,48,0.35)]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[rgba(10,21,48,0.85)] via-[rgba(10,21,48,0.55)] to-transparent md:from-[rgba(10,21,48,0.78)] md:via-[rgba(10,21,48,0.35)] md:to-transparent" />
+      </div>
+
+      <div className="absolute inset-0 flex flex-col justify-center px-5 py-6 md:px-12 md:py-10">
+        {badge ? (
+          <span className="mb-3 inline-flex w-fit items-center rounded-md bg-[#2F67F6] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white">
+            {badge}
+          </span>
+        ) : null}
+
+        <h2 className="max-w-[260px] text-[22px] font-extrabold leading-[1.1] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] sm:max-w-[460px] sm:text-[26px] sm:leading-[1.12] md:max-w-[520px] md:text-[40px] md:leading-[1.08]">
+          {title}
+        </h2>
+
+        <p className="mt-3 max-w-[300px] text-[13px] leading-5 text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] sm:max-w-[460px] sm:text-[14px] sm:leading-6 md:max-w-[520px] md:text-[17px] md:leading-7">
+          {subtitle}
+        </p>
+
+        {readTime ? (
+          <p className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-white/90 sm:text-[13px] md:mt-4 md:text-[14px]">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            {readTime}
+          </p>
+        ) : null}
+      </div>
+    </Link>
+  );
+}
+
+export function ClockIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
     </svg>
   );
 }
 
-export function ArrowRightIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg {...svgBase(className)} strokeWidth={2.2}>
-      <path d="M5 12h14" />
-      <path d="m13 6 6 6-6 6" />
-    </svg>
-  );
+export function readingMinutesLabel(value?: string) {
+  const text = toText(value, "");
+  if (!text) return "Ler artigo";
+  if (/min/i.test(text)) return text;
+  return `${text} de leitura`;
 }
 
-function CartIcon() {
-  return (
-    <svg {...svgBase("h-4 w-4")}>
-      <circle cx="9" cy="20" r="1.4" />
-      <circle cx="18" cy="20" r="1.4" />
-      <path d="M3 4h2l2.5 11.5a2 2 0 0 0 2 1.5h7.5a2 2 0 0 0 2-1.5L21 7H6" />
-    </svg>
-  );
-}
-function TagIcon() {
-  return (
-    <svg {...svgBase("h-4 w-4")}>
-      <path d="M3 12V4h8l10 10-8 8L3 12Z" />
-      <circle cx="8" cy="8" r="1.6" />
-    </svg>
-  );
-}
-function WrenchIcon() {
-  return (
-    <svg {...svgBase("h-4 w-4")}>
-      <path d="M14.7 6.3a4 4 0 0 1 5 5l-2.5 2.5-3-3 .5-4.5Z" />
-      <path d="m11 9-7 7a2.1 2.1 0 1 0 3 3l7-7" />
-    </svg>
-  );
-}
-function BarsIcon() {
-  return (
-    <svg {...svgBase("h-4 w-4")}>
-      <path d="M5 21V11M12 21V5M19 21v-7" />
-    </svg>
-  );
-}
-function DollarIcon() {
-  return (
-    <svg {...svgBase("h-4 w-4")}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v10M15 9.5C15 8 13.7 7 12 7s-3 1-3 2.5 1.3 2.2 3 2.5c1.7.3 3 1 3 2.5S13.7 17 12 17s-3-1-3-2.5" />
-    </svg>
-  );
-}
-function PinIcon() {
-  return (
-    <svg {...svgBase("h-4 w-4")}>
-      <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
-      <circle cx="12" cy="9" r="2.2" />
-    </svg>
-  );
-}
-function MapPinSmallIcon() {
-  return (
-    <svg {...svgBase("h-5 w-5")}>
-      <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
-      <circle cx="12" cy="9" r="2.2" />
-    </svg>
-  );
-}
-
-/* ----------------------------------------------------------------------
- * Sub-componentes
- * ---------------------------------------------------------------------- */
-
-function CategoryChip({
-  chip,
-  href,
-  active,
+export function BlogPostCard({
+  post,
+  citySlug,
+  featured: _featured,
 }: {
-  chip: CategoryChipDef;
-  href: string;
-  active?: boolean;
+  post: BlogPost;
+  citySlug?: string;
+  featured?: boolean;
 }) {
+  return <FeaturedPostCard post={post} citySlug={citySlug ?? DEFAULT_PUBLIC_CITY_SLUG} />;
+}
+
+function FeaturedPostCard({ post, citySlug }: { post: BlogPost; citySlug: string }) {
+  const href = normalizePostHref(post, citySlug);
+  const title = toText(post.title, "Artigo automotivo");
+  const coverImage = toSafeImage(post.coverImage, FALLBACK_POST_IMAGE);
+  const readTime = toText(post.readTime, "");
+
+  return (
+    <article className="group overflow-hidden rounded-[20px] border border-[#E7EAF3] bg-white shadow-[0_10px_24px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(20,30,60,0.12)]">
+      <Link href={href} className="block">
+        <div className="relative aspect-[1.6/1] overflow-hidden">
+          <img
+            src={coverImage}
+            alt={title}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+            loading="lazy"
+          />
+          <div className="absolute left-3 top-3">
+            <CategoryBadge post={post} />
+          </div>
+          <button
+            type="button"
+            aria-label="Salvar artigo"
+            className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-[#1D2440] shadow-[0_4px_12px_rgba(20,30,60,0.18)] transition hover:bg-white"
+            onClick={(event) => event.preventDefault()}
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-4 pb-4 pt-4 md:px-5 md:pb-5">
+          <h3 className="line-clamp-2 text-[16px] font-extrabold leading-[1.25] text-[#1D2440] md:text-[18px]">
+            {title}
+          </h3>
+
+          {readTime ? (
+            <p className="mt-3 inline-flex items-center gap-2 text-[13px] font-medium text-[#7A8197]">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              {readTime}
+            </p>
+          ) : null}
+        </div>
+      </Link>
+    </article>
+  );
+}
+
+function TrendingCard({ item }: { item: BlogTrendingItem }) {
+  const href = normalizeHref(item.href, FALLBACK_BLOG_CITY_HREF);
+  const image = toSafeImage(item.image, FALLBACK_POST_IMAGE);
+  const title = toText(item.title, "Tendência da semana");
+
   return (
     <Link
       href={href}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition sm:px-3.5 sm:text-[13px] ${
-        active
-          ? "bg-primary text-white shadow-card"
-          : "bg-cnc-surface text-cnc-text-strong ring-1 ring-cnc-line hover:ring-primary/40"
-      }`}
+      className="group flex shrink-0 flex-col gap-2 overflow-hidden rounded-[16px] bg-white shadow-[0_8px_20px_rgba(20,30,60,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(20,30,60,0.10)]"
+      style={{ width: 168 }}
     >
-      <span className={active ? "text-white" : "text-primary"}>{chip.icon()}</span>
-      {chip.label}
+      <div className="aspect-[1.46/1] overflow-hidden">
+        <img
+          src={image}
+          alt={title}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]"
+          loading="lazy"
+        />
+      </div>
+      <p className="line-clamp-2 px-3 pb-3 text-[13px] font-semibold leading-snug text-[#1D2440]">
+        {title}
+      </p>
     </Link>
   );
 }
 
-function CategoryPill({ category, tone }: { category: string; tone: ChipTone }) {
-  return (
-    <span
-      className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.1em] ring-1 ring-inset ${CHIP_TONE_CLASS[tone]}`}
-    >
-      {category}
-    </span>
-  );
-}
+function PopularPostRow({ post, citySlug }: { post: BlogPost; citySlug: string }) {
+  const href = normalizePostHref(post, citySlug);
+  const title = toText(post.title, "Artigo automotivo");
+  const excerpt = toText(post.excerpt, "");
+  const coverImage = toSafeImage(post.coverImage, FALLBACK_POST_IMAGE);
 
-function HeroFeaturedCard({ post, citySlug }: { post: BlogPost; citySlug: string }) {
   return (
     <Link
-      href={`/blog/${citySlug}/${post.slug}`}
-      className="group relative block overflow-hidden rounded-2xl shadow-card transition hover:shadow-premium"
+      href={href}
+      className="group flex gap-4 overflow-hidden rounded-[16px] border border-[#E7EAF3] bg-white p-3 shadow-[0_8px_20px_rgba(20,30,60,0.05)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(20,30,60,0.10)]"
     >
-      <div className="relative aspect-[16/10] w-full bg-cnc-bg sm:aspect-[16/9]">
-        <Image
-          src={post.coverImage || PLACEHOLDER_IMAGE}
-          alt={post.title}
-          fill
-          priority
-          sizes="(max-width: 768px) 100vw, 720px"
-          className="object-cover transition duration-500 group-hover:scale-[1.03]"
+      <div className="aspect-square h-[88px] w-[88px] shrink-0 overflow-hidden rounded-[12px] md:h-[120px] md:w-[120px]">
+        <img
+          src={coverImage}
+          alt={title}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
       </div>
-
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 sm:p-6">
-        {/*
-          IMPORTANTE: text-white EXPLÍCITO em todos os textos do overlay.
-          O globals.css aplica `h2 { color: var(--cnc-text-strong) }`
-          via @apply em element selectors — isso sobrepõe a herança de
-          text-white do pai. Sem text-white na própria tag, h2 fica preto
-          (lutando contra o background escuro do banner).
-        */}
-        <span className="inline-flex w-fit items-center rounded-md bg-primary/90 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white">
-          {post.category || "GUIA"}
-        </span>
-        <h2 className="line-clamp-3 text-[18px] font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-[22px] md:text-[26px]">
-          {post.title}
-        </h2>
-        <p className="inline-flex items-center gap-1.5 text-[12px] font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]">
-          <ClockIcon /> {readingMinutesLabel(post.readTime)}
-        </p>
-      </div>
-
-      {/* Carousel dots decorativos (mockup blog.png) */}
-      <div
-        aria-hidden="true"
-        className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1.5"
-      >
-        <span className="h-1.5 w-6 rounded-full bg-white/90" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/45" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/45" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/45" />
-        <span className="h-1.5 w-1.5 rounded-full bg-white/45" />
-      </div>
-    </Link>
-  );
-}
-
-export function BlogPostCard({ post, citySlug }: { post: BlogPost; citySlug: string }) {
-  const tone = categoryTone(post.category);
-  return (
-    <Link
-      href={`/blog/${citySlug}/${post.slug}`}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium"
-    >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-cnc-bg">
-        <Image
-          src={post.coverImage || PLACEHOLDER_IMAGE}
-          alt={post.title}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-          className="object-cover transition duration-300 group-hover:scale-[1.04]"
-        />
-        {/* Pill de categoria sobreposta no canto inferior-esquerdo */}
-        {post.category ? (
-          <span className="absolute bottom-2 left-2">
-            <CategoryPill category={post.category} tone={tone} />
-          </span>
-        ) : null}
-      </div>
-
-      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5">
-        <h3 className="line-clamp-2 min-h-[2.5rem] text-[14px] font-extrabold leading-tight text-cnc-text-strong sm:text-[15px]">
-          {post.title}
+      <div className="flex flex-1 flex-col justify-center">
+        <CategoryBadge post={post} />
+        <h3 className="mt-2 line-clamp-2 text-[15px] font-extrabold leading-snug text-[#1D2440] md:text-[17px]">
+          {title}
         </h3>
-        <p className="mt-auto inline-flex items-center gap-1.5 pt-1 text-[12px] text-cnc-muted">
-          <ClockIcon /> {readingMinutesLabel(post.readTime)}
+        {excerpt ? (
+          <p className="mt-1 line-clamp-2 hidden text-[14px] text-[#636C82] md:block">{excerpt}</p>
+        ) : null}
+        <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#7A8197]">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+          </svg>
+          {toText(post.readTime, "Ler artigo")}
         </p>
       </div>
     </Link>
   );
 }
-
-function BottomPromoCard({ cityName, citySlug }: { cityName: string; citySlug: string }) {
-  return (
-    <section
-      aria-label="Encontre carros na sua região"
-      className="rounded-2xl border border-primary/20 bg-primary-soft px-4 py-3.5 sm:px-5 sm:py-4"
-    >
-      <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-primary shadow-sm">
-          <MapPinSmallIcon />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[14px] font-extrabold leading-tight text-cnc-text-strong sm:text-[15px]">
-            Encontre o carro ideal na sua região
-          </h3>
-          <p className="mt-0.5 text-[12.5px] leading-snug text-cnc-muted sm:text-[13px]">
-            Explore ofertas de veículos em {cityName} e região.
-          </p>
-        </div>
-        <Link
-          href={`/comprar/cidade/${citySlug}`}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-[12.5px] font-bold text-white transition hover:bg-primary-strong sm:h-10 sm:px-4 sm:text-[13.5px]"
-        >
-          Ver carros em {cityName}
-          <ArrowRightIcon className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------------------------------------------------
- * Página
- * ---------------------------------------------------------------------- */
 
 export function BlogPageClient({ content }: BlogPageClientProps) {
-  const cityName = content.cityName;
-  const citySlug = content.citySlug;
+  const citySlug = toText(content.citySlug, DEFAULT_PUBLIC_CITY_SLUG);
+  const cityName = toText(content.cityName, "São Paulo");
 
-  const heroPost: BlogPost | null = useMemo(() => {
-    return content.featuredPosts?.[0] ?? content.popularPosts?.[0] ?? null;
-  }, [content.featuredPosts, content.popularPosts]);
+  const heroBadge = toText(content.heroBanner?.badge, "DICA");
+  const heroTitle = toText(
+    content.heroBanner?.title,
+    `Os carros que estão em alta em ${cityName}`
+  );
+  const heroSubtitle = toText(
+    content.heroBanner?.subtitle,
+    "Confira os modelos mais procurados, as tendências do mercado e dicas para fazer a melhor escolha."
+  );
+  const heroImage = toSafeImage(content.heroBanner?.image, FALLBACK_HERO_IMAGE);
+  const heroReadTime = toText(content.heroBanner?.readTime, "6 min de leitura");
+  const heroHref = `/blog/${citySlug}/categoria/mercado`;
 
-  // Cards do grid: pula o hero post (já em destaque) e mostra 4-6 abaixo.
-  const gridPosts: BlogPost[] = useMemo(() => {
-    const featured = content.featuredPosts ?? [];
-    const popular = content.popularPosts ?? [];
-    const skipFirst = featured.length > 0 ? featured.slice(1) : [];
-    const combined = [...skipFirst, ...popular];
-    const seen = new Set<string>();
-    const unique: BlogPost[] = [];
-    for (const post of combined) {
-      if (!post?.id || seen.has(post.id)) continue;
-      seen.add(post.id);
-      unique.push(post);
-      if (unique.length >= 6) break;
-    }
-    return unique;
-  }, [content.featuredPosts, content.popularPosts]);
+  const bottomBannerTitle = toText(
+    content.bottomBanner?.title,
+    "Encontre o carro ideal na sua região"
+  );
+  const bottomBannerSubtitle = toText(
+    content.bottomBanner?.subtitle,
+    `Veículos verificados, vendedores confiáveis e as melhores oportunidades em ${cityName} e região.`
+  );
+  const bottomBannerHref = normalizeHref(
+    content.bottomBanner?.ctaHref,
+    `/comprar/cidade/${citySlug}`
+  );
+  const bottomBannerCta = toText(content.bottomBanner?.ctaLabel, `Ver carros em ${cityName}`);
 
-  const chipsHrefBase = `/blog/${citySlug}`;
+  const safeCategories = useMemo(() => {
+    return Array.isArray(content.categories) ? content.categories : [];
+  }, [content.categories]);
+
+  const safeFeatured = useMemo(() => {
+    return Array.isArray(content.featuredPosts) ? content.featuredPosts.slice(0, 6) : [];
+  }, [content.featuredPosts]);
+
+  const safeTrending = useMemo(() => {
+    return Array.isArray(content.trendingPosts) ? content.trendingPosts : [];
+  }, [content.trendingPosts]);
+
+  const safePopular = useMemo(() => {
+    return Array.isArray(content.popularPosts) ? content.popularPosts : [];
+  }, [content.popularPosts]);
 
   return (
-    <>
-      <main className="bg-cnc-bg pb-24 md:pb-12">
-        <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 sm:pt-6 lg:max-w-5xl lg:px-8">
-          {/* Page header */}
-          <header>
-            <h1 className="text-[22px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[28px] md:text-[34px]">
+    <main className="bg-[#F5F7FC]">
+      <section className="border-b border-[#EDF1F8] bg-white">
+        <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-8 sm:px-6 md:pb-10 md:pt-12">
+          <div className="max-w-3xl">
+            <h1 className="text-[32px] font-extrabold leading-[1.05] tracking-[-0.02em] text-[#1D2440] md:text-[44px]">
               Blog automotivo
             </h1>
-            <p className="mt-1.5 max-w-2xl text-[13px] leading-snug text-cnc-muted sm:mt-2 sm:text-[14.5px]">
+            <p className="mt-2 text-[15px] leading-7 text-[#5D667D] md:text-[18px]">
               Guias, dicas e notícias para comprar, vender e cuidar do seu carro.
             </p>
-          </header>
+          </div>
 
-          {/* Chips de categoria com ícones (scroll horizontal mobile) */}
-          <div
-            className="mt-3.5 flex gap-2 overflow-x-auto pb-1 sm:mt-5 sm:gap-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            role="tablist"
-            aria-label="Categorias do blog"
+          {safeCategories.length > 0 ? (
+            <nav
+              aria-label="Categorias do blog"
+              className="mt-6 grid grid-cols-3 gap-4 sm:gap-5 md:mt-8 md:grid-cols-6"
+            >
+              {safeCategories.map((category) => (
+                <CategoryButton key={category.id} category={category} />
+              ))}
+            </nav>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-8">
+        <FeaturedHeroBanner
+          badge={heroBadge}
+          title={heroTitle}
+          subtitle={heroSubtitle}
+          image={heroImage}
+          readTime={heroReadTime}
+          href={heroHref}
+        />
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 md:pt-10">
+        <div className="mb-4 flex items-end justify-between">
+          <h2 className="text-[22px] font-extrabold tracking-[-0.01em] text-[#1D2440] md:text-[28px]">
+            Destaques do blog
+          </h2>
+          <Link
+            href={`/blog/${citySlug}/categoria/compra`}
+            className="inline-flex items-center gap-1 text-[14px] font-semibold text-[#2F67F6] transition hover:text-[#234EC1] md:text-[15px]"
           >
-            {CATEGORY_CHIPS.map((chip) => (
-              <CategoryChip
-                key={chip.id}
-                chip={chip}
-                href={`${chipsHrefBase}?categoria=${chip.id}`}
-              />
+            Ver todos
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </Link>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {safeFeatured.map((post) => (
+            <FeaturedPostCard key={post.id} post={post} citySlug={citySlug} />
+          ))}
+        </div>
+      </section>
+
+      {safeTrending.length > 0 ? (
+        <section className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 md:pt-10">
+          <div className="mb-4 flex items-end justify-between">
+            <h2 className="inline-flex items-center gap-2 text-[22px] font-extrabold tracking-[-0.01em] text-[#1D2440] md:text-[28px]">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#1FAE6A]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 17 9 11l4 4 8-8" />
+                <path d="M14 7h7v7" />
+              </svg>
+              Tendências da semana
+            </h2>
+            <Link
+              href={`/blog/${citySlug}/categoria/mercado`}
+              className="inline-flex items-center gap-1 text-[14px] font-semibold text-[#2F67F6] transition hover:text-[#234EC1] md:text-[15px]"
+            >
+              Ver mais
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </Link>
+          </div>
+
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 md:gap-4">
+            {safeTrending.map((item) => (
+              <TrendingCard key={item.id} item={item} />
             ))}
           </div>
+        </section>
+      ) : null}
 
-          {/* Hero post em destaque */}
-          {heroPost ? (
-            <div className="mt-4 sm:mt-5">
-              <HeroFeaturedCard post={heroPost} citySlug={citySlug} />
-            </div>
-          ) : null}
+      {safePopular.length > 0 ? (
+        <section className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 md:pt-10">
+          <div className="mb-4 flex items-end justify-between">
+            <h2 className="text-[22px] font-extrabold tracking-[-0.01em] text-[#1D2440] md:text-[28px]">
+              Mais lidos em {cityName}
+            </h2>
+          </div>
 
-          {/* Grid de destaques */}
-          <section className="mt-6 sm:mt-7" aria-label="Destaques do blog">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-extrabold leading-tight text-cnc-text-strong sm:text-[18px]">
-                Destaques do blog
-              </h2>
-              <Link
-                href={`/blog/${citySlug}?categoria=destaques`}
-                className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary transition hover:text-primary-strong"
-              >
-                Ver todos
-                <ArrowRightIcon className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {safePopular.map((post) => (
+              <PopularPostRow key={post.id} post={post} citySlug={citySlug} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
-            {gridPosts.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-                {gridPosts.map((post) => (
-                  <BlogPostCard key={post.id} post={post} citySlug={citySlug} />
-                ))}
+      <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
+        <div className="overflow-hidden rounded-[20px] border border-[#E5ECFF] bg-[#EAF1FF] shadow-[0_12px_28px_rgba(20,30,60,0.06)]">
+          <div className="flex flex-col items-start gap-5 px-5 py-6 md:flex-row md:items-center md:justify-between md:px-8 md:py-7">
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2F67F6] text-white shadow-[0_6px_16px_rgba(47,103,246,0.35)]">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s7-7.6 7-13A7 7 0 1 0 5 9c0 5.4 7 13 7 13Z" />
+                  <circle cx="12" cy="9" r="2.5" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="text-[20px] font-extrabold leading-tight text-[#1D2440] md:text-[24px]">
+                  {bottomBannerTitle}
+                </h2>
+                <p className="mt-1 text-[14px] leading-6 text-[#4D5670] md:text-[15px]">
+                  {bottomBannerSubtitle}
+                </p>
               </div>
-            ) : (
-              <p className="mt-3 rounded-xl border border-cnc-line bg-cnc-surface p-5 text-[13px] text-cnc-muted">
-                Em breve novos artigos para {cityName}. Volte em alguns dias.
-              </p>
-            )}
-          </section>
+            </div>
 
-          {/* Promo único no rodapé do blog (mockup blog.png).
-              Anti-duplicação: ToolsRow (FIPE/Simulador/Anunciar) e o banner
-              extra "Anunciar grátis" foram removidos — esses destinos já
-              são canônicos em HomePrimaryActions, no atalho "Vender" da
-              home, no header desktop e no FAB do SiteBottomNav. */}
-          <div className="mt-6 sm:mt-7">
-            <BottomPromoCard cityName={cityName} citySlug={citySlug} />
+            <Link
+              href={bottomBannerHref}
+              className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#2F67F6] px-6 text-[16px] font-extrabold text-white transition hover:bg-[#2457DC] md:w-auto md:text-[17px]"
+            >
+              {bottomBannerCta}
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </Link>
           </div>
         </div>
-      </main>
-
-      <SiteBottomNav />
-    </>
+      </section>
+    </main>
   );
 }
 
