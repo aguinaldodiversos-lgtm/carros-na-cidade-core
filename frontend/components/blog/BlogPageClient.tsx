@@ -201,7 +201,8 @@ function FeaturedHeroBanner({
     >
       <div className="relative aspect-[1.6/1] w-full sm:aspect-[2/1] md:aspect-[2.4/1]">
         <img src={image} alt={title} className="h-full w-full object-cover" loading="eager" />
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 md:from-white/95 md:via-white/65 md:to-transparent" />
+        <div className="absolute inset-0 bg-[rgba(8,16,36,0.35)]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[rgba(8,16,36,0.88)] via-[rgba(8,16,36,0.6)] to-transparent md:from-[rgba(8,16,36,0.82)] md:via-[rgba(8,16,36,0.4)] md:to-transparent" />
       </div>
 
       <div className="absolute inset-0 flex flex-col justify-center px-5 py-6 md:px-12 md:py-10">
@@ -211,16 +212,16 @@ function FeaturedHeroBanner({
           </span>
         ) : null}
 
-        <h2 className="max-w-[260px] text-[22px] font-extrabold leading-[1.1] text-[#0F1A2E] sm:max-w-[460px] sm:text-[26px] sm:leading-[1.12] md:max-w-[520px] md:text-[40px] md:leading-[1.08]">
+        <h2 className="max-w-[260px] text-[22px] font-extrabold leading-[1.1] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] sm:max-w-[460px] sm:text-[26px] sm:leading-[1.12] md:max-w-[520px] md:text-[40px] md:leading-[1.08]">
           {title}
         </h2>
 
-        <p className="mt-3 max-w-[300px] text-[13px] leading-5 text-[#3D4660] sm:max-w-[460px] sm:text-[14px] sm:leading-6 md:max-w-[520px] md:text-[17px] md:leading-7">
+        <p className="mt-3 max-w-[300px] text-[13px] leading-5 text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] sm:max-w-[460px] sm:text-[14px] sm:leading-6 md:max-w-[520px] md:text-[17px] md:leading-7">
           {subtitle}
         </p>
 
         {readTime ? (
-          <p className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-[#5D667D] sm:text-[13px] md:mt-4 md:text-[14px]">
+          <p className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-white/90 sm:text-[13px] md:mt-4 md:text-[14px]">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
