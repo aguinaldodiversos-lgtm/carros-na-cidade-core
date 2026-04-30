@@ -1,12 +1,12 @@
 // frontend/components/fipe/FipePageClient.tsx
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import AdCard from "@/components/ads/AdCard";
 import { FipeCombobox } from "@/components/fipe/FipeCombobox";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
+import { VehicleImage } from "@/components/ui/VehicleImage";
 import {
   fetchFipeQuote,
   listFipeBrands,
@@ -19,22 +19,37 @@ import type { FipeOption, FipeQuote, FipeVehicleType } from "@/lib/fipe/fipe-pro
  * Página de consulta da Tabela FIPE — mobile-first, contrato visual
  * oficial em `frontend/public/images/Fipe.png`.
  *
- * Estrutura (espelha o gabarito Fipe.png — todas as seções
- * empilham em mobile e abrem em colunas a partir de sm/md):
+ * Estrutura (mobile-first; em sm+ o form abre 3 cols e o card de
+ * resultado coloca a ilustração à esquerda):
  *
- *   1. Título "Consultar Tabela FIPE" + sub + badge "Dados 100% oficiais"
+ *   1. Título "Consultar Tabela FIPE" + sub
  *   2. Card de formulário:
- *        Marca / Modelo (2 cols desktop)
- *        Ano / Botão azul "Consultar valor FIPE" (2 cols desktop)
+ *        Marca / Modelo / Ano  (3 cols em sm+)
+ *        Botão azul "Consultar valor FIPE" — full-width abaixo, com
+ *        ícone de lupa
  *   3. Card de resultado (imagem + bloco de info empilhado em mobile,
  *      lado-a-lado em sm+): pill "Valor médio FIPE", título, versão,
- *      pílulas de specs, "Valor FIPE" gigante, referência
+ *      pílulas de specs (combustível / câmbio / carroceria / portas
+ *      detectados heuristicamente do model string da FIPE), "Valor FIPE"
+ *      em destaque, referência. Caption "Referência visual do valor
+ *      FIPE" abaixo da ilustração.
  *   4. Card "Por que consultar a FIPE conosco?" — 3 features
  *   5. "Ofertas próximas do modelo" + "Ver todas →" (carrossel mobile,
  *      grid desktop)
- *   6. CTA "Anuncie grátis no portal" — phone illustration + botão
+ *   6. CTA "Anuncie grátis no portal" — ilustração PNG (phone + carro
+ *      + selo "GRÁTIS") + botão
  *   7. CTA "Ver carros abaixo da FIPE em [cidade]"
  *   8. SiteBottomNav (fora do <main>)
+ *
+ * Imagens estáticas em `public/images/fipe/`:
+ *   - result-illustration.png  → ilustração do clipboard FIPE no card
+ *                                de resultado (com fundo transparente).
+ *   - anuncie-gratis.png       → ilustração do phone + carro com selo
+ *                                "GRÁTIS" (fundo transparente) no banner
+ *                                "Anuncie grátis no portal".
+ *
+ * Se o PNG estiver ausente, `<VehicleImage onError>` cai silenciosamente
+ * no `VehicleImagePlaceholder` do design system — a página não quebra.
  */
 
 type VehicleItem = {
@@ -63,7 +78,8 @@ interface FipePageClientProps {
   opportunityAds: VehicleItem[];
 }
 
-const FIPE_PLACEHOLDER_IMAGE = "/images/vehicle-placeholder.svg";
+const FIPE_RESULT_ILLUSTRATION = "/images/fipe/result-illustration.png";
+const FIPE_ANUNCIE_GRATIS_ILLUSTRATION = "/images/fipe/anuncie-gratis.png";
 
 /* ---------------- Icons ---------------- */
 
@@ -103,24 +119,6 @@ function InfoIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   );
 }
 
-function ShieldCheckIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3 4 6v6c0 5 3.5 7.7 8 9 4.5-1.3 8-4 8-9V6l-8-3Z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
-
 function BrandFlagIcon() {
   return (
     <svg
@@ -139,12 +137,12 @@ function BrandFlagIcon() {
   );
 }
 
-function SearchIcon() {
+function SearchIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="h-5 w-5"
+      className={className}
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -306,72 +304,6 @@ function MapPinIcon() {
   );
 }
 
-function PhoneCarIllustration() {
-  // Phone com carro e selo "GRÁTIS" — espelha o gabarito Fipe.png.
-  return (
-    <svg
-      viewBox="0 0 200 160"
-      aria-hidden="true"
-      className="h-full w-full"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      <defs>
-        <linearGradient id="fipe-phone-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#1e2740" />
-          <stop offset="100%" stopColor="#0e1830" />
-        </linearGradient>
-        <linearGradient id="fipe-car-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3d8bff" />
-          <stop offset="100%" stopColor="#1356c8" />
-        </linearGradient>
-      </defs>
-
-      {/* phone body */}
-      <rect x="50" y="20" width="80" height="125" rx="14" fill="url(#fipe-phone-grad)" />
-      <rect x="56" y="28" width="68" height="105" rx="6" fill="#ffffff" />
-
-      {/* car silhouette inside the phone */}
-      <g transform="translate(60 60)">
-        <path d="M2 28 L8 14 Q10 10 14 9 L46 9 Q50 10 52 14 L58 28 Z" fill="url(#fipe-car-grad)" />
-        <rect x="6" y="28" width="48" height="6" rx="2" fill="#0e62d8" />
-        <circle cx="14" cy="34" r="3.6" fill="#1f2940" />
-        <circle cx="46" cy="34" r="3.6" fill="#1f2940" />
-        <path d="M16 14 L24 18 L36 18 L44 14" stroke="#ffffff" strokeWidth="1.5" fill="none" />
-      </g>
-
-      {/* notch */}
-      <rect x="80" y="24" width="20" height="3" rx="1.5" fill="#0e1830" />
-
-      {/* GRÁTIS badge */}
-      <g transform="translate(110 12)">
-        <circle cx="20" cy="20" r="20" fill="#22c55e" />
-        <text
-          x="20"
-          y="24"
-          textAnchor="middle"
-          fontSize="11"
-          fontWeight="800"
-          fill="#ffffff"
-          fontFamily="system-ui, sans-serif"
-        >
-          GRÁTIS
-        </text>
-      </g>
-
-      {/* sparkles */}
-      <g fill="#f7a400">
-        <path d="M30 45 l2 -6 l2 6 l6 2 l-6 2 l-2 6 l-2 -6 l-6 -2 z" />
-        <path d="M165 95 l1.4 -4 l1.4 4 l4 1.4 l-4 1.4 l-1.4 4 l-1.4 -4 l-4 -1.4 z" />
-      </g>
-      <g fill="#0e62d8">
-        <circle cx="20" cy="120" r="2" />
-        <circle cx="160" cy="40" r="2.4" />
-        <circle cx="170" cy="125" r="1.8" />
-      </g>
-    </svg>
-  );
-}
-
 /* ---------------- Page ---------------- */
 
 export function FipePageClient({
@@ -506,22 +438,13 @@ export function FipePageClient({
       <main className="bg-cnc-bg pb-24 text-cnc-text">
         <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 sm:pt-6 lg:max-w-5xl lg:px-8">
           {/* 1 — Page header */}
-          <header className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[30px] md:text-[34px]">
-                Consultar Tabela FIPE
-              </h1>
-              <p className="mt-1.5 text-[13px] leading-snug text-cnc-muted sm:text-[14.5px]">
-                Veja o valor médio do veículo e compare com ofertas próximas.
-              </p>
-            </div>
-
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1.5 text-[11.5px] font-semibold text-primary sm:text-[12.5px]">
-              <span className="text-primary">
-                <ShieldCheckIcon />
-              </span>
-              Dados 100% oficiais
-            </span>
+          <header>
+            <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[30px] md:text-[34px]">
+              Consultar Tabela FIPE
+            </h1>
+            <p className="mt-1.5 text-[13px] leading-snug text-cnc-muted sm:text-[14.5px]">
+              Veja o valor médio do veículo e compare com ofertas próximas.
+            </p>
           </header>
 
           {/* 2 — Form card */}
@@ -529,7 +452,7 @@ export function FipePageClient({
             aria-label="Pesquisar valor FIPE"
             className="mt-5 rounded-2xl border border-cnc-line bg-white p-4 shadow-card sm:p-5"
           >
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
               <FipeCombobox
                 label="Marca"
                 placeholder="Selecione a marca"
@@ -548,7 +471,7 @@ export function FipePageClient({
                 onChange={handleModelChange}
                 disabled={!selectedBrand}
                 loading={modelsLoading}
-                leftIcon={<SearchIcon />}
+                leftIcon={<SearchIcon className="h-5 w-5" />}
                 clearable
               />
 
@@ -562,21 +485,17 @@ export function FipePageClient({
                 loading={yearsLoading}
                 leftIcon={<CalendarIcon />}
               />
-
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={handleQuote}
-                  disabled={quoteLoading}
-                  className="inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-[14.5px] font-bold text-white shadow-card transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-70 sm:h-[52px] sm:text-[15px]"
-                >
-                  <span>{quoteLoading ? "Consultando…" : "Consultar valor FIPE"}</span>
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
-                    <ArrowRightIcon />
-                  </span>
-                </button>
-              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleQuote}
+              disabled={quoteLoading}
+              className="mt-4 inline-flex h-[48px] w-full items-center justify-center gap-2.5 rounded-xl bg-primary text-[14.5px] font-bold text-white shadow-card transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-70 sm:h-[52px] sm:text-[15px]"
+            >
+              <SearchIcon className="h-[18px] w-[18px]" />
+              <span>{quoteLoading ? "Consultando…" : "Consultar valor FIPE"}</span>
+            </button>
 
             {error ? (
               <div
@@ -670,16 +589,57 @@ interface FipeResultCardProps {
 
 type Spec = { icon: ReactNode; label: string };
 
-function buildSpecs(quote: FipeQuote): Spec[] {
+/**
+ * A FIPE só devolve combustível como atributo discreto. Câmbio,
+ * carroceria e portas, quando presentes, ficam embutidos no campo
+ * `model` (ex.: "Civic Sed.Touring 2.0 16V Aut. (Híbrido)").
+ *
+ * Esta função extrai esses dados via heurística simples para preencher
+ * as 4 pílulas do card de resultado conforme o gabarito. Quando a string
+ * não tem o sinal, a pílula correspondente é omitida — sem chutar
+ * valores incorretos.
+ */
+function extractSpecsFromQuote(quote: FipeQuote): Spec[] {
   const out: Spec[] = [];
-  if (quote.fuel) out.push({ icon: <FuelIcon />, label: quote.fuel });
-  // A FIPE só retorna combustível, código, marca, modelo, ano; demais
-  // (transmissão, carroceria, portas) ficam de fora.
+  const model = (quote.model || "").trim();
+  const fuel = (quote.fuel || "").trim();
+
+  // Combustível — direto da FIPE
+  if (fuel && fuel !== "—") {
+    out.push({ icon: <FuelIcon />, label: fuel });
+  }
+
+  // Câmbio
+  if (/\b(aut\.?|cvt|automátic|automatic|dct|dsg)\b/i.test(model)) {
+    out.push({ icon: <GearIcon />, label: "Automático" });
+  } else if (/\b(mec\.?|manual)\b/i.test(model)) {
+    out.push({ icon: <GearIcon />, label: "Manual" });
+  }
+
+  // Carroceria — aceita "Sed", "Sed.", "Sedan", "Sedã"
+  if (/\bsed(?:an|\.|ã)?\b/i.test(model)) {
+    out.push({ icon: <CarIcon />, label: "Sedã" });
+  } else if (/\bhatch\b/i.test(model)) {
+    out.push({ icon: <CarIcon />, label: "Hatch" });
+  } else if (/\bsuv\b/i.test(model)) {
+    out.push({ icon: <CarIcon />, label: "SUV" });
+  } else if (/\b(picape|pickup)\b/i.test(model)) {
+    out.push({ icon: <CarIcon />, label: "Picape" });
+  } else if (/\bcoup[eé]\b/i.test(model)) {
+    out.push({ icon: <CarIcon />, label: "Coupé" });
+  }
+
+  // Portas — ex.: "4P", "4 portas", "2P"
+  const doorMatch = model.match(/(\d)\s*(?:p\b|portas)/i);
+  if (doorMatch) {
+    out.push({ icon: <PersonIcon />, label: `${doorMatch[1]} portas` });
+  }
+
   return out;
 }
 
 function FipeResultCard({ quote }: FipeResultCardProps) {
-  const specs = buildSpecs(quote);
+  const specs = extractSpecsFromQuote(quote);
   const referenceLabel = quote.referenceMonth ? quote.referenceMonth.trim() : null;
 
   return (
@@ -688,15 +648,23 @@ function FipeResultCard({ quote }: FipeResultCardProps) {
       className="mt-4 rounded-2xl border border-cnc-line bg-white p-4 shadow-card sm:mt-5 sm:p-5"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
-        {/* Imagem ilustrativa do veículo */}
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-[#f4f5f7] sm:aspect-auto sm:h-[160px] sm:w-[44%] sm:shrink-0">
-          <Image
-            src={FIPE_PLACEHOLDER_IMAGE}
-            alt={`${quote.brand} ${quote.model}`}
-            fill
-            sizes="(min-width: 640px) 44vw, 100vw"
-            className="object-contain p-3"
-          />
+        {/* Ilustração do FIPE (clipboard com gráfico) — referência visual */}
+        <div className="flex flex-col items-center gap-1.5 sm:w-[44%] sm:shrink-0">
+          <div className="flex h-[160px] w-full items-center justify-center overflow-hidden rounded-xl bg-cnc-bg sm:h-[180px]">
+            <VehicleImage
+              src={FIPE_RESULT_ILLUSTRATION}
+              alt="Referência visual do valor FIPE"
+              width={260}
+              height={160}
+              variant="card"
+              sizes="(min-width: 640px) 44vw, 90vw"
+              className="max-h-full max-w-full object-contain"
+              fallbackLabel="Referência FIPE"
+            />
+          </div>
+          <p className="text-center text-[11px] leading-snug text-cnc-muted-soft sm:text-[11.5px]">
+            Referência visual do valor FIPE
+          </p>
         </div>
 
         {/* Info */}
@@ -816,7 +784,7 @@ function WhyConsultFipeCard() {
 }
 
 /* ----------------------------------------------------------------------
- * "Anuncie grátis no portal" — CTA com phone illustration
+ * "Anuncie grátis no portal" — CTA com PNG (phone + carro + selo GRÁTIS)
  * ---------------------------------------------------------------------- */
 
 function AnunciarFreeBanner() {
@@ -824,8 +792,17 @@ function AnunciarFreeBanner() {
     <section className="mt-6">
       <div className="overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#dbe7ff_0%,#eef4ff_55%,#f3edff_100%)] p-4 sm:p-5">
         <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
-          <div className="relative mx-auto h-[120px] w-[150px] shrink-0 sm:mx-0 sm:h-[140px] sm:w-[170px]">
-            <PhoneCarIllustration />
+          <div className="mx-auto flex h-[120px] w-[160px] shrink-0 items-center justify-center overflow-hidden sm:mx-0 sm:h-[140px] sm:w-[180px]">
+            <VehicleImage
+              src={FIPE_ANUNCIE_GRATIS_ILLUSTRATION}
+              alt="Anuncie seu carro grátis no portal"
+              width={180}
+              height={140}
+              variant="card"
+              sizes="(min-width: 640px) 180px, 160px"
+              className="max-h-full max-w-full object-contain"
+              fallbackLabel="Anuncie"
+            />
           </div>
 
           <div className="min-w-0 flex-1 text-center sm:text-left">
