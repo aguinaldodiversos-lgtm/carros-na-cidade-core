@@ -48,9 +48,9 @@ export function HomeShortcuts() {
       aria-label="Atalhos rápidos"
       className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8"
     >
-      <ul className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
+      <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden">
         {SHORTCUTS.map((s) => (
-          <li key={s.href} className="snap-start">
+          <li key={s.href} className="snap-start shrink-0">
             <Link
               href={s.href}
               aria-label={s.label}
@@ -61,7 +61,8 @@ export function HomeShortcuts() {
                 alt={s.label}
                 width={240}
                 height={240}
-                className="h-24 w-24 object-contain md:h-28 md:w-28"
+                className="h-28 w-28 object-contain mix-blend-multiply md:h-32 md:w-32"
+                style={{ mixBlendMode: "multiply" }}
                 priority
               />
             </Link>
