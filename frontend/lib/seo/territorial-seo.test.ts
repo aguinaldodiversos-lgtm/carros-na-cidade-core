@@ -62,6 +62,48 @@ describe("buildTerritorialMetadata canonical override (transição)", () => {
   });
 });
 
+describe("buildTerritorialMetadata — title NÃO duplica sufixo do site", () => {
+  it("strip do sufixo '| Carros na Cidade' quando backend já incluiu (evita dupla concatenação contra title.template do RootLayout)", () => {
+    const data = {
+      ...baseData,
+      seo: { ...baseData.seo, title: "Carros em Atibaia - SP | Carros na Cidade" },
+    } as TerritorialPagePayload;
+
+    const meta = buildTerritorialMetadata(data, "city");
+
+    expect(String(meta.title)).toBe("Carros em Atibaia - SP");
+    expect(String(meta.title)).not.toMatch(/\|\s*Carros na Cidade\s*$/);
+  });
+
+  it("strip case-insensitive (sufixo com casing inconsistente também é removido)", () => {
+    const data = {
+      ...baseData,
+      seo: { ...baseData.seo, title: "Carros em Atibaia | CARROS NA CIDADE" },
+    } as TerritorialPagePayload;
+
+    expect(String(buildTerritorialMetadata(data, "city").title)).toBe("Carros em Atibaia");
+  });
+
+  it("preserva o título quando o backend NÃO inclui o sufixo (template do layout cuida)", () => {
+    const data = {
+      ...baseData,
+      seo: { ...baseData.seo, title: "Carros em Atibaia - SP" },
+    } as TerritorialPagePayload;
+
+    expect(String(buildTerritorialMetadata(data, "city").title)).toBe("Carros em Atibaia - SP");
+  });
+
+  it("fallback defensivo: título que SÓ contém o sufixo é preservado (não devolve string vazia)", () => {
+    const data = {
+      ...baseData,
+      seo: { ...baseData.seo, title: "| Carros na Cidade" },
+    } as TerritorialPagePayload;
+
+    // Strip resultaria em "" — fallback preserva o original.
+    expect(String(buildTerritorialMetadata(data, "city").title).length).toBeGreaterThan(0);
+  });
+});
+
 describe("buildTerritorialJsonLd canonical override", () => {
   it("usa data.seo.canonicalPath quando override é omitido", () => {
     const jsonLd = buildTerritorialJsonLd(baseData, "city") as { url?: string };

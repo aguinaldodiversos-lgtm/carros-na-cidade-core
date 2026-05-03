@@ -39,25 +39,25 @@ function buildModel(variant: LocalSeoLandingModel["variant"]): LocalSeoLandingMo
   } as unknown as LocalSeoLandingModel;
 }
 
-describe("buildLocalSeoMetadata — política de canonical de transição", () => {
-  it("variant 'em' canonicaliza para /comprar/cidade/[slug]", () => {
+describe("buildLocalSeoMetadata — Fase 1: canonical de transição", () => {
+  it("variant 'em' canonicaliza para si mesma (/carros-em/[slug])", () => {
     const meta = buildLocalSeoMetadata(buildModel("em"));
     expect(meta.alternates?.canonical).toBe(
-      "https://carrosnacidade.com/comprar/cidade/atibaia-sp"
+      "https://carrosnacidade.com/carros-em/atibaia-sp"
     );
   });
 
-  it("variant 'baratos' canonicaliza para /cidade/[slug]/abaixo-da-fipe", () => {
+  it("variant 'baratos' canonicaliza para si mesma (/carros-baratos-em/[slug])", () => {
     const meta = buildLocalSeoMetadata(buildModel("baratos"));
     expect(meta.alternates?.canonical).toBe(
-      "https://carrosnacidade.com/cidade/atibaia-sp/abaixo-da-fipe"
+      "https://carrosnacidade.com/carros-baratos-em/atibaia-sp"
     );
   });
 
-  it("variant 'automaticos' canonicaliza para /comprar/cidade/[slug]", () => {
+  it("variant 'automaticos' canonicaliza para /carros-em/[slug] (indexável da intenção mais próxima)", () => {
     const meta = buildLocalSeoMetadata(buildModel("automaticos"));
     expect(meta.alternates?.canonical).toBe(
-      "https://carrosnacidade.com/comprar/cidade/atibaia-sp"
+      "https://carrosnacidade.com/carros-em/atibaia-sp"
     );
   });
 
@@ -72,29 +72,67 @@ describe("buildLocalSeoMetadata — política de canonical de transição", () =
     });
   });
 
-  it("variant 'automaticos' recebe noindex,follow", () => {
+  it("variant 'automaticos' permanece noindex,follow", () => {
     const robots = buildLocalSeoMetadata(buildModel("automaticos")).robots;
     expect(robots).toMatchObject({ index: false, follow: true });
   });
 
-  it("openGraph.url também aponta para a canônica de transição", () => {
-    const meta = buildLocalSeoMetadata(buildModel("em"));
-    expect(meta.openGraph?.url).toBe(
-      "https://carrosnacidade.com/comprar/cidade/atibaia-sp"
+  it("openGraph.url espelha a canonical de transição", () => {
+    expect(buildLocalSeoMetadata(buildModel("em")).openGraph?.url).toBe(
+      "https://carrosnacidade.com/carros-em/atibaia-sp"
     );
+    expect(buildLocalSeoMetadata(buildModel("baratos")).openGraph?.url).toBe(
+      "https://carrosnacidade.com/carros-baratos-em/atibaia-sp"
+    );
+  });
+
+  it("canonical é URL LIMPA — nunca contém query string (sort/limit/page/utm/filtros)", () => {
+    const variants = ["em", "baratos", "automaticos"] as const;
+    for (const v of variants) {
+      const canonical = buildLocalSeoMetadata(buildModel(v)).alternates?.canonical;
+      expect(String(canonical)).not.toContain("?");
+      expect(String(canonical)).not.toMatch(/sort|limit|page|utm/i);
+    }
+  });
+});
+
+describe("buildLocalSeoMetadata — title NÃO duplica o sufixo do site", () => {
+  it("variant 'em' não termina com '| Carros na Cidade' (template do RootLayout adiciona)", () => {
+    const meta = buildLocalSeoMetadata(buildModel("em"));
+    expect(String(meta.title)).not.toMatch(/\|\s*Carros na Cidade\s*$/);
+    // Conteúdo essencial preservado
+    expect(String(meta.title)).toContain("Atibaia");
+    expect(String(meta.title)).toContain("anúncios");
+  });
+
+  it("variant 'baratos' não termina com '| Carros na Cidade'", () => {
+    const meta = buildLocalSeoMetadata(buildModel("baratos"));
+    expect(String(meta.title)).not.toMatch(/\|\s*Carros na Cidade\s*$/);
+    expect(String(meta.title)).toContain("baratos");
+  });
+
+  it("variant 'automaticos' não termina com '| Carros na Cidade'", () => {
+    const meta = buildLocalSeoMetadata(buildModel("automaticos"));
+    expect(String(meta.title)).not.toMatch(/\|\s*Carros na Cidade\s*$/);
+    expect(String(meta.title)).toContain("automáticos");
   });
 });
 
 describe("buildLocalSeoJsonLd — url alinhada à canonical de transição", () => {
-  it("variant 'em' devolve url /comprar/cidade/[slug] no JSON-LD", () => {
+  it("variant 'em' devolve url self (/carros-em/[slug]) no JSON-LD", () => {
     const jsonLd = buildLocalSeoJsonLd(buildModel("em")) as { url?: string };
-    expect(jsonLd.url).toBe("https://carrosnacidade.com/comprar/cidade/atibaia-sp");
+    expect(jsonLd.url).toBe("https://carrosnacidade.com/carros-em/atibaia-sp");
   });
 
-  it("variant 'baratos' devolve url /cidade/[slug]/abaixo-da-fipe no JSON-LD", () => {
+  it("variant 'baratos' devolve url self (/carros-baratos-em/[slug]) no JSON-LD", () => {
     const jsonLd = buildLocalSeoJsonLd(buildModel("baratos")) as { url?: string };
     expect(jsonLd.url).toBe(
-      "https://carrosnacidade.com/cidade/atibaia-sp/abaixo-da-fipe"
+      "https://carrosnacidade.com/carros-baratos-em/atibaia-sp"
     );
+  });
+
+  it("variant 'automaticos' devolve url /carros-em/[slug] no JSON-LD", () => {
+    const jsonLd = buildLocalSeoJsonLd(buildModel("automaticos")) as { url?: string };
+    expect(jsonLd.url).toBe("https://carrosnacidade.com/carros-em/atibaia-sp");
   });
 });

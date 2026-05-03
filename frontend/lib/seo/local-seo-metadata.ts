@@ -13,20 +13,27 @@ function truncateDesc(raw: string, max = 160): string {
 }
 
 /**
- * Política de canonical de transição (sem 301): cada variante de landing
- * "carros-em / carros-baratos-em / carros-automaticos-em" canonicaliza para
- * a URL canônica intermediária equivalente da família /comprar+/cidade.
- * Isso consolida a autoridade SEO numa única URL por intenção, mantendo
- * a página antiga acessível para usuários e backlinks externos.
+ * Política de canonical de transição — Fase 1 da auditoria territorial
+ * (docs/runbooks/territorial-canonical-audit.md). Cada landing aponta
+ * para a INDEXÁVEL da sua intenção:
  *
- *   /carros-em/[slug]            → /comprar/cidade/[slug]
- *   /carros-baratos-em/[slug]    → /cidade/[slug]/abaixo-da-fipe
- *   /carros-automaticos-em/[slug]→ /comprar/cidade/[slug]   (+ noindex,follow)
+ *   /carros-em/[slug]             → self (canônica intermediária da intenção
+ *                                   "comprar carros na cidade")
+ *   /carros-baratos-em/[slug]     → self (canônica intermediária da intenção
+ *                                   "barato/abaixo-da-fipe")
+ *   /carros-automaticos-em/[slug] → /carros-em/[slug] (página é noindex,follow;
+ *                                   consolida sinal na indexável da intenção
+ *                                   mais próxima)
+ *
+ * URLs INTERMEDIÁRIAS, não definitivas — futuro: possível migração para
+ * /carros-usados/cidade/[slug]. Sem 301 nesta etapa.
  */
 function transitionCanonicalPath(model: LocalSeoLandingModel): string {
   const slug = encodeURIComponent(model.slug);
-  if (model.variant === "baratos") return `/cidade/${slug}/abaixo-da-fipe`;
-  return `/comprar/cidade/${slug}`;
+  if (model.variant === "em") return `/carros-em/${slug}`;
+  if (model.variant === "baratos") return `/carros-baratos-em/${slug}`;
+  // automaticos: noindex,follow → canonical aponta para a indexável "em"
+  return `/carros-em/${slug}`;
 }
 
 function resolveCanonical(model: LocalSeoLandingModel): string {
@@ -102,32 +109,38 @@ function buildDescription(model: LocalSeoLandingModel): string {
   );
 }
 
+/**
+ * Title SEM o sufixo " | Carros na Cidade" — `title.template` do RootLayout
+ * (`app/layout.tsx`: `"%s | Carros na Cidade"`) já adiciona automaticamente.
+ * Incluir aqui resulta em "...| Carros na Cidade | Carros na Cidade" no HTML
+ * final (bug observado em prod, ver docs/runbooks/territorial-canonical-audit.md).
+ */
 function buildTitle(model: LocalSeoLandingModel): string {
   const { cityName, state, variant, totalAds } = model;
   const uf = state ? ` - ${state}` : "";
 
   if (model.isEmptyCity) {
     if (variant === "baratos") {
-      return truncateTitle(`Carros baratos em ${cityName}${uf} | Carros na Cidade`);
+      return truncateTitle(`Carros baratos em ${cityName}${uf}`);
     }
     if (variant === "automaticos") {
-      return truncateTitle(`Carros automáticos em ${cityName}${uf} | Carros na Cidade`);
+      return truncateTitle(`Carros automáticos em ${cityName}${uf}`);
     }
-    return truncateTitle(`Carros em ${cityName}${uf} | Carros na Cidade`);
+    return truncateTitle(`Carros em ${cityName}${uf}`);
   }
 
   if (variant === "em") {
-    return truncateTitle(`Carros em ${cityName}${uf} — ${totalAds} anúncios | Carros na Cidade`);
+    return truncateTitle(`Carros em ${cityName}${uf} — ${totalAds} anúncios`);
   }
 
   if (variant === "baratos") {
     return truncateTitle(
-      `Carros baratos em ${cityName}${uf} — ${totalAds} abaixo da FIPE | Carros na Cidade`
+      `Carros baratos em ${cityName}${uf} — ${totalAds} abaixo da FIPE`
     );
   }
 
   return truncateTitle(
-    `Carros automáticos em ${cityName}${uf} — ${totalAds} ofertas | Carros na Cidade`
+    `Carros automáticos em ${cityName}${uf} — ${totalAds} ofertas`
   );
 }
 

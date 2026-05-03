@@ -17,7 +17,6 @@ import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-territory-fallback";
 import {
-  buildCityPath,
   cityContextFromRef,
   cityContextFromSlug,
   isValidCitySlug,
@@ -163,7 +162,12 @@ export async function generateMetadata({
         ? `Carros ${brand} em ${ctx.name} (${ctx.state}): catálogo focado na sua cidade com ofertas reais e contexto local — Carros na Cidade.`
         : `Encontre carros usados à venda em ${ctx.name}, ${stateName}. Anúncios locais com filtros, preços e contexto da sua cidade no Carros na Cidade.`;
 
-  const canonicalPath = buildCityPath(slug, filters);
+  // Fase 1 da auditoria territorial (docs/runbooks/territorial-canonical-audit.md):
+  // /comprar/cidade/[slug] consolida sinal SEO em /carros-em/[slug], a
+  // canônica intermediária da intenção "comprar carros na cidade".
+  // Canonical é URL LIMPA — nunca carrega sort/limit/page/utm/filtros, que
+  // antes vazavam via buildCityPath(slug, filters).
+  const canonicalPath = `/carros-em/${encodeURIComponent(slug)}`;
 
   return {
     title,

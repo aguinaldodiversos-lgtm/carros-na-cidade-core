@@ -16,13 +16,15 @@ const getCityOpportunitiesPageData = cache(
 );
 
 /**
- * Deduplicação de transição: "oportunidades" e "abaixo da FIPE" representam
- * a mesma intenção de busca (carros com preço abaixo da FIPE na cidade).
- * Esta página continua acessível mas canonicaliza para
- * /cidade/[slug]/abaixo-da-fipe — sem 301 nesta etapa.
+ * Deduplicação de transição (Fase 1 da auditoria territorial em
+ * docs/runbooks/territorial-canonical-audit.md): "oportunidades" e
+ * "abaixo da FIPE" representam a mesma intenção de busca (carros com
+ * preço abaixo da FIPE na cidade). Esta página continua noindex,follow
+ * e canonicaliza para /carros-baratos-em/[slug], a única indexável da
+ * intenção "barato/abaixo-da-fipe". Sem 301 nesta etapa.
  */
 function transitionCanonicalPath(slug: string): string {
-  return `/cidade/${encodeURIComponent(slug)}/abaixo-da-fipe`;
+  return `/carros-baratos-em/${encodeURIComponent(slug)}`;
 }
 
 export async function generateMetadata({

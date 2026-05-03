@@ -16,13 +16,16 @@ const getCityPageData = cache(
 );
 
 /**
- * Política de canonical de transição: /cidade/[slug] continua acessível mas
- * canonicaliza para /comprar/cidade/[slug] (canônica intermediária do catálogo).
- * Sem 301 nesta etapa — apenas <link rel="canonical"> e JSON-LD url para
- * consolidar autoridade na URL canônica.
+ * Política de canonical de transição (Fase 1 da auditoria territorial em
+ * docs/runbooks/territorial-canonical-audit.md): /cidade/[slug] continua
+ * acessível mas canonicaliza para /carros-em/[slug], a canônica
+ * intermediária da intenção "comprar carros na cidade". Sem 301 nesta
+ * etapa — apenas <link rel="canonical"> e JSON-LD url para consolidar
+ * autoridade na URL canônica. /carros-em é INTERMEDIÁRIA, não definitiva
+ * (futuro: possível migração para /carros-usados/cidade/[slug]).
  */
 function transitionCanonicalPath(slug: string): string {
-  return `/comprar/cidade/${encodeURIComponent(slug)}`;
+  return `/carros-em/${encodeURIComponent(slug)}`;
 }
 
 export async function generateMetadata({ params, searchParams }: CityPageProps): Promise<Metadata> {

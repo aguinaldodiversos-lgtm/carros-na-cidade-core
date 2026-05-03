@@ -40,8 +40,23 @@ function resolveOgImage(data: TerritorialPagePayload): string | undefined {
   return candidate ? toAbsoluteUrl(candidate) : undefined;
 }
 
+/**
+ * Strip do sufixo " | Carros na Cidade" antes do `title.template` do
+ * RootLayout (`app/layout.tsx`: `"%s | Carros na Cidade"`) reaplicar.
+ * Backend e alguns helpers locais retornam title já com o sufixo — sem
+ * strip, o usuário vê "...| Carros na Cidade | Carros na Cidade" no HTML
+ * final (bug observado em prod, ver docs/runbooks/territorial-canonical-audit.md).
+ *
+ * Fallback defensivo: se o resultado ficar vazio (caso o título original
+ * fosse só o nome da brand), preserva o original para não devolver "".
+ */
+function stripSiteTitleSuffix(raw: string): string {
+  const stripped = raw.replace(/\s*\|\s*Carros na Cidade\s*$/i, "").trim();
+  return stripped.length > 0 ? stripped : raw;
+}
+
 function buildMetadataTitle(data: TerritorialPagePayload): string {
-  return normalizeTitle(data.seo?.title || "Carros na Cidade");
+  return normalizeTitle(stripSiteTitleSuffix(data.seo?.title || "Carros na Cidade"));
 }
 
 function buildMetadataDescription(data: TerritorialPagePayload): string {
