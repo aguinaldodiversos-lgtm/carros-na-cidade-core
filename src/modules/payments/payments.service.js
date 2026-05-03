@@ -15,7 +15,15 @@ const MP_PUBLIC_KEY = process.env.MP_PUBLIC_KEY || "";
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
 const MP_API_BASE = "https://api.mercadopago.com";
 
-let schemaReadyPromise = null;
+// Em produção MP_WEBHOOK_SECRET é obrigatório: sem ele, verifyWebhookSignature
+// retorna `true` para qualquer payload (ver função abaixo) — qualquer atacante
+// poderia forjar webhooks aprovando planos e destaques. Falhar fast no boot
+// evita esse modo bypass passar despercebido em deploys reais.
+if (process.env.NODE_ENV === "production" && !MP_WEBHOOK_SECRET) {
+  throw new Error(
+    "MP_WEBHOOK_SECRET é obrigatório em NODE_ENV=production (anti-spoofing do webhook Mercado Pago)."
+  );
+}
 
 function stripTrailingSlash(value) {
   return String(value || "").replace(/\/+$/, "");
@@ -33,34 +41,6 @@ function getBackendPublicUrl() {
   }
 
   return stripTrailingSlash(value);
-}
-
-async function ensurePaymentsSchema() {
-  if (!schemaReadyPromise) {
-    schemaReadyPromise = query(`
-      CREATE TABLE IF NOT EXISTS payment_intents (
-        id text PRIMARY KEY,
-        user_id text NOT NULL,
-        context text NOT NULL CHECK (context IN ('plan', 'boost')),
-        plan_id text REFERENCES subscription_plans(id),
-        ad_id text,
-        boost_option_id text,
-        amount numeric(12,2) NOT NULL DEFAULT 0,
-        checkout_resource_id text,
-        checkout_resource_type text CHECK (checkout_resource_type IN ('preference', 'preapproval')),
-        payment_resource_id text UNIQUE,
-        status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'canceled')),
-        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-        created_at timestamptz NOT NULL DEFAULT NOW(),
-        updated_at timestamptz NOT NULL DEFAULT NOW()
-      );
-    `).catch((error) => {
-      schemaReadyPromise = null;
-      throw error;
-    });
-  }
-
-  return schemaReadyPromise;
 }
 
 async function mpRequest(path, init) {
@@ -90,8 +70,6 @@ function serializeMetadata(value) {
 }
 
 async function insertPaymentIntent(intent) {
-  await ensurePaymentsSchema();
-
   await query(
     `
     INSERT INTO payment_intents (
@@ -128,7 +106,6 @@ async function insertPaymentIntent(intent) {
 }
 
 async function getPaymentIntentById(intentId) {
-  await ensurePaymentsSchema();
   const result = await query(
     `
     SELECT *
@@ -633,7 +610,6 @@ async function resolveIntentForWebhook(paymentData, resourceId) {
     if (byId) return byId;
   }
 
-  await ensurePaymentsSchema();
   const result = await query(
     `
     SELECT *
@@ -876,7 +852,7 @@ export async function handleWebhookNotification({ rawBody, signature, requestId,
         await client.query(
           `
           UPDATE users
-          SET plan = $2
+          SET plan_id = $2
           WHERE id = $1
           `,
           [lockedIntent.user_id, lockedIntent.plan_id]
@@ -895,10 +871,15 @@ export async function handleWebhookNotification({ rawBody, signature, requestId,
         );
 
         if (!activeSubscriptionResult.rows[0]) {
+          // Sem assinatura ativa: rebaixa para o gratuito correspondente ao
+          // tipo de documento (CPF -> cpf-free-essential, CNPJ -> cnpj-free-store).
           await client.query(
             `
             UPDATE users
-            SET plan = 'free'
+            SET plan_id = CASE
+              WHEN UPPER(COALESCE(document_type, '')) = 'CNPJ' THEN 'cnpj-free-store'
+              ELSE 'cpf-free-essential'
+            END
             WHERE id = $1
             `,
             [lockedIntent.user_id]

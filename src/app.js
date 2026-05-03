@@ -19,7 +19,7 @@
 //
 // Rotas HTTP legadas CommonJS em src/routes foram removidas; mantêm-se apenas health/metrics.
 //
-// Anúncios: código ativo só em src/modules/ads/. Legado CommonJS isolado em src/legacy/services-ads/.
+// Anúncios: código ativo só em src/modules/ads/.
 // =============================================================================
 
 import fs from "node:fs";

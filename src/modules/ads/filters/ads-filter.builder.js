@@ -140,6 +140,8 @@ export function buildAdsSearchQuery(filters = {}) {
     FROM ads a
     LEFT JOIN cities c ON c.id = a.city_id
     LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    LEFT JOIN users u ON u.id = adv.user_id
+    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id
     LEFT JOIN ad_metrics m ON m.ad_id = a.id
     LEFT JOIN city_metrics cm ON cm.city_id = a.city_id
     ${whereClause}

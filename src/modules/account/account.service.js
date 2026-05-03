@@ -339,6 +339,29 @@ function resolveLegacyPlanAlias(planValue, accountType) {
   return normalized;
 }
 
+/**
+ * Lê `users.plan_id` (coluna canônica criada na migration 020) — fonte de
+ * verdade preferencial para o plano atual. Retorna null se a coluna não
+ * existir (banco legado pré-020) ou se o usuário ainda não tiver plan_id.
+ */
+async function getPlanIdFromUsersColumn(userId) {
+  try {
+    const userColumns = await getTableColumns("users");
+    if (!hasColumn(userColumns, "plan_id")) {
+      return null;
+    }
+
+    const result = await pool.query(
+      `SELECT plan_id FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    return result.rows[0]?.plan_id ? String(result.rows[0].plan_id) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getCurrentPlanIdFromDatabase(userId) {
   try {
     const userColumn = await resolveSubscriptionUserColumn();
@@ -460,10 +483,21 @@ export async function getPlanById(planId) {
 async function resolveCurrentPlan(user) {
   const planType = user.type === "pending" ? "CPF" : user.type;
   const plans = await listPlans({ type: planType, onlyActive: false });
-  const planIdFromSubscription = await getCurrentPlanIdFromDatabase(user.id);
-  const hasHistory = await hasSubscriptionHistory(user.id);
+
+  // Prioridade: users.plan_id (canônico, atualizado pelo webhook + backfill da
+  // migration 020) > user_subscriptions.active > resolveLegacyPlanAlias (fallback
+  // para bancos legados ainda não migrados ou usuários sem plano explícito).
+  const planIdFromUsersColumn = await getPlanIdFromUsersColumn(user.id);
+  const planIdFromSubscription = planIdFromUsersColumn
+    ? null
+    : await getCurrentPlanIdFromDatabase(user.id);
+  const hasHistory =
+    planIdFromUsersColumn || planIdFromSubscription
+      ? false
+      : await hasSubscriptionHistory(user.id);
 
   const preferredId =
+    planIdFromUsersColumn ||
     planIdFromSubscription ||
     (hasHistory
       ? resolveLegacyPlanAlias("free", planType)

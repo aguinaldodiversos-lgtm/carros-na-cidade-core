@@ -107,11 +107,14 @@ Apenas `README.LEGACY.md` permanece documentando a remoção.
 `apiTokenAuth.js`, `metrics.js`, e `auth.js` foram removidos (zero imports).
 Middleware ativo: `src/shared/middlewares/` (ESM). `README.LEGACY.md` documenta a remoção.
 
-### `src/legacy/services-ads/` — CommonJS morto para o servidor atual
+### `src/legacy/services-ads/` — **REMOVIDO** (maio 2026)
 
-Código antigo de criação de anúncio, limites e IA de texto (**não importado** por `app.js` nem por `modules/*`). Mantido só como referência; o caminho ativo é **`src/modules/ads/`** (ver `src/modules/ads/README.md`).
+Código antigo de criação de anúncio, limites e IA de texto (CommonJS, zero imports).
+Removido junto com `src/config/mercadopago.js`, `src/shared/middlewares/plan.middleware.js`
+e `src/modules/ads/ads.plan-limit.service.js` na unificação dos planos comerciais
+(ver migration `020_subscription_plans_and_billing.sql`).
 
-A pasta `src/services/ads/` ficou apenas com `README.LEGACY.md` apontando para `legacy`.
+A pasta `src/services/ads/` ficou apenas com `README.LEGACY.md` documentando a remoção.
 
 ### `src/modules/integrations/` — router ESM **não montado**
 
@@ -124,7 +127,7 @@ Detalhes e comparação com o legado CommonJS: `src/modules/integrations/README.
 1. **Novas features e correções de API:** usar somente `src/modules/**` e montar em `src/app.js` se for rota HTTP nova.
 2. **Não adicionar** rotas em `src/routes/*` além de `health.js` / `metrics.js`.
 3. **Eventos de anúncio:** alterar apenas `ad-events.ingest.js`; manter os dois URLs (`/api/ads/event` e `/api/events`) ou remover o alias numa fase futura com aviso aos clientes.
-4. **Legado restante:** `src/legacy/*` — não montado em `app.js`. `src/controllers/*` e `src/middlewares/*` foram removidos.
+4. **Legado restante:** `src/controllers/*`, `src/middlewares/*` e `src/legacy/*` foram removidos. Resta apenas `src/services/ads/README.LEGACY.md` como nota histórica.
 
 ---
 

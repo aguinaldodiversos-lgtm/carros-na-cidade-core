@@ -276,6 +276,25 @@ async function seedLegacyTrackingSchema(pool) {
   );
 }
 
+// Backfill SQL idêntico ao corpo da migration 020. Mantido aqui para o teste
+// poder reaplicá-lo em rows inseridas após a migration original ter rodado e
+// validar que cada vocabulário legado vira o ID novo correto.
+const PLAN_ID_BACKFILL_SQL = `
+  UPDATE users
+  SET plan_id = CASE
+    WHEN LOWER(BTRIM(COALESCE(plan, ''))) = 'free' AND UPPER(COALESCE(document_type, '')) = 'CNPJ'
+      THEN 'cnpj-free-store'
+    WHEN LOWER(BTRIM(COALESCE(plan, ''))) = 'start'
+      THEN 'cnpj-store-start'
+    WHEN LOWER(BTRIM(COALESCE(plan, ''))) = 'pro'
+      THEN 'cnpj-store-pro'
+    WHEN LOWER(BTRIM(COALESCE(plan, ''))) = 'evento-premium'
+      THEN 'cnpj-evento-premium'
+    ELSE 'cpf-free-essential'
+  END
+  WHERE plan_id IS NULL
+`;
+
 describe.sequential("integração — compatibilidade de migrations", () => {
   beforeAll(async () => {
     await adminPool.query("SELECT 1");
@@ -304,7 +323,94 @@ describe.sequential("integração — compatibilidade de migrations", () => {
 
         const filenames = await getMigrationFilenames(db);
         expect(filenames).toContain("012_core_schema_compatibility.sql");
-        expect(filenames.length).toBeGreaterThanOrEqual(12);
+        expect(filenames).toContain("020_subscription_plans_and_billing.sql");
+        expect(filenames.length).toBeGreaterThanOrEqual(13);
+      } finally {
+        await db.end();
+      }
+    });
+  }, 120000);
+
+  it("020 cria subscription_plans + billing e popula 6 planos canônicos", async () => {
+    await withDatabase("billing_schema", async ({ dbUrl }) => {
+      await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+
+      const db = await openPool(dbUrl);
+      try {
+        const planColumns = await listColumns(db, "subscription_plans");
+        expect(planColumns.has("priority_level")).toBe(true);
+        expect(planColumns.has("billing_model")).toBe(true);
+        expect(planColumns.has("ad_limit")).toBe(true);
+        expect(planColumns.has("benefits")).toBe(true);
+
+        const subscriptionColumns = await listColumns(db, "user_subscriptions");
+        expect(subscriptionColumns.has("plan_id")).toBe(true);
+        expect(subscriptionColumns.has("expires_at")).toBe(true);
+
+        const paymentColumns = await listColumns(db, "payments");
+        expect(paymentColumns.has("mercado_pago_id")).toBe(true);
+        expect(paymentColumns.has("plan_id")).toBe(true);
+
+        const intentColumns = await listColumns(db, "payment_intents");
+        expect(intentColumns.has("context")).toBe(true);
+        expect(intentColumns.has("payment_resource_id")).toBe(true);
+
+        const userColumns = await listColumns(db, "users");
+        expect(userColumns.has("plan_id")).toBe(true);
+
+        const seededPlans = await db.query(
+          `SELECT id FROM subscription_plans ORDER BY id ASC`
+        );
+        const seededIds = seededPlans.rows.map((row) => row.id);
+        expect(seededIds).toEqual([
+          "cnpj-evento-premium",
+          "cnpj-free-store",
+          "cnpj-store-pro",
+          "cnpj-store-start",
+          "cpf-free-essential",
+          "cpf-premium-highlight",
+        ]);
+      } finally {
+        await db.end();
+      }
+    });
+  }, 120000);
+
+  it("backfill da 020 traduz vocabulário legado (free/start/pro) para IDs novos", async () => {
+    await withDatabase("billing_backfill", async ({ dbUrl }) => {
+      await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+
+      const db = await openPool(dbUrl);
+      try {
+        // Insere usuários com vocabulário antigo, plan_id=null para forçar
+        // o backfill (mesma forma que a migration trataria registros pré-020).
+        await db.query(
+          `
+          INSERT INTO users (email, plan, document_type, plan_id) VALUES
+            ('cpf-free@test.local',   'free', 'cpf',  NULL),
+            ('cnpj-free@test.local',  'free', 'cnpj', NULL),
+            ('start@test.local',      'start', 'cnpj', NULL),
+            ('pro@test.local',        'pro', 'cnpj', NULL),
+            ('evento@test.local',     'evento-premium', 'cnpj', NULL),
+            ('null-plan@test.local',  NULL,   NULL,   NULL)
+          `
+        );
+
+        await db.query(PLAN_ID_BACKFILL_SQL);
+
+        const result = await db.query(
+          `SELECT email, plan_id FROM users WHERE email LIKE '%@test.local' ORDER BY email ASC`
+        );
+        const byEmail = Object.fromEntries(
+          result.rows.map((row) => [row.email, row.plan_id])
+        );
+
+        expect(byEmail["cpf-free@test.local"]).toBe("cpf-free-essential");
+        expect(byEmail["cnpj-free@test.local"]).toBe("cnpj-free-store");
+        expect(byEmail["start@test.local"]).toBe("cnpj-store-start");
+        expect(byEmail["pro@test.local"]).toBe("cnpj-store-pro");
+        expect(byEmail["evento@test.local"]).toBe("cnpj-evento-premium");
+        expect(byEmail["null-plan@test.local"]).toBe("cpf-free-essential");
       } finally {
         await db.end();
       }
