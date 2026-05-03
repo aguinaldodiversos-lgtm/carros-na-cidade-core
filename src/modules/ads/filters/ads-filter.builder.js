@@ -1,7 +1,7 @@
 // src/modules/ads/filters/ads-filter.builder.js
 
 import { buildSortClause } from "./ads-filter.sort.js";
-import { cityDemandBoostExpr, planRankExpr } from "./ads-ranking.sql.js";
+import { baseCityBoostExpr, cityDemandBoostExpr, planRankExpr } from "./ads-ranking.sql.js";
 import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
 
 function pushFilter(where, params, expression, ...values) {
@@ -69,6 +69,11 @@ export function buildAdsSearchQuery(filters = {}) {
     textRankExpression = `ts_rank(a.search_vector, plainto_tsquery('portuguese', $${textIndex}))`;
   }
 
+  // Captura o param da cidade-base só quando city_slugs[0] é um slug não-vazio
+  // E há vizinhança (length > 1). Permanece null nos outros caminhos —
+  // hybridScoreExpr abaixo injeta `0` (no-op) quando null.
+  let baseCitySlugParamIdx = null;
+
   if (city_slug) {
     pushFilter(where, params, `c.slug = ?`, city_slug);
   } else if (Array.isArray(city_slugs) && city_slugs.length > 0) {
@@ -79,6 +84,18 @@ export function buildAdsSearchQuery(filters = {}) {
     // inconsistente vs UF gravada em ads.state). Ver normalizeTerritoryFilters.
     params.push(city_slugs);
     where.push(`c.slug = ANY($${params.length})`);
+
+    // Preferência cidade-base: city_slugs[0] é a base por convenção.
+    // SÓ aplica quando length > 1 (com 1 cidade não há "vizinha" — boost
+    // sem alvo). Slug é capturado AQUI como param SQL preparado: o caller
+    // NUNCA passa base_city_id pela URL pública (ver normalizeTerritoryFilters,
+    // que stripa base_city_id defensivamente, e ads-ranking.sql.js
+    // que documenta a regra).
+    if (city_slugs.length > 1 && typeof city_slugs[0] === "string" && city_slugs[0]) {
+      params.push(city_slugs[0]);
+      baseCitySlugParamIdx = params.length;
+    }
+
     if (state)
       pushFilter(where, params, `UPPER(COALESCE(a.state, c.state)) = ?`, state.toUpperCase());
   } else if (city_id) {
@@ -118,6 +135,13 @@ export function buildAdsSearchQuery(filters = {}) {
   const whereClause = `WHERE ${where.join(" AND ")}`;
   const orderByClause = buildSortClause(sort, { useTextRank });
 
+  // Boost intra-camada para cidade-base (multi-cidade). `0` quando não há
+  // city_slugs[0] válido com vizinhança — no-op no hybrid_score, comportamento
+  // singular intacto. Ver baseCityBoostExpr em ads-ranking.sql.js.
+  const baseCityBoostFragment = baseCitySlugParamIdx
+    ? baseCityBoostExpr(baseCitySlugParamIdx)
+    : "0";
+
   const hybridScoreExpr = `
     (
       (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125
@@ -128,6 +152,7 @@ export function buildAdsSearchQuery(filters = {}) {
       + (COALESCE(m.leads, 0) * 2)
       + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))
       + (${useTextRank ? `${textRankExpression} * 50` : "0"})
+      + (${baseCityBoostFragment})
     )
   `;
 

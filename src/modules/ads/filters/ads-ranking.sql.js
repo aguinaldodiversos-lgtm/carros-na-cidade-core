@@ -65,3 +65,50 @@ export const commercialLayerExpr = `
     ELSE 1
   END)
 `;
+
+/**
+ * Pontos de boost para anúncios da cidade-base num filtro multi-cidade.
+ *
+ * Calibração:
+ *   - Maior que os tiebreakers típicos do hybrid_score dentro de uma camada
+ *     (planRank 0–32, cityDemandBoost 0–48, recency 0–28). Garante que a
+ *     cidade-base vence empate entre Pro-base vs Pro-vizinha em caso médio.
+ *   - Menor que priority*10 (admin override que pode chegar a 990) e que
+ *     leads*2 (que pode chegar a centenas em anúncios virais). Isso é
+ *     intencional: anúncio vizinho com qualidade real comprovada (muitos
+ *     leads) ainda pode superar cidade-base — esperado, não inversão.
+ *   - MUITO menor que o salto entre camadas comerciais (commercial_layer
+ *     DESC é a chave PRIMÁRIA do ORDER BY; nenhum boost aqui pode flipar
+ *     Destaque > Pro > Start > Grátis).
+ *
+ * Em prod, ajustar este valor isoladamente é seguro; o ranking continua
+ * sob controle do commercial_layer DESC.
+ */
+export const BASE_CITY_BOOST_POINTS = 60;
+
+/**
+ * Boost intra-camada para anúncios cuja cidade é a "cidade-base" do filtro
+ * multi-cidade (city_slugs[0] por convenção).
+ *
+ * USO RESTRITO:
+ *   - Só faz sentido quando city_slugs.length > 1 (múltiplas cidades). Com
+ *     1 cidade, não há "vizinha" — o boost não tem alvo.
+ *   - Deve ser somado ao hybrid_score (NÃO ao commercial_layer, sob risco
+ *     de inverter a hierarquia comercial alvo).
+ *
+ * SEGURANÇA:
+ *   - O caller passa o slug da cidade-base como parâmetro SQL preparado.
+ *     Nunca aceitar `base_city_id` ou `base_city_slug` do query string
+ *     público — a base é sempre derivada de city_slugs[0] internamente
+ *     pelo builder. Ver `ads-filter.builder.js` + comentário em
+ *     `normalizeTerritoryFilters` (parser).
+ *
+ * Quando o caller não está em modo multi-cidade, o builder injeta `0` no
+ * lugar deste fragmento (no-op no hybrid_score).
+ */
+export function baseCityBoostExpr(baseSlugParamIdx) {
+  if (!Number.isInteger(baseSlugParamIdx) || baseSlugParamIdx < 1) {
+    throw new Error("baseCityBoostExpr: baseSlugParamIdx deve ser inteiro >= 1.");
+  }
+  return `(CASE WHEN c.slug = $${baseSlugParamIdx} THEN ${BASE_CITY_BOOST_POINTS} ELSE 0 END)`;
+}

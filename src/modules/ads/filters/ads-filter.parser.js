@@ -71,11 +71,33 @@ function normalizeHighlightFilter(data) {
  *     a confiança no slug não é total como no caso single-city porque é
  *     possível alguém compor uma lista grande mal-formada).
  *
+ * SEGURANÇA — `base_city_id`:
+ *   A "cidade-base" do filtro multi-cidade é DERIVADA INTERNAMENTE de
+ *   city_slugs[0] (ver ads-filter.builder.js). NUNCA aceitamos
+ *   `base_city_id` ou `base_city_slug` vindos do query string público —
+ *   permitir isso deixaria o visitante manipular o boost de ranking
+ *   (impulsionar artificialmente um anúncio de cidade específica).
+ *
+ *   O Zod schema usa `passthrough()`, então um caller pode enviar
+ *   `?base_city_id=42` e o campo sobrevive ao parse. O builder atual não
+ *   destrutura essa chave, mas stripamos defensivamente aqui para
+ *   eliminar QUALQUER chance de uso futuro acidental por outro consumer
+ *   (autocomplete, facets, etc).
+ *
  * Mantém a regra atual de city_slug intacta — pré-requisito da trava
  * "não quebrar city_slug atual".
  */
 function normalizeTerritoryFilters(data) {
   if (!data || typeof data !== "object") return data;
+
+  // Strip defensivo: base_city_id NUNCA é input público. Idem base_city_slug.
+  // Belt-and-suspenders contra futuros consumers que esquecam de filtrar.
+  if ("base_city_id" in data || "base_city_slug" in data) {
+    const sanitized = { ...data };
+    delete sanitized.base_city_id;
+    delete sanitized.base_city_slug;
+    data = sanitized;
+  }
 
   const slug = typeof data.city_slug === "string" ? data.city_slug.trim() : "";
   if (slug) {
