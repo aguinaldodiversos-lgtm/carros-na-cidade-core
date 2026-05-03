@@ -405,7 +405,99 @@ curl -sSL https://www.carrosnacidade.com/sitemaps/below-fipe.xml \
 
 ---
 
-## 8. Próximo prompt recomendado
+## 8. Uso da implementação Opção 2 (já entregue)
+
+**Status:** implementado, mas **NÃO executado** em ambiente algum.
+Comandos abaixo são **referência de uso** — não rodar sem antes ler §5
+(roll-out) e §7 (segurança).
+
+### Arquivos entregues
+
+- [scripts/seo/bootstrap-cluster-plans.mjs](../../scripts/seo/bootstrap-cluster-plans.mjs) — script CLI standalone (default = dry-run; persistência exige `--yes` explícito).
+- [src/modules/seo/planner/cluster-plan-canonical-transform.js](../../src/modules/seo/planner/cluster-plan-canonical-transform.js) — helper puro de transformação `cluster_type → path canônico Fase 1`.
+- [src/modules/seo/planner/cluster-plan-canonical-transform.test.js](../../src/modules/seo/planner/cluster-plan-canonical-transform.test.js) — 20 testes unitários.
+- [tests/scripts/bootstrap-cluster-plans.test.js](../../tests/scripts/bootstrap-cluster-plans.test.js) — 18 testes do script com mocks (zero acesso a DB/rede).
+
+Engine (`cluster-planner.engine.js`) e worker (`cluster-planner.worker.js`)
+**não foram alterados**. O script é uma ferramenta paralela ao fluxo automático.
+
+### Comandos
+
+```bash
+# Dry-run (NÃO escreve em banco — comportamento default):
+node scripts/seo/bootstrap-cluster-plans.mjs --dry-run --limit=3
+
+# Execução sem flag também é dry-run (default fechado por segurança):
+node scripts/seo/bootstrap-cluster-plans.mjs --limit=3
+
+# Persistência (EXIGE --yes explícito):
+node scripts/seo/bootstrap-cluster-plans.mjs --yes --limit=3
+
+# Persistência com confirmação dupla:
+node scripts/seo/bootstrap-cluster-plans.mjs --yes --dry-run   # --yes vence; persiste
+```
+
+### Aviso operacional
+
+- ⚠️ **NÃO rodar com `--yes` em produção sem antes:** (a) rodar Fase 0 do
+  roll-out (auditoria SQL read-only); (b) rodar dry-run em staging;
+  (c) rodar com `--yes --limit=3` em staging e validar via curl; (d) só então
+  rodar em prod com `--yes --limit=3` na janela de baixa visitação.
+- ⚠️ Script **não** habilita worker recorrente. Cada batch é manual.
+- ⚠️ Script aborta com exit code `1` se algum cluster falhar transformação,
+  sem persistir lote parcial (fail-fast pré-validação).
+- ⚠️ Após `--yes`, a tabela `seo_cluster_plans` recebe rows com `status='planned'`.
+  Promoção para `'published'` continua dependendo do `cluster-executor.worker`
+  (que opera em rows pendentes da tabela — fluxo separado).
+
+### Saída esperada do dry-run
+
+```
+[bootstrap-cluster-plans] iniciando {"limit":3,"dryRun":true}
+[bootstrap-cluster-plans] DRY-RUN: nenhuma escrita ao banco. Use --yes para persistir.
+[bootstrap-cluster-plans] plans construídos em memória {"totalCities":3}
+[bootstrap-cluster-plans] transformação concluída {"totalGenerated":15,"totalTransformed":12,"totalSkipped":3,"totalToPersist":12,"totalErrors":0}
+[bootstrap-cluster-plans] sample: city_home /cidade/atibaia-sp → /carros-em/atibaia-sp
+[bootstrap-cluster-plans] sample: city_below_fipe /cidade/atibaia-sp/abaixo-da-fipe → /carros-baratos-em/atibaia-sp
+[bootstrap-cluster-plans] sample: city_brand /cidade/atibaia-sp/marca/honda → /cidade/atibaia-sp/marca/honda
+[bootstrap-cluster-plans] sample: city_brand_model /cidade/atibaia-sp/marca/honda/modelo/civic → /cidade/atibaia-sp/marca/honda/modelo/civic
+... (até 10 amostras)
+[bootstrap-cluster-plans] DRY-RUN concluído. 12 plans seriam persistidos. Re-rodar com --yes para persistir.
+```
+
+(Output real depende do estado de produção — N de cidades × 5 cluster_types
+gerados por cidade − 1 skip de `city_opportunities` por cidade.)
+
+### Plano de rollback
+
+Cada execução com `--yes` pode ser revertida via `DELETE` pontual usando
+o timestamp do batch. Antes de cada `--yes`:
+
+```sql
+-- Capturar timestamp ANTES do batch:
+SELECT NOW();
+-- → ex.: '2026-05-04 10:23:45.123+00'
+```
+
+Após o batch, se for necessário reverter:
+
+```sql
+-- DELETE pontual baseado no timestamp capturado:
+DELETE FROM seo_cluster_plans
+WHERE created_at >= '2026-05-04 10:23:45'
+  AND created_at <  '2026-05-04 10:30:00';  -- ajustar margem ao tempo real do batch
+```
+
+⚠️ Se rodar `--yes` SEM capturar timestamp antes, rollback fica impreciso —
+operação manual com `WHERE` baseado em path/cluster_type, com risco de
+deletar a mais. **Sempre capturar o timestamp.**
+
+⚠️ Como `upsertClusterPlan` é UPSERT por `path`, re-rodar `--yes` no mesmo
+batch é **idempotente** — atualiza `updated_at` mas não duplica linhas.
+
+---
+
+## 9. Próximo prompt recomendado
 
 > **Tarefa:** Implementar a **Opção 2** (script de bootstrap explícito) deste runbook. Criar:
 >
