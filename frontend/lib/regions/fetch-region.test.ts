@@ -15,7 +15,11 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
 
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
-import { fetchRegionByCitySlug } from "./fetch-region";
+import {
+  fetchRegionByCitySlug,
+  regionToAdsSearchFilters,
+  type RegionPayload,
+} from "./fetch-region";
 
 const mockedBackendBase = vi.mocked(getBackendApiBaseUrl);
 const mockedResolveUrl = vi.mocked(resolveBackendApiUrl);
@@ -331,5 +335,189 @@ describe("fetchRegionByCitySlug — degrade gracioso em erros", () => {
 
     expect(result).toBeNull();
     expect(errorSpy).toHaveBeenCalled();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// regionToAdsSearchFilters — helper puro (sem rede, sem env)
+// ───────────────────────────────────────────────────────────────────────────
+
+function buildRegion(overrides: Partial<RegionPayload> = {}): RegionPayload {
+  return {
+    base: { id: 1, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+    members: [
+      {
+        city_id: 2,
+        slug: "bom-jesus-dos-perdoes-sp",
+        name: "Bom Jesus dos Perdões",
+        state: "SP",
+        layer: 1,
+        distance_km: 12.4,
+      },
+      {
+        city_id: 3,
+        slug: "campinas-sp",
+        name: "Campinas",
+        state: "SP",
+        layer: 2,
+        distance_km: 55.2,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe("regionToAdsSearchFilters — city_slugs e ordem", () => {
+  it("city_slugs[0] é a cidade-base (preferência no ranking)", () => {
+    const result = regionToAdsSearchFilters(buildRegion());
+    expect(result.city_slugs?.[0]).toBe("atibaia-sp");
+  });
+
+  it("preserva a ordem dos members após a base", () => {
+    const result = regionToAdsSearchFilters(buildRegion());
+    expect(result.city_slugs).toEqual([
+      "atibaia-sp",
+      "bom-jesus-dos-perdoes-sp",
+      "campinas-sp",
+    ]);
+  });
+
+  it("remove duplicado quando member tem o mesmo slug da base", () => {
+    const region = buildRegion({
+      members: [
+        {
+          city_id: 1,
+          slug: "atibaia-sp",
+          name: "Atibaia",
+          state: "SP",
+          layer: 1,
+          distance_km: 0,
+        },
+        {
+          city_id: 3,
+          slug: "campinas-sp",
+          name: "Campinas",
+          state: "SP",
+          layer: 2,
+          distance_km: 50,
+        },
+      ],
+    });
+    const result = regionToAdsSearchFilters(region);
+    expect(result.city_slugs).toEqual(["atibaia-sp", "campinas-sp"]);
+  });
+
+  it("remove slugs vazios dos members (defesa)", () => {
+    const region = buildRegion({
+      members: [
+        {
+          city_id: 99,
+          slug: "",
+          name: "Sem slug",
+          state: "SP",
+          layer: 1,
+          distance_km: 0,
+        },
+        {
+          city_id: 3,
+          slug: "campinas-sp",
+          name: "Campinas",
+          state: "SP",
+          layer: 2,
+          distance_km: 55,
+        },
+      ],
+    });
+    const result = regionToAdsSearchFilters(region);
+    expect(result.city_slugs).toEqual(["atibaia-sp", "campinas-sp"]);
+  });
+
+  it("respeita o cap de 30 slugs (1 base + 29 members)", () => {
+    const members = Array.from({ length: 50 }, (_, i) => ({
+      city_id: i + 100,
+      slug: `cidade-${String(i + 100).padStart(3, "0")}-sp`,
+      name: `Cidade ${i + 100}`,
+      state: "SP",
+      layer: 2,
+      distance_km: 30,
+    }));
+    const region = buildRegion({ members });
+    const result = regionToAdsSearchFilters(region);
+    expect(result.city_slugs).toHaveLength(30);
+    expect(result.city_slugs?.[0]).toBe("atibaia-sp");
+    expect(result.city_slugs?.[1]).toBe("cidade-100-sp");
+    expect(result.city_slugs?.[29]).toBe("cidade-128-sp");
+  });
+});
+
+describe("regionToAdsSearchFilters — overrides", () => {
+  it("aceita brand, page e price_min via overrides (com mapeamento price_min → min_price)", () => {
+    const result = regionToAdsSearchFilters(buildRegion(), {
+      brand: "honda",
+      page: 2,
+      price_min: 30000,
+    });
+    expect(result.brand).toBe("honda");
+    expect(result.page).toBe(2);
+    expect(result.min_price).toBe(30000);
+  });
+
+  it("overrides NÃO sobrescreve city_slugs (vem sempre do RegionPayload)", () => {
+    const result = regionToAdsSearchFilters(
+      buildRegion(),
+      // city_slugs não consta no tipo de overrides — força via cast para
+      // verificar a defesa em runtime.
+      { city_slugs: ["hackerville-tt"] } as unknown as Parameters<
+        typeof regionToAdsSearchFilters
+      >[1]
+    );
+    expect(result.city_slugs).toEqual([
+      "atibaia-sp",
+      "bom-jesus-dos-perdoes-sp",
+      "campinas-sp",
+    ]);
+  });
+});
+
+describe("regionToAdsSearchFilters — includeState", () => {
+  it("includeState ausente → não adiciona state", () => {
+    const result = regionToAdsSearchFilters(buildRegion());
+    expect(result.state).toBeUndefined();
+  });
+
+  it("includeState=false → não adiciona state", () => {
+    const result = regionToAdsSearchFilters(buildRegion(), { includeState: false });
+    expect(result.state).toBeUndefined();
+  });
+
+  it("includeState=true → adiciona state da base", () => {
+    const result = regionToAdsSearchFilters(buildRegion(), { includeState: true });
+    expect(result.state).toBe("SP");
+  });
+
+  it("includeState=true: overrides não sobrescreve state", () => {
+    const result = regionToAdsSearchFilters(
+      buildRegion(),
+      // state não consta no tipo de overrides — força via cast para
+      // verificar que region.base.state prevalece.
+      { includeState: true, state: "RJ" } as unknown as Parameters<
+        typeof regionToAdsSearchFilters
+      >[1]
+    );
+    expect(result.state).toBe("SP");
+  });
+});
+
+describe("regionToAdsSearchFilters — null safety", () => {
+  it("region null → lança erro claro (sem retornar {} silencioso)", () => {
+    expect(() =>
+      regionToAdsSearchFilters(null as unknown as RegionPayload)
+    ).toThrow(/region/i);
+  });
+
+  it("region undefined → lança erro claro", () => {
+    expect(() =>
+      regionToAdsSearchFilters(undefined as unknown as RegionPayload)
+    ).toThrow(/region/i);
   });
 });

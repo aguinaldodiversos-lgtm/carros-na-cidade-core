@@ -1,6 +1,7 @@
 import "server-only";
 import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
+import type { AdsSearchFilters } from "@/lib/search/ads-search";
 
 /**
  * BFF server-only para o endpoint privado /api/internal/regions/:slug.
@@ -210,4 +211,121 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
     .filter((m): m is RegionMember => m !== null);
 
   return { base, members };
+}
+
+/**
+ * Overrides permitidos no helper regionToAdsSearchFilters.
+ *
+ * Intencionalmente NÃO inclui `city_slugs` nem `state` — essas duas dimensões
+ * pertencem exclusivamente à região (RegionPayload) e ao toggle `includeState`.
+ * Permitir que o caller passasse `city_slugs` ou `state` aqui abriria a porta
+ * para "vazar" a busca para fora da região-pivot, furando a contenção
+ * territorial que justifica o boost de city_slugs[0] no ranking.
+ */
+export type RegionToAdsSearchFiltersOptions = {
+  brand?: string;
+  model?: string;
+  price_min?: number;
+  price_max?: number;
+  year_min?: number;
+  year_max?: number;
+  mileage_min?: number;
+  mileage_max?: number;
+  page?: number;
+  sort?: string;
+  below_fipe?: boolean;
+  highlight_only?: boolean;
+  /** Quando true, adiciona `state = region.base.state`. Default: false. */
+  includeState?: boolean;
+};
+
+/**
+ * Cap de city_slugs alinhado ao backend (Zod schema do /api/ads/search).
+ * Manter sincronizado com `MAX_CITY_SLUGS` em src/modules/ads/filters/.
+ */
+const MAX_CITY_SLUGS = 30;
+
+/**
+ * Transforma um RegionPayload em AdsSearchFilters pronto para fetchAdsSearch.
+ *
+ * Por que city_slugs[0] = cidade-base?
+ * - O backend (src/modules/ads/filters/ads-ranking.sql.js → baseCityBoostExpr)
+ *   adiciona +60 pontos de boost a anúncios cuja `c.slug = city_slugs[0]`,
+ *   dentro da mesma camada comercial. Manter a base no índice 0 garante que
+ *   a Página Regional priorize anúncios da cidade-pivot sem alterar a SQL.
+ *   A ordem do array é semanticamente significativa: inverter member/base
+ *   inverte qual cidade ganha preferência no ranking.
+ *
+ * Por que overrides não pode mexer em city_slugs nem state?
+ * - city_slugs vem do RegionPayload (cidade-base + members aprovados).
+ *   Permitir override violaria a contenção territorial e poderia "vazar"
+ *   resultados para outra região por engano.
+ * - state, quando habilitado via includeState=true, vem de region.base.state.
+ *   Cidades de UF diferente em algumas fronteiras já são filtradas no
+ *   backend pela camada de region_memberships; o helper não deve permitir
+ *   que o caller troque isso.
+ *
+ * Por que throw em region null/undefined?
+ * - Retornar `{}` silenciosamente faria o backend cair em busca ampla
+ *   (sem qualquer território). Em produção isso seria uma página regional
+ *   exibindo anúncios do Brasil inteiro — bug visível e regressão de SEO.
+ *   Falhar cedo, alto e claro é mais seguro.
+ */
+export function regionToAdsSearchFilters(
+  region: RegionPayload,
+  options: RegionToAdsSearchFiltersOptions = {}
+): AdsSearchFilters {
+  if (region == null) {
+    throw new Error(
+      "regionToAdsSearchFilters: parâmetro `region` é obrigatório (recebeu null/undefined). Não retornamos {} silenciosamente para evitar uma busca ampla acidental sem território."
+    );
+  }
+
+  const baseSlug = typeof region.base?.slug === "string" ? region.base.slug.trim() : "";
+  const seen = new Set<string>();
+  const orderedSlugs: string[] = [];
+
+  if (baseSlug) {
+    orderedSlugs.push(baseSlug);
+    seen.add(baseSlug);
+  }
+
+  const members = Array.isArray(region.members) ? region.members : [];
+  for (const member of members) {
+    if (orderedSlugs.length >= MAX_CITY_SLUGS) break;
+    const slug = typeof member?.slug === "string" ? member.slug.trim() : "";
+    if (!slug || seen.has(slug)) continue;
+    orderedSlugs.push(slug);
+    seen.add(slug);
+  }
+
+  const filters: AdsSearchFilters = {
+    city_slugs: orderedSlugs,
+  };
+
+  // Overrides complementares — NUNCA atingem city_slugs nem state.
+  // Mapeia nomes do helper (price_min/price_max) para os nomes do contrato
+  // AdsSearchFilters (min_price/max_price) que o backend já espera.
+  if (options.brand !== undefined) filters.brand = options.brand;
+  if (options.model !== undefined) filters.model = options.model;
+  if (options.price_min !== undefined) filters.min_price = options.price_min;
+  if (options.price_max !== undefined) filters.max_price = options.price_max;
+  if (options.year_min !== undefined) filters.year_min = options.year_min;
+  if (options.year_max !== undefined) filters.year_max = options.year_max;
+  if (options.mileage_max !== undefined) filters.mileage_max = options.mileage_max;
+  // mileage_min consta nos overrides do spec para forward-compat, mas
+  // AdsSearchFilters / contrato público do backend não definem `mileage_min`
+  // hoje — aceito na assinatura, ignorado na propagação.
+  if (options.page !== undefined) filters.page = options.page;
+  if (options.sort !== undefined) filters.sort = options.sort;
+  if (options.below_fipe !== undefined) filters.below_fipe = options.below_fipe;
+  if (options.highlight_only !== undefined) filters.highlight_only = options.highlight_only;
+
+  if (options.includeState === true) {
+    // Aplicado depois dos overrides — `state` não consta em
+    // RegionToAdsSearchFiltersOptions, então não há como o caller sobrescrever.
+    filters.state = region.base.state;
+  }
+
+  return filters;
 }
