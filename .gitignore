@@ -6,6 +6,10 @@ coverage/
 report/
 .env
 
+# Cache de fontes de dados externas (gerado por scripts; o .gitkeep mantem o diretorio).
+scripts/data/*.json
+!scripts/data/.gitkeep
+
 # Worktrees locais do Claude Code — nunca versionar.
 # Evita falsos submodules e warnings de git submodule foreach no CI.
 .claude/worktrees/
