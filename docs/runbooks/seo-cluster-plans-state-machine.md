@@ -248,3 +248,205 @@ para `/carros-em/[slug]`. Documentado em §8 da investigação anterior.
 > (responsável por gerar os planos) e `src/modules/seo/publishing/seo-publishing.worker.js`
 > (responsável por promover `'planned'` → `'published'`) para entender o
 > fluxo end-to-end antes de tocar qualquer dado em prod.
+
+---
+
+## Auditoria SQL de produção — 2026-05-03
+
+### Ambiente
+
+| Item | Valor |
+|---|---|
+| Serviço Render alvo | `carros-na-cidade-core` (web service backend) |
+| Banco | Postgres do plano do mesmo serviço (string `DATABASE_URL` no painel — **não exposta**) |
+| Migration `022_seo_publications_is_indexable.sql` aplicada? | **NÃO CONFIRMADO** (depende de `npm run db:migrate` ou `RUN_MIGRATIONS=true` no boot do serviço) |
+| Quem deve rodar | Operador com Render Shell do `carros-na-cidade-core` |
+| Quem rodou | **PENDENTE** — assistente NÃO tem acesso a este ambiente (sem `render` CLI, `psql` ou `DATABASE_URL` local; `.env` está fora do git por segurança, conforme commit `4250060`) |
+
+### Status desta auditoria
+
+**Esta seção foi pré-preenchida com evidência DETERMINÍSTICA de código + evidência indireta de prod via curl.** O resultado dos `SELECT`s reais ainda precisa ser colado pelo operador no apêndice abaixo, mas a conclusão operacional já é defensável **só com a evidência de código** — a auditoria SQL serve como sanity check.
+
+### Evidência de código que torna o Caminho A determinístico
+
+Trilha completa, sem dependência de SQL contra prod:
+
+```
+runClusterPlannerEngine(limit)        ← src/brain/engines/cluster-planner.engine.js
+  └─> clusterPlannerService.buildTopCitiesClusterPlans(limit)
+                                      ← src/modules/seo/planner/cluster-planner.service.js
+        └─> for each city → buildCityClusterPlan(city)
+                  └─> retorna clusters em MEMÓRIA, sem persistir
+        └─> retorna array, sem persistir
+  └─> retorna array, sem persistir
+
+✗ Nenhuma chamada a clusterPlanRepository.upsertClusterPlan() neste fluxo.
+```
+
+As funções que efetivamente persistem em `seo_cluster_plans` existem mas estão **órfãs**:
+
+```
+src/modules/seo/planner/cluster-plan.service.js
+  ├─ persistCityClusterPlan(city)        ← chama upsertClusterPlan ✓
+  └─ persistTopCityClusterPlans(limit)   ← chama upsertClusterPlan ✓
+
+grep -rn "persistTopCityClusterPlans\|persistCityClusterPlan" src --include="*.js"
+→ retorna SOMENTE as próprias declarações.
+→ ZERO callers no projeto inteiro.
+```
+
+**Implicação:** mesmo que `RUN_WORKERS=true` esteja configurado no Render, o `cluster-planner.worker` chama `runClusterPlannerEngine`, que chama `buildTopCitiesClusterPlans`, que constrói clusters em memória e os retorna sem nunca tocar `seo_cluster_plans`. O fluxo automático **nunca persiste** — não é questão de "worker desligado", é questão de "wire desconectado" entre build e persist.
+
+Isso explica todas as evidências indiretas:
+- `/api/public/seo/sitemap/type/<type>` → `data:[]` para 4 tipos diferentes
+- `/api/public/seo/sitemap/region/SP` (sem filtro de tipo) → `data:[]`
+- HTTP 200 sem erro de relation → tabela existe, query roda, zero rows
+
+### Tabelas encontradas
+
+> **PENDENTE — operador deve preencher após rodar `\d` ou `information_schema.tables` via Render Shell.**
+
+| Tabela | Existe? | Total de registros | Observações |
+|---|---|---|---|
+| `seo_cluster_plans` | _(esperado: SIM)_ | _(esperado: 0 ou pequeno)_ | Aparentemente vazia. Backend devolve `data:[]` em todos os endpoints. |
+| `seo_publications` | _(esperado: SIM)_ | _(operador rodar)_ | Coluna `is_indexable` ausente até migration 022 ser aplicada. |
+| `cities` | _(esperado: SIM)_ | _(esperado: ~5570)_ | OK, alimentado por seed IBGE. |
+| `ads` | _(esperado: SIM)_ | _(operador rodar)_ | OK, dados reais de produção. |
+
+**Queries a rodar (copia-cola no Render Shell):**
+
+```sql
+-- 1. Existência das 4 tabelas
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = current_schema()
+  AND table_name IN ('seo_cluster_plans', 'seo_publications', 'cities', 'ads')
+ORDER BY table_name;
+
+-- 2. Schema de seo_cluster_plans e seo_publications
+SELECT table_name, column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = current_schema()
+  AND table_name IN ('seo_cluster_plans', 'seo_publications')
+ORDER BY table_name, ordinal_position;
+
+-- 3. Contagens
+SELECT COUNT(*) AS total FROM seo_cluster_plans;
+SELECT COUNT(*) AS total FROM seo_publications;
+SELECT COUNT(*) AS total FROM cities;
+SELECT COUNT(*) AS total_active_ads FROM ads WHERE status = 'active';
+SELECT COUNT(*) AS total_active_ads_with_city FROM ads WHERE status = 'active' AND city_id IS NOT NULL;
+```
+
+### Distribuição `seo_cluster_plans` (cluster_type × status)
+
+> **PENDENTE — operador rodar a query abaixo e colar o resultado.**
+
+```sql
+SELECT cluster_type, status, COUNT(*) AS total
+FROM seo_cluster_plans
+GROUP BY cluster_type, status
+ORDER BY cluster_type, status;
+```
+
+| cluster_type | status | total |
+|---|---|---|
+| _(esperado: vazio — nenhuma linha)_ | _—_ | _—_ |
+
+**Por que esperamos vazio:** ver §"Evidência de código" acima — o fluxo automático não persiste.
+
+### Datas (sinal se o pipeline rodou alguma vez)
+
+> **PENDENTE — operador rodar:**
+
+```sql
+SELECT MIN(created_at) AS first_plan,
+       MAX(created_at) AS last_plan,
+       MAX(updated_at) AS last_update
+FROM seo_cluster_plans;
+```
+
+| Métrica | Valor real |
+|---|---|
+| MIN(created_at) | _operador preencher_ |
+| MAX(created_at) | _operador preencher_ |
+| MAX(updated_at) | _operador preencher_ |
+
+Se todos `NULL`: tabela vazia (esperado).
+Se há datas mas a tabela só tem poucas linhas: pode haver dados antigos de seed manual ou teste — investigar amostra.
+
+### Distribuição `seo_publications.is_indexable`
+
+> **Só rodar APÓS aplicar a migration 022.** Antes da migration, esta query falha com `column "is_indexable" does not exist`.
+
+```sql
+SELECT is_indexable, COUNT(*) AS total
+FROM seo_publications
+GROUP BY is_indexable
+ORDER BY is_indexable;
+```
+
+| is_indexable | total |
+|---|---|
+| _(esperado pós-migration: TRUE = todas as linhas legadas, FALSE = 0)_ | _operador preencher_ |
+
+### Amostra de `seo_cluster_plans` (se houver dados)
+
+```sql
+SELECT id, cluster_type, status, path, city_id, created_at, updated_at
+FROM seo_cluster_plans
+ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+LIMIT 20;
+```
+
+> **PENDENTE — operador rodar.** Se vazio, confirma Caminho A. Se há linhas com status diferente de `('planned','generated','published')`, indica Caminho B.
+
+---
+
+### Conclusão operacional
+
+**Caminho escolhido: A (`seo_cluster_plans` vazia).**
+
+**Confiança:** **ALTA** — apoiada em:
+1. **Evidência determinística de código** (callers órfãos de `persistTopCityClusterPlans`/`persistCityClusterPlan`).
+2. **Evidência indireta de prod via curl** (5 endpoints diferentes, todos `data:[]`).
+3. **Migrations não criam a tabela** (criada out-of-band → sem garantia de seed inicial).
+
+**Caveat:** confirmação 100% requer o operador rodar `SELECT COUNT(*) FROM seo_cluster_plans;` no Render Shell. Se o resultado for `> 0`, reavaliar para Caminho B ou C — mas isso seria evidência **contraditória** ao código (alguém populou a tabela manualmente em algum momento, fora do fluxo).
+
+**Causa raiz:** o fluxo automático tem **dois bugs encadeados**:
+- (i) a função `persistTopCityClusterPlans` em `cluster-plan.service.js` está implementada mas órfã (zero callers);
+- (ii) a engine `runClusterPlannerEngine` chama o builder em memória (`buildTopCitiesClusterPlans`) em vez do persistor (`persistTopCityClusterPlans`).
+
+**Próximo passo (sem alterar código nesta etapa):**
+- Operador roda os SQLs acima e cola os resultados num PR de docs (atualizando este apêndice).
+- Em paralelo, criar runbook novo `cluster-planner-bootstrap.md` documentando como reconectar o "wire" desconectado entre build e persist (fix de 1 linha em `cluster-planner.engine.js` OU 1 linha em `cluster-planner.worker.js`), com plan de roll-out (rodar manualmente uma vez em staging → validar `seo_cluster_plans` populada → confirmar sitemap territorial volta a ter URLs → ligar fix em prod).
+
+---
+
+## Próximo prompt recomendado
+
+> **Tarefa:** Documentar a correção do "wire" desconectado entre o builder e o persistor de `seo_cluster_plans`, **sem implementar a correção**. Criar runbook novo `docs/runbooks/cluster-planner-bootstrap.md` cobrindo:
+>
+> 1. Diagnóstico exato com citações de linha:
+>    - `src/brain/engines/cluster-planner.engine.js:7` chama `buildTopCitiesClusterPlans` (não persiste).
+>    - `src/modules/seo/planner/cluster-plan.service.js:32-63` define `persistTopCityClusterPlans` (persiste, mas órfão).
+>    - `grep -rn "persistTopCityClusterPlans\|persistCityClusterPlan" src --include="*.js"` retorna apenas as próprias declarações.
+>
+> 2. Opções de correção (analisar trade-offs, sem implementar):
+>    - **Opção 1:** trocar a chamada na engine para `persistTopCityClusterPlans` (1 linha; mais cirúrgico).
+>    - **Opção 2:** adicionar `await persistCityClusterPlan(city)` no loop em `buildTopCitiesClusterPlans` (mistura responsabilidades).
+>    - **Opção 3:** criar nova engine `persistClusterPlansEngine` e ajustar worker (mais código, separação clara).
+>
+>    Recomendar Opção 1 com justificativa.
+>
+> 3. Plano de roll-out de 4 fases:
+>    - Fase 1 — fix de 1 linha + teste unitário verificando que `runClusterPlannerEngine` agora persiste.
+>    - Fase 2 — rodar manualmente em staging (Render Shell: `node -e 'import("./src/brain/engines/cluster-planner.engine.js").then(m => m.runClusterPlannerEngine(50))'`); validar `seo_cluster_plans` populada; validar `/api/public/seo/sitemap/type/city_home` retorna `data:[...]`.
+>    - Fase 3 — deploy em prod sem ligar `RUN_WORKERS` ainda; rodar 1x manual via Render Shell; validar.
+>    - Fase 4 — só depois habilitar `RUN_WORKERS=true` (intervalo padrão 6h) ou migrar workers para dyno separado.
+>
+> 4. **NÃO alterar:** frontend, layout, components, sitemap em código, canonical em código, robots, rotas, ranking, planos, Página Regional, RUN_WORKERS em prod, dados em prod, código backend nesta etapa. Apenas markdown novo + decisão arquitetural documentada.
+>
+> 5. **Antes de escrever o runbook:** o operador deve idealmente rodar os SQLs de §"Tabelas encontradas"/"Distribuição" deste runbook e colar os resultados aqui — para confirmar Caminho A (e descartar a possibilidade remota de seed manual antigo).
+
