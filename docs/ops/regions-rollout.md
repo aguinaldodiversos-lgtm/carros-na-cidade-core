@@ -37,6 +37,10 @@ Tempo total esperado: **~5-10 minutos**, sendo ~3-5 min de execução do
 Este token protege `/api/internal/regions/:slug` contra acesso público
 (ver `src/modules/regions/regions.middleware.js` — sem token = 404).
 
+O **mesmo valor** precisa ser configurado em **dois services do Render**:
+o backend (que valida o header) e o frontend (que envia o header via
+BFF server-side em `frontend/lib/regions/fetch-region.ts`).
+
 **No laptop do operador**:
 
 ```bash
@@ -45,17 +49,36 @@ NEW_TOKEN=$(openssl rand -hex 32)
 echo "$NEW_TOKEN"
 ```
 
-**No painel do Render**:
+**Etapa 0.a — Backend** (service `carros-na-cidade-core`):
 
-1. Service `carros-na-cidade-core` → tab `Environment`.
+1. Render dashboard → service `carros-na-cidade-core` → tab `Environment`.
 2. `Add Environment Variable`:
    - Key: `INTERNAL_API_TOKEN`
    - Value: cola o `NEW_TOKEN`.
    - Sync: **OFF** (token não pode aparecer em logs/manifest).
 3. Save Changes — Render redeploya automaticamente (~3 min).
 
+**Etapa 0.b — Frontend** (service `carros-na-cidade-portal`):
+
+1. Render dashboard → service `carros-na-cidade-portal` → tab `Environment`.
+2. `Add Environment Variable`:
+   - Key: `INTERNAL_API_TOKEN`  ← **mesmo nome, MESMO valor** do backend.
+   - Value: cola o `NEW_TOKEN` (idêntico ao do backend).
+   - Sync: **OFF**.
+   - **Atenção**: NÃO usar prefixo `NEXT_PUBLIC_*`. O `import "server-only"`
+     em `frontend/lib/regions/fetch-region.ts` impede client-import por
+     build-time, mas a confusão de prefixo abriria o token no bundle JS
+     do navegador. `INTERNAL_API_TOKEN` (sem prefixo) só é lido em
+     server components, route handlers e BFF `/api/*`.
+3. Save Changes — Render redeploya o frontend automaticamente (~3 min).
+
 **Guardar o token** em secret manager (1Password/Bitwarden/AWS Secrets).
 Não commitar, não copiar para Slack, não logar.
+
+**Rotação**: ao trocar o token, atualizar AMBOS os services no mesmo
+deploy ou os fetches do frontend respondem 404 imediatamente até o
+backend redeployar com o token novo. Cache Redis (`internal:regions:*`)
+não chaveia pelo token — não precisa flush manual.
 
 ---
 
