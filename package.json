@@ -31,6 +31,7 @@
     "db:print-checks": "node scripts/print-ads-constraints.js",
     "test:watch": "vitest",
     "db:migrate": "node scripts/run-migrations.mjs",
+    "regions:build": "node scripts/build-region-memberships.mjs",
     "seed:cities": "node scripts/seed-ibge-municipios.mjs",
     "import:cities": "node scripts/import-ibge-cities.js",
     "create:test-ad": "node scripts/create-test-ad.mjs",

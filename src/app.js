@@ -41,6 +41,7 @@ import leadsRoutes from "./modules/leads/leads.routes.js";
 import paymentsRoutes from "./modules/payments/payments.routes.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
+import regionsRoutes from "./modules/regions/regions.routes.js";
 import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 
@@ -203,6 +204,10 @@ app.use("/api/events", adEventsRoutes);
 app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
 app.use("/api/vehicle-images", vehicleImagesRoutes);
 app.use("/api/admin", adminRoutes);
+
+// Endpoint privado (X-Internal-Token). Não documentado em /api/public, não
+// aparece em sitemap, base da futura Página Regional. Sem token = 404.
+app.use("/api/internal/regions", regionsRoutes);
 
 // 404
 app.use((req, _res, next) => {
