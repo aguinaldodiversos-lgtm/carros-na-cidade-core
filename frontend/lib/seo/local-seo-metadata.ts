@@ -12,10 +12,35 @@ function truncateDesc(raw: string, max = 160): string {
   return t.length <= max ? t : `${t.slice(0, max - 3)}...`;
 }
 
+/**
+ * Política de canonical de transição (sem 301): cada variante de landing
+ * "carros-em / carros-baratos-em / carros-automaticos-em" canonicaliza para
+ * a URL canônica intermediária equivalente da família /comprar+/cidade.
+ * Isso consolida a autoridade SEO numa única URL por intenção, mantendo
+ * a página antiga acessível para usuários e backlinks externos.
+ *
+ *   /carros-em/[slug]            → /comprar/cidade/[slug]
+ *   /carros-baratos-em/[slug]    → /cidade/[slug]/abaixo-da-fipe
+ *   /carros-automaticos-em/[slug]→ /comprar/cidade/[slug]   (+ noindex,follow)
+ */
+function transitionCanonicalPath(model: LocalSeoLandingModel): string {
+  const slug = encodeURIComponent(model.slug);
+  if (model.variant === "baratos") return `/cidade/${slug}/abaixo-da-fipe`;
+  return `/comprar/cidade/${slug}`;
+}
+
 function resolveCanonical(model: LocalSeoLandingModel): string {
-  if (model.variant === "em") return toAbsoluteUrl(model.paths.em);
-  if (model.variant === "baratos") return toAbsoluteUrl(model.paths.baratos);
-  return toAbsoluteUrl(model.paths.automaticos);
+  return toAbsoluteUrl(transitionCanonicalPath(model));
+}
+
+/**
+ * /carros-automaticos-em/[slug] cobre uma intenção de busca específica
+ * ("câmbio automático em X") com pouca demanda própria e grande sobreposição
+ * com /comprar/cidade/[slug]. Em transição, recebe noindex,follow para
+ * impedir indexação concorrente, mas links continuam navegáveis.
+ */
+function shouldIndexLocalSeo(model: LocalSeoLandingModel): boolean {
+  return model.variant !== "automaticos";
 }
 
 function resolveOgImage(model: LocalSeoLandingModel): string | undefined {
@@ -186,6 +211,7 @@ export function buildLocalSeoMetadata(model: LocalSeoLandingModel): Metadata {
   const description = buildDescription(model);
   const canonical = resolveCanonical(model);
   const ogImage = resolveOgImage(model);
+  const indexable = shouldIndexLocalSeo(model);
 
   return {
     metadataBase: new URL(siteUrl),
@@ -209,10 +235,10 @@ export function buildLocalSeoMetadata(model: LocalSeoLandingModel): Metadata {
       images: ogImage ? [ogImage] : undefined,
     },
     robots: {
-      index: true,
+      index: indexable,
       follow: true,
       googleBot: {
-        index: true,
+        index: indexable,
         follow: true,
         "max-image-preview": "large",
         "max-snippet": -1,

@@ -15,17 +15,34 @@ const getCityPageData = cache(
     fetchCityTerritorialPage(slug, searchParams)
 );
 
+/**
+ * Política de canonical de transição: /cidade/[slug] continua acessível mas
+ * canonicaliza para /comprar/cidade/[slug] (canônica intermediária do catálogo).
+ * Sem 301 nesta etapa — apenas <link rel="canonical"> e JSON-LD url para
+ * consolidar autoridade na URL canônica.
+ */
+function transitionCanonicalPath(slug: string): string {
+  return `/comprar/cidade/${encodeURIComponent(slug)}`;
+}
+
 export async function generateMetadata({ params, searchParams }: CityPageProps): Promise<Metadata> {
   const data = await getCityPageData(params.slug, searchParams);
-  return buildTerritorialMetadata(data, "city");
+  return buildTerritorialMetadata(data, "city", {
+    canonicalPathOverride: transitionCanonicalPath(params.slug),
+  });
 }
 
 export default async function CityPage({ params, searchParams }: CityPageProps) {
   const initialData = await getCityPageData(params.slug, searchParams);
+  const canonicalPathOverride = transitionCanonicalPath(params.slug);
 
   return (
     <>
-      <TerritorialSeoJsonLd data={initialData} mode="city" />
+      <TerritorialSeoJsonLd
+        data={initialData}
+        mode="city"
+        canonicalPathOverride={canonicalPathOverride}
+      />
       <TerritorialResultsPageClient mode="city" slug={params.slug} initialData={initialData} />
     </>
   );

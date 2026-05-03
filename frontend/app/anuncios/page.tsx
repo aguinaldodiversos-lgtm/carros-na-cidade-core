@@ -41,8 +41,12 @@ export async function generateMetadata({ searchParams }: AnunciosPageProps): Pro
     description: filteredView
       ? "Compare anúncios de carros usados e seminovos com filtros por marca, modelo, preço, quilometragem e localização no Carros na Cidade."
       : "Explore anúncios de carros usados e seminovos com filtros inteligentes, ofertas abaixo da FIPE e resultados organizados para encontrar o veículo ideal.",
+    // Transição: /anuncios canonicaliza para /comprar (sem 301 nesta etapa).
+    // /comprar é a URL canônica intermediária da Busca Livre. Páginas filtradas
+    // continuam noindex (regra abaixo) — mesmo na transição não queremos indexar
+    // URLs com query string.
     alternates: {
-      canonical: "/anuncios",
+      canonical: "/comprar",
     },
     robots: filteredView
       ? {

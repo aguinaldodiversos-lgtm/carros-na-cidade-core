@@ -142,16 +142,28 @@ function shouldIndexTerritorialPage(
   return true;
 }
 
+/**
+ * Em transição entre famílias de páginas territoriais, algumas rotas precisam
+ * canonicalizar para uma URL diferente da que o backend devolve em
+ * `data.seo.canonicalPath`. Exemplos: /cidade/[slug] aponta para
+ * /comprar/cidade/[slug] (canônica intermediária), /cidade/[slug]/oportunidades
+ * aponta para /cidade/[slug]/abaixo-da-fipe (deduplicação semântica).
+ *
+ * `canonicalPathOverride` (path relativo, ex.: "/comprar/cidade/sao-paulo-sp")
+ * é convertido em URL absoluta e usado tanto no <link rel="canonical">
+ * quanto no openGraph.url, garantindo consistência. Ignorado se omitido.
+ */
 export function buildTerritorialMetadata(
   data: TerritorialPagePayload,
-  mode: TerritorialSeoMode
+  mode: TerritorialSeoMode,
+  options: { canonicalPathOverride?: string; forceNoindex?: boolean } = {}
 ): Metadata {
   const siteUrl = getSiteUrl();
   const title = buildMetadataTitle(data);
   const description = buildMetadataDescription(data);
-  const canonical = toAbsoluteUrl(data.seo?.canonicalPath || "/");
+  const canonical = toAbsoluteUrl(options.canonicalPathOverride || data.seo?.canonicalPath || "/");
   const ogImage = resolveOgImage(data);
-  const indexable = shouldIndexTerritorialPage(data, mode);
+  const indexable = options.forceNoindex ? false : shouldIndexTerritorialPage(data, mode);
   const followable = data.seo?.robots !== "noindex,nofollow";
 
   return {
@@ -214,9 +226,10 @@ function buildListItemUrl(
 
 export function buildTerritorialJsonLd(
   data: TerritorialPagePayload,
-  mode: TerritorialSeoMode
+  mode: TerritorialSeoMode,
+  options: { canonicalPathOverride?: string } = {}
 ): Record<string, unknown> {
-  const canonical = toAbsoluteUrl(data.seo?.canonicalPath || "/");
+  const canonical = toAbsoluteUrl(options.canonicalPathOverride || data.seo?.canonicalPath || "/");
   const city = sanitizeText(data.city?.name);
   const state = sanitizeText(data.city?.state);
   const title = buildMetadataTitle(data);

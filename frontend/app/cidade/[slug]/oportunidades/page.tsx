@@ -15,12 +15,24 @@ const getCityOpportunitiesPageData = cache(
     fetchCityOpportunitiesTerritorialPage(slug, searchParams)
 );
 
+/**
+ * Deduplicação de transição: "oportunidades" e "abaixo da FIPE" representam
+ * a mesma intenção de busca (carros com preço abaixo da FIPE na cidade).
+ * Esta página continua acessível mas canonicaliza para
+ * /cidade/[slug]/abaixo-da-fipe — sem 301 nesta etapa.
+ */
+function transitionCanonicalPath(slug: string): string {
+  return `/cidade/${encodeURIComponent(slug)}/abaixo-da-fipe`;
+}
+
 export async function generateMetadata({
   params,
   searchParams,
 }: CityOpportunitiesPageProps): Promise<Metadata> {
   const data = await getCityOpportunitiesPageData(params.slug, searchParams);
-  return buildTerritorialMetadata(data, "opportunities");
+  return buildTerritorialMetadata(data, "opportunities", {
+    canonicalPathOverride: transitionCanonicalPath(params.slug),
+  });
 }
 
 export default async function CityOpportunitiesPage({
@@ -28,10 +40,15 @@ export default async function CityOpportunitiesPage({
   searchParams,
 }: CityOpportunitiesPageProps) {
   const initialData = await getCityOpportunitiesPageData(params.slug, searchParams);
+  const canonicalPathOverride = transitionCanonicalPath(params.slug);
 
   return (
     <>
-      <TerritorialSeoJsonLd data={initialData} mode="opportunities" />
+      <TerritorialSeoJsonLd
+        data={initialData}
+        mode="opportunities"
+        canonicalPathOverride={canonicalPathOverride}
+      />
       <TerritorialResultsPageClient
         mode="opportunities"
         slug={params.slug}
