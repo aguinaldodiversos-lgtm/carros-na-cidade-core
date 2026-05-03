@@ -481,6 +481,128 @@ describe.sequential("integração — compatibilidade de migrations", () => {
     });
   }, 120000);
 
+  it("022 adiciona seo_publications.is_indexable quando a tabela existe (criada out-of-band em prod)", async () => {
+    await withDatabase("seo_pub_is_indexable", async ({ dbUrl }) => {
+      // Pré-condição: simular o estado real de produção, onde
+      // `seo_publications` foi criada fora das migrations (ver
+      // docs/runbooks/sitemap-empty-investigation.md §5) e nunca recebeu
+      // a coluna `is_indexable`. Schema mínimo suficiente para reproduzir
+      // a query LEFT JOIN do `public-seo.service.js#listEntries` que
+      // quebrava com PostgreSQL 42703.
+      const seedDb = await openPool(dbUrl);
+      try {
+        await seedDb.query(`
+          CREATE TABLE seo_publications (
+            id SERIAL PRIMARY KEY,
+            cluster_plan_id INTEGER,
+            path TEXT NOT NULL UNIQUE,
+            title TEXT,
+            status TEXT,
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            published_at TIMESTAMPTZ
+          );
+        `);
+        await seedDb.query(
+          `INSERT INTO seo_publications (path, status) VALUES ('/cidade/legacy-row-tt', 'published')`
+        );
+      } finally {
+        await seedDb.end();
+      }
+
+      // Roda migrations (incluindo 022) sobre a tabela legada.
+      await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+
+      const db = await openPool(dbUrl);
+      try {
+        // 1. Migration 022 foi registrada.
+        const filenames = await getMigrationFilenames(db);
+        expect(filenames).toContain("022_seo_publications_is_indexable.sql");
+
+        // 2. Coluna existe, com tipo boolean, NOT NULL, DEFAULT TRUE.
+        const colMeta = await db.query(
+          `
+          SELECT data_type, is_nullable, column_default
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'seo_publications'
+            AND column_name = 'is_indexable'
+          `
+        );
+        expect(colMeta.rows).toHaveLength(1);
+        expect(colMeta.rows[0].data_type).toBe("boolean");
+        expect(colMeta.rows[0].is_nullable).toBe("NO");
+        expect(String(colMeta.rows[0].column_default).toLowerCase()).toContain("true");
+
+        // 3. Linhas pré-existentes ficaram is_indexable = true (default
+        //    aplicado retroativamente — comportamento padrão do Postgres
+        //    para ADD COLUMN ... NOT NULL DEFAULT <const>).
+        const legacyRow = await db.query(
+          `SELECT is_indexable FROM seo_publications WHERE path = '/cidade/legacy-row-tt'`
+        );
+        expect(legacyRow.rows[0].is_indexable).toBe(true);
+
+        // 4. O SELECT do public-seo.service.js que quebrava (HTTP 500
+        //    "column sp.is_indexable does not exist" / código 42703) agora
+        //    roda. Não esperamos resultados — só validamos que não levanta.
+        await expect(
+          db.query(
+            `
+            SELECT sp.id
+            FROM seo_publications sp
+            WHERE (sp.id IS NULL OR sp.is_indexable = TRUE)
+              AND (sp.id IS NULL OR sp.status IN ('published', 'review_required'))
+            `
+          )
+        ).resolves.toBeDefined();
+
+        // 5. Idempotência: rodar migrations de novo é no-op (não duplica
+        //    coluna, não falha por já existir).
+        await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+        const colMetaAfter = await db.query(
+          `
+          SELECT COUNT(*)::int AS n
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'seo_publications'
+            AND column_name = 'is_indexable'
+          `
+        );
+        expect(colMetaAfter.rows[0].n).toBe(1);
+      } finally {
+        await db.end();
+      }
+    });
+  }, 120000);
+
+  it("022 é no-op quando seo_publications não existe (fresh DB sem schema legado)", async () => {
+    // Em CI/test default, nenhuma migration cria seo_publications. A 022
+    // precisa ser silenciosa nesse cenário — `IF EXISTS` no bloco DO
+    // garante isso. Sem essa proteção, a migration falharia em todo banco
+    // novo.
+    await withDatabase("seo_pub_no_table", async ({ dbUrl }) => {
+      await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+
+      const db = await openPool(dbUrl);
+      try {
+        const filenames = await getMigrationFilenames(db);
+        expect(filenames).toContain("022_seo_publications_is_indexable.sql");
+
+        // Tabela continua não existindo — migration NÃO criou.
+        const tableExists = await db.query(
+          `
+          SELECT COUNT(*)::int AS n
+          FROM information_schema.tables
+          WHERE table_schema = current_schema()
+            AND table_name = 'seo_publications'
+          `
+        );
+        expect(tableExists.rows[0].n).toBe(0);
+      } finally {
+        await db.end();
+      }
+    });
+  }, 120000);
+
   it("faz boot com RUN_MIGRATIONS=true sem cair em banco vazio", async () => {
     await withDatabase("boot", async ({ dbUrl }) => {
       const server = await startServerAndWait({
