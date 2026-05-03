@@ -4,6 +4,21 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FipeOption } from "@/lib/fipe/fipe-provider";
 
+/**
+ * Busca tolerante para o combobox FIPE: acentos removidos, lowercase,
+ * e o filtro divide a query em tokens (AND), não substring contíguo.
+ * Sem isso, o usuário que digita "Onix Plus 1.0 LT" não encontra o
+ * modelo, porque a FIPE registra como "ONIX SEDAN Plus LT 1.0 ...",
+ * com "SEDAN" entre "Onix" e "Plus".
+ */
+function normalizeForSearch(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 interface FipeComboboxProps {
   label: string;
   placeholder: string;
@@ -51,11 +66,17 @@ export function FipeCombobox({
   }, []);
 
   const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = normalizeForSearch(query);
 
-    if (!normalizedQuery) return options.slice(0, 12);
+    if (!normalizedQuery) return options.slice(0, 30);
 
-    return options.filter((item) => item.name.toLowerCase().includes(normalizedQuery)).slice(0, 12);
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    return options
+      .filter((item) => {
+        const haystack = normalizeForSearch(item.name);
+        return tokens.every((token) => haystack.includes(token));
+      })
+      .slice(0, 30);
   }, [options, query]);
 
   const showClear = clearable && !disabled && Boolean(value);
