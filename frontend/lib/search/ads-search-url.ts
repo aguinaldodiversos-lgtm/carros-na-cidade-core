@@ -6,9 +6,81 @@ export const PUBLIC_ADS_SEARCH_LIMIT_MAX = 50;
 /** Default de `/comprar` quando `limit` não está na query (máx. aceito pelo backend). */
 export const DEFAULT_COMPRAR_CATALOG_LIMIT = PUBLIC_ADS_SEARCH_LIMIT_MAX;
 
+/**
+ * Cap de cidades num filtro multi-cidade. Espelha
+ * `ADS_FILTER_LIMITS.CITY_SLUGS_MAX` no backend (src/modules/ads/filters/
+ * ads-filter.constants.js). Mantemos a constante duplicada porque o
+ * frontend não importa de src/ (boundary do Render rootDir=frontend).
+ * Em divergência, o backend é a fonte de verdade — frontend deve só
+ * limitar localmente para UX, validação real é no Zod.
+ */
+export const PUBLIC_ADS_SEARCH_CITY_SLUGS_MAX = 30;
+
+/** Slug oficial: slugify(nome) + '-' + uf, lowercase. */
+const CITY_SLUG_PATTERN = /^[a-z0-9-]+-[a-z]{2}$/;
+
 type SearchParamsReader = {
   get(name: string): string | null;
+  /**
+   * Opcional. Quando disponível (`URLSearchParams` nativo), permite ler
+   * chaves repetidas (`?city_slugs=a&city_slugs=b`). Wrappers leves que
+   * só implementam `.get` ainda funcionam: o parser lê a string única
+   * via `.get` e divide CSV em vírgulas.
+   */
+  getAll?(name: string): string[];
 };
+
+/**
+ * Normaliza array bruto de city_slugs (vindo de query string) para um
+ * array canônico: trim → lowercase → split CSV → dedup → validar regex →
+ * cap em PUBLIC_ADS_SEARCH_CITY_SLUGS_MAX.
+ *
+ * Slug inválido é descartado SILENCIOSAMENTE (mesmo padrão de toBoolean,
+ * toNumber neste arquivo: helpers nunca jogam — defaultam pra undefined).
+ *
+ * Retorna `undefined` quando o resultado fica vazio: equivale a omitir
+ * o parâmetro.
+ */
+function normalizeCitySlugs(rawValues: Iterable<string>): string[] | undefined {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const raw of rawValues) {
+    if (typeof raw !== "string") continue;
+    // Suporta CSV em qualquer elemento: ?city_slugs=a,b OU getAll() => ['a,b','c'].
+    for (const piece of raw.split(",")) {
+      const slug = piece.trim().toLowerCase();
+      if (!slug) continue;
+      if (seen.has(slug)) continue;
+      if (!CITY_SLUG_PATTERN.test(slug)) continue;
+      seen.add(slug);
+      out.push(slug);
+      if (out.length >= PUBLIC_ADS_SEARCH_CITY_SLUGS_MAX) {
+        return out;
+      }
+    }
+  }
+
+  return out.length > 0 ? out : undefined;
+}
+
+function readCitySlugsFromSearchParams(
+  searchParams: SearchParamsReader
+): string[] | undefined {
+  // Preferência: getAll() quando disponível (URLSearchParams nativo) — captura
+  // tanto `?city_slugs=a,b` (1 entry com CSV) quanto `?city_slugs=a&city_slugs=b`
+  // (2 entries). normalizeCitySlugs faz split CSV em qualquer elemento.
+  if (typeof searchParams.getAll === "function") {
+    const all = searchParams.getAll("city_slugs");
+    return normalizeCitySlugs(all);
+  }
+
+  // Fallback: reader minimalista (só `.get`). Captura só uma entrada,
+  // mas CSV continua sendo splittado.
+  const single = searchParams.get("city_slugs");
+  if (single == null) return undefined;
+  return normalizeCitySlugs([single]);
+}
 
 function toNumber(value: string | null): number | undefined {
   if (!value) return undefined;
@@ -65,7 +137,12 @@ export function canonicalTerritoryForApi(
   return out;
 }
 
-const TERRITORY_PARAM_KEYS = ["city_slug", "city_id", "city", "state"] as const;
+/**
+ * city_slugs entra na lista para o builder NÃO tentar serializá-lo via
+ * Object.entries — emissão é feita manualmente como CSV abaixo. Sem isso,
+ * `String(['a','b'])` daria 'a,b' por sorte mas dependeria do Array.toString.
+ */
+const TERRITORY_PARAM_KEYS = ["city_slug", "city_slugs", "city_id", "city", "state"] as const;
 
 /** Filtro canônico highlight_only; highlight= é alias legado (não confundir com sort=highlight). */
 function mergeHighlightFilterParams(
@@ -86,6 +163,7 @@ export function parseAdsSearchFiltersFromSearchParams(
     model: toStringOrUndefined(searchParams.get("model")),
     city_id: toNumber(searchParams.get("city_id")),
     city_slug: toStringOrUndefined(searchParams.get("city_slug")),
+    city_slugs: readCitySlugsFromSearchParams(searchParams),
     city: toStringOrUndefined(searchParams.get("city")),
     state: toStringOrUndefined(searchParams.get("state")),
     min_price: toNumber(searchParams.get("min_price")) ?? toNumber(searchParams.get("price_min")),
@@ -148,6 +226,17 @@ export function buildSearchQueryString(filters: AdsSearchFilters): string {
   else {
     if (territory.city) params.set("city", territory.city);
     if (territory.state) params.set("state", territory.state);
+  }
+
+  // Multi-cidade: emite CSV se houver array não-vazio. O backend aceita
+  // tanto CSV quanto chaves repetidas; CSV economiza bytes na URL e é
+  // mais legível em logs/SEO. Re-normaliza por defesa caso o caller passe
+  // o array com slugs duplicados, espaços ou capitalizações inconsistentes.
+  if (Array.isArray(filters.city_slugs) && filters.city_slugs.length > 0) {
+    const normalized = normalizeCitySlugs(filters.city_slugs);
+    if (normalized && normalized.length > 0) {
+      params.set("city_slugs", normalized.join(","));
+    }
   }
 
   return params.toString();

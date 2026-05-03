@@ -9,6 +9,22 @@ export interface AdsSearchFilters {
   model?: string;
   city_id?: number;
   city_slug?: string;
+  /**
+   * Filtro multi-cidade — preparação interna para a futura Página Regional.
+   *
+   * IMPORTANTE:
+   *   - `city_slugs[0]` é a cidade-base por convenção. A ordem do array é
+   *     semanticamente significativa: o backend dá +60 pontos de boost
+   *     (`baseCityBoostExpr` em src/modules/ads/filters/ads-ranking.sql.js)
+   *     a anúncios cuja `c.slug = city_slugs[0]`, dentro da mesma camada
+   *     comercial. Inverter a ordem inverte qual cidade ganha preferência.
+   *   - Uso restrito: este campo deve ser populado apenas por fluxos
+   *     controlados (ex.: BFF da Página Regional via
+   *     `frontend/lib/regions/fetch-region.ts`). Páginas atuais
+   *     (/comprar/cidade, /cidade, /carros-em) NÃO devem populá-lo.
+   *   - Backend valida com regex `^[a-z0-9-]+-[a-z]{2}$` e cap de 30.
+   */
+  city_slugs?: string[];
   city?: string;
   state?: string;
   /** Anúncios do mesmo anunciante (ex.: loja). */
@@ -326,6 +342,22 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
     appendIfPresent(params, "city", territory.city);
     appendIfPresent(params, "state", territory.state);
   }
+
+  // Multi-cidade: emite CSV em paralelo a city_slug/city_id/city+state.
+  // Backend (Zod schema) aceita CSV e faz normalize (trim/lower/dedup/regex/cap).
+  // Aqui deixamos o caller responsável pela ordem (city_slugs[0] = base).
+  // Filtra elementos não-string/vazios por defesa, sem reaplicar regex
+  // (backend rejeita; frontend confia que callers controlados — Página Regional
+  // — passam slugs já válidos vindos de region_memberships).
+  if (Array.isArray(filters.city_slugs) && filters.city_slugs.length > 0) {
+    const cleaned = filters.city_slugs
+      .map((s) => (typeof s === "string" ? s.trim().toLowerCase() : ""))
+      .filter((s) => s.length > 0);
+    if (cleaned.length > 0) {
+      params.set("city_slugs", cleaned.join(","));
+    }
+  }
+
   appendIfPresent(params, "advertiser_id", filters.advertiser_id);
   appendIfPresent(params, "min_price", filters.min_price);
   appendIfPresent(params, "max_price", filters.max_price);
