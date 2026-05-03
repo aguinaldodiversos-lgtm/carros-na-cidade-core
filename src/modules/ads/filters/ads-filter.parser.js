@@ -61,8 +61,18 @@ function normalizeHighlightFilter(data) {
 }
 
 /**
- * Território canônico: city_slug > city_id > city+state (legado).
- * Remove AND redundante entre slug, id e texto/UF.
+ * Território canônico: city_slug > city_slugs > city_id > city+state (legado).
+ * Remove AND redundante entre slug, lista, id e texto/UF.
+ *
+ * Diferenças entre city_slug e city_slugs:
+ *   - city_slug (singular): wins sobre tudo, strip TUDO mais (slug encoda UF).
+ *   - city_slugs (plural):  multi-cidade. Strip city/city_id; mantém `state`
+ *     se presente (defesa em profundidade contra slug com UF errada/corrupta;
+ *     a confiança no slug não é total como no caso single-city porque é
+ *     possível alguém compor uma lista grande mal-formada).
+ *
+ * Mantém a regra atual de city_slug intacta — pré-requisito da trava
+ * "não quebrar city_slug atual".
  */
 function normalizeTerritoryFilters(data) {
   if (!data || typeof data !== "object") return data;
@@ -70,15 +80,27 @@ function normalizeTerritoryFilters(data) {
   const slug = typeof data.city_slug === "string" ? data.city_slug.trim() : "";
   if (slug) {
     const next = { ...data, city_slug: slug };
+    delete next.city_slugs;
     delete next.city_id;
     delete next.city;
     delete next.state;
     return next;
   }
 
+  if (Array.isArray(data.city_slugs) && data.city_slugs.length > 0) {
+    const next = { ...data, city_slugs: data.city_slugs };
+    delete next.city_slug;
+    delete next.city;
+    delete next.city_id;
+    // state PERMANECE se foi enviado: AND-ed com c.slug = ANY($n) no builder
+    // como safety net contra slugs com UF inconsistente.
+    return next;
+  }
+
   if (data.city_id != null && Number.isFinite(Number(data.city_id))) {
     const next = { ...data, city_id: Number(data.city_id) };
     delete next.city_slug;
+    delete next.city_slugs;
     delete next.city;
     delete next.state;
     return next;

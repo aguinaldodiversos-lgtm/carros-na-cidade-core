@@ -89,6 +89,84 @@ const sortParam = () =>
     )
     .default(ADS_DEFAULTS.sort);
 
+/**
+ * Slug oficial de cidade no projeto: `slugify(nome) + '-' + uf.toLowerCase()`.
+ * Sempre minúsculo, sempre termina com 2 letras (UF). Ver
+ * src/shared/utils/slugify.js + scripts/seed-ibge-municipios.mjs.
+ */
+const CITY_SLUG_PATTERN = /^[a-z0-9-]+-[a-z]{2}$/;
+
+/**
+ * Filtro multi-cidade (`city_slugs`) — preparado para a futura Página Regional.
+ *
+ * Aceita 3 formatos no querystring; tudo é normalizado para `string[]`:
+ *   CSV:           ?city_slugs=atibaia-sp,bragança-paulista-sp
+ *   Array:         ?city_slugs=atibaia-sp&city_slugs=jundiai-sp
+ *   Já como array: useful for service-to-service callers
+ *
+ * Regras:
+ *   - Cada elemento é trimado, lowercased, validado com CITY_SLUG_PATTERN.
+ *   - Duplicatas são removidas (ANY($n) ignora-as no SQL, mas reduz payload).
+ *   - Ordem é preservada (primeiro slug = cidade-base no caso da Página Regional).
+ *   - Limite: CITY_SLUGS_MAX (30). Acima disso, Zod rejeita o request todo.
+ *   - Vazio → undefined (não filtra nada; equivale a omitir o parâmetro).
+ *
+ * NOTA: a precedência entre `city_slug` (singular) e `city_slugs` (plural)
+ * é decidida no parser (`normalizeTerritoryFilters`), não aqui. Aqui só
+ * validamos o shape.
+ */
+const citySlugsParam = () =>
+  z.preprocess(
+    (value) => {
+      if (value === undefined || value === null) return undefined;
+
+      // Array já vindo (Express/Next URL com chave repetida ou caller programático).
+      if (Array.isArray(value)) {
+        const cleaned = Array.from(
+          new Set(
+            value
+              .map((s) => String(s ?? "").trim().toLowerCase())
+              .filter(Boolean)
+          )
+        );
+        return cleaned.length > 0 ? cleaned : undefined;
+      }
+
+      // CSV string (uso comum em URLs SEO-friendly).
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return undefined;
+        const cleaned = Array.from(
+          new Set(
+            trimmed
+              .split(",")
+              .map((s) => s.trim().toLowerCase())
+              .filter(Boolean)
+          )
+        );
+        return cleaned.length > 0 ? cleaned : undefined;
+      }
+
+      return undefined;
+    },
+    // .optional() aqui dentro: aceita o `undefined` que o preprocess pode
+    // devolver para CSV vazio/null/outros tipos. Se ficasse fora do
+    // preprocess, o array schema receberia undefined e jogaria "Required".
+    z
+      .array(
+        z
+          .string()
+          .min(3)
+          .max(ADS_FILTER_LIMITS.CITY_SLUG_MAX_LENGTH)
+          .regex(CITY_SLUG_PATTERN, { message: "city_slugs[i]: slug inválido." })
+      )
+      .min(1)
+      .max(ADS_FILTER_LIMITS.CITY_SLUGS_MAX, {
+        message: `city_slugs: máximo de ${ADS_FILTER_LIMITS.CITY_SLUGS_MAX} cidades.`,
+      })
+      .optional()
+  );
+
 /* =========================================================
    Base object (ZodObject) — serve para .pick() / .shape
 ========================================================= */
@@ -106,6 +184,12 @@ const adsFilterQueryBase = z.object({
 
   // território (legado por texto; city_slug/city_id vêm por passthrough e são normalizados no parser)
   city: optionalTrimmedStringMax(ADS_FILTER_LIMITS.CITY_MAX_LENGTH),
+  /**
+   * Multi-cidade (preparação interna para Página Regional). Aceita CSV ou array.
+   * Precedência (definida no parser): city_slug (singular) > city_slugs > city_id > city+state.
+   * Ver `citySlugsParam` no header deste arquivo.
+   */
+  city_slugs: citySlugsParam(),
   state: z
     .preprocess(
       emptyToUndef,

@@ -28,6 +28,17 @@ export const ADS_FILTER_LIMITS = Object.freeze({
   MILEAGE_MAX: 9999999,
 
   STATE_LENGTH: 2,
+
+  /**
+   * Teto de cidades-membro num filtro multi-cidade (`city_slugs`).
+   * 30 = layer 1 max (12) + layer 2 max (18) do build-region-memberships.mjs.
+   * Se a Página Regional vier a precisar de mais cidades, ajustar AQUI e
+   * confirmar que o índice em `cities.slug` aguenta o ANY($n) com payload maior.
+   */
+  CITY_SLUGS_MAX: 30,
+
+  /** Tamanho máximo de cada slug individual na lista city_slugs (defesa contra abuso). */
+  CITY_SLUG_MAX_LENGTH: 80,
 });
 
 // Ordem canônica de território na busca: city_slug (c.slug) > city_id > city + state (legado).

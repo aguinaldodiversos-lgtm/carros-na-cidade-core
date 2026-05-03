@@ -20,6 +20,7 @@ export function buildAdsSearchQuery(filters = {}) {
     q,
     city_id,
     city_slug,
+    city_slugs,
     city,
     state,
     brand,
@@ -70,6 +71,16 @@ export function buildAdsSearchQuery(filters = {}) {
 
   if (city_slug) {
     pushFilter(where, params, `c.slug = ?`, city_slug);
+  } else if (Array.isArray(city_slugs) && city_slugs.length > 0) {
+    // Multi-cidade (preparação interna para Página Regional). Usa ANY($n)
+    // com array — postgres.js / node-postgres serializa para text[] no
+    // protocolo binário, índice em cities.slug atende. Se `state` for
+    // passado junto, AND-ed como safety net (defesa contra slug
+    // inconsistente vs UF gravada em ads.state). Ver normalizeTerritoryFilters.
+    params.push(city_slugs);
+    where.push(`c.slug = ANY($${params.length})`);
+    if (state)
+      pushFilter(where, params, `UPPER(COALESCE(a.state, c.state)) = ?`, state.toUpperCase());
   } else if (city_id) {
     pushFilter(where, params, `a.city_id = ?`, Number(city_id));
   } else {
