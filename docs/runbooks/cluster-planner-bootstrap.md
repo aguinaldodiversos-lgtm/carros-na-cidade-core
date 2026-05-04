@@ -583,12 +583,47 @@ primária vence. Não há flag, não há toggle: a presença de dados em
 `slug`, `stage`. Os demais campos são preenchidos para auditoria + para
 quando o scoring real assumir.
 
-### 9.4 Limitações conhecidas do fallback
+### 9.4 Filtro de slug canônico (defesa em camadas)
 
-- **Slugs malformados não são corrigidos.** A query exclui `NULL` e `''`,
-  mas não valida formato (espaço, acento, etc.). Se uma cidade tiver
-  slug ruim, o cluster plan herdará o problema. Endereçar em runbook
-  próprio (`cities-slug-cleanup.md`) — fora do escopo do bootstrap.
+Dry-run real em prod (2026-05-04) revelou São Paulo com slug
+`sæo-paulo` (não-ASCII). Sem filtro, o script teria gerado
+`/carros-em/sæo-paulo` e `/carros-baratos-em/sæo-paulo` — URLs
+impublicáveis em sitemap.
+
+**Fix aplicado (defesa em camadas):**
+
+1. **SQL do fallback** filtra slug por regex POSIX:
+   ```sql
+   AND c.slug ~ '^[a-z0-9-]+-[a-z]{2}$'
+   ```
+   Slugs malformados nunca chegam ao service.
+
+2. **Transformer** valida formato pós-`requireNonEmpty`. Se `city_scores`
+   um dia trouxer slug ruim, o transformer lança e o script aborta o
+   batch inteiro (fail-fast pré-persist).
+
+**Padrão aceito** (definido em
+[`VALID_SLUG_REGEX`](../../src/modules/seo/planner/cluster-plan-canonical-transform.js)):
+
+```
+^[a-z0-9-]+-[a-z]{2}$
+```
+
+| Slug | Aceito? |
+|---|---|
+| `atibaia-sp` | ✅ |
+| `braganca-paulista-sp` | ✅ |
+| `sæo-paulo` | ❌ não-ASCII |
+| `sao-paulo` | ❌ sem UF |
+| `são-paulo-sp` | ❌ acento |
+| `Atibaia-SP` | ❌ uppercase |
+
+**Cleanup do dado de São Paulo (e potencialmente outras cidades) fica
+para runbook próprio** (`cities-slug-cleanup.md`). Bootstrap não toca
+banco — só filtra leitura.
+
+### 9.5 Outras limitações conhecidas do fallback
+
 - **Ranking é proxy local.** Ordenação por `COUNT(active_ads)` ignora
   fatores que `city_scores` consideraria (leads, sazonalidade, score
   territorial). Isso é aceitável no bootstrap (≤ poucas dezenas de

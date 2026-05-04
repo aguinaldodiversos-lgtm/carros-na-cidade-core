@@ -48,6 +48,26 @@ const KNOWN_CLUSTER_TYPES = Object.freeze([
   "city_brand_model",
 ]);
 
+/**
+ * Padrão canônico de slug de cidade: ASCII lowercase + dígitos + hífens,
+ * com sufixo de UF de duas letras. Exemplos válidos: `atibaia-sp`,
+ * `braganca-paulista-sp`, `s-jose-dos-campos-sp`. Inválidos: `sæo-paulo`
+ * (não-ASCII), `sao-paulo` (sem UF), `SP-Atibaia` (uppercase, prefixo UF),
+ * `atibaia` (sem UF).
+ *
+ * Bootstrap inicial só persiste cidades que casam este padrão. Slugs
+ * malformados ficam fora do sitemap até o cleanup de dados ser feito em
+ * runbook próprio (`cities-slug-cleanup.md`, fora do escopo do bootstrap).
+ *
+ * Compartilhada com `cluster-planner.repository.js` via `.source` para
+ * embutir no SQL do fallback (`c.slug ~ '<source>'`). Mudou aqui? Mudou lá.
+ */
+export const VALID_SLUG_REGEX = /^[a-z0-9-]+-[a-z]{2}$/;
+
+function isValidCanonicalSlug(slug) {
+  return typeof slug === "string" && VALID_SLUG_REGEX.test(slug);
+}
+
 function normalizeSlugPart(value) {
   // Mantém comportamento de cluster-planner.tasks.js (trim + lowercase, sem encode).
   return String(value || "")
@@ -74,6 +94,19 @@ export function transformClusterPlanToCanonicalPath(cluster, city) {
   }
 
   const slug = requireNonEmpty(city.slug, "city.slug", `cluster_type=${cluster.cluster_type}`);
+
+  // Validação de formato — fail-fast. Aplica a TODOS os tipos (mesmo
+  // os skipados): slug malformado é sempre sinal de dado upstream
+  // defeituoso, e o script (runBootstrap) tem fail-fast pré-persist
+  // para abortar o batch inteiro quando um cluster falha transformação.
+  // O fallback do repository já filtra antes via SQL; esta validação é
+  // rede de segurança caso `city_scores` (fonte primária) traga lixo.
+  if (!isValidCanonicalSlug(slug)) {
+    throw new Error(
+      `transformClusterPlanToCanonicalPath: city.slug fora do padrão canônico ${VALID_SLUG_REGEX.source} (cluster_type=${cluster.cluster_type}, slug=${JSON.stringify(slug)})`
+    );
+  }
+
   const clusterType = cluster.cluster_type;
 
   switch (clusterType) {
@@ -122,4 +155,5 @@ export function transformClusterPlanToCanonicalPath(cluster, city) {
 export const __TEST_ONLY__ = Object.freeze({
   KNOWN_CLUSTER_TYPES,
   normalizeSlugPart,
+  isValidCanonicalSlug,
 });

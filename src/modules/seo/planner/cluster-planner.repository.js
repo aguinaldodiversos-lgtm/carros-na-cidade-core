@@ -1,4 +1,5 @@
 import { pool } from "../../../infrastructure/database/db.js";
+import { VALID_SLUG_REGEX } from "./cluster-plan-canonical-transform.js";
 
 /**
  * SQL primário: lê do ranking territorial (`city_scores`).
@@ -29,7 +30,7 @@ const SQL_PRIMARY = `
 
 /**
  * SQL de fallback (bootstrap inicial): seleciona cidades com anúncios
- * ativos e slug válido, ordenadas pelo volume de anúncios.
+ * ativos e slug **canônico** (ASCII + UF), ordenadas pelo volume de anúncios.
  *
  * Por que existe?
  * Em ambientes onde `city_scores` ainda não foi alimentada (bootstrap
@@ -38,6 +39,13 @@ const SQL_PRIMARY = `
  * Este fallback usa a cardinalidade de `ads` (status='active') para
  * eleger as N cidades com maior densidade de anúncios — proxy razoável
  * de "cidades com conteúdo real para indexar".
+ *
+ * Filtro de slug:
+ * O regex `^[a-z0-9-]+-[a-z]{2}$` é a fonte única de verdade definida
+ * em `cluster-plan-canonical-transform.js#VALID_SLUG_REGEX`. Aqui é
+ * embutido via `.source`. Slugs malformados (`sæo-paulo`, `sao-paulo`
+ * sem UF, com acento, etc.) ficam fora do bootstrap inicial — cleanup
+ * de dados é runbook próprio (`cities-slug-cleanup.md`).
  *
  * Read-only por construção: SELECT puro, sem CTE de escrita, sem trigger.
  *
@@ -49,13 +57,6 @@ const SQL_PRIMARY = `
  *   - territorial_score / ranking_priority / total_ads = active_ads
  *     (proxy local; será sobrescrito quando o scoring real rodar).
  *   - total_leads = 0 (sem fonte de leads no bootstrap).
- *
- * Limitações conhecidas:
- *   - Não corrige slugs malformados (excluímos NULL/'' mas não validamos
- *     formato). Se uma cidade tiver slug com espaço/acento, o cluster
- *     plan herdará o problema — endereçar em runbook próprio.
- *   - Não respeita `cs.stage` legado (não há). Toda cidade vinda do
- *     fallback é `stage='seed'`.
  */
 const SQL_FALLBACK_ADS = `
   SELECT
@@ -71,6 +72,7 @@ const SQL_FALLBACK_ADS = `
     AND a.city_id IS NOT NULL
     AND c.slug IS NOT NULL
     AND c.slug <> ''
+    AND c.slug ~ '${VALID_SLUG_REGEX.source}'
   GROUP BY c.id, c.name, c.state, c.slug
   ORDER BY COUNT(a.id) DESC, c.id ASC
   LIMIT $1

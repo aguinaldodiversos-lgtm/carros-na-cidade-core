@@ -218,6 +218,78 @@ describe("listTopCitiesForClusterPlanning — invariantes read-only", () => {
     expect(sql).toMatch(/a\.status = 'active'/);
     expect(sql).toMatch(/a\.city_id IS NOT NULL/);
   });
+
+  it("SQL fallback filtra slug pelo regex canônico ^[a-z0-9-]+-[a-z]{2}$", () => {
+    const sql = __TEST_ONLY__.SQL_FALLBACK_ADS;
+    // O regex é interpolado de VALID_SLUG_REGEX.source pra garantir
+    // single source of truth com o transformer.
+    expect(sql).toMatch(/c\.slug ~ '\^\[a-z0-9-\]\+-\[a-z\]\{2\}\$'/);
+  });
+});
+
+describe("listTopCitiesForClusterPlanning — filtro de slug canônico no fallback", () => {
+  it("aceita atibaia-sp e braganca-paulista-sp (slugs canônicos)", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [] }) // primary vazia → ativa fallback
+      .mockResolvedValueOnce({
+        rows: [ATIBAIA_FALLBACK_ROW, BRAGANCA_FALLBACK_ROW],
+      });
+
+    const result = await listTopCitiesForClusterPlanning(10);
+    const slugs = result.map((r) => r.slug);
+    expect(slugs).toContain("atibaia-sp");
+    expect(slugs).toContain("braganca-paulista-sp");
+  });
+
+  it("ordena por active_ads DESC (primário pelo SQL ORDER BY; teste preserva a ordem)", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          { ...ATIBAIA_FALLBACK_ROW, active_ads: 9 },
+          { ...BRAGANCA_FALLBACK_ROW, active_ads: 3 },
+        ],
+      });
+
+    const result = await listTopCitiesForClusterPlanning(10);
+    expect(result[0].active_ads ?? result[0].total_ads).toBeGreaterThanOrEqual(
+      result[1].total_ads
+    );
+    expect(result[0].slug).toBe("atibaia-sp"); // 9 ads vem antes
+  });
+
+  // As asserções abaixo verificam o regex que compõe o filtro SQL —
+  // cobrindo o critério funcional pedido (excluir sæo-paulo, sao-paulo,
+  // são-paulo etc) sem precisar de Postgres real.
+  it("regex canônico aceita slug atibaia-sp", async () => {
+    const { VALID_SLUG_REGEX } = await import("./cluster-plan-canonical-transform.js");
+    expect(VALID_SLUG_REGEX.test("atibaia-sp")).toBe(true);
+  });
+
+  it("regex canônico aceita slug braganca-paulista-sp", async () => {
+    const { VALID_SLUG_REGEX } = await import("./cluster-plan-canonical-transform.js");
+    expect(VALID_SLUG_REGEX.test("braganca-paulista-sp")).toBe(true);
+  });
+
+  it("regex canônico EXCLUI sæo-paulo (não-ASCII)", async () => {
+    const { VALID_SLUG_REGEX } = await import("./cluster-plan-canonical-transform.js");
+    expect(VALID_SLUG_REGEX.test("sæo-paulo")).toBe(false);
+  });
+
+  it("regex canônico EXCLUI sao-paulo (sem UF)", async () => {
+    const { VALID_SLUG_REGEX } = await import("./cluster-plan-canonical-transform.js");
+    expect(VALID_SLUG_REGEX.test("sao-paulo")).toBe(false);
+  });
+
+  it("regex canônico EXCLUI são-paulo-sp (com acento)", async () => {
+    const { VALID_SLUG_REGEX } = await import("./cluster-plan-canonical-transform.js");
+    expect(VALID_SLUG_REGEX.test("são-paulo-sp")).toBe(false);
+  });
+
+  it("regex canônico EXCLUI Atibaia-SP (uppercase)", async () => {
+    const { VALID_SLUG_REGEX } = await import("./cluster-plan-canonical-transform.js");
+    expect(VALID_SLUG_REGEX.test("Atibaia-SP")).toBe(false);
+  });
 });
 
 describe("projectFallbackRow — mapping defensivo", () => {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { transformClusterPlanToCanonicalPath } from "./cluster-plan-canonical-transform.js";
+import {
+  transformClusterPlanToCanonicalPath,
+  VALID_SLUG_REGEX,
+} from "./cluster-plan-canonical-transform.js";
 
 const ATIBAIA = Object.freeze({
   city_id: 4761,
@@ -116,6 +119,79 @@ describe("transformClusterPlanToCanonicalPath — validação fail-fast", () => 
     expect(() => transformClusterPlanToCanonicalPath(cluster, ATIBAIA)).toThrow(
       /cluster_type desconhecido.*city_super_estranho/
     );
+  });
+});
+
+describe("transformClusterPlanToCanonicalPath — validação de slug canônico", () => {
+  it("slug com não-ASCII (sæo-paulo) → throw fail-fast", () => {
+    const badCity = { ...ATIBAIA, slug: "sæo-paulo" };
+    expect(() => transformClusterPlanToCanonicalPath(makeCluster("city_home"), badCity)).toThrow(
+      /slug fora do padrão canônico/
+    );
+  });
+
+  it("slug sem UF (sao-paulo) → throw", () => {
+    const badCity = { ...ATIBAIA, slug: "sao-paulo" };
+    expect(() => transformClusterPlanToCanonicalPath(makeCluster("city_home"), badCity)).toThrow(
+      /slug fora do padrão canônico/
+    );
+  });
+
+  it("slug com acento (são-paulo-sp) → throw", () => {
+    const badCity = { ...ATIBAIA, slug: "são-paulo-sp" };
+    expect(() => transformClusterPlanToCanonicalPath(makeCluster("city_home"), badCity)).toThrow(
+      /slug fora do padrão canônico/
+    );
+  });
+
+  it("slug uppercase (Atibaia-SP) → throw", () => {
+    const badCity = { ...ATIBAIA, slug: "Atibaia-SP" };
+    expect(() => transformClusterPlanToCanonicalPath(makeCluster("city_home"), badCity)).toThrow(
+      /slug fora do padrão canônico/
+    );
+  });
+
+  it("slug sem nada antes do UF (-sp) → throw", () => {
+    const badCity = { ...ATIBAIA, slug: "-sp" };
+    expect(() => transformClusterPlanToCanonicalPath(makeCluster("city_home"), badCity)).toThrow(
+      /slug fora do padrão canônico/
+    );
+  });
+
+  it("slug válido (atibaia-sp) → não throw, retorna /carros-em/atibaia-sp", () => {
+    const result = transformClusterPlanToCanonicalPath(makeCluster("city_home"), ATIBAIA);
+    expect(result).toBe("/carros-em/atibaia-sp");
+  });
+
+  it("slug válido com múltiplos hífens (braganca-paulista-sp) → não throw", () => {
+    const ok = { ...ATIBAIA, slug: "braganca-paulista-sp" };
+    const result = transformClusterPlanToCanonicalPath(makeCluster("city_home"), ok);
+    expect(result).toBe("/carros-em/braganca-paulista-sp");
+  });
+
+  it("validação de slug aplica MESMO para tipos skipados (fail-fast antes do switch)", () => {
+    // Slug inválido em city_brand/city_brand_model/city_opportunities
+    // (que retornariam null) ainda assim throwa — sinal de dado upstream
+    // defeituoso vale para qualquer tipo.
+    const badCity = { ...ATIBAIA, slug: "sæo-paulo" };
+    for (const ct of ["city_opportunities", "city_brand", "city_brand_model"]) {
+      const cluster = makeCluster(ct, { brand: "Honda", model: "Civic" });
+      expect(() => transformClusterPlanToCanonicalPath(cluster, badCity)).toThrow(
+        /slug fora do padrão canônico/
+      );
+    }
+  });
+
+  it("erro inclui o slug ofensivo e o cluster_type para diagnóstico", () => {
+    const badCity = { ...ATIBAIA, slug: "sæo-paulo" };
+    try {
+      transformClusterPlanToCanonicalPath(makeCluster("city_home"), badCity);
+      throw new Error("deveria ter throwado");
+    } catch (err) {
+      expect(err.message).toContain("sæo-paulo");
+      expect(err.message).toContain("city_home");
+      expect(err.message).toContain(VALID_SLUG_REGEX.source);
+    }
   });
 });
 

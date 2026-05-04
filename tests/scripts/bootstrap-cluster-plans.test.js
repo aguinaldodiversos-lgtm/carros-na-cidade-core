@@ -396,6 +396,91 @@ describe("runBootstrap — bootstrap inicial via fallback (stage=seed)", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
+// runBootstrap — slug malformado é abortado pelo transformer (fail-fast)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("runBootstrap — slug malformado em uma das cidades", () => {
+  it("usando transformer real: cidade com slug 'sæo-paulo' aborta o batch sem persistir", async () => {
+    // Cenário do dry-run em produção: fallback retornou Atibaia, Bragança
+    // e (por hipótese) São Paulo com slug 'sæo-paulo'. O transformer real
+    // valida formato e aborta. Atibaia e Bragança NÃO são persistidas
+    // (fail-fast pré-persist). Operador deve corrigir dado upstream antes.
+    const persist = vi.fn();
+    const plans = [
+      makePlan("atibaia-sp"),
+      makePlan("braganca-paulista-sp"),
+      makePlan("sæo-paulo"), // slug malformado → transformer throw
+    ];
+
+    const result = await runBootstrap({
+      limit: 3,
+      dryRun: false,
+      build: async () => plans,
+      persist,
+      log: () => {},
+      // sem `transform` injetado → usa o real (transformClusterPlanToCanonicalPath)
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("transform_errors");
+    expect(persist).not.toHaveBeenCalled();
+
+    // Erros devem mencionar 'sæo-paulo' e o regex canônico
+    const errorsForBadCity = result.transformErrors.filter(
+      (e) => e.city === "sæo-paulo"
+    );
+    expect(errorsForBadCity.length).toBeGreaterThan(0);
+    for (const e of errorsForBadCity) {
+      expect(e.error).toMatch(/slug fora do padrão canônico/);
+    }
+  });
+
+  it("se o fallback já filtrou (build retorna só 2 cidades válidas), processa normalmente", async () => {
+    // Cenário esperado pós-fix: SQL do fallback exclui sæo-paulo, planner
+    // só recebe atibaia-sp + braganca-paulista-sp, dry-run roda limpo.
+    const plans = [makePlan("atibaia-sp"), makePlan("braganca-paulista-sp")];
+
+    const result = await runBootstrap({
+      limit: 3, // pediu 3, mas fallback só achou 2 válidas
+      dryRun: true,
+      build: async () => plans,
+      persist: vi.fn(),
+      log: () => {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.totals.totalCities).toBe(2);
+    expect(result.totals.totalGenerated).toBe(10); // 2 × 5
+    expect(result.totals.totalSkipped).toBe(6); // (opp+brand+brand_model) × 2
+    expect(result.totals.totalToPersist).toBe(4); // (home+below_fipe) × 2
+    expect(result.totals.totalErrors).toBeUndefined(); // só aparece em transformErrors quando há
+  });
+
+  it("nenhum sample/persist contém path com sæo-paulo (sanity)", async () => {
+    const persist = vi.fn();
+    const logger = makeLogger();
+
+    // Build retorna 2 cidades limpas (simulando fallback funcionando).
+    await runBootstrap({
+      limit: 3,
+      dryRun: false,
+      build: async () => [makePlan("atibaia-sp"), makePlan("braganca-paulista-sp")],
+      persist,
+      log: logger.log,
+    });
+
+    for (const [args] of persist.mock.calls) {
+      expect(args.path).not.toContain("sæo");
+      expect(args.path).not.toContain("são");
+    }
+    for (const call of logger.calls) {
+      const text = call.msg + JSON.stringify(call.meta || {});
+      expect(text).not.toContain("sæo");
+    }
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
 // runBootstrap — fail-fast em erro de transformação
 // ───────────────────────────────────────────────────────────────────────────
 
