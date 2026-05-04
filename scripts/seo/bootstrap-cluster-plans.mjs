@@ -34,12 +34,49 @@
  *   idempotente, sem duplicar.
  */
 
-import "dotenv/config";
-
-import { buildTopCitiesClusterPlans } from "../../src/modules/seo/planner/cluster-planner.service.js";
-import { upsertClusterPlan } from "../../src/modules/seo/planner/cluster-plan.repository.js";
+// Apenas o transformer é importado estaticamente — é módulo puro, sem
+// efeitos colaterais e sem leitura de process.env, então é seguro rodar
+// no parse-time. Os módulos que tocam o banco (db.js, repository, service)
+// são importados dinamicamente no entry-point CLI, DEPOIS do
+// `loadDotenvIfAvailable()` rodar — isso garante que process.env já esteja
+// hidratado quando `env.js` faz `parseEnv()` no module-load.
 import { transformClusterPlanToCanonicalPath } from "../../src/modules/seo/planner/cluster-plan-canonical-transform.js";
-import { closeDatabasePool } from "../../src/infrastructure/database/db.js";
+
+/**
+ * dotenv é opcional aqui — em ambientes como o Render, as variáveis já
+ * vêm do orquestrador e o pacote `dotenv` pode não estar disponível pro
+ * processo (extensão .mjs / install de produção / etc.). Em dev local
+ * com `.env` na raiz, ele continua sendo carregado quando presente.
+ *
+ * Falha silenciosa SOMENTE para ERR_MODULE_NOT_FOUND. Qualquer outro
+ * erro (parse de .env corrompido, etc.) sobe — não vamos mascarar bug.
+ *
+ * Exportada para teste; também chamada antes de qualquer import dinâmico
+ * que precise de process.env populado (`db.js` → `env.js#parseEnv`).
+ */
+export async function loadDotenvIfAvailable({
+  importer = (spec) => import(spec),
+} = {}) {
+  try {
+    const dotenv = await importer("dotenv");
+    const config =
+      typeof dotenv?.config === "function"
+        ? dotenv.config
+        : typeof dotenv?.default?.config === "function"
+          ? dotenv.default.config
+          : null;
+    if (!config) {
+      return { loaded: false, reason: "no-config-fn" };
+    }
+    config();
+    return { loaded: true };
+  } catch (error) {
+    if (error?.code === "ERR_MODULE_NOT_FOUND") {
+      return { loaded: false, reason: "module-not-found" };
+    }
+    throw error;
+  }
+}
 
 const DEFAULT_LIMIT = 5;
 const SAMPLE_LOG_MAX = 10;
@@ -252,7 +289,21 @@ const isMainModule = import.meta.url === `file://${process.argv[1]}` ||
 
 if (isMainModule) {
   const args = parseArgs(process.argv);
+
+  // Carregar .env ANTES dos imports que tocam env.js — env.js#parseEnv
+  // roda no module-load e consome process.env imediatamente.
+  await loadDotenvIfAvailable();
+
+  let closeDatabasePool = async () => {};
   try {
+    const [{ buildTopCitiesClusterPlans }, { upsertClusterPlan }, dbModule] =
+      await Promise.all([
+        import("../../src/modules/seo/planner/cluster-planner.service.js"),
+        import("../../src/modules/seo/planner/cluster-plan.repository.js"),
+        import("../../src/infrastructure/database/db.js"),
+      ]);
+    closeDatabasePool = dbModule.closeDatabasePool;
+
     const result = await runBootstrap({
       limit: args.limit,
       dryRun: args.dryRun,

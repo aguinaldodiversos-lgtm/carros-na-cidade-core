@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  loadDotenvIfAvailable,
   parseArgs,
   runBootstrap,
 } from "../../scripts/seo/bootstrap-cluster-plans.mjs";
@@ -40,6 +41,69 @@ function makeLogger() {
     calls,
   };
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// loadDotenvIfAvailable — dotenv é opcional (Render já tem env populada)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("loadDotenvIfAvailable — dotenv opcional", () => {
+  it("retorna {loaded:true} quando dotenv está presente (importer real)", async () => {
+    // No ambiente de teste local, dotenv está instalado — happy path real.
+    const result = await loadDotenvIfAvailable();
+    expect(result.loaded).toBe(true);
+  });
+
+  it("retorna {loaded:false, reason:'module-not-found'} quando dotenv falta (Render-like)", async () => {
+    const importer = vi.fn(() => {
+      const err = new Error("Cannot find package 'dotenv'");
+      err.code = "ERR_MODULE_NOT_FOUND";
+      throw err;
+    });
+    const result = await loadDotenvIfAvailable({ importer });
+    expect(result).toEqual({ loaded: false, reason: "module-not-found" });
+    expect(importer).toHaveBeenCalledWith("dotenv");
+  });
+
+  it("propaga erros que NÃO sejam ERR_MODULE_NOT_FOUND (não mascara bug)", async () => {
+    const importer = vi.fn(() => {
+      throw new Error("kaboom — .env corrompido");
+    });
+    await expect(loadDotenvIfAvailable({ importer })).rejects.toThrow(/kaboom/);
+  });
+
+  it("usa dotenv.config quando o módulo o expõe na raiz", async () => {
+    const config = vi.fn();
+    const importer = vi.fn(async () => ({ config }));
+    const result = await loadDotenvIfAvailable({ importer });
+    expect(config).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ loaded: true });
+  });
+
+  it("usa dotenv.default.config quando o módulo só expõe via default", async () => {
+    const config = vi.fn();
+    const importer = vi.fn(async () => ({ default: { config } }));
+    const result = await loadDotenvIfAvailable({ importer });
+    expect(config).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ loaded: true });
+  });
+
+  it("retorna {loaded:false, reason:'no-config-fn'} se dotenv vier sem .config", async () => {
+    const importer = vi.fn(async () => ({}));
+    const result = await loadDotenvIfAvailable({ importer });
+    expect(result).toEqual({ loaded: false, reason: "no-config-fn" });
+  });
+
+  it("não persiste no banco — função é puramente side-effect em process.env", async () => {
+    // Sanity: confirmar que loadDotenvIfAvailable não importa nada de DB.
+    // O importer mockado nunca é chamado com 'pg' / db.js / etc.
+    const importer = vi.fn(async () => ({ config: () => {} }));
+    await loadDotenvIfAvailable({ importer });
+    for (const call of importer.mock.calls) {
+      expect(call[0]).toBe("dotenv");
+      expect(call[0]).not.toMatch(/db\.js|pg|repository|service/);
+    }
+  });
+});
 
 // ───────────────────────────────────────────────────────────────────────────
 // parseArgs
