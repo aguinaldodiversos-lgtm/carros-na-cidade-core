@@ -1,4 +1,9 @@
-import "dotenv/config";
+// Side-effect import: carrega dotenv OPCIONALMENTE antes de env.js avaliar
+// `parseEnv()`. Em ESM, imports rodam na ordem em que aparecem; portanto
+// este DEVE permanecer como o primeiro import do módulo. Ver
+// _load-dotenv-optional.js para a justificativa completa.
+import "./_load-dotenv-optional.js";
+
 import { Pool } from "pg";
 import { env } from "../../config/env.js";
 import { logger } from "../../shared/logger.js";
