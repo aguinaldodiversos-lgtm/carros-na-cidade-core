@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { rewriteCityHomeEntries } from "./cities.xml/route";
-import { buildLocalSeoTransitionEntries } from "./local-seo.xml/route";
-import { buildOpportunitiesTransitionEntries } from "./opportunities.xml/route";
+import {
+  buildLocalSeoTransitionEntries,
+  buildOpportunitiesTransitionEntries,
+  rewriteCityHomeEntries,
+} from "./_lib/transition-helpers";
 import type { PublicSitemapEntry } from "@/lib/seo/sitemap-client";
 
 describe("rewriteCityHomeEntries (cities.xml)", () => {
