@@ -177,7 +177,50 @@ describe("runBootstrap — modo persistência (--yes)", () => {
     expect(opportunitiesCall).toBeUndefined();
   });
 
-  it("totals.totalSkipped reflete city_opportunities ignorados", async () => {
+  it("city_brand é skipped no bootstrap inicial (Opção A; não chama persist)", async () => {
+    const persist = vi.fn();
+    await runBootstrap({
+      limit: 1,
+      dryRun: false,
+      build: async () => [makePlan("atibaia-sp")],
+      persist,
+      log: () => {},
+    });
+    const brandCall = persist.mock.calls.find(
+      ([args]) => args.clusterType === "city_brand"
+    );
+    expect(brandCall).toBeUndefined();
+  });
+
+  it("city_brand_model é skipped no bootstrap inicial (Opção A; não chama persist)", async () => {
+    const persist = vi.fn();
+    await runBootstrap({
+      limit: 1,
+      dryRun: false,
+      build: async () => [makePlan("atibaia-sp")],
+      persist,
+      log: () => {},
+    });
+    const brandModelCall = persist.mock.calls.find(
+      ([args]) => args.clusterType === "city_brand_model"
+    );
+    expect(brandModelCall).toBeUndefined();
+  });
+
+  it("apenas city_home e city_below_fipe são persistidos (bootstrap Opção A)", async () => {
+    const persist = vi.fn();
+    await runBootstrap({
+      limit: 1,
+      dryRun: false,
+      build: async () => [makePlan("atibaia-sp")],
+      persist,
+      log: () => {},
+    });
+    const persistedTypes = persist.mock.calls.map(([args]) => args.clusterType).sort();
+    expect(persistedTypes).toEqual(["city_below_fipe", "city_home"]);
+  });
+
+  it("totals.totalSkipped reflete city_opportunities + city_brand + city_brand_model ignorados (Opção A)", async () => {
     const result = await runBootstrap({
       limit: 1,
       dryRun: false,
@@ -185,11 +228,11 @@ describe("runBootstrap — modo persistência (--yes)", () => {
       persist: vi.fn(),
       log: () => {},
     });
-    // 1 city × 5 clusters; 1 skipped (city_opportunities); 4 persistidos
+    // 1 city × 5 clusters; 3 skipped (opportunities + brand + brand_model); 2 persistidos
     expect(result.totals.totalGenerated).toBe(5);
-    expect(result.totals.totalSkipped).toBe(1);
-    expect(result.totals.totalTransformed).toBe(4);
-    expect(result.totals.totalPersisted).toBe(4);
+    expect(result.totals.totalSkipped).toBe(3);
+    expect(result.totals.totalTransformed).toBe(2);
+    expect(result.totals.totalPersisted).toBe(2);
   });
 
   it("status='planned' e stage de city.stage propagados ao persist", async () => {
@@ -240,10 +283,51 @@ describe("runBootstrap — --limit", () => {
       log: () => {},
     });
     expect(result.totals.totalCities).toBe(3);
-    // 3 cidades × 5 clusters = 15 generated; 3 skipped (city_opportunities × 3); 12 persistidos
+    // Bootstrap Opção A: 3 cidades × 5 clusters = 15 generated;
+    // 9 skipped (opportunities + brand + brand_model por cidade); 6 persistidos
+    // (city_home + city_below_fipe por cidade).
     expect(result.totals.totalGenerated).toBe(15);
-    expect(result.totals.totalSkipped).toBe(3);
-    expect(result.totals.totalPersisted).toBe(12);
+    expect(result.totals.totalSkipped).toBe(9);
+    expect(result.totals.totalPersisted).toBe(6);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// runBootstrap — fluxo bootstrap inicial (city_scores vazia → fallback)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("runBootstrap — bootstrap inicial via fallback (stage=seed)", () => {
+  it("dry-run: 3 cidades vindas do fallback (stage='seed') → 15/9/6/0", async () => {
+    // Simula a saída de buildTopCitiesClusterPlans quando o fallback ads+cities
+    // alimenta o planner (city_scores vazia em produção bootstrap).
+    const fallbackPlans = [
+      makePlan("atibaia-sp", {
+        city: makeCity("atibaia-sp", { city_id: 4761, stage: "seed" }),
+      }),
+      makePlan("braganca-paulista-sp", {
+        city: makeCity("braganca-paulista-sp", { city_id: 4762, stage: "seed" }),
+      }),
+      makePlan("mairipora-sp", {
+        city: makeCity("mairipora-sp", { city_id: 4763, stage: "seed" }),
+      }),
+    ];
+
+    const result = await runBootstrap({
+      limit: 3,
+      dryRun: true,
+      build: async () => fallbackPlans,
+      persist: vi.fn(),
+      log: () => {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.dryRun).toBe(true);
+    expect(result.totals.totalCities).toBe(3);
+    expect(result.totals.totalGenerated).toBe(15);
+    expect(result.totals.totalSkipped).toBe(9);
+    expect(result.totals.totalToPersist).toBe(6);
+    expect(result.totals.totalTransformed).toBe(6);
+    expect(result.totals.totalPersisted).toBe(0); // dry-run nunca persiste
   });
 });
 

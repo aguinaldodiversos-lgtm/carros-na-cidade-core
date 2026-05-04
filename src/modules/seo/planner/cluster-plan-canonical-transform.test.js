@@ -53,30 +53,36 @@ describe("transformClusterPlanToCanonicalPath — Fase 1 reescrita", () => {
   });
 });
 
-describe("transformClusterPlanToCanonicalPath — skip explícito", () => {
+describe("transformClusterPlanToCanonicalPath — skip explícito (bootstrap Opção A)", () => {
   it("city_opportunities → null (skip; canonicaliza para a mesma URL que below_fipe transforma)", () => {
     const result = transformClusterPlanToCanonicalPath(makeCluster("city_opportunities"), ATIBAIA);
     expect(result).toBeNull();
   });
-});
 
-describe("transformClusterPlanToCanonicalPath — preserva tipos não tocados pela Fase 1", () => {
-  it("city_brand preserva /cidade/[slug]/marca/[brand_slug]", () => {
+  it("city_brand → null (skip; página está noindex,follow em produção)", () => {
     const cluster = makeCluster("city_brand", { brand: "Honda" });
     const result = transformClusterPlanToCanonicalPath(cluster, ATIBAIA);
-    expect(result).toBe("/cidade/atibaia-sp/marca/honda");
+    expect(result).toBeNull();
   });
 
-  it("city_brand normaliza brand para lowercase + trim (mesmo comportamento do builder original)", () => {
-    const cluster = makeCluster("city_brand", { brand: "  Honda  " });
+  it("city_brand → null mesmo sem brand definida (skip vence validação)", () => {
+    // Como o tipo é skipado, brand vazio NÃO deve gerar throw — o skip
+    // acontece antes de qualquer requisito de brand. Caller pula.
+    const cluster = makeCluster("city_brand", { brand: "" });
     const result = transformClusterPlanToCanonicalPath(cluster, ATIBAIA);
-    expect(result).toBe("/cidade/atibaia-sp/marca/honda");
+    expect(result).toBeNull();
   });
 
-  it("city_brand_model preserva /cidade/[slug]/marca/[brand_slug]/modelo/[model_slug]", () => {
+  it("city_brand_model → null (skip; página está noindex,follow em produção)", () => {
     const cluster = makeCluster("city_brand_model", { brand: "Honda", model: "Civic" });
     const result = transformClusterPlanToCanonicalPath(cluster, ATIBAIA);
-    expect(result).toBe("/cidade/atibaia-sp/marca/honda/modelo/civic");
+    expect(result).toBeNull();
+  });
+
+  it("city_brand_model → null mesmo sem brand/model definidos (skip vence validação)", () => {
+    const cluster = makeCluster("city_brand_model", { brand: "", model: "" });
+    const result = transformClusterPlanToCanonicalPath(cluster, ATIBAIA);
+    expect(result).toBeNull();
   });
 });
 
@@ -105,34 +111,6 @@ describe("transformClusterPlanToCanonicalPath — validação fail-fast", () => 
     );
   });
 
-  it("city_brand sem brand → throw", () => {
-    const cluster = makeCluster("city_brand", { brand: "" });
-    expect(() => transformClusterPlanToCanonicalPath(cluster, ATIBAIA)).toThrow(
-      /city_brand.*brand/
-    );
-  });
-
-  it("city_brand com brand whitespace → throw", () => {
-    const cluster = makeCluster("city_brand", { brand: "   " });
-    expect(() => transformClusterPlanToCanonicalPath(cluster, ATIBAIA)).toThrow(
-      /city_brand.*brand/
-    );
-  });
-
-  it("city_brand_model sem brand → throw", () => {
-    const cluster = makeCluster("city_brand_model", { brand: "", model: "Civic" });
-    expect(() => transformClusterPlanToCanonicalPath(cluster, ATIBAIA)).toThrow(
-      /city_brand_model.*brand/
-    );
-  });
-
-  it("city_brand_model sem model → throw", () => {
-    const cluster = makeCluster("city_brand_model", { brand: "Honda", model: "" });
-    expect(() => transformClusterPlanToCanonicalPath(cluster, ATIBAIA)).toThrow(
-      /city_brand_model.*model/
-    );
-  });
-
   it("cluster_type desconhecido → throw com listagem dos válidos", () => {
     const cluster = makeCluster("city_super_estranho");
     expect(() => transformClusterPlanToCanonicalPath(cluster, ATIBAIA)).toThrow(
@@ -142,7 +120,7 @@ describe("transformClusterPlanToCanonicalPath — validação fail-fast", () => 
 });
 
 describe("transformClusterPlanToCanonicalPath — invariantes globais", () => {
-  it("nenhum tipo retorna path com query string", () => {
+  it("nenhum tipo persistível retorna path com query string", () => {
     const cases = [
       { type: "city_home" },
       { type: "city_below_fipe" },
@@ -158,7 +136,7 @@ describe("transformClusterPlanToCanonicalPath — invariantes globais", () => {
     }
   });
 
-  it("nenhum tipo retorna path vazio", () => {
+  it("nenhum tipo persistível retorna path vazio", () => {
     const cases = [
       { type: "city_home" },
       { type: "city_below_fipe" },
@@ -171,6 +149,27 @@ describe("transformClusterPlanToCanonicalPath — invariantes globais", () => {
       if (result !== null) {
         expect(result.length).toBeGreaterThan(0);
         expect(result.startsWith("/")).toBe(true);
+      }
+    }
+  });
+
+  it("bootstrap Opção A: APENAS city_home e city_below_fipe são persistíveis; demais retornam null", () => {
+    const persistible = new Set(["city_home", "city_below_fipe"]);
+    const allTypes = [
+      "city_home",
+      "city_below_fipe",
+      "city_opportunities",
+      "city_brand",
+      "city_brand_model",
+    ];
+    for (const ct of allTypes) {
+      const cluster = makeCluster(ct, { brand: "Honda", model: "Civic" });
+      const result = transformClusterPlanToCanonicalPath(cluster, ATIBAIA);
+      if (persistible.has(ct)) {
+        expect(result).not.toBeNull();
+        expect(typeof result).toBe("string");
+      } else {
+        expect(result).toBeNull();
       }
     }
   });

@@ -450,23 +450,41 @@ node scripts/seo/bootstrap-cluster-plans.mjs --yes --dry-run   # --yes vence; pe
   Promoção para `'published'` continua dependendo do `cluster-executor.worker`
   (que opera em rows pendentes da tabela — fluxo separado).
 
-### Saída esperada do dry-run
+### Saída esperada do dry-run (bootstrap Opção A)
+
+> Política aplicada: ver
+> [cluster-plan-brand-model-policy.md](./cluster-plan-brand-model-policy.md).
+> Bootstrap inicial persiste **apenas** `city_home` e `city_below_fipe`.
+> `city_opportunities`, `city_brand` e `city_brand_model` são **skipados**
+> porque suas páginas estão `noindex,follow` em produção (sinal contraditório
+> se entrarem no sitemap antes de auditoria de canonical).
+
+Para `--limit=3`:
+
+- 3 cidades × 5 cluster_types = **15 generated**
+- **9 skipped** (`city_opportunities` + `city_brand` + `city_brand_model` por cidade)
+- **6 transformados/persistíveis** (`city_home` + `city_below_fipe` por cidade)
+- `city_home` sample: `/cidade/atibaia-sp` → `/carros-em/atibaia-sp`
+- `city_below_fipe` sample: `/cidade/atibaia-sp/abaixo-da-fipe` → `/carros-baratos-em/atibaia-sp`
+- `city_opportunities`: skipped
+- `city_brand`: skipped
+- `city_brand_model`: skipped
 
 ```
 [bootstrap-cluster-plans] iniciando {"limit":3,"dryRun":true}
 [bootstrap-cluster-plans] DRY-RUN: nenhuma escrita ao banco. Use --yes para persistir.
 [bootstrap-cluster-plans] plans construídos em memória {"totalCities":3}
-[bootstrap-cluster-plans] transformação concluída {"totalGenerated":15,"totalTransformed":12,"totalSkipped":3,"totalToPersist":12,"totalErrors":0}
+[bootstrap-cluster-plans] transformação concluída {"totalGenerated":15,"totalTransformed":6,"totalSkipped":9,"totalToPersist":6,"totalErrors":0}
 [bootstrap-cluster-plans] sample: city_home /cidade/atibaia-sp → /carros-em/atibaia-sp
 [bootstrap-cluster-plans] sample: city_below_fipe /cidade/atibaia-sp/abaixo-da-fipe → /carros-baratos-em/atibaia-sp
-[bootstrap-cluster-plans] sample: city_brand /cidade/atibaia-sp/marca/honda → /cidade/atibaia-sp/marca/honda
-[bootstrap-cluster-plans] sample: city_brand_model /cidade/atibaia-sp/marca/honda/modelo/civic → /cidade/atibaia-sp/marca/honda/modelo/civic
+[bootstrap-cluster-plans] sample: city_home /cidade/braganca-paulista-sp → /carros-em/braganca-paulista-sp
+[bootstrap-cluster-plans] sample: city_below_fipe /cidade/braganca-paulista-sp/abaixo-da-fipe → /carros-baratos-em/braganca-paulista-sp
 ... (até 10 amostras)
-[bootstrap-cluster-plans] DRY-RUN concluído. 12 plans seriam persistidos. Re-rodar com --yes para persistir.
+[bootstrap-cluster-plans] DRY-RUN concluído. 6 plans seriam persistidos. Re-rodar com --yes para persistir.
 ```
 
 (Output real depende do estado de produção — N de cidades × 5 cluster_types
-gerados por cidade − 1 skip de `city_opportunities` por cidade.)
+gerados por cidade − 3 skips por cidade no bootstrap inicial Opção A.)
 
 ### Plano de rollback
 
@@ -497,7 +515,106 @@ batch é **idempotente** — atualiza `updated_at` mas não duplica linhas.
 
 ---
 
-## 9. Próximo prompt recomendado
+## 9. Fonte de cidades — primária × fallback
+
+`buildTopCitiesClusterPlans` chama
+[`listTopCitiesForClusterPlanning`](../../src/modules/seo/planner/cluster-planner.repository.js)
+que opera em **duas fases**:
+
+### 9.1 Fonte primária (preferencial)
+
+```sql
+SELECT cs.city_id, c.name, c.state, c.slug, cs.stage,
+       cs.territorial_score, cs.ranking_priority, cs.total_ads, cs.total_leads
+FROM city_scores cs
+JOIN cities c ON c.id = cs.city_id
+ORDER BY cs.ranking_priority DESC, cs.territorial_score DESC
+LIMIT $1
+```
+
+`city_scores` é a fonte canônica do ranking territorial — alimentada pelo
+pipeline de scoring (worker próprio, fora do escopo deste runbook). Em
+regime estável, **só** essa fonte é consultada.
+
+### 9.2 Fallback (bootstrap inicial — só quando a primária retorna [])
+
+```sql
+SELECT
+  c.id AS city_id, c.name, c.state, c.slug,
+  'seed'::text AS stage,
+  COUNT(a.id)::int AS active_ads
+FROM cities c
+JOIN ads a ON a.city_id = c.id
+WHERE a.status = 'active'
+  AND a.city_id IS NOT NULL
+  AND c.slug IS NOT NULL
+  AND c.slug <> ''
+GROUP BY c.id, c.name, c.state, c.slug
+ORDER BY COUNT(a.id) DESC, c.id ASC
+LIMIT $1
+```
+
+**Por que existe:** auditoria de produção (2026-05-03) revelou
+`city_scores=0`, `city_targets=0`, `city_metrics` com 1 linha zerada.
+Sem o fallback, o dry-run retornava `totalCities=0` mesmo com 16 ads
+ativos e 5572 cidades. O fallback usa cardinalidade de `ads` como proxy
+de "cidade com conteúdo real" para destravar o bootstrap inicial.
+
+**Quando deixa de ser usado:** assim que `city_scores` for alimentada
+(>= 1 linha), o fallback nunca mais é tocado em runtime — a fonte
+primária vence. Não há flag, não há toggle: a presença de dados em
+`city_scores` é o sinal.
+
+### 9.3 Shape devolvido (compatível entre as duas fontes)
+
+| Campo | Primária (city_scores) | Fallback (ads+cities) |
+|---|---|---|
+| `city_id` | `cs.city_id` | `c.id` |
+| `name` | `c.name` | `c.name` |
+| `state` | `c.state` | `c.state` |
+| `slug` | `c.slug` | `c.slug` |
+| `stage` | `cs.stage` (real) | `'seed'` (fixo) |
+| `territorial_score` | `cs.territorial_score` | `active_ads` (proxy) |
+| `ranking_priority` | `cs.ranking_priority` | `active_ads` (proxy) |
+| `total_ads` | `cs.total_ads` | `active_ads` |
+| `total_leads` | `cs.total_leads` | `0` |
+
+`buildCityClusterPlan`/`buildStageClusters` consomem só `city_id`,
+`slug`, `stage`. Os demais campos são preenchidos para auditoria + para
+quando o scoring real assumir.
+
+### 9.4 Limitações conhecidas do fallback
+
+- **Slugs malformados não são corrigidos.** A query exclui `NULL` e `''`,
+  mas não valida formato (espaço, acento, etc.). Se uma cidade tiver
+  slug ruim, o cluster plan herdará o problema. Endereçar em runbook
+  próprio (`cities-slug-cleanup.md`) — fora do escopo do bootstrap.
+- **Ranking é proxy local.** Ordenação por `COUNT(active_ads)` ignora
+  fatores que `city_scores` consideraria (leads, sazonalidade, score
+  territorial). Isso é aceitável no bootstrap (≤ poucas dezenas de
+  cidades reais com anúncios), mas vira ruim em escala.
+- **`stage='seed'` força brand/model limits baixos**
+  ([cluster-planner.service.js:10](../../src/modules/seo/planner/cluster-planner.service.js)).
+  Aceitável: brand/model são skipados pelo transformer Opção A
+  ([cluster-plan-brand-model-policy.md](./cluster-plan-brand-model-policy.md))
+  de qualquer jeito; só `city_home` e `city_below_fipe` chegam ao DB.
+
+### 9.5 Migração futura para fonte primária
+
+Quando `city_scores` for alimentada:
+
+1. Rodar `SELECT COUNT(*) FROM city_scores;` — se > 0, fallback fica
+   inerte automaticamente.
+2. Re-executar `bootstrap-cluster-plans.mjs --dry-run --limit=N` e
+   conferir que samples vêm com `stage` real (`discovery` / `expansion`
+   / `dominance`), não mais `seed`.
+3. Considerar remover o fallback quando o scoring estiver garantido em
+   prod (decisão pra runbook próprio; manter por enquanto como rede de
+   segurança).
+
+---
+
+## 10. Próximo prompt recomendado
 
 > **Tarefa:** Implementar a **Opção 2** (script de bootstrap explícito) deste runbook. Criar:
 >

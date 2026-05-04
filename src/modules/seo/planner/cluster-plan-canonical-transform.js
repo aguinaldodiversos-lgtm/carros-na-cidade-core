@@ -25,6 +25,19 @@
  *
  * `null` é distinto de "throw" por design: caller usa `null` como sinal
  * de "skip silencioso, esperado", e `throw` como "fail-fast, dado inválido".
+ *
+ * Bootstrap inicial — Opção A
+ * (docs/runbooks/cluster-plan-brand-model-policy.md):
+ *   - city_home          → /carros-em/[slug]            (persistível)
+ *   - city_below_fipe    → /carros-baratos-em/[slug]    (persistível)
+ *   - city_opportunities → null                          (skip)
+ *   - city_brand         → null                          (skip — noindex em prod)
+ *   - city_brand_model   → null                          (skip — noindex em prod)
+ *
+ * city_brand e city_brand_model estão noindex,follow em produção; persistir
+ * esses paths no sitemap agora seria sinal contraditório para SEO. Quando a
+ * auditoria territorial decidir canonical próprio + index,follow para essas
+ * páginas, este transformer volta a emitir paths para elas.
  */
 
 const KNOWN_CLUSTER_TYPES = Object.freeze([
@@ -83,37 +96,21 @@ export function transformClusterPlanToCanonicalPath(cluster, city) {
       // Skip aqui é a escolha correta — caller pula esta entrada.
       return null;
 
-    case "city_brand": {
-      // Fase 1 NÃO tocou /cidade/[slug]/marca/[brand] — auditoria territorial
-      // (docs/runbooks/territorial-canonical-audit.md) só cobriu city_home,
-      // below_fipe, oportunidades, /comprar/cidade, /carros-em, /carros-baratos-em
-      // e /carros-automaticos-em. Preservar comportamento existente até auditoria
-      // explícita ser feita.
-      const brandSlug = normalizeSlugPart(cluster.brand);
-      if (!brandSlug) {
-        throw new Error(
-          `transformClusterPlanToCanonicalPath: city_brand requer cluster.brand não vazio (city.slug=${slug}, brand=${JSON.stringify(cluster.brand)})`
-        );
-      }
-      return `/cidade/${slug}/marca/${brandSlug}`;
-    }
+    case "city_brand":
+      // Bootstrap inicial — Opção A
+      // (docs/runbooks/cluster-plan-brand-model-policy.md):
+      // /cidade/[slug]/marca/[brand] está noindex,follow em produção.
+      // Persistir esse path no sitemap agora cria sinal contraditório
+      // (sitemap diz "indexe" enquanto a página diz "não indexe"). Skip
+      // explícito até a página ganhar canonical próprio + index,follow.
+      return null;
 
-    case "city_brand_model": {
-      // Mesma justificativa de city_brand: Fase 1 não tocou — preservar.
-      const brandSlug = normalizeSlugPart(cluster.brand);
-      const modelSlug = normalizeSlugPart(cluster.model);
-      if (!brandSlug) {
-        throw new Error(
-          `transformClusterPlanToCanonicalPath: city_brand_model requer cluster.brand não vazio (city.slug=${slug})`
-        );
-      }
-      if (!modelSlug) {
-        throw new Error(
-          `transformClusterPlanToCanonicalPath: city_brand_model requer cluster.model não vazio (city.slug=${slug}, brand=${cluster.brand})`
-        );
-      }
-      return `/cidade/${slug}/marca/${brandSlug}/modelo/${modelSlug}`;
-    }
+    case "city_brand_model":
+      // Mesma justificativa de city_brand: a página
+      // /cidade/[slug]/marca/[brand]/modelo/[model] também está
+      // noindex,follow em produção. Skip no bootstrap inicial até auditoria
+      // territorial explícita decidir o canonical desta intenção.
+      return null;
 
     default:
       throw new Error(
