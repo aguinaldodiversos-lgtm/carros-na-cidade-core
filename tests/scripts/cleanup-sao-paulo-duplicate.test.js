@@ -11,6 +11,9 @@ const {
   parseArgs,
   validatePreconditions,
   captureSnapshot,
+  toNumber,
+  sameId,
+  isZeroDistance,
 } = await import("../../scripts/maintenance/cleanup-sao-paulo-duplicate.mjs");
 
 // ─────────────────────────────────────────────────────────────────────
@@ -715,5 +718,177 @@ describe("regressão — archive-test-data continua bloqueado por refs fortes", 
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("preconditions_failed");
     expect(pg.connect).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// helpers de coerção (toNumber / sameId / isZeroDistance)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("toNumber", () => {
+  it("number finito → ele mesmo", () => {
+    expect(toNumber(1)).toBe(1);
+    expect(toNumber(0)).toBe(0);
+    expect(toNumber(-3.14)).toBe(-3.14);
+  });
+  it("string parseável → number", () => {
+    expect(toNumber("1")).toBe(1);
+    expect(toNumber("0")).toBe(0);
+    expect(toNumber("0.0000")).toBe(0);
+    expect(toNumber("  10  ")).toBe(10);
+  });
+  it("null / undefined / vazio / NaN-like → null", () => {
+    expect(toNumber(null)).toBeNull();
+    expect(toNumber(undefined)).toBeNull();
+    expect(toNumber("")).toBeNull();
+    expect(toNumber("abc")).toBeNull();
+    expect(toNumber(NaN)).toBeNull();
+    expect(toNumber(Infinity)).toBeNull();
+  });
+});
+
+describe("sameId", () => {
+  it("aceita number e string equivalentes", () => {
+    expect(sameId(1, 1)).toBe(true);
+    expect(sameId("1", 1)).toBe(true);
+    expect(sameId(" 1 ", 1)).toBe(true);
+    expect(sameId(5278, 5278)).toBe(true);
+    expect(sameId("5278", 5278)).toBe(true);
+  });
+  it("rejeita IDs diferentes", () => {
+    expect(sameId(2, 1)).toBe(false);
+    expect(sameId("2", 1)).toBe(false);
+    expect(sameId(null, 1)).toBe(false);
+    expect(sameId(undefined, 1)).toBe(false);
+    expect(sameId("", 1)).toBe(false);
+    expect(sameId("abc", 1)).toBe(false);
+  });
+});
+
+describe("isZeroDistance", () => {
+  it("aceita zero em qualquer formato comum do pg driver", () => {
+    expect(isZeroDistance(0)).toBe(true);
+    expect(isZeroDistance(0.0)).toBe(true);
+    expect(isZeroDistance("0")).toBe(true);
+    expect(isZeroDistance("0.0")).toBe(true);
+    expect(isZeroDistance("0.0000")).toBe(true);
+    expect(isZeroDistance(" 0 ")).toBe(true);
+  });
+  it("null/undefined contam como zero (alinhado a COALESCE(distance_km,0)=0)", () => {
+    expect(isZeroDistance(null)).toBe(true);
+    expect(isZeroDistance(undefined)).toBe(true);
+  });
+  it("rejeita valores não-zero", () => {
+    expect(isZeroDistance(10)).toBe(false);
+    expect(isZeroDistance("10")).toBe(false);
+    expect(isZeroDistance("0.0001")).toBe(false);
+    expect(isZeroDistance("abc")).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// region_memberships: tolerância string vs number (regressão produção)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("validatePreconditions — region_memberships com tipos mistos", () => {
+  const happyArgs = {
+    confirmEventId: 4,
+    confirmBrokenCityId: 1,
+    confirmCanonicalCityId: 5278,
+  };
+
+  it("autoref com strings (\"1\"/\"1\"/\"0\") — caso real produção — passa", async () => {
+    // Estado encontrado no dry-run de prod (2026-05-04): pg driver
+    // devolveu base_city_id="1", member_city_id="1", distance_km="0"
+    // (numeric/decimal ou parseInt8=false). Antes da correção, `===`
+    // contra o número 1/0 falhava e a pré-condição dava `encontrado 0`.
+    const rmStringRow = {
+      base_city_id: "1",
+      member_city_id: "1",
+      distance_km: "0",
+    };
+    const pg = makePoolByMatcher(happyPathMatchers({ rmBroken: [rmStringRow] }));
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("autoref numérica (1/1/0) — caso fixture — passa", async () => {
+    const pg = makePoolByMatcher(happyPathMatchers());
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("autoref com distance_km=\"10\" (string) — aborta", async () => {
+    const pg = makePoolByMatcher(
+      happyPathMatchers({
+        rmBroken: [{ base_city_id: "1", member_city_id: "1", distance_km: "10" }],
+      })
+    );
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.join(" ")).toMatch(/distance_km=10 ≠ 0/);
+  });
+
+  it("base=\"1\" / member=\"200\" (string) — classifica como otherRef e aborta", async () => {
+    const pg = makePoolByMatcher(
+      happyPathMatchers({
+        rmBroken: [
+          { base_city_id: "1", member_city_id: "1", distance_km: "0" },
+          { base_city_id: "1", member_city_id: "200", distance_km: "10" },
+        ],
+      })
+    );
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.join(" ")).toMatch(/1 linha\(s\) extras/);
+  });
+
+  it("base=\"200\" / member=\"1\" (string) — classifica como otherRef e aborta", async () => {
+    const pg = makePoolByMatcher(
+      happyPathMatchers({
+        rmBroken: [
+          { base_city_id: "1", member_city_id: "1", distance_km: "0" },
+          { base_city_id: "200", member_city_id: "1", distance_km: "10" },
+        ],
+      })
+    );
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.join(" ")).toMatch(/1 linha\(s\) extras/);
+  });
+
+  it("não toca cities.id=5278 mesmo com tipos mistos no rm", async () => {
+    // Sanity defensiva: garante que o caminho com strings não muda o
+    // plano gerado (continua sem mencionar 5278 em qualquer step).
+    const steps = planScenario("confirmed-test-data-cleanup");
+    for (const s of steps) {
+      expect(s.sql).not.toMatch(/id\s*=\s*5278/);
+      expect(JSON.stringify(s.params)).not.toContain("5278");
+    }
   });
 });

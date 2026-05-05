@@ -85,6 +85,55 @@ const FORBIDDEN_REF_TABLES = Object.freeze([
   "city_scores",
 ]);
 
+/**
+ * Coerção numérica tolerante. O driver `pg` devolve colunas `numeric`
+ * (e às vezes `bigint` / FK ids quando `parseInt8=false`) como string.
+ * Sem essa normalização, comparações com `===` no JS quebram silenciosamente.
+ *
+ *   toNumber(1)        → 1
+ *   toNumber("1")      → 1
+ *   toNumber("0.0000") → 0
+ *   toNumber(null)     → null   (caller decide o que fazer com ausência)
+ *   toNumber(undefined)→ null
+ *   toNumber("")       → null
+ *   toNumber("abc")    → null
+ */
+export function toNumber(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Igualdade de IDs tolerante a string vs number. Usar para FKs do
+ * Postgres (`base_city_id`, `member_city_id`, etc.).
+ */
+export function sameId(value, expected) {
+  const n = toNumber(value);
+  if (n === null) return false;
+  return n === expected;
+}
+
+/**
+ * `distance_km` é `numeric` no schema → pg driver devolve string.
+ * Tratamos como zero qualquer um dos seguintes:
+ *   - 0, 0.0
+ *   - "0", "0.0", "0.0000", " 0 "
+ *   - null / undefined  (consistente com o legado `Number(null) === 0`
+ *     e com o COALESCE(distance_km, 0) usado nos DELETEs do plano)
+ */
+export function isZeroDistance(value) {
+  if (value === null || value === undefined) return true;
+  const n = toNumber(value);
+  return n === 0;
+}
+
 export function parseArgs(argv) {
   const args = {
     scenario: null,
@@ -490,18 +539,19 @@ async function validateConfirmedCleanup({
       `,
       [BROKEN_ID]
     );
-    const selfRefs = rm1.rows.filter(
-      (r) => r.base_city_id === BROKEN_ID && r.member_city_id === BROKEN_ID
-    );
-    const otherRefs = rm1.rows.filter(
-      (r) => !(r.base_city_id === BROKEN_ID && r.member_city_id === BROKEN_ID)
-    );
+    // pg driver devolve `base_city_id`/`member_city_id`/`distance_km`
+    // como string quando a coluna é `numeric` ou quando parseInt8=false.
+    // Comparar com `===` quebra silenciosamente: filtra-se via helpers.
+    const isSelfRef = (r) =>
+      sameId(r.base_city_id, BROKEN_ID) && sameId(r.member_city_id, BROKEN_ID);
+    const selfRefs = rm1.rows.filter(isSelfRef);
+    const otherRefs = rm1.rows.filter((r) => !isSelfRef(r));
 
     if (selfRefs.length !== 1) {
       reasons.push(
         `region_memberships base=${BROKEN_ID} AND member=${BROKEN_ID}: esperado exatamente 1 linha, encontrado ${selfRefs.length}`
       );
-    } else if (Number(selfRefs[0].distance_km) !== 0) {
+    } else if (!isZeroDistance(selfRefs[0].distance_km)) {
       reasons.push(
         `region_memberships autorreferente tem distance_km=${selfRefs[0].distance_km} ≠ 0`
       );
@@ -515,7 +565,10 @@ async function validateConfirmedCleanup({
     // Se a forma não bate, anexa as linhas REAIS pra o operador ver
     // exatamente o que existe no banco. Cada linha vira uma `reason`
     // legível (formato consistente com o log do audit).
-    const shapeOk = selfRefs.length === 1 && otherRefs.length === 0 && Number(selfRefs[0]?.distance_km) === 0;
+    const shapeOk =
+      selfRefs.length === 1 &&
+      otherRefs.length === 0 &&
+      isZeroDistance(selfRefs[0]?.distance_km);
     if (!shapeOk) {
       if (rm1.rows.length === 0) {
         reasons.push(
