@@ -569,23 +569,32 @@ export async function runAudit({ pg = pool, log = defaultLog } = {}) {
 
   const rm1 = await auditRegionMemberships(pg, BROKEN_ID);
   const rm5278 = await auditRegionMemberships(pg, CANONICAL_ID);
-  if (rm1.ok) {
-    log(
-      "info",
-      `region_memberships city_id=${BROKEN_ID}: ${rm1.rows.length} (id_column=${rm1.hasId ? "id" : "row_no"})`
-    );
-    for (const r of rm1.rows) {
-      const ident = r.id ?? r.row_no;
-      const base = `${r.base_name ?? "?"}/${r.base_slug ?? "?"}/${r.base_state ?? "?"}`;
-      const member = `${r.member_name ?? "?"}/${r.member_slug ?? "?"}/${r.member_state ?? "?"}`;
+
+  // Helper: imprime cada linha de rm com nomes/slugs das pontas. Usado
+  // tanto para id=1 quanto id=5278 (simetria — operador precisa ver as
+  // duas para decidir cleanup, especialmente em forma diferente do
+  // padrão 1→1 esperado).
+  const logRmRows = (label, result) => {
+    if (result.ok) {
       log(
         "info",
-        `  rm ${rm1.hasId ? "id" : "row_no"}=${ident} base=${r.base_city_id} (${base}) member=${r.member_city_id} (${member}) radius=${r.radius_km ?? "—"} dist=${r.distance_km ?? "—"}`
+        `region_memberships ${label}: ${result.rows.length} (id_column=${result.hasId ? "id" : "row_no"})`
       );
+      for (const r of result.rows) {
+        const ident = r.id ?? r.row_no;
+        const base = `${r.base_name ?? "?"}/${r.base_slug ?? "?"}/${r.base_state ?? "?"}`;
+        const member = `${r.member_name ?? "?"}/${r.member_slug ?? "?"}/${r.member_state ?? "?"}`;
+        log(
+          "info",
+          `  rm ${result.hasId ? "id" : "row_no"}=${ident} base=${r.base_city_id} (${base}) member=${r.member_city_id} (${member}) radius=${r.radius_km ?? "—"} dist=${r.distance_km ?? "—"}`
+        );
+      }
+    } else if (result.missing) {
+      log("info", `region_memberships ${label} ausente/incompatível (skip): ${result.error ?? ""}`);
     }
-  } else if (rm1.missing) {
-    log("info", `region_memberships ausente/incompatível (skip): ${rm1.error ?? ""}`);
-  }
+  };
+  logRmRows(`city_id=${BROKEN_ID}`, rm1);
+  logRmRows(`city_id=${CANONICAL_ID}`, rm5278);
 
   // city_status — auditoria sem classificação automática.
   const cs1 = await auditCityStatus(pg, BROKEN_ID);

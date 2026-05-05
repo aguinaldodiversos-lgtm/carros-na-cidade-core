@@ -176,14 +176,14 @@ function happyPathMatchers(overrides = {}) {
       match: /information_schema\.columns WHERE table_name='region_memberships'/,
       response: { rows: [{ column_name: "base_city_id" }, { column_name: "member_city_id" }, { column_name: "distance_km" }] },
     },
-    // region_memberships SELECT broken
+    // region_memberships SELECT broken — agora com LEFT JOIN cities
     {
-      match: /FROM region_memberships WHERE base_city_id = \$1 OR member_city_id = \$1/,
+      match: /FROM region_memberships rm[\s\S]*WHERE rm\.base_city_id = \$1 OR rm\.member_city_id = \$1/,
       response: { rows: overrides.rmBroken ?? [RM_SELF_BROKEN] },
     },
-    // region_memberships canonical
+    // region_memberships canonical — agora com LEFT JOIN cities + LIMIT 1
     {
-      match: /FROM region_memberships WHERE base_city_id = \$1 AND member_city_id = \$1 LIMIT 1/,
+      match: /FROM region_memberships rm[\s\S]*WHERE rm\.base_city_id = \$1 AND rm\.member_city_id = \$1[\s\S]*LIMIT 1/,
       response: { rows: overrides.rmCanonical ?? [RM_SELF_CANONICAL] },
     },
     // tableHasColumn — para FORBIDDEN_REF_TABLES
@@ -431,6 +431,58 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
     expect(r.reasons.join(" ")).toMatch(/linha\(s\) extras/);
   });
 
+  it("id=1 SÓ como member (sem autoref): aborta com diagnóstico detalhado das linhas reais", async () => {
+    // Cenário real encontrado no dry-run de produção (2026-05-04):
+    // não havia linha 1→1, mas havia 1 linha apontando id=1 como
+    // member de outra cidade. Esperado: pré-condição falha E reasons
+    // listam a linha real (com nome/slug das pontas) pra operador ver.
+    const memberOnly = {
+      base_city_id: 200,
+      member_city_id: 1,
+      distance_km: 10,
+      base_name: "Cidade Base",
+      base_slug: "cidade-base-sp",
+      base_state: "SP",
+      member_name: "SÆo Paulo",
+      member_slug: "sæo-paulo",
+      member_state: "SP",
+    };
+    const pg = makePoolByMatcher(
+      happyPathMatchers({ rmBroken: [memberOnly] })
+    );
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(false);
+    const all = r.reasons.join("\n");
+    // Sintetiza: "esperado 1, encontrado 0" para autoref
+    expect(all).toMatch(/esperado exatamente 1 linha, encontrado 0/);
+    // E inclui "1 linha extra"
+    expect(all).toMatch(/1 linha\(s\) extras/);
+    // E DETALHA a linha real com nomes/slugs/distance — esse é o
+    // ponto novo desta correção: operador não precisa rodar SELECT
+    // adicional para ver o que tem no banco.
+    expect(all).toMatch(/region_memberships envolvendo city_id=1/);
+    expect(all).toMatch(/base=200\/cidade-base-sp/);
+    expect(all).toMatch(/member=1\/sæo-paulo/);
+    expect(all).toMatch(/distance_km=10/);
+  });
+
+  it("region_memberships zero linhas envolvendo id=1: aborta com mensagem de cleanup parcial", async () => {
+    const pg = makePoolByMatcher(happyPathMatchers({ rmBroken: [] }));
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.join(" ")).toMatch(/zero linhas referenciando city_id=1/);
+  });
+
   it("ausência da linha canônica 5278→5278 → aborta", async () => {
     const pg = makePoolByMatcher(happyPathMatchers({ rmCanonical: [] }));
     const r = await validatePreconditions({
@@ -440,7 +492,7 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
       log: () => {},
     });
     expect(r.ok).toBe(false);
-    expect(r.reasons.join(" ")).toMatch(/canônico precisa estar saudável/);
+    expect(r.reasons.join(" ")).toMatch(/canônic[ao] precisa estar saudável/);
   });
 
   it("ads ativos diferentes de [9, 80] → aborta", async () => {

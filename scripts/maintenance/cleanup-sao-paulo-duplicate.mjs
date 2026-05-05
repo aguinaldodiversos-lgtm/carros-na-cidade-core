@@ -468,13 +468,26 @@ async function validateConfirmedCleanup({
     }
   }
 
-  // 7. region_memberships
+  // 7. region_memberships — diagnóstico detalhado em caso de falha
   const rmCols = await pg.query(
     `SELECT column_name FROM information_schema.columns WHERE table_name='region_memberships'`
   );
   if (rmCols.rows.length > 0) {
+    // SELECT com JOIN cities para já trazer nome/slug/state das pontas;
+    // permite gerar reasons explícitas com os dados reais quando a forma
+    // não bate com o esperado (cleanup automático sai sem dúvida).
     const rm1 = await pg.query(
-      `SELECT base_city_id, member_city_id, distance_km FROM region_memberships WHERE base_city_id = $1 OR member_city_id = $1`,
+      `
+      SELECT
+        rm.base_city_id, rm.member_city_id, rm.distance_km,
+        cb.name AS base_name, cb.slug AS base_slug, cb.state AS base_state,
+        cm.name AS member_name, cm.slug AS member_slug, cm.state AS member_state
+      FROM region_memberships rm
+      LEFT JOIN cities cb ON cb.id = rm.base_city_id
+      LEFT JOIN cities cm ON cm.id = rm.member_city_id
+      WHERE rm.base_city_id = $1 OR rm.member_city_id = $1
+      ORDER BY rm.base_city_id, rm.member_city_id
+      `,
       [BROKEN_ID]
     );
     const selfRefs = rm1.rows.filter(
@@ -483,9 +496,10 @@ async function validateConfirmedCleanup({
     const otherRefs = rm1.rows.filter(
       (r) => !(r.base_city_id === BROKEN_ID && r.member_city_id === BROKEN_ID)
     );
+
     if (selfRefs.length !== 1) {
       reasons.push(
-        `region_memberships base=${BROKEN_ID} member=${BROKEN_ID}: esperado exatamente 1 linha, encontrado ${selfRefs.length}`
+        `region_memberships base=${BROKEN_ID} AND member=${BROKEN_ID}: esperado exatamente 1 linha, encontrado ${selfRefs.length}`
       );
     } else if (Number(selfRefs[0].distance_km) !== 0) {
       reasons.push(
@@ -494,18 +508,46 @@ async function validateConfirmedCleanup({
     }
     if (otherRefs.length > 0) {
       reasons.push(
-        `region_memberships tem ${otherRefs.length} linha(s) extras referenciando city_id=${BROKEN_ID} além da autorreferência — abortar (poderia órfãos quebrar FKs)`
+        `region_memberships tem ${otherRefs.length} linha(s) extras referenciando city_id=${BROKEN_ID} além da autorreferência — exige cenário próprio (cada linha resolvida caso a caso)`
       );
     }
 
-    // canônico precisa ter linha equivalente
+    // Se a forma não bate, anexa as linhas REAIS pra o operador ver
+    // exatamente o que existe no banco. Cada linha vira uma `reason`
+    // legível (formato consistente com o log do audit).
+    const shapeOk = selfRefs.length === 1 && otherRefs.length === 0 && Number(selfRefs[0]?.distance_km) === 0;
+    if (!shapeOk) {
+      if (rm1.rows.length === 0) {
+        reasons.push(
+          `region_memberships: zero linhas referenciando city_id=${BROKEN_ID} — investigar se cleanup parcial anterior já removeu`
+        );
+      } else {
+        reasons.push(`region_memberships envolvendo city_id=${BROKEN_ID}: ${rm1.rows.length} linha(s) reais →`);
+        for (const r of rm1.rows) {
+          reasons.push(
+            `  base=${r.base_city_id}/${r.base_slug ?? "?"} (${r.base_name ?? "?"}, ${r.base_state ?? "?"}) → member=${r.member_city_id}/${r.member_slug ?? "?"} (${r.member_name ?? "?"}, ${r.member_state ?? "?"}) distance_km=${r.distance_km ?? "—"}`
+          );
+        }
+      }
+    }
+
+    // canônico precisa ter linha equivalente — também com diagnóstico real
     const rmCanon = await pg.query(
-      `SELECT 1 FROM region_memberships WHERE base_city_id = $1 AND member_city_id = $1 LIMIT 1`,
+      `
+      SELECT
+        rm.base_city_id, rm.member_city_id, rm.distance_km,
+        cb.slug AS base_slug, cm.slug AS member_slug
+      FROM region_memberships rm
+      LEFT JOIN cities cb ON cb.id = rm.base_city_id
+      LEFT JOIN cities cm ON cm.id = rm.member_city_id
+      WHERE rm.base_city_id = $1 AND rm.member_city_id = $1
+      LIMIT 1
+      `,
       [CANONICAL_ID]
     );
     if (rmCanon.rows.length !== 1) {
       reasons.push(
-        `region_memberships não tem linha base=${CANONICAL_ID} member=${CANONICAL_ID} — canônico precisa estar saudável antes do cleanup`
+        `region_memberships não tem linha autorreferente base=${CANONICAL_ID} AND member=${CANONICAL_ID} — canônica precisa estar saudável antes do cleanup`
       );
     }
   }
