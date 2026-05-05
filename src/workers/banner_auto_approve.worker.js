@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const { refuseIfEventsWorkerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -24,6 +25,7 @@ async function autoApproveBanners() {
 }
 
 function startBannerAutoApproveWorker() {
+  if (refuseIfEventsWorkerDisabled("banner_auto_approve")) return;
   console.log("⏳ Banner Auto Approve Worker iniciado...");
 
   // roda a cada 1 hora

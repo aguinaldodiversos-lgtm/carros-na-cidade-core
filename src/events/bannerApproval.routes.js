@@ -8,6 +8,31 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+/**
+ * Guard de produto: enquanto Eventos estiver dormente
+ * (`EVENTS_ENABLED !== "true"` OU `EVENTS_CREATION_ENABLED !== "true"`),
+ * estas rotas retornam 410 Gone com mensagem clara. Não tocam o banco.
+ *
+ * Ver `docs/runbooks/events-feature-shutdown.md`. Reativar exige flag.
+ *
+ * NOTA: este router não é montado em nenhum entry-point hoje (código
+ * órfão). O middleware é defesa em profundidade caso seja remontado
+ * acidentalmente em deploys futuros.
+ */
+router.use((req, res, next) => {
+  const eventsOn = process.env.EVENTS_ENABLED === "true";
+  const creationOn = process.env.EVENTS_CREATION_ENABLED === "true";
+  if (!eventsOn || !creationOn) {
+    return res.status(410).json({
+      ok: false,
+      error: "events_disabled",
+      message:
+        "Produto Evento está desligado. Aprovação/rejeição de banner indisponível.",
+    });
+  }
+  return next();
+});
+
 router.post("/:eventId/approve", async (req, res) => {
   try {
     const { eventId } = req.params;

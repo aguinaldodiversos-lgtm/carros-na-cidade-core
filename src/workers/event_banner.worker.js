@@ -1,6 +1,10 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 const OpenAI = require("openai");
+const {
+  refuseIfEventsWorkerDisabled,
+  refuseIfAiBannerDisabled,
+} = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -65,6 +69,10 @@ Estilo:
    GERAÇÃO DE BANNER
 ===================================================== */
 async function generateBanner(event) {
+  // Guard de IA: não chamar DALL-E enquanto produto Evento estiver
+  // dormente. Custo OpenAI real, default fechado.
+  if (refuseIfAiBannerDisabled("event_banner")) return null;
+
   try {
     const prompt = buildBannerPrompt(event);
 
@@ -135,6 +143,7 @@ async function runEventBannerWorker() {
    START
 ===================================================== */
 function startEventBannerWorker() {
+  if (refuseIfEventsWorkerDisabled("event_banner")) return;
   setInterval(runEventBannerWorker, 5 * 60 * 1000);
   runEventBannerWorker();
 }

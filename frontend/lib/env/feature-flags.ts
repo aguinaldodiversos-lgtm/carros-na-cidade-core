@@ -39,3 +39,21 @@ import "server-only";
 export function isRegionalPageEnabled(): boolean {
   return process.env.REGIONAL_PAGE_ENABLED === "true";
 }
+
+/**
+ * Espelho server-only da flag `EVENTS_PUBLIC_ENABLED` do backend.
+ * Default `false`: produto Evento permanece OCULTO no frontend mesmo
+ * quando o fallback local de `plan-store.ts` é usado (cenário em que o
+ * backend cai e o SSR cai no array hardcoded).
+ *
+ * Mesmo contrato strict do `isRegionalPageEnabled`: somente `"true"`
+ * lowercase exato libera. Documentação completa do produto Evento e
+ * checklist de reativação:
+ * `docs/runbooks/events-feature-shutdown.md`.
+ */
+export function isEventsPublicEnabled(): boolean {
+  return (
+    process.env.EVENTS_ENABLED === "true" &&
+    process.env.EVENTS_PUBLIC_ENABLED === "true"
+  );
+}

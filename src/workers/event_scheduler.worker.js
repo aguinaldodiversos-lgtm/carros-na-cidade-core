@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { Pool } = require("pg");
+const { refuseIfEventsWorkerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -34,6 +35,7 @@ async function runEventScheduler() {
 }
 
 function startEventSchedulerWorker() {
+  if (refuseIfEventsWorkerDisabled("event_scheduler")) return;
   setInterval(runEventScheduler, 5 * 60 * 1000);
   runEventScheduler();
 }

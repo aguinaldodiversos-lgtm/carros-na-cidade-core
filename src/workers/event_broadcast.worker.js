@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { Pool } = require("pg");
+const { refuseIfEventsWorkerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -48,6 +49,7 @@ async function runEventBroadcastWorker() {
 }
 
 function startEventBroadcastWorker() {
+  if (refuseIfEventsWorkerDisabled("event_broadcast")) return;
   setInterval(runEventBroadcastWorker, 2 * 60 * 1000);
   runEventBroadcastWorker();
 }

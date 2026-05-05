@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 const { sendWhatsAppAlert } = require("../services/whatsapp.service");
+const { refuseIfEventsWorkerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -90,6 +91,7 @@ Verifique no painel.`;
 }
 
 function startEventFailSafeWorker() {
+  if (refuseIfEventsWorkerDisabled("event_fail_safe")) return;
   setInterval(runEventFailSafeWorker, 10 * 60 * 1000);
   runEventFailSafeWorker();
 }

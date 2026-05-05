@@ -1,8 +1,23 @@
 import { pool, withUserTransaction } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
+import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import * as adsRepository from "../ads/ads.repository.js";
 import { getAccountUser } from "./account.user.read.js";
+
+/**
+ * IDs de planos atrelados ao produto Evento (dormente). Filtrados das
+ * respostas públicas quando `EVENTS_PUBLIC_ENABLED !== "true"`.
+ *
+ * Mantemos a row no DB e em DEFAULT_PLANS — o filtro é só de exposição,
+ * não delete. Reativar exige flag + revisão do runbook
+ * `docs/runbooks/events-feature-shutdown.md`.
+ */
+const EVENT_PLAN_IDS = new Set(["cnpj-evento-premium"]);
+
+export function isEventPlanId(planId) {
+  return EVENT_PLAN_IDS.has(String(planId || "").trim().toLowerCase());
+}
 
 export { getAccountUser };
 
@@ -470,9 +485,17 @@ export async function countNonDeletedAdsForUser(userId) {
 export async function listPlans({ type, onlyActive = true } = {}) {
   const plans = await queryPlansFromDatabase();
 
+  // Filtro de produto Evento (dormente) — quando EVENTS_PUBLIC_ENABLED
+  // não está em "true" exato, planos atrelados ao produto Evento NÃO
+  // aparecem na resposta pública. Frontend `/planos` consome este
+  // endpoint e simplesmente não renderiza o card. Zero alteração de
+  // layout/componentes necessária. Re-ativar = flag em "true".
+  const eventsPublic = isEventsDomainEnabled("public");
+
   return plans
     .filter((plan) => (type ? plan.type === normalizeAccountType(type) : true))
-    .filter((plan) => (onlyActive ? plan.is_active : true));
+    .filter((plan) => (onlyActive ? plan.is_active : true))
+    .filter((plan) => (eventsPublic ? true : !isEventPlanId(plan.id)));
 }
 
 export async function getPlanById(planId) {

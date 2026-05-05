@@ -1,6 +1,7 @@
 const { Pool } = require("pg");
 const OpenAI = require("openai");
 const fs = require("fs");
+const { refuseIfAiBannerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -54,6 +55,9 @@ Estilo minimalista e barato de gerar
    GERAR BANNER
 ===================================================== */
 async function generateBanner(event) {
+  // Guard de IA: produto Evento dormente → não chamar DALL-E.
+  if (refuseIfAiBannerDisabled("banner_generator")) return;
+
   try {
     // Limite de gerações
     if (event.banner_generated_count >= 3) {

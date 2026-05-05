@@ -5,10 +5,38 @@ import {
   getAccountUser,
   getOwnedAd,
   getPlanById,
+  isEventPlanId,
   listBoostOptions,
 } from "../account/account.service.js";
+import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
+
+/**
+ * Guard: bloqueia checkout/subscription para planos do produto Evento
+ * (dormente). Aplicado em createPlanCheckout e createPlanSubscription.
+ * Não afeta planos de loja (Start/Pro), planos CPF, nem boost de anúncio.
+ *
+ * Comportamento: se planId é evento E EVENTS_PAYMENTS_ENABLED não é
+ * "true", lança AppError 410 antes de tocar Mercado Pago. Log de
+ * tentativa fica em logger.warn para auditoria.
+ */
+function refuseEventPlanCheckout(planId, where) {
+  if (!isEventPlanId(planId)) return;
+  if (isEventsDomainEnabled("payments")) return;
+  logger.warn(
+    {
+      domain: "events.shutdown",
+      where,
+      planId,
+    },
+    "[payments] tentativa de checkout para plano de Evento (dormente) — bloqueado"
+  );
+  throw new AppError(
+    "Plano de Evento esta indisponivel no momento. Tente novamente mais tarde.",
+    410
+  );
+}
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const MP_PUBLIC_KEY = process.env.MP_PUBLIC_KEY || "";
@@ -138,6 +166,8 @@ export async function createPlanCheckout({
   pendingUrl,
   requestId,
 }) {
+  refuseEventPlanCheckout(planId, "createPlanCheckout");
+
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
   if (!plan || !plan.is_active) {
@@ -267,6 +297,8 @@ export async function createPlanCheckout({
 }
 
 export async function createPlanSubscription({ userId, planId, successUrl, requestId }) {
+  refuseEventPlanCheckout(planId, "createPlanSubscription");
+
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
   if (!plan || !plan.is_active) {

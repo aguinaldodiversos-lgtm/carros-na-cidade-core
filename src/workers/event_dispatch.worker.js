@@ -2,6 +2,7 @@ const { Pool } = require("pg");
 const { sendWhatsAppAlert } = require("../services/whatsapp.service");
 const { sendEmail } = require("../services/email.service");
 const { publishSocialPost } = require("../services/social.service");
+const { refuseIfEventsWorkerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -122,6 +123,7 @@ async function eventDispatchWorker() {
    START
 ===================================================== */
 function startEventDispatchWorker() {
+  if (refuseIfEventsWorkerDisabled("event_dispatch")) return;
   console.log("📢 Event Dispatch Worker iniciado...");
 
   // roda a cada 3 minutos
