@@ -57,7 +57,7 @@ function fallbackContent(): SellPageContent {
       eyebrow: "Venda seu carro com presença regional forte",
       title: "Anuncie no Carros na Cidade e fale com compradores da sua região",
       subtitle:
-        "Publique seu veículo com visual premium, destaque regional, apoio de páginas locais e ferramentas que ajudam você a vender com mais confiança. Ideal para particulares e lojistas.",
+        "Publique seu veículo com visual profissional, destaque 7 dias, apoio de páginas locais e ferramentas que ajudam você a vender com mais confiança. Ideal para particulares e lojistas.",
       primaryCtaLabel: "Começar meu anúncio",
       primaryCtaHref: "/anunciar/publicar?tipo=particular",
       secondaryCtaLabel: "Sou lojista",
@@ -68,9 +68,9 @@ function fallbackContent(): SellPageContent {
         { value: "WhatsApp", label: "contato direto com comprador" },
       ],
       highlights: [
-        "Anúncio com aparência premium",
+        "Anúncio com aparência profissional",
         "Maior foco em compradores da sua cidade",
-        "Integração futura com CRM automotivo",
+        "Gestão simples dos anúncios",
         "Fluxo pensado para particular e lojista",
       ],
     },
@@ -81,7 +81,7 @@ function fallbackContent(): SellPageContent {
           "O portal foi pensado para captar compradores próximos, aumentando a chance de contato útil e visita real.",
       },
       {
-        title: "Visual premium que valoriza o veículo",
+        title: "Visual profissional que valoriza o veículo",
         description:
           "Seu anúncio aparece em uma experiência comercial forte, limpa e confiável, no padrão de grandes marketplaces automotivos.",
       },
@@ -138,10 +138,10 @@ function fallbackContent(): SellPageContent {
       {
         title: "Hierarquia comercial de exposição",
         description:
-          "Destaque, plano premium e plano básico respeitam posição comercial no catálogo.",
+          "Destaque, plano Pro e plano Start respeitam posição comercial no catálogo.",
       },
       {
-        title: "Base pronta para integração com CRM",
+        title: "Base pronta para organizar estoque e contatos",
         description: "Estrutura pensada para crescer junto com operação, leads e estoque.",
       },
     ],
@@ -153,7 +153,7 @@ function fallbackContent(): SellPageContent {
       {
         title: "Mais confiança na apresentação",
         description:
-          "Seu veículo aparece em ambiente profissional, com cara de marketplace premium.",
+          "Seu veículo aparece em ambiente profissional, com cara de marketplace confiável.",
       },
       {
         title: "Maior chance de contato qualificado",
@@ -196,7 +196,7 @@ function fallbackContent(): SellPageContent {
       {
         question: "Lojista terá vantagens extras?",
         answer:
-          "Sim. A estratégia do produto considera vitrine regional, hierarquia comercial, integração com CRM e expansão do estoque.",
+          "Sim. A estratégia do produto considera vitrine regional, hierarquia comercial, gestão simples de estoque e contatos.",
       },
       {
         question: "Posso começar como particular e depois evoluir?",
@@ -207,7 +207,7 @@ function fallbackContent(): SellPageContent {
     bottomCta: {
       title: "Seu próximo comprador pode estar procurando exatamente o seu carro hoje",
       subtitle:
-        "Publique agora e coloque seu veículo em uma vitrine premium, regional e pronta para conversão.",
+        "Publique agora e coloque seu veículo em uma vitrine profissional, regional e pronta para conversão.",
       primaryCtaLabel: "Criar meu anúncio",
       primaryCtaHref: "/anunciar/publicar?tipo=particular",
       secondaryCtaLabel: "Quero anunciar como lojista",
