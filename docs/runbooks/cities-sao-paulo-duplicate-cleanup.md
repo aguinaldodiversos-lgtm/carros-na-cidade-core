@@ -568,6 +568,99 @@ Mesmo com `--yes`, o script **aborta antes do BEGIN** se detectar:
 - Evento sensível (paid / price > 0) em `city_id=1`.
 - `region_memberships` referenciando `city_id=1`.
 
+### 6.5.4 Cleanup confirmado de dados de teste (cenário D resolvido manualmente)
+
+> **Pré-requisito:** auditoria classificou D, **operador confirmou**
+> que o evento `id=4` ('FeirÆo de Seminovos', paid, R$ 499) é teste
+> operacional de IA (não pagamento real) E os ads `id IN (9, 80)` são
+> seed/teste E `region_memberships` autoref `1→1` é seed quebrado.
+
+Comandos:
+
+**Dry-run obrigatório primeiro** — imprime SQL planejado, snapshot
+JSON em `reports/sao-paulo-cleanup-snapshot-<ts>.json`, e SQL de
+rollback manual:
+
+```bash
+node scripts/maintenance/cleanup-sao-paulo-duplicate.mjs \
+  --scenario=confirmed-test-data-cleanup \
+  --confirm-event-id=4 \
+  --confirm-broken-city-id=1 \
+  --confirm-canonical-city-id=5278
+```
+
+**Execução real, somente após aprovação do dry-run:**
+
+```bash
+node scripts/maintenance/cleanup-sao-paulo-duplicate.mjs \
+  --scenario=confirmed-test-data-cleanup \
+  --confirm-event-id=4 \
+  --confirm-broken-city-id=1 \
+  --confirm-canonical-city-id=5278 \
+  --yes
+```
+
+**O que faz dentro de uma única transação (BEGIN/COMMIT, ROLLBACK em erro):**
+
+| # | Operação | Tabela | Tipo |
+|---|---|---|---|
+| 1 | `status='cancelled', payment_status='test_cancelled', price=0` | `events` (id=4) | UPDATE |
+| 2 | `status='archived'` | `ads` (id IN (9,80)) | UPDATE |
+| 3 | `DELETE` linha autorreferente quebrada (base=1, member=1, dist=0) | `region_memberships` | DELETE |
+| 4 | `DELETE` métricas zeradas | `city_metrics` (city_id=1) | DELETE |
+| 5 | `DELETE` city_status='exploring' score=0 | `city_status` (city_id=1) | DELETE |
+| 6 | `is_active=false` (NÃO deleta) | `cities` (id=1) | UPDATE |
+
+**O que o script NÃO faz:**
+
+- ❌ NÃO deleta fisicamente `cities.id=1`.
+- ❌ NÃO altera `cities.id=5278` (confirmado por teste de regressão).
+- ❌ NÃO tenta `slug='sao-paulo-sp'` em id=1 (quebraria UNIQUE).
+- ❌ NÃO mexe em outras cidades.
+- ❌ NÃO toca `seo_cluster_plans`, `seo_publications`, `leads`,
+   `dealer_leads`, `event_queue`, `city_scores` — pré-condição #8 abortaria.
+
+**8 categorias de pré-condição checadas antes do BEGIN:**
+
+1. `cities.id=1` ainda tem slug='sæo-paulo', state='SP', is_active=true.
+2. `cities.id=5278` tem slug='sao-paulo-sp', state='SP', ibge_code=3550308, is_active=true.
+3. Apenas ads `id IN (9, 80)` ativos em city_id=1, ambos batem regex de teste.
+4. Evento `id=4` em city_id=1 com title/status/payment_status/price exatos; `payment_id` NULL/vazio se a coluna existir; CHECK constraint em `events.status` permite 'cancelled' (e em `payment_status` permite 'test_cancelled') — se não permitir, aborta com instrução manual.
+5. `city_metrics` city_id=1 com ≤1 linha, todas métricas da whitelist == 0.
+6. `city_status` city_id=1 com ≤1 linha, status='exploring', score=0.
+7. `region_memberships` exatamente 1 linha autorreferente 1→1 com distance_km=0; sem outras linhas referenciando city_id=1; `5278→5278` existe.
+8. Zero linhas em `seo_cluster_plans`, `seo_publications`, `leads`, `dealer_leads`, `event_queue`, `city_scores` para city_id=1.
+
+Qualquer falha aborta antes do BEGIN.
+
+**Snapshot e rollback manual:**
+
+Antes de qualquer escrita (mesmo no dry-run, para o operador
+revisar), o script captura JSON com todas as linhas afetadas em:
+
+```
+reports/sao-paulo-cleanup-snapshot-<timestamp>.json
+```
+
+E imprime SQL de rollback manual (UPDATE/INSERT inversos com valores
+capturados) que o operador pode copiar/colar no `psql` em emergência.
+
+### 6.5.5 Validação pós-cleanup
+
+```bash
+node scripts/maintenance/audit-sao-paulo-duplicate.mjs --json
+```
+
+**Esperado:**
+- `events city_id=1`: 1 linha com `status='cancelled'`, `payment_status='test_cancelled'`, `price=0` → `sensivel=false`.
+- `ads city_id=1`: 0 ativos (2 com `status='archived'`).
+- `city_metrics city_id=1`: 0 linhas (ou seja, sem registro).
+- `city_status city_id=1`: 0 linhas.
+- `region_memberships city_id=1`: 0 linhas.
+- `cities.id=1`: `is_active=false` (preservado, não deletado).
+- `cities.id=5278`: intacto.
+- `classification.scenario`: deixa de ser **D** — pode virar `indefinido` (sem ads ativos para classificar) ou cair em outro caminho. O importante é que **não há mais bloqueador** para São Paulo entrar no sitemap quando `cities.id=5278` ganhar ads ativos reais.
+
 > **Recomendação atual** (com base no que já sabemos: existe evento paid
 > `FeirÆo de Seminovos` e `region_memberships` apontando para id=1):
 > **NÃO executar `--yes` neste momento.** A classificação é D — exige
