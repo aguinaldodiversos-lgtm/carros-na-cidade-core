@@ -83,6 +83,86 @@ async function safeQuery(pg, sql, params = []) {
   }
 }
 
+/**
+ * Introspecta colunas de uma tabela via information_schema.
+ * Retorna `Set<string>` com nomes das colunas (lowercase) ou `null`
+ * se a tabela não existir. Usado pelas auditorias para montar SELECTs
+ * apenas com colunas presentes no schema real (evita 42703 em ambientes
+ * com schemas variantes — bug original do auditAds com `user_id`).
+ */
+async function listColumns(pg, tableName) {
+  const result = await pg.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = $1
+    `,
+    [tableName]
+  );
+  if (result.rows.length === 0) return null;
+  return new Set(result.rows.map((r) => String(r.column_name).toLowerCase()));
+}
+
+/**
+ * Retorna o primeiro nome de coluna do array `candidates` que esteja
+ * presente em `availableColumns`. `null` se nenhum bater.
+ */
+function pickFirstExisting(availableColumns, candidates) {
+  if (!availableColumns) return null;
+  for (const c of candidates) {
+    if (availableColumns.has(String(c).toLowerCase())) return c;
+  }
+  return null;
+}
+
+/**
+ * Parser numérico tolerante para colunas que podem voltar como `number`
+ * (int) ou `string` (numeric/decimal — pg-driver mantém precisão).
+ *   - `null` / `undefined` → 0 (tratado como zerado)
+ *   - número finito → ele mesmo
+ *   - string parseável (`"0"`, `"0.0000"`, `"12.34"`) → Number(parsed)
+ *   - qualquer outro → NaN (caller decide)
+ */
+function parseNumeric(value) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return 0;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  return NaN;
+}
+
+/**
+ * Whitelist de métricas em `city_metrics` para a heurística `isZeroed`.
+ *
+ * **Por que whitelist?**  A heurística antiga iterava sobre TODAS as
+ * colunas pulando só `id`, `city_id` e `*_at`. Em produção descobrimos
+ * (2026-05-04) que isso falhava por dois motivos:
+ *   1. Coluna `roi_score` é `numeric` no Postgres → driver devolve string
+ *      `"0.0000"` que NÃO casava com `"0"`/`"0.00"`.
+ *   2. Outras colunas auxiliares (status flags, slugs, etc) podiam ser
+ *      adicionadas em migrations sem aparecer aqui — qualquer coluna
+ *      não-numérica falhava silenciosamente como "não-zerado".
+ *
+ * Whitelist explícita é mais previsível: se a tabela ganhar uma nova
+ * métrica zerável, atualiza-se este array intencionalmente.
+ */
+const ZEROED_METRIC_COLUMNS = Object.freeze([
+  "visits",
+  "leads",
+  "ads_count",
+  "advertisers_count",
+  "conversion_rate",
+  "total_leads",
+  "roi_score",
+  "demand_score",
+  "dealer_pipeline_leads",
+  "dealer_outreach_sent",
+]);
+
 async function auditCities(pg) {
   const result = await pg.query(
     `
@@ -99,7 +179,39 @@ async function auditCities(pg) {
   return result.rows;
 }
 
+/**
+ * Lista candidatos de coluna "owner" em `ads`, na ordem de preferência
+ * observada nos schemas reais do projeto.
+ *
+ * Schema atual de produção (2026-05-04) usa `advertiser_id`. Outros
+ * schemas históricos podem ter `user_id`/`owner_id`/`account_id` — só
+ * incluímos no SELECT a que existir, evitando 42703.
+ */
+const ADS_OWNER_COLUMN_CANDIDATES = Object.freeze([
+  "advertiser_id",
+  "user_id",
+  "owner_id",
+  "account_id",
+]);
+
 async function auditAds(pg, cityId) {
+  // Introspecta colunas pra construir SELECT seguro.
+  const adsColumns = await listColumns(pg, "ads");
+  if (!adsColumns) {
+    return { ok: false, missing: true, error: "tabela ads ausente" };
+  }
+
+  const ownerColumn = pickFirstExisting(adsColumns, ADS_OWNER_COLUMN_CANDIDATES);
+
+  // Colunas opcionais — só incluem se existirem no schema.
+  const optionalColumns = ["city", "state", "created_at", "updated_at"];
+  const presentOptional = optionalColumns.filter((c) => adsColumns.has(c));
+
+  // Sempre presentes (se ads existir, presume essas colunas centrais).
+  const baseSelect = ["a.id", "a.title", "a.slug", "a.status", "a.city_id"];
+  if (ownerColumn) baseSelect.push(`a.${ownerColumn} AS advertiser_id`);
+  for (const c of presentOptional) baseSelect.push(`a.${c}`);
+
   // Ads com classificação de "parece teste" via OR de patterns.
   const titleClauses = TEST_TITLE_PATTERNS.map(
     (_, i) => `LOWER(COALESCE(a.title, '')) ILIKE $${i + 2}`
@@ -112,25 +224,24 @@ async function auditAds(pg, cityId) {
 
   const params = [cityId, ...TEST_TITLE_PATTERNS, ...TEST_SLUG_PATTERNS];
 
+  const orderBy = adsColumns.has("created_at")
+    ? "ORDER BY a.created_at DESC NULLS LAST, a.id DESC"
+    : "ORDER BY a.id DESC";
+
   const result = await safeQuery(
     pg,
     `
     SELECT
-      a.id,
-      a.title,
-      a.slug,
-      a.status,
-      a.city_id,
-      a.user_id,
-      a.created_at,
+      ${baseSelect.join(",\n      ")},
       (CASE WHEN ${parecePatterns} THEN true ELSE false END) AS parece_teste
     FROM ads a
     WHERE a.city_id = $1
-    ORDER BY a.created_at DESC NULLS LAST, a.id DESC
+    ${orderBy}
     `,
     params
   );
-  return result;
+  if (!result.ok) return result;
+  return { ...result, ownerColumn };
 }
 
 async function auditCityMetrics(pg, cityId) {
@@ -145,17 +256,39 @@ async function auditCityMetrics(pg, cityId) {
   );
   if (!result.ok) return result;
 
-  // Heurística de "zerado": todas as métricas numéricas são 0/null.
+  // Heurística "zerada" via whitelist de métricas conhecidas (ZEROED_METRIC_COLUMNS).
+  // Toda métrica é parseada com parseNumeric (tolerante a `numeric` vindo
+  // como string do driver pg). Se uma métrica esperada nem existe no row,
+  // tratamos como zero (ausência == sem valor não-zero).
   const isZeroed = result.rows.every((row) => {
-    return Object.entries(row).every(([key, value]) => {
-      if (key === "id" || key === "city_id" || key.endsWith("_at")) return true;
-      if (value === null || value === 0) return true;
-      if (typeof value === "string" && (value === "0" || value === "0.00")) return true;
-      return false;
+    return ZEROED_METRIC_COLUMNS.every((col) => {
+      if (!(col in row)) return true; // coluna ausente == sem dado positivo
+      const n = parseNumeric(row[col]);
+      if (Number.isNaN(n)) return false; // valor não-parseável → não-zerado
+      return n === 0;
     });
   });
 
   return { ok: true, rows: result.rows, isZeroed };
+}
+
+/**
+ * Auditoria de `city_status`. Tabela operacional com flags de estado
+ * por cidade (descoberta no relatório de FKs como tendo refs leves).
+ * Lista crua das linhas para id=1 e id=5278 — sem classificação
+ * automática (operador decide caso a caso).
+ */
+async function auditCityStatus(pg, cityId) {
+  const cols = await listColumns(pg, "city_status");
+  if (!cols) {
+    return { ok: false, missing: true, error: "tabela city_status ausente" };
+  }
+  const result = await safeQuery(
+    pg,
+    `SELECT * FROM city_status WHERE city_id = $1`,
+    [cityId]
+  );
+  return result;
 }
 
 async function auditEvents(pg, cityId) {
@@ -190,26 +323,63 @@ async function auditEvents(pg, cityId) {
 }
 
 async function auditRegionMemberships(pg, cityId) {
-  // region_memberships tem nomes de coluna específicos do projeto;
-  // tentar shape canônico. Se não existir, safeQuery devolve missing=true.
+  const cols = await listColumns(pg, "region_memberships");
+  if (!cols) {
+    return { ok: false, missing: true, error: "tabela region_memberships ausente" };
+  }
+
+  // base_city_id e member_city_id são pré-condição: a tabela representa
+  // pares (base, member); sem alguma das duas, não há o que auditar.
+  if (!cols.has("base_city_id") || !cols.has("member_city_id")) {
+    return {
+      ok: false,
+      missing: true,
+      error: "region_memberships não tem base_city_id/member_city_id — schema incompatível",
+    };
+  }
+
+  // Colunas opcionais — só incluem se existirem.
+  const optional = ["radius_km", "distance_km", "created_at", "updated_at"];
+  const presentOptional = optional.filter((c) => cols.has(c));
+
+  // Identificador da linha: usa `id` se existir; senão ROW_NUMBER.
+  const hasId = cols.has("id");
+  const idExpr = hasId
+    ? "rm.id AS id"
+    : "ROW_NUMBER() OVER (ORDER BY rm.base_city_id, rm.member_city_id) AS row_no";
+
+  const baseSelect = [
+    idExpr,
+    "rm.base_city_id",
+    "rm.member_city_id",
+    ...presentOptional.map((c) => `rm.${c}`),
+    "cb.name  AS base_name",
+    "cb.slug  AS base_slug",
+    "cb.state AS base_state",
+    "cm.name  AS member_name",
+    "cm.slug  AS member_slug",
+    "cm.state AS member_state",
+  ];
+
+  const orderBy = hasId
+    ? "ORDER BY rm.id"
+    : "ORDER BY rm.base_city_id, rm.member_city_id";
+
   const result = await safeQuery(
     pg,
     `
     SELECT
-      id,
-      base_city_id,
-      member_city_id,
-      radius_km,
-      distance_km,
-      created_at,
-      updated_at
-    FROM region_memberships
-    WHERE base_city_id = $1 OR member_city_id = $1
-    ORDER BY id
+      ${baseSelect.join(",\n      ")}
+    FROM region_memberships rm
+    LEFT JOIN cities cb ON cb.id = rm.base_city_id
+    LEFT JOIN cities cm ON cm.id = rm.member_city_id
+    WHERE rm.base_city_id = $1 OR rm.member_city_id = $1
+    ${orderBy}
     `,
     [cityId]
   );
-  return result;
+  if (!result.ok) return result;
+  return { ...result, hasId };
 }
 
 async function listForeignKeysReferencingCities(pg) {
@@ -271,11 +441,35 @@ async function countRefsByFk(pg, tableName, columnName) {
  */
 export function classifyScenario(findings) {
   const reasons = [];
+  const context = [];
+
+  // Contexto auxiliar — incluído nos `reasons` mesmo quando o cenário D
+  // vence, para o operador ver de uma vez TUDO o que precisa endereçar.
+  const ads1 = findings.ads?.id1?.rows || [];
+  const testAds = ads1.filter((a) => a.parece_teste);
+  if (testAds.length > 0) {
+    context.push(
+      `ads de teste em city_id=1: ${testAds.length} (${testAds.map((a) => `id=${a.id}`).join(", ")})`
+    );
+  }
+  const cm1 = findings.city_metrics?.id1;
+  if (cm1?.ok && cm1.rows.length > 0) {
+    context.push(`city_metrics city_id=1: ${cm1.rows.length} (zerada=${cm1.isZeroed})`);
+  }
+  const cs1 = findings.city_status?.id1;
+  if (cs1?.ok && cs1.rows.length > 0) {
+    context.push(`city_status city_id=1: ${cs1.rows.length} linha(s)`);
+  }
+  const rm1ctx = findings.region_memberships?.id1;
+  if (rm1ctx?.ok && rm1ctx.rows.length > 0) {
+    context.push(`region_memberships referenciando city_id=1: ${rm1ctx.rows.length}`);
+  }
 
   // D — paid event ou price > 0
   const sensitiveEvents = (findings.events?.id1?.rows || []).filter((r) => r.sensivel);
   if (sensitiveEvents.length > 0) {
     reasons.push(`events sensíveis em city_id=1: ${sensitiveEvents.length}`);
+    for (const c of context) reasons.push(c);
     return { scenario: "D", reasons };
   }
 
@@ -298,8 +492,7 @@ export function classifyScenario(findings) {
     return { scenario: "C", reasons };
   }
 
-  // B — ads não-teste em city_id=1
-  const ads1 = findings.ads?.id1?.rows || [];
+  // B — ads não-teste em city_id=1 (reusa `ads1` definido no início)
   const realAds = ads1.filter((a) => !a.parece_teste);
   if (realAds.length > 0) {
     reasons.push(`ads reais (não-teste) em city_id=1: ${realAds.length}`);
@@ -334,9 +527,15 @@ export async function runAudit({ pg = pool, log = defaultLog } = {}) {
 
   if (ads1.ok) {
     const testCount = ads1.rows.filter((a) => a.parece_teste).length;
-    log("info", `ads city_id=${BROKEN_ID}: ${ads1.rows.length} (${testCount} parecem teste)`);
+    log(
+      "info",
+      `ads city_id=${BROKEN_ID}: ${ads1.rows.length} (${testCount} parecem teste; owner_column=${ads1.ownerColumn ?? "<ausente>"})`
+    );
     for (const a of ads1.rows) {
-      log("info", `  ad id=${a.id} title=${JSON.stringify(a.title)} status=${a.status} parece_teste=${a.parece_teste}`);
+      log(
+        "info",
+        `  ad id=${a.id} title=${JSON.stringify(a.title)} status=${a.status} advertiser_id=${a.advertiser_id ?? "—"} parece_teste=${a.parece_teste}`
+      );
     }
   } else {
     log("error", `ads não auditável: ${ads1.error}`);
@@ -371,12 +570,33 @@ export async function runAudit({ pg = pool, log = defaultLog } = {}) {
   const rm1 = await auditRegionMemberships(pg, BROKEN_ID);
   const rm5278 = await auditRegionMemberships(pg, CANONICAL_ID);
   if (rm1.ok) {
-    log("info", `region_memberships city_id=${BROKEN_ID}: ${rm1.rows.length}`);
+    log(
+      "info",
+      `region_memberships city_id=${BROKEN_ID}: ${rm1.rows.length} (id_column=${rm1.hasId ? "id" : "row_no"})`
+    );
     for (const r of rm1.rows) {
-      log("info", `  rm id=${r.id} base=${r.base_city_id} member=${r.member_city_id} radius=${r.radius_km} dist=${r.distance_km}`);
+      const ident = r.id ?? r.row_no;
+      const base = `${r.base_name ?? "?"}/${r.base_slug ?? "?"}/${r.base_state ?? "?"}`;
+      const member = `${r.member_name ?? "?"}/${r.member_slug ?? "?"}/${r.member_state ?? "?"}`;
+      log(
+        "info",
+        `  rm ${rm1.hasId ? "id" : "row_no"}=${ident} base=${r.base_city_id} (${base}) member=${r.member_city_id} (${member}) radius=${r.radius_km ?? "—"} dist=${r.distance_km ?? "—"}`
+      );
     }
   } else if (rm1.missing) {
-    log("info", `region_memberships ausente do schema (skip)`);
+    log("info", `region_memberships ausente/incompatível (skip): ${rm1.error ?? ""}`);
+  }
+
+  // city_status — auditoria sem classificação automática.
+  const cs1 = await auditCityStatus(pg, BROKEN_ID);
+  const cs5278 = await auditCityStatus(pg, CANONICAL_ID);
+  if (cs1.ok) {
+    log("info", `city_status city_id=${BROKEN_ID}: ${cs1.rows.length}`);
+    for (const r of cs1.rows) {
+      log("info", `  city_status row=${JSON.stringify(r)}`);
+    }
+  } else if (cs1.missing) {
+    log("info", `city_status ausente/skip: ${cs1.error ?? ""}`);
   }
 
   // Mapeamento dinâmico de FKs e contagens
@@ -402,6 +622,7 @@ export async function runAudit({ pg = pool, log = defaultLog } = {}) {
     cities,
     ads: { id1: ads1, id5278: ads5278 },
     city_metrics: { id1: cm1, id5278: cm5278 },
+    city_status: { id1: cs1, id5278: cs5278 },
     events: { id1: ev1, id5278: ev5278 },
     region_memberships: { id1: rm1, id5278: rm5278 },
     fkRefs,
