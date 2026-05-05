@@ -14,6 +14,7 @@ const {
   toNumber,
   sameId,
   isZeroDistance,
+  TARGET_AD_STATUS,
 } = await import("../../scripts/maintenance/cleanup-sao-paulo-duplicate.mjs");
 
 // ─────────────────────────────────────────────────────────────────────
@@ -149,10 +150,16 @@ function happyPathMatchers(overrides = {}) {
       match: /FROM events\s+WHERE city_id = \$1\s+ORDER BY id/,
       response: { rows: overrides.events ?? [PAID_EVENT_4] },
     },
-    // pg_constraint check
+    // pg_constraint check — dispatch por regclass (events vs ads)
     {
       match: /FROM pg_constraint\s+WHERE contype = 'c'/,
-      response: { rows: overrides.checkConstraints ?? [] },
+      response: ({ sql }) => {
+        if (sql.includes("'ads'::regclass")) {
+          return { rows: overrides.adsCheckConstraints ?? [] };
+        }
+        // default = events
+        return { rows: overrides.checkConstraints ?? [] };
+      },
     },
     // city_metrics columns introspect
     {
@@ -288,7 +295,10 @@ describe("planScenario", () => {
     expect(steps[0].sql).toMatch(/UPDATE events/);
     expect(steps[0].sql).toMatch(/SET status = 'cancelled'/);
     expect(steps[1].sql).toMatch(/UPDATE ads/);
-    expect(steps[1].sql).toMatch(/SET status = 'archived'/);
+    // Status canônico (deleted) — ver src/shared/constants/status.js.
+    // 'archived' NUNCA pode aparecer (constraint ads_status_check rejeita).
+    expect(steps[1].sql).toMatch(new RegExp(`SET status = '${TARGET_AD_STATUS}'`));
+    expect(steps[1].sql).not.toMatch(/SET status = 'archived'/);
     expect(steps[2].sql).toMatch(/DELETE FROM region_memberships/);
     expect(steps[3].sql).toMatch(/DELETE FROM city_metrics/);
     expect(steps[4].sql).toMatch(/DELETE FROM city_status/);
@@ -299,6 +309,21 @@ describe("planScenario", () => {
       expect(step.sql).not.toMatch(/id\s*=\s*5278/);
       expect(JSON.stringify(step.params)).not.toContain("5278");
     }
+    // 'archived' NUNCA aparece em nenhum step (regressão da incidência
+    // de 2026-05-04: violou ads_status_check em produção).
+    for (const step of steps) {
+      expect(step.sql).not.toMatch(/'archived'/);
+    }
+  });
+
+  it("TARGET_AD_STATUS é 'deleted' (canônico, está em AD_STATUS)", () => {
+    expect(TARGET_AD_STATUS).toBe("deleted");
+  });
+
+  it("archive-test-data: usa TARGET_AD_STATUS, nunca 'archived'", () => {
+    const steps = planScenario("archive-test-data");
+    expect(steps[0].sql).toMatch(new RegExp(`SET status = '${TARGET_AD_STATUS}'`));
+    expect(steps[0].sql).not.toMatch(/'archived'/);
   });
 
   it("cenário desconhecido → throw", () => {
@@ -529,6 +554,47 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
     expect(r.reasons.join(" ")).toMatch(/CHECK constraint.*status.*NÃO inclui 'cancelled'/);
   });
 
+  it("ads_status_check NÃO inclui TARGET_AD_STATUS → aborta (regressão prod 2026-05-04)", async () => {
+    // A incidência real: cleanup tentou status='archived' mas a
+    // constraint só aceitava active/paused/deleted/blocked. O
+    // BEGIN passou e o UPDATE explodiu no meio da transação.
+    // Esta verificação trava ANTES do BEGIN.
+    const adsChecks = [
+      {
+        conname: "ads_status_check",
+        def: "CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'blocked'::text])))",
+      },
+    ];
+    const pg = makePoolByMatcher(happyPathMatchers({ adsCheckConstraints: adsChecks }));
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.join(" ")).toMatch(
+      new RegExp(`ads_status_check.*NÃO inclui '${TARGET_AD_STATUS}'`)
+    );
+  });
+
+  it("ads_status_check inclui TARGET_AD_STATUS ('deleted') → passa", async () => {
+    const adsChecks = [
+      {
+        conname: "ads_status_check",
+        def: "CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'deleted'::text, 'blocked'::text])))",
+      },
+    ];
+    const pg = makePoolByMatcher(happyPathMatchers({ adsCheckConstraints: adsChecks }));
+    const r = await validatePreconditions({
+      pg,
+      scenario: "confirmed-test-data-cleanup",
+      args: happyArgs,
+      log: () => {},
+    });
+    expect(r.ok).toBe(true);
+  });
+
   it("ref proibida em seo_cluster_plans → aborta", async () => {
     const pg = makePoolByMatcher(
       happyPathMatchers({
@@ -600,6 +666,43 @@ describe("runCleanup — dry-run nunca escreve", () => {
       expect(sql).not.toMatch(/^\s*DELETE/i);
       expect(sql).not.toMatch(/^\s*INSERT/i);
     }
+    expect(pg.connect).not.toHaveBeenCalled();
+  });
+
+  it("rollbackSql restaura ads para 'active' (snapshot capturou estado pré-cleanup)", async () => {
+    const pg = makePoolByMatcher(happyPathMatchers());
+    pg.connect = vi.fn();
+    const result = await runCleanup({
+      scenario: "confirmed-test-data-cleanup",
+      dryRun: true,
+      args: { confirmEventId: 4, confirmBrokenCityId: 1, confirmCanonicalCityId: 5278 },
+      pg,
+      log: () => {},
+      writeSnapshot: () => null,
+    });
+    expect(result.ok).toBe(true);
+    const rb = result.rollbackSql.join("\n");
+    // Ads 9 e 80 voltam para 'active' a partir do snapshot pré-cleanup
+    expect(rb).toMatch(/UPDATE ads SET status = 'active' WHERE id = 9;/);
+    expect(rb).toMatch(/UPDATE ads SET status = 'active' WHERE id = 80;/);
+    // Nada de 'archived' (status fantasma) ou TARGET_AD_STATUS no rollback
+    expect(rb).not.toMatch(/'archived'/);
+    expect(rb).not.toMatch(new RegExp(`UPDATE ads SET status = '${TARGET_AD_STATUS}'`));
+  });
+
+  it("sem --yes (dryRun=true) NUNCA conecta ao client (não abre transação)", async () => {
+    const pg = makePoolByMatcher(happyPathMatchers());
+    pg.connect = vi.fn();
+    const result = await runCleanup({
+      scenario: "confirmed-test-data-cleanup",
+      dryRun: true,
+      args: { confirmEventId: 4, confirmBrokenCityId: 1, confirmCanonicalCityId: 5278 },
+      pg,
+      log: () => {},
+      writeSnapshot: () => null,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.dryRun).toBe(true);
     expect(pg.connect).not.toHaveBeenCalled();
   });
 });

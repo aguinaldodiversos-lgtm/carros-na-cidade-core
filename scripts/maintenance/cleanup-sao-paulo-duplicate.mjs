@@ -61,6 +61,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { pool, closeDatabasePool } from "../../src/infrastructure/database/db.js";
+import { AD_STATUS } from "../../src/shared/constants/status.js";
 
 const BROKEN_ID = 1;
 const CANONICAL_ID = 5278;
@@ -68,6 +69,14 @@ const EXPECTED_TEST_AD_IDS = [9, 80];
 const EXPECTED_EVENT_ID = 4;
 const EXPECTED_EVENT_TITLE = "FeirÆo de Seminovos";
 const EXPECTED_EVENT_PRICE = 499;
+// Status canônico para tirar anúncios de teste do catálogo público
+// preservando o registro pra auditoria. `deleted` é o único valor da
+// constraint `ads_status_check` que: (a) sai da vitrine pública
+// (apenas `active` aparece — ver src/shared/constants/status.js:54),
+// (b) preserva a linha pra histórico, (c) NÃO pertubra estatísticas
+// como 'sold' faria, (d) NÃO carrega semântica de violação como
+// 'blocked'. Validado dinamicamente contra `ads_status_check`.
+export const TARGET_AD_STATUS = AD_STATUS.DELETED;
 const REPORT_DIR = "reports";
 const SUPPORTED_SCENARIOS = new Set([
   "archive-test-data",
@@ -478,6 +487,41 @@ async function validateConfirmedCleanup({
     }
   }
 
+  // 4.c. CHECK constraint em ads.status — TARGET_AD_STATUS precisa ser
+  // permitido. Detectado via pg_get_constraintdef (mesmo padrão acima).
+  // Em produção (2026-05-04) o cleanup falhou com 'archived' violando
+  // ads_status_check; esta verificação trava o cenário antes do BEGIN
+  // se o status escolhido não estiver na constraint.
+  const adsChecks = await safeSelect(
+    pg,
+    `
+    SELECT conname, pg_get_constraintdef(oid) AS def
+    FROM pg_constraint
+    WHERE contype = 'c' AND conrelid = 'ads'::regclass
+    `
+  );
+  if (adsChecks.ok) {
+    for (const c of adsChecks.rows) {
+      const def = String(c.def || "");
+      // Aceita as duas formas que pg_get_constraintdef pode devolver:
+      //   CHECK ((status IN ('active', 'deleted', ...)))
+      //   CHECK ((status = ANY (ARRAY['active'::text, 'deleted'::text, ...])))
+      const isStatusEnum =
+        /\bstatus\b/i.test(def) && (/\bIN\s*\(/i.test(def) || /=\s*ANY\s*\(\s*ARRAY/i.test(def));
+      if (isStatusEnum) {
+        // Quoting tolerante: aceita 'X' como literal SQL em qualquer
+        // posição da lista. Não tenta parsear o ARRAY — só verifica a
+        // presença textual do literal entre aspas simples.
+        const re = new RegExp(`'${TARGET_AD_STATUS}'`);
+        if (!re.test(def)) {
+          reasons.push(
+            `ads tem CHECK constraint '${c.conname}' em status que NÃO inclui '${TARGET_AD_STATUS}': ${def}. Atualizar TARGET_AD_STATUS no script ou a constraint no banco.`
+          );
+        }
+      }
+    }
+  }
+
   // 5. city_metrics: ≤1 linha; zerada
   const cmCols = await pg.query(
     `SELECT column_name FROM information_schema.columns WHERE table_name='city_metrics'`
@@ -695,7 +739,7 @@ function buildRollbackSql(snapshot) {
     );
   }
 
-  // ads: archived → active
+  // ads: TARGET_AD_STATUS → status original do snapshot (active na captura)
   for (const a of snapshot.ads || []) {
     lines.push(
       `UPDATE ads SET status = ${escSql(a.status)} WHERE id = ${a.id};`
@@ -753,10 +797,10 @@ export function planScenario(scenario) {
   if (scenario === "archive-test-data") {
     return [
       {
-        description: `arquivar ads de teste id IN (${EXPECTED_TEST_AD_IDS.join(", ")}) (atualmente active, city_id=${BROKEN_ID})`,
+        description: `marcar ads de teste id IN (${EXPECTED_TEST_AD_IDS.join(", ")}) como '${TARGET_AD_STATUS}' (atualmente active, city_id=${BROKEN_ID})`,
         sql: `
           UPDATE ads
-          SET status = 'archived',
+          SET status = '${TARGET_AD_STATUS}',
               updated_at = NOW()
           WHERE id = ANY($1::int[])
             AND city_id = $2
@@ -787,10 +831,10 @@ export function planScenario(scenario) {
         params: [EXPECTED_EVENT_ID, BROKEN_ID, EXPECTED_EVENT_TITLE, EXPECTED_EVENT_PRICE],
       },
       {
-        description: `arquivar ads de teste id IN (${EXPECTED_TEST_AD_IDS.join(", ")})`,
+        description: `marcar ads de teste id IN (${EXPECTED_TEST_AD_IDS.join(", ")}) como '${TARGET_AD_STATUS}'`,
         sql: `
           UPDATE ads
-          SET status = 'archived',
+          SET status = '${TARGET_AD_STATUS}',
               updated_at = NOW()
           WHERE id = ANY($1::int[])
             AND city_id = $2
