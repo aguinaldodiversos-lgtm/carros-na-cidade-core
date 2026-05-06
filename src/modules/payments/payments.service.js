@@ -71,7 +71,13 @@ function getBackendPublicUrl() {
   return stripTrailingSlash(value);
 }
 
-async function mpRequest(path, init) {
+/**
+ * Wrapper minimal do fetch contra a API do Mercado Pago. Exporta para
+ * permitir reuso em camadas isoladas (ex: mercadopago-subscription.client.js
+ * da Fase 3C). NÃO usar em código de domínio diretamente — chame via
+ * client específico do recurso (preference, preapproval, payment).
+ */
+export async function mpRequest(path, init = {}) {
   if (!MP_ACCESS_TOKEN) {
     throw new AppError("Mercado Pago token ausente.", 500);
   }
@@ -91,6 +97,23 @@ async function mpRequest(path, init) {
   }
 
   return response.json();
+}
+
+/**
+ * Indica se o cliente MP está em modo MOCK (sem MP_ACCESS_TOKEN). Em modo
+ * mock, clients devem retornar payloads sintéticos em vez de tocar a API
+ * — evita teste local depender de credencial real.
+ */
+export function isMercadoPagoMockMode() {
+  return !MP_ACCESS_TOKEN;
+}
+
+export function getMercadoPagoPublicKey() {
+  return MP_PUBLIC_KEY;
+}
+
+export function getMercadoPagoBackendPublicUrl() {
+  return getBackendPublicUrl();
 }
 
 function serializeMetadata(value) {

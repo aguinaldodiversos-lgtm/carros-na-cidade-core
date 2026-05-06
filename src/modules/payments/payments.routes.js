@@ -7,6 +7,10 @@ import {
   createPlanSubscription,
   handleWebhookNotification,
 } from "./payments.service.js";
+import {
+  cancelUserSubscription,
+  createSubscriptionCheckout,
+} from "./subscriptions.service.js";
 
 const router = express.Router();
 
@@ -82,6 +86,56 @@ router.post(
       ...resolvePublicUrls(req),
     });
 
+    res.json(payload);
+  })
+);
+
+/**
+ * Rotas dedicadas de assinatura recorrente Start/Pro (Fase 3C).
+ *
+ * IMPORTANTE — não ativar publicamente nesta fase:
+ *   - /planos NÃO chama estes endpoints (CTAs Start/Pro continuam em
+ *     /anunciar?plano=X até validação ponta a ponta em sandbox).
+ *   - Endpoints existem para que sandbox + admin possam testar o fluxo
+ *     completo sem ainda expor pra usuário comum.
+ *   - Em produção, MP_ACCESS_TOKEN sandbox nesta fase; PROD só após
+ *     checklist do runbook docs/runbooks/mercado-pago-subscriptions-start-pro.md
+ *
+ * Diferenças do legacy POST /subscription:
+ *   - Whitelist explícita: SÓ aceita cnpj-store-start ou cnpj-store-pro
+ *     (legacy aceita qualquer plan_id com billing_model='monthly')
+ *   - Bloqueia explicitamente cnpj-evento-premium e cpf-premium-highlight
+ *   - Bloqueia criar 2ª assinatura quando user já tem uma viva
+ *     (active/pending/paused)
+ */
+router.post(
+  "/subscriptions/checkout",
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const planId = String(req.body?.plan_id || "").trim();
+    if (!planId) {
+      throw new AppError("plan_id e obrigatorio", 400);
+    }
+
+    const payload = await createSubscriptionCheckout({
+      userId: req.user.id,
+      planId,
+      requestId: req.requestId,
+      ...resolvePublicUrls(req),
+    });
+
+    res.json(payload);
+  })
+);
+
+router.post(
+  "/subscriptions/cancel",
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const payload = await cancelUserSubscription({
+      userId: req.user.id,
+      requestId: req.requestId,
+    });
     res.json(payload);
   })
 );
