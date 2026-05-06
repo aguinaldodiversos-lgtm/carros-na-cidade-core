@@ -160,32 +160,48 @@ describe("/planos — conteúdo dos cards (oferta segura desta fase)", () => {
   });
 });
 
-describe("/planos — CTAs apontam para fluxos seguros (Mercado Pago NÃO acionado)", () => {
+describe("/planos — CTAs apontam para login → fluxo do anúncio (Mercado Pago NÃO acionado)", () => {
   function hrefOfCta(container: HTMLElement, planId: string): string | null {
     const card = container.querySelector(`[data-plan-id="${planId}"]`);
     return card?.querySelector("a")?.getAttribute("href") ?? null;
   }
 
-  it("Grátis → /cadastro (rota existente, sem MP)", () => {
+  it("Grátis → /login?next=/anunciar (volta pra fluxo do anúncio após auth)", () => {
     const { container } = renderPage();
-    expect(hrefOfCta(container, "gratis")).toBe("/cadastro");
+    expect(hrefOfCta(container, "gratis")).toBe("/login?next=/anunciar");
   });
 
-  it("Start → /anunciar?plano=start (fluxo existente, sem MP)", () => {
+  it("Start → /login?next=/anunciar?plano=start", () => {
     const { container } = renderPage();
-    expect(hrefOfCta(container, "lojista-start")).toBe("/anunciar?plano=start");
+    expect(hrefOfCta(container, "lojista-start")).toBe(
+      "/login?next=/anunciar?plano=start"
+    );
   });
 
-  it("Pro → /anunciar?plano=pro (fluxo existente, sem MP)", () => {
+  it("Pro → /login?next=/anunciar?plano=pro", () => {
     const { container } = renderPage();
-    expect(hrefOfCta(container, "lojista-pro")).toBe("/anunciar?plano=pro");
+    expect(hrefOfCta(container, "lojista-pro")).toBe(
+      "/login?next=/anunciar?plano=pro"
+    );
   });
 
-  it("Destaque 7 dias → /ajuda (suporte humano, NÃO checkout MP)", () => {
-    // Decisão: enquanto MP de boost não validado, CTA encaminha pra suporte.
-    // Quando Fase 3B liberar checkout, trocar pra rota de pagamento.
+  it("Destaque 7 dias → /login?next=/anunciar?acao=destaque (NÃO checkout MP — exige ad_id)", () => {
+    // Travamento: NUNCA iniciar Mercado Pago de Destaque sem ad_id.
+    // CTA público leva ao fluxo de criar/escolher anúncio; Mercado Pago
+    // é acionado APENAS pelo BoostCheckoutButton no painel pós-revisão.
     const { container } = renderPage();
-    expect(hrefOfCta(container, "destaque-7-dias")).toMatch(/^\/ajuda/);
+    expect(hrefOfCta(container, "destaque-7-dias")).toBe(
+      "/login?next=/anunciar?acao=destaque"
+    );
+  });
+
+  it("TODAS as 4 CTAs começam com /login?next= (forçam autenticação antes de qualquer ação comercial)", () => {
+    const { container } = renderPage();
+    const planIds = ["gratis", "lojista-start", "lojista-pro", "destaque-7-dias"];
+    for (const id of planIds) {
+      const href = hrefOfCta(container, id);
+      expect(href, `plano=${id}`).toMatch(/^\/login\?next=/);
+    }
   });
 
   it("nenhum link da página aponta para mercadopago.com / /api/payments diretamente", () => {

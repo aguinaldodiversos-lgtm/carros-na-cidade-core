@@ -10,6 +10,7 @@ import { validateAdIdentifier, validateAdId, validateUpdateAdPayload } from "./a
 import { invalidateAdsCachesAfterMutation } from "./ads.mutation-cache.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { getPublicationOptions } from "./ads.publication-options.service.js";
 
 /**
  * Upload de fotos do wizard de publicação → Cloudflare R2 (mesmo pipeline que veículos).
@@ -169,6 +170,29 @@ export async function remove(req, res, next) {
       success: true,
       message: "Anúncio removido com sucesso",
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/ads/:id/publication-options (Fase 4).
+ *
+ * Tela interna pós-revisão consulta este endpoint pra saber
+ * quais ações estão disponíveis pra publicar/destacar este ad
+ * específico. Devolve estado normalizado: ad + plano + sub +
+ * limite + lista de actions com `enabled` e `reason`.
+ *
+ * Mercado Pago NÃO é tocado aqui — este endpoint apenas DESCREVE
+ * opções. O frontend (PublicationPlanSelector) chama os checkouts
+ * dedicados (/api/payments/boost-7d/checkout, /api/payments/
+ * subscriptions/checkout) quando o user clica em uma action.
+ */
+export async function publicationOptions(req, res, next) {
+  try {
+    const id = validateAdId(req.params.id);
+    const payload = await getPublicationOptions({ userId: req.user.id, adId: id });
+    res.json({ success: true, data: payload });
   } catch (err) {
     next(err);
   }

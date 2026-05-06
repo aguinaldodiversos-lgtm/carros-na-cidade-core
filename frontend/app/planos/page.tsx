@@ -79,7 +79,13 @@ const PLANS: ReadonlyArray<PlanCardData> = [
       "Não altera o limite de fotos",
       "Não altera o limite de anúncios",
     ],
-    cta: { label: "Destacar agora", href: "/ajuda?assunto=destaque-7-dias" },
+    cta: {
+      label: "Destacar agora",
+      // Fase 4: CTA leva pra autenticação que retorna ao fluxo do anúncio.
+      // Mercado Pago só inicia DEPOIS que o user tem ad_id (tela interna
+      // pós-revisão renderiza BoostCheckoutButton, que aí sim chama MP).
+      href: "/login?next=/anunciar?acao=destaque",
+    },
     style: "accent",
   },
   {
@@ -95,7 +101,7 @@ const PLANS: ReadonlyArray<PlanCardData> = [
       "Prioridade comercial superior ao Start",
       "Perfil de loja com identidade visual",
     ],
-    cta: { label: "Assinar Pro", href: "/anunciar?plano=pro" },
+    cta: { label: "Assinar Pro", href: "/login?next=/anunciar?plano=pro" },
     style: "highlight",
   },
   {
@@ -110,7 +116,7 @@ const PLANS: ReadonlyArray<PlanCardData> = [
       "Ideal para lojas em início de operação digital",
       "Perfil de loja personalizado",
     ],
-    cta: { label: "Assinar Start", href: "/anunciar?plano=start" },
+    cta: { label: "Assinar Start", href: "/login?next=/anunciar?plano=start" },
     style: "neutral",
   },
   {
@@ -125,7 +131,7 @@ const PLANS: ReadonlyArray<PlanCardData> = [
       "Até 8 fotos por anúncio",
       "CPF ou CNPJ validado",
     ],
-    cta: { label: "Começar grátis", href: "/cadastro" },
+    cta: { label: "Começar grátis", href: "/login?next=/anunciar" },
     style: "neutral",
   },
 ];
@@ -369,7 +375,7 @@ export default function PlanosPage() {
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
           <Link
-            href="/cadastro"
+            href="/login?next=/anunciar"
             className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-bold text-white transition hover:bg-primary/90"
           >
             Criar conta grátis

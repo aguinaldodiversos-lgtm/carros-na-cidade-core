@@ -48,6 +48,15 @@ router.get(
   adsController.search
 );
 
+// Fase 4: tela interna pós-revisão consulta este endpoint pra saber
+// quais ações estão disponíveis. DEVE ficar ANTES de GET /:identifier
+// (que é greedy e capturaria '/:id/publication-options' senão).
+router.get(
+  "/:id/publication-options",
+  authMiddleware,
+  adsController.publicationOptions
+);
+
 router.get("/:identifier", adsController.show);
 
 router.post("/", authMiddleware, adsController.create);
