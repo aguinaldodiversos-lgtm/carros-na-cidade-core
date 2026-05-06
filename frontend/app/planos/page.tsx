@@ -52,7 +52,7 @@ export default async function PlanosPage() {
           Planos para lojistas
         </h2>
         <p className="mt-1 text-sm text-[#5f6982]">
-          CNPJ verificado no backend. Limite gratuito de 20 anúncios ativos e planos pagos com
+          CNPJ verificado no backend. Limite gratuito de 10 anúncios ativos e planos pagos com
           destaque e prioridade.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

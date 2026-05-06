@@ -20,6 +20,18 @@ export type SubscriptionPlan = {
   description: string;
   benefits: string[];
   recommended?: boolean;
+  /**
+   * Campos opcionais alinhados à oferta oficial de lançamento. Backend
+   * ainda não tem colunas dedicadas; são preenchidos no fallback e
+   * documentados em docs/runbooks/plans-launch-alignment.md para a
+   * próxima fase (migration de schema). Quando o backend devolver,
+   * o frontend já consome — campo opcional não quebra payload legado.
+   */
+  max_photos?: number;
+  /** Camada comercial alvo (espelha commercial_layer do ranking SQL). */
+  weight?: 1 | 2 | 3 | 4;
+  video_360_enabled?: boolean;
+  monthly_highlight_credits?: number;
 };
 
 export type UserSubscription = {
@@ -59,6 +71,34 @@ type UserAd = {
 
 const nowIso = () => new Date().toISOString();
 
+/**
+ * Trava técnica do "ilimitado" do plano Pro. Banco/admin pode ajustar,
+ * mas o fallback público nunca devolve um número absurdo. 1000 cobre
+ * com folga qualquer caso real de produção atual e ainda evita queries
+ * patológicas / abuso enquanto admin não rebalancear.
+ */
+const PRO_PLAN_AD_LIMIT_GUARD = 1000;
+
+/**
+ * Catálogo público de planos — FALLBACK quando o backend (`/api/plans`
+ * → `subscription_plans`) está indisponível. Fonte de verdade real é
+ * o banco/admin; aqui ficam os números OFICIAIS de lançamento alinhados
+ * à oferta comercial:
+ *
+ *   Grátis CPF:  3 ads,  8 fotos, peso 1, sem vídeo, 0 destaques/mês
+ *   Grátis CNPJ: 10 ads, 8 fotos, peso 1, sem vídeo, 0 destaques/mês
+ *   Start CNPJ:  20 ads, 12 fotos, peso 2, sem vídeo, 1 destaque/mês  — R$ 79,90/mês
+ *   Pro CNPJ:    ilimitado (trava ${PRO_PLAN_AD_LIMIT_GUARD}), 15 fotos, peso 3, vídeo 360, 3 destaques/mês — R$ 149,90/mês
+ *
+ * Boost avulso "Destaque 7 dias" (R$ 39,90, peso 4 enquanto ativo)
+ * vive em BOOST_OPTIONS no backend (account.service.js), não aqui.
+ *
+ * Planos descontinuados (`cpf-premium-highlight`, `cnpj-evento-premium`)
+ * permanecem no array com `is_active=false` — preserva tipos/IDs para
+ * lookup histórico, mas `getPlans({ onlyActive: true })` os omite no
+ * fallback público. Banco continua tendo as rows; remoção definitiva
+ * é decisão de runbook separado (docs/runbooks/plans-launch-alignment.md).
+ */
 const planSeed: SubscriptionPlan[] = [
   {
     id: "cpf-free-essential",
@@ -77,9 +117,14 @@ const planSeed: SubscriptionPlan[] = [
     description: "Ideal para pessoa fisica que quer anunciar sem mensalidade.",
     benefits: [
       "Ate 3 anuncios ativos por CPF",
+      "Ate 8 fotos por anuncio",
       "Contato direto via WhatsApp",
       "Sem comissao por venda",
     ],
+    max_photos: 8,
+    weight: 1,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
   },
   {
     id: "cpf-premium-highlight",
@@ -90,7 +135,10 @@ const planSeed: SubscriptionPlan[] = [
     is_featured_enabled: true,
     has_store_profile: false,
     priority_level: 50,
-    is_active: true,
+    // Descontinuado na oferta de lançamento: substituído pelo boost avulso
+    // "Destaque 7 dias" (R$ 39,90, BOOST_OPTIONS), válido para CPF e CNPJ.
+    // Mantido com is_active=false para preservar lookup histórico.
+    is_active: false,
     validity_days: 30,
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -101,14 +149,17 @@ const planSeed: SubscriptionPlan[] = [
       "Badge premium no anuncio",
       "Prioridade de exibicao por 30 dias",
     ],
-    recommended: true,
+    max_photos: 8,
+    weight: 1,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
   },
   {
     id: "cnpj-free-store",
     name: "Plano Gratuito Loja",
     type: "CNPJ",
     price: 0,
-    ad_limit: 20,
+    ad_limit: 10,
     is_featured_enabled: false,
     has_store_profile: true,
     priority_level: 5,
@@ -118,14 +169,23 @@ const planSeed: SubscriptionPlan[] = [
     updated_at: nowIso(),
     billing_model: "free",
     description: "Para lojas com CNPJ verificado iniciarem no portal sem mensalidade.",
-    benefits: ["Ate 20 anuncios ativos", "Perfil de loja ativo", "Sem comissao nas vendas"],
+    benefits: [
+      "Ate 10 anuncios ativos",
+      "Ate 8 fotos por anuncio",
+      "Perfil de loja ativo",
+      "Sem comissao nas vendas",
+    ],
+    max_photos: 8,
+    weight: 1,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
   },
   {
     id: "cnpj-store-start",
     name: "Plano Loja Start",
     type: "CNPJ",
-    price: 299.9,
-    ad_limit: 80,
+    price: 79.9,
+    ad_limit: 20,
     is_featured_enabled: true,
     has_store_profile: true,
     priority_level: 60,
@@ -135,14 +195,23 @@ const planSeed: SubscriptionPlan[] = [
     updated_at: nowIso(),
     billing_model: "monthly",
     description: "Plano de entrada para escalar anuncios da loja com destaque opcional.",
-    benefits: ["Ate 80 anuncios", "Perfil de loja personalizado", "Destaques configuraveis"],
+    benefits: [
+      "Ate 20 anuncios ativos",
+      "Ate 12 fotos por anuncio",
+      "1 destaque mensal incluido",
+      "Perfil de loja personalizado",
+    ],
+    max_photos: 12,
+    weight: 2,
+    video_360_enabled: false,
+    monthly_highlight_credits: 1,
   },
   {
     id: "cnpj-store-pro",
     name: "Plano Loja Pro",
     type: "CNPJ",
-    price: 599.9,
-    ad_limit: 200,
+    price: 149.9,
+    ad_limit: PRO_PLAN_AD_LIMIT_GUARD,
     is_featured_enabled: true,
     has_store_profile: true,
     priority_level: 80,
@@ -151,8 +220,18 @@ const planSeed: SubscriptionPlan[] = [
     created_at: nowIso(),
     updated_at: nowIso(),
     billing_model: "monthly",
-    description: "Mais anuncios, destaque automatico e estatisticas avancadas.",
-    benefits: ["Ate 200 anuncios", "Destaque automatico", "Dashboard de performance por cidade"],
+    description: "Anuncios sem limite pratico, destaques mensais inclusos e video 360.",
+    benefits: [
+      "Anuncios ilimitados (trava tecnica configuravel pelo admin)",
+      "Ate 15 fotos por anuncio",
+      "3 destaques mensais inclusos",
+      "Video 360 habilitado",
+      "Dashboard de performance por cidade",
+    ],
+    max_photos: 15,
+    weight: 3,
+    video_360_enabled: true,
+    monthly_highlight_credits: 3,
     recommended: true,
   },
   {
@@ -164,7 +243,11 @@ const planSeed: SubscriptionPlan[] = [
     is_featured_enabled: true,
     has_store_profile: true,
     priority_level: 100,
-    is_active: true,
+    // Produto Evento desligado por feature flag. Mantido com is_active=false
+    // no fallback como defesa em profundidade: se backend cair em prod,
+    // /planos não exibe Evento mesmo que alguém esqueça a flag em runtime.
+    // Backend filtra adicionalmente via isEventPlanId() + EVENTS_PUBLIC_ENABLED.
+    is_active: false,
     validity_days: 30,
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -365,7 +448,10 @@ export function validatePublishEligibility(userId: string) {
     };
   }
 
-  const freeLimit = user.document_type === "CPF" ? 3 : 20;
+  // Limites alinhados à oferta oficial de lançamento (cpf-free-essential
+  // / cnpj-free-store em planSeed). Backend faz validação real com banco
+  // em src/modules/account/account.service.js#resolvePublishEligibility.
+  const freeLimit = user.document_type === "CPF" ? 3 : 10;
   if (activeAds < freeLimit) {
     return { allowed: true, reason: "Limite gratuito disponivel", suggested_plan_type: null };
   }
@@ -375,7 +461,7 @@ export function validatePublishEligibility(userId: string) {
     reason:
       user.document_type === "CPF"
         ? "Limite de 3 anuncios gratuitos por CPF atingido"
-        : "Limite de 20 anuncios gratuitos por CNPJ atingido",
+        : "Limite de 10 anuncios gratuitos por CNPJ atingido",
     suggested_plan_type: user.document_type,
   };
 }

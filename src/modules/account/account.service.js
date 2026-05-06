@@ -21,6 +21,37 @@ export function isEventPlanId(planId) {
 
 export { getAccountUser };
 
+/**
+ * Trava técnica do "ilimitado" do plano Pro. Banco/admin pode ajustar,
+ * mas o fallback nunca devolve um número absurdo. Ver docs/runbooks/
+ * plans-launch-alignment.md para política e UI.
+ */
+const PRO_PLAN_AD_LIMIT_GUARD = 1000;
+
+/**
+ * Catálogo público de planos — FALLBACK quando a query em
+ * `subscription_plans` retorna vazio ou falha. Fonte de verdade real é
+ * o banco/admin; aqui ficam os números OFICIAIS de lançamento alinhados
+ * à oferta comercial:
+ *
+ *   Grátis CPF:  3 ads,  peso 1
+ *   Grátis CNPJ: 10 ads, peso 1
+ *   Start CNPJ:  20 ads, peso 2  — R$ 79,90/mês
+ *   Pro CNPJ:    ilimitado (trava ${PRO_PLAN_AD_LIMIT_GUARD}), peso 3 — R$ 149,90/mês
+ *
+ * Boost avulso "Destaque 7 dias" (R$ 39,90, peso 4 enquanto ativo)
+ * vive em BOOST_OPTIONS abaixo, não aqui.
+ *
+ * Planos descontinuados (`cpf-premium-highlight`, `cnpj-evento-premium`)
+ * permanecem no array com `is_active=false` — preserva resolução por id
+ * mas omite no `listPlans({ onlyActive: true })`. Banco continua tendo
+ * as rows; remoção definitiva é decisão de runbook separado
+ * (docs/runbooks/plans-launch-alignment.md).
+ *
+ * Campos `max_photos`, `weight`, `video_360_enabled`, `monthly_highlight_credits`
+ * ainda não têm coluna no banco. Frontend já consome quando vêm; backend
+ * devolve no fallback. Migration documentada no runbook.
+ */
 const DEFAULT_PLANS = [
   {
     id: "cpf-free-essential",
@@ -37,9 +68,14 @@ const DEFAULT_PLANS = [
     description: "Ideal para pessoa fisica que quer anunciar sem mensalidade.",
     benefits: [
       "Ate 3 anuncios ativos por CPF",
+      "Ate 8 fotos por anuncio",
       "Contato direto via WhatsApp",
       "Sem comissao por venda",
     ],
+    max_photos: 8,
+    weight: 1,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
     recommended: false,
   },
   {
@@ -51,7 +87,10 @@ const DEFAULT_PLANS = [
     is_featured_enabled: true,
     has_store_profile: false,
     priority_level: 50,
-    is_active: true,
+    // Descontinuado na oferta de lançamento: substituído pelo boost avulso
+    // boost-7d (R$ 39,90), válido para CPF e CNPJ. Mantido com is_active=false
+    // para preservar lookup histórico (subscription antiga de 30 dias).
+    is_active: false,
     validity_days: 30,
     billing_model: "one_time",
     description: "Destaque no topo da busca com mais visibilidade para vender mais rapido.",
@@ -60,14 +99,18 @@ const DEFAULT_PLANS = [
       "Badge premium no anuncio",
       "Prioridade de exibicao por 30 dias",
     ],
-    recommended: true,
+    max_photos: 8,
+    weight: 1,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
+    recommended: false,
   },
   {
     id: "cnpj-free-store",
     name: "Plano Gratuito Loja",
     type: "CNPJ",
     price: 0,
-    ad_limit: 20,
+    ad_limit: 10,
     is_featured_enabled: false,
     has_store_profile: true,
     priority_level: 5,
@@ -75,15 +118,24 @@ const DEFAULT_PLANS = [
     validity_days: null,
     billing_model: "free",
     description: "Para lojas com CNPJ verificado iniciarem no portal sem mensalidade.",
-    benefits: ["Ate 20 anuncios ativos", "Perfil de loja ativo", "Sem comissao nas vendas"],
+    benefits: [
+      "Ate 10 anuncios ativos",
+      "Ate 8 fotos por anuncio",
+      "Perfil de loja ativo",
+      "Sem comissao nas vendas",
+    ],
+    max_photos: 8,
+    weight: 1,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
     recommended: false,
   },
   {
     id: "cnpj-store-start",
     name: "Plano Loja Start",
     type: "CNPJ",
-    price: 299.9,
-    ad_limit: 80,
+    price: 79.9,
+    ad_limit: 20,
     is_featured_enabled: true,
     has_store_profile: true,
     priority_level: 60,
@@ -91,23 +143,42 @@ const DEFAULT_PLANS = [
     validity_days: 30,
     billing_model: "monthly",
     description: "Plano de entrada para escalar anuncios da loja com destaque opcional.",
-    benefits: ["Ate 80 anuncios", "Perfil de loja personalizado", "Destaques configuraveis"],
+    benefits: [
+      "Ate 20 anuncios ativos",
+      "Ate 12 fotos por anuncio",
+      "1 destaque mensal incluido",
+      "Perfil de loja personalizado",
+    ],
+    max_photos: 12,
+    weight: 2,
+    video_360_enabled: false,
+    monthly_highlight_credits: 1,
     recommended: false,
   },
   {
     id: "cnpj-store-pro",
     name: "Plano Loja Pro",
     type: "CNPJ",
-    price: 599.9,
-    ad_limit: 200,
+    price: 149.9,
+    ad_limit: PRO_PLAN_AD_LIMIT_GUARD,
     is_featured_enabled: true,
     has_store_profile: true,
     priority_level: 80,
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description: "Mais anuncios, destaque automatico e estatisticas avancadas.",
-    benefits: ["Ate 200 anuncios", "Destaque automatico", "Dashboard de performance por cidade"],
+    description: "Anuncios sem limite pratico, destaques mensais inclusos e video 360.",
+    benefits: [
+      "Anuncios ilimitados (trava tecnica configuravel pelo admin)",
+      "Ate 15 fotos por anuncio",
+      "3 destaques mensais inclusos",
+      "Video 360 habilitado",
+      "Dashboard de performance por cidade",
+    ],
+    max_photos: 15,
+    weight: 3,
+    video_360_enabled: true,
+    monthly_highlight_credits: 3,
     recommended: true,
   },
   {
@@ -119,7 +190,11 @@ const DEFAULT_PLANS = [
     is_featured_enabled: true,
     has_store_profile: true,
     priority_level: 100,
-    is_active: true,
+    // Produto Evento desligado por feature flag. is_active=false no
+    // fallback como defesa em profundidade: se banco devolver vazio,
+    // listPlans não exibe Evento. Filtro adicional via isEventPlanId() +
+    // EVENTS_PUBLIC_ENABLED já removia da resposta pública.
+    is_active: false,
     validity_days: 30,
     billing_model: "monthly",
     description: "Impulsionamento regional com banner promocional e campanha especial.",
