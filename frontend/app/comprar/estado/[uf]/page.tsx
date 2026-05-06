@@ -102,7 +102,12 @@ export async function generateMetadata({
         ? `Carros ${brand} em ${stateName}: vitrine estadual com filtros inteligentes e anúncios reais em todas as cidades — Carros na Cidade.`
         : `Catálogo de veículos em ${stateName}: explore anúncios do estado inteiro e refine pela sua cidade no Carros na Cidade.`;
 
-  const canonicalPath = buildStatePath(uf, filters);
+  // Simétrico ao canonical limpo de /comprar/cidade/[slug] (Fase 1, ver
+  // territorial-canonical-audit.md): a estadual consolida sinal SEO em
+  // /comprar/estado/{uf} sem query string. `buildStatePath(uf, filters)`
+  // vazaria sort/limit/brand/model/utm — fragmentaria o sinal e criaria
+  // múltiplas URLs canônicas concorrentes para a mesma página.
+  const canonicalPath = buildStatePath(uf);
 
   return {
     title,

@@ -105,11 +105,13 @@ vi.mock("@/components/seo/TerritorialSeoJsonLd", () => ({
 }));
 
 import { generateMetadata as generateMetadataComprarCidade } from "@/app/comprar/cidade/[slug]/page";
+import { generateMetadata as generateMetadataComprarEstado } from "@/app/comprar/estado/[uf]/page";
 import { generateMetadata as generateMetadataCidade } from "@/app/cidade/[slug]/page";
 import { generateMetadata as generateMetadataOportunidades } from "@/app/cidade/[slug]/oportunidades/page";
 import { generateMetadata as generateMetadataBelowFipe } from "@/app/cidade/[slug]/abaixo-da-fipe/page";
 
 const SLUG = "atibaia-sp";
+const UF = "SP";
 
 beforeEach(() => {
   // Cada teste começa com env limpa.
@@ -217,12 +219,59 @@ describe("/cidade/[slug]/abaixo-da-fipe — generateMetadata (Fase 1)", () => {
   });
 });
 
-describe("Fase 1 — invariantes globais (todas as 4 páginas)", () => {
+describe("/comprar/estado/[uf] — generateMetadata (Fase 2)", () => {
+  it("canonical = /comprar/estado/{uf} LIMPO (sem sort/limit/brand/utm vazando)", async () => {
+    // Antes da Fase 2, `buildStatePath(uf, filters)` injetava no canonical
+    // o sort='recent' default e limit=50 — fragmentava sinal SEO em várias
+    // URLs canônicas concorrentes pra mesma página.
+    const meta = await generateMetadataComprarEstado({
+      params: { uf: UF.toLowerCase() },
+      searchParams: {
+        sort: "price_asc",
+        limit: "50",
+        page: "3",
+        brand: "honda",
+        model: "civic",
+        utm_source: "google",
+      },
+    });
+
+    expect(meta.alternates?.canonical).toBe(`/comprar/estado/${UF.toLowerCase()}`);
+    const canonical = String(meta.alternates?.canonical || "");
+    expect(canonical).not.toContain("?");
+    expect(canonical).not.toMatch(/sort|limit|page|utm|honda|civic/i);
+  });
+
+  it("canonical limpo TAMBÉM quando searchParams vem vazio (fix do default 'recent' vazando)", async () => {
+    const meta = await generateMetadataComprarEstado({
+      params: { uf: UF.toLowerCase() },
+      searchParams: {},
+    });
+
+    expect(meta.alternates?.canonical).toBe(`/comprar/estado/${UF.toLowerCase()}`);
+    const canonical = String(meta.alternates?.canonical || "");
+    expect(canonical).not.toContain("?");
+  });
+
+  it("UF inválido → fallback metadata noindex, sem canonical poluído", async () => {
+    const meta = await generateMetadataComprarEstado({
+      params: { uf: "xx" },
+      searchParams: {},
+    });
+    expect(meta.robots).toMatchObject({ index: false });
+  });
+});
+
+describe("Fase 1+2 — invariantes globais (todas as páginas de listagem)", () => {
   it("nenhuma rota emite canonical com query string (sort/limit/page/utm/filtros)", async () => {
     const metas = await Promise.all([
       generateMetadataComprarCidade({
         params: { slug: SLUG },
         searchParams: { sort: "recent", limit: "50", utm_source: "x" },
+      }),
+      generateMetadataComprarEstado({
+        params: { uf: UF.toLowerCase() },
+        searchParams: { sort: "price_asc", limit: "50", brand: "honda" },
       }),
       generateMetadataCidade({ params: { slug: SLUG }, searchParams: {} }),
       generateMetadataOportunidades({ params: { slug: SLUG }, searchParams: {} }),
