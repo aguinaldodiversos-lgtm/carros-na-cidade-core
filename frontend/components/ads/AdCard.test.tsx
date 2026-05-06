@@ -67,8 +67,15 @@ describe("AdCard", () => {
         const { container } = render(<AdCard item={SAMPLE_AD} variant={variant} />);
         const root = container.querySelector(`[data-variant="${variant}"]`);
         expect(root).toBeTruthy();
-        // Título sempre presente
-        expect(screen.getByText("Honda Civic EXL 2020")).toBeTruthy();
+        // Identificação do veículo sempre presente. As variantes verticais
+        // (grid/carousel/featured/etc.) renderizam BRAND uppercase + Model
+        // em <h3> e Version em <p> separado (hierarquia Webmotors). As
+        // horizontais (horizontal/admin) renderizam o title concatenado.
+        // Validamos via textContent para tolerar ambos os layouts sem prender
+        // o teste a uma estrutura visual específica.
+        const text = container.textContent || "";
+        expect(text).toMatch(/honda/i);
+        expect(text).toMatch(/civic/i);
       });
     }
   });
@@ -101,19 +108,28 @@ describe("AdCard", () => {
   // 3. showLocation por variant
   // ---------------------------------------------------------------------------
   describe("localização por variant", () => {
-    it("variant='grid' mostra cidade - estado", () => {
-      render(<AdCard item={SAMPLE_AD} variant="grid" />);
-      expect(screen.getByText("Atibaia - SP")).toBeTruthy();
+    it("variant='grid' mostra cidade e estado", () => {
+      // Layout atual usa formato "Cidade (UF)" com pino — mais compacto que
+      // o "Cidade - UF" antigo. Verificamos via textContent pra tolerar a
+      // mudança visual sem travar o teste num separador específico.
+      const { container } = render(<AdCard item={SAMPLE_AD} variant="grid" />);
+      const text = container.textContent || "";
+      expect(text).toMatch(/atibaia/i);
+      expect(text).toMatch(/\bSP\b/);
     });
 
     it("variant='dashboard' não mostra localização (foco em status)", () => {
-      render(<AdCard item={SAMPLE_AD} variant="dashboard" />);
-      expect(screen.queryByText("Atibaia - SP")).toBeNull();
+      const { container } = render(<AdCard item={SAMPLE_AD} variant="dashboard" />);
+      const text = container.textContent || "";
+      // Dashboard tem showLocation=false no VARIANTS — bloco de cidade
+      // simplesmente não é renderizado.
+      expect(text).not.toMatch(/atibaia/i);
     });
 
     it("variant='admin' não mostra localização", () => {
-      render(<AdCard item={SAMPLE_AD} variant="admin" />);
-      expect(screen.queryByText("Atibaia - SP")).toBeNull();
+      const { container } = render(<AdCard item={SAMPLE_AD} variant="admin" />);
+      const text = container.textContent || "";
+      expect(text).not.toMatch(/atibaia/i);
     });
   });
 
@@ -198,8 +214,13 @@ describe("AdCard", () => {
   // 9. Compat retroativa: prop `ad` (alias) funciona
   // ---------------------------------------------------------------------------
   it("prop `ad` (alias de `item`) funciona", () => {
-    render(<AdCard ad={SAMPLE_AD} variant="grid" />);
-    expect(screen.getByText("Honda Civic EXL 2020")).toBeTruthy();
+    const { container } = render(<AdCard ad={SAMPLE_AD} variant="grid" />);
+    // Mesma lógica do teste de renderização por variante: layout vertical
+    // separa BRAND/Model/Version em elementos distintos. Validamos a
+    // identificação do veículo via textContent.
+    const text = container.textContent || "";
+    expect(text).toMatch(/honda/i);
+    expect(text).toMatch(/civic/i);
   });
 
   // ---------------------------------------------------------------------------
