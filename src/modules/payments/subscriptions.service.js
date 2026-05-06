@@ -18,7 +18,7 @@
 
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
-import { query, withTransaction } from "../../infrastructure/database/db.js";
+import { withTransaction } from "../../infrastructure/database/db.js";
 import {
   cancelPreapproval,
   mapPreapprovalStatusToLocal,
@@ -26,63 +26,20 @@ import {
 import {
   createPlanSubscription,
 } from "./payments.service.js";
+import {
+  ALLOWED_SUBSCRIPTION_PLAN_IDS,
+  assertNoLiveSubscriptionFor,
+  assertSubscriptionPlanAllowed,
+  findLiveSubscriptionForUser,
+} from "./subscriptions.guards.js";
 
-/**
- * Único conjunto de planos comerciais permitidos no fluxo de
- * assinatura recorrente da Fase 3C. Hardcoded (whitelist) para evitar
- * que admin cadastre um plano novo no banco e ele escape acidentalmente
- * para esse fluxo sem revisão de produto.
- *
- * cpf-premium-highlight (R$ 79,90 one-time, descontinuado) e
- * cnpj-evento-premium (Evento dormente) são REJEITADOS aqui mesmo
- * que algum dia retornem como is_active=true no banco.
- */
-export const ALLOWED_SUBSCRIPTION_PLAN_IDS = Object.freeze([
-  "cnpj-store-start",
-  "cnpj-store-pro",
-]);
-
-const REJECTED_PLAN_IDS = Object.freeze([
-  "cnpj-evento-premium", // Evento dormente — bloqueio explícito mesmo com flag
-  "cpf-premium-highlight", // descontinuado, substituído por boost-7d avulso
-]);
-
-/**
- * Estados locais que contam como "assinatura ainda viva" — bloqueia
- * criar uma nova nesse momento (evita cobrar 2x o user por engano).
- * `paused` também bloqueia: lojista deve reativar a existente em vez
- * de criar uma nova.
- */
-const LIVE_SUBSCRIPTION_STATUSES = Object.freeze(["active", "pending", "paused"]);
-
-/**
- * Procura uma assinatura "viva" (status active/pending/paused) do user.
- * Não filtra por provider — qualquer sub local viva bloqueia.
- *
- * Retorna a row mais recente ou null.
- */
-export async function findLiveSubscriptionForUser(userId) {
-  // Defesa: query usa colunas da migration 024 quando disponíveis;
-  // fallback para schema antigo (apenas user_id/plan_id/status/expires_at).
-  const result = await query(
-    `
-    SELECT
-      user_id,
-      plan_id,
-      status,
-      expires_at,
-      payment_id,
-      created_at
-    FROM user_subscriptions
-    WHERE user_id = $1
-      AND status = ANY($2::text[])
-    ORDER BY created_at DESC
-    LIMIT 1
-    `,
-    [userId, LIVE_SUBSCRIPTION_STATUSES]
-  );
-  return result.rows[0] || null;
-}
+// Re-exporta para compat retroativa (Fase 3C importava daqui).
+export {
+  ALLOWED_SUBSCRIPTION_PLAN_IDS,
+  assertNoLiveSubscriptionFor,
+  assertSubscriptionPlanAllowed,
+  findLiveSubscriptionForUser,
+};
 
 /**
  * Cria checkout de assinatura mensal Start ou Pro.
@@ -110,28 +67,12 @@ export async function createSubscriptionCheckout({
 }) {
   const id = String(planId || "").trim();
 
-  // 1. Whitelist explícita (a primeira linha de defesa).
-  if (!ALLOWED_SUBSCRIPTION_PLAN_IDS.includes(id)) {
-    if (REJECTED_PLAN_IDS.includes(id)) {
-      throw new AppError(
-        `Plano ${id} indisponivel para assinatura recorrente.`,
-        410
-      );
-    }
-    throw new AppError(
-      `plan_id deve ser um dos: ${ALLOWED_SUBSCRIPTION_PLAN_IDS.join(", ")}.`,
-      400
-    );
-  }
+  // 1. Whitelist explícita (defesa em profundidade — também aplicada
+  //    em createPlanSubscription pra cobrir o endpoint legacy).
+  assertSubscriptionPlanAllowed(id);
 
-  // 2. Bloqueio de duplicata: user já tem sub viva?
-  const live = await findLiveSubscriptionForUser(userId);
-  if (live) {
-    throw new AppError(
-      `Usuario ja possui assinatura ativa (plano: ${live.plan_id}, status: ${live.status}).`,
-      409
-    );
-  }
+  // 2. Bloqueio de duplicata.
+  await assertNoLiveSubscriptionFor(userId);
 
   // 3. Delega para createPlanSubscription que faz:
   //    - validação adicional (is_active, billing_model='monthly', preço > 0)

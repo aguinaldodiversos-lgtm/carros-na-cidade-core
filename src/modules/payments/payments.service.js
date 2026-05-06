@@ -11,6 +11,10 @@ import {
 import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
+import {
+  assertNoLiveSubscriptionFor,
+  assertSubscriptionPlanAllowed,
+} from "./subscriptions.guards.js";
 
 /**
  * Guard: bloqueia checkout/subscription para planos do produto Evento
@@ -321,6 +325,15 @@ export async function createPlanCheckout({
 
 export async function createPlanSubscription({ userId, planId, successUrl, requestId }) {
   refuseEventPlanCheckout(planId, "createPlanSubscription");
+
+  // Fase 3C — defesa em profundidade no service base: bloqueia
+  // qualquer chamada (legacy POST /subscription, scripts admin,
+  // futuros consumidores) que tente assinar plano fora da whitelist
+  // Start/Pro ou criar 2ª assinatura para o mesmo user.
+  // Detalhes em src/modules/payments/subscriptions.guards.js e
+  // tests/payments/subscriptions-bypass-audit.test.js.
+  assertSubscriptionPlanAllowed(planId);
+  await assertNoLiveSubscriptionFor(userId);
 
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
