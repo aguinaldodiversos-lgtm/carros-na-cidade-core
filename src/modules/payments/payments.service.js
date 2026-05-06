@@ -730,7 +730,30 @@ async function upsertUserSubscription(client, { userId, planId, paymentId, statu
   );
 }
 
-async function applyBoostApproval(client, intent) {
+/**
+ * Aplica aprovação de boost num anúncio. Idempotência efetiva é garantida
+ * pelo caller (`handleWebhookNotification` faz `FOR UPDATE` no intent +
+ * checa `intent.status === 'approved'` antes de chamar; `payment_intents.
+ * payment_resource_id UNIQUE` evita registrar 2x o mesmo payment).
+ *
+ * Regra de prazo (alinhada à oferta oficial do Destaque 7 dias —
+ * "compras duplicadas estendem prazo, não aumentam prioridade"):
+ *
+ *   - Se `highlight_until > NOW()` (ainda ativo): SOMA `+boost_days`
+ *     ao valor existente — extensão real do prazo.
+ *   - Se `highlight_until IS NULL` ou está no passado: define
+ *     `NOW() + boost_days` — começa do zero.
+ *
+ * Defesa em profundidade:
+ *   - Sem `ad_id` ou `boost_days=0`: no-op (early return).
+ *   - WHERE `status != 'deleted'`: anúncio soft-deleted não é boostado
+ *     mesmo se um intent antigo aprovar tarde.
+ *
+ * Exportado para teste (validar shape do SQL + params + early return).
+ * Não chamar diretamente fora do webhook — a idempotência depende do
+ * lock + check de status do caller.
+ */
+export async function applyBoostApproval(client, intent) {
   const boostDays = Number(intent.metadata?.boost_days || 0);
   if (!intent.ad_id || !boostDays) {
     return;
