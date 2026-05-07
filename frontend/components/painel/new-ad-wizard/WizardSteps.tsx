@@ -11,7 +11,14 @@ import {
 } from "@/lib/fipe/fipe-client";
 import { CONDITION_ITEMS, OPTIONAL_ITEMS, VEHICLE_COLORS } from "./constants";
 import { formatCurrencyInput, formatKm, parseCurrency, parseKmDigits } from "./currency";
-import { fabricationYearChoices, uniqueModelYears, versionsForYear } from "./fipe-years";
+import {
+  extractModelBase,
+  fabricationYearChoices,
+  uniqueModelBases,
+  uniqueModelYears,
+  variantsOfBase,
+  versionsForYear,
+} from "./fipe-years";
 import type { WizardFormState } from "./types";
 import ChipSelect from "./ChipSelect";
 import { FinalizeLocationFields } from "./FinalizeLocationFields";
@@ -31,11 +38,23 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
   const [yearOptions, setYearOptions] = useState<FipeOption[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Modelo "base" — primeira palavra do nome (GOL, GOLF, AMAROK). A FIPE pública
+  // devolve modelo+variante concatenados (~547 itens p/ Volkswagen). Mostrar isso
+  // num <select> nativo trava o renderer e cria UX confusa. Fix: usuário escolhe
+  // primeiro o modelo base, depois a variante. Inicializa a partir do estado
+  // persistido para retomar o wizard sem perda. Não vai pra WizardFormState pra
+  // evitar migrações no localStorage v2 (não é fonte de verdade).
+  const [modelBase, setModelBase] = useState<string>("");
+
   useEffect(() => {
     let cancelled = false;
     listFipeBrands(state.fipeVehicleType)
       .then((data) => {
-        if (!cancelled) setBrands(data);
+        if (cancelled) return;
+        setBrands(data);
+        setLoadError((current) =>
+          current && current.includes("marcas") ? null : current
+        );
       })
       .catch(() => {
         if (!cancelled) setLoadError("Não foi possível carregar marcas da FIPE.");
@@ -48,12 +67,17 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
   useEffect(() => {
     if (!state.fipeBrandCode) {
       setModels([]);
+      setModelBase("");
       return;
     }
     let cancelled = false;
     listFipeModels(state.fipeVehicleType, state.fipeBrandCode)
       .then((data) => {
-        if (!cancelled) setModels(data);
+        if (cancelled) return;
+        setModels(data);
+        setLoadError((current) =>
+          current && current.includes("modelos") ? null : current
+        );
       })
       .catch(() => {
         if (!cancelled) setLoadError("Não foi possível carregar modelos.");
@@ -71,7 +95,11 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
     let cancelled = false;
     listFipeYears(state.fipeVehicleType, state.fipeBrandCode, state.fipeModelCode)
       .then((data) => {
-        if (!cancelled) setYearOptions(data);
+        if (cancelled) return;
+        setYearOptions(data);
+        setLoadError((current) =>
+          current && current.includes("anos") ? null : current
+        );
       })
       .catch(() => {
         if (!cancelled) setLoadError("Não foi possível carregar anos/versões.");
@@ -80,6 +108,23 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
       cancelled = true;
     };
   }, [state.fipeBrandCode, state.fipeModelCode, state.fipeVehicleType]);
+
+  // Recalcula a base do modelo quando o user retorna ao wizard com um
+  // fipeModelCode persistido — preserva a seleção anterior de variante.
+  useEffect(() => {
+    if (!state.modelLabel || !models.length) return;
+    const inferred = extractModelBase(state.modelLabel);
+    if (inferred && inferred !== modelBase) setModelBase(inferred);
+    // Só dispara quando models carregam; não devemos invalidar quando o
+    // user troca de base (modelBase como dep causaria loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, state.modelLabel]);
+
+  const modelBaseChoices = useMemo(() => uniqueModelBases(models), [models]);
+  const variantChoices = useMemo(
+    () => variantsOfBase(models, modelBase),
+    [models, modelBase]
+  );
 
   const modelYears = useMemo(() => uniqueModelYears(yearOptions), [yearOptions]);
   const selectedModelYear = state.yearModel ? parseInt(state.yearModel, 10) : null;
@@ -97,6 +142,7 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
   const onBrandChange = useCallback(
     (code: string) => {
       const label = brands.find((b) => b.code === code)?.name ?? "";
+      setModelBase("");
       patch({
         fipeBrandCode: code,
         brandLabel: label,
@@ -110,6 +156,23 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
       });
     },
     [brands, patch]
+  );
+
+  const onModelBaseChange = useCallback(
+    (base: string) => {
+      setModelBase(base);
+      // Trocar a base sempre invalida a variante e cascata abaixo.
+      patch({
+        fipeModelCode: "",
+        modelLabel: "",
+        fipeYearCode: "",
+        yearModel: "",
+        yearManufacture: "",
+        versionLabel: "",
+        fipeValue: "",
+      });
+    },
+    [patch]
   );
 
   const onModelChange = useCallback(
@@ -220,12 +283,43 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
           </span>
           <select
             className={selectClass}
+            value={modelBase}
+            disabled={!state.fipeBrandCode || !modelBaseChoices.length}
+            data-testid="wizard-model-base-select"
+            onChange={(e) => onModelBaseChange(e.target.value)}
+          >
+            <option value="">
+              {state.fipeBrandCode
+                ? modelBaseChoices.length
+                  ? "Escolha uma..."
+                  : "Carregando..."
+                : "Escolha a marca primeiro"}
+            </option>
+            {modelBaseChoices.map((base) => (
+              <option key={base} value={base}>
+                {base}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-1">
+        <label className="block">
+          <span className={labelClass}>
+            Versão <span className="text-red-500">*</span>
+          </span>
+          <select
+            className={selectClass}
             value={state.fipeModelCode}
-            disabled={!state.fipeBrandCode}
+            disabled={!modelBase || !variantChoices.length}
+            data-testid="wizard-model-variant-select"
             onChange={(e) => onModelChange(e.target.value)}
           >
-            <option value="">Escolha uma...</option>
-            {models.map((m) => (
+            <option value="">
+              {modelBase ? "Escolha uma..." : "Escolha o modelo primeiro"}
+            </option>
+            {variantChoices.map((m) => (
               <option key={m.code} value={m.code}>
                 {m.name}
               </option>
@@ -277,12 +371,13 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block md:col-span-2">
           <span className={labelClass}>
-            Versão <span className="text-red-500">*</span>
+            Combustível / Ano FIPE <span className="text-red-500">*</span>
           </span>
           <select
             className={selectClass}
             value={state.fipeYearCode}
             disabled={!state.yearModel || !versionChoices.length}
+            data-testid="wizard-version-select"
             onChange={(e) => void onVersionChange(e.target.value)}
           >
             <option value="">Escolha uma...</option>
