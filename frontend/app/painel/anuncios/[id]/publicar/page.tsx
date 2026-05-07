@@ -13,7 +13,7 @@
  */
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import PublicationPlanSelector from "@/components/painel/PublicationPlanSelector";
 import { fetchOwnedAd } from "@/lib/account/backend-account";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
@@ -54,10 +54,19 @@ export default async function PublicarAnuncioPage({ params }: PageProps) {
   }
   const session = ensured.session;
 
+  // fetchOwnedAd valida ownership no backend (JOIN advertisers + adv.user_id).
+  // 404 → ad não pertence ao user (ou inexiste). Tratamos como notFound()
+  // para não vazar a existência do anúncio nem renderizar shell para id alheio.
+  // Outros erros (rede, 5xx) caem em null e o cliente mostra error state via
+  // GET /publication-options, que valida a mesma cadeia.
   let owned: Awaited<ReturnType<typeof fetchOwnedAd>> | null = null;
   try {
     owned = await fetchOwnedAd(session, params.id);
-  } catch {
+  } catch (error) {
+    const status = (error as { status?: number })?.status;
+    if (status === 404) {
+      notFound();
+    }
     owned = null;
   }
 

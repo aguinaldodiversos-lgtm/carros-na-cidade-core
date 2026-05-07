@@ -965,6 +965,33 @@ export async function updateOwnedAdStatus(userId, adId, action) {
     throw new AppError("Anuncio nao encontrado", 404);
   }
 
+  // Status-guard: 'deleted' e 'blocked' têm fluxos próprios (admin/recovery)
+  // e nunca podem virar 'active'/'paused' por chamada do dono. Defesa contra
+  // ressurreição/desbloqueio via PATCH activate (Fase 4 — tela pós-revisão
+  // chama este endpoint como CTA de "Publicar grátis").
+  const currentStatus = String(owner.status || "");
+  if (currentStatus === "deleted" || currentStatus === "blocked") {
+    throw new AppError(
+      `Anuncio em status '${currentStatus}' nao admite alteracao por este endpoint.`,
+      410
+    );
+  }
+
+  // Eligibility-guard: ao reativar um anúncio pausado, aplicar a mesma
+  // fonte única de elegibilidade que o pipeline de criação. Defesa contra
+  // bypass do limite de plano / CPF não verificado / CNPJ não verificado
+  // via "pausar+reativar". Ignorado quando o ad já está active (idempotente,
+  // sem efeito incremental no contador).
+  if (action === "activate" && currentStatus !== "active") {
+    const eligibility = await resolvePublishEligibility(userId);
+    if (!eligibility.allowed) {
+      throw new AppError(
+        eligibility.reason || "Publicacao nao permitida no momento.",
+        403
+      );
+    }
+  }
+
   const status = action === "pause" ? "paused" : "active";
 
   // withUserTransaction sets app.current_user_id so the RLS write policy
