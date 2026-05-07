@@ -518,7 +518,19 @@ async function hasSubscriptionHistory(userId) {
   }
 }
 
-async function countActiveAdsByUser(userId) {
+/**
+ * Conta anúncios ativos do usuário (status='active', via JOIN advertisers).
+ *
+ * Reexportado em 2026-05-06 porque `ads.publication-options.service.js`
+ * (Fase 4) importa este named export para compor o payload `ad_limit`. O
+ * service já usava a função internamente em `resolvePublishEligibility`;
+ * a falta da palavra-chave `export` quebrou o boot do backend no Render
+ * com `SyntaxError: ... does not provide an export named 'countActiveAdsByUser'`.
+ * Os testes da publication-options mockam o módulo inteiro com vi.mock,
+ * o que mascara a checagem de named exports do ESM — daí o boot só
+ * quebrar em produção.
+ */
+export async function countActiveAdsByUser(userId) {
   try {
     const result = await pool.query(
       `
@@ -578,7 +590,13 @@ export async function getPlanById(planId) {
   return plans.find((plan) => plan.id === planId) ?? null;
 }
 
-async function resolveCurrentPlan(user) {
+/**
+ * Resolve o plano corrente do usuário (free → paid → último ativo).
+ * Reexportado em 2026-05-06 pelo mesmo motivo de `countActiveAdsByUser`:
+ * `ads.publication-options.service.js` importa este símbolo como named
+ * export e o boot do backend quebra no Render se faltar `export`.
+ */
+export async function resolveCurrentPlan(user) {
   const planType = user.type === "pending" ? "CPF" : user.type;
   const plans = await listPlans({ type: planType, onlyActive: false });
 
