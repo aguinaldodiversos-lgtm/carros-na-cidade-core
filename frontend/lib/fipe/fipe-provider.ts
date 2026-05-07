@@ -179,25 +179,76 @@ export async function getFipeBrands(vehicleType?: string): Promise<FipeOption[]>
   }
 }
 
+/**
+ * Snapshot estático de modelos por marca, lazy-loaded por vehicleType
+ * pra não inflar boot do servidor. Carros é o caso 95% do tráfego.
+ * Mesmo motivo de `getFipeBrands`: parallelum bloqueia o IP do Render
+ * free tier. Usado como fallback quando o provider real falha.
+ */
+type ModelsSnapshot = Record<string, Array<{ code: string; name: string }>>;
+type ModelsSnapshotModule = { default: ModelsSnapshot };
+
+const modelsSnapshotPath: Record<FipeVehicleType, () => Promise<ModelsSnapshotModule>> = {
+  carros: () => import("./snapshots/modelos-carros.json") as Promise<ModelsSnapshotModule>,
+  motos: () => import("./snapshots/modelos-motos.json") as Promise<ModelsSnapshotModule>,
+  caminhoes: () =>
+    import("./snapshots/modelos-caminhoes.json") as Promise<ModelsSnapshotModule>,
+};
+
+async function loadModelsFromSnapshot(
+  type: FipeVehicleType,
+  brandCode: string
+): Promise<FipeOption[]> {
+  try {
+    const mod = await modelsSnapshotPath[type]();
+    const byBrand = mod.default ?? (mod as unknown as ModelsSnapshot);
+    const list = byBrand[String(brandCode)] || [];
+    return list.map((item) => ({ code: item.code, name: item.name }));
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[fipe-provider] snapshot de modelos indisponivel (${type}/${brandCode}):`,
+      error instanceof Error ? error.message : error
+    );
+    return [];
+  }
+}
+
 export async function getFipeModels(
   brandCode: string,
   vehicleType?: string
 ): Promise<FipeOption[]> {
   const type = normalizeVehicleType(vehicleType);
-  const data = await providerFetch(
-    `/${type}/marcas/${encodeURIComponent(brandCode)}/modelos`,
-    86400
-  );
 
-  const rawItems = Array.isArray(data)
-    ? data
-    : Array.isArray(data?.modelos)
-      ? data.modelos
-      : Array.isArray(data?.models)
-        ? data.models
-        : [];
+  try {
+    const data = await providerFetch(
+      `/${type}/marcas/${encodeURIComponent(brandCode)}/modelos`,
+      86400
+    );
 
-  return flattenFipeModelRows(rawItems);
+    const rawItems = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.modelos)
+        ? data.modelos
+        : Array.isArray(data?.models)
+          ? data.models
+          : [];
+
+    const flattened = flattenFipeModelRows(rawItems);
+    if (flattened.length > 0) return flattened;
+    throw new Error("Provider devolveu lista de modelos vazia.");
+  } catch (error) {
+    const fallback = await loadModelsFromSnapshot(type, brandCode);
+    if (fallback.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[fipe-provider] usando snapshot de modelos (${type}/${brandCode}, ${fallback.length} entradas) — provider falhou:`,
+        error instanceof Error ? error.message : error
+      );
+      return fallback;
+    }
+    throw error;
+  }
 }
 
 export async function getFipeYears(

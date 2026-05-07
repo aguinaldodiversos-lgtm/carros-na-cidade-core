@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FIPE_BRAND_SNAPSHOT } from "./fipe-brands-snapshot";
-import { flattenFipeModelRows, getFipeBrands } from "./fipe-provider";
+import { flattenFipeModelRows, getFipeBrands, getFipeModels } from "./fipe-provider";
 
 describe("flattenFipeModelRows", () => {
   it("aceita lista plana (nome + codigo string)", () => {
@@ -105,5 +105,81 @@ describe("getFipeBrands — fallback para snapshot quando provider falha", () =>
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     const out = await getFipeBrands("xpto" as unknown as string);
     expect(out.length).toBe(FIPE_BRAND_SNAPSHOT.carros.length);
+  });
+});
+
+describe("getFipeModels — fallback para snapshot por marca quando provider falha", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("happy path: provider 200 → usa dados do provider, ignora snapshot", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          modelos: [{ codigo: "999", nome: "ModeloFake" }],
+        }),
+      } as Response)
+    );
+
+    const out = await getFipeModels("21", "carros");
+    expect(out).toEqual([{ code: "999", name: "ModeloFake" }]);
+  });
+
+  it("provider 5xx → fallback usa snapshot da marca (Fiat=21, carros)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({}),
+      } as Response)
+    );
+
+    const out = await getFipeModels("21", "carros");
+    expect(out.length).toBeGreaterThan(50);
+    // Snapshot de Fiat traz Uno, Palio etc.
+    expect(out.some((m) => /\b(uno|palio|strada|toro)\b/i.test(m.name))).toBe(true);
+  });
+
+  it("provider erro de rede → fallback usa snapshot (motos / Honda=80)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("ECONNREFUSED"))
+    );
+
+    const out = await getFipeModels("80", "motos");
+    expect(out.length).toBeGreaterThan(0);
+  });
+
+  it("provider devolve modelos=[] → fallback (caminhoes)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ modelos: [] }),
+      } as Response)
+    );
+
+    const out = await getFipeModels("106", "caminhoes");
+    // Snapshot tem ao menos a marca; pode ser vazia se brandCode inválido,
+    // então só validamos que não jogou exceção (degraded gracefully).
+    expect(Array.isArray(out)).toBe(true);
+  });
+
+  it("provider falha + brandCode inexistente no snapshot → throw original error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down"))
+    );
+
+    await expect(getFipeModels("999999", "carros")).rejects.toThrow();
   });
 });
