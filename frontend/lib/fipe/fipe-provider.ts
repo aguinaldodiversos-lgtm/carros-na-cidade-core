@@ -1,4 +1,6 @@
 // frontend/lib/fipe/fipe-provider.ts
+import { FIPE_BRAND_SNAPSHOT } from "./fipe-brands-snapshot";
+
 export type FipeVehicleType = "carros" | "motos" | "caminhoes";
 
 export type FipeOption = {
@@ -141,12 +143,40 @@ async function providerFetch(path: string, revalidateSeconds = 86400) {
   throw new Error("A FIPE está indisponível no momento. Tente novamente em alguns instantes.");
 }
 
+/**
+ * Lista de marcas via provider, com fallback estático.
+ *
+ * Caso real (produção, Render free tier): parallelum bloqueia/rate-limita
+ * o IP de saída e o `/marcas` falha 100% das vezes — todo o wizard de
+ * anúncio fica preso no Step "Veículo" com "Não foi possível carregar
+ * marcas da FIPE.". Marcas raramente mudam (adições ~1-2x/ano), então
+ * usar o snapshot estático embutido como fallback é seguro: o usuário
+ * consegue escolher montadora e seguir; modelos/anos são lazy e tentam
+ * o provider de novo (cache de Next.js cobre cold start). Quando o
+ * provider voltar, futuros deploys/builds atualizam naturalmente.
+ */
 export async function getFipeBrands(vehicleType?: string): Promise<FipeOption[]> {
   const type = normalizeVehicleType(vehicleType);
-  const data = await providerFetch(`/${type}/marcas`, 86400);
 
-  const items = Array.isArray(data) ? data : [];
-  return items.map(toOption).filter(Boolean) as FipeOption[];
+  try {
+    const data = await providerFetch(`/${type}/marcas`, 86400);
+    const items = Array.isArray(data) ? data : [];
+    const brands = items.map(toOption).filter(Boolean) as FipeOption[];
+    if (brands.length > 0) return brands;
+    // Provider devolveu lista vazia → trata como falha pra cair no fallback.
+    throw new Error("Provider devolveu lista de marcas vazia.");
+  } catch (error) {
+    const fallback = FIPE_BRAND_SNAPSHOT[type];
+    if (fallback && fallback.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[fipe-provider] usando snapshot estático para marcas (${type}) — provider falhou:`,
+        error instanceof Error ? error.message : error
+      );
+      return fallback.map((item) => ({ code: item.code, name: item.name }));
+    }
+    throw error;
+  }
 }
 
 export async function getFipeModels(
