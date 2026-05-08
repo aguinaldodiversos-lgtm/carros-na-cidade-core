@@ -4,6 +4,28 @@ import * as adsRepository from "./ads.repository.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
 import * as dbModule from "../../infrastructure/database/db.js";
 import { removeVehicleImages } from "../../infrastructure/storage/r2.service.js";
+import { AD_STATUS } from "./ads.canonical.constants.js";
+import { recordModerationEvent } from "./risk/ad-risk.repository.js";
+import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
+
+/**
+ * Campos estruturais — definem QUAL veículo e DE QUEM é o anúncio. Trocar
+ * qualquer um equivale a postar outro anúncio (potencial bypass do score).
+ * Estratégia escolhida (Tarefa 11): BLOQUEAR a alteração e orientar o
+ * usuário a criar novo anúncio. Se quisermos mudar para "permite mas
+ * envia para PENDING_REVIEW", basta mudar o handler.
+ */
+const STRUCTURAL_FIELDS = Object.freeze([
+  "brand",
+  "model",
+  "version",
+  "year",
+  "city",
+  "city_id",
+  "state",
+  "plate",
+  "advertiser_id",
+]);
 
 const tableColumnsCache = new Map();
 
@@ -203,9 +225,25 @@ export async function updateAd(id, data, user, ctx = {}) {
         400
       );
     }
+
+    // Guard inconditional: troca de advertiser_id é sempre proibida (não
+    // depende do status atual do ad). Os demais campos estruturais usam
+    // a regra do `protectedStatuses` abaixo.
     if (data && Object.prototype.hasOwnProperty.call(data, "advertiser_id")) {
       throw new AppError("Alteração de advertiser_id não é permitida.", 400);
     }
+
+    // Tarefa 11 — bloqueio de campos estruturais (exceto advertiser_id, já
+    // tratado acima).
+    // Sempre coletamos os campos estruturais que viriam alterados; se o ad
+    // ainda existe e a tentativa for em status público (ACTIVE) ou já em
+    // moderação (PENDING_REVIEW), recusamos com mensagem clara e gravamos
+    // um evento de auditoria para o admin enxergar a tentativa.
+    const attemptedStructural = data
+      ? STRUCTURAL_FIELDS.filter((field) =>
+          Object.prototype.hasOwnProperty.call(data, field)
+        )
+      : [];
 
     const ownerContext = await adsRepository.findOwnerContextById(id);
     if (ownerContext) {
@@ -213,6 +251,43 @@ export async function updateAd(id, data, user, ctx = {}) {
       cityId = ownerContext.city_id ?? null;
     }
     assertOwner(ownerContext, user.id);
+
+    if (attemptedStructural.length > 0) {
+      const protectedStatuses = [
+        AD_STATUS.ACTIVE,
+        AD_STATUS.PENDING_REVIEW,
+        AD_STATUS.PAUSED,
+        AD_STATUS.SOLD,
+      ];
+      if (protectedStatuses.includes(String(ownerContext?.status))) {
+        // Auditoria: registra a TENTATIVA antes de rejeitar — admin
+        // consegue rastrear comportamento suspeito mesmo com 400.
+        try {
+          await recordModerationEvent({
+            adId: id,
+            eventType: MODERATION_EVENT.STRUCTURAL_FIELD_CHANGE_DETECTED,
+            actorUserId: user.id,
+            actorRole: "owner",
+            fromStatus: ownerContext?.status ?? null,
+            toStatus: ownerContext?.status ?? null,
+            reason: "Tentativa de alteração de campo estrutural rejeitada.",
+            metadata: { fields: attemptedStructural },
+          });
+        } catch {
+          /* tabela pode não existir em legado — não bloquear o erro principal */
+        }
+
+        throw new AppError(
+          "Para alterar marca, modelo, ano ou cidade, crie um novo anúncio. Esses campos não podem ser alterados após a publicação.",
+          400,
+          true,
+          {
+            code: "STRUCTURAL_FIELDS_LOCKED",
+            fields: attemptedStructural,
+          }
+        );
+      }
+    }
 
     stage = "prepareUpdatePayload";
     const payload = prepareAdUpdatePayload({ ...data });

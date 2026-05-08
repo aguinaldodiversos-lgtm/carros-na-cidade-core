@@ -56,6 +56,12 @@ export type BackendCreateAdPayload = {
   fuel_type?: string | null;
   transmission?: string | null;
   below_fipe: boolean;
+  /**
+   * Valor FIPE consultado no wizard. Permite que o adRiskService no backend
+   * calcule a diferença percentual e decida PENDING_REVIEW. Opcional —
+   * `null` é tratado como `FIPE_UNAVAILABLE` (não bloqueia).
+   */
+  fipe_value?: number | null;
   images?: string[];
 };
 
@@ -146,6 +152,7 @@ export function buildBackendCreateAdPayload(
     fuel_type: n.fuel?.trim() || null,
     transmission: n.transmission?.trim() || null,
     below_fipe: belowFipe,
+    fipe_value: fipe > 0 ? fipe : null,
     ...(cleanedUrls.length > 0 ? { images: cleanedUrls } : {}),
   };
 }

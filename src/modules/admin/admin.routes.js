@@ -8,6 +8,7 @@ import * as adsService from "./ads/admin-ads.service.js";
 import * as advertisersService from "./advertisers/admin-advertisers.service.js";
 import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";
+import * as moderationService from "./moderation/admin-moderation.service.js";
 
 const router = express.Router();
 
@@ -248,6 +249,64 @@ router.get(
     const limit = parseIntParam(req.query.limit, 30);
     const data = await metricsService.getSeoCityMetrics({ limit });
     res.json({ ok: true, data });
+  })
+);
+
+// =========================================================================
+// MODERATION (fila de pending_review — Tarefa 7 da rodada antifraude)
+// =========================================================================
+
+router.get(
+  "/moderation/ads",
+  asyncHandler(async (req, res) => {
+    const result = await moderationService.listPending({
+      limit: req.query.limit,
+      offset: req.query.offset,
+      city_id: req.query.city_id,
+      severity: req.query.severity,
+      below_fipe_only: req.query.below_fipe_only,
+    });
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.get(
+  "/moderation/ads/:id",
+  asyncHandler(async (req, res) => {
+    const detail = await moderationService.getDetail(req.params.id);
+    res.json({ ok: true, data: detail });
+  })
+);
+
+router.post(
+  "/moderation/ads/:id/approve",
+  asyncHandler(async (req, res) => {
+    const result = await moderationService.approve(req.user.id, req.params.id);
+    res.json({ ok: true, data: result });
+  })
+);
+
+router.post(
+  "/moderation/ads/:id/reject",
+  asyncHandler(async (req, res) => {
+    const reason = String(req.body?.reason || "").trim();
+    if (!reason) throw new AppError("Motivo da rejeição é obrigatório.", 400);
+    const result = await moderationService.reject(req.user.id, req.params.id, reason);
+    res.json({ ok: true, data: result });
+  })
+);
+
+router.post(
+  "/moderation/ads/:id/request-correction",
+  asyncHandler(async (req, res) => {
+    const reason = String(req.body?.reason || "").trim();
+    if (!reason) throw new AppError("Motivo da solicitação é obrigatório.", 400);
+    const result = await moderationService.requestCorrection(
+      req.user.id,
+      req.params.id,
+      reason
+    );
+    res.json({ ok: true, data: result });
   })
 );
 

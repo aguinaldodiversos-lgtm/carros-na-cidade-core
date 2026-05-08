@@ -61,7 +61,7 @@ beforeEach(() => {
 describe("createBoostCheckout — preço fixo do backend (anti-spoof)", () => {
   it("amount em payment_intents = 39.9 (do BOOST_OPTIONS, não do client)", async () => {
     account.getAccountUser.mockResolvedValue({ id: "u1", email: "u@x.com", type: "CPF" });
-    account.getOwnedAd.mockResolvedValue({ id: "ad1", title: "Civic 2018" });
+    account.getOwnedAd.mockResolvedValue({ id: "ad1", title: "Civic 2018", status: "active" });
 
     await createBoostCheckout({
       userId: "u1",
@@ -84,7 +84,7 @@ describe("createBoostCheckout — preço fixo do backend (anti-spoof)", () => {
 
   it("metadata.boost_days='7' é gravado (consumido por applyBoostApproval)", async () => {
     account.getAccountUser.mockResolvedValue({ id: "u1" });
-    account.getOwnedAd.mockResolvedValue({ id: "ad1", title: "X" });
+    account.getOwnedAd.mockResolvedValue({ id: "ad1", title: "X", status: "active" });
 
     await createBoostCheckout({ userId: "u1", adId: "ad1", boostOptionId: "boost-7d" });
 
@@ -115,7 +115,7 @@ describe("createBoostCheckout — preço fixo do backend (anti-spoof)", () => {
     // (lê via reflection do código? não confiável). Em vez disso, tenta
     // passar amount=1 via boostOptionId hack — não muda preço.
     account.getAccountUser.mockResolvedValue({ id: "u1" });
-    account.getOwnedAd.mockResolvedValue({ id: "ad1" });
+    account.getOwnedAd.mockResolvedValue({ id: "ad1", status: "active" });
 
     await fn({
       userId: "u1",
@@ -151,7 +151,7 @@ describe("createBoostCheckout — ownership e validações", () => {
 
   it("400 quando boost_option_id desconhecido", async () => {
     account.getAccountUser.mockResolvedValue({ id: "u1" });
-    account.getOwnedAd.mockResolvedValue({ id: "ad1" });
+    account.getOwnedAd.mockResolvedValue({ id: "ad1", status: "active" });
 
     await expect(
       createBoostCheckout({ userId: "u1", adId: "ad1", boostOptionId: "boost-fake" })
@@ -160,7 +160,7 @@ describe("createBoostCheckout — ownership e validações", () => {
 
   it("retorno tem contract estável (context, ad_id, boost_option_id, init_point, mercado_pago_id)", async () => {
     account.getAccountUser.mockResolvedValue({ id: "u1", email: "u@x.com" });
-    account.getOwnedAd.mockResolvedValue({ id: "ad1", title: "X" });
+    account.getOwnedAd.mockResolvedValue({ id: "ad1", title: "X", status: "active" });
 
     const r = await createBoostCheckout({
       userId: "u1",
@@ -288,7 +288,7 @@ describe("applyBoostApproval — regra de prazo +N dias", () => {
 describe("Boost não toca o fluxo de Start/Pro (Fase 3B isolada)", () => {
   it("createBoostCheckout não chama insertPlanCheckout/createPlanSubscription", async () => {
     account.getAccountUser.mockResolvedValue({ id: "u1" });
-    account.getOwnedAd.mockResolvedValue({ id: "ad1" });
+    account.getOwnedAd.mockResolvedValue({ id: "ad1", status: "active" });
 
     await createBoostCheckout({ userId: "u1", adId: "ad1", boostOptionId: "boost-7d" });
 

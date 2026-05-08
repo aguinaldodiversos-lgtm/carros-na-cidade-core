@@ -437,8 +437,26 @@ export default function NewAdWizardClient({ initialType }: Props) {
         // ignore
       }
 
+      // Tarefa 8 — interpretar moderation_status retornado pelo backend.
+      // O createAdNormalized devolve { ...row, moderation_status: 'pending_review'|'approved' }
+      // dentro de result.result.data. Mensagem ao usuário muda conforme.
+      const moderationStatus =
+        (typeof result?.result?.data?.moderation_status === "string"
+          ? result.result.data.moderation_status
+          : null) ||
+        (typeof result?.result?.data?.status === "string" &&
+        result.result.data.status === "pending_review"
+          ? "pending_review"
+          : null);
+
       setSubmitState("success");
-      setSubmitMessage(result?.message || "Anúncio publicado com sucesso!");
+      if (moderationStatus === "pending_review") {
+        setSubmitMessage(
+          "Seu anúncio foi recebido e está em análise de segurança. Assim que for aprovado, ele aparecerá no portal."
+        );
+      } else {
+        setSubmitMessage(result?.message || "Anúncio publicado com sucesso!");
+      }
 
       const backendRedirect =
         result?.result?.redirectTo || result?.result?.redirect_to || result?.result?.url || "";
@@ -453,7 +471,9 @@ export default function NewAdWizardClient({ initialType }: Props) {
           ? backendRedirect
           : defaultRedirect;
 
-      setTimeout(() => router.push(redirectTo), 1200);
+      // Mais tempo para o usuário ler a mensagem de "em análise".
+      const delay = moderationStatus === "pending_review" ? 2400 : 1200;
+      setTimeout(() => router.push(redirectTo), delay);
     } catch (e) {
       setSubmitState("error");
       setSubmitMessage(e instanceof Error ? e.message : "Erro ao publicar.");

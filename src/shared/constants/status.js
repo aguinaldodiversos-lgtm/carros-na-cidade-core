@@ -9,13 +9,24 @@
  *
  * AD STATUS
  * ---------
- * active    — Published and visible in the public catalog. Accepts leads.
- * paused    — Owner-initiated pause. Hidden from catalog but preserved.
- *             Owner can re-activate at any time.
- * deleted   — Soft-deleted by owner. Hidden everywhere. Cannot be restored
- *             via normal flow. Still exists in DB for audit/analytics.
- * blocked   — Administratively blocked (e.g. policy violation). Hidden from
- *             catalog. Owner sees "blocked" in dashboard. Only admin can unblock.
+ * draft           — Rascunho (reservado; admin pode usar quando solicitar
+ *                   correção sem rejeitar). Não exibido publicamente.
+ * pending_review  — Anúncio retido para análise antifraude/moderação. NUNCA
+ *                   aparece publicamente. Aguarda decisão do admin (approve /
+ *                   reject / request_correction).
+ * active          — Published and visible in the public catalog. Accepts leads.
+ * paused          — Owner-initiated pause. Hidden from catalog but preserved.
+ *                   Owner can re-activate at any time.
+ * sold            — Marcado como vendido pelo dono. Hidden from catalog mas
+ *                   preservado para histórico/relatório.
+ * expired         — Expirado por inatividade ou prazo. Hidden from catalog.
+ * rejected        — Reprovado pela moderação. NUNCA aparece publicamente.
+ *                   Pode ser corrigido pelo dono (vira pending_review novamente).
+ * deleted         — Soft-deleted by owner. Hidden everywhere. Cannot be restored
+ *                   via normal flow. Still exists in DB for audit/analytics.
+ * blocked         — Administratively blocked (e.g. policy violation). Hidden
+ *                   from catalog. Owner sees "blocked" in dashboard. Only admin
+ *                   can unblock.
  *
  * Catalog visibility rule: ONLY ads with status = 'active' appear in public
  * listings and searches. The "highlighted" state is NOT a status — it is
@@ -45,25 +56,95 @@
  */
 
 export const AD_STATUS = Object.freeze({
+  DRAFT: "draft",
+  PENDING_REVIEW: "pending_review",
   ACTIVE: "active",
   PAUSED: "paused",
+  SOLD: "sold",
+  EXPIRED: "expired",
+  REJECTED: "rejected",
   DELETED: "deleted",
   BLOCKED: "blocked",
 });
 
-export const AD_VISIBLE_STATUSES = Object.freeze([AD_STATUS.ACTIVE]);
+/**
+ * Listas derivadas — todo filtro/guard de status DEVE consumir uma destas em
+ * vez de literais. Mantenha alinhado às regras de produto.
+ *
+ * AD_STATUS_PUBLIC ............ aparece em /comprar, sitemap, vitrines, busca
+ *                              pública, autocomplete e qualquer feed externo.
+ * AD_STATUS_OWNER_OPERABLE .... estados que o dono pode visualizar/editar no
+ *                              dashboard. PENDING_REVIEW é incluído para que
+ *                              o badge "Em análise" apareça; REJECTED é
+ *                              incluído para que o dono possa reenviar.
+ *                              DRAFT entra para suportar fluxo de correção
+ *                              admin → dono.
+ * AD_STATUS_CAN_RECEIVE_BOOST . SOMENTE ACTIVE pode comprar/aplicar destaque.
+ * AD_STATUS_REQUIRES_ADMIN_ACTION  estados que travam o anúncio aguardando
+ *                              decisão administrativa (lista da fila de
+ *                              moderação).
+ * AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC  todos os estados em que o dono ainda
+ *                              é dono mas o ad não aparece publicamente.
+ */
+export const AD_STATUS_PUBLIC = Object.freeze([AD_STATUS.ACTIVE]);
+
+export const AD_STATUS_OWNER_OPERABLE = Object.freeze([
+  AD_STATUS.DRAFT,
+  AD_STATUS.PENDING_REVIEW,
+  AD_STATUS.ACTIVE,
+  AD_STATUS.PAUSED,
+  AD_STATUS.REJECTED,
+  AD_STATUS.SOLD,
+]);
+
+export const AD_STATUS_CAN_RECEIVE_BOOST = Object.freeze([AD_STATUS.ACTIVE]);
+
+export const AD_STATUS_REQUIRES_ADMIN_ACTION = Object.freeze([
+  AD_STATUS.PENDING_REVIEW,
+]);
+
+export const AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC = Object.freeze([
+  AD_STATUS.DRAFT,
+  AD_STATUS.PENDING_REVIEW,
+  AD_STATUS.PAUSED,
+  AD_STATUS.SOLD,
+  AD_STATUS.EXPIRED,
+  AD_STATUS.REJECTED,
+  AD_STATUS.BLOCKED,
+]);
+
+// Compat: nome legado mantido para callers existentes (busca pública).
+export const AD_VISIBLE_STATUSES = AD_STATUS_PUBLIC;
 
 export const AD_OWNER_VISIBLE_STATUSES = Object.freeze([
   AD_STATUS.ACTIVE,
   AD_STATUS.PAUSED,
+  AD_STATUS.PENDING_REVIEW,
+  AD_STATUS.REJECTED,
+  AD_STATUS.SOLD,
   AD_STATUS.BLOCKED,
 ]);
 
 export const AD_NON_DELETED_STATUSES = Object.freeze([
+  AD_STATUS.DRAFT,
+  AD_STATUS.PENDING_REVIEW,
   AD_STATUS.ACTIVE,
   AD_STATUS.PAUSED,
+  AD_STATUS.SOLD,
+  AD_STATUS.EXPIRED,
+  AD_STATUS.REJECTED,
   AD_STATUS.BLOCKED,
 ]);
+
+/** Severidade de risco antifraude (alinhada a ad_risk_signals.severity). */
+export const AD_RISK_LEVEL = Object.freeze({
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+  CRITICAL: "critical",
+});
+
+export const AD_RISK_LEVEL_VALUES = Object.freeze(Object.values(AD_RISK_LEVEL));
 
 export const ADVERTISER_STATUS = Object.freeze({
   ACTIVE: "active",

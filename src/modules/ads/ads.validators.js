@@ -45,6 +45,12 @@ const CreateAdSchema = z.object({
     .array(z.string().min(1).max(2048))
     .min(1, { message: "Anúncio precisa de pelo menos 1 foto válida." })
     .max(VEHICLE_IMAGE_MAX_FILES),
+  /**
+   * Valor FIPE de referência consultado pelo frontend no Step 0/Step 4.
+   * Opcional — o adRiskService trata `null` como `FIPE_UNAVAILABLE` (não
+   * bloqueia publicação). Snapshot fica em `ads.fipe_reference_value`.
+   */
+  fipe_value: z.coerce.number().positive().optional().nullable(),
 });
 
 const UpdateAdSchema = CreateAdSchema.partial();

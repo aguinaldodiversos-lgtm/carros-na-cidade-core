@@ -1,33 +1,31 @@
 /**
- * Enum canônico de status de anúncio.
+ * Re-export do enum canônico de status de anúncio.
  *
- * Fonte única — qualquer literal de status no código deve passar por aqui.
- * Mantido alinhado ao que o banco aceita hoje em `ads.status`. Adicionar
- * novo valor (ex: pending_review) requer migration + atualização desta lista.
+ * Fonte única real: `src/shared/constants/status.js`. Este arquivo permanece
+ * apenas como fachada para callers que já importam de `ads.canonical.constants`
+ * (e para co-localização com os outros enums de domínio do módulo `ads`).
  *
- * Semântica:
- *   ACTIVE   — anúncio público, listável em `/comprar` e páginas territoriais.
- *   PAUSED   — escondido temporariamente pelo dono; reativável via PATCH.
- *   DELETED  — soft-delete; oculto em todo lugar; nunca volta para ACTIVE
- *              pelo caminho do dono (ver account.service.updateOwnedAdStatus).
- *   BLOCKED  — bloqueio administrativo; mesmo tratamento que DELETED no
- *              guard do dono.
+ * Para alterar/adicionar status, edite o arquivo canônico — não duplique aqui.
  */
-export const AD_STATUS = Object.freeze({
-  ACTIVE: "active",
-  PAUSED: "paused",
-  DELETED: "deleted",
-  BLOCKED: "blocked",
-});
+export {
+  AD_STATUS,
+  AD_STATUS_PUBLIC,
+  AD_STATUS_OWNER_OPERABLE,
+  AD_STATUS_CAN_RECEIVE_BOOST,
+  AD_STATUS_REQUIRES_ADMIN_ACTION,
+  AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC,
+  AD_NON_DELETED_STATUSES,
+  AD_OWNER_VISIBLE_STATUSES,
+  AD_VISIBLE_STATUSES,
+  AD_RISK_LEVEL,
+  AD_RISK_LEVEL_VALUES,
+  isValidAdStatus,
+} from "../../shared/constants/status.js";
 
-/** Status que aparecem publicamente em listagens. */
-export const AD_STATUS_PUBLIC = Object.freeze([AD_STATUS.ACTIVE]);
-
-/** Status que o dono pode operar via PATCH/PUT (pause/activate). */
-export const AD_STATUS_OWNER_OPERABLE = Object.freeze([AD_STATUS.ACTIVE, AD_STATUS.PAUSED]);
+import { AD_STATUS as _AD_STATUS } from "../../shared/constants/status.js";
 
 /** Conjunto de todos os status conhecidos (defesa contra strings desconhecidas). */
-export const AD_STATUS_VALUES = Object.freeze(Object.values(AD_STATUS));
+export const AD_STATUS_VALUES = Object.freeze(Object.values(_AD_STATUS));
 
 export function isKnownAdStatus(value) {
   return AD_STATUS_VALUES.includes(String(value || ""));

@@ -683,6 +683,23 @@ function normalizeDashboardAd(row) {
 
   const imageUrl = primaryImageUrlFromAdRow(row) || "/images/vehicle-placeholder.svg";
 
+  // Status passa direto para o dashboard — frontend renderiza o badge
+  // correspondente (Em análise / Rejeitado / Pausado / Ativo / etc.).
+  // Defesa: se vier algum status desconhecido (legado), cai em ACTIVE
+  // para o frontend não renderizar string crua.
+  const KNOWN_DASHBOARD_STATUSES = [
+    AD_STATUS.ACTIVE,
+    AD_STATUS.PAUSED,
+    AD_STATUS.PENDING_REVIEW,
+    AD_STATUS.REJECTED,
+    AD_STATUS.SOLD,
+    AD_STATUS.EXPIRED,
+    AD_STATUS.BLOCKED,
+  ];
+  const dashboardStatus = KNOWN_DASHBOARD_STATUSES.includes(row.status)
+    ? row.status
+    : AD_STATUS.ACTIVE;
+
   return {
     id: String(row.id),
     user_id: String(
@@ -691,12 +708,17 @@ function normalizeDashboardAd(row) {
     title: row.title?.trim() || "Anuncio sem titulo",
     price: toNumber(row.price, 0),
     image_url: imageUrl,
-    status: row.status === "paused" ? "paused" : "active",
+    status: dashboardStatus,
     is_featured: isFeatured,
     featured_until: featuredUntil,
     priority_level: isFeatured ? "high" : "normal",
     views: toNumber(row.views, 0),
     expires_at: fallbackExpiry.toISOString(),
+    // Motivos exibíveis no card (quando aplicável). Frontend só mostra se vier.
+    moderation: {
+      rejection_reason: row.rejection_reason || null,
+      correction_requested_reason: row.correction_requested_reason || null,
+    },
   };
 }
 
@@ -713,13 +735,26 @@ export async function listOwnedAds(userId) {
         a.highlight_until,
         a.created_at,
         a.updated_at,
-        a.images
+        a.images,
+        a.rejection_reason,
+        a.correction_requested_reason
       FROM ads a
       JOIN advertisers adv ON adv.id = a.advertiser_id
-      WHERE a.status IN ('${AD_STATUS.ACTIVE}', '${AD_STATUS.PAUSED}')
+      WHERE a.status IN (
+        '${AD_STATUS.ACTIVE}',
+        '${AD_STATUS.PAUSED}',
+        '${AD_STATUS.PENDING_REVIEW}',
+        '${AD_STATUS.REJECTED}',
+        '${AD_STATUS.SOLD}',
+        '${AD_STATUS.EXPIRED}'
+      )
         AND adv.user_id = $1
       ORDER BY
-        CASE WHEN a.status = '${AD_STATUS.ACTIVE}' THEN 0 ELSE 1 END,
+        CASE WHEN a.status = '${AD_STATUS.ACTIVE}' THEN 0
+             WHEN a.status = '${AD_STATUS.PENDING_REVIEW}' THEN 1
+             WHEN a.status = '${AD_STATUS.PAUSED}' THEN 2
+             WHEN a.status = '${AD_STATUS.REJECTED}' THEN 3
+             ELSE 4 END,
         a.updated_at DESC NULLS LAST,
         a.created_at DESC NULLS LAST
       `,

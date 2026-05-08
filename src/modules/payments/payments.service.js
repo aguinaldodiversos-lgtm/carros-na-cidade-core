@@ -469,6 +469,18 @@ export async function createBoostCheckout({
     throw new AppError("Opcao de impulsionamento invalida.", 400);
   }
 
+  // Tarefa 9 — destaque só pode ser comprado para anúncios ACTIVE.
+  // PENDING_REVIEW / REJECTED / PAUSED / SOLD / EXPIRED / DELETED nunca
+  // entram no checkout. O webhook (applyBoostApproval) também revalida.
+  if (String(ad.status) !== "active") {
+    throw new AppError(
+      "Este anúncio precisa estar ativo para receber destaque.",
+      400,
+      true,
+      { code: "BOOST_REQUIRES_ACTIVE_STATUS", currentStatus: ad.status }
+    );
+  }
+
   const intentId = crypto.randomUUID();
   const metadata = {
     intent_id: intentId,
@@ -842,6 +854,44 @@ export async function applyBoostApproval(client, intent) {
       "[payments] boost rejeitado: anúncio deletado"
     );
     return { applied: false, reason: "ad_deleted" };
+  }
+
+  // Tarefa 9 — somente ACTIVE pode receber destaque. Bloqueia
+  // PENDING_REVIEW / REJECTED / PAUSED / SOLD / EXPIRED / BLOCKED
+  // mesmo que o checkout tenha sido aprovado pelo MP.
+  if (String(owner.status) !== "active") {
+    logger.warn(
+      {
+        ...buildDomainFields({ action: "payments.webhook.boost.reject", result: "error" }),
+        intentId: intent.id,
+        adId: intent.ad_id,
+        reason: "boost_blocked_due_to_status",
+        currentStatus: owner.status,
+      },
+      "[payments] boost rejeitado: anúncio fora de ACTIVE"
+    );
+    // Audit em ad_moderation_events (defesa em profundidade — segura caso
+    // outro caller execute applyBoostApproval direto). Falhas de log não
+    // alteram o resultado.
+    try {
+      await client.query(
+        `
+        INSERT INTO ad_moderation_events
+          (ad_id, event_type, actor_user_id, actor_role, from_status, to_status, reason, metadata)
+        VALUES ($1, 'boost_blocked_due_to_status', $2, 'system', $3, $3, $4, $5::jsonb)
+        `,
+        [
+          intent.ad_id,
+          intent.user_id != null ? String(intent.user_id) : null,
+          owner.status,
+          "Boost approval skipped: ad is not ACTIVE.",
+          JSON.stringify({ intentId: intent.id }),
+        ]
+      );
+    } catch {
+      /* tabela pode não existir em ambientes legados — não falhar webhook */
+    }
+    return { applied: false, reason: "boost_blocked_due_to_status" };
   }
 
   if (String(owner.advertiser_user_id) !== String(intent.user_id)) {

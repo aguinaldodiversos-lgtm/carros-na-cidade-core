@@ -7,6 +7,14 @@ import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import { AD_STATUS } from "./ads.canonical.constants.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { calculateForAd } from "./risk/ad-risk.service.js";
+import {
+  countDistinctOwnersForPhone,
+  persistAdRiskSignals,
+  persistAdRiskSnapshot,
+  recordModerationEvent,
+} from "./risk/ad-risk.repository.js";
+import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
 
 /**
  * Invariante: anúncio só nasce `active` se tiver pelo menos 1 imagem válida.
@@ -62,6 +70,41 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
     });
     advertiserId = advertiser.id;
 
+    // ──────────────────────────────────────────────────────────────────
+    // Risk score ANTES do INSERT — assim:
+    //   • PRICE_INVALID derruba a publicação sem deixar resíduo no banco
+    //   • status inicial já é o final (ACTIVE ou PENDING_REVIEW), sem
+    //     janela em que o ad poderia aparecer publicamente
+    // ──────────────────────────────────────────────────────────────────
+    stage = "calculateRisk";
+    const riskResult = await calculateForAd(
+      {
+        ad: validated,
+        advertiser,
+        account,
+        fipeValue: validated.fipe_value ?? null,
+      },
+      { countDistinctOwnersForPhone }
+    );
+
+    if (riskResult.shouldRejectImmediately) {
+      throw new AppError(
+        "Anúncio rejeitado por dados inválidos. Revise o preço e tente novamente.",
+        400,
+        true,
+        {
+          code: "ADS_REJECTED_INVALID_DATA",
+          reasons: riskResult.reasons,
+          riskScore: riskResult.riskScore,
+          riskLevel: riskResult.riskLevel,
+        }
+      );
+    }
+
+    const initialStatus = riskResult.shouldSendToReview
+      ? AD_STATUS.PENDING_REVIEW
+      : AD_STATUS.ACTIVE;
+
     stage = "buildInsertRow";
     const slug = slugify(`${validated.brand}-${validated.model}-${validated.year}-${Date.now()}`);
     const plan = user?.plan || account.raw_plan || "free";
@@ -71,11 +114,62 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
       advertiser_id: advertiser.id,
       plan,
       slug,
-      status: AD_STATUS.ACTIVE,
+      status: initialStatus,
     });
 
     stage = "executeInsert";
     const inserted = await executeAdInsert(row, { requestId });
+
+    // Persistência do risco (snapshot em ads + sinais detalhados + eventos).
+    // Falhas aqui NÃO podem reverter o INSERT (decisão de status já foi
+    // tomada e o ad existe). Apenas logamos para auditoria.
+    if (inserted?.id) {
+      try {
+        stage = "persistRisk";
+        await persistAdRiskSnapshot(inserted.id, riskResult);
+        await persistAdRiskSignals(inserted.id, riskResult.reasons);
+        await recordModerationEvent({
+          adId: inserted.id,
+          eventType: MODERATION_EVENT.RISK_SCORE_CALCULATED,
+          actorRole: "system",
+          fromStatus: null,
+          toStatus: initialStatus,
+          reason: null,
+          metadata: {
+            riskScore: riskResult.riskScore,
+            riskLevel: riskResult.riskLevel,
+            reasonCount: riskResult.reasons.length,
+          },
+        });
+        if (initialStatus === AD_STATUS.PENDING_REVIEW) {
+          await recordModerationEvent({
+            adId: inserted.id,
+            eventType: MODERATION_EVENT.SENT_TO_REVIEW,
+            actorRole: "system",
+            fromStatus: null,
+            toStatus: AD_STATUS.PENDING_REVIEW,
+            reason: "Risk pipeline routed to manual review.",
+            metadata: {
+              codes: riskResult.reasons.map((r) => r.code),
+            },
+          });
+        }
+      } catch (riskErr) {
+        logger.error(
+          {
+            ...buildDomainFields({
+              action: "ads.create.persistRisk",
+              result: "error",
+              requestId,
+              userId: user?.id ?? null,
+            }),
+            adId: inserted.id,
+            err: riskErr?.message || String(riskErr),
+          },
+          "[ads] falha ao persistir risco — anúncio criado mas auditoria incompleta"
+        );
+      }
+    }
 
     logger.info(
       {
@@ -88,11 +182,23 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
         advertiserId,
         adId: inserted?.id ?? null,
         cityId: validated.city_id,
+        riskScore: riskResult.riskScore,
+        riskLevel: riskResult.riskLevel,
+        finalStatus: initialStatus,
       },
       "[ads] anúncio criado"
     );
 
-    return inserted;
+    // Anexa metadados de risco/decisão à row retornada para o BFF
+    // sinalizar PENDING_REVIEW vs ACTIVE no fluxo de submit.
+    return {
+      ...inserted,
+      risk_score: riskResult.riskScore,
+      risk_level: riskResult.riskLevel,
+      risk_reasons: riskResult.reasons,
+      moderation_status:
+        initialStatus === AD_STATUS.PENDING_REVIEW ? "pending_review" : "approved",
+    };
   } catch (err) {
     const cityId =
       validated?.city_id ??

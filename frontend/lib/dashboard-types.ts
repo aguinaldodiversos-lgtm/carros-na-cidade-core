@@ -17,7 +17,14 @@ export type DashboardPlanSummary = {
   billing_model: "free" | "one_time" | "monthly";
 };
 
-export type DashboardAdStatus = "active" | "paused";
+export type DashboardAdStatus =
+  | "active"
+  | "paused"
+  | "pending_review"
+  | "rejected"
+  | "sold"
+  | "expired"
+  | "blocked";
 export type DashboardPriorityLevel = "normal" | "high";
 
 export type DashboardAd = {
@@ -32,6 +39,11 @@ export type DashboardAd = {
   priority_level: DashboardPriorityLevel;
   views: number;
   expires_at: string;
+  /** Mensagens da moderação (visíveis para o dono no card). Apenas se aplicável. */
+  moderation?: {
+    rejection_reason: string | null;
+    correction_requested_reason: string | null;
+  };
 };
 
 export type BoostOption = {
