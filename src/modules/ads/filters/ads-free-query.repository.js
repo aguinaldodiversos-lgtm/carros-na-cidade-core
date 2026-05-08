@@ -1,13 +1,14 @@
 // src/modules/ads/filters/ads-free-query.repository.js
 
 import { pool } from "../../../infrastructure/database/db.js";
+import { AD_STATUS } from "../ads.canonical.constants.js";
 
 export async function loadBrandDictionary(limit = 300) {
   const result = await pool.query(
     `
     SELECT brand, COUNT(*)::int AS total
     FROM ads
-    WHERE status = 'active'
+    WHERE status = '${AD_STATUS.ACTIVE}'
       AND brand IS NOT NULL
     GROUP BY brand
     ORDER BY total DESC, brand ASC
@@ -24,7 +25,7 @@ export async function loadModelDictionary(limit = 1500) {
     `
     SELECT brand, model, COUNT(*)::int AS total
     FROM ads
-    WHERE status = 'active'
+    WHERE status = '${AD_STATUS.ACTIVE}'
       AND brand IS NOT NULL
       AND model IS NOT NULL
     GROUP BY brand, model

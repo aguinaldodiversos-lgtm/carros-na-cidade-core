@@ -193,6 +193,20 @@ export async function updateAd(id, data, user, ctx = {}) {
   let cityId = null;
 
   try {
+    // Guard: transição de status (active/paused/deleted) tem caminho próprio
+    // (account.service.updateOwnedAdStatus + deleteOwnedAd) com elegibility-
+    // -guard, RLS e cleanup R2. Permitir aqui criaria um segundo caminho
+    // sem essas garantias.
+    if (data && Object.prototype.hasOwnProperty.call(data, "status")) {
+      throw new AppError(
+        "Alteração de status não é permitida por este endpoint. Use PATCH /api/account/ads/:id/status (pause/activate) ou DELETE /api/ads/:id.",
+        400
+      );
+    }
+    if (data && Object.prototype.hasOwnProperty.call(data, "advertiser_id")) {
+      throw new AppError("Alteração de advertiser_id não é permitida.", 400);
+    }
+
     const ownerContext = await adsRepository.findOwnerContextById(id);
     if (ownerContext) {
       advertiserId = ownerContext.advertiser_id ?? null;

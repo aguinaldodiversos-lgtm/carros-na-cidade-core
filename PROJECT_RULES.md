@@ -128,6 +128,26 @@ O shell público oficial está no `app/layout.tsx`.
 
 ---
 
+## Rotas canônicas do fluxo de postagem de anúncio
+
+### Mapa oficial (não criar variações paralelas)
+
+- `/anunciar` — **landing comercial** (estática). Apenas SEO/CTA. Não cria anúncio.
+- `/anunciar/publicar` — **seletor de tipo de anunciante** (PF/CNPJ). Apenas redireciona para o wizard.
+- `/anunciar/novo` — **única rota canônica de criação de anúncio** (wizard de 5 passos).
+- `/dashboard/meus-anuncios` — listagem do anunciante PF.
+- `/dashboard-loja/meus-anuncios` — listagem do anunciante CNPJ (loja).
+- `/painel/anuncios/[id]/upgrade` — tela operacional pós-criação para upsell de plano e Destaque 7 dias. **Não publica nada** — o anúncio já chega em `active` na criação. (Rota antiga `/painel/anuncios/[id]/publicar` redireciona 301 para `/upgrade`.)
+
+### Regras obrigatórias
+
+- **Único ponto real de criação** de anúncio é `/anunciar/novo`. Não criar `/publicar-anuncio`, `/vender`, `/dashboard/anuncios/novo`, `/painel/anuncios/novo` ou variantes — todas devem redirecionar para `/anunciar/novo`.
+- Tela pós-criação **nunca** deve se chamar "publicar" — o ad já está `active` quando chega ali. Usar terminologia de **upgrade/destaque/upsell**.
+- Submit final do wizard envia **referências persistentes** das fotos enviadas no Step 2, **não** os arquivos novamente. Não pode haver dois caminhos de upload concorrentes no mesmo fluxo.
+- Endpoints de criação/edição/exclusão de anúncio sempre passam por `account.service.*` (`getOwnedAd`, `updateOwnedAdStatus`, `deleteOwnedAd`) ou `ads.create.pipeline.service.createAdNormalized`. Nada de criar segunda função para a mesma operação.
+
+---
+
 ## Integração oficial com backend
 
 ### Home pública

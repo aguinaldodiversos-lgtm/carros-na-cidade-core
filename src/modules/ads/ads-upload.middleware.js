@@ -1,9 +1,16 @@
 import multer from "multer";
 import { ACCEPTED_INPUT_MIMES } from "../../infrastructure/storage/image-normalizer.js";
+import {
+  VEHICLE_IMAGE_MAX_FILES,
+  VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES,
+} from "./ads.upload.constants.js";
 
-/** Alinhado ao default de `VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES` / r2.service (10 MB). */
-const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_FILES = 24;
+/**
+ * Limites importados de `ads.upload.constants` — fonte única para multer,
+ * validator Zod, ads.routes (`.array(..., MAX_FILES)`) e r2.service.
+ */
+const MAX_BYTES = VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES;
+const MAX_FILES = VEHICLE_IMAGE_MAX_FILES;
 
 /**
  * Normaliza aliases MIME de JPEG antes da verificação do whitelist.

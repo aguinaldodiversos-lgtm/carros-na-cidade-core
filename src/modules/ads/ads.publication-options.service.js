@@ -27,6 +27,7 @@ import {
   resolveCurrentPlan,
 } from "../account/account.service.js";
 import { findLiveSubscriptionForUser } from "../payments/subscriptions.guards.js";
+import { AD_STATUS, AD_STATUS_OWNER_OPERABLE } from "./ads.canonical.constants.js";
 
 /**
  * Preços oficiais em CENTAVOS — bate com a oferta de lançamento e
@@ -50,8 +51,11 @@ const PLAN_ID = Object.freeze({
  * Status do anúncio que admitem ações de publicação/destaque.
  * `deleted` e `blocked` são bloqueados — anúncio precisa ser
  * recuperado/desbloqueado por outro fluxo antes.
+ *
+ * Fonte: AD_STATUS_OWNER_OPERABLE em `ads.canonical.constants.js`.
  */
-const PUBLISHABLE_STATUSES = new Set(["active", "paused"]);
+const PUBLISHABLE_STATUSES = new Set(AD_STATUS_OWNER_OPERABLE);
+void AD_STATUS;
 
 function isHighlightActive(highlightUntilIso) {
   if (!highlightUntilIso) return false;

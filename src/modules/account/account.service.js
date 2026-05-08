@@ -3,6 +3,8 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import * as adsRepository from "../ads/ads.repository.js";
+import * as adsPanelService from "../ads/ads.panel.service.js";
+import { AD_STATUS } from "../ads/ads.canonical.constants.js";
 import { getAccountUser } from "./account.user.read.js";
 
 /**
@@ -537,7 +539,7 @@ export async function countActiveAdsByUser(userId) {
       SELECT COUNT(*)::int AS total
       FROM ads a
       JOIN advertisers adv ON adv.id = a.advertiser_id
-      WHERE a.status = 'active'
+      WHERE a.status = '${AD_STATUS.ACTIVE}'
         AND adv.user_id = $1
       `,
       [userId]
@@ -558,7 +560,7 @@ export async function countNonDeletedAdsForUser(userId) {
       FROM ads a
       JOIN advertisers adv ON adv.id = a.advertiser_id
       WHERE adv.user_id = $1
-        AND a.status != 'deleted'
+        AND a.status != '${AD_STATUS.DELETED}'
       `,
       [userId]
     );
@@ -714,10 +716,10 @@ export async function listOwnedAds(userId) {
         a.images
       FROM ads a
       JOIN advertisers adv ON adv.id = a.advertiser_id
-      WHERE a.status IN ('active', 'paused')
+      WHERE a.status IN ('${AD_STATUS.ACTIVE}', '${AD_STATUS.PAUSED}')
         AND adv.user_id = $1
       ORDER BY
-        CASE WHEN a.status = 'active' THEN 0 ELSE 1 END,
+        CASE WHEN a.status = '${AD_STATUS.ACTIVE}' THEN 0 ELSE 1 END,
         a.updated_at DESC NULLS LAST,
         a.created_at DESC NULLS LAST
       `,
@@ -746,7 +748,7 @@ export async function getOwnedAd(userId, adId) {
     FROM ads a
     JOIN advertisers adv ON adv.id = a.advertiser_id
     WHERE a.id = $1
-      AND a.status != 'deleted'
+      AND a.status != '${AD_STATUS.DELETED}'
       AND adv.user_id = $2
     LIMIT 1
     `,
@@ -983,12 +985,12 @@ export async function updateOwnedAdStatus(userId, adId, action) {
     throw new AppError("Anuncio nao encontrado", 404);
   }
 
-  // Status-guard: 'deleted' e 'blocked' têm fluxos próprios (admin/recovery)
-  // e nunca podem virar 'active'/'paused' por chamada do dono. Defesa contra
+  // Status-guard: DELETED e BLOCKED têm fluxos próprios (admin/recovery)
+  // e nunca podem virar ACTIVE/PAUSED por chamada do dono. Defesa contra
   // ressurreição/desbloqueio via PATCH activate (Fase 4 — tela pós-revisão
   // chama este endpoint como CTA de "Publicar grátis").
   const currentStatus = String(owner.status || "");
-  if (currentStatus === "deleted" || currentStatus === "blocked") {
+  if (currentStatus === AD_STATUS.DELETED || currentStatus === AD_STATUS.BLOCKED) {
     throw new AppError(
       `Anuncio em status '${currentStatus}' nao admite alteracao por este endpoint.`,
       410
@@ -1000,7 +1002,7 @@ export async function updateOwnedAdStatus(userId, adId, action) {
   // bypass do limite de plano / CPF não verificado / CNPJ não verificado
   // via "pausar+reativar". Ignorado quando o ad já está active (idempotente,
   // sem efeito incremental no contador).
-  if (action === "activate" && currentStatus !== "active") {
+  if (action === "activate" && currentStatus !== AD_STATUS.ACTIVE) {
     const eligibility = await resolvePublishEligibility(userId);
     if (!eligibility.allowed) {
       throw new AppError(
@@ -1010,7 +1012,7 @@ export async function updateOwnedAdStatus(userId, adId, action) {
     }
   }
 
-  const status = action === "pause" ? "paused" : "active";
+  const status = action === "pause" ? AD_STATUS.PAUSED : AD_STATUS.ACTIVE;
 
   // withUserTransaction sets app.current_user_id so the RLS write policy
   // on ads can verify the owner at the database level (second defence layer).
@@ -1029,27 +1031,25 @@ export async function updateOwnedAdStatus(userId, adId, action) {
   return getOwnedAd(userId, adId);
 }
 
+/**
+ * Soft-delete unificado: delega para `adsPanelService.removeAd`, que é a
+ * fonte única — faz `assertOwner` (mesma regra deste fluxo) + soft-delete
+ * com `AD_STATUS.DELETED` + cleanup das imagens em R2 e da tabela
+ * `vehicle_images`.
+ *
+ * Antes desta unificação, esta função apenas atualizava `ads.status`,
+ * deixando objetos em R2 órfãos quando o usuário deletava pelo dashboard.
+ * Ambas as portas (`DELETE /api/ads/:id` e `DELETE /api/account/ads/:id`)
+ * agora chegam exatamente no mesmo caminho.
+ */
 export async function deleteOwnedAd(userId, adId) {
-  const owner = await adsRepository.findOwnerContextById(adId);
-  const ownerIds = [owner?.advertiser_user_id].filter(Boolean).map((value) => String(value));
-
-  if (!owner || !ownerIds.includes(String(userId))) {
-    throw new AppError("Anuncio nao encontrado", 404);
-  }
-
-  // withUserTransaction sets app.current_user_id so the RLS write policy
-  // on ads can verify the owner at the database level (second defence layer).
-  const removed = await withUserTransaction(String(userId), async (tx) => {
-    const { rows } = await tx.query(
-      `UPDATE ads SET status = 'deleted', updated_at = NOW() WHERE id = $1 RETURNING id`,
-      [adId]
-    );
-    return rows[0] || null;
-  });
-
-  if (!removed) {
+  try {
+    await adsPanelService.removeAd(adId, { id: userId });
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof AppError) {
+      throw err;
+    }
     throw new AppError("Falha ao excluir anuncio", 500);
   }
-
-  return { ok: true };
 }

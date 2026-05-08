@@ -780,10 +780,18 @@ async function upsertUserSubscription(client, { userId, planId, paymentId, statu
  *   - Se `highlight_until IS NULL` ou está no passado: define
  *     `NOW() + boost_days` — começa do zero.
  *
- * Defesa em profundidade:
+ * Defesa em profundidade (revalidação do vínculo dono↔ad↔intent):
  *   - Sem `ad_id` ou `boost_days=0`: no-op (early return).
- *   - WHERE `status != 'deleted'`: anúncio soft-deleted não é boostado
- *     mesmo se um intent antigo aprovar tarde.
+ *   - O UPDATE só passa quando:
+ *       1. `ads.id = intent.ad_id`
+ *       2. `ads.status != 'deleted'`
+ *       3. `advertisers.user_id = intent.user_id`  (pagador continua dono)
+ *     Se algum desses falhar (ad transferido, removido ou pagador trocou
+ *     de conta entre o checkout e a confirmação MP), o webhook é loggado
+ *     como rejeitado de segurança e `highlight_until` permanece intacto.
+ *   - O service de checkout (`createBoostCheckout`) já valida ownership
+ *     via `getOwnedAd`; esta camada existe para pegar mudanças que
+ *     ocorrerem ENTRE o início do checkout e a confirmação assíncrona.
  *
  * Exportado para teste (validar shape do SQL + params + early return).
  * Não chamar diretamente fora do webhook — a idempotência depende do
@@ -792,7 +800,63 @@ async function upsertUserSubscription(client, { userId, planId, paymentId, statu
 export async function applyBoostApproval(client, intent) {
   const boostDays = Number(intent.metadata?.boost_days || 0);
   if (!intent.ad_id || !boostDays) {
-    return;
+    return { applied: false, reason: "missing_ad_or_days" };
+  }
+
+  // Revalidação síncrona do vínculo: ad existe, não está deleted,
+  // ainda pertence ao usuário que iniciou o pagamento.
+  const ownerCheck = await client.query(
+    `
+    SELECT a.id, a.status, adv.user_id AS advertiser_user_id
+    FROM ads a
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    WHERE a.id = $1
+    LIMIT 1
+    `,
+    [intent.ad_id]
+  );
+
+  const owner = ownerCheck.rows[0] || null;
+
+  if (!owner) {
+    logger.warn(
+      {
+        ...buildDomainFields({ action: "payments.webhook.boost.reject", result: "error" }),
+        intentId: intent.id,
+        adId: intent.ad_id,
+        reason: "ad_not_found",
+      },
+      "[payments] boost rejeitado: anúncio inexistente"
+    );
+    return { applied: false, reason: "ad_not_found" };
+  }
+
+  if (String(owner.status) === "deleted") {
+    logger.warn(
+      {
+        ...buildDomainFields({ action: "payments.webhook.boost.reject", result: "error" }),
+        intentId: intent.id,
+        adId: intent.ad_id,
+        reason: "ad_deleted",
+      },
+      "[payments] boost rejeitado: anúncio deletado"
+    );
+    return { applied: false, reason: "ad_deleted" };
+  }
+
+  if (String(owner.advertiser_user_id) !== String(intent.user_id)) {
+    logger.warn(
+      {
+        ...buildDomainFields({ action: "payments.webhook.boost.reject", result: "error" }),
+        intentId: intent.id,
+        adId: intent.ad_id,
+        reason: "ownership_mismatch",
+        purchaserUserId: String(intent.user_id),
+        currentOwnerUserId: String(owner.advertiser_user_id),
+      },
+      "[payments] boost rejeitado: pagador não é mais dono do anúncio"
+    );
+    return { applied: false, reason: "ownership_mismatch" };
   }
 
   await client.query(
@@ -811,6 +875,8 @@ export async function applyBoostApproval(client, intent) {
     `,
     [intent.ad_id, String(boostDays)]
   );
+
+  return { applied: true };
 }
 
 export async function handleWebhookNotification({ rawBody, signature, requestId, traceRequestId }) {

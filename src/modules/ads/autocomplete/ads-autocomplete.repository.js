@@ -2,6 +2,7 @@
 
 import { pool } from "../../../infrastructure/database/db.js";
 import { logger } from "../../../shared/logger.js";
+import { AD_STATUS } from "../ads.canonical.constants.js";
 
 /* =====================================================
    DICTIONARIES
@@ -16,7 +17,7 @@ export async function loadBrandDictionary(limit = 400) {
       a.brand,
       COUNT(*)::int AS total
     FROM ads a
-    WHERE a.status = 'active'
+    WHERE a.status = '${AD_STATUS.ACTIVE}'
       AND a.brand IS NOT NULL
     GROUP BY a.brand
     ORDER BY total DESC, a.brand ASC
@@ -38,7 +39,7 @@ export async function loadModelDictionary(limit = 2500) {
       a.model,
       COUNT(*)::int AS total
     FROM ads a
-    WHERE a.status = 'active'
+    WHERE a.status = '${AD_STATUS.ACTIVE}'
       AND a.brand IS NOT NULL
       AND a.model IS NOT NULL
     GROUP BY a.brand, a.model
@@ -113,7 +114,7 @@ export async function loadCityBrandPresence(limit = 5000) {
       COUNT(*)::int AS total
     FROM ads a
     JOIN cities c ON c.id = a.city_id
-    WHERE a.status = 'active'
+    WHERE a.status = '${AD_STATUS.ACTIVE}'
       AND a.brand IS NOT NULL
     GROUP BY c.slug, c.name, c.state, a.brand
     ORDER BY total DESC, c.name ASC, a.brand ASC

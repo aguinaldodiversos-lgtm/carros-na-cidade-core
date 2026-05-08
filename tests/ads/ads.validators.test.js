@@ -11,6 +11,9 @@ const basePayload = {
   model: "Gol",
   year: 2020,
   mileage: 10000,
+  // Invariante a partir de 2026-05-08: anúncio active exige >=1 imagem
+  // (ver ads.upload.constants + AD_STATUS). Payload base mínimo já passa.
+  images: ["https://r2.example.com/ads/test/1.webp"],
 };
 
 describe("validateCreateAdPayload", () => {

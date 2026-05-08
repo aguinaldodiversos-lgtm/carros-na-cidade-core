@@ -9,11 +9,6 @@ import {
   fetchResolvedCityByIdFromBackend,
   type PublishWizardInput,
 } from "@/lib/painel/create-ad-backend";
-import { snapshotPhotoFiles } from "@/lib/painel/upload-draft-photo-snapshots";
-import {
-  runWizardPhotoUploadPipeline,
-  type WizardPipelineError,
-} from "@/lib/painel/upload-wizard-photos-pipeline";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import {
   applySessionCookiesToResponse,
@@ -24,7 +19,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const LOG_PREFIX = "[publish-ad-route]";
-const MAX_WIZARD_FILES = 10;
+
+/**
+ * Submit final aceita SOMENTE referências persistentes de fotos enviadas no
+ * Step 2 do wizard (`draftPhotoUrls`). Não há mais upload concorrente neste
+ * endpoint — antes existia um pipeline de upload aqui (snapshot de
+ * `photos[]` + `runWizardPhotoUploadPipeline`) que coexistia com o upload
+ * isolado do Step 2 e podia duplicar arquivos em R2 ou deixar fotos órfãs.
+ *
+ * Fonte única do upload: `POST /api/painel/anuncios/upload-draft-photos`
+ * (chamado no Step 2). Submit recebe as URLs canônicas e o backend
+ * (`POST /api/ads`) gera a row em `ads` com `images[]` apontando pra elas.
+ */
 
 function firstText(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -78,21 +84,15 @@ function parseDraftPhotoUrls(raw: string): string[] {
   }
 }
 
-function toSafeHttpStatus(input?: number): number {
-  const allowed = new Set([400, 401, 403, 408, 409, 413, 415, 422, 429, 500, 502, 503, 504]);
-  if (!input || !allowed.has(input)) return 502;
-  return input;
-}
-
-function sanitizePipelineError(error: WizardPipelineError): Record<string, unknown> {
-  return {
-    stage: error.stage,
-    message: error.message,
-    statusCode: error.statusCode,
-    code: error.code,
-    requestId: error.requestId,
-    backendUrl: error.backendUrl,
-  };
+function isLikelyHttpUrl(value: string): boolean {
+  if (!value) return false;
+  if (value.startsWith("/api/vehicle-images?")) return true;
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
@@ -280,108 +280,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let photoUrls: string[] = [];
-    let usedDraftPhotoUrls = false;
-
+    // Submit final aceita APENAS referências persistentes vindas do upload
+    // do Step 2 (`POST /api/painel/anuncios/upload-draft-photos`). Arquivos
+    // brutos no FormData (`photos[]`) são ignorados: tinha um segundo
+    // pipeline aqui que reconvertia File→snapshot→re-upload em paralelo
+    // ao Step 2, criando duplicatas em R2 e fotos órfãs sem vínculo a `ads`.
     const draftUrlsRaw = firstText(source, "draftPhotoUrls");
-    if (draftUrlsRaw) {
-      photoUrls = parseDraftPhotoUrls(draftUrlsRaw);
-      usedDraftPhotoUrls = photoUrls.length > 0;
-
-      if (usedDraftPhotoUrls) {
-        console.info(`${LOG_PREFIX} using draftPhotoUrls`, {
-          requestId,
-          urlCount: photoUrls.length,
-        });
-      } else {
-        console.warn(`${LOG_PREFIX} invalid or empty draftPhotoUrls`, {
-          requestId,
-        });
-      }
-    }
+    const parsedDraftUrls = draftUrlsRaw ? parseDraftPhotoUrls(draftUrlsRaw) : [];
+    const photoUrls = parsedDraftUrls.filter(isLikelyHttpUrl);
 
     if (photoUrls.length === 0) {
-      const attemptedPhotos = source
+      const ignoredPhotoFiles = source
         .getAll("photos")
         .filter(
           (file): file is File =>
             typeof File !== "undefined" && file instanceof File && file.size > 0
-        );
+        ).length;
 
-      if (attemptedPhotos.length > MAX_WIZARD_FILES) {
-        return jsonWithSession(
-          {
-            ok: false,
-            requestId,
-            message: `Envie no máximo ${MAX_WIZARD_FILES} fotos por vez.`,
-          },
-          400
-        );
-      }
+      console.warn(`${LOG_PREFIX} submit sem draftPhotoUrls válidas`, {
+        requestId,
+        rawProvided: Boolean(draftUrlsRaw),
+        parsedCount: parsedDraftUrls.length,
+        ignoredPhotoFiles,
+      });
 
-      if (attemptedPhotos.length > 0) {
-        const snapshots = await snapshotPhotoFiles(attemptedPhotos);
-        const nodeEnv = process.env.NODE_ENV || "development";
-
-        const pipeline = await runWizardPhotoUploadPipeline({
-          snapshots,
-          userId: ensured.session.id || "anon",
-          accessToken: ensured.session.accessToken,
-          requestId,
-          forwardHeaders: backendHeaders,
-          nodeEnv,
-        });
-
-        photoUrls = pipeline.photoUrls;
-
-        if (photoUrls.length === 0) {
-          const status = toSafeHttpStatus(pipeline.primaryError?.statusCode);
-          const body: Record<string, unknown> = {
-            ok: false,
-            requestId,
-            message:
-              pipeline.primaryError?.message ||
-              "Não foi possível salvar as fotos. Tente novamente.",
-          };
-
-          if (nodeEnv !== "production") {
-            body.debug = {
-              strategiesAttempted: pipeline.strategiesAttempted,
-              errors: pipeline.errors.map(sanitizePipelineError),
-              validUrlCount: 0,
-              usedDraftPhotoUrls: false,
-            };
-          }
-
-          console.error(`${LOG_PREFIX} photo upload failed`, {
-            requestId,
-            status,
-            strategiesAttempted: pipeline.strategiesAttempted,
-            errors: pipeline.errors.map((error) => ({
-              stage: error.stage,
-              code: error.code,
-              statusCode: error.statusCode,
-              message: error.message,
-              backendUrl: error.backendUrl,
-              backendRequestId: error.requestId,
-            })),
-          });
-
-          return jsonWithSession(body, status);
-        }
-      }
-    }
-
-    if (photoUrls.length === 0) {
       return jsonWithSession(
         {
           ok: false,
           requestId,
-          message: "Adicione pelo menos uma foto do veículo para publicar.",
+          message:
+            "Não foi possível confirmar as fotos do anúncio. Refaça o envio das fotos no Step 2 e tente publicar novamente.",
         },
         400
       );
     }
+
+    if (parsedDraftUrls.length !== photoUrls.length) {
+      console.warn(`${LOG_PREFIX} submit ignorou URLs de foto malformadas`, {
+        requestId,
+        provided: parsedDraftUrls.length,
+        accepted: photoUrls.length,
+      });
+    }
+
+    const usedDraftPhotoUrls = true;
+    console.info(`${LOG_PREFIX} using draftPhotoUrls`, {
+      requestId,
+      urlCount: photoUrls.length,
+    });
 
     const backendPayload = buildBackendCreateAdPayload(
       normalized,

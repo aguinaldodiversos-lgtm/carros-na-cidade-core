@@ -1,4 +1,39 @@
 /**
+ * Enum canônico de status de anúncio.
+ *
+ * Fonte única — qualquer literal de status no código deve passar por aqui.
+ * Mantido alinhado ao que o banco aceita hoje em `ads.status`. Adicionar
+ * novo valor (ex: pending_review) requer migration + atualização desta lista.
+ *
+ * Semântica:
+ *   ACTIVE   — anúncio público, listável em `/comprar` e páginas territoriais.
+ *   PAUSED   — escondido temporariamente pelo dono; reativável via PATCH.
+ *   DELETED  — soft-delete; oculto em todo lugar; nunca volta para ACTIVE
+ *              pelo caminho do dono (ver account.service.updateOwnedAdStatus).
+ *   BLOCKED  — bloqueio administrativo; mesmo tratamento que DELETED no
+ *              guard do dono.
+ */
+export const AD_STATUS = Object.freeze({
+  ACTIVE: "active",
+  PAUSED: "paused",
+  DELETED: "deleted",
+  BLOCKED: "blocked",
+});
+
+/** Status que aparecem publicamente em listagens. */
+export const AD_STATUS_PUBLIC = Object.freeze([AD_STATUS.ACTIVE]);
+
+/** Status que o dono pode operar via PATCH/PUT (pause/activate). */
+export const AD_STATUS_OWNER_OPERABLE = Object.freeze([AD_STATUS.ACTIVE, AD_STATUS.PAUSED]);
+
+/** Conjunto de todos os status conhecidos (defesa contra strings desconhecidas). */
+export const AD_STATUS_VALUES = Object.freeze(Object.values(AD_STATUS));
+
+export function isKnownAdStatus(value) {
+  return AD_STATUS_VALUES.includes(String(value || ""));
+}
+
+/**
  * Fonte única de verdade para slugs de veículo persistidos em `ads`.
  * Deve permanecer alinhada ao CHECK do Postgres (ver docs/database/ads-schema-contract.sql).
  */

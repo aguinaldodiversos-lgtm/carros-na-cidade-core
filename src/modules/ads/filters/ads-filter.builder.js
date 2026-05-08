@@ -3,6 +3,7 @@
 import { buildSortClause } from "./ads-filter.sort.js";
 import { baseCityBoostExpr, cityDemandBoostExpr, planRankExpr } from "./ads-ranking.sql.js";
 import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
+import { AD_STATUS } from "../ads.canonical.constants.js";
 
 function pushFilter(where, params, expression, ...values) {
   let sql = expression;
@@ -56,7 +57,7 @@ export function buildAdsSearchQuery(filters = {}) {
   );
   const offset = (safePage - 1) * safeLimit;
 
-  const where = [`a.status = 'active'`];
+  const where = [`a.status = '${AD_STATUS.ACTIVE}'`];
   const params = [];
   let useTextRank = false;
   let textRankExpression = "0";
@@ -207,7 +208,7 @@ export function buildAdsSearchQuery(filters = {}) {
 }
 
 export function buildAdsFacetWhere(filters = {}) {
-  const where = [`a.status = 'active'`];
+  const where = [`a.status = '${AD_STATUS.ACTIVE}'`];
   const params = [];
 
   if (filters.city_slug) {

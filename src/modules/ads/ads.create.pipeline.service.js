@@ -5,6 +5,29 @@ import { validateCreateAdPayload } from "./ads.validators.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
+import { AD_STATUS } from "./ads.canonical.constants.js";
+import { AppError } from "../../shared/middlewares/error.middleware.js";
+
+/**
+ * Invariante: anúncio só nasce `active` se tiver pelo menos 1 imagem válida.
+ * O Zod já exige `images.min(1)` (defesa de contrato), mas mantemos esta
+ * checagem de domínio para que callers diretos de `createAdNormalized`
+ * (sem passar pelo validator do controller) não escapem da regra.
+ */
+function assertHasValidImages(images, ctx) {
+  const list = Array.isArray(images)
+    ? images.filter((u) => typeof u === "string" && u.trim().length > 0)
+    : [];
+  if (list.length === 0) {
+    throw new AppError(
+      "Anúncio precisa de pelo menos 1 foto válida para ser publicado.",
+      400,
+      true,
+      { code: "ADS_REQUIRE_AT_LEAST_ONE_IMAGE", ...ctx }
+    );
+  }
+  return list;
+}
 
 /**
  * Pipeline único de criação de anúncio:
@@ -22,6 +45,15 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
 
   try {
     validated = validateCreateAdPayload(rawPayload);
+
+    // Invariante de domínio (defesa em profundidade do `min(1)` no Zod):
+    // anúncio nasce `active` no banco — não pode ficar público sem foto.
+    stage = "assertImages";
+    validated.images = assertHasValidImages(validated.images, {
+      requestId,
+      userId: user?.id ?? null,
+    });
+
     stage = "ensurePublishEligibility";
 
     const { advertiser, account } = await ensurePublishEligibility(user, {
@@ -39,7 +71,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
       advertiser_id: advertiser.id,
       plan,
       slug,
-      status: "active",
+      status: AD_STATUS.ACTIVE,
     });
 
     stage = "executeInsert";

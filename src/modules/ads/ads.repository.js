@@ -1,5 +1,6 @@
 import db from "../../infrastructure/database/db.js";
 import { normalizeAdVehicleFieldsForPersistence } from "./ads.storage-normalize.js";
+import { AD_STATUS } from "./ads.canonical.constants.js";
 
 const UPDATE_FIELDS = [
   "title",
@@ -85,7 +86,7 @@ export async function createAd(data) {
     row.transmission || null,
     Boolean(row.below_fipe),
     JSON.stringify(images),
-    row.status || "active",
+    row.status || AD_STATUS.ACTIVE,
     row.plan || "free",
     row.slug,
   ];
@@ -95,7 +96,10 @@ export async function createAd(data) {
 }
 
 export async function findById(id) {
-  const { rows } = await db.query(`SELECT * FROM ads WHERE id = $1 AND status != 'deleted'`, [id]);
+  const { rows } = await db.query(
+    `SELECT * FROM ads WHERE id = $1 AND status != $2`,
+    [id, AD_STATUS.DELETED]
+  );
 
   return rows[0] || null;
 }
@@ -115,11 +119,11 @@ export async function findAdByIdentifier(identifier) {
     LEFT JOIN cities c      ON c.id = a.city_id
     LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
     WHERE ${isNumeric ? "a.id = $1" : "a.slug = $1"}
-      AND a.status = 'active'
+      AND a.status = $2
     LIMIT 1
   `;
 
-  const { rows } = await db.query(baseQuery, [identifier]);
+  const { rows } = await db.query(baseQuery, [identifier, AD_STATUS.ACTIVE]);
   return rows[0] || null;
 }
 
@@ -181,12 +185,12 @@ export async function softDeleteAd(id) {
   const { rows } = await db.query(
     `
     UPDATE ads
-    SET status = 'deleted',
+    SET status = $2,
         updated_at = NOW()
     WHERE id = $1
     RETURNING *;
     `,
-    [id]
+    [id, AD_STATUS.DELETED]
   );
 
   return rows[0] || null;

@@ -5,6 +5,7 @@ import {
   fuelTypeZodField,
   transmissionZodField,
 } from "./ads.vehicle-fields.zod.js";
+import { VEHICLE_IMAGE_MAX_FILES } from "./ads.upload.constants.js";
 
 /**
  * Contrato de criação de anúncio.
@@ -35,8 +36,15 @@ const CreateAdSchema = z.object({
   fuel_type: fuelTypeZodField,
   transmission: transmissionZodField,
   below_fipe: z.coerce.boolean().optional().default(false),
-  /** URLs públicas (relativas ao portal ou absolutas) — ordem = capa primeiro. */
-  images: z.array(z.string().min(1).max(2048)).max(24).optional().default([]),
+  /**
+   * URLs públicas (relativas ao portal ou absolutas) — ordem = capa primeiro.
+   * Mínimo 1 imagem: invariante "anúncio active exige imagem válida". Limite
+   * superior alinhado a `ads.upload.constants` (multer + r2.service).
+   */
+  images: z
+    .array(z.string().min(1).max(2048))
+    .min(1, { message: "Anúncio precisa de pelo menos 1 foto válida." })
+    .max(VEHICLE_IMAGE_MAX_FILES),
 });
 
 const UpdateAdSchema = CreateAdSchema.partial();

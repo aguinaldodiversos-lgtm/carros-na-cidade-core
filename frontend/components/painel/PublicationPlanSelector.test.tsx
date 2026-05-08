@@ -38,7 +38,9 @@ beforeEach(() => {
   Object.defineProperty(window, "location", {
     writable: true,
     value: {
-      pathname: "/painel/anuncios/ad-1/publicar",
+      // Rota canônica desde 2026-05-08: a antiga `/publicar` redireciona
+      // 301 para `/upgrade` (ver frontend/middleware.ts).
+      pathname: "/painel/anuncios/ad-1/upgrade",
       search: "",
       href: "",
       assign: vi.fn(),

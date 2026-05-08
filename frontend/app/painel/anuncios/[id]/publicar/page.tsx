@@ -1,87 +1,30 @@
 /**
- * Tela interna pós-revisão (Fase 4).
+ * Rota legada — renomeada para `/painel/anuncios/[id]/upgrade`.
  *
- * Rota dedicada `/painel/anuncios/[id]/publicar` — operacional, NÃO é
- * landing pública e NÃO substitui /planos. Server component que faz:
- *   1. valida sessão (redireciona /login se não autenticado);
- *   2. busca o anúncio para compor o card-resumo (foto, preço, cidade);
- *   3. delega para o client `PublicationPlanSelector` que consulta
- *      GET /api/ads/:id/publication-options e renderiza ações.
+ * O anúncio já chega `active` na criação (ver
+ * `src/modules/ads/ads.create.pipeline.service.createAdNormalized`); esta
+ * tela nunca publicou nada — sempre foi upsell pós-publicação. O nome
+ * "publicar" foi descartado por induzir a erro.
  *
- * NÃO altera /planos, header/footer global, sitemap nem layout global.
- * NÃO inicia checkouts: o client só dispara MP após clique do usuário.
+ * Redirect primário: `frontend/middleware.ts` faz 301 em
+ * `/painel/anuncios/:id/publicar` → `/upgrade` antes de chegar aqui.
+ * Esta página existe como segunda linha de defesa (ex: matcher fora de
+ * sincronia, dev server, prerender legado).
  */
-import type { Metadata } from "next";
-import { cookies, headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
-import PublicationPlanSelector from "@/components/painel/PublicationPlanSelector";
-import { fetchOwnedAd } from "@/lib/account/backend-account";
-import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
-import { getSessionDataFromCookieStore } from "@/services/sessionService";
+import { redirect, permanentRedirect } from "next/navigation";
 
 type PageProps = {
   params: { id: string };
 };
 
-export const metadata: Metadata = {
-  title: "Revisão final e publicação",
-  description:
-    "Tela interna pós-revisão do anúncio: escolha como publicar e, se quiser, comprar Destaque 7 dias.",
-  // robots noindex — é tela operacional interna, não vai pra SEO.
-  robots: { index: false, follow: false },
-};
-
 export const dynamic = "force-dynamic";
 
-export default async function PublicarAnuncioPage({ params }: PageProps) {
-  const cookieStore = cookies();
-  const raw = getSessionDataFromCookieStore(cookieStore, headers());
-  if (!raw) {
-    redirect(
-      `/login?next=${encodeURIComponent(`/painel/anuncios/${params.id}/publicar`)}`
-    );
+export default function PublicarAnuncioLegacyPage({ params }: PageProps) {
+  // permanentRedirect = 308 (sinaliza ao cliente para reenviar com mesmo
+  // método); para navegação GET o efeito ao usuário é o mesmo de 301.
+  // O middleware ainda emite 301 puro — esta linha é fallback.
+  if (typeof permanentRedirect === "function") {
+    permanentRedirect(`/painel/anuncios/${params.id}/upgrade`);
   }
-
-  if (!raw.accessToken && !raw.refreshToken) {
-    redirect(raw.type === "CNPJ" ? "/dashboard-loja" : "/dashboard");
-  }
-
-  const ensured = await ensureSessionWithFreshBackendTokens(raw);
-  if (!ensured.ok) {
-    redirect(
-      `/login?next=${encodeURIComponent(`/painel/anuncios/${params.id}/publicar`)}`
-    );
-  }
-  const session = ensured.session;
-
-  // fetchOwnedAd valida ownership no backend (JOIN advertisers + adv.user_id).
-  // 404 → ad não pertence ao user (ou inexiste). Tratamos como notFound()
-  // para não vazar a existência do anúncio nem renderizar shell para id alheio.
-  // Outros erros (rede, 5xx) caem em null e o cliente mostra error state via
-  // GET /publication-options, que valida a mesma cadeia.
-  let owned: Awaited<ReturnType<typeof fetchOwnedAd>> | null = null;
-  try {
-    owned = await fetchOwnedAd(session, params.id);
-  } catch (error) {
-    const status = (error as { status?: number })?.status;
-    if (status === 404) {
-      notFound();
-    }
-    owned = null;
-  }
-
-  const summary = owned
-    ? {
-        id: owned.ad.id,
-        title: owned.ad.title,
-        price: owned.ad.price,
-        image_url: owned.ad.image_url,
-      }
-    : null;
-
-  return (
-    <main className="min-h-screen bg-cnc-bg">
-      <PublicationPlanSelector adId={params.id} adSummary={summary} />
-    </main>
-  );
+  redirect(`/painel/anuncios/${params.id}/upgrade`);
 }

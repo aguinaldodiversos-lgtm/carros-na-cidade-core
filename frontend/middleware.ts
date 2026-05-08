@@ -50,6 +50,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 301);
   }
 
+  // Tela pós-criação renomeada: /publicar → /upgrade (anúncio já chega
+  // `active` no backend; o nome "publicar" induzia a erro).
+  const upgradeMatch = /^\/painel\/anuncios\/([^/]+)\/publicar\/?$/.exec(pathname);
+  if (upgradeMatch?.[1]) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/painel/anuncios/${upgradeMatch[1]}/upgrade`;
+    return NextResponse.redirect(url, 301);
+  }
+
   return NextResponse.next();
 }
 
@@ -59,5 +68,6 @@ export const config = {
     "/carros-baratos-em-:slug",
     "/carros-automaticos-em-:slug",
     "/painel/anuncios/novo",
+    "/painel/anuncios/:id/publicar",
   ],
 };

@@ -182,19 +182,41 @@ describe("createBoostCheckout — ownership e validações", () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe("applyBoostApproval — regra de prazo +N dias", () => {
+  /**
+   * Após a defesa em profundidade adicionada em 2026-05-08, o service
+   * faz uma checagem SELECT (ownerCheck) antes do UPDATE — aqui
+   * mockamos o SELECT com um anúncio ativo cujo dono = intent.user_id,
+   * para que o UPDATE de prazo seja emitido.
+   */
   function makeClient() {
-    return { query: vi.fn().mockResolvedValue({ rowCount: 1 }) };
+    const fn = vi.fn().mockImplementation((sql) => {
+      if (String(sql).includes("FROM ads a")) {
+        return Promise.resolve({
+          rows: [{ id: "ad1", status: "active", advertiser_user_id: "u1" }],
+          rowCount: 1,
+        });
+      }
+      return Promise.resolve({ rowCount: 1, rows: [] });
+    });
+    return { query: fn };
+  }
+
+  function findUpdateAdsCall(client) {
+    return client.query.mock.calls.find(([sql]) => /UPDATE\s+ads/i.test(String(sql)));
   }
 
   it("SQL UPDATE soma +N dias quando highlight_until > NOW (extensão real)", async () => {
     const client = makeClient();
     await applyBoostApproval(client, {
+      id: "intent-1",
+      user_id: "u1",
       ad_id: "ad1",
       metadata: { boost_days: "7" },
     });
 
-    expect(client.query).toHaveBeenCalledTimes(1);
-    const [sql, params] = client.query.mock.calls[0];
+    const updateCall = findUpdateAdsCall(client);
+    expect(updateCall).toBeTruthy();
+    const [sql, params] = updateCall;
     // Branch de extensão: `highlight_until + ($2 || ' days')::interval`
     expect(String(sql)).toMatch(
       /highlight_until\s*\+\s*\(\$2\s*\|\|\s*' days'\)::interval/
@@ -210,10 +232,13 @@ describe("applyBoostApproval — regra de prazo +N dias", () => {
   it("SQL contém CASE WHEN para diferenciar prazo no futuro vs no passado/null", async () => {
     const client = makeClient();
     await applyBoostApproval(client, {
+      id: "intent-1",
+      user_id: "u1",
       ad_id: "ad1",
       metadata: { boost_days: "7" },
     });
-    const [sql] = client.query.mock.calls[0];
+    const updateCall = findUpdateAdsCall(client);
+    const [sql] = updateCall;
     expect(String(sql)).toMatch(/CASE\s+WHEN\s+highlight_until\s+IS\s+NOT\s+NULL/i);
     expect(String(sql)).toMatch(/highlight_until\s*>\s*NOW\(\)/i);
     expect(String(sql)).toMatch(/ELSE\s+NOW\(\)/i);
@@ -222,10 +247,13 @@ describe("applyBoostApproval — regra de prazo +N dias", () => {
   it("priority sobe no MÁXIMO até 99 (não dispara escala infinita em compras múltiplas)", async () => {
     const client = makeClient();
     await applyBoostApproval(client, {
+      id: "intent-1",
+      user_id: "u1",
       ad_id: "ad1",
       metadata: { boost_days: "7" },
     });
-    const [sql] = client.query.mock.calls[0];
+    const updateCall = findUpdateAdsCall(client);
+    const [sql] = updateCall;
     expect(String(sql)).toMatch(/LEAST\(99,\s*COALESCE\(priority,\s*1\)\s*\+\s*8\)/);
   });
 
@@ -275,12 +303,30 @@ describe("Boost não toca o fluxo de Start/Pro (Fase 3B isolada)", () => {
   });
 
   it("applyBoostApproval não toca subscription_plans / user_subscriptions / users.plan_id", async () => {
-    const client = { query: vi.fn().mockResolvedValue({ rowCount: 1 }) };
-    await applyBoostApproval(client, { ad_id: "ad1", metadata: { boost_days: "7" } });
-    const [sql] = client.query.mock.calls[0];
-    expect(String(sql)).not.toMatch(/subscription_plans/i);
-    expect(String(sql)).not.toMatch(/user_subscriptions/i);
-    expect(String(sql)).not.toMatch(/users\.plan_id/i);
-    expect(String(sql)).toMatch(/UPDATE\s+ads/i);
+    const client = {
+      query: vi.fn().mockImplementation((sql) => {
+        if (String(sql).includes("FROM ads a")) {
+          return Promise.resolve({
+            rows: [{ id: "ad1", status: "active", advertiser_user_id: "u1" }],
+            rowCount: 1,
+          });
+        }
+        return Promise.resolve({ rowCount: 1, rows: [] });
+      }),
+    };
+    await applyBoostApproval(client, {
+      id: "intent-1",
+      user_id: "u1",
+      ad_id: "ad1",
+      metadata: { boost_days: "7" },
+    });
+    const allSqls = client.query.mock.calls.map(([sql]) => String(sql));
+    for (const sql of allSqls) {
+      expect(sql).not.toMatch(/subscription_plans/i);
+      expect(sql).not.toMatch(/user_subscriptions/i);
+      expect(sql).not.toMatch(/users\.plan_id/i);
+    }
+    // UPDATE ads tem que ter sido emitido (caminho feliz)
+    expect(allSqls.some((s) => /UPDATE\s+ads/i.test(s))).toBe(true);
   });
 });
