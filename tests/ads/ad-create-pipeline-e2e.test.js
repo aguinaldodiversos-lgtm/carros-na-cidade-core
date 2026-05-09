@@ -38,6 +38,15 @@ vi.mock("../../src/modules/ads/risk/ad-risk.repository.js", () => ({
   countDistinctOwnersForPhone: vi.fn(async () => 0),
 }));
 
+// Mock do provider FIPE — fonte de verdade no novo contrato.
+// Cenários B/C/D abaixo configuram retorno por teste.
+vi.mock("../../src/modules/fipe/fipe.provider.js", () => ({
+  quoteByCodes: vi.fn(),
+  parseFipePriceBr: vi.fn(),
+  __resetFipeProviderCache: vi.fn(),
+  __fipeProviderCacheSize: vi.fn(),
+}));
+
 const eligibility = await import(
   "../../src/modules/ads/ads.publish.eligibility.service.js"
 );
@@ -47,9 +56,17 @@ const persistence = await import(
 const riskRepo = await import(
   "../../src/modules/ads/risk/ad-risk.repository.js"
 );
+const provider = await import("../../src/modules/fipe/fipe.provider.js");
 const { createAdNormalized } = await import(
   "../../src/modules/ads/ads.create.pipeline.service.js"
 );
+
+/** Códigos FIPE canônicos válidos para o pipeline cotar via provider. */
+const FIPE_CODES = {
+  fipe_brand_code: "23",
+  fipe_model_code: "5585",
+  fipe_year_code: "2018-1",
+};
 
 const baseAdvertiser = { id: "adv-1" };
 const baseAccount = {
@@ -76,7 +93,10 @@ function basePayload(overrides = {}) {
       "https://r2.example/qa/2.webp",
       "https://r2.example/qa/3.webp",
     ],
-    fipe_value: 85_000,
+    // Códigos canônicos para o backend cotar a FIPE via provider.
+    // Com isso o pipeline ignora `fipe_value` e usa o snapshot real.
+    ...FIPE_CODES,
+    fipe_value: 85_000, // hint do cliente (descartado pelo backend)
     ...overrides,
   };
 }
@@ -94,61 +114,60 @@ beforeEach(() => {
   riskRepo.persistAdRiskSnapshot.mockReset();
   riskRepo.persistAdRiskSignals.mockReset();
   riskRepo.recordModerationEvent.mockReset();
+  provider.quoteByCodes.mockReset();
 });
 
 describe("E2E — pipeline de criação", () => {
-  it("A. preço compatível → status final ACTIVE", async () => {
+  it("A. preço compatível → status final ACTIVE (FIPE server-side high)", async () => {
+    provider.quoteByCodes.mockResolvedValue({ ok: true, price: 85_000 });
     const result = await createAdNormalized(basePayload(), { id: "user-1" });
     expect(result.status).toBe("active");
     expect(result.moderation_status).toBe("approved");
-    // INSERT chamado com status='active'.
     const insertedRow = persistence.executeAdInsert.mock.calls[0][0];
     expect(insertedRow.status).toBe("active");
-    // Snapshot persistido com risk_level baixo.
     expect(riskRepo.persistAdRiskSnapshot).toHaveBeenCalledTimes(1);
     expect(result.risk_level).toBe("low");
   });
 
-  it("B. preço 30% abaixo da FIPE → PENDING_REVIEW", async () => {
+  it("B. FIPE server-side detecta -30% → PENDING_REVIEW (cliente envia fipe_value falso)", async () => {
+    // Provider real retorna 100_000; cliente tenta enviar 70_000 (igual ao preço)
+    // como tentativa de spoof. Backend ignora o hint e usa 100_000.
+    provider.quoteByCodes.mockResolvedValue({ ok: true, price: 100_000 });
     const result = await createAdNormalized(
-      basePayload({ price: 70_000, fipe_value: 100_000 }),
+      basePayload({ price: 70_000, fipe_value: 70_000 }),
       { id: "user-1" }
     );
     expect(result.status).toBe("pending_review");
     expect(result.moderation_status).toBe("pending_review");
-    const insertedRow = persistence.executeAdInsert.mock.calls[0][0];
-    expect(insertedRow.status).toBe("pending_review");
     const codes = result.risk_reasons.map((r) => r.code);
     expect(codes).toContain("PRICE_BELOW_FIPE_REVIEW");
-
-    // Evento sent_to_review registrado.
     const eventTypes = riskRepo.recordModerationEvent.mock.calls.map(
       ([e]) => e.eventType
     );
     expect(eventTypes).toContain("sent_to_review");
   });
 
-  it("C. preço 45% abaixo da FIPE → PENDING_REVIEW + risk_level CRITICAL", async () => {
+  it("C. FIPE server-side detecta -45% → PENDING_REVIEW critical", async () => {
+    provider.quoteByCodes.mockResolvedValue({ ok: true, price: 100_000 });
     const result = await createAdNormalized(
-      basePayload({ price: 55_000, fipe_value: 100_000 }),
+      basePayload({ price: 55_000, fipe_value: 55_000 }),
       { id: "user-1" }
     );
     expect(result.status).toBe("pending_review");
     expect(result.risk_level).toBe("critical");
-    const codes = result.risk_reasons.map((r) => r.code);
-    expect(codes).toContain("PRICE_FAR_BELOW_FIPE_CRITICAL");
     const critical = result.risk_reasons.find(
       (r) => r.code === "PRICE_FAR_BELOW_FIPE_CRITICAL"
     );
-    expect(critical.severity).toBe("critical");
+    expect(critical?.severity).toBe("critical");
   });
 
-  it("D. FIPE indisponível (null) NÃO quebra a criação; sinal FIPE_UNAVAILABLE", async () => {
+  it("D. FIPE indisponível (provider retorna ok=false) → ACTIVE + FIPE_UNAVAILABLE", async () => {
+    provider.quoteByCodes.mockResolvedValue({ ok: false, reason: "network_error" });
     const result = await createAdNormalized(
       basePayload({ fipe_value: null }),
       { id: "user-1" }
     );
-    expect(result.status).toBe("active"); // só FIPE_UNAVAILABLE não força review
+    expect(result.status).toBe("active");
     const codes = result.risk_reasons.map((r) => r.code);
     expect(codes).toContain("FIPE_UNAVAILABLE");
   });

@@ -351,5 +351,249 @@ Quando todos os bloqueadores estiverem checados, agendar janela de produção e 
 - Migration: [src/database/migrations/025_ads_antifraud_moderation.sql](../../src/database/migrations/025_ads_antifraud_moderation.sql)
 - Pipeline: [src/modules/ads/ads.create.pipeline.service.js](../../src/modules/ads/ads.create.pipeline.service.js)
 - Service de risco: [src/modules/ads/risk/ad-risk.service.js](../../src/modules/ads/risk/ad-risk.service.js)
+- **Backend FIPE Service**: [src/modules/fipe/fipe.service.js](../../src/modules/fipe/fipe.service.js)
 - Endpoints admin: [src/modules/admin/admin.routes.js](../../src/modules/admin/admin.routes.js) (seção MODERATION)
 - Enum canônico: [src/shared/constants/status.js](../../src/shared/constants/status.js)
+
+---
+
+## Apêndice A — Comandos manuais para validação em staging
+
+Esta seção é para o operador que executa o smoke fora deste ambiente
+(ex: terminal com acesso direto ao Postgres de staging). Todos os
+comandos abaixo são idempotentes ou somente leitura; nenhum aplica
+mutation destrutiva.
+
+### A.1 Verificação de pré-condição (env)
+
+```bash
+# Confirmar que estamos apontando para STAGING (não produção):
+psql "$DATABASE_URL" -c "SELECT current_database(), inet_server_addr();"
+# A linha 'current_database' deve indicar staging. Aborte se estiver em prod.
+```
+
+### A.2 Backup direcionado (espelha §2 do runbook)
+
+```bash
+mkdir -p backups
+TS=$(date +%Y%m%d-%H%M)
+pg_dump --no-owner --no-acl \
+  --table=public.ads --table=public.advertisers --table=public.admin_actions \
+  --schema-only "$DATABASE_URL" > "backups/${TS}-pre-025-schema.sql"
+pg_dump --no-owner --no-acl \
+  --table=public.ads --data-only "$DATABASE_URL" > "backups/${TS}-pre-025-ads-data.sql"
+ls -lh backups/${TS}-pre-025-*.sql
+```
+
+### A.3 Auditoria de status (§3)
+
+```bash
+psql "$DATABASE_URL" -c "
+  SELECT status, COUNT(*)::int AS total
+  FROM ads
+  GROUP BY status
+  ORDER BY total DESC;
+"
+```
+
+Se aparecer qualquer status fora de
+`active|paused|deleted|blocked|pending_review|rejected|sold|expired|draft`,
+**parar** e abrir issue antes da migration.
+
+### A.4 Aplicar migration (§4)
+
+```bash
+# Caminho oficial:
+npm run db:migrate
+
+# Confirma versão registrada:
+psql "$DATABASE_URL" -c "
+  SELECT version, applied_at FROM schema_migrations
+  WHERE version LIKE '025_%' ORDER BY applied_at DESC LIMIT 1;
+"
+```
+
+### A.5 Verificações pós-migration (§5)
+
+```bash
+psql "$DATABASE_URL" <<'SQL'
+-- 5.1 Colunas novas em ads
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'ads'
+  AND column_name IN (
+    'risk_score','risk_level','risk_reasons',
+    'reviewed_at','reviewed_by','rejection_reason','correction_requested_reason',
+    'fipe_reference_value','fipe_diff_percent','structural_change_count'
+  )
+ORDER BY column_name;
+
+-- 5.2 Tabelas auxiliares
+SELECT to_regclass('public.ad_risk_signals')      AS risk_signals,
+       to_regclass('public.ad_moderation_events') AS moderation_events;
+
+-- 5.3 Índices
+SELECT indexname FROM pg_indexes
+ WHERE tablename IN ('ads','ad_risk_signals','ad_moderation_events')
+   AND indexname IN (
+     'idx_ads_status_risk','idx_ads_pending_review_priority',
+     'idx_ad_risk_signals_ad_id','idx_ad_risk_signals_code',
+     'idx_ad_moderation_events_ad_id','idx_ad_moderation_events_event_type'
+   );
+
+-- 5.4 Sanidade dos anúncios pré-existentes
+SELECT risk_score, risk_level, COUNT(*)::int
+  FROM ads
+ WHERE created_at < NOW() - INTERVAL '5 minutes'
+ GROUP BY risk_score, risk_level
+ ORDER BY 3 DESC;
+SQL
+```
+
+### A.6 Smoke A/B/C/D do pipeline (§6)
+
+Substitua `$APP_URL`, `$EMAIL`, `$PASSWORD` antes de executar.
+
+```bash
+APP_URL="https://staging.carrosnacidade.com.br"
+EMAIL="qa-cpf@example.com"
+PASSWORD="..."
+
+TOKEN=$(curl -sS -X POST "$APP_URL/api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
+  | jq -r .access_token)
+echo "TOKEN=${TOKEN:0:8}…"
+
+# Caso A — preço compatível, com códigos FIPE canônicos.
+# Esperado: HTTP 201, status="active".
+curl -sS -X POST "$APP_URL/api/ads" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "title":"Civic 2018 LX",
+    "price": 80000,
+    "city_id": 1, "city":"Atibaia", "state":"SP",
+    "brand":"Honda","model":"Civic","year":2018,"mileage":50000,
+    "images":["https://r2.example/qa/1.webp"],
+    "fipe_brand_code":"23","fipe_model_code":"5585","fipe_year_code":"2018-1"
+  }' | jq '.data | {id, status, risk_level, risk_score}'
+
+# Caso B — -30% abaixo da FIPE.
+# Esperado: HTTP 201, status="pending_review", PRICE_BELOW_FIPE_REVIEW.
+curl -sS -X POST "$APP_URL/api/ads" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "title":"Civic 2018 LX",
+    "price": 70000,
+    "city_id": 1, "city":"Atibaia", "state":"SP",
+    "brand":"Honda","model":"Civic","year":2018,"mileage":50000,
+    "images":["https://r2.example/qa/1.webp"],
+    "fipe_brand_code":"23","fipe_model_code":"5585","fipe_year_code":"2018-1"
+  }' | jq '.data | {id, status, risk_level, risk_reasons}'
+
+# Caso C — preço inválido (zero / R$1).
+# Esperado: HTTP 400 code="ADS_REJECTED_INVALID_DATA".
+curl -i -sS -X POST "$APP_URL/api/ads" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{ "title":"x", "price": 0, "city_id": 1, "city":"A", "state":"SP",
+        "brand":"Honda","model":"Civic","year":2018,"mileage":0,
+        "images":["https://r2.example/qa/1.webp"] }' | head -25
+
+# Caso D — preço 45%+ abaixo da FIPE.
+# Esperado: status="pending_review", risk_level="critical".
+curl -sS -X POST "$APP_URL/api/ads" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "title":"Civic 2018 LX",
+    "price": 55000,
+    "city_id": 1, "city":"Atibaia", "state":"SP",
+    "brand":"Honda","model":"Civic","year":2018,"mileage":50000,
+    "images":["https://r2.example/qa/1.webp"],
+    "fipe_brand_code":"23","fipe_model_code":"5585","fipe_year_code":"2018-1"
+  }' | jq '.data | {id, status, risk_level}'
+
+# Caso E — anti-spoof: cliente envia fipe_value alto SEM códigos.
+# Esperado: status="active" e risk_reasons contém FIPE_UNAVAILABLE
+# (hint do cliente é registrado em ad_moderation_events mas não é
+# fonte autoritativa).
+curl -sS -X POST "$APP_URL/api/ads" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "title":"Civic 2018 LX",
+    "price": 70000,
+    "fipe_value": 200000,
+    "city_id": 1, "city":"Atibaia", "state":"SP",
+    "brand":"Honda","model":"Civic","year":2018,"mileage":50000,
+    "images":["https://r2.example/qa/1.webp"]
+  }' | jq '.data | {id, status, risk_reasons}'
+```
+
+### A.7 Conferência manual da fila admin
+
+Login com usuário admin (ver A.8) e abrir
+`https://staging.carrosnacidade.com.br/admin/moderation`.
+
+Esperado:
+- Caso B e Caso D aparecem na lista, ordenados por `risk_score` ↓.
+- Caso A não aparece (foi para `active`).
+- Botão "Revisar" leva ao detalhe; ações `approve / reject / request-correction`
+  funcionam e atualizam o status.
+
+### A.8 Promover usuário a admin em staging (se necessário)
+
+```bash
+# 1) Confirme o id do usuário a promover:
+psql "$DATABASE_URL" -c "SELECT id, email, role FROM users WHERE email = 'admin@staging.local' LIMIT 1;"
+
+# 2) Promover (idempotente):
+psql "$DATABASE_URL" -c "UPDATE users SET role = 'admin' WHERE email = 'admin@staging.local' RETURNING id, role;"
+```
+
+### A.9 Conferência do feed público (Tarefa 5)
+
+```bash
+# Lista pública: nenhum status diferente de active.
+curl -sS "$APP_URL/api/ads/search?limit=20" | jq '[.ads[].status] | unique'
+# Esperado: ["active"]
+
+# Detalhe direto pelo slug do ad B (deve 404 enquanto pending_review):
+curl -i -sS "$APP_URL/api/ads/<slug-do-ad-B>" | head -3
+# Esperado: HTTP/1.1 404 Not Found
+```
+
+### A.10 Teste do anti-spoof FIPE (Tarefa 7/8)
+
+```bash
+# Cria ad com price=70k tentando enviar fipe_value=70k (igual ao preço)
+# E códigos canônicos válidos. O backend cota e descobre o valor real.
+# Se o real for 100k+, esperado: pending_review.
+# (Mesma chamada do Caso B em A.6 — o anti-spoof é exatamente isto:
+# o backend usa o snapshot do provider, ignorando o fipe_value do cliente.)
+```
+
+Para auditar o que o backend FIPE service registrou:
+
+```sql
+SELECT id, ad_id, event_type, metadata->>'confidence' AS confidence,
+       metadata->>'source' AS source, metadata->>'used_client_hint' AS used_hint,
+       metadata->>'value' AS server_value, metadata->>'client_hint_value' AS hint_value,
+       created_at
+FROM ad_moderation_events
+WHERE event_type = 'fipe_resolved'
+ORDER BY created_at DESC
+LIMIT 20;
+```
+
+### A.11 Verificar variáveis de ambiente do FIPE
+
+```bash
+# Configure (ou herde de .env):
+#   FIPE_API_BASE_URL  default: https://parallelum.com.br/fipe/api/v1
+#   FIPE_BACKEND_DISABLED=true   → desliga lookup (modo seguro/dev)
+#   FIPE_ALLOW_CLIENT_HINT=false → bloqueia até o registro do hint do cliente
+
+# Para staging recomendado:
+#   FIPE_BACKEND_DISABLED=false (default)
+#   FIPE_ALLOW_CLIENT_HINT=true (default)
+#   FIPE_API_BASE_URL = endpoint da parallelum ou mirror caching interno
+```

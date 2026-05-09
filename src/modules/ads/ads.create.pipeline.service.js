@@ -15,6 +15,10 @@ import {
   recordModerationEvent,
 } from "./risk/ad-risk.repository.js";
 import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
+import {
+  resolveFipeReference,
+  fipeValueForRiskScoring,
+} from "../fipe/fipe.service.js";
 
 /**
  * Invariante: anúncio só nasce `active` se tiver pelo menos 1 imagem válida.
@@ -71,6 +75,28 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
     advertiserId = advertiser.id;
 
     // ──────────────────────────────────────────────────────────────────
+    // FIPE — snapshot SERVER-SIDE.
+    //
+    // Anti-spoof: o `validated.fipe_value` enviado pelo cliente é tratado
+    // apenas como hint informativo de baixa confiança (confidence='low').
+    // A regra de PENDING_REVIEW por preço×FIPE só dispara com snapshot
+    // server-side (confidence='high'). Manipular o payload NÃO faz o ad
+    // escapar de review.
+    // ──────────────────────────────────────────────────────────────────
+    stage = "resolveFipe";
+    const fipeSnapshot = await resolveFipeReference({
+      brand: validated.brand,
+      model: validated.model,
+      year: validated.year,
+      fipe_brand_code: validated.fipe_brand_code ?? null,
+      fipe_model_code: validated.fipe_model_code ?? null,
+      fipe_year_code: validated.fipe_year_code ?? null,
+      fipe_code: validated.fipe_code ?? null,
+      vehicle_type: validated.vehicle_type ?? null,
+      client_hint_value: validated.fipe_value ?? null,
+    });
+
+    // ──────────────────────────────────────────────────────────────────
     // Risk score ANTES do INSERT — assim:
     //   • PRICE_INVALID derruba a publicação sem deixar resíduo no banco
     //   • status inicial já é o final (ACTIVE ou PENDING_REVIEW), sem
@@ -82,7 +108,10 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
         ad: validated,
         advertiser,
         account,
-        fipeValue: validated.fipe_value ?? null,
+        // Apenas o valor server-side de alta confiança alimenta o score.
+        // Hint do cliente (mesmo plausível) é descartado aqui — fica
+        // registrado em `ad_moderation_events` para auditoria.
+        fipeValue: fipeValueForRiskScoring(fipeSnapshot),
       },
       { countDistinctOwnersForPhone }
     );
@@ -128,6 +157,30 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
         stage = "persistRisk";
         await persistAdRiskSnapshot(inserted.id, riskResult);
         await persistAdRiskSignals(inserted.id, riskResult.reasons);
+
+        // Auditoria do FIPE server-side: gravamos o snapshot inteiro
+        // (incluindo se o hint do cliente foi ignorado). Útil para
+        // detectar futuramente padrões de spoof.
+        await recordModerationEvent({
+          adId: inserted.id,
+          eventType: "fipe_resolved",
+          actorRole: "system",
+          fromStatus: null,
+          toStatus: initialStatus,
+          reason: fipeSnapshot.failure_reason || null,
+          metadata: {
+            ok: Boolean(fipeSnapshot.ok),
+            value: fipeSnapshot.value,
+            confidence: fipeSnapshot.confidence,
+            source: fipeSnapshot.fipe_source,
+            fipe_code: fipeSnapshot.fipe_code,
+            used_client_hint: Boolean(fipeSnapshot.used_client_hint),
+            client_hint_value:
+              fipeSnapshot.client_hint_value ?? validated.fipe_value ?? null,
+            reference_month: fipeSnapshot.reference_month ?? null,
+          },
+        });
+
         await recordModerationEvent({
           adId: inserted.id,
           eventType: MODERATION_EVENT.RISK_SCORE_CALCULATED,
@@ -139,6 +192,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
             riskScore: riskResult.riskScore,
             riskLevel: riskResult.riskLevel,
             reasonCount: riskResult.reasons.length,
+            fipe_confidence: fipeSnapshot.confidence,
           },
         });
         if (initialStatus === AD_STATUS.PENDING_REVIEW) {

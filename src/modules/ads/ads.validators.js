@@ -46,11 +46,25 @@ const CreateAdSchema = z.object({
     .min(1, { message: "Anúncio precisa de pelo menos 1 foto válida." })
     .max(VEHICLE_IMAGE_MAX_FILES),
   /**
-   * Valor FIPE de referência consultado pelo frontend no Step 0/Step 4.
-   * Opcional — o adRiskService trata `null` como `FIPE_UNAVAILABLE` (não
-   * bloqueia publicação). Snapshot fica em `ads.fipe_reference_value`.
+   * Valor FIPE de referência consultado pelo FRONTEND. Aceito apenas
+   * como hint informativo (low confidence) — o adRiskService usa o
+   * snapshot do backend FIPE service como fonte autoritativa.
+   * Manipular este campo NÃO permite escapar de PENDING_REVIEW.
    */
   fipe_value: z.coerce.number().positive().optional().nullable(),
+  /**
+   * Códigos canônicos da Tabela FIPE (parallelum) — quando enviados,
+   * permitem cotação server-side com confidence='high'.
+   *   fipe_brand_code: código numérico da marca (ex: "23")
+   *   fipe_model_code: código numérico do modelo (ex: "5585")
+   *   fipe_year_code:  string composta ano-combustível (ex: "2018-1")
+   *   fipe_code:       código alfanumérico FIPE oficial (auditoria)
+   */
+  fipe_brand_code: z.string().trim().min(1).max(32).optional().nullable(),
+  fipe_model_code: z.string().trim().min(1).max(32).optional().nullable(),
+  fipe_year_code: z.string().trim().min(1).max(16).optional().nullable(),
+  fipe_code: z.string().trim().min(1).max(32).optional().nullable(),
+  vehicle_type: z.enum(["carros", "motos", "caminhoes"]).optional().nullable(),
 });
 
 const UpdateAdSchema = CreateAdSchema.partial();
