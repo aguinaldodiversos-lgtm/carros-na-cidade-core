@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import {
   fetchAdsFacets,
@@ -138,10 +139,17 @@ export default async function ComprarEstadualPage({
     fetchAdsFacets(filters),
   ]);
 
-  const initialResults =
+  const initialResultsRaw =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
       ? resultsResponse.value
       : buildEmptyResults(filters);
+
+  // Defesa em profundidade contra placeholder R$ 0 — vitrine pública
+  // nunca pode mostrar card sem preço real.
+  const initialResults: AdsSearchResponse = {
+    ...initialResultsRaw,
+    data: (initialResultsRaw.data || []).filter(hasRealPrice),
+  };
 
   const initialFacets =
     facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)

@@ -145,6 +145,32 @@ export default function BuyMarketplacePageClient({
   const currentPage = initialResults?.pagination?.page || initialFilters.page || 1;
   const totalPages = initialResults?.pagination?.totalPages || 1;
 
+  // Sinal de "usuário aplicou filtro" — muda copy do empty state para
+  // "Tente remover filtros" em vez de "Não há anúncios cadastrados".
+  const hasFilters = Boolean(
+    initialFilters.q ||
+      initialFilters.brand ||
+      initialFilters.model ||
+      initialFilters.min_price ||
+      initialFilters.max_price ||
+      initialFilters.year_min ||
+      initialFilters.year_max ||
+      initialFilters.mileage_max ||
+      initialFilters.fuel_type ||
+      initialFilters.transmission ||
+      initialFilters.body_type ||
+      initialFilters.below_fipe === true ||
+      initialFilters.highlight_only === true
+  );
+
+  const emptyContext = {
+    variant,
+    citySlug: variant === "cidade" ? city.slug : undefined,
+    cityName: variant === "cidade" ? city.name : undefined,
+    stateUf: variant === "nacional" ? undefined : stateUf || city.state,
+    hasFilters,
+  };
+
   const sidebarProps = {
     filters: initialFilters,
     city,
@@ -243,7 +269,7 @@ export default function BuyMarketplacePageClient({
             </aside>
 
             <div className="min-w-0 flex-1">
-              <VehicleGrid items={items} inferWeight={inferWeight} />
+              <VehicleGrid items={items} inferWeight={inferWeight} emptyContext={emptyContext} />
               <CatalogPagination
                 page={currentPage}
                 totalPages={totalPages}
@@ -251,12 +277,22 @@ export default function BuyMarketplacePageClient({
               />
 
               {/* Promo bottom (mockup `pagina catalogo.png`): convida o usuário
-                  a consultar a FIPE da cidade ativa antes de fechar negócio. */}
+                  a consultar a FIPE da cidade ativa antes de fechar negócio.
+                  No modo "nacional" não há cidade ativa — o card aponta para
+                  a busca geral da FIPE em vez de forçar São Paulo. */}
               <div className="mt-6 sm:mt-8">
                 <QuickActionTile
-                  href={`/tabela-fipe/${encodeURIComponent(city.slug)}`}
+                  href={
+                    variant === "nacional"
+                      ? "/tabela-fipe"
+                      : `/tabela-fipe/${encodeURIComponent(city.slug)}`
+                  }
                   title="Consulte a FIPE em segundos"
-                  subtitle={`Compare valores em ${city.name}`}
+                  subtitle={
+                    variant === "nacional"
+                      ? "Compare valores antes de fechar negócio"
+                      : `Compare valores em ${city.name}`
+                  }
                   icon={<IconTable className="h-full w-full" />}
                 />
               </div>
@@ -265,7 +301,12 @@ export default function BuyMarketplacePageClient({
         </div>
       </main>
 
-      <CatalogSeoBlock city={city} brands={brandFacets} />
+      {/*
+        Bloco SEO institucional só faz sentido com cidade real (territorial).
+        No modo "nacional" não temos territory; suprimir o bloco evita texto
+        com "em Brasil (BR)" hard-coded.
+      */}
+      {variant !== "nacional" ? <CatalogSeoBlock city={city} brands={brandFacets} /> : null}
     </BuyPageShell>
   );
 }

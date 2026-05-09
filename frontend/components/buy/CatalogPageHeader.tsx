@@ -179,8 +179,15 @@ export function CatalogPageHeader({
   const pathname = usePathname();
   const [query, setQuery] = useState(filters.q || "");
 
-  const activeStateUf = stateUf || filters.state || city.state || "SP";
-  const stateName = stateNameFromUf(activeStateUf);
+  // No modo "nacional" não há UF de contexto — manter Select sem valor
+  // selecionado para o usuário escolher (e não exibir "BR" como opção, que
+  // não existe em BRAZIL_UFS). Em estadual/cidade mantém o comportamento
+  // anterior (UF da rota).
+  const activeStateUf =
+    variant === "nacional"
+      ? filters.state || ""
+      : stateUf || filters.state || city.state || "SP";
+  const stateName = activeStateUf ? stateNameFromUf(activeStateUf) : "";
 
   const breadcrumbItems = useMemo(() => {
     if (variant === "cidade") {
@@ -190,6 +197,9 @@ export function CatalogPageHeader({
         { label: `${city.name} (${city.state})` },
       ];
     }
+    if (variant === "nacional") {
+      return [{ label: "Home", href: "/" }, { label: "Comprar" }];
+    }
     return [
       { label: "Home", href: "/" },
       { label: "Comprar", href: "/comprar" },
@@ -197,14 +207,18 @@ export function CatalogPageHeader({
     ];
   }, [variant, city.name, city.state]);
 
-  const stateOptions = useMemo(
-    () =>
-      BRAZIL_UFS.map((uf) => ({
-        label: `${uf.label} - ${uf.value}`,
-        value: uf.value,
-      })),
-    []
-  );
+  const stateOptions = useMemo(() => {
+    const ufs = BRAZIL_UFS.map((uf) => ({
+      label: `${uf.label} - ${uf.value}`,
+      value: uf.value,
+    }));
+    // No catálogo nacional, primeira opção é "Todos os estados" (vazia)
+    // — sem isso o Select renderiza fora de qualquer opção e o usuário
+    // não consegue voltar para Brasil-todo após filtrar por estado.
+    return variant === "nacional"
+      ? [{ label: "Todos os estados", value: "" }, ...ufs]
+      : ufs;
+  }, [variant]);
 
   const submitSearch = useCallback(
     (value: string) => {
@@ -221,10 +235,16 @@ export function CatalogPageHeader({
   const handleStateChange = useCallback(
     (uf: string) => {
       if (!uf) {
+        // No nacional: limpar = ficar em /comprar (Brasil todo).
+        // No estadual/cidade: mantém comportamento anterior (limpar via patch).
+        if (variant === "nacional") {
+          router.push("/comprar");
+          return;
+        }
         onPatch({ state: undefined, city: undefined, city_slug: undefined, city_id: undefined });
         return;
       }
-      if (variant === "cidade" || uf !== activeStateUf) {
+      if (variant === "cidade" || variant === "nacional" || uf !== activeStateUf) {
         router.push(buildStatePath(uf, { ...filters, page: 1 }));
         return;
       }
@@ -270,6 +290,10 @@ export function CatalogPageHeader({
               <>
                 Carros usados em <span className="text-primary">{city.name}</span>
               </>
+            ) : variant === "nacional" ? (
+              <>
+                Carros usados <span className="text-primary">no Brasil</span>
+              </>
             ) : (
               <>
                 Catálogo de veículos em <span className="text-primary">{stateName}</span>
@@ -279,7 +303,11 @@ export function CatalogPageHeader({
           <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-cnc-muted sm:text-sm md:text-base">
             <Badge variant="info" size="md">
               <span className="tabular-nums">{formatTotal(totalResults)}</span>
-              {variant === "cidade" ? " ofertas locais" : " ofertas no estado"}
+              {variant === "cidade"
+                ? " ofertas locais"
+                : variant === "nacional"
+                  ? " ofertas no Brasil"
+                  : " ofertas no estado"}
             </Badge>
             {variant === "cidade" ? (
               <>
@@ -288,6 +316,8 @@ export function CatalogPageHeader({
                   {city.name} - {city.state}
                 </strong>
               </>
+            ) : variant === "nacional" ? (
+              <span>refine por estado ou cidade quando quiser</span>
             ) : (
               <span>em todo o estado</span>
             )}
@@ -315,7 +345,13 @@ export function CatalogPageHeader({
             value={query}
             onChange={setQuery}
             onSubmit={submitSearch}
-            placeholder="Buscar marca ou modelo nesta cidade"
+            placeholder={
+              variant === "cidade"
+                ? "Buscar marca ou modelo nesta cidade"
+                : variant === "nacional"
+                  ? "Buscar marca ou modelo no Brasil"
+                  : `Buscar marca ou modelo em ${stateName}`
+            }
             ariaLabel="Buscar no catálogo"
             filterButton={
               <Button type="submit" variant="primary" size="md" className="hidden sm:inline-flex">

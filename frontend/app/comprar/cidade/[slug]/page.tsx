@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { toCityRef, type CityRef } from "@/lib/city/city-types";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { toAbsoluteUrl } from "@/lib/seo/site";
@@ -250,6 +251,13 @@ export default async function ComprarCidadePage({
       }
     }
   }
+
+  // Defesa em profundidade contra placeholder R$ 0 — vitrine pública
+  // nunca pode mostrar card sem preço real (rodada de credibilidade).
+  initialResults = {
+    ...initialResults,
+    data: (initialResults.data || []).filter(hasRealPrice),
+  };
 
   const breadcrumbItems = [
     { name: "Home", href: "/" },
