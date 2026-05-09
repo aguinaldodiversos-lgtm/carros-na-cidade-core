@@ -291,12 +291,24 @@ function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   return 1;
 }
 
+/**
+ * Variantes do Badge primitivo que o `HorizontalLayout` consome.
+ * NÃO inclui `reviewed` — o selo "ANÚNCIO ANALISADO" só aparece em
+ * `resolveBadges` (array) e é renderizado pelo `BadgeChipPill` próprio,
+ * que tem palette dedicada para `reviewed` (slate, sóbrio, sem
+ * conotação de "garantia").
+ */
+type SimpleBadgeVariant = "success" | "warning" | "info" | "premium";
+type SimpleBadgeChip = {
+  label: string;
+  variant: SimpleBadgeVariant;
+};
 type BadgeChip = {
   label: string;
-  variant: "success" | "warning" | "info" | "premium" | "reviewed";
+  variant: SimpleBadgeVariant | "reviewed";
 };
 
-function resolveBadge(item: BaseAdData): BadgeChip | null {
+function resolveBadge(item: BaseAdData): SimpleBadgeChip | null {
   if (item.badge) {
     const label = String(item.badge);
     const lower = label.toLowerCase();
@@ -372,7 +384,10 @@ type NormalizedAd = {
   price: number;
   mileage: number;
   image: string;
-  badge: BadgeChip | null;
+  // Singular: só as variantes que `resolveBadge` realmente emite. O Badge
+  // UI primitivo do design system aceita exatamente este subset.
+  badge: SimpleBadgeChip | null;
+  // Array: pode incluir `reviewed`. Renderizado por `BadgeChipPill`.
   badges: BadgeChip[];
   isDealer: boolean;
   dealerLabel: string;
