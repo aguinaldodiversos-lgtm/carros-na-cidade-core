@@ -62,6 +62,11 @@ function buildAtibaiaPayload() {
     ok: true,
     data: {
       base: { id: 100, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+      // radius_km é injetado pelo backend dinâmico (getRegionByBaseSlugDynamic).
+      // Smoke valida que o BFF expõe o valor no RegionPayload sem quebrar o
+      // contrato do helper regionToAdsSearchFilters (que ignora radius_km
+      // na hora de compor city_slugs).
+      radius_km: 80,
       members: [
         {
           city_id: 200,
@@ -190,6 +195,35 @@ describe("smoke: pipeline regional ponta-a-ponta", () => {
     expect(params.get("city_slugs")).toBe(
       "atibaia-sp,braganca-paulista-sp,piracaia-sp,nazare-paulista-sp"
     );
+  });
+});
+
+describe("smoke: radius_km dinâmico — BFF preserva valor recebido do backend", () => {
+  it("radius_km do envelope chega no RegionPayload sem alterar city_slugs", async () => {
+    mockedFetch.mockResolvedValueOnce(buildResponse(200, buildAtibaiaPayload()));
+
+    const region = await fetchRegionByCitySlug("atibaia-sp");
+
+    expect(region).not.toBeNull();
+    expect(region?.radius_km).toBe(80);
+
+    const filters = regionToAdsSearchFilters(region as RegionPayload);
+    expect(filters.city_slugs?.[0]).toBe("atibaia-sp");
+    // Garante que radius_km NÃO virou um filtro "vazado" — ele permanece
+    // exclusivamente no payload regional. Backend é fonte de verdade.
+    expect("radius_km" in filters).toBe(false);
+  });
+
+  it("radius_km ausente no envelope → RegionPayload.radius_km = undefined (compat)", async () => {
+    const legacyPayload = buildAtibaiaPayload();
+    delete (legacyPayload.data as { radius_km?: number }).radius_km;
+    mockedFetch.mockResolvedValueOnce(buildResponse(200, legacyPayload));
+
+    const region = await fetchRegionByCitySlug("atibaia-sp");
+
+    expect(region).not.toBeNull();
+    expect(region?.radius_km).toBeUndefined();
+    // Page handler deve aplicar fallback de 80 ao consumir.
   });
 });
 

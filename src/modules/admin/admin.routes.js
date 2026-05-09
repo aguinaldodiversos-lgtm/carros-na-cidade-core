@@ -9,6 +9,10 @@ import * as advertisersService from "./advertisers/admin-advertisers.service.js"
 import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";
 import * as moderationService from "./moderation/admin-moderation.service.js";
+import {
+  getRegionalSettings,
+  updateRegionalSettings,
+} from "./regional-settings/admin-regional-settings.service.js";
 
 const router = express.Router();
 
@@ -307,6 +311,29 @@ router.post(
       reason
     );
     res.json({ ok: true, data: result });
+  })
+);
+
+// =========================================================================
+// REGIONAL SETTINGS — radius_km da Página Regional (default 80, range 10–150)
+// =========================================================================
+
+router.get(
+  "/regional-settings",
+  asyncHandler(async (_req, res) => {
+    const data = await getRegionalSettings();
+    res.json({ ok: true, data });
+  })
+);
+
+router.patch(
+  "/regional-settings",
+  asyncHandler(async (req, res) => {
+    const data = await updateRegionalSettings({
+      adminUserId: req.user.id,
+      payload: req.body || {},
+    });
+    res.json({ ok: true, data });
   })
 );
 

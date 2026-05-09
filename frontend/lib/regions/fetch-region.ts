@@ -57,6 +57,13 @@ export type RegionBase = {
 export type RegionPayload = {
   base: RegionBase;
   members: RegionMember[];
+  /**
+   * Raio em km efetivamente usado pelo backend para montar `members`.
+   * Vem de `platform_settings.regional.radius_km` (default 80, range
+   * 10..150, editável por admin). Pode estar ausente em respostas do
+   * legado (`getRegionByBaseSlug`) — caller deve aplicar fallback.
+   */
+  radius_km?: number;
 };
 
 type BackendEnvelope = {
@@ -64,6 +71,7 @@ type BackendEnvelope = {
   data?: {
     base?: Partial<RegionBase> | null;
     members?: Array<Partial<RegionMember>> | null;
+    radius_km?: number | null;
   } | null;
   error?: string;
 };
@@ -210,7 +218,13 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
     .map((m) => normalizeMember(m))
     .filter((m): m is RegionMember => m !== null);
 
-  return { base, members };
+  const rawRadius = envelope.data.radius_km;
+  const radius_km =
+    typeof rawRadius === "number" && Number.isFinite(rawRadius) && rawRadius > 0
+      ? rawRadius
+      : undefined;
+
+  return { base, members, radius_km };
 }
 
 /**

@@ -1,12 +1,17 @@
 # Rollout da Página Regional — Carros na Cidade
 
-> **Status:** plano. A Página Regional **ainda não existe**. Este runbook
-> define como ativá-la no futuro sem indexação prematura, canonical errado
-> nem sitemap indevido.
+> **Status:** Fase A implementada (rota + UI + admin). A Página Regional
+> existe em `/carros-usados/regiao/[slug]`, gated por
+> `REGIONAL_PAGE_ENABLED=false` (default), `noindex,follow` quando
+> servida, fora do sitemap. Aguardando smoke em staging para Fase B.
 >
-> **Documento vivo.** Atualizar quando a URL final for cravada, quando a
-> flag for ligada em qualquer ambiente, e quando o critério de indexação
-> for aprovado.
+> **Raio configurável.** O raio usado para montar a região (default 80 km,
+> range 10..150 km) é editável pelo admin em `/admin/regional-settings`.
+> Persistido em `platform_settings.regional.radius_km`. Frontend NÃO
+> passa radius — backend é fonte única de verdade.
+>
+> **Documento vivo.** Atualizar quando a flag for ligada em qualquer
+> ambiente, e quando o critério de indexação for aprovado para Fase D.
 
 ---
 
@@ -60,19 +65,17 @@ para indexação.
 
 ---
 
-## 4. URL regional — não cravar antes da aprovação
+## 4. URL regional — cravada
 
-A URL final **não está decidida** e deve ser aprovada antes de qualquer
-indexação. Opções em discussão:
+A URL canônica adotada é **`/carros-usados/regiao/[base-slug]`**, alinhada
+ao padrão semântico das outras superfícies territoriais (`/carros-em/`).
+Trocar esta URL depois de indexada implicaria 301 em massa — operação
+que este rollout existe justamente para evitar.
 
-| Opção | URL | Quando preferir |
-|---|---|---|
-| **Recomendada** | `/carros-usados/regiao/[base-slug]` | Alinhada ao padrão semântico das outras superfícies (`/carros-em/`, `/carros-usados/...`). Mais autoexplicativa para CTR. |
-| **Provisória** | `/regiao/[slug]` | Curta, neutra. Aceitável apenas se a recomendada for descartada por motivo de conflito de namespace. |
-
-**Regra:** decidir a URL final **antes** de remover o `noindex` ou de
-incluir a rota no sitemap. Trocar URL depois de indexada implica em 301
-em massa — operação que este rollout existe justamente para evitar.
+| URL | Status |
+|---|---|
+| `/carros-usados/regiao/[slug]` | **Canônica.** Implementada como `frontend/app/carros-usados/regiao/[slug]/page.tsx`. |
+| `/regiao/[slug]` | **Não usada.** Foi descartada em favor da canônica acima. |
 
 ---
 
@@ -211,29 +214,70 @@ Executar **em ordem**. Não pular itens.
 
 ---
 
-## 10. Próxima etapa recomendada
+## 10. Configuração administrativa do raio regional
 
-A próxima etapa técnica **não é** criar a Página Regional. É resolver
-a duplicação SEO das **páginas territoriais existentes** antes de
-adicionar uma nova superfície ao mix.
+A página usa raio dinâmico configurável pelo admin (default 80 km, range
+10..150 km), não as constantes hardcoded de `region_memberships` (≤30/60 km).
 
-Rotas que precisam de auditoria de canonical / `noindex` / sitemap antes
-de qualquer trabalho na Regional:
+### Arquitetura
 
-- `/comprar/cidade/[slug]`
-- `/cidade/[slug]`
-- `/carros-em/[slug]`
-- `/cidade/[slug]/oportunidades`
-- `/cidade/[slug]/abaixo-da-fipe`
-- `/carros-baratos-em/[slug]`
-- `/carros-automaticos-em/[slug]`
+- **Persistência:** tabela `platform_settings` (key/value JSONB) — migration
+  `027_platform_settings.sql`. Key `regional.radius_km`. Seed inicial = 80.
+- **Service:** `src/modules/platform/settings.service.js` (cache local 60s,
+  fail-safe para default em caso de erro de leitura).
+- **Endpoints admin:**
+  - `GET /api/admin/regional-settings` → `{ radius_km, radius_min_km,
+    radius_max_km, radius_default_km }`.
+  - `PATCH /api/admin/regional-settings` body `{ radius_km, reason? }` —
+    valida 10..150, integer, transacional, audita em `admin_actions` com
+    action `update_regional_radius`, invalida cache Redis `internal:regions:*`.
+- **UI admin:** `/admin/regional-settings` (form com input number + botão
+  salvar). Reaproveita layout/guard admin existente.
+- **Backend regions:** `getRegionByBaseSlugDynamic()` em
+  `src/modules/regions/regions.service.js` lê o raio internamente, faz
+  haversine SQL contra `cities.latitude/longitude` filtrando por mesma UF,
+  cap de `MAX_REGION_MEMBERS=30`. **Fallback** para `region_memberships`
+  pré-computado quando: base sem lat/lon, haversine retorna 0 vizinhas, ou
+  query haversine lança.
+- **Frontend BFF:** `frontend/lib/regions/fetch-region.ts` propaga
+  `radius_km` no `RegionPayload`. Não passa radius como query param —
+  fonte única de verdade é o backend.
 
-Plano sugerido para o próximo runbook:
+### Por que haversine dinâmico em vez de estender `region_memberships`?
 
-1. Mapear o canonical atual de cada rota acima (via `curl -sI` em prod).
-2. Decidir uma URL canônica única por intenção (uma por cidade, uma por
-   "abaixo-da-fipe", etc.).
-3. Definir `noindex, follow` nas variantes não-canônicas.
-4. Atualizar `app/sitemap.ts` para emitir somente URLs canônicas.
-5. Validar em Search Console por 1 ciclo de re-crawl.
-6. Só então abrir o trabalho da Página Regional (com este runbook).
+- `region_memberships` é pré-computado offline (script
+  `scripts/build-region-memberships.mjs`) com camadas hardcoded ≤30 km e
+  30–60 km. Cada mudança de raio exigiria rebuild offline — incompatível
+  com edição em tempo real pelo admin.
+- Haversine SQL dinâmico contra `cities.latitude/longitude` (DOUBLE
+  PRECISION, populadas via `npm run seed:cities-geo`) suporta range
+  arbitrário (10..150) e respeita o admin. Sem PostGIS — usa bounding
+  box em latitude + cálculo trigonométrico. Sem índice GIST.
+- `region_memberships` permanece em uso por workers e dashboards
+  (regional_cluster, regional_expansion) e como fallback automático na
+  página pública.
+
+## 11. Próxima etapa recomendada
+
+A página existe em Fase A (flag `false` por default, `noindex,follow`
+quando servida, fora do sitemap, sem CTAs públicos amplos). Próximas
+etapas em ordem:
+
+1. **Fase B em staging.** Ligar `REGIONAL_PAGE_ENABLED=true` em staging,
+   rodar checklist §8 manualmente para Atibaia / Bragança Paulista /
+   Mairiporã. Confirmar que `cities.latitude/longitude` está seedado
+   (`npm run seed:cities-geo`). Verificar fallback funcional para cidades
+   sem coords.
+2. **Auditoria SEO de páginas territoriais existentes.** Antes de promover
+   a Regional para Fase D (indexação), resolver duplicação canonical das
+   rotas que já estão indexadas (`/comprar/cidade/[slug]`, `/cidade/[slug]`,
+   `/carros-em/[slug]`, `/cidade/[slug]/oportunidades`,
+   `/cidade/[slug]/abaixo-da-fipe`, `/carros-baratos-em/[slug]`,
+   `/carros-automaticos-em/[slug]`). Senão, a Regional vira mais uma
+   fonte de duplicação para o Google decidir sozinho.
+3. **Fase C em produção** com `noindex` mantido. Monitorar Search Console
+   e logs por 1 ciclo de re-crawl (~7 dias).
+4. **Fase D — indexação.** Trocar canonical para self-canonical, remover
+   `noindex`, incluir no sitemap regional (`/sitemaps/regiao/[state].xml`,
+   já linkado mas vazio). Requer aprovação SEO formal e critério de
+   estoque/conteúdo (§6).

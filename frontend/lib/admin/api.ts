@@ -79,6 +79,15 @@ export const adminApi = {
     seoCities: (limit = 30) =>
       adminFetch<ApiOne<SeoCityMetric[]>>("metrics/seo/cities", { params: { limit } }),
   },
+  regional: {
+    getSettings: () =>
+      adminFetch<ApiOne<RegionalSettings>>("regional-settings"),
+    updateSettings: (radius_km: number, reason?: string) =>
+      adminFetch<ApiOne<RegionalSettings>>("regional-settings", {
+        method: "PATCH",
+        body: { radius_km, reason },
+      }),
+  },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<ModerationAdRow>>("moderation/ads", {
@@ -338,4 +347,12 @@ export type SeoCityMetric = {
   clicks: number;
   ctr: number;
   avg_position: number;
+};
+
+export type RegionalSettings = {
+  radius_km: number;
+  radius_min_km: number;
+  radius_max_km: number;
+  radius_default_km: number;
+  updated_at?: string;
 };
