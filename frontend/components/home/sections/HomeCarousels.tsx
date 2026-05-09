@@ -13,10 +13,14 @@ interface HomeCarouselsProps {
  * Server Component async — renderizado dentro de <Suspense> em app/page.tsx
  * para permitir stream do HTML acima da dobra antes dos anuncios chegarem.
  *
- * Quando nao ha anuncios em destaque/oportunidade (criterios raros no
- * lancamento), caimos para recentAds: sempre ha algo para mostrar desde
- * que haja pelo menos 1 anuncio ativo no portal. O fallback territorial
- * para global ja foi tratado em fetchHomeCarousels.
+ * Coerência com a página da cidade (/cidade/[slug] e /cidade/[slug]/oportunidades):
+ *   - Quando não há destaque PAGO mas há anúncio comum, mostramos os recentes
+ *     com subtítulo explicando que não há destaque pago — sem sugerir ausência
+ *     total de veículos (a página territorial mostraria os mesmos anúncios).
+ *   - O carrossel de oportunidades só aparece quando o backend devolveu pelo
+ *     menos 1 anúncio abaixo da FIPE para o território (ou via fallback global
+ *     em fetchHomeCarousels). Não usamos recentAds como fallback aqui — isso
+ *     seria mentir sobre "abaixo da FIPE".
  */
 export async function HomeCarousels({
   activeCitySlug,
@@ -28,15 +32,18 @@ export async function HomeCarousels({
     activeCityId
   );
 
-  const highlightItems = (highlightAds.length ? highlightAds : recentAds) as VehicleCardItem[];
-  const opportunityItems = (
-    opportunityAds.length ? opportunityAds : recentAds
-  ) as VehicleCardItem[];
+  const hasHighlight = highlightAds.length > 0;
+  const hasRecent = recentAds.length > 0;
 
-  const highlightTitle = highlightAds.length ? "Veículos em destaque" : "Veículos recentes";
-  const highlightSubtitle = highlightAds.length
+  const highlightItems = (hasHighlight ? highlightAds : recentAds) as VehicleCardItem[];
+  const opportunityItems = opportunityAds as VehicleCardItem[];
+
+  const highlightTitle = hasHighlight ? "Veículos em destaque" : "Veículos recentes";
+  const highlightSubtitle = hasHighlight
     ? `Conheça alguns dos veículos mais procurados em ${activeCityName}.`
-    : `Anúncios adicionados recentemente perto de ${activeCityName}.`;
+    : hasRecent
+      ? `Nenhum destaque pago no momento — veja anúncios recentes em ${activeCityName}.`
+      : `Anúncios adicionados recentemente perto de ${activeCityName}.`;
 
   return (
     <>

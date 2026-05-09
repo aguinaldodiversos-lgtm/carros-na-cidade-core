@@ -166,8 +166,15 @@ export function PublicHeader() {
           >
             <HeaderNavLink href={routes.comprar}>Comprar</HeaderNavLink>
             <HeaderNavLink href={routes.financing}>
-              <span className="hidden md:inline">Simulador de Financiamento</span>
-              <span className="md:hidden">Simulador</span>
+              {/*
+                Single-label: o navegador desktop só aparece a partir de md
+                (pai já tem `hidden md:flex`), então o split entre "Simulador
+                de Financiamento" / "Simulador" gerava label duplicado em
+                AT/SR e em screenshots de cliente — ambos os spans existem
+                no DOM, e em alguns leitores ambos são lidos. Mantemos só
+                a forma curta no header e a forma longa no menu mobile.
+              */}
+              Simulador
             </HeaderNavLink>
             <HeaderNavLink href={routes.fipe}>FIPE</HeaderNavLink>
             <HeaderNavLink href={routes.blog}>Blog</HeaderNavLink>

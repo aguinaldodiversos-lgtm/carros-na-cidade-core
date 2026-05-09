@@ -1,6 +1,7 @@
 // frontend/app/tabela-fipe/[cidade]/page.tsx
 import type { Metadata } from "next";
 import { FipePageClient } from "@/components/fipe/FipePageClient";
+import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 
 type PageProps = {
@@ -77,18 +78,21 @@ export default async function TabelaFipeCidadePage({ params }: PageProps) {
     }),
   ]);
 
-  const fallbackRecent =
-    fallbackRecentResult.status === "fulfilled" ? fallbackRecentResult.value.data || [] : [];
+  const fallbackRecent = (
+    fallbackRecentResult.status === "fulfilled" ? fallbackRecentResult.value.data || [] : []
+  ).filter(hasRealPrice);
 
-  const highlightAds =
-    highlightResult.status === "fulfilled" && highlightResult.value.data?.length > 0
-      ? highlightResult.value.data
-      : fallbackRecent.slice(0, 10);
+  const highlightFromBackend = (
+    highlightResult.status === "fulfilled" ? highlightResult.value.data || [] : []
+  ).filter(hasRealPrice);
 
+  const opportunityFromBackend = (
+    belowFipeResult.status === "fulfilled" ? belowFipeResult.value.data || [] : []
+  ).filter(hasRealPrice);
+
+  const highlightAds = highlightFromBackend.length > 0 ? highlightFromBackend : fallbackRecent;
   const opportunityAds =
-    belowFipeResult.status === "fulfilled" && belowFipeResult.value.data?.length > 0
-      ? belowFipeResult.value.data
-      : fallbackRecent.slice(0, 10);
+    opportunityFromBackend.length > 0 ? opportunityFromBackend : fallbackRecent;
 
   return (
     <FipePageClient

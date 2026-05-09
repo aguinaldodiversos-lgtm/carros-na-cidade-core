@@ -24,6 +24,13 @@ export interface PublicAdDetail {
   advertiser_id?: number | string | null;
   city_slug?: string | null;
   seller_name?: string | null;
+  /**
+   * Tipo do anunciante (`dealer`, `dealership`, `loja`, `premium`, `basic`,
+   * `private`...). Importante manter no payload público para o detalhe não
+   * exibir loja como "Anunciante particular" quando `dealership_name` não
+   * tiver sido preenchido (caso real do Onix sinalizado).
+   */
+  seller_type?: string | null;
   dealership_name?: string | null;
   color?: string | null;
   phone?: string | null;
@@ -110,13 +117,11 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
 
   const imageUrl = images[0] || null;
 
+  // Não incluir o ano no título — o detalhe do veículo já mostra o ano em
+  // bloco separado (meta de cabeçalho). Concatenar aqui produz duplicação
+  // visível ("Onix Hatch 2020 ... 2020 · 41.000 km · São Paulo (SP)").
   const titleFallback =
-    [
-      toText(item.year || item.year_model),
-      toText(item.brand),
-      toText(item.model),
-      toText(item.version),
-    ]
+    [toText(item.brand), toText(item.model), toText(item.version)]
       .filter(Boolean)
       .join(" ")
       .trim() || "Veículo";
@@ -146,6 +151,7 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
         : null,
     city_slug: toNullableText(item.city_slug),
     seller_name: toNullableText(item.seller_name ?? item.sellerName ?? item.owner_name),
+    seller_type: toNullableText(item.seller_type ?? item.sellerType ?? item.account_type),
     dealership_name: toNullableText(
       item.dealership_name ?? item.dealershipName ?? item.store_name ?? item.dealer_name
     ),
@@ -201,6 +207,7 @@ function buildFallbackAd(identifier: string): PublicAdDetail {
     advertiser_id: null,
     city_slug: null,
     seller_name: null,
+    seller_type: null,
     dealership_name: null,
     color: null,
     phone: null,

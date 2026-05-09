@@ -7,6 +7,7 @@ import AdCard from "@/components/ads/AdCard";
 import { FipeCombobox } from "@/components/fipe/FipeCombobox";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { VehicleImage } from "@/components/ui/VehicleImage";
+import { hasRealPrice } from "@/lib/ads/has-real-price";
 import {
   fetchFipeQuote,
   listFipeBrands,
@@ -331,8 +332,11 @@ export function FipePageClient({
   const [error, setError] = useState<string | null>(null);
 
   const compatibleAds = useMemo(() => {
+    // Defesa em profundidade: vitrine nunca pode mostrar card com R$ 0.
+    // O server já filtra em frontend/app/tabela-fipe/[cidade]/page.tsx mas
+    // mantemos o filtro aqui para qualquer chamador futuro do client.
     const list = highlightAds?.length ? highlightAds : opportunityAds;
-    return (list || []).slice(0, 3);
+    return (list || []).filter(hasRealPrice).slice(0, 3);
   }, [highlightAds, opportunityAds]);
 
   useEffect(() => {

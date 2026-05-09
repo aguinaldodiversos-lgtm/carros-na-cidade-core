@@ -294,15 +294,29 @@ export function TerritorialResultsPageClient({
               </span>
             )}
 
-            {typeof data.stats?.totalAds === "number" && (
-              <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-medium text-[#475569]">
-                {data.stats.totalAds} anúncios
-              </span>
-            )}
+            {/*
+              Em modos opportunities/below_fipe a contagem relevante é a de
+              abaixo-da-fipe — mostrar "totalAds" (cidade-wide) acima dela
+              produziria contradição pública ("0 anúncios" vs "1 abaixo da
+              FIPE" + 1 card renderizado). Em modo city/brand/model, mantemos
+              ambos pois "totalAds" representa o universo da página.
+            */}
+            {mode !== "opportunities" &&
+              mode !== "below_fipe" &&
+              typeof data.stats?.totalAds === "number" && (
+                <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-medium text-[#475569]">
+                  {data.stats.totalAds} anúncios
+                </span>
+              )}
 
             {typeof data.stats?.totalBelowFipeAds === "number" && (
               <span className="rounded-full bg-[#e9fff5] px-3 py-1 text-xs font-medium text-[#0f9f5f]">
-                {data.stats.totalBelowFipeAds} abaixo da FIPE
+                {data.stats.totalBelowFipeAds}{" "}
+                {mode === "opportunities" || mode === "below_fipe"
+                  ? data.stats.totalBelowFipeAds === 1
+                    ? "oportunidade abaixo da FIPE"
+                    : "oportunidades abaixo da FIPE"
+                  : "abaixo da FIPE"}
               </span>
             )}
           </div>
@@ -347,7 +361,23 @@ export function TerritorialResultsPageClient({
           <div className="text-sm text-[#64748b]">
             {loading
               ? "Atualizando resultados..."
-              : `${primaryPagination?.total || primaryItems.length || 0} anúncios neste território`}
+              : (() => {
+                  // Garantia de coerência: a contagem aqui usa SEMPRE a
+                  // mesma fonte que alimenta a lista de cards (primaryItems
+                  // / primaryPagination), nunca data.stats.totalAds — que
+                  // é cidade-wide e produziria "0 anúncios" mesmo com 1
+                  // card renderizado em /oportunidades.
+                  const total = primaryPagination?.total ?? primaryItems.length ?? 0;
+                  const noun =
+                    mode === "opportunities" || mode === "below_fipe"
+                      ? total === 1
+                        ? "oportunidade abaixo da FIPE"
+                        : "oportunidades abaixo da FIPE"
+                      : total === 1
+                        ? "anúncio neste território"
+                        : "anúncios neste território";
+                  return `${total} ${noun}`;
+                })()}
           </div>
 
           <SearchSortSelect value={filters.sort || "relevance"} onChange={pushFilters} />

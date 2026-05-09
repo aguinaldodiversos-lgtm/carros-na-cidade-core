@@ -49,7 +49,10 @@ async function fetchJson<T>(url: string, tags: string[]): Promise<T | null> {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       logTag: "public-home",
-      next: { revalidate: 300, tags },
+      // 60s — alinhado a `fetchTerritorialPage` (frontend/lib/search/territorial-public.ts)
+      // para evitar janela de 5min em que a Home diz "sem oportunidade" e a página
+      // territorial da cidade mostra anúncio recém-publicado.
+      next: { revalidate: 60, tags },
     });
 
     if (!response.ok) {
