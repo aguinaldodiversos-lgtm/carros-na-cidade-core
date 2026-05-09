@@ -19,6 +19,10 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
+    // Carrega matchers do `@testing-library/jest-dom` (toBeInTheDocument,
+    // toBeEnabled, toBeDisabled). Sem este setup, testes DOM do dashboard
+    // (AdCard.test.tsx etc.) quebram com "Invalid Chai property".
+    setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules", "e2e/**", ".next/**"],
     coverage: {

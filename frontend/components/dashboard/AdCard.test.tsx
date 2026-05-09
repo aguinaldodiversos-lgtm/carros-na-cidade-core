@@ -94,8 +94,9 @@ describe("AdCard — badges e bloqueios por status", () => {
       />
     );
     expect(screen.getAllByText(/rejeitado/i).length).toBeGreaterThan(0);
+    // Banner de moderação (role="status") explica o bloqueio para o anunciante.
     expect(
-      screen.getByText(/não foi possível publicar/i)
+      screen.getByText(/anúncio foi rejeitado.*verifique os dados/i)
     ).toBeInTheDocument();
 
     const statusBtn = screen.getByRole("button", { name: /aguardando/i });

@@ -1,9 +1,20 @@
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
+import { toAbsoluteUrl } from "@/lib/seo/site";
 
 interface CityOpportunitiesPageProps {
   params: { slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
+}
+
+/**
+ * Mesmo destino de canonical de `/cidade/[slug]/abaixo-da-fipe` — as duas
+ * rotas têm a mesma intenção de busca ("oportunidades / abaixo da FIPE").
+ * Mantém o sinal de SEO consolidado em `/carros-baratos-em/[slug]` para
+ * crawlers que leiam a metadata antes de processar o 308.
+ */
+function transitionCanonicalPath(slug: string): string {
+  return `/carros-baratos-em/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -68,12 +79,18 @@ function buildTargetPath(
   return qs ? `${base}?${qs}` : base;
 }
 
-export async function generateMetadata(): Promise<Metadata> {
-  // Mesmo redirecionando, declaramos noindex,follow por defesa: se algum
-  // crawler atingir esta URL antes de processar o 308, evitamos sinal de
-  // conteúdo duplicado.
+export async function generateMetadata({
+  params,
+}: CityOpportunitiesPageProps): Promise<Metadata> {
+  // Mesmo redirecionando, declaramos noindex,follow E canonical por defesa:
+  // se algum crawler atingir esta URL antes de processar o 308, o canonical
+  // explícito direciona o sinal para `/carros-baratos-em/[slug]` (mesma URL
+  // canônica de `/cidade/[slug]/abaixo-da-fipe`), evitando duplicidade.
   return {
     robots: { index: false, follow: true },
+    alternates: {
+      canonical: toAbsoluteUrl(transitionCanonicalPath(params.slug)),
+    },
   };
 }
 

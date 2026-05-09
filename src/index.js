@@ -7,7 +7,8 @@ import { logger } from "./shared/logger.js";
 import { startWorkersBootstrap, stopWorkersBootstrap } from "./workers/bootstrap.js";
 import { closeWhatsAppQueue } from "./queues/whatsapp.queue.js";
 import { closeQueueRedisConnection } from "./infrastructure/queue/redis.connection.js";
-import { closeDatabasePool } from "./infrastructure/database/db.js";
+import { closeDatabasePool, pool } from "./infrastructure/database/db.js";
+import { enforceAntifraudSchemaAtBoot } from "./infrastructure/database/schema-readiness.js";
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -101,6 +102,24 @@ async function runStartupMigrations() {
   await runMigrations();
 }
 
+/**
+ * Defesa contra deploy do backend novo sem a migration 025 aplicada.
+ *
+ * Em production/staging: lança e o boot falha (Render marca o deploy como
+ * crashed e não promove a release). Em dev/test: apenas warning.
+ *
+ * Roda DEPOIS de `runStartupMigrations` para que o caso normal — migration
+ * acabou de ser aplicada — passe sem ruído. O check é idempotente e
+ * leve (2 queries em information_schema), então também serve de canário
+ * caso alguém suba o serviço com `RUN_MIGRATIONS=false`.
+ */
+async function verifyAntifraudSchemaReady() {
+  await enforceAntifraudSchemaAtBoot(pool, {
+    env: NODE_ENV,
+    logger,
+  });
+}
+
 async function createAndListenHttpServer() {
   server = http.createServer(app);
 
@@ -138,6 +157,7 @@ async function startServer() {
     );
 
     await runStartupMigrations();
+    await verifyAntifraudSchemaReady();
     await createAndListenHttpServer();
     await runStartupWorkers();
   } catch (error) {

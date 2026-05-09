@@ -1,6 +1,6 @@
 # Runbook — Migration 025 (Antifraude e Moderação)
 
-Última revisão: 2026-05-08
+Última revisão: 2026-05-09
 
 ## Objetivo
 
@@ -13,7 +13,22 @@ Aplicar a migration `src/database/migrations/025_ads_antifraud_moderation.sql` e
 - anúncios ACTIVE existentes continuam visíveis;
 - dashboard do anunciante carrega anúncios pré-migration sem alteração visual.
 
-> **Importante:** esta migration NÃO inclui `CHECK constraint` em `ads.status`. A constraint só será aplicada numa migration posterior, depois de auditoria explícita dos dados em produção. Ver §6.
+> **Importante:** esta migration NÃO inclui `CHECK constraint` em `ads.status`. A constraint só será aplicada numa migration posterior, depois de auditoria explícita dos dados em produção. Ver §9.
+
+## Status atual — produção continua BLOQUEADA
+
+**A migration 025 ainda NÃO foi aplicada em staging real**. A última rodada de validação rodou contra mocks e código (suítes vitest verdes), mas sem `STAGING_DATABASE_URL` no ambiente do operador.
+
+Para liberar produção, TODOS os passos abaixo precisam estar `[x]` em staging real:
+
+- [ ] §3 (audit `SELECT status, COUNT(*)` sem legado fora do enum)
+- [ ] §4 (migration 025 aplicada e registrada em `schema_migrations`)
+- [ ] §5 (verificações pós-migration — colunas, tabelas, índices)
+- [ ] §5.7 (schema readiness check — `/health` retorna `antifraud_schema=ok`)
+- [ ] §6 (smoke operacional `npm run smoke:antifraud-staging` — 7/7 cenários PASS)
+- [ ] §7 (validação UI `/admin/moderation` + boost bloqueado fora de active)
+
+Bloqueador permanece até o operador conferir cada item.
 
 ---
 
@@ -219,11 +234,93 @@ curl -s "$APP_URL/api/ads/search?limit=5" | jq '.ads[].status'
 
 Esperado: todas `"active"`. Nenhuma row `pending_review`/`rejected` aparecendo.
 
+### 5.7 Schema readiness check (defesa contra deploy sem migration)
+
+A partir desta rodada o backend valida no boot e em `/health` que a migration 025 está aplicada. Em `production`/`staging`, schema incompleto:
+
+- impede o boot (`SCHEMA_READINESS_MISSING_MIGRATION_025`);
+- degrada `/health` para HTTP 503 com `checks.antifraud_schema = "missing"`.
+
+Conferir manualmente em staging:
+
+```bash
+curl -s "$APP_URL/health" | jq '{ok, status, antifraud: .checks.antifraud_schema, missing: .checks.antifraud_schema_missing}'
+```
+
+Esperado pós-migration:
+
+```json
+{ "ok": true, "status": "healthy", "antifraud": "ok", "missing": null }
+```
+
+Se aparecer `"antifraud": "missing"`, **parar** — o pipeline tem `try/catch` que mascara a ausência das colunas e a auditoria fica vazia. A migration 025 precisa rodar antes de promover qualquer release.
+
+Implementação:
+- check puro: [src/infrastructure/database/schema-readiness.js](../../src/infrastructure/database/schema-readiness.js)
+- hook de boot: [src/index.js](../../src/index.js) (`verifyAntifraudSchemaReady`)
+- exposição em healthcheck: [src/routes/health.js](../../src/routes/health.js)
+
 ---
 
-## 6. Smoke do pipeline de criação
+## 6. Smoke operacional automatizado (`npm run smoke:antifraud-staging`)
 
-Em staging (NÃO em produção), criar um anúncio novo de teste para validar o pipeline completo:
+A partir desta rodada existe um script que executa os 7 cenários do plano de validação contra um ambiente real e reporta `PASS|FAIL|SKIP|FATAL` por linha. Rodar **em staging** (o script recusa rodar contra produção sem `ALLOW_PRODUCTION=true` explícito).
+
+```bash
+export STAGING_BASE_URL="https://staging-api.carrosnacidade.com"
+export STAGING_PUBLIC_BASE_URL="https://staging.carrosnacidade.com"   # opcional
+export STAGING_QA_EMAIL="qa-cpf@example.com"
+export STAGING_QA_PASSWORD="••••••••"
+# Opcional: se a city_id 1 não existir no staging, ajuste:
+# export STAGING_CITY_ID=42
+
+npm run smoke:antifraud-staging
+```
+
+Cenários executados:
+
+| ID | Cenário                                         | PASS quando                                      |
+|----|-------------------------------------------------|--------------------------------------------------|
+| PRE| `/health` healthy + `antifraud_schema=ok`       | migration 025 está aplicada                      |
+| LOGIN | autentica com QA user                        | `access_token` retornado                         |
+| A  | preço compatível com FIPE                       | ad criado com `status=active`                    |
+| B  | preço −30% FIPE (códigos canônicos)             | ad criado com `status=pending_review`            |
+| C  | preço −45% FIPE                                 | `pending_review` + `risk_level=critical`         |
+| D  | preço inválido (R$ 0)                           | HTTP 400, sem INSERT                             |
+| E  | sem códigos FIPE (provider indisponível)        | ad criado, `risk_reasons` contém `FIPE_UNAVAILABLE` |
+| F  | busca pública após cenário B                    | ad de B NÃO aparece, todos os listados são `active` |
+| G  | tentativa de boost no ad de B (`pending_review`)| HTTP 400 (`ad ativo` na mensagem)                |
+
+Exit codes:
+- `0` — todos os cenários PASS/SKIP justificado.
+- `1` — algum FAIL ou FATAL — produção continua bloqueada.
+- `2` — env obrigatória ausente ou guard de produção bloqueou.
+
+Limpeza pós-smoke: o ad criado no cenário B fica em `pending_review` para o cenário G poder usar; o script imprime o `id` e o comando para soft-delete:
+
+```bash
+psql "$STAGING_DATABASE_URL" -c \
+  "UPDATE ads SET status='deleted' WHERE id=<ID>;"
+```
+
+Implementação: [scripts/staging-antifraud-smoke.mjs](../../scripts/staging-antifraud-smoke.mjs).
+
+### 6.1 Sinais de falha no smoke
+
+| Sintoma                                | Diagnóstico                                                    |
+|----------------------------------------|----------------------------------------------------------------|
+| `[PRE][FATAL] migration 025 ausente…`  | rodar §4 antes de tentar de novo                               |
+| `[LOGIN][FATAL] login HTTP 401`        | senha do QA user errada ou conta bloqueada                     |
+| `[A][FAIL] esperado active, recebido pending_review` | regras FIPE_REVIEW_PCT/CRITICAL_PCT em valor inesperado, ou provider FIPE retornou preço diferente do esperado |
+| `[B][FAIL] esperado pending_review, recebido active` | `fipe_brand_code/model/year` inválidos para staging — backend caiu em FIPE_UNAVAILABLE; ajustar `STAGING_FIPE_*` |
+| `[F][FAIL] vazamento`                  | `ads-filter.builder` regrediu o WHERE `status='active'`. INCIDENTE |
+| `[G][FAIL] HTTP 200`                   | webhook/checkout aceitou boost em `pending_review`. INCIDENTE  |
+
+Mantenha a saída do smoke arquivada antes de qualquer release de produção.
+
+### 6.2 Apêndice — smoke manual via curl
+
+Útil quando o script não está disponível (ex.: bastion sem npm). Mesmo conjunto de cenários, formato `curl + jq`:
 
 ```bash
 # Login com user de teste (CPF verificado).
@@ -257,9 +354,19 @@ curl -s -X POST $APP_URL/api/ads \
 
 Conferir que anúncio do **Caso B** aparece em `GET /api/admin/moderation/ads` e NÃO aparece em `GET /api/ads/search`.
 
+## 7. Validação manual da UI admin / boost
+
+Depois do smoke automatizado, o operador valida manualmente:
+
+- [ ] login com user comum (`role=user`) → `/admin/moderation` redireciona para `/login?next=/admin`;
+- [ ] login com user admin → fila lista os ads dos cenários B e C ordenados por `risk_score`;
+- [ ] aprovar o ad do cenário B → status muda para `active`, aparece no feed público;
+- [ ] rejeitar (com motivo) outro ad pending_review → status `rejected`, NÃO aparece no público;
+- [ ] tentar `POST /api/payments/boost-7d/checkout` em ad rejeitado → HTTP 400.
+
 ---
 
-## 7. Rollback
+## 8. Rollback
 
 A migration é puramente aditiva (não remove dados). Para reverter sem perder nada:
 
@@ -306,7 +413,7 @@ UPDATE ads SET status = 'paused'
 
 ---
 
-## 8. Quando aplicar CHECK constraint em `ads.status`
+## 9. Quando aplicar CHECK constraint em `ads.status`
 
 Migration separada, **não nesta rodada**. Pré-requisitos:
 
@@ -332,17 +439,19 @@ ALTER TABLE ads VALIDATE CONSTRAINT ads_status_check;
 
 ---
 
-## 9. Critérios de "pronto para produção"
+## 10. Critérios de "pronto para produção"
 
-- [x] Migration aplicada em staging.
-- [x] Verificações §5 passaram.
-- [x] Smoke §6 passou (Caso A → ACTIVE, B → PENDING_REVIEW, C → REJECTED).
-- [x] Suite de testes backend rodou (`npm test` ou `npx vitest run`).
-- [ ] **Bloqueador:** auditoria §3 NÃO retornou status fora do enum **em produção**.
-- [ ] **Bloqueador:** painel admin abre `/admin/moderation` sem erros.
-- [ ] **Bloqueador:** filtros públicos validados (busca pública só retorna ACTIVE).
+Todos os checks abaixo precisam estar ✅ **em staging real**:
 
-Quando todos os bloqueadores estiverem checados, agendar janela de produção e seguir §2 → §6.
+- [ ] Migration aplicada em staging (§4).
+- [ ] Verificações §5 passaram (colunas, tabelas, índices, dados pré-existentes).
+- [ ] `/health` em staging retorna `antifraud_schema=ok` (§5.7).
+- [ ] `npm run smoke:antifraud-staging` retorna **exit 0** com 7/7 cenários PASS (§6).
+- [ ] Validação manual de admin / boost (§7).
+- [ ] Suítes locais limpas (`npm test` raiz e `cd frontend && npm test`).
+- [ ] Auditoria §3 em **produção** confirmou ausência de status fora do enum.
+
+Só depois, agendar janela de produção e seguir §2 → §7. **Não promover a release sem o ✅ explícito de cada item acima**: o backend, a partir desta rodada, recusa subir em production sem a migration 025; ainda assim, o operador precisa checar manualmente que o smoke passou em staging antes da release.
 
 ---
 
@@ -354,6 +463,8 @@ Quando todos os bloqueadores estiverem checados, agendar janela de produção e 
 - **Backend FIPE Service**: [src/modules/fipe/fipe.service.js](../../src/modules/fipe/fipe.service.js)
 - Endpoints admin: [src/modules/admin/admin.routes.js](../../src/modules/admin/admin.routes.js) (seção MODERATION)
 - Enum canônico: [src/shared/constants/status.js](../../src/shared/constants/status.js)
+- **Schema readiness check**: [src/infrastructure/database/schema-readiness.js](../../src/infrastructure/database/schema-readiness.js) (boot guard + `/health`)
+- **Smoke operacional**: [scripts/staging-antifraud-smoke.mjs](../../scripts/staging-antifraud-smoke.mjs) (`npm run smoke:antifraud-staging`)
 
 ---
 

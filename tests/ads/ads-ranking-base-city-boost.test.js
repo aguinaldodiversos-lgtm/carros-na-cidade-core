@@ -168,8 +168,16 @@ describe("buildAdsSearchQuery — payload público de /api/ads/search inalterado
     });
 
     // Ambos têm o mesmo SELECT — diferença é só no WHERE/score.
-    expect(normalize(withoutBoost)).toContain("a.* , c.slug AS city_slug".replace(/\s+/g, " "));
-    expect(normalize(withBoost)).toContain("a.* , c.slug AS city_slug".replace(/\s+/g, " "));
+    // Tolerante a whitespace ao redor da vírgula: o objetivo é confirmar
+    // que `a.*` e `c.slug AS city_slug` estão lado a lado, não a formatação.
+    const selectShape = /a\.\*\s*,\s*c\.slug\s+AS\s+city_slug/i;
+    expect(normalize(withoutBoost)).toMatch(selectShape);
+    expect(normalize(withBoost)).toMatch(selectShape);
+
+    // Defesa: status='active' continua presente nas duas variantes (não
+    // perdemos o guard público em nenhuma camada de boost).
+    expect(normalize(withoutBoost)).toMatch(/a\.status\s*=\s*'active'/i);
+    expect(normalize(withBoost)).toMatch(/a\.status\s*=\s*'active'/i);
   });
 
   it("countQuery não é afetado pelo boost (sem JOIN extra, sem param da base)", () => {
