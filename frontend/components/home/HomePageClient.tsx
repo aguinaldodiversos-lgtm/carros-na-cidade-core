@@ -16,8 +16,9 @@ import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
  *
  * Ordem das seções (mobile-first, fiel ao mockup):
  *   1. HomeSearchCard      — SearchBar + chips de filtro com ícones
- *   2. HomeShortcuts       — 6 atalhos circulares (Comprar, Vender, Blog,
- *                            Ofertas, Lojas, Favoritos) — set do mockup
+ *   2. HomeShortcuts       — 7 atalhos circulares (Comprar, Vender, Blog,
+ *                            Ofertas, Lojas, Favoritos, Planos). Centralizados
+ *                            em desktop; carrossel scroll-snap em mobile.
  *   3. HomeHero            — banner regional com pílula da cidade, CTA
  *                            "Ver ofertas →" e badge "+N mil ofertas ativas"
  *   4. HomePrimaryActions  — 3 cards quick-action coloridos: Anunciar grátis
