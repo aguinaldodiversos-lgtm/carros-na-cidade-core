@@ -79,6 +79,96 @@ export const adminApi = {
     seoCities: (limit = 30) =>
       adminFetch<ApiOne<SeoCityMetric[]>>("metrics/seo/cities", { params: { limit } }),
   },
+  moderation: {
+    list: (p: Record<string, string | number | boolean> = {}) =>
+      adminFetch<ApiList<ModerationAdRow>>("moderation/ads", {
+        params: Object.fromEntries(
+          Object.entries({ limit: 50, ...p }).map(([k, v]) => [k, String(v)])
+        ),
+      }),
+    detail: (id: string | number) =>
+      adminFetch<ApiOne<ModerationAdDetail>>(`moderation/ads/${id}`),
+    approve: (id: string | number) =>
+      adminFetch<ApiOne<{ ok: boolean; status: string }>>(
+        `moderation/ads/${id}/approve`,
+        { method: "POST", body: {} }
+      ),
+    reject: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<{ ok: boolean; status: string }>>(
+        `moderation/ads/${id}/reject`,
+        { method: "POST", body: { reason } }
+      ),
+    requestCorrection: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<{ ok: boolean; status: string }>>(
+        `moderation/ads/${id}/request-correction`,
+        { method: "POST", body: { reason } }
+      ),
+  },
+};
+
+export type ModerationRiskReason = {
+  code: string;
+  message: string | null;
+  severity: "low" | "medium" | "high" | "critical";
+  scoreDelta?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type ModerationAdRow = {
+  id: number;
+  title: string;
+  brand: string;
+  model: string;
+  year: number;
+  price: string | number;
+  city: string | null;
+  state: string | null;
+  status: string;
+  risk_score: number;
+  risk_level: "low" | "medium" | "high" | "critical";
+  risk_reasons: ModerationRiskReason[] | string;
+  fipe_reference_value: string | number | null;
+  fipe_diff_percent: string | number | null;
+  created_at: string;
+  updated_at: string;
+  advertiser_id: number | null;
+  advertiser_user_id: string | null;
+  advertiser_name: string | null;
+};
+
+export type ModerationSignalRow = {
+  id: number;
+  signal_code: string;
+  severity: "low" | "medium" | "high" | "critical";
+  score_delta: number;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type ModerationEventRow = {
+  id: number;
+  event_type: string;
+  actor_user_id: string | null;
+  actor_role: string | null;
+  from_status: string | null;
+  to_status: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type ModerationAdDetail = {
+  ad: ModerationAdRow & {
+    description?: string | null;
+    images?: unknown;
+    mileage?: number | null;
+    advertiser_company?: string | null;
+    rejection_reason?: string | null;
+    correction_requested_reason?: string | null;
+  };
+  signals: ModerationSignalRow[];
+  events: ModerationEventRow[];
 };
 
 // ── Types ──

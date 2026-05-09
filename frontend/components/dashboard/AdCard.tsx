@@ -3,6 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { DashboardAd } from "@/lib/dashboard-types";
+import {
+  AD_BADGE_STYLE,
+  resolveAdBadgeVariant,
+  type AdBadgeVariant,
+} from "@/lib/dashboard/ad-status-badge";
 
 type AdCardProps = {
   ad: DashboardAd;
@@ -23,31 +28,11 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString("pt-BR");
 }
 
-type BadgeVariant = "active" | "paused" | "highlighted" | "pending_review" | "rejected" | "sold" | "expired" | "blocked";
-
-const BADGE_STYLE: Record<BadgeVariant, { bg: string; label: string }> = {
-  highlighted: { bg: "#e43358", label: "Destaque" },
-  active: { bg: "#198754", label: "Ativo" },
-  pending_review: { bg: "#d97706", label: "Em análise" },
-  rejected: { bg: "#b91c1c", label: "Rejeitado" },
-  paused: { bg: "#8f98af", label: "Pausado" },
-  sold: { bg: "#475569", label: "Vendido" },
-  expired: { bg: "#6b7280", label: "Expirado" },
-  blocked: { bg: "#7f1d1d", label: "Bloqueado" },
-};
-
-function resolveBadgeVariant(status: string, highlighted: boolean): BadgeVariant {
-  // Em análise ou rejeitado são prioritários — não exibir "Destaque"
-  // sobre um anúncio que ainda está em moderação.
-  if (status === "pending_review") return "pending_review";
-  if (status === "rejected") return "rejected";
-  if (status === "blocked") return "blocked";
-  if (status === "sold") return "sold";
-  if (status === "expired") return "expired";
-  if (highlighted && status === "active") return "highlighted";
-  if (status === "active") return "active";
-  return "paused";
-}
+// Variant + estilo + função pura vivem em `frontend/lib/dashboard/ad-status-badge.ts`
+// para que possam ser cobertos por testes sem DOM.
+type BadgeVariant = AdBadgeVariant;
+const BADGE_STYLE = AD_BADGE_STYLE;
+const resolveBadgeVariant = resolveAdBadgeVariant;
 
 function StatusBadge({
   status,

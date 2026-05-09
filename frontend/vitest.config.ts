@@ -8,6 +8,14 @@ export default defineConfig({
   esbuild: {
     jsx: "automatic",
   },
+  // PostCSS overridden para o teste: jsdom não usa estilos, e o
+  // postcss.config.cjs do Next exige `tailwindcss` em runtime — pacote
+  // que pode estar fora dos node_modules em ambientes de worktree
+  // (ex: ambientes de revisão/CI parcial). Forçando `postcss: { plugins: [] }`
+  // o Vite ignora a discovery do config e nunca tenta resolver plugins.
+  css: {
+    postcss: { plugins: [] },
+  },
   test: {
     environment: "node",
     globals: false,
