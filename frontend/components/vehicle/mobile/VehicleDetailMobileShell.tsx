@@ -15,6 +15,8 @@ import {
 } from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
+import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
+
 import MobileHero from "./MobileHero";
 import MobileTopBar from "./MobileTopBar";
 import PhoneRevealSheet from "./PhoneRevealSheet";
@@ -53,6 +55,7 @@ export default function VehicleDetailMobileShell({
 }: VehicleDetailMobileShellProps) {
   const [phoneSheetOpen, setPhoneSheetOpen] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const sellerPhone = vehicle.seller.phone || "";
   const waLink = useMemo(
@@ -92,6 +95,7 @@ export default function VehicleDetailMobileShell({
             alt={vehicle.fullName}
             bodyTypeChip={vehicle.bodyType !== "Não informado" ? vehicle.bodyType : null}
             isBelowFipe={vehicle.isBelowFipe}
+            reviewedAfterBelowFipe={vehicle.reviewedAfterBelowFipe}
           />
         </div>
 
@@ -238,6 +242,35 @@ export default function VehicleDetailMobileShell({
           <MessageForm vehicleId={vehicle.id} vehicleName={vehicle.fullName} />
         </section>
 
+        {/* ---- Denunciar anúncio ---- */}
+        {/*
+          Botão discreto logo após o formulário de mensagem ao vendedor —
+          mesma região que concentra interação com o anunciante. Antes
+          existia apenas um mailto via VehicleTrustPanel; agora abrimos
+          um modal que POSTa para /api/ads/[id]/report (ad_reports).
+        */}
+        <section aria-label="Denunciar anúncio" className="px-4 pt-4">
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 4v17M4 4l13 2-3 5 3 5-13-2" />
+            </svg>
+            Denunciar este anúncio
+          </button>
+        </section>
+
         {/* ---- Mais carros em [Cidade] ---- */}
         {cityVehicles.length > 0 ? (
           <section aria-label={`Mais carros em ${cityName}`} className="pt-7">
@@ -273,6 +306,13 @@ export default function VehicleDetailMobileShell({
         vehicleId={vehicle.id}
         vehicleName={vehicle.fullName}
         sellerPhone={sellerPhone}
+      />
+
+      <ReportAdModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        adId={vehicle.id}
+        vehicleName={vehicle.fullName}
       />
     </>
   );

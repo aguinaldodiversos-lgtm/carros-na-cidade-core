@@ -165,8 +165,10 @@ export function buildAdsSearchQuery(filters = {}) {
     SELECT
       a.*,
       c.slug AS city_slug,
-      adv.name        AS seller_name,
+      adv.name         AS seller_name,
       adv.company_name AS dealership_name,
+      adv.id           AS dealership_id,
+      u.document_type  AS account_type,
       COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,
       COALESCE(m.views, 0) AS views,
       COALESCE(m.clicks, 0) AS clicks,

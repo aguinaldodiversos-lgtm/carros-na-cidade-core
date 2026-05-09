@@ -31,6 +31,21 @@ export interface PublicAdDetail {
    * tiver sido preenchido (caso real do Onix sinalizado).
    */
   seller_type?: string | null;
+  /**
+   * Veredito canônico do backend trust pass ('dealer'|'private') —
+   * frontend prefere este campo sobre `seller_type`/heurísticas locais.
+   */
+  seller_kind?: string | null;
+  /** users.document_type ('CPF'|'CNPJ') do dono do anúncio. */
+  account_type?: string | null;
+  /** id do registro em advertisers (loja registrada). */
+  dealership_id?: number | string | null;
+  /**
+   * Backend marca true quando o anúncio entrou em pending_review por
+   * sinal de preço abaixo da FIPE e foi aprovado pela moderação.
+   * Renderizar como selo "Anúncio analisado" — nunca como garantia.
+   */
+  reviewed_after_below_fipe?: boolean | null;
   dealership_name?: string | null;
   color?: string | null;
   phone?: string | null;
@@ -151,7 +166,14 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
         : null,
     city_slug: toNullableText(item.city_slug),
     seller_name: toNullableText(item.seller_name ?? item.sellerName ?? item.owner_name),
-    seller_type: toNullableText(item.seller_type ?? item.sellerType ?? item.account_type),
+    seller_type: toNullableText(item.seller_type ?? item.sellerType),
+    seller_kind: toNullableText(item.seller_kind),
+    account_type: toNullableText(item.account_type ?? item.document_type),
+    dealership_id:
+      item.dealership_id != null && item.dealership_id !== ""
+        ? toNumberOrString(item.dealership_id)
+        : null,
+    reviewed_after_below_fipe: item.reviewed_after_below_fipe === true,
     dealership_name: toNullableText(
       item.dealership_name ?? item.dealershipName ?? item.store_name ?? item.dealer_name
     ),
@@ -208,6 +230,10 @@ function buildFallbackAd(identifier: string): PublicAdDetail {
     city_slug: null,
     seller_name: null,
     seller_type: null,
+    seller_kind: null,
+    account_type: null,
+    dealership_id: null,
+    reviewed_after_below_fipe: false,
     dealership_name: null,
     color: null,
     phone: null,

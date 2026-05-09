@@ -88,18 +88,41 @@ describe("adaptAdDetailToVehicle — reconciliação anti-incoerência", () => {
     expect(v.optionalItems).not.toContain("Carroceria sedan");
   });
 
-  it("identifica loja via seller_type=dealer mesmo sem dealership_name", () => {
+  it("identifica loja via seller_kind='dealer' do backend (trust pass)", () => {
     const v = adaptAdDetailToVehicle(
-      makeAd({ seller_type: "dealer", dealership_name: null, plan: "free" })
+      makeAd({ seller_kind: "dealer", dealership_id: null, plan: "free" })
     );
     expect(v.seller.type).toBe("dealer");
   });
 
-  it("identifica loja via dealership_name quando seller_type vem vazio", () => {
+  it("identifica loja via dealership_id válido", () => {
     const v = adaptAdDetailToVehicle(
-      makeAd({ seller_type: null, dealership_name: "AutoCar Veículos" })
+      makeAd({ seller_kind: null, dealership_id: 42 })
     );
     expect(v.seller.type).toBe("dealer");
+  });
+
+  it("identifica loja via account_type=CNPJ sem dealership_id (loja sem advertiser)", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({ seller_kind: null, dealership_id: null, account_type: "CNPJ" })
+    );
+    expect(v.seller.type).toBe("dealer");
+  });
+
+  it("dealership_name SEM outros sinais → private (regressão 'ittmotors')", () => {
+    // Caso real: backend antigo deixava nome comercial em dealership_name
+    // mas o usuário era CPF e não havia advertiser registrado. Frontend
+    // NUNCA pode classificar como loja por nome.
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        seller_kind: null,
+        seller_type: null,
+        dealership_id: null,
+        dealership_name: "ittmotors",
+        account_type: "CPF",
+      })
+    );
+    expect(v.seller.type).toBe("private");
   });
 
   it("preserva 'particular' quando não há sinais de loja", () => {

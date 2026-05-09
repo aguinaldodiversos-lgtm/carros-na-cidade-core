@@ -129,9 +129,12 @@ export function normalizeCatalogItem(
     highlight_until: sanitizeText(item.highlight_until) || undefined,
     plan: sanitizeText(item.plan) || undefined,
     seller_type: sanitizeText(item.seller_type) || undefined,
+    seller_kind: sanitizeText(item.seller_kind) || undefined,
+    account_type: sanitizeText(item.account_type) || undefined,
     dealer_name: sanitizeText(item.dealer_name) || undefined,
     dealership_name: sanitizeText(item.dealership_name) || undefined,
     dealership_id: typeof item.dealership_id === "number" ? item.dealership_id : undefined,
+    reviewed_after_below_fipe: item.reviewed_after_below_fipe === true,
     created_at: sanitizeText(item.created_at) || undefined,
     catalogWeight: item.catalogWeight,
   };

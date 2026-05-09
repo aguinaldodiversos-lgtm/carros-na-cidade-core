@@ -9,10 +9,23 @@ export type SellStep = {
   description: string;
 };
 
+/**
+ * Tipo legado de depoimentos. NÃO popular com nomes/textos fictícios em
+ * produção — a rodada de credibilidade removeu os 3 depoimentos
+ * placeholder ("Carlos M.", "Prime Auto Center", "Fernanda R.") que
+ * apareciam como prova social não verificada. Mantemos o tipo apenas
+ * para retrocompatibilidade do contrato; quando houver depoimentos
+ * reais (com fonte verificável) eles entram aqui.
+ */
 export type SellTestimonial = {
   name: string;
   role: string;
   text: string;
+};
+
+export type SellTrustItem = {
+  title: string;
+  description: string;
 };
 
 export type SellFaq = {
@@ -40,6 +53,13 @@ export type SellPageContent = {
   dealerBenefits: SellBenefit[];
   privateSellerBenefits: SellBenefit[];
   testimonials: SellTestimonial[];
+  /**
+   * Itens de "Confiança e moderação" — substituem os depoimentos
+   * fictícios. Texto descreve regras REAIS do backend (antifraude,
+   * pending_review, denúncia → reavaliação). Sem promessas que o
+   * sistema ainda não cumpre (Detran, vistoria, garantia).
+   */
+  trust: SellTrustItem[];
   faq: SellFaq[];
   bottomCta: {
     title: string;
@@ -160,21 +180,26 @@ function fallbackContent(): SellPageContent {
         description: "O foco regional reduz ruído e aproxima o comprador certo.",
       },
     ],
-    testimonials: [
+    // Sem depoimentos fictícios. Quando houver nome+role+texto vindos
+    // de fonte verificável (case study assinado, post em rede social
+    // pública etc.), preencher este array — caso contrário, manter
+    // vazio e renderizar a seção `trust` no lugar (regras reais).
+    testimonials: [],
+    trust: [
       {
-        name: "Carlos M.",
-        role: "Vendedor particular • São Paulo",
-        text: "Gostei da proposta porque o anúncio fica com aparência muito mais profissional e o comprador já chega mais decidido.",
+        title: "Anúncios passam por checagem antes do destaque",
+        description:
+          "Sinais de risco (preço muito abaixo da FIPE, dados inconsistentes, telefones em descrição, contas novas) levam o anúncio para análise antes de aparecer publicamente.",
       },
       {
-        name: "Prime Auto Center",
-        role: "Lojista • Zona Sul",
-        text: "Para loja, o diferencial está na presença regional e na forma como o estoque ganha cara de operação séria.",
+        title: "Preço fora da curva exige revisão manual",
+        description:
+          "Se o valor publicado destoa muito da referência FIPE, a moderação revisa o anúncio antes de aprovar — protege comprador de golpe e vendedor de cadastro mal feito.",
       },
       {
-        name: "Fernanda R.",
-        role: "Vendedora particular • ABC",
-        text: "A combinação entre anúncio bonito, preço de referência e contato rápido ajuda muito na confiança.",
+        title: "Denúncias entram na fila de reavaliação",
+        description:
+          "Qualquer comprador pode denunciar um anúncio. As denúncias são revisadas e podem reabrir a análise do anúncio, sem expor dados de quem reportou.",
       },
     ],
     faq: [

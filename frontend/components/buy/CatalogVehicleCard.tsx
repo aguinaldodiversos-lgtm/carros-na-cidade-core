@@ -51,9 +51,12 @@ export type CatalogItem = AdItem & {
   highlight_until?: string | null;
   plan?: string | null;
   seller_type?: string | null;
+  seller_kind?: string | null;
+  account_type?: string | null;
   dealer_name?: string | null;
   dealership_name?: string | null;
   dealership_id?: number | null;
+  reviewed_after_below_fipe?: boolean | null;
   created_at?: string | null;
   catalogWeight?: 1 | 2 | 3 | 4;
 };
@@ -100,6 +103,9 @@ function toBaseAdData(item: CatalogItem, weight: 1 | 2 | 3 | 4): BaseAdData {
     dealership_name: item.dealership_name ?? null,
     dealer_name: item.dealer_name ?? null,
     seller_type: item.seller_type ?? null,
+    seller_kind: item.seller_kind ?? null,
+    account_type: item.account_type ?? null,
+    reviewed_after_below_fipe: item.reviewed_after_below_fipe ?? null,
   };
 }
 

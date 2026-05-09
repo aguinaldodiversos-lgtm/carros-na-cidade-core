@@ -18,6 +18,7 @@
  */
 import db from "../../infrastructure/database/db.js";
 import { buildR2PublicUrl } from "../../infrastructure/storage/r2.service.js";
+import { applyPublicTrustFields } from "./ads.public-trust.js";
 
 const LEGACY_UPLOADS_PREFIX = /^\/?uploads\/ads\//i;
 const STORAGE_KEY_PREFIX = /^vehicles\//i;
@@ -321,8 +322,13 @@ export async function normalizePublicAdRow(row) {
   const imagesByAdId = await listVehicleImagesByAdIds([row.id]);
   const normalizedImages = buildNormalizedPublicImages(row, imagesByAdId.get(Number(row.id)) || []);
 
+  // Trust pass: computa seller_kind/reviewed_after_below_fipe e remove
+  // campos sensíveis (risk_reasons, reviewed_by, rejection_reason, etc.)
+  // antes de devolver para a API pública.
+  const trusted = applyPublicTrustFields(row);
+
   return {
-    ...row,
+    ...trusted,
     images: normalizedImages,
     image_url: normalizedImages[0] || null,
   };
@@ -341,8 +347,10 @@ export async function normalizePublicAdRows(rows) {
       imagesByAdId.get(Number(row?.id)) || []
     );
 
+    const trusted = applyPublicTrustFields(row);
+
     return {
-      ...row,
+      ...trusted,
       images: normalizedImages,
       image_url: normalizedImages[0] || null,
     };

@@ -448,42 +448,77 @@ export default function SellPageClient({ content }: Props) {
           </div>
         </section>
 
-        <section className="mt-20">
-          <SectionTitle
-            eyebrow="Prova social"
-            title="Confiança e percepção comercial importam muito na decisão de anunciar"
-            subtitle="Mesmo antes da operação completa de reviews, a página já pode sustentar credibilidade com depoimentos e narrativa correta."
-            align="center"
-          />
+        {/*
+          Bloco "Confiança e moderação" substitui o "Prova social" antigo
+          (que listava 3 depoimentos fictícios "Carlos M./Prime Auto/
+          Fernanda R."). A copy aqui descreve REGRAS reais do backend:
+          antifraude, pending_review, denúncia → reavaliação. Sem
+          prometer Detran, vistoria ou garantia.
 
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
-            {content.testimonials.map((item) => (
-              <div
-                key={item.name}
-                className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
-              >
-                <div className="mb-4 flex gap-1 text-[#FFB648]">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <span key={index}>★</span>
-                  ))}
-                </div>
+          Quando houver depoimentos reais com fonte verificável, populá-los
+          em `content.testimonials` — o bloco passa a renderizar os cards
+          de depoimentos automaticamente. Enquanto vazio, mostramos as
+          regras de moderação (linguagem honesta no lugar de placeholder).
+        */}
+        <section className="mt-20" aria-label="Confiança e moderação">
+          {content.testimonials.length > 0 ? (
+            <>
+              <SectionTitle
+                eyebrow="Depoimentos"
+                title="O que vendedores reais já contaram sobre o portal"
+                subtitle="Casos compartilhados publicamente por anunciantes do Carros na Cidade."
+                align="center"
+              />
 
-                <p className="text-[16px] leading-8 text-[#4B536A]">“{item.text}”</p>
+              <div className="mt-10 grid gap-5 lg:grid-cols-3">
+                {content.testimonials.map((item) => (
+                  <div
+                    key={item.name}
+                    className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
+                  >
+                    <p className="text-[16px] leading-8 text-[#4B536A]">“{item.text}”</p>
 
-                <div className="mt-6">
-                  <div className="text-[17px] font-bold text-[#1D2440]">{item.name}</div>
-                  <div className="text-sm text-[#6E748A]">{item.role}</div>
-                </div>
+                    <div className="mt-6">
+                      <div className="text-[17px] font-bold text-[#1D2440]">{item.name}</div>
+                      <div className="text-sm text-[#6E748A]">{item.role}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <>
+              <SectionTitle
+                eyebrow="Confiança e moderação"
+                title="Como protegemos quem anuncia e quem compra"
+                subtitle="Anúncios passam por checagens automáticas antes de aparecer no catálogo. Não fazemos consulta Detran nem vistoria física, mas removemos sinais óbvios de risco e aceitamos denúncia pública."
+                align="center"
+              />
+
+              <div className="mt-10 grid gap-5 lg:grid-cols-3">
+                {content.trust.map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
+                  >
+                    <div className="text-[17px] font-bold leading-snug text-[#1D2440]">
+                      {item.title}
+                    </div>
+                    <p className="mt-3 text-[15px] leading-7 text-[#4B536A]">
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </section>
 
         <section className="mt-20">
           <SectionTitle
             eyebrow="Perguntas frequentes"
             title="Dúvidas comuns antes de começar"
-            subtitle="Aqui entramos com objeções comerciais básicas para reduzir atrito antes do cadastro."
+            subtitle="Quem pode anunciar, como funciona o contato com o comprador e o que esperar do fluxo."
             align="center"
           />
 

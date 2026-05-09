@@ -9,6 +9,7 @@ import { VehicleImage } from "@/components/ui/VehicleImage";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
+import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
 
 /**
  * AdCard — componente OFICIAL e ÚNICO de card de anúncio.
@@ -67,7 +68,17 @@ export type BaseAdData = {
   dealership_id?: string | number | null;
   dealership_name?: string | null;
   dealer_name?: string | null;
+  /** Compat: backend agora envia `seller_kind` ('dealer'|'private'). */
   seller_type?: string | null;
+  /** Fonte canônica do tipo de anunciante (backend trust pass). */
+  seller_kind?: string | null;
+  /** users.document_type (CPF|CNPJ) — fallback do mapper único. */
+  account_type?: string | null;
+  /**
+   * Backend computa após moderação aprovar anúncio com sinal de
+   * preço abaixo da FIPE. Se true, AdCard mostra selo "Anúncio analisado".
+   */
+  reviewed_after_below_fipe?: boolean | null;
 };
 
 export type AdCardVariant =
@@ -280,7 +291,10 @@ function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   return 1;
 }
 
-type BadgeChip = { label: string; variant: "success" | "warning" | "info" | "premium" };
+type BadgeChip = {
+  label: string;
+  variant: "success" | "warning" | "info" | "premium" | "reviewed";
+};
 
 function resolveBadge(item: BaseAdData): BadgeChip | null {
   if (item.badge) {
@@ -299,9 +313,15 @@ function resolveBadge(item: BaseAdData): BadgeChip | null {
 }
 
 /**
- * Combina sinais "destaque" e "abaixo da FIPE" em até 2 chips coloridos
- * lado a lado — padrão Webmotors. Ordem fixa: destaque (warning) primeiro,
- * abaixo-da-fipe (success) depois.
+ * Combina sinais "destaque", "abaixo da FIPE" e "anúncio analisado" em
+ * até 3 chips coloridos lado a lado. Ordem fixa: destaque (warning),
+ * abaixo-da-fipe (success), anúncio analisado (reviewed).
+ *
+ * "Anúncio analisado" SÓ aparece quando o backend marcou
+ * `reviewed_after_below_fipe` (anúncio entrou em pending_review por sinal
+ * de preço abaixo da FIPE e foi aprovado pela moderação). Frontend
+ * NUNCA infere este selo a partir de outras heurísticas — risco de
+ * passar mensagem de "garantia" indevidamente.
  */
 function resolveBadges(item: BaseAdData): BadgeChip[] {
   const out: BadgeChip[] = [];
@@ -309,6 +329,9 @@ function resolveBadges(item: BaseAdData): BadgeChip[] {
   if (weight === 4) out.push({ label: "OFERTA DESTAQUE", variant: "warning" });
   else if (weight === 3) out.push({ label: "LOJA PREMIUM", variant: "premium" });
   if (item.below_fipe) out.push({ label: "ABAIXO DA FIPE", variant: "success" });
+  if (item.reviewed_after_below_fipe === true) {
+    out.push({ label: "ANÚNCIO ANALISADO", variant: "reviewed" });
+  }
   // Se o backend mandou um item.badge custom e ainda não temos nada, usa.
   if (out.length === 0 && item.badge) {
     const single = resolveBadge(item);
@@ -475,15 +498,12 @@ function DealerPill({ name }: { name: string }) {
 }
 
 function isDealerListing(item: BaseAdData): boolean {
-  if (item.dealership_name && String(item.dealership_name).trim()) return true;
-  if (item.dealer_name && String(item.dealer_name).trim()) return true;
-  const sellerType = String(item.seller_type || "").toLowerCase();
-  if (sellerType === "dealer" || sellerType === "dealership" || sellerType === "premium")
-    return true;
-  const plan = String(item.plan || "").toLowerCase();
-  if (["premium", "pro", "plus", "master", "dealer"].some((token) => plan.includes(token)))
-    return true;
-  return false;
+  // Fonte única: o mapper canônico em lib/vehicle/seller-kind.ts.
+  // Antes, esta função inferia "loja" também por `dealership_name` ou
+  // `plan` premium — heurística que classificava errado casos como
+  // particulares com plano premium ativo. Agora delegamos ao mapper
+  // que prioriza dealership_id (loja registrada) e document_type CNPJ.
+  return resolveSellerKind(item) === "dealer";
 }
 
 function dealerLabelFor(item: BaseAdData): string {
@@ -651,10 +671,20 @@ function BadgeChipPill({ chip }: { chip: BadgeChip }) {
     warning: "bg-cnc-warning/15 text-cnc-warning ring-cnc-warning/40",
     info: "bg-primary-soft text-primary ring-primary/30",
     premium: "bg-violet-100 text-violet-700 ring-violet-300/60",
+    // Selo "ANÚNCIO ANALISADO" — sóbrio, sem cor de "garantia". Slate
+    // claro com tipografia do DS evita conotação de "verificado pelo
+    // governo" / "compra segura garantida". Comunica REVISÃO, não
+    // garantia.
+    reviewed: "bg-slate-100 text-slate-700 ring-slate-300/70",
   };
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] ring-1 ring-inset ${palette[chip.variant]}`}
+      title={
+        chip.variant === "reviewed"
+          ? "Este anúncio passou por revisão antes de ser exibido."
+          : undefined
+      }
     >
       {chip.label}
     </span>

@@ -32,9 +32,21 @@ type MobileHeroProps = {
   bodyTypeChip?: string | null;
   /** Quando o anúncio está abaixo da FIPE, mostra o pill colorido. */
   isBelowFipe?: boolean;
+  /**
+   * Backend marca true quando o anúncio passou por revisão manual após
+   * sinal de preço abaixo da FIPE. Renderizamos um chip "Anúncio analisado"
+   * — sóbrio, sem cor de garantia. Texto auxiliar via `title` HTML.
+   */
+  reviewedAfterBelowFipe?: boolean;
 };
 
-export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: MobileHeroProps) {
+export default function MobileHero({
+  images,
+  alt,
+  bodyTypeChip,
+  isBelowFipe,
+  reviewedAfterBelowFipe,
+}: MobileHeroProps) {
   const [failedImages, setFailedImages] = useState<string[]>([]);
 
   const safeImages = useMemo(() => {
@@ -125,6 +137,15 @@ export default function MobileHero({ images, alt, bodyTypeChip, isBelowFipe }: M
             <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700 shadow-sm">
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Abaixo da FIPE
+            </span>
+          ) : null}
+          {reviewedAfterBelowFipe ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-700 shadow-sm"
+              title="Este anúncio passou por revisão antes de ser exibido."
+            >
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+              Anúncio analisado
             </span>
           ) : null}
         </div>

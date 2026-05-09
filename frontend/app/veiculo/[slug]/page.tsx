@@ -92,6 +92,7 @@ function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
     fipeDeltaPercent: null,
     isPaidListing: false,
     advertiserId: null,
+    reviewedAfterBelowFipe: false,
     images: [],
     hasRealImages: false,
     description:

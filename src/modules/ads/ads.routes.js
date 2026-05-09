@@ -1,5 +1,6 @@
 import express from "express";
 import * as adsController from "./ads.controller.js";
+import * as adReportsController from "./reports/ad-reports.controller.js";
 import * as autocompleteController from "./autocomplete/ads-autocomplete.controller.js";
 import { adsPublishImageUpload } from "./ads-upload.middleware.js";
 import { VEHICLE_IMAGE_MAX_FILES } from "./ads.upload.constants.js";
@@ -57,6 +58,14 @@ router.get(
   authMiddleware,
   adsController.publicationOptions
 );
+
+// Denúncia pública de anúncio. Aceita anônimo (sem authMiddleware) com
+// rate limit por IP (sha256 hash) no service. Logado tem precedência se
+// req.user já estiver populado por algum middleware upstream — mas não
+// exigimos auth para reduzir fricção do fluxo do comprador.
+// DEVE ficar ANTES de GET /:identifier para não ser engolido pela rota
+// genérica de show.
+router.post("/:id/report", adReportsController.create);
 
 router.get("/:identifier", adsController.show);
 

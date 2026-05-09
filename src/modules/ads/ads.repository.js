@@ -107,17 +107,32 @@ export async function findById(id) {
 export async function findAdByIdentifier(identifier) {
   const isNumeric = /^\d+$/.test(String(identifier));
 
+  // SELECT inclui:
+  //   - dealership_id      → fonte canônica de "isto é loja" (advertiser
+  //                          com company_name preenchido OU CNPJ
+  //                          associado). Frontend NÃO infere mais por
+  //                          nome do anunciante.
+  //   - account_type       → users.document_type ('CPF'|'CNPJ') do
+  //                          owner; usado pelo seller-type mapper único.
+  //   - risk_reasons,
+  //     reviewed_at,
+  //     reviewed_by        → já em a.* (migration 025); permite o
+  //                          frontend computar o selo "Anúncio
+  //                          analisado" para below-fipe aprovado.
   const baseQuery = `
     SELECT
       a.*,
       c.slug AS city_slug,
-      adv.name        AS seller_name,
+      adv.id           AS dealership_id,
+      adv.name         AS seller_name,
       adv.company_name AS dealership_name,
-      adv.phone       AS seller_phone,
+      adv.phone        AS seller_phone,
+      u.document_type  AS account_type,
       COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number
     FROM ads a
-    LEFT JOIN cities c      ON c.id = a.city_id
+    LEFT JOIN cities c        ON c.id = a.city_id
     LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    LEFT JOIN users u         ON u.id = adv.user_id
     WHERE ${isNumeric ? "a.id = $1" : "a.slug = $1"}
       AND a.status = $2
     LIMIT 1

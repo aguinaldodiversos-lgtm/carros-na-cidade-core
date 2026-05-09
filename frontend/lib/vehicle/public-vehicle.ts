@@ -3,6 +3,7 @@ import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { normalizeVehicleGalleryImages } from "@/lib/vehicle/detail-utils";
+import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
 
 export type SellerDealer = {
   type: "dealer";
@@ -56,6 +57,12 @@ export type VehicleDetail = {
   isPaidListing: boolean;
   /** ID do anunciante na base, quando disponível */
   advertiserId: string | null;
+  /**
+   * True quando o backend marcou o anúncio como aprovado por moderação
+   * após sinal de preço abaixo da FIPE. Frontend exibe selo "Anúncio
+   * analisado" — nunca como "garantia". False/undefined → sem selo.
+   */
+  reviewedAfterBelowFipe: boolean;
   images: string[];
   hasRealImages: boolean;
   description: string;
@@ -385,26 +392,12 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
     sanitizeNullableText((ad as PublicAdDetail & { phone?: string | null }).phone) ||
     undefined;
 
-  const plan = sanitizeText(ad.plan).toLowerCase();
-  const sellerType = sanitizeText(
-    (ad as PublicAdDetail & { seller_type?: string | null }).seller_type
-  ).toLowerCase();
-  // Detecção de loja: amplia o sinal para `seller_type` (dealer/dealership/
-  // premium/basic) — antes só plan/dealership_name eram considerados, então
-  // anúncios cadastrados como loja mas sem plan pago apareciam como
-  // "particular" no detalhe público.
-  const isDealer =
-    Boolean(dealershipName) ||
-    sellerType === "dealer" ||
-    sellerType === "dealership" ||
-    sellerType === "loja" ||
-    sellerType === "premium" ||
-    sellerType === "basic" ||
-    plan.includes("premium") ||
-    plan.includes("pro") ||
-    plan.includes("plus") ||
-    plan.includes("master") ||
-    plan.includes("dealer");
+  // Tipo do anunciante via mapper único (frontend/lib/vehicle/seller-kind.ts).
+  // O mapper consome `seller_kind` (backend trust pass) ou cai em
+  // dealership_id/account_type — NUNCA infere por nome do anunciante.
+  // Antes, esta função aceitava plan="premium" como sinal de loja, o
+  // que classificava errado particular com plano premium.
+  const isDealer = resolveSellerKind(ad) === "dealer";
 
   if (isDealer) {
     const cityDisplay = deriveCityDisplay(ad.city, ad.state);
@@ -516,6 +509,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     fipeDeltaPercent,
     isPaidListing,
     advertiserId,
+    reviewedAfterBelowFipe: ad.reviewed_after_below_fipe === true,
     images,
     hasRealImages: images.length > 0,
     description: safeDescription,

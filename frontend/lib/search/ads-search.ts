@@ -76,10 +76,19 @@ export interface AdItem {
   photos?: unknown;
   gallery?: unknown;
   seller_type?: string | null;
+  seller_kind?: string | null;
+  account_type?: string | null;
   seller_name?: string | null;
   dealer_name?: string | null;
   dealership_name?: string | null;
   dealership_id?: number | null;
+  /**
+   * Backend marca este flag quando o anúncio entrou em pending_review por
+   * sinal de preço abaixo da FIPE e foi aprovado pela moderação. Frontend
+   * usa o flag para renderizar o selo "Anúncio analisado" em AdCard e no
+   * detalhe — nunca infere por outras heurísticas.
+   */
+  reviewed_after_below_fipe?: boolean | null;
 }
 
 export interface AdsPagination {
@@ -221,10 +230,13 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     photos: item.photos,
     gallery: item.gallery,
     seller_type: toNullableText(item.seller_type),
+    seller_kind: toNullableText(item.seller_kind),
+    account_type: toNullableText(item.account_type),
     seller_name: toNullableText(item.seller_name),
     dealer_name: toNullableText(item.dealer_name),
     dealership_name: toNullableText(item.dealership_name),
     dealership_id: toOptionalNumber(item.dealership_id) ?? null,
+    reviewed_after_below_fipe: item.reviewed_after_below_fipe === true,
   };
 }
 

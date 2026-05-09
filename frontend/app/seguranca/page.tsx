@@ -16,6 +16,20 @@ export default function SegurancaPage() {
       description="Negociar carro envolve dinheiro e documento: abaixo estão boas práticas alinhadas ao que o Carros na Cidade é — um lugar para encontrar ofertas e contatos, não um substituto da sua cautela na hora de fechar negócio."
       sections={[
         {
+          // Bloco novo (rodada de credibilidade): explicita o que o portal
+          // FAZ e o que NÃO FAZ em moderação. Linguagem alinhada ao
+          // backend real (antifraude/pending_review/risk_signals em
+          // src/modules/ads/risk/) — sem prometer Detran, vistoria ou
+          // garantia de procedência.
+          title: "O que o Carros na Cidade faz na moderação dos anúncios",
+          body: [
+            "Anúncios com sinais de risco (preço muito abaixo da FIPE, fotos genéricas, dados inconsistentes, links ou telefones na descrição, contas recém-criadas) podem ir para análise antes de aparecer publicamente.",
+            "Anúncios denunciados entram na fila de reavaliação — podem voltar para análise e ser despublicados se confirmarmos o problema.",
+            "Anúncios reprovados (ex.: dados que não batem, suspeita de golpe, conteúdo proibido) são removidos do catálogo público.",
+            "O que NÃO fazemos: consulta Detran, vistoria física, validação documental completa nem garantia de procedência. Use a checagem do veículo como complemento, não como única fonte de confiança.",
+          ],
+        },
+        {
           title: "Antes de combinar visita ou test-drive",
           body: [
             "Confira se o anúncio faz sentido (preço muito abaixo do mercado, fotos genéricas ou dados incompletos merecem desconfiança).",
