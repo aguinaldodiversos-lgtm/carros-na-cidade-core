@@ -64,6 +64,11 @@ const CreateAdSchema = z.object({
   fipe_model_code: z.string().trim().min(1).max(32).optional().nullable(),
   fipe_year_code: z.string().trim().min(1).max(16).optional().nullable(),
   fipe_code: z.string().trim().min(1).max(32).optional().nullable(),
+  /**
+   * Mês de referência da cotação FIPE (ex: "maio de 2026"). Auditoria
+   * apenas — gravado em ad_moderation_events, não decide nada.
+   */
+  fipe_reference_month: z.string().trim().min(1).max(64).optional().nullable(),
   vehicle_type: z.enum(["carros", "motos", "caminhoes"]).optional().nullable(),
 });
 

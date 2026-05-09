@@ -52,6 +52,15 @@ function parsePublishWizardForm(source: FormData): PublishWizardInput {
     mileage: firstText(source, "mileage"),
     price: firstText(source, "price"),
     fipeValue: firstText(source, "fipeValue"),
+    // Códigos canônicos da FIPE (Tarefa 4 da rodada de integração end-to-end).
+    // Strings vazias significam "não consultou FIPE" — backend cai em
+    // FIPE_UNAVAILABLE, regra segura. Nunca usar `fipeValue` como fonte.
+    fipeBrandCode: firstText(source, "fipeBrandCode"),
+    fipeModelCode: firstText(source, "fipeModelCode"),
+    fipeYearCode: firstText(source, "fipeYearCode"),
+    fipeCode: firstText(source, "fipeCode"),
+    fipeReferenceMonth: firstText(source, "fipeReferenceMonth"),
+    fipeVehicleType: firstText(source, "fipeVehicleType"),
     city: firstText(source, "city"),
     state: firstText(source, "state"),
     fuel: firstText(source, "fuel"),

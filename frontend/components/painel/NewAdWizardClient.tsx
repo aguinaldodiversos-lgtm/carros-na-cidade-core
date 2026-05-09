@@ -37,6 +37,12 @@ const INITIAL_FORM: WizardFormState = {
   fipeBrandCode: "",
   fipeModelCode: "",
   fipeYearCode: "",
+  // Adicionados em 2026-05-08 (rodada de integração FIPE end-to-end).
+  // Drafts antigos do localStorage (sem estes campos) são rehidratados
+  // com strings vazias via spread ...INITIAL_FORM em buildInitialState
+  // — backward-compat preservada.
+  fipeCode: "",
+  fipeReferenceMonth: "",
   brandLabel: "",
   modelLabel: "",
   yearModel: "",
@@ -392,6 +398,16 @@ export default function NewAdWizardClient({ initialType }: Props) {
       payload.append("mileage", form.mileage);
       payload.append("price", form.price);
       payload.append("fipeValue", form.fipeValue);
+      // Códigos canônicos da FIPE — encaminhados ao backend para que o
+      // Backend FIPE Service consulte server-side com confidence='high'.
+      // Strings vazias = ausentes; backend cai em FIPE_UNAVAILABLE
+      // (regra segura, não bloqueia publicação).
+      payload.append("fipeBrandCode", form.fipeBrandCode || "");
+      payload.append("fipeModelCode", form.fipeModelCode || "");
+      payload.append("fipeYearCode", form.fipeYearCode || "");
+      payload.append("fipeCode", form.fipeCode || "");
+      payload.append("fipeReferenceMonth", form.fipeReferenceMonth || "");
+      payload.append("fipeVehicleType", form.fipeVehicleType || "carros");
       payload.append("city", form.city);
       payload.append("state", form.state);
       payload.append("cityId", String(form.cityId));

@@ -7,6 +7,18 @@ export type WizardFormState = {
   fipeBrandCode: string;
   fipeModelCode: string;
   fipeYearCode: string;
+  /**
+   * Código FIPE oficial (ex: "001234-5"), retornado pelo
+   * `fetchFipeQuote` quando a cotação é bem-sucedida. Persistido em
+   * localStorage para sobreviver a refresh entre Step 0 (consulta) e
+   * Step 4 (submit). Apenas auditoria — backend ignora se vier vazio.
+   */
+  fipeCode: string;
+  /**
+   * Mês de referência da cotação FIPE (ex: "maio de 2026"). Usado pelo
+   * admin para auditoria do snapshot. NÃO é fonte de decisão.
+   */
+  fipeReferenceMonth: string;
   brandLabel: string;
   modelLabel: string;
   yearModel: string;

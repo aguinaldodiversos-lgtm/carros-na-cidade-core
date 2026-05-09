@@ -153,6 +153,8 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         yearManufacture: "",
         versionLabel: "",
         fipeValue: "",
+        fipeCode: "",
+        fipeReferenceMonth: "",
       });
     },
     [brands, patch]
@@ -170,6 +172,8 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         yearManufacture: "",
         versionLabel: "",
         fipeValue: "",
+        fipeCode: "",
+        fipeReferenceMonth: "",
       });
     },
     [patch]
@@ -186,6 +190,8 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         yearManufacture: "",
         versionLabel: "",
         fipeValue: "",
+        fipeCode: "",
+        fipeReferenceMonth: "",
       });
     },
     [models, patch]
@@ -199,6 +205,8 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         yearManufacture: "",
         versionLabel: "",
         fipeValue: "",
+        fipeCode: "",
+        fipeReferenceMonth: "",
       });
     },
     [patch]
@@ -226,8 +234,16 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
                 priceNum
               )
             : "";
+        // Persiste o código FIPE e o mês de referência ao lado dos outros
+        // identificadores. Esses campos são encaminhados ao BFF/backend
+        // (via FormData no submit final) e usados pelo Backend FIPE Service
+        // para cotação server-side com confidence='high'. Strings vazias
+        // são tratadas como ausentes — backend cai em FIPE_UNAVAILABLE.
         patch({
           fipeValue: formatted,
+          fipeCode: typeof quote.fipeCode === "string" ? quote.fipeCode.trim() : "",
+          fipeReferenceMonth:
+            typeof quote.referenceMonth === "string" ? quote.referenceMonth.trim() : "",
           fuel: quote.fuel || state.fuel,
           yearModel: quote.modelYear?.trim() || state.yearModel,
         });

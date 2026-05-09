@@ -25,7 +25,25 @@ export type PublishWizardInput = {
   yearModel: string;
   mileage: string;
   price: string;
+  /**
+   * `fipeValue` é o valor monetário formatado que o cliente vê na UI
+   * (após `fetchFipeQuote`). NÃO é fonte autoritativa — o backend o
+   * trata como `client_hint_value` e ignora para decisão de risco.
+   */
   fipeValue: string;
+  /**
+   * Códigos canônicos da Tabela FIPE (parallelum). Quando presentes,
+   * permitem que o Backend FIPE Service cote o veículo server-side com
+   * `confidence='high'` (ver `src/modules/fipe/fipe.service.js`). Sem
+   * eles, o backend usa `FIPE_UNAVAILABLE` — não bloqueia publicação,
+   * mas também não consegue detectar preço abaixo da FIPE.
+   */
+  fipeBrandCode?: string;
+  fipeModelCode?: string;
+  fipeYearCode?: string;
+  fipeCode?: string;
+  fipeReferenceMonth?: string;
+  fipeVehicleType?: string;
   city: string;
   state: string;
   fuel: string;
@@ -57,11 +75,22 @@ export type BackendCreateAdPayload = {
   transmission?: string | null;
   below_fipe: boolean;
   /**
-   * Valor FIPE consultado no wizard. Permite que o adRiskService no backend
-   * calcule a diferença percentual e decida PENDING_REVIEW. Opcional —
-   * `null` é tratado como `FIPE_UNAVAILABLE` (não bloqueia).
+   * Valor FIPE consultado no wizard. Aceito apenas como hint informativo
+   * de baixa confiança — o Backend FIPE Service ignora como fonte
+   * autoritativa (anti-spoof). Para o backend cotar com confidence='high',
+   * passe os códigos canônicos abaixo.
    */
   fipe_value?: number | null;
+  /**
+   * Códigos canônicos da FIPE (parallelum). Quando enviados, o backend
+   * cota server-side e detecta automaticamente preço abaixo da FIPE.
+   */
+  fipe_brand_code?: string;
+  fipe_model_code?: string;
+  fipe_year_code?: string;
+  fipe_code?: string;
+  fipe_reference_month?: string;
+  vehicle_type?: "carros" | "motos" | "caminhoes";
   images?: string[];
 };
 
@@ -153,6 +182,18 @@ export function buildBackendCreateAdPayload(
     transmission: n.transmission?.trim() || null,
     below_fipe: belowFipe,
     fipe_value: fipe > 0 ? fipe : null,
+    // Códigos canônicos: incluídos APENAS quando não vazios. Permitem ao
+    // Backend FIPE Service cotar server-side e atingir confidence='high'.
+    ...(n.fipeBrandCode?.trim() ? { fipe_brand_code: n.fipeBrandCode.trim() } : {}),
+    ...(n.fipeModelCode?.trim() ? { fipe_model_code: n.fipeModelCode.trim() } : {}),
+    ...(n.fipeYearCode?.trim() ? { fipe_year_code: n.fipeYearCode.trim() } : {}),
+    ...(n.fipeCode?.trim() ? { fipe_code: n.fipeCode.trim() } : {}),
+    ...(n.fipeReferenceMonth?.trim()
+      ? { fipe_reference_month: n.fipeReferenceMonth.trim() }
+      : {}),
+    ...(n.fipeVehicleType === "motos" || n.fipeVehicleType === "caminhoes"
+      ? { vehicle_type: n.fipeVehicleType }
+      : {}),
     ...(cleanedUrls.length > 0 ? { images: cleanedUrls } : {}),
   };
 }

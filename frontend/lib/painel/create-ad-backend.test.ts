@@ -119,6 +119,62 @@ describe("buildBackendCreateAdPayload", () => {
     const result = buildBackendCreateAdPayload(baseInput, resolvedCity, "CPF", urls);
     expect(result.images?.length).toBe(24);
   });
+
+  describe("códigos FIPE encaminhados ao backend", () => {
+    it("encaminha fipe_brand_code/fipe_model_code/fipe_year_code/fipe_code/fipe_reference_month quando presentes", () => {
+      const input: PublishWizardInput = {
+        ...baseInput,
+        fipeBrandCode: "23",
+        fipeModelCode: "5585",
+        fipeYearCode: "2018-1",
+        fipeCode: "001234-5",
+        fipeReferenceMonth: "maio de 2026",
+        fipeVehicleType: "carros",
+      };
+      const result = buildBackendCreateAdPayload(input, resolvedCity, "CPF", []);
+      expect(result.fipe_brand_code).toBe("23");
+      expect(result.fipe_model_code).toBe("5585");
+      expect(result.fipe_year_code).toBe("2018-1");
+      expect(result.fipe_code).toBe("001234-5");
+      expect(result.fipe_reference_month).toBe("maio de 2026");
+      // vehicle_type só é incluído para motos/caminhoes — carros é default no backend.
+      expect(result.vehicle_type).toBeUndefined();
+    });
+
+    it("inclui vehicle_type apenas para motos/caminhoes", () => {
+      const motos = buildBackendCreateAdPayload(
+        { ...baseInput, fipeVehicleType: "motos" },
+        resolvedCity,
+        "CPF",
+        []
+      );
+      expect(motos.vehicle_type).toBe("motos");
+    });
+
+    it("strings vazias são omitidas (backend cai em FIPE_UNAVAILABLE, regra segura)", () => {
+      const input: PublishWizardInput = {
+        ...baseInput,
+        fipeBrandCode: "",
+        fipeModelCode: "   ",
+        fipeYearCode: undefined,
+        fipeCode: undefined,
+      };
+      const result = buildBackendCreateAdPayload(input, resolvedCity, "CPF", []);
+      expect(result.fipe_brand_code).toBeUndefined();
+      expect(result.fipe_model_code).toBeUndefined();
+      expect(result.fipe_year_code).toBeUndefined();
+      expect(result.fipe_code).toBeUndefined();
+    });
+
+    it("baseline (sem códigos): payload continua válido — backward-compat", () => {
+      const result = buildBackendCreateAdPayload(baseInput, resolvedCity, "CPF", []);
+      expect(result.fipe_brand_code).toBeUndefined();
+      expect(result.fipe_model_code).toBeUndefined();
+      expect(result.fipe_year_code).toBeUndefined();
+      // fipe_value continua aceito (hint informativo backend ignora como autoritativo).
+      expect(result.fipe_value).toBe(40000);
+    });
+  });
 });
 
 describe("extractBackendErrorMessage", () => {

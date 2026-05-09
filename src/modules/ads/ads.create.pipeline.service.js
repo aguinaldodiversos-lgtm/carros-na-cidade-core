@@ -92,6 +92,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
       fipe_model_code: validated.fipe_model_code ?? null,
       fipe_year_code: validated.fipe_year_code ?? null,
       fipe_code: validated.fipe_code ?? null,
+      fipe_reference_month: validated.fipe_reference_month ?? null,
       vehicle_type: validated.vehicle_type ?? null,
       client_hint_value: validated.fipe_value ?? null,
     });
