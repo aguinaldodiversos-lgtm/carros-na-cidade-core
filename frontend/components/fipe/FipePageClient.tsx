@@ -20,34 +20,26 @@ import type { FipeOption, FipeQuote, FipeVehicleType } from "@/lib/fipe/fipe-pro
  * Página de consulta da Tabela FIPE — mobile-first, contrato visual
  * oficial em `frontend/public/images/Fipe.png`.
  *
- * Estrutura (mobile-first; em sm+ o form abre 3 cols e o card de
- * resultado coloca a ilustração à esquerda):
+ * Estrutura atual:
  *
  *   1. Título "Consultar Tabela FIPE" + sub
- *   2. Card de formulário:
- *        Marca / Modelo / Ano  (3 cols em sm+)
- *        Botão azul "Consultar valor FIPE" — full-width abaixo, com
- *        ícone de lupa
- *   3. Card de resultado (imagem + bloco de info empilhado em mobile,
- *      lado-a-lado em sm+): pill "Valor médio FIPE", título, versão,
- *      pílulas de specs (combustível / câmbio / carroceria / portas
- *      detectados heuristicamente do model string da FIPE), "Valor FIPE"
- *      em destaque, referência. Caption "Referência visual do valor
- *      FIPE" abaixo da ilustração.
+ *   2. Card de formulário (Marca/Modelo/Ano + botão "Consultar valor FIPE")
+ *   3. Card de resultado (quando há cotação)
  *   4. Card "Por que consultar a FIPE conosco?" — 3 features
- *   5. "Ofertas próximas do modelo" + "Ver todas →" (carrossel mobile,
- *      grid desktop)
- *   6. CTA "Anuncie grátis no portal" — ilustração PNG (phone + carro
- *      + selo "GRÁTIS") + botão
- *   7. CTA "Ver carros abaixo da FIPE em [cidade]"
- *   8. SiteBottomNav (fora do <main>)
+ *   5. "Ofertas próximas do modelo" — quando há anúncio elegível
+ *   6. CTA secundário "Ver carros abaixo da FIPE em [cidade]"
+ *   7. SiteBottomNav (fora do <main>) — FAB "Anunciar" continua disponível
+ *
+ * NOTA — rodada de simplificação: removemos o banner promocional que
+ * duplicava o CTA de criação de anúncio já presente no Header desktop e
+ * no FAB do SiteBottomNav mobile. A página é uma ferramenta de consulta
+ * FIPE; CTAs comerciais redundantes desviavam o foco da intenção de uso.
+ * O CTA secundário do final é puramente de COMPRA (carros abaixo da
+ * FIPE na cidade) — não duplica o CTA global de criação de anúncio.
  *
  * Imagens estáticas em `public/images/fipe/`:
  *   - result-illustration.png  → ilustração do clipboard FIPE no card
  *                                de resultado (com fundo transparente).
- *   - anuncie-gratis.png       → ilustração do phone + carro com selo
- *                                "GRÁTIS" (fundo transparente) no banner
- *                                "Anuncie grátis no portal".
  *
  * Se o PNG estiver ausente, `<VehicleImage onError>` cai silenciosamente
  * no `VehicleImagePlaceholder` do design system — a página não quebra.
@@ -80,7 +72,6 @@ interface FipePageClientProps {
 }
 
 const FIPE_RESULT_ILLUSTRATION = "/images/fipe/result-illustration.png";
-const FIPE_ANUNCIE_GRATIS_ILLUSTRATION = "/images/fipe/anuncie-gratis.png";
 
 /* ---------------- Icons ---------------- */
 
@@ -547,10 +538,14 @@ export function FipePageClient({
             </section>
           ) : null}
 
-          {/* 6 — CTA Anuncie grátis no portal */}
-          <AnunciarFreeBanner />
+          {/*
+            6 — Removido: banner "Anuncie grátis no portal".
+            CTA de criar anúncio já está no Header desktop e no FAB do
+            SiteBottomNav mobile. Manter o banner aqui era duplicidade
+            comercial em uma página de consulta FIPE.
+          */}
 
-          {/* 7 — Promo: ver carros abaixo da FIPE em [cidade] */}
+          {/* 6 — CTA secundário: ver carros abaixo da FIPE em [cidade] */}
           <section className="mt-4">
             <div className="rounded-2xl border border-primary/20 bg-primary-soft px-4 py-3.5 sm:px-5 sm:py-4">
               <div className="flex flex-wrap items-center gap-3">
@@ -781,52 +776,6 @@ function WhyConsultFipeCard() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ----------------------------------------------------------------------
- * "Anuncie grátis no portal" — CTA com PNG (phone + carro + selo GRÁTIS)
- * ---------------------------------------------------------------------- */
-
-function AnunciarFreeBanner() {
-  return (
-    <section className="mt-6">
-      <div className="overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#dbe7ff_0%,#eef4ff_55%,#f3edff_100%)] p-4 sm:p-5">
-        <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
-          <div className="mx-auto flex h-[120px] w-[160px] shrink-0 items-center justify-center overflow-hidden sm:mx-0 sm:h-[140px] sm:w-[180px]">
-            <VehicleImage
-              src={FIPE_ANUNCIE_GRATIS_ILLUSTRATION}
-              alt="Anuncie seu carro grátis no portal"
-              width={180}
-              height={140}
-              variant="card"
-              sizes="(min-width: 640px) 180px, 160px"
-              className="max-h-full max-w-full object-contain"
-              fallbackLabel="Anuncie"
-            />
-          </div>
-
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <h3 className="text-[15px] font-extrabold leading-tight text-cnc-text-strong sm:text-[17px]">
-              Anuncie grátis no portal
-            </h3>
-            <p className="mt-1 text-[12.5px] leading-snug text-cnc-muted sm:text-[13.5px]">
-              Cadastre seu veículo sem custo e alcance compradores da sua região.
-            </p>
-          </div>
-
-          <Link
-            href="/anunciar/novo"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13.5px] font-bold text-white shadow-card transition hover:bg-primary-strong sm:h-12 sm:w-auto sm:text-[14px]"
-          >
-            Criar anúncio grátis
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
-              <ArrowRightIcon className="h-3.5 w-3.5" />
-            </span>
-          </Link>
         </div>
       </div>
     </section>

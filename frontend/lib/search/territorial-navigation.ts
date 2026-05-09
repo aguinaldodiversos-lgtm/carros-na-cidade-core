@@ -36,6 +36,12 @@ function compactItems<T>(items: Array<T | null | undefined>): T[] {
 }
 
 function buildPrimaryRouteItems(data: TerritorialPagePayload, links: TerritorialInternalLinks) {
+  // Fusão /oportunidades → /abaixo-da-fipe (rodada de simplificação):
+  // ambas tinham mesma intenção (anúncios below_fipe) e mesmos cards. A
+  // rota canônica transacional é /abaixo-da-fipe; suprimimos o item
+  // "Ver oportunidades locais" para não oferecer duas portas para o
+  // mesmo destino. O backend ainda devolve `links.opportunities` (mesma
+  // URL pré-redirect), mas ela não vira chip aqui.
   return compactItems<TerritorialNavItem>([
     links.city && !isCurrentPath(data, links.city)
       ? {
@@ -44,18 +50,15 @@ function buildPrimaryRouteItems(data: TerritorialPagePayload, links: Territorial
           badge: toTotalBadge(data.stats?.totalAds),
         }
       : null,
-    links.opportunities && !isCurrentPath(data, links.opportunities)
-      ? {
-          label: "Ver oportunidades locais",
-          href: links.opportunities,
-          badge: toTotalBadge(data.stats?.totalOpportunityAds),
-        }
-      : null,
     links.belowFipe && !isCurrentPath(data, links.belowFipe)
       ? {
           label: "Ver carros abaixo da FIPE",
           href: links.belowFipe,
-          badge: toTotalBadge(data.stats?.totalBelowFipeAds),
+          // Soma o que vinha em totalOpportunityAds (mesma intenção):
+          // se o backend devolve só um dos dois campos, usamos o disponível.
+          badge: toTotalBadge(
+            data.stats?.totalBelowFipeAds ?? data.stats?.totalOpportunityAds
+          ),
         }
       : null,
     links.brand && data.brand?.name && !isCurrentPath(data, links.brand)

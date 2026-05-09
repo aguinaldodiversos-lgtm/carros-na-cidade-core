@@ -67,7 +67,6 @@ function SectionTitle({
 export default function SellPublishFlowClient({ initialType }: Props) {
   const [selectedType, setSelectedType] = useState<SellerType>(initialType);
 
-  const panelHref = useMemo(() => buildPanelHref(selectedType), [selectedType]);
   const loginHref = useMemo(() => buildLoginHref(selectedType), [selectedType]);
   const signupHref = useMemo(() => buildSignupHref(selectedType), [selectedType]);
 
@@ -122,13 +121,9 @@ export default function SellPublishFlowClient({ initialType }: Props) {
       <div className="mx-auto max-w-[1320px] px-4 pb-16 pt-6 sm:pt-8">
         <section className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div>
-            <div className="mb-4 inline-flex rounded-full border border-[#DCE6F7] bg-white px-4 py-2 text-sm font-bold text-[#2F67F6] shadow-sm">
-              Fluxo de anúncio
-            </div>
-
             <SectionTitle
               title="Comece seu anúncio no Carros na Cidade"
-              subtitle="Escolha seu perfil e siga para o acesso. A partir daí, o usuário entra no fluxo de publicação do veículo com direcionamento correto para particular ou lojista."
+              subtitle="Escolha seu perfil e entre para continuar. A partir do acesso, você segue direto para o formulário do anúncio."
             />
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -176,10 +171,7 @@ export default function SellPublishFlowClient({ initialType }: Props) {
             </div>
 
             <div className="mt-8 rounded-[32px] border border-[#DCE6F7] bg-[linear-gradient(145deg,#FFFFFF_0%,#F4F8FF_50%,#EDF3FF_100%)] p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] sm:p-7">
-              <div className="text-sm font-bold uppercase tracking-[0.16em] text-[#2F67F6]">
-                Perfil selecionado
-              </div>
-              <h3 className="mt-3 text-[32px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
+              <h3 className="text-[32px] font-extrabold tracking-[-0.04em] text-[#1D2440]">
                 {selectedMeta.title}
               </h3>
               <p className="mt-3 text-[16px] leading-8 text-[#5C647C]">{selectedMeta.subtitle}</p>
@@ -214,10 +206,12 @@ export default function SellPublishFlowClient({ initialType }: Props) {
                 </Link>
               </div>
 
-              <div className="mt-4 text-sm text-[#6E748A]">
-                Destino pós-acesso:{" "}
-                <span className="font-semibold text-[#1D2440]">{panelHref}</span>
-              </div>
+              {/*
+                Linha que mostrava o path interno da rota foi removida —
+                detalhe de implementação não tem lugar em vitrine pública
+                e induzia desconfiança no usuário. O destino real continua
+                sendo gerado via `next=` no link de login/signup.
+              */}
             </div>
           </div>
 
@@ -269,15 +263,12 @@ export default function SellPublishFlowClient({ initialType }: Props) {
                 ))}
               </div>
 
-              <div className="mt-6 rounded-[24px] border border-[#DCE6F7] bg-[linear-gradient(135deg,#F8FBFF_0%,#EEF4FF_100%)] p-5">
-                <div className="text-[20px] font-bold text-[#1D2440]">
-                  Fluxo preparado para conversão
-                </div>
-                <p className="mt-2 text-[15px] leading-7 text-[#5C647C]">
-                  Essa etapa já separa corretamente particular e lojista e entrega um caminho mais
-                  limpo para autenticação e continuidade do anúncio.
-                </p>
-              </div>
+              {/*
+                Bloco meta-marketing removido nesta rodada — copy
+                interna que falava sobre o fluxo em vez de falar com o
+                usuário. Sem perda funcional: particular/lojista já
+                estão claros nas duas opções acima.
+              */}
             </div>
           </div>
         </section>

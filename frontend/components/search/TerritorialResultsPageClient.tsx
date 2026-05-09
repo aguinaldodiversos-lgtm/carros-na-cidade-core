@@ -345,9 +345,14 @@ export function TerritorialResultsPageClient({
         />
       </div>
 
-      <div className="mt-6">
-        <TerritorialInternalLinksSection data={data} />
-      </div>
+      {/*
+        TerritorialInternalLinksSection ("Continuar em [cidade]") era
+        renderizado DUAS vezes — aqui acima da listagem e novamente após
+        a paginação. Removida a primeira ocorrência: o bloco fica no fim
+        da página, depois dos cards, alinhado ao padrão "navegação
+        relacionada" sem competir com a lista de resultados. Manter aqui
+        causava repetição visual e diluía o foco.
+      */}
 
       <div className="mt-5 flex flex-col gap-3">
         <AppliedFilterChips
