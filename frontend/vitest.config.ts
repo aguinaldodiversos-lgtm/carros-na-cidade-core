@@ -48,6 +48,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": root,
+      // O pacote `server-only` não está instalado nos worktrees parciais
+      // (e mesmo quando está, o Vite tenta resolvê-lo antes de qualquer
+      // `vi.mock` rodar). Apontar para um stub vazio mantém
+      // `import "server-only"` como no-op em teste sem afetar produção.
+      "server-only": path.resolve(root, "./test/stubs/server-only.ts"),
     },
   },
 });

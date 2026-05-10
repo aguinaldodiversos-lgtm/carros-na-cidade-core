@@ -34,7 +34,11 @@ export function RegionPageView({ base, members, ads, radiusKm }: RegionPageViewP
   const memberCount = members.length;
   const stateUF = base.state.toUpperCase();
   const cityHref = `/carros-em/${encodeURIComponent(base.slug)}`;
-  const stateHref = `/comprar?state=${encodeURIComponent(stateUF)}`;
+  // URL canônica da Página Estadual: `/comprar/estado/[uf]` (lowercase).
+  // `/comprar?state=UF` ainda funciona via 307 → canonical, mas adiciona
+  // um hop e Search Console pode interpretar como link "fraco". Como
+  // conhecemos a canonical, apontamos direto.
+  const stateHref = `/comprar/estado/${stateUF.toLowerCase()}`;
 
   return (
     <main className="mx-auto max-w-[1200px] px-4 py-6 md:py-10">

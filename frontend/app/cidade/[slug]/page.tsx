@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { cache } from "react";
 import { TerritorialResultsPageClient } from "@/components/search/TerritorialResultsPageClient";
 import { TerritorialSeoJsonLd } from "@/components/seo/TerritorialSeoJsonLd";
-import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
+import { RegionCtaLink } from "@/components/territorial/RegionCtaLink";
 import { fetchCityTerritorialPage } from "@/lib/search/territorial-public";
 import { buildTerritorialMetadata } from "@/lib/seo/territorial-seo";
 
@@ -61,7 +60,6 @@ function getCityDisplayName(
 export default async function CityPage({ params, searchParams }: CityPageProps) {
   const initialData = await getCityPageData(params.slug, searchParams);
   const canonicalPathOverride = transitionCanonicalPath(params.slug);
-  const regionalEnabled = isRegionalPageEnabled();
   const cityName = getCityDisplayName(initialData, params.slug);
 
   return (
@@ -72,17 +70,13 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
         canonicalPathOverride={canonicalPathOverride}
       />
       <TerritorialResultsPageClient mode="city" slug={params.slug} initialData={initialData} />
-      {regionalEnabled && (
-        <div className="mx-auto max-w-[1200px] px-4 py-6">
-          <Link
-            href={`/carros-usados/regiao/${encodeURIComponent(params.slug)}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text hover:border-primary hover:text-primary transition-colors"
-            aria-label={`Ver carros na região de ${cityName}`}
-          >
-            Ver carros na região de {cityName}
-          </Link>
-        </div>
-      )}
+      {/*
+        CTA gated por flag — single source of truth em RegionCtaLink.
+        Consistente com a URL canônica `/carros-em/[slug]` para que o link
+        apareça no mesmo lugar independentemente de qual variante o
+        usuário acessou.
+      */}
+      <RegionCtaLink slug={params.slug} cityName={cityName} />
     </>
   );
 }
