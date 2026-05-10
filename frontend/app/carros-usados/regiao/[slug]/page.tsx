@@ -10,7 +10,32 @@ import {
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import { RegionPageView } from "./region-page-view";
-export const revalidate = 300;
+
+/**
+ * `force-dynamic` (NÃO mudar para `revalidate`) — bug crítico do Next 14.2:
+ *
+ * Quando esta rota tinha `export const revalidate = 300`, o Next.js
+ * tratava-a como ISR-able. Em rota ISR-able combinada com `notFound()`
+ * dentro do server component, o Next.js servia o conteúdo do
+ * `not-found.tsx` global mas retornava **status HTTP 200** em vez de 404.
+ *
+ * Sintoma reproduzido em produção (commit 1ba73de4): smoke contra
+ * /carros-usados/regiao/regiao-fake-zz-smoke-only retornava 200 com o
+ * UI "Página não encontrada", quebrando a proteção da feature flag e
+ * abrindo o risco de indexação SEO de slugs inexistentes (mesmo com
+ * noindex herdado).
+ *
+ * `dynamic = "force-dynamic"` força runtime por request, e nesse caminho
+ * o Next retorna o status code real do `notFound()` (404). Sem perda
+ * material de performance: o BFF da região (`fetch-region.ts`) tem
+ * cache 5min próprio e `fetchAdsSearch` tem `revalidate: 60` embutido.
+ * O que perdemos é o cache do HTML inteiro — aceitável em Fase A→C
+ * dado que a rota está gated por flag e tem volume baixo.
+ *
+ * Não trocar de volta para `revalidate` sem antes confirmar que o
+ * comportamento `notFound() → 404` foi corrigido no Next.
+ */
+export const dynamic = "force-dynamic";
 
 /**
  * Página Regional pública — `/carros-usados/regiao/[slug]`.

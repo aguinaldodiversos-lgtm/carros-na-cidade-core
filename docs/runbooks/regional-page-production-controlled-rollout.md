@@ -195,6 +195,30 @@ Environment → **Add Environment Variable**:
   desligado (contrato estrito de `isRegionalPageEnabled()`).
 - Sync = OFF para evitar replicação acidental para outro environment.
 - **Não** prefixar com `NEXT_PUBLIC_*` — vazaria no bundle JS público.
+- **Redeploy é obrigatório.** A página regional usa
+  `export const dynamic = "force-dynamic"` (ver §0.1 abaixo), então a
+  flag é lida a cada request. Mas o bundle do Next compila o módulo de
+  feature-flags no build; só o restart do service garante o env novo.
+  Salvar a env var no Render dispara restart automático — se isso não
+  acontecer, **Manual Deploy → Deploy latest commit**.
+
+### 0.1 Por que `dynamic = "force-dynamic"` na página regional
+
+A rota `/carros-usados/regiao/[slug]/page.tsx` exporta
+`dynamic = "force-dynamic"`, e NÃO exporta `revalidate`. Isso é
+proteção contra um bug do Next 14.2: rota com `revalidate` (ISR) que
+chama `notFound()` retorna o UI do not-found mas com **status HTTP
+200** em vez de 404. Reproduzido em produção em 2026-05-10, smoke
+contra slug fake retornando 200 com tela "Página não encontrada".
+
+Consequência operacional:
+- A flag passa a ser lida runtime em cada request — bom para rollback
+  rápido.
+- O HTML inteiro deixa de ser cacheável pelo CDN — aceitável em Fase
+  A→C porque o BFF da região (`fetch-region.ts`) tem cache 5min e
+  `fetchAdsSearch` revalida a cada 60s.
+- Suite vitest tem teste de regressão (`page.config.test.ts`) que
+  falha se alguém remover `dynamic` ou reintroduzir `revalidate`.
 
 ### 2.2 Disparar redeploy
 
