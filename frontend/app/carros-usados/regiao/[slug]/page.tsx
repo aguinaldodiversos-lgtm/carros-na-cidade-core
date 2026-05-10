@@ -85,18 +85,30 @@ function buildDescription(name: string, memberCount: number) {
 }
 
 export async function generateMetadata({ params }: RegionPageProps): Promise<Metadata> {
+  // CRÍTICO: chamar notFound() AQUI, não só no Page. Em Next 14.2 App Router
+  // com `dynamic = "force-dynamic"`, o ciclo de SSR é:
+  //   1. generateMetadata roda para preencher <head>.
+  //   2. Next "comita" o status code com base no resultado.
+  //   3. Page (default export) roda depois.
+  //   4. notFound() chamado no Page troca o BODY (renderiza not-found UI)
+  //      mas é TARDE para trocar o status code — já foi enviado como 200.
+  //
+  // Sintoma reproduzido em produção (commit ce297b2d): mesmo com
+  // force-dynamic, /carros-usados/regiao/atibaia-sp retornava 200 +
+  // <template data-dgst="NEXT_NOT_FOUND"></template>. O Page CHAMAVA
+  // notFound() corretamente, mas o status já tinha sido comitado.
+  //
+  // Fix: chamar notFound() AQUI faz Next interromper antes de comitar 200.
+  // O Page mantém os mesmos checks como defesa em profundidade — se
+  // alguém mudar generateMetadata no futuro e quebrar o gate, o Page
+  // ainda protege a renderização (mas perde o status code).
   if (!isRegionalPageEnabled()) {
-    // Defesa em profundidade: mesmo com fetcher não chamado abaixo, garantir
-    // que metadata vazia não seja indexada se a flag estiver off por engano.
-    return { robots: { index: false, follow: false } };
+    notFound();
   }
 
   const region = await getRegionData(params.slug);
-  if (!region) {
-    return {
-      title: "Região não encontrada — Carros na Cidade",
-      robots: { index: false, follow: true },
-    };
+  if (!region || !region.base) {
+    notFound();
   }
 
   const title = buildTitle(region.base.name, region.base.state);
@@ -136,12 +148,17 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
 }
 
 export default async function RegionPage({ params }: RegionPageProps) {
+  // Dupla proteção: generateMetadata acima JÁ chama notFound() nos
+  // mesmos cenários e isso é o que de fato fixa o status code 404.
+  // Os checks aqui são defesa em profundidade — se alguém alterar
+  // generateMetadata no futuro removendo um gate, o Page ainda
+  // recusa renderizar (perdendo o status code mas mantendo a UI 404).
   if (!isRegionalPageEnabled()) {
     notFound();
   }
 
   const region = await getRegionData(params.slug);
-  if (!region) {
+  if (!region || !region.base) {
     notFound();
   }
 

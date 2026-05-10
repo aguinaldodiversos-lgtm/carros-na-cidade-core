@@ -170,6 +170,26 @@ function deriveCityNameHints(slug) {
 
 // ── checks ─────────────────────────────────────────────────────────────
 
+/**
+ * Detecta o bug "status 200 + NEXT_NOT_FOUND no body".
+ *
+ * Reproduzido em produção em 2026-05-10: o Next 14.2 chamava notFound()
+ * mas servia o UI not-found com status 200. Resultado: a flag estava
+ * funcionando (notFound era chamado) mas o status code mentia.
+ *
+ * Quando isso acontece, queremos um diagnóstico DIFERENTE de "status 200
+ * (esperado 404)" — a causa raiz não é a flag, é o status code do
+ * Next. Mensagem específica ajuda o operador a saber que está vendo o
+ * bug conhecido e não um problema novo.
+ */
+function detectNextNotFoundBug(html) {
+  return (
+    typeof html === "string" &&
+    (html.includes('NEXT_NOT_FOUND') ||
+      html.includes('data-dgst="NEXT_NOT_FOUND"'))
+  );
+}
+
 async function smokeOneSlug(slug) {
   const url = `${FRONTEND_BASE}/carros-usados/regiao/${encodeURIComponent(slug)}`;
   console.log(`\n[${slug}] GET ${url}`);
@@ -183,8 +203,21 @@ async function smokeOneSlug(slug) {
   // ── EXPECT_FLAG=off → única validação é status 404. Pula o resto.
   if (EXPECT_FLAG === "off") {
     const statusCheck = checkStatus(response.status, 404);
-    if (statusCheck.ok) recordPass(`[${slug}] status (flag=off)`, statusCheck.message);
-    else recordFail(`[${slug}] status (flag=off)`, statusCheck.message);
+    if (statusCheck.ok) {
+      recordPass(`[${slug}] status (flag=off)`, statusCheck.message);
+    } else if (response.status === 200 && detectNextNotFoundBug(response.body)) {
+      recordFail(
+        `[${slug}] status (flag=off)`,
+        `BUG CRÍTICO: status 200 mas body contém NEXT_NOT_FOUND. ` +
+          `O gate da flag está funcionando (notFound() foi chamado) mas o Next ` +
+          `não trocou o status code. Causa típica: generateMetadata retornando ` +
+          `metadata válida em vez de chamar notFound(); ou export const revalidate ` +
+          `presente fazendo a rota virar ISR-able. Conferir ` +
+          `frontend/app/carros-usados/regiao/[slug]/page.tsx.`
+      );
+    } else {
+      recordFail(`[${slug}] status (flag=off)`, statusCheck.message);
+    }
     return;
   }
 
@@ -235,8 +268,19 @@ async function smokeNotFound() {
   // mesma resposta, ambiguidade aceitável (tudo retorna 404). Só checa
   // que NÃO retornou 200.
   const statusCheck = checkStatus(response.status, 404);
-  if (statusCheck.ok) recordPass("[404] cidade inexistente → 404", statusCheck.message);
-  else recordFail("[404] cidade inexistente → 404", statusCheck.message);
+  if (statusCheck.ok) {
+    recordPass("[404] cidade inexistente → 404", statusCheck.message);
+  } else if (response.status === 200 && detectNextNotFoundBug(response.body)) {
+    recordFail(
+      "[404] cidade inexistente → 404",
+      `BUG CRÍTICO: status 200 mas body contém NEXT_NOT_FOUND. ` +
+        `Slug fake nunca foi acessado antes (descarta cache). ` +
+        `Indica que generateMetadata não está chamando notFound() — ` +
+        `ver frontend/app/carros-usados/regiao/[slug]/page.tsx.`
+    );
+  } else {
+    recordFail("[404] cidade inexistente → 404", statusCheck.message);
+  }
 }
 
 async function smokeAdminRadius() {
