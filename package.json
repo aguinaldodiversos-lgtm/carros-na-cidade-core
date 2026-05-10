@@ -44,6 +44,7 @@
     "smoke:local": "node scripts/smoke.mjs",
     "smoke:publish-upload": "node scripts/smoke-publish-upload.mjs",
     "smoke:regions": "node scripts/smoke-regions.mjs",
+    "smoke:regional-page": "node scripts/smoke-regional-page.mjs",
     "smoke:antifraud-staging": "node scripts/staging-antifraud-smoke.mjs",
     "audit:project": "node ./scripts/project-audit.mjs",
     "audit:project:strict": "node ./scripts/project-audit.mjs --strict",

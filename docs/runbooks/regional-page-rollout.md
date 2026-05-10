@@ -164,29 +164,44 @@ Executar **em ordem**. Não pular itens.
 2. **Validar `INTERNAL_API_TOKEN`:** mesma string nos services frontend
    **e** backend no Render. Sem isso, o BFF retorna `null` e a Regional,
    quando ligada, exibe vazio.
-3. **Rodar smoke de regiões:** `npm run smoke:regions` do laptop com o
-   token; e `npx vitest run lib/regions/` no frontend (deve passar 37
-   testes — 31 unitários + 6 smoke).
-4. **Ligar `REGIONAL_PAGE_ENABLED=true` em staging.**
-5. **Testar manualmente 3 cidades** (cobertura típica do PR-3 do projeto):
-   - **Atibaia** (cidade-base com vizinhança densa).
-   - **Bragança Paulista** (cidade-base com vizinhança intermediária).
-   - **Mairiporã** ou outra cidade pequena (cidade-base com pouca
-     vizinhança — testa o caminho com poucos members).
-6. **Validar em cada cidade:**
-   - `city_slugs[0]` é a cidade-base na query do `/api/ads/search` (DevTools → Network).
+3. **Rodar smoke de regiões (API interna):** `npm run smoke:regions` do
+   laptop com o token; e `npx vitest run lib/regions/` no frontend
+   (deve passar 39 testes — 31 unitários + 8 smoke).
+4. **Rodar smoke da Página Regional (HTML público):**
+   `STAGING_PUBLIC_BASE_URL=https://<staging-frontend>.onrender.com EXPECT_FLAG=off npm run smoke:regional-page`
+   primeiro, para confirmar 404 com flag desligada. Depois ligar a flag
+   em staging e rodar com `EXPECT_FLAG=on` (default).
+   Variáveis aceitas pelo script: `STAGING_PUBLIC_BASE_URL`,
+   `STAGING_BASE_URL` (backend, opcional para o step admin),
+   `REGIONAL_SMOKE_SLUGS` (CSV; default `atibaia-sp,campinas-sp,sao-paulo-sp`),
+   `EXPECT_FLAG` (`on` ou `off`), `STAGING_ADMIN_EMAIL` /
+   `STAGING_ADMIN_PASSWORD` (opcionais; só dispara o step admin),
+   `STAGING_ALLOW_PATCH=true` (libera round-trip do PATCH no admin
+   radius). O guard interno do script bloqueia hostnames de produção
+   por default — só hostnames com `staging`, `preview`, `review`,
+   `localhost` ou `127.0.0.1` passam (escape `ALLOW_PRODUCTION=true`
+   existe mas é apenas para troubleshooting isolado, não para uso
+   regular).
+5. **Ligar `REGIONAL_PAGE_ENABLED=true` em staging.**
+6. **Re-rodar smoke da Página Regional** com flag ligada
+   (`EXPECT_FLAG=on`, default). Esperar PASS para os 3 slugs default
+   (`atibaia-sp`, `campinas-sp`, `sao-paulo-sp`) + check 404 do slug
+   inexistente. O smoke automatiza: status, robots, canonical,
+   conteúdo essencial, presença de anúncios ou fallback, e chips de
+   cidades vizinhas.
+7. **Validação manual visual nas mesmas 3 cidades** (smoke não cobre):
+   - `city_slugs[0]` é a cidade-base na query do `/api/ads/search`
+     (DevTools → Network).
    - Anúncios da cidade-base aparecem **antes** dos das vizinhas dentro
      da mesma camada comercial (efeito de `baseCityBoostExpr`).
    - Não aparecem cidades de outra UF automaticamente.
    - **Layout não muda** vs. cidade isolada (header, footer, cards, grids).
-   - Resposta inclui `<meta name="robots" content="noindex, follow">`.
-   - Canonical conforme a fase atual (§5).
-7. **Só depois de tudo acima, considerar produção.**
-8. **Em produção, ligar primeiro sem sitemap e mantendo `noindex`** (Fase C).
-9. **Validar Search Console e logs** por pelo menos 1 ciclo de re-crawl
-   (~7 dias). Procurar: erros 5xx, picos de latência, páginas finas
-   sinalizadas, cobertura cruzada com Páginas de Cidade.
-10. **Só depois liberar indexação e sitemap** (Fase D, §5 e §7).
+8. **Só depois de tudo acima, considerar produção.**
+9. **Em produção, ligar primeiro sem sitemap e mantendo `noindex`** (Fase C).
+10. **Validar Search Console e logs** por pelo menos 1 ciclo de re-crawl
+    (~7 dias). Procurar: erros 5xx, picos de latência, páginas finas
+    sinalizadas, cobertura cruzada com Páginas de Cidade.
+11. **Só depois liberar indexação e sitemap** (Fase D, §5 e §7).
 
 ---
 
