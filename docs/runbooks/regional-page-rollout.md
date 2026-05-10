@@ -1,9 +1,11 @@
 # Rollout da Página Regional — Carros na Cidade
 
-> **Status:** Fase A implementada (rota + UI + admin). A Página Regional
-> existe em `/carros-usados/regiao/[slug]`, gated por
-> `REGIONAL_PAGE_ENABLED=false` (default), `noindex,follow` quando
-> servida, fora do sitemap. Aguardando smoke em staging para Fase B.
+> **Status:** Fase A implementada (rota + UI + admin). Fase C controlada
+> documentada em
+> [`regional-page-production-controlled-rollout.md`](regional-page-production-controlled-rollout.md)
+> — runbook executável para ativar `REGIONAL_PAGE_ENABLED=true` em
+> produção sem staging separado, mantendo `noindex,follow`, fora do
+> sitemap, com rollback por flag em ≤ 1 min.
 >
 > **Raio configurável.** O raio usado para montar a região (default 80 km,
 > range 10..150 km) é editável pelo admin em `/admin/regional-settings`.

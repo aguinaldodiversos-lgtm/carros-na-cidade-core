@@ -35,10 +35,14 @@
  *   STAGING_ALLOW_PATCH      "true" libera o check PATCH do admin radius
  *                            (rebate de volta ao valor original ao final).
  *                            Sem isso, só GET é feito. Default: false.
- *   ALLOW_PRODUCTION         escape de emergência para rodar contra um
- *                            host fora da allowlist. NÃO documentado no
- *                            runbook — usar apenas em troubleshooting
- *                            isolado. Default: false.
+ *   ALLOW_PRODUCTION         libera execução contra um host fora da
+ *                            allowlist (staging/preview/review/localhost).
+ *                            Caso de uso oficial: ativação controlada
+ *                            em produção sem staging separado, conforme
+ *                            `docs/runbooks/regional-page-production-controlled-rollout.md`.
+ *                            Sempre combinar com `EXPECT_FLAG=off` antes
+ *                            de ligar a flag e `EXPECT_FLAG=on` depois.
+ *                            Default: false.
  *
  * Sem dependências de runtime. Usa apenas fetch nativo (Node 20+).
  *
@@ -365,6 +369,12 @@ async function main() {
     }
     console.warn(
       `AVISO: rodando contra ${FRONTEND_BASE} (fora da allowlist) com ALLOW_PRODUCTION=true`
+    );
+    console.warn(
+      `       Caso de uso esperado: ativação controlada em produção (Fase C).`
+    );
+    console.warn(
+      `       EXPECT_FLAG atual: ${EXPECT_FLAG} — confirme antes/depois de mexer na flag no Render.`
     );
   }
 
