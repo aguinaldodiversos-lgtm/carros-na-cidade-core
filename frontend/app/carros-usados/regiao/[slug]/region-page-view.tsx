@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AdItem } from "@/lib/search/ads-search";
 import type { RegionBase, RegionMember } from "@/lib/regions/fetch-region";
+import type { BrandCount, CityCount } from "@/lib/regions/regional-facets";
 import { AdGrid } from "@/components/ads/AdGrid";
 
 /**
@@ -30,6 +31,19 @@ interface RegionPageViewProps {
    * sem inventar quantidades.
    */
   totalAds: number;
+  /**
+   * Top marcas agregadas da amostra de anúncios (até 5). Vazio quando
+   * a amostra é insuficiente. Por ser amostra, exibimos com label
+   * "marcas frequentes" em vez de "top marcas da região" — ver
+   * `lib/regions/regional-facets.ts` para o contrato.
+   */
+  topBrands?: BrandCount[];
+  /**
+   * Contagem de anúncios por cidade (cidade-base + membros) derivada
+   * da amostra. Quando vazio, caímos para a UI antiga de chips sem
+   * contagem.
+   */
+  cityCounts?: CityCount[];
 }
 
 function formatDistance(km: number | null | undefined): string {
@@ -44,6 +58,8 @@ export function RegionPageView({
   ads,
   radiusKm,
   totalAds,
+  topBrands = [],
+  cityCounts = [],
 }: RegionPageViewProps) {
   const memberCount = members.length;
   const stateUF = base.state.toUpperCase();
@@ -118,29 +134,105 @@ export function RegionPageView({
             Cidades nesta região
           </p>
           <div className="flex flex-wrap gap-2">
-            <span
-              className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
-              title={`${base.name} (cidade base)`}
-            >
-              {base.name}
-              <span className="ml-1.5 text-[10px] uppercase tracking-wide opacity-80">
-                base
-              </span>
-            </span>
-            {members.map((m) => (
-              <Link
-                key={`${m.city_id}-${m.slug}`}
-                href={`/carros-em/${encodeURIComponent(m.slug)}`}
-                className="inline-flex items-center rounded-full border border-cnc-line bg-white px-3 py-1 text-xs text-cnc-text hover:border-primary hover:text-primary transition-colors"
-                title={`${m.name} — ${formatDistance(m.distance_km)} de ${base.name}`}
-              >
-                {m.name}
-                {m.distance_km != null && (
-                  <span className="ml-1.5 text-[10px] text-cnc-muted-soft">
-                    {formatDistance(m.distance_km)}
+            {cityCounts.length > 0 ? (
+              cityCounts.map((c) => {
+                if (c.is_base) {
+                  return (
+                    <span
+                      key={`base-${c.slug}`}
+                      className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
+                      title={`${c.name} (cidade base) — ${c.count} anúncio(s) nesta página`}
+                    >
+                      {c.name}
+                      <span className="ml-1.5 text-[10px] uppercase tracking-wide opacity-80">
+                        base
+                      </span>
+                      {c.count > 0 && (
+                        <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 text-[10px] font-semibold">
+                          {c.count}
+                        </span>
+                      )}
+                    </span>
+                  );
+                }
+                return (
+                  <Link
+                    key={`chip-${c.slug}`}
+                    href={`/carros-em/${encodeURIComponent(c.slug)}`}
+                    className="inline-flex items-center rounded-full border border-cnc-line bg-white px-3 py-1 text-xs text-cnc-text hover:border-primary hover:text-primary transition-colors"
+                    title={
+                      c.distance_km != null
+                        ? `${c.name} — ${formatDistance(c.distance_km)} de ${base.name}`
+                        : c.name
+                    }
+                  >
+                    {c.name}
+                    {c.distance_km != null && (
+                      <span className="ml-1.5 text-[10px] text-cnc-muted-soft">
+                        {formatDistance(c.distance_km)}
+                      </span>
+                    )}
+                    {c.count > 0 && (
+                      <span className="ml-1.5 rounded-full bg-cnc-bg px-1.5 text-[10px] font-semibold text-cnc-text">
+                        {c.count}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })
+            ) : (
+              <>
+                <span
+                  className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
+                  title={`${base.name} (cidade base)`}
+                >
+                  {base.name}
+                  <span className="ml-1.5 text-[10px] uppercase tracking-wide opacity-80">
+                    base
                   </span>
-                )}
-              </Link>
+                </span>
+                {members.map((m) => (
+                  <Link
+                    key={`${m.city_id}-${m.slug}`}
+                    href={`/carros-em/${encodeURIComponent(m.slug)}`}
+                    className="inline-flex items-center rounded-full border border-cnc-line bg-white px-3 py-1 text-xs text-cnc-text hover:border-primary hover:text-primary transition-colors"
+                    title={`${m.name} — ${formatDistance(m.distance_km)} de ${base.name}`}
+                  >
+                    {m.name}
+                    {m.distance_km != null && (
+                      <span className="ml-1.5 text-[10px] text-cnc-muted-soft">
+                        {formatDistance(m.distance_km)}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {topBrands.length > 0 && (
+        <section
+          aria-label="Top marcas nesta região"
+          className="mb-6"
+          data-testid="regional-top-brands"
+        >
+          <p className="text-xs uppercase tracking-wide text-cnc-muted-soft mb-2">
+            Marcas frequentes na região de {base.name}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {topBrands.map((b) => (
+              <span
+                key={b.brand}
+                className="inline-flex items-center rounded-full border border-cnc-line bg-white px-3 py-1 text-xs text-cnc-text"
+                title={`${b.brand} — ${b.count} anúncio(s) nesta página`}
+              >
+                <strong className="font-semibold text-cnc-text">{b.brand}</strong>
+                <span className="ml-1.5 rounded-full bg-cnc-bg px-1.5 text-[10px] font-semibold text-cnc-text">
+                  {b.count}
+                </span>
+              </span>
             ))}
           </div>
         </section>

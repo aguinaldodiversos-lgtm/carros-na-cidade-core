@@ -7,6 +7,12 @@ import {
   regionToAdsSearchFilters,
   type RegionPayload,
 } from "@/lib/regions/fetch-region";
+import {
+  aggregateBrandsFromAds,
+  aggregateCityCountsFromAds,
+  pickDynamicOgImage,
+  sortAdsByPriorityAndProximity,
+} from "@/lib/regions/regional-facets";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 import { buildRegionStructuredDataBlocks } from "@/lib/seo/region-structured-data";
 import { toAbsoluteUrl } from "@/lib/seo/site";
@@ -127,6 +133,21 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
   // muda para self-canonical na regional.
   const canonical = toAbsoluteUrl(`/carros-em/${encodeURIComponent(region.base.slug)}`);
 
+  // OG image dinâmica simples: primeira imagem válida do primeiro
+  // anúncio da região. `getAdsForRegion` é cached(); chamar aqui não
+  // duplica fetch — o Page reusa o mesmo resultado. Em qualquer falha
+  // (envelope sem data, URL inválida) cai para `undefined` e o OG fica
+  // sem image (Twitter/Open Graph default herdado do layout).
+  let ogImage: string | undefined;
+  try {
+    const adsResponse = await getAdsForRegion(region);
+    const ads = Array.isArray(adsResponse?.data) ? adsResponse.data : [];
+    const picked = pickDynamicOgImage(ads);
+    if (picked) ogImage = picked;
+  } catch {
+    ogImage = undefined;
+  }
+
   return {
     title,
     description,
@@ -138,11 +159,13 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
       siteName: "Carros na Cidade",
       title,
       description,
+      images: ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: title }] : undefined,
     },
     twitter: {
-      card: "summary",
+      card: ogImage ? "summary_large_image" : "summary",
       title,
       description,
+      images: ogImage ? [ogImage] : undefined,
     },
     robots: {
       index: false,
@@ -171,7 +194,7 @@ export default async function RegionPage({ params }: RegionPageProps) {
   }
 
   const adsResponse = await getAdsForRegion(region);
-  const ads = Array.isArray(adsResponse?.data) ? adsResponse.data : [];
+  const rawAds = Array.isArray(adsResponse?.data) ? adsResponse.data : [];
   // `pagination.total` é o agregado real do backend. Preferimos esse
   // número à `ads.length` para a "contagem destacada" e para o JSON-LD
   // (a amostra é só a primeira página). Se o envelope vier sem
@@ -179,12 +202,24 @@ export default async function RegionPage({ params }: RegionPageProps) {
   const totalAds =
     typeof adsResponse?.pagination?.total === "number" && adsResponse.pagination.total >= 0
       ? adsResponse.pagination.total
-      : ads.length;
+      : rawAds.length;
 
   // `radius_km` vem do backend (foi adicionado em getRegionByBaseSlugDynamic).
   // Casts defensivos: se o BFF antigo for cacheado e voltar sem o campo,
   // fallback para 80 (o default declarado em platform_settings).
   const radiusKm = (region as RegionPayload & { radius_km?: number }).radius_km ?? 80;
+
+  // Reordena por prioridade comercial + proximidade. Defesa client-side:
+  // o backend já aplica ranking SQL (`buildSortClause` +
+  // `baseCityBoostExpr`), este sort garante a regra estratégica no caso
+  // de divergência (cache antigo, paginação por relevância, etc.).
+  const ads = sortAdsByPriorityAndProximity(rawAds, region.base, region.members);
+
+  // Facets agregadas a partir da AMOSTRA (primeira página). Não chamamos
+  // de "estoque" para evitar prometer números do backend agregador
+  // (`/api/ads/facets` ainda não está integrado à query regional).
+  const topBrands = aggregateBrandsFromAds(ads);
+  const cityCounts = aggregateCityCountsFromAds(ads, region.base, region.members);
 
   const structuredData = buildRegionStructuredDataBlocks({
     base: region.base,
@@ -218,6 +253,8 @@ export default async function RegionPage({ params }: RegionPageProps) {
         ads={ads}
         radiusKm={radiusKm}
         totalAds={totalAds}
+        topBrands={topBrands}
+        cityCounts={cityCounts}
       />
     </>
   );
