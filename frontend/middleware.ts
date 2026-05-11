@@ -37,25 +37,42 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── 1. Hard gate da Regional (antes de qualquer outra lógica). ─────
+  //
+  // IMPORTANTE: a decisão de "é rota regional?" é feita aqui dentro via
+  // `extractRegionalSlug` (regex testado), NÃO pelo matcher do Next.
+  // Validamos empiricamente que o `path-to-regexp` do Next 14 com
+  // `/carros-usados/regiao/:slug` no matcher NÃO casava em produção
+  // (rota chegava no App Router sem passar pelo middleware). Mover o
+  // pattern matching para dentro elimina a dependência de quirks do
+  // matcher e usa o regex que já tem cobertura unit (20 testes).
   const regionalSlug = extractRegionalSlug(pathname);
   if (regionalSlug !== null) {
     if (!isFlagEnabled()) {
       // Body vazio + status 404: resposta mínima e clara. Não usa
       // `redirect()` (evita 307/308) nem rewrite (evita renderizar
       // app/not-found e arriscar 200 de novo).
-      return new NextResponse(null, { status: 404 });
+      const blocked = new NextResponse(null, { status: 404 });
+      blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
+      return blocked;
     }
 
     // Flag on: validar slug via backend antes de deixar passar.
     const validation = await validateRegionalSlug(regionalSlug);
     if (validation.kind === "not_found") {
-      return new NextResponse(null, { status: 404 });
+      const blocked = new NextResponse(null, { status: 404 });
+      blocked.headers.set("X-Middleware-Regional", "blocked-slug-invalid");
+      return blocked;
     }
     // `unavailable` (backend offline, timeout, token ausente) →
     // fail-open: deixa passar, page.tsx mostra UI 404 interno via
     // `notFound()`. Não 404-far por incidente do backend para evitar
     // falso-positivo em cold start.
-    return NextResponse.next();
+    const passed = NextResponse.next();
+    passed.headers.set(
+      "X-Middleware-Regional",
+      validation.kind === "valid" ? "passed-valid" : `passed-${validation.kind}`
+    );
+    return passed;
   }
 
   // ── 2. Redirects 301 legados (preservados como estavam). ───────────
@@ -106,12 +123,29 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+/**
+ * Matcher do middleware.
+ *
+ * Decisões:
+ *  - `/carros-usados/regiao/:path*` (não `/carros-usados/regiao/:slug`):
+ *    `:path*` casa zero ou mais segmentos e é o pattern mais robusto no
+ *    `path-to-regexp` do Next 14. O matcher só decide SE o middleware
+ *    roda; a validação fina de "é rota regional válida?" é feita
+ *    dentro do código via `extractRegionalSlug`.
+ *  - As rotas legadas com hífen único (`/carros-em-foo`, etc.) usam
+ *    `/:slug` com path completo porque `:slug` no MEIO do segmento
+ *    (sem `/` antes) é interpretado de forma inconsistente. Para essas,
+ *    pegamos via path mais amplo e validamos dentro.
+ *  - `/painel/anuncios/novo` é match exato — sem parâmetro, funciona.
+ *  - `/painel/anuncios/:id/publicar` usa `:id` separado por `/`, que
+ *    é o caso canônico que `path-to-regexp` cata sem ambiguidade.
+ */
 export const config = {
   matcher: [
-    "/carros-usados/regiao/:slug",
-    "/carros-em-:slug",
-    "/carros-baratos-em-:slug",
-    "/carros-automaticos-em-:slug",
+    "/carros-usados/regiao/:path*",
+    "/carros-em-:path*",
+    "/carros-baratos-em-:path*",
+    "/carros-automaticos-em-:path*",
     "/painel/anuncios/novo",
     "/painel/anuncios/:id/publicar",
   ],
