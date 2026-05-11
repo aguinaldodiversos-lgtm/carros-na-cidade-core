@@ -1,8 +1,17 @@
 /**
  * Origem do território ativo (somente runtime; não persistir como fonte de verdade).
- * Prioridade de bootstrap: `url` → `manual` → `cookie` → `fallback`.
+ *
+ * Prioridade de bootstrap:
+ *   `url`     query `?city_slug=` (explícita do clique)
+ *   `path`    derivada do pathname em rotas territoriais (ex.:
+ *             `/carros-usados/regiao/atibaia-sp` → atibaia-sp).
+ *             NÃO persiste cookie/localStorage para não sobrescrever
+ *             a escolha do usuário silenciosamente.
+ *   `manual`  escolhida via CityHeaderSelector/picker (userConfirmed=true).
+ *   `cookie`  hidratada do cookie/localStorage do navegador.
+ *   `fallback`  cidade padrão (DEFAULT_CITY).
  */
-export type CitySource = "url" | "manual" | "cookie" | "fallback";
+export type CitySource = "url" | "path" | "manual" | "cookie" | "fallback";
 
 /**
  * Referência de cidade usada no City Engine (header, filtros, URLs).

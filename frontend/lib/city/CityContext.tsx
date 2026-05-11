@@ -12,6 +12,7 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { extractCitySlugFromPathname } from "@/lib/city/city-from-pathname";
 import { DEFAULT_CITY } from "@/lib/city/city-default";
 import type { CityRef, CitySource } from "@/lib/city/city-types";
 import {
@@ -72,12 +73,25 @@ function CityProviderInner({
     hydrated.current = true;
 
     const qSlug = searchParams.get("city_slug")?.trim();
+    // Slug derivado do pathname em rotas territoriais (ex.:
+    // `/carros-usados/regiao/atibaia-sp` → atibaia-sp). Tem prioridade
+    // MENOR que `?city_slug=` (clique explícito) e MAIOR que cookie/
+    // localStorage — caso contrário, ao visitar a página regional de
+    // Atibaia com cookie=sao-paulo-sp, o header mostraria São Paulo
+    // (incoerência territorial reproduzida em 2026-05-11).
+    const pathSlug = extractCitySlugFromPathname(pathname);
     const ls = readCityFromLocalStorage();
     const ck = readCityFromCookie();
 
     void (async () => {
       let next: CityRef = initialCity;
       let nextSource: CitySource = "fallback";
+      // Ativos contextuais (path) NÃO sobrescrevem a cidade que o
+      // visitante já escolheu/salvou. Só `url` (query explícita) e
+      // ações de `setCity` persistem. Assim, navegar pela página
+      // regional de Atibaia exibe Atibaia no header sem mudar a
+      // "cidade-base" salva do usuário.
+      let shouldPersist = true;
 
       if (qSlug) {
         const resolved = await fetchCityBySlug(qSlug);
@@ -91,6 +105,28 @@ function CityProviderInner({
           next = { ...DEFAULT_CITY, slug: qSlug };
         }
         nextSource = "url";
+      } else if (pathSlug) {
+        // Tenta resolver via API (label/name reais). Fallback:
+        // monta um CityRef minimamente válido com o slug, marcando
+        // como source="path". O hook abaixo (segundo useEffect)
+        // continua escutando mudanças de query, mas não escutamos
+        // mudanças de pathname aqui — re-hidratação inicial é
+        // suficiente porque `useMemo(routes, [city.slug])` no
+        // PublicHeader reage à troca, e navegação client-side
+        // entre territoriais dispara este efeito de novo se o
+        // contexto for remontado.
+        const resolved = await fetchCityBySlug(pathSlug);
+        if (resolved) {
+          next = resolved;
+        } else if (ls?.slug === pathSlug) {
+          next = ls;
+        } else if (ck?.slug === pathSlug) {
+          next = ck;
+        } else {
+          next = { ...DEFAULT_CITY, slug: pathSlug };
+        }
+        nextSource = "path";
+        shouldPersist = false;
       } else if (hasUserConfirmedCity() && ls) {
         next = ls;
         nextSource = "manual";
@@ -107,8 +143,10 @@ function CityProviderInner({
 
       setCityState(next);
       setCitySource(nextSource);
-      writeCityToLocalStorage(next, { userConfirmed: false });
-      writeCityCookie(next);
+      if (shouldPersist) {
+        writeCityToLocalStorage(next, { userConfirmed: false });
+        writeCityCookie(next);
+      }
       setReady(true);
     })();
   }, [initialCity, searchKey]);
@@ -159,6 +197,43 @@ function CityProviderInner({
       }
     });
   }, [ready, searchParams, city.slug]);
+
+  // Sync `city` quando o usuário navega entre rotas territoriais
+  // client-side (ex.: /carros-em/sao-paulo-sp → /carros-usados/regiao/
+  // atibaia-sp). Sem isso, o header continuaria mostrando a cidade
+  // resolvida na hidratação inicial.
+  //
+  // Regras de quando NÃO reagir ao pathname:
+  //   - `?city_slug=` na URL atual: o efeito acima já cuida disso e
+  //     vence o path-slug (query é mais explícita).
+  //   - source = "manual": usuário escolheu cidade conscientemente
+  //     via picker; respeitamos a escolha mesmo ao visitar páginas
+  //     de outras cidades. Atibaia aparece no h1 da regional via o
+  //     próprio template; o header reflete a preferência salva.
+  //   - source = "url": query é a fonte de verdade enquanto vigente.
+  //
+  // Em qualquer outro caso (source = path/cookie/fallback), o
+  // path-derived vence — porque é mais específico que cookie default
+  // e menos invasivo que sobrescrever escolha manual.
+  useEffect(() => {
+    if (!ready) return;
+    if (searchParams.get("city_slug")?.trim()) return;
+    if (citySource === "manual" || citySource === "url") return;
+
+    const pathSlug = extractCitySlugFromPathname(pathname);
+    if (!pathSlug || pathSlug === city.slug) return;
+
+    void fetchCityBySlug(pathSlug).then((resolved) => {
+      const next: CityRef = resolved ?? { ...DEFAULT_CITY, slug: pathSlug };
+      setCityState(next);
+      setCitySource("path");
+      // Importante: NÃO persistir. Path-derived é display-only —
+      // se sobrescrevêssemos cookie/localStorage, navegar pela página
+      // de Atibaia mudaria a "cidade-base" salva do usuário sem
+      // consentimento, e a próxima visita pela home apareceria
+      // Atibaia em vez da preferência prévia.
+    });
+  }, [ready, pathname, city.slug, citySource, searchParams]);
 
   const cityId = city.id ?? null;
 
