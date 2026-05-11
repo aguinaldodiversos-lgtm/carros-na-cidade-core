@@ -200,10 +200,29 @@ function detectNextNotFoundBug(html) {
   return false;
 }
 
+/**
+ * Lê os headers diagnósticos do middleware regional e retorna uma
+ * string compacta para incluir nas mensagens de fail/skip. Útil em
+ * `blocked-unavailable` para o operador ver o motivo direto no log
+ * sem precisar inspecionar o curl.
+ */
+function describeMiddlewareHeaders(headers) {
+  if (!headers || typeof headers.get !== "function") return "";
+  const phase = headers.get("x-middleware-regional");
+  const reason = headers.get("x-middleware-regional-reason");
+  const retry = headers.get("retry-after");
+  const parts = [];
+  if (phase) parts.push(`x-middleware-regional=${phase}`);
+  if (reason) parts.push(`reason=${reason}`);
+  if (retry) parts.push(`retry-after=${retry}`);
+  return parts.length ? ` [${parts.join(", ")}]` : "";
+}
+
 async function smokeOneSlug(slug) {
   const url = `${FRONTEND_BASE}/carros-usados/regiao/${encodeURIComponent(slug)}`;
   console.log(`\n[${slug}] GET ${url}`);
   const response = await fetchHtml(url);
+  const mwInfo = describeMiddlewareHeaders(response.headers);
 
   if (response.status === 0) {
     recordFail(`[${slug}] rede`, response.error);
@@ -214,7 +233,7 @@ async function smokeOneSlug(slug) {
   if (EXPECT_FLAG === "off") {
     const statusCheck = checkStatus(response.status, 404);
     if (statusCheck.ok) {
-      recordPass(`[${slug}] status (flag=off)`, statusCheck.message);
+      recordPass(`[${slug}] status (flag=off)`, `${statusCheck.message}${mwInfo}`);
     } else if (response.status === 200 && detectNextNotFoundBug(response.body)) {
       recordFail(
         `[${slug}] status (flag=off)`,
@@ -223,20 +242,59 @@ async function smokeOneSlug(slug) {
           `não trocou o status code. Causa típica: generateMetadata retornando ` +
           `metadata válida em vez de chamar notFound(); ou export const revalidate ` +
           `presente fazendo a rota virar ISR-able. Conferir ` +
-          `frontend/app/carros-usados/regiao/[slug]/page.tsx.`
+          `frontend/app/carros-usados/regiao/[slug]/page.tsx.${mwInfo}`
       );
     } else {
-      recordFail(`[${slug}] status (flag=off)`, statusCheck.message);
+      recordFail(`[${slug}] status (flag=off)`, `${statusCheck.message}${mwInfo}`);
     }
     return;
   }
 
-  // ── EXPECT_FLAG=on (default) → série completa.
+  // ── EXPECT_FLAG=on — três caminhos finitos:
+  //
+  // 1. status 200 + body Tier 1   → PASS (página regional real).
+  // 2. status 200 + body NEXT_NOT_FOUND → FAIL CRÍTICO (soft 404
+  //    em slug válido — regressão da fase 2026-05-11).
+  // 3. status 503 + blocked-unavailable → SKIP/BLOQUEIO operacional
+  //    (backend/token mal configurado; não é regressão, é config).
+  // 4. status 404 → FAIL (slug deveria existir; conferir seed).
+  // 5. qualquer outro → FAIL.
+
+  if (response.status === 503) {
+    const phase = response.headers?.get?.("x-middleware-regional") || "";
+    const reason = response.headers?.get?.("x-middleware-regional-reason") || "?";
+    if (phase === "blocked-unavailable") {
+      recordSkip(
+        `[${slug}] bloqueio operacional (flag=on)`,
+        `503 blocked-unavailable reason=${reason} — middleware se recusou a renderizar porque não conseguiu validar o slug. Corrija BACKEND_API_URL/INTERNAL_API_TOKEN no Render do frontend e rode o smoke de novo. Isso NÃO é regressão de hard 404.`
+      );
+    } else {
+      recordFail(
+        `[${slug}] 503 inesperado`,
+        `status 503 sem header blocked-unavailable${mwInfo} — investigar`
+      );
+    }
+    return;
+  }
+
+  // Detector unificado de soft 404 — vale para qualquer slug em flag=on.
+  // Antes era exclusivo do slug fake; um slug válido caindo em soft 404
+  // era invisível ao smoke (só falhava nos checks subsequentes).
+  if (response.status === 200 && detectNextNotFoundBug(response.body)) {
+    recordFail(
+      `[${slug}] status (flag=on)`,
+      `BUG CRÍTICO: status 200 mas body contém NEXT_NOT_FOUND ou UI app/not-found global. ` +
+        `Indica que page.tsx caiu em notFound() (BFF retornou null ou fetch falhou) ` +
+        `mas o Next não trocou o status code. Em flag=on, isso aponta para ` +
+        `middleware fail-open: deveria ter retornado 503 blocked-unavailable.${mwInfo}`
+    );
+    return;
+  }
+
   const statusCheck = checkStatus(response.status, 200);
-  if (statusCheck.ok) recordPass(`[${slug}] status`, statusCheck.message);
+  if (statusCheck.ok) recordPass(`[${slug}] status`, `${statusCheck.message}${mwInfo}`);
   else {
-    recordFail(`[${slug}] status`, statusCheck.message);
-    // Sem 200 não há sentido seguir.
+    recordFail(`[${slug}] status`, `${statusCheck.message}${mwInfo}`);
     return;
   }
 
@@ -268,29 +326,47 @@ async function smokeNotFound() {
   const url = `${FRONTEND_BASE}/carros-usados/regiao/${encodeURIComponent(NONEXISTENT_SLUG)}`;
   console.log(`\n[404] GET ${url}`);
   const response = await fetchHtml(url);
+  const mwInfo = describeMiddlewareHeaders(response.headers);
 
   if (response.status === 0) {
     recordFail("[404] rede", response.error);
     return;
   }
 
-  // Quando a flag está OFF, o 404 também acontece para slug inexistente —
-  // mesma resposta, ambiguidade aceitável (tudo retorna 404). Só checa
-  // que NÃO retornou 200.
-  const statusCheck = checkStatus(response.status, 404);
-  if (statusCheck.ok) {
-    recordPass("[404] cidade inexistente → 404", statusCheck.message);
-  } else if (response.status === 200 && detectNextNotFoundBug(response.body)) {
+  // Slug fake + flag=on: a única resposta aceitável é HTTP 404 real.
+  // 200 com NEXT_NOT_FOUND = regressão crítica.
+  // 503 blocked-unavailable = bloqueio operacional (config errada) —
+  //   reportar como SKIP, não PASS: o slug fake virou 503 não porque
+  //   o gate funcionou, mas porque a config impediu a validação.
+  if (response.status === 404) {
+    recordPass("[404] cidade inexistente → 404", `status 404 OK${mwInfo}`);
+    return;
+  }
+  if (response.status === 503) {
+    const phase = response.headers?.get?.("x-middleware-regional") || "";
+    const reason = response.headers?.get?.("x-middleware-regional-reason") || "?";
+    if (phase === "blocked-unavailable") {
+      recordSkip(
+        "[404] cidade inexistente",
+        `503 blocked-unavailable reason=${reason} — slug fake bloqueado por config (não pelo gate "slug não existe"). Corrija BACKEND_API_URL/INTERNAL_API_TOKEN antes de afirmar que o hard 404 está funcionando.`
+      );
+    } else {
+      recordFail("[404] cidade inexistente", `503 inesperado${mwInfo}`);
+    }
+    return;
+  }
+  if (response.status === 200 && detectNextNotFoundBug(response.body)) {
     recordFail(
       "[404] cidade inexistente → 404",
       `BUG CRÍTICO: status 200 mas body contém NEXT_NOT_FOUND. ` +
         `Slug fake nunca foi acessado antes (descarta cache). ` +
-        `Indica que generateMetadata não está chamando notFound() — ` +
-        `ver frontend/app/carros-usados/regiao/[slug]/page.tsx.`
+        `Em flag=on, isso aponta para middleware fail-open: deveria ter ` +
+        `retornado 404 (slug confirmado inválido) ou 503 (validação ` +
+        `indisponível). Ver frontend/middleware.ts.${mwInfo}`
     );
-  } else {
-    recordFail("[404] cidade inexistente → 404", statusCheck.message);
+    return;
   }
+  recordFail("[404] cidade inexistente → 404", `status ${response.status}${mwInfo}`);
 }
 
 async function smokeAdminRadius() {

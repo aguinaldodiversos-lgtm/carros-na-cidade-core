@@ -66,13 +66,46 @@ export interface SlugValidationConfig {
 }
 
 /**
+ * Motivos enumerados para `unavailable`. Cada motivo descreve uma falha
+ * de configuração/integração distinta, com diagnóstico operacional
+ * diferente:
+ *
+ *   missing-backend-api-url  → env BACKEND_API_URL ausente no service
+ *                              do frontend.
+ *   missing-internal-api-token → env INTERNAL_API_TOKEN ausente.
+ *   backend-401              → token rejeitado pelo backend (não bate
+ *                              com INTERNAL_API_TOKEN do backend).
+ *   backend-403              → endpoint privado bloqueado para o token.
+ *   backend-5xx              → backend respondeu erro 5xx (instabilidade).
+ *   backend-timeout          → fetch abortado pelo AbortController após
+ *                              `timeoutMs`.
+ *   fetch-error              → erro de rede (DNS, TLS, ECONNREFUSED,
+ *                              etc.) — fetch lançou exceção.
+ *
+ * Esses códigos viajam pelo header `X-Middleware-Regional-Reason` para
+ * que operadores diagnostiquem produção sem precisar dos logs.
+ */
+export type UnavailableReason =
+  | "missing-backend-api-url"
+  | "missing-internal-api-token"
+  | "backend-401"
+  | "backend-403"
+  | "backend-5xx"
+  | "backend-timeout"
+  | "fetch-error";
+
+/**
  * Resultado da validação do slug. Três estados explícitos em vez de
  * boolean para o caller distinguir "slug inválido" de "validação falhou".
+ *
+ * Em `unavailable` carregamos o `reason` enumerado (diagnóstico
+ * operacional) e opcionalmente `detail` (mensagem livre para log,
+ * NUNCA exposto no header HTTP).
  */
 export type SlugValidation =
   | { kind: "valid" }
   | { kind: "not_found" }
-  | { kind: "unavailable"; reason: string };
+  | { kind: "unavailable"; reason: UnavailableReason; detail?: string };
 
 /**
  * Consulta o backend privado `/api/internal/regions/:slug` para descobrir
@@ -104,15 +137,19 @@ export async function validateRegionalSlug(
   const fetchImpl = config.fetchImpl ?? fetch;
 
   if (!apiBase) {
-    return { kind: "unavailable", reason: "BACKEND_API_URL ausente" };
+    return { kind: "unavailable", reason: "missing-backend-api-url" };
   }
   if (!token) {
-    return { kind: "unavailable", reason: "INTERNAL_API_TOKEN ausente" };
+    return { kind: "unavailable", reason: "missing-internal-api-token" };
   }
 
   const url = `${apiBase}/api/internal/regions/${encodeURIComponent(safeSlug)}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await fetchImpl(url, {
@@ -130,18 +167,80 @@ export async function validateRegionalSlug(
     if (response.status === 200) return { kind: "valid" };
     if (response.status === 404) return { kind: "not_found" };
 
-    // 5xx, 4xx outros: unavailable. Não tratar como not_found para evitar
-    // 404 falso-positivo durante incidente do backend.
+    // 401/403: token errado ou negado — não confundir com slug inválido.
+    if (response.status === 401) {
+      return { kind: "unavailable", reason: "backend-401" };
+    }
+    if (response.status === 403) {
+      return { kind: "unavailable", reason: "backend-403" };
+    }
+    // 5xx: incidente do backend. Não tratar como not_found para evitar
+    // 404 falso-positivo durante cold start ou queda parcial.
+    if (response.status >= 500 && response.status < 600) {
+      return { kind: "unavailable", reason: "backend-5xx", detail: `status ${response.status}` };
+    }
+    // Outros 4xx inesperados (415, 429, etc.): rotular como backend-5xx
+    // operacionalmente — caller trata igual: bloqueio temporário.
     return {
       kind: "unavailable",
-      reason: `backend respondeu ${response.status}`,
+      reason: "backend-5xx",
+      detail: `status ${response.status}`,
     };
   } catch (err) {
+    if (timedOut) {
+      return { kind: "unavailable", reason: "backend-timeout" };
+    }
     return {
       kind: "unavailable",
-      reason: err instanceof Error ? err.message : String(err),
+      reason: "fetch-error",
+      detail: err instanceof Error ? err.message : String(err),
     };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Decisão pura do middleware regional. Recebe o estado da flag e o
+ * resultado da validação; devolve a ação a tomar.
+ *
+ * Por que separar do middleware?
+ *   1. `middleware.ts` precisa de runtime do Next (NextResponse) e roda
+ *      no edge — difícil de testar isoladamente sem subir o servidor.
+ *   2. Esta função é pura: dado (flag, validation), saída determinística.
+ *      Cobertura via unit test é direta e sem mocks de runtime.
+ *
+ * Política — endurecida em 2026-05-11 após regressão de soft 404 em
+ * produção com flag=on (slugs retornavam 200 com app/not-found global
+ * porque o middleware caía em fail-open sempre que `BACKEND_API_URL` ou
+ * `INTERNAL_API_TOKEN` estavam ausentes/incorretos):
+ *
+ *   flag off                       → block-flag-off    (HTTP 404)
+ *   flag on, valid                 → pass-valid        (HTTP next)
+ *   flag on, not_found              → block-not-found  (HTTP 404)
+ *   flag on, unavailable (qualquer reason) → block-unavailable (HTTP 503)
+ *
+ * **Nunca** retorna pass-valid em estado unavailable — esse era o bug
+ * que reintroduzia o soft 404 do App Router. Trade-off conhecido: se o
+ * backend tiver cold-start ou instabilidade transiente, a Página
+ * Regional fica 503 até a janela de cache do Next data cache encher.
+ * Aceitável porque (a) o middleware tem `Retry-After: 60`; (b) o
+ * smoke detecta `blocked-unavailable` como "bloqueio operacional"
+ * (não regressão); (c) 503 com retry é correto SEO/semanticamente,
+ * 200 com not-found é soft 404 e Google penaliza.
+ */
+export type MiddlewareAction =
+  | { kind: "block-flag-off" }
+  | { kind: "block-not-found" }
+  | { kind: "block-unavailable"; reason: UnavailableReason }
+  | { kind: "pass-valid" };
+
+export function decideRegionalMiddlewareAction(
+  flagOn: boolean,
+  validation: SlugValidation
+): MiddlewareAction {
+  if (!flagOn) return { kind: "block-flag-off" };
+  if (validation.kind === "valid") return { kind: "pass-valid" };
+  if (validation.kind === "not_found") return { kind: "block-not-found" };
+  return { kind: "block-unavailable", reason: validation.reason };
 }

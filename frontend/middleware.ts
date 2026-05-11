@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  decideRegionalMiddlewareAction,
   extractRegionalSlug,
   isFlagEnabled,
   validateRegionalSlug,
@@ -47,32 +48,49 @@ export async function middleware(request: NextRequest) {
   // matcher e usa o regex que já tem cobertura unit (20 testes).
   const regionalSlug = extractRegionalSlug(pathname);
   if (regionalSlug !== null) {
-    if (!isFlagEnabled()) {
-      // Body vazio + status 404: resposta mínima e clara. Não usa
-      // `redirect()` (evita 307/308) nem rewrite (evita renderizar
-      // app/not-found e arriscar 200 de novo).
+    const flagOn = isFlagEnabled();
+
+    // Curto-circuito explícito: flag off NÃO chama o backend para evitar
+    // tráfego desnecessário e cold-start spurious. O decisor abaixo
+    // também lida com flag off, mas pular o fetch aqui é eficiência pura.
+    if (!flagOn) {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
       return blocked;
     }
 
-    // Flag on: validar slug via backend antes de deixar passar.
     const validation = await validateRegionalSlug(regionalSlug);
-    if (validation.kind === "not_found") {
+    const action = decideRegionalMiddlewareAction(flagOn, validation);
+
+    // Política de decisão (ver `decideRegionalMiddlewareAction` para
+    // racional): `unavailable` NUNCA passa para o App Router porque
+    // o `notFound()` da page.tsx no Next 14.2 retorna soft 404 (200
+    // com body NEXT_NOT_FOUND), problema reproduzido em produção em
+    // 2026-05-11. 503 com `Retry-After` é a resposta correta para
+    // "não consegui validar" — semanticamente honesta, SEO-safe.
+    if (action.kind === "pass-valid") {
+      const passed = NextResponse.next();
+      passed.headers.set("X-Middleware-Regional", "passed-valid");
+      return passed;
+    }
+    if (action.kind === "block-not-found") {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-Regional", "blocked-slug-invalid");
       return blocked;
     }
-    // `unavailable` (backend offline, timeout, token ausente) →
-    // fail-open: deixa passar, page.tsx mostra UI 404 interno via
-    // `notFound()`. Não 404-far por incidente do backend para evitar
-    // falso-positivo em cold start.
-    const passed = NextResponse.next();
-    passed.headers.set(
-      "X-Middleware-Regional",
-      validation.kind === "valid" ? "passed-valid" : `passed-${validation.kind}`
-    );
-    return passed;
+    if (action.kind === "block-unavailable") {
+      const blocked = new NextResponse(null, { status: 503 });
+      blocked.headers.set("X-Middleware-Regional", "blocked-unavailable");
+      blocked.headers.set("X-Middleware-Regional-Reason", action.reason);
+      blocked.headers.set("Retry-After", "60");
+      return blocked;
+    }
+    // block-flag-off — defesa em profundidade. O curto-circuito acima já
+    // tratou flag=off, mas o tipo do `action` permite esse caminho e o
+    // exhaustive-check torna a função type-safe contra novas variantes.
+    const blocked = new NextResponse(null, { status: 404 });
+    blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
+    return blocked;
   }
 
   // ── 2. Redirects 301 legados (preservados como estavam). ───────────

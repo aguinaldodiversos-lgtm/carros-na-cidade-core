@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   REGIONAL_PATH_REGEX,
+  decideRegionalMiddlewareAction,
   extractRegionalSlug,
   isFlagEnabled,
   validateRegionalSlug,
+  type SlugValidation,
 } from "./regional-page-guard";
 
 describe("REGIONAL_PATH_REGEX e extractRegionalSlug", () => {
@@ -97,25 +99,25 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("apiBase ausente → unavailable", async () => {
+  it("apiBase ausente → unavailable com reason 'missing-backend-api-url'", async () => {
     const fetchImpl = vi.fn();
     const result = await validateRegionalSlug("atibaia-sp", {
       apiBase: "",
       token: TOKEN,
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    expect(result.kind).toBe("unavailable");
+    expect(result).toEqual({ kind: "unavailable", reason: "missing-backend-api-url" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("token ausente → unavailable (não 404, para não confundir falta de config com slug inválido)", async () => {
+  it("token ausente → unavailable com reason 'missing-internal-api-token'", async () => {
     const fetchImpl = vi.fn();
     const result = await validateRegionalSlug("atibaia-sp", {
       apiBase: BASE,
       token: "",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    expect(result.kind).toBe("unavailable");
+    expect(result).toEqual({ kind: "unavailable", reason: "missing-internal-api-token" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -139,7 +141,7 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
     expect(result).toEqual({ kind: "not_found" });
   });
 
-  it("backend 500 → unavailable (NÃO 404 falso-positivo)", async () => {
+  it("backend 500 → unavailable com reason 'backend-5xx'", async () => {
     const fetchImpl = fakeFetchOk(500);
     const result = await validateRegionalSlug("atibaia-sp", {
       apiBase: BASE,
@@ -147,27 +149,45 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
       fetchImpl,
     });
     expect(result.kind).toBe("unavailable");
+    if (result.kind === "unavailable") {
+      expect(result.reason).toBe("backend-5xx");
+    }
   });
 
-  it("backend 401/403 → unavailable (token errado na config, não slug inválido)", async () => {
-    const fetchImpl401 = fakeFetchOk(401);
-    const r401 = await validateRegionalSlug("atibaia-sp", {
+  it("backend 401 → unavailable com reason 'backend-401'", async () => {
+    const fetchImpl = fakeFetchOk(401);
+    const result = await validateRegionalSlug("atibaia-sp", {
       apiBase: BASE,
       token: TOKEN,
-      fetchImpl: fetchImpl401,
+      fetchImpl,
     });
-    expect(r401.kind).toBe("unavailable");
-
-    const fetchImpl403 = fakeFetchOk(403);
-    const r403 = await validateRegionalSlug("atibaia-sp", {
-      apiBase: BASE,
-      token: TOKEN,
-      fetchImpl: fetchImpl403,
-    });
-    expect(r403.kind).toBe("unavailable");
+    expect(result).toEqual({ kind: "unavailable", reason: "backend-401" });
   });
 
-  it("fetch lança (rede offline) → unavailable", async () => {
+  it("backend 403 → unavailable com reason 'backend-403'", async () => {
+    const fetchImpl = fakeFetchOk(403);
+    const result = await validateRegionalSlug("atibaia-sp", {
+      apiBase: BASE,
+      token: TOKEN,
+      fetchImpl,
+    });
+    expect(result).toEqual({ kind: "unavailable", reason: "backend-403" });
+  });
+
+  it("backend 429 (outro 4xx inesperado) → unavailable com reason 'backend-5xx'", async () => {
+    const fetchImpl = fakeFetchOk(429);
+    const result = await validateRegionalSlug("atibaia-sp", {
+      apiBase: BASE,
+      token: TOKEN,
+      fetchImpl,
+    });
+    expect(result.kind).toBe("unavailable");
+    if (result.kind === "unavailable") {
+      expect(result.reason).toBe("backend-5xx");
+    }
+  });
+
+  it("fetch lança (rede offline) → unavailable com reason 'fetch-error'", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("ECONNREFUSED")) as unknown as typeof fetch;
     const result = await validateRegionalSlug("atibaia-sp", {
       apiBase: BASE,
@@ -176,8 +196,35 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
     });
     expect(result.kind).toBe("unavailable");
     if (result.kind === "unavailable") {
-      expect(result.reason).toContain("ECONNREFUSED");
+      expect(result.reason).toBe("fetch-error");
+      expect(result.detail).toContain("ECONNREFUSED");
     }
+  });
+
+  it("fetch abortado por timeout → unavailable com reason 'backend-timeout'", async () => {
+    vi.useRealTimers();
+    // Fetch que respeita o AbortSignal e rejeita com AbortError quando
+    // sinalizado. Necessário simular o timeout real do AbortController.
+    const fetchImpl = vi.fn().mockImplementation((_url, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        const onAbort = () => {
+          const err = new Error("The operation was aborted.");
+          err.name = "AbortError";
+          reject(err);
+        };
+        if (signal?.aborted) onAbort();
+        else signal?.addEventListener("abort", onAbort);
+      });
+    }) as unknown as typeof fetch;
+
+    const result = await validateRegionalSlug("atibaia-sp", {
+      apiBase: BASE,
+      token: TOKEN,
+      timeoutMs: 5,
+      fetchImpl,
+    });
+    expect(result).toEqual({ kind: "unavailable", reason: "backend-timeout" });
   });
 
   it("envia X-Internal-Token e encoda o slug", async () => {
@@ -205,5 +252,78 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
     const calls = (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls;
     const [url] = calls[0] as [string];
     expect(url).toBe(`${BASE}/api/internal/regions/atibaia-sp`);
+  });
+});
+
+describe("decideRegionalMiddlewareAction — política de gate", () => {
+  it("flag off → block-flag-off (independente da validação)", () => {
+    const validation: SlugValidation = { kind: "valid" };
+    expect(decideRegionalMiddlewareAction(false, validation)).toEqual({
+      kind: "block-flag-off",
+    });
+  });
+
+  it("flag off + not_found → ainda block-flag-off (flag tem precedência)", () => {
+    const validation: SlugValidation = { kind: "not_found" };
+    expect(decideRegionalMiddlewareAction(false, validation)).toEqual({
+      kind: "block-flag-off",
+    });
+  });
+
+  it("flag on + valid → pass-valid", () => {
+    const validation: SlugValidation = { kind: "valid" };
+    expect(decideRegionalMiddlewareAction(true, validation)).toEqual({
+      kind: "pass-valid",
+    });
+  });
+
+  it("flag on + not_found → block-not-found", () => {
+    const validation: SlugValidation = { kind: "not_found" };
+    expect(decideRegionalMiddlewareAction(true, validation)).toEqual({
+      kind: "block-not-found",
+    });
+  });
+
+  // O ANTI-REGRESSION CRÍTICO. Antes de 2026-05-11, este caminho retornava
+  // pass-valid (fail-open). Resultado em produção: soft 404 para todo
+  // slug regional quando env do backend estava mal configurado.
+  // Nunca aceitar pass-* em estado unavailable.
+  const UNAVAILABLE_REASONS = [
+    "missing-backend-api-url",
+    "missing-internal-api-token",
+    "backend-401",
+    "backend-403",
+    "backend-5xx",
+    "backend-timeout",
+    "fetch-error",
+  ] as const;
+
+  for (const reason of UNAVAILABLE_REASONS) {
+    it(`flag on + unavailable[${reason}] → block-unavailable (NUNCA pass)`, () => {
+      const validation: SlugValidation = { kind: "unavailable", reason };
+      const action = decideRegionalMiddlewareAction(true, validation);
+      expect(action.kind).toBe("block-unavailable");
+      if (action.kind === "block-unavailable") {
+        expect(action.reason).toBe(reason);
+      }
+    });
+  }
+
+  it("garante que pass-valid é a ÚNICA saída que deixa a request seguir", () => {
+    const states: SlugValidation[] = [
+      { kind: "valid" },
+      { kind: "not_found" },
+      { kind: "unavailable", reason: "missing-backend-api-url" },
+      { kind: "unavailable", reason: "missing-internal-api-token" },
+      { kind: "unavailable", reason: "backend-401" },
+      { kind: "unavailable", reason: "backend-403" },
+      { kind: "unavailable", reason: "backend-5xx" },
+      { kind: "unavailable", reason: "backend-timeout" },
+      { kind: "unavailable", reason: "fetch-error" },
+    ];
+    const passCount = states
+      .map((v) => decideRegionalMiddlewareAction(true, v))
+      .filter((a) => a.kind === "pass-valid").length;
+    expect(passCount).toBe(1);
   });
 });
