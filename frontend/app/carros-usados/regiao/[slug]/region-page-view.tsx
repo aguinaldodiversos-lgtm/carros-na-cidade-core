@@ -22,6 +22,14 @@ interface RegionPageViewProps {
   members: RegionMember[];
   ads: AdItem[];
   radiusKm: number;
+  /**
+   * Total agregado de anúncios na região, devolvido pelo backend em
+   * `pagination.total`. Distinto de `ads.length` (apenas a amostra
+   * exibida nesta página). Usado na "contagem destacada" e nas seções
+   * SEO contextuais para refletir o número real do estoque regional,
+   * sem inventar quantidades.
+   */
+  totalAds: number;
 }
 
 function formatDistance(km: number | null | undefined): string {
@@ -30,10 +38,24 @@ function formatDistance(km: number | null | undefined): string {
   return `${Math.round(km)} km`;
 }
 
-export function RegionPageView({ base, members, ads, radiusKm }: RegionPageViewProps) {
+export function RegionPageView({
+  base,
+  members,
+  ads,
+  radiusKm,
+  totalAds,
+}: RegionPageViewProps) {
   const memberCount = members.length;
   const stateUF = base.state.toUpperCase();
   const cityHref = `/carros-em/${encodeURIComponent(base.slug)}`;
+  // `totalAds` é o número agregado do backend; `ads.length` é só a
+  // amostra desta página. Para a contagem destacada e os blocos SEO
+  // contextuais, sempre preferir `totalAds` quando > 0; cair para o
+  // tamanho da amostra apenas quando o backend não devolveu pagination
+  // (defesa contra envelope legado).
+  const safeTotal = totalAds > 0 ? totalAds : ads.length;
+  const memberPreviewNames = members.slice(0, 4).map((m) => m.name);
+  const remainingMembers = Math.max(0, memberCount - memberPreviewNames.length);
   // URL canônica da Página Estadual: `/comprar/estado/[uf]` (lowercase).
   // `/comprar?state=UF` ainda funciona via 307 → canonical, mas adiciona
   // um hop e Search Console pode interpretar como link "fraco". Como
@@ -67,6 +89,28 @@ export function RegionPageView({ base, members, ads, radiusKm }: RegionPageViewP
           cidades próximas em até <strong className="text-cnc-text">{radiusKm} km</strong>.
         </p>
       </header>
+
+      {safeTotal > 0 && (
+        <section
+          aria-label="Total de anúncios na região"
+          className="mb-6 rounded-xl border border-cnc-line bg-white px-4 py-3 md:px-5 md:py-4"
+          data-testid="regional-count-highlight"
+        >
+          <p className="text-base md:text-lg text-cnc-text">
+            <strong className="text-xl md:text-2xl font-bold text-primary">
+              {safeTotal.toLocaleString("pt-BR")}
+            </strong>{" "}
+            <span className="font-semibold">
+              {safeTotal === 1 ? "carro" : "carros"}
+            </span>{" "}
+            <span className="text-cnc-muted">
+              em uma região de até{" "}
+              <strong className="text-cnc-text">{radiusKm} km</strong> ao redor de{" "}
+              <strong className="text-cnc-text">{base.name}</strong>
+            </span>
+          </p>
+        </section>
+      )}
 
       {memberCount > 0 && (
         <section aria-label="Cidades incluídas na região" className="mb-6">
@@ -130,6 +174,68 @@ export function RegionPageView({ base, members, ads, radiusKm }: RegionPageViewP
           <AdGrid items={ads} />
         </section>
       )}
+
+      <section
+        aria-label="Sobre a região de busca"
+        className="mt-10 grid gap-4 md:grid-cols-3"
+        data-testid="regional-seo-blocks"
+      >
+        <article className="rounded-xl border border-cnc-line bg-white p-4 md:p-5">
+          <h2 className="text-sm md:text-base font-semibold text-cnc-text">
+            Por que comprar na região de {base.name}
+          </h2>
+          <p className="mt-2 text-sm text-cnc-muted leading-relaxed">
+            Quando você amplia a busca para a região de {base.name}, encontra mais
+            oferta, mais variedade de marcas e mais flexibilidade para negociar
+            sem precisar viajar para longe. Carros de cidades vizinhas costumam
+            estar a poucos quilômetros e podem ser visitados no mesmo dia.
+          </p>
+        </article>
+
+        <article className="rounded-xl border border-cnc-line bg-white p-4 md:p-5">
+          <h2 className="text-sm md:text-base font-semibold text-cnc-text">
+            Cidades próximas incluídas
+          </h2>
+          <p className="mt-2 text-sm text-cnc-muted leading-relaxed">
+            {memberCount > 0 ? (
+              <>
+                Esta região inclui {base.name} e mais{" "}
+                <strong className="text-cnc-text">
+                  {memberCount} cidade{memberCount === 1 ? "" : "s"}
+                </strong>{" "}
+                próxima{memberCount === 1 ? "" : "s"}
+                {memberPreviewNames.length > 0 ? (
+                  <>
+                    , como <strong className="text-cnc-text">{memberPreviewNames.join(", ")}</strong>
+                    {remainingMembers > 0 ? ` e mais ${remainingMembers}` : ""}
+                  </>
+                ) : null}
+                . Todas dentro do alcance de até {radiusKm} km a partir da
+                cidade-base.
+              </>
+            ) : (
+              <>
+                No momento, a região de {base.name} mostra anúncios apenas da
+                própria cidade-base. Conforme novos veículos forem cadastrados
+                em cidades vizinhas, eles aparecem aqui automaticamente.
+              </>
+            )}
+          </p>
+        </article>
+
+        <article className="rounded-xl border border-cnc-line bg-white p-4 md:p-5">
+          <h2 className="text-sm md:text-base font-semibold text-cnc-text">
+            Como funciona o alcance regional inteligente
+          </h2>
+          <p className="mt-2 text-sm text-cnc-muted leading-relaxed">
+            O alcance regional inteligente une {base.name} às cidades vizinhas
+            dentro de {radiusKm} km e prioriza anúncios mais próximos da
+            cidade-base. Você vê primeiro o que está perto, sem precisar
+            configurar filtros, e sem perder ofertas que estariam de fora numa
+            busca só por cidade.
+          </p>
+        </article>
+      </section>
 
       <footer className="mt-10 flex flex-wrap gap-3 text-sm">
         <Link

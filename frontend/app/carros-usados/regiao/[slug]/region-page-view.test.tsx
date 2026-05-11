@@ -38,6 +38,7 @@ describe("RegionPageView — link da Estadual usa URL canônica /comprar/estado/
         members={ATIBAIA_MEMBERS}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     // Breadcrumb tem o UF visível como label.
@@ -52,6 +53,7 @@ describe("RegionPageView — link da Estadual usa URL canônica /comprar/estado/
         members={ATIBAIA_MEMBERS}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     const footerLink = screen.getByRole("link", { name: /Ver catálogo de SP/i });
@@ -65,6 +67,7 @@ describe("RegionPageView — link da Estadual usa URL canônica /comprar/estado/
         members={[]}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     const fallbackLink = screen.getByRole("link", { name: /Ver anúncios em SP/i });
@@ -78,6 +81,7 @@ describe("RegionPageView — link da Estadual usa URL canônica /comprar/estado/
         members={[]}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     const link = screen.getByRole("link", { name: /Ver anúncios em MG/i });
@@ -91,6 +95,7 @@ describe("RegionPageView — link da Estadual usa URL canônica /comprar/estado/
         members={ATIBAIA_MEMBERS}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     const allLinks = container.querySelectorAll("a[href]");
@@ -109,6 +114,7 @@ describe("RegionPageView — invariantes de Fase A→C", () => {
         members={ATIBAIA_MEMBERS}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     const cityLink = screen.getByRole("link", { name: /Voltar para Atibaia/i });
@@ -122,6 +128,7 @@ describe("RegionPageView — invariantes de Fase A→C", () => {
         members={ATIBAIA_MEMBERS}
         ads={[]}
         radiusKm={80}
+        totalAds={0}
       />
     );
     const memberLink = screen.getByRole("link", { name: /Bragança Paulista/i });

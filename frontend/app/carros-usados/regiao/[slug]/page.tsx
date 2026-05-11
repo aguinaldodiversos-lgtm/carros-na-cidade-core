@@ -8,6 +8,7 @@ import {
   type RegionPayload,
 } from "@/lib/regions/fetch-region";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
+import { buildRegionStructuredDataBlocks } from "@/lib/seo/region-structured-data";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import { RegionPageView } from "./region-page-view";
 
@@ -77,11 +78,12 @@ function buildTitle(name: string, state: string) {
   return `Carros usados na região de ${name} — ${state.toUpperCase()}`;
 }
 
-function buildDescription(name: string, memberCount: number) {
+function buildDescription(name: string, state: string, memberCount: number, radiusKm: number) {
+  const uf = state.toUpperCase();
   if (memberCount === 0) {
-    return `Veja veículos anunciados em ${name} e arredores. Anúncios verificados, com filtros e contato direto com o anunciante.`;
+    return `Veja carros usados em ${name}, ${uf} e arredores, com alcance regional de até ${radiusKm} km. Compare ofertas com filtros e contato direto no Carros na Cidade.`;
   }
-  return `Veja veículos anunciados em ${name} e em ${memberCount} cidade${memberCount === 1 ? "" : "s"} próxima${memberCount === 1 ? "" : "s"}. Anúncios verificados, com filtros e contato direto.`;
+  return `Veja carros usados em ${name} e em ${memberCount} cidade${memberCount === 1 ? "" : "s"} próxima${memberCount === 1 ? "" : "s"} de ${uf}, com alcance regional de até ${radiusKm} km. Compare ofertas com alcance regional inteligente.`;
 }
 
 export async function generateMetadata({ params }: RegionPageProps): Promise<Metadata> {
@@ -111,8 +113,14 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
     notFound();
   }
 
+  const radiusKm = (region as RegionPayload & { radius_km?: number }).radius_km ?? 80;
   const title = buildTitle(region.base.name, region.base.state);
-  const description = buildDescription(region.base.name, region.members.length);
+  const description = buildDescription(
+    region.base.name,
+    region.base.state,
+    region.members.length,
+    radiusKm
+  );
 
   // Canonical aponta para a página da cidade-base — proteção temporária
   // do runbook §5 Fase A/B/C. Em Fase D (aprovação SEO) este canonical
@@ -164,18 +172,53 @@ export default async function RegionPage({ params }: RegionPageProps) {
 
   const adsResponse = await getAdsForRegion(region);
   const ads = Array.isArray(adsResponse?.data) ? adsResponse.data : [];
+  // `pagination.total` é o agregado real do backend. Preferimos esse
+  // número à `ads.length` para a "contagem destacada" e para o JSON-LD
+  // (a amostra é só a primeira página). Se o envelope vier sem
+  // pagination, cai para o tamanho da amostra — sem inventar.
+  const totalAds =
+    typeof adsResponse?.pagination?.total === "number" && adsResponse.pagination.total >= 0
+      ? adsResponse.pagination.total
+      : ads.length;
 
   // `radius_km` vem do backend (foi adicionado em getRegionByBaseSlugDynamic).
   // Casts defensivos: se o BFF antigo for cacheado e voltar sem o campo,
   // fallback para 80 (o default declarado em platform_settings).
   const radiusKm = (region as RegionPayload & { radius_km?: number }).radius_km ?? 80;
 
+  const structuredData = buildRegionStructuredDataBlocks({
+    base: region.base,
+    members: region.members,
+    totalAds,
+    radiusKm,
+    sampleAds: ads.slice(0, 12).map((ad) => ({
+      slug: ad.slug,
+      title: ad.title,
+      brand: ad.brand,
+      model: ad.model,
+      year: ad.year,
+    })),
+  });
+
   return (
-    <RegionPageView
-      base={region.base}
-      members={region.members}
-      ads={ads}
-      radiusKm={radiusKm}
-    />
+    <>
+      {structuredData.map((block, index) => (
+        <script
+          key={`region-jsonld-${index}`}
+          type="application/ld+json"
+          // Server-rendered, no user-controlled fields nested without escaping.
+          // `JSON.stringify` é suficiente porque os strings vêm do payload
+          // sanitizado do backend e dos próprios builders puros.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(block) }}
+        />
+      ))}
+      <RegionPageView
+        base={region.base}
+        members={region.members}
+        ads={ads}
+        radiusKm={radiusKm}
+        totalAds={totalAds}
+      />
+    </>
   );
 }
