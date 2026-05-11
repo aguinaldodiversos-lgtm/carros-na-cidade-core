@@ -183,11 +183,21 @@ function deriveCityNameHints(slug) {
  * bug conhecido e não um problema novo.
  */
 function detectNextNotFoundBug(html) {
-  return (
-    typeof html === "string" &&
-    (html.includes('NEXT_NOT_FOUND') ||
-      html.includes('data-dgst="NEXT_NOT_FOUND"'))
-  );
+  if (typeof html !== "string") return false;
+  // Sinal interno do Next quando notFound() foi chamado mas status saiu 200.
+  if (html.includes("NEXT_NOT_FOUND")) return true;
+  if (html.includes('data-dgst="NEXT_NOT_FOUND"')) return true;
+  // Defesa adicional: UI do not-found global renderizando com status 200.
+  // Se o body tem o texto literal "Página não encontrada" do `app/not-found.tsx`,
+  // estamos servindo a UI 404 com status 200 — soft 404 inaceitável.
+  if (
+    /Página não encontrada/i.test(html) &&
+    /404/.test(html) &&
+    !html.includes("Carros usados na região de")
+  ) {
+    return true;
+  }
+  return false;
 }
 
 async function smokeOneSlug(slug) {

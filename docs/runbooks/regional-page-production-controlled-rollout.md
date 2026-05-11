@@ -202,23 +202,68 @@ Environment → **Add Environment Variable**:
   Salvar a env var no Render dispara restart automático — se isso não
   acontecer, **Manual Deploy → Deploy latest commit**.
 
-### 0.1 Por que `dynamic = "force-dynamic"` na página regional
+### 0.1 Arquitetura do hard 404 — três camadas
 
-A rota `/carros-usados/regiao/[slug]/page.tsx` exporta
-`dynamic = "force-dynamic"`, e NÃO exporta `revalidate`. Isso é
-proteção contra um bug do Next 14.2: rota com `revalidate` (ISR) que
-chama `notFound()` retorna o UI do not-found mas com **status HTTP
-200** em vez de 404. Reproduzido em produção em 2026-05-10, smoke
-contra slug fake retornando 200 com tela "Página não encontrada".
+O status 404 real da rota regional é garantido por **três camadas
+independentes**, na ordem em que são atravessadas pela request:
 
-Consequência operacional:
-- A flag passa a ser lida runtime em cada request — bom para rollback
-  rápido.
-- O HTML inteiro deixa de ser cacheável pelo CDN — aceitável em Fase
-  A→C porque o BFF da região (`fetch-region.ts`) tem cache 5min e
-  `fetchAdsSearch` revalida a cada 60s.
-- Suite vitest tem teste de regressão (`page.config.test.ts`) que
-  falha se alguém remover `dynamic` ou reintroduzir `revalidate`.
+**Camada 1 — Middleware (edge, garante o status code).**
+`frontend/middleware.ts` intercepta `/carros-usados/regiao/:slug`
+ANTES do App Router. Lê `REGIONAL_PAGE_ENABLED` direto de
+`process.env`:
+- `!== "true"` → retorna `NextResponse(null, { status: 404 })`
+  imediatamente. Sem fetch, sem render.
+- `=== "true"` → chama `validateRegionalSlug(slug)` em
+  `frontend/lib/regional-page-guard.ts`, que faz `fetch GET` em
+  `${BACKEND_API_URL}/api/internal/regions/:slug` com header
+  `X-Internal-Token` e `next: { revalidate: 300 }`. Resultado:
+  - `valid` (backend 200) → `NextResponse.next()` (App Router renderiza).
+  - `not_found` (backend 404) → `NextResponse(null, { status: 404 })`.
+  - `unavailable` (5xx, timeout, token ausente) → fail-open
+    (`NextResponse.next()`), página interna lida via `notFound()`.
+
+Esta é a camada que torna o 404 REAL: como o middleware roda antes
+de qualquer render, o status code é decidido antes do stream começar.
+
+**Camada 2 — `generateMetadata` (page.tsx, defesa em profundidade).**
+Mesmo fluxo de validação, chamando `notFound()` interno. Cobre o
+caso de middleware desabilitado/falhando ou ambiente local sem
+middleware ativo.
+
+**Camada 3 — Page default (page.tsx, última defesa).**
+Repete os checks. Em Next 14.2 o status HTTP nessa camada pode ficar
+200, mas o body é UI 404 — segurança visual.
+
+A rota também usa `export const dynamic = "force-dynamic"` (sem
+`revalidate`), preservando o comportamento de leitura runtime da flag.
+
+### 0.2 Variáveis de ambiente necessárias no Render frontend
+
+Para que a Camada 1 funcione corretamente:
+
+| Variável | Origem | Para quê |
+|---|---|---|
+| `REGIONAL_PAGE_ENABLED` | painel Render, sync OFF | Gate principal. Apenas `"true"` libera. |
+| `BACKEND_API_URL` | já no `render.yaml` | URL do backend para validação de slug. |
+| `INTERNAL_API_TOKEN` | painel Render, sync OFF | Mesmo token usado pelo BFF `fetch-region.ts`. |
+
+Se `BACKEND_API_URL` ou `INTERNAL_API_TOKEN` ausentes com flag on,
+o middleware degrada para `fail-open` e a page.tsx assume — page.tsx
+chama `notFound()` corretamente nesse fluxo.
+
+### 0.3 Por que `dynamic = "force-dynamic"` continua sendo necessário
+
+A rota também exporta `dynamic = "force-dynamic"` (e NÃO `revalidate`)
+para que a Camada 2/3 funcione mesmo quando o middleware é
+contornado. Em Next 14.2 com `revalidate` (ISR), `notFound()` em
+Server Component pode retornar status 200 — a Camada 1 do middleware
+seria a única proteção, e queremos múltiplas.
+
+Consequência: o HTML inteiro deixa de ser cacheável pelo CDN —
+aceitável em Fase A→C porque o BFF da região tem cache 5min e a
+validação no middleware tem cache `revalidate: 300` no Next data
+cache. Suite vitest tem teste de regressão (`page.config.test.ts`)
+que falha se alguém remover `dynamic` ou reintroduzir `revalidate`.
 
 ### 2.2 Disparar redeploy
 
