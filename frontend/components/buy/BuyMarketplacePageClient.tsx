@@ -9,6 +9,7 @@ import { CatalogPagination } from "@/components/buy/CatalogPagination";
 import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
+import { StateTerritorialShortcuts } from "@/components/buy/StateTerritorialShortcuts";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
@@ -296,6 +297,15 @@ export default function BuyMarketplacePageClient({
                   icon={<IconTable className="h-full w-full" />}
                 />
               </div>
+
+              {/* Navegação cross-territorial — só em modo estadual. Bloco
+                  curado de cidades destacadas com links canônicos
+                  (/carros-em/[slug]) e regional (/carros-usados/regiao/
+                  [slug]). Adicionado na auditoria 2026-05-11 para
+                  conectar Estado → Cidade canônica e Estado → Regional. */}
+              {variant === "estadual" && (stateUf || city.state) ? (
+                <StateTerritorialShortcuts uf={stateUf || city.state} />
+              ) : null}
             </div>
           </div>
         </div>
