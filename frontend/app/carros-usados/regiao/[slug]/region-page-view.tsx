@@ -325,8 +325,14 @@ export function RegionPageView({
       {/* ───────── BODY ───────── */}
       <main>
         <div className="mx-auto w-full max-w-7xl px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12">
-          {/* Cidades incluídas — faixa horizontal compacta */}
-          {visibleCityChips.length > 0 && (
+          {/* Cidades incluídas — faixa horizontal compacta. Renderiza
+              SÓ quando há cidades vizinhas (memberCount > 0). Quando a
+              região está reduzida à cidade-base, a seção é suprimida —
+              evita exibir o label "Cidades nesta região" com apenas o
+              chip base, que confunde o usuário e quebra o smoke
+              validator (que espera ao menos uma vizinha quando o
+              label aparece). */}
+          {memberCount > 0 && visibleCityChips.length > 0 && (
             <section aria-label="Cidades incluídas na região" className="mb-5">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cnc-muted">
                 Cidades nesta região

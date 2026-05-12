@@ -34,8 +34,38 @@ import {
  *    - /painel/anuncios/novo → /anunciar/novo
  *    - /painel/anuncios/[id]/publicar → /upgrade
  */
+/**
+ * Header interno usado para passar o pathname da request para os
+ * Server Components do App Router (`headers()` em `next/headers`).
+ *
+ * Por que existe?
+ *   O `RootLayout` precisa saber o pathname para resolver a cidade
+ *   ativa territorial (ex.: `/carros-em/atibaia-sp` → Atibaia) ANTES
+ *   da hidratação client-side. Sem isso, o SSR cai em `DEFAULT_CITY`
+ *   (sao-paulo-sp) e os links territoriais do header SSR contradizem
+ *   a URL — bug detectado na auditoria 2026-05-11.
+ *
+ * Como funciona?
+ *   - Middleware roda no edge e tem acesso a `request.nextUrl.pathname`.
+ *   - `NextResponse.next({ request: { headers: ... } })` injeta os
+ *     headers no contexto da request que segue para o App Router.
+ *   - Server Components lêem via `headers().get("x-cnc-pathname")`.
+ *
+ * Por que prefixo `x-cnc-`?
+ *   Sinaliza que é header interno da aplicação, não enviado pelo
+ *   cliente nem propagado para o navegador.
+ */
+const PATHNAME_HEADER = "x-cnc-pathname";
+
+function withPathnameHeader(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(PATHNAME_HEADER, request.nextUrl.pathname);
+  return { request: { headers: requestHeaders } };
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const territorialContext = withPathnameHeader(request);
 
   // ── 1. Hard gate da Regional (antes de qualquer outra lógica). ─────
   //
@@ -69,7 +99,7 @@ export async function middleware(request: NextRequest) {
     // 2026-05-11. 503 com `Retry-After` é a resposta correta para
     // "não consegui validar" — semanticamente honesta, SEO-safe.
     if (action.kind === "pass-valid") {
-      const passed = NextResponse.next();
+      const passed = NextResponse.next(territorialContext);
       passed.headers.set("X-Middleware-Regional", "passed-valid");
       return passed;
     }
@@ -138,7 +168,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 301);
   }
 
-  return NextResponse.next();
+  // Fim do middleware: propaga o pathname para o RootLayout via header
+  // interno. Isso é benigno para rotas não-territoriais (RootLayout só
+  // usa o header se `extractCitySlugFromPathname` reconhecer um prefixo
+  // territorial; caso contrário, mantém a lógica antiga de cookie).
+  return NextResponse.next(territorialContext);
 }
 
 /**
@@ -160,10 +194,29 @@ export async function middleware(request: NextRequest) {
  */
 export const config = {
   matcher: [
+    // Hard gate da Regional + injeção do x-cnc-pathname.
     "/carros-usados/regiao/:path*",
+
+    // Redirects 301 legados (hífen único → barra).
     "/carros-em-:path*",
     "/carros-baratos-em-:path*",
     "/carros-automaticos-em-:path*",
+
+    // Rotas territoriais que precisam do `x-cnc-pathname` para o
+    // RootLayout derivar a cidade ativa SSR. Sem isso, o header
+    // server-rendered cai em DEFAULT_CITY (sao-paulo-sp) mesmo em
+    // páginas de outra cidade — bug auditoria 2026-05-11.
+    "/carros-em/:path*",
+    "/carros-baratos-em/:path*",
+    "/carros-automaticos-em/:path*",
+    "/cidade/:path*",
+    "/comprar/cidade/:path*",
+    "/comprar/estado/:path*",
+    "/tabela-fipe/:path*",
+    "/simulador-financiamento/:path*",
+    "/blog/:path*",
+
+    // Redirects 301 do painel.
     "/painel/anuncios/novo",
     "/painel/anuncios/:id/publicar",
   ],

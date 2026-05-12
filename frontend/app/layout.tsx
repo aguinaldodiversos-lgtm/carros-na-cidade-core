@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { AppProviders } from "@/components/providers/AppProviders";
+import { cityContextFromSlug } from "@/lib/buy/territory-variant";
+import { extractCitySlugFromPathname } from "@/lib/city/city-from-pathname";
 import { DEFAULT_CITY } from "@/lib/city/city-default";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
+import type { CityRef } from "@/lib/city/city-types";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 
 import { SITE_FAVICON_SRC, SITE_OG_IMAGE_PATH } from "@/lib/site/brand-assets";
@@ -141,10 +144,46 @@ type RootLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
+/**
+ * Resolve a cidade ativa para o SSR — auditoria 2026-05-11.
+ *
+ * Hierarquia:
+ *   1. Slug derivado do pathname em rotas territoriais (ex.:
+ *      `/carros-em/atibaia-sp` → atibaia-sp). O `pathname` chega via
+ *      header interno `x-cnc-pathname` injetado pelo middleware.
+ *      Quando presente, é a fonte mais confiável (URL do usuário).
+ *   2. Cookie `cnc_city` salvo em visitas anteriores.
+ *   3. `DEFAULT_CITY` (sao-paulo-sp) — última linha.
+ *
+ * Sem este resolver, todas as páginas territoriais de outras cidades
+ * (`/carros-em/atibaia-sp`, `/carros-usados/regiao/atibaia-sp`, etc.)
+ * recebiam SSR com `DEFAULT_CITY` → header com links errados (links
+ * para `sao-paulo-sp` em página de Atibaia). O fix do `CityContext`
+ * client-side cobria o caso pós-hidratação mas deixava flash inicial
+ * e crawlers sem JS verem incoerência.
+ */
+function resolveSsrInitialCity(pathname: string | null, cookieValue: string | undefined): CityRef {
+  if (pathname) {
+    const slug = extractCitySlugFromPathname(pathname);
+    if (slug) {
+      const ctx = cityContextFromSlug(slug);
+      return {
+        slug: ctx.slug,
+        name: ctx.name,
+        state: ctx.state,
+        label: ctx.label,
+      };
+    }
+  }
+  return parseCityCookieValue(cookieValue) ?? DEFAULT_CITY;
+}
+
 export default async function RootLayout({ children }: RootLayoutProps) {
   const cookieStore = await cookies();
+  const headerStore = await headers();
   const rawCity = cookieStore.get(CITY_COOKIE_NAME)?.value;
-  const initialCity = parseCityCookieValue(rawCity) ?? DEFAULT_CITY;
+  const pathname = headerStore.get("x-cnc-pathname");
+  const initialCity = resolveSsrInitialCity(pathname, rawCity);
 
   return (
     <html lang="pt-BR" className={inter.variable}>
