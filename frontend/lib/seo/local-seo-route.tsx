@@ -6,7 +6,11 @@ import {
   type LocalSeoLandingModel,
   type LocalSeoVariant,
 } from "@/lib/seo/local-seo-data";
-import { buildLocalSeoJsonLd, buildLocalSeoMetadata } from "@/lib/seo/local-seo-metadata";
+import {
+  buildLocalSeoBreadcrumbJsonLd,
+  buildLocalSeoJsonLd,
+  buildLocalSeoMetadata,
+} from "@/lib/seo/local-seo-metadata";
 
 export const LOCAL_SEO_REVALIDATE = 60;
 
@@ -51,12 +55,24 @@ export function createLocalSeoPage(
     const model = await load(params.slug);
     const jsonLd = buildLocalSeoJsonLd(model);
 
+    // BreadcrumbList complementar — só para variant "em" (canônica
+    // indexável). Variantes baratos/automaticos canonicalizam em /carros-em
+    // e emitir Breadcrumb duplicaria sinal para o Google.
+    const breadcrumbJsonLd =
+      variant === "em" ? buildLocalSeoBreadcrumbJsonLd(model) : null;
+
     return (
       <>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {breadcrumbJsonLd ? (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+          />
+        ) : null}
         <LocalSeoLanding model={model} />
         {options.renderAfter ? options.renderAfter(model) : null}
       </>

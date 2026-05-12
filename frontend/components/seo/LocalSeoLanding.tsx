@@ -26,11 +26,31 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
     <div className="min-h-screen bg-[#f6f7fb]">
       <header className="border-b border-slate-200/80 bg-white">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-10 sm:px-6">
+          {/*
+            Breadcrumb visível com 3 níveis (Início > UF > Cidade).
+            Auditoria 2026-05-11 detectou que a rota canônica
+            /carros-em/[slug] não tinha breadcrumb visível nem
+            BreadcrumbList JSON-LD apesar de ser `index,follow`. O
+            JSON-LD complementar é emitido no createLocalSeoPage.
+            Quando `model.state` está ausente, cai para o formato
+            antigo de 2 níveis (defesa contra payload legado).
+          */}
           <nav className="text-sm text-slate-600" aria-label="Trilha">
             <Link href="/" className="hover:text-[#0e62d8]">
               Início
             </Link>
             <span className="mx-2 text-slate-400">/</span>
+            {model.state ? (
+              <>
+                <Link
+                  href={`/comprar/estado/${model.state.toLowerCase()}`}
+                  className="hover:text-[#0e62d8]"
+                >
+                  {model.state}
+                </Link>
+                <span className="mx-2 text-slate-400">/</span>
+              </>
+            ) : null}
             <Link href={hubHref} className="hover:text-[#0e62d8]">
               {model.cityName}
             </Link>

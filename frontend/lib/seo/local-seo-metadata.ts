@@ -168,6 +168,56 @@ function buildKeywords(model: LocalSeoLandingModel): string[] {
   return [...k];
 }
 
+/**
+ * BreadcrumbList JSON-LD complementar para `/carros-em/[slug]`.
+ *
+ * Auditoria 2026-05-11: a rota canônica `index,follow` da cidade só
+ * emitia CollectionPage, sem BreadcrumbList — buraco SEO. Aqui
+ * emitimos a hierarquia oficial Início → UF → Cidade. Quando o `state`
+ * estiver ausente no payload (legado), pula o nó de UF.
+ *
+ * Caller (createLocalSeoPage) só renderiza este JSON-LD para variant
+ * "em" — variantes baratos/automaticos já têm canonical próprio que
+ * consolida em /carros-em, e BreadcrumbList delas duplicaria sinal.
+ */
+export function buildLocalSeoBreadcrumbJsonLd(
+  model: LocalSeoLandingModel
+): Record<string, unknown> | null {
+  const slug = (model.slug || "").trim();
+  const cityName = (model.cityName || "").trim();
+  if (!slug || !cityName) return null;
+
+  const stateUpper = (model.state || "").trim().toUpperCase();
+  const items: Array<Record<string, unknown>> = [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: "Início",
+      item: toAbsoluteUrl("/"),
+    },
+  ];
+  if (stateUpper) {
+    items.push({
+      "@type": "ListItem",
+      position: items.length + 1,
+      name: stateUpper,
+      item: toAbsoluteUrl(`/comprar/estado/${stateUpper.toLowerCase()}`),
+    });
+  }
+  items.push({
+    "@type": "ListItem",
+    position: items.length + 1,
+    name: cityName,
+    item: toAbsoluteUrl(`/carros-em/${encodeURIComponent(slug)}`),
+  });
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items,
+  };
+}
+
 export function buildLocalSeoJsonLd(model: LocalSeoLandingModel): Record<string, unknown> {
   const canonical = resolveCanonical(model);
   const description = buildDescription(model);

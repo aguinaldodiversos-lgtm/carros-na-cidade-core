@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildLocalSeoJsonLd, buildLocalSeoMetadata } from "./local-seo-metadata";
+import {
+  buildLocalSeoBreadcrumbJsonLd,
+  buildLocalSeoJsonLd,
+  buildLocalSeoMetadata,
+} from "./local-seo-metadata";
 import type { LocalSeoLandingModel } from "./local-seo-data";
 
 function buildModel(variant: LocalSeoLandingModel["variant"]): LocalSeoLandingModel {
@@ -134,5 +138,53 @@ describe("buildLocalSeoJsonLd — url alinhada à canonical de transição", () 
   it("variant 'automaticos' devolve url /carros-em/[slug] no JSON-LD", () => {
     const jsonLd = buildLocalSeoJsonLd(buildModel("automaticos")) as { url?: string };
     expect(jsonLd.url).toBe("https://carrosnacidade.com/carros-em/atibaia-sp");
+  });
+});
+
+describe("buildLocalSeoBreadcrumbJsonLd — Início > UF > Cidade", () => {
+  it("emite 3 itens (Início, UF, Cidade) com URLs canônicas", () => {
+    const jsonLd = buildLocalSeoBreadcrumbJsonLd(buildModel("em")) as {
+      "@type"?: string;
+      itemListElement?: Array<{ position: number; name: string; item: string }>;
+    } | null;
+    expect(jsonLd).not.toBeNull();
+    expect(jsonLd?.["@type"]).toBe("BreadcrumbList");
+    expect(jsonLd?.itemListElement).toHaveLength(3);
+    expect(jsonLd?.itemListElement?.[0]).toMatchObject({
+      position: 1,
+      name: "Início",
+      item: "https://carrosnacidade.com/",
+    });
+    expect(jsonLd?.itemListElement?.[1]).toMatchObject({
+      position: 2,
+      name: "SP",
+      item: "https://carrosnacidade.com/comprar/estado/sp",
+    });
+    expect(jsonLd?.itemListElement?.[2]).toMatchObject({
+      position: 3,
+      name: "Atibaia",
+      item: "https://carrosnacidade.com/carros-em/atibaia-sp",
+    });
+  });
+
+  it("payload sem state cai para 2 níveis (defesa contra legado)", () => {
+    const model = buildModel("em");
+    (model as unknown as { state: string | null }).state = "";
+    const jsonLd = buildLocalSeoBreadcrumbJsonLd(model) as {
+      itemListElement?: Array<{ name: string }>;
+    } | null;
+    expect(jsonLd?.itemListElement).toHaveLength(2);
+    const names = jsonLd?.itemListElement?.map((i) => i.name);
+    expect(names).toEqual(["Início", "Atibaia"]);
+  });
+
+  it("retorna null quando slug ou cityName ausente", () => {
+    const noSlug = buildModel("em");
+    (noSlug as unknown as { slug: string }).slug = "";
+    expect(buildLocalSeoBreadcrumbJsonLd(noSlug)).toBeNull();
+
+    const noCity = buildModel("em");
+    (noCity as unknown as { cityName: string }).cityName = "";
+    expect(buildLocalSeoBreadcrumbJsonLd(noCity)).toBeNull();
   });
 });
