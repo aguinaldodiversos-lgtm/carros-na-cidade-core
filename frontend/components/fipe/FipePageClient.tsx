@@ -524,14 +524,18 @@ export function FipePageClient({
                 </Link>
               </div>
 
-              {/* Mobile: scroll horizontal; Desktop: grid 3 cols */}
+              {/* Mobile: scroll horizontal (variant="carousel" mantém o
+                  card vertical mesmo no mobile — variant="grid" o tornaria
+                  horizontal e ficaria espremido dentro do snap-item).
+                  Desktop: grid 3 cols (variant="carousel" continua
+                  vertical, igual ao desktop do grid). */}
               <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3">
                 {compatibleAds.map((item, index) => (
                   <div
                     key={`fipe-near-${item.id ?? item.slug ?? index}`}
                     className="w-[78%] shrink-0 snap-start sm:w-auto"
                   >
-                    <AdCard item={item} variant="grid" />
+                    <AdCard item={item} variant="carousel" />
                   </div>
                 ))}
               </div>

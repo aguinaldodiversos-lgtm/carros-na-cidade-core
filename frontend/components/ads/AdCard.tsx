@@ -580,24 +580,74 @@ function VerticalLayout({
   const isShowcase =
     variant === "grid" || variant === "carousel" || variant === "featured" || variant === "compact";
 
+  // Layout responsivo:
+  //   - variant="grid" → mobile horizontal (image left ~42%, text right);
+  //     desktop vertical. Densifica listagens single-column (Estado/
+  //     Regional/Cidade) — 2-3 cards visíveis por tela em vez de 1.
+  //   - DEMAIS variantes (carousel/featured/compact/related/dashboard/
+  //     admin) → SEMPRE vertical. Carrosséis horizontais (Home, FIPE,
+  //     "Mais nesta cidade" do detail) NÃO podem ter card horizontal
+  //     porque o próprio container já scrolla horizontalmente — ficaria
+  //     "card dentro de carrossel" cortado/espremido.
+  //
+  // Auditoria 2026-05-12: a regra inicial (sempre horizontal-mobile)
+  // quebrou os carrosséis. Aqui restringimos o horizontal-mobile só ao
+  // grid, mantendo a densidade na listagem e preservando o card
+  // vertical clássico nos carrosséis.
+  const compactMobile = variant === "grid";
+
+  const rootClass = compactMobile
+    ? "group flex h-full flex-row overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium sm:flex-col"
+    : "group flex h-full flex-col overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium";
+
+  const imageWrapClass = compactMobile
+    ? `relative ${config.aspectClass} w-[42%] shrink-0 overflow-hidden bg-[#f4f5f7] sm:w-full`
+    : `relative ${config.aspectClass} overflow-hidden bg-[#f4f5f7]`;
+
+  const textWrapClass = compactMobile
+    ? "flex min-w-0 flex-1 flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-3.5"
+    : "flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5";
+
+  // Linha de badges: no carrossel/grade desktop mantemos min-h reservado
+  // para alinhar cards do mesmo row. No grid mobile horizontal,
+  // single-column, sem necessidade de placeholder.
+  const badgeRowClass = compactMobile
+    ? "flex flex-wrap items-center gap-1.5 sm:min-h-[1.25rem]"
+    : "flex min-h-[1.25rem] flex-wrap items-center gap-1.5";
+
+  const titleClass = compactMobile
+    ? "line-clamp-1 text-[13px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]"
+    : "line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]";
+
+  // Subtítulo/versão: no grid mobile horizontal, escondemos para ganhar
+  // densidade — versão completa aparece na página de detalhes. Nos
+  // carrosséis/grid desktop, mostramos com placeholder min-h-2rem.
+  const versionVisibleClass = compactMobile
+    ? "hidden text-[12.5px] leading-snug text-cnc-muted sm:line-clamp-2 sm:block sm:min-h-[2rem]"
+    : "line-clamp-2 min-h-[2rem] text-[12px] leading-snug text-cnc-muted sm:text-[12.5px]";
+  const versionPlaceholderClass = compactMobile
+    ? "hidden sm:block sm:min-h-[2rem]"
+    : "min-h-[2rem]";
+
+  const locationClass = compactMobile
+    ? "inline-flex items-center gap-1 text-[11.5px] text-cnc-muted sm:text-[12.5px]"
+    : "inline-flex items-center gap-1 text-[12px] text-cnc-muted sm:text-[12.5px]";
+
+  const footerWrapClass = compactMobile
+    ? "mt-auto flex flex-col gap-1.5 pt-1.5 sm:gap-2 sm:pt-2"
+    : "mt-auto flex flex-col gap-2 pt-2";
+
+  const priceClass = compactMobile
+    ? "text-[16px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]"
+    : "text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]";
+
+  const ctaClass = compactMobile
+    ? "inline-flex h-8 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]"
+    : "inline-flex h-9 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12.5px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]";
+
   return (
-    <Link
-      href={href}
-      className="group flex h-full flex-row overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium sm:flex-col"
-    >
-      {/*
-        Container da foto:
-        - Mobile (auditoria 2026-05-11): layout horizontal com imagem à
-          esquerda (~42% da largura), texto à direita. Mais densidade
-          → 2-3 cards visíveis por tela em vez de só 1.
-        - Desktop (sm+): layout vertical clássico (imagem topo, texto
-          embaixo), preserva o grid de 2-3 colunas existente.
-        - bg neutro + object-contain — preserva proporção real do
-          veículo (não corta SUVs/sedans wide), padrão Webmotors.
-      */}
-      <div
-        className={`relative ${config.aspectClass} w-[42%] shrink-0 overflow-hidden bg-[#f4f5f7] sm:w-full`}
-      >
+    <Link href={href} className={rootClass}>
+      <div className={imageWrapClass}>
         <VehicleImage
           src={normalized.image}
           alt={normalized.title}
@@ -605,57 +655,34 @@ function VerticalLayout({
           height={config.imgHeight}
           variant={config.imgVariant}
           priority={priority}
-          className="h-full w-full object-contain p-1 transition duration-300 group-hover:scale-[1.02] sm:p-2"
+          className="h-full w-full object-contain p-1.5 transition duration-300 group-hover:scale-[1.02] sm:p-2"
         />
         {config.showFavorite && <FavoriteButton itemKey={favKey} />}
-        {/*
-          Mileage não é mais badge sobre a foto — desce pra linha de
-          specs. DealerPill mantida (sinaliza loja parceira no rodapé da
-          foto).
-        */}
         {config.showDealerPill && normalized.isDealer && (
           <DealerPill name={normalized.dealerLabel} />
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-3.5">
-        {/*
-          Linha de badges. min-h reservado APENAS em sm+ (grid 2-3 cols
-          precisa alinhar verticalmente). No mobile horizontal,
-          single-column, sem necessidade de placeholder.
-        */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:min-h-[1.25rem]">
+      <div className={textWrapClass}>
+        <div className={badgeRowClass}>
           {normalized.badges.map((b) => (
             <BadgeChipPill key={b.label} chip={b} />
           ))}
           {config.showStatus && status && <StatusPill status={status} />}
         </div>
 
-        {/* Título: BRAND uppercase + Modelo */}
-        <h3 className="line-clamp-1 text-[13px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]">
-          {headTitle}
-        </h3>
+        <h3 className={titleClass}>{headTitle}</h3>
 
-        {/*
-          Subtítulo: versão/trim (line-clamp 2). Escondido no mobile
-          horizontal para ganhar densidade — versão completa aparece
-          na página de detalhes. Em sm+, mantemos placeholder min-h-2rem
-          para alinhamento do grid.
-        */}
         {showVersion ? (
-          <p className="hidden text-[12.5px] leading-snug text-cnc-muted sm:line-clamp-2 sm:block sm:min-h-[2rem]">
-            {versionLabel}
-          </p>
+          <p className={versionVisibleClass}>{versionLabel}</p>
         ) : (
-          <p className="hidden sm:block sm:min-h-[2rem]" aria-hidden="true" />
+          <p className={versionPlaceholderClass} aria-hidden="true" />
         )}
 
-        {/* Specs row: ano + km com ícones */}
         <SpecRow yearLabel={normalized.yearLabel} mileage={normalized.mileage} />
 
-        {/* Localização com pin */}
         {config.showLocation && (
-          <p className="inline-flex items-center gap-1 text-[11.5px] text-cnc-muted sm:text-[12.5px]">
+          <p className={locationClass}>
             <PinIcon />
             <span className="truncate">
               {normalized.city} ({normalized.state})
@@ -663,22 +690,12 @@ function VerticalLayout({
           </p>
         )}
 
-        {/*
-          Footer wrapper com `mt-auto` — empurra preço + CTA pra base do
-          card mesmo quando o conteúdo acima varia. Garante o alinhamento
-          horizontal dos botões entre cards do mesmo grid row.
-        */}
-        <div className="mt-auto flex flex-col gap-1.5 pt-1.5 sm:gap-2 sm:pt-2">
-          <strong className="text-[16px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]">
-            {formatCurrency(normalized.price)}
-          </strong>
-
+        <div className={footerWrapClass}>
+          <strong className={priceClass}>{formatCurrency(normalized.price)}</strong>
           {actions ? (
             <div>{actions}</div>
           ) : isShowcase ? (
-            <span className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]">
-              Ver Detalhes
-            </span>
+            <span className={ctaClass}>Ver Detalhes</span>
           ) : null}
         </div>
       </div>

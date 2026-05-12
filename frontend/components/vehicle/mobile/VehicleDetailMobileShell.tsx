@@ -292,7 +292,12 @@ export default function VehicleDetailMobileShell({
                   key={`${item.id ?? item.slug ?? idx}`}
                   className="w-[68%] max-w-[260px] shrink-0 snap-start"
                 >
-                  <AdCard item={item} variant="grid" />
+                  {/* variant="carousel" mantém o card vertical mesmo no
+                      mobile — necessário porque este ul É o carrossel
+                      horizontal. variant="grid" deixaria o card também
+                      horizontal mobile (compactMobile no AdCard), ficando
+                      espremido dentro do snap-item. */}
+                  <AdCard item={item} variant="carousel" />
                 </li>
               ))}
             </ul>
