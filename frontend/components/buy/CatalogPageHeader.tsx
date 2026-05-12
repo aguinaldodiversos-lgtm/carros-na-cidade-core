@@ -257,7 +257,9 @@ export function CatalogPageHeader({
 
   return (
     <div className="border-b border-cnc-line bg-cnc-surface">
-      <div className="mx-auto w-full max-w-7xl px-4 pb-3 pt-3 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
+      {/* pt/pb reduzidos no mobile (auditoria 2026-05-11) — antes
+          pt-3 já era razoável mas sobrava no pb-3 + chips em wrap. */}
+      <div className="mx-auto w-full max-w-7xl px-4 pb-2 pt-2 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
         <CatalogBreadcrumb items={breadcrumbItems} />
 
         {fallbackTerritory ? (
@@ -284,8 +286,8 @@ export function CatalogPageHeader({
           </div>
         ) : null}
 
-        <div className="mt-2.5 flex flex-col gap-1 sm:mt-4 sm:gap-1.5">
-          <h1 className="text-[20px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[26px] md:text-[32px] lg:text-[36px]">
+        <div className="mt-2 flex flex-col gap-0.5 sm:mt-4 sm:gap-1.5">
+          <h1 className="text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[26px] md:text-[32px] lg:text-[36px]">
             {variant === "cidade" ? (
               <>
                 Carros usados em <span className="text-primary">{city.name}</span>
@@ -361,8 +363,13 @@ export function CatalogPageHeader({
           />
         </div>
 
-        {/* Chips de filtro rápido — toggleam querystring */}
-        <div className="mt-3 flex flex-wrap gap-2">
+        {/*
+          Chips de filtro rápido. Mobile (auditoria 2026-05-11):
+          carrossel horizontal, sem quebra de linha, scrollbar
+          escondida — evita o bloco gigante que empurra os anúncios
+          para baixo da dobra. sm+ volta ao flex-wrap clássico.
+        */}
+        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
           <span className="sr-only">Filtros rápidos</span>
           {QUICK_FILTERS.map((f) => {
             const active = f.matches(filters);
@@ -372,6 +379,7 @@ export function CatalogPageHeader({
                 variant="filter"
                 selected={active}
                 onClick={() => onPatch(active ? f.remove() : f.apply(filters))}
+                className="shrink-0 sm:shrink"
               >
                 {f.label}
               </Chip>

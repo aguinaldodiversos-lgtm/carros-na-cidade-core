@@ -25,7 +25,10 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
   return (
     <div className="min-h-screen bg-[#f6f7fb]">
       <header className="border-b border-slate-200/80 bg-white">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-10 sm:px-6">
+        {/* Topo mobile mais enxuto (py-5) — auditoria 2026-05-11
+            relatou hero alto demais no celular. Desktop preserva
+            py-10 para a aparência institucional. */}
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-5 sm:gap-4 sm:px-6 sm:py-10">
           {/*
             Breadcrumb visível com 3 níveis (Início > UF > Cidade).
             Auditoria 2026-05-11 detectou que a rota canônica
@@ -55,8 +58,8 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
               {model.cityName}
             </Link>
           </nav>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{h1}</h1>
-          <dl className="grid gap-3 sm:grid-cols-3">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-4xl">{h1}</h1>
+          <dl className="grid gap-2 sm:grid-cols-3 sm:gap-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
               <dt className="text-xs font-medium uppercase text-slate-500">Anúncios (recorte)</dt>
               <dd className="text-lg font-semibold text-slate-900">{model.totalAds}</dd>
@@ -115,7 +118,14 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
                 Ver todos no catálogo →
               </Link>
             </div>
-            <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/*
+              Cards mobile-first (auditoria 2026-05-11): layout
+              horizontal no mobile (imagem 38% à esquerda + texto à
+              direita) para 2-3 anúncios visíveis por tela, alinhado
+              ao padrão do AdCard que Estado/Regional já usam.
+              sm+: grid 2-3 colunas verticais clássicas.
+            */}
+            <ul className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
               {sampleAds.map((ad) => {
                 const href = buildAdHref(ad);
                 const img =
@@ -128,23 +138,23 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
                   <li key={ad.id}>
                     <Link
                       href={href}
-                      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-[#0e62d8]/40 hover:shadow-md"
+                      className="group flex h-full flex-row overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-[#0e62d8]/40 hover:shadow-md sm:flex-col"
                     >
-                      <div className="relative aspect-[16/10] w-full bg-slate-100">
+                      <div className="relative aspect-[4/3] w-[38%] shrink-0 bg-slate-100 sm:aspect-[16/10] sm:w-full">
                         <Image
                           src={img}
                           alt={title}
                           fill
                           className="object-cover"
-                          sizes="(max-width: 768px) 100vw, 33vw"
+                          sizes="(max-width: 640px) 40vw, (max-width: 768px) 100vw, 33vw"
                         />
                       </div>
-                      <div className="flex flex-1 flex-col gap-1 p-4">
-                        <span className="line-clamp-2 font-medium text-slate-900 group-hover:text-[#0e62d8]">
+                      <div className="flex min-w-0 flex-1 flex-col gap-1 p-3 sm:p-4">
+                        <span className="line-clamp-2 text-[13px] font-medium text-slate-900 group-hover:text-[#0e62d8] sm:text-base">
                           {title}
                         </span>
                         {ad.price ? (
-                          <span className="text-sm font-semibold text-slate-800">
+                          <span className="mt-auto text-sm font-semibold text-slate-800">
                             {formatMoney(ad.price)}
                           </span>
                         ) : null}

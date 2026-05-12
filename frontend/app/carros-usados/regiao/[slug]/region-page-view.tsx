@@ -197,9 +197,11 @@ export function RegionPageView({
 
   return (
     <BuyPageShell mobileFilterTrigger={<SiteBottomNav />}>
-      {/* ───────── HEADER (breadcrumb + hero compacto) ───────── */}
+      {/* ───────── HEADER (breadcrumb + hero compacto) ─────────
+          Top spacing reduzido no mobile (auditoria 2026-05-11) para
+          encurtar a distância entre o header global e os anúncios. */}
       <div className="border-b border-cnc-line bg-cnc-surface">
-        <div className="mx-auto w-full max-w-7xl px-4 pb-3 pt-3 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
+        <div className="mx-auto w-full max-w-7xl px-4 pb-2 pt-2 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
           <CatalogBreadcrumb
             items={[
               { label: "Início", href: "/" },
@@ -210,7 +212,7 @@ export function RegionPageView({
           />
 
           <div className="mt-2.5 flex flex-col gap-1 sm:mt-4 sm:gap-1.5">
-            <h1 className="text-[20px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[26px] md:text-[32px] lg:text-[36px]">
+            <h1 className="text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[26px] md:text-[32px] lg:text-[36px]">
               Carros na região de <span className="text-primary">{base.name}</span>
             </h1>
             <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-cnc-muted sm:text-sm md:text-base">
@@ -286,13 +288,13 @@ export function RegionPageView({
             </div>
           </form>
 
-          {/* Chips rápidos: navegação para /comprar com filtros pré-aplicados.
-              "Perto de <Cidade>" é static-selected — representa o escopo
-              atual desta página regional. */}
-          <div className="mt-3 flex flex-wrap gap-2">
+          {/* Chips rápidos: carrossel horizontal no mobile, wrap em sm+.
+              "Perto de <Cidade>" é static-selected — representa o
+              escopo atual desta página regional. */}
+          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
             <span className="sr-only">Filtros rápidos</span>
             <span
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary bg-primary-soft px-3.5 text-sm font-semibold text-primary-strong"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary bg-primary-soft px-3.5 text-sm font-semibold text-primary-strong sm:shrink"
               aria-current="true"
               title={`Escopo atual: região de ${base.name}`}
             >
@@ -313,7 +315,7 @@ export function RegionPageView({
               <Link
                 key={c.key}
                 href={buildQuickChipHref(base.slug, c.filterParams)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-cnc-line bg-white px-3.5 text-sm font-medium text-cnc-text transition hover:border-cnc-line-strong hover:bg-cnc-bg"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-cnc-line bg-white px-3.5 text-sm font-medium text-cnc-text transition hover:border-cnc-line-strong hover:bg-cnc-bg sm:shrink"
               >
                 {c.label}
               </Link>
@@ -337,12 +339,14 @@ export function RegionPageView({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cnc-muted">
                 Cidades nesta região
               </p>
-              <div className="flex flex-wrap gap-2">
+              {/* Mobile: carrossel horizontal sem wrap (auditoria 2026-05-11)
+                  para evitar grade gigante de chips em telas estreitas. */}
+              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
                 {visibleCityChips.map((c) =>
                   c.is_base ? (
                     <span
                       key={`base-${c.slug}`}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary bg-primary-soft px-3 text-xs font-semibold text-primary-strong"
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary bg-primary-soft px-3 text-xs font-semibold text-primary-strong sm:shrink"
                       title={`${c.name} (cidade base) — ${c.count} anúncio(s) nesta página`}
                     >
                       {c.name}
@@ -357,7 +361,7 @@ export function RegionPageView({
                     <Link
                       key={`chip-${c.slug}`}
                       href={`/carros-em/${encodeURIComponent(c.slug)}`}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full border border-cnc-line bg-white px-3 text-xs font-medium text-cnc-text transition hover:border-primary hover:text-primary"
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-cnc-line bg-white px-3 text-xs font-medium text-cnc-text transition hover:border-primary hover:text-primary sm:shrink"
                       title={
                         c.distance_km != null
                           ? `${c.name} — ${formatDistance(c.distance_km)} de ${base.name}`
@@ -381,7 +385,7 @@ export function RegionPageView({
                 {hasMoreCities && (
                   <Link
                     href={stateHref}
-                    className="inline-flex h-8 items-center rounded-full border border-cnc-line bg-white px-3 text-xs font-semibold text-primary transition hover:border-primary"
+                    className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border border-cnc-line bg-white px-3 text-xs font-semibold text-primary transition hover:border-primary sm:shrink"
                   >
                     Ver todas →
                   </Link>
@@ -390,7 +394,7 @@ export function RegionPageView({
             </section>
           )}
 
-          {/* Marcas frequentes — chips discretos */}
+          {/* Marcas frequentes — chips discretos, carrossel no mobile */}
           {topBrands.length > 0 && (
             <section
               aria-label="Marcas frequentes nesta região"
@@ -400,12 +404,12 @@ export function RegionPageView({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cnc-muted">
                 Marcas frequentes em {base.name}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
                 {topBrands.map((b) => (
                   <Link
                     key={b.brand}
                     href={`/comprar?city_slug=${encodeURIComponent(base.slug)}&brand=${encodeURIComponent(b.brand)}`}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-cnc-line bg-white px-3 text-xs font-medium text-cnc-text transition hover:border-primary hover:text-primary"
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-cnc-line bg-white px-3 text-xs font-medium text-cnc-text transition hover:border-primary hover:text-primary sm:shrink"
                     title={`${b.brand} — ${b.count} anúncio(s) nesta página`}
                   >
                     <span className="font-semibold">{b.brand}</span>
@@ -416,7 +420,7 @@ export function RegionPageView({
                 ))}
                 <Link
                   href={`/comprar?city_slug=${encodeURIComponent(base.slug)}`}
-                  className="inline-flex h-8 items-center rounded-full border border-cnc-line bg-white px-3 text-xs font-semibold text-primary transition hover:border-primary"
+                  className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border border-cnc-line bg-white px-3 text-xs font-semibold text-primary transition hover:border-primary sm:shrink"
                 >
                   Ver mais →
                 </Link>

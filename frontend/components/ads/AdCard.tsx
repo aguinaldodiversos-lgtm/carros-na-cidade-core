@@ -583,13 +583,21 @@ function VerticalLayout({
   return (
     <Link
       href={href}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium"
+      className="group flex h-full flex-row overflow-hidden rounded-xl border border-cnc-line bg-cnc-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-premium sm:flex-col"
     >
       {/*
-        Container da foto: bg neutro e object-contain — preserva proporção
-        original do veículo (não corta SUVs/sedans wide), padrão Webmotors.
+        Container da foto:
+        - Mobile (auditoria 2026-05-11): layout horizontal com imagem à
+          esquerda (~42% da largura), texto à direita. Mais densidade
+          → 2-3 cards visíveis por tela em vez de só 1.
+        - Desktop (sm+): layout vertical clássico (imagem topo, texto
+          embaixo), preserva o grid de 2-3 colunas existente.
+        - bg neutro + object-contain — preserva proporção real do
+          veículo (não corta SUVs/sedans wide), padrão Webmotors.
       */}
-      <div className={`relative ${config.aspectClass} overflow-hidden bg-[#f4f5f7]`}>
+      <div
+        className={`relative ${config.aspectClass} w-[42%] shrink-0 overflow-hidden bg-[#f4f5f7] sm:w-full`}
+      >
         <VehicleImage
           src={normalized.image}
           alt={normalized.title}
@@ -597,7 +605,7 @@ function VerticalLayout({
           height={config.imgHeight}
           variant={config.imgVariant}
           priority={priority}
-          className="h-full w-full object-contain p-1.5 transition duration-300 group-hover:scale-[1.02] sm:p-2"
+          className="h-full w-full object-contain p-1 transition duration-300 group-hover:scale-[1.02] sm:p-2"
         />
         {config.showFavorite && <FavoriteButton itemKey={favKey} />}
         {/*
@@ -610,13 +618,13 @@ function VerticalLayout({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-3.5">
         {/*
-          Linha de badges SEMPRE reservada com min-h fixo — assim cards
-          sem destaque/fipe não sobem o footer (CTAs alinhados em grid).
-          OFERTA DESTAQUE (warning) + ABAIXO DA FIPE (success) em até 2 chips.
+          Linha de badges. min-h reservado APENAS em sm+ (grid 2-3 cols
+          precisa alinhar verticalmente). No mobile horizontal,
+          single-column, sem necessidade de placeholder.
         */}
-        <div className="flex min-h-[1.25rem] flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 sm:min-h-[1.25rem]">
           {normalized.badges.map((b) => (
             <BadgeChipPill key={b.label} chip={b} />
           ))}
@@ -624,21 +632,22 @@ function VerticalLayout({
         </div>
 
         {/* Título: BRAND uppercase + Modelo */}
-        <h3 className="line-clamp-1 text-[14px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]">
+        <h3 className="line-clamp-1 text-[13px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]">
           {headTitle}
         </h3>
 
         {/*
-          Subtítulo: versão/trim (line-clamp 2). Sempre reservamos
-          min-h-2rem mesmo quando o veículo não tem versão — mantém os
-          cards alinhados em grid.
+          Subtítulo: versão/trim (line-clamp 2). Escondido no mobile
+          horizontal para ganhar densidade — versão completa aparece
+          na página de detalhes. Em sm+, mantemos placeholder min-h-2rem
+          para alinhamento do grid.
         */}
         {showVersion ? (
-          <p className="line-clamp-2 min-h-[2rem] text-[12px] leading-snug text-cnc-muted sm:text-[12.5px]">
+          <p className="hidden text-[12.5px] leading-snug text-cnc-muted sm:line-clamp-2 sm:block sm:min-h-[2rem]">
             {versionLabel}
           </p>
         ) : (
-          <p className="min-h-[2rem]" aria-hidden="true" />
+          <p className="hidden sm:block sm:min-h-[2rem]" aria-hidden="true" />
         )}
 
         {/* Specs row: ano + km com ícones */}
@@ -646,9 +655,11 @@ function VerticalLayout({
 
         {/* Localização com pin */}
         {config.showLocation && (
-          <p className="inline-flex items-center gap-1 text-[12px] text-cnc-muted sm:text-[12.5px]">
+          <p className="inline-flex items-center gap-1 text-[11.5px] text-cnc-muted sm:text-[12.5px]">
             <PinIcon />
-            {normalized.city} ({normalized.state})
+            <span className="truncate">
+              {normalized.city} ({normalized.state})
+            </span>
           </p>
         )}
 
@@ -657,15 +668,15 @@ function VerticalLayout({
           card mesmo quando o conteúdo acima varia. Garante o alinhamento
           horizontal dos botões entre cards do mesmo grid row.
         */}
-        <div className="mt-auto flex flex-col gap-2 pt-2">
-          <strong className="text-[18px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]">
+        <div className="mt-auto flex flex-col gap-1.5 pt-1.5 sm:gap-2 sm:pt-2">
+          <strong className="text-[16px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[20px]">
             {formatCurrency(normalized.price)}
           </strong>
 
           {actions ? (
             <div>{actions}</div>
           ) : isShowcase ? (
-            <span className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12.5px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]">
+            <span className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-cnc-footer-a text-[12px] font-bold text-white shadow-sm transition group-hover:bg-cnc-footer-b sm:h-10 sm:text-[13.5px]">
               Ver Detalhes
             </span>
           ) : null}
