@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  buildVehicleImageProxyUrlFromStorageKey,
   collectVehicleImageCandidates,
   LISTING_CARD_FALLBACK_IMAGE,
   normalizeVehicleGalleryImages,
@@ -9,23 +10,37 @@ import {
   isSupportedVehicleImageUrl,
 } from "./detail-utils";
 
-const envKeys = ["API_URL", "NEXT_PUBLIC_API_URL"] as const;
+const envKeys = [
+  "API_URL",
+  "NEXT_PUBLIC_API_URL",
+  "NEXT_PUBLIC_R2_PUBLIC_BASE_URL",
+  "PUBLIC_EMIT_LEGACY_IMAGE_PROXY",
+  "NODE_ENV",
+] as const;
+
+// `process.env.NODE_ENV` é tipado readonly pelo @types/node; cast pra Record
+// mantém manipulação possível e o `as const` da chave evita typo.
+const env = process.env as Record<string, string | undefined>;
 
 describe("vehicle detail image utils", () => {
   const snapshot: Partial<Record<(typeof envKeys)[number], string | undefined>> = {};
 
   beforeEach(() => {
     for (const key of envKeys) {
-      snapshot[key] = process.env[key];
-      delete process.env[key];
+      snapshot[key] = env[key];
+      delete env[key];
     }
+    // Default explícito para "produção" — sem R2 público e sem legacy proxy.
+    // Testes que precisam do comportamento legado setam as envs.
+    env.NODE_ENV = "production";
+    env.PUBLIC_EMIT_LEGACY_IMAGE_PROXY = "true";
   });
 
   afterEach(() => {
     for (const key of envKeys) {
       const value = snapshot[key];
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+      if (value === undefined) delete env[key];
+      else env[key] = value;
     }
   });
 
@@ -35,16 +50,57 @@ describe("vehicle detail image utils", () => {
     expect(isSupportedVehicleImageUrl("/uploads/ads/foto.png")).toBe(true);
   });
 
-  it("normaliza caminhos relativos de upload para o frontend quando não há host", () => {
-    expect(normalizeVehicleImageUrl("/uploads/ads/foto.jpg")).toBe(
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"
-    );
-    expect(normalizeVehicleImageUrl("uploads/ads/foto.jpeg")).toBe(
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpeg"
-    );
-    expect(normalizeVehicleImageUrl("uploads\\ads\\foto.png")).toBe(
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.png"
-    );
+  describe("com legacyImageProxy=true (compat dev / legado)", () => {
+    it("normaliza /uploads/... para o proxy quando legacyImageProxy está ligado", () => {
+      expect(normalizeVehicleImageUrl("/uploads/ads/foto.jpg")).toBe(
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"
+      );
+      expect(normalizeVehicleImageUrl("uploads/ads/foto.jpeg")).toBe(
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpeg"
+      );
+      expect(normalizeVehicleImageUrl("uploads\\ads\\foto.png")).toBe(
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.png"
+      );
+    });
+
+    it("coleta /uploads/... como proxy em listas", () => {
+      const images = collectVehicleImageCandidates(
+        ["/uploads/ads/primeira.jpg", "uploads/ads/segunda.jpeg"],
+        '[{"url":"/uploads/ads/terceira.png"}]',
+        { image_url: "/uploads/ads/quarta.jpg" }
+      );
+      expect(images).toEqual([
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Fprimeira.jpg",
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Fsegunda.jpeg",
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Fterceira.png",
+        "/api/vehicle-images?src=%2Fuploads%2Fads%2Fquarta.jpg",
+      ]);
+    });
+
+    it("resolvePublicListingImageUrl usa proxy para /uploads/", () => {
+      expect(
+        resolvePublicListingImageUrl({
+          images: ["/uploads/ads/card.jpg"],
+        })
+      ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fcard.jpg");
+    });
+  });
+
+  describe("com legacyImageProxy=false (produção default)", () => {
+    beforeEach(() => {
+      env.PUBLIC_EMIT_LEGACY_IMAGE_PROXY = "false";
+    });
+
+    it("NÃO converte /uploads/... para proxy — devolve null (cai no placeholder)", () => {
+      expect(normalizeVehicleImageUrl("/uploads/ads/foto.jpg")).toBeNull();
+      expect(normalizeVehicleImageUrl("uploads/ads/foto.jpeg")).toBeNull();
+    });
+
+    it("resolvePublicListingImageUrl cai no placeholder quando só há /uploads/", () => {
+      expect(resolvePublicListingImageUrl({ images: ["/uploads/ads/x.jpg"] })).toBe(
+        LISTING_CARD_FALLBACK_IMAGE
+      );
+    });
   });
 
   it("preserva URLs absolutas válidas de backend para formatos suportados", () => {
@@ -76,21 +132,6 @@ describe("vehicle detail image utils", () => {
     ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg");
   });
 
-  it("coleta imagens de arrays, json string e objetos de galeria", () => {
-    const images = collectVehicleImageCandidates(
-      ["/uploads/ads/primeira.jpg", "uploads/ads/segunda.jpeg"],
-      '[{"url":"/uploads/ads/terceira.png"}]',
-      { image_url: "/uploads/ads/quarta.jpg" }
-    );
-
-    expect(images).toEqual([
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Fprimeira.jpg",
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Fsegunda.jpeg",
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Fterceira.png",
-      "/api/vehicle-images?src=%2Fuploads%2Fads%2Fquarta.jpg",
-    ]);
-  });
-
   it("remove placeholders conhecidos da lista final da galeria", () => {
     const images = normalizeVehicleGalleryImages([
       "/images/hero.jpeg",
@@ -103,19 +144,7 @@ describe("vehicle detail image utils", () => {
     expect(images).toEqual(["/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg"]);
   });
 
-  it("resolvePublicListingImageUrl usa proxy para uploads e fallback SVG sem fotos", () => {
-    expect(
-      resolvePublicListingImageUrl({
-        images: ["/uploads/ads/card.jpg"],
-      })
-    ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fcard.jpg");
-
-    expect(resolvePublicListingImageUrl({ image_url: null, images: [] })).toBe(
-      LISTING_CARD_FALLBACK_IMAGE
-    );
-  });
-
-  it("resolvePublicListingImageUrl aceita cover_image_url, photos e gallery", () => {
+  it("resolvePublicListingImageUrl aceita cover_image_url, photos e gallery (legacy proxy)", () => {
     expect(
       resolvePublicListingImageUrl({
         cover_image_url: "/uploads/ads/capa.jpg",
@@ -135,19 +164,69 @@ describe("vehicle detail image utils", () => {
     ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fgaleria.png");
   });
 
-  it("resolvePublicListingImageUrl prioriza image_url e usa storage_key (R2) via proxy key", () => {
+  describe("storage_key → URL pública R2", () => {
+    it("sem NEXT_PUBLIC_R2_PUBLIC_BASE_URL: cai no proxy /api/vehicle-images?key=...", () => {
+      expect(buildVehicleImageProxyUrlFromStorageKey("vehicles/abc/foto.webp")).toBe(
+        "/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp"
+      );
+    });
+
+    it("com NEXT_PUBLIC_R2_PUBLIC_BASE_URL: gera URL absoluta direta (sem passar pelo Render)", () => {
+      process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com";
+      expect(buildVehicleImageProxyUrlFromStorageKey("vehicles/abc/foto.webp")).toBe(
+        "https://cdn.carrosnacidade.com/vehicles/abc/foto.webp"
+      );
+    });
+
+    it("aceita trailing slash no base URL", () => {
+      process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com/";
+      expect(buildVehicleImageProxyUrlFromStorageKey("vehicles/abc/foto.webp")).toBe(
+        "https://cdn.carrosnacidade.com/vehicles/abc/foto.webp"
+      );
+    });
+
+    it("encode-URL components do path (espaços, caracteres especiais) por segmento", () => {
+      process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.example.com";
+      expect(buildVehicleImageProxyUrlFromStorageKey("vehicles/draft id 1/foto bonita.webp")).toBe(
+        "https://cdn.example.com/vehicles/draft%20id%201/foto%20bonita.webp"
+      );
+    });
+
+    it("bloqueia path traversal", () => {
+      expect(buildVehicleImageProxyUrlFromStorageKey("../etc/passwd")).toBeNull();
+    });
+
+    it("resolvePublicListingImageUrl emite URL R2 direta quando configurado", () => {
+      process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com";
+      expect(
+        resolvePublicListingImageUrl({
+          storage_key: "vehicles/abc/foto.webp",
+          images: [],
+        })
+      ).toBe("https://cdn.carrosnacidade.com/vehicles/abc/foto.webp");
+    });
+
+    it("re-hidrata /api/vehicle-images?key=... persistido para R2 direto", () => {
+      process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com";
+      expect(normalizeVehicleImageUrl("/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp")).toBe(
+        "https://cdn.carrosnacidade.com/vehicles/abc/foto.webp"
+      );
+    });
+
+    it("mantém /api/vehicle-images?key=... quando R2 público não está configurado", () => {
+      expect(normalizeVehicleImageUrl("/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp")).toBe(
+        "/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp"
+      );
+    });
+  });
+
+  it("resolvePublicListingImageUrl prioriza image_url sobre storage_key", () => {
+    process.env.PUBLIC_EMIT_LEGACY_IMAGE_PROXY = "true";
     expect(
       resolvePublicListingImageUrl({
         image_url: "/uploads/ads/x.jpg",
         storage_key: "ads/123/capa.jpg",
       })
     ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fx.jpg");
-
-    expect(
-      resolvePublicListingImageUrl({
-        storage_key: "vehicles/abc/foto.webp",
-        images: [],
-      })
-    ).toBe("/api/vehicle-images?key=vehicles%2Fabc%2Ffoto.webp");
   });
 });

@@ -246,18 +246,61 @@ describe("VehicleImage", () => {
   // ---------------------------------------------------------------------------
   // Compatibilidade com formatos especiais
   // ---------------------------------------------------------------------------
-  it("URL /api/vehicle-images?key=... renderiza via next/image (vai pelo otimizador)", () => {
+  // Após o incidente de outbound bandwidth (2026-05-13), proxies próprios e
+  // /uploads NUNCA podem passar pelo otimizador /_next/image — re-otimizar
+  // gera caminho duplo Render→Render. Ver lib/images/image-optimization.ts.
+  //
+  // Como detectar: quando next/image otimiza, o `src` final contém
+  // "/_next/image?url=..." (jsdom resolve URLs relativas com base no
+  // window.location, então conferir presença da substring é robusto).
+
+  function rendersWithoutOptimizer(src: string) {
     const { container } = render(
-      <VehicleImage src="/api/vehicle-images?key=ads/abc.jpg" alt="x" width={400} height={300} />
+      <VehicleImage src={src} alt="x" width={400} height={300} />
     );
-    expect(container.querySelector("img")).toBeTruthy();
+    const finalSrc = container.querySelector("img")?.getAttribute("src") || "";
+    expect(finalSrc, `src final foi ${finalSrc}`).not.toContain("/_next/image");
+    expect(finalSrc).toContain(src);
+  }
+
+  it("URL /api/vehicle-images?key=... NÃO passa pelo otimizador (src direto)", () => {
+    rendersWithoutOptimizer("/api/vehicle-images?key=ads/abc.jpg");
   });
 
-  it("URL /uploads/... legada renderiza via next/image", () => {
+  it("URL /api/vehicle-images?src=... NÃO passa pelo otimizador", () => {
+    rendersWithoutOptimizer("/api/vehicle-images?src=%2Fuploads%2Fads%2Ffoto.jpg");
+  });
+
+  it("URL /uploads/... legada NÃO passa pelo otimizador (src direto)", () => {
+    rendersWithoutOptimizer("/uploads/ad-123.jpg");
+  });
+
+  it("URL absoluta no host R2 público NÃO passa pelo otimizador", () => {
+    const prev = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+    process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com";
+    try {
+      rendersWithoutOptimizer("https://cdn.carrosnacidade.com/vehicles/abc/foto.webp");
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+      else process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = prev;
+    }
+  });
+
+  it("URL no backend *.onrender.com NÃO passa pelo otimizador", () => {
+    rendersWithoutOptimizer("https://carros-na-cidade-core.onrender.com/uploads/foo.jpg");
+  });
+
+  it("URL externa fora dos hosts internos PASSA pelo otimizador (CDN externo, ganho real)", () => {
     const { container } = render(
-      <VehicleImage src="/uploads/ad-123.jpg" alt="x" width={400} height={300} />
+      <VehicleImage
+        src="https://images.unsplash.com/photo-abc.jpg"
+        alt="x"
+        width={400}
+        height={300}
+      />
     );
-    expect(container.querySelector("img")).toBeTruthy();
+    const src = container.querySelector("img")?.getAttribute("src") || "";
+    expect(src).toContain("/_next/image");
   });
 
   it("URL .svg passa por skipOptimizer (unoptimized)", () => {

@@ -106,6 +106,9 @@ export function VehicleImage({
   }
 
   const finalSrc = (src as string).trim();
+  // Pula `/_next/image` quando o ganho do otimizador é nulo (SVG, data:) ou
+  // quando re-otimizar geraria caminho duplo Render→Render (proxy próprio,
+  // /uploads, CDN R2, *.onrender.com). Ver lib/images/image-optimization.ts.
   const skipOptimizer = shouldSkipNextImageOptimizer(finalSrc);
   const finalSizes = sizes ?? DEFAULT_SIZES[variant];
 

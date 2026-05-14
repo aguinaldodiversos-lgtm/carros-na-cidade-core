@@ -15,9 +15,15 @@ const nextConfig = {
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: "inline",
+    // remotePatterns restritivo: somente hosts onde realmente queremos que
+    // o /_next/image otimize variantes. Imagens de veículo (R2 público,
+    // backend onrender, proxy /api/vehicle-images, /uploads) são marcadas
+    // como `unoptimized` no <VehicleImage> e NÃO precisam estar listadas
+    // aqui — o hostname "**" foi removido em 2026-05-13 para forçar
+    // qualquer imagem remota arbitrária a quebrar visivelmente em dev em
+    // vez de silenciosamente passar pelo otimizador do Render.
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "**" },
       { protocol: "http", hostname: "localhost" },
     ],
   },

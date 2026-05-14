@@ -56,13 +56,50 @@ export function buildVehicleImageProxyUrl(pathname: string): string {
 }
 
 /**
- * Imagens privadas no R2: o browser chama o proxy (Next ou API) com a chave do objeto — sem credenciais no cliente.
+ * Lê o base URL público do R2 a cada chamada (em vez de uma const no top-level)
+ * para que testes possam manipular `process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL`
+ * via beforeEach/afterEach. O custo é trivial.
+ */
+function readPublicR2BaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+}
+
+/**
+ * Lê on-demand para o mesmo motivo de `readPublicR2BaseUrl`. Mantém testes
+ * com beforeEach/afterEach honestos.
+ */
+function isLegacyImageProxyEnabled(): boolean {
+  const v = process.env.PUBLIC_EMIT_LEGACY_IMAGE_PROXY;
+  if (v === "true" || v === "1") return true;
+  if (v === "false" || v === "0") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+function encodeKeyForUrl(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
+ * Resolve uma chave R2 (`storage_key`) para a URL pública servida.
+ *
+ * Caminho preferido: URL absoluta no CDN público do R2 — não toca o Render,
+ * preserva outbound bandwidth do origin.
+ *
+ * Fallback: proxy `/api/vehicle-images?key=...` na mesma origem do app. Esse
+ * caminho deve ser raro em produção (significa que `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`
+ * não está setada) e desde a refatoração do 2026-05-13 o handler responde
+ * com 302/placeholder em vez de stream — protegendo o origin de qualquer jeito.
  */
 export function buildVehicleImageProxyUrlFromStorageKey(key: string): string | null {
   const normalized = String(key ?? "")
     .trim()
     .replace(/^\/+/, "");
   if (!normalized || normalized.includes("..")) return null;
+
+  const publicBase = readPublicR2BaseUrl();
+  if (publicBase) {
+    return `${publicBase}/${encodeKeyForUrl(normalized)}`;
+  }
   return `${VEHICLE_IMAGE_PROXY_PATH}?key=${encodeURIComponent(normalized)}`;
 }
 
@@ -84,8 +121,18 @@ function normalizeExistingVehicleProxyUrl(value: string): string | null {
     return decodedSrc.startsWith("/uploads/") ? buildVehicleImageProxyUrl(decodedSrc) : null;
   };
 
+  // Re-hidrata um ?key= legado para a URL pública R2 direta sempre que possível.
+  // Anúncios criados antes do fix do bandwidth podem ter `/api/vehicle-images?key=...`
+  // persistido no banco; reciclamos para CDN direto em runtime.
+  const buildFromKey = (key: string | null) => {
+    if (!key) return null;
+    return buildVehicleImageProxyUrlFromStorageKey(decodeUrlComponentSafely(key));
+  };
+
   if (raw.startsWith(`${VEHICLE_IMAGE_PROXY_PATH}?`)) {
     const params = new URLSearchParams(raw.split("?")[1] || "");
+    const fromKey = buildFromKey(params.get("key"));
+    if (fromKey) return fromKey;
     return buildFromSrc(params.get("src")) || safeUrl(raw);
   }
 
@@ -94,6 +141,8 @@ function normalizeExistingVehicleProxyUrl(value: string): string | null {
   try {
     const parsed = new URL(raw);
     if (parsed.pathname !== VEHICLE_IMAGE_PROXY_PATH) return null;
+    const fromKey = buildFromKey(parsed.searchParams.get("key"));
+    if (fromKey) return fromKey;
     return buildFromSrc(parsed.searchParams.get("src")) || safeUrl(raw);
   } catch {
     return null;
@@ -185,14 +234,18 @@ export function normalizeVehicleImageUrl(value: unknown): string | null {
   }
 
   if (raw.startsWith("/uploads/")) {
-    return isSupportedVehicleImageUrl(raw) ? buildVehicleImageProxyUrl(raw) : null;
+    if (!isSupportedVehicleImageUrl(raw)) return null;
+    // Em produção (legacyImageProxy=false) /uploads/ é um caminho que serve bytes
+    // pelo Render — não pode ser o padrão. Retornar null faz o VehicleImage cair
+    // no placeholder. Em dev mantém o proxy para compatibilidade com seed local.
+    return isLegacyImageProxyEnabled() ? buildVehicleImageProxyUrl(raw) : null;
   }
 
   if (raw.startsWith("images/") || raw.startsWith("uploads/")) {
     const normalizedLocalPath = `/${raw.replace(/^\/+/, "")}`;
     if (!isSupportedVehicleImageUrl(normalizedLocalPath)) return null;
     if (normalizedLocalPath.startsWith("/uploads/")) {
-      return buildVehicleImageProxyUrl(normalizedLocalPath);
+      return isLegacyImageProxyEnabled() ? buildVehicleImageProxyUrl(normalizedLocalPath) : null;
     }
     return safeUrl(normalizedLocalPath);
   }
