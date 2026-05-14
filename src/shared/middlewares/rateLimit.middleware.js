@@ -60,3 +60,46 @@ export const autocompleteRateLimit = rateLimit({
     message: "Muitas buscas em sequência. Aguarde alguns segundos.",
   },
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rate limits específicos por endpoint pesado (2026-05-14, terceira iteração
+// do fix de bandwidth). O limit global (1000 req/15min) permite ~1.1 req/s
+// sustentado por IP — suficiente pra um bot ferrar listagens/sitemap em
+// algumas horas. Estes limits são curtos (janela de 60s) e específicos por
+// endpoint pra cortar o sangramento sem atrapalhar usuário humano.
+//
+// Resposta padrão: 429 + Retry-After dinâmico (via standardHeaders) + corpo
+// mínimo. Sem HTML/JSON volumoso, mesmo na resposta de bloqueio.
+//
+// Valores:
+//   - sitemap*       :  5 req/min  (humanos não acessam sitemap.xml)
+//   - vehicle-images : 10 req/min  (redirect 302, baixo custo, ok ser baixo)
+//   - ads (geral)    : 30 req/min  (humano clica devagar; mapa frontend chama
+//                                   /api/ads/* em background com cache 30-60s)
+//   - ads/search     : 20 req/min  (mais pesado que listagem; bots adoram)
+//   - public/cities  : 30 req/min  (BFF cacheado deve evitar; bots ferrarão)
+//   - search         : 20 req/min  (idem)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildPerMinuteLimit(prefix, max) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `${prefix}:${clientRateLimitKey(req)}`,
+    handler(req, res) {
+      res.set("Cache-Control", "no-store");
+      res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      return res.status(429).json({ error: "rate_limited" });
+    },
+  });
+}
+
+export const sitemapRateLimit = buildPerMinuteLimit("sitemap", 5);
+export const vehicleImagesRateLimit = buildPerMinuteLimit("vehicle-images", 10);
+export const adsListRateLimit = buildPerMinuteLimit("ads-list", 30);
+export const adsSearchRateLimit = buildPerMinuteLimit("ads-search", 20);
+export const publicCitiesRateLimit = buildPerMinuteLimit("public-cities", 30);
+export const searchRateLimit = buildPerMinuteLimit("search", 20);
+export const uploadsRateLimit = buildPerMinuteLimit("uploads", 5);

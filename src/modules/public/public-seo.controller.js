@@ -30,6 +30,42 @@ const MAX_INTERNAL_LINKS_LIMIT = 1000;
 const SITEMAP_CACHE_CONTROL =
   "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
 
+/**
+ * Kill switch temporário (2026-05-14, terceira iteração do fix de bandwidth).
+ *
+ * Quando SITEMAP_PUBLIC_ENABLED=false (default), todos os endpoints de sitemap
+ * respondem com corpo mínimo (503 + Retry-After + X-Robots-Tag noindex) e
+ * NÃO geram o payload de até ~10 MB. O cache forte continua aplicado às
+ * respostas leves (1h browser, 24h edge) — bots que insistem batem cache,
+ * não o handler.
+ *
+ * Quando =true, segue a política normal de cache forte definida acima.
+ *
+ * Não apaga código nem rotas. SEO real é servido pelo frontend (Next.js
+ * gera /sitemap.xml e /sitemaps/*.xml com base nesses mesmos dados).
+ * Quando o portal sair de "em desenvolvimento" e quiser indexação ampla,
+ * basta setar SITEMAP_PUBLIC_ENABLED=true.
+ */
+function isSitemapPublicEnabled() {
+  return process.env.SITEMAP_PUBLIC_ENABLED === "true";
+}
+
+function respondSitemapDisabled(res, format = "json") {
+  const headers = {
+    "Retry-After": "3600",
+    "Cache-Control": "public, max-age=300",
+    "X-Robots-Tag": "noindex, nofollow, noarchive",
+  };
+  res.status(503).set(headers);
+  if (format === "xml") {
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    return res.send(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<!-- sitemap temporariamente desabilitado -->\n'
+    );
+  }
+  return res.json({ success: false, error: "sitemap_disabled" });
+}
+
 const ALLOWED_CHANGEFREQ = new Set([
   "always",
   "hourly",
@@ -193,6 +229,9 @@ async function loadCanonicalEntries(limit) {
 }
 
 export async function sendCanonicalSitemapXml(req, res) {
+  if (!isSitemapPublicEnabled()) {
+    return respondSitemapDisabled(res, "xml");
+  }
   const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
 
   try {
@@ -235,6 +274,9 @@ export async function sendCanonicalSitemapXml(req, res) {
 }
 
 export async function getPublicSitemapJson(req, res, next) {
+  if (!isSitemapPublicEnabled()) {
+    return respondSitemapDisabled(res, "json");
+  }
   const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
 
   try {
@@ -252,6 +294,9 @@ export async function getPublicSitemapJson(req, res, next) {
 }
 
 export async function getPublicSitemapByType(req, res, next) {
+  if (!isSitemapPublicEnabled()) {
+    return respondSitemapDisabled(res, "json");
+  }
   try {
     const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
     const data = await sitemapPublicService.getPublicSitemapByType(req.params.type, limit);
@@ -273,6 +318,9 @@ export async function getPublicSitemapByType(req, res, next) {
 }
 
 export async function getPublicSitemapByRegion(req, res, next) {
+  if (!isSitemapPublicEnabled()) {
+    return respondSitemapDisabled(res, "json");
+  }
   try {
     const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
     const data = await sitemapPublicService.getPublicSitemapByRegion(req.params.state, limit);

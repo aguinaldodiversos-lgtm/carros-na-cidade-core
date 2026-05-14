@@ -63,13 +63,24 @@ function makeReq({ query = {}, params = {} } = {}) {
 const EXPECTED_CACHE =
   "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
 
+const envBackup = {};
+
 beforeEach(() => {
+  envBackup.SITEMAP_PUBLIC_ENABLED = process.env.SITEMAP_PUBLIC_ENABLED;
+  // Esse arquivo testa o CAMINHO LIGADO do sitemap (cache forte). O kill
+  // switch é coberto em public-seo-sitemap-killswitch.test.js.
+  process.env.SITEMAP_PUBLIC_ENABLED = "true";
   listPublicSitemapEntries.mockReset();
   getPublicSitemapByType.mockReset();
   getPublicSitemapByRegion.mockReset();
 });
 
 afterEach(() => {
+  if (envBackup.SITEMAP_PUBLIC_ENABLED === undefined) {
+    delete process.env.SITEMAP_PUBLIC_ENABLED;
+  } else {
+    process.env.SITEMAP_PUBLIC_ENABLED = envBackup.SITEMAP_PUBLIC_ENABLED;
+  }
   vi.restoreAllMocks();
 });
 

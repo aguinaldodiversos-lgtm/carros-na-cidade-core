@@ -8,7 +8,31 @@ function stableStringify(obj) {
   return JSON.stringify(sorted);
 }
 
-export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"] }) {
+/**
+ * Filtra `req.query` para conter apenas as chaves explicitamente permitidas.
+ *
+ * Por que: bots variam query params lixo (`?utm_*`, `?fbclid=`, `?_=timestamp`)
+ * para forçar cache MISS e bater o origin. Sem whitelist, `varyBy=["query"]`
+ * cria uma cache key distinta por combinação — efeito conhecido como
+ * "cache key explosion". Com whitelist, params desconhecidos são ignorados
+ * na key (e a resposta cacheada é reutilizada).
+ *
+ * Filtros legítimos (page, limit, brand, model, etc.) PRECISAM estar listados
+ * pra continuar variando o cache corretamente. Default (allowedQueryKeys
+ * ausente ou null) preserva o comportamento antigo — sem filtragem.
+ */
+function filterQuery(query, allowed) {
+  if (!allowed) return query;
+  const out = {};
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(query, key)) {
+      out[key] = query[key];
+    }
+  }
+  return out;
+}
+
+export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"], allowedQueryKeys = null }) {
   return async (req, res, next) => {
     try {
       if (!redis) return next();
@@ -17,7 +41,7 @@ export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"] }) {
       if (req.method !== "GET") return next();
 
       const vary = {};
-      if (varyBy.includes("query")) vary.query = req.query;
+      if (varyBy.includes("query")) vary.query = filterQuery(req.query, allowedQueryKeys);
       if (varyBy.includes("params")) vary.params = req.params;
 
       const raw = `${prefix}:${req.path}:${stableStringify(vary)}`;

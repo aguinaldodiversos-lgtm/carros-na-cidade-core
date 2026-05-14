@@ -52,7 +52,18 @@ import { requestIdMiddleware } from "./shared/middlewares/requestId.middleware.j
 import { httpLoggerMiddleware } from "./shared/middlewares/httpLogger.middleware.js";
 import { errorHandler, AppError } from "./shared/middlewares/error.middleware.js";
 import { requestMetricsMiddleware } from "./shared/observability/request.metrics.middleware.js";
-import { clientRateLimitKey } from "./shared/middlewares/rateLimit.middleware.js";
+import {
+  clientRateLimitKey,
+  sitemapRateLimit,
+  vehicleImagesRateLimit,
+  adsListRateLimit,
+  adsSearchRateLimit,
+  publicCitiesRateLimit,
+  searchRateLimit,
+  uploadsRateLimit,
+} from "./shared/middlewares/rateLimit.middleware.js";
+import { bandwidthDiagnosticsMiddleware } from "./shared/middlewares/bandwidth-diagnostics.middleware.js";
+import { botBlockerMiddleware } from "./shared/middlewares/bot-blocker.middleware.js";
 
 const app = express();
 
@@ -152,6 +163,34 @@ app.use((req, res, next) => {
   }
 });
 
+// Bandwidth diagnostics (controlado por BACKEND_BANDWIDTH_DIAGNOSTICS_ENABLED).
+// Conta bytes via wrap de res.write/end e emite agregado JSON a cada 60s.
+// Posicionado depois do logger pra que `bytes_sent` reflita exatamente o que
+// foi enviado (incluindo possíveis transformações de upstream middlewares).
+app.use(bandwidthDiagnosticsMiddleware);
+
+// X-Robots-Tag global: o backend (carros-na-cidade-core.onrender.com) NUNCA
+// deve aparecer indexado. SEO real acontece no frontend (carrosnacidade.com).
+// Aplicar antes de qualquer rota — middleware no-op se a env não estiver
+// setada não faz sentido aqui, é guardrail leve.
+app.use((req, res, next) => {
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  next();
+});
+
+// Bot blocklist emergencial (controlado por BAD_BOTS_BLOCKED). Termina o
+// request com 429 ANTES das rotas pesadas serem invocadas.
+app.use(botBlockerMiddleware);
+
+// robots.txt do backend: explícito Disallow: / pra crawlers que ignoram o
+// header X-Robots-Tag. Cache 1h.
+app.get("/robots.txt", (_req, res) => {
+  res.set("Content-Type", "text/plain; charset=utf-8");
+  res.set("Cache-Control", "public, max-age=3600");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.status(200).send("User-agent: *\nDisallow: /\n");
+});
+
 // Probes / raiz
 app.head("/", (_req, res) => res.sendStatus(200));
 
@@ -189,13 +228,20 @@ const uploadsRoot = process.env.UPLOADS_ROOT
   ? path.resolve(process.env.UPLOADS_ROOT)
   : path.join(process.cwd(), "uploads");
 if (process.env.SERVE_UPLOADS_STATIC === "true" && fs.existsSync(uploadsRoot)) {
-  app.use("/uploads", express.static(uploadsRoot));
+  app.use("/uploads", uploadsRateLimit, express.static(uploadsRoot));
 }
 
 // API routes
 // `/api/public/seo` deve vir antes de `/api/public` para o prefixo mais específico
 // ser resolvido primeiro e não competir com o router mais amplo.
+//
+// Rate limits específicos por endpoint (2026-05-14, terceira iteração do fix
+// de bandwidth). Cada um é uma janela de 60s independente do limit global.
+// Resposta 429 com corpo mínimo `{"error":"rate_limited"}`.
+app.use("/api/public/seo/sitemap", sitemapRateLimit);
 app.use("/api/public/seo", publicSeoRoutes);
+
+app.use("/api/public/cities", publicCitiesRateLimit);
 app.use("/api/public", publicRoutes);
 
 app.use("/api/auth", authRoutes);
@@ -203,12 +249,18 @@ app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/leads", leadsRoutes);
 
+// /api/ads/search é o mais pesado; aplicar limit mais restritivo PRIMEIRO,
+// senão `adsListRateLimit` em /api/ads casa /search também.
+app.use("/api/ads/search", adsSearchRateLimit);
+app.use("/api/ads", adsListRateLimit);
 app.use("/api/ads", adsRoutes);
 app.use("/api/ads", adsEventsRoutes);
 app.use("/api/events", adEventsRoutes);
 
+app.use("/api/search", searchRateLimit);
+
 app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
-app.use("/api/vehicle-images", vehicleImagesRoutes);
+app.use("/api/vehicle-images", vehicleImagesRateLimit, vehicleImagesRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Endpoint privado (X-Internal-Token). Não documentado em /api/public, não
