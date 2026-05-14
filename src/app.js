@@ -177,12 +177,18 @@ app.get("/health/meta", (req, res) => {
   });
 });
 
-// Legado `/uploads/...`: servir quando a pasta existe (dev, volume persistente ou disco montado no Render).
-// Sem arquivos no disco, o proxy do portal continua sendo o caminho; novos uploads vão para R2.
+// Legado `/uploads/...`: servir somente quando habilitado EXPLICITAMENTE via
+// SERVE_UPLOADS_STATIC=true. Default OFF (refatorado em 2026-05-13 após
+// incidente de bandwidth — a verificação anterior `!== "false"` ligava
+// quando a env não estava setada, contradizendo o feature flag
+// `features.serveUploadsStatic` que tem default OFF em produção).
+//
+// Em produção, novos uploads vão direto para R2 e listagens recebem URLs
+// públicas — não há razão de servir /uploads pelo origin.
 const uploadsRoot = process.env.UPLOADS_ROOT
   ? path.resolve(process.env.UPLOADS_ROOT)
   : path.join(process.cwd(), "uploads");
-if (process.env.SERVE_UPLOADS_STATIC !== "false" && fs.existsSync(uploadsRoot)) {
+if (process.env.SERVE_UPLOADS_STATIC === "true" && fs.existsSync(uploadsRoot)) {
   app.use("/uploads", express.static(uploadsRoot));
 }
 

@@ -9,6 +9,27 @@ const DEFAULT_INTERNAL_LINKS_LIMIT = 200;
 const MAX_SITEMAP_LIMIT = 50000;
 const MAX_INTERNAL_LINKS_LIMIT = 1000;
 
+/**
+ * Cache forte para os sitemaps (refatorado em 2026-05-13 após incidente de
+ * outbound bandwidth no Render). Bots SEO (Ahrefs, Semrush, etc.) batem
+ * `/api/public/seo/sitemap*` repetidamente; cada hit pode trazer até
+ * ~10 MB de XML/JSON. Cache fraco anterior (60s JSON, 300s XML, sem cache
+ * nas variantes por type/region) deixava o origin do Render servindo a
+ * maior parte das chamadas.
+ *
+ * Política agora:
+ *   - max-age=3600        — browsers/proxies cacheiam 1h.
+ *   - s-maxage=86400      — CDNs/edges cacheiam 24h (Render CDN, Cloudflare).
+ *   - stale-while-revalidate=604800 — entrega stale até 7d enquanto revalida.
+ *
+ * Sitemap muda lentamente; 1h é suficiente. Caso seja preciso forçar
+ * invalidação, basta um deploy (muda o ETag implícito) ou um `?v=` no link.
+ *
+ * Erros (4xx/5xx) mantêm `no-store`: não queremos cachear falhas.
+ */
+const SITEMAP_CACHE_CONTROL =
+  "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
+
 const ALLOWED_CHANGEFREQ = new Set([
   "always",
   "hourly",
@@ -189,7 +210,7 @@ export async function sendCanonicalSitemapXml(req, res) {
     return res
       .status(200)
       .set("Content-Type", "application/xml; charset=utf-8")
-      .set("Cache-Control", "public, max-age=300")
+      .set("Cache-Control", SITEMAP_CACHE_CONTROL)
       .send(xml);
   } catch (error) {
     logger.error({ error }, "[public-seo] falha ao gerar sitemap XML");
@@ -222,7 +243,7 @@ export async function getPublicSitemapJson(req, res, next) {
     return res
       .status(200)
       .set("Content-Type", "application/json; charset=utf-8")
-      .set("Cache-Control", "public, max-age=60")
+      .set("Cache-Control", SITEMAP_CACHE_CONTROL)
       .json(toJsonPayload(entries));
   } catch (err) {
     logger.error({ error: err }, "[public-seo] falha ao gerar sitemap JSON");
@@ -235,10 +256,13 @@ export async function getPublicSitemapByType(req, res, next) {
     const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
     const data = await sitemapPublicService.getPublicSitemapByType(req.params.type, limit);
 
-    return res.json({
-      success: true,
-      data,
-    });
+    return res
+      .status(200)
+      .set("Cache-Control", SITEMAP_CACHE_CONTROL)
+      .json({
+        success: true,
+        data,
+      });
   } catch (err) {
     logger.error(
       { error: err, type: req.params.type },
@@ -253,10 +277,13 @@ export async function getPublicSitemapByRegion(req, res, next) {
     const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
     const data = await sitemapPublicService.getPublicSitemapByRegion(req.params.state, limit);
 
-    return res.json({
-      success: true,
-      data,
-    });
+    return res
+      .status(200)
+      .set("Cache-Control", SITEMAP_CACHE_CONTROL)
+      .json({
+        success: true,
+        data,
+      });
   } catch (err) {
     logger.error(
       { error: err, state: req.params.state },
