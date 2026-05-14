@@ -121,3 +121,57 @@ Render só vê o 302 (alguns bytes de header). Zero bytes de imagem.
 - Bandwidth ataca pelo flanco oposto do storage: storage cresce por write; bandwidth cresce por read. Ambos exigem amostragem/redirecionamento agressivo.
 - "Origin é proxy de CDN" é o anti-padrão central. Servir 302 e deixar o CDN trabalhar é quase sempre certo.
 - `next/image` `hostname: "**"` parece inofensivo no review (nada quebra) mas converte o origin em otimizador de imagens da internet inteira.
+
+---
+
+## 2ª iteração — kill switch global de `next/image` (2026-05-13, mesmo dia)
+
+A validação no DevTools após a 1ª iteração mostrou que imagens R2 **ainda passavam por `/_next/image`** com query `url=https%3A%2F%2Fpub-...r2.dev/...`. Duas razões:
+
+1. **`NEXT_PUBLIC_R2_PUBLIC_BASE_URL` não estava setada no Render.** Apenas `R2_PUBLIC_BASE_URL` (backend) estava. O bundle do client não tinha visão do host R2 e o helper `shouldSkipNextImageOptimizer` não reconhecia `pub-*.r2.dev`.
+2. **8 componentes contornam o `VehicleImage` e usam `next/image` direto:** `VehicleGallery`, `MobileHero`, `dashboard/AdCard`, `account/AdsPremiumList`, `impulsionar/[adId]`, `seo/LocalSeoLanding`, `VehicleGalleryLightbox`, `admin/moderation/[id]`. Eles não passam pelo helper de jeito nenhum.
+
+### Correções aplicadas
+
+| Arquivo | Mudança |
+| --- | --- |
+| [frontend/next.config.mjs](../../frontend/next.config.mjs) | **`images.unoptimized = true`** — kill switch global. Qualquer `<Image>` no app renderiza `<img>` com src original, sem prefixo `/_next/image`. Zero bytes pelo origin do Render. |
+| [frontend/lib/images/image-optimization.ts](../../frontend/lib/images/image-optimization.ts) | `shouldSkipNextImageOptimizer` agora reconhece qualquer host terminando em `.r2.dev` ou `.r2.cloudflarestorage.com` por padrão, sem depender de env. Defesa em profundidade. |
+| Testes | +5 testes cobrindo o exato sintoma do incidente (`pub-*.r2.dev` sem env, host R2 case-insensitive, kill switch ativo no config). |
+
+### Trade-off do kill switch
+
+`unoptimized: true` global desliga otimização de variantes responsivas para **todas** as imagens da aplicação, incluindo Unsplash e assets locais. Isso pode aumentar marginalmente o peso de algumas imagens externas (banners CMS, hero), mas:
+- O ganho real para imagens internas era pequeno (R2 já entrega WebP otimizado em CDN edge).
+- O custo do otimizador era pago em bandwidth do Render, o flanco que estamos protegendo.
+- A perda visual é zero — só muda o pipeline.
+
+### Follow-up planejado (não bloqueia o fix)
+
+Para um dia voltar a otimizar imagens externas (Unsplash etc.):
+
+1. Converter os 8 bypasses para usar `<VehicleImage>` ou aplicar `unoptimized={true}` consistentemente:
+   - [components/vehicle/VehicleGallery.tsx](../../frontend/components/vehicle/VehicleGallery.tsx) — já tem `unoptimized`, mas vale unificar
+   - [components/vehicle/mobile/MobileHero.tsx](../../frontend/components/vehicle/mobile/MobileHero.tsx) — **sem proteção**
+   - [components/dashboard/AdCard.tsx](../../frontend/components/dashboard/AdCard.tsx) — `unoptimized={!startsWith("/")}` (R2 ok, legados não)
+   - [components/account/AdsPremiumList.tsx](../../frontend/components/account/AdsPremiumList.tsx) — idem
+   - [app/impulsionar/[adId]/page.tsx](../../frontend/app/impulsionar/[adId]/page.tsx) — **sem proteção, crítico**
+   - [components/seo/LocalSeoLanding.tsx](../../frontend/components/seo/LocalSeoLanding.tsx)
+   - [components/vehicle/VehicleGalleryLightbox.tsx](../../frontend/components/vehicle/VehicleGalleryLightbox.tsx)
+   - [app/admin/moderation/[id]/page.tsx](../../frontend/app/admin/moderation/[id]/page.tsx)
+2. Setar `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` no Render (espelha `R2_PUBLIC_BASE_URL`).
+3. Remover `images.unoptimized: true` do next.config — o teste `next.config.test.ts` vai chiar, atualizar nele também.
+
+### Validação final no DevTools
+
+Após este deploy:
+- Network → **Img** deve mostrar requests indo para `pub-*.r2.dev` ou domínio R2 público direto.
+- Não deve aparecer `/_next/image?...` para nenhuma imagem — nem mesmo Unsplash.
+- Não deve aparecer `/api/vehicle-images?...` como caminho padrão (raro fallback ainda possível para anúncios sem `storage_key`).
+
+### Rollback adicional
+
+| Mudança | Como reverter |
+| --- | --- |
+| `images.unoptimized: true` | Remover a linha. Voltar a depender só do `shouldSkipNextImageOptimizer` + listar todos os hosts no `remotePatterns`. Não recomendado enquanto os 8 bypasses não forem migrados. |
+| Detecção de `.r2.dev`/`.r2.cloudflarestorage.com` | `git revert` do commit. Volta a depender de `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` estar setado. |

@@ -275,6 +275,25 @@ describe("VehicleImage", () => {
     rendersWithoutOptimizer("/uploads/ad-123.jpg");
   });
 
+  it("URL pub-*.r2.dev NÃO passa pelo otimizador MESMO sem NEXT_PUBLIC_R2_PUBLIC_BASE_URL setado", () => {
+    // Caso exato do incidente da 2ª iteração (2026-05-13). O env público
+    // não estava setado no Render e por isso o helper antigo não reconhecia
+    // o host — agora o sufixo .r2.dev é detectado por padrão.
+    const prev = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+    delete (process.env as Record<string, string | undefined>).NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+    try {
+      rendersWithoutOptimizer(
+        "https://pub-662ff7f9e6a946168e27ca660899bc3f.r2.dev/vehicles/abc/foto.webp"
+      );
+    } finally {
+      if (prev === undefined) {
+        delete (process.env as Record<string, string | undefined>).NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+      } else {
+        process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = prev;
+      }
+    }
+  });
+
   it("URL absoluta no host R2 público NÃO passa pelo otimizador", () => {
     const prev = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
     process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com";

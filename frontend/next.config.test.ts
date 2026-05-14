@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import nextConfig from "./next.config.mjs";
 
 describe("next.config.mjs — guardrails de outbound bandwidth", () => {
+  it("images.unoptimized === true (kill switch global)", () => {
+    // Enquanto a flag estiver ligada, /_next/image NÃO é gerado para nenhuma
+    // imagem do app. Remover só depois de converter os 8 bypasses listados
+    // em docs/runbooks/vehicle-images-bandwidth-incident.md.
+    expect(nextConfig.images?.unoptimized).toBe(true);
+  });
+
   it("remotePatterns NÃO contém wildcard '**' (qualquer HTTPS)", () => {
     const patterns = nextConfig.images?.remotePatterns ?? [];
     for (const p of patterns) {

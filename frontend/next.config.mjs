@@ -13,15 +13,31 @@ const nextConfig = {
     return [{ source: "/favicon.ico", destination: "/images/favicon.png" }];
   },
   images: {
+    // KILL SWITCH GLOBAL (2026-05-13, segunda iteração do fix de bandwidth).
+    //
+    // Após o primeiro fix, validação em DevTools ainda mostrou imagens R2
+    // passando por /_next/image?url=https%3A%2F%2Fpub-...r2.dev. Causa:
+    //   - NEXT_PUBLIC_R2_PUBLIC_BASE_URL não estava setado no Render, então
+    //     o helper `shouldSkipNextImageOptimizer` não reconhecia *.r2.dev
+    //     como host interno;
+    //   - 8 componentes (VehicleGallery, MobileHero, dashboard/AdCard,
+    //     account/AdsPremiumList, impulsionar/[adId], LocalSeoLanding,
+    //     VehicleGalleryLightbox, admin/moderation/[id]) usam <Image>
+    //     diretamente, contornando o VehicleImage.
+    //
+    // `unoptimized: true` faz com que qualquer <Image> renderize a tag
+    // <img> com `src` original, sem prefixo /_next/image. Zero bytes
+    // de imagem passam pelo origin do Render. Custo: perdemos as variantes
+    // responsivas que o /_next/image gerava — mas como o R2 já entrega
+    // o original em CDN edge, o ganho real era pequeno e estava sendo
+    // PAGO com bandwidth do Render (caminho duplo).
+    //
+    // Para reativar otimização de Unsplash/CMS no futuro, converter os
+    // 8 bypasses para VehicleImage primeiro, depois remover esta linha.
+    unoptimized: true,
     dangerouslyAllowSVG: true,
     contentDispositionType: "inline",
-    // remotePatterns restritivo: somente hosts onde realmente queremos que
-    // o /_next/image otimize variantes. Imagens de veículo (R2 público,
-    // backend onrender, proxy /api/vehicle-images, /uploads) são marcadas
-    // como `unoptimized` no <VehicleImage> e NÃO precisam estar listadas
-    // aqui — o hostname "**" foi removido em 2026-05-13 para forçar
-    // qualquer imagem remota arbitrária a quebrar visivelmente em dev em
-    // vez de silenciosamente passar pelo otimizador do Render.
+    // remotePatterns ficam para o dia que sairmos do unoptimized global.
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "http", hostname: "localhost" },

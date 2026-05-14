@@ -75,6 +75,27 @@ describe("shouldSkipNextImageOptimizer", () => {
     expect(shouldSkipNextImageOptimizer("https://cdn.example.com/x.webp")).toBe(false);
   });
 
+  it("skip qualquer *.r2.dev (Cloudflare R2 público) MESMO SEM NEXT_PUBLIC_R2_PUBLIC_BASE_URL", () => {
+    // Caso exato do incidente da 2ª iteração: o env não estava setado e
+    // imagens viravam /_next/image?url=https%3A%2F%2Fpub-...r2.dev.
+    expect(
+      shouldSkipNextImageOptimizer(
+        "https://pub-662ff7f9e6a946168e27ca660899bc3f.r2.dev/vehicles/abc/foto.webp"
+      )
+    ).toBe(true);
+    expect(shouldSkipNextImageOptimizer("https://anything.r2.dev/x.jpg")).toBe(true);
+  });
+
+  it("skip endpoint interno do R2 (*.r2.cloudflarestorage.com)", () => {
+    expect(
+      shouldSkipNextImageOptimizer("https://accountid.r2.cloudflarestorage.com/bucket/x.jpg")
+    ).toBe(true);
+  });
+
+  it(".r2.dev case-insensitive", () => {
+    expect(shouldSkipNextImageOptimizer("https://Pub-ABC.R2.DEV/x.webp")).toBe(true);
+  });
+
   it("URLs http inválidas tratadas como skip (não otimiza lixo)", () => {
     expect(shouldSkipNextImageOptimizer("http://[invalid")).toBe(true);
   });

@@ -23,6 +23,14 @@
 
 const ONRENDER_DOMAIN_SUFFIX = ".onrender.com";
 
+// Cloudflare R2 sempre expõe buckets públicos em `*.r2.dev` (ou em
+// `*.r2.cloudflarestorage.com` para o endpoint interno).  Reconhecemos os
+// dois sufixos por padrão para que o skip funcione mesmo quando
+// NEXT_PUBLIC_R2_PUBLIC_BASE_URL não está setado no Render — esse era o
+// agujero exato pelo qual imagens R2 ainda viravam /_next/image após o
+// primeiro fix em 2026-05-13.
+const R2_DOMAIN_SUFFIXES = [".r2.dev", ".r2.cloudflarestorage.com"];
+
 const SAME_ORIGIN_PREFIXES = [
   "/api/vehicle-images",
   "/uploads/",
@@ -40,6 +48,10 @@ function getPublicR2Host(): string | null {
   }
 }
 
+function isR2Host(host: string): boolean {
+  return R2_DOMAIN_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 export function shouldSkipNextImageOptimizer(url: string): boolean {
   if (!url) return true;
   if (url.startsWith("data:")) return true;
@@ -55,6 +67,7 @@ export function shouldSkipNextImageOptimizer(url: string): boolean {
   if (/^https?:\/\//i.test(url)) {
     try {
       const host = new URL(url).host.toLowerCase();
+      if (isR2Host(host)) return true;
       const r2Host = getPublicR2Host();
       if (r2Host && host === r2Host) return true;
       if (host.endsWith(ONRENDER_DOMAIN_SUFFIX)) return true;
