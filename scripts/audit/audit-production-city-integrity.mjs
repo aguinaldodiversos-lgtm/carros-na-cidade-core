@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Auditoria read-only da integridade territorial — cidades + consistência
- * entre `ads` e `cities`.
+ * ads vs cities.
  *
  * Detecta:
  *   - Cidades com encoding corrompido (SÆo, Ã£, Ã©)
  *   - Cidades com state inválido (não UF brasileira)
- *   - Cidades com slug em formato errado (não bate `nome-uf`)
+ *   - Cidades com slug em formato errado
  *   - Inconsistência ads.city/state vs cities.name/state
  *   - Anúncios ativos sem city_id quando deveriam ter
  *   - Cidades sem coordenadas (impede regional para a base)
@@ -15,6 +15,12 @@
  *   node scripts/audit/audit-production-city-integrity.mjs
  *   node scripts/audit/audit-production-city-integrity.mjs --sample
  *   node scripts/audit/audit-production-city-integrity.mjs --format=csv
+ *   node scripts/audit/audit-production-city-integrity.mjs --print-schema
+ *
+ * Schema dinâmico (PR6):
+ *   Antes de SELECT, lê information_schema.columns para `cities` e `ads`.
+ *   Colunas OPCIONAIS ausentes viram warning + são omitidas do SELECT.
+ *   Required mínimas: cities(id,name,slug,state) + ads(id,status).
  *
  * Read-only. PII redactada. Sem alteração de produção.
  */
@@ -25,7 +31,17 @@ import { closeDatabasePool, pool } from "../../src/infrastructure/database/db.js
 
 import { detectMalformedCity } from "./lib/detect-malformed-city.mjs";
 import {
+  ALL_ADS_COLUMNS_FOR_CITY,
+  ALL_CITIES_COLUMNS,
+  buildAdCityJoinQuery,
+  buildCitiesScanQuery,
+  buildMissingCoordsQuery,
+  buildOrphanAdsQuery,
+} from "./lib/city-integrity-query-builder.mjs";
+import {
+  fetchExistingColumns,
   parseAuditArgs,
+  printSchemaDiagnostic,
   printSummary,
   truncate,
   writeCsvReport,
@@ -34,103 +50,64 @@ import {
 
 const args = parseAuditArgs(process.argv.slice(2));
 
-async function fetchCities() {
-  const result = await pool.query(
-    `
-    SELECT id, name, slug, state, latitude, longitude
-    FROM cities
-    ORDER BY name ASC
-    LIMIT $1
-    `,
-    [args.limit]
-  );
-  return result.rows;
-}
-
-async function fetchAdCityJoin() {
-  const where = [];
-  const params = [];
-
-  if (args.statusFilter) {
-    params.push(args.statusFilter);
-    where.push(`a.status = $${params.length}`);
-  }
-  params.push(args.limit);
-  const limitPos = params.length;
-
-  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-
-  const result = await pool.query(
-    `
-    SELECT
-      a.id          AS ad_id,
-      a.title       AS ad_title,
-      a.city        AS ad_city,
-      a.state       AS ad_state,
-      a.city_id     AS ad_city_id,
-      a.status      AS ad_status,
-      c.id          AS city_id,
-      c.name        AS city_name,
-      c.slug        AS city_slug,
-      c.state       AS city_state,
-      c.latitude    AS city_lat,
-      c.longitude   AS city_lng
-    FROM ads a
-    LEFT JOIN cities c ON c.id = a.city_id
-    ${whereClause}
-    ORDER BY a.created_at DESC
-    LIMIT $${limitPos}
-    `,
-    params
-  );
-  return result.rows;
-}
-
-async function fetchOrphanAds() {
-  const params = [];
-  let where = "a.city_id IS NULL";
-  if (args.statusFilter) {
-    params.push(args.statusFilter);
-    where = `${where} AND a.status = $${params.length}`;
-  }
-  const result = await pool.query(
-    `
-    SELECT a.id, a.title, a.city, a.state, a.status, a.created_at
-    FROM ads a
-    WHERE ${where}
-    ORDER BY a.created_at DESC
-    LIMIT 500
-    `,
-    params
-  );
-  return result.rows;
-}
-
-async function fetchCitiesMissingCoords() {
-  const result = await pool.query(
-    `
-    SELECT id, name, slug, state
-    FROM cities
-    WHERE latitude IS NULL OR longitude IS NULL
-    ORDER BY name ASC
-    LIMIT 200
-    `
-  );
-  return result.rows;
-}
-
 async function main() {
+  const [adsColumns, citiesColumns] = await Promise.all([
+    fetchExistingColumns(pool, "ads"),
+    fetchExistingColumns(pool, "cities"),
+  ]);
+
+  if (args.printSchema) {
+    printSchemaDiagnostic({
+      table: "ads",
+      available: adsColumns,
+      requested: ALL_ADS_COLUMNS_FOR_CITY,
+    });
+    printSchemaDiagnostic({
+      table: "cities",
+      available: citiesColumns,
+      requested: ALL_CITIES_COLUMNS,
+    });
+    return;
+  }
+
   if (!args.silent) {
     /* eslint-disable-next-line no-console */
-    console.log(`[audit-city-integrity] reading cities + ad joins (limit=${args.limit})…`);
+    console.log(
+      `[audit-city-integrity] reading cities + ad joins (limit=${args.limit})…`
+    );
   }
 
-  const [cities, adJoin, orphans, missingCoords] = await Promise.all([
-    fetchCities(),
-    fetchAdCityJoin(),
-    fetchOrphanAds(),
-    fetchCitiesMissingCoords(),
+  const citiesScan = buildCitiesScanQuery({ availableColumns: citiesColumns, args });
+  const adJoinBuild = buildAdCityJoinQuery({ adsColumns, citiesColumns, args });
+  const orphanBuild = buildOrphanAdsQuery({ availableColumns: adsColumns, args });
+  const missingCoordsBuild = buildMissingCoordsQuery({ availableColumns: citiesColumns });
+
+  if (!args.silent) {
+    if (citiesScan.missing.length > 0) {
+      /* eslint-disable-next-line no-console */
+      console.warn(
+        `[audit-city-integrity] cities OPCIONAIS ausentes: ${citiesScan.missing.join(", ")}`
+      );
+    }
+    if (adJoinBuild.adsMissing.length > 0) {
+      /* eslint-disable-next-line no-console */
+      console.warn(
+        `[audit-city-integrity] ads OPCIONAIS ausentes: ${adJoinBuild.adsMissing.join(", ")}`
+      );
+    }
+  }
+
+  const [citiesRes, adJoinRes, orphanRes, missingCoordsRes] = await Promise.all([
+    pool.query(citiesScan.sql, citiesScan.params),
+    pool.query(adJoinBuild.sql, adJoinBuild.params),
+    pool.query(orphanBuild.sql, orphanBuild.params),
+    pool.query(missingCoordsBuild.sql, missingCoordsBuild.params),
   ]);
+
+  const cities = citiesRes.rows;
+  const adJoin = adJoinRes.rows;
+  const orphans = orphanRes.rows;
+  const missingCoords = missingCoordsRes.rows;
 
   const cityFindings = [];
   for (const city of cities) {

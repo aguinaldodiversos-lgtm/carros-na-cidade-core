@@ -19,6 +19,14 @@ const DEFAULT_LIMIT = 1000;
 const DEFAULT_REPORT_DIR = "./reports/audit";
 
 /**
+ * Identifier seguro de coluna/tabela Postgres — só letras, dígitos e
+ * underscore, começando com letra ou underscore. Defesa contra SQL
+ * injection no caso (improvável mas possível) de alguém estender a lista
+ * de colunas requested com input externo.
+ */
+const SAFE_IDENTIFIER_RE = /^[a-z_][a-z0-9_]*$/i;
+
+/**
  * Parse seguro de argv para flags `--name=value` e booleans `--flag`.
  *
  * Não usa `process.exit` para erros — devolve `{ ok: false, error }`
@@ -33,6 +41,7 @@ export function parseAuditArgs(argv) {
     sinceDays: null,
     sampleOnly: false,
     silent: false,
+    printSchema: false,
   };
 
   for (const raw of argv) {
@@ -43,6 +52,12 @@ export function parseAuditArgs(argv) {
       out.silent = true;
     } else if (raw === "--all-statuses") {
       out.statusFilter = null;
+    } else if (raw === "--print-schema") {
+      // Diagnóstico: imprime colunas detectadas no DB e sai sem extrair
+      // dados de anúncio. Útil quando o schema de produção diverge da
+      // assunção do script (causa do incidente PR5 → PR6: coluna
+      // `version` inexistente).
+      out.printSchema = true;
     } else if (raw.startsWith("--limit=")) {
       const n = Number(raw.split("=")[1]);
       if (Number.isFinite(n) && n > 0) out.limit = Math.floor(n);
@@ -187,6 +202,105 @@ export function truncate(value, max = 80) {
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
 
+/**
+ * Lê as colunas existentes de uma tabela em `public` via
+ * `information_schema.columns`. Devolve um `Set<string>` (lowercase, sem
+ * mutation no caller).
+ *
+ * Por que existe:
+ *   PR5 assumiu coluna `version` em `ads` que não existe em produção. O
+ *   script quebrou com 'column "version" does not exist'. A solução é
+ *   introspectar o schema antes de montar o SELECT, e omitir colunas
+ *   ausentes (com warning explícito, não silenciosamente).
+ */
+export async function fetchExistingColumns(poolLike, tableName) {
+  if (!poolLike || typeof poolLike.query !== "function") {
+    throw new Error("fetchExistingColumns: pool inválido (espera-se objeto com .query)");
+  }
+  if (!SAFE_IDENTIFIER_RE.test(String(tableName || ""))) {
+    throw new Error(`fetchExistingColumns: nome de tabela inválido '${tableName}'`);
+  }
+  const result = await poolLike.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1`,
+    [tableName]
+  );
+  return new Set(result.rows.map((row) => String(row.column_name).toLowerCase()));
+}
+
+/**
+ * Filtra uma lista REQUESTED de colunas pelo conjunto AVAILABLE. Devolve
+ * `{ present, missing }` ambos ordenados. Defende contra identifier
+ * unsafe (SAFE_IDENTIFIER_RE) — qualquer entrada que não bata o pattern
+ * é descartada silenciosamente e contada em `unsafe` (sem entrar em
+ * present nem em missing).
+ */
+export function buildSafeColumnList(available, requested) {
+  if (!(available instanceof Set)) {
+    throw new Error("buildSafeColumnList: 'available' precisa ser Set");
+  }
+  if (!Array.isArray(requested)) {
+    throw new Error("buildSafeColumnList: 'requested' precisa ser array");
+  }
+
+  const present = [];
+  const missing = [];
+  const unsafe = [];
+
+  for (const raw of requested) {
+    const col = String(raw || "").trim().toLowerCase();
+    if (!col) continue;
+    if (!SAFE_IDENTIFIER_RE.test(col)) {
+      unsafe.push(raw);
+      continue;
+    }
+    if (available.has(col)) {
+      present.push(col);
+    } else {
+      missing.push(col);
+    }
+  }
+
+  return { present, missing, unsafe };
+}
+
+/**
+ * Prefixa uma lista de colunas com um alias de tabela (ex.: "a." ou "c.").
+ * Não muda o conteúdo de present/missing — apenas formata.
+ */
+export function withAlias(columns, alias) {
+  if (!alias) return [...columns];
+  if (!SAFE_IDENTIFIER_RE.test(alias)) {
+    throw new Error(`withAlias: alias inválido '${alias}'`);
+  }
+  return columns.map((c) => `${alias}.${c}`);
+}
+
+/**
+ * Mostra um diagnóstico de schema com colunas detectadas vs colunas
+ * pedidas pelo script. Usado por `--print-schema` quando o operador quer
+ * confirmar o que o script vai consultar antes de uma corrida real.
+ */
+export function printSchemaDiagnostic({ table, available, requested }) {
+  const { present, missing, unsafe } = buildSafeColumnList(available, requested);
+  /* eslint-disable no-console */
+  console.log("");
+  console.log(`=== Schema diagnostic: ${table} ===`);
+  console.log(`  Colunas detectadas (${available.size}):`);
+  console.log(`    ${[...available].sort().join(", ")}`);
+  console.log(`  Colunas pedidas pelo script (${requested.length}):`);
+  console.log(`    ${requested.join(", ")}`);
+  console.log(`  PRESENT (${present.length}): ${present.join(", ") || "(nenhuma)"}`);
+  console.log(`  MISSING (${missing.length}): ${missing.join(", ") || "(nenhuma)"}`);
+  if (unsafe.length > 0) {
+    console.log(`  UNSAFE/ignored (${unsafe.length}): ${unsafe.join(", ")}`);
+  }
+  /* eslint-enable no-console */
+  return { present, missing, unsafe };
+}
+
 export const __INTERNAL__ = {
   DEFAULT_LIMIT,
   DEFAULT_REPORT_DIR,
@@ -194,4 +308,5 @@ export const __INTERNAL__ = {
   PHONE_RE,
   CPF_RE,
   CNPJ_RE,
+  SAFE_IDENTIFIER_RE,
 };

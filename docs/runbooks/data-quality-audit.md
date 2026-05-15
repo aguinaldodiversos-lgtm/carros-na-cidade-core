@@ -66,6 +66,55 @@ Os relatórios saem em `reports/audit/<nome>-<timestamp>.json` (ou .csv).
 | `--since-days=N` | off | Só anúncios criados nos últimos N dias. |
 | `--sample` | off | Atalho: limit=100. |
 | `--silent` | off | Suprime saída no console. |
+| `--print-schema` | off | **Diagnóstico (PR 6)**: imprime as colunas detectadas em `information_schema.columns`, mostra quais o script vai usar (PRESENT) e quais estão ausentes (MISSING). Sai sem extrair dados. |
+
+## Schema dinâmico (incidente PR 5 → PR 6)
+
+Em produção, o script PR 5 falhou com `column "version" does not exist`
+porque o SELECT assumia uma coluna que não existe na tabela `ads`. PR 6
+corrige isso introspectando o schema antes de cada SELECT:
+
+1. Cada script chama `fetchExistingColumns(pool, 'ads')` (e/ou
+   `'cities'`) — lê `information_schema.columns` para a tabela.
+2. `buildSafeColumnList(available, requested)` divide as colunas
+   pedidas em PRESENT (existem) e MISSING (não existem).
+3. O SELECT é montado SÓ com as PRESENT. As MISSING viram warning no
+   console (`[audit-*] colunas OPCIONAIS ausentes: ...`) mas não
+   abortam o script.
+4. Cada script tem uma lista `REQUIRED_*` mínima — se uma coluna
+   REQUIRED estiver ausente, aborta cedo com instrução clara para
+   rodar `--print-schema`.
+
+**Para confirmar o schema antes de uma corrida real:**
+```bash
+node scripts/audit/audit-production-ads-quality.mjs --print-schema
+node scripts/audit/audit-production-city-integrity.mjs --print-schema
+node scripts/audit/audit-production-image-integrity.mjs --print-schema
+```
+
+Saída de `--print-schema` para `ads`:
+```
+=== Schema diagnostic: ads ===
+  Colunas detectadas (24):
+    advertiser_id, brand, city, city_id, created_at, description, ...
+  Colunas pedidas pelo script (16):
+    id, title, slug, status, brand, model, version, description, ...
+  PRESENT (14): id, title, slug, status, brand, model, description, ...
+  MISSING (2): version, dealership_id
+```
+
+As colunas REQUIRED de cada script:
+
+| Script | REQUIRED (sem isso o script aborta) |
+|---|---|
+| `ads-quality` | `id`, `title`, `slug`, `status` |
+| `city-integrity` (cities) | `id`, `name`, `slug`, `state` |
+| `city-integrity` (ads) | `id`, `status` |
+| `image-integrity` | `id`, `images` |
+
+Todas as outras (brand, model, version, description, city_id, etc.) são
+OPCIONAIS — ausência apenas reduz a cobertura do detector, mas não
+quebra.
 
 ## Estrutura dos relatórios
 

@@ -12,20 +12,21 @@
  *   node scripts/audit/audit-production-ads-quality.mjs
  *   node scripts/audit/audit-production-ads-quality.mjs --limit=5000
  *   node scripts/audit/audit-production-ads-quality.mjs --format=csv --out=./reports/audit
- *   node scripts/audit/audit-production-ads-quality.mjs --sample      # 100 ads, console-friendly
- *   node scripts/audit/audit-production-ads-quality.mjs --all-statuses  # inclui status != active
+ *   node scripts/audit/audit-production-ads-quality.mjs --sample
+ *   node scripts/audit/audit-production-ads-quality.mjs --all-statuses
+ *   node scripts/audit/audit-production-ads-quality.mjs --print-schema
  *
  * Environment:
  *   DATABASE_URL — obrigatório (mesmo pool do backend).
  *
- * Saída:
- *   - reports/audit/ads-quality-<timestamp>.{json,csv}
- *   - Sumário no console (a menos que --silent).
+ * Schema dinâmico:
+ *   Antes do SELECT, lê `information_schema.columns` para `ads` e monta o
+ *   projection só com colunas que existem. Colunas OPCIONAIS ausentes
+ *   (ex.: `version`, `dealership_id`) viram warning. Apenas REQUIRED
+ *   (id, title, slug, status) precisam existir — sem elas o script aborta
+ *   cedo com erro claro indicando rodar `--print-schema`.
  *
- * IMPORTANTE:
- *   - Read-only. Nenhum UPDATE/DELETE. Apenas SELECT.
- *   - PII redactada antes de escrever em arquivo.
- *   - Não faz HTTP para o anúncio (sem 200-check de URL).
+ * Read-only. PII redactada. Sem alteração de produção.
  */
 
 import "dotenv/config";
@@ -35,7 +36,14 @@ import { closeDatabasePool, pool } from "../../src/infrastructure/database/db.js
 import { detectTestAd } from "./lib/detect-test-ad.mjs";
 import { detectBadSlug } from "./lib/detect-bad-slug.mjs";
 import {
+  ALL_ADS_COLUMNS,
+  buildAdsQualityQuery,
+  buildDuplicateSlugsQuery,
+} from "./lib/ads-query-builder.mjs";
+import {
+  fetchExistingColumns,
   parseAuditArgs,
+  printSchemaDiagnostic,
   printSummary,
   truncate,
   writeCsvReport,
@@ -44,66 +52,47 @@ import {
 
 const args = parseAuditArgs(process.argv.slice(2));
 
-async function fetchAds() {
-  const where = [];
-  const params = [];
-
-  if (args.statusFilter) {
-    params.push(args.statusFilter);
-    where.push(`status = $${params.length}`);
+async function fetchAds(availableColumns) {
+  const { sql, params, missing } = buildAdsQualityQuery({ availableColumns, args });
+  if (!args.silent && missing.length > 0) {
+    /* eslint-disable-next-line no-console */
+    console.warn(
+      `[audit-ads-quality] colunas OPCIONAIS ausentes em ads (omitidas do SELECT): ${missing.join(", ")}`
+    );
   }
-  if (args.sinceDays) {
-    params.push(args.sinceDays);
-    where.push(`created_at >= NOW() - ($${params.length}::int * INTERVAL '1 day')`);
-  }
-
-  params.push(args.limit);
-  const limitPos = params.length;
-
-  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-
-  const result = await pool.query(
-    `
-    SELECT
-      id, title, slug, brand, model, version, description,
-      city, state, city_id, status, plan,
-      created_at,
-      advertiser_id, dealership_id
-    FROM ads
-    ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT $${limitPos}
-    `,
-    params
-  );
+  const result = await pool.query(sql, params);
   return result.rows;
 }
 
-async function fetchDuplicateSlugs() {
-  const result = await pool.query(
-    `
-    SELECT slug, COUNT(*)::int AS cnt, ARRAY_AGG(id ORDER BY id) AS ids
-    FROM ads
-    WHERE slug IS NOT NULL
-      AND slug <> ''
-      ${args.statusFilter ? "AND status = $1" : ""}
-    GROUP BY slug
-    HAVING COUNT(*) > 1
-    ORDER BY cnt DESC, slug ASC
-    LIMIT 500
-    `,
-    args.statusFilter ? [args.statusFilter] : []
-  );
+async function fetchDuplicateSlugs(availableColumns) {
+  const { sql, params } = buildDuplicateSlugsQuery({ availableColumns, args });
+  const result = await pool.query(sql, params);
   return result.rows;
 }
 
 async function main() {
-  if (!args.silent) {
-    /* eslint-disable-next-line no-console */
-    console.log(`[audit-ads-quality] reading up to ${args.limit} ads (status=${args.statusFilter ?? "ANY"})…`);
+  const availableColumns = await fetchExistingColumns(pool, "ads");
+
+  if (args.printSchema) {
+    printSchemaDiagnostic({
+      table: "ads",
+      available: availableColumns,
+      requested: ALL_ADS_COLUMNS,
+    });
+    return;
   }
 
-  const [ads, duplicateSlugs] = await Promise.all([fetchAds(), fetchDuplicateSlugs()]);
+  if (!args.silent) {
+    /* eslint-disable-next-line no-console */
+    console.log(
+      `[audit-ads-quality] reading up to ${args.limit} ads (status=${args.statusFilter ?? "ANY"})…`
+    );
+  }
+
+  const [ads, duplicateSlugs] = await Promise.all([
+    fetchAds(availableColumns),
+    fetchDuplicateSlugs(availableColumns),
+  ]);
 
   const testFindings = [];
   const slugFindings = [];

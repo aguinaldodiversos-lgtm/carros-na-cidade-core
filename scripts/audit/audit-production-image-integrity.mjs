@@ -15,9 +15,13 @@
  *   node scripts/audit/audit-production-image-integrity.mjs
  *   node scripts/audit/audit-production-image-integrity.mjs --sample
  *   node scripts/audit/audit-production-image-integrity.mjs --format=csv
+ *   node scripts/audit/audit-production-image-integrity.mjs --print-schema
  *
- * Read-only. Não faz HTTP HEAD nas URLs (apenas shape/heurística). Não
- * altera produção. Não mexe no R2 nem no /_next/image.
+ * Schema dinâmico (PR6): introspecta `information_schema.columns` para
+ * `ads`. Required: id, images. Optional: title, slug, status, created_at,
+ * city_id. Aborta cedo se `images` não existir.
+ *
+ * Read-only. Não faz HTTP HEAD nas URLs. Não altera produção.
  */
 
 import "dotenv/config";
@@ -26,7 +30,13 @@ import { closeDatabasePool, pool } from "../../src/infrastructure/database/db.js
 
 import { detectImageIssues } from "./lib/detect-image-issues.mjs";
 import {
+  ALL_ADS_IMAGE_COLUMNS,
+  buildImagesAuditQuery,
+} from "./lib/image-integrity-query-builder.mjs";
+import {
+  fetchExistingColumns,
   parseAuditArgs,
+  printSchemaDiagnostic,
   printSummary,
   truncate,
   writeCsvReport,
@@ -35,63 +45,55 @@ import {
 
 const args = parseAuditArgs(process.argv.slice(2));
 
-async function fetchAds() {
-  const where = [];
-  const params = [];
-
-  if (args.statusFilter) {
-    params.push(args.statusFilter);
-    where.push(`status = $${params.length}`);
-  }
-  if (args.sinceDays) {
-    params.push(args.sinceDays);
-    where.push(`created_at >= NOW() - ($${params.length}::int * INTERVAL '1 day')`);
-  }
-
-  params.push(args.limit);
-  const limitPos = params.length;
-
-  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-
-  const result = await pool.query(
-    `
-    SELECT id, title, slug, status, images, created_at, city_id
-    FROM ads
-    ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT $${limitPos}
-    `,
-    params
-  );
-  return result.rows;
-}
-
 function bucketSeverity(severity, buckets) {
   buckets[severity] = (buckets[severity] || 0) + 1;
 }
 
 async function main() {
-  if (!args.silent) {
-    /* eslint-disable-next-line no-console */
-    console.log(`[audit-image-integrity] reading ${args.limit} ads (status=${args.statusFilter ?? "ANY"})…`);
+  const availableColumns = await fetchExistingColumns(pool, "ads");
+
+  if (args.printSchema) {
+    printSchemaDiagnostic({
+      table: "ads",
+      available: availableColumns,
+      requested: ALL_ADS_IMAGE_COLUMNS,
+    });
+    return;
   }
 
-  const ads = await fetchAds();
+  if (!args.silent) {
+    /* eslint-disable-next-line no-console */
+    console.log(
+      `[audit-image-integrity] reading ${args.limit} ads (status=${args.statusFilter ?? "ANY"})…`
+    );
+  }
+
+  const { sql, params, missing } = buildImagesAuditQuery({ availableColumns, args });
+  if (!args.silent && missing.length > 0) {
+    /* eslint-disable-next-line no-console */
+    console.warn(
+      `[audit-image-integrity] colunas OPCIONAIS ausentes em ads (omitidas): ${missing.join(", ")}`
+    );
+  }
+
+  const result = await pool.query(sql, params);
+  const ads = result.rows;
+
   const findings = [];
   const severityBuckets = {};
 
   for (const ad of ads) {
-    const result = detectImageIssues(ad);
-    if (!result.isProblematic) continue;
-    bucketSeverity(result.severity, severityBuckets);
+    const r = detectImageIssues(ad);
+    if (!r.isProblematic) continue;
+    bucketSeverity(r.severity, severityBuckets);
 
     findings.push({
       kind: "image_issue",
       id: ad.id,
-      severity: result.severity,
-      issue_codes: result.issues.map((i) => i.code).join("|"),
-      issue_labels: result.issues.map((i) => i.label).slice(0, 5).join(" | "),
-      issue_count: result.issues.length,
+      severity: r.severity,
+      issue_codes: r.issues.map((i) => i.code).join("|"),
+      issue_labels: r.issues.map((i) => i.label).slice(0, 5).join(" | "),
+      issue_count: r.issues.length,
       title: truncate(ad.title, 60),
       slug: ad.slug,
       status: ad.status,
@@ -102,7 +104,7 @@ async function main() {
           ? "stringified"
           : 0,
       sample_url: truncate(
-        result.issues.find((i) => i.sampleUrl)?.sampleUrl ?? "",
+        r.issues.find((i) => i.sampleUrl)?.sampleUrl ?? "",
         120
       ),
     });
