@@ -45,6 +45,8 @@ const envBackup = {};
 beforeEach(() => {
   envBackup.BAD_BOTS_BLOCKED = process.env.BAD_BOTS_BLOCKED;
   envBackup.INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
+  envBackup.LEGACY_BFF_COMPAT = process.env.LEGACY_BFF_COMPAT;
+  envBackup.NODE_ENV = process.env.NODE_ENV;
 });
 
 afterEach(() => {
@@ -52,6 +54,10 @@ afterEach(() => {
   else process.env.BAD_BOTS_BLOCKED = envBackup.BAD_BOTS_BLOCKED;
   if (envBackup.INTERNAL_API_TOKEN === undefined) delete process.env.INTERNAL_API_TOKEN;
   else process.env.INTERNAL_API_TOKEN = envBackup.INTERNAL_API_TOKEN;
+  if (envBackup.LEGACY_BFF_COMPAT === undefined) delete process.env.LEGACY_BFF_COMPAT;
+  else process.env.LEGACY_BFF_COMPAT = envBackup.LEGACY_BFF_COMPAT;
+  if (envBackup.NODE_ENV === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = envBackup.NODE_ENV;
 });
 
 describe("isBadBot", () => {
@@ -179,17 +185,53 @@ describe("isAuthenticatedInternalCall", () => {
     });
     expect(isAuthenticatedInternalCall(req)).toBe(false);
   });
+
+  it("token com tamanho diferente do esperado → false (timingSafeEqual seguro)", () => {
+    // timingSafeEqual exige mesmo length; nosso wrapper fast-fails no length
+    // mismatch. O comportamento externo permanece "rejeita".
+    process.env.INTERNAL_API_TOKEN = "secret-12345";
+    const req = makeReq({
+      ua: "cnc-internal/1.0",
+      headers: { "x-internal-token": "short" },
+    });
+    expect(isAuthenticatedInternalCall(req)).toBe(false);
+  });
+
+  it("emite warning UNICO em prod quando UA interno chega sem token valido", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.INTERNAL_API_TOKEN = "secret-prod";
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    // Reset module state para o warning unico vir limpo.
+    vi.resetModules();
+    const mod = await import("../../src/shared/middlewares/bot-blocker.middleware.js");
+
+    const reqMissing = makeReq({ ua: "cnc-internal/1.0" });
+    const reqWrong = makeReq({
+      ua: "cnc-internal/1.0",
+      headers: { "x-internal-token": "errado" },
+    });
+    mod.isAuthenticatedInternalCall(reqMissing);
+    mod.isAuthenticatedInternalCall(reqWrong);
+    mod.isAuthenticatedInternalCall(reqMissing);
+
+    // warning unico mesmo com 3 chamadas
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    const msg = String(errSpy.mock.calls[0][0]);
+    expect(msg).toContain("UA cnc-internal/1.0");
+    expect(msg).not.toContain("secret-prod");
+  });
 });
 
 describe("looksLikeBffCall", () => {
   it("com X-Cnc-Client-Ip presente e válido (IPv4) → true", () => {
-    expect(looksLikeBffCall(makeReq({ headers: { "x-cnc-client-ip": "203.0.113.42" } }))).toBe(true);
+    expect(looksLikeBffCall(makeReq({ headers: { "x-cnc-client-ip": "203.0.113.42" } }))).toBe(
+      true
+    );
   });
 
   it("com X-Cnc-Client-Ip IPv6 válido → true", () => {
-    expect(
-      looksLikeBffCall(makeReq({ headers: { "x-cnc-client-ip": "2001:db8::1" } }))
-    ).toBe(true);
+    expect(looksLikeBffCall(makeReq({ headers: { "x-cnc-client-ip": "2001:db8::1" } }))).toBe(true);
   });
 
   it("sem header → false", () => {
@@ -292,9 +334,8 @@ describe("botBlockerMiddleware", () => {
       expect(res.statusCode).toBe(429);
     });
 
-    it("UA 'node' COM X-Cnc-Client-Ip válido (BFF compat) passa", () => {
-      // Frontend Next.js SSR usando fetch global → UA="node", mas BFF marca
-      // o IP real. Não pode ser cortado.
+    it("UA 'node' COM X-Cnc-Client-Ip + LEGACY_BFF_COMPAT=true: passa (rollback emergencial)", () => {
+      process.env.LEGACY_BFF_COMPAT = "true";
       const req = makeReq({
         ua: "node",
         path: "/api/ads",
@@ -305,6 +346,22 @@ describe("botBlockerMiddleware", () => {
       botBlockerMiddleware(req, res, next);
       expect(next).toHaveBeenCalledOnce();
       expect(res.statusCode).toBe(200);
+    });
+
+    it("UA 'node' COM X-Cnc-Client-Ip e LEGACY_BFF_COMPAT desligada: BLOQUEIA (default novo)", () => {
+      // Default em prod a partir deste PR: a compat fraca esta OFF. O caminho
+      // legitimo do frontend SSR/BFF agora e UA cnc-internal/1.0 + token.
+      delete process.env.LEGACY_BFF_COMPAT;
+      const req = makeReq({
+        ua: "node",
+        path: "/api/ads",
+        headers: { "x-cnc-client-ip": "203.0.113.42" },
+      });
+      const res = makeRes();
+      const next = vi.fn();
+      botBlockerMiddleware(req, res, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(429);
     });
 
     it("UA 'AhrefsBot' COM X-Cnc-Client-Ip NÃO passa (compat fraca só vale para 'node')", () => {

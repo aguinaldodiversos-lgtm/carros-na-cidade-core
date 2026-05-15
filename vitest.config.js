@@ -8,6 +8,13 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "frontend"),
+      // O frontend usa `import "server-only"` para impedir vazamento de
+      // INTERNAL_API_TOKEN no bundle do client. Esse pacote so existe no
+      // node_modules do frontend. Quando os testes do backend importam
+      // codigo do frontend (ex: fetchResolvedCityByIdFromBackend), o
+      // `server-only` precisa resolver para algo no contexto Node — basta
+      // um stub vazio, porque o teste roda server-side por definicao.
+      "server-only": path.resolve(import.meta.dirname, "tests/helpers/server-only-stub.js"),
     },
   },
   test: {

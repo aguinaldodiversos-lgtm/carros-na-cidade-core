@@ -27,6 +27,18 @@
 // Sem o token, o UA `cnc-internal/1.0` é tratado como qualquer outro — não
 // dá pra burlar a proteção setando só o UA. O token vem da env
 // INTERNAL_API_TOKEN (já existente no projeto, usado em /api/internal/regions).
+// Comparação via timingSafeEqual para evitar timing attacks.
+//
+// ─── Compat fraca (LEGACY_BFF_COMPAT) ────────────────────────────────────────
+// Durante o incidente de bandwidth (2026-05) deixamos UA `node` + X-Cnc-Client-Ip
+// passar como fallback enquanto o frontend ainda não emitia UA cnc-internal/1.0.
+// Bots podem forjar `X-Cnc-Client-Ip`, então esse caminho é FRACO.
+//
+// A partir deste PR, a compat só fica disponível com `LEGACY_BFF_COMPAT=true` na
+// env (default OFF em prod). Estado-alvo: frontend manda UA cnc-internal/1.0 e
+// X-Internal-Token corretos, compat fica desligada permanentemente.
+
+import { timingSafeEqual } from "node:crypto";
 
 const INTERNAL_UA_PATTERN = /^cnc-internal\//i;
 
@@ -100,34 +112,99 @@ function getInternalToken() {
 }
 
 /**
+ * Comparação de tokens em tempo constante. Evita timing attacks por análise
+ * de latência (improvável neste contexto, mas é trivial fazer certo).
+ *
+ * `timingSafeEqual` exige que os Buffers tenham o mesmo length, então
+ * comparamos o length explicitamente primeiro (fast-fail nao vaza além do
+ * que ja vazaria).
+ */
+function safeCompareTokens(provided, expected) {
+  const a = String(provided || "");
+  const b = String(expected || "");
+  if (!a || !b) return false;
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  try {
+    return timingSafeEqual(aBuf, bBuf);
+  } catch {
+    return false;
+  }
+}
+
+let warnedMissingTokenInProd = false;
+function warnMissingTokenInProductionOnce() {
+  if (warnedMissingTokenInProd) return;
+  if (process.env.NODE_ENV !== "production") return;
+  warnedMissingTokenInProd = true;
+  // Nao logamos o valor do token (nao temos), so o fato dele estar ausente.
+  // eslint-disable-next-line no-console
+  console.error(
+    "[bot-blocker] INTERNAL_API_TOKEN ausente em producao: chamadas com UA cnc-internal/1.0 nao podem ser autenticadas e serao bloqueadas como 429 quando BAD_BOTS_BLOCKED=true. Configure a env no Render Dashboard > backend > Environment."
+  );
+}
+
+let warnedInternalUaWithoutTokenInProd = false;
+function warnInternalUaWithoutTokenOnce() {
+  if (warnedInternalUaWithoutTokenInProd) return;
+  if (process.env.NODE_ENV !== "production") return;
+  warnedInternalUaWithoutTokenInProd = true;
+  // eslint-disable-next-line no-console
+  console.error(
+    "[bot-blocker] UA cnc-internal/1.0 recebido SEM X-Internal-Token valido em producao. Possiveis causas: (a) frontend SSR/BFF deployou sem INTERNAL_API_TOKEN no env; (b) atacante tentando burlar bot blocker so com UA. Bloqueando como 429."
+  );
+}
+
+/**
  * Resposta autoritativa: este request é uma chamada interna autenticada
  * (frontend SSR/BFF ou script interno)? Precisa do par UA + token.
+ *
+ * Retorna false em qualquer falha (token ausente, mismatch, UA divergente).
+ * Emite warning UNICO em prod quando UA cnc-internal/1.0 chegar sem token
+ * valido — isso facilita diagnostico sem floodar log a cada request.
  */
 export function isAuthenticatedInternalCall(req) {
   const ua = req.headers["user-agent"] || "";
   if (!INTERNAL_UA_PATTERN.test(String(ua))) return false;
 
   const expectedToken = getInternalToken();
-  if (!expectedToken) return false;
+  if (!expectedToken) {
+    warnMissingTokenInProductionOnce();
+    return false;
+  }
 
   const providedToken = req.headers["x-internal-token"] || "";
-  return String(providedToken) === expectedToken;
+  const ok = safeCompareTokens(providedToken, expectedToken);
+  if (!ok) {
+    warnInternalUaWithoutTokenOnce();
+  }
+  return ok;
 }
 
 /**
- * Compat fraca: o frontend Next.js BFF/SSR ainda não envia UA `cnc-internal/1.0`
- * (vai ser atualizado em PR separado). Enquanto isso, o BFF sempre marca o
- * IP real do visitante em `X-Cnc-Client-Ip` — header custom do projeto. Bots
- * externos não conhecem esse header.
+ * Compat FRACA herdada do hotfix de bandwidth (2026-05). Permite UA `node`
+ * (default do fetch global do Node 18+) bypassar quando vier acompanhado de
+ * `X-Cnc-Client-Ip` minimamente valido.
  *
- * Quando ele está presente, tratamos UA `node` (default do fetch global do
- * Node 18+) como amigável. Isso é uma camada FRACA — pode ser spoofada — mas
- * é o que evita cortar o próprio frontend no curto prazo. O `X-Cnc-Client-Ip`
- * tem que parecer um IPv4/IPv6 minimamente válido pra valer.
+ * Por que e fraca: qualquer bot externo pode setar `X-Cnc-Client-Ip` com um
+ * IP arbitrario. So o par UA `cnc-internal/1.0` + X-Internal-Token correto
+ * autentica de verdade — `isAuthenticatedInternalCall`.
  *
- * Caminho preferido permanece: UA cnc-internal/1.0 + X-Internal-Token.
+ * Por que ainda existe: rollback de seguranca. Se o deploy do frontend que
+ * passa a emitir UA cnc-internal/1.0 falhar (ex: env INTERNAL_API_TOKEN nao
+ * sincronizada no Render), o SSR publico cairia em 429 imediatamente. Com a
+ * flag LEGACY_BFF_COMPAT=true, voltamos a aceitar o caminho antigo por
+ * algumas horas enquanto investigamos.
+ *
+ * Default agora: OFF em prod. Estado-alvo: remover de vez no proximo PR
+ * depois de 48h validando metricas e ausencia de regressao.
  */
 const IP_LIKE = /^[0-9a-f:.]{3,45}$/i;
+
+function isLegacyBffCompatEnabled() {
+  return process.env.LEGACY_BFF_COMPAT === "true";
+}
 
 export function looksLikeBffCall(req) {
   const ip = req.headers["x-cnc-client-ip"];
@@ -156,11 +233,15 @@ export function botBlockerMiddleware(req, res, next) {
   const ua = req.headers["user-agent"] || "";
   if (!isBadBot(ua)) return next();
 
-  // Compat fraca: UA `node` puro + X-Cnc-Client-Ip presente → libera. Cobre o
-  // frontend BFF/SSR enquanto não emite UA `cnc-internal/1.0`. Outras UAs da
-  // blocklist (Ahrefs, python-requests, etc.) NÃO são liberadas por essa
-  // brecha — só `node` puro, que é o caso real do nosso Next.js SSR.
-  if (String(ua).trim().toLowerCase() === "node" && looksLikeBffCall(req)) {
+  // Compat FRACA (LEGACY_BFF_COMPAT=true): UA `node` + X-Cnc-Client-Ip libera.
+  // Disponivel apenas como rollback emergencial — o caminho normal e UA
+  // cnc-internal/1.0 + X-Internal-Token. Outras UAs da blocklist (Ahrefs,
+  // python-requests, etc.) NUNCA passam por aqui, so `node` puro.
+  if (
+    isLegacyBffCompatEnabled() &&
+    String(ua).trim().toLowerCase() === "node" &&
+    looksLikeBffCall(req)
+  ) {
     return next();
   }
 
