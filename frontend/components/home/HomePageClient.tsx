@@ -1,6 +1,7 @@
 // frontend/components/home/HomePageClient.tsx
 import { Suspense, type ReactNode } from "react";
 
+import { LocationRegionalPrompt } from "@/components/home/LocationRegionalPrompt";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { ContentCardsSection } from "@/components/home/sections/ContentCardsSection";
 import { ExploreByState } from "@/components/home/sections/ExploreByState";
@@ -73,6 +74,13 @@ interface HomePageClientProps {
    * está off ou o endpoint não retornou regiões.
    */
   stateRegions?: ReactNode;
+  /**
+   * Vem do server (lê REGIONAL_PAGE_ENABLED). Controla se o
+   * `LocationRegionalPrompt` exibe o CTA primário "Ver ofertas da região"
+   * após a geolocalização — quando off, o componente só oferece cidade
+   * e estado como destinos.
+   */
+  regionalEnabled: boolean;
 }
 
 function parseTotalAds(value: number | string | undefined): number | undefined {
@@ -86,17 +94,14 @@ function parseTotalAds(value: number | string | undefined): number | undefined {
 
 export function HomePageClient({
   data,
-  stateUf: _stateUf,
+  stateUf,
   stateName,
   detectedCity = null,
   carousels,
   stateRegions = null,
+  regionalEnabled,
 }: HomePageClientProps) {
   const totalAds = parseTotalAds(data?.stats?.total_ads);
-  // _stateUf é exposto na assinatura para o caller ter intent claro; o
-  // consumo real do UF acontece no fetchHomeCarousels (server) já antes
-  // desta árvore renderizar.
-  void _stateUf;
 
   // Search/Hero usam `defaultCitySlug` quando há cidade detectada para
   // preservar contexto na busca. Sem cidade detectada, ficam vazios e o
@@ -108,6 +113,19 @@ export function HomePageClient({
     <>
       <main className="bg-cnc-bg pb-20 md:pb-12">
         <HomeSearchCard defaultCitySlug={defaultCitySlug} />
+
+        {/*
+          LocationRegionalPrompt — PR 4 territorial.
+          Server passa regionalEnabled (flag REGIONAL_PAGE_ENABLED). O
+          componente NUNCA pede geolocalização automaticamente; só ao
+          clicar no CTA. Coordenadas vivem só na memória do callback —
+          sem storage, sem log.
+        */}
+        <LocationRegionalPrompt
+          regionalEnabled={regionalEnabled}
+          stateName={stateName}
+          stateCode={stateUf}
+        />
 
         <HomeShortcuts />
 

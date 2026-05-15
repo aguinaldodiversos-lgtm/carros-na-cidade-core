@@ -42,6 +42,7 @@ import paymentsRoutes from "./modules/payments/payments.routes.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
+import locationRoutes from "./modules/location/location.routes.js";
 import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 
@@ -289,6 +290,12 @@ app.use("/api/admin", adminRoutes);
 // Endpoint privado (X-Internal-Token). Não documentado em /api/public, não
 // aparece em sitemap, base da futura Página Regional. Sem token = 404.
 app.use("/api/internal/regions", regionsRoutes);
+
+// Endpoint privado de resolução de localização (PR 4 territorial).
+// POST /api/internal/location/resolve recebe { latitude, longitude } e
+// devolve cidade mais próxima + região. Sem token = 404. Coordenadas NÃO
+// são persistidas em banco nem logadas (apenas resultado agregado).
+app.use("/api/internal/location", locationRoutes);
 
 // 404
 app.use((req, _res, next) => {

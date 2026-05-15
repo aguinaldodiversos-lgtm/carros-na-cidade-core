@@ -88,6 +88,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
       stateName={territory.state.name}
       detectedCity={detectedCity}
       stateRegions={homeRegionsBlock}
+      regionalEnabled={regionalEnabled}
       carousels={
         <HomeCarousels
           stateUf={territory.state.code}
