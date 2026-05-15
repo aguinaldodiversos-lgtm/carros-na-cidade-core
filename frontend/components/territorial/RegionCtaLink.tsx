@@ -3,8 +3,13 @@ import Link from "next/link";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 
 /**
- * CTA discreto que liga uma página de cidade à Página Regional
+ * CTA primário que liga uma página de cidade à Página Regional
  * (`/carros-usados/regiao/[slug]`).
+ *
+ * PR 2 (2026-05-15) — promovido de outline neutro para primary filled.
+ * A Página Regional é o destino natural de quem visita uma cidade com
+ * poucos anúncios. Antes ficava como botão neutro discreto e o usuário
+ * não tinha pista clara do "próximo passo certo".
  *
  * Server component (`"server-only"`): chama `isRegionalPageEnabled()`
  * direto e retorna `null` quando a flag está desligada. NÃO pode ser
@@ -34,13 +39,17 @@ export function RegionCtaLink({ slug, cityName }: RegionCtaLinkProps) {
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6">
+      <p className="mb-3 text-sm text-cnc-muted">
+        Quer ver mais opções perto de {cityName}? Veja a região completa.
+      </p>
       <Link
         href={`/carros-usados/regiao/${encodeURIComponent(slug)}`}
-        className="inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text hover:border-primary hover:text-primary transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
         aria-label={`Ver carros na região de ${cityName}`}
         data-testid="region-cta-link"
       >
         Ver carros na região de {cityName}
+        <span aria-hidden="true">→</span>
       </Link>
     </div>
   );

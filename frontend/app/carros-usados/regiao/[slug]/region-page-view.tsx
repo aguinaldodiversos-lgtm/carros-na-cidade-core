@@ -16,6 +16,8 @@ import {
   type BuyCityContext,
 } from "@/lib/buy/catalog-helpers";
 
+import { RegionFAQ } from "./RegionFAQ";
+
 /**
  * View server-render-friendly da Página Regional alinhada ao padrão
  * visual da Página Estadual/Cidade.
@@ -545,28 +547,51 @@ export function RegionPageView({
             </article>
           </section>
 
-          {/* Faixa compacta de links finais */}
+          {/* FAQ regional — 4 perguntas estratégicas (vale a pena, cidades,
+              só cidade, anunciar). Server-rendered com <details>, sem JS.
+              Page.tsx pode também emitir FAQPage JSON-LD quando a flag
+              REGIONAL_PAGE_INDEXABLE estiver true. */}
+          <RegionFAQ
+            cityName={base.name}
+            citySlug={base.slug}
+            stateUF={stateUF}
+            members={members}
+            radiusKm={radiusKm}
+          />
+
+          {/* Faixa de CTAs com hierarquia clara — a Região é o ponto atual,
+              então as ações listadas aqui são as ALTERNATIVAS:
+                1. Anunciar na região (comercial, primary)
+                2. Ver somente {cidade} (restrição, secondary)
+                3. Ver catálogo de {UF} (ampliação, secondary)
+              Removido o link genérico "Buscar outra cidade" — a busca já
+              vive no header do portal e na home. */}
           <nav
-            aria-label="Atalhos relacionados"
-            className="mt-10 flex flex-wrap gap-3 text-sm"
+            aria-label="Próximos passos na Região de {base.name}"
+            className="mt-10 flex flex-wrap items-center gap-3"
+            data-testid="regional-footer-ctas"
           >
+            <Button
+              href={`/anunciar?city_slug=${encodeURIComponent(base.slug)}`}
+              variant="primary"
+              size="md"
+              data-testid="regional-anunciar-cta"
+            >
+              Anunciar na região
+            </Button>
             <Link
               href={cityHref}
-              className="inline-flex items-center rounded-lg border border-cnc-line bg-white px-4 py-2 font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
+              className="inline-flex items-center rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
+              data-testid="regional-city-cta"
             >
-              Voltar para {base.name}
+              Ver somente {base.name}
             </Link>
             <Link
               href={stateHref}
-              className="inline-flex items-center rounded-lg border border-cnc-line bg-white px-4 py-2 font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
+              className="inline-flex items-center rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
+              data-testid="regional-state-cta"
             >
-              Ver catálogo de {stateUF}
-            </Link>
-            <Link
-              href="/comprar"
-              className="inline-flex items-center rounded-lg border border-cnc-line bg-white px-4 py-2 font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
-            >
-              Buscar outra cidade
+              Ampliar para {stateUF}
             </Link>
           </nav>
         </div>

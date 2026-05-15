@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
+
+import {
+  isRegionalPageCanonicalSelf,
+  isRegionalPageEnabled,
+  isRegionalPageIndexable,
+} from "@/lib/env/feature-flags";
 import {
   fetchRegionByCitySlug,
   regionToAdsSearchFilters,
@@ -16,6 +21,9 @@ import {
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 import { buildRegionStructuredDataBlocks } from "@/lib/seo/region-structured-data";
 import { toAbsoluteUrl } from "@/lib/seo/site";
+import { resolveTerritory } from "@/lib/territory/territory-resolver";
+
+import { buildRegionFaqEntries } from "./region-faq-entries";
 import { RegionPageView } from "./region-page-view";
 
 /**
@@ -51,11 +59,19 @@ export const dynamic = "force-dynamic";
  *  - Fase A: flag `REGIONAL_PAGE_ENABLED=false` → notFound() sem renderizar.
  *  - Fase B: flag `true` em staging → renderiza com `noindex, follow`.
  *  - Fase C: flag `true` em produção, ainda `noindex` até aprovação SEO.
- *  - Fase D: canonical próprio + entrada no sitemap (futuro PR).
+ *  - Fase D: canonical próprio + indexação SEO. Flag `REGIONAL_PAGE_INDEXABLE`
+ *           + `REGIONAL_PAGE_CANONICAL_SELF`. Sitemap continua FORA.
  *
- * Atualmente (Fase A→B): noindex obrigatório, canonical apontando para a
- * página da cidade-base como proteção temporária contra indexação cruzada,
- * NÃO entra no sitemap.
+ * Promoção SEO (Fase D) é controlada por duas flags independentes:
+ *   - `REGIONAL_PAGE_CANONICAL_SELF=true` → canonical aponta para a própria
+ *     URL regional (em vez de /carros-em/[slug]).
+ *   - `REGIONAL_PAGE_INDEXABLE=true` → emite `robots: index, follow`.
+ *
+ * Recomendação operacional: ligar `CANONICAL_SELF` ANTES de `INDEXABLE`.
+ * Caso contrário, o Googlebot pode indexar a URL regional com canonical
+ * para cidade (resultando em "URL canonical alternativa" no Search Console
+ * e potencialmente sinalizando a cidade — desejado durante ramp-up — mas
+ * dificultando a transição quando promover a regional).
  *
  * Pipeline de dados:
  *   isRegionalPageEnabled? → fetchRegionByCitySlug → regionToAdsSearchFilters
@@ -78,6 +94,14 @@ const getRegionData = cache(async (slug: string): Promise<RegionPayload | null> 
 const getAdsForRegion = cache(async (region: RegionPayload) => {
   const filters = regionToAdsSearchFilters(region, { includeState: true });
   return fetchAdsSearch(filters);
+});
+
+const getTerritoryContext = cache(async (slug: string) => {
+  // Consome o resolver central — ponto único de verdade para canonical,
+  // breadcrumbs e title genérico territorial. O resolver internamente
+  // chama fetchRegionByCitySlug; o Next dedupa via fetch cache, então
+  // não há RTT extra mesmo quando getRegionData também é chamado.
+  return resolveTerritory({ level: "region", regionSlug: slug });
 });
 
 function buildTitle(name: string, state: string) {
@@ -128,10 +152,19 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
     radiusKm
   );
 
-  // Canonical aponta para a página da cidade-base — proteção temporária
-  // do runbook §5 Fase A/B/C. Em Fase D (aprovação SEO) este canonical
-  // muda para self-canonical na regional.
-  const canonical = toAbsoluteUrl(`/carros-em/${encodeURIComponent(region.base.slug)}`);
+  // Canonical é flag-driven (REGIONAL_PAGE_CANONICAL_SELF):
+  //   - false (default): aponta para /carros-em/[slug] (cidade-base).
+  //     Proteção temporária do runbook §5 — protege sinal SEO da cidade
+  //     enquanto a regional está em ramp-up.
+  //   - true: aponta para a própria regional. Consumimos `canonicalUrl`
+  //     do TerritoryContext para garantir consistência com qualquer outra
+  //     parte do portal que monte a URL canônica regional.
+  const territory = await getTerritoryContext(params.slug);
+  const canonical = isRegionalPageCanonicalSelf()
+    ? toAbsoluteUrl(territory.canonicalUrl)
+    : toAbsoluteUrl(`/carros-em/${encodeURIComponent(region.base.slug)}`);
+
+  const indexable = isRegionalPageIndexable();
 
   // OG image dinâmica simples: primeira imagem válida do primeiro
   // anúncio da região. `getAdsForRegion` é cached(); chamar aqui não
@@ -168,13 +201,42 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
       images: ogImage ? [ogImage] : undefined,
     },
     robots: {
-      index: false,
+      index: indexable,
       follow: true,
       googleBot: {
-        index: false,
+        index: indexable,
         follow: true,
       },
     },
+  };
+}
+
+function buildFaqJsonLd(args: {
+  cityName: string;
+  citySlug: string;
+  stateUF: string;
+  members: RegionPayload["members"];
+  radiusKm: number;
+}) {
+  const entries = buildRegionFaqEntries({
+    cityName: args.cityName,
+    citySlug: args.citySlug,
+    stateUF: args.stateUF,
+    members: args.members,
+    radiusKm: args.radiusKm,
+  });
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: entries.map((entry) => ({
+      "@type": "Question",
+      name: entry.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: entry.answer,
+      },
+    })),
   };
 }
 
@@ -235,6 +297,20 @@ export default async function RegionPage({ params }: RegionPageProps) {
     })),
   });
 
+  // FAQ JSON-LD só faz sentido quando a página é indexável. Sem isso
+  // estaríamos alimentando rich snippets do Google a partir de uma URL
+  // que ele mandou para não indexar — desperdício.
+  const indexable = isRegionalPageIndexable();
+  const faqJsonLd = indexable
+    ? buildFaqJsonLd({
+        cityName: region.base.name,
+        citySlug: region.base.slug,
+        stateUF: region.base.state.toUpperCase(),
+        members: region.members,
+        radiusKm,
+      })
+    : null;
+
   return (
     <>
       {structuredData.map((block, index) => (
@@ -247,6 +323,13 @@ export default async function RegionPage({ params }: RegionPageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(block) }}
         />
       ))}
+      {faqJsonLd ? (
+        <script
+          type="application/ld+json"
+          data-testid="regional-faq-jsonld"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
+      ) : null}
       <RegionPageView
         base={region.base}
         members={region.members}

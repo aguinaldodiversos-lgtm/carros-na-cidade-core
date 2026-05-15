@@ -3,20 +3,28 @@ import Link from "next/link";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 
 /**
- * Faixa de CTAs cross-territoriais no rodapé das páginas de Cidade
- * (`/carros-em/[slug]`).
+ * Faixa de CTAs cross-territoriais nas páginas de Cidade
+ * (`/carros-em/[slug]` e `/cidade/[slug]`).
  *
  * Auditoria 2026-05-11: a Página da Cidade tinha CTA para a Regional
  * (via `RegionCtaLink`) mas NÃO oferecia caminho navegacional para a
  * Página Estadual. Resultado: visitante em Atibaia conseguia ampliar
  * para "Região de Atibaia" mas não para "Catálogo de SP".
  *
- * Este componente substitui o `RegionCtaLink` solo, agregando:
- *   - CTA "Ver carros na região de [Cidade]" → `/carros-usados/regiao/
- *     [slug]`. Gated por `isRegionalPageEnabled()` (preserva o gate
- *     server-only que o `RegionCtaLink` já tinha).
- *   - CTA "Ver catálogo de [UF]" → `/comprar/estado/[uf]`. Sempre
- *     visível (rota estadual não tem feature flag).
+ * PR 2 (2026-05-15) — hierarquia de "ampliação" reestruturada:
+ *   - A Região é o destino NATURAL de quem está numa cidade pequena ou
+ *     com poucos anúncios. Antes, ambos os CTAs (Região + Estado) eram
+ *     outline neutros lado a lado, e o Regional ficava escondido como
+ *     "mais um botão". Agora o Regional vira PRIMARY filled quando a
+ *     flag `REGIONAL_PAGE_ENABLED` está ativa.
+ *   - O Estado é "ampliação ampla" — mantido como secondary outline.
+ *   - Quando a flag regional está OFF (Fase A do rollout, ou estados
+ *     onde a regional ainda não foi ativada), o Estado vira o único
+ *     caminho e ganha destaque primary como fallback.
+ *
+ * Princípio: o usuário SEMPRE tem um próximo passo claro. A regional é
+ * preferida quando disponível porque preserva proximidade; o estado é
+ * a alternativa segura quando a regional não existe.
  *
  * Server component (`"server-only"`): a flag regional é server-only por
  * design. Mantém compat com `data-testid="region-cta-link"` para
@@ -36,6 +44,12 @@ interface TerritorialFooterLinksProps {
   state: string | null | undefined;
 }
 
+const PRIMARY_BTN =
+  "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong";
+
+const SECONDARY_BTN =
+  "inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text hover:border-primary hover:text-primary transition-colors";
+
 export function TerritorialFooterLinks({
   slug,
   cityName,
@@ -47,11 +61,19 @@ export function TerritorialFooterLinks({
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6">
+      {/* Microcopy que explica POR QUE estes CTAs existem — sem ela, a
+          ampliação parece arbitrária. Mantida discreta acima dos botões. */}
+      <p className="mb-3 text-sm text-cnc-muted">
+        {regionalEnabled
+          ? `Quer ver mais opções perto de ${cityName}? Amplie para a região ou para o estado.`
+          : `Quer ver mais opções? Veja o catálogo completo do estado.`}
+      </p>
+
       <div className="flex flex-wrap items-center gap-3">
         {regionalEnabled ? (
           <Link
             href={`/carros-usados/regiao/${encodeURIComponent(slug)}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text hover:border-primary hover:text-primary transition-colors"
+            className={PRIMARY_BTN}
             aria-label={`Ver carros na região de ${cityName}`}
             data-testid="region-cta-link"
           >
@@ -62,7 +84,7 @@ export function TerritorialFooterLinks({
         {stateUpper ? (
           <Link
             href={`/comprar/estado/${stateLower}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text hover:border-primary hover:text-primary transition-colors"
+            className={regionalEnabled ? SECONDARY_BTN : PRIMARY_BTN}
             aria-label={`Ver catálogo de ${stateUpper}`}
             data-testid="state-cta-link"
           >

@@ -23,7 +23,7 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/env/backend-api", () => ({
   getBackendApiBaseUrl: vi.fn(() => "https://backend.example.com"),
-  resolveBackendApiUrl: vi.fn(
+  resolveInternalBackendApiUrl: vi.fn(
     (path: string) => `https://backend.example.com${path}`
   ),
 }));

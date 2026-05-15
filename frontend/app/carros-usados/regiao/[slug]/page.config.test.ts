@@ -33,6 +33,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   - `generateMetadata` chama `notFound()` em todos os cenários
  *     que o `Page` também chama.
  *   - `Page` mantém os checks redundantes.
+ *   - Flags `REGIONAL_PAGE_INDEXABLE` e `REGIONAL_PAGE_CANONICAL_SELF`
+ *     controlam corretamente `robots` e `canonical` (PR 2).
  */
 
 // `React.cache` faz parte do Server Components runtime — em ambiente
@@ -68,6 +70,32 @@ vi.mock("@/lib/seo/site", () => ({
 
 vi.mock("@/lib/env/feature-flags", () => ({
   isRegionalPageEnabled: vi.fn().mockReturnValue(false),
+  isRegionalPageIndexable: vi.fn().mockReturnValue(false),
+  isRegionalPageCanonicalSelf: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock("@/lib/territory/territory-resolver", () => ({
+  resolveTerritory: vi.fn().mockResolvedValue({
+    level: "region",
+    state: { code: "SP", slug: "sp", name: "São Paulo" },
+    region: {
+      slug: "atibaia-sp",
+      name: "Região de Atibaia",
+      baseCitySlug: "atibaia-sp",
+      citySlugs: ["atibaia-sp"],
+      cityNames: ["Atibaia"],
+      radiusKm: 80,
+    },
+    city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+    canonicalUrl: "/carros-usados/regiao/atibaia-sp",
+    title: "Carros usados na Região de Atibaia",
+    description: "Ofertas em Atibaia e cidades próximas.",
+    breadcrumbs: [
+      { label: "Início", href: "/" },
+      { label: "São Paulo", href: "/comprar/estado/sp" },
+      { label: "Região de Atibaia", href: "/carros-usados/regiao/atibaia-sp" },
+    ],
+  }),
 }));
 
 vi.mock("./region-page-view", () => ({
@@ -123,37 +151,6 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
-  it("flag = 'false' (contrato estrito) → chama notFound()", async () => {
-    // O contrato de isRegionalPageEnabled é `=== "true"` — qualquer outro
-    // valor resolve para false. O retorno do mock simula esse contrato.
-    const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    vi.mocked(isRegionalPageEnabled).mockReturnValue(false);
-
-    await expect(
-      pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
-  });
-
-  it("flag = 'TRUE' (contrato estrito case-sensitive) → resolve false → notFound()", async () => {
-    const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    // isRegionalPageEnabled() = process.env.REGIONAL_PAGE_ENABLED === "true"
-    // "TRUE" !== "true" → retorna false. Mock simula.
-    vi.mocked(isRegionalPageEnabled).mockReturnValue(false);
-
-    await expect(
-      pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
-  });
-
-  it("flag = '1' (contrato estrito case-sensitive) → resolve false → notFound()", async () => {
-    const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    vi.mocked(isRegionalPageEnabled).mockReturnValue(false);
-
-    await expect(
-      pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
-  });
-
   it("flag = 'true' + region null (slug inexistente) → chama notFound()", async () => {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
     const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
@@ -169,7 +166,6 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
     const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    // Defesa contra BFF malformado: retorna objeto truthy sem base.
     vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce({
       base: null,
       members: [],
@@ -179,19 +175,70 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
       pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
+});
 
-  it("flag = 'true' + region válida → retorna metadata regional real", async () => {
+describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (PR 2)", () => {
+  async function buildMetadata() {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
     const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
     vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce(VALID_REGION as never);
 
-    const md = await pageModule.generateMetadata({ params: { slug: "atibaia-sp" } });
+    return pageModule.generateMetadata({ params: { slug: "atibaia-sp" } });
+  }
 
-    expect(md.title).toMatch(/região de Atibaia/i);
-    expect(md.alternates?.canonical).toContain("/carros-em/atibaia-sp");
-    // Fase A→C: noindex,follow obrigatório.
+  it("default (ambas as flags false) → noindex + canonical para cidade-base", async () => {
+    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+      "@/lib/env/feature-flags"
+    );
+    vi.mocked(isRegionalPageIndexable).mockReturnValue(false);
+    vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(false);
+
+    const md = await buildMetadata();
+
     expect(md.robots).toMatchObject({ index: false, follow: true });
+    expect(md.alternates?.canonical).toContain("/carros-em/atibaia-sp");
+    expect(md.alternates?.canonical).not.toContain("/carros-usados/regiao");
+  });
+
+  it("INDEXABLE=true sozinha → index, mas canonical permanece para cidade-base", async () => {
+    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+      "@/lib/env/feature-flags"
+    );
+    vi.mocked(isRegionalPageIndexable).mockReturnValue(true);
+    vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(false);
+
+    const md = await buildMetadata();
+
+    expect(md.robots).toMatchObject({ index: true, follow: true });
+    expect(md.alternates?.canonical).toContain("/carros-em/atibaia-sp");
+  });
+
+  it("CANONICAL_SELF=true sozinha → canonical self, mas noindex permanece", async () => {
+    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+      "@/lib/env/feature-flags"
+    );
+    vi.mocked(isRegionalPageIndexable).mockReturnValue(false);
+    vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(true);
+
+    const md = await buildMetadata();
+
+    expect(md.robots).toMatchObject({ index: false, follow: true });
+    expect(md.alternates?.canonical).toContain("/carros-usados/regiao/atibaia-sp");
+    expect(md.alternates?.canonical).not.toContain("/carros-em/");
+  });
+
+  it("ambas true (Fase D plena) → index + canonical self", async () => {
+    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+      "@/lib/env/feature-flags"
+    );
+    vi.mocked(isRegionalPageIndexable).mockReturnValue(true);
+    vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(true);
+
+    const md = await buildMetadata();
+
+    expect(md.robots).toMatchObject({ index: true, follow: true });
+    expect(md.alternates?.canonical).toContain("/carros-usados/regiao/atibaia-sp");
   });
 });
 

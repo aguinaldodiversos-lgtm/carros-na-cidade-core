@@ -84,4 +84,16 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
     const link = screen.getByTestId("region-cta-link");
     expect(link.getAttribute("href")).toBe("/carros-usados/regiao/rio-de-janeiro-rj");
   });
+
+  it("PR 2: é CTA primary filled (bg-primary, não outline neutro)", () => {
+    render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
+    const link = screen.getByTestId("region-cta-link");
+    expect(link.className).toMatch(/bg-primary/);
+    expect(link.className).not.toMatch(/border-cnc-line/);
+  });
+
+  it("PR 2: tem microcopy explicando o motivo do CTA", () => {
+    render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
+    expect(screen.getByText(/mais opções perto de Atibaia/i)).toBeInTheDocument();
+  });
 });

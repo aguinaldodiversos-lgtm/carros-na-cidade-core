@@ -6,14 +6,17 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/env/backend-api", () => ({
   getBackendApiBaseUrl: vi.fn(),
-  resolveBackendApiUrl: vi.fn(),
+  resolveInternalBackendApiUrl: vi.fn(),
 }));
 
 vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
   ssrResilientFetch: vi.fn(),
 }));
 
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import {
+  getBackendApiBaseUrl,
+  resolveInternalBackendApiUrl,
+} from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import {
   fetchRegionByCitySlug,
@@ -22,7 +25,7 @@ import {
 } from "./fetch-region";
 
 const mockedBackendBase = vi.mocked(getBackendApiBaseUrl);
-const mockedResolveUrl = vi.mocked(resolveBackendApiUrl);
+const mockedResolveUrl = vi.mocked(resolveInternalBackendApiUrl);
 const mockedFetch = vi.mocked(ssrResilientFetch);
 
 const ORIGINAL_TOKEN = process.env.INTERNAL_API_TOKEN;
