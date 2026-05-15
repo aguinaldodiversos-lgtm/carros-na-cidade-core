@@ -49,4 +49,29 @@ describe("clientRateLimitKey", () => {
     });
     expect(clientRateLimitKey(req)).toBe("198.51.100.1");
   });
+
+  // ─── CF-Connecting-IP (Cloudflare na frente) ──────────────────────────────
+  it("prefere CF-Connecting-IP sobre todos os outros (Cloudflare → origin)", () => {
+    const req = mockReq({
+      headers: {
+        "cf-connecting-ip": "203.0.113.99",
+        "x-cnc-client-ip": "203.0.113.42",
+        "x-forwarded-for": "198.51.100.1",
+      },
+      ip: "10.0.0.1",
+    });
+    expect(clientRateLimitKey(req)).toBe("203.0.113.99");
+  });
+
+  it("CF-Connecting-IP funciona sem outros headers", () => {
+    const req = mockReq({ headers: { "cf-connecting-ip": "203.0.113.99" } });
+    expect(clientRateLimitKey(req)).toBe("203.0.113.99");
+  });
+
+  it("CF-Connecting-IP vazio cai para X-Cnc-Client-Ip", () => {
+    const req = mockReq({
+      headers: { "cf-connecting-ip": "   ", "x-cnc-client-ip": "203.0.113.42" },
+    });
+    expect(clientRateLimitKey(req)).toBe("203.0.113.42");
+  });
 });

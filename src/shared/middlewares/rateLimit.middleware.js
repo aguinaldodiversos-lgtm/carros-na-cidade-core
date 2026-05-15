@@ -1,11 +1,32 @@
 import rateLimit from "express-rate-limit";
 
 /**
- * Chave para rate limit quando o portal chama o backend via BFF (Next.js).
- * Sem isso, todas as requisições compartilham o IP do servidor do portal e o limite global é atingido em segundos.
- * Prioriza o header enviado pelo BFF (IP real do visitante).
+ * Extrai o IP real do cliente para rate limit, bot blocker e 404 storm guard.
+ *
+ * Ordem de prioridade (do mais confiável para o menos):
+ *   1. `CF-Connecting-IP`        — Cloudflare na frente do origin. É o IP
+ *                                  do visitante real, não da edge CF.
+ *   2. `X-Cnc-Client-Ip`         — header injetado pelo BFF (Next.js SSR)
+ *                                  com o IP do visitante real. Sem isso,
+ *                                  todo tráfego compartilharia o IP do
+ *                                  servidor do portal.
+ *   3. `X-Forwarded-For` (1º IP) — proxy padrão. Pode ser spoofado, mas
+ *                                  como o `trust proxy` do Express está em
+ *                                  1 (Render é o único hop confiável), o
+ *                                  primeiro IP é o cliente original.
+ *   4. `req.ip` / socket          — fallback.
+ *
+ * Importante: NÃO usar apenas o IP da borda Cloudflare como identidade do
+ * cliente — todos os bots dividiriam o mesmo IP de edge e o rate limit
+ * cortaria humanos junto.
  */
 export function clientRateLimitKey(req) {
+  const cf = req.headers["cf-connecting-ip"];
+  if (cf) {
+    const trimmed = String(cf).trim();
+    if (trimmed) return trimmed;
+  }
+
   const bff = req.headers["x-cnc-client-ip"];
   if (bff) {
     const trimmed = String(bff).trim();

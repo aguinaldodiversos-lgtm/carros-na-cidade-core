@@ -167,20 +167,45 @@ export function errorHandler(err, req, res, _next) {
     path: req?.originalUrl || req?.url || null,
   });
 
-  logger.error(
-    {
-      requestId: req?.requestId || null,
-      userId: req?.user?.id != null ? String(req.user.id) : null,
-      statusCode: error.statusCode,
-      isOperational: error.isOperational,
-      details: error.details || null,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    },
-    `[http] ${error.statusCode >= 500 ? "5xx" : "erro"}: ${error.message}`
-  );
+  // 404 público (rota não encontrada) é evento de tráfego, não erro de
+  // aplicação. Em ataques de enumeração, cada 404 gerava log level 50 com
+  // stack — ruído operacional pesado. Rebaixa para `warn` (40) e omite stack.
+  //
+  // 5xx e 4xx aplicacionais (validação, conflito, etc.) seguem em error/warn
+  // normal — esse fluxo é o que importa pra alarmes.
+  if (error.statusCode === 404 && error.isOperational) {
+    logger.warn(
+      {
+        requestId: req?.requestId || null,
+        statusCode: 404,
+        method: req?.method || null,
+        path: req?.originalUrl || req?.url || null,
+      },
+      "[http] 404: rota inexistente"
+    );
+  } else {
+    logger.error(
+      {
+        requestId: req?.requestId || null,
+        userId: req?.user?.id != null ? String(req.user.id) : null,
+        statusCode: error.statusCode,
+        isOperational: error.isOperational,
+        details: error.details || null,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
+      `[http] ${error.statusCode >= 500 ? "5xx" : "erro"}: ${error.message}`
+    );
+  }
 
   if (res.headersSent) {
     return;
+  }
+
+  // Resposta 404 enxuta — corpo mínimo + Cache-Control curto. Evita pagar
+  // bandwidth por requestId/details em 404 de bot.
+  if (error.statusCode === 404 && error.isOperational) {
+    res.set("Cache-Control", "public, max-age=60");
+    return res.status(404).json({ success: false, error: "not_found" });
   }
 
   return res.status(error.statusCode).json({

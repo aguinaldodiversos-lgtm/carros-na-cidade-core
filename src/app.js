@@ -64,6 +64,8 @@ import {
 } from "./shared/middlewares/rateLimit.middleware.js";
 import { bandwidthDiagnosticsMiddleware } from "./shared/middlewares/bandwidth-diagnostics.middleware.js";
 import { botBlockerMiddleware } from "./shared/middlewares/bot-blocker.middleware.js";
+import { legacyRoutesGuardMiddleware } from "./shared/middlewares/legacy-routes-guard.middleware.js";
+import { publicStormGuardMiddleware } from "./shared/middlewares/404-storm-guard.middleware.js";
 
 const app = express();
 
@@ -179,8 +181,19 @@ app.use((req, res, next) => {
 });
 
 // Bot blocklist emergencial (controlado por BAD_BOTS_BLOCKED). Termina o
-// request com 429 ANTES das rotas pesadas serem invocadas.
+// request com 429 ANTES das rotas pesadas serem invocadas. Chamadas internas
+// autenticadas (UA `cnc-internal/1.0` + header X-Internal-Token) sempre passam.
 app.use(botBlockerMiddleware);
+
+// Legacy routes guard: rotas que NUNCA existiram no backend (`/catalog/ads/*`,
+// `/public/listings/*`, `/ads/<slug>`, etc.) — bots Node enumeram. Responde
+// 410 leve antes de chegar no router/404 handler. Sem env: sempre ligado,
+// é puramente defensivo e o padrão de path é específico.
+app.use(legacyRoutesGuardMiddleware);
+
+// 404 storm guard: conta 404s por (IP, UA) e bloqueia em janela longa após
+// threshold. Controlado por PUBLIC_404_STORM_GUARD_ENABLED.
+app.use(publicStormGuardMiddleware);
 
 // robots.txt do backend: explícito Disallow: / pra crawlers que ignoram o
 // header X-Robots-Tag. Cache 1h.
