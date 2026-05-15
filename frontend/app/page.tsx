@@ -4,11 +4,9 @@ import { cookies } from "next/headers";
 import { HomePageClient } from "@/components/home/HomePageClient";
 import { HomeCarousels } from "@/components/home/sections/HomeCarousels";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
-import { DEFAULT_CITY } from "@/lib/city/city-default";
-import { fetchCityMetaBySlug } from "@/lib/city/fetch-city-meta-server";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { fetchHomeAboveFold } from "@/lib/home/public-home";
-import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
+import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
 export const revalidate = 300;
 
@@ -19,43 +17,56 @@ function getFirstParam(value: string | string[] | undefined): string | undefined
   return value;
 }
 
+/**
+ * Home — vitrine ESTADUAL.
+ *
+ * Política territorial:
+ *   - A Home é a entrada do portal e é sempre vitrine de UM estado, nunca
+ *     de uma cidade isolada nem do Brasil inteiro. Isso é deliberado:
+ *       · Cidade isolada (ex: SP capital) zerava o inventário visível.
+ *       · Brasil-todo nivelava sinal SEO e produzia página genérica.
+ *   - O estado é resolvido pelo TerritoryResolver com prioridade:
+ *       1. `?state=UF` na query.
+ *       2. Estado da cidade do cookie (cookie_city.slug → UF inferida).
+ *       3. Default (SP, overridable por NEXT_PUBLIC_DEFAULT_STATE_UF).
+ *   - A cidade do cookie/query NÃO promove o nível para "city" no Home —
+ *     ela só inferi a UF e aparece como contexto secundário ("você está em
+ *     Atibaia, ver carros próximos?"). O usuário só vê uma vitrine de
+ *     cidade ao navegar para `/comprar/cidade/[slug]` ou
+ *     `/carros-usados/regiao/[slug]`.
+ */
 export default async function HomePage({ searchParams = {} }: { searchParams?: SearchParams }) {
   const cookieStore = await cookies();
   const fromCookie = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
-  const fromQuery = getFirstParam(searchParams.city_slug)?.trim();
+  const queryState = getFirstParam(searchParams.state)?.trim() || null;
+  const queryCitySlug = getFirstParam(searchParams.city_slug)?.trim() || null;
 
-  const activeSlug = fromQuery || fromCookie?.slug || DEFAULT_PUBLIC_CITY_SLUG;
+  const territory = await resolveTerritory({
+    level: "state",
+    cookie: fromCookie
+      ? { slug: fromCookie.slug, state: fromCookie.state, name: fromCookie.name }
+      : null,
+    query: { city_slug: queryCitySlug, state: queryState },
+  });
 
-  const resolved =
-    fromQuery && (!fromCookie || fromCookie.slug !== fromQuery)
-      ? await fetchCityMetaBySlug(fromQuery)
+  const detectedCity =
+    fromCookie?.slug && fromCookie?.name
+      ? { slug: fromCookie.slug, name: fromCookie.name }
       : null;
 
-  const cityIdForHome =
-    resolved?.id ?? (fromCookie?.slug === activeSlug ? fromCookie.id : undefined);
-
-  // Fetch leve — resolve antes do primeiro byte. Os carrosseis (pesados)
-  // sao resolvidos em paralelo dentro de <Suspense> e streamados depois.
   const aboveFold = await fetchHomeAboveFold();
-
-  const featuredName = aboveFold.featuredCities?.find((c) => c.slug === activeSlug)?.name;
-
-  const activeCityName =
-    featuredName ||
-    resolved?.name ||
-    (fromCookie?.slug === activeSlug ? fromCookie.name : null) ||
-    DEFAULT_CITY.name;
 
   return (
     <HomePageClient
       data={aboveFold}
-      activeCitySlug={activeSlug}
-      activeCityName={activeCityName}
+      stateUf={territory.state.code}
+      stateName={territory.state.name}
+      detectedCity={detectedCity}
       carousels={
         <HomeCarousels
-          activeCitySlug={activeSlug}
-          activeCityId={cityIdForHome}
-          activeCityName={activeCityName}
+          stateUf={territory.state.code}
+          stateName={territory.state.name}
+          detectedCityName={detectedCity?.name}
         />
       }
     />

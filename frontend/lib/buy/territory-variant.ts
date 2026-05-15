@@ -23,11 +23,14 @@ import {
 /**
  * Variantes da página /comprar.
  *
- * - `nacional`: catálogo público amplo. Não aplica filtro territorial. Renderizado
- *   diretamente em /comprar quando o usuário NÃO traz city_slug nem state na URL.
- *   Distinto de "estadual" sem UF: aqui não há fallback automático para SP.
- * - `estadual`: catálogo de um UF (`/comprar/estado/[uf]`).
+ * - `estadual`: catálogo de um UF (`/comprar/estado/[uf]`). Vitrine padrão
+ *   quando o usuário não traz cidade explícita — `/comprar` redireciona
+ *   para `/comprar/estado/[uf]` resolvendo a UF via cookie/default.
  * - `cidade`: catálogo de uma cidade (`/comprar/cidade/[slug]`).
+ * - `nacional`: fallback técnico do `BuyMarketplacePageClient` para empty
+ *   states e telas que não têm contexto territorial. Nenhuma rota pública
+ *   entra por aqui — o ponto de entrada (`/comprar`) sempre redireciona
+ *   para `estadual` ou `cidade`.
  */
 export type ComprarVariant = "estadual" | "cidade" | "nacional";
 
@@ -131,48 +134,6 @@ export function normalizeStateFilters(uf: string, searchParams: SearchParams): A
     limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
   };
 
-  delete next.city_slug;
-  delete next.city_id;
-  delete next.city;
-
-  return next;
-}
-
-/**
- * Normaliza filtros para o catálogo NACIONAL público (`/comprar` sem
- * território explícito).
- *
- * Regra absoluta: NUNCA injeta `state` / `city_slug` / `city` / `city_id`
- * a partir de cookie, header, geo ou DEFAULT_PUBLIC_CITY_SLUG. O catálogo
- * é amplo por design — quando o usuário não pediu cidade/estado, ele vê
- * Brasil inteiro. A escolha territorial é sempre transparente:
- *   - URL traz city_slug/state → caller redireciona para a rota canônica
- *     (cidade/estado), não chama este normalizador.
- *   - Cookie/geo → exibido como BANNER opt-in no client; só vira filtro
- *     quando o usuário clicar.
- *
- * Este normalizador preserva apenas filtros não-territoriais (q, brand,
- * model, preço, ano, km, fuel, transmission, body_type, below_fipe,
- * highlight_only, sort, page, limit).
- */
-export function normalizeNationalFilters(searchParams: SearchParams): AdsSearchFilters {
-  const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
-
-  const sortInQuery = getFirstValue(searchParams.sort);
-  const hasExplicitSort = sortInQuery != null && String(sortInQuery).trim() !== "";
-
-  const next: AdsSearchFilters = {
-    ...parsed,
-    sort: hasExplicitSort ? parsed.sort || "recent" : "recent",
-    page: parsed.page || 1,
-    limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
-  };
-
-  // Defesa em profundidade: zera qualquer território que tenha vazado pela
-  // URL (ex.: /comprar?state=SP&brand=Honda chega aqui apenas se o caller
-  // decidiu NÃO redirecionar — neste módulo, o contrato de "nacional" é
-  // estritamente sem território).
-  delete next.state;
   delete next.city_slug;
   delete next.city_id;
   delete next.city;

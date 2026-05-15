@@ -28,9 +28,20 @@ import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
  */
 
 interface HomeHeroProps {
-  defaultCitySlug: string;
-  /** Nome da cidade ativa (para personalizar pílula e microtexto). */
+  /**
+   * Slug da cidade detectada (cookie/query). Quando presente, o CTA "Ver
+   * ofertas" leva a `/comprar?city_slug=<slug>` que cai na cidade canônica.
+   * Quando vazio, o CTA vai para `/comprar` puro — que redireciona para o
+   * catálogo do estado padrão (vitrine estadual).
+   */
+  defaultCitySlug?: string;
+  /** Nome da cidade detectada (cookie). Usado na pílula quando presente. */
   cityName?: string;
+  /**
+   * Estado em foco quando não há cidade detectada — a Home é vitrine estadual
+   * por padrão, então este nome aparece na pílula e na microcopy.
+   */
+  stateName: string;
   /** Total de anúncios ativos (para a "+N mil ofertas ativas"). */
   totalAds?: number;
 }
@@ -81,15 +92,27 @@ function formatActiveOffers(total: number | undefined): string | null {
   return `+${rounded} ofertas ativas`;
 }
 
-export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps) {
+export function HomeHero({
+  defaultCitySlug,
+  cityName,
+  stateName,
+  totalAds,
+}: HomeHeroProps) {
   const router = useRouter();
-  const cityLabel = cityName || "sua região";
+  // Quando há cidade detectada, microcopy fala na cidade. Sem cidade, fala
+  // no estado (vitrine estadual padrão).
+  const scopeLabel = cityName ? `${cityName} e região` : stateName;
+  const pillLabel = cityName ? `${cityName} e região` : `${stateName} e região`;
 
   const offersHref = useMemo(() => {
-    const params = new URLSearchParams();
-    if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
-    const qs = params.toString();
-    return qs ? `/comprar?${qs}` : "/comprar";
+    // Cidade detectada → preserva no link (rota canonicaliza para /comprar/cidade/X).
+    // Sem cidade → /comprar puro (cai no /comprar/estado/[default]).
+    if (defaultCitySlug) {
+      const params = new URLSearchParams();
+      params.set("city_slug", defaultCitySlug);
+      return `/comprar?${params.toString()}`;
+    }
+    return "/comprar";
   }, [defaultCitySlug]);
 
   const handleCtaClick = useCallback(() => {
@@ -107,7 +130,7 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
           alt={
             cityName
               ? `Carros usados em ${cityName} no Carros na Cidade`
-              : "Carros na Cidade — portal automotivo regional"
+              : `Carros usados em ${stateName} no Carros na Cidade`
           }
           fill
           priority
@@ -128,19 +151,31 @@ export function HomeHero({ defaultCitySlug, cityName, totalAds }: HomeHeroProps)
           <div className="max-w-xl">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm sm:text-[12px]">
               <PinIcon />
-              {cityName ? `${cityName} e região` : "Sua região"}
+              {pillLabel}
             </span>
 
             <h1 className="mt-3 text-[22px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[28px] md:text-[36px]">
-              Encontre
-              <br />
-              oportunidades
-              <br />
-              na sua cidade
+              {cityName ? (
+                <>
+                  Encontre
+                  <br />
+                  oportunidades
+                  <br />
+                  na sua cidade
+                </>
+              ) : (
+                <>
+                  Carros usados
+                  <br />
+                  em {stateName}
+                </>
+              )}
             </h1>
 
             <p className="mt-2 max-w-md text-[13px] leading-snug text-white/85 sm:mt-3 sm:text-[15px]">
-              Carros, lojas e ofertas reais em {cityLabel}.
+              {cityName
+                ? `Carros, lojas e ofertas reais em ${scopeLabel}.`
+                : `Ofertas selecionadas em todo o estado de ${stateName} — informe sua cidade para ver carros próximos.`}
             </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-2.5 sm:mt-5 sm:gap-4">

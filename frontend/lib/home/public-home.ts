@@ -43,8 +43,8 @@ function fallbackHome(): HomeDataResponse["data"] {
   };
 }
 
-function homeCacheTags(citySlug?: string): string[] {
-  const s = citySlug?.trim() || "default";
+function homeCacheTags(scopeKey: string): string[] {
+  const s = scopeKey.trim() || "default";
   return ["public-home", `public-home:${s}`];
 }
 
@@ -92,51 +92,6 @@ async function fetchAdsCollection(
   return Array.isArray(json?.data) ? json.data : [];
 }
 
-/**
- * Home pública por território. Usa `city_slug` + opcionalmente `city_id` para alinhar com o backend.
- * Tags Next.js permitem `revalidateTag` quando houver webhook de invalidação.
- */
-export async function fetchPublicHomeData(
-  citySlug?: string,
-  cityId?: number
-): Promise<HomeDataResponse["data"]> {
-  const apiBase = getApiBaseUrl();
-  const empty = fallbackHome();
-
-  const cs = citySlug?.trim();
-  const tags = homeCacheTags(cs);
-  const withTerritory = (base: Record<string, string | number | boolean>) => {
-    const o: Record<string, string | number | boolean> = { ...base };
-    if (cs) o.city_slug = cs;
-    if (cityId && Number.isFinite(cityId) && cityId > 0) o.city_id = cityId;
-    return o;
-  };
-
-  const [homeJson, highlightAds, opportunityAds, recentAds] = await Promise.all([
-    fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`, tags),
-    fetchAdsCollection(
-      apiBase,
-      withTerritory({ highlight_only: true, limit: 12, sort: "highlight" }),
-      tags
-    ),
-    fetchAdsCollection(apiBase, withTerritory({ below_fipe: true, limit: 4 }), tags),
-    fetchAdsCollection(apiBase, withTerritory({ limit: 8, sort: "recent" }), tags),
-  ]);
-
-  const homeData = homeJson?.success && homeJson.data ? homeJson.data : empty;
-
-  return {
-    featuredCities: homeData.featuredCities || empty.featuredCities,
-    highlightAds: highlightAds.length ? highlightAds : homeData.highlightAds || empty.highlightAds,
-    opportunityAds: opportunityAds.length
-      ? opportunityAds
-      : homeData.opportunityAds || empty.opportunityAds,
-    recentAds: recentAds.length ? recentAds : homeData.recentAds || empty.recentAds,
-    adsByState: homeData.adsByState || empty.adsByState,
-    stats: homeData.stats || empty.stats,
-  };
-}
-
 export type HomeAboveFoldData = Pick<
   HomeDataResponse["data"],
   "featuredCities" | "adsByState" | "stats"
@@ -150,7 +105,7 @@ export type HomeAboveFoldData = Pick<
 export async function fetchHomeAboveFold(): Promise<HomeAboveFoldData> {
   const apiBase = getApiBaseUrl();
   const empty = fallbackHome();
-  const tags = homeCacheTags(undefined);
+  const tags = homeCacheTags("above-fold");
 
   const homeJson = await fetchJson<HomeDataResponse>(`${apiBase}/api/public/home`, tags);
   const homeData = homeJson?.success && homeJson.data ? homeJson.data : empty;
@@ -169,26 +124,30 @@ export type HomeCarouselsData = {
 };
 
 /**
- * Fetch pesado dos carrosseis de veiculos — renderizado dentro de <Suspense>
- * para permitir stream do HTML acima da dobra antes destes dados chegarem.
+ * Fetch dos carrosseis da Home — filtrados por ESTADO (vitrine estadual).
  *
- * Cada carrossel tem fallback global: se a cidade do usuario nao tem ads
- * para aquele criterio (ex.: Sao Paulo capital sem highlight), cai para
- * busca nacional do mesmo criterio. Isso evita home totalmente vazia
- * quando o estoque regional esta zerado — comum em lancamento do portal.
+ * Política territorial atual (substitui o antigo filtro por city_slug):
+ *   - A Home é sempre vitrine estadual. Filtrar por cidade restringia o
+ *     inventário (ex: SP capital escondia o resto de SP) e fazia o portal
+ *     parecer vazio para usuários sem cookie.
+ *   - O estado vem do TerritoryResolver (cookie → UF inferida, query → UF
+ *     explícita, default → SP).
+ *   - Cidade do cookie/usuário é exibida apenas como contexto visual
+ *     ("você está em Atibaia, ver carros próximos?") e CTA, nunca como
+ *     filtro silencioso dos carrosseis.
+ *
+ * Fallback global: se o estado não tem destaque/oportunidade/recente para
+ * algum carrossel, cai para busca sem filtro de estado. Isso é raro mas
+ * acontece em estados com inventário baixo no início do portal.
  */
-export async function fetchHomeCarousels(
-  citySlug?: string,
-  cityId?: number
-): Promise<HomeCarouselsData> {
+export async function fetchHomeCarousels(stateUf: string): Promise<HomeCarouselsData> {
   const apiBase = getApiBaseUrl();
-  const cs = citySlug?.trim();
-  const tags = homeCacheTags(cs);
+  const uf = (stateUf || "").trim().toUpperCase();
+  const tags = homeCacheTags(uf || "no-state");
 
-  const withTerritory = (base: Record<string, string | number | boolean>) => {
+  const withState = (base: Record<string, string | number | boolean>) => {
     const o: Record<string, string | number | boolean> = { ...base };
-    if (cs) o.city_slug = cs;
-    if (cityId && Number.isFinite(cityId) && cityId > 0) o.city_id = cityId;
+    if (uf) o.state = uf;
     return o;
   };
 
@@ -196,18 +155,18 @@ export async function fetchHomeCarousels(
   const OPPORTUNITY = { below_fipe: true, limit: 4 };
   const RECENT = { limit: 8, sort: "recent" };
 
-  // 1a onda: busca territorial.
-  const [localHighlight, localOpportunity, localRecent] = await Promise.all([
-    fetchAdsCollection(apiBase, withTerritory(HIGHLIGHT), tags),
-    fetchAdsCollection(apiBase, withTerritory(OPPORTUNITY), tags),
-    fetchAdsCollection(apiBase, withTerritory(RECENT), tags),
+  // 1a onda: busca estadual.
+  const [stateHighlight, stateOpportunity, stateRecent] = await Promise.all([
+    fetchAdsCollection(apiBase, withState(HIGHLIGHT), tags),
+    fetchAdsCollection(apiBase, withState(OPPORTUNITY), tags),
+    fetchAdsCollection(apiBase, withState(RECENT), tags),
   ]);
 
   // 2a onda: fallback global apenas para carrosseis que vieram vazios.
-  // Nao dispara fallback se nao ha filtro territorial — evita round-trip.
-  const needsHighlightFallback = cs && localHighlight.length === 0;
-  const needsOpportunityFallback = cs && localOpportunity.length === 0;
-  const needsRecentFallback = cs && localRecent.length === 0;
+  // Nao dispara fallback se nao ha estado — evita round-trip.
+  const needsHighlightFallback = uf && stateHighlight.length === 0;
+  const needsOpportunityFallback = uf && stateOpportunity.length === 0;
+  const needsRecentFallback = uf && stateRecent.length === 0;
 
   const [globalHighlight, globalOpportunity, globalRecent] = await Promise.all([
     needsHighlightFallback ? fetchAdsCollection(apiBase, HIGHLIGHT, tags) : Promise.resolve([]),
@@ -216,8 +175,8 @@ export async function fetchHomeCarousels(
   ]);
 
   return {
-    highlightAds: localHighlight.length ? localHighlight : globalHighlight,
-    opportunityAds: localOpportunity.length ? localOpportunity : globalOpportunity,
-    recentAds: localRecent.length ? localRecent : globalRecent,
+    highlightAds: stateHighlight.length ? stateHighlight : globalHighlight,
+    opportunityAds: stateOpportunity.length ? stateOpportunity : globalOpportunity,
+    recentAds: stateRecent.length ? stateRecent : globalRecent,
   };
 }

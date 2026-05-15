@@ -19,11 +19,13 @@ import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
  *   2. HomeShortcuts       — 7 atalhos circulares (Comprar, Vender, Blog,
  *                            Ofertas, Lojas, Favoritos, Planos). Centralizados
  *                            em desktop; carrossel scroll-snap em mobile.
- *   3. HomeHero            — banner regional com pílula da cidade, CTA
- *                            "Ver ofertas →" e badge "+N mil ofertas ativas"
+ *   3. HomeHero            — banner regional com pílula do escopo (estado ou
+ *                            cidade detectada), CTA "Ver ofertas →" e badge.
  *   4. HomePrimaryActions  — 3 cards quick-action coloridos: Anunciar grátis
  *                            (azul), Tabela FIPE (verde), Simulador (roxo)
- *   5. HomeCarousels       — Suspense com destaques + oportunidades
+ *   5. HomeCarousels       — Suspense com destaques + oportunidades (vitrine
+ *                            ESTADUAL — substitui o antigo filtro por cidade
+ *                            que zerava o inventário fora de SP capital).
  *   6. ExploreByState      — atalhos por estado
  *   7. ContentCardsSection — blog integrado (motor de aquisição)
  *
@@ -57,8 +59,12 @@ interface HomePageClientProps {
     adsByState?: StateAggregation[];
     stats: HomeStats;
   };
-  activeCitySlug: string;
-  activeCityName: string;
+  /** UF em foco — usado no banner e pelos carrosseis (vitrine estadual). */
+  stateUf: string;
+  /** Nome do estado em foco (ex: "São Paulo"). */
+  stateName: string;
+  /** Cidade detectada via cookie/query — usada como contexto secundário. */
+  detectedCity?: { slug: string; name: string } | null;
   /** Slot de streaming: HomeCarousels embrulhado em <Suspense> na page.tsx. */
   carousels: ReactNode;
 }
@@ -74,20 +80,36 @@ function parseTotalAds(value: number | string | undefined): number | undefined {
 
 export function HomePageClient({
   data,
-  activeCitySlug,
-  activeCityName,
+  stateUf: _stateUf,
+  stateName,
+  detectedCity = null,
   carousels,
 }: HomePageClientProps) {
   const totalAds = parseTotalAds(data?.stats?.total_ads);
+  // _stateUf é exposto na assinatura para o caller ter intent claro; o
+  // consumo real do UF acontece no fetchHomeCarousels (server) já antes
+  // desta árvore renderizar.
+  void _stateUf;
+
+  // Search/Hero usam `defaultCitySlug` quando há cidade detectada para
+  // preservar contexto na busca. Sem cidade detectada, ficam vazios e o
+  // /comprar canoniza para o catálogo estadual padrão.
+  const defaultCitySlug = detectedCity?.slug ?? "";
+  const detectedCityName = detectedCity?.name;
 
   return (
     <>
       <main className="bg-cnc-bg pb-20 md:pb-12">
-        <HomeSearchCard defaultCitySlug={activeCitySlug} />
+        <HomeSearchCard defaultCitySlug={defaultCitySlug} />
 
         <HomeShortcuts />
 
-        <HomeHero defaultCitySlug={activeCitySlug} cityName={activeCityName} totalAds={totalAds} />
+        <HomeHero
+          defaultCitySlug={defaultCitySlug}
+          cityName={detectedCityName}
+          stateName={stateName}
+          totalAds={totalAds}
+        />
 
         <HomePrimaryActions />
 
