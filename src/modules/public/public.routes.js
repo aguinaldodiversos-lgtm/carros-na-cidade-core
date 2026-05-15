@@ -13,12 +13,29 @@ import {
   resolveCity,
   searchCities,
 } from "./public-city-query.controller.js";
+import { getFeaturedRegionsByState } from "./public-state.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 
 const router = express.Router();
 
 router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
+
+/**
+ * Regiões destacadas por estado — alimenta o bloco "Explore por região" da
+ * Página Estadual e CTAs leves na Home. Cache 5 min: o payload depende de
+ * agregação SQL não-trivial (haversine + contagem de anúncios por região)
+ * e a lista de regiões muda pouco em escala de minutos.
+ *
+ * `varyBy: ["params", "query"]` para diferenciar:
+ *   - params.uf — cada estado tem seu próprio cache key.
+ *   - query.limit — caller pode pedir 8 (default) ou 12 (hard cap).
+ */
+router.get(
+  "/states/:uf/regions",
+  cacheGet({ prefix: "public:state:regions", ttlSeconds: 300, varyBy: ["params", "query"] }),
+  getFeaturedRegionsByState
+);
 
 router.get(
   "/cities/resolve",

@@ -67,6 +67,12 @@ interface HomePageClientProps {
   detectedCity?: { slug: string; name: string } | null;
   /** Slot de streaming: HomeCarousels embrulhado em <Suspense> na page.tsx. */
   carousels: ReactNode;
+  /**
+   * Slot opcional para o bloco "Explore por região" — renderizado entre
+   * ExploreByState e ContentCardsSection. `null` quando flag regional
+   * está off ou o endpoint não retornou regiões.
+   */
+  stateRegions?: ReactNode;
 }
 
 function parseTotalAds(value: number | string | undefined): number | undefined {
@@ -84,6 +90,7 @@ export function HomePageClient({
   stateName,
   detectedCity = null,
   carousels,
+  stateRegions = null,
 }: HomePageClientProps) {
   const totalAds = parseTotalAds(data?.stats?.total_ads);
   // _stateUf é exposto na assinatura para o caller ter intent claro; o
@@ -116,6 +123,8 @@ export function HomePageClient({
         <Suspense fallback={<HomeCarouselsSkeleton />}>{carousels}</Suspense>
 
         <ExploreByState items={data.adsByState} />
+
+        {stateRegions}
 
         <ContentCardsSection />
       </main>

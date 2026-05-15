@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
+import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import {
   fetchAdsFacets,
@@ -20,6 +22,8 @@ import {
   stateNameFromUf,
   type SearchParams,
 } from "@/lib/buy/territory-variant";
+import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
+import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
 type ComprarEstadualPageProps = {
   params: { uf: string };
@@ -134,10 +138,28 @@ export default async function ComprarEstadualPage({
   const stateName = stateNameFromUf(uf);
   const filters = normalizeStateFilters(uf, searchParams);
 
-  const [resultsResponse, facetsResponse] = await Promise.allSettled([
-    fetchAdsSearch(filters),
-    fetchAdsFacets(filters),
-  ]);
+  // TerritoryContext unificado para o estado — consumido pelo bloco SEO
+  // e por crosslinks futuros. Resolvido em paralelo com ads/facets.
+  const regionalEnabled = isRegionalPageEnabled();
+
+  const [resultsResponse, facetsResponse, territory, stateRegionsPayload] =
+    await Promise.all([
+      fetchAdsSearch(filters).then(
+        (v) => ({ status: "fulfilled" as const, value: v }),
+        (e) => ({ status: "rejected" as const, reason: e })
+      ),
+      fetchAdsFacets(filters).then(
+        (v) => ({ status: "fulfilled" as const, value: v }),
+        (e) => ({ status: "rejected" as const, reason: e })
+      ),
+      resolveTerritory({ level: "state", stateUf: uf }),
+      // Bloco "Explore por região" só faz fetch quando a flag regional
+      // estiver ativa — links regionais com flag off são 404. Quando a
+      // flag está off, o bloco fica totalmente oculto (sem fetch).
+      regionalEnabled
+        ? fetchStateRegions(uf, { limit: 8 })
+        : Promise.resolve(null),
+    ]);
 
   const initialResultsRaw =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
@@ -163,11 +185,16 @@ export default async function ComprarEstadualPage({
     label: `${stateName} (${uf})`,
   };
 
-  const breadcrumbItems = [
-    { name: "Home", href: "/" },
-    { name: "Comprar", href: "/comprar" },
-    { name: "Catálogo" },
-  ];
+  // Breadcrumbs vêm do TerritoryResolver (single source of truth do
+  // contrato territorial). Mapeia `{label, href}` → `{name, href?}` que
+  // BreadcrumbJsonLd espera. O item final (página atual) não tem href
+  // por convenção — removemos o href do último item.
+  const breadcrumbItems = territory.breadcrumbs.map((bc, idx, all) => ({
+    name: bc.label,
+    href: idx === all.length - 1 ? undefined : bc.href,
+  }));
+
+  const stateRegions = stateRegionsPayload?.regions ?? [];
 
   const itemListJsonLd = {
     "@context": "https://schema.org",
@@ -189,6 +216,15 @@ export default async function ComprarEstadualPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
       />
+      {/*
+        Bloco "Explore por região" — vem antes da grade para alinhar
+        com o princípio territorial: o estado conduz para regiões.
+        Suprime-se quando a flag regional está off OU quando o
+        endpoint não retorna regiões (estado sem cobertura ainda).
+      */}
+      {regionalEnabled && stateRegions.length > 0 ? (
+        <StateRegionsBlock stateName={stateName} regions={stateRegions} maxCards={8} />
+      ) : null}
       <BuyMarketplacePageClient
         initialResults={initialResults}
         initialFacets={initialFacets}
