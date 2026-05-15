@@ -1,4 +1,4 @@
-import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
 
@@ -68,6 +68,11 @@ export interface AdDetailResponse {
 }
 
 function getApiBaseUrl(): string {
+  // Server-side: prefer Private Network do Render se configurada.
+  if (typeof window === "undefined") {
+    const internal = getInternalBackendApiBaseUrl();
+    if (internal) return internal;
+  }
   const base = getBackendApiBaseUrl();
   if (base) return base;
   return (

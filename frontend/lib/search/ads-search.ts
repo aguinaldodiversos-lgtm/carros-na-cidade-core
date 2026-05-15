@@ -1,4 +1,4 @@
-import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { canonicalTerritoryForApi, clampPublicAdsSearchLimit } from "@/lib/search/ads-search-url";
 import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
@@ -132,6 +132,13 @@ const EMPTY_FACETS: AdsFacetsResponse["facets"] = {
 };
 
 function getApiBaseUrl(): string {
+  // Em SSR/BFF, prefere a Private Network do Render quando configurada
+  // (INTERNAL_BACKEND_API_URL). Cliente nunca enxerga essa env, entao
+  // typeof window === "undefined" e o gate seguro.
+  if (typeof window === "undefined") {
+    const internal = getInternalBackendApiBaseUrl();
+    if (internal) return internal;
+  }
   return getBackendApiBaseUrl();
 }
 

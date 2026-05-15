@@ -15,8 +15,9 @@
  * — frontend redireciona pro init_point do Mercado Pago.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ad_id e obrigatorio" }, { status: 400 });
     }
 
-    const backendUrl = resolveBackendApiUrl("/api/payments/boost-7d/checkout");
+    const backendUrl = resolveInternalBackendApiUrl("/api/payments/boost-7d/checkout");
     if (!backendUrl) {
       return NextResponse.json(
         { error: "Backend nao configurado" },
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(backendUrl, {
       method: "POST",
       headers: {
+        ...buildBffBackendForwardHeaders(request),
         Accept: "application/json",
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.ctx.session.accessToken}`,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const uf = sp.get("uf") ?? "";
   const limit = sp.get("limit") ?? "";
 
-  const url = resolveBackendApiUrl(
+  const url = resolveInternalBackendApiUrl(
     `/api/public/cities/search?${new URLSearchParams({ q, uf, ...(limit ? { limit } : {}) }).toString()}`
   );
   if (!url) {

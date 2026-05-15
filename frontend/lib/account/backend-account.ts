@@ -1,6 +1,7 @@
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import { normalizeDashboardPayload } from "@/lib/dashboard/normalize-dashboard-payload";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { getBoostOptions } from "@/services/adService";
 import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import type { SessionData } from "@/services/sessionService";
@@ -90,7 +91,7 @@ function assertAccessToken(session: SessionData | null | undefined): string {
 }
 
 function buildUrl(path: string): string {
-  const url = resolveBackendApiUrl(path);
+  const url = resolveInternalBackendApiUrl(path);
   if (!url) {
     throw new Error("Backend API URL nao configurada.");
   }
@@ -142,6 +143,7 @@ async function fetchBackendJson<T>(path: string, init: FetchInit = {}): Promise<
     const response = await fetch(url, {
       method: init.method ?? "GET",
       headers: {
+        ...buildInternalBackendHeaders(),
         Accept: "application/json",
         ...(init.body ? { "Content-Type": "application/json" } : {}),
         ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
@@ -202,6 +204,7 @@ async function fetchBackendText(
     const response = await fetch(url, {
       method: init.method ?? "POST",
       headers: {
+        ...buildInternalBackendHeaders(),
         Accept: "*/*",
         ...(init.accessToken ? { Authorization: `Bearer ${init.accessToken}` } : {}),
         ...(init.headers ?? {}),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { toCityRef } from "@/lib/city/city-types";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     return NextResponse.json({ success: false, message: "API não configurada." }, { status: 500 });
   }
 
-  const url = resolveBackendApiUrl(`/api/public/cities/${encodeURIComponent(slug)}`);
+  const url = resolveInternalBackendApiUrl(`/api/public/cities/${encodeURIComponent(slug)}`);
   if (!url) {
     return NextResponse.json({ success: false, message: "URL inválida." }, { status: 500 });
   }

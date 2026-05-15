@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import type { AccountType } from "@/lib/dashboard-types";
 import {
@@ -189,12 +190,13 @@ export async function POST(request: NextRequest) {
     // em vez de bloquearmos aqui com informação desatualizada.
     let resolvedSessionType: AccountType = ensured.session.type;
     if (resolvedSessionType === "pending") {
-      const meUrl = resolveBackendApiUrl("/api/auth/me");
+      const meUrl = resolveInternalBackendApiUrl("/api/auth/me");
       if (meUrl) {
         try {
           const meRes = await fetch(meUrl, {
             method: "GET",
             headers: {
+              ...buildInternalBackendHeaders(),
               Accept: "application/json",
               Authorization: `Bearer ${ensured.session.accessToken}`,
             },
@@ -345,7 +347,7 @@ export async function POST(request: NextRequest) {
       photoUrls
     );
 
-    const publishUrl = resolveBackendApiUrl("/api/ads");
+    const publishUrl = resolveInternalBackendApiUrl("/api/ads");
     if (!publishUrl) {
       return jsonWithSession(
         {

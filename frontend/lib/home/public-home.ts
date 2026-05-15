@@ -1,4 +1,4 @@
-import { getBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import type { AdItem } from "@/lib/search/ads-search";
 
@@ -24,6 +24,11 @@ function stripTrailingSlash(url: string) {
 }
 
 function getApiBaseUrl(): string {
+  // Private Network do Render quando configurada (SSR-only).
+  if (typeof window === "undefined") {
+    const internal = getInternalBackendApiBaseUrl();
+    if (internal) return stripTrailingSlash(internal);
+  }
   return stripTrailingSlash(getBackendApiBaseUrl());
 }
 

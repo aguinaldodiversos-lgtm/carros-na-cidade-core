@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import type { AccountType } from "@/lib/dashboard-types";
 import {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
     }
 
-    const url = resolveBackendApiUrl("/api/auth/verify-document");
+    const url = resolveInternalBackendApiUrl("/api/auth/verify-document");
     if (!url) {
       return NextResponse.json({ error: "Backend nao configurado." }, { status: 500 });
     }
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: msg }, { status: res.status >= 400 ? res.status : 400 });
     }
 
-    const meUrl = resolveBackendApiUrl("/api/auth/me");
+    const meUrl = resolveInternalBackendApiUrl("/api/auth/me");
     if (!meUrl) {
       const out = NextResponse.json(parsed);
       if (ensured.persistCookies) {
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
 
     const meRes = await fetch(meUrl, {
       headers: {
+        ...buildInternalBackendHeaders(),
         Accept: "application/json",
         Authorization: `Bearer ${ensured.session.accessToken}`,
       },

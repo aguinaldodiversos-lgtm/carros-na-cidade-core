@@ -154,9 +154,29 @@ export async function ssrResilientFetch(
   // muda entre tentativas). Vira header X-Cnc-Client-Ip para o backend
   // rate-limitar por usuario final em vez de pelo IP do container.
   const clientIp = await readClientIpFromNextHeaders();
-  const mergedHeaders = clientIp
-    ? mergeHeaders(extraHeaders, { "X-Cnc-Client-Ip": clientIp })
-    : extraHeaders;
+
+  // Headers internos: UA cnc-internal/1.0 + X-Internal-Token. Sao injetados
+  // em TODAS as chamadas server-side, mesmo as publicas — o backend usa o
+  // par UA+token para bypassar o bot blocker e identificar a origem nos
+  // logs (categoria internal). Sem isso, o frontend seria 429-ado quando
+  // LEGACY_BFF_COMPAT for desativada em prod.
+  //
+  // Lazy import: o helper traz `server-only` para impedir vazamento de
+  // INTERNAL_API_TOKEN no bundle do client. Carregamos so quando isServer().
+  const internalHeaders: Record<string, string> = {};
+  if (isServer()) {
+    try {
+      const mod = await import("@/lib/http/internal-backend-headers");
+      Object.assign(internalHeaders, mod.buildInternalBackendHeaders());
+    } catch {
+      // build/test fora de request scope: segue sem internal headers
+    }
+  }
+
+  const extras: Record<string, string> = { ...internalHeaders };
+  if (clientIp) extras["X-Cnc-Client-Ip"] = clientIp;
+
+  const mergedHeaders = mergeHeaders(extraHeaders, extras);
 
   let lastError: unknown = null;
 

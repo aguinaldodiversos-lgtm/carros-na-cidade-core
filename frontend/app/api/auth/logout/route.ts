@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import {
   AUTH_ACCESS_COOKIE_NAME,
   AUTH_COOKIE_NAME,
@@ -13,11 +14,14 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   const session = getSessionDataFromRequest(request);
-  const backendUrl = resolveBackendApiUrl("/api/auth/logout");
+  const backendUrl = resolveInternalBackendApiUrl("/api/auth/logout");
   if (backendUrl && session?.refreshToken) {
     await fetch(backendUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        ...buildBffBackendForwardHeaders(request),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ refreshToken: session.refreshToken }),
     }).catch(() => {});
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionDataFromRequest } from "@/services/sessionService";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 import { ensureSessionWithFreshBackendTokens } from "@/lib/session/ensure-backend-session";
 import { applySessionCookiesToResponse } from "@/services/sessionService";
@@ -18,7 +18,7 @@ async function proxy(request: NextRequest, { params }: { params: { path: string[
 
   const subPath = params.path.join("/");
   const search = request.nextUrl.search || "";
-  const backendUrl = resolveBackendApiUrl(`/api/admin/${subPath}${search}`);
+  const backendUrl = resolveInternalBackendApiUrl(`/api/admin/${subPath}${search}`);
 
   if (!backendUrl) {
     return NextResponse.json({ ok: false, error: "Backend não configurado" }, { status: 502 });

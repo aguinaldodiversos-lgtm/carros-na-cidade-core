@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import {
   getBackendApiBaseUrl,
   getBackendApiResolutionInfo,
-  resolveBackendApiUrl,
+  isInternalBackendApiConfigured,
+  resolveInternalBackendApiUrl,
 } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,7 +34,7 @@ async function probeBackend(
   timeoutMs: number,
   extraHeaders: Record<string, string> = {}
 ): Promise<BackendProbe> {
-  const url = resolveBackendApiUrl(pathname);
+  const url = resolveInternalBackendApiUrl(pathname);
   if (!url) {
     return {
       url: null,
@@ -41,7 +43,7 @@ async function probeBackend(
       status: null,
       elapsedMs: null,
       bodyPreview: null,
-      error: "resolveBackendApiUrl retornou string vazia",
+      error: "resolveInternalBackendApiUrl retornou string vazia",
     };
   }
 
@@ -52,7 +54,11 @@ async function probeBackend(
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: { Accept: "application/json", ...extraHeaders },
+      headers: {
+        ...buildInternalBackendHeaders(),
+        Accept: "application/json",
+        ...extraHeaders,
+      },
       signal: controller.signal,
       cache: "no-store",
     });
@@ -133,6 +139,12 @@ export async function GET() {
         CNC_API_URL: Boolean(process.env.CNC_API_URL),
         API_URL: Boolean(process.env.API_URL),
         NEXT_PUBLIC_API_URL: Boolean(process.env.NEXT_PUBLIC_API_URL),
+        INTERNAL_BACKEND_API_URL: Boolean(process.env.INTERNAL_BACKEND_API_URL),
+        BACKEND_INTERNAL_URL: Boolean(process.env.BACKEND_INTERNAL_URL),
+        INTERNAL_API_TOKEN: Boolean(process.env.INTERNAL_API_TOKEN),
+      },
+      privateNetwork: {
+        active: isInternalBackendApiConfigured(),
       },
       clientIp: {
         detected: clientIp || null,

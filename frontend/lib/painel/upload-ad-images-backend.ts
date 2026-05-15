@@ -1,4 +1,5 @@
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 const LOG_PREFIX = "[upload-backend-r2]";
 const UPLOAD_TIMEOUT_MS = 60_000;
@@ -194,6 +195,7 @@ function buildOutboundHeaders(
   options?: { forwardHeaders?: Record<string, string>; requestId?: string }
 ): Record<string, string> {
   const headers: Record<string, string> = {
+    ...buildInternalBackendHeaders(),
     Accept: "application/json",
     Authorization: `Bearer ${accessToken}`,
     ...pickForwardHeaders(options?.forwardHeaders),
@@ -263,7 +265,7 @@ export async function uploadPublishPhotosToBackendR2(
     outbound.append("photos", file);
   }
 
-  const url = resolveBackendApiUrl("/api/ads/upload-images");
+  const url = resolveInternalBackendApiUrl("/api/ads/upload-images");
   if (!url) {
     throw new UploadBackendError("URL do backend inválida para upload de imagens.", {
       code: "BACKEND_URL_INVALID",

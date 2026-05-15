@@ -18,7 +18,28 @@ const BACKEND_API_ENV_KEYS = [
   "NEXT_PUBLIC_API_URL",
 ] as const;
 
+/**
+ * Envs reservadas para a Private Network do Render: usar URL interna entre
+ * services (mesma regiao) reduz bandwidth outbound e latencia.
+ *
+ * IMPORTANTE: essas variaveis NUNCA podem ser expostas no bundle do client
+ * (sem prefixo NEXT_PUBLIC_*). Toda funcao que as le precisa rodar em
+ * server-side. Em client a chamada cairia em fallback publico via
+ * `getBackendApiBaseUrl()`.
+ *
+ * Como configurar no Render:
+ *   - O hostname interno tem formato `<service-name>.internal` (ex.:
+ *     carros-na-cidade-core.internal). Veja o painel: Service > Settings >
+ *     "Private network" para o hostname exato. NAO assuma o formato.
+ *   - Porta interna padrao do backend e a mesma do build (4000 em dev).
+ */
+const INTERNAL_BACKEND_API_ENV_KEYS = [
+  "INTERNAL_BACKEND_API_URL",
+  "BACKEND_INTERNAL_URL",
+] as const;
+
 type BackendApiEnvKey = (typeof BACKEND_API_ENV_KEYS)[number];
+type InternalBackendApiEnvKey = (typeof INTERNAL_BACKEND_API_ENV_KEYS)[number];
 
 export type BackendApiResolutionInfo = {
   baseUrl: string;
@@ -74,6 +95,10 @@ function isAbsoluteHttpUrl(value: string): boolean {
 }
 
 function getEnvValue(key: BackendApiEnvKey): string {
+  return process.env[key]?.trim() || "";
+}
+
+function getInternalEnvValue(key: InternalBackendApiEnvKey): string {
   return process.env[key]?.trim() || "";
 }
 
@@ -233,4 +258,78 @@ export function resolveBackendApiUrl(path: string): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * Base URL interna (Private Network) lida de INTERNAL_BACKEND_API_URL ou
+ * BACKEND_INTERNAL_URL. SERVER-ONLY: nunca prefixe com NEXT_PUBLIC_*.
+ *
+ * Retorna string vazia quando nenhuma das envs esta configurada — o caller
+ * deve fazer fallback para `getBackendApiBaseUrl()`.
+ */
+export function getInternalBackendApiBaseUrl(): string {
+  for (const key of INTERNAL_BACKEND_API_ENV_KEYS) {
+    const normalized = normalizeBaseUrl(getInternalEnvValue(key));
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
+}
+
+/**
+ * Resolve uma URL completa do backend preferindo a Private Network quando
+ * configurada. Quando nao houver INTERNAL_BACKEND_API_URL, recai no
+ * resolvedor publico (`resolveBackendApiUrl`).
+ *
+ * SERVER-ONLY. Em client, sempre use `resolveBackendApiUrl`.
+ *
+ * Regras:
+ * - se a path ja for absoluta, retorna sem mexer (mesma semantica do publico);
+ * - se a base interna terminar em `/api`, segue a mesma logica do publico:
+ *   caminhos `/api/...` continuam na base, caminhos sem `/api` vao para a origem.
+ */
+export function resolveInternalBackendApiUrl(path: string): string {
+  const normalizedPath = normalizeRequestPath(path);
+  if (!normalizedPath) return "";
+
+  if (isAbsoluteHttpUrl(normalizedPath)) {
+    return normalizedPath;
+  }
+
+  const internalBase = getInternalBackendApiBaseUrl();
+  if (!internalBase) {
+    return resolveBackendApiUrl(path);
+  }
+
+  try {
+    const baseUrl = new URL(internalBase);
+    const basePath = stripTrailingSlashes(baseUrl.pathname || "");
+    const baseEndsWithApi = basePath.endsWith("/api");
+
+    if (!baseEndsWithApi) {
+      return joinUrl(internalBase, normalizedPath);
+    }
+
+    if (isApiPath(normalizedPath)) {
+      const pathWithoutApiPrefix =
+        normalizedPath === "/api" ? "/" : normalizedPath.replace(/^\/api(?=\/|$)/, "");
+      return joinUrl(internalBase, pathWithoutApiPrefix);
+    }
+
+    return joinUrl(baseUrl.origin, normalizedPath);
+  } catch {
+    return resolveBackendApiUrl(path);
+  }
+}
+
+/**
+ * Indica se a Private Network esta configurada e tera prioridade sobre o
+ * resolvedor publico em chamadas server-side.
+ *
+ * Util para logs/diagnostico — nao use para alterar headers (envie sempre
+ * os internal headers em SSR/BFF, independente da URL ser publica ou privada).
+ */
+export function isInternalBackendApiConfigured(): boolean {
+  return getInternalBackendApiBaseUrl() !== "";
 }

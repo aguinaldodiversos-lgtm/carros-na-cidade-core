@@ -1,4 +1,5 @@
 import { buildAdSlug } from "@/lib/ads/build-ad-href";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 export type RelatedAd = {
   id: string;
@@ -697,6 +698,7 @@ export async function getAdDetails(slug: string): Promise<AdDetails> {
       try {
         const response = await fetch(`${base}${path}`, {
           headers: {
+            ...buildInternalBackendHeaders(),
             Accept: "application/json",
           },
           next: {

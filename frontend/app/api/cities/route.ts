@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET() {
     );
   }
 
-  const url = resolveBackendApiUrl("/api/public/home");
+  const url = resolveInternalBackendApiUrl("/api/public/home");
   if (!url) {
     return NextResponse.json(
       { success: false, message: "URL inválida.", data: [] },
@@ -28,7 +29,7 @@ export async function GET() {
 
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers: { ...buildInternalBackendHeaders(), Accept: "application/json" },
       next: { revalidate: 120 },
     });
 

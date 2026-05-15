@@ -1,4 +1,4 @@
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 export type CatalogAdsTerritoryFallback = {
@@ -23,7 +23,7 @@ export async function fetchCatalogAdsTerritoryFallback(
   const base = getBackendApiBaseUrl();
   if (!base) return null;
 
-  const url = resolveBackendApiUrl(
+  const url = resolveInternalBackendApiUrl(
     `/api/public/cities/${encodeURIComponent(normalized)}/catalog-ads-fallback`
   );
   if (!url) return null;

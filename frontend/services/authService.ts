@@ -1,5 +1,6 @@
 import type { AccountType } from "@/lib/dashboard-types";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { getUserById } from "@/lib/plans/plan-store";
 
 export type AuthUser = {
@@ -231,13 +232,14 @@ async function safeJson<T>(response: Response): Promise<T> {
 }
 
 async function fetchCurrentUserFromBackend(accessToken: string, fallbackEmail: string) {
-  const endpoint = resolveBackendApiUrl("/api/auth/me");
+  const endpoint = resolveInternalBackendApiUrl("/api/auth/me");
   if (!endpoint) return null;
 
   try {
     const response = await fetch(endpoint, {
       method: "GET",
       headers: {
+        ...buildInternalBackendHeaders(),
         Authorization: `Bearer ${accessToken}`,
       },
       cache: "no-store",
@@ -289,13 +291,14 @@ async function authenticateAgainstBackend(
   const normalizedEmail = normalizeEmail(email);
   if (!getBackendApiBaseUrl()) return null;
 
-  const endpoint = resolveBackendApiUrl("/api/auth/login");
+  const endpoint = resolveInternalBackendApiUrl("/api/auth/login");
   if (!endpoint) return null;
 
   try {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
+        ...buildInternalBackendHeaders(),
         "Content-Type": "application/json",
         ...forwardHeaders,
       },
@@ -393,7 +396,7 @@ export async function registerUser(
     return { success: false, error: "API do backend nao configurada." };
   }
 
-  const endpoint = resolveBackendApiUrl("/api/auth/register");
+  const endpoint = resolveInternalBackendApiUrl("/api/auth/register");
   if (!endpoint) {
     return { success: false, error: "Endpoint de cadastro nao configurado." };
   }
@@ -412,6 +415,7 @@ export async function registerUser(
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
+        ...buildInternalBackendHeaders(),
         "Content-Type": "application/json",
         ...forwardHeaders,
       },
@@ -458,13 +462,14 @@ async function postAuthProxy(
   payload: Record<string, unknown>,
   extraHeaders?: Record<string, string>
 ) {
-  const url = resolveBackendApiUrl(endpoint);
+  const url = resolveInternalBackendApiUrl(endpoint);
   if (!url) return false;
 
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: {
+        ...buildInternalBackendHeaders(),
         "Content-Type": "application/json",
         ...extraHeaders,
       },

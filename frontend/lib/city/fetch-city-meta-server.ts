@@ -1,5 +1,5 @@
 import { normalizeCityId } from "@/lib/city/city-types";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 type CityPayload = {
@@ -19,7 +19,7 @@ export async function fetchCityMetaBySlug(slug: string): Promise<CityMetaLite | 
 
   if (!getBackendApiBaseUrl()) return null;
 
-  const url = resolveBackendApiUrl(`/api/public/cities/${encodeURIComponent(s)}`);
+  const url = resolveInternalBackendApiUrl(`/api/public/cities/${encodeURIComponent(s)}`);
   if (!url) return null;
 
   try {

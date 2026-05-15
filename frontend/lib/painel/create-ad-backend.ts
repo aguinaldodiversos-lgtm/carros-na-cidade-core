@@ -11,7 +11,8 @@
  * JSON; o backend aplica `ads.storage-normalize` + enums canônicos (`ads.canonical.constants.js`).
  */
 import type { AccountType } from "@/lib/dashboard-types";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 /**
  * Campos do wizard usados para montar o corpo de POST /api/ads.
@@ -232,13 +233,13 @@ export async function fetchResolvedCityByIdFromBackend(
   fallbackUf?: string,
   extraHeaders?: Record<string, string>
 ): Promise<CityResolutionResult> {
-  const url = resolveBackendApiUrl(
+  const url = resolveInternalBackendApiUrl(
     `/api/public/cities/by-id/${encodeURIComponent(String(cityId))}`
   );
   if (!url) return { ok: false, reason: "backend_error" };
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json", ...extraHeaders },
+      headers: { ...buildInternalBackendHeaders(), Accept: "application/json", ...extraHeaders },
       cache: "no-store",
     });
     if (res.status === 429) {

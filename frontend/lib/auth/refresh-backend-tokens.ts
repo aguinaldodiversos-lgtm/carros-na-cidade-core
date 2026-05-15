@@ -1,4 +1,5 @@
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 export type RefreshedTokens = {
   accessToken: string;
@@ -22,7 +23,7 @@ const REFRESH_TIMEOUT_MS = 20_000;
  * Rotaciona refresh no backend (POST /api/auth/refresh).
  */
 export async function refreshBackendTokens(refreshToken: string): Promise<RefreshedTokens | null> {
-  const url = resolveBackendApiUrl("/api/auth/refresh");
+  const url = resolveInternalBackendApiUrl("/api/auth/refresh");
   if (!url) return null;
 
   const controller = new AbortController();
@@ -31,7 +32,7 @@ export async function refreshBackendTokens(refreshToken: string): Promise<Refres
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { ...buildInternalBackendHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),
       cache: "no-store",
       signal: controller.signal,

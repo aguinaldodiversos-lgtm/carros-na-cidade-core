@@ -12,8 +12,9 @@
  * - 5xx → 502 com mensagem genérica.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "ad_id e obrigatorio" }, { status: 400 });
     }
 
-    const backendUrl = resolveBackendApiUrl(
+    const backendUrl = resolveInternalBackendApiUrl(
       `/api/ads/${encodeURIComponent(adId)}/publication-options`
     );
     if (!backendUrl) {
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const response = await fetch(backendUrl, {
       method: "GET",
       headers: {
+        ...buildBffBackendForwardHeaders(request),
         Accept: "application/json",
         Authorization: `Bearer ${auth.ctx.session.accessToken}`,
       },

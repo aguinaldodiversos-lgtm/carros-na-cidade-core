@@ -1,5 +1,6 @@
 import "server-only";
-import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 
@@ -150,7 +151,9 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
     return null;
   }
 
-  const url = resolveBackendApiUrl(`/api/internal/regions/${encodeURIComponent(safeSlug)}`);
+  const url = resolveInternalBackendApiUrl(
+    `/api/internal/regions/${encodeURIComponent(safeSlug)}`
+  );
   if (!url) return null;
 
   let response: Response;
@@ -158,8 +161,8 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
     response = await ssrResilientFetch(url, {
       method: "GET",
       headers: {
+        ...buildInternalBackendHeaders(),
         Accept: "application/json",
-        "X-Internal-Token": token,
       },
       logTag: "regions:bff",
       next: {

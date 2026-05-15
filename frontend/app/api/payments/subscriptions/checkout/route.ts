@@ -14,8 +14,9 @@
  * é a fonte de verdade.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
+import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const backendUrl = resolveBackendApiUrl("/api/payments/subscriptions/checkout");
+    const backendUrl = resolveInternalBackendApiUrl("/api/payments/subscriptions/checkout");
     if (!backendUrl) {
       return NextResponse.json(
         { error: "Backend nao configurado" },
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(backendUrl, {
       method: "POST",
       headers: {
+        ...buildBffBackendForwardHeaders(request),
         Accept: "application/json",
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.ctx.session.accessToken}`,
