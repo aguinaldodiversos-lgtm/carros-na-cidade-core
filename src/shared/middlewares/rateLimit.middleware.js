@@ -1,5 +1,32 @@
 import rateLimit from "express-rate-limit";
 
+import { isAuthenticatedInternalCall } from "./bot-blocker.middleware.js";
+
+/**
+ * Skip uniforme para chamadas internas autenticadas (UA cnc-internal/1.0 +
+ * X-Internal-Token valido).
+ *
+ * Por que skip ao inves de keyGenerator separado:
+ *   O frontend Next.js SSR/BFF e o middleware Edge fazem dezenas a centenas
+ *   de fetches por minuto compartilhando o IP do container do Render. Mesmo
+ *   o limite global de 1000 req/15min e atingido rapidamente sob load real,
+ *   especialmente com page warmup, prefetch RSC e cold start. O par UA+token
+ *   ja garante que so e o NOSSO frontend (timingSafeEqual em bot-blocker).
+ *   Confiavel = sem rate limit.
+ *
+ *   Outros caminhos continuam protegidos:
+ *     - Bot blocker corta UAs da blocklist ANTES do rate limit.
+ *     - 404 storm guard corta abuso de enumeracao.
+ *     - Rate limits sao mantidos para qualquer chamada sem token interno.
+ *
+ *   Risco aceito: se INTERNAL_API_TOKEN vazar, o atacante bypassa o rate
+ *   limit. Mitigacoes: token sem prefixo NEXT_PUBLIC_*, rotacao periodica,
+ *   timingSafeEqual contra timing attacks.
+ */
+function skipIfAuthenticatedInternal(req) {
+  return isAuthenticatedInternalCall(req);
+}
+
 /**
  * Extrai o IP real do cliente para rate limit, bot blocker e 404 storm guard.
  *
@@ -48,6 +75,7 @@ export const loginRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => clientRateLimitKey(req),
+  skip: skipIfAuthenticatedInternal,
   message: {
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
@@ -60,6 +88,7 @@ export const registerRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => clientRateLimitKey(req),
+  skip: skipIfAuthenticatedInternal,
   message: {
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
@@ -76,6 +105,7 @@ export const autocompleteRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => `autocomplete:${clientRateLimitKey(req)}`,
+  skip: skipIfAuthenticatedInternal,
   message: {
     success: false,
     message: "Muitas buscas em sequência. Aguarde alguns segundos.",
@@ -109,6 +139,7 @@ function buildPerMinuteLimit(prefix, max) {
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => `${prefix}:${clientRateLimitKey(req)}`,
+    skip: skipIfAuthenticatedInternal,
     handler(req, res) {
       res.set("Cache-Control", "no-store");
       res.set("X-Robots-Tag", "noindex, nofollow, noarchive");

@@ -238,7 +238,14 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
     expect(calls.length).toBe(1);
     const [url, init] = calls[0] as [string, RequestInit];
     expect(url).toBe(`${BASE}/api/internal/regions/atibaia-sp`);
-    expect(init.headers).toMatchObject({ "X-Internal-Token": TOKEN });
+    expect(init.headers).toMatchObject({
+      "X-Internal-Token": TOKEN,
+      // UA cnc-internal/1.0 e obrigatorio: sem ele,
+      // isAuthenticatedInternalCall no backend retorna false e a request
+      // cai no rate limit normal (compartilhado pelo IP do container do
+      // edge runtime). Regressao desse header bloqueia toda regional.
+      "User-Agent": "cnc-internal/1.0",
+    });
     expect(init.method).toBe("GET");
   });
 

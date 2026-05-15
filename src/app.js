@@ -63,7 +63,10 @@ import {
   uploadsRateLimit,
 } from "./shared/middlewares/rateLimit.middleware.js";
 import { bandwidthDiagnosticsMiddleware } from "./shared/middlewares/bandwidth-diagnostics.middleware.js";
-import { botBlockerMiddleware } from "./shared/middlewares/bot-blocker.middleware.js";
+import {
+  botBlockerMiddleware,
+  isAuthenticatedInternalCall,
+} from "./shared/middlewares/bot-blocker.middleware.js";
 import { legacyRoutesGuardMiddleware } from "./shared/middlewares/legacy-routes-guard.middleware.js";
 import { publicStormGuardMiddleware } from "./shared/middlewares/404-storm-guard.middleware.js";
 
@@ -121,6 +124,12 @@ app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
 // Rate limit global (por visitante real quando o BFF envia X-Cnc-Client-Ip)
+//
+// `skip` para chamadas internas autenticadas: nosso proprio frontend SSR/BFF
+// e middleware Edge fazem dezenas de fetches/min compartilhando o IP do
+// container Render — o limite de 1000/15min ratearia antes do trafego real.
+// O par UA cnc-internal/1.0 + X-Internal-Token (timingSafeEqual) ja garante
+// que e o nosso codigo. Resto continua protegido por IP.
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -128,6 +137,7 @@ app.use(
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => clientRateLimitKey(req),
+    skip: (req) => isAuthenticatedInternalCall(req),
     message: {
       success: false,
       message: "Muitas requisições. Tente novamente em instantes.",

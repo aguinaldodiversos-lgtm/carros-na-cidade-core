@@ -156,6 +156,17 @@ export async function validateRegionalSlug(
       method: "GET",
       headers: {
         Accept: "application/json",
+        // UA cnc-internal/1.0 + token = chamada interna autenticada para o
+        // backend. Sem o UA, `isAuthenticatedInternalCall` no bot-blocker
+        // retorna false e o backend ratelimit-a pelo IP do container do
+        // edge (compartilhado entre todos os SSRs) → todos os requests
+        // regionais batem 429 e o guard traduz para backend-5xx → 503.
+        //
+        // Nao usamos buildInternalBackendHeaders pq este arquivo roda em
+        // Edge runtime e ja le `process.env.INTERNAL_API_TOKEN` direto na
+        // linha 134. Inlining os 2 headers mantem o codigo Edge-friendly
+        // e independente do helper Node-side.
+        "User-Agent": "cnc-internal/1.0",
         "X-Internal-Token": token,
       },
       signal: controller.signal,
