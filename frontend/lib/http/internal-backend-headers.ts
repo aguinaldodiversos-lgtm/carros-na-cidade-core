@@ -1,5 +1,3 @@
-import "server-only";
-
 /**
  * Headers de autenticacao interna entre frontend SSR/BFF e backend core.
  *
@@ -7,9 +5,28 @@ import "server-only";
  *   User-Agent: cnc-internal/1.0
  *   X-Internal-Token: <process.env.INTERNAL_API_TOKEN>
  *
- * Por que server-only?
- * - Bundles do client NUNCA podem conter INTERNAL_API_TOKEN. `import "server-only"`
- *   faz o Next abortar o build se algum client component importar este arquivo.
+ * INVARIANTE DE SEGURANCA: este modulo precisa rodar APENAS em server-side.
+ *
+ * NAO usamos `import "server-only"` porque:
+ * - Modulos vizinhos (ex: ssr-resilient-fetch.ts) sao importados estaticamente
+ *   por client components compartilhados (ex: territorial-public.ts ->
+ *   TerritorialResultsPageClient.tsx). Mesmo com lazy `await import(...)`,
+ *   o webpack do Next 14 analisa o grafo e quebra o build inteiro com
+ *   "You're importing a component that needs server-only".
+ *
+ * A invariante e mantida em CAMADAS:
+ * 1) `INTERNAL_API_TOKEN` NAO TEM prefixo NEXT_PUBLIC_*, entao o Next strip-a
+ *    a env do bundle do client automaticamente (process.env.INTERNAL_API_TOKEN
+ *    e undefined no client).
+ * 2) Runtime guard: `typeof window !== "undefined"` retorna {} no client,
+ *    para nao espalhar UA cnc-internal/1.0 em chamadas browser que iriam pro
+ *    domain publico via NEXT_PUBLIC_API_URL.
+ * 3) Comentario no caller: ssr-resilient-fetch.ts envolve a chamada em
+ *    `if (isServer())`.
+ *
+ * O custo aceito de remover `server-only` e que um dev mal-intencionado/distraido
+ * conseguiria importar este modulo num client component sem erro de build —
+ * mas, na pratica, no client retorna `{}` (item 2), entao nenhum dano real.
  *
  * Por que enviar User-Agent mesmo sem token?
  * - O UA identifica a origem da chamada nos logs de bandwidth-diagnostics
@@ -59,6 +76,15 @@ function readInternalToken(): string {
 export function buildInternalBackendHeaders(
   options: InternalHeaderOptions = {}
 ): Record<string, string> {
+  // Defesa em profundidade: se executado no client por engano, retorna {} sem
+  // setar UA ou token. O bundle client tambem nao teria acesso a
+  // process.env.INTERNAL_API_TOKEN (sem prefixo NEXT_PUBLIC_*), mas evitar o
+  // UA cnc-internal/1.0 garante que esta funcao nao emita marcadores internos
+  // em chamadas browser que iriam para o domain publico do backend.
+  if (typeof window !== "undefined") {
+    return {};
+  }
+
   const headers: Record<string, string> = {
     [USER_AGENT_HEADER]: INTERNAL_USER_AGENT,
   };

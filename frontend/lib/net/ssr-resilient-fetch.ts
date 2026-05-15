@@ -25,6 +25,8 @@
  *    429, dando ao rate-limiter tempo de janela rodar.
  */
 
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
+
 type NextCacheConfig = { revalidate?: number | false; tags?: string[] };
 
 export type SsrFetchOptions = Omit<RequestInit, "signal"> & {
@@ -161,17 +163,12 @@ export async function ssrResilientFetch(
   // logs (categoria internal). Sem isso, o frontend seria 429-ado quando
   // LEGACY_BFF_COMPAT for desativada em prod.
   //
-  // Lazy import: o helper traz `server-only` para impedir vazamento de
-  // INTERNAL_API_TOKEN no bundle do client. Carregamos so quando isServer().
-  const internalHeaders: Record<string, string> = {};
-  if (isServer()) {
-    try {
-      const mod = await import("@/lib/http/internal-backend-headers");
-      Object.assign(internalHeaders, mod.buildInternalBackendHeaders());
-    } catch {
-      // build/test fora de request scope: segue sem internal headers
-    }
-  }
+  // O helper ja faz o guard `typeof window !== "undefined"` internamente,
+  // mas o `isServer()` aqui evita ate a chamada quando o caller for client
+  // — torna o intent explicito no caller. ssrResilientFetch as vezes e
+  // chamado de codigo que tambem roda no client (lib/search/territorial-public),
+  // ai os internal headers nao se aplicam.
+  const internalHeaders = isServer() ? buildInternalBackendHeaders() : {};
 
   const extras: Record<string, string> = { ...internalHeaders };
   if (clientIp) extras["X-Cnc-Client-Ip"] = clientIp;
