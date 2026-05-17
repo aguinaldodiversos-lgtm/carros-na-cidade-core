@@ -1,6 +1,8 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { logger } from "../../shared/logger.js";
 import { getRegionalRadiusKm } from "../admin/regional-settings/admin-regional-settings.service.js";
+import { getSetting } from "../platform/settings.service.js";
+import { commercialLayerExpr } from "../ads/filters/ads-ranking.sql.js";
 
 /**
  * Cap de membros retornados pela API regional.
@@ -18,6 +20,24 @@ import { getRegionalRadiusKm } from "../admin/regional-settings/admin-regional-s
  * frontend gerenciar é mais seguro.
  */
 const MAX_REGION_MEMBERS = 30;
+
+// ─── Defaults para configurações de faixa ────────────────────────────────────
+const FAIXA_2_DEFAULT = 30;
+const FAIXA_3_DEFAULT = 60;
+
+/**
+ * Lê os limites de faixa da Página Regional de platform_settings.
+ * Retorna { faixa2Km, faixa3Km } sempre como inteiros válidos.
+ */
+async function getRegionalFaixas() {
+  const [f2Raw, f3Raw] = await Promise.all([
+    getSetting("regional.faixa_2_km", FAIXA_2_DEFAULT),
+    getSetting("regional.faixa_3_km", FAIXA_3_DEFAULT),
+  ]);
+  const faixa2Km = Number.isFinite(Number(f2Raw)) ? Number(f2Raw) : FAIXA_2_DEFAULT;
+  const faixa3Km = Number.isFinite(Number(f3Raw)) ? Number(f3Raw) : FAIXA_3_DEFAULT;
+  return { faixa2Km, faixa3Km };
+}
 
 /**
  * Lê a cidade-base por slug. Retorna null se não existir.
@@ -258,5 +278,281 @@ export async function getRegionByBaseSlugDynamic(slug) {
       layer: Number(row.layer),
       distance_km: row.distance_km == null ? null : Number(row.distance_km),
     })),
+  };
+}
+
+/**
+ * Resolve a cidade-âncora pelo slug parcial (sem sufixo de UF) + UF.
+ *
+ * URLs públicas usam `ancoraPart` (ex: "atibaia"); o banco armazena o slug
+ * completo "atibaia-sp". Reconstrói o slug e filtra por is_ancora = true
+ * para garantir que a cidade tem cobertura regional ativa.
+ *
+ * Retorna null se:
+ *  - slug inválido ou UF inválida
+ *  - cidade não existe
+ *  - cidade existe mas is_ancora = false (sem anúncios ativos)
+ */
+export async function getAncoraBySlugPart(ancoraPart, uf) {
+  const part = String(ancoraPart || "").trim().toLowerCase();
+  const state = String(uf || "").trim().toUpperCase();
+  if (!part || !state) return null;
+
+  const fullSlug = `${part}-${state.toLowerCase()}`;
+  const result = await pool.query(
+    `SELECT id, slug, name, state, latitude, longitude
+     FROM cities
+     WHERE slug = $1 AND state = $2 AND is_ancora = true
+     LIMIT 1`,
+    [fullSlug, state]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Encontra a cidade-âncora ativa mais próxima de uma coordenada (lat, lng)
+ * dentro da mesma UF.
+ *
+ * Usado para redirecionar o usuário geolocalizado para a Página Regional
+ * mais relevante. Filtra is_ancora = true e ordena por distância haversine.
+ *
+ * Retorna null se:
+ *  - lat/lng inválidos
+ *  - nenhuma âncora ativa na UF dentro de radius_km (usa o raio do admin)
+ */
+export async function getCidadeAncoraProxima(lat, lng, uf) {
+  if (
+    lat == null || lng == null ||
+    !Number.isFinite(Number(lat)) ||
+    !Number.isFinite(Number(lng))
+  ) {
+    return null;
+  }
+
+  const baseLat = Number(lat);
+  const baseLon = Number(lng);
+  const state = String(uf || "").trim().toUpperCase();
+  if (!state) return null;
+
+  let radius = 80;
+  try {
+    radius = await getRegionalRadiusKm();
+  } catch (_) {
+    // usa 80 km por padrão
+  }
+
+  const latDelta = radius / 111.32;
+
+  const result = await pool.query(
+    `
+    WITH candidates AS (
+      SELECT id, slug, name, state, latitude, longitude
+      FROM cities
+      WHERE state = $1
+        AND is_ancora = true
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL
+        AND latitude BETWEEN $2 - $4 AND $2 + $4
+    )
+    SELECT
+      id, slug, name, state,
+      ROUND(
+        (
+          6371 * acos(
+            LEAST(1.0, GREATEST(-1.0,
+              sin(radians($2)) * sin(radians(latitude))
+              + cos(radians($2)) * cos(radians(latitude))
+              * cos(radians(longitude) - radians($3))
+            ))
+          )
+        )::numeric,
+        2
+      ) AS distance_km
+    FROM candidates
+    WHERE
+      6371 * acos(
+        LEAST(1.0, GREATEST(-1.0,
+          sin(radians($2)) * sin(radians(latitude))
+          + cos(radians($2)) * cos(radians(latitude))
+          * cos(radians(longitude) - radians($3))
+        ))
+      ) <= $5
+    ORDER BY distance_km ASC
+    LIMIT 1
+    `,
+    [state, baseLat, baseLon, latDelta, radius]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Retorna os anúncios ativos de uma região (âncora + vizinhas) ordenados por
+ * faixa de proximidade e camada comercial.
+ *
+ * Pipeline:
+ *   1. Resolve a âncora (getAncoraBySlugPart). 404 se não encontrar.
+ *   2. Lê radius_km e faixas de platform_settings.
+ *   3. CTE `nearby`: vizinhas haversine dentro do raio na mesma UF.
+ *   4. CTE `ranked`: JOIN ads + anunciantes + planos + faixa de distância.
+ *   5. Ordena por (faixa ASC, commercial_layer DESC, created_at DESC).
+ *   6. Aplica paginação via LIMIT / OFFSET.
+ *
+ * Parâmetros `options`:
+ *   - page      {number}  página (1-based, default 1)
+ *   - limit     {number}  itens por página (default 20, max 60)
+ *   - status    {string}  default "ACTIVE"
+ *
+ * Retorna { ancora, radius_km, total, page, limit, ads } ou null se âncora
+ * não existir.
+ */
+export async function getAnunciosNaRegiao(ancoraPart, uf, options = {}) {
+  const ancora = await getAncoraBySlugPart(ancoraPart, uf);
+  if (!ancora) return null;
+
+  const page = Math.max(1, Number(options.page) || 1);
+  const limit = Math.min(60, Math.max(1, Number(options.limit) || 20));
+  const offset = (page - 1) * limit;
+  const status = String(options.status || "ACTIVE");
+
+  let radius = 80;
+  try {
+    radius = await getRegionalRadiusKm();
+  } catch (_) {
+    // usa 80 km por padrão
+  }
+
+  const { faixa2Km, faixa3Km } = await getRegionalFaixas();
+
+  const baseLat = ancora.latitude != null ? Number(ancora.latitude) : null;
+  const baseLon = ancora.longitude != null ? Number(ancora.longitude) : null;
+  const hasCoords = baseLat != null && baseLon != null &&
+    Number.isFinite(baseLat) && Number.isFinite(baseLon);
+
+  const latDelta = hasCoords ? radius / 111.32 : 0;
+
+  // city_ids elegíveis: âncora + vizinhas dentro do raio (mesma UF)
+  // Se a âncora não tiver coords, inclui apenas ela mesma.
+  let cityIds = [Number(ancora.id)];
+  let memberDistances = new Map([[Number(ancora.id), 0]]);
+
+  if (hasCoords) {
+    const nearbyResult = await pool.query(
+      `
+      WITH candidates AS (
+        SELECT id,
+          ROUND(
+            (
+              6371 * acos(
+                LEAST(1.0, GREATEST(-1.0,
+                  sin(radians($2)) * sin(radians(latitude))
+                  + cos(radians($2)) * cos(radians(latitude))
+                  * cos(radians(longitude) - radians($3))
+                ))
+              )
+            )::numeric,
+            2
+          ) AS distance_km
+        FROM cities
+        WHERE state = $1
+          AND latitude IS NOT NULL AND longitude IS NOT NULL
+          AND latitude BETWEEN $2 - $4 AND $2 + $4
+      )
+      SELECT id, distance_km
+      FROM candidates
+      WHERE distance_km <= $5
+      ORDER BY distance_km ASC
+      LIMIT $6
+      `,
+      [ancora.state, baseLat, baseLon, latDelta, radius, MAX_REGION_MEMBERS + 1]
+    );
+    cityIds = nearbyResult.rows.map((r) => Number(r.id));
+    if (!cityIds.includes(Number(ancora.id))) cityIds.unshift(Number(ancora.id));
+    memberDistances = new Map(nearbyResult.rows.map((r) => [Number(r.id), Number(r.distance_km)]));
+    memberDistances.set(Number(ancora.id), 0);
+  }
+
+  const commercialExpr = commercialLayerExpr("sp", "u", "plans");
+
+  const result = await pool.query(
+    `
+    WITH city_dist AS (
+      SELECT
+        unnest($1::int[]) AS city_id,
+        unnest($2::numeric[]) AS distance_km
+    ),
+    ranked AS (
+      SELECT
+        a.id,
+        a.slug,
+        a.title,
+        a.price,
+        a.brand,
+        a.model,
+        a.year,
+        a.mileage,
+        a.fuel_type,
+        a.body_type,
+        a.city_id,
+        a.created_at,
+        cd.distance_km,
+        CASE
+          WHEN cd.distance_km = 0            THEN 0
+          WHEN cd.distance_km <= $3          THEN 1
+          WHEN cd.distance_km <= $4          THEN 2
+          ELSE                                    3
+        END AS faixa,
+        ${commercialExpr} AS commercial_layer
+      FROM ads a
+      JOIN city_dist cd ON cd.city_id = a.city_id
+      JOIN subscription_plans plans ON plans.id = (
+        SELECT sp2.id FROM subscription_plans sp2
+        JOIN advertiser_subscriptions asub ON asub.plan_id = sp2.id
+        WHERE asub.advertiser_id = a.advertiser_id
+          AND asub.status = 'ACTIVE'
+        ORDER BY sp2.tier DESC
+        LIMIT 1
+      )
+      JOIN advertisers sp ON sp.id = a.advertiser_id
+      JOIN users u ON u.id = sp.user_id
+      WHERE a.status = $5
+    )
+    SELECT *, COUNT(*) OVER () AS total_count
+    FROM ranked
+    ORDER BY faixa ASC, commercial_layer DESC, created_at DESC
+    LIMIT $6 OFFSET $7
+    `,
+    [
+      cityIds,
+      cityIds.map((id) => memberDistances.get(id) ?? 0),
+      faixa2Km,
+      faixa3Km,
+      status,
+      limit,
+      offset,
+    ]
+  );
+
+  const total = result.rows.length > 0 ? Number(result.rows[0].total_count) : 0;
+  const ads = result.rows.map(({ total_count, faixa, commercial_layer, ...ad }) => ({
+    ...ad,
+    price: ad.price == null ? null : Number(ad.price),
+    faixa: Number(faixa),
+    commercial_layer: Number(commercial_layer),
+    distance_km: memberDistances.get(Number(ad.city_id)) ?? null,
+  }));
+
+  return {
+    ancora: {
+      id: Number(ancora.id),
+      slug: ancora.slug,
+      name: ancora.name,
+      state: ancora.state,
+    },
+    radius_km: radius,
+    total,
+    page,
+    limit,
+    ads,
   };
 }

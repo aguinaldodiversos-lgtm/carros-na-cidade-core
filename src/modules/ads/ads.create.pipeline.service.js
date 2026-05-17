@@ -14,6 +14,7 @@ import {
   persistAdRiskSnapshot,
   recordModerationEvent,
 } from "./risk/ad-risk.repository.js";
+import { markCityAsAncoraIfEligible } from "../cities/cities.anchor.service.js";
 import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
 import {
   resolveFipeReference,
@@ -223,6 +224,13 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
           },
           "[ads] falha ao persistir risco — anúncio criado mas auditoria incompleta"
         );
+      }
+
+      // Âncora regional: ativa is_ancora na cidade se elegível.
+      // Só faz sentido quando o anúncio nasce ACTIVE; PENDING_REVIEW não conta.
+      // Falhas não propagam — o anúncio já existe no banco.
+      if (initialStatus === AD_STATUS.ACTIVE && validated?.city_id) {
+        markCityAsAncoraIfEligible(validated.city_id).catch(() => {});
       }
     }
 
