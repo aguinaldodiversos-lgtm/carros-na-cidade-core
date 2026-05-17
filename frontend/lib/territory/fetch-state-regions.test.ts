@@ -39,7 +39,7 @@ function buildPayload(overrides: Record<string, unknown> = {}) {
           name: "Região de Atibaia",
           baseCitySlug: "atibaia-sp",
           baseCityName: "Atibaia",
-          href: "/carros-usados/regiao/atibaia-sp",
+          href: "/sp/regiao/atibaia",
           cityNames: ["Atibaia", "Itatiba"],
           citySlugs: ["atibaia-sp", "itatiba-sp"],
           adsCount: 12,
@@ -134,7 +134,7 @@ describe("fetchStateRegions — happy path", () => {
       name: "Região de Atibaia",
       baseCitySlug: "atibaia-sp",
       baseCityName: "Atibaia",
-      href: "/carros-usados/regiao/atibaia-sp",
+      href: "/sp/regiao/atibaia",
       adsCount: 12,
       featuredCount: 2,
     });

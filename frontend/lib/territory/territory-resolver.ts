@@ -3,6 +3,7 @@ import "server-only";
 import { isValidCitySlug } from "@/lib/buy/territory-variant";
 import { fetchCityMetaBySlug } from "@/lib/city/fetch-city-meta-server";
 import { fetchRegionByCitySlug } from "@/lib/regions/fetch-region";
+import { slugToAncoraHref } from "@/lib/regions/ancora-url";
 
 import {
   getDefaultTerritoryState,
@@ -95,7 +96,7 @@ function buildRegionBreadcrumbs(
   return [
     { label: "Início", href: "/" },
     { label: state.name, href: `/comprar/estado/${state.slug}` },
-    { label: region.name, href: `/carros-usados/regiao/${region.slug}` },
+    { label: region.name, href: slugToAncoraHref(region.slug) },
   ];
 }
 
@@ -159,7 +160,7 @@ async function resolveRegionContext(regionSlug: string): Promise<TerritoryContex
       name: region.base.name,
       state: region.base.state,
     },
-    canonicalUrl: `/carros-usados/regiao/${region.base.slug}`,
+    canonicalUrl: slugToAncoraHref(region.base.slug),
     title: `Carros usados na ${regionName}`,
     description,
     breadcrumbs: buildRegionBreadcrumbs(state, { slug: region.base.slug, name: regionName }),

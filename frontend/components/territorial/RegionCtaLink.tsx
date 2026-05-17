@@ -1,6 +1,7 @@
 import "server-only";
 import Link from "next/link";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
+import { slugToAncoraHref } from "@/lib/regions/ancora-url";
 
 /**
  * CTA primário que liga uma página de cidade à Página Regional
@@ -43,7 +44,7 @@ export function RegionCtaLink({ slug, cityName }: RegionCtaLinkProps) {
         Quer ver mais opções perto de {cityName}? Veja a região completa.
       </p>
       <Link
-        href={`/carros-usados/regiao/${encodeURIComponent(slug)}`}
+        href={slugToAncoraHref(slug)}
         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
         aria-label={`Ver carros na região de ${cityName}`}
         data-testid="region-cta-link"

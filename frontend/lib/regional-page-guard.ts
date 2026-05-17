@@ -26,32 +26,42 @@
  */
 
 /**
- * Regex que casa `/carros-usados/regiao/<slug>` e variantes com trailing
- * slash, mas NÃO `/carros-usados/regiao` puro (sem slug) nem subpaths
- * mais profundos. O slug é capturado em $1.
+ * Regex legada que casa `/carros-usados/regiao/<slug>`.
+ * Mantida para uso nos testes existentes e referência.
  */
 export const REGIONAL_PATH_REGEX = /^\/carros-usados\/regiao\/([^/?#]+)\/?$/;
 
 /**
+ * Regex da nova URL regional `/:uf/regiao/:ancora`.
+ * Captura: $1 = uf (2 letras minúsculas), $2 = ancora (slug sem sufixo).
+ * NÃO casa subpaths mais profundos nem trailing slash com conteúdo.
+ */
+export const ANCORA_PATH_REGEX = /^\/([a-z]{2})\/regiao\/([a-z0-9-]+)\/?$/;
+
+/**
  * Contrato estrito da flag, idêntico a `isRegionalPageEnabled()` no
- * server frontend. Apenas a string exata `"true"` libera. Qualquer
- * outro valor (incluindo `"True"`, `"1"`, `"yes"`, `" true "`, vazio,
- * undefined) resolve false.
- *
- * Aceita o env como parâmetro para que o teste possa controlar sem
- * mutar `process.env` global.
+ * server frontend. Apenas a string exata `"true"` libera.
  */
 export function isFlagEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.REGIONAL_PAGE_ENABLED === "true";
 }
 
-/**
- * Extrai slug do pathname se for rota regional, ou null caso não seja.
- * Útil para o matcher do middleware.
- */
+/** @deprecated Use `extractAncoraParams`. Mantida para retrocompatibilidade de testes. */
 export function extractRegionalSlug(pathname: string): string | null {
   const match = REGIONAL_PATH_REGEX.exec(pathname);
   return match?.[1] ?? null;
+}
+
+/**
+ * Extrai `{ uf, ancora }` do pathname da nova rota regional, ou null.
+ * Ex.: `/sp/regiao/atibaia` → `{ uf: "sp", ancora: "atibaia" }`.
+ */
+export function extractAncoraParams(
+  pathname: string
+): { uf: string; ancora: string } | null {
+  const match = ANCORA_PATH_REGEX.exec(pathname);
+  if (!match) return null;
+  return { uf: match[1], ancora: match[2] };
 }
 
 export interface SlugValidationConfig {
@@ -201,6 +211,74 @@ export async function validateRegionalSlug(
     if (timedOut) {
       return { kind: "unavailable", reason: "backend-timeout" };
     }
+    return {
+      kind: "unavailable",
+      reason: "fetch-error",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Valida uma âncora pela nova rota interna `/api/internal/regions/ancora/:uf/:ancora`.
+ * Semântica idêntica a `validateRegionalSlug` — ver comentário daquela função.
+ */
+export async function validateAncoraPath(
+  uf: string,
+  ancora: string,
+  config: SlugValidationConfig = {}
+): Promise<SlugValidation> {
+  const safeUf = String(uf || "").trim().toLowerCase().slice(0, 2);
+  const safeAncora = String(ancora || "").trim().toLowerCase();
+  if (!safeUf || !safeAncora) return { kind: "not_found" };
+
+  const apiBase = (config.apiBase ?? process.env.BACKEND_API_URL ?? "").replace(/\/+$/, "");
+  const token = (config.token ?? process.env.INTERNAL_API_TOKEN ?? "").trim();
+  const revalidate = config.revalidateSeconds ?? 300;
+  const timeoutMs = config.timeoutMs ?? 8000;
+  const fetchImpl = config.fetchImpl ?? fetch;
+
+  if (!apiBase) return { kind: "unavailable", reason: "missing-backend-api-url" };
+  if (!token) return { kind: "unavailable", reason: "missing-internal-api-token" };
+
+  const url = `${apiBase}/api/internal/regions/ancora/${encodeURIComponent(safeUf)}/${encodeURIComponent(safeAncora)}`;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "cnc-internal/1.0",
+        "X-Internal-Token": token,
+      },
+      signal: controller.signal,
+      next: {
+        revalidate,
+        tags: [
+          "internal:regions",
+          `internal:regions:ancora:${safeUf}:${safeAncora}`,
+        ],
+      },
+    });
+
+    if (response.status === 200) return { kind: "valid" };
+    if (response.status === 404) return { kind: "not_found" };
+    if (response.status === 401) return { kind: "unavailable", reason: "backend-401" };
+    if (response.status === 403) return { kind: "unavailable", reason: "backend-403" };
+    if (response.status >= 500 && response.status < 600) {
+      return { kind: "unavailable", reason: "backend-5xx", detail: `status ${response.status}` };
+    }
+    return { kind: "unavailable", reason: "backend-5xx", detail: `status ${response.status}` };
+  } catch (err) {
+    if (timedOut) return { kind: "unavailable", reason: "backend-timeout" };
     return {
       kind: "unavailable",
       reason: "fetch-error",

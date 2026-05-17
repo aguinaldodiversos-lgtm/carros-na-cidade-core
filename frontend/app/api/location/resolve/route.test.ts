@@ -167,7 +167,7 @@ describe("BFF /api/location/resolve — proxy ao backend", () => {
       region: {
         slug: "atibaia-sp",
         name: "Região de Atibaia",
-        href: "/carros-usados/regiao/atibaia-sp",
+        href: "/sp/regiao/atibaia",
       },
       confidence: "high",
       distanceKm: 3.2,

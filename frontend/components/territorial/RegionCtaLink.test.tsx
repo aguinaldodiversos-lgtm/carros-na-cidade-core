@@ -57,11 +57,11 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
     process.env.REGIONAL_PAGE_ENABLED = "true";
   });
 
-  it("renderiza Link com href para /carros-usados/regiao/[slug]", () => {
+  it("renderiza Link com href para /{uf}/regiao/{city}", () => {
     render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
     const link = screen.getByTestId("region-cta-link");
     expect(link).toBeInTheDocument();
-    expect(link.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
+    expect(link.getAttribute("href")).toBe("/sp/regiao/atibaia");
   });
 
   it("texto visível inclui o nome da cidade", () => {
@@ -82,7 +82,7 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
     // componente passa por encodeURIComponent.
     render(<RegionCtaLink slug="rio-de-janeiro-rj" cityName="Rio de Janeiro" />);
     const link = screen.getByTestId("region-cta-link");
-    expect(link.getAttribute("href")).toBe("/carros-usados/regiao/rio-de-janeiro-rj");
+    expect(link.getAttribute("href")).toBe("/rj/regiao/rio-de-janeiro");
   });
 
   it("PR 2: é CTA primary filled (bg-primary, não outline neutro)", () => {

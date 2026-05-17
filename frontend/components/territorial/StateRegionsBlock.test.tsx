@@ -11,7 +11,7 @@ function buildRegion(overrides: Partial<StateRegionSummary> = {}): StateRegionSu
     name: "Região de Atibaia",
     baseCitySlug: "atibaia-sp",
     baseCityName: "Atibaia",
-    href: "/carros-usados/regiao/atibaia-sp",
+    href: "/sp/regiao/atibaia",
     cityNames: ["Atibaia", "Itatiba", "Jarinu"],
     citySlugs: ["atibaia-sp", "itatiba-sp", "jarinu-sp"],
     adsCount: 12,
@@ -40,7 +40,7 @@ describe("StateRegionsBlock — renderização básica", () => {
 
   it("renderiza um card por região (com limite default 8)", () => {
     const many = Array.from({ length: 10 }, (_, i) =>
-      buildRegion({ slug: `regiao-${i}-sp`, baseCitySlug: `regiao-${i}-sp`, baseCityName: `Região ${i}`, name: `Região de Região ${i}`, href: `/carros-usados/regiao/regiao-${i}-sp` })
+      buildRegion({ slug: `regiao-${i}-sp`, baseCitySlug: `regiao-${i}-sp`, baseCityName: `Região ${i}`, name: `Região de Região ${i}`, href: `/sp/regiao/regiao-${i}` })
     );
     render(<StateRegionsBlock stateName="São Paulo" regions={many} />);
     const cards = screen.getAllByTestId(/^state-region-card-/);
@@ -105,10 +105,10 @@ describe("StateRegionsBlock — conteúdo dos cards", () => {
 });
 
 describe("StateRegionsBlock — segurança dos links", () => {
-  it("href aponta para /carros-usados/regiao/[slug] (não Brasil)", () => {
+  it("href aponta para /{uf}/regiao/{city} (não Brasil)", () => {
     render(<StateRegionsBlock stateName="São Paulo" regions={[buildRegion()]} />);
     const link = screen.getByTestId("state-region-card-atibaia-sp");
-    expect(link.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
+    expect(link.getAttribute("href")).toBe("/sp/regiao/atibaia");
   });
 
   it("nenhum link aponta para /comprar?state= ou texto 'Brasil'", () => {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { stateNameFromUf } from "@/lib/buy/territory-variant";
+import { slugToAncoraHref } from "@/lib/regions/ancora-url";
 import {
   getStateCuratedCities,
   type StateCuratedCity,
@@ -36,7 +37,7 @@ type StateTerritorialShortcutsProps = {
 };
 
 function CityCard({ city, ufUpper }: { city: StateCuratedCity; ufUpper: string }) {
-  const citySlug = encodeURIComponent(city.slug);
+  const citySlug = encodeURIComponent(city.slug); // used for /carros-em/ link
   return (
     <li className="rounded-xl border border-cnc-line bg-white p-4 transition hover:border-primary/40 hover:shadow-sm">
       <div className="flex items-baseline justify-between gap-2">
@@ -54,7 +55,7 @@ function CityCard({ city, ufUpper }: { city: StateCuratedCity; ufUpper: string }
           <span aria-hidden="true">→</span>
         </Link>
         <Link
-          href={`/carros-usados/regiao/${citySlug}`}
+          href={slugToAncoraHref(city.slug)}
           className="inline-flex items-center gap-1 text-xs font-medium text-cnc-muted transition hover:text-primary"
         >
           Região de {city.name}

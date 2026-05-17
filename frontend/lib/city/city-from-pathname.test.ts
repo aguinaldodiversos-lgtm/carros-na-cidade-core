@@ -27,8 +27,8 @@ describe("CITY_SLUG_REGEX", () => {
 });
 
 describe("extractCitySlugFromPathname — rotas territoriais", () => {
-  it("extrai slug de /carros-usados/regiao/[slug]", () => {
-    expect(extractCitySlugFromPathname("/carros-usados/regiao/atibaia-sp")).toBe("atibaia-sp");
+  it("extrai slug de /sp/regiao/[city] (ancora URL)", () => {
+    expect(extractCitySlugFromPathname("/sp/regiao/atibaia")).toBe("atibaia-sp");
   });
 
   it("extrai slug de /carros-em/[slug]", () => {
@@ -59,7 +59,7 @@ describe("extractCitySlugFromPathname — rotas territoriais", () => {
 
   it("tolera trailing slash", () => {
     expect(extractCitySlugFromPathname("/carros-em/atibaia-sp/")).toBe("atibaia-sp");
-    expect(extractCitySlugFromPathname("/carros-usados/regiao/atibaia-sp/")).toBe("atibaia-sp");
+    expect(extractCitySlugFromPathname("/sp/regiao/atibaia/")).toBe("atibaia-sp");
   });
 });
 
@@ -76,13 +76,13 @@ describe("extractCitySlugFromPathname — casos que devem retornar null", () => 
   it("rejeita prefixo territorial sem slug", () => {
     expect(extractCitySlugFromPathname("/carros-em/")).toBeNull();
     expect(extractCitySlugFromPathname("/carros-em")).toBeNull();
-    expect(extractCitySlugFromPathname("/carros-usados/regiao/")).toBeNull();
-    expect(extractCitySlugFromPathname("/carros-usados/regiao")).toBeNull();
+    expect(extractCitySlugFromPathname("/sp/regiao/")).toBeNull();
+    expect(extractCitySlugFromPathname("/sp/regiao")).toBeNull();
   });
 
   it("rejeita subpaths (slug com segmento adicional)", () => {
     expect(extractCitySlugFromPathname("/carros-em/atibaia-sp/comparar")).toBeNull();
-    expect(extractCitySlugFromPathname("/carros-usados/regiao/atibaia-sp/oportunidades")).toBeNull();
+    expect(extractCitySlugFromPathname("/sp/regiao/atibaia/oportunidades")).toBeNull();
   });
 
   it("rejeita segmento que não casa com o formato canônico", () => {

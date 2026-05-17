@@ -9,18 +9,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["@aws-sdk/client-s3"],
   },
-  async redirects() {
-    return [
-      // Fase 1 — urgência: links externos chegam com sufixo -sp e recebem 404
-      // porque a rota /carros-usados/regiao/[slug] está gated por feature flag.
-      // 302 (temporário): em Fase 4 este redirect vira 301 → /sp/regiao/:cidade.
-      {
-        source: "/carros-usados/regiao/:cidade-sp",
-        destination: "/carros-em/:cidade-sp",
-        permanent: false,
-      },
-    ];
-  },
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/images/favicon.png" }];
   },

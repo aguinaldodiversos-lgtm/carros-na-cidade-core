@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ANCORA_PATH_REGEX,
   REGIONAL_PATH_REGEX,
   decideRegionalMiddlewareAction,
+  extractAncoraParams,
   extractRegionalSlug,
   isFlagEnabled,
   validateRegionalSlug,
@@ -332,5 +334,34 @@ describe("decideRegionalMiddlewareAction — política de gate", () => {
       .map((v) => decideRegionalMiddlewareAction(true, v))
       .filter((a) => a.kind === "pass-valid").length;
     expect(passCount).toBe(1);
+  });
+});
+
+describe("ANCORA_PATH_REGEX e extractAncoraParams", () => {
+  it("/sp/regiao/atibaia → { uf: 'sp', ancora: 'atibaia' }", () => {
+    expect(extractAncoraParams("/sp/regiao/atibaia")).toEqual({ uf: "sp", ancora: "atibaia" });
+  });
+
+  it("/rj/regiao/rio-de-janeiro → { uf: 'rj', ancora: 'rio-de-janeiro' }", () => {
+    expect(extractAncoraParams("/rj/regiao/rio-de-janeiro")).toEqual({
+      uf: "rj",
+      ancora: "rio-de-janeiro",
+    });
+  });
+
+  it("/sp/regiao/ (sem ancora) → null", () => {
+    expect(extractAncoraParams("/sp/regiao/")).toBeNull();
+  });
+
+  it("/sp/regiao (sem ancora e sem slash) → null", () => {
+    expect(extractAncoraParams("/sp/regiao")).toBeNull();
+  });
+
+  it("/sp/regiao/atibaia/oportunidades (subpath) → null", () => {
+    expect(extractAncoraParams("/sp/regiao/atibaia/oportunidades")).toBeNull();
+  });
+
+  it("ANCORA_PATH_REGEX.test('/sp/regiao/atibaia?foo=bar') → false", () => {
+    expect(ANCORA_PATH_REGEX.test("/sp/regiao/atibaia?foo=bar")).toBe(false);
   });
 });

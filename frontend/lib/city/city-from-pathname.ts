@@ -58,6 +58,13 @@ const TERRITORIAL_ROUTE_PREFIXES: readonly string[] = [
 ];
 
 /**
+ * Regex para a nova URL regional `/:uf/regiao/:ancora`.
+ * Captura: $1 = uf (2 letras), $2 = ancora (slug sem sufixo).
+ * Rejeita subpaths e trailing slash inconsistentes.
+ */
+const ANCORA_PATH_RE = /^\/([a-z]{2})\/regiao\/([a-z0-9-]+)\/?$/;
+
+/**
  * Devolve o slug da cidade derivado do pathname, ou `null` se a rota
  * não for territorial reconhecida ou o segmento não casar com o formato
  * de slug canônico.
@@ -81,6 +88,13 @@ export function extractCitySlugFromPathname(pathname: string | null | undefined)
     if (rest.includes("/")) return null;
     if (!CITY_SLUG_REGEX.test(rest)) return null;
     return rest;
+  }
+
+  // Nova URL regional `/:uf/regiao/:ancora` → reconstrói slug como `ancora-uf`.
+  const ancoraMatch = ANCORA_PATH_RE.exec(path);
+  if (ancoraMatch) {
+    const reconstructed = `${ancoraMatch[2]}-${ancoraMatch[1]}`;
+    if (CITY_SLUG_REGEX.test(reconstructed)) return reconstructed;
   }
 
   return null;

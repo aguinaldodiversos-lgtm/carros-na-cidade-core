@@ -2,32 +2,28 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   decideRegionalMiddlewareAction,
-  extractRegionalSlug,
+  extractAncoraParams,
   isFlagEnabled,
-  validateRegionalSlug,
+  validateAncoraPath,
 } from "@/lib/regional-page-guard";
 
 /**
  * Middleware do frontend. Responsabilidades:
  *
- * 1. **Hard gate da Página Regional** (`/carros-usados/regiao/:slug`):
+ * 1. **Hard gate da Nova Página Regional** (`/:uf/regiao/:ancora`):
  *    - Sem `REGIONAL_PAGE_ENABLED="true"` → 404 HTTP real imediato.
- *    - Com flag on + slug inválido → 404 HTTP real após validar no
- *      backend.
- *    - Com flag on + slug válido → deixa passar, App Router renderiza.
+ *    - Com flag on + âncora inválida → 404 HTTP real após validar no
+ *      backend (is_ancora = false ou cidade inexistente).
+ *    - Com flag on + âncora válida → deixa passar, App Router renderiza.
+ *
+ *    A rota legada `/carros-usados/regiao/[slug]` foi convertida a
+ *    redirect 308 permanente (Fase 4) e não precisa mais de gate —
+ *    ela redireciona incondicionalmente, independente da flag.
  *
  *    POR QUE NO MIDDLEWARE em vez de só no page.tsx?
- *    No Next 14.2 App Router, `notFound()` dentro de Server Component
- *    pode retornar status 200 (o `<head>` já foi flushed; o status code
- *    foi comitado). Reproduzido em produção em 2026-05-10: smoke
- *    contra rota regional com flag off retornava 200 + body com
- *    `data-dgst="NEXT_NOT_FOUND"`. Middleware roda ANTES do App
- *    Router, então `NextResponse(null, { status: 404 })` aqui garante
- *    o status real.
- *
- *    A page.tsx mantém o gate interno (`notFound()`) como defesa em
- *    profundidade — se o middleware falhar/for desativado, a página
- *    ainda recusa renderizar.
+ *    Mesmo motivo da lógica anterior: Next 14.2 pode retornar 200 com
+ *    NEXT_NOT_FOUND quando notFound() é chamado depois do <head> ser
+ *    flushed. Middleware garante 404 HTTP real.
  *
  * 2. **Redirects 301 de URLs legadas** (existente):
  *    - /carros-{em,baratos-em,automaticos-em}-[slug] → versão com `/`
@@ -67,37 +63,29 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const territorialContext = withPathnameHeader(request);
 
-  // ── 1. Hard gate da Regional (antes de qualquer outra lógica). ─────
+  // ── 1. Hard gate da Nova Página Regional (`/:uf/regiao/:ancora`). ────
   //
-  // IMPORTANTE: a decisão de "é rota regional?" é feita aqui dentro via
-  // `extractRegionalSlug` (regex testado), NÃO pelo matcher do Next.
-  // Validamos empiricamente que o `path-to-regexp` do Next 14 com
-  // `/carros-usados/regiao/:slug` no matcher NÃO casava em produção
-  // (rota chegava no App Router sem passar pelo middleware). Mover o
-  // pattern matching para dentro elimina a dependência de quirks do
-  // matcher e usa o regex que já tem cobertura unit (20 testes).
-  const regionalSlug = extractRegionalSlug(pathname);
-  if (regionalSlug !== null) {
+  // A rota `/carros-usados/regiao/[slug]` foi convertida a redirect 308
+  // permanente (Fase 4) e NÃO precisa mais de gate aqui — ela sempre
+  // redireciona, independente de flag.
+  //
+  // Esta verificação protege a NOVA rota `/:uf/regiao/:ancora`, pelo mesmo
+  // motivo da lógica anterior: Next 14.2 pode retornar status 200 com body
+  // NEXT_NOT_FOUND quando `notFound()` é chamado em Server Component depois
+  // que o <head> já foi flushed. O middleware garante o status HTTP real.
+  const ancoraParams = extractAncoraParams(pathname);
+  if (ancoraParams !== null) {
     const flagOn = isFlagEnabled();
 
-    // Curto-circuito explícito: flag off NÃO chama o backend para evitar
-    // tráfego desnecessário e cold-start spurious. O decisor abaixo
-    // também lida com flag off, mas pular o fetch aqui é eficiência pura.
     if (!flagOn) {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
       return blocked;
     }
 
-    const validation = await validateRegionalSlug(regionalSlug);
+    const validation = await validateAncoraPath(ancoraParams.uf, ancoraParams.ancora);
     const action = decideRegionalMiddlewareAction(flagOn, validation);
 
-    // Política de decisão (ver `decideRegionalMiddlewareAction` para
-    // racional): `unavailable` NUNCA passa para o App Router porque
-    // o `notFound()` da page.tsx no Next 14.2 retorna soft 404 (200
-    // com body NEXT_NOT_FOUND), problema reproduzido em produção em
-    // 2026-05-11. 503 com `Retry-After` é a resposta correta para
-    // "não consegui validar" — semanticamente honesta, SEO-safe.
     if (action.kind === "pass-valid") {
       const passed = NextResponse.next(territorialContext);
       passed.headers.set("X-Middleware-Regional", "passed-valid");
@@ -115,9 +103,6 @@ export async function middleware(request: NextRequest) {
       blocked.headers.set("Retry-After", "60");
       return blocked;
     }
-    // block-flag-off — defesa em profundidade. O curto-circuito acima já
-    // tratou flag=off, mas o tipo do `action` permite esse caminho e o
-    // exhaustive-check torna a função type-safe contra novas variantes.
     const blocked = new NextResponse(null, { status: 404 });
     blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
     return blocked;
@@ -194,18 +179,23 @@ export async function middleware(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    // Hard gate da Regional + injeção do x-cnc-pathname.
-    "/carros-usados/regiao/:path*",
-
     // Redirects 301 legados (hífen único → barra).
     "/carros-em-:path*",
     "/carros-baratos-em-:path*",
     "/carros-automaticos-em-:path*",
 
+    // Rota legada de região — agora só redireciona (308 permanente).
+    // Mantida no matcher para injeção do x-cnc-pathname; não tem gate.
+    "/carros-usados/regiao/:path*",
+
+    // Nova rota regional `/:uf/regiao/:ancora` — gate de feature flag
+    // + injeção do x-cnc-pathname. O pattern `:uf([a-z]{2})` filtra
+    // apenas segmentos de 2 letras minúsculas para não conflitar com
+    // rotas existentes como /comprar, /carros-em, etc.
+    "/:uf([a-z]{2})/regiao/:path*",
+
     // Rotas territoriais que precisam do `x-cnc-pathname` para o
-    // RootLayout derivar a cidade ativa SSR. Sem isso, o header
-    // server-rendered cai em DEFAULT_CITY (sao-paulo-sp) mesmo em
-    // páginas de outra cidade — bug auditoria 2026-05-11.
+    // RootLayout derivar a cidade ativa SSR.
     "/carros-em/:path*",
     "/carros-baratos-em/:path*",
     "/carros-automaticos-em/:path*",

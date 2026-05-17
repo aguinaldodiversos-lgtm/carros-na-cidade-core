@@ -137,7 +137,7 @@ describe("resolveTerritory — input explícito de região", () => {
     expect(ctx.region?.citySlugs).toContain("braganca-paulista-sp");
     expect(ctx.region?.citySlugs).toContain("itatiba-sp");
     expect(ctx.region?.radiusKm).toBe(80);
-    expect(ctx.canonicalUrl).toBe("/carros-usados/regiao/atibaia-sp");
+    expect(ctx.canonicalUrl).toBe("/sp/regiao/atibaia");
     expect(ctx.title).toBe("Carros usados na Região de Atibaia");
   });
 
