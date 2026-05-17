@@ -175,7 +175,7 @@ export function VehicleSearchResultsPage({
         : "Compare ofertas, refinie filtros e descubra o melhor contexto para comprar ou vender seu próximo veículo.",
       quickLinks: cityProfile
         ? [
-            { label: `Cidade ${cityProfile.name}`, href: `/cidade/${cityProfile.slug}` },
+            { label: `Cidade ${cityProfile.name}`, href: `/carros-em/${cityProfile.slug}` },
             { label: "FIPE local", href: `/tabela-fipe/${cityProfile.slug}` },
             { label: "Simulador", href: `/simulador-financiamento/${cityProfile.slug}` },
             { label: "Blog local", href: `/blog/${cityProfile.slug}` },
@@ -263,7 +263,7 @@ export function VehicleSearchResultsPage({
                     <SearchSortSelect value={filters.sort || "recent"} onChange={pushFilters} />
                     {cityProfile ? (
                       <Link
-                        href={`/cidade/${cityProfile.slug}`}
+                        href={`/carros-em/${cityProfile.slug}`}
                         className="inline-flex h-11 items-center justify-center rounded-xl bg-[#f5f7fb] px-4 text-sm font-semibold text-[#6b7488] transition hover:bg-[#edf1f7]"
                       >
                         Ver hub da cidade

@@ -53,7 +53,7 @@ function buildColumns(city: BuyCityContext, data: CatalogSeoBlockProps): SeoColu
     data.stateCities && data.stateCities.length > 0
       ? data.stateCities.slice(0, 6).map((c) => ({
           label: c.name,
-          href: `/cidade/${encodeURIComponent(c.slug)}`,
+          href: `/carros-em/${encodeURIComponent(c.slug)}`,
         }))
       : [
           { label: "São Paulo", slug: "sao-paulo-sp" },

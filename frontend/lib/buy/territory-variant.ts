@@ -115,6 +115,31 @@ export function cityContextFromRef(ref: CityRef | null | undefined): BuyCityCont
 }
 
 /**
+ * Retorna true quando os searchParams contêm filtros de produto (brand, model,
+ * q, faixa de preço etc.) — ou seja, a URL não é a vitrine canônica limpa.
+ * Usado em generateMetadata para emitir robots:noindex nessas variantes,
+ * evitando indexação de páginas de filtro com canonical apontando para a URL
+ * limpa (o canonical só consolida; noindex é mais explícito para o crawl budget).
+ */
+export function hasRestrictiveFilters(filters: AdsSearchFilters): boolean {
+  return Boolean(
+    filters.q ||
+      filters.brand ||
+      filters.model ||
+      filters.min_price ||
+      filters.max_price ||
+      filters.year_min ||
+      filters.year_max ||
+      filters.mileage_max ||
+      filters.fuel_type ||
+      filters.transmission ||
+      filters.body_type ||
+      filters.below_fipe === true ||
+      filters.highlight_only === true
+  );
+}
+
+/**
  * Normaliza filtros para o catálogo estadual:
  * - força UF;
  * - remove qualquer resquício de território de cidade;

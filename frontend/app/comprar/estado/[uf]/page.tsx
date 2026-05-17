@@ -17,6 +17,7 @@ import {
 import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
 import {
   buildStatePath,
+  hasRestrictiveFilters,
   normalizeStateFilters,
   normalizeUf,
   stateNameFromUf,
@@ -114,10 +115,16 @@ export async function generateMetadata({
   // múltiplas URLs canônicas concorrentes para a mesma página.
   const canonicalPath = buildStatePath(uf);
 
+  // URLs filtradas (brand, model, q, etc.) não devem ser indexadas.
+  // Canonical já aponta para URL limpa; noindex é mais explícito para
+  // que o Googlebot não desperdice crawl budget em variações de filtro.
+  const noindex = hasRestrictiveFilters(filters);
+
   return {
     title,
     description,
     alternates: { canonical: canonicalPath },
+    ...(noindex && { robots: { index: false, follow: true } }),
     openGraph: {
       title,
       description,

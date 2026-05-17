@@ -14,7 +14,7 @@ export function getTerritorialRoutesForCity(citySlug: string) {
     comprarBelowFipe: `/comprar?below_fipe=true&city_slug=${enc}`,
     fipe: `/tabela-fipe/${enc}`,
     financing: `/simulador-financiamento/${enc}`,
-    cidade: `/cidade/${enc}`,
+    cidade: `/carros-em/${enc}`,
     blog: `/blog/${enc}`,
   } as const;
 }
@@ -162,8 +162,8 @@ export function isNavLinkActive(
   if (path.startsWith("/simulador-financiamento")) {
     return pathname.startsWith("/simulador-financiamento");
   }
-  if (path.startsWith("/cidade/")) {
-    return pathname.startsWith("/cidade/");
+  if (path.startsWith("/carros-em/")) {
+    return pathname.startsWith("/carros-em/");
   }
 
   if (path === "/comprar") {

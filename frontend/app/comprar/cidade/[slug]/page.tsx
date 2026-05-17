@@ -20,6 +20,7 @@ import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-terri
 import {
   cityContextFromRef,
   cityContextFromSlug,
+  hasRestrictiveFilters,
   isValidCitySlug,
   normalizeCityFilters,
   stateNameFromUf,
@@ -74,29 +75,6 @@ function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
     Array.isArray(response.facets.models) &&
     Array.isArray(response.facets.fuelTypes) &&
     Array.isArray(response.facets.bodyTypes)
-  );
-}
-
-/**
- * Só aciona fallback territorial se o usuário NÃO filtrou nada específico.
- * Se ele escolheu brand=Honda e a cidade não tem Honda, manter vazio é o certo —
- * empurrar Atibaia como fallback mascararia a ausência do filtro dele.
- */
-function hasRestrictiveFilters(filters: AdsSearchFilters): boolean {
-  return Boolean(
-    filters.q ||
-      filters.brand ||
-      filters.model ||
-      filters.min_price ||
-      filters.max_price ||
-      filters.year_min ||
-      filters.year_max ||
-      filters.mileage_max ||
-      filters.fuel_type ||
-      filters.transmission ||
-      filters.body_type ||
-      filters.below_fipe === true ||
-      filters.highlight_only === true
   );
 }
 
@@ -170,10 +148,16 @@ export async function generateMetadata({
   // antes vazavam via buildCityPath(slug, filters).
   const canonicalPath = `/carros-em/${encodeURIComponent(slug)}`;
 
+  // URLs filtradas (brand, model, q, etc.) não devem ser indexadas: o
+  // canonical já aponta para a URL limpa, mas robots:noindex é mais explícito
+  // e evita que o Googlebot gaste crawl budget em variações de filtro.
+  const noindex = hasRestrictiveFilters(filters);
+
   return {
     title,
     description,
     alternates: { canonical: canonicalPath },
+    ...(noindex && { robots: { index: false, follow: true } }),
     openGraph: {
       title,
       description,
