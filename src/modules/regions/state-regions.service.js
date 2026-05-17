@@ -195,7 +195,7 @@ export async function listFeaturedRegionsByUf(uf, options = {}) {
       name: `Região de ${region.base.name}`,
       baseCitySlug: region.base.slug,
       baseCityName: region.base.name,
-      href: `/carros-usados/regiao/${region.base.slug}`,
+      href: `/${region.base.state.toLowerCase()}/regiao/${region.base.slug.replace(/-[a-z]{2}$/, "")}`,
       cityNames,
       citySlugs,
       adsCount,

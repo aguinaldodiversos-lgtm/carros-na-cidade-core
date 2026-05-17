@@ -1,7 +1,7 @@
 import express from "express";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import { requireInternalToken } from "./regions.middleware.js";
-import { getRegionByBaseSlugDynamic } from "./regions.service.js";
+import { getAncoraBySlugPart, getRegionByBaseSlugDynamic } from "./regions.service.js";
 
 /**
  * Rotas internas do recurso "região aproximada".
@@ -29,6 +29,43 @@ router.get(
   async (req, res, next) => {
     try {
       const region = await getRegionByBaseSlugDynamic(req.params.baseCitySlug);
+      if (!region) {
+        return res.status(404).json({ ok: false, error: "Region not found" });
+      }
+      return res.status(200).json({ ok: true, data: region });
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
+/**
+ * Resolve a região de uma cidade-âncora pelo padrão de URL público:
+ *   GET /api/internal/regions/ancora/:uf/:ancora
+ *
+ * Diferença em relação à rota /:baseCitySlug:
+ *  - Aceita ancoraPart sem sufixo de UF (ex: "atibaia" em vez de "atibaia-sp").
+ *  - Rejeita cidades que não sejam âncoras ativas (is_ancora = false).
+ *  - Cache Redis 5 min por (uf, ancora).
+ *
+ * Usado pelo BFF `fetch-region-ancora.ts` que alimenta a Página Regional
+ * nova em /[uf]/regiao/[ancora].
+ */
+router.get(
+  "/ancora/:uf/:ancora",
+  requireInternalToken,
+  cacheGet({
+    prefix: "internal:regions:ancora",
+    ttlSeconds: 300,
+    varyBy: ["params"],
+  }),
+  async (req, res, next) => {
+    try {
+      const anchor = await getAncoraBySlugPart(req.params.ancora, req.params.uf);
+      if (!anchor) {
+        return res.status(404).json({ ok: false, error: "Ancora not found" });
+      }
+      const region = await getRegionByBaseSlugDynamic(anchor.slug);
       if (!region) {
         return res.status(404).json({ ok: false, error: "Region not found" });
       }
