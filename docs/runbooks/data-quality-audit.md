@@ -190,32 +190,77 @@ Para cada um, decidir:
 **Rollback:** se classificou como "despublicar" mas era real, basta
 voltar `status = 'active'`.
 
-### Fase C — Despublicar anúncios claramente de teste
+### Fase C — Despublicar anúncios claramente de teste (PR 7)
 
-**O que fazer:** escrever script `scripts/audit/cleanup-test-ads.mjs`
-seguindo o padrão de `scripts/cleanup-orphan-test-ads.mjs` existente:
+**Implementado:** `scripts/cleanup/archive-test-ads.mjs` + `restore-archived-ads.mjs`.
 
-- Lê o JSON da Fase B (com `decision: "unpublish"`)
-- Default `--dry-run`, exige `--execute` explícito
-- Usa `withTransaction` do `db.js`
-- Snapshot pré-transação em arquivo separado para rollback
-- Atualiza `status = 'archived_test'` em vez de DELETE (preserva
-  evidência)
+**Política**: arquiva via `UPDATE ads SET status='archived_test'` apenas
+findings com `kind=test_ad_suspect` AND `confidence=high`. Medium/low
+NÃO são tocados — exigem decisão humana.
 
-**Não fazer parte deste PR** — depende dos dados reais da Fase A/B.
+**Padrão de segurança ("rehearsal commit")**: o UPDATE roda EM TRANSAÇÃO
+mesmo no dry-run, mas é revertido. Isso valida constraints (se
+`archived_test` violar algum check constraint, o erro aparece no
+dry-run) sem alterar dados. Apenas `--execute --yes` (ambos juntos)
+disparam COMMIT.
 
-**Comando previsto:**
+**Comando (dry-run obrigatório antes):**
 ```bash
-node scripts/audit/cleanup-test-ads.mjs --decision-file=reports/audit/decisions-2026-05-15.json --dry-run
-# revisar saída
-node scripts/audit/cleanup-test-ads.mjs --decision-file=... --execute
+# 1. Lê reports/audit/ads-quality-LATEST.json automaticamente, mostra
+#    inventário ATUAL + SIMULADO, gera snapshot, faz UPDATE em TX,
+#    ROLLBACK no final. Salva snapshot + result em reports/cleanup/.
+node scripts/cleanup/archive-test-ads.mjs
+
+# 2. Idem, mas COMMIT no final:
+node scripts/cleanup/archive-test-ads.mjs --execute --yes
+
+# 3. Aplica E roda os 3 audits de novo:
+node scripts/cleanup/archive-test-ads.mjs --execute --yes --reaudit
+
+# Flags úteis:
+#   --status=archived           (se archived_test violar constraint)
+#   --audit-file=PATH           (não usar o mais recente)
+#   --min-remaining=5           (ajusta threshold de alerta)
 ```
 
-**Risco:** médio (modifica produção). Mitigado por dry-run + snapshot +
-`archived_test` em vez de DELETE.
+**Inventário alertado**: o script imprime `Inventário ATUAL` e
+`Inventário SIMULADO`. Se restarem `< --min-remaining` (default 10)
+anúncios após cleanup, emite alerta:
 
-**Rollback:** `UPDATE ads SET status = 'active' WHERE id IN (...)`
-restaurando do snapshot.
+> ⚠️ Após arquivar anúncios de teste, restarão apenas N anúncio(s)
+> ativo(s) (< 10). Não ativar SEO regional. A prioridade é popular
+> inventário real antes de indexar.
+
+**Saídas geradas em `reports/cleanup/`:**
+
+- `archive-test-ads-snapshot-<ts>.json` — estado PRÉ-update de cada
+  linha tocada. Use isso para rollback.
+- `archive-test-ads-result-<ts>.json` — sumário da execução
+  (committed/rolledBack, candidates, affectedRows, inventoryBefore/After,
+  alerts, seoRecommendation).
+
+**Risco:** médio (modifica produção). Mitigado por:
+- dry-run rehearsal (valida constraint, captura rowcount).
+- Dois flags obrigatórios para escrever (`--execute --yes`).
+- Snapshot transacional ANTES do UPDATE.
+- UPDATE com `WHERE id = ANY(...) AND status = 'active'` — não toca
+  linhas que mudaram de status entre audit e execute.
+- Sem DELETE (validado por teste estático em `tests/cleanup/no-delete.test.js`).
+
+**Rollback:** 
+```bash
+node scripts/cleanup/restore-archived-ads.mjs \
+  --snapshot-file=reports/cleanup/archive-test-ads-snapshot-<ts>.json
+
+# Para aplicar de fato:
+node scripts/cleanup/restore-archived-ads.mjs \
+  --snapshot-file=reports/cleanup/archive-test-ads-snapshot-<ts>.json \
+  --execute --yes
+```
+
+O restore só toca linhas que ainda estão em `targetStatus` (default
+`archived_test`). Se algo mudou desde o archive, essa linha é pulada
+(não jogada — só registrada como `skipped` no result).
 
 ### Fase D — Corrigir city_slug/state
 
