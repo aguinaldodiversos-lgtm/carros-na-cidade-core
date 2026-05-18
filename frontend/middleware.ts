@@ -108,6 +108,31 @@ export async function middleware(request: NextRequest) {
     return blocked;
   }
 
+  // ── 1.5. Redirect 308 da rota legada `/carros-usados/regiao/:slug`.
+  //
+  // POR QUE NO MIDDLEWARE em vez de no page.tsx?
+  // O page.tsx usa `permanentRedirect()` (Server Component), mas Next 14.2
+  // tem um bug conhecido: se o redirect é chamado após o <head> ter sido
+  // flushed via streaming SSR, Next NÃO emite o status HTTP 308 — em vez
+  // disso retorna 200 + `<meta http-equiv="refresh">` no body. Isso quebra
+  // SEO (crawlers preferem 308 real) e cria flicker visual.
+  //
+  // O middleware garante 308 HTTP de verdade, antes de qualquer SSR.
+  // O page.tsx fica como fallback defensivo caso o matcher mude.
+  const legacyRegional = /^\/carros-usados\/regiao\/([a-z0-9-]+)\/?$/.exec(pathname);
+  if (legacyRegional?.[1]) {
+    const fullSlug = legacyRegional[1].replace(/\/+$/, "");
+    const ufMatch = /^(.+)-([a-z]{2})$/.exec(fullSlug);
+    if (ufMatch) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/${ufMatch[2]}/regiao/${ufMatch[1]}`;
+      return NextResponse.redirect(url, 308);
+    }
+    // Slug malformado (sem sufixo -uf) — 404 antes de chegar no page.tsx
+    // que faria notFound() (sujeito ao mesmo bug Next 14.2).
+    return new NextResponse(null, { status: 404 });
+  }
+
   // ── 2. Redirects 301 legados (preservados como estavam). ───────────
 
   const hyphenEm = /^\/carros-em-([^/]+)\/?$/.exec(pathname);
