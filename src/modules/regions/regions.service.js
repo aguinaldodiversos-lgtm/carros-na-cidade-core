@@ -401,7 +401,7 @@ export async function getCidadeAncoraProxima(lat, lng, uf) {
  * Parâmetros `options`:
  *   - page      {number}  página (1-based, default 1)
  *   - limit     {number}  itens por página (default 20, max 60)
- *   - status    {string}  default "ACTIVE"
+ *   - status    {string}  default "active"
  *
  * Retorna { ancora, radius_km, total, page, limit, ads } ou null se âncora
  * não existir.
@@ -413,7 +413,7 @@ export async function getAnunciosNaRegiao(ancoraPart, uf, options = {}) {
   const page = Math.max(1, Number(options.page) || 1);
   const limit = Math.min(60, Math.max(1, Number(options.limit) || 20));
   const offset = (page - 1) * limit;
-  const status = String(options.status || "ACTIVE");
+  const status = String(options.status || "active");
 
   let radius = 80;
   try {
@@ -505,16 +505,9 @@ export async function getAnunciosNaRegiao(ancoraPart, uf, options = {}) {
         ${commercialExpr} AS commercial_layer
       FROM ads a
       JOIN city_dist cd ON cd.city_id = a.city_id
-      JOIN subscription_plans plans ON plans.id = (
-        SELECT sp2.id FROM subscription_plans sp2
-        JOIN advertiser_subscriptions asub ON asub.plan_id = sp2.id
-        WHERE asub.advertiser_id = a.advertiser_id
-          AND asub.status = 'ACTIVE'
-        ORDER BY sp2.tier DESC
-        LIMIT 1
-      )
-      JOIN advertisers sp ON sp.id = a.advertiser_id
-      JOIN users u ON u.id = sp.user_id
+      LEFT JOIN advertisers sp ON sp.id = a.advertiser_id
+      LEFT JOIN users u ON u.id = sp.user_id
+      LEFT JOIN subscription_plans plans ON plans.id = u.plan_id
       WHERE a.status = $5
     )
     SELECT *, COUNT(*) OVER () AS total_count

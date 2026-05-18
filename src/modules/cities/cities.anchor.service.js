@@ -27,7 +27,7 @@ export async function markCityAsAncoraIfEligible(cityId) {
     const { rows } = await pool.query(
       `SELECT COUNT(*) AS cnt
        FROM ads
-       WHERE city_id = $1 AND status = 'ACTIVE'`,
+       WHERE city_id = $1 AND status = 'active'`,
       [cityId]
     );
     const activeCount = Number(rows[0]?.cnt ?? 0);
@@ -75,7 +75,7 @@ export async function deactivateStaleAncoras() {
        AND id NOT IN (
          SELECT DISTINCT city_id
          FROM ads
-         WHERE status = 'ACTIVE'
+         WHERE status = 'active'
            AND created_at >= NOW() - ($1 || ' days')::interval
        )`,
     [dias]

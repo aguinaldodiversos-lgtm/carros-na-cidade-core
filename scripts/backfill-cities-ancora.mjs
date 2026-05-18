@@ -54,7 +54,7 @@ export async function backfillCitiesAncora() {
     `
     SELECT c.id, c.slug, c.state, COUNT(a.id) AS active_ads
     FROM cities c
-    JOIN ads a ON a.city_id = c.id AND a.status = 'ACTIVE'
+    JOIN ads a ON a.city_id = c.id AND a.status = 'active'
     WHERE c.is_ancora = false
     GROUP BY c.id, c.slug, c.state
     HAVING COUNT(a.id) >= $1
@@ -86,7 +86,7 @@ export async function backfillCitiesAncora() {
       AND c.id IN (
         SELECT a.city_id
         FROM ads a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status = 'active'
         GROUP BY a.city_id
         HAVING COUNT(*) >= $1
       )
