@@ -47,7 +47,7 @@ import { getRegionByBaseSlugDynamic } from "./regions.service.js";
  *     name: "Região de Atibaia",
  *     baseCitySlug: "atibaia-sp",
  *     baseCityName: "Atibaia",
- *     href: "/carros-usados/regiao/atibaia-sp",
+ *     href: "/sp/regiao/atibaia",
  *     cityNames: ["Atibaia", "Bragança Paulista", ...],
  *     citySlugs: ["atibaia-sp", "braganca-paulista-sp", ...],
  *     adsCount: 12,

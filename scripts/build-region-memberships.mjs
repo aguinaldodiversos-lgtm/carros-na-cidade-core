@@ -125,8 +125,113 @@ async function rebuildMembershipsForBase(client, baseCity, candidatesInState) {
   return { layer1: members.filter((m) => m.layer === 1).length, layer2: members.filter((m) => m.layer === 2).length };
 }
 
-export async function buildRegionMemberships() {
+/**
+ * Filtro de UFs por arg `--uf=SP,MG` ou env `BUILD_UF=SP,MG`.
+ * Retorna `Set<string>` de UFs upper-case, ou `null` se "todas".
+ *
+ * Por que existe?
+ *   Render Postgres free-tier corta conexões longas no meio do build. Para
+ *   recuperação, é prático rodar em batches de 3-5 UFs com conexão fresca
+ *   a cada vez. Idempotência preservada (ON CONFLICT DO UPDATE no INSERT).
+ */
+export function parseUfFilter(argv = process.argv, env = process.env) {
+  const argRaw = argv.find((a) => typeof a === "string" && a.startsWith("--uf="));
+  const raw = argRaw ? argRaw.slice("--uf=".length) : env.BUILD_UF || "";
+  const trimmed = String(raw || "").trim();
+  if (!trimmed || trimmed.toUpperCase() === "ALL") return null;
+  const set = new Set(
+    trimmed
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => /^[A-Z]{2}$/.test(s))
+  );
+  return set.size ? set : null;
+}
+
+const CONNECTION_DROP_HINTS = [
+  "connection terminated",
+  "econnreset",
+  "client has encountered a connection error",
+  "terminating connection",
+  "server closed the connection unexpectedly",
+  "read econnreset",
+  "socket hang up",
+];
+
+function isConnectionDrop(err) {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return CONNECTION_DROP_HINTS.some((p) => msg.includes(p));
+}
+
+/**
+ * Processa uma UF inteira numa conexão dedicada, com retry em connection drop.
+ *
+ * Por que conexão por UF?
+ *   Antes, o script segurava um único `client` durante todo o loop de UFs.
+ *   Em ambientes com idle reaper agressivo (Render free-tier Postgres) ou
+ *   latência transcontinental, qualquer drop derrubava o build inteiro
+ *   sem chance de retomar. Conexão fresca por UF reduz a janela de
+ *   exposição e isola a falha — UFs já gravadas ficam (idempotência), e
+ *   a UF que caiu é retentada até MAX_ATTEMPTS.
+ *
+ * Handler `client.on('error', ...)`:
+ *   pg emite `error` async quando o socket cai entre queries. Sem handler,
+ *   Node derruba o processo com Unhandled 'error' event. Aqui nós só
+ *   logamos — o erro real vai bubble pela próxima `client.query()` e
+ *   cair no catch do retry-loop.
+ */
+async function processStateWithRetry(state, citiesInState, { maxAttempts = 3 } = {}) {
+  let attempt = 0;
+  let lastErr = null;
+
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    const client = await pool.connect();
+    client.on("error", (err) => {
+      console.warn(`[regions:build] [${state}] client error silenciado: ${err?.message || err}`);
+    });
+
+    let stateLayer1 = 0;
+    let stateLayer2 = 0;
+    let released = false;
+
+    try {
+      for (const baseCity of citiesInState) {
+        const stats = await rebuildMembershipsForBase(client, baseCity, citiesInState);
+        stateLayer1 += stats.layer1;
+        stateLayer2 += stats.layer2;
+      }
+      client.release();
+      released = true;
+      return { stateLayer1, stateLayer2, attempts: attempt };
+    } catch (err) {
+      lastErr = err;
+      // Em connection drop, devolver o client com erro para o pool descartá-lo.
+      // `release(err)` sinaliza ao pool que esta conexão está corrompida.
+      if (!released) {
+        try {
+          client.release(err);
+          released = true;
+        } catch {}
+      }
+
+      if (!isConnectionDrop(err)) throw err;
+      if (attempt >= maxAttempts) break;
+
+      const waitMs = Math.min(8000, 1000 * 3 ** (attempt - 1));
+      console.warn(
+        `[regions:build] [${state}] connection drop na tentativa ${attempt}/${maxAttempts}: ${err?.message}. Retentando em ${waitMs}ms…`
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+
+  throw lastErr || new Error(`[regions:build] [${state}] esgotou ${maxAttempts} tentativas`);
+}
+
+export async function buildRegionMemberships({ ufFilter } = {}) {
   const start = Date.now();
+  const filter = ufFilter === undefined ? parseUfFilter() : ufFilter;
 
   const { rows: cities } = await pool.query(
     `
@@ -151,46 +256,62 @@ export async function buildRegionMemberships() {
     byState.get(key).push(city);
   }
 
+  const plannedStates = [...byState.keys()].filter((s) => !filter || filter.has(s));
+  if (filter) {
+    console.log(`[regions:build] filtro UF ativo: ${plannedStates.join(", ")}`);
+  } else {
+    console.log(`[regions:build] processando todas as ${plannedStates.length} UFs`);
+  }
+
   const summary = {};
   let totalProcessed = 0;
   let totalLayer1 = 0;
   let totalLayer2 = 0;
+  const failedStates = [];
 
-  const client = await pool.connect();
-  try {
-    for (const [state, citiesInState] of byState) {
-      let stateLayer1 = 0;
-      let stateLayer2 = 0;
-
-      for (const baseCity of citiesInState) {
-        const stats = await rebuildMembershipsForBase(client, baseCity, citiesInState);
-        stateLayer1 += stats.layer1;
-        stateLayer2 += stats.layer2;
-        totalProcessed += 1;
-      }
-
+  for (const state of plannedStates) {
+    const citiesInState = byState.get(state);
+    try {
+      const { stateLayer1, stateLayer2, attempts } = await processStateWithRetry(
+        state,
+        citiesInState
+      );
       summary[state] = {
         cities: citiesInState.length,
         layer1Total: stateLayer1,
         layer2Total: stateLayer2,
+        attempts,
       };
       totalLayer1 += stateLayer1;
       totalLayer2 += stateLayer2;
-
+      totalProcessed += citiesInState.length;
+      const retryNote = attempts > 1 ? ` (recuperado em ${attempts} tentativas)` : "";
       console.log(
-        `[regions:build] ${state}: ${citiesInState.length} cidades, ${stateLayer1} memberships layer 1, ${stateLayer2} layer 2`
+        `[regions:build] ${state}: ${citiesInState.length} cidades, ${stateLayer1} memberships layer 1, ${stateLayer2} layer 2${retryNote}`
+      );
+    } catch (err) {
+      failedStates.push(state);
+      summary[state] = {
+        cities: citiesInState.length,
+        error: err?.message || String(err),
+      };
+      console.error(
+        `[regions:build] ${state}: FALHA após retries — ${err?.message || err}. Pulando para próxima UF.`
       );
     }
-  } finally {
-    client.release();
   }
 
   const elapsedSec = ((Date.now() - start) / 1000).toFixed(1);
   console.log(
     `[regions:build] OK — ${totalProcessed} cidades-base processadas, ${totalLayer1} memberships layer 1 + ${totalLayer2} layer 2 em ${elapsedSec}s.`
   );
+  if (failedStates.length) {
+    console.warn(
+      `[regions:build] UFs que falharam após retries: ${failedStates.join(", ")} — rode novamente com --uf=${failedStates.join(",")} para retomar.`
+    );
+  }
 
-  return { processed: totalProcessed, byState: summary };
+  return { processed: totalProcessed, byState: summary, failedStates };
 }
 
 // Auto-execução quando rodado via `node scripts/build-region-memberships.mjs`.

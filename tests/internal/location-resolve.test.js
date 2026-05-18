@@ -151,7 +151,7 @@ describe("location.service — resolveLocation (integração com região)", () =
     expect(result.region).toEqual({
       slug: "atibaia-sp",
       name: "Região de Atibaia",
-      href: "/carros-usados/regiao/atibaia-sp",
+      href: "/sp/regiao/atibaia",
       memberCount: 1,
     });
     expect(result.confidence).toBe("high");

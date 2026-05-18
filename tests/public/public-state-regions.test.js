@@ -139,7 +139,7 @@ describe("listFeaturedRegionsByUf — montagem de regiões", () => {
       name: "Região de Atibaia",
       baseCitySlug: "atibaia-sp",
       baseCityName: "Atibaia",
-      href: "/carros-usados/regiao/atibaia-sp",
+      href: "/sp/regiao/atibaia",
       cityNames: ["Atibaia", "Itatiba", "Jarinu"],
       citySlugs: ["atibaia-sp", "itatiba-sp", "jarinu-sp"],
       radiusKm: 80,
@@ -371,7 +371,7 @@ describe("controller GET /api/public/states/:uf/regions", () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.state).toEqual({ code: "SP", slug: "sp" });
     expect(res.body.data.regions).toHaveLength(1);
-    expect(res.body.data.regions[0].href).toBe("/carros-usados/regiao/atibaia-sp");
+    expect(res.body.data.regions[0].href).toBe("/sp/regiao/atibaia");
   });
 
   it("UF inválida (sem 2 letras) → 400", async () => {
