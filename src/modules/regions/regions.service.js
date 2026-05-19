@@ -268,6 +268,8 @@ export async function getRegionByBaseSlugDynamic(slug) {
       slug: base.slug,
       name: base.name,
       state: base.state,
+      latitude: base.latitude != null ? Number(base.latitude) : null,
+      longitude: base.longitude != null ? Number(base.longitude) : null,
     },
     radius_km: radius,
     members: rows.map((row) => ({
