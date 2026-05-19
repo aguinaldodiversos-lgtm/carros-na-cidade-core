@@ -64,6 +64,49 @@ export function isRegionalPageIndexable(): boolean {
 }
 
 /**
+ * Threshold mínimo de anúncios ATIVOS necessário para a Página Regional
+ * ser indexável, MESMO QUE `REGIONAL_PAGE_INDEXABLE=true`.
+ *
+ * Lê de `REGIONAL_INDEX_MIN_ADS` (number). Default `0` = sem threshold
+ * (depende apenas de `REGIONAL_PAGE_INDEXABLE`).
+ *
+ * Uso recomendado no rollout nacional: começar com 0 ou 1 enquanto a
+ * base de anúncios é pequena; subir para 10 / 20 / 30 conforme o volume
+ * de anúncios reais cresce. Evita indexar regional vazia, que prejudica
+ * sinal SEO e pode gerar penalização por "thin content".
+ *
+ * Combinação completa para decidir indexabilidade:
+ *   `shouldIndexRegionalPage(adsCount)` (helper abaixo) — sempre prefira
+ *   esse helper sobre `isRegionalPageIndexable()` direto.
+ */
+export function regionalIndexMinAds(): number {
+  const raw = process.env.REGIONAL_INDEX_MIN_ADS;
+  if (raw == null || raw === "") return 0;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.floor(parsed);
+}
+
+/**
+ * Decisão final de indexabilidade de uma Página Regional específica,
+ * combinando:
+ *   1. Flag global `REGIONAL_PAGE_INDEXABLE=true`.
+ *   2. Threshold `REGIONAL_INDEX_MIN_ADS` (default 0 = sem threshold).
+ *
+ * Caller (page.tsx) já tem `adsCount` em mãos depois de chamar o BFF de
+ * busca — basta passar adiante.
+ *
+ * @param adsCount número de anúncios ativos da região (não da amostra,
+ *   o agregado `total` da paginação do backend).
+ */
+export function shouldIndexRegionalPage(adsCount: number): boolean {
+  if (!isRegionalPageIndexable()) return false;
+  const minAds = regionalIndexMinAds();
+  if (minAds <= 0) return true; // sem threshold configurado
+  return Number(adsCount || 0) >= minAds;
+}
+
+/**
  * Controla se a Página Regional emite canonical auto-referencial
  * (`/carros-usados/regiao/[slug]`) em vez de apontar para a cidade-base
  * (`/carros-em/[slug]`).

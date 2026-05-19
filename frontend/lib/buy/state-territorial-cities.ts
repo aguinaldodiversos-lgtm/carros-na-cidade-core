@@ -2,27 +2,40 @@
  * Lista curada de cidades destacadas por UF para o bloco de navegação
  * territorial da Página Estadual (`/comprar/estado/[uf]`).
  *
- * Por que curada e não derivada da pagination?
+ * ⚠️  ATENÇÃO — DESTAQUE ≠ COBERTURA:
+ *
+ *   Esta lista controla APENAS QUAIS cidades aparecem em destaque no
+ *   bloco `StateTerritorialShortcuts` da Página Estadual.
+ *
+ *   Ela NÃO controla cobertura nacional do sistema. NÃO limita quais
+ *   cidades podem ter Página Regional. NÃO é fonte de verdade para
+ *   resolver regiões.
+ *
+ *   Fonte de verdade para cobertura nacional:
+ *   ─────────────────────────────────────────
+ *     - Tabela `cities` no banco (5.5k+ cidades brasileiras).
+ *     - Qualquer cidade com (slug, UF, latitude, longitude) válidos
+ *       GERA Página Regional via `/carros-usados/regiao/{citySlug}`.
+ *     - O backend `getRegionByBaseSlug` resolve qualquer slug que existe
+ *       na tabela `cities` — independente desta curadoria.
+ *     - O middleware do frontend valida slug via
+ *       `/api/internal/regions/{citySlug}` (que consulta a tabela `cities`).
+ *
+ *   Exemplo: `sumare-sp` NÃO está nesta lista, mas
+ *   `/carros-usados/regiao/sumare-sp` funciona perfeitamente porque
+ *   Sumaré existe em `cities` com coordenadas — a Página Regional é gerada
+ *   dinamicamente.
+ *
+ * Por que curada e não derivada do catálogo?
  *   1. O catálogo estadual retorna uma amostra paginada — usar apenas as
- *      cidades que aparecem nessa amostra (17 cards na SP, por exemplo)
- *      esconde cidades reais com estoque ativo paginado fora.
- *   2. O backend ainda não expõe um endpoint de "cidades destacadas por
- *      UF". Quando expuser, trocar a fonte aqui sem mudar a interface
- *      pública (`getStateCuratedCities(uf)`).
+ *      cidades que aparecem nessa amostra esconde cidades reais com
+ *      estoque ativo paginado fora.
+ *   2. Curadoria garante que capitais e polos relevantes apareçam em
+ *      destaque mesmo em UFs com baixo volume inicial.
  *
- * Decisões:
- *   - Allowlist explícita por UF. UFs não mapeados retornam lista vazia
- *     → bloco é suprimido (não promete cidades inexistentes).
- *   - Cada cidade tem `slug` canônico (`nome-uf` minúsculo, sem acento) +
- *     `name` para exibição. UF derivada do sufixo do slug (defesa).
- *   - Ordem deliberada: cidade-capital primeiro, depois cidades médias
- *     que aparecem em campanhas/SEO do portal, depois o resto.
- *   - Atibaia, Bragança Paulista e Jundiaí incluídos em SP porque foram
- *     identificados na auditoria territorial 2026-05-11 como cidades
- *     com estoque ativo invisíveis na nav do catálogo estadual.
- *
- * Quando o backend publicar agregação por UF, trocar para fetch SSR
- * cached(); a interface `StateCuratedCity` continua válida.
+ * Quando o backend publicar agregação por UF (data-driven via população
+ * IBGE 2022 ou ads ACTIVE), trocar para fetch SSR cached(); a interface
+ * `StateCuratedCity` continua válida e a Página Regional segue intocada.
  */
 
 export type StateCuratedCity = {

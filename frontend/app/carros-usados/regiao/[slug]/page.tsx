@@ -5,7 +5,7 @@ import { cache } from "react";
 import {
   isRegionalPageCanonicalSelf,
   isRegionalPageEnabled,
-  isRegionalPageIndexable,
+  shouldIndexRegionalPage,
 } from "@/lib/env/feature-flags";
 import {
   fetchRegionByCitySlug,
@@ -164,22 +164,35 @@ export async function generateMetadata({ params }: RegionPageProps): Promise<Met
     ? toAbsoluteUrl(territory.canonicalUrl)
     : toAbsoluteUrl(`/carros-em/${encodeURIComponent(region.base.slug)}`);
 
-  const indexable = isRegionalPageIndexable();
-
   // OG image dinâmica simples: primeira imagem válida do primeiro
   // anúncio da região. `getAdsForRegion` é cached(); chamar aqui não
   // duplica fetch — o Page reusa o mesmo resultado. Em qualquer falha
   // (envelope sem data, URL inválida) cai para `undefined` e o OG fica
   // sem image (Twitter/Open Graph default herdado do layout).
+  //
+  // Reaproveitamos o `totalAds` calculado aqui para decidir indexabilidade
+  // via `shouldIndexRegionalPage(totalAds)` — sem fetch extra.
   let ogImage: string | undefined;
+  let totalAdsForIndex = 0;
   try {
     const adsResponse = await getAdsForRegion(region);
     const ads = Array.isArray(adsResponse?.data) ? adsResponse.data : [];
     const picked = pickDynamicOgImage(ads);
     if (picked) ogImage = picked;
+    totalAdsForIndex =
+      typeof adsResponse?.pagination?.total === "number" &&
+      adsResponse.pagination.total >= 0
+        ? adsResponse.pagination.total
+        : ads.length;
   } catch {
     ogImage = undefined;
+    totalAdsForIndex = 0;
   }
+
+  // Decisão final de indexabilidade: combina flag global + threshold
+  // de inventário mínimo (REGIONAL_INDEX_MIN_ADS). Regional vazia ou
+  // com inventário abaixo do threshold sempre vira noindex.
+  const indexable = shouldIndexRegionalPage(totalAdsForIndex);
 
   return {
     title,
@@ -300,7 +313,9 @@ export default async function RegionPage({ params }: RegionPageProps) {
   // FAQ JSON-LD só faz sentido quando a página é indexável. Sem isso
   // estaríamos alimentando rich snippets do Google a partir de uma URL
   // que ele mandou para não indexar — desperdício.
-  const indexable = isRegionalPageIndexable();
+  // Consome a mesma decisão central de generateMetadata (combina flag
+  // global + threshold de inventário mínimo).
+  const indexable = shouldIndexRegionalPage(totalAds);
   const faqJsonLd = indexable
     ? buildFaqJsonLd({
         cityName: region.base.name,

@@ -9,6 +9,8 @@ import {
   isRegionalPageCanonicalSelf,
   isRegionalPageEnabled,
   isRegionalPageIndexable,
+  regionalIndexMinAds,
+  shouldIndexRegionalPage,
 } from "./feature-flags";
 
 const ORIGINAL = process.env.REGIONAL_PAGE_ENABLED;
@@ -197,5 +199,98 @@ describe("flags regionais — independência (PR 2)", () => {
     expect(isRegionalPageEnabled()).toBe(false);
     expect(isRegionalPageIndexable()).toBe(true);
     expect(isRegionalPageCanonicalSelf()).toBe(true);
+  });
+});
+
+function setMinAds(value: string | undefined) {
+  if (value === undefined) {
+    delete process.env.REGIONAL_INDEX_MIN_ADS;
+  } else {
+    process.env.REGIONAL_INDEX_MIN_ADS = value;
+  }
+}
+
+describe("regionalIndexMinAds — threshold de inventário", () => {
+  beforeEach(() => setMinAds(undefined));
+  afterEach(() => setMinAds(undefined));
+
+  it("env ausente → 0 (sem threshold)", () => {
+    expect(regionalIndexMinAds()).toBe(0);
+  });
+
+  it("env vazia → 0", () => {
+    setMinAds("");
+    expect(regionalIndexMinAds()).toBe(0);
+  });
+
+  it("número positivo válido → parseado", () => {
+    setMinAds("10");
+    expect(regionalIndexMinAds()).toBe(10);
+    setMinAds("30");
+    expect(regionalIndexMinAds()).toBe(30);
+  });
+
+  it("número negativo → 0 (proteção contra config maluca)", () => {
+    setMinAds("-5");
+    expect(regionalIndexMinAds()).toBe(0);
+  });
+
+  it("string não numérica → 0", () => {
+    setMinAds("abc");
+    expect(regionalIndexMinAds()).toBe(0);
+  });
+
+  it("decimal → trunca para inteiro", () => {
+    setMinAds("12.7");
+    expect(regionalIndexMinAds()).toBe(12);
+  });
+});
+
+describe("shouldIndexRegionalPage — combina flag global + threshold", () => {
+  beforeEach(() => {
+    setIndexable(undefined);
+    setMinAds(undefined);
+  });
+  afterEach(() => {
+    setIndexable(undefined);
+    setMinAds(undefined);
+  });
+
+  it("REGIONAL_PAGE_INDEXABLE=false → noindex independente de adsCount", () => {
+    setIndexable("false");
+    expect(shouldIndexRegionalPage(0)).toBe(false);
+    expect(shouldIndexRegionalPage(1000)).toBe(false);
+  });
+
+  it("INDEXABLE=true + threshold=0 → indexa qualquer adsCount", () => {
+    setIndexable("true");
+    setMinAds("0");
+    expect(shouldIndexRegionalPage(0)).toBe(true);
+    expect(shouldIndexRegionalPage(5)).toBe(true);
+  });
+
+  it("INDEXABLE=true + threshold=10 → só indexa com adsCount >= 10", () => {
+    setIndexable("true");
+    setMinAds("10");
+    expect(shouldIndexRegionalPage(0)).toBe(false);
+    expect(shouldIndexRegionalPage(9)).toBe(false);
+    expect(shouldIndexRegionalPage(10)).toBe(true);
+    expect(shouldIndexRegionalPage(50)).toBe(true);
+  });
+
+  it("INDEXABLE=true + threshold ausente → indexa sem restrição", () => {
+    setIndexable("true");
+    expect(shouldIndexRegionalPage(0)).toBe(true);
+    expect(shouldIndexRegionalPage(7)).toBe(true);
+  });
+
+  it("adsCount inválido tratado como 0 (defesa)", () => {
+    setIndexable("true");
+    setMinAds("5");
+    // @ts-expect-error testando coerção defensiva
+    expect(shouldIndexRegionalPage(undefined)).toBe(false);
+    // @ts-expect-error testando coerção defensiva
+    expect(shouldIndexRegionalPage(null)).toBe(false);
+    expect(shouldIndexRegionalPage(NaN)).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ import {
   searchCities,
 } from "./public-city-query.controller.js";
 import { getFeaturedRegionsByState } from "./public-state.controller.js";
+import { getPublicRegionByCitySlug } from "./public-region.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 
@@ -35,6 +36,23 @@ router.get(
   "/states/:uf/regions",
   cacheGet({ prefix: "public:state:regions", ttlSeconds: 300, varyBy: ["params", "query"] }),
   getFeaturedRegionsByState
+);
+
+/**
+ * Página Regional pública por citySlug canônico (`nome-uf`).
+ *
+ * `GET /api/public/regions/atibaia-sp` → resolve a região da cidade-base
+ * com payload leve, sanitizado e sem token. Universal: funciona para
+ * qualquer cidade brasileira cadastrada com latitude/longitude.
+ *
+ * Cache 15 min (mais agressivo que `/states/:uf/regions` porque a
+ * vizinhança haversine muda apenas quando o admin altera radius ou
+ * quando lat/lng de cidades é re-seeded — eventos raros).
+ */
+router.get(
+  "/regions/:citySlug",
+  cacheGet({ prefix: "public:region", ttlSeconds: 900, varyBy: ["params"] }),
+  getPublicRegionByCitySlug
 );
 
 router.get(

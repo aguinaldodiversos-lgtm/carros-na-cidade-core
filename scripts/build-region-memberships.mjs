@@ -31,8 +31,27 @@ import { pool, closeDatabasePool } from "../src/infrastructure/database/db.js";
 const EARTH_RADIUS_KM = 6371;
 const LAYER_1_MAX_KM = 30;
 const LAYER_2_MAX_KM = 60;
-const LAYER_1_MAX_MEMBERS = 12;
-const LAYER_2_MAX_MEMBERS = 18;
+
+/**
+ * Limites de cidades por região, configuráveis via env vars.
+ *
+ * Defaults (12 + 18 = 30 vizinhos) calibrados para Brasil típico em
+ * raios de 30/60 km. Override no Render (ou .env local) sem precisar
+ * mexer no código:
+ *
+ *   REGIONAL_LAYER1_MAX_MEMBERS=20    # vizinhos ≤30 km
+ *   REGIONAL_LAYER2_MAX_MEMBERS=30    # vizinhos 30-60 km
+ *
+ * Quando admin tiver UI no portal para isso, mover para `platform_settings`
+ * (mesmo padrão de `regional.radius_km`).
+ */
+function parsePositiveInt(raw, fallback) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.floor(parsed);
+}
+const LAYER_1_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER1_MAX_MEMBERS, 12);
+const LAYER_2_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER2_MAX_MEMBERS, 18);
 
 function toRadians(degrees) {
   return (degrees * Math.PI) / 180;
@@ -308,6 +327,72 @@ export async function buildRegionMemberships({ ufFilter } = {}) {
   if (failedStates.length) {
     console.warn(
       `[regions:build] UFs que falharam após retries: ${failedStates.join(", ")} — rode novamente com --uf=${failedStates.join(",")} para retomar.`
+    );
+  }
+
+  // ── Relatório nacional de cobertura ─────────────────────────────────
+  //
+  // Mostra, ao fim do build, números agregados para auditoria:
+  //   - Total de cidades cadastradas vs com coordenadas.
+  //   - Cidades sem coordenadas (gap geográfico do dataset IBGE).
+  //   - Cidades com vizinhança gravada (layer > 0) vs sem.
+  //   - Cobertura por UF (proporção entre cidades base com membros).
+  //
+  // Em UFs com cidades isoladas (interior do Norte, Centro-Oeste), é
+  // esperado que algumas cidades fiquem sem vizinhança (geografia real,
+  // não regressão). O relatório torna isso explícito.
+  try {
+    const { rows: nacional } = await pool.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(latitude)::int AS com_coords,
+         COUNT(*) FILTER (WHERE latitude IS NULL)::int AS sem_coords
+       FROM cities`
+    );
+    const { rows: coberturaPorUf } = await pool.query(
+      `SELECT c.state,
+              COUNT(DISTINCT c.id)::int AS total_cities,
+              COUNT(DISTINCT c.id) FILTER (
+                WHERE EXISTS (
+                  SELECT 1 FROM region_memberships rm
+                  WHERE rm.base_city_id = c.id AND rm.layer > 0
+                )
+              )::int AS com_vizinhanca
+       FROM cities c
+       WHERE c.latitude IS NOT NULL
+       GROUP BY c.state
+       ORDER BY c.state`
+    );
+
+    console.log("");
+    console.log("[regions:build] ── COBERTURA NACIONAL ─────────────────");
+    console.log(
+      `[regions:build] ${nacional[0].total} cidades cadastradas, ${nacional[0].com_coords} com coords (${nacional[0].sem_coords} sem).`
+    );
+    console.log("[regions:build] UF | base_cities | com_vizinhança | % cobertura");
+    let totalComViz = 0;
+    let totalBase = 0;
+    for (const row of coberturaPorUf) {
+      const pct =
+        row.total_cities > 0
+          ? ((row.com_vizinhanca / row.total_cities) * 100).toFixed(0)
+          : "0";
+      console.log(
+        `[regions:build] ${row.state}  | ${String(row.total_cities).padStart(5)} | ${String(row.com_vizinhanca).padStart(5)}          | ${pct.padStart(3)}%`
+      );
+      totalComViz += row.com_vizinhanca;
+      totalBase += row.total_cities;
+    }
+    const pctNacional = totalBase > 0 ? ((totalComViz / totalBase) * 100).toFixed(1) : "0";
+    console.log(
+      `[regions:build] TOTAL: ${totalComViz}/${totalBase} cidades com vizinhança gravada (${pctNacional}%).`
+    );
+    console.log(
+      `[regions:build] Cidades sem vizinhança são, em geral, isoladas geograficamente (sem vizinhos no raio de ${LAYER_2_MAX_KM} km na mesma UF). Não é regressão.`
+    );
+  } catch (err) {
+    console.warn(
+      `[regions:build] Falha ao gerar relatório de cobertura — ${err?.message || err}. (Build em si concluiu OK.)`
     );
   }
 

@@ -72,6 +72,10 @@ vi.mock("@/lib/env/feature-flags", () => ({
   isRegionalPageEnabled: vi.fn().mockReturnValue(false),
   isRegionalPageIndexable: vi.fn().mockReturnValue(false),
   isRegionalPageCanonicalSelf: vi.fn().mockReturnValue(false),
+  // Fase 6: helper combinado. Por default segue o INDEXABLE; testes
+  // que precisem do threshold REGIONAL_INDEX_MIN_ADS sobrescrevem.
+  shouldIndexRegionalPage: vi.fn().mockReturnValue(false),
+  regionalIndexMinAds: vi.fn().mockReturnValue(0),
 }));
 
 vi.mock("@/lib/territory/territory-resolver", () => ({
@@ -188,10 +192,10 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
   }
 
   it("default (ambas as flags false) → noindex + canonical para cidade-base", async () => {
-    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+    const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
-    vi.mocked(isRegionalPageIndexable).mockReturnValue(false);
+    vi.mocked(shouldIndexRegionalPage).mockReturnValue(false);
     vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(false);
 
     const md = await buildMetadata();
@@ -202,10 +206,10 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
   });
 
   it("INDEXABLE=true sozinha → index, mas canonical permanece para cidade-base", async () => {
-    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+    const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
-    vi.mocked(isRegionalPageIndexable).mockReturnValue(true);
+    vi.mocked(shouldIndexRegionalPage).mockReturnValue(true);
     vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(false);
 
     const md = await buildMetadata();
@@ -215,10 +219,10 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
   });
 
   it("CANONICAL_SELF=true sozinha → canonical self, mas noindex permanece", async () => {
-    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+    const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
-    vi.mocked(isRegionalPageIndexable).mockReturnValue(false);
+    vi.mocked(shouldIndexRegionalPage).mockReturnValue(false);
     vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(true);
 
     const md = await buildMetadata();
@@ -229,10 +233,10 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
   });
 
   it("ambas true (Fase D plena) → index + canonical self", async () => {
-    const { isRegionalPageIndexable, isRegionalPageCanonicalSelf } = await import(
+    const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
-    vi.mocked(isRegionalPageIndexable).mockReturnValue(true);
+    vi.mocked(shouldIndexRegionalPage).mockReturnValue(true);
     vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(true);
 
     const md = await buildMetadata();
