@@ -114,7 +114,7 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
             region: {
               slug: "atibaia-sp",
               name: "Região de Atibaia",
-              href: "/sp/regiao/atibaia",
+              href: "/carros-usados/regiao/atibaia-sp",
             },
             confidence: "high",
             distanceKm: 3.2,
@@ -155,7 +155,7 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
             region: {
               slug: "atibaia-sp",
               name: "Região de Atibaia",
-              href: "/sp/regiao/atibaia",
+              href: "/carros-usados/regiao/atibaia-sp",
             },
             confidence: "high",
             distanceKm: 3.2,
@@ -175,7 +175,7 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
     );
 
     const regionCta = screen.getByTestId("location-prompt-region-cta");
-    expect(regionCta.getAttribute("href")).toBe("/sp/regiao/atibaia");
+    expect(regionCta.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
 
     const cityCta = screen.getByTestId("location-prompt-city-cta");
     expect(cityCta.getAttribute("href")).toBe("/carros-em/atibaia-sp");
@@ -196,7 +196,7 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
             region: {
               slug: "atibaia-sp",
               name: "Região de Atibaia",
-              href: "/sp/regiao/atibaia",
+              href: "/carros-usados/regiao/atibaia-sp",
             },
             confidence: "high",
             distanceKm: 3.2,
@@ -233,7 +233,7 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
             region: {
               slug: "atibaia-sp",
               name: "Região de Atibaia",
-              href: "/sp/regiao/atibaia",
+              href: "/carros-usados/regiao/atibaia-sp",
             },
             confidence: "high",
             distanceKm: 3.2,

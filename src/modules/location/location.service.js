@@ -152,16 +152,10 @@ export async function resolveLocation(latitude, longitude) {
   try {
     const regionPayload = await getRegionByBaseSlugDynamic(nearest.city.slug);
     if (regionPayload && regionPayload.base) {
-      const baseSlug = String(regionPayload.base.slug || "");
-      const ufMatch = /-([a-z]{2})$/.exec(baseSlug);
-      const ancoraPart = ufMatch ? baseSlug.slice(0, -3) : baseSlug;
-      const ufSeg = ufMatch ? ufMatch[1] : "";
       region = {
-        slug: baseSlug,
+        slug: regionPayload.base.slug,
         name: `Região de ${regionPayload.base.name}`,
-        href: ufSeg && ancoraPart
-          ? `/${ufSeg}/regiao/${ancoraPart}`
-          : `/carros-usados/regiao/${baseSlug}`,
+        href: `/carros-usados/regiao/${regionPayload.base.slug}`,
         memberCount: Array.isArray(regionPayload.members)
           ? regionPayload.members.length
           : 0,

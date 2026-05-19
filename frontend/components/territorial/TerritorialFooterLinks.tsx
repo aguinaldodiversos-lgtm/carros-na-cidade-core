@@ -1,7 +1,7 @@
 import "server-only";
 import Link from "next/link";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
-import { slugToAncoraHref } from "@/lib/regions/ancora-url";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 
 /**
  * Faixa de CTAs cross-territoriais nas páginas de Cidade
@@ -73,7 +73,7 @@ export function TerritorialFooterLinks({
       <div className="flex flex-wrap items-center gap-3">
         {regionalEnabled ? (
           <Link
-            href={slugToAncoraHref(slug)}
+            href={slugToRegionHref(slug)}
             className={PRIMARY_BTN}
             aria-label={`Ver carros na região de ${cityName}`}
             data-testid="region-cta-link"

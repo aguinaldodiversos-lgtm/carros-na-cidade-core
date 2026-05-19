@@ -129,6 +129,78 @@ describe("location.service — findNearestCity (happy path)", () => {
 });
 
 describe("location.service — resolveLocation (integração com região)", () => {
+  // Matriz nacional: a lógica de location.service deve funcionar idêntica
+  // para qualquer cidade brasileira com coordenadas válidas. Atibaia
+  // é apenas um exemplo — Campinas, São José dos Campos, Belo Horizonte,
+  // Salvador, etc. precisam todos gerar o mesmo shape.
+  it.each([
+    {
+      id: 7,
+      cityName: "Atibaia",
+      citySlug: "atibaia-sp",
+      stateCode: "SP",
+      regionName: "Região de Atibaia",
+      expectedHref: "/carros-usados/regiao/atibaia-sp",
+    },
+    {
+      id: 17,
+      cityName: "Campinas",
+      citySlug: "campinas-sp",
+      stateCode: "SP",
+      regionName: "Região de Campinas",
+      expectedHref: "/carros-usados/regiao/campinas-sp",
+    },
+    {
+      id: 23,
+      cityName: "São José dos Campos",
+      citySlug: "sao-jose-dos-campos-sp",
+      stateCode: "SP",
+      regionName: "Região de São José dos Campos",
+      expectedHref: "/carros-usados/regiao/sao-jose-dos-campos-sp",
+    },
+    {
+      id: 31,
+      cityName: "Belo Horizonte",
+      citySlug: "belo-horizonte-mg",
+      stateCode: "MG",
+      regionName: "Região de Belo Horizonte",
+      expectedHref: "/carros-usados/regiao/belo-horizonte-mg",
+    },
+    {
+      id: 47,
+      cityName: "Salvador",
+      citySlug: "salvador-ba",
+      stateCode: "BA",
+      regionName: "Região de Salvador",
+      expectedHref: "/carros-usados/regiao/salvador-ba",
+    },
+  ])(
+    "coordenada de $cityName → resolve $citySlug + href canônico universal",
+    async ({ id, cityName, citySlug, stateCode, regionName, expectedHref }) => {
+      mocks.poolQuery.mockResolvedValueOnce({
+        rows: [
+          { id, slug: citySlug, name: cityName, state: stateCode, distance_km: "3.2" },
+        ],
+      });
+      mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce({
+        base: { id, slug: citySlug, name: cityName, state: stateCode },
+        members: [],
+        radius_km: 80,
+      });
+
+      const result = await resolveLocation(ATIBAIA_LAT, ATIBAIA_LNG);
+
+      expect(result).not.toBeNull();
+      expect(result.city.slug).toBe(citySlug);
+      expect(result.region).toEqual({
+        slug: citySlug,
+        name: regionName,
+        href: expectedHref,
+        memberCount: 0,
+      });
+    }
+  );
+
   it("coordenada de Atibaia → resolve atibaia-sp + Região de Atibaia", async () => {
     mocks.poolQuery.mockResolvedValueOnce({
       rows: [
@@ -151,7 +223,7 @@ describe("location.service — resolveLocation (integração com região)", () =
     expect(result.region).toEqual({
       slug: "atibaia-sp",
       name: "Região de Atibaia",
-      href: "/sp/regiao/atibaia",
+      href: "/carros-usados/regiao/atibaia-sp",
       memberCount: 1,
     });
     expect(result.confidence).toBe("high");

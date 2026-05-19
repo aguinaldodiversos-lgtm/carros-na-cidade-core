@@ -26,15 +26,24 @@
  */
 
 /**
- * Regex legada que casa `/carros-usados/regiao/<slug>`.
- * Mantida para uso nos testes existentes e referência.
+ * Regex da URL CANÔNICA da Página Regional `/carros-usados/regiao/<slug>`.
+ *
+ * `<slug>` é o citySlug canônico (`nome-uf`, ex.: `atibaia-sp`).
+ * O middleware bate esta regex para acionar o gate hard-404.
  */
 export const REGIONAL_PATH_REGEX = /^\/carros-usados\/regiao\/([^/?#]+)\/?$/;
 
 /**
- * Regex da nova URL regional `/:uf/regiao/:ancora`.
+ * Regex da URL LEGADA da Página Regional `/:uf/regiao/:ancora`.
+ *
+ * Existiu na Fase 4 (2026-05-17) como tentativa de canônica curta —
+ * revertida na Fase 5 (2026-05-18). Mantida aqui apenas para compor o
+ * redirect 301 do legacy para a canônica via middleware.
+ *
  * Captura: $1 = uf (2 letras minúsculas), $2 = ancora (slug sem sufixo).
- * NÃO casa subpaths mais profundos nem trailing slash com conteúdo.
+ *
+ * @deprecated Não usar em código novo. Toda nova lógica regional usa
+ * o citySlug canônico (`nome-uf`) via `REGIONAL_PATH_REGEX`.
  */
 export const ANCORA_PATH_REGEX = /^\/([a-z]{2})\/regiao\/([a-z0-9-]+)\/?$/;
 
@@ -46,15 +55,24 @@ export function isFlagEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.REGIONAL_PAGE_ENABLED === "true";
 }
 
-/** @deprecated Use `extractAncoraParams`. Mantida para retrocompatibilidade de testes. */
+/**
+ * Extrai o citySlug da URL canônica `/carros-usados/regiao/<slug>`,
+ * ou retorna null se o pathname não casar.
+ *
+ * Ex.: `/carros-usados/regiao/atibaia-sp` → `atibaia-sp`.
+ *      `/carros-usados/regiao/belo-horizonte-mg` → `belo-horizonte-mg`.
+ */
 export function extractRegionalSlug(pathname: string): string | null {
   const match = REGIONAL_PATH_REGEX.exec(pathname);
   return match?.[1] ?? null;
 }
 
 /**
- * Extrai `{ uf, ancora }` do pathname da nova rota regional, ou null.
- * Ex.: `/sp/regiao/atibaia` → `{ uf: "sp", ancora: "atibaia" }`.
+ * Extrai `{ uf, ancora }` do pathname da rota LEGADA `/:uf/regiao/:ancora`.
+ *
+ * @deprecated A canônica é `/carros-usados/regiao/<slug>` desde a Fase 5.
+ * Esta função existe só para o middleware emitir o redirect 301 e para
+ * compatibilidade com testes herdados — não usar em código novo.
  */
 export function extractAncoraParams(
   pathname: string
@@ -222,8 +240,12 @@ export async function validateRegionalSlug(
 }
 
 /**
- * Valida uma âncora pela nova rota interna `/api/internal/regions/ancora/:uf/:ancora`.
+ * Valida uma âncora pela rota interna `/api/internal/regions/ancora/:uf/:ancora`.
  * Semântica idêntica a `validateRegionalSlug` — ver comentário daquela função.
+ *
+ * @deprecated A canônica é `/carros-usados/regiao/<slug>` desde a Fase 5,
+ * validada via `validateRegionalSlug`. Mantida para retrocompatibilidade
+ * de testes que ainda assumem a rota legada `/:uf/regiao/:ancora`.
  */
 export async function validateAncoraPath(
   uf: string,

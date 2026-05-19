@@ -32,7 +32,29 @@ const API_BASE_URL = (process.env.API_BASE_URL || "https://carros-na-cidade-core
   ""
 );
 const TOKEN = process.env.INTERNAL_API_TOKEN || "";
-const SLUG = process.argv[2] || "sao-paulo-sp";
+
+// Matriz nacional default — uma cidade-base por região do Brasil, escolhida
+// como capital ou polo com vizinhança não-trivial esperada:
+//   N    — manaus-am, palmas-to
+//   NE   — fortaleza-ce, salvador-ba
+//   CO   — goiania-go, cuiaba-mt
+//   SE   — belo-horizonte-mg, sao-paulo-sp
+//   S    — curitiba-pr, porto-alegre-rs
+//
+// Pode ser sobrescrita via `REGIONS_SMOKE_SLUGS=foo,bar,baz` ou via 1º
+// argumento posicional (CSV). Argumento posicional ganha sobre env.
+const DEFAULT_SLUGS = [
+  "belo-horizonte-mg",
+  "salvador-ba",
+  "curitiba-pr",
+  "fortaleza-ce",
+  "goiania-go",
+];
+const SLUGS_RAW = process.argv[2] || process.env.REGIONS_SMOKE_SLUGS || DEFAULT_SLUGS.join(",");
+const SLUGS = SLUGS_RAW
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 const NONEXISTENT_SLUG = process.argv[3] || "cidade-que-nao-existe-tt";
 const FETCH_TIMEOUT_MS = 15000;
 
@@ -85,9 +107,9 @@ async function fetchEndpoint({ slug, token, label }) {
   }
 }
 
-async function checkValidTokenAndSlug() {
-  const label = `GET /api/internal/regions/${SLUG} com token correto → 200 + members não-trivial`;
-  const result = await fetchEndpoint({ slug: SLUG, token: TOKEN });
+async function checkValidTokenAndSlug(slug) {
+  const label = `GET /api/internal/regions/${slug} com token correto → 200 + members não-trivial`;
+  const result = await fetchEndpoint({ slug, token: TOKEN });
 
   if (result.status === 0) {
     fail(label, `Erro de rede: ${result.error}`);
@@ -102,8 +124,8 @@ async function checkValidTokenAndSlug() {
     return;
   }
   const { base, members } = result.body.data;
-  if (!base || base.slug !== SLUG) {
-    fail(label, `data.base.slug deveria ser "${SLUG}", veio: ${JSON.stringify(base)}`);
+  if (!base || base.slug !== slug) {
+    fail(label, `data.base.slug deveria ser "${slug}", veio: ${JSON.stringify(base)}`);
     return;
   }
   if (!Array.isArray(members)) {
@@ -128,23 +150,23 @@ async function checkValidTokenAndSlug() {
     return;
   }
   // Self-row layer 0 NÃO pode aparecer em members (semântica do service).
-  if (members.some((m) => m.slug === SLUG)) {
-    fail(label, `Self-row (slug=${SLUG}) apareceu em members; service deveria excluir.`);
+  if (members.some((m) => m.slug === slug)) {
+    fail(label, `Self-row (slug=${slug}) apareceu em members; service deveria excluir.`);
     return;
   }
   pass(`${label} (members.length=${members.length}, layer 1+2 presentes)`);
 }
 
-async function checkNoToken() {
-  const label = `GET /api/internal/regions/${SLUG} SEM token → 404 (anti-enumeração)`;
-  const result = await fetchEndpoint({ slug: SLUG, token: "" });
+async function checkNoToken(slug) {
+  const label = `GET /api/internal/regions/${slug} SEM token → 404 (anti-enumeração)`;
+  const result = await fetchEndpoint({ slug, token: "" });
   if (result.status === 404) pass(label);
   else fail(label, `Status ${result.status}, esperado 404.`);
 }
 
-async function checkWrongToken() {
-  const label = `GET /api/internal/regions/${SLUG} com token errado → 404`;
-  const result = await fetchEndpoint({ slug: SLUG, token: "wrong-token-deliberadamente-invalido" });
+async function checkWrongToken(slug) {
+  const label = `GET /api/internal/regions/${slug} com token errado → 404`;
+  const result = await fetchEndpoint({ slug, token: "wrong-token-deliberadamente-invalido" });
   if (result.status === 404) pass(label);
   else fail(label, `Status ${result.status}, esperado 404.`);
 }
@@ -165,12 +187,17 @@ async function checkSlugNaoExiste() {
 
 async function main() {
   console.log(`[smoke:regions] API_BASE_URL=${API_BASE_URL}`);
-  console.log(`[smoke:regions] slug=${SLUG} (slug-inexistente=${NONEXISTENT_SLUG})`);
+  console.log(`[smoke:regions] slugs=${SLUGS.join(", ")} (slug-inexistente=${NONEXISTENT_SLUG})`);
   console.log("");
 
-  await checkValidTokenAndSlug();
-  await checkNoToken();
-  await checkWrongToken();
+  // Iterando pelos slugs nacionais — cada um deve ter members layer 1+2.
+  for (const slug of SLUGS) {
+    await checkValidTokenAndSlug(slug);
+  }
+  // Verificações de autorização rodam com o primeiro slug (basta uma vez).
+  const [primarySlug] = SLUGS;
+  await checkNoToken(primarySlug);
+  await checkWrongToken(primarySlug);
   await checkSlugNaoExiste();
 
   console.log("");

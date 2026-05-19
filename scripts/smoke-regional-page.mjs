@@ -61,8 +61,37 @@ import {
 } from "./lib/regional-page-validators.mjs";
 
 const FETCH_TIMEOUT_MS = 20_000;
-const DEFAULT_SLUGS = ["atibaia-sp", "campinas-sp", "sao-paulo-sp"];
+// Matriz nacional default: capitais e polos com cobertura geográfica ampla.
+// O smoke testa a URL CANÔNICA `/carros-usados/regiao/{citySlug}` onde
+// `citySlug` é o slug canônico no formato `nome-uf` (regex
+// `^[a-z0-9-]+-[a-z]{2}$`). Pode ser sobrescrita via env
+// REGIONAL_SMOKE_SLUGS=foo,bar,baz.
+//
+// Para validar o redirect 301 da URL legada `/:uf/regiao/:ancora`, ver
+// `smokeLegacyRedirect()`.
+const DEFAULT_SLUGS = [
+  "belo-horizonte-mg",
+  "salvador-ba",
+  "curitiba-pr",
+  "fortaleza-ce",
+  "goiania-go",
+];
 const NONEXISTENT_SLUG = "regiao-fake-zz-smoke-only";
+
+// Constrói o path canônico da Página Regional a partir do citySlug.
+function regionPathFromSlug(slug) {
+  const clean = String(slug || "").trim().toLowerCase();
+  if (!clean) return null;
+  return `/carros-usados/regiao/${encodeURIComponent(clean)}`;
+}
+
+// Para validar o redirect 301 do legacy, precisamos da URL legada
+// `/{uf}/regiao/{ancoraPart}` derivada do citySlug `{ancoraPart}-{uf}`.
+function legacyAncoraPathFromSlug(slug) {
+  const match = /^(.+)-([a-z]{2})$/.exec(String(slug || "").toLowerCase());
+  if (!match) return null;
+  return `/${match[2]}/regiao/${match[1]}`;
+}
 
 // ── env ────────────────────────────────────────────────────────────────
 
@@ -219,7 +248,12 @@ function describeMiddlewareHeaders(headers) {
 }
 
 async function smokeOneSlug(slug) {
-  const url = `${FRONTEND_BASE}/carros-usados/regiao/${encodeURIComponent(slug)}`;
+  const regionPath = regionPathFromSlug(slug);
+  if (!regionPath) {
+    recordFail(`[${slug}] slug malformado`, `slug vazio`);
+    return;
+  }
+  const url = `${FRONTEND_BASE}${regionPath}`;
   console.log(`\n[${slug}] GET ${url}`);
   const response = await fetchHtml(url);
   const mwInfo = describeMiddlewareHeaders(response.headers);
@@ -323,7 +357,10 @@ async function smokeOneSlug(slug) {
 }
 
 async function smokeNotFound() {
-  const url = `${FRONTEND_BASE}/carros-usados/regiao/${encodeURIComponent(NONEXISTENT_SLUG)}`;
+  // Slug fake no formato `nome-uf` — testa o caminho da URL canônica
+  // (rota /carros-usados/regiao/[slug]) com slug que não existe no DB.
+  const regionPath = regionPathFromSlug(NONEXISTENT_SLUG);
+  const url = `${FRONTEND_BASE}${regionPath}`;
   console.log(`\n[404] GET ${url}`);
   const response = await fetchHtml(url);
   const mwInfo = describeMiddlewareHeaders(response.headers);
@@ -367,6 +404,52 @@ async function smokeNotFound() {
     return;
   }
   recordFail("[404] cidade inexistente → 404", `status ${response.status}${mwInfo}`);
+}
+
+/**
+ * Smoke do redirect 301 permanente da rota legada
+ * `/:uf/regiao/:ancora` → `/carros-usados/regiao/{citySlug}`.
+ *
+ * Histórico:
+ *   - Fase 4 (2026-05-17): a URL `/:uf/regiao/:ancora` foi criada como
+ *     tentativa de canônica curta. Smoke validava 308 desse path para
+ *     a antiga.
+ *   - Fase 5 (2026-05-18): reversão arquitetural — a canônica voltou
+ *     a ser `/carros-usados/regiao/{citySlug}`, e este caminho passou
+ *     a ser legado com redirect 301 emitido pelo middleware.
+ *
+ * O redirect é emitido pelo middleware (antes de qualquer SSR) para
+ * garantir HTTP 301 real e não cair no bug Next 14.2 de meta-refresh.
+ */
+async function smokeLegacyRedirect(slug) {
+  const legacyPath = legacyAncoraPathFromSlug(slug);
+  if (!legacyPath) return;
+  const canonicalPath = regionPathFromSlug(slug);
+  if (!canonicalPath) return;
+  const url = `${FRONTEND_BASE}${legacyPath}`;
+  console.log(`\n[301 legacy ${slug}] GET ${url}`);
+  const response = await fetchHtml(url);
+
+  if (response.status !== 301) {
+    if (response.status === 200) {
+      recordFail(
+        `[301 legacy ${slug}]`,
+        `status 200 (esperado 301). Middleware não está emitindo o redirect — conferir frontend/middleware.ts seção 1.`
+      );
+    } else {
+      recordFail(`[301 legacy ${slug}]`, `status ${response.status} (esperado 301)`);
+    }
+    return;
+  }
+  const location = response.headers?.get?.("location") || "";
+  if (!location.endsWith(canonicalPath)) {
+    recordFail(
+      `[301 legacy ${slug}]`,
+      `Location="${location}" não termina com "${canonicalPath}"`
+    );
+    return;
+  }
+  recordPass(`[301 legacy ${slug}]`, `301 → ${canonicalPath}`);
 }
 
 async function smokeAdminRadius() {
@@ -515,6 +598,15 @@ async function main() {
 
   for (const slug of SLUGS) {
     await smokeOneSlug(slug);
+  }
+
+  // Garante que o redirect 308 da rota legada permanece funcional para
+  // cada slug nacional — protege SEO contra regressão Next 14.2.
+  // Pulado quando EXPECT_FLAG=off porque o gate sequer renderiza a rota.
+  if (EXPECT_FLAG !== "off") {
+    for (const slug of SLUGS) {
+      await smokeLegacyRedirect(slug);
+    }
   }
 
   await smokeNotFound();

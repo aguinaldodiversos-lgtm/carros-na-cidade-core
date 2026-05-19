@@ -2,34 +2,44 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   decideRegionalMiddlewareAction,
-  extractAncoraParams,
+  extractRegionalSlug,
   isFlagEnabled,
-  validateAncoraPath,
+  validateRegionalSlug,
 } from "@/lib/regional-page-guard";
 
 /**
  * Middleware do frontend. Responsabilidades:
  *
- * 1. **Hard gate da Nova Página Regional** (`/:uf/regiao/:ancora`):
+ * 1. **Hard gate da Página Regional canônica** (`/carros-usados/regiao/:slug`):
  *    - Sem `REGIONAL_PAGE_ENABLED="true"` → 404 HTTP real imediato.
- *    - Com flag on + âncora inválida → 404 HTTP real após validar no
- *      backend (is_ancora = false ou cidade inexistente).
- *    - Com flag on + âncora válida → deixa passar, App Router renderiza.
+ *    - Com flag on + slug inválido (cidade não existe) → 404 HTTP real.
+ *    - Com flag on + slug válido → deixa passar, App Router renderiza.
  *
- *    A rota legada `/carros-usados/regiao/[slug]` foi convertida a
- *    redirect 308 permanente (Fase 4) e não precisa mais de gate —
- *    ela redireciona incondicionalmente, independente da flag.
+ *    A URL canônica é `/carros-usados/regiao/{citySlug}` onde `citySlug`
+ *    é o slug canônico da cidade-base no formato `nome-uf` (regex
+ *    `^[a-z0-9-]+-[a-z]{2}$`). Exemplos: `atibaia-sp`, `campinas-sp`,
+ *    `belo-horizonte-mg`. O slug aceita qualquer cidade brasileira com
+ *    coordenadas — a Página Regional é universal (Fase 5).
  *
  *    POR QUE NO MIDDLEWARE em vez de só no page.tsx?
- *    Mesmo motivo da lógica anterior: Next 14.2 pode retornar 200 com
- *    NEXT_NOT_FOUND quando notFound() é chamado depois do <head> ser
- *    flushed. Middleware garante 404 HTTP real.
+ *    Next 14.2 pode retornar 200 com `NEXT_NOT_FOUND` quando `notFound()`
+ *    é chamado depois do `<head>` ser flushed. Middleware garante 404
+ *    HTTP real para slugs inválidos.
  *
- * 2. **Redirects 301 de URLs legadas** (existente):
+ * 2. **Redirect 301 da rota legada** (`/:uf/regiao/:ancora`):
+ *    - Sempre redireciona para `/carros-usados/regiao/{ancora}-{uf}`,
+ *      sem validar slug aqui (a canônica valida via gate quando chega).
+ *    - Esta rota existiu brevemente na Fase 4 (2026-05-17) como tentativa
+ *      de canônica curta — Fase 5 (2026-05-18) reverteu para o slug
+ *      completo `nome-uf` por alinhamento com `/carros-em/[slug]` e
+ *      simplificação de partições de URL.
+ *
+ * 3. **Redirects 301 de outras URLs legadas** (preservados):
  *    - /carros-{em,baratos-em,automaticos-em}-[slug] → versão com `/`
  *    - /painel/anuncios/novo → /anunciar/novo
  *    - /painel/anuncios/[id]/publicar → /upgrade
  */
+
 /**
  * Header interno usado para passar o pathname da request para os
  * Server Components do App Router (`headers()` em `next/headers`).
@@ -38,8 +48,8 @@ import {
  *   O `RootLayout` precisa saber o pathname para resolver a cidade
  *   ativa territorial (ex.: `/carros-em/atibaia-sp` → Atibaia) ANTES
  *   da hidratação client-side. Sem isso, o SSR cai em `DEFAULT_CITY`
- *   (sao-paulo-sp) e os links territoriais do header SSR contradizem
- *   a URL — bug detectado na auditoria 2026-05-11.
+ *   e os links territoriais do header SSR contradizem a URL — bug
+ *   detectado na auditoria 2026-05-11.
  *
  * Como funciona?
  *   - Middleware roda no edge e tem acesso a `request.nextUrl.pathname`.
@@ -59,22 +69,39 @@ function withPathnameHeader(request: NextRequest) {
   return { request: { headers: requestHeaders } };
 }
 
+// Padrão da rota legada `/:uf/regiao/:ancora` que será redirecionada
+// 301 para `/carros-usados/regiao/{ancora}-{uf}`. UF deve ser 2 letras.
+const LEGACY_ANCORA_RE = /^\/([a-z]{2})\/regiao\/([a-z0-9-]+)\/?$/;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const territorialContext = withPathnameHeader(request);
 
-  // ── 1. Hard gate da Nova Página Regional (`/:uf/regiao/:ancora`). ────
+  // ── 1. Redirect 301 da rota legada `/:uf/regiao/:ancora` para canônica.
   //
-  // A rota `/carros-usados/regiao/[slug]` foi convertida a redirect 308
-  // permanente (Fase 4) e NÃO precisa mais de gate aqui — ela sempre
-  // redireciona, independente de flag.
+  // Esta rota não tem gate de feature flag — sempre redireciona, mesmo
+  // com REGIONAL_PAGE_ENABLED=false. A canônica fará seu próprio gate
+  // quando o request chegar lá. Isso simplifica o invariante: o legado
+  // SEMPRE virou para o canônico.
+  const legacyAncoraMatch = LEGACY_ANCORA_RE.exec(pathname);
+  if (legacyAncoraMatch) {
+    const [, uf, ancora] = legacyAncoraMatch;
+    const canonicalSlug = `${ancora}-${uf}`;
+    const url = request.nextUrl.clone();
+    url.pathname = `/carros-usados/regiao/${canonicalSlug}`;
+    return NextResponse.redirect(url, 301);
+  }
+
+  // ── 2. Hard gate da Página Regional canônica `/carros-usados/regiao/:slug`.
   //
-  // Esta verificação protege a NOVA rota `/:uf/regiao/:ancora`, pelo mesmo
-  // motivo da lógica anterior: Next 14.2 pode retornar status 200 com body
-  // NEXT_NOT_FOUND quando `notFound()` é chamado em Server Component depois
-  // que o <head> já foi flushed. O middleware garante o status HTTP real.
-  const ancoraParams = extractAncoraParams(pathname);
-  if (ancoraParams !== null) {
+  // O slug é o citySlug canônico (`nome-uf`). Validamos:
+  //   - feature flag REGIONAL_PAGE_ENABLED
+  //   - slug existe no DB (cidade com coordenadas válidas)
+  //
+  // Cidades sem coordenadas válidas: o backend retorna 404 e o gate
+  // bloqueia aqui — evita renderização de uma região impossível.
+  const regionalSlug = extractRegionalSlug(pathname);
+  if (regionalSlug !== null) {
     const flagOn = isFlagEnabled();
 
     if (!flagOn) {
@@ -83,7 +110,7 @@ export async function middleware(request: NextRequest) {
       return blocked;
     }
 
-    const validation = await validateAncoraPath(ancoraParams.uf, ancoraParams.ancora);
+    const validation = await validateRegionalSlug(regionalSlug);
     const action = decideRegionalMiddlewareAction(flagOn, validation);
 
     if (action.kind === "pass-valid") {
@@ -108,32 +135,7 @@ export async function middleware(request: NextRequest) {
     return blocked;
   }
 
-  // ── 1.5. Redirect 308 da rota legada `/carros-usados/regiao/:slug`.
-  //
-  // POR QUE NO MIDDLEWARE em vez de no page.tsx?
-  // O page.tsx usa `permanentRedirect()` (Server Component), mas Next 14.2
-  // tem um bug conhecido: se o redirect é chamado após o <head> ter sido
-  // flushed via streaming SSR, Next NÃO emite o status HTTP 308 — em vez
-  // disso retorna 200 + `<meta http-equiv="refresh">` no body. Isso quebra
-  // SEO (crawlers preferem 308 real) e cria flicker visual.
-  //
-  // O middleware garante 308 HTTP de verdade, antes de qualquer SSR.
-  // O page.tsx fica como fallback defensivo caso o matcher mude.
-  const legacyRegional = /^\/carros-usados\/regiao\/([a-z0-9-]+)\/?$/.exec(pathname);
-  if (legacyRegional?.[1]) {
-    const fullSlug = legacyRegional[1].replace(/\/+$/, "");
-    const ufMatch = /^(.+)-([a-z]{2})$/.exec(fullSlug);
-    if (ufMatch) {
-      const url = request.nextUrl.clone();
-      url.pathname = `/${ufMatch[2]}/regiao/${ufMatch[1]}`;
-      return NextResponse.redirect(url, 308);
-    }
-    // Slug malformado (sem sufixo -uf) — 404 antes de chegar no page.tsx
-    // que faria notFound() (sujeito ao mesmo bug Next 14.2).
-    return new NextResponse(null, { status: 404 });
-  }
-
-  // ── 2. Redirects 301 legados (preservados como estavam). ───────────
+  // ── 3. Redirects 301 legados (hífen único → barra). ────────────────
 
   const hyphenEm = /^\/carros-em-([^/]+)\/?$/.exec(pathname);
   if (hyphenEm?.[1]) {
@@ -189,35 +191,22 @@ export async function middleware(request: NextRequest) {
  * Matcher do middleware.
  *
  * Decisões:
- *  - `/carros-usados/regiao/:path*` (não `/carros-usados/regiao/:slug`):
- *    `:path*` casa zero ou mais segmentos e é o pattern mais robusto no
- *    `path-to-regexp` do Next 14. O matcher só decide SE o middleware
- *    roda; a validação fina de "é rota regional válida?" é feita
- *    dentro do código via `extractRegionalSlug`.
- *  - As rotas legadas com hífen único (`/carros-em-foo`, etc.) usam
- *    `/:slug` com path completo porque `:slug` no MEIO do segmento
- *    (sem `/` antes) é interpretado de forma inconsistente. Para essas,
- *    pegamos via path mais amplo e validamos dentro.
- *  - `/painel/anuncios/novo` é match exato — sem parâmetro, funciona.
- *  - `/painel/anuncios/:id/publicar` usa `:id` separado por `/`, que
- *    é o caso canônico que `path-to-regexp` cata sem ambiguidade.
+ *  - `/carros-usados/regiao/:path*`: gate hard-404 da canônica.
+ *  - `/:uf([a-z]{2})/regiao/:path*`: redirect 301 da legada.
+ *  - Demais rotas territoriais entram para injeção do `x-cnc-pathname`.
  */
 export const config = {
   matcher: [
+    // Página Regional canônica — gate de feature flag + validação de slug.
+    "/carros-usados/regiao/:path*",
+
+    // Página Regional legada — redirect 301 para canônica (sem gate).
+    "/:uf([a-z]{2})/regiao/:path*",
+
     // Redirects 301 legados (hífen único → barra).
     "/carros-em-:path*",
     "/carros-baratos-em-:path*",
     "/carros-automaticos-em-:path*",
-
-    // Rota legada de região — agora só redireciona (308 permanente).
-    // Mantida no matcher para injeção do x-cnc-pathname; não tem gate.
-    "/carros-usados/regiao/:path*",
-
-    // Nova rota regional `/:uf/regiao/:ancora` — gate de feature flag
-    // + injeção do x-cnc-pathname. O pattern `:uf([a-z]{2})` filtra
-    // apenas segmentos de 2 letras minúsculas para não conflitar com
-    // rotas existentes como /comprar, /carros-em, etc.
-    "/:uf([a-z]{2})/regiao/:path*",
 
     // Rotas territoriais que precisam do `x-cnc-pathname` para o
     // RootLayout derivar a cidade ativa SSR.

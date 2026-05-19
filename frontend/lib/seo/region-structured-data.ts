@@ -1,5 +1,5 @@
 import { toAbsoluteUrl } from "./site";
-import { slugToAncoraHref } from "@/lib/regions/ancora-url";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 
 /**
  * Builders puros de JSON-LD para a Página Regional
@@ -43,7 +43,7 @@ export type RegionStructuredDataInput = {
 const SITE_NAME = "Carros na Cidade";
 
 function regionPath(slug: string) {
-  return slugToAncoraHref(slug);
+  return slugToRegionHref(slug);
 }
 
 function cityPath(slug: string) {

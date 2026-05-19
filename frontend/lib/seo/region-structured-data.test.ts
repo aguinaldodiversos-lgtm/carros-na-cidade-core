@@ -68,7 +68,7 @@ describe("buildRegionBreadcrumbJsonLd", () => {
     expect(items[3]).toMatchObject({
       position: 4,
       name: "Região de Atibaia",
-      item: "https://example.test/sp/regiao/atibaia",
+      item: "https://example.test/carros-usados/regiao/atibaia-sp",
     });
   });
 });
@@ -105,7 +105,7 @@ describe("buildRegionItemListJsonLd", () => {
 describe("buildRegionCollectionPageJsonLd", () => {
   it("aponta url para a regional canônica (não para a cidade)", () => {
     const json = buildRegionCollectionPageJsonLd(ATIBAIA);
-    expect(json.url).toBe("https://example.test/sp/regiao/atibaia");
+    expect(json.url).toBe("https://example.test/carros-usados/regiao/atibaia-sp");
   });
 
   it("description menciona total real (não a amostra) e raio", () => {

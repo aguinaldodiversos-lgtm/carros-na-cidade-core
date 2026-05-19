@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { stateNameFromUf } from "@/lib/buy/territory-variant";
-import { slugToAncoraHref } from "@/lib/regions/ancora-url";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import {
   getStateCuratedCities,
   type StateCuratedCity,
@@ -55,7 +55,7 @@ function CityCard({ city, ufUpper }: { city: StateCuratedCity; ufUpper: string }
           <span aria-hidden="true">→</span>
         </Link>
         <Link
-          href={slugToAncoraHref(city.slug)}
+          href={slugToRegionHref(city.slug)}
           className="inline-flex items-center gap-1 text-xs font-medium text-cnc-muted transition hover:text-primary"
         >
           Região de {city.name}

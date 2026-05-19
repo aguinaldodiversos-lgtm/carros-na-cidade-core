@@ -57,11 +57,27 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
     process.env.REGIONAL_PAGE_ENABLED = "true";
   });
 
-  it("renderiza Link com href para /{uf}/regiao/{city}", () => {
+  it("renderiza Link com href canônico /carros-usados/regiao/[citySlug]", () => {
     render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
     const link = screen.getByTestId("region-cta-link");
     expect(link).toBeInTheDocument();
-    expect(link.getAttribute("href")).toBe("/sp/regiao/atibaia");
+    expect(link.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
+  });
+
+  it("funciona para qualquer cidade brasileira (Campinas, BH, Salvador, Curitiba)", () => {
+    const samples: Array<{ slug: string; city: string; expected: string }> = [
+      { slug: "campinas-sp", city: "Campinas", expected: "/carros-usados/regiao/campinas-sp" },
+      { slug: "belo-horizonte-mg", city: "Belo Horizonte", expected: "/carros-usados/regiao/belo-horizonte-mg" },
+      { slug: "salvador-ba", city: "Salvador", expected: "/carros-usados/regiao/salvador-ba" },
+      { slug: "curitiba-pr", city: "Curitiba", expected: "/carros-usados/regiao/curitiba-pr" },
+      { slug: "sao-jose-dos-campos-sp", city: "São José dos Campos", expected: "/carros-usados/regiao/sao-jose-dos-campos-sp" },
+    ];
+    for (const { slug, city, expected } of samples) {
+      const { unmount } = render(<RegionCtaLink slug={slug} cityName={city} />);
+      const link = screen.getByTestId("region-cta-link");
+      expect(link.getAttribute("href")).toBe(expected);
+      unmount();
+    }
   });
 
   it("texto visível inclui o nome da cidade", () => {
@@ -82,7 +98,7 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
     // componente passa por encodeURIComponent.
     render(<RegionCtaLink slug="rio-de-janeiro-rj" cityName="Rio de Janeiro" />);
     const link = screen.getByTestId("region-cta-link");
-    expect(link.getAttribute("href")).toBe("/rj/regiao/rio-de-janeiro");
+    expect(link.getAttribute("href")).toBe("/carros-usados/regiao/rio-de-janeiro-rj");
   });
 
   it("PR 2: é CTA primary filled (bg-primary, não outline neutro)", () => {
