@@ -5,14 +5,15 @@ import { IconCalculator, IconPlus, IconTable } from "@/components/home/icons";
 
 /**
  * 3 cards quick-action lado a lado (1 col mobile, 3 col >= sm) abaixo do
- * banner herói da Home, conforme mockup `pagina Home.png`:
- *   - Anunciar grátis        → /anunciar/novo  (acento azul)
- *   - Tabela FIPE            → /tabela-fipe    (acento verde)
- *   - Simulador financiamento → /simulador-financiamento (acento roxo)
+ * banner herói da Home, conforme contrato visual `atualização-home.png`
+ * (revisão 2026-05-19):
+ *   - Anuncie seu carro grátis  → /anunciar/novo
+ *   - Tabela FIPE               → /tabela-fipe
+ *   - Simulador financiamento   → /simulador-financiamento
  *
- * Os tons (azul/verde/roxo) seguem o padrão visual do mockup, no qual cada
- * card tem um ícone circular colorido distinto para diferenciar a ação à
- * primeira vista.
+ * Diferente do mockup anterior (azul/verde/roxo), nesta revisão TODOS os
+ * cards usam o mesmo acento azul primário — proposta minimalista
+ * solicitada pelo PO em 2026-05-19. Ver QuickActionTile["accent"].
  *
  * Server Component — apenas composição.
  */
@@ -20,8 +21,8 @@ import { IconCalculator, IconPlus, IconTable } from "@/components/home/icons";
 const ACTIONS = [
   {
     href: "/anunciar/novo",
-    title: "Anunciar grátis",
-    subtitle: "É rápido e fácil",
+    title: "Anuncie seu carro grátis",
+    subtitle: "Publique em poucos minutos",
     icon: <IconPlus className="h-full w-full" />,
     accent: "primary" as const,
   },
@@ -30,14 +31,14 @@ const ACTIONS = [
     title: "Tabela FIPE",
     subtitle: "Consulte agora",
     icon: <IconTable className="h-full w-full" />,
-    accent: "success" as const,
+    accent: "primary" as const,
   },
   {
     href: "/simulador-financiamento",
     title: "Simulador de financiamento",
     subtitle: "Veja parcelas",
     icon: <IconCalculator className="h-full w-full" />,
-    accent: "violet" as const,
+    accent: "primary" as const,
   },
 ];
 

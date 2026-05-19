@@ -71,24 +71,6 @@ type PromptState =
 
 const GEO_TIMEOUT_MS = 10_000;
 
-function PinIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
-      <circle cx="12" cy="9" r="2.5" />
-    </svg>
-  );
-}
-
 function CheckIcon() {
   return (
     <svg
@@ -106,9 +88,9 @@ function CheckIcon() {
   );
 }
 
-function MapIllustration() {
+function MapIllustration({ className = "h-16 w-16 sm:h-20 sm:w-20" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 80 80" width="80" height="80" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 80 80" className={className} fill="none" aria-hidden="true">
       {/* Map background */}
       <rect width="80" height="80" rx="14" fill="#EFF6FF" />
       {/* Vertical streets */}
@@ -370,22 +352,31 @@ export function LocationRegionalPrompt({
       className="mx-auto w-full max-w-8xl px-4 pt-4 sm:px-6 lg:px-8"
       data-testid="location-prompt-idle"
     >
-      <div className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white px-5 py-4">
-        <div className="shrink-0">
-          <MapIllustration />
+      <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="shrink-0">
+            <MapIllustration />
+          </div>
+          {/*
+            Mobile: texto em cima, botão full-width abaixo (evita esmagar
+            o input e mantém boa área de toque em 360–414px).
+            Desktop sm+: texto e botão lado a lado (espelha referência).
+          */}
+          <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+            <p className="text-[14px] font-bold leading-snug text-slate-900 sm:flex-1 sm:text-[16px]">
+              Quer ver carros próximos de você?
+            </p>
+            <button
+              type="button"
+              onClick={handleUseLocation}
+              disabled={isBusy}
+              className="w-full whitespace-nowrap rounded-xl bg-blue-600 px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 disabled:opacity-60 sm:w-auto sm:shrink-0 sm:px-5 sm:py-3 sm:text-[14px]"
+              data-testid="location-prompt-trigger"
+            >
+              {isBusy ? busyLabel : "Ver carros perto de mim"}
+            </button>
+          </div>
         </div>
-        <p className="flex-1 text-[17px] font-bold leading-snug text-slate-900">
-          Quer ver carros próximos de você?
-        </p>
-        <button
-          type="button"
-          onClick={handleUseLocation}
-          disabled={isBusy}
-          className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-[15px] font-semibold text-white transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
-          data-testid="location-prompt-trigger"
-        >
-          {isBusy ? busyLabel : "Ver carros perto de mim"}
-        </button>
       </div>
     </section>
   );

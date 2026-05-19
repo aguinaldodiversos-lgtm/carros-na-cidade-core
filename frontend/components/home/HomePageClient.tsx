@@ -10,6 +10,7 @@ import { HomeHero } from "@/components/home/sections/HomeHero";
 import { HomePrimaryActions } from "@/components/home/sections/HomePrimaryActions";
 import { HomeSearchCard } from "@/components/home/sections/HomeSearchCard";
 import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
+import { HomeTrustStrip } from "@/components/home/sections/HomeTrustStrip";
 
 /**
  * Orquestrador da Home — alinhado ao contrato visual oficial em
@@ -137,6 +138,8 @@ export function HomePageClient({
         />
 
         <HomePrimaryActions />
+
+        <HomeTrustStrip />
 
         <Suspense fallback={<HomeCarouselsSkeleton />}>{carousels}</Suspense>
 

@@ -4,6 +4,18 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
+/**
+ * Barra de busca da Home — contrato visual `atualização-home.png`
+ * (revisão 2026-05-19).
+ *
+ * Estrutura mobile-first:
+ *   • Container do input: rounded-2xl, borda gray-200, padding compacto em
+ *     mobile (px-4 py-3) que cresce em sm+ (px-5 py-4).
+ *   • Botão de filtros: círculo azul à direita, 44px mobile / 52px sm+.
+ *   • Sem chips de filtro rápido — eliminados nesta revisão para reduzir
+ *     peso do topo. Os mesmos filtros existem em /comprar e nos atalhos.
+ */
+
 function SearchIcon() {
   return (
     <svg
@@ -14,7 +26,7 @@ function SearchIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-[22px] w-[22px] shrink-0 text-gray-500"
+      className="h-5 w-5 shrink-0 text-gray-500 sm:h-[22px] sm:w-[22px]"
     >
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-3.5-3.5" />
@@ -73,12 +85,12 @@ export function HomeSearchCard({ defaultCitySlug }: HomeSearchCardProps) {
           e.preventDefault();
           submit(query);
         }}
-        className="flex items-center gap-3"
+        className="flex items-center gap-2 sm:gap-3"
       >
         <label htmlFor="home-search-input" className="sr-only">
           Buscar veículos
         </label>
-        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 sm:gap-3 sm:px-5 sm:py-4">
           <span aria-hidden="true" className="flex shrink-0 items-center">
             <SearchIcon />
           </span>
@@ -91,14 +103,13 @@ export function HomeSearchCard({ defaultCitySlug }: HomeSearchCardProps) {
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
             inputMode="search"
-            className="flex-1 bg-transparent text-base text-gray-700 outline-none placeholder:text-gray-400"
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-gray-700 outline-none placeholder:text-gray-400 sm:text-base"
           />
         </div>
         <button
           type="submit"
           aria-label="Aplicar filtros e ver ofertas"
-          className="flex shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-md transition hover:bg-blue-700 active:scale-95"
-          style={{ width: 52, height: 52 }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-md transition hover:bg-blue-700 active:scale-95 sm:h-[52px] sm:w-[52px]"
         >
           <SlidersIcon />
         </button>

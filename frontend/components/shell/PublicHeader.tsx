@@ -52,48 +52,6 @@ function UserAvatarIcon() {
   );
 }
 
-function CncLogoMobile() {
-  return (
-    <div className="flex items-center gap-1.5">
-      {/* City skyline + car icon */}
-      <svg
-        viewBox="0 0 40 40"
-        width="36"
-        height="36"
-        fill="none"
-        aria-hidden="true"
-      >
-        {/* Buildings */}
-        <rect x="2" y="14" width="7" height="20" rx="1.5" fill="#2563EB" />
-        <rect x="8" y="10" width="6" height="24" rx="1.5" fill="#2563EB" />
-        <rect x="17" y="8" width="9" height="26" rx="1.5" fill="#2563EB" />
-        <rect x="29" y="12" width="9" height="22" rx="1.5" fill="#2563EB" />
-        {/* Car body */}
-        <path
-          d="M6 26h28l-1.8-4.8A2 2 0 0 0 30.3 20H9.7a2 2 0 0 0-1.9 1.2L6 26Z"
-          fill="#0F172A"
-        />
-        <rect x="4" y="26" width="32" height="7" rx="2" fill="#0F172A" />
-        {/* Wheels */}
-        <circle cx="12" cy="33" r="3" fill="#1E293B" />
-        <circle cx="28" cy="33" r="3" fill="#1E293B" />
-        {/* Windshield highlight */}
-        <path d="M12 24h16" stroke="#2563EB" strokeWidth="0.8" strokeLinecap="round" />
-      </svg>
-      {/* Text */}
-      <div className="leading-tight">
-        <div className="text-[15px] font-bold tracking-tight">
-          <span className="text-slate-900">Carros na </span>
-          <span className="text-blue-600">Cidade</span>
-        </div>
-        <div className="text-[9px] font-medium text-blue-900">
-          O seu guia de confiança
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MenuIcon({ open }: { open: boolean }) {
   return (
     <svg
@@ -181,18 +139,23 @@ export function PublicHeader() {
               aria-label="Carros na Cidade — Ofertas locais e confiança perto de você"
               className="inline-flex shrink-0 items-center"
             >
-              {/* Mobile: SVG inline logo com ícone + texto */}
-              <span className="md:hidden">
-                <CncLogoMobile />
-              </span>
-              {/* Desktop: imagem logo oficial */}
+              {/*
+                Logo oficial PNG. `mix-blend-multiply` neutraliza o fundo
+                branco do arquivo contra o `bg-white/95` do header, dando
+                aparência de fundo transparente sem precisar re-exportar
+                a imagem com canal alpha.
+                Sizing mobile-first: 32px mobile / 36px sm / 48px md+.
+                Larguras máximas evitam que o logo empurre a pílula da
+                cidade fora do viewport em telas pequenas (320–360px).
+              */}
               <Image
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade — Ofertas locais e confiança perto de você"
                 width={400}
                 height={100}
                 priority
-                className="hidden h-12 w-auto max-w-[220px] object-contain object-left md:block"
+                className="h-8 w-auto max-w-[140px] object-contain object-left sm:h-9 sm:max-w-[170px] md:h-12 md:max-w-[220px]"
+                style={{ mixBlendMode: "multiply" }}
               />
             </Link>
 
