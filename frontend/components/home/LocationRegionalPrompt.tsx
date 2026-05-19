@@ -106,6 +106,49 @@ function CheckIcon() {
   );
 }
 
+function MapIllustration() {
+  return (
+    <svg viewBox="0 0 80 80" width="80" height="80" fill="none" aria-hidden="true">
+      {/* Map background */}
+      <rect width="80" height="80" rx="14" fill="#EFF6FF" />
+      {/* Vertical streets */}
+      <rect x="18" y="0" width="5" height="80" rx="2" fill="#DBEAFE" />
+      <rect x="43" y="0" width="4" height="80" rx="2" fill="#BFDBFE" />
+      <rect x="60" y="0" width="5" height="80" rx="2" fill="#DBEAFE" />
+      {/* Horizontal streets */}
+      <rect x="0" y="22" width="80" height="5" rx="2" fill="#DBEAFE" />
+      <rect x="0" y="47" width="80" height="4" rx="2" fill="#BFDBFE" />
+      <rect x="0" y="64" width="80" height="5" rx="2" fill="#DBEAFE" />
+      {/* City blocks */}
+      <rect x="0" y="5" width="16" height="15" rx="3" fill="#DBEAFE" opacity="0.6" />
+      <rect x="24" y="5" width="17" height="15" rx="3" fill="#BFDBFE" opacity="0.8" />
+      <rect x="66" y="5" width="14" height="15" rx="3" fill="#DBEAFE" opacity="0.6" />
+      <rect x="0" y="29" width="16" height="16" rx="3" fill="#BFDBFE" opacity="0.5" />
+      <rect x="24" y="29" width="17" height="16" rx="3" fill="#93C5FD" opacity="0.55" />
+      <rect x="66" y="29" width="14" height="16" rx="3" fill="#DBEAFE" opacity="0.5" />
+      <rect x="0" y="55" width="16" height="7" rx="3" fill="#DBEAFE" opacity="0.5" />
+      <rect x="24" y="55" width="17" height="7" rx="3" fill="#DBEAFE" opacity="0.6" />
+      {/* Location pin */}
+      <path
+        d="M47 43 C47 43 38 34 38 28 A9 9 0 0 1 56 28 C56 34 47 43 47 43Z"
+        fill="#2563EB"
+      />
+      <circle cx="47" cy="28" r="4" fill="white" />
+      {/* Sparkles */}
+      <path
+        d="M63 17 L64.2 20 L67.5 21.2 L64.2 22.4 L63 25.5 L61.8 22.4 L58.5 21.2 L61.8 20 Z"
+        fill="#FDE68A"
+      />
+      <path
+        d="M28 18 L29 20.5 L31.5 21.5 L29 22.5 L28 25 L27 22.5 L24.5 21.5 L27 20.5 Z"
+        fill="#FDE68A"
+        opacity="0.7"
+      />
+      <circle cx="59" cy="11" r="2" fill="#FDE68A" />
+    </svg>
+  );
+}
+
 async function postResolveLocation(
   latitude: number,
   longitude: number
@@ -324,27 +367,23 @@ export function LocationRegionalPrompt({
   return (
     <section
       aria-label="Encontrar carros próximos"
-      className="mx-auto w-full max-w-7xl px-4 pt-3 sm:px-6 lg:px-8"
+      className="mx-auto w-full max-w-8xl px-4 pt-4 sm:px-6 lg:px-8"
       data-testid="location-prompt-idle"
     >
-      <div className="flex flex-col items-start gap-2 rounded-xl border border-cnc-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
-        <div>
-          <p className="text-sm font-semibold text-cnc-text-strong sm:text-[15px]">
-            Quer ver carros próximos de você?
-          </p>
-          <p className="mt-0.5 text-[12.5px] leading-snug text-cnc-muted sm:text-[13px]">
-            Usamos sua localização só para sugerir a região mais relevante — não salvamos a
-            coordenada nem enviamos para terceiros.
-          </p>
+      <div className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white px-5 py-4">
+        <div className="shrink-0">
+          <MapIllustration />
         </div>
+        <p className="flex-1 text-[17px] font-bold leading-snug text-slate-900">
+          Quer ver carros próximos de você?
+        </p>
         <button
           type="button"
           onClick={handleUseLocation}
           disabled={isBusy}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong disabled:opacity-60"
+          className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-[15px] font-semibold text-white transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
           data-testid="location-prompt-trigger"
         >
-          <PinIcon />
           {isBusy ? busyLabel : "Ver carros perto de mim"}
         </button>
       </div>

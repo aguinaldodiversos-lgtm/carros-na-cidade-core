@@ -1,61 +1,120 @@
 // frontend/components/home/sections/HomeShortcuts.tsx
 
-import Image from "next/image";
 import Link from "next/link";
 
 /**
- * Faixa de atalhos circulares — equivalente "stories" mas com ações
- * úteis (sem FOMO, sem badge automática "novo").
+ * Quick actions — 5 atalhos circulares azuis conforme contrato visual
+ * atualizado em 2026-05-19 (atualização-home.png).
  *
- * Set canônico (contrato visual oficial — mockup `pagina Home.png`):
- *   - Comprar    → /comprar
- *   - Vender     → /anunciar
- *   - Blog       → /blog
- *   - Ofertas    → /comprar?below_fipe=true   (oportunidades destacadas)
- *   - Lojas      → /comprar?seller_type=dealer
- *   - Favoritos  → /favoritos
- *   - Planos     → /planos                    (CTA premium adicionado em 2026-05-08)
+ * Items: Comprar, Vender, FIPE, Ofertas, Planos.
+ * Ícones brancos sobre círculo azul sólido (#2563EB).
  *
- * FIPE e Simulador NÃO aparecem aqui — ficam nos cards quick-action
- * (HomePrimaryActions) abaixo desta faixa, e também no header desktop.
- *
- * Os badges são PNGs extraídos diretamente do sprite oficial
- * (`banner e icones.png`) — preservam o anel com gradiente colorido
- * e o glifo dark navy idênticos ao mockup `pagina Home.png`.
- *
- * O ícone "Planos" usa SVG (anel gradient violeta→rosa + glifo de
- * estrela navy) — mantém o mesmo formato circular, espessura de anel
- * e cor de glifo dos PNGs irmãos. Next/Image renderiza com
- * `unoptimized` para SVG (transformação por extensão da string src).
- *
- * Layout:
- *   • Mobile (< md): carrossel horizontal scroll-snap (preservado).
- *   • Desktop (md+): centralizado, sem scroll, gap maior.
- *
- * Server Component — apenas composição.
+ * Server Component — apenas composição estática.
  */
 
-const SHORTCUTS = [
-  { href: "/comprar", label: "Comprar", iconSrc: "/images/comprar.png" },
-  { href: "/anunciar", label: "Vender", iconSrc: "/images/vender.png" },
-  { href: "/blog", label: "Blog", iconSrc: "/images/blog.png" },
-  {
-    href: "/comprar?below_fipe=true",
-    label: "Ofertas",
-    iconSrc: "/images/ofertas.png",
-  },
-  {
-    href: "/comprar?seller_type=dealer",
-    label: "Lojas",
-    iconSrc: "/images/lojas.png",
-  },
-  { href: "/favoritos", label: "Favoritos", iconSrc: "/images/favoritos.png" },
-  { href: "/planos", label: "Planos", iconSrc: "/images/planos.svg" },
-];
-
-function isSvgSrc(src: string): boolean {
-  return src.toLowerCase().endsWith(".svg");
+function CarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="white"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-7 w-7"
+    >
+      <path d="M5 11V14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3l-1.9-4.8A1 1 0 0 0 16.2 6H7.8a1 1 0 0 0-.93.62L5 11Z" />
+      <path d="M5 11h14" />
+      <circle cx="8.5" cy="15" r="1.5" fill="white" stroke="none" />
+      <circle cx="15.5" cy="15" r="1.5" fill="white" stroke="none" />
+    </svg>
+  );
 }
+
+function TagIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="white"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-7 w-7"
+    >
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8 8a2 2 0 0 0 2.828 0l7.172-7.172a2 2 0 0 0 0-2.828l-8-8Z" />
+      <circle cx="7.5" cy="7.5" r="1.5" fill="white" stroke="none" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="white"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-7 w-7"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" />
+      <path d="M14 2v6h6" />
+      <text
+        x="12"
+        y="17"
+        textAnchor="middle"
+        fontSize="5.5"
+        fontWeight="800"
+        fill="white"
+        stroke="none"
+        fontFamily="Arial, sans-serif"
+      >
+        FIPE
+      </text>
+    </svg>
+  );
+}
+
+function PercentTagIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="white"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-7 w-7"
+    >
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8 8a2 2 0 0 0 2.828 0l7.172-7.172a2 2 0 0 0 0-2.828l-8-8Z" />
+      <circle cx="8.5" cy="8.5" r="1" fill="white" stroke="none" />
+      <circle cx="13.5" cy="13.5" r="1" fill="white" stroke="none" />
+      <path d="M8 14.5 15.5 7" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function StarFilledIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="white" aria-hidden="true" className="h-7 w-7">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </svg>
+  );
+}
+
+const ACTIONS = [
+  { href: "/comprar", label: "Comprar", icon: <CarIcon /> },
+  { href: "/anunciar", label: "Vender", icon: <TagIcon /> },
+  { href: "/fipe", label: "FIPE", icon: <FileIcon /> },
+  { href: "/comprar?below_fipe=true", label: "Ofertas", icon: <PercentTagIcon /> },
+  { href: "/planos", label: "Planos", icon: <StarFilledIcon /> },
+];
 
 export function HomeShortcuts() {
   return (
@@ -63,34 +122,18 @@ export function HomeShortcuts() {
       aria-label="Atalhos rápidos"
       className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8"
     >
-      <ul
-        className={[
-          // Mobile: carrossel scrollável com snap (mantém comportamento anterior).
-          "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1",
-          "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          "sm:gap-4",
-          // Desktop (md+): centraliza horizontalmente, remove scroll, espaça mais.
-          "md:justify-center md:gap-6 md:overflow-visible md:snap-none",
-        ].join(" ")}
-      >
-        {SHORTCUTS.map((s) => (
-          <li key={s.href} className="snap-start shrink-0">
+      <ul className="flex items-start justify-between">
+        {ACTIONS.map(({ href, label, icon }) => (
+          <li key={href}>
             <Link
-              href={s.href}
-              aria-label={s.label}
-              className="flex shrink-0 items-center justify-center"
+              href={href}
+              aria-label={label}
+              className="flex flex-col items-center gap-2 outline-none focus-visible:opacity-90"
             >
-              <Image
-                src={s.iconSrc}
-                alt={s.label}
-                width={240}
-                height={240}
-                // SVG é tratado como já-otimizado (sem pipeline raster do Next).
-                unoptimized={isSvgSrc(s.iconSrc)}
-                className="h-28 w-28 object-contain mix-blend-multiply md:h-32 md:w-32"
-                style={{ mixBlendMode: "multiply" }}
-                priority
-              />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-[0_4px_14px_rgba(37,99,235,0.35)] transition hover:bg-blue-700 active:scale-95">
+                {icon}
+              </div>
+              <span className="text-[13px] font-semibold text-slate-900">{label}</span>
             </Link>
           </li>
         ))}

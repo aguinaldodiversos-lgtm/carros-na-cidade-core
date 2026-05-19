@@ -4,123 +4,45 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
-import { SearchBar } from "@/components/ui/SearchBar";
+function SearchIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[22px] w-[22px] shrink-0 text-gray-500"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
 
-/**
- * Card de busca da Home — alinhado ao mockup `pagina Home.png`.
- *
- * Renderiza, no topo da Home (logo abaixo do header global):
- *   1. SearchBar canônica (DS) com botão de filtros à direita.
- *   2. Linha de chips de filtro rápido com ícones (Até R$ 50 mil, SUV,
- *      Abaixo da FIPE, Lojas).
- *
- * Esta seção foi extraída do antigo `HomeHero` para que o banner regional
- * (`HomeHero`, com CTA interno "Ver ofertas →") possa aparecer ABAIXO dos
- * atalhos circulares, espelhando a ordem do mockup.
- */
-
-type QuickFilter = {
-  key: string;
-  label: string;
-  query: string;
-  icon: React.ReactNode;
-};
-
-const PriceTagIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className="h-3.5 w-3.5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 12V4h8l10 10-8 8L3 12Z" />
-    <circle cx="8" cy="8" r="1.6" />
-  </svg>
-);
-
-const SuvIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className="h-3.5 w-3.5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 14V12l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-    <path d="M6 11h12" />
-    <circle cx="7.5" cy="14" r="1" />
-    <circle cx="16.5" cy="14" r="1" />
-  </svg>
-);
-
-const DollarIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className="h-3.5 w-3.5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 3v18" />
-    <path d="M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H7" />
-  </svg>
-);
-
-const StoreIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className="h-3.5 w-3.5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M4 9h16l-1.2-3.6a1.5 1.5 0 0 0-1.4-1H6.6a1.5 1.5 0 0 0-1.4 1L4 9Z" />
-    <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
-    <path d="M9 14h6" />
-  </svg>
-);
-
-const SlidersIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className="h-5 w-5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M4 6h13" />
-    <path d="M4 12h7" />
-    <path d="M4 18h11" />
-    <circle cx="19" cy="6" r="2" />
-    <circle cx="14" cy="12" r="2" />
-    <circle cx="18" cy="18" r="2" />
-  </svg>
-);
-
-const QUICK_FILTERS: ReadonlyArray<QuickFilter> = [
-  { key: "ate-50", label: "Até R$ 50 mil", query: "price_max=50000", icon: PriceTagIcon },
-  { key: "suv", label: "SUV", query: "body_type=SUV", icon: SuvIcon },
-  { key: "below-fipe", label: "Abaixo da FIPE", query: "below_fipe=true", icon: DollarIcon },
-  { key: "lojas", label: "Lojas", query: "seller_type=dealer", icon: StoreIcon },
-];
+function SlidersIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="white"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+    >
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="14" y2="12" />
+      <line x1="4" y1="18" x2="18" y2="18" />
+      <circle cx="16" cy="6" r="2" fill="white" stroke="white" />
+      <circle cx="10" cy="12" r="2" fill="white" stroke="white" />
+      <circle cx="14" cy="18" r="2" fill="white" stroke="white" />
+    </svg>
+  );
+}
 
 interface HomeSearchCardProps {
   defaultCitySlug: string;
@@ -140,53 +62,47 @@ export function HomeSearchCard({ defaultCitySlug }: HomeSearchCardProps) {
     [defaultCitySlug, router]
   );
 
-  const goWithFilter = useCallback(
-    (filterQuery: string) => {
-      const params = new URLSearchParams(filterQuery);
-      if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
-      router.push(`/comprar?${params.toString()}`);
-    },
-    [defaultCitySlug, router]
-  );
-
   return (
     <section
       aria-label="Buscar veículos"
       className="mx-auto w-full max-w-8xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8"
     >
-      <SearchBar
-        value={query}
-        onChange={setQuery}
-        onSubmit={submit}
-        placeholder="Busque por marca, modelo ou cidade"
-        ariaLabel="Buscar veículos"
-        filterButton={
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            aria-label="Aplicar filtros e ver ofertas"
-            className="!rounded-full !px-4"
-          >
-            {SlidersIcon}
-          </Button>
-        }
-      />
-
-      <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
-        <span className="sr-only">Filtros rápidos</span>
-        {QUICK_FILTERS.map((f) => (
-          <Chip
-            key={f.key}
-            variant="filter"
-            iconLeft={f.icon}
-            onClick={() => goWithFilter(f.query)}
-            className="shrink-0"
-          >
-            {f.label}
-          </Chip>
-        ))}
-      </div>
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(query);
+        }}
+        className="flex items-center gap-3"
+      >
+        <label htmlFor="home-search-input" className="sr-only">
+          Buscar veículos
+        </label>
+        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+          <span aria-hidden="true" className="flex shrink-0 items-center">
+            <SearchIcon />
+          </span>
+          <input
+            id="home-search-input"
+            type="search"
+            name="q"
+            placeholder="Busque por marca, modelo ou cidade"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoComplete="off"
+            inputMode="search"
+            className="flex-1 bg-transparent text-base text-gray-700 outline-none placeholder:text-gray-400"
+          />
+        </div>
+        <button
+          type="submit"
+          aria-label="Aplicar filtros e ver ofertas"
+          className="flex shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-md transition hover:bg-blue-700 active:scale-95"
+          style={{ width: 52, height: 52 }}
+        >
+          <SlidersIcon />
+        </button>
+      </form>
     </section>
   );
 }
