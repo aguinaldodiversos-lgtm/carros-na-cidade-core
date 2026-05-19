@@ -5,36 +5,43 @@ import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 
 /**
- * BFF server-only para o endpoint privado /api/internal/regions/:slug.
+ * BFF server-only do payload de Região para a Página Regional e o
+ * resolver territorial.
+ *
+ * ESCOLHA DE ENDPOINT (Fase 7, 2026-05-18 briefing):
+ *   Default: `/api/internal/regions/:slug` (com X-Internal-Token, cache
+ *   5min) — preservado por compatibilidade com testes e configuração
+ *   existente em produção.
+ *
+ *   Opt-in: `REGIONAL_BFF_USE_PUBLIC=true` ativa o novo
+ *   `/api/public/regions/:citySlug` (sem token, cache 15min, payload
+ *   sanitizado). Reduz dependência de INTERNAL_API_TOKEN no SSR e
+ *   padroniza contrato com terceiros/crawlers. Ativar no Render via env
+ *   var quando confortável (sem deploy de código).
+ *
+ *   O middleware do frontend (`lib/regional-page-guard.ts`) continua
+ *   usando o INTERNAL por design (gate hard-404 + cache 5min consistente).
  *
  * Por que server-only?
- * - O header X-Internal-Token usa process.env.INTERNAL_API_TOKEN, que NUNCA
- *   pode vazar no bundle do client (qualquer NEXT_PUBLIC_* prefix exporia
- *   o token via JS público). `import "server-only"` faz o Next abortar o
- *   build se algum client component importar este arquivo.
+ * - O header X-Internal-Token (fallback) usa process.env.INTERNAL_API_TOKEN,
+ *   que NUNCA pode vazar no bundle do client. `import "server-only"` faz
+ *   o Next abortar o build se algum client component importar este arquivo.
  *
  * Por que degrade gracioso (null) em vez de throw?
- * - A futura Página Regional renderiza com graceful fallback se a região
- *   não estiver disponível (cidade isolada, INTERNAL_API_TOKEN não
- *   configurado, backend cold-start). Crash em SSR poluiria o ISR e
- *   geraria página de erro pública. Regional é "extra"; sua ausência
- *   nunca pode quebrar a navegação.
+ * - A Página Regional renderiza com graceful fallback se a região não
+ *   estiver disponível. Crash em SSR poluiria o ISR e geraria página de
+ *   erro pública. Regional é "extra"; sua ausência nunca pode quebrar a
+ *   navegação.
  *
  * Cache (next: { revalidate, tags }):
- * - revalidate=300 (5 min) coincide com o TTL do cache Redis do backend
- *   em /api/internal/regions/* — evita hit pattern em que ISR e Redis
- *   expiram em momentos descoordenados.
- * - tags ["internal:regions", "internal:regions:<slug>"] permitem invalidar
- *   uma região específica via revalidateTag(`internal:regions:${slug}`)
- *   ou tudo via revalidateTag("internal:regions") quando o admin rodar
- *   `npm run regions:build` em prod.
+ * - Endpoint público: revalidate=900 (15 min, alinha com TTL Redis).
+ * - Endpoint internal: revalidate=300 (5 min, alinha com TTL Redis).
+ * - tags ["regions", "regions:<slug>"] permitem invalidar uma região via
+ *   `revalidateTag('regions:atibaia-sp')` ou tudo via `revalidateTag('regions')`.
  *
  * Estados retornando null:
- *   - INTERNAL_API_TOKEN não configurado (warn).
- *   - backend base URL não configurada (silencioso — mesmo padrão de
- *     fetch-city-meta-server.ts).
- *   - HTTP 4xx (incluindo 404 para slug desconhecido OU token errado —
- *     backend dá 404 nos dois casos por design anti-enumeração).
+ *   - Backend base URL não configurada (silencioso).
+ *   - HTTP 404 (slug desconhecido).
  *   - HTTP 5xx, timeout, qualquer erro de rede ou parse.
  */
 
@@ -67,7 +74,11 @@ export type RegionPayload = {
   radius_km?: number;
 };
 
-type BackendEnvelope = {
+/**
+ * Envelope do endpoint INTERNAL `/api/internal/regions/:slug`.
+ * Mantido para fallback quando `REGIONAL_BFF_USE_INTERNAL=true`.
+ */
+type InternalBackendEnvelope = {
   ok?: boolean;
   data?: {
     base?: Partial<RegionBase> | null;
@@ -77,7 +88,57 @@ type BackendEnvelope = {
   error?: string;
 };
 
-const REVALIDATE_SECONDS = 300;
+/**
+ * Envelope do endpoint PUBLIC `/api/public/regions/:citySlug`.
+ * Shape mais rico (state.name, canonicalUrl, lat/lng do baseCity, members
+ * com cityId/distanceKm em camelCase) — adaptado abaixo para o shape
+ * interno `RegionPayload` esperado pelos callers.
+ */
+type PublicBackendEnvelope = {
+  success?: boolean;
+  data?: {
+    region?: {
+      slug?: string;
+      name?: string;
+      canonicalUrl?: string;
+      radiusKm?: number;
+    };
+    baseCity?: {
+      id?: number;
+      name?: string;
+      slug?: string;
+      state?: string;
+      latitude?: number | null;
+      longitude?: number | null;
+    };
+    state?: { code?: string; slug?: string; name?: string };
+    members?: Array<{
+      cityId?: number;
+      name?: string;
+      slug?: string;
+      state?: string;
+      distanceKm?: number | null;
+      layer?: number;
+    }>;
+    citySlugs?: string[];
+    adsCount?: number;
+    featuredCount?: number;
+  } | null;
+  error?: string;
+};
+
+const PUBLIC_REVALIDATE_SECONDS = 900; // 15 min (alinha com TTL do endpoint público)
+const INTERNAL_REVALIDATE_SECONDS = 300; // 5 min (legado)
+
+/**
+ * Por default, BFF usa o endpoint INTERNAL (token + cache 5min) — preserva
+ * compatibilidade. Setar `REGIONAL_BFF_USE_PUBLIC=true` alterna para o
+ * endpoint PUBLIC (sem token + cache 15min). Quando o público comprovar
+ * estabilidade em produção, inverteremos o default.
+ */
+function shouldUsePublicEndpoint(): boolean {
+  return process.env.REGIONAL_BFF_USE_PUBLIC === "true";
+}
 
 function logWarn(message: string, context?: Record<string, unknown>) {
   // Logger frontend = console em SSR. Não poluir produção com info debug.
@@ -129,27 +190,145 @@ function normalizeMember(value: unknown): RegionMember | null {
 }
 
 /**
- * Lê a região aproximada de uma cidade-base no backend.
- * Retorna `null` em qualquer falha (degrade gracioso) — caller deve sempre
- * tratar null como "região não disponível agora".
+ * Adapta o envelope do endpoint PUBLIC para o shape interno `RegionPayload`
+ * esperado pelos callers (page.tsx, territory-resolver, ads-search filters).
+ *
+ * O endpoint público usa shape mais rico (camelCase, com state.name e
+ * lat/lng do baseCity). O caller não precisa saber dessa diferença —
+ * o adapter mantém o contrato `RegionPayload` consistente.
  */
-export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload | null> {
-  const safeSlug = String(slug || "").trim();
-  if (!safeSlug) return null;
+function adaptPublicToRegionPayload(
+  envelope: PublicBackendEnvelope
+): RegionPayload | null {
+  const data = envelope?.data;
+  if (!data || !data.baseCity) return null;
+  const baseCity = data.baseCity;
+  if (
+    typeof baseCity.id !== "number" ||
+    typeof baseCity.slug !== "string" ||
+    typeof baseCity.name !== "string" ||
+    typeof baseCity.state !== "string"
+  ) {
+    return null;
+  }
+  const base: RegionBase = {
+    id: baseCity.id,
+    slug: baseCity.slug,
+    name: baseCity.name,
+    state: baseCity.state,
+  };
+  const rawMembers = Array.isArray(data.members) ? data.members : [];
+  const members: RegionMember[] = rawMembers
+    .map((m) => {
+      if (
+        typeof m?.cityId !== "number" ||
+        typeof m?.slug !== "string" ||
+        typeof m?.name !== "string" ||
+        typeof m?.state !== "string" ||
+        typeof m?.layer !== "number"
+      ) {
+        return null;
+      }
+      return {
+        city_id: m.cityId,
+        slug: m.slug,
+        name: m.name,
+        state: m.state,
+        layer: m.layer,
+        distance_km:
+          m.distanceKm === null || m.distanceKm === undefined ? null : Number(m.distanceKm),
+      };
+    })
+    .filter((m): m is RegionMember => m !== null);
 
+  const rawRadius = data.region?.radiusKm;
+  const radius_km =
+    typeof rawRadius === "number" && Number.isFinite(rawRadius) && rawRadius > 0
+      ? rawRadius
+      : undefined;
+
+  return { base, members, radius_km };
+}
+
+/**
+ * Implementação interna que consulta o endpoint PUBLIC `/api/public/regions/:citySlug`.
+ *
+ * Sem token. Cache 15min (alinha com TTL do endpoint público).
+ */
+async function fetchFromPublicEndpoint(safeSlug: string): Promise<RegionPayload | null> {
+  const base = getBackendApiBaseUrl();
+  if (!base) return null;
+
+  const url = `${base.replace(/\/+$/, "")}/api/public/regions/${encodeURIComponent(safeSlug)}`;
+
+  let response: Response;
+  try {
+    response = await ssrResilientFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        // UA não-curl para evitar bot-blocker do backend (UA "cnc-ssr/1.0"
+        // foi configurado como SSR legítimo no whitelist do backend).
+        "User-Agent": "cnc-ssr/1.0",
+      },
+      logTag: "regions:bff:public",
+      next: {
+        revalidate: PUBLIC_REVALIDATE_SECONDS,
+        tags: ["regions", `regions:${safeSlug}`],
+      },
+    });
+  } catch (err) {
+    logError("falha de rede ao buscar região (público)", {
+      slug: safeSlug,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    logError("backend público retornou status não-OK", {
+      slug: safeSlug,
+      status: response.status,
+    });
+    return null;
+  }
+
+  let envelope: PublicBackendEnvelope | null = null;
+  try {
+    envelope = (await response.json()) as PublicBackendEnvelope;
+  } catch (err) {
+    logError("body do público não é JSON parseável", {
+      slug: safeSlug,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  if (!envelope || envelope.success !== true || !envelope.data) {
+    logError("envelope público inválido (success!=true ou sem .data)", {
+      slug: safeSlug,
+    });
+    return null;
+  }
+
+  return adaptPublicToRegionPayload(envelope);
+}
+
+/**
+ * Implementação INTERNAL legada — usada como fallback opt-in via
+ * `REGIONAL_BFF_USE_INTERNAL=true`. Mantida intacta para retrocompat.
+ */
+async function fetchFromInternalEndpoint(safeSlug: string): Promise<RegionPayload | null> {
   const token = readInternalApiToken();
   if (!token) {
     logWarn(
-      "INTERNAL_API_TOKEN não configurado no env do frontend — região indisponível. Configure no Render do service do frontend (sync OFF, sem prefixo NEXT_PUBLIC_)."
+      "INTERNAL_API_TOKEN não configurado e REGIONAL_BFF_USE_INTERNAL=true — desligue a flag ou configure o token."
     );
     return null;
   }
 
-  if (!getBackendApiBaseUrl()) {
-    // Mesmo padrão silencioso de fetch-city-meta-server.ts: em build local
-    // sem backend, evitar warn ruidoso.
-    return null;
-  }
+  if (!getBackendApiBaseUrl()) return null;
 
   const url = resolveInternalBackendApiUrl(
     `/api/internal/regions/${encodeURIComponent(safeSlug)}`
@@ -166,39 +345,32 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
       },
       logTag: "regions:bff",
       next: {
-        revalidate: REVALIDATE_SECONDS,
+        revalidate: INTERNAL_REVALIDATE_SECONDS,
         tags: ["internal:regions", `internal:regions:${safeSlug}`],
       },
     });
   } catch (err) {
-    logError("falha de rede ao buscar região", {
+    logError("falha de rede ao buscar região (internal)", {
       slug: safeSlug,
       message: err instanceof Error ? err.message : String(err),
     });
     return null;
   }
 
-  if (response.status === 404) {
-    // 404 cobre dois casos no contrato do backend (anti-enumeração):
-    //   (a) slug desconhecido em cities.
-    //   (b) token errado/ausente.
-    // Em qualquer um, do lado do BFF a região simplesmente não existe agora.
-    return null;
-  }
-
+  if (response.status === 404) return null;
   if (!response.ok) {
-    logError("backend retornou status não-OK", {
+    logError("backend internal retornou status não-OK", {
       slug: safeSlug,
       status: response.status,
     });
     return null;
   }
 
-  let envelope: BackendEnvelope | null = null;
+  let envelope: InternalBackendEnvelope | null = null;
   try {
-    envelope = (await response.json()) as BackendEnvelope;
+    envelope = (await response.json()) as InternalBackendEnvelope;
   } catch (err) {
-    logError("body não é JSON parseável", {
+    logError("body internal não é JSON parseável", {
       slug: safeSlug,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -206,13 +378,13 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
   }
 
   if (!envelope || envelope.ok !== true || !envelope.data) {
-    logError("envelope inválido (ok!=true ou sem .data)", { slug: safeSlug });
+    logError("envelope internal inválido", { slug: safeSlug });
     return null;
   }
 
   const base = envelope.data.base;
   if (!isPlausibleBase(base)) {
-    logError("base com shape inválido", { slug: safeSlug, base });
+    logError("base internal com shape inválido", { slug: safeSlug, base });
     return null;
   }
 
@@ -228,6 +400,27 @@ export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload
       : undefined;
 
   return { base, members, radius_km };
+}
+
+/**
+ * Lê a região aproximada de uma cidade-base no backend.
+ *
+ * Por default usa `/api/internal/regions/:slug` (token + cache 5min).
+ * Setando `REGIONAL_BFF_USE_PUBLIC=true`, troca para
+ * `/api/public/regions/:citySlug` (sem token + cache 15min). A inversão
+ * do default acontecerá quando o público comprovar estabilidade em prod.
+ *
+ * Retorna `null` em qualquer falha (degrade gracioso) — caller deve sempre
+ * tratar null como "região não disponível agora".
+ */
+export async function fetchRegionByCitySlug(slug: string): Promise<RegionPayload | null> {
+  const safeSlug = String(slug || "").trim();
+  if (!safeSlug) return null;
+
+  if (shouldUsePublicEndpoint()) {
+    return fetchFromPublicEndpoint(safeSlug);
+  }
+  return fetchFromInternalEndpoint(safeSlug);
 }
 
 /**
