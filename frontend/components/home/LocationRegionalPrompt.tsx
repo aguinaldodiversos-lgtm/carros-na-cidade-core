@@ -361,11 +361,20 @@ export function LocationRegionalPrompt({
             Mobile: texto em cima, botão full-width abaixo (evita esmagar
             o input e mantém boa área de toque em 360–414px).
             Desktop sm+: texto e botão lado a lado (espelha referência).
+            A microcopy LGPD fica como linha discreta abaixo da headline —
+            sr-only se necessário não passa no compliance check, mantemos
+            visível mas em estilo secundário.
           */}
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
-            <p className="text-[14px] font-bold leading-snug text-slate-900 sm:flex-1 sm:text-[16px]">
-              Quer ver carros próximos de você?
-            </p>
+            <div className="min-w-0 sm:flex-1">
+              <p className="text-[14px] font-bold leading-snug text-slate-900 sm:text-[16px]">
+                Quer ver carros próximos de você?
+              </p>
+              <p className="mt-0.5 text-[10.5px] leading-snug text-slate-500 sm:text-[11px]">
+                Usamos sua localização só para sugerir a região mais relevante — não
+                salvamos a coordenada nem enviamos para terceiros.
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleUseLocation}
