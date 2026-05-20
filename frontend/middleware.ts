@@ -1,6 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  buildBandwidthLogEntry,
+  isBandwidthDiagnosticsEnabled,
+} from "@/lib/middleware/bandwidth-log";
+import { decideBotGuard } from "@/lib/middleware/bot-guard";
+import { decideHostRedirect } from "@/lib/middleware/host-redirect";
+import {
   decideRegionalMiddlewareAction,
   extractRegionalSlug,
   isFlagEnabled,
@@ -10,6 +16,18 @@ import {
 /**
  * Middleware do frontend. Responsabilidades:
  *
+ * 0. **Redirect 301 de hosts onrender.com → www.carrosnacidade.com**
+ *    (contenção de bandwidth 2026-05-20). Bots/scrapers acessando
+ *    `carros-na-cidade-portal.onrender.com` recebiam HTML completo —
+ *    duplicando banda e fragmentando SEO. Exceção: pathname='/' e
+ *    /healthcheck (Render usa raiz como probe). Ver
+ *    `lib/middleware/host-redirect.ts`.
+ *
+ * 0b. **Bot guard: 429 para user-agent vazio em rotas SSR pesadas**
+ *    (contenção de bandwidth 2026-05-20). Defesa de primeira linha
+ *    contra scrapers elementares. Não afeta navegadores nem bots
+ *    legítimos (Googlebot envia UA). Ver `lib/middleware/bot-guard.ts`.
+ *
  * 1. **Hard gate da Página Regional canônica** (`/carros-usados/regiao/:slug`):
  *    - Sem `REGIONAL_PAGE_ENABLED="true"` → 404 HTTP real imediato.
  *    - Com flag on + slug inválido (cidade não existe) → 404 HTTP real.
@@ -18,8 +36,7 @@ import {
  *    A URL canônica é `/carros-usados/regiao/{citySlug}` onde `citySlug`
  *    é o slug canônico da cidade-base no formato `nome-uf` (regex
  *    `^[a-z0-9-]+-[a-z]{2}$`). Exemplos: `atibaia-sp`, `campinas-sp`,
- *    `belo-horizonte-mg`. O slug aceita qualquer cidade brasileira com
- *    coordenadas — a Página Regional é universal (Fase 5).
+ *    `belo-horizonte-mg`.
  *
  *    POR QUE NO MIDDLEWARE em vez de só no page.tsx?
  *    Next 14.2 pode retornar 200 com `NEXT_NOT_FOUND` quando `notFound()`
@@ -27,40 +44,20 @@ import {
  *    HTTP real para slugs inválidos.
  *
  * 2. **Redirect 301 da rota legada** (`/:uf/regiao/:ancora`):
- *    - Sempre redireciona para `/carros-usados/regiao/{ancora}-{uf}`,
- *      sem validar slug aqui (a canônica valida via gate quando chega).
- *    - Esta rota existiu brevemente na Fase 4 (2026-05-17) como tentativa
- *      de canônica curta — Fase 5 (2026-05-18) reverteu para o slug
- *      completo `nome-uf` por alinhamento com `/carros-em/[slug]` e
- *      simplificação de partições de URL.
+ *    Sempre redireciona para `/carros-usados/regiao/{ancora}-{uf}`.
  *
  * 3. **Redirects 301 de outras URLs legadas** (preservados):
  *    - /carros-{em,baratos-em,automaticos-em}-[slug] → versão com `/`
  *    - /painel/anuncios/novo → /anunciar/novo
  *    - /painel/anuncios/[id]/publicar → /upgrade
+ *
+ * 4. **Injeção de `x-cnc-pathname`** para RootLayout resolver cidade ativa SSR.
+ *
+ * 5. **Logging temporário de bandwidth** condicionado a
+ *    `BANDWIDTH_DIAGNOSTICS_ENABLED=true`. Emite 1 linha JSON por request
+ *    em stdout (Render Logs). Sem PII. Ver `lib/middleware/bandwidth-log.ts`.
  */
 
-/**
- * Header interno usado para passar o pathname da request para os
- * Server Components do App Router (`headers()` em `next/headers`).
- *
- * Por que existe?
- *   O `RootLayout` precisa saber o pathname para resolver a cidade
- *   ativa territorial (ex.: `/carros-em/atibaia-sp` → Atibaia) ANTES
- *   da hidratação client-side. Sem isso, o SSR cai em `DEFAULT_CITY`
- *   e os links territoriais do header SSR contradizem a URL — bug
- *   detectado na auditoria 2026-05-11.
- *
- * Como funciona?
- *   - Middleware roda no edge e tem acesso a `request.nextUrl.pathname`.
- *   - `NextResponse.next({ request: { headers: ... } })` injeta os
- *     headers no contexto da request que segue para o App Router.
- *   - Server Components lêem via `headers().get("x-cnc-pathname")`.
- *
- * Por que prefixo `x-cnc-`?
- *   Sinaliza que é header interno da aplicação, não enviado pelo
- *   cliente nem propagado para o navegador.
- */
 const PATHNAME_HEADER = "x-cnc-pathname";
 
 function withPathnameHeader(request: NextRequest) {
@@ -69,37 +66,82 @@ function withPathnameHeader(request: NextRequest) {
   return { request: { headers: requestHeaders } };
 }
 
-// Padrão da rota legada `/:uf/regiao/:ancora` que será redirecionada
-// 301 para `/carros-usados/regiao/{ancora}-{uf}`. UF deve ser 2 letras.
 const LEGACY_ANCORA_RE = /^\/([a-z]{2})\/regiao\/([a-z0-9-]+)\/?$/;
 
+function maybeLogBandwidth(
+  request: NextRequest,
+  response: NextResponse,
+  startedAt: number
+): void {
+  if (!isBandwidthDiagnosticsEnabled()) return;
+  try {
+    const entry = buildBandwidthLogEntry({
+      method: request.method,
+      pathname: request.nextUrl.pathname,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      host: request.headers.get("host"),
+      referer: request.headers.get("referer"),
+      userAgent: request.headers.get("user-agent"),
+      cacheControl: response.headers.get("cache-control"),
+      durationMs: Date.now() - startedAt,
+    });
+    // Stdout capturado pelo Render Logs. Nunca derrubar request por log.
+    console.log(JSON.stringify(entry));
+  } catch {
+    // ignore — log nunca quebra request
+  }
+}
+
+/** Envolve qualquer response com o logging de bandwidth condicional. */
+function respond(
+  request: NextRequest,
+  startedAt: number,
+  response: NextResponse
+): NextResponse {
+  maybeLogBandwidth(request, response, startedAt);
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const startedAt = Date.now();
+  const { pathname, search } = request.nextUrl;
   const territorialContext = withPathnameHeader(request);
 
+  // ── 0a. Redirect 301 onrender → canônico (defesa de bandwidth).
+  const hostDecision = decideHostRedirect(
+    request.headers.get("host"),
+    pathname,
+    search
+  );
+  if (hostDecision.kind === "redirect") {
+    return respond(request, startedAt, NextResponse.redirect(hostDecision.target, 301));
+  }
+
+  // ── 0b. Bot guard: 429 para UA vazio em rotas SSR pesadas.
+  const botDecision = decideBotGuard(
+    request.headers.get("user-agent"),
+    pathname
+  );
+  if (botDecision.kind === "block-429") {
+    const blocked = new NextResponse(null, {
+      status: 429,
+      headers: { "Retry-After": "60", "X-Middleware-Bot-Guard": "ua-empty" },
+    });
+    return respond(request, startedAt, blocked);
+  }
+
   // ── 1. Redirect 301 da rota legada `/:uf/regiao/:ancora` para canônica.
-  //
-  // Esta rota não tem gate de feature flag — sempre redireciona, mesmo
-  // com REGIONAL_PAGE_ENABLED=false. A canônica fará seu próprio gate
-  // quando o request chegar lá. Isso simplifica o invariante: o legado
-  // SEMPRE virou para o canônico.
   const legacyAncoraMatch = LEGACY_ANCORA_RE.exec(pathname);
   if (legacyAncoraMatch) {
     const [, uf, ancora] = legacyAncoraMatch;
     const canonicalSlug = `${ancora}-${uf}`;
     const url = request.nextUrl.clone();
     url.pathname = `/carros-usados/regiao/${canonicalSlug}`;
-    return NextResponse.redirect(url, 301);
+    return respond(request, startedAt, NextResponse.redirect(url, 301));
   }
 
-  // ── 2. Hard gate da Página Regional canônica `/carros-usados/regiao/:slug`.
-  //
-  // O slug é o citySlug canônico (`nome-uf`). Validamos:
-  //   - feature flag REGIONAL_PAGE_ENABLED
-  //   - slug existe no DB (cidade com coordenadas válidas)
-  //
-  // Cidades sem coordenadas válidas: o backend retorna 404 e o gate
-  // bloqueia aqui — evita renderização de uma região impossível.
+  // ── 2. Hard gate da Página Regional canônica.
   const regionalSlug = extractRegionalSlug(pathname);
   if (regionalSlug !== null) {
     const flagOn = isFlagEnabled();
@@ -107,7 +149,7 @@ export async function middleware(request: NextRequest) {
     if (!flagOn) {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
-      return blocked;
+      return respond(request, startedAt, blocked);
     }
 
     const validation = await validateRegionalSlug(regionalSlug);
@@ -116,23 +158,23 @@ export async function middleware(request: NextRequest) {
     if (action.kind === "pass-valid") {
       const passed = NextResponse.next(territorialContext);
       passed.headers.set("X-Middleware-Regional", "passed-valid");
-      return passed;
+      return respond(request, startedAt, passed);
     }
     if (action.kind === "block-not-found") {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-Regional", "blocked-slug-invalid");
-      return blocked;
+      return respond(request, startedAt, blocked);
     }
     if (action.kind === "block-unavailable") {
       const blocked = new NextResponse(null, { status: 503 });
       blocked.headers.set("X-Middleware-Regional", "blocked-unavailable");
       blocked.headers.set("X-Middleware-Regional-Reason", action.reason);
       blocked.headers.set("Retry-After", "60");
-      return blocked;
+      return respond(request, startedAt, blocked);
     }
     const blocked = new NextResponse(null, { status: 404 });
     blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
-    return blocked;
+    return respond(request, startedAt, blocked);
   }
 
   // ── 3. Redirects 301 legados (hífen único → barra). ────────────────
@@ -143,7 +185,7 @@ export async function middleware(request: NextRequest) {
     if (slug) {
       const url = request.nextUrl.clone();
       url.pathname = `/carros-em/${slug}`;
-      return NextResponse.redirect(url, 301);
+      return respond(request, startedAt, NextResponse.redirect(url, 301));
     }
   }
 
@@ -153,7 +195,7 @@ export async function middleware(request: NextRequest) {
     if (slug) {
       const url = request.nextUrl.clone();
       url.pathname = `/carros-baratos-em/${slug}`;
-      return NextResponse.redirect(url, 301);
+      return respond(request, startedAt, NextResponse.redirect(url, 301));
     }
   }
 
@@ -163,65 +205,45 @@ export async function middleware(request: NextRequest) {
     if (slug) {
       const url = request.nextUrl.clone();
       url.pathname = `/carros-automaticos-em/${slug}`;
-      return NextResponse.redirect(url, 301);
+      return respond(request, startedAt, NextResponse.redirect(url, 301));
     }
   }
 
   if (pathname === "/painel/anuncios/novo") {
     const url = request.nextUrl.clone();
     url.pathname = "/anunciar/novo";
-    return NextResponse.redirect(url, 301);
+    return respond(request, startedAt, NextResponse.redirect(url, 301));
   }
 
   const upgradeMatch = /^\/painel\/anuncios\/([^/]+)\/publicar\/?$/.exec(pathname);
   if (upgradeMatch?.[1]) {
     const url = request.nextUrl.clone();
     url.pathname = `/painel/anuncios/${upgradeMatch[1]}/upgrade`;
-    return NextResponse.redirect(url, 301);
+    return respond(request, startedAt, NextResponse.redirect(url, 301));
   }
 
-  // Fim do middleware: propaga o pathname para o RootLayout via header
-  // interno. Isso é benigno para rotas não-territoriais (RootLayout só
-  // usa o header se `extractCitySlugFromPathname` reconhecer um prefixo
-  // territorial; caso contrário, mantém a lógica antiga de cookie).
-  return NextResponse.next(territorialContext);
+  // Fim: propaga o pathname para o RootLayout via header interno.
+  return respond(request, startedAt, NextResponse.next(territorialContext));
 }
 
 /**
  * Matcher do middleware.
  *
- * Decisões:
- *  - `/carros-usados/regiao/:path*`: gate hard-404 da canônica.
- *  - `/:uf([a-z]{2})/regiao/:path*`: redirect 301 da legada.
- *  - Demais rotas territoriais entram para injeção do `x-cnc-pathname`.
+ * Catch-all com exceções para recursos estáticos. Necessário desde
+ * 2026-05-20 para que o redirect 301 onrender → canônico cobra TODAS
+ * as rotas (incluindo home `/`), não apenas as territoriais.
+ *
+ * Excluídos do middleware (são recursos servidos diretamente):
+ *   - /_next/*       (chunks, runtime data, otimizador)
+ *   - /images/*      (assets estáticos, cache de 1 ano em next.config)
+ *   - /favicon.ico   (rewrite para /images/favicon.png)
+ *   - /robots.txt    (gerado por app/robots.ts)
+ *   - /sitemap.xml   (sitemap raiz)
+ *
+ * Todas as outras rotas (HTML SSR, /api/*, /sitemaps/*) entram no
+ * middleware para que os hosts onrender sejam redirecionados e o bot
+ * guard / logging sejam aplicados nas rotas pesadas.
  */
 export const config = {
-  matcher: [
-    // Página Regional canônica — gate de feature flag + validação de slug.
-    "/carros-usados/regiao/:path*",
-
-    // Página Regional legada — redirect 301 para canônica (sem gate).
-    "/:uf([a-z]{2})/regiao/:path*",
-
-    // Redirects 301 legados (hífen único → barra).
-    "/carros-em-:path*",
-    "/carros-baratos-em-:path*",
-    "/carros-automaticos-em-:path*",
-
-    // Rotas territoriais que precisam do `x-cnc-pathname` para o
-    // RootLayout derivar a cidade ativa SSR.
-    "/carros-em/:path*",
-    "/carros-baratos-em/:path*",
-    "/carros-automaticos-em/:path*",
-    "/cidade/:path*",
-    "/comprar/cidade/:path*",
-    "/comprar/estado/:path*",
-    "/tabela-fipe/:path*",
-    "/simulador-financiamento/:path*",
-    "/blog/:path*",
-
-    // Redirects 301 do painel.
-    "/painel/anuncios/novo",
-    "/painel/anuncios/:id/publicar",
-  ],
+  matcher: ["/((?!_next|images|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)"],
 };
