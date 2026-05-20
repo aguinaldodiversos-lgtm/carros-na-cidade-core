@@ -184,6 +184,93 @@ describe("sortAdsByPriorityAndProximity", () => {
   });
 });
 
+/**
+ * Blinda o invariante comercial absoluto do Carros na Cidade no sorter
+ * client-side da Página Regional:
+ *
+ *   1. commercial tier (4>3>2>1) é a chave PRIMÁRIA — nada pode flipar.
+ *   2. cidade-base só pode desempatar DENTRO do mesmo tier.
+ *   3. Destaque/Pro/Start de cidade vizinha SEMPRE vence cidade-base de
+ *      tier inferior — não permitir que cidade-base ultrapasse tier.
+ *
+ * O backend SQL já cobre estes casos em
+ * `tests/integration/ads-ranking-base-city-boost.integration.test.js`.
+ * Estes testes blindam o sorter de defesa que reordena após o fetch,
+ * usando os nomes reais de cidades dos exemplos da especificação.
+ */
+describe("sortAdsByPriorityAndProximity — invariante comercial absoluto (regra do produto)", () => {
+  const future = new Date(Date.now() + 86400_000).toISOString();
+  const MEMBERS_WITH_JUNDIAI: RegionMember[] = [
+    ...MEMBERS,
+    { city_id: 5, slug: "jundiai-sp", name: "Jundiaí", state: "SP", layer: 2, distance_km: 40 },
+  ];
+
+  it("Destaque de Bragança > Pro de Atibaia (tier 4 vence cidade-base no tier 3)", () => {
+    const ads = [
+      makeAd({ id: 1, city: "Atibaia", plan: "pro" }), // tier 3 base
+      makeAd({ id: 2, city: "Bragança Paulista", highlight_until: future }), // tier 4 vizinha
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+
+  it("Pro de Campinas > Start de Atibaia (tier 3 vence cidade-base no tier 2)", () => {
+    const ads = [
+      makeAd({ id: 1, city: "Atibaia", dealership_id: 99 }), // tier 2 base
+      makeAd({ id: 2, city: "Campinas", plan: "pro" }), // tier 3 vizinha
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+
+  it("Start de Jundiaí > Grátis de Atibaia (tier 2 vence cidade-base no tier 1)", () => {
+    const ads = [
+      makeAd({ id: 1, city: "Atibaia" }), // tier 1 base
+      makeAd({ id: 2, city: "Jundiaí", dealership_id: 77 }), // tier 2 vizinha
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS_WITH_JUNDIAI);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+
+  it("Destaque de Atibaia > Destaque de Bragança (mesma tier 4: cidade-base desempata)", () => {
+    const ads = [
+      makeAd({ id: 1, city: "Bragança Paulista", highlight_until: future }), // tier 4 vizinha
+      makeAd({ id: 2, city: "Atibaia", highlight_until: future }), // tier 4 base
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+
+  it("Pro de Atibaia > Pro de Campinas (mesma tier 3: cidade-base desempata)", () => {
+    const ads = [
+      makeAd({ id: 1, city: "Campinas", plan: "pro" }), // tier 3 vizinha 60km
+      makeAd({ id: 2, city: "Atibaia", plan: "pro" }), // tier 3 base 0km
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+
+  it("ordem completa: tier domina, cidade-base só atua dentro do tier", () => {
+    // Cenário: 6 anúncios misturando tiers e cidades. Ordem esperada:
+    //   1. Destaque vizinha (tier 4) — vence Pro/Start/Grátis de base.
+    //   2. Pro base       (tier 3) — base desempata vs Pro vizinha do mesmo tier.
+    //   3. Pro vizinha    (tier 3)
+    //   4. Start base     (tier 2) — base desempata vs Start vizinha.
+    //   5. Start vizinha  (tier 2)
+    //   6. Grátis base    (tier 1) — base desempata vs Grátis vizinha.
+    const ads = [
+      makeAd({ id: 6, city: "Atibaia" }), // tier 1 base
+      makeAd({ id: 1, city: "Bragança Paulista", highlight_until: future }), // tier 4 vizinha
+      makeAd({ id: 5, city: "Jarinu", dealership_id: 50 }), // tier 2 vizinha
+      makeAd({ id: 3, city: "Campinas", plan: "pro" }), // tier 3 vizinha
+      makeAd({ id: 4, city: "Atibaia", dealership_id: 99 }), // tier 2 base
+      makeAd({ id: 2, city: "Atibaia", plan: "pro" }), // tier 3 base
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
 describe("pickDynamicOgImage", () => {
   it("retorna primeira URL https válida do primeiro anúncio", () => {
     const ads = [
