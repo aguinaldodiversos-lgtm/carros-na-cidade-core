@@ -360,3 +360,110 @@ describe("city_slugs — roundtrip build → parse", () => {
     expect(parsed.city_slugs).toBeUndefined();
   });
 });
+
+describe("parseAdsSearchFiltersFromSearchParams — filtros canônicos da Fase 3", () => {
+  function makeParams(obj: Record<string, string>) {
+    return new URLSearchParams(obj);
+  }
+
+  it("priority_tier=4 vira number 4 (Destaques)", () => {
+    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: "4" })).priority_tier).toBe(4);
+  });
+
+  it("priority_tier 1..4 são aceitos", () => {
+    for (const v of [1, 2, 3, 4]) {
+      expect(parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: String(v) })).priority_tier).toBe(v);
+    }
+  });
+
+  it("priority_tier fora de 1..4 vira undefined (defesa)", () => {
+    for (const v of ["0", "5", "-1", "abc", ""]) {
+      expect(parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: v })).priority_tier).toBeUndefined();
+    }
+  });
+
+  it("opportunity=true é parseado como boolean true", () => {
+    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ opportunity: "true" })).opportunity).toBe(true);
+    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ opportunity: "1" })).opportunity).toBe(true);
+  });
+
+  it("opportunity ausente vira undefined", () => {
+    expect(parseAdsSearchFiltersFromSearchParams(makeParams({})).opportunity).toBeUndefined();
+  });
+
+  it("seller_kind 'dealer' e 'private' são aceitos", () => {
+    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: "dealer" })).seller_kind).toBe("dealer");
+    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: "private" })).seller_kind).toBe("private");
+  });
+
+  it("seller_kind inválido vira undefined (defesa contra valor não-canônico)", () => {
+    for (const v of ["DEALER", "loja", "verified", ""]) {
+      expect(parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: v })).seller_kind).toBeUndefined();
+    }
+  });
+});
+
+describe("buildSearchQueryString — filtros canônicos da Fase 3", () => {
+  it("emite priority_tier quando valor é 1..4", () => {
+    for (const v of [1, 2, 3, 4] as const) {
+      const qs = buildSearchQueryString({ priority_tier: v });
+      expect(new URLSearchParams(qs).get("priority_tier")).toBe(String(v));
+    }
+  });
+
+  it("NÃO emite priority_tier quando valor é inválido (defesa)", () => {
+    for (const v of [0, 5, -1, undefined, null] as unknown[]) {
+      const qs = buildSearchQueryString({ priority_tier: v as 1 });
+      expect(new URLSearchParams(qs).get("priority_tier")).toBeNull();
+    }
+  });
+
+  it("emite opportunity=true quando true; omite quando false ou undefined", () => {
+    expect(new URLSearchParams(buildSearchQueryString({ opportunity: true })).get("opportunity")).toBe("true");
+    expect(new URLSearchParams(buildSearchQueryString({ opportunity: false })).get("opportunity")).toBeNull();
+    expect(new URLSearchParams(buildSearchQueryString({})).get("opportunity")).toBeNull();
+  });
+
+  it("emite seller_kind apenas para 'dealer' ou 'private'", () => {
+    expect(new URLSearchParams(buildSearchQueryString({ seller_kind: "dealer" })).get("seller_kind")).toBe("dealer");
+    expect(new URLSearchParams(buildSearchQueryString({ seller_kind: "private" })).get("seller_kind")).toBe("private");
+    expect(new URLSearchParams(buildSearchQueryString({ seller_kind: "DEALER" as "dealer" })).get("seller_kind")).toBeNull();
+  });
+});
+
+describe("filtros canônicos — roundtrip build → parse", () => {
+  it("priority_tier=4 sobrevive ao roundtrip", () => {
+    const qs = buildSearchQueryString({ priority_tier: 4 });
+    expect(parseAdsSearchFiltersFromSearchParams(new URLSearchParams(qs)).priority_tier).toBe(4);
+  });
+
+  it("opportunity=true sobrevive ao roundtrip", () => {
+    const qs = buildSearchQueryString({ opportunity: true });
+    expect(parseAdsSearchFiltersFromSearchParams(new URLSearchParams(qs)).opportunity).toBe(true);
+  });
+
+  it("seller_kind sobrevive ao roundtrip (ambos os valores canônicos)", () => {
+    for (const v of ["dealer", "private"] as const) {
+      const qs = buildSearchQueryString({ seller_kind: v });
+      expect(parseAdsSearchFiltersFromSearchParams(new URLSearchParams(qs)).seller_kind).toBe(v);
+    }
+  });
+
+  it("filtros canônicos coexistem com filtros legados sem conflito", () => {
+    const qs = buildSearchQueryString({
+      city_slug: "atibaia-sp",
+      brand: "Honda",
+      priority_tier: 4,
+      opportunity: true,
+      seller_kind: "dealer",
+      below_fipe: true,
+    });
+    const parsed = parseAdsSearchFiltersFromSearchParams(new URLSearchParams(qs));
+    expect(parsed.priority_tier).toBe(4);
+    expect(parsed.opportunity).toBe(true);
+    expect(parsed.seller_kind).toBe("dealer");
+    expect(parsed.below_fipe).toBe(true);
+    expect(parsed.city_slug).toBe("atibaia-sp");
+    expect(parsed.brand).toBe("Honda");
+  });
+});

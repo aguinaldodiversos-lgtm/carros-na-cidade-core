@@ -225,6 +225,33 @@ const adsFilterQueryBase = z.object({
   // highlight: alias legado do mesmo filtro (compat links antigos)
   highlight: boolParam().optional(),
 
+  /**
+   * Tier comercial canônico do anúncio (commercialLayerExpr):
+   *   4 = Destaque ativo, 3 = Lojista Pro, 2 = Lojista Start, 1 = Grátis.
+   *
+   * NÃO confundir com seller_kind (tipo de vendedor). Filtros ortogonais:
+   * uma loja CNPJ pode estar em tier 1 (Grátis); um particular CPF pode
+   * estar em tier 4 (boost de destaque pago avulso).
+   */
+  priority_tier: intParam(1, 4).optional(),
+
+  /**
+   * Filtro canônico de "Oportunidade" (opportunityExpr): preço >= 10%
+   * abaixo da FIPE com fipe_reference_value e price válidos. Diferente
+   * de below_fipe (qualquer margem) — não são sinônimos.
+   */
+  opportunity: boolParam().optional(),
+
+  /**
+   * Tipo de vendedor canônico (sellerKindExpr): 'dealer' | 'private'.
+   * Espelha o `deriveSellerKind` do trust pass. NÃO é plano pago.
+   *
+   * .optional() dentro do preprocess: emptyToUndef converte ""/null para
+   * undefined, e o enum aceita undefined via .optional() interno. Padrão
+   * mais robusto que .optional() externo para casos com preprocess.
+   */
+  seller_kind: z.preprocess(emptyToUndef, z.enum(["dealer", "private"]).optional()),
+
   /** Filtra anúncios do mesmo anunciante (loja) — busca pública. */
   advertiser_id: intParam(1, 2147483647).optional(),
 });

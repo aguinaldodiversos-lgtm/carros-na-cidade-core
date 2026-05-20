@@ -111,6 +111,23 @@ function toBoolean(value: string | null): boolean | undefined {
   return undefined;
 }
 
+function toPriorityTierFromString(value: string | null): 1 | 2 | 3 | 4 | undefined {
+  if (!value) return undefined;
+  const n = Number(value);
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return undefined;
+}
+
+function toSellerKindFromString(value: string | null): "dealer" | "private" | undefined {
+  if (!value) return undefined;
+  // Case-sensitive deliberadamente: espelha o schema Zod do backend
+  // (z.enum(["dealer", "private"])). Casing inconsistente é defeito de
+  // caller — defendemos rejeitando, não normalizando silenciosamente.
+  const v = value.trim();
+  if (v === "dealer" || v === "private") return v;
+  return undefined;
+}
+
 function toStringOrUndefined(value: string | null): string | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
@@ -179,6 +196,9 @@ export function parseAdsSearchFiltersFromSearchParams(
       toBoolean(searchParams.get("highlight_only")),
       toBoolean(searchParams.get("highlight"))
     ),
+    priority_tier: toPriorityTierFromString(searchParams.get("priority_tier")),
+    opportunity: toBoolean(searchParams.get("opportunity")),
+    seller_kind: toSellerKindFromString(searchParams.get("seller_kind")),
     sort: toStringOrUndefined(searchParams.get("sort")) || "relevance",
     page: toNumber(searchParams.get("page")) || 1,
     limit: parseLimitFromSearchParams(searchParams),
@@ -208,7 +228,25 @@ export function buildSearchQueryString(filters: AdsSearchFilters): string {
   const params = new URLSearchParams();
   const skipTerritory = new Set<string>(TERRITORY_PARAM_KEYS);
 
-  for (const [key, value] of Object.entries(filters)) {
+  // Sanitização defensiva dos filtros canônicos da Fase 3. O builder
+  // genérico abaixo aceita qualquer valor truthy; aqui removemos valores
+  // semanticamente inválidos para não gerar URL com `priority_tier=99` ou
+  // `seller_kind=DEALER`. A validação real é no schema Zod do backend —
+  // este filtro é primeira linha de defesa do frontend.
+  const cleaned: AdsSearchFilters = { ...filters };
+  const tier = cleaned.priority_tier;
+  if (tier !== 1 && tier !== 2 && tier !== 3 && tier !== 4) {
+    delete cleaned.priority_tier;
+  }
+  if (cleaned.opportunity !== true) {
+    delete cleaned.opportunity;
+  }
+  const kind = cleaned.seller_kind as string | undefined;
+  if (kind !== "dealer" && kind !== "private") {
+    delete cleaned.seller_kind;
+  }
+
+  for (const [key, value] of Object.entries(cleaned)) {
     if (skipTerritory.has(key)) continue;
     if (value === undefined || value === null || value === "") continue;
 
@@ -220,7 +258,7 @@ export function buildSearchQueryString(filters: AdsSearchFilters): string {
     params.set(key, String(value));
   }
 
-  const territory = canonicalTerritoryForApi(filters);
+  const territory = canonicalTerritoryForApi(cleaned);
   if (territory.city_slug) params.set("city_slug", territory.city_slug);
   else if (territory.city_id != null) params.set("city_id", String(territory.city_id));
   else {
@@ -232,8 +270,8 @@ export function buildSearchQueryString(filters: AdsSearchFilters): string {
   // tanto CSV quanto chaves repetidas; CSV economiza bytes na URL e é
   // mais legível em logs/SEO. Re-normaliza por defesa caso o caller passe
   // o array com slugs duplicados, espaços ou capitalizações inconsistentes.
-  if (Array.isArray(filters.city_slugs) && filters.city_slugs.length > 0) {
-    const normalized = normalizeCitySlugs(filters.city_slugs);
+  if (Array.isArray(cleaned.city_slugs) && cleaned.city_slugs.length > 0) {
+    const normalized = normalizeCitySlugs(cleaned.city_slugs);
     if (normalized && normalized.length > 0) {
       params.set("city_slugs", normalized.join(","));
     }

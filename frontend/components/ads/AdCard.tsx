@@ -9,7 +9,7 @@ import { VehicleImage } from "@/components/ui/VehicleImage";
 import {
   type AdBadge,
   inferAdTier,
-  resolveAdBadges,
+  resolvePublicAdBadges,
 } from "@/lib/ads/ad-badges";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
@@ -301,14 +301,14 @@ type SimpleBadgeChip = {
 /**
  * Selo singular para HorizontalLayout (que renderiza só 1 chip via
  * Badge primitivo). Pega o primeiro selo não-"reviewed" do array
- * canônico — ordem do `resolveAdBadges` decide qual ganha (tier
+ * canônico — ordem do `resolvePublicAdBadges` decide qual ganha (tier
  * comercial primeiro, depois oportunidade/abaixo da FIPE).
  *
  * Se backend mandou `item.badge` custom e não há nenhum canônico,
  * usa o custom como fallback.
  */
 function resolveBadge(item: BaseAdData): SimpleBadgeChip | null {
-  const canonical = resolveAdBadges(item);
+  const canonical = resolvePublicAdBadges(item);
   const firstSimple = canonical.find((b) => b.variant !== "reviewed");
   if (firstSimple) {
     // Capitaliza ("OFERTA DESTAQUE" → "Oferta Destaque") para variant Badge.
@@ -334,7 +334,7 @@ function resolveBadge(item: BaseAdData): SimpleBadgeChip | null {
 
 /**
  * Lista de chips coloridos para os layouts vertical (grid/featured/...).
- * Delegamos ao mapper canônico `resolveAdBadges` em
+ * Delegamos ao mapper canônico `resolvePublicAdBadges` em
  * `frontend/lib/ads/ad-badges.ts` — fonte ÚNICA dos selos para evitar
  * heurística divergente entre cards.
  *
@@ -343,7 +343,7 @@ function resolveBadge(item: BaseAdData): SimpleBadgeChip | null {
  *     checksum self-service (não verificação externa). Adiado.
  */
 function resolveBadges(item: BaseAdData): AdBadge[] {
-  const canonical = resolveAdBadges(item);
+  const canonical = resolvePublicAdBadges(item);
   // Custom badge do backend só aparece se o mapper canônico não emitiu nada.
   if (canonical.length === 0 && item.badge) {
     return [

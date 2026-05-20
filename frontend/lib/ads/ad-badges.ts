@@ -2,41 +2,57 @@
  * Mapper canônico de selos do card de anúncio.
  *
  * Fonte ÚNICA dos selos visuais. AdCard (e qualquer card adapter) consome
- * `resolveAdBadges` em vez de re-implementar a lógica. Isso evita que a
- * heurística textual baseada em `ads.plan` (snapshot legado) se espalhe
- * por múltiplos componentes — divergindo do ranking SQL.
+ * `resolvePublicAdBadges` em vez de re-implementar a lógica. Isso evita
+ * que a heurística textual baseada em `ads.plan` (snapshot legado) se
+ * espalhe por múltiplos componentes — divergindo do ranking SQL.
+ *
+ * Duas faces:
+ *   - `resolvePublicAdBadges`  → vitrine pública. Nunca expõe nomes de
+ *     plano comercial (Pro/Start/Grátis). Apenas:
+ *         Destaque, Oportunidade, Abaixo da FIPE, Loja, Particular,
+ *         Anúncio Analisado.
+ *   - `resolveAdminAdBadges`   → painel admin/diagnóstico. Expõe Pro/Start
+ *     como rótulos de plano para uso INTERNO de moderação.
+ *
+ * Decisão de produto (correção da Fase 2):
+ *   priority_tier=3/2 NÃO viram badge público com nome de plano
+ *   ("Lojista Pro"/"Lojista Start") porque revelam bastidor comercial
+ *   e poluem a interface de decisão de compra. O tier comercial continua
+ *   sendo a chave primária do ranking SQL — bastidor comercial fica
+ *   apenas no ranking, não na vitrine.
  *
  * Sinais canônicos preferidos:
- *   - priority_tier        — calculado pelo backend (commercialLayerExpr).
- *                            Fonte de verdade para tier comercial.
- *   - highlight_until      — canônico (timestamp).
- *   - below_fipe           — canônico (flag de risk).
- *   - opportunity          — calculado pelo backend (opportunityExpr).
- *                            >= 10% abaixo da FIPE.
- *   - seller_kind          — canônico do backend trust pass.
- *   - reviewed_after_below_fipe — canônico de moderação.
+ *   - priority_tier            (commercialLayerExpr — só decide "Destaque" público)
+ *   - highlight_until          (canônico timestamp)
+ *   - below_fipe               (flag de risk)
+ *   - opportunity              (opportunityExpr — >= 10% abaixo da FIPE)
+ *   - seller_kind              (trust pass: 'dealer' | 'private')
+ *   - reviewed_after_below_fipe (canônico de moderação)
  *
  * Heurísticas (fallback APENAS quando o canônico não veio do backend):
  *   - plan contém "pro/premium/master/etc."  → tier 3
  *   - dealership_id/seller_type === "dealer" → tier 2
  *
- * Selos NÃO emitidos:
+ * Selos NÃO emitidos publicamente:
  *   - "Loja verificada": auditoria 2026-05-19 mostrou que
  *     `users.document_verified` é checksum self-service (sem KYC externo)
  *     e `advertisers.verified` é coluna morta. Sem sinal canônico
  *     confiável, este selo fica adiado até integração com Receita/Junta.
+ *   - "Lojista Pro"/"Lojista Start"/"Grátis": ver decisão de produto acima.
  */
 
 import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
 
 export type AdBadgeId =
   | "destaque"
-  | "pro"
-  | "start"
-  | "below_fipe"
   | "opportunity"
+  | "below_fipe"
+  | "loja"
   | "particular"
-  | "reviewed";
+  | "reviewed"
+  // ADMIN-ONLY — nunca exibidos em UI pública.
+  | "pro"
+  | "start";
 
 export type AdBadgeVariant = "warning" | "premium" | "info" | "success" | "reviewed";
 
@@ -105,6 +121,9 @@ function isDealerLegacy(ad: AdBadgeSignals): boolean {
  * O fallback existe para defesa em profundidade (cache antigo, BFF sem
  * o campo). Quando o backend está enviando `priority_tier`, esse caminho
  * nunca executa.
+ *
+ * O tier serve PRIMARIAMENTE ao ranking SQL. No card público, só o
+ * tier=4 (Destaque) vira badge visível — Pro/Start são bastidor comercial.
  */
 export function inferAdTier(ad: AdBadgeSignals): 1 | 2 | 3 | 4 {
   if (
@@ -122,22 +141,76 @@ export function inferAdTier(ad: AdBadgeSignals): 1 | 2 | 3 | 4 {
 }
 
 /**
- * Lista canônica de selos para um anúncio. Caller renderiza in-order.
+ * Selos para a VITRINE PÚBLICA. Caller renderiza in-order.
  *
  * Ordem produzida:
- *   1. Tier comercial (Destaque > Pro > Start) — máximo 1
- *   2. Sinal de preço (Oportunidade OU Abaixo da FIPE) — máximo 1
- *      (Oportunidade implica abaixo da FIPE — não duplicamos)
- *   3. Anúncio analisado — sóbrio, só se backend marcou
- *   4. Particular — apenas para tier 1 (Grátis), evita conflito
- *      visual com Pro/Start/Destaque que já comunicam o canal
+ *   1. Destaque        — só se tier=4 (oferta destacada paga)
+ *   2. Oportunidade    — opportunity=true (>= 10% abaixo da FIPE)
+ *   3. Abaixo da FIPE  — below_fipe=true e !opportunity (não duplica)
+ *   4. Anúncio Analisado — selo sóbrio de moderação
+ *   5. Loja OU Particular — sempre um dos dois (tipo de vendedor)
+ *
+ * NÃO emite:
+ *   - "Lojista Pro" / "Lojista Start" — bastidor comercial, fora da vitrine.
+ *   - "Grátis" — bastidor comercial, fora da vitrine.
+ *   - "Loja verificada" — sem sinal canônico confiável (adiado).
+ *
+ * Tier 2/3 (Pro/Start) caem sob o selo genérico "Loja" via seller_kind,
+ * preservando informação útil ao comprador (loja vs. particular) sem
+ * vazar o plano contratado.
  */
-export function resolveAdBadges(ad: AdBadgeSignals): AdBadge[] {
+export function resolvePublicAdBadges(ad: AdBadgeSignals): AdBadge[] {
   const out: AdBadge[] = [];
   const tier = inferAdTier(ad);
 
   if (tier === 4) {
-    out.push({ id: "destaque", label: "OFERTA DESTAQUE", variant: "warning" });
+    out.push({ id: "destaque", label: "DESTAQUE", variant: "warning" });
+  }
+
+  if (ad.opportunity === true) {
+    out.push({ id: "opportunity", label: "OPORTUNIDADE", variant: "success" });
+  } else if (ad.below_fipe === true) {
+    out.push({ id: "below_fipe", label: "ABAIXO DA FIPE", variant: "success" });
+  }
+
+  if (ad.reviewed_after_below_fipe === true) {
+    out.push({ id: "reviewed", label: "ANÚNCIO ANALISADO", variant: "reviewed" });
+  }
+
+  // Tipo de vendedor — SEMPRE exibido (dealer OU private). Comprador
+  // precisa saber se está falando com loja ou particular, independente
+  // do plano comercial contratado.
+  const sellerKind = resolveSellerKind(ad);
+  if (sellerKind === "dealer") {
+    out.push({ id: "loja", label: "LOJA", variant: "info" });
+  } else {
+    out.push({ id: "particular", label: "PARTICULAR", variant: "info" });
+  }
+
+  return out;
+}
+
+/**
+ * Selos para o painel ADMIN/MODERAÇÃO. Inclui rótulos de plano
+ * (Pro/Start) para diagnóstico interno. Nunca usar em UI pública.
+ *
+ * Ordem produzida:
+ *   1. Destaque  (tier=4)
+ *   2. Pro       (tier=3)
+ *   3. Start     (tier=2)
+ *   4. Oportunidade
+ *   5. Abaixo da FIPE
+ *   6. Anúncio Analisado
+ *   7. Loja / Particular
+ *
+ * Não emite "Grátis" — ausência de selo de plano já comunica isso.
+ */
+export function resolveAdminAdBadges(ad: AdBadgeSignals): AdBadge[] {
+  const out: AdBadge[] = [];
+  const tier = inferAdTier(ad);
+
+  if (tier === 4) {
+    out.push({ id: "destaque", label: "DESTAQUE", variant: "warning" });
   } else if (tier === 3) {
     out.push({ id: "pro", label: "LOJISTA PRO", variant: "premium" });
   } else if (tier === 2) {
@@ -154,7 +227,10 @@ export function resolveAdBadges(ad: AdBadgeSignals): AdBadge[] {
     out.push({ id: "reviewed", label: "ANÚNCIO ANALISADO", variant: "reviewed" });
   }
 
-  if (tier === 1 && resolveSellerKind(ad) === "private") {
+  const sellerKind = resolveSellerKind(ad);
+  if (sellerKind === "dealer") {
+    out.push({ id: "loja", label: "LOJA", variant: "info" });
+  } else {
     out.push({ id: "particular", label: "PARTICULAR", variant: "info" });
   }
 

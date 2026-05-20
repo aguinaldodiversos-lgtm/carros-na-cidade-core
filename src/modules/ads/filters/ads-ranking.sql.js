@@ -150,3 +150,39 @@ export const opportunityExpr = `
     AND a.price <= a.fipe_reference_value * ${OPPORTUNITY_DISCOUNT_RATIO}
   )
 `;
+
+/**
+ * Tipo de vendedor canônico — espelha `deriveSellerKind` em
+ * `src/modules/ads/ads.public-trust.js`. Mantemos a regra em DOIS lugares
+ * intencionalmente:
+ *
+ *   - JS (trust pass): enriquece o payload da listagem com `seller_kind`
+ *     já calculado.
+ *   - SQL (este expr): permite FILTRAR por seller_kind no WHERE, sem
+ *     materializar a coluna.
+ *
+ * IMPORTANTE: se a regra mudar (ex.: nova categoria 'verified-dealer'),
+ * atualizar nos dois lugares. Testes de paridade ficam em
+ * `tests/ads/ads-filter-builder-canonical.test.js`.
+ *
+ * Regra:
+ *   - 'dealer'  se adv.id válido OU users.document_type === 'CNPJ'
+ *   - 'private' caso contrário
+ *
+ * Conceito vs. plano:
+ *   - `seller_kind` é TIPO DE VENDEDOR (loja vs. particular). NÃO confundir
+ *     com `priority_tier` (plano pago: Destaque/Pro/Start/Grátis). Uma
+ *     loja CNPJ pode estar no tier 1 (Grátis); um particular CPF pode
+ *     ter destaque pago (tier 4). Os filtros são ortogonais.
+ *
+ * Requer os JOINs já presentes no builder:
+ *   LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+ *   LEFT JOIN users u ON u.id = adv.user_id
+ */
+export const sellerKindExpr = `
+  (CASE
+    WHEN adv.id IS NOT NULL AND adv.id > 0 THEN 'dealer'
+    WHEN UPPER(COALESCE(u.document_type, '')) = 'CNPJ' THEN 'dealer'
+    ELSE 'private'
+  END)
+`;

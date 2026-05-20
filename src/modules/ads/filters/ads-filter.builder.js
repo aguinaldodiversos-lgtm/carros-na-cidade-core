@@ -7,6 +7,7 @@ import {
   commercialLayerExpr,
   opportunityExpr,
   planRankExpr,
+  sellerKindExpr,
 } from "./ads-ranking.sql.js";
 import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
 import { AD_STATUS } from "../ads.canonical.constants.js";
@@ -47,6 +48,9 @@ export function buildAdsSearchQuery(filters = {}) {
     highlight_only,
     // highlight: alias legado do mesmo filtro (parser unifica em highlight_only)
     highlight,
+    priority_tier,
+    opportunity,
+    seller_kind,
     advertiser_id,
     page = 1,
     limit = 20,
@@ -137,6 +141,27 @@ export function buildAdsSearchQuery(filters = {}) {
   if (highlight_only === true || highlight === true) where.push(`a.highlight_until > NOW()`);
   if (advertiser_id !== undefined && advertiser_id !== null) {
     pushFilter(where, params, `a.advertiser_id = ?`, Number(advertiser_id));
+  }
+
+  // ─── Filtros canônicos da Fase 3 (selos viraram filtros) ───────────
+  // priority_tier: filtra pela camada comercial calculada (1..4). Aceitar
+  // só inteiros 1-4 — Zod já valida. Defesa: re-checa aqui para callers
+  // programáticos.
+  if (priority_tier !== undefined && priority_tier !== null) {
+    const tier = Number(priority_tier);
+    if (tier === 1 || tier === 2 || tier === 3 || tier === 4) {
+      pushFilter(where, params, `${commercialLayerExpr} = ?`, tier);
+    }
+  }
+  // opportunity: filtra anúncios com selo "Oportunidade" canônico (>=10%
+  // abaixo da FIPE). opportunity=false NÃO é case útil (não selo, não filtra).
+  if (opportunity === true) {
+    where.push(`${opportunityExpr} = true`);
+  }
+  // seller_kind: 'dealer' (loja: dealership_id ou CNPJ) ou 'private'
+  // (particular). Filtro TIPO DE VENDEDOR — ortogonal ao priority_tier.
+  if (seller_kind === "dealer" || seller_kind === "private") {
+    pushFilter(where, params, `${sellerKindExpr} = ?`, seller_kind);
   }
 
   const whereClause = `WHERE ${where.join(" AND ")}`;

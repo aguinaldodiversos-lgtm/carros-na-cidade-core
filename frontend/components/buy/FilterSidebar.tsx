@@ -96,6 +96,15 @@ const selectClasses =
 const inputClasses =
   "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20";
 
+const chipBase =
+  "inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold transition";
+
+function chipClass(active: boolean): string {
+  return active
+    ? `${chipBase} border border-blue-600 bg-blue-600 text-white`
+    : `${chipBase} border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-white hover:text-blue-700`;
+}
+
 export function FilterSidebar({
   filters,
   city,
@@ -140,6 +149,82 @@ export function FilterSidebar({
         </div>
 
         <div className="space-y-4 px-5 py-5">
+          {/*
+            Chips de filtros públicos (Fase 3 — selos viraram filtros).
+            Cada chip é toggle. Lojas/Particulares são mutuamente exclusivos
+            (selecionar um troca o outro). Não exibimos chips para "Lojista
+            Pro"/"Start" — bastidor comercial fica fora da vitrine.
+          */}
+          <FieldGroup label="Ofertas">
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                aria-pressed={filters.priority_tier === 4}
+                onClick={() =>
+                  onPatch({
+                    priority_tier: filters.priority_tier === 4 ? undefined : 4,
+                    page: 1,
+                  })
+                }
+                className={chipClass(filters.priority_tier === 4)}
+              >
+                Destaques
+              </button>
+              <button
+                type="button"
+                aria-pressed={filters.opportunity === true}
+                onClick={() =>
+                  onPatch({
+                    opportunity: filters.opportunity === true ? undefined : true,
+                    page: 1,
+                  })
+                }
+                className={chipClass(filters.opportunity === true)}
+              >
+                Oportunidades
+              </button>
+              <button
+                type="button"
+                aria-pressed={filters.below_fipe === true}
+                onClick={() =>
+                  onPatch({
+                    below_fipe: filters.below_fipe === true ? undefined : true,
+                    page: 1,
+                  })
+                }
+                className={chipClass(filters.below_fipe === true)}
+              >
+                Abaixo da FIPE
+              </button>
+              <button
+                type="button"
+                aria-pressed={filters.seller_kind === "dealer"}
+                onClick={() =>
+                  onPatch({
+                    seller_kind: filters.seller_kind === "dealer" ? undefined : "dealer",
+                    page: 1,
+                  })
+                }
+                className={chipClass(filters.seller_kind === "dealer")}
+              >
+                Lojas
+              </button>
+              <button
+                type="button"
+                aria-pressed={filters.seller_kind === "private"}
+                onClick={() =>
+                  onPatch({
+                    seller_kind: filters.seller_kind === "private" ? undefined : "private",
+                    page: 1,
+                  })
+                }
+                className={chipClass(filters.seller_kind === "private")}
+              >
+                Particulares
+              </button>
+            </div>
+          </FieldGroup>
+
           <FieldGroup label="Marca" htmlFor="fs-brand">
             <select
               id="fs-brand"

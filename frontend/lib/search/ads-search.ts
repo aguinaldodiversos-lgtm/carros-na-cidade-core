@@ -40,6 +40,24 @@ export interface AdsSearchFilters {
   below_fipe?: boolean;
   /** Filtro: somente anúncios em destaque. Alias de query `highlight=true` é aceito (compat). */
   highlight_only?: boolean;
+  /**
+   * Tier comercial canônico (commercialLayerExpr):
+   *   4 = Destaque, 3 = Lojista Pro, 2 = Lojista Start, 1 = Grátis.
+   * Filtra anúncios pela camada — NÃO confundir com seller_kind (tipo
+   * de vendedor). Loja CNPJ pode estar em tier 1; particular pode estar
+   * em tier 4 (boost pago). Filtros ortogonais.
+   */
+  priority_tier?: 1 | 2 | 3 | 4;
+  /**
+   * Filtro "Oportunidade" canônico: preço >= 10% abaixo da FIPE.
+   * Diferente de below_fipe (qualquer margem).
+   */
+  opportunity?: boolean;
+  /**
+   * Tipo de vendedor canônico: 'dealer' (CNPJ ou dealership_id) ou
+   * 'private' (particular). Espelha `seller_kind` do trust pass.
+   */
+  seller_kind?: "dealer" | "private";
   sort?: string;
   page?: number;
   limit?: number;
@@ -425,6 +443,19 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
 
   if (filters.highlight_only === true) {
     params.set("highlight_only", "true");
+  }
+
+  // Filtros canônicos da Fase 3 — emite só quando o valor é semanticamente
+  // útil (filtros são "apenas anúncios X" — não há valor `false` que
+  // restringe o resultado, então tratamos isso como "filtro ausente").
+  if (filters.priority_tier === 1 || filters.priority_tier === 2 || filters.priority_tier === 3 || filters.priority_tier === 4) {
+    params.set("priority_tier", String(filters.priority_tier));
+  }
+  if (filters.opportunity === true) {
+    params.set("opportunity", "true");
+  }
+  if (filters.seller_kind === "dealer" || filters.seller_kind === "private") {
+    params.set("seller_kind", filters.seller_kind);
   }
 
   return params;
