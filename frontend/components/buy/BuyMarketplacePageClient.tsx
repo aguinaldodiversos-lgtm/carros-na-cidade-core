@@ -50,6 +50,12 @@ interface BuyMarketplacePageClientProps {
   enableGeoRedirect?: boolean;
   /** Preenchido quando SSR fez fallback automatico para outra cidade do mesmo UF. */
   fallbackTerritory?: FallbackTerritoryInfo;
+  /**
+   * Resolvido em SSR via `isRegionalPageEnabled()`. Quando true e
+   * variant="cidade", o `CatalogPageHeader` renderiza o CTA pill
+   * primário "Veículos na região de [cidade]".
+   */
+  regionalEnabled?: boolean;
 }
 
 export default function BuyMarketplacePageClient({
@@ -61,6 +67,7 @@ export default function BuyMarketplacePageClient({
   stateUf,
   enableGeoRedirect = false,
   fallbackTerritory,
+  regionalEnabled = false,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -260,6 +267,7 @@ export default function BuyMarketplacePageClient({
         variant={variant}
         stateUf={stateUf}
         fallbackTerritory={fallbackTerritory}
+        regionalEnabled={regionalEnabled}
       />
 
       <main>

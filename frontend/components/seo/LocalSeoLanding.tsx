@@ -17,13 +17,26 @@ function cx(...parts: Array<string | false | null | undefined>) {
 
 export interface LocalSeoLandingProps {
   model: LocalSeoLandingModel;
+  /**
+   * Modo "abaixo do catálogo": esconde o hero (breadcrumb + H1 + stats)
+   * porque a página de cidade canônica (`/carros-em/[slug]`) já renderiza
+   * esses elementos no `CatalogPageHeader` acima. Mantém parágrafos SEO,
+   * marcas, destaques e bloco "Continue explorando" — esses sinais
+   * complementam o catálogo sem competir visualmente com ele.
+   *
+   * Quando false (default), o componente continua sendo a landing SEO
+   * stand-alone usada pelas variantes `/carros-baratos-em/` e
+   * `/carros-automaticos-em/`.
+   */
+  compactBelow?: boolean;
 }
 
-export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
+export function LocalSeoLanding({ model, compactBelow = false }: LocalSeoLandingProps) {
   const { h1, paragraphs, sampleAds, topBrands, paths, hubHref, comprarHref } = model;
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb]">
+    <div className={compactBelow ? "bg-[#f6f7fb]" : "min-h-screen bg-[#f6f7fb]"}>
+      {compactBelow ? null : (
       <header className="border-b border-slate-200/80 bg-white">
         {/* Topo mobile mais enxuto (py-5) — auditoria 2026-05-11
             relatou hero alto demais no celular. Desktop preserva
@@ -79,8 +92,13 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
           </dl>
         </div>
       </header>
+      )}
 
-      <article className="mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6">
+      <article className={
+        compactBelow
+          ? "mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8"
+          : "mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6"
+      }>
         <section className="prose prose-slate max-w-none prose-p:text-slate-700 prose-p:leading-relaxed">
           {paragraphs.map((p, i) => (
             <p key={i}>{p}</p>
@@ -105,7 +123,7 @@ export function LocalSeoLanding({ model }: LocalSeoLandingProps) {
           </section>
         ) : null}
 
-        {sampleAds.length > 0 ? (
+        {!compactBelow && sampleAds.length > 0 ? (
           <section aria-labelledby="destaques-heading">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <h2 id="destaques-heading" className="text-lg font-semibold text-slate-900">

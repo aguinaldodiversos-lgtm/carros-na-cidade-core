@@ -316,3 +316,61 @@ describe("resolveAdminAdBadges — painel interno (com rótulos de plano)", () =
     }
   });
 });
+
+/**
+ * Invariantes adicionais alinhados ao briefing territorial 2026-05-20:
+ *
+ * A imagem `atualização-catalogo.png` mostra "Loja verificada" e "Loja
+ * premium" como selos nos cards. O briefing prevalece: enquanto não
+ * houver sinal canônico confiável de verificação externa
+ * (ex.: `dealer_verified`/`store_verified`), esses labels não podem ser
+ * exibidos. Premium também não pode aparecer porque vazaria plano
+ * comercial (Pro/Start) indiretamente.
+ */
+describe("resolvePublicAdBadges — invariantes territoriais 2026-05-20", () => {
+  it("nenhum selo público contém o texto 'verificada' (sem sinal canônico ainda)", () => {
+    const variants: AdBadgeSignals[] = [
+      { priority_tier: 4, seller_kind: "dealer" },
+      { priority_tier: 3, seller_kind: "dealer" },
+      { priority_tier: 2, seller_kind: "dealer" },
+      { priority_tier: 1, seller_kind: "dealer", opportunity: true },
+      { priority_tier: 1, seller_kind: "dealer", below_fipe: true },
+    ];
+    for (const a of variants) {
+      const out = resolvePublicAdBadges(a);
+      for (const b of out) {
+        expect(b.label.toLowerCase()).not.toContain("verificada");
+        expect(b.label.toLowerCase()).not.toContain("verificado");
+      }
+    }
+  });
+
+  it("nenhum selo público contém o texto 'premium' (vazaria plano comercial)", () => {
+    const variants: AdBadgeSignals[] = [
+      { priority_tier: 4 },
+      { priority_tier: 3, seller_kind: "dealer" },
+      { priority_tier: 2, seller_kind: "dealer", opportunity: true },
+      { priority_tier: 1, seller_kind: "private", below_fipe: true },
+    ];
+    for (const a of variants) {
+      const out = resolvePublicAdBadges(a);
+      for (const b of out) {
+        expect(b.label.toLowerCase()).not.toContain("premium");
+      }
+    }
+  });
+
+  it("dealer com qualquer tier renderiza exatamente 'LOJA' (sem sufixos)", () => {
+    const variants: AdBadgeSignals[] = [
+      { priority_tier: 4, seller_kind: "dealer" },
+      { priority_tier: 3, seller_kind: "dealer" },
+      { priority_tier: 2, seller_kind: "dealer" },
+      { priority_tier: 1, seller_kind: "dealer" },
+    ];
+    for (const a of variants) {
+      const out = resolvePublicAdBadges(a);
+      const loja = out.find((b) => b.id === "loja");
+      expect(loja?.label).toBe("LOJA");
+    }
+  });
+});

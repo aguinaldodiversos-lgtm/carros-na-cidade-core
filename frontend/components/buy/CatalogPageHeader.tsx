@@ -16,6 +16,7 @@ import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import { formatTotal, type BuyCityContext } from "@/lib/buy/catalog-helpers";
 import { buildStatePath, type ComprarVariant, stateNameFromUf } from "@/lib/buy/territory-variant";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 
 import { CatalogBreadcrumb } from "./CatalogBreadcrumb";
 
@@ -36,11 +37,19 @@ import { CatalogBreadcrumb } from "./CatalogBreadcrumb";
  */
 
 /**
- * Ordem espelhada do mockup `pagina catalogo.png`:
- * Até R$ 50 mil • SUV • Automático • Abaixo da FIPE.
+ * Chips de filtro rápido alinhados à imagem `atualização-catalogo.png` e
+ * à política de produto territorial (briefing 2026-05-20):
+ *   Até R$ 50 mil • SUV • Automático • Abaixo da FIPE • Loja •
+ *   Particular • Oportunidade • Destaque.
  *
- * "Em destaque" foi tirado dos chips rápidos (não consta no mockup) — o
- * filtro continua disponível via FilterSidebar / drawer mobile.
+ * Cada chip mapeia para um filtro canônico do backend
+ * (`AdsSearchFilters`). Loja/Particular usam `seller_kind`, Oportunidade
+ * usa a flag canônica `opportunity` (computed pelo backend, >=10% abaixo
+ * da FIPE) e Destaque usa `highlight_only` (priority_tier=4).
+ *
+ * Loja e Particular são mutuamente exclusivos — clicar em um remove o
+ * outro automaticamente (apply() retorna o seller_kind oposto como
+ * undefined). Os demais chips são ortogonais entre si.
  */
 const QUICK_FILTERS: ReadonlyArray<{
   key: string;
@@ -76,6 +85,34 @@ const QUICK_FILTERS: ReadonlyArray<{
     matches: (f) => f.below_fipe === true,
     apply: () => ({ below_fipe: true, page: 1 }),
     remove: () => ({ below_fipe: undefined, page: 1 }),
+  },
+  {
+    key: "loja",
+    label: "Loja",
+    matches: (f) => f.seller_kind === "dealer",
+    apply: () => ({ seller_kind: "dealer", page: 1 }),
+    remove: () => ({ seller_kind: undefined, page: 1 }),
+  },
+  {
+    key: "particular",
+    label: "Particular",
+    matches: (f) => f.seller_kind === "private",
+    apply: () => ({ seller_kind: "private", page: 1 }),
+    remove: () => ({ seller_kind: undefined, page: 1 }),
+  },
+  {
+    key: "oportunidade",
+    label: "Oportunidade",
+    matches: (f) => f.opportunity === true,
+    apply: () => ({ opportunity: true, page: 1 }),
+    remove: () => ({ opportunity: undefined, page: 1 }),
+  },
+  {
+    key: "destaque",
+    label: "Destaque",
+    matches: (f) => f.priority_tier === 4,
+    apply: () => ({ priority_tier: 4, page: 1 }),
+    remove: () => ({ priority_tier: undefined, page: 1 }),
   },
 ];
 
@@ -164,6 +201,13 @@ type CatalogPageHeaderProps = {
     actualState: string;
     actualSlug: string;
   };
+  /**
+   * Quando true e variant="cidade", renderiza o CTA pill primário
+   * "Veículos na região de [cidade]" — destino natural de ampliação a
+   * partir de uma cidade pequena. Resolvido em SSR via
+   * `isRegionalPageEnabled()` e propagado pelo Server Component.
+   */
+  regionalEnabled?: boolean;
 };
 
 export function CatalogPageHeader({
@@ -174,6 +218,7 @@ export function CatalogPageHeader({
   variant = "estadual",
   stateUf,
   fallbackTerritory,
+  regionalEnabled = false,
 }: CatalogPageHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -328,6 +373,17 @@ export function CatalogPageHeader({
 
         {variant === "cidade" ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            {regionalEnabled && city.slug ? (
+              <Link
+                href={slugToRegionHref(city.slug)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 font-semibold text-primary transition hover:border-primary hover:bg-primary-soft/80"
+                data-testid="city-region-cta"
+                aria-label={`Veículos na região de ${city.name}`}
+              >
+                <PinSmallIcon />
+                Veículos na região de {city.name}
+              </Link>
+            ) : null}
             <Link
               href={buildStatePath(activeStateUf, filters)}
               className="inline-flex items-center gap-1.5 rounded-full border border-cnc-line bg-cnc-surface px-3 py-1.5 font-semibold text-primary transition hover:border-primary hover:bg-primary-soft"
@@ -335,9 +391,6 @@ export function CatalogPageHeader({
               <span aria-hidden="true">←</span>
               Ampliar para {stateName}
             </Link>
-            <span className="hidden text-cnc-muted sm:inline">
-              Ou veja outras cidades do estado.
-            </span>
           </div>
         ) : null}
 
@@ -349,10 +402,10 @@ export function CatalogPageHeader({
             onSubmit={submitSearch}
             placeholder={
               variant === "cidade"
-                ? "Buscar marca ou modelo nesta cidade"
+                ? "Buscar marca, modelo ou versão nesta cidade"
                 : variant === "nacional"
-                  ? "Buscar marca ou modelo no Brasil"
-                  : `Buscar marca ou modelo em ${stateName}`
+                  ? "Buscar marca, modelo ou versão no Brasil"
+                  : `Buscar marca, modelo ou cidade em ${stateName}`
             }
             ariaLabel="Buscar no catálogo"
             filterButton={
@@ -433,5 +486,23 @@ export function CatalogPageHeader({
         </div>
       </div>
     </div>
+  );
+}
+
+function PinSmallIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
+      <circle cx="12" cy="9" r="2.2" />
+    </svg>
   );
 }
