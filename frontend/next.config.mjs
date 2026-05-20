@@ -12,6 +12,41 @@ const nextConfig = {
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/images/favicon.png" }];
   },
+  /**
+   * Cache long-lived APENAS para /images/* (assets manuais em frontend/public/images).
+   *
+   * Motivação (2026-05-20, contenção de bandwidth):
+   *   Antes, o Render servia banner-home.png (2 MB), banner-blog.png (2 MB),
+   *   pagina-Comprar-Estadual.png (4.7 MB) e outras 12 imagens grandes com
+   *   `Cache-Control: public, max-age=0`. Cada visita re-baixava megabytes
+   *   do origin — gargalo estimado em 30-50% do bandwidth total do
+   *   serviço frontend.
+   *
+   * Escopo deliberadamente restrito:
+   *   - Aplica APENAS a /images/:path* (assets físicos em /public/images/).
+   *   - NÃO toca em rotas SSR (HTML), /_next/* (já cacheado pelo Next),
+   *     /api/*, /_next/image (proxy dinâmico).
+   *
+   * Requisito de versionamento:
+   *   Assets em /public/images/ NÃO são versionados por hash automático
+   *   (Next só faz isso para /_next/static/*). Qualquer atualização DEVE
+   *   trocar o nome do arquivo (ex.: banner-home-v2.png) ou conviver com
+   *   até 1 ano de cache stale em browsers existentes. Documentado em
+   *   docs/runbooks/bandwidth-hardening-runbook.md (a ser atualizado).
+   */
+  async headers() {
+    return [
+      {
+        source: "/images/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ];
+  },
   images: {
     // KILL SWITCH GLOBAL (2026-05-13, segunda iteração do fix de bandwidth).
     //
