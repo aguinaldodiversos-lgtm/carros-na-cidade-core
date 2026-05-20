@@ -134,17 +134,24 @@ export function aggregateCityCountsFromAds(
  *
  * Maior valor numérico = maior prioridade. Mapeamento:
  *
- *   4 — Destaque ativo (`highlight_until` populado e não expirado)
- *   3 — Lojista Pro     (`plan` contém marcador pro/premium/master/etc.)
- *   2 — Lojista Start   (`seller_type` ou `dealership_*` indica lojista,
- *                        mas sem plan pro)
- *   1 — Grátis          (particular/sem plan)
+ *   4 — Destaque ativo
+ *   3 — Lojista Pro     (priority_level >= 80 no plano canônico)
+ *   2 — Lojista Start   (priority_level >= 50)
+ *   1 — Grátis          (sem plano pago ativo)
  *
- * O backend já aplica um ranking SQL próprio com pesos semelhantes
+ * Fonte primária: `ad.priority_tier` calculado pelo backend via
+ * `commercialLayerExpr` (que deriva de `users.plan_id` + `highlight_until`,
+ * canônico — não usa o snapshot legado `ads.plan`). Esta função
+ * SEMPRE prefere o campo canônico quando ele está presente e válido.
+ *
+ * A heurística (isProPlan/isStartDealer) só roda como FALLBACK quando
+ * o backend não envia `priority_tier` — cenários: cache antigo, payload
+ * de testes legados, BFF sem a coluna. É defesa em profundidade, não
+ * fonte de verdade.
+ *
+ * O backend SQL também aplica este ranking diretamente em `ORDER BY`
  * (`buildSortClause` + `baseCityBoostExpr`); este reorder client-side
- * é o último passo de garantia visual no caso de o backend retornar
- * em ordem diferente (ex.: paginação por relevância antiga, cache
- * intermediário, etc.). NÃO é fonte primária de truth — é defesa.
+ * é o último passo de garantia visual.
  */
 export type AdPriorityTier = 1 | 2 | 3 | 4;
 
@@ -174,6 +181,19 @@ function isStartDealer(ad: AdItem): boolean {
 }
 
 export function computeAdPriorityTier(ad: AdItem): AdPriorityTier {
+  // Fonte primária canônica do backend.
+  if (
+    ad.priority_tier === 1 ||
+    ad.priority_tier === 2 ||
+    ad.priority_tier === 3 ||
+    ad.priority_tier === 4
+  ) {
+    return ad.priority_tier;
+  }
+  // Fallback heurístico — apenas quando o campo canônico não veio. Pode
+  // divergir do backend para anúncios cujo ads.plan é snapshot legado
+  // (ex.: Loja Pro com ads.plan='free'). Por isso o backend sempre
+  // deve enviar priority_tier; este caminho é defesa.
   if (isHighlightActive(ad.highlight_until)) return 4;
   if (isProPlan(ad.plan)) return 3;
   if (isStartDealer(ad)) return 2;

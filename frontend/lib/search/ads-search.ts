@@ -64,6 +64,19 @@ export interface AdItem {
   below_fipe?: boolean;
   highlight_until?: string | null;
   plan?: string | null;
+  /**
+   * Camada comercial canônica calculada pelo backend (commercialLayerExpr):
+   *   4 = Destaque ativo (highlight_until > NOW)
+   *   3 = Lojista Pro     (users.plan_id com priority_level >= 80)
+   *   2 = Lojista Start   (priority_level >= 50)
+   *   1 = Grátis          (sem plano pago ativo)
+   *
+   * Fonte de verdade para tier comercial — derivado de users.plan_id em
+   * runtime, não de ads.plan (snapshot legado). O frontend deve preferir
+   * este campo para sorter/selos; a heurística baseada em ad.plan/
+   * dealership_id é fallback defensivo apenas.
+   */
+  priority_tier?: 1 | 2 | 3 | 4 | null;
   created_at?: string;
   updated_at?: string;
   image_url?: string | null;
@@ -178,6 +191,12 @@ function toNullableText(value: unknown) {
   return parsed || null;
 }
 
+function toPriorityTier(value: unknown): 1 | 2 | 3 | 4 | null {
+  const n = typeof value === "number" ? value : Number(value);
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return null;
+}
+
 function normalizeAdItem(raw: unknown, index: number): AdItem | null {
   if (!raw || typeof raw !== "object") return null;
 
@@ -226,6 +245,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     below_fipe: item.below_fipe === true,
     highlight_until: toNullableText(item.highlight_until),
     plan: toNullableText(item.plan),
+    priority_tier: toPriorityTier(item.priority_tier),
     created_at: toText(item.created_at) || undefined,
     updated_at: toText(item.updated_at) || undefined,
     image_url: imageUrl,

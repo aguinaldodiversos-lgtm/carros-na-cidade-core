@@ -1,7 +1,12 @@
 // src/modules/ads/filters/ads-filter.builder.js
 
 import { buildSortClause } from "./ads-filter.sort.js";
-import { baseCityBoostExpr, cityDemandBoostExpr, planRankExpr } from "./ads-ranking.sql.js";
+import {
+  baseCityBoostExpr,
+  cityDemandBoostExpr,
+  commercialLayerExpr,
+  planRankExpr,
+} from "./ads-ranking.sql.js";
 import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
 import { AD_STATUS } from "../ads.canonical.constants.js";
 
@@ -174,6 +179,7 @@ export function buildAdsSearchQuery(filters = {}) {
       COALESCE(m.clicks, 0) AS clicks,
       COALESCE(m.leads, 0) AS leads,
       COALESCE(m.ctr, 0) AS ctr,
+      ${commercialLayerExpr} AS priority_tier,
       ${textRankExpression} AS text_rank,
       ${hybridScoreExpr} AS hybrid_score
     FROM ads a

@@ -271,6 +271,106 @@ describe("sortAdsByPriorityAndProximity — invariante comercial absoluto (regra
   });
 });
 
+/**
+ * Garante alinhamento frontend↔backend: o sorter prefere o tier canônico
+ * calculado pelo backend (priority_tier via commercialLayerExpr) sobre a
+ * heurística defensiva baseada em ads.plan/dealership_id/seller_type.
+ *
+ * Sem este invariante, anúncios cujo ads.plan é snapshot legado
+ * (ex.: Loja Pro publicou quando era Free → ads.plan='free') seriam
+ * classificados errado pelo sorter, gerando UI inconsistente com o
+ * ranking real do banco.
+ */
+describe("computeAdPriorityTier — fonte canônica vs fallback heurístico", () => {
+  it("usa priority_tier=3 do backend mesmo com ads.plan='free' (Loja Pro com snapshot legado)", () => {
+    const ad = makeAd({ priority_tier: 3, plan: "free", dealership_id: 99 });
+    expect(computeAdPriorityTier(ad)).toBe(3);
+  });
+
+  it("usa priority_tier=4 (Destaque) mesmo sem highlight_until ou plan na heurística", () => {
+    const ad = makeAd({ priority_tier: 4, plan: null, highlight_until: null });
+    expect(computeAdPriorityTier(ad)).toBe(4);
+  });
+
+  it("priority_tier=1 (Grátis) NÃO é promovido a 2 por ter dealership_id (cnpj-free-store)", () => {
+    const ad = makeAd({
+      priority_tier: 1,
+      dealership_id: 99,
+      dealership_name: "Loja Free",
+      seller_type: "dealer",
+    });
+    expect(computeAdPriorityTier(ad)).toBe(1);
+  });
+
+  it("priority_tier=2 (Start) NÃO é promovido a 3 por ads.plan conter 'premium' (cpf-premium-highlight)", () => {
+    const ad = makeAd({ priority_tier: 2, plan: "cpf-premium-highlight" });
+    expect(computeAdPriorityTier(ad)).toBe(2);
+  });
+
+  it("priority_tier ausente/nulo cai para heurística (fallback defensivo)", () => {
+    // Sem priority_tier, heurística atua: dealership_id detecta lojista (tier 2).
+    expect(computeAdPriorityTier(makeAd({ dealership_id: 99 }))).toBe(2);
+    // Sem priority_tier, plan="pro" detecta Pro (tier 3).
+    expect(computeAdPriorityTier(makeAd({ plan: "pro" }))).toBe(3);
+    // priority_tier=null explícito (BFF normalizou) também cai para heurística.
+    expect(computeAdPriorityTier(makeAd({ priority_tier: null }))).toBe(1);
+  });
+
+  it("priority_tier inválido (0, 5, string) é ignorado — cai para heurística", () => {
+    // Backend pode evoluir tier; valores fora de 1..4 são ignorados defensivamente.
+    expect(computeAdPriorityTier(makeAd({ priority_tier: 0 as 1 }))).toBe(1);
+    expect(computeAdPriorityTier(makeAd({ priority_tier: 5 as 4 }))).toBe(1);
+    expect(
+      computeAdPriorityTier(makeAd({ priority_tier: "3" as unknown as 3 }))
+    ).toBe(1);
+  });
+});
+
+describe("sortAdsByPriorityAndProximity — prefere priority_tier canônico do backend", () => {
+  const future = new Date(Date.now() + 86400_000).toISOString();
+
+  it("Loja Pro com ads.plan='free' (snapshot legado) ranqueia como Pro via priority_tier", () => {
+    // Sem priority_tier, este anúncio seria tier 2 pela heurística (tem
+    // dealership_id) — abaixo de um anúncio com plan="pro". Com canônico,
+    // sobe corretamente para tier 3.
+    const ads = [
+      makeAd({ id: 1, city: "Atibaia", plan: "pro" }), // heurística: tier 3
+      makeAd({
+        id: 2,
+        city: "Atibaia",
+        priority_tier: 3,
+        plan: "free",
+        dealership_id: 99,
+      }),
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    // Mesmo tier 3 → cidade-base (mesma) → ordem de input preservada.
+    expect(out.map((a) => a.id).sort()).toEqual([1, 2]);
+    // Mais crítico: anúncio 2 NÃO cai para tier 2.
+    expect(out.every((a) => computeAdPriorityTier(a) === 3)).toBe(true);
+  });
+
+  it("invariante cross-tier mantém-se com priority_tier canônico (Destaque-Bragança > Pro-Atibaia)", () => {
+    const ads = [
+      makeAd({ id: 1, city: "Atibaia", priority_tier: 3 }),
+      makeAd({ id: 2, city: "Bragança Paulista", priority_tier: 4 }),
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+
+  it("cidade-base só desempata DENTRO do tier canônico (priority_tier vence distância)", () => {
+    // Mesmo um cnpj-free-store (priority_tier=1) na cidade-base NÃO sobe acima
+    // de um anúncio Start (priority_tier=2) numa vizinha.
+    const ads = [
+      makeAd({ id: 1, city: "Atibaia", priority_tier: 1, dealership_id: 50 }), // base mas tier 1
+      makeAd({ id: 2, city: "Campinas", priority_tier: 2 }), // vizinha 60km, tier 2
+    ];
+    const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
+    expect(out.map((a) => a.id)).toEqual([2, 1]);
+  });
+});
+
 describe("pickDynamicOgImage", () => {
   it("retorna primeira URL https válida do primeiro anúncio", () => {
     const ads = [

@@ -194,3 +194,36 @@ describe("buildAdsSearchQuery — payload público de /api/ads/search inalterado
     expect(countParams.length).toBeGreaterThan(0);
   });
 });
+
+describe("buildAdsSearchQuery — priority_tier canônico exposto no SELECT", () => {
+  it("dataQuery inclui AS priority_tier", () => {
+    const { dataQuery } = buildAdsSearchQuery({});
+    expect(normalize(dataQuery)).toContain("AS priority_tier");
+  });
+
+  it("priority_tier é exposto a partir do commercialLayerExpr (CASE 4>3>2>1)", () => {
+    const { dataQuery } = buildAdsSearchQuery({});
+    const sql = normalize(dataQuery);
+    const aliasIdx = sql.indexOf("AS priority_tier");
+    expect(aliasIdx).toBeGreaterThan(-1);
+    const caseStart = sql.lastIndexOf("CASE", aliasIdx);
+    expect(caseStart).toBeGreaterThan(-1);
+    const caseBody = sql.slice(caseStart, aliasIdx);
+    expect(caseBody).toContain("a.highlight_until > NOW() THEN 4");
+    expect(caseBody).toContain("COALESCE(sp.priority_level, 0) >= 80 THEN 3");
+    expect(caseBody).toContain("COALESCE(sp.priority_level, 0) >= 50 THEN 2");
+    expect(caseBody).toContain("ELSE 1");
+  });
+
+  it("priority_tier presente independente do sort escolhido", () => {
+    for (const sort of ["recent", "price_asc", "price_desc", "highlight", "relevance"]) {
+      const { dataQuery } = buildAdsSearchQuery({ sort });
+      expect(normalize(dataQuery)).toContain("AS priority_tier");
+    }
+  });
+
+  it("countQuery não expõe priority_tier (só listagem precisa)", () => {
+    const { countQuery } = buildAdsSearchQuery({});
+    expect(normalize(countQuery)).not.toContain("priority_tier");
+  });
+});

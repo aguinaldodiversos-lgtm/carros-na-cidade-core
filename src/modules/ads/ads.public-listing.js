@@ -68,6 +68,11 @@ const LISTING_ALLOWED_FIELDS = Object.freeze([
   // Comercial / vendedor (so o suficiente para card)
   "plan",
   "priority",
+  // Camada comercial canonica (1=Gratis, 2=Start, 3=Pro, 4=Destaque ativo)
+  // calculada pelo SQL via commercialLayerExpr (deriva de users.plan_id +
+  // ads.highlight_until). Fonte de truth para selos/sorter do frontend.
+  // O frontend NAO deve recalcular a partir de ads.plan (snapshot legado).
+  "priority_tier",
   "highlight_until",
   "dealership_id",
   "dealership_name",

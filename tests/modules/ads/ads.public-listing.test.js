@@ -41,6 +41,7 @@ function fullAd(overrides = {}) {
     ],
     plan: "destaque",
     priority: 10,
+    priority_tier: 4,
     highlight_until: "2026-06-15T00:00:00Z",
     advertiser_id: 7,
     dealership_id: 7,
@@ -167,6 +168,16 @@ describe("serializeAdForListing", () => {
     expect(serializeAdForListing(null)).toBeNull();
     expect(serializeAdForListing(undefined)).toBeUndefined();
     expect(serializeAdForListing("string")).toBe("string");
+  });
+
+  it("preserva priority_tier canonico (fonte de truth do tier comercial)", () => {
+    const ad = fullAd({ priority_tier: 3 });
+    const slim = serializeAdForListing(ad);
+    expect(slim.priority_tier).toBe(3);
+  });
+
+  it("priority_tier esta na whitelist (defesa contra refactor que tire o campo)", () => {
+    expect(PUBLIC_LISTING_CONTRACT.ALLOWED_FIELDS).toContain("priority_tier");
   });
 
   it("payload slim e menor que o input completo (regressao bandwidth)", () => {
