@@ -52,6 +52,11 @@ const LISTING_ALLOWED_FIELDS = Object.freeze([
   "price",
   "below_fipe",
   "reviewed_after_below_fipe",
+  // Selo "Oportunidade": calculado em runtime no SELECT (opportunityExpr).
+  // True quando below_fipe + fipe_reference_value valido + preco <=90% FIPE.
+  // NAO e sinonimo de below_fipe (que aceita qualquer margem). Ver
+  // src/modules/ads/filters/ads-ranking.sql.js para regra canonica.
+  "opportunity",
   // Localizacao
   "city",
   "city_id",

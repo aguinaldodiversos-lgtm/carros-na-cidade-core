@@ -24,6 +24,7 @@ function fullAd(overrides = {}) {
     body_type: "Sedan",
     price: 95000,
     below_fipe: true,
+    opportunity: true,
     reviewed_after_below_fipe: true,
     city: "Atibaia",
     city_id: 123,
@@ -178,6 +179,17 @@ describe("serializeAdForListing", () => {
 
   it("priority_tier esta na whitelist (defesa contra refactor que tire o campo)", () => {
     expect(PUBLIC_LISTING_CONTRACT.ALLOWED_FIELDS).toContain("priority_tier");
+  });
+
+  it("preserva opportunity calculado pelo backend", () => {
+    const adTrue = fullAd({ opportunity: true });
+    const adFalse = fullAd({ opportunity: false });
+    expect(serializeAdForListing(adTrue).opportunity).toBe(true);
+    expect(serializeAdForListing(adFalse).opportunity).toBe(false);
+  });
+
+  it("opportunity esta na whitelist", () => {
+    expect(PUBLIC_LISTING_CONTRACT.ALLOWED_FIELDS).toContain("opportunity");
   });
 
   it("payload slim e menor que o input completo (regressao bandwidth)", () => {

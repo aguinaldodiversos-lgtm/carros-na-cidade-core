@@ -48,8 +48,12 @@ export type CatalogItem = AdItem & {
   storage_key?: string | null;
   slug?: string;
   below_fipe?: boolean;
+  /** Coluna canônica do backend (opportunityExpr). >=10% abaixo da FIPE. */
+  opportunity?: boolean;
   highlight_until?: string | null;
   plan?: string | null;
+  /** Tier canônico do backend (commercialLayerExpr). */
+  priority_tier?: 1 | 2 | 3 | 4 | null;
   seller_type?: string | null;
   seller_kind?: string | null;
   account_type?: string | null;
@@ -96,8 +100,10 @@ function toBaseAdData(item: CatalogItem, weight: 1 | 2 | 3 | 4): BaseAdData {
     photos: item.photos,
     gallery: item.gallery,
     below_fipe: item.below_fipe ?? null,
+    opportunity: item.opportunity ?? null,
     highlight_until: item.highlight_until ?? null,
     catalogWeight: item.catalogWeight ?? weight,
+    priority_tier: item.priority_tier ?? null,
     plan: item.plan ?? null,
     dealership_id: item.dealership_id ?? null,
     dealership_name: item.dealership_name ?? null,

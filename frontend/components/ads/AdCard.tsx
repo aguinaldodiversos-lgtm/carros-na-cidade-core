@@ -6,6 +6,11 @@ import { useCallback, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { VehicleImage } from "@/components/ui/VehicleImage";
+import {
+  type AdBadge,
+  inferAdTier,
+  resolveAdBadges,
+} from "@/lib/ads/ad-badges";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
@@ -62,7 +67,11 @@ export type BaseAdData = {
   gallery?: unknown;
   badge?: string | null;
   below_fipe?: boolean | null;
+  /** Coluna canônica do backend (opportunityExpr). >=10% abaixo da FIPE. */
+  opportunity?: boolean | null;
   highlight_until?: string | null;
+  /** Tier canônico do backend (commercialLayerExpr). Sobrescreve heurística. */
+  priority_tier?: 1 | 2 | 3 | 4 | null;
   catalogWeight?: 1 | 2 | 3 | 4 | null;
   plan?: string | null;
   dealership_id?: string | number | null;
@@ -267,89 +276,85 @@ function formatNumber(value?: number | string | null): string {
   return new Intl.NumberFormat("pt-BR").format(parseNumber(value));
 }
 
+/**
+ * Tier comercial efetivo. Prefere `catalogWeight` (override explícito do
+ * caller) → `priority_tier` canônico do backend → fallback heurístico
+ * de `inferAdTier`. Esta cascata existe para não quebrar callers legados
+ * que ainda passam `catalogWeight` como prop.
+ */
 function inferWeight(item: BaseAdData): 1 | 2 | 3 | 4 {
   if (item.catalogWeight) return item.catalogWeight;
-  if (item.highlight_until) return 4;
-  const plan = String(item.plan || "").toLowerCase();
-  if (
-    ["premium", "pro", "complete", "enterprise", "plus", "master"].some((signal) =>
-      plan.includes(signal)
-    )
-  ) {
-    return 3;
-  }
-  const isDealer = Boolean(
-    item.dealership_id ||
-      item.dealership_name ||
-      item.dealer_name ||
-      item.seller_type === "dealer" ||
-      item.seller_type === "dealership" ||
-      item.seller_type === "basic" ||
-      item.seller_type === "premium"
-  );
-  if (isDealer) return 2;
-  return 1;
+  return inferAdTier(item);
 }
 
 /**
  * Variantes do Badge primitivo que o `HorizontalLayout` consome.
- * NÃO inclui `reviewed` — o selo "ANÚNCIO ANALISADO" só aparece em
- * `resolveBadges` (array) e é renderizado pelo `BadgeChipPill` próprio,
- * que tem palette dedicada para `reviewed` (slate, sóbrio, sem
- * conotação de "garantia").
+ * Não inclui `reviewed` — o selo "ANÚNCIO ANALISADO" só aparece via
+ * `BadgeChipPill` (palette dedicada slate/sóbrio).
  */
 type SimpleBadgeVariant = "success" | "warning" | "info" | "premium";
 type SimpleBadgeChip = {
   label: string;
   variant: SimpleBadgeVariant;
 };
-type BadgeChip = {
-  label: string;
-  variant: SimpleBadgeVariant | "reviewed";
-};
 
+/**
+ * Selo singular para HorizontalLayout (que renderiza só 1 chip via
+ * Badge primitivo). Pega o primeiro selo não-"reviewed" do array
+ * canônico — ordem do `resolveAdBadges` decide qual ganha (tier
+ * comercial primeiro, depois oportunidade/abaixo da FIPE).
+ *
+ * Se backend mandou `item.badge` custom e não há nenhum canônico,
+ * usa o custom como fallback.
+ */
 function resolveBadge(item: BaseAdData): SimpleBadgeChip | null {
+  const canonical = resolveAdBadges(item);
+  const firstSimple = canonical.find((b) => b.variant !== "reviewed");
+  if (firstSimple) {
+    // Capitaliza ("OFERTA DESTAQUE" → "Oferta Destaque") para variant Badge.
+    return {
+      label: firstSimple.label
+        .toLowerCase()
+        .replace(/(^|\s)\S/g, (m) => m.toUpperCase()),
+      variant: firstSimple.variant as SimpleBadgeVariant,
+    };
+  }
   if (item.badge) {
     const label = String(item.badge);
     const lower = label.toLowerCase();
     if (lower.includes("abaixo")) return { label, variant: "success" };
     if (lower.includes("destaque")) return { label, variant: "warning" };
-    if (lower.includes("premium")) return { label, variant: "premium" };
+    if (lower.includes("premium") || lower.includes("pro")) {
+      return { label, variant: "premium" };
+    }
     return { label, variant: "info" };
   }
-  if (item.below_fipe) return { label: "Abaixo da FIPE", variant: "success" };
-  const weight = inferWeight(item);
-  if (weight === 4) return { label: "Destaque", variant: "warning" };
-  if (weight === 3) return { label: "Loja Premium", variant: "premium" };
   return null;
 }
 
 /**
- * Combina sinais "destaque", "abaixo da FIPE" e "anúncio analisado" em
- * até 3 chips coloridos lado a lado. Ordem fixa: destaque (warning),
- * abaixo-da-fipe (success), anúncio analisado (reviewed).
+ * Lista de chips coloridos para os layouts vertical (grid/featured/...).
+ * Delegamos ao mapper canônico `resolveAdBadges` em
+ * `frontend/lib/ads/ad-badges.ts` — fonte ÚNICA dos selos para evitar
+ * heurística divergente entre cards.
  *
- * "Anúncio analisado" SÓ aparece quando o backend marcou
- * `reviewed_after_below_fipe` (anúncio entrou em pending_review por sinal
- * de preço abaixo da FIPE e foi aprovado pela moderação). Frontend
- * NUNCA infere este selo a partir de outras heurísticas — risco de
- * passar mensagem de "garantia" indevidamente.
+ * Selos NÃO emitidos:
+ *   - "Loja verificada": auditoria mostrou que document_verified é
+ *     checksum self-service (não verificação externa). Adiado.
  */
-function resolveBadges(item: BaseAdData): BadgeChip[] {
-  const out: BadgeChip[] = [];
-  const weight = inferWeight(item);
-  if (weight === 4) out.push({ label: "OFERTA DESTAQUE", variant: "warning" });
-  else if (weight === 3) out.push({ label: "LOJA PREMIUM", variant: "premium" });
-  if (item.below_fipe) out.push({ label: "ABAIXO DA FIPE", variant: "success" });
-  if (item.reviewed_after_below_fipe === true) {
-    out.push({ label: "ANÚNCIO ANALISADO", variant: "reviewed" });
+function resolveBadges(item: BaseAdData): AdBadge[] {
+  const canonical = resolveAdBadges(item);
+  // Custom badge do backend só aparece se o mapper canônico não emitiu nada.
+  if (canonical.length === 0 && item.badge) {
+    return [
+      {
+        id: "destaque",
+        label: String(item.badge).toUpperCase(),
+        variant: "info",
+      },
+    ];
   }
-  // Se o backend mandou um item.badge custom e ainda não temos nada, usa.
-  if (out.length === 0 && item.badge) {
-    const single = resolveBadge(item);
-    if (single) out.push({ ...single, label: single.label.toUpperCase() });
-  }
-  return out;
+  return canonical;
 }
 
 function slugify(value: string): string {
@@ -388,7 +393,7 @@ type NormalizedAd = {
   // UI primitivo do design system aceita exatamente este subset.
   badge: SimpleBadgeChip | null;
   // Array: pode incluir `reviewed`. Renderizado por `BadgeChipPill`.
-  badges: BadgeChip[];
+  badges: AdBadge[];
   isDealer: boolean;
   dealerLabel: string;
 };
@@ -708,8 +713,8 @@ function VerticalLayout({
  * Mais denso e tipográfico que o Badge genérico (uppercase + tracking +
  * cores do DS).
  */
-function BadgeChipPill({ chip }: { chip: BadgeChip }) {
-  const palette: Record<BadgeChip["variant"], string> = {
+function BadgeChipPill({ chip }: { chip: AdBadge }) {
+  const palette: Record<AdBadge["variant"], string> = {
     success: "bg-cnc-success/12 text-cnc-success ring-cnc-success/35",
     warning: "bg-cnc-warning/15 text-cnc-warning ring-cnc-warning/40",
     info: "bg-primary-soft text-primary ring-primary/30",

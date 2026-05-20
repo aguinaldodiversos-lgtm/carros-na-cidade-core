@@ -31,7 +31,11 @@ export type VehicleItem = {
   state?: string;
   price?: number | string;
   below_fipe?: boolean;
+  /** Coluna canônica do backend (opportunityExpr). >=10% abaixo da FIPE. */
+  opportunity?: boolean;
   highlight_until?: string | null;
+  /** Tier canônico do backend (commercialLayerExpr). */
+  priority_tier?: 1 | 2 | 3 | 4 | null;
   image_url?: string | null;
   image?: string | null;
   cover_image_url?: string | null;
@@ -65,7 +69,9 @@ function toBaseAdData(item: VehicleItem): BaseAdData {
     state: item.state ?? null,
     price: item.price ?? null,
     below_fipe: item.below_fipe ?? null,
+    opportunity: item.opportunity ?? null,
     highlight_until: item.highlight_until ?? null,
+    priority_tier: item.priority_tier ?? null,
     image: item.image ?? null,
     image_url: item.image_url ?? null,
     cover_image_url: item.cover_image_url ?? null,

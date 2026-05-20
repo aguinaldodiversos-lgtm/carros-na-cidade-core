@@ -62,6 +62,12 @@ export interface AdItem {
   transmission?: string | null;
   body_type?: string | null;
   below_fipe?: boolean;
+  /**
+   * Selo "Oportunidade" — preço pelo menos 10% abaixo da FIPE.
+   * Calculado pelo backend (opportunityExpr) — não inferir no cliente.
+   * Diferente de `below_fipe` (que aceita qualquer margem).
+   */
+  opportunity?: boolean;
   highlight_until?: string | null;
   plan?: string | null;
   /**
@@ -243,6 +249,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     transmission: toNullableText(item.transmission),
     body_type: toNullableText(item.body_type),
     below_fipe: item.below_fipe === true,
+    opportunity: item.opportunity === true,
     highlight_until: toNullableText(item.highlight_until),
     plan: toNullableText(item.plan),
     priority_tier: toPriorityTier(item.priority_tier),

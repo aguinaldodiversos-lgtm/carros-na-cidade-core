@@ -5,6 +5,7 @@ import {
   baseCityBoostExpr,
   cityDemandBoostExpr,
   commercialLayerExpr,
+  opportunityExpr,
   planRankExpr,
 } from "./ads-ranking.sql.js";
 import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
@@ -180,6 +181,7 @@ export function buildAdsSearchQuery(filters = {}) {
       COALESCE(m.leads, 0) AS leads,
       COALESCE(m.ctr, 0) AS ctr,
       ${commercialLayerExpr} AS priority_tier,
+      ${opportunityExpr} AS opportunity,
       ${textRankExpression} AS text_rank,
       ${hybridScoreExpr} AS hybrid_score
     FROM ads a

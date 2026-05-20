@@ -112,3 +112,41 @@ export function baseCityBoostExpr(baseSlugParamIdx) {
   }
   return `(CASE WHEN c.slug = $${baseSlugParamIdx} THEN ${BASE_CITY_BOOST_POINTS} ELSE 0 END)`;
 }
+
+/**
+ * Selo "Oportunidade" — preço significativamente abaixo da FIPE (>= 10%).
+ *
+ * Regra canônica (definida pelo produto):
+ *   opportunity = true SE TODAS as condições forem verdadeiras:
+ *     1. a.below_fipe = true                          (flag de risco gravada na criação/edição)
+ *     2. a.fipe_reference_value IS NOT NULL           (FIPE foi resolvida pelo backend)
+ *     3. a.fipe_reference_value > 0                   (defesa contra 0/NULL malformado)
+ *     4. a.price IS NOT NULL
+ *     5. a.price > 0
+ *     6. a.price <= a.fipe_reference_value * 0.90     (margem de 10% ou mais)
+ *
+ * Diferença vs `below_fipe`:
+ *   - below_fipe: preço apenas menor que FIPE (qualquer margem, inclusive 1%).
+ *   - opportunity: preço com margem RELEVANTE (>= 10%), gera selo forte e
+ *     filtro mais restritivo. NÃO são sinônimos.
+ *
+ * Por que calcular em runtime e não materializar coluna:
+ *   - FIPE muda mensalmente. Coluna persistida ficaria stale sem worker.
+ *   - Calcular no SELECT mantém sempre consistente com fipe_reference_value.
+ *   - 0 bytes no banco; +1 boolean no payload de listagem.
+ *
+ * Mudar o limiar (0.90 → outro) é decisão de produto: ajustar AQUI e revisar
+ * tests/ads/ads-opportunity-expr.test.js.
+ */
+export const OPPORTUNITY_DISCOUNT_RATIO = 0.9;
+
+export const opportunityExpr = `
+  (
+    a.below_fipe = true
+    AND a.fipe_reference_value IS NOT NULL
+    AND a.fipe_reference_value > 0
+    AND a.price IS NOT NULL
+    AND a.price > 0
+    AND a.price <= a.fipe_reference_value * ${OPPORTUNITY_DISCOUNT_RATIO}
+  )
+`;
