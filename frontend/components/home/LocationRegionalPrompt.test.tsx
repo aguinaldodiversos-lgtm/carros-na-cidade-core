@@ -2,6 +2,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
+// Mock do App Router — jsdom não monta AppRouterContext, então
+// `useRouter()` real lança "invariant expected app router to be mounted".
+// Capturamos `push` em variável compartilhada para asserts em testes
+// que validam a auto-navegação pós-consentimento.
+const pushMock = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: pushMock,
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 import { LocationRegionalPrompt } from "./LocationRegionalPrompt";
 
 const originalGeolocation = (globalThis as typeof globalThis & { navigator?: Navigator }).navigator
@@ -60,6 +76,7 @@ function removeGeolocation() {
 beforeEach(() => {
   document.cookie = "cnc_city=;path=/;max-age=0";
   document.cookie = "cnc_territorial_prefs_v1=;path=/;max-age=0";
+  pushMock.mockClear();
 });
 
 afterEach(() => {
@@ -329,5 +346,90 @@ describe("LocationRegionalPrompt — fora de cobertura", () => {
 
     await waitFor(() => screen.getByTestId("location-prompt-fallback"));
     expect(screen.getByText(/Não encontramos uma cidade próxima/i)).toBeInTheDocument();
+  });
+});
+
+describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 2026-05-19)", () => {
+  function mockResolvedAtibaia() {
+    setupGeolocationSuccess(-23.117, -46.55);
+    global.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+            state: { code: "SP", slug: "sp" },
+            region: {
+              slug: "atibaia-sp",
+              name: "Região de Atibaia",
+              href: "/carros-usados/regiao/atibaia-sp",
+            },
+            confidence: "high",
+            distanceKm: 3.2,
+          },
+        }),
+        { status: 200 }
+      )
+    ) as unknown as typeof fetch;
+  }
+
+  it("regionalEnabled=true → navega para /carros-usados/regiao/{slug} automaticamente", async () => {
+    mockResolvedAtibaia();
+
+    render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp");
+    });
+    expect(pushMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("regionalEnabled=false → navega para /carros-em/{slug} (fallback cidade)", async () => {
+    mockResolvedAtibaia();
+
+    render(
+      <LocationRegionalPrompt regionalEnabled={false} stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/carros-em/atibaia-sp");
+    });
+  });
+
+  it("navegação dispara apenas uma vez mesmo em re-render (proteção navigatedRef)", async () => {
+    mockResolvedAtibaia();
+
+    const { rerender } = render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+
+    // Força re-render — não pode disparar push de novo.
+    rerender(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
+
+    expect(pushMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("persiste cidade no cookie antes de navegar (prefs salvas mesmo sem 2º clique)", async () => {
+    mockResolvedAtibaia();
+
+    render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+
+    expect(document.cookie).toContain("cnc_city=");
+    expect(document.cookie).toContain("cnc_territorial_prefs_v1=");
+    // Coordenadas NÃO devem vazar pelo cookie.
+    expect(document.cookie.toLowerCase()).not.toContain("23.117");
+    expect(document.cookie.toLowerCase()).not.toContain("latitude");
   });
 });

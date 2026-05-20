@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { writeCityCookie, writeCityToLocalStorage } from "@/lib/city/city-storage";
 import { writeTerritorialPrefs } from "@/lib/territory/territorial-prefs";
@@ -197,7 +198,56 @@ export function LocationRegionalPrompt({
   stateCode,
   onOpenManualPicker,
 }: LocationRegionalPromptProps) {
+  const router = useRouter();
   const [state, setState] = useState<PromptState>({ kind: "idle" });
+  // Guarda contra dupla navegação em re-renders/strict-mode.
+  const navigatedRef = useRef(false);
+
+  /**
+   * Auto-navegação pós-consentimento — fix 2026-05-19.
+   *
+   * Após `state.kind === "resolved"`, persiste as prefs e empurra o
+   * usuário para a página regional automaticamente. Antes dependia de
+   * um segundo clique no CTA "Ver ofertas da região", o que travava
+   * o fluxo: usuário concedia permissão e via apenas uma caixa nova
+   * com botões — sem perceber que precisava clicar de novo.
+   *
+   * Ordem de precedência do destino:
+   *   1. /carros-usados/regiao/{slug}   — quando regional habilitado
+   *      e a região consolidada existe (cidade-base + vizinhos).
+   *   2. /carros-em/{citySlug}          — fallback quando só temos a
+   *      cidade isolada (ex.: cidade sem região no banco ainda).
+   *
+   * Os Links visuais do estado "resolved" continuam renderizados —
+   * servem como fallback caso o router falhe e como ponto de auditoria
+   * dos testes existentes (test:179-185 valida hrefs).
+   */
+  useEffect(() => {
+    if (state.kind !== "resolved") return;
+    if (navigatedRef.current) return;
+
+    const { city, region } = state.data;
+    if (!city) return;
+
+    persistPrefsForCity(city, region, "geolocation");
+
+    const target =
+      regionalEnabled && region?.href
+        ? region.href
+        : `/carros-em/${encodeURIComponent(city.slug)}`;
+
+    navigatedRef.current = true;
+
+    // router pode ser null em ambientes sem AppRouterContext (ex.: jsdom
+    // sem provider). Mantemos fallback para `window.location.assign` —
+    // hard nav, mas garante que o redirect aconteça em produção mesmo
+    // se algo na hidratação falhar.
+    if (router && typeof router.push === "function") {
+      router.push(target);
+    } else if (typeof window !== "undefined") {
+      window.location.assign(target);
+    }
+  }, [state, regionalEnabled, router]);
 
   const handleUseLocation = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
