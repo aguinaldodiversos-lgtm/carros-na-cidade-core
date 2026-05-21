@@ -1,37 +1,77 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+import { readCityFromLocalStorage } from "@/lib/city/city-storage";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 
 /**
  * CTA de localização/distribuição da Página Estadual.
  *
- * Briefing 2026-05-20 (item 7): a Estadual deve oferecer entrada
- * para localização/região com dois caminhos:
+ * Briefing 2026-05-21 (Estado → Regional → Cidade):
  *
- *   - "Ver ofertas perto de mim" → solicita `navigator.geolocation` no
- *     browser. Quando permitido, sinaliza ao usuário que a localização
- *     foi capturada e direciona visualmente para os blocos "Regiões em
- *     destaque" / "Cidades com mais ofertas" abaixo (via scroll para
- *     `#state-regions-anchor`).
+ *   Quando o visitante usa localização (ou já tem cidade conhecida no
+ *   storage), o destino primário é SEMPRE a Página Regional
+ *   correspondente — NÃO a Página Cidade. Esta política mantém a
+ *   Regional como centro do funil ("Estado recebe, Região converte").
  *
- *   - "Escolher cidade ou região" → fallback manual que também rola
- *     para a mesma âncora; mantém a Estadual navegável quando o usuário
- *     nega ou ignora a permissão.
+ * Comportamentos:
  *
- * Importante (briefing): NÃO fazer redirecionamento agressivo sem
- * contexto. Esta versão MVP NÃO resolve coordenadas → cidade
- * automaticamente — apenas valida consentimento de geolocalização e
- * conduz o usuário para os blocos de descoberta abaixo. Resolução
- * coord→cidade fica para iteração futura (precisa endpoint
- * `/api/public/cities/nearest` no backend).
+ *   1. Cidade já conhecida (localStorage, mesma UF):
+ *      Renderiza um CTA direto "Ver ofertas na região de [cidade]"
+ *      que navega para `/carros-usados/regiao/[slug]`. Sem precisar
+ *      pedir geolocation de novo.
+ *
+ *   2. Cidade desconhecida + browser com geo disponível:
+ *      Botão "Ver carros perto de mim" pede `navigator.geolocation`.
+ *      Esta versão MVP NÃO resolve coordenadas→cidade no client;
+ *      após o consentimento, rola para os blocos abaixo (StateRegionsBlock
+ *      + StateTerritorialShortcuts) onde o visitante escolhe a região
+ *      manualmente. Resolução coord→cidade fica para iteração futura
+ *      (precisa endpoint `/api/public/cities/nearest`).
+ *
+ *   3. Cidade desconhecida + sem geo: botão "Escolher cidade ou região"
+ *      apenas rola para os blocos de descoberta.
+ *
+ * Importante: NÃO fazer redirecionamento agressivo sem contexto.
+ * Toda navegação automática só dispara quando o storage já carrega
+ * uma cidade do MESMO estado que o visitante está olhando — sem isso,
+ * a Estadual continua a porta de entrada ampla que o briefing pede.
  */
 
 const ANCHOR_ID = "state-regions-anchor";
 
 type Status = "idle" | "requesting" | "granted" | "denied";
 
-export function StateLocationPrompt() {
+type StateLocationPromptProps = {
+  /**
+   * UF da Página Estadual em foco (ex.: "SP"). Usado para filtrar a
+   * cidade do localStorage — só sugerimos "Ver ofertas na região de X"
+   * quando X pertence ao mesmo estado da página atual.
+   */
+  stateUf: string;
+};
+
+type KnownCity = {
+  slug: string;
+  name: string;
+};
+
+export function StateLocationPrompt({ stateUf }: StateLocationPromptProps) {
   const [status, setStatus] = useState<Status>("idle");
+  const [knownCity, setKnownCity] = useState<KnownCity | null>(null);
+
+  // Hydrata a partir do localStorage. Só aceita cidade do MESMO estado
+  // da página atual — cidade de outro estado não cabe como "região
+  // próxima" aqui.
+  useEffect(() => {
+    const stored = readCityFromLocalStorage();
+    if (!stored) return;
+    const ufUpper = String(stateUf || "").toUpperCase();
+    if (stored.state.toUpperCase() !== ufUpper) return;
+    setKnownCity({ slug: stored.slug, name: stored.name });
+  }, [stateUf]);
 
   const scrollToRegions = useCallback(() => {
     if (typeof document === "undefined") return;
@@ -41,7 +81,6 @@ export function StateLocationPrompt() {
 
   const handleGeoRequest = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      // Browser sem suporte — fallback equivalente ao "Escolher cidade".
       setStatus("denied");
       scrollToRegions();
       return;
@@ -66,6 +105,38 @@ export function StateLocationPrompt() {
     scrollToRegions();
   }, [scrollToRegions]);
 
+  // Quando já temos cidade conhecida, renderiza o atalho regional
+  // direto — caminho mais curto Estado → Regional sem fricção.
+  if (knownCity) {
+    return (
+      <section
+        aria-label="Sua região"
+        className="mx-auto w-full max-w-7xl px-3 pb-3 pt-1 sm:px-6 sm:pb-4 lg:px-8"
+        data-testid="state-location-prompt"
+      >
+        <div className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-primary-soft/50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-cnc-text-strong">
+              Sua região está pronta
+            </p>
+            <p className="mt-0.5 text-xs text-cnc-muted">
+              Ver ofertas em volta de {knownCity.name} sem ter que filtrar de novo.
+            </p>
+          </div>
+          <Link
+            href={slugToRegionHref(knownCity.slug)}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+            data-testid="state-location-known-city-cta"
+            aria-label={`Ver ofertas na região de ${knownCity.name}`}
+          >
+            <PinIcon />
+            Ver ofertas na região de {knownCity.name}
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Encontrar ofertas perto de você"
@@ -80,8 +151,8 @@ export function StateLocationPrompt() {
               role="status"
               aria-live="polite"
             >
-              Localização detectada — confira regiões e cidades próximas
-              abaixo.
+              Localização detectada — escolha uma região abaixo para ver as
+              ofertas próximas.
             </p>
           ) : status === "denied" ? (
             <p
@@ -89,16 +160,17 @@ export function StateLocationPrompt() {
               role="status"
               aria-live="polite"
             >
-              Escolha sua cidade ou região nos blocos abaixo.
+              Escolha uma cidade nos blocos abaixo para ver as ofertas da região.
             </p>
           ) : (
             <p className="text-sm font-semibold text-cnc-text-strong">
-              Encontre ofertas perto de você
+              Encontre ofertas na sua região
             </p>
           )}
           {status === "idle" ? (
             <p className="mt-0.5 text-xs text-cnc-muted">
-              Permita a localização ou escolha manualmente.
+              Permita a localização ou escolha uma cidade para abrir a Página
+              Regional.
             </p>
           ) : null}
         </div>
@@ -121,9 +193,9 @@ export function StateLocationPrompt() {
               onClick={handleChooseCity}
               className="inline-flex shrink-0 items-center justify-center rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary-soft"
               data-testid="state-location-manual-cta"
-              aria-label="Escolher cidade ou região"
+              aria-label="Escolher cidade para ver ofertas na região"
             >
-              Escolher cidade ou região
+              Escolher cidade para ver ofertas na região
             </button>
           </div>
         ) : null}

@@ -6,6 +6,7 @@ import { StateLocationPrompt } from "@/components/territorial/StateLocationPromp
 import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadStateCatalogData } from "@/lib/buy/state-catalog-loader";
+import { resolveStateNearbyContext } from "@/lib/buy/state-nearby-cities";
 import {
   hasRestrictiveFilters,
   normalizeStateFilters,
@@ -132,6 +133,13 @@ export default async function CarrosUsadosUfPage({
     : null;
   const stateRegions = stateRegionsPayload?.regions ?? [];
 
+  // Contexto territorial para o sub-bloco "Cidades próximas de [cidade]"
+  // do StateTerritorialShortcuts. Lê a cidade do cookie e mapeia para a
+  // região correspondente (reusa o payload acima — sem fetch extra).
+  // Sem cookie ou sem região correspondente, fica `null` e o bloco
+  // renderiza só o fallback "Principais cidades em [estado]".
+  const stateNearby = await resolveStateNearbyContext(uf, stateRegions);
+
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -161,6 +169,8 @@ export default async function CarrosUsadosUfPage({
         stateUf={uf}
         enableGeoRedirect
         regionalEnabled={regionalEnabled}
+        stateNearbyCities={stateNearby?.nearbyCities}
+        stateActiveCityName={stateNearby?.activeCityName}
       />
 
       <div className="bg-cnc-bg pb-20 md:pb-0">
@@ -168,7 +178,7 @@ export default async function CarrosUsadosUfPage({
             convidar usuários "novos" (sem cidade confirmada) a se
             localizar OU descer para os blocos de descoberta abaixo.
             Não redireciona agressivamente; só guia via scroll. */}
-        <StateLocationPrompt />
+        <StateLocationPrompt stateUf={uf} />
 
         {/* Bloco "Explore por região" — caminho de conversão para a
             Regional. Suprimido quando a flag está OFF para não criar

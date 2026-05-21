@@ -112,9 +112,28 @@ describe("CatalogPageHeader — CTA territorial (variant cidade)", () => {
     expect(cta.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
   });
 
-  it("CTA 'Ampliar para [estado]' permanece visível independente da flag regional", () => {
+  it("link 'Ampliar para [estado]' permanece visível mesmo com a flag regional", () => {
     renderHeader({}, vi.fn(), { regionalEnabled: true });
     expect(screen.getByText(/ampliar para são paulo/i)).toBeTruthy();
+  });
+
+  it("com regional ON, 'Ampliar para [estado]' é link discreto — NÃO um pill primário (briefing 2026-05-21)", () => {
+    renderHeader({}, vi.fn(), { regionalEnabled: true });
+    const link = screen.getByTestId("city-state-cta");
+    // CTA primário de ampliação da Cidade é Regional, NÃO Estadual.
+    // O link para Estado vira texto discreto (text-xs muted), sem pill.
+    const cls = link.className;
+    expect(cls).not.toMatch(/bg-primary-soft/);
+    expect(cls).not.toMatch(/rounded-full/);
+    expect(cls).toMatch(/text-xs/);
+    expect(cls).toMatch(/text-cnc-muted/);
+  });
+
+  it("com regional OFF, 'Ampliar para [estado]' assume pill fallback (sem Regional, é o único caminho de ampliação)", () => {
+    renderHeader({}, vi.fn(), { regionalEnabled: false });
+    const link = screen.getByTestId("city-state-cta");
+    const cls = link.className;
+    expect(cls).toMatch(/rounded-full/);
   });
 });
 

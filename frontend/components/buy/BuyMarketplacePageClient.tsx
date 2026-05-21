@@ -10,6 +10,7 @@ import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { StateTerritorialShortcuts } from "@/components/buy/StateTerritorialShortcuts";
+import type { StateCuratedCity } from "@/lib/buy/state-territorial-cities";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
@@ -56,6 +57,15 @@ interface BuyMarketplacePageClientProps {
    * primário "Veículos na região de [cidade]".
    */
   regionalEnabled?: boolean;
+  /**
+   * Cidades a renderizar no sub-bloco contextual "Cidades próximas
+   * de [cidade]" do StateTerritorialShortcuts (briefing 2026-05-21
+   * item 12). Resolvido pelo SSR caller usando cidade detectada do
+   * cookie/preferência + membros da Região correspondente.
+   */
+  stateNearbyCities?: StateCuratedCity[];
+  /** Nome da cidade que ancora o sub-bloco contextual. */
+  stateActiveCityName?: string;
 }
 
 export default function BuyMarketplacePageClient({
@@ -68,6 +78,8 @@ export default function BuyMarketplacePageClient({
   enableGeoRedirect = false,
   fallbackTerritory,
   regionalEnabled = false,
+  stateNearbyCities,
+  stateActiveCityName,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -314,7 +326,11 @@ export default function BuyMarketplacePageClient({
                   [slug]). Adicionado na auditoria 2026-05-11 para
                   conectar Estado → Cidade canônica e Estado → Regional. */}
               {variant === "estadual" && (stateUf || city.state) ? (
-                <StateTerritorialShortcuts uf={stateUf || city.state} />
+                <StateTerritorialShortcuts
+                  uf={stateUf || city.state}
+                  nearbyCities={stateNearbyCities}
+                  activeCityName={stateActiveCityName}
+                />
               ) : null}
             </div>
           </div>

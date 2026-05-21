@@ -404,7 +404,7 @@ export function CatalogPageHeader({
         </div>
 
         {variant === "cidade" ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             {regionalEnabled && city.slug ? (
               <Link
                 href={slugToRegionHref(city.slug)}
@@ -416,11 +416,25 @@ export function CatalogPageHeader({
                 Veículos na região de {city.name}
               </Link>
             ) : null}
+            {/*
+              Briefing 2026-05-21: a Página Cidade NÃO deve ampliar
+              direto para o Estado como CTA principal — a ampliação
+              padrão é Cidade → Regional. Mantemos só um link discreto
+              de texto (sem pill, sem destaque visual) para quem
+              realmente quer pular para o catálogo estadual. Quando a
+              flag regional está OFF, este link assume papel principal
+              (fallback) porque a Regional não existe.
+            */}
             <Link
               href={buildStatePath(activeStateUf, filters)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-cnc-line bg-cnc-surface px-3 py-1.5 font-semibold text-primary transition hover:border-primary hover:bg-primary-soft"
+              className={
+                regionalEnabled
+                  ? "text-xs font-medium text-cnc-muted underline-offset-2 transition hover:text-primary hover:underline"
+                  : "inline-flex items-center gap-1.5 rounded-full border border-cnc-line bg-cnc-surface px-3 py-1.5 font-semibold text-primary transition hover:border-primary hover:bg-primary-soft"
+              }
+              data-testid="city-state-cta"
             >
-              <span aria-hidden="true">←</span>
+              <span aria-hidden="true">{regionalEnabled ? "" : "← "}</span>
               Ampliar para {stateName}
             </Link>
           </div>
