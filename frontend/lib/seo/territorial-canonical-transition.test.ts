@@ -219,11 +219,13 @@ describe("/cidade/[slug]/abaixo-da-fipe — generateMetadata (Fase 1)", () => {
   });
 });
 
-describe("/comprar/estado/[uf] — generateMetadata (Fase 2)", () => {
-  it("canonical = /comprar/estado/{uf} LIMPO (sem sort/limit/brand/utm vazando)", async () => {
-    // Antes da Fase 2, `buildStatePath(uf, filters)` injetava no canonical
-    // o sort='recent' default e limit=50 — fragmentava sinal SEO em várias
-    // URLs canônicas concorrentes pra mesma página.
+describe("/comprar/estado/[uf] — generateMetadata (PR 3 redirect canonical)", () => {
+  it("canonical APONTA PARA /carros-usados/{uf} (a nova canônica), não self", async () => {
+    // PR 3 (briefing 2026-05-20): /carros-usados/[uf] é a nova canônica
+    // estadual. /comprar/estado/[uf] continua respondendo por
+    // compatibilidade mas emite canonical apontando para a canônica,
+    // consolidando sinal SEO. Sem redirect 301 ainda — só após validar
+    // produção e SEO.
     const meta = await generateMetadataComprarEstado({
       params: { uf: UF.toLowerCase() },
       searchParams: {
@@ -236,19 +238,19 @@ describe("/comprar/estado/[uf] — generateMetadata (Fase 2)", () => {
       },
     });
 
-    expect(meta.alternates?.canonical).toBe(`/comprar/estado/${UF.toLowerCase()}`);
+    expect(meta.alternates?.canonical).toBe(`/carros-usados/${UF.toLowerCase()}`);
     const canonical = String(meta.alternates?.canonical || "");
     expect(canonical).not.toContain("?");
     expect(canonical).not.toMatch(/sort|limit|page|utm|honda|civic/i);
   });
 
-  it("canonical limpo TAMBÉM quando searchParams vem vazio (fix do default 'recent' vazando)", async () => {
+  it("canonical aponta para /carros-usados/{uf} TAMBÉM quando searchParams vem vazio", async () => {
     const meta = await generateMetadataComprarEstado({
       params: { uf: UF.toLowerCase() },
       searchParams: {},
     });
 
-    expect(meta.alternates?.canonical).toBe(`/comprar/estado/${UF.toLowerCase()}`);
+    expect(meta.alternates?.canonical).toBe(`/carros-usados/${UF.toLowerCase()}`);
     const canonical = String(meta.alternates?.canonical || "");
     expect(canonical).not.toContain("?");
   });

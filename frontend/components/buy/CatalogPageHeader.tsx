@@ -364,7 +364,7 @@ export function CatalogPageHeader({
               </>
             ) : (
               <>
-                Catálogo de veículos em <span className="text-primary">{stateName}</span>
+                Carros usados em <span className="text-primary">{stateName}</span>
               </>
             )}
           </h1>
@@ -395,7 +395,10 @@ export function CatalogPageHeader({
             ) : variant === "nacional" ? (
               <span>refine por estado ou cidade quando quiser</span>
             ) : (
-              <span>em todo o estado</span>
+              <>
+                <span>em cidades e regiões de</span>
+                <strong className="text-cnc-text-strong">{activeStateUf}</strong>
+              </>
             )}
           </p>
         </div>
@@ -461,7 +464,10 @@ export function CatalogPageHeader({
                   ? "Buscar marca, modelo ou versão nesta região"
                   : variant === "nacional"
                     ? "Buscar marca, modelo ou versão no Brasil"
-                    : `Buscar marca, modelo ou cidade em ${stateName}`
+                    : // Estadual: briefing 2026-05-20 pede "Buscar marca, modelo
+                      // ou cidade em [Estado]" — referindo-se ao nome cheio do
+                      // estado (ex.: "São Paulo"), não à UF.
+                      `Buscar marca, modelo ou cidade em ${stateName}`
             }
             ariaLabel="Buscar no catálogo"
             filterButton={

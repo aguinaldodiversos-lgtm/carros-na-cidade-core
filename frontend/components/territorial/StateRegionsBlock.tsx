@@ -90,6 +90,7 @@ export function StateRegionsBlock({
 
   return (
     <section
+      id="state-regions-anchor"
       aria-labelledby="state-regions-heading"
       className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
       data-testid="state-regions-block"

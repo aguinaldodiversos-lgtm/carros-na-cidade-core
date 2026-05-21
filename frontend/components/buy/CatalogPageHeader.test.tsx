@@ -206,3 +206,62 @@ describe("CatalogPageHeader — variant 'regional' (briefing 2026-05-20)", () =>
     expect(screen.queryByRole("button", { name: /premium/i })).toBeNull();
   });
 });
+
+function renderEstadualHeader(
+  filters: AdsSearchFilters,
+  onPatch: (patch: Partial<AdsSearchFilters>) => void
+) {
+  return render(
+    <CatalogPageHeader
+      city={{ slug: "estado-sp", name: "São Paulo", state: "SP", label: "São Paulo (SP)" }}
+      filters={filters}
+      totalResults={1234}
+      onPatch={onPatch}
+      variant="estadual"
+      stateUf="SP"
+    />
+  );
+}
+
+describe("CatalogPageHeader — variant 'estadual' (briefing 2026-05-20)", () => {
+  it("H1 'Carros usados em [Estado]' (nome completo do estado em azul)", () => {
+    renderEstadualHeader({}, vi.fn());
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.textContent).toMatch(/Carros usados em São Paulo/i);
+  });
+
+  it("subtítulo menciona 'cidades e regiões' + UF", () => {
+    renderEstadualHeader({}, vi.fn());
+    expect(screen.getByText(/cidades e regiões de/i)).toBeTruthy();
+  });
+
+  it("placeholder da busca: 'Buscar marca, modelo ou cidade em [Estado]'", () => {
+    renderEstadualHeader({}, vi.fn());
+    const search = screen.getByRole("searchbox");
+    expect(search.getAttribute("placeholder")).toBe(
+      "Buscar marca, modelo ou cidade em São Paulo"
+    );
+  });
+
+  it("renderiza os 8 chips canônicos (mesmo padrão da Cidade)", () => {
+    renderEstadualHeader({}, vi.fn());
+    ["Até R$ 50 mil", "SUV", "Automático", "Abaixo da FIPE", "Loja", "Particular", "Oportunidade", "Destaque"].forEach(
+      (label) => {
+        expect(screen.getByRole("button", { name: label })).toBeTruthy();
+      }
+    );
+  });
+
+  it("não exibe selos de plano comercial nos chips (Pro/Start/Grátis/verificada/premium)", () => {
+    renderEstadualHeader({}, vi.fn());
+    expect(screen.queryByRole("button", { name: /lojista pro/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /lojista start/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /verificada/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /premium/i })).toBeNull();
+  });
+
+  it("exibe Select de Estado (caller pode trocar UF)", () => {
+    renderEstadualHeader({}, vi.fn());
+    expect(screen.getByRole("combobox", { name: /estado/i })).toBeTruthy();
+  });
+});

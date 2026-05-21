@@ -16,7 +16,6 @@ import {
 } from "@/lib/search/ads-search";
 import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
 import {
-  buildStatePath,
   hasRestrictiveFilters,
   normalizeStateFilters,
   normalizeUf,
@@ -108,12 +107,13 @@ export async function generateMetadata({
         ? `Carros ${brand} em ${stateName}: vitrine estadual com filtros inteligentes e anúncios reais em todas as cidades — Carros na Cidade.`
         : `Catálogo de veículos em ${stateName}: explore anúncios do estado inteiro e refine pela sua cidade no Carros na Cidade.`;
 
-  // Simétrico ao canonical limpo de /comprar/cidade/[slug] (Fase 1, ver
-  // territorial-canonical-audit.md): a estadual consolida sinal SEO em
-  // /comprar/estado/{uf} sem query string. `buildStatePath(uf, filters)`
-  // vazaria sort/limit/brand/model/utm — fragmentaria o sinal e criaria
-  // múltiplas URLs canônicas concorrentes para a mesma página.
-  const canonicalPath = buildStatePath(uf);
+  // PR 3 (briefing 2026-05-20): `/carros-usados/[uf]` é a canônica
+  // estadual. Esta rota (`/comprar/estado/[uf]`) continua respondendo
+  // por compatibilidade — links antigos, indexação histórica — mas
+  // emite canonical APONTANDO PARA a nova canônica para consolidar
+  // sinal SEO. Não há redirect 301 ainda (briefing item 2: "só após
+  // validar produção e SEO").
+  const canonicalPath = `/carros-usados/${uf.toLowerCase()}`;
 
   // URLs filtradas (brand, model, q, etc.) não devem ser indexadas.
   // Canonical já aponta para URL limpa; noindex é mais explícito para
