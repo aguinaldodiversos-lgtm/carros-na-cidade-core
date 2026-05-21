@@ -112,6 +112,26 @@ function readFromSearchParams(searchParams: SearchParams) {
  * Filtros aceitos do usuário no regional. Excluímos qualquer dimensão
  * territorial — a região é a verdade canônica. Em particular não aceitamos
  * `state`, `city`, `city_id`, `city_slug`, `city_slugs` do usuário.
+ *
+ * PENDÊNCIA — filtros de distância (briefing 2026-05-20, item 7):
+ *   chips "Até 30 km / 50 km / 80 km / 100 km" estão listados em "filtros
+ *   avançados" mas NÃO foram implementados nesta entrega. Razão:
+ *
+ *     1. O backend não aceita `distance_max_km` como filtro de query.
+ *        O raio é resolvido no SSR via `platform_settings.regional.radius_km`
+ *        + `region_memberships`. Adicionar suporte exige Zod schema novo
+ *        no `ads-filter.schema.js` + SQL builder + boost compatível com
+ *        `baseCityBoostExpr`.
+ *
+ *     2. Filtro client-side post-fetch quebraria paginação: a página 2
+ *        pode pular anúncios que a página 1 filtrou localmente, gerando
+ *        UX inconsistente.
+ *
+ *   Estratégia recomendada para próxima iteração: filtrar `region.members`
+ *   por `distance_km <= maxKm` AQUI no SSR loader, ANTES de chamar
+ *   `regionToAdsSearchFilters` — recompõe `city_slugs[]` com o subset que
+ *   atende ao raio do usuário. Funciona sem mexer no backend, mantém
+ *   paginação consistente e respeita o cap `MAX_CITY_SLUGS=30`.
  */
 function pickUserOverrides(searchParams: SearchParams): Partial<AdsSearchFilters> {
   const parsed = parseAdsSearchFiltersFromSearchParams(readFromSearchParams(searchParams));

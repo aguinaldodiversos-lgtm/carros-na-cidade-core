@@ -45,11 +45,19 @@ import { CatalogBreadcrumb } from "./CatalogBreadcrumb";
  * Cada chip mapeia para um filtro canônico do backend
  * (`AdsSearchFilters`). Loja/Particular usam `seller_kind`, Oportunidade
  * usa a flag canônica `opportunity` (computed pelo backend, >=10% abaixo
- * da FIPE) e Destaque usa `highlight_only` (priority_tier=4).
+ * da FIPE) e Destaque usa `priority_tier=4`.
  *
  * Loja e Particular são mutuamente exclusivos — clicar em um remove o
  * outro automaticamente (apply() retorna o seller_kind oposto como
  * undefined). Os demais chips são ortogonais entre si.
+ *
+ * PENDÊNCIA (variant="regional") — filtros de distância:
+ *   O briefing 2026-05-20 lista chips "Até 30 km / 50 km / 80 km /
+ *   100 km" para a Página Regional. NÃO entregues nesta PR porque o
+ *   backend não aceita `distance_max_km` como filtro de query e a
+ *   filtragem client-side post-fetch quebraria paginação. Estratégia
+ *   recomendada: ver TODO em `lib/buy/region-catalog-loader.ts` (filtrar
+ *   `region.members` por distância no SSR antes de compor `city_slugs`).
  */
 const QUICK_FILTERS: ReadonlyArray<{
   key: string;
