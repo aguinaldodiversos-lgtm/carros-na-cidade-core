@@ -202,14 +202,16 @@ describe("Fase 3 — invariantes globais (3 page.tsx integradas)", () => {
     }
   });
 
-  it("slug com caracteres URI-reservados é encodado no path do canonical", async () => {
-    // Defesa contra slug malformado vindo do roteador. Slugs reais sempre
-    // batem em /^[a-z0-9-]+-[a-z]{2}$/ — nada precisa encoding nesse formato.
-    // Mas o helper usa encodeURIComponent: garante que slug "atibaia sp"
-    // (com espaço, edge case) não vaza espaço cru no canonical.
-    const meta = await generateMetadataEm({ params: { slug: "atibaia sp" } });
-    const canonical = String(meta.alternates?.canonical || "");
-    expect(canonical).not.toContain(" ");
-    expect(canonical).toMatch(/atibaia(%20|\+)sp/);
+  it("slug malformado (sem UF brasileira válida no final) → 404 real, não soft-404", async () => {
+    // Auditoria 2026-05-21: a defesa subiu de nível. Antes este teste
+    // validava que encodeURIComponent era aplicado para slugs malformados
+    // tipo "atibaia sp" (com espaço). Agora a defesa é mais forte:
+    // generateMetadata chama notFound() porque o slug não tem UF
+    // brasileira válida no final, bloqueando o canonical inválido na
+    // origem. Combinado com middleware territory-gate, garante 404 HTTP
+    // real para qualquer slug fora do contrato `nome-uf-br`.
+    await expect(
+      generateMetadataEm({ params: { slug: "atibaia sp" } })
+    ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 });

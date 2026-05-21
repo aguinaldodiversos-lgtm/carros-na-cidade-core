@@ -114,10 +114,15 @@ describe("/carros-usados/[uf] — generateMetadata", () => {
     expect(String(md.alternates?.canonical)).not.toContain("?");
   });
 
-  it("UF inválida → metadata noindex e title genérico", async () => {
-    const md = await pageModule.generateMetadata({ params: { uf: "xx" } });
-    expect(md.robots).toMatchObject({ index: false, follow: true });
-    expect(md.title).toMatch(/Comprar carros/i);
+  it("UF inválida → generateMetadata chama notFound() (404 real ao invés de soft-404)", async () => {
+    // Fix da auditoria 2026-05-21: o middleware faz hard gate em
+    // `/carros-usados/[uf]` (404 real). Como defesa em profundidade,
+    // generateMetadata também chama notFound() para fechar o gate caso
+    // o middleware seja mudado no futuro. Ambos garantem 404 HTTP real
+    // ao invés do bug Next 14.2 (200 + soft-404 UI).
+    await expect(
+      pageModule.generateMetadata({ params: { uf: "xx" } })
+    ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
   it("filtros restritivos (brand/model/q) emitem robots noindex mas mantêm canonical limpo", async () => {

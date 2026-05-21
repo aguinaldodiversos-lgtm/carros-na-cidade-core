@@ -40,7 +40,26 @@ type CarrosUsadosUfPageProps = {
  *     `rj`, etc. UF inválida retorna 404 real via `notFound()`.
  */
 
-export const revalidate = 60;
+/**
+ * `force-dynamic` (NÃO mudar para `revalidate`) — bug crítico do Next 14.2:
+ *
+ * Quando esta rota tinha `export const revalidate = 60` (ou qualquer
+ * outro valor), o Next.js tratava-a como ISR-able. Em rota ISR-able
+ * combinada com `notFound()` dentro do server component, o Next.js
+ * serve o conteúdo do `not-found.tsx` global mas retorna **status HTTP
+ * 200** em vez de 404 — mesmo bug confirmado em `/carros-usados/regiao/
+ * [slug]/page.tsx` (ver runbook regional-page-rollout.md §"Fix #2").
+ *
+ * Reproduzido em runtime durante auditoria 2026-05-21:
+ *   /carros-usados/zz → HTTP 200 com body do not-found.
+ *
+ * Fix: `dynamic = "force-dynamic"` força runtime por request e o status
+ * code real do `notFound()` vai para o response. `generateMetadata`
+ * também chama `notFound()` no mesmo gate (UF inválida) — necessário
+ * porque o Next 14.2 comita o status code APÓS generateMetadata, antes
+ * do Page rodar. Se o gate ficar só no Page, o status já foi 200.
+ */
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -48,10 +67,10 @@ export async function generateMetadata({
 }: CarrosUsadosUfPageProps): Promise<Metadata> {
   const uf = normalizeUf(params.uf);
   if (!uf) {
-    return {
-      title: "Comprar carros | Carros na Cidade",
-      robots: { index: false, follow: true },
-    };
+    // Chamamos notFound() aqui ANTES do status code ser comitado para
+    // garantir HTTP 404 real (não soft-404 com 200). Sem isso, o Page
+    // chama notFound() mas o body troca para not-found-UI já com 200.
+    notFound();
   }
 
   const stateName = stateNameFromUf(uf);

@@ -8,7 +8,7 @@ import { AlsoInRegionBlock } from "@/components/territorial/AlsoInRegionBlock";
 import { TerritorialFooterLinks } from "@/components/territorial/TerritorialFooterLinks";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
-import { isValidCitySlug, hasRestrictiveFilters, type SearchParams } from "@/lib/buy/territory-variant";
+import { isValidCitySlug, hasRestrictiveFilters, normalizeUf, type SearchParams } from "@/lib/buy/territory-variant";
 import {
   buildLocalSeoBreadcrumbJsonLd,
   buildLocalSeoJsonLd,
@@ -47,12 +47,49 @@ interface PageProps {
   searchParams?: SearchParams;
 }
 
-export const revalidate = LOCAL_SEO_REVALIDATE;
+/**
+ * `force-dynamic` (NÃO mudar para `revalidate`) — bug Next 14.2:
+ * ISR + `notFound()` em server component retorna HTTP 200 com body
+ * not-found global (soft-404). Reproduzido em runtime na auditoria
+ * 2026-05-21: `/carros-em/cidade-falsa-xx` retornava 200.
+ *
+ * `dynamic = "force-dynamic"` força runtime por request e preserva
+ * o status 404 real quando `notFound()` é chamado. Sem perda material
+ * de performance: o backend territorial-public tem cache próprio e
+ * `fetchAdsSearch` tem `revalidate: 60` embutido.
+ *
+ * Mantemos `LOCAL_SEO_REVALIDATE` no import para compatibilidade com
+ * `createLocalSeoPage` factory (usado por variantes
+ * /carros-baratos-em/, /carros-automaticos-em/) que ainda dependem
+ * dessa constante.
+ */
+export const dynamic = "force-dynamic";
+void LOCAL_SEO_REVALIDATE; // import preservado por compat (ver doc acima)
 
 const loadSeoModel = cache((slug: string) => loadLocalSeoLanding(slug, "em"));
 
+/**
+ * Valida que a UF embutida no slug é uma UF brasileira REAL (não só
+ * 2 letras). Sem isso, slugs "cidade-falsa-xx" passariam o
+ * `isValidCitySlug` (que valida só formato regex `^[a-z]{2}$`),
+ * cairiam no fetch, retornariam vazio e produziriam soft-404.
+ */
+function slugHasValidBrazilianUf(slug: string): boolean {
+  const parts = slug.trim().toLowerCase().split("-").filter(Boolean);
+  if (parts.length < 2) return false;
+  return normalizeUf(parts[parts.length - 1]) !== null;
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const model = await loadSeoModel(params.slug);
+  const slug = String(params.slug || "").trim();
+  if (!isValidCitySlug(slug) || !slugHasValidBrazilianUf(slug)) {
+    // Chamamos notFound() no generateMetadata para que o status code
+    // 404 seja comitado ANTES do Page rodar. Sem isso, o status já é
+    // 200 quando o Page chama notFound() — body troca para not-found
+    // mas o crawler vê HTTP 200 (soft-404).
+    notFound();
+  }
+  const model = await loadSeoModel(slug);
   return buildLocalSeoMetadata(model);
 }
 
@@ -61,7 +98,7 @@ export default async function CarrosEmCidadePage({
   searchParams = {},
 }: PageProps) {
   const slug = String(params.slug || "").trim();
-  if (!isValidCitySlug(slug)) notFound();
+  if (!isValidCitySlug(slug) || !slugHasValidBrazilianUf(slug)) notFound();
 
   // SEO model carrega em paralelo com o catálogo. Falha aqui chama
   // notFound() internamente, então usamos try/catch no caller.

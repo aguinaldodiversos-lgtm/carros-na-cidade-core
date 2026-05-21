@@ -12,6 +12,7 @@ import {
   isFlagEnabled,
   validateRegionalSlug,
 } from "@/lib/regional-page-guard";
+import { decideTerritoryGate } from "@/lib/middleware/territory-gate";
 
 /**
  * Middleware do frontend. Responsabilidades:
@@ -174,6 +175,32 @@ export async function middleware(request: NextRequest) {
     }
     const blocked = new NextResponse(null, { status: 404 });
     blocked.headers.set("X-Middleware-Regional", "blocked-flag-off");
+    return respond(request, startedAt, blocked);
+  }
+
+  // ── 2b. Hard gate de UF inválida em `/carros-usados/[uf]` e
+  //        `/carros-em/[slug]` (auditoria 2026-05-21).
+  //
+  // Bug Next 14.2: ISR + notFound() em server component retorna HTTP 200
+  // com body not-found global. `force-dynamic` + notFound() em
+  // generateMetadata ajudam mas em modo dev o status ainda comita 200.
+  // Middleware emite 404 real ANTES do router pegar a rota, igual ao
+  // hard gate Regional acima. Lógica pura em
+  // `lib/middleware/territory-gate.ts` (testável isoladamente).
+  const territoryDecision = decideTerritoryGate(pathname);
+  if (territoryDecision.kind === "block-state-uf-invalid") {
+    const blocked = new NextResponse(null, { status: 404 });
+    blocked.headers.set("X-Middleware-State", "blocked-uf-invalid");
+    return respond(request, startedAt, blocked);
+  }
+  if (territoryDecision.kind === "block-legacy-state-uf-invalid") {
+    const blocked = new NextResponse(null, { status: 404 });
+    blocked.headers.set("X-Middleware-State", "blocked-uf-invalid-legacy");
+    return respond(request, startedAt, blocked);
+  }
+  if (territoryDecision.kind === "block-city-slug-invalid") {
+    const blocked = new NextResponse(null, { status: 404 });
+    blocked.headers.set("X-Middleware-City", "blocked-slug-invalid");
     return respond(request, startedAt, blocked);
   }
 
