@@ -349,6 +349,85 @@ describe("LocationRegionalPrompt — fora de cobertura", () => {
   });
 });
 
+describe("LocationRegionalPrompt — backend offline / 502 (fix 2026-05-21)", () => {
+  it("BFF responde 502 → mostra 'tente novamente' (NÃO 'fora de cobertura')", async () => {
+    setupGeolocationSuccess(-23.117, -46.55);
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: false, error: "backend_error" }), {
+        status: 502,
+      })
+    ) as unknown as typeof fetch;
+
+    render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => screen.getByTestId("location-prompt-fallback"));
+    expect(screen.getByText(/tente de novo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Não encontramos uma cidade próxima/i)).toBeNull();
+    expect(screen.getByTestId("location-prompt-retry-cta")).toBeInTheDocument();
+  });
+
+  it("clique em 'Tentar novamente' refaz o fluxo de geo", async () => {
+    setupGeolocationSuccess(-23.117, -46.55);
+    let attempt = 0;
+    global.fetch = vi.fn(async () => {
+      attempt += 1;
+      if (attempt === 1) {
+        return new Response(JSON.stringify({ ok: false, error: "backend_error" }), {
+          status: 502,
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+            state: { code: "SP", slug: "sp" },
+            region: {
+              slug: "atibaia-sp",
+              name: "Região de Atibaia",
+              href: "/carros-usados/regiao/atibaia-sp",
+            },
+            confidence: "high",
+            distanceKm: 3.2,
+          },
+        }),
+        { status: 200 }
+      );
+    }) as unknown as typeof fetch;
+
+    render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => screen.getByTestId("location-prompt-retry-cta"));
+    fireEvent.click(screen.getByTestId("location-prompt-retry-cta"));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp");
+    });
+  });
+
+  it("BFF responde 200 com data:null → ainda mostra 'fora de cobertura' (mensagem distinta)", async () => {
+    setupGeolocationSuccess(0, 0);
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
+    ) as unknown as typeof fetch;
+
+    render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => screen.getByTestId("location-prompt-fallback"));
+    expect(screen.getByText(/Não encontramos uma cidade próxima/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tente de novo/i)).toBeNull();
+  });
+});
+
 describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 2026-05-19)", () => {
   function mockResolvedAtibaia() {
     setupGeolocationSuccess(-23.117, -46.55);
@@ -385,6 +464,36 @@ describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 20
       expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp");
     });
     expect(pushMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("regionalEnabled=true + region=null → constrói /carros-usados/regiao/{citySlug} (fix 2026-05-21)", async () => {
+    setupGeolocationSuccess(-23.117, -46.55);
+    global.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+            state: { code: "SP", slug: "sp" },
+            // Backend resolveu a cidade mas não consolidou a região (rollout
+            // incompleto). Frontend deve construir a URL regional pelo slug.
+            region: null,
+            confidence: "medium",
+            distanceKm: 3.2,
+          },
+        }),
+        { status: 200 }
+      )
+    ) as unknown as typeof fetch;
+
+    render(
+      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
+    );
+    fireEvent.click(screen.getByTestId("location-prompt-trigger"));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp");
+    });
   });
 
   it("regionalEnabled=false → navega para /carros-em/{slug} (fallback cidade)", async () => {

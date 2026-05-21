@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { writeCityCookie, writeCityToLocalStorage } from "@/lib/city/city-storage";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import { writeTerritorialPrefs } from "@/lib/territory/territorial-prefs";
 
 /**
@@ -68,7 +69,8 @@ type PromptState =
   | { kind: "resolved"; data: ResolvedLocation }
   | { kind: "out_of_coverage" }
   | { kind: "denied" }
-  | { kind: "unavailable"; reason: string };
+  | { kind: "unavailable"; reason: string }
+  | { kind: "backend_error"; status: number };
 
 const GEO_TIMEOUT_MS = 10_000;
 
@@ -132,25 +134,51 @@ function MapIllustration({ className = "h-16 w-16 sm:h-20 sm:w-20" }: { classNam
   );
 }
 
+type ResolveOutcome =
+  | { kind: "ok"; data: ResolvedLocation }
+  | { kind: "empty" } // backend respondeu 200 mas sem cidade (fora de cobertura)
+  | { kind: "backend_error"; status: number }; // backend offline / token / outro 4xx-5xx
+
 async function postResolveLocation(
   latitude: number,
   longitude: number
-): Promise<ResolvedLocation | null> {
-  const response = await fetch("/api/location/resolve", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ latitude, longitude }),
-    credentials: "same-origin",
-    cache: "no-store",
-  });
+): Promise<ResolveOutcome> {
+  let response: Response;
+  try {
+    response = await fetch("/api/location/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ latitude, longitude }),
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch {
+    return { kind: "backend_error", status: 0 };
+  }
 
-  if (!response.ok) return null;
-  const envelope = (await response.json()) as {
-    ok?: boolean;
-    data?: ResolvedLocation | null;
-  };
-  if (!envelope?.ok) return null;
-  return envelope.data ?? null;
+  // BFF retorna 502 quando o backend interno está offline / token ausente.
+  // Tratamos como erro recuperável, NÃO como "fora de cobertura" — o usuário
+  // não merece ver "não encontramos sua cidade" quando o problema é nosso.
+  if (!response.ok) {
+    return { kind: "backend_error", status: response.status };
+  }
+
+  let envelope: { ok?: boolean; data?: ResolvedLocation | null };
+  try {
+    envelope = await response.json();
+  } catch {
+    return { kind: "backend_error", status: response.status };
+  }
+
+  if (!envelope?.ok) {
+    return { kind: "backend_error", status: response.status };
+  }
+
+  const data = envelope.data ?? null;
+  if (!data || !data.city) {
+    return { kind: "empty" };
+  }
+  return { kind: "ok", data };
 }
 
 function persistPrefsForCity(
@@ -204,23 +232,27 @@ export function LocationRegionalPrompt({
   const navigatedRef = useRef(false);
 
   /**
-   * Auto-navegação pós-consentimento — fix 2026-05-19.
+   * Auto-navegação pós-consentimento — fix 2026-05-19, robustecido 2026-05-21.
    *
    * Após `state.kind === "resolved"`, persiste as prefs e empurra o
-   * usuário para a página regional automaticamente. Antes dependia de
-   * um segundo clique no CTA "Ver ofertas da região", o que travava
-   * o fluxo: usuário concedia permissão e via apenas uma caixa nova
-   * com botões — sem perceber que precisava clicar de novo.
+   * usuário para a página REGIONAL automaticamente — Estado → Regional
+   * → Cidade do briefing 2026-05-21 manda que a Regional seja sempre o
+   * destino preferido quando uma cidade é detectada.
    *
    * Ordem de precedência do destino:
-   *   1. /carros-usados/regiao/{slug}   — quando regional habilitado
-   *      e a região consolidada existe (cidade-base + vizinhos).
-   *   2. /carros-em/{citySlug}          — fallback quando só temos a
-   *      cidade isolada (ex.: cidade sem região no banco ainda).
+   *   1. `region.href` quando o backend já consolidou a região (ideal).
+   *   2. `/carros-usados/regiao/{citySlug}` construído manualmente —
+   *      cobre o caso em que o backend resolveu a cidade mas o payload
+   *      `region` veio null (ex.: cobertura regional ainda em rollout).
+   *      A Página Regional é dinâmica por cidade, então qualquer slug
+   *      válido funciona.
+   *   3. `/carros-em/{citySlug}` apenas quando a flag regional está
+   *      OFF — sem Regional, Cidade é o único destino possível.
    *
-   * Os Links visuais do estado "resolved" continuam renderizados —
-   * servem como fallback caso o router falhe e como ponto de auditoria
-   * dos testes existentes (test:179-185 valida hrefs).
+   * Por que não usar diretamente `window.location.href`?
+   *   `router.push` mantém a hidratação do AppRouter e evita full reload
+   *   desnecessário. Fallback para `window.location.assign` cobre cenários
+   *   raros sem AppRouterContext (jsdom sem provider, hidratação falhada).
    */
   useEffect(() => {
     if (state.kind !== "resolved") return;
@@ -231,17 +263,16 @@ export function LocationRegionalPrompt({
 
     persistPrefsForCity(city, region, "geolocation");
 
-    const target =
-      regionalEnabled && region?.href
-        ? region.href
-        : `/carros-em/${encodeURIComponent(city.slug)}`;
+    let target: string;
+    if (regionalEnabled) {
+      target =
+        region?.href || slugToRegionHref(city.slug);
+    } else {
+      target = `/carros-em/${encodeURIComponent(city.slug)}`;
+    }
 
     navigatedRef.current = true;
 
-    // router pode ser null em ambientes sem AppRouterContext (ex.: jsdom
-    // sem provider). Mantemos fallback para `window.location.assign` —
-    // hard nav, mas garante que o redirect aconteça em produção mesmo
-    // se algo na hidratação falhar.
     if (router && typeof router.push === "function") {
       router.push(target);
     } else if (typeof window !== "undefined") {
@@ -266,12 +297,17 @@ export function LocationRegionalPrompt({
         const lng = position.coords.longitude;
 
         try {
-          const resolved = await postResolveLocation(lat, lng);
-          if (!resolved || !resolved.city) {
+          const outcome = await postResolveLocation(lat, lng);
+          if (outcome.kind === "ok") {
+            setState({ kind: "resolved", data: outcome.data });
+          } else if (outcome.kind === "empty") {
             setState({ kind: "out_of_coverage" });
-            return;
+          } else {
+            // backend_error — diferencia para o usuário entre "fora de
+            // cobertura" (cidade não existe na base) e "estamos com
+            // problema agora" (backend offline / token / 5xx).
+            setState({ kind: "backend_error", status: outcome.status });
           }
-          setState({ kind: "resolved", data: resolved });
         } catch {
           setState({ kind: "unavailable", reason: "network" });
         }
@@ -349,13 +385,22 @@ export function LocationRegionalPrompt({
     );
   }
 
-  if (state.kind === "denied" || state.kind === "unavailable" || state.kind === "out_of_coverage") {
+  if (
+    state.kind === "denied" ||
+    state.kind === "unavailable" ||
+    state.kind === "out_of_coverage" ||
+    state.kind === "backend_error"
+  ) {
     const message =
       state.kind === "denied"
         ? "Localização não autorizada. Você pode escolher sua cidade manualmente."
         : state.kind === "out_of_coverage"
           ? "Não encontramos uma cidade próxima na nossa cobertura. Escolha manualmente:"
-          : "Não foi possível usar sua localização. Escolha sua cidade manualmente.";
+          : state.kind === "backend_error"
+            ? "Não conseguimos localizar agora — tente de novo ou escolha sua cidade manualmente."
+            : "Não foi possível usar sua localização. Escolha sua cidade manualmente.";
+
+    const showRetry = state.kind === "backend_error" || state.kind === "unavailable";
 
     return (
       <section
@@ -364,13 +409,32 @@ export function LocationRegionalPrompt({
         data-testid="location-prompt-fallback"
       >
         <div className="rounded-xl border border-cnc-line bg-white p-4 sm:p-5">
-          <p className="text-sm text-cnc-muted">{message}</p>
-          <div className="mt-3">
+          <p className="text-sm text-cnc-muted" role="status" aria-live="polite">
+            {message}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {showRetry ? (
+              <button
+                type="button"
+                onClick={() => {
+                  navigatedRef.current = false;
+                  handleUseLocation();
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+                data-testid="location-prompt-retry-cta"
+              >
+                Tentar novamente
+              </button>
+            ) : null}
             {onOpenManualPicker ? (
               <button
                 type="button"
                 onClick={onOpenManualPicker}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+                className={
+                  showRetry
+                    ? "inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2.5 text-sm font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
+                    : "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+                }
                 data-testid="location-prompt-manual-cta"
               >
                 Escolher cidade
@@ -379,7 +443,11 @@ export function LocationRegionalPrompt({
             ) : (
               <Link
                 href={`/comprar/estado/${stateCode.toLowerCase()}`}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+                className={
+                  showRetry
+                    ? "inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2.5 text-sm font-semibold text-cnc-text transition hover:border-primary hover:text-primary"
+                    : "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+                }
                 data-testid="location-prompt-manual-cta"
               >
                 Ver ofertas de {stateName}
