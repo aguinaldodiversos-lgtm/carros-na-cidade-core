@@ -148,6 +148,12 @@ export function hasRestrictiveFilters(filters: AdsSearchFilters): boolean {
  * - força UF;
  * - remove qualquer resquício de território de cidade;
  * - aplica defaults de sort/page/limit coerentes com /comprar.
+ *
+ * Default `sort="relevance"` (briefing 2026-05-20): a ordenação canônica
+ * das páginas territoriais é "Mais relevantes" — combina peso comercial,
+ * proximidade da cidade-base, oportunidade, abaixo da FIPE, qualidade e
+ * recência. Trocar pra "recent" como default enfraqueceria a monetização
+ * (Destaque/Pro perderiam topo da SERP interna).
  */
 export function normalizeStateFilters(uf: string, searchParams: SearchParams): AdsSearchFilters {
   const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
@@ -158,7 +164,7 @@ export function normalizeStateFilters(uf: string, searchParams: SearchParams): A
   const next: AdsSearchFilters = {
     ...parsed,
     state: uf,
-    sort: hasExplicitSort ? parsed.sort || "recent" : "recent",
+    sort: hasExplicitSort ? parsed.sort || "relevance" : "relevance",
     page: parsed.page || 1,
     limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
   };
@@ -173,7 +179,8 @@ export function normalizeStateFilters(uf: string, searchParams: SearchParams): A
 /**
  * Normaliza filtros para o catálogo da cidade:
  * - força city_slug;
- * - remove state/city/city_id (evita AND redundante que pode zerar resultados).
+ * - remove state/city/city_id (evita AND redundante que pode zerar resultados);
+ * - default `sort="relevance"` (ver nota em `normalizeStateFilters`).
  */
 export function normalizeCityFilters(
   citySlug: string,
@@ -187,7 +194,7 @@ export function normalizeCityFilters(
   const next: AdsSearchFilters = {
     ...parsed,
     city_slug: citySlug,
-    sort: hasExplicitSort ? parsed.sort || "recent" : "recent",
+    sort: hasExplicitSort ? parsed.sort || "relevance" : "relevance",
     page: parsed.page || 1,
     limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
   };

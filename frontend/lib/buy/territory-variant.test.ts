@@ -71,9 +71,9 @@ describe("normalizeStateFilters — contrato Página Estadual", () => {
     expect(out.year_max).toBe(2024);
   });
 
-  it("aplica sort='recent' como default quando o usuário não pediu sort", () => {
+  it("aplica sort='relevance' como default (briefing 2026-05-20: ranking comercial primeiro)", () => {
     const out = normalizeStateFilters("SP", {});
-    expect(out.sort).toBe("recent");
+    expect(out.sort).toBe("relevance");
   });
 
   it("respeita sort explícito do usuário", () => {

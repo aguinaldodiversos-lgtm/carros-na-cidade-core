@@ -700,7 +700,7 @@ function VerticalLayout({
           {actions ? (
             <div>{actions}</div>
           ) : isShowcase ? (
-            <span className={ctaClass}>Ver Detalhes</span>
+            <span className={ctaClass}>Ver oferta</span>
           ) : null}
         </div>
       </div>
