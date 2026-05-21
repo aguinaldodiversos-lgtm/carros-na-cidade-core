@@ -173,8 +173,10 @@ export default function BuyMarketplacePageClient({
 
   const emptyContext = {
     variant,
-    citySlug: variant === "cidade" ? city.slug : undefined,
-    cityName: variant === "cidade" ? city.name : undefined,
+    citySlug:
+      variant === "cidade" || variant === "regional" ? city.slug : undefined,
+    cityName:
+      variant === "cidade" || variant === "regional" ? city.name : undefined,
     stateUf: variant === "nacional" ? undefined : stateUf || city.state,
     hasFilters,
   };
@@ -321,10 +323,13 @@ export default function BuyMarketplacePageClient({
 
       {/*
         Bloco SEO institucional só faz sentido com cidade real (territorial).
-        No modo "nacional" não temos territory; suprimir o bloco evita texto
-        com "em Brasil (BR)" hard-coded.
+        No modo "nacional" não temos territory; no modo "regional" a página
+        injeta seus próprios blocos SEO regionais via children — suprimir aqui
+        evita duplicação. Em cidade/estadual mantém o comportamento legado.
       */}
-      {variant !== "nacional" ? <CatalogSeoBlock city={city} brands={brandFacets} /> : null}
+      {variant === "cidade" || variant === "estadual" ? (
+        <CatalogSeoBlock city={city} brands={brandFacets} />
+      ) : null}
     </BuyPageShell>
   );
 }

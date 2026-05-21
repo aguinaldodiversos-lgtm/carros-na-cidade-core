@@ -26,13 +26,17 @@ import {
  * - `estadual`: catálogo de um UF (`/comprar/estado/[uf]`). Vitrine padrão
  *   quando o usuário não traz cidade explícita — `/comprar` redireciona
  *   para `/comprar/estado/[uf]` resolvendo a UF via cookie/default.
- * - `cidade`: catálogo de uma cidade (`/comprar/cidade/[slug]`).
+ * - `cidade`: catálogo de uma cidade (`/carros-em/[slug]`, canônica).
+ * - `regional`: catálogo da região de uma cidade-base
+ *   (`/carros-usados/regiao/[slug]`). Inclui a cidade-base + cidades
+ *   próximas dentro do raio configurável; cidade-base prioriza só
+ *   dentro do mesmo tier comercial (briefing 2026-05-20).
  * - `nacional`: fallback técnico do `BuyMarketplacePageClient` para empty
  *   states e telas que não têm contexto territorial. Nenhuma rota pública
  *   entra por aqui — o ponto de entrada (`/comprar`) sempre redireciona
  *   para `estadual` ou `cidade`.
  */
-export type ComprarVariant = "estadual" | "cidade" | "nacional";
+export type ComprarVariant = "estadual" | "cidade" | "regional" | "nacional";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 

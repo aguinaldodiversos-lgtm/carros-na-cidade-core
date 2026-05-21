@@ -25,8 +25,8 @@ import { stateNameFromUf } from "@/lib/buy/territory-variant";
  */
 
 type EmptyStateContext = {
-  variant: "cidade" | "estadual" | "nacional";
-  /** Slug da cidade ativa (cidade variant) ou null nas demais. */
+  variant: "cidade" | "regional" | "estadual" | "nacional";
+  /** Slug da cidade ativa (cidade/regional) ou null nas demais. */
   citySlug?: string;
   /** Nome amigável da cidade ativa, quando aplicável. */
   cityName?: string;
@@ -47,6 +47,9 @@ function buildEmptyTitle(ctx: EmptyStateContext): string {
   if (ctx.variant === "cidade" && ctx.cityName) {
     return `Ainda não há veículos cadastrados em ${ctx.cityName}`;
   }
+  if (ctx.variant === "regional" && ctx.cityName) {
+    return `Ainda não há veículos na região de ${ctx.cityName}`;
+  }
   if (ctx.variant === "estadual" && ctx.stateUf) {
     return `Ainda não há veículos cadastrados em ${stateNameFromUf(ctx.stateUf)}`;
   }
@@ -60,6 +63,9 @@ function buildEmptyDescription(ctx: EmptyStateContext): string {
   if (ctx.variant === "cidade") {
     return "Nenhum anúncio ativo no momento. Veja o catálogo do estado, troque de cidade ou seja o primeiro a anunciar aqui.";
   }
+  if (ctx.variant === "regional") {
+    return "Nenhum anúncio ativo nesta região no momento. Veja o catálogo do estado ou anuncie agora.";
+  }
   if (ctx.variant === "estadual") {
     return "Nenhum anúncio ativo no momento neste estado. Veja o catálogo Brasil ou anuncie agora.";
   }
@@ -70,30 +76,36 @@ function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
   const title = buildEmptyTitle(ctx);
   const description = buildEmptyDescription(ctx);
 
-  // Ação primária: limpar filtros (cidade/estado mantém pathname para
-  // preservar canonical; nacional sempre vai para /comprar limpo).
+  // Ação primária: limpar filtros (cidade/regional/estado mantém pathname
+  // para preservar canonical; nacional sempre vai para /comprar limpo).
   const clearFiltersHref =
     ctx.variant === "cidade" && ctx.citySlug
-      ? `/comprar/cidade/${ctx.citySlug}`
-      : ctx.variant === "estadual" && ctx.stateUf
-        ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
-        : "/comprar";
+      ? `/carros-em/${ctx.citySlug}`
+      : ctx.variant === "regional" && ctx.citySlug
+        ? `/carros-usados/regiao/${ctx.citySlug}`
+        : ctx.variant === "estadual" && ctx.stateUf
+          ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
+          : "/comprar";
 
-  // Ação secundária: ampliar escopo. Cidade → estado, estado → Brasil,
-  // nacional → não tem (já é o topo).
+  // Ação secundária: ampliar escopo. Cidade → região (ou estado),
+  // regional → estado, estado → Brasil, nacional → não tem.
   const broaderHref =
     ctx.variant === "cidade" && ctx.stateUf
       ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
-      : ctx.variant === "estadual"
-        ? "/comprar"
-        : null;
+      : ctx.variant === "regional" && ctx.stateUf
+        ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
+        : ctx.variant === "estadual"
+          ? "/comprar"
+          : null;
 
   const broaderLabel =
     ctx.variant === "cidade" && ctx.stateUf
       ? `Ver ofertas em ${stateNameFromUf(ctx.stateUf)}`
-      : ctx.variant === "estadual"
-        ? "Ver catálogo Brasil"
-        : null;
+      : ctx.variant === "regional" && ctx.stateUf
+        ? `Ver ofertas em ${stateNameFromUf(ctx.stateUf)}`
+        : ctx.variant === "estadual"
+          ? "Ver catálogo Brasil"
+          : null;
 
   return (
     <Card

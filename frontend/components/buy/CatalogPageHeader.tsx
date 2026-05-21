@@ -242,6 +242,15 @@ export function CatalogPageHeader({
         { label: `${city.name} (${city.state})` },
       ];
     }
+    if (variant === "regional") {
+      return [
+        { label: "Home", href: "/" },
+        { label: "Comprar", href: "/comprar" },
+        { label: city.state, href: `/comprar/estado/${city.state.toLowerCase()}` },
+        { label: city.name, href: `/carros-em/${city.slug}` },
+        { label: "Região" },
+      ];
+    }
     if (variant === "nacional") {
       return [{ label: "Home", href: "/" }, { label: "Comprar" }];
     }
@@ -250,7 +259,7 @@ export function CatalogPageHeader({
       { label: "Comprar", href: "/comprar" },
       { label: "Catálogo" },
     ];
-  }, [variant, city.name, city.state]);
+  }, [variant, city.name, city.state, city.slug]);
 
   const stateOptions = useMemo(() => {
     const ufs = BRAZIL_UFS.map((uf) => ({
@@ -337,6 +346,10 @@ export function CatalogPageHeader({
               <>
                 Carros usados em <span className="text-primary">{city.name}</span>
               </>
+            ) : variant === "regional" ? (
+              <>
+                Carros usados em <span className="text-primary">{city.name}</span> e região
+              </>
             ) : variant === "nacional" ? (
               <>
                 Carros usados <span className="text-primary">no Brasil</span>
@@ -352,9 +365,11 @@ export function CatalogPageHeader({
               <span className="tabular-nums">{formatTotal(totalResults)}</span>
               {variant === "cidade"
                 ? " ofertas locais"
-                : variant === "nacional"
-                  ? " ofertas no Brasil"
-                  : " ofertas no estado"}
+                : variant === "regional"
+                  ? " ofertas na região"
+                  : variant === "nacional"
+                    ? " ofertas no Brasil"
+                    : " ofertas no estado"}
             </Badge>
             {variant === "cidade" ? (
               <>
@@ -362,6 +377,12 @@ export function CatalogPageHeader({
                 <strong className="text-cnc-text-strong">
                   {city.name} - {city.state}
                 </strong>
+              </>
+            ) : variant === "regional" ? (
+              <>
+                <span>em</span>
+                <strong className="text-cnc-text-strong">{city.name}</strong>
+                <span>e cidades próximas</span>
               </>
             ) : variant === "nacional" ? (
               <span>refine por estado ou cidade quando quiser</span>
@@ -394,6 +415,31 @@ export function CatalogPageHeader({
           </div>
         ) : null}
 
+        {variant === "regional" && city.slug ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            {/* CTA primário pill: caminho de "restrição" para a Página
+                Cidade (apenas anúncios da cidade-base). Outlined igual ao
+                CTA da Cidade — hierarquia coerente no padrão visual. */}
+            <Link
+              href={`/carros-em/${encodeURIComponent(city.slug)}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 font-semibold text-primary transition hover:border-primary hover:bg-primary-soft/80"
+              data-testid="regional-city-cta"
+              aria-label={`Ver apenas carros em ${city.name}`}
+            >
+              <PinSmallIcon />
+              Ver apenas carros em {city.name}
+            </Link>
+            <Link
+              href={buildStatePath(activeStateUf, filters)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-cnc-line bg-cnc-surface px-3 py-1.5 font-semibold text-primary transition hover:border-primary hover:bg-primary-soft"
+              data-testid="regional-state-cta"
+            >
+              <span aria-hidden="true">←</span>
+              Ampliar para {stateName}
+            </Link>
+          </div>
+        ) : null}
+
         {/* Busca protagonista */}
         <div className="mt-4">
           <SearchBar
@@ -403,9 +449,11 @@ export function CatalogPageHeader({
             placeholder={
               variant === "cidade"
                 ? "Buscar marca, modelo ou versão nesta cidade"
-                : variant === "nacional"
-                  ? "Buscar marca, modelo ou versão no Brasil"
-                  : `Buscar marca, modelo ou cidade em ${stateName}`
+                : variant === "regional"
+                  ? "Buscar marca, modelo ou versão nesta região"
+                  : variant === "nacional"
+                    ? "Buscar marca, modelo ou versão no Brasil"
+                    : `Buscar marca, modelo ou cidade em ${stateName}`
             }
             ariaLabel="Buscar no catálogo"
             filterButton={
@@ -464,7 +512,7 @@ export function CatalogPageHeader({
           </div>
 
           <div className="flex items-center gap-2">
-            {variant !== "cidade" ? (
+            {variant === "estadual" || variant === "nacional" ? (
               <Select
                 aria-label="Estado"
                 value={activeStateUf}

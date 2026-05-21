@@ -27,6 +27,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *    do status ser comitado, garantindo 404 real. `Page` mantém os
  *    checks como defesa em profundidade.
  *
+ * 5. PR 2 (briefing 2026-05-20): a página passou a usar
+ *    `loadRegionalCatalogData` que retorna `null` quando a região
+ *    não é resolvível. O contrato 404 permanece o mesmo: flag
+ *    desligada OU loader retorna null → `notFound()` em ambos
+ *    generateMetadata e Page.
+ *
  * Anti-regressão coberta aqui:
  *   - `dynamic === "force-dynamic"` (sem ISR).
  *   - `revalidate` ausente (incompatível com o fix).
@@ -37,8 +43,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *     controlam corretamente `robots` e `canonical` (PR 2).
  */
 
-// `React.cache` faz parte do Server Components runtime — em ambiente
-// Node de teste ele simplesmente não está disponível. Stub: identidade.
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
@@ -49,19 +53,12 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("next/navigation", () => ({
   notFound: () => {
-    // Em produção, notFound() lança um erro especial que Next intercepta
-    // e converte em response 404. Aqui usamos uma sentinel previsível.
     throw new Error("NEXT_NOT_FOUND");
   },
 }));
 
-vi.mock("@/lib/regions/fetch-region", () => ({
-  fetchRegionByCitySlug: vi.fn().mockResolvedValue(null),
-  regionToAdsSearchFilters: vi.fn().mockReturnValue({ city_slugs: [] }),
-}));
-
-vi.mock("@/lib/search/ads-search", () => ({
-  fetchAdsSearch: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+vi.mock("@/lib/buy/region-catalog-loader", () => ({
+  loadRegionalCatalogData: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/seo/site", () => ({
@@ -72,8 +69,6 @@ vi.mock("@/lib/env/feature-flags", () => ({
   isRegionalPageEnabled: vi.fn().mockReturnValue(false),
   isRegionalPageIndexable: vi.fn().mockReturnValue(false),
   isRegionalPageCanonicalSelf: vi.fn().mockReturnValue(false),
-  // Fase 6: helper combinado. Por default segue o INDEXABLE; testes
-  // que precisem do threshold REGIONAL_INDEX_MIN_ADS sobrescrevem.
   shouldIndexRegionalPage: vi.fn().mockReturnValue(false),
   regionalIndexMinAds: vi.fn().mockReturnValue(0),
 }));
@@ -102,25 +97,67 @@ vi.mock("@/lib/territory/territory-resolver", () => ({
   }),
 }));
 
-vi.mock("./region-page-view", () => ({
-  RegionPageView: () => null,
+vi.mock("@/lib/regions/regional-facets", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/regions/regional-facets")>();
+  return {
+    ...actual,
+    pickDynamicOgImage: vi.fn().mockReturnValue(null),
+  };
+});
+
+// Componentes pesados não importam — só precisamos do shape do module.
+vi.mock("@/components/buy/BuyMarketplacePageClient", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+vi.mock("@/components/territorial/RegionalAuxiliaryBlocks", () => ({
+  RegionalAuxiliaryBlocks: () => null,
+}));
+
+vi.mock("./RegionFAQ", () => ({
+  RegionFAQ: () => null,
+}));
+
+vi.mock("@/lib/seo/region-structured-data", () => ({
+  buildRegionStructuredDataBlocks: vi.fn().mockReturnValue([]),
 }));
 
 import * as pageModule from "./page";
 
-const VALID_REGION = {
-  base: { id: 100, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-  members: [
-    {
-      city_id: 200,
-      slug: "braganca-paulista-sp",
-      name: "Bragança Paulista",
-      state: "SP",
-      layer: 1,
-      distance_km: 22.1,
-    },
-  ],
-  radius_km: 80,
+const VALID_CATALOG = {
+  region: {
+    base: { id: 100, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+    members: [
+      {
+        city_id: 200,
+        slug: "braganca-paulista-sp",
+        name: "Bragança Paulista",
+        state: "SP",
+        layer: 1,
+        distance_km: 22.1,
+      },
+    ],
+    radius_km: 80,
+  },
+  city: {
+    slug: "atibaia-sp",
+    name: "Atibaia",
+    state: "SP",
+    label: "Atibaia (SP)",
+  },
+  stateUf: "SP",
+  radiusKm: 80,
+  filters: { city_slugs: ["atibaia-sp", "braganca-paulista-sp"], state: "SP" },
+  initialResults: {
+    success: true,
+    ok: true,
+    data: [],
+    pagination: { page: 1, limit: 20, total: 0, totalPages: 1 },
+    error: null,
+  },
+  initialFacets: { brands: [], models: [], fuelTypes: [], bodyTypes: [] },
 };
 
 afterEach(() => {
@@ -155,28 +192,16 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
-  it("flag = 'true' + region null (slug inexistente) → chama notFound()", async () => {
+  it("flag = 'true' + loader retorna null (slug inexistente) → chama notFound()", async () => {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
+    const { loadRegionalCatalogData } = await import(
+      "@/lib/buy/region-catalog-loader"
+    );
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce(null);
+    vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(null);
 
     await expect(
       pageModule.generateMetadata({ params: { slug: "regiao-fake-zz" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
-  });
-
-  it("flag = 'true' + region.base ausente → chama notFound()", async () => {
-    const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
-    vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce({
-      base: null,
-      members: [],
-    } as unknown as null);
-
-    await expect(
-      pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 });
@@ -184,9 +209,13 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
 describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (PR 2)", () => {
   async function buildMetadata() {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
+    const { loadRegionalCatalogData } = await import(
+      "@/lib/buy/region-catalog-loader"
+    );
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce(VALID_REGION as never);
+    vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(
+      VALID_CATALOG as never
+    );
 
     return pageModule.generateMetadata({ params: { slug: "atibaia-sp" } });
   }
@@ -244,6 +273,21 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
     expect(md.robots).toMatchObject({ index: true, follow: true });
     expect(md.alternates?.canonical).toContain("/carros-usados/regiao/atibaia-sp");
   });
+
+  it("title e description seguem o padrão do briefing", async () => {
+    const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
+      "@/lib/env/feature-flags"
+    );
+    vi.mocked(shouldIndexRegionalPage).mockReturnValue(true);
+    vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(true);
+
+    const md = await buildMetadata();
+
+    expect(md.title).toBe("Carros usados em Atibaia e região | Carros na Cidade");
+    expect(md.description).toBe(
+      "Veja ofertas de carros usados em Atibaia e cidades próximas. Compare veículos de lojas e particulares na região."
+    );
+  });
 });
 
 describe("Page (default export) — defesa em profundidade", () => {
@@ -256,28 +300,16 @@ describe("Page (default export) — defesa em profundidade", () => {
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
-  it("flag true + region null → notFound()", async () => {
+  it("flag true + loader retorna null → notFound()", async () => {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
+    const { loadRegionalCatalogData } = await import(
+      "@/lib/buy/region-catalog-loader"
+    );
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce(null);
+    vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(null);
 
     await expect(
       pageModule.default({ params: { slug: "regiao-fake-zz" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
-  });
-
-  it("flag true + region.base ausente → notFound()", async () => {
-    const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { fetchRegionByCitySlug } = await import("@/lib/regions/fetch-region");
-    vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    vi.mocked(fetchRegionByCitySlug).mockResolvedValueOnce({
-      base: null,
-      members: [],
-    } as unknown as null);
-
-    await expect(
-      pageModule.default({ params: { slug: "atibaia-sp" } })
     ).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 });
