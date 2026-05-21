@@ -10,6 +10,10 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = ORIGINAL_ENV;
+  // vi.unstubAllEnvs() limpa os stubs de NODE_ENV/etc. setados via
+  // vi.stubEnv — necessário porque Node 20+ marca NODE_ENV como readonly
+  // no tipo NodeJS.ProcessEnv, então não dá pra atribuir direto.
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -70,7 +74,7 @@ describe("buildInternalBackendHeaders", () => {
   });
 
   it("warning em producao quando token ausente, so 1 vez", async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     delete process.env.INTERNAL_API_TOKEN;
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { buildInternalBackendHeaders } = await loadHelper();
@@ -83,7 +87,7 @@ describe("buildInternalBackendHeaders", () => {
   });
 
   it("nao emite warning em dev quando token ausente", async () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
     delete process.env.INTERNAL_API_TOKEN;
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { buildInternalBackendHeaders } = await loadHelper();

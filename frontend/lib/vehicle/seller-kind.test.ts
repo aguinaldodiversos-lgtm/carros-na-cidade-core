@@ -20,11 +20,15 @@ describe("resolveSellerKind — backend trust pass tem precedência", () => {
   });
 
   it("respeita seller_kind='private' do backend mesmo com nome de loja", () => {
+    // `dealership_name` é um campo legado do payload que NÃO faz parte
+    // do contrato `SellerKindInput` — o mapper canônico ignora nomes
+    // comerciais por design. Passamos via cast para confirmar que a
+    // presença do campo no payload bruto não muda o veredito.
     expect(
       resolveSellerKind({
         seller_kind: "private",
         dealership_name: "AutoCar",
-      })
+      } as Parameters<typeof resolveSellerKind>[0])
     ).toBe("private");
   });
 
@@ -73,20 +77,26 @@ describe("resolveSellerKind — heurística por nome NÃO é usada (regressão '
   it("dealership_name preenchido SEM seller_kind/dealership_id/CNPJ → private", () => {
     // Caso histórico: backend antigo deixava `ittmotors` em
     // `dealership_name` mas não tinha advertiser registrado e o usuário
-    // era CPF. Frontend NUNCA pode classificar como loja por nome.
+    // era CPF. Frontend NUNCA pode classificar como loja por nome — o
+    // tipo canônico `SellerKindInput` propositalmente NÃO inclui
+    // `dealership_name`, então passamos via cast para o teste exercer
+    // o payload bruto.
     expect(
       resolveSellerKind({
         dealership_name: "ittmotors",
         account_type: "CPF",
-      })
+      } as Parameters<typeof resolveSellerKind>[0])
     ).toBe("private");
   });
 
   it("seller_name com nome comercial mas sem outros sinais → private", () => {
+    // Mesma razão acima: `seller_name` é campo legado fora do contrato
+    // canônico do mapper — o teste confirma que sua presença no payload
+    // bruto não promove o anunciante a dealer.
     expect(
       resolveSellerKind({
         seller_name: "AutoCar Veículos LTDA",
-      })
+      } as Parameters<typeof resolveSellerKind>[0])
     ).toBe("private");
   });
 });

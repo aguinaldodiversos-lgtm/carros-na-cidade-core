@@ -20,6 +20,10 @@ beforeEach(() => {
 function makeRequest(_id: string) {
   return {
     nextUrl: { origin: "https://example.com" },
+    // `headers` é exigido por `buildBffBackendForwardHeaders` para
+    // extrair o IP do visitante. Sem ele o route handler explode e o
+    // teste vê 502 em vez do status real propagado do backend mockado.
+    headers: new Headers(),
   } as unknown as import("next/server").NextRequest;
 }
 

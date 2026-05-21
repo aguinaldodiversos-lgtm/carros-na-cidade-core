@@ -24,6 +24,10 @@ function makeRequest(body: Record<string, unknown>) {
   return {
     json: async () => body,
     nextUrl: { origin: "https://example.com" },
+    // `headers` é exigido por `buildBffBackendForwardHeaders` para
+    // extrair o IP do visitante (x-forwarded-for/cf-connecting-ip/etc).
+    // Sem ele o route handler explode no try{} e retorna 502.
+    headers: new Headers(),
   } as unknown as import("next/server").NextRequest;
 }
 
