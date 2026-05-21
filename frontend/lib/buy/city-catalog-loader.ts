@@ -42,6 +42,22 @@ export interface CityCatalogLoadResult {
   };
 }
 
+export interface LoadCityCatalogOptions {
+  /**
+   * Quando true (default), troca silenciosamente os resultados por
+   * anúncios de uma cidade-vizinha quando a cidade pedida está sem
+   * estoque — comportamento legado de `/comprar/cidade/[slug]` que
+   * dispara um aviso amarelo "mostrando ofertas em X".
+   *
+   * Na canônica `/carros-em/[slug]` esse fallback é DESLIGADO
+   * (briefing territorial 2026-05-20): a listagem principal só pode
+   * conter anúncios da cidade. Quando há poucos/zero, o componente
+   * `<AlsoInRegionBlock>` oferece a saída regional num bloco
+   * visualmente separado, preservando a integridade da "prova local".
+   */
+  applyTerritoryFallback?: boolean;
+}
+
 function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
   return {
     success: false,
@@ -88,8 +104,10 @@ function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
 
 export async function loadCityCatalogData(
   slug: string,
-  searchParams: SearchParams = {}
+  searchParams: SearchParams = {},
+  options: LoadCityCatalogOptions = {}
 ): Promise<CityCatalogLoadResult> {
+  const { applyTerritoryFallback = true } = options;
   const safeSlug = String(slug || "").trim();
   const ref = await resolveCityMeta(safeSlug);
   const ctx = cityContextFromRef(ref) || cityContextFromSlug(safeSlug);
@@ -112,7 +130,11 @@ export async function loadCityCatalogData(
 
   let fallbackTerritory: CityCatalogLoadResult["fallbackTerritory"];
 
-  if (initialResults.pagination.total === 0 && !hasRestrictiveFilters(filters)) {
+  if (
+    applyTerritoryFallback &&
+    initialResults.pagination.total === 0 &&
+    !hasRestrictiveFilters(filters)
+  ) {
     const fallback = await fetchCatalogAdsTerritoryFallback(safeSlug);
     if (fallback && fallback.mode === "fallback" && fallback.slug && fallback.slug !== safeSlug) {
       const fallbackFilters: AdsSearchFilters = { ...filters, city_slug: fallback.slug };

@@ -69,15 +69,19 @@ export default async function CarrosEmCidadePage({
 
   const [model, catalog] = await Promise.all([
     loadSeoModel(slug),
-    loadCityCatalogData(slug, searchParams),
+    // applyTerritoryFallback=false: a Página Cidade canônica é "prova
+    // local" — listagem principal nunca mistura anúncios de cidades
+    // vizinhas. Quando o estoque é baixo/zero, o <AlsoInRegionBlock>
+    // oferece a saída regional num bloco visualmente separado.
+    loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
   ]);
 
-  const { ctx, filters, initialResults, initialFacets, fallbackTerritory } = catalog;
+  const { ctx, filters, initialResults, initialFacets } = catalog;
 
   const totalAds = initialResults.pagination.total || 0;
   const noFilters = !hasRestrictiveFilters(filters);
   const showAlsoInRegion =
-    regionalEnabled && noFilters && !fallbackTerritory && totalAds < FEW_ADS_THRESHOLD;
+    regionalEnabled && noFilters && totalAds < FEW_ADS_THRESHOLD;
 
   // BreadcrumbList canônico — usa o builder existente do LocalSeoLanding
   // (mesma estrutura usada na variant SEO stand-alone). ItemList só é
@@ -87,20 +91,22 @@ export default async function CarrosEmCidadePage({
   const jsonLd = buildLocalSeoJsonLd(model);
   const breadcrumbJsonLd = buildLocalSeoBreadcrumbJsonLd(model);
 
-  const itemListJsonLd = fallbackTerritory
-    ? null
-    : {
-        "@context": "https://schema.org",
-        "@type": "ItemList",
-        name: `Carros usados em ${ctx.name}`,
-        numberOfItems: totalAds,
-        itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
-          "@type": "ListItem",
-          position: index + 1,
-          url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
-          name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
-        })),
-      };
+  // Sem fallback territorial nesta rota: ItemList sempre reflete a
+  // cidade pedida. Quando não há anúncios, emitimos ItemList vazio mas
+  // numberOfItems=0 é semântico para o Google ("essa cidade existe,
+  // está vazia agora").
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `Carros usados em ${ctx.name}`,
+    numberOfItems: totalAds,
+    itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
+      name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
+    })),
+  };
 
   return (
     <>
@@ -114,12 +120,10 @@ export default async function CarrosEmCidadePage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       ) : null}
-      {itemListJsonLd ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-        />
-      ) : null}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
 
       <BuyMarketplacePageClient
         initialResults={initialResults}
@@ -128,7 +132,6 @@ export default async function CarrosEmCidadePage({
         city={ctx}
         variant="cidade"
         stateUf={ctx.state}
-        fallbackTerritory={fallbackTerritory}
         regionalEnabled={regionalEnabled}
       />
 
