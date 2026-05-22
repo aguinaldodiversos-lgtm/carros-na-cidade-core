@@ -71,19 +71,12 @@ function findAction<T extends PublicationAction["id"]>(
   actions: PublicationAction[],
   id: T
 ): Extract<PublicationAction, { id: T }> | undefined {
-  return actions.find((a) => a.id === id) as
-    | Extract<PublicationAction, { id: T }>
-    | undefined;
+  return actions.find((a) => a.id === id) as Extract<PublicationAction, { id: T }> | undefined;
 }
 
-export default function PublicationPlanSelector({
-  adId,
-  adSummary,
-}: PublicationPlanSelectorProps) {
+export default function PublicationPlanSelector({ adId, adSummary }: PublicationPlanSelectorProps) {
   const [state, setState] = useState<FetchState>({ status: "loading" });
-  const [pendingAction, setPendingAction] = useState<PublicationAction["id"] | null>(
-    null
-  );
+  const [pendingAction, setPendingAction] = useState<PublicationAction["id"] | null>(null);
   const [actionError, setActionError] = useState<string>("");
 
   useEffect(() => {
@@ -140,10 +133,7 @@ export default function PublicationPlanSelector({
 
   if (state.status === "error") {
     return (
-      <section
-        data-testid="publication-plan-error"
-        className="mx-auto max-w-3xl px-4 py-10"
-      >
+      <section data-testid="publication-plan-error" className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900">
           {state.message}
         </div>
@@ -165,10 +155,7 @@ export default function PublicationPlanSelector({
 
   if (!actions.length) {
     return (
-      <section
-        data-testid="publication-plan-empty"
-        className="mx-auto max-w-3xl px-4 py-10"
-      >
+      <section data-testid="publication-plan-empty" className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
           Nenhuma ação disponível para este anúncio no momento.
         </div>
@@ -197,10 +184,7 @@ export default function PublicationPlanSelector({
 
       <RulesCard />
 
-      <h2
-        className="mt-8 mb-3 text-xl font-extrabold sm:text-2xl"
-        style={{ color: TEXT_STRONG }}
-      >
+      <h2 className="mt-8 mb-3 text-xl font-extrabold sm:text-2xl" style={{ color: TEXT_STRONG }}>
         Escolha como publicar
       </h2>
 
@@ -230,9 +214,7 @@ export default function PublicationPlanSelector({
             adLimit={ad_limit}
             disabledByPending={pendingAction !== null}
             isPending={pendingAction === "publish_with_subscription"}
-            onPublish={() =>
-              handlePublishWithSubscription(adId, setPendingAction, setActionError)
-            }
+            onPublish={() => handlePublishWithSubscription(adId, setPendingAction, setActionError)}
           />
         ) : null}
 
@@ -244,9 +226,7 @@ export default function PublicationPlanSelector({
             label="Lojista Start"
             description="Plano mensal para CNPJ verificado: 20 anúncios/mês, prioridade no ranking."
             ctaLabel="Assinar Start"
-            onSubscribe={() =>
-              handleSubscribe(subStart.plan_id, setPendingAction, setActionError)
-            }
+            onSubscribe={() => handleSubscribe(subStart.plan_id, setPendingAction, setActionError)}
           />
         ) : null}
 
@@ -258,9 +238,7 @@ export default function PublicationPlanSelector({
             label="Lojista Pro"
             description="Plano mensal para CNPJ verificado: anúncios ilimitados (limite operacional), maior visibilidade."
             ctaLabel="Assinar Pro"
-            onSubscribe={() =>
-              handleSubscribe(subPro.plan_id, setPendingAction, setActionError)
-            }
+            onSubscribe={() => handleSubscribe(subPro.plan_id, setPendingAction, setActionError)}
           />
         ) : null}
 
@@ -341,10 +319,7 @@ function AdSummaryCard({
           </h2>
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {price !== null ? (
-              <span
-                className="text-xl font-extrabold sm:text-2xl"
-                style={{ color: PRIMARY }}
-              >
+              <span className="text-xl font-extrabold sm:text-2xl" style={{ color: PRIMARY }}>
                 {formatBrlFromReais(price)}
               </span>
             ) : null}
@@ -374,10 +349,7 @@ function ReviewDoneCard() {
       className="mt-4 rounded-3xl border bg-white p-5 shadow-[0_3px_18px_rgba(10,20,40,0.04)]"
       style={{ borderColor: SURFACE_LINE }}
     >
-      <h3
-        className="text-base font-extrabold sm:text-lg"
-        style={{ color: TEXT_STRONG }}
-      >
+      <h3 className="text-base font-extrabold sm:text-lg" style={{ color: TEXT_STRONG }}>
         Revisão concluída
       </h3>
       <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2" style={{ color: TEXT_STRONG }}>
@@ -410,16 +382,10 @@ function RulesCard() {
       className="mt-4 rounded-3xl border p-5"
       style={{ borderColor: "#FFE0B2", backgroundColor: "#FFF7EC" }}
     >
-      <h3
-        className="text-base font-extrabold sm:text-lg"
-        style={{ color: "#B45309" }}
-      >
+      <h3 className="text-base font-extrabold sm:text-lg" style={{ color: "#B45309" }}>
         Regras importantes
       </h3>
-      <ul
-        className="mt-3 space-y-2 text-sm leading-6"
-        style={{ color: "#7C4A03" }}
-      >
+      <ul className="mt-3 space-y-2 text-sm leading-6" style={{ color: "#7C4A03" }}>
         {rules.map((rule) => (
           <li key={rule} className="flex items-start gap-2">
             <span aria-hidden>•</span>
@@ -452,20 +418,17 @@ function PublishFreeCard({
       className="rounded-3xl border bg-white p-5 shadow-[0_3px_18px_rgba(10,20,40,0.04)]"
       style={{ borderColor: SURFACE_LINE }}
     >
-      <h3
-        className="text-lg font-extrabold sm:text-xl"
-        style={{ color: TEXT_STRONG }}
-      >
+      <h3 className="text-lg font-extrabold sm:text-xl" style={{ color: TEXT_STRONG }}>
         Publicar grátis
       </h3>
       <p className="mt-1 text-sm" style={{ color: MUTED }}>
-        Mantém seu anúncio ativo no plano gratuito atual. Você pode comprar Destaque
-        depois pelo painel.
+        Mantém seu anúncio ativo no plano gratuito atual. Você pode comprar Destaque depois pelo
+        painel.
       </p>
       {adLimit.total > 0 ? (
         <p className="mt-2 text-xs font-semibold" style={{ color: MUTED }}>
-          {adLimit.used}/{adLimit.total} anúncios usados • {adLimit.available}{" "}
-          disponível(is) no plano atual
+          {adLimit.used}/{adLimit.total} anúncios usados • {adLimit.available} disponível(is) no
+          plano atual
         </p>
       ) : null}
       {!action.enabled && action.reason ? (
@@ -503,8 +466,7 @@ function PublishWithSubscriptionCard({
   onPublish: () => void;
 }) {
   const enabled = action.enabled && !disabledByPending;
-  const planLabel =
-    action.plan_id === "cnpj-store-pro" ? "Lojista Pro" : "Lojista Start";
+  const planLabel = action.plan_id === "cnpj-store-pro" ? "Lojista Pro" : "Lojista Start";
   return (
     <article
       data-action="publish_with_subscription"
@@ -513,10 +475,7 @@ function PublishWithSubscriptionCard({
       style={{ borderColor: SURFACE_LINE }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3
-          className="text-lg font-extrabold sm:text-xl"
-          style={{ color: TEXT_STRONG }}
-        >
+        <h3 className="text-lg font-extrabold sm:text-xl" style={{ color: TEXT_STRONG }}>
           Publicar com meu plano
         </h3>
         <span
@@ -531,8 +490,8 @@ function PublishWithSubscriptionCard({
       </p>
       {adLimit.total > 0 ? (
         <p className="mt-2 text-xs font-semibold" style={{ color: MUTED }}>
-          {adLimit.used}/{adLimit.total} anúncios usados • {adLimit.available}{" "}
-          disponível(is) no plano atual
+          {adLimit.used}/{adLimit.total} anúncios usados • {adLimit.available} disponível(is) no
+          plano atual
         </p>
       ) : null}
       {!action.enabled && action.reason ? (
@@ -585,10 +544,7 @@ function SubscribeCard({
       style={{ borderColor: SURFACE_LINE }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h3
-          className="text-lg font-extrabold sm:text-xl"
-          style={{ color: TEXT_STRONG }}
-        >
+        <h3 className="text-lg font-extrabold sm:text-xl" style={{ color: TEXT_STRONG }}>
           {label}
         </h3>
         <span
@@ -628,10 +584,7 @@ function UpgradeToProCard({ action }: { action: PublicationActionUpgradeToPro })
       style={{ borderColor: SURFACE_LINE, backgroundColor: "#F4F6FB" }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3
-          className="text-base font-extrabold sm:text-lg"
-          style={{ color: TEXT_STRONG }}
-        >
+        <h3 className="text-base font-extrabold sm:text-lg" style={{ color: TEXT_STRONG }}>
           Upgrade para Pro
         </h3>
         <span
@@ -642,8 +595,7 @@ function UpgradeToProCard({ action }: { action: PublicationActionUpgradeToPro })
         </span>
       </div>
       <p className="mt-2 text-sm" style={{ color: MUTED }} data-testid="upgrade-reason">
-        {action.reason ||
-          "Upgrade direto ainda não disponível — cancele o Start e assine o Pro."}
+        {action.reason || "Upgrade direto ainda não disponível — cancele o Start e assine o Pro."}
       </p>
       <button
         type="button"
@@ -679,10 +631,7 @@ function BoostCard({
       style={{ borderColor: "#FFD7B5" }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h3
-          className="text-lg font-extrabold sm:text-xl"
-          style={{ color: TEXT_STRONG }}
-        >
+        <h3 className="text-lg font-extrabold sm:text-xl" style={{ color: TEXT_STRONG }}>
           Destaque 7 dias
         </h3>
         <span
@@ -694,8 +643,8 @@ function BoostCard({
         </span>
       </div>
       <p className="mt-1 text-sm" style={{ color: MUTED }}>
-        Topo das buscas locais por <strong>{action.days} dias</strong>. Pagamento único
-        via Mercado Pago.
+        Topo das buscas locais por <strong>{action.days} dias</strong>. Pagamento único via Mercado
+        Pago.
       </p>
       {action.already_active ? (
         <p
@@ -715,9 +664,7 @@ function BoostCard({
         onClick={onBoost}
         className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-2xl px-4 text-base font-extrabold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{
-          background: enabled
-            ? "linear-gradient(120deg,#f59e0b 0%,#f97316 100%)"
-            : "#FBC78A",
+          background: enabled ? "linear-gradient(120deg,#f59e0b 0%,#f97316 100%)" : "#FBC78A",
         }}
       >
         {isPending ? "Abrindo Mercado Pago…" : "Ir para pagamento"}
@@ -858,9 +805,7 @@ async function handleBoostCheckout(
     };
     if (!res.ok) {
       if (res.status === 401) {
-        const next = encodeURIComponent(
-          `${window.location.pathname}${window.location.search}`
-        );
+        const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
         window.location.assign(`/login?next=${next}`);
         return;
       }
@@ -889,8 +834,7 @@ async function handleSubscribe(
     setError("plan_id ausente.");
     return;
   }
-  const actionId =
-    planId === "cnpj-store-pro" ? "subscribe_pro" : "subscribe_start";
+  const actionId = planId === "cnpj-store-pro" ? "subscribe_pro" : "subscribe_start";
   setPending(actionId);
   setError("");
   try {
@@ -924,4 +868,3 @@ async function handleSubscribe(
     setPending(null);
   }
 }
-

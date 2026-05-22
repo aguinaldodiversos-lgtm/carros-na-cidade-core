@@ -35,12 +35,7 @@ const CANONICAL_ID = 5278;
 const REPORT_DIR = "reports";
 const REPORT_FILE = "sao-paulo-duplicate-audit.json";
 
-const TEST_TITLE_PATTERNS = [
-  "%test%",
-  "%teste%",
-  "%seed%",
-  "%deploymodel%",
-];
+const TEST_TITLE_PATTERNS = ["%test%", "%teste%", "%seed%", "%deploymodel%"];
 const TEST_SLUG_PATTERNS = ["%test%", "%teste%", "%seed%"];
 
 export function parseArgs(argv) {
@@ -53,7 +48,8 @@ export function parseArgs(argv) {
 
 function defaultLog(level, message, meta) {
   const prefix = "[audit-sao-paulo]";
-  const line = meta !== undefined ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
+  const line =
+    meta !== undefined ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
   if (level === "error") {
     // eslint-disable-next-line no-console
     console.error(line);
@@ -283,11 +279,7 @@ async function auditCityStatus(pg, cityId) {
   if (!cols) {
     return { ok: false, missing: true, error: "tabela city_status ausente" };
   }
-  const result = await safeQuery(
-    pg,
-    `SELECT * FROM city_status WHERE city_id = $1`,
-    [cityId]
-  );
+  const result = await safeQuery(pg, `SELECT * FROM city_status WHERE city_id = $1`, [cityId]);
   return result;
 }
 
@@ -361,9 +353,7 @@ async function auditRegionMemberships(pg, cityId) {
     "cm.state AS member_state",
   ];
 
-  const orderBy = hasId
-    ? "ORDER BY rm.id"
-    : "ORDER BY rm.base_city_id, rm.member_city_id";
+  const orderBy = hasId ? "ORDER BY rm.id" : "ORDER BY rm.base_city_id, rm.member_city_id";
 
   const result = await safeQuery(
     pg,
@@ -517,7 +507,10 @@ export function classifyScenario(findings) {
  * Lógica core — recebe deps via injeção pra ser testável sem banco real.
  */
 export async function runAudit({ pg = pool, log = defaultLog } = {}) {
-  log("info", "iniciando auditoria read-only", { broken_id: BROKEN_ID, canonical_id: CANONICAL_ID });
+  log("info", "iniciando auditoria read-only", {
+    broken_id: BROKEN_ID,
+    canonical_id: CANONICAL_ID,
+  });
 
   const cities = await auditCities(pg);
   log("info", `cidades encontradas: ${cities.length}`, { ids: cities.map((c) => c.id) });

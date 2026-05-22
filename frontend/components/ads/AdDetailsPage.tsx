@@ -178,7 +178,9 @@ function SectionCard({
   return (
     <section className="rounded-[28px] border border-[#E5E9F2] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:p-6">
       <div className="mb-5">
-        <h2 className="text-[18px] font-bold leading-tight tracking-[-0.02em] text-[#1D2440] sm:text-[22px] md:text-[26px]">{title}</h2>
+        <h2 className="text-[18px] font-bold leading-tight tracking-[-0.02em] text-[#1D2440] sm:text-[22px] md:text-[26px]">
+          {title}
+        </h2>
         {subtitle ? <p className="mt-2 text-sm leading-6 text-[#6E748A]">{subtitle}</p> : null}
       </div>
       {children}

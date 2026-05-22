@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  normalizeSourceEntry,
-  ufFromCodigoIbge,
-} from "../../scripts/seed-cities-geo.mjs";
+import { normalizeSourceEntry, ufFromCodigoIbge } from "../../scripts/seed-cities-geo.mjs";
 
 describe("ufFromCodigoIbge", () => {
   it("traduz codigos numericos IBGE para siglas (canonicas)", () => {
@@ -43,13 +40,15 @@ describe("normalizeSourceEntry", () => {
   });
 
   it("normaliza acentos no nome (Atibaia, Brasília, etc)", () => {
-    expect(normalizeSourceEntry({
-      codigo_ibge: 1,
-      nome: "Brasília",
-      latitude: -15.7795,
-      longitude: -47.9297,
-      codigo_uf: 53,
-    })).toEqual({
+    expect(
+      normalizeSourceEntry({
+        codigo_ibge: 1,
+        nome: "Brasília",
+        latitude: -15.7795,
+        longitude: -47.9297,
+        codigo_uf: 53,
+      })
+    ).toEqual({
       slug: "brasilia-df",
       latitude: -15.7795,
       longitude: -47.9297,
@@ -57,32 +56,42 @@ describe("normalizeSourceEntry", () => {
   });
 
   it("converte espacos e caracteres especiais para hifens (slug oficial do projeto)", () => {
-    expect(normalizeSourceEntry({
-      codigo_ibge: 1,
-      nome: "Embu das Artes",
-      latitude: -23.65,
-      longitude: -46.85,
-      codigo_uf: 35,
-    })?.slug).toBe("embu-das-artes-sp");
+    expect(
+      normalizeSourceEntry({
+        codigo_ibge: 1,
+        nome: "Embu das Artes",
+        latitude: -23.65,
+        longitude: -46.85,
+        codigo_uf: 35,
+      })?.slug
+    ).toBe("embu-das-artes-sp");
   });
 
   it("retorna null para entry sem nome ou sem geo (degrade gracioso)", () => {
     expect(normalizeSourceEntry(null)).toBeNull();
     expect(normalizeSourceEntry({})).toBeNull();
     expect(normalizeSourceEntry({ nome: "", codigo_uf: 35, latitude: 1, longitude: 1 })).toBeNull();
-    expect(normalizeSourceEntry({ nome: "Foo", codigo_uf: 35, latitude: null, longitude: 1 })).toBeNull();
-    expect(normalizeSourceEntry({ nome: "Foo", codigo_uf: 35, latitude: 1, longitude: null })).toBeNull();
-    expect(normalizeSourceEntry({ nome: "Foo", codigo_uf: 35, latitude: "abc", longitude: 1 })).toBeNull();
+    expect(
+      normalizeSourceEntry({ nome: "Foo", codigo_uf: 35, latitude: null, longitude: 1 })
+    ).toBeNull();
+    expect(
+      normalizeSourceEntry({ nome: "Foo", codigo_uf: 35, latitude: 1, longitude: null })
+    ).toBeNull();
+    expect(
+      normalizeSourceEntry({ nome: "Foo", codigo_uf: 35, latitude: "abc", longitude: 1 })
+    ).toBeNull();
   });
 
   it("retorna null para codigo_uf invalido", () => {
-    expect(normalizeSourceEntry({
-      codigo_ibge: 1,
-      nome: "Cidade Inexistente",
-      latitude: -10,
-      longitude: -50,
-      codigo_uf: 999,
-    })).toBeNull();
+    expect(
+      normalizeSourceEntry({
+        codigo_ibge: 1,
+        nome: "Cidade Inexistente",
+        latitude: -10,
+        longitude: -50,
+        codigo_uf: 999,
+      })
+    ).toBeNull();
   });
 
   it("aceita latitude/longitude como strings numericas (coercao explicita)", () => {

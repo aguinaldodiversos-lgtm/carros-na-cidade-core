@@ -24,10 +24,33 @@ function makePlan(slug, overrides = {}) {
     city: makeCity(slug),
     clusters: [
       { cluster_type: "city_home", path: `/cidade/${slug}`, money_page: false, priority: 100 },
-      { cluster_type: "city_below_fipe", path: `/cidade/${slug}/abaixo-da-fipe`, money_page: true, priority: 94 },
-      { cluster_type: "city_opportunities", path: `/cidade/${slug}/oportunidades`, money_page: true, priority: 95 },
-      { cluster_type: "city_brand", brand: "Honda", path: `/cidade/${slug}/marca/honda`, money_page: false, priority: 65 },
-      { cluster_type: "city_brand_model", brand: "Honda", model: "Civic", path: `/cidade/${slug}/marca/honda/modelo/civic`, money_page: false, priority: 58 },
+      {
+        cluster_type: "city_below_fipe",
+        path: `/cidade/${slug}/abaixo-da-fipe`,
+        money_page: true,
+        priority: 94,
+      },
+      {
+        cluster_type: "city_opportunities",
+        path: `/cidade/${slug}/oportunidades`,
+        money_page: true,
+        priority: 95,
+      },
+      {
+        cluster_type: "city_brand",
+        brand: "Honda",
+        path: `/cidade/${slug}/marca/honda`,
+        money_page: false,
+        priority: 65,
+      },
+      {
+        cluster_type: "city_brand_model",
+        brand: "Honda",
+        model: "Civic",
+        path: `/cidade/${slug}/marca/honda/modelo/civic`,
+        money_page: false,
+        priority: 58,
+      },
     ],
     generatedAt: "2026-05-03T00:00:00.000Z",
     ...overrides,
@@ -208,15 +231,11 @@ describe("runBootstrap — modo persistência (--yes)", () => {
     expect(result.dryRun).toBe(false);
 
     // city_home transformado para /carros-em/atibaia-sp
-    const cityHomeCall = persist.mock.calls.find(
-      ([args]) => args.clusterType === "city_home"
-    );
+    const cityHomeCall = persist.mock.calls.find(([args]) => args.clusterType === "city_home");
     expect(cityHomeCall).toBeDefined();
     expect(cityHomeCall[0].path).toBe("/carros-em/atibaia-sp");
     // NÃO chamou com o path antigo
-    const oldPathCall = persist.mock.calls.find(
-      ([args]) => args.path === "/cidade/atibaia-sp"
-    );
+    const oldPathCall = persist.mock.calls.find(([args]) => args.path === "/cidade/atibaia-sp");
     expect(oldPathCall).toBeUndefined();
 
     // city_below_fipe transformado para /carros-baratos-em/atibaia-sp
@@ -250,9 +269,7 @@ describe("runBootstrap — modo persistência (--yes)", () => {
       persist,
       log: () => {},
     });
-    const brandCall = persist.mock.calls.find(
-      ([args]) => args.clusterType === "city_brand"
-    );
+    const brandCall = persist.mock.calls.find(([args]) => args.clusterType === "city_brand");
     expect(brandCall).toBeUndefined();
   });
 
@@ -426,9 +443,7 @@ describe("runBootstrap — slug malformado em uma das cidades", () => {
     expect(persist).not.toHaveBeenCalled();
 
     // Erros devem mencionar 'sæo-paulo' e o regex canônico
-    const errorsForBadCity = result.transformErrors.filter(
-      (e) => e.city === "sæo-paulo"
-    );
+    const errorsForBadCity = result.transformErrors.filter((e) => e.city === "sæo-paulo");
     expect(errorsForBadCity.length).toBeGreaterThan(0);
     for (const e of errorsForBadCity) {
       expect(e.error).toMatch(/slug fora do padrão canônico/);

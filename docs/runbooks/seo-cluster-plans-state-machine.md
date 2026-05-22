@@ -15,24 +15,24 @@
 
 ### 1.1 Confirmado pelos endpoints HTTP em prod
 
-| Endpoint | HTTP | Body | Conclusão |
-|---|---|---|---|
-| `/api/public/seo/sitemap/type/city_home?limit=10` | 200 | `{"success":true,"data":[]}` | Tabela `seo_cluster_plans` existe; query roda; WHERE filtra tudo. |
-| `/api/public/seo/sitemap/type/city_below_fipe` | 200 | `{"success":true,"data":[]}` | idem |
-| `/api/public/seo/sitemap/type/city_brand` | 200 | `{"success":true,"data":[]}` | idem |
-| `/api/public/seo/sitemap/type/city_brand_model` | 200 | `{"success":true,"data":[]}` | idem |
-| `/api/public/seo/sitemap/region/SP` | 200 | `{"success":true,"data":[]}` | **SEM filtro de cluster_type, ainda vazio** — confirma que a tabela está vazia OU todos os registros têm `status` fora de `('planned','generated')`. Não é divergência por `cluster_type`. |
-| `/api/public/seo/sitemap.json` | **500** | `{"message":"column sp.is_indexable does not exist","details":{"code":"42703",...}}` | `seo_publications` existe; coluna `is_indexable` não. **Esta migration corrige.** |
-| `/api/public/seo/sitemap.xml` | 200 | 446 bytes — só `/` e `/anuncios` (fallback) | Controller catch-all (`sendCanonicalSitemapXml`) mascara o 500 acima devolvendo as 2 URLs estáticas de `buildFallbackEntries()`. |
+| Endpoint                                          | HTTP    | Body                                                                                 | Conclusão                                                                                                                                                                                  |
+| ------------------------------------------------- | ------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/api/public/seo/sitemap/type/city_home?limit=10` | 200     | `{"success":true,"data":[]}`                                                         | Tabela `seo_cluster_plans` existe; query roda; WHERE filtra tudo.                                                                                                                          |
+| `/api/public/seo/sitemap/type/city_below_fipe`    | 200     | `{"success":true,"data":[]}`                                                         | idem                                                                                                                                                                                       |
+| `/api/public/seo/sitemap/type/city_brand`         | 200     | `{"success":true,"data":[]}`                                                         | idem                                                                                                                                                                                       |
+| `/api/public/seo/sitemap/type/city_brand_model`   | 200     | `{"success":true,"data":[]}`                                                         | idem                                                                                                                                                                                       |
+| `/api/public/seo/sitemap/region/SP`               | 200     | `{"success":true,"data":[]}`                                                         | **SEM filtro de cluster_type, ainda vazio** — confirma que a tabela está vazia OU todos os registros têm `status` fora de `('planned','generated')`. Não é divergência por `cluster_type`. |
+| `/api/public/seo/sitemap.json`                    | **500** | `{"message":"column sp.is_indexable does not exist","details":{"code":"42703",...}}` | `seo_publications` existe; coluna `is_indexable` não. **Esta migration corrige.**                                                                                                          |
+| `/api/public/seo/sitemap.xml`                     | 200     | 446 bytes — só `/` e `/anuncios` (fallback)                                          | Controller catch-all (`sendCanonicalSitemapXml`) mascara o 500 acima devolvendo as 2 URLs estáticas de `buildFallbackEntries()`.                                                           |
 
 ### 1.2 Tabelas — origem em migrations oficiais
 
-| Tabela | Migration que cria? | Existe em prod? | Observação |
-|---|---|---|---|
-| `seo_cluster_plans` | **❌ NENHUMA** (`grep -l seo_cluster_plans src/database/migrations/*.sql` → 0/21) | **SIM** (queries rodam sem erro de relation) | Criada out-of-band — sem trilha de auditoria de schema. |
-| `seo_publications` | **❌ NENHUMA** | **SIM** (erro do 500 é "column does not exist", não "relation does not exist") | Mesma situação. Coluna `is_indexable` ausente até esta migration. |
-| `cities` | ✅ `001_baseline_cities.sql` | SIM | OK. |
-| `seo_city_metrics` | ✅ `015_seo_city_metrics_canonical.sql` | SIM | Não relacionada ao sitemap territorial. |
+| Tabela              | Migration que cria?                                                               | Existe em prod?                                                                | Observação                                                        |
+| ------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `seo_cluster_plans` | **❌ NENHUMA** (`grep -l seo_cluster_plans src/database/migrations/*.sql` → 0/21) | **SIM** (queries rodam sem erro de relation)                                   | Criada out-of-band — sem trilha de auditoria de schema.           |
+| `seo_publications`  | **❌ NENHUMA**                                                                    | **SIM** (erro do 500 é "column does not exist", não "relation does not exist") | Mesma situação. Coluna `is_indexable` ausente até esta migration. |
+| `cities`            | ✅ `001_baseline_cities.sql`                                                      | SIM                                                                            | OK.                                                               |
+| `seo_city_metrics`  | ✅ `015_seo_city_metrics_canonical.sql`                                           | SIM                                                                            | Não relacionada ao sitemap territorial.                           |
 
 ### 1.3 Auditoria SQL recomendada (read-only, prod)
 
@@ -95,32 +95,32 @@ Mapeada por leitura, não há documento canônico no projeto.
 
 ### 2.1 Escritores conhecidos
 
-| Componente | Tabela | Status que grava | Observação |
-|---|---|---|---|
-| `src/modules/seo/planner/cluster-plan.repository.js#upsertClusterPlan` | `seo_cluster_plans` | default `'planned'` | Único caller que insere. Aceita override do parâmetro `status`. |
-| `src/workers/seo/cluster-planner.worker.js#startClusterPlannerWorker` | (chama o anterior via `runClusterPlannerEngine`) | — | Roda só se `RUN_WORKERS=true`. Default desligado. |
-| `src/modules/seo/publishing/content-publisher.repository.js#upsertSeoPublication` | `seo_publications` | default `'published'` | Default `isIndexable = true`. |
-| `src/modules/seo/publishing/content-publisher.repository.js#markClusterPublished` | `seo_cluster_plans` | promove para `'published'` | Chamado após o publisher gravar com sucesso. |
-| `src/modules/seo/publishing/publication-validator.service.js` | `seo_publications` (via audit) | grava `is_indexable: issues.length === 0` + `health_status: "healthy" \| "needs_review"` | Chamado pelo audit para revalidar publicações existentes. |
+| Componente                                                                        | Tabela                                           | Status que grava                                                                         | Observação                                                      |
+| --------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `src/modules/seo/planner/cluster-plan.repository.js#upsertClusterPlan`            | `seo_cluster_plans`                              | default `'planned'`                                                                      | Único caller que insere. Aceita override do parâmetro `status`. |
+| `src/workers/seo/cluster-planner.worker.js#startClusterPlannerWorker`             | (chama o anterior via `runClusterPlannerEngine`) | —                                                                                        | Roda só se `RUN_WORKERS=true`. Default desligado.               |
+| `src/modules/seo/publishing/content-publisher.repository.js#upsertSeoPublication` | `seo_publications`                               | default `'published'`                                                                    | Default `isIndexable = true`.                                   |
+| `src/modules/seo/publishing/content-publisher.repository.js#markClusterPublished` | `seo_cluster_plans`                              | promove para `'published'`                                                               | Chamado após o publisher gravar com sucesso.                    |
+| `src/modules/seo/publishing/publication-validator.service.js`                     | `seo_publications` (via audit)                   | grava `is_indexable: issues.length === 0` + `health_status: "healthy" \| "needs_review"` | Chamado pelo audit para revalidar publicações existentes.       |
 
 ### 2.2 Status conhecidos no código
 
-| Status | Onde aparece | Significado inferido |
-|---|---|---|
-| `planned` | Default do upsert do planner; aceito por ambos os SQLs do sitemap | "cluster identificado, sem conteúdo gerado ainda" |
-| `generated` | Aceito SOMENTE em `sitemap-public.repository.js` (filtro `('planned','generated')`) | Nunca encontrado sendo GRAVADO no código — possivelmente legado de uma fase anterior do pipeline OU estado intermediário da engine de geração. |
-| `published` | Default do publisher; grava via `markClusterPublished`; aceito SOMENTE em `public-seo.service.js` (filtro `('published','planned')`) | "cluster com conteúdo publicado" |
-| `review_required` | Aparece em `public-seo.service.js#listEntries` no filtro de `seo_publications.status` (LEFT JOIN), não no `scp.status` | Estado da PUBLICAÇÃO (não do plano) — publicação que precisa de review humana. |
+| Status            | Onde aparece                                                                                                                         | Significado inferido                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `planned`         | Default do upsert do planner; aceito por ambos os SQLs do sitemap                                                                    | "cluster identificado, sem conteúdo gerado ainda"                                                                                              |
+| `generated`       | Aceito SOMENTE em `sitemap-public.repository.js` (filtro `('planned','generated')`)                                                  | Nunca encontrado sendo GRAVADO no código — possivelmente legado de uma fase anterior do pipeline OU estado intermediário da engine de geração. |
+| `published`       | Default do publisher; grava via `markClusterPublished`; aceito SOMENTE em `public-seo.service.js` (filtro `('published','planned')`) | "cluster com conteúdo publicado"                                                                                                               |
+| `review_required` | Aparece em `public-seo.service.js#listEntries` no filtro de `seo_publications.status` (LEFT JOIN), não no `scp.status`               | Estado da PUBLICAÇÃO (não do plano) — publicação que precisa de review humana.                                                                 |
 
 ### 2.3 `is_indexable` (em `seo_publications`)
 
-| Caller | Comportamento |
-|---|---|
-| `content-publisher.repository.js` (linha 17) | parâmetro JS default = `true` |
-| `publication-validator.service.js` (linha 76) | `is_indexable: issues.length === 0` (TRUE quando não há issues) |
-| `publication-audit.repository.js` (linha 36) | `UPDATE seo_publications SET is_indexable = $2` — sempre Boolean coerced |
-| `public-seo.service.js` (linha 47) | filtro: `(sp.id IS NULL OR sp.is_indexable = TRUE)` — TRUE inclui no sitemap |
-| `city-performance.repository.js` (linha 81) | `COUNT(*) FILTER (WHERE sp.is_indexable = true)` — métrica de "indexable_pages" |
+| Caller                                        | Comportamento                                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------------------- |
+| `content-publisher.repository.js` (linha 17)  | parâmetro JS default = `true`                                                   |
+| `publication-validator.service.js` (linha 76) | `is_indexable: issues.length === 0` (TRUE quando não há issues)                 |
+| `publication-audit.repository.js` (linha 36)  | `UPDATE seo_publications SET is_indexable = $2` — sempre Boolean coerced        |
+| `public-seo.service.js` (linha 47)            | filtro: `(sp.id IS NULL OR sp.is_indexable = TRUE)` — TRUE inclui no sitemap    |
+| `city-performance.repository.js` (linha 81)   | `COUNT(*) FILTER (WHERE sp.is_indexable = true)` — métrica de "indexable_pages" |
 
 **Default da migration 022 = `TRUE`** alinha com TODOS esses call sites. Default
 `FALSE` excluiria silenciosamente todas as publicações pré-existentes do
@@ -132,13 +132,13 @@ sitemap até cada uma ser republicada — regressão grave.
 
 ### 3.1 Schema drift entre os dois SQLs do backend
 
-| Aspecto | `sitemap-public.repository.js` (`/sitemap/type/`, `/sitemap/region/`) | `public-seo.service.js` (`/sitemap.json`, `/sitemap.xml`) |
-|---|---|---|
-| Tabelas | `seo_cluster_plans scp JOIN cities c` | `seo_cluster_plans scp LEFT JOIN seo_publications sp LEFT JOIN cities c` |
-| Filtro de status `scp` | `('planned', 'generated')` | `('published', 'planned')` |
-| Referência a `is_indexable` | Não usa | `(sp.id IS NULL OR sp.is_indexable = TRUE)` |
-| Filtro de status `sp` | n/a | `(sp.id IS NULL OR sp.status IN ('published','review_required'))` |
-| `lastmod` | `scp.updated_at` apenas | `COALESCE(sp.updated_at, sp.published_at, scp.last_generated_at, scp.updated_at, scp.created_at)` |
+| Aspecto                     | `sitemap-public.repository.js` (`/sitemap/type/`, `/sitemap/region/`) | `public-seo.service.js` (`/sitemap.json`, `/sitemap.xml`)                                         |
+| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Tabelas                     | `seo_cluster_plans scp JOIN cities c`                                 | `seo_cluster_plans scp LEFT JOIN seo_publications sp LEFT JOIN cities c`                          |
+| Filtro de status `scp`      | `('planned', 'generated')`                                            | `('published', 'planned')`                                                                        |
+| Referência a `is_indexable` | Não usa                                                               | `(sp.id IS NULL OR sp.is_indexable = TRUE)`                                                       |
+| Filtro de status `sp`       | n/a                                                                   | `(sp.id IS NULL OR sp.status IN ('published','review_required'))`                                 |
+| `lastmod`                   | `scp.updated_at` apenas                                               | `COALESCE(sp.updated_at, sp.published_at, scp.last_generated_at, scp.updated_at, scp.created_at)` |
 
 **Conjunto comum:** ambos aceitam `'planned'` em `scp.status`.
 **`'generated'`** é exclusivo do repository público — **ninguém grava esse valor** pelo grep do código. Pode ser legado.
@@ -168,6 +168,7 @@ para `/carros-em/[slug]`. Documentado em §8 da investigação anterior.
 **Causa raiz mais provável (priorizada):**
 
 1. **`seo_cluster_plans` está vazia em produção.** Confirmado indiretamente:
+
    - `/sitemap/type/<type>` para 4 tipos diferentes → todos `data:[]`.
    - `/sitemap/region/SP` (sem filtro de cluster_type) → `data:[]`.
    - O único filtro comum a esses 5 endpoints é `scp.status IN ('planned','generated')`.
@@ -215,10 +216,10 @@ para `/carros-em/[slug]`. Documentado em §8 da investigação anterior.
 >
 > 1. **Conectar ao DB de prod via Render Shell** (`carros-na-cidade-core`),
 >    rodar as queries em §1.3 deste runbook, preencher o apêndice.
->
 > 2. **Decidir baseado nos resultados:**
 >
 >    **Caminho A — tabela vazia (`plans_total = 0`):**
+>
 >    - Causa: planner nunca rodou.
 >    - Próxima ação (ainda sem alterar código): validar se
 >      `RUN_WORKERS=true` está no painel Render do web service E/OU se
@@ -227,6 +228,7 @@ para `/carros-em/[slug]`. Documentado em §8 da investigação anterior.
 >      com passos pra rodar o planner manualmente uma vez via Render Shell.
 >
 >    **Caminho B — tabela cheia mas todos com status fora de `('planned','generated')`:**
+>
 >    - Causa: status drift confirmado.
 >    - Próxima ação: documentar a state machine real em runbook novo
 >      `cluster-plan-status-machine.md` (transições reais, não inferidas)
@@ -235,6 +237,7 @@ para `/carros-em/[slug]`. Documentado em §8 da investigação anterior.
 >      etapa futura, depois de discussão.
 >
 >    **Caminho C — tabela cheia com status válidos mas distribuição estranha:**
+>
 >    - Causa: filtros corretos, dados parciais. Investigar individualmente.
 >    - Próxima ação: profilar entradas, verificar se `cluster_type` cobre
 >      todas as cidades esperadas, etc. Análise dirigida.
@@ -255,13 +258,13 @@ para `/carros-em/[slug]`. Documentado em §8 da investigação anterior.
 
 ### Ambiente
 
-| Item | Valor |
-|---|---|
-| Serviço Render alvo | `carros-na-cidade-core` (web service backend) |
-| Banco | Postgres do plano do mesmo serviço (string `DATABASE_URL` no painel — **não exposta**) |
-| Migration `022_seo_publications_is_indexable.sql` aplicada? | **NÃO CONFIRMADO** (depende de `npm run db:migrate` ou `RUN_MIGRATIONS=true` no boot do serviço) |
-| Quem deve rodar | Operador com Render Shell do `carros-na-cidade-core` |
-| Quem rodou | **PENDENTE** — assistente NÃO tem acesso a este ambiente (sem `render` CLI, `psql` ou `DATABASE_URL` local; `.env` está fora do git por segurança, conforme commit `4250060`) |
+| Item                                                        | Valor                                                                                                                                                                         |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Serviço Render alvo                                         | `carros-na-cidade-core` (web service backend)                                                                                                                                 |
+| Banco                                                       | Postgres do plano do mesmo serviço (string `DATABASE_URL` no painel — **não exposta**)                                                                                        |
+| Migration `022_seo_publications_is_indexable.sql` aplicada? | **NÃO CONFIRMADO** (depende de `npm run db:migrate` ou `RUN_MIGRATIONS=true` no boot do serviço)                                                                              |
+| Quem deve rodar                                             | Operador com Render Shell do `carros-na-cidade-core`                                                                                                                          |
+| Quem rodou                                                  | **PENDENTE** — assistente NÃO tem acesso a este ambiente (sem `render` CLI, `psql` ou `DATABASE_URL` local; `.env` está fora do git por segurança, conforme commit `4250060`) |
 
 ### Status desta auditoria
 
@@ -298,6 +301,7 @@ grep -rn "persistTopCityClusterPlans\|persistCityClusterPlan" src --include="*.j
 **Implicação:** mesmo que `RUN_WORKERS=true` esteja configurado no Render, o `cluster-planner.worker` chama `runClusterPlannerEngine`, que chama `buildTopCitiesClusterPlans`, que constrói clusters em memória e os retorna sem nunca tocar `seo_cluster_plans`. O fluxo automático **nunca persiste** — não é questão de "worker desligado", é questão de "wire desconectado" entre build e persist.
 
 Isso explica todas as evidências indiretas:
+
 - `/api/public/seo/sitemap/type/<type>` → `data:[]` para 4 tipos diferentes
 - `/api/public/seo/sitemap/region/SP` (sem filtro de tipo) → `data:[]`
 - HTTP 200 sem erro de relation → tabela existe, query roda, zero rows
@@ -306,12 +310,12 @@ Isso explica todas as evidências indiretas:
 
 > **PENDENTE — operador deve preencher após rodar `\d` ou `information_schema.tables` via Render Shell.**
 
-| Tabela | Existe? | Total de registros | Observações |
-|---|---|---|---|
+| Tabela              | Existe?           | Total de registros         | Observações                                                           |
+| ------------------- | ----------------- | -------------------------- | --------------------------------------------------------------------- |
 | `seo_cluster_plans` | _(esperado: SIM)_ | _(esperado: 0 ou pequeno)_ | Aparentemente vazia. Backend devolve `data:[]` em todos os endpoints. |
-| `seo_publications` | _(esperado: SIM)_ | _(operador rodar)_ | Coluna `is_indexable` ausente até migration 022 ser aplicada. |
-| `cities` | _(esperado: SIM)_ | _(esperado: ~5570)_ | OK, alimentado por seed IBGE. |
-| `ads` | _(esperado: SIM)_ | _(operador rodar)_ | OK, dados reais de produção. |
+| `seo_publications`  | _(esperado: SIM)_ | _(operador rodar)_         | Coluna `is_indexable` ausente até migration 022 ser aplicada.         |
+| `cities`            | _(esperado: SIM)_ | _(esperado: ~5570)_        | OK, alimentado por seed IBGE.                                         |
+| `ads`               | _(esperado: SIM)_ | _(operador rodar)_         | OK, dados reais de produção.                                          |
 
 **Queries a rodar (copia-cola no Render Shell):**
 
@@ -349,9 +353,9 @@ GROUP BY cluster_type, status
 ORDER BY cluster_type, status;
 ```
 
-| cluster_type | status | total |
-|---|---|---|
-| _(esperado: vazio — nenhuma linha)_ | _—_ | _—_ |
+| cluster_type                        | status | total |
+| ----------------------------------- | ------ | ----- |
+| _(esperado: vazio — nenhuma linha)_ | _—_    | _—_   |
 
 **Por que esperamos vazio:** ver §"Evidência de código" acima — o fluxo automático não persiste.
 
@@ -366,8 +370,8 @@ SELECT MIN(created_at) AS first_plan,
 FROM seo_cluster_plans;
 ```
 
-| Métrica | Valor real |
-|---|---|
+| Métrica         | Valor real           |
+| --------------- | -------------------- |
 | MIN(created_at) | _operador preencher_ |
 | MAX(created_at) | _operador preencher_ |
 | MAX(updated_at) | _operador preencher_ |
@@ -386,8 +390,8 @@ GROUP BY is_indexable
 ORDER BY is_indexable;
 ```
 
-| is_indexable | total |
-|---|---|
+| is_indexable                                                          | total                |
+| --------------------------------------------------------------------- | -------------------- |
 | _(esperado pós-migration: TRUE = todas as linhas legadas, FALSE = 0)_ | _operador preencher_ |
 
 ### Amostra de `seo_cluster_plans` (se houver dados)
@@ -408,6 +412,7 @@ LIMIT 20;
 **Caminho escolhido: A (`seo_cluster_plans` vazia).**
 
 **Confiança:** **ALTA** — apoiada em:
+
 1. **Evidência determinística de código** (callers órfãos de `persistTopCityClusterPlans`/`persistCityClusterPlan`).
 2. **Evidência indireta de prod via curl** (5 endpoints diferentes, todos `data:[]`).
 3. **Migrations não criam a tabela** (criada out-of-band → sem garantia de seed inicial).
@@ -415,10 +420,12 @@ LIMIT 20;
 **Caveat:** confirmação 100% requer o operador rodar `SELECT COUNT(*) FROM seo_cluster_plans;` no Render Shell. Se o resultado for `> 0`, reavaliar para Caminho B ou C — mas isso seria evidência **contraditória** ao código (alguém populou a tabela manualmente em algum momento, fora do fluxo).
 
 **Causa raiz:** o fluxo automático tem **dois bugs encadeados**:
+
 - (i) a função `persistTopCityClusterPlans` em `cluster-plan.service.js` está implementada mas órfã (zero callers);
 - (ii) a engine `runClusterPlannerEngine` chama o builder em memória (`buildTopCitiesClusterPlans`) em vez do persistor (`persistTopCityClusterPlans`).
 
 **Próximo passo (sem alterar código nesta etapa):**
+
 - Operador roda os SQLs acima e cola os resultados num PR de docs (atualizando este apêndice).
 - Em paralelo, criar runbook novo `cluster-planner-bootstrap.md` documentando como reconectar o "wire" desconectado entre build e persist (fix de 1 linha em `cluster-planner.engine.js` OU 1 linha em `cluster-planner.worker.js`), com plan de roll-out (rodar manualmente uma vez em staging → validar `seo_cluster_plans` populada → confirmar sitemap territorial volta a ter URLs → ligar fix em prod).
 
@@ -432,8 +439,8 @@ LIMIT 20;
 >    - `src/brain/engines/cluster-planner.engine.js:7` chama `buildTopCitiesClusterPlans` (não persiste).
 >    - `src/modules/seo/planner/cluster-plan.service.js:32-63` define `persistTopCityClusterPlans` (persiste, mas órfão).
 >    - `grep -rn "persistTopCityClusterPlans\|persistCityClusterPlan" src --include="*.js"` retorna apenas as próprias declarações.
->
 > 2. Opções de correção (analisar trade-offs, sem implementar):
+>
 >    - **Opção 1:** trocar a chamada na engine para `persistTopCityClusterPlans` (1 linha; mais cirúrgico).
 >    - **Opção 2:** adicionar `await persistCityClusterPlan(city)` no loop em `buildTopCitiesClusterPlans` (mistura responsabilidades).
 >    - **Opção 3:** criar nova engine `persistClusterPlansEngine` e ajustar worker (mais código, separação clara).
@@ -445,8 +452,5 @@ LIMIT 20;
 >    - Fase 2 — rodar manualmente em staging (Render Shell: `node -e 'import("./src/brain/engines/cluster-planner.engine.js").then(m => m.runClusterPlannerEngine(50))'`); validar `seo_cluster_plans` populada; validar `/api/public/seo/sitemap/type/city_home` retorna `data:[...]`.
 >    - Fase 3 — deploy em prod sem ligar `RUN_WORKERS` ainda; rodar 1x manual via Render Shell; validar.
 >    - Fase 4 — só depois habilitar `RUN_WORKERS=true` (intervalo padrão 6h) ou migrar workers para dyno separado.
->
 > 4. **NÃO alterar:** frontend, layout, components, sitemap em código, canonical em código, robots, rotas, ranking, planos, Página Regional, RUN_WORKERS em prod, dados em prod, código backend nesta etapa. Apenas markdown novo + decisão arquitetural documentada.
->
 > 5. **Antes de escrever o runbook:** o operador deve idealmente rodar os SQLs de §"Tabelas encontradas"/"Distribuição" deste runbook e colar os resultados aqui — para confirmar Caminho A (e descartar a possibilidade remota de seed manual antigo).
-

@@ -79,9 +79,7 @@ function buildTargetPath(
   return qs ? `${base}?${qs}` : base;
 }
 
-export async function generateMetadata({
-  params,
-}: CityOpportunitiesPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: CityOpportunitiesPageProps): Promise<Metadata> {
   // Mesmo redirecionando, declaramos noindex,follow E canonical por defesa:
   // se algum crawler atingir esta URL antes de processar o 308, o canonical
   // explícito direciona o sinal para `/carros-baratos-em/[slug]` (mesma URL

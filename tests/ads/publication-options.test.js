@@ -37,8 +37,18 @@ const { getPublicationOptions } = await import(
   "../../src/modules/ads/ads.publication-options.service.js"
 );
 
-const PLAN_FREE_CPF = { id: "cpf-free-essential", name: "Plano Gratuito (CPF)", ad_limit: 3, type: "CPF" };
-const PLAN_FREE_CNPJ = { id: "cnpj-free-store", name: "Plano Gratuito Loja", ad_limit: 10, type: "CNPJ" };
+const PLAN_FREE_CPF = {
+  id: "cpf-free-essential",
+  name: "Plano Gratuito (CPF)",
+  ad_limit: 3,
+  type: "CPF",
+};
+const PLAN_FREE_CNPJ = {
+  id: "cnpj-free-store",
+  name: "Plano Gratuito Loja",
+  ad_limit: 10,
+  type: "CNPJ",
+};
 const PLAN_START = { id: "cnpj-store-start", name: "Plano Loja Start", ad_limit: 20, type: "CNPJ" };
 const PLAN_PRO = { id: "cnpj-store-pro", name: "Plano Loja Pro", ad_limit: 1000, type: "CNPJ" };
 
@@ -72,30 +82,35 @@ describe("publication-options — ownership e status", () => {
     const { AppError } = await import("../../src/shared/middlewares/error.middleware.js");
     account.getOwnedAd.mockRejectedValue(new AppError("Anuncio nao encontrado.", 404));
 
-    await expect(
-      getPublicationOptions({ userId: "u1", adId: "ad-other" })
-    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(getPublicationOptions({ userId: "u1", adId: "ad-other" })).rejects.toMatchObject({
+      statusCode: 404,
+    });
   });
 
   it("410 quando anúncio está em status='deleted'", async () => {
     account.getOwnedAd.mockResolvedValue({ ...AD_ACTIVE, status: "deleted" });
 
-    await expect(
-      getPublicationOptions({ userId: "u1", adId: "ad-1" })
-    ).rejects.toMatchObject({ statusCode: 410 });
+    await expect(getPublicationOptions({ userId: "u1", adId: "ad-1" })).rejects.toMatchObject({
+      statusCode: 410,
+    });
   });
 
   it("410 quando anúncio está em status='blocked'", async () => {
     account.getOwnedAd.mockResolvedValue({ ...AD_ACTIVE, status: "blocked" });
 
-    await expect(
-      getPublicationOptions({ userId: "u1", adId: "ad-1" })
-    ).rejects.toMatchObject({ statusCode: 410 });
+    await expect(getPublicationOptions({ userId: "u1", adId: "ad-1" })).rejects.toMatchObject({
+      statusCode: 410,
+    });
   });
 
   it("aceita status='paused' (anúncio pausado pode ser destacado/republicado)", async () => {
     account.getOwnedAd.mockResolvedValue({ ...AD_ACTIVE, status: "paused" });
-    account.getAccountUser.mockResolvedValue({ id: "u1", type: "CPF", cnpj_verified: false, document_verified: true });
+    account.getAccountUser.mockResolvedValue({
+      id: "u1",
+      type: "CPF",
+      cnpj_verified: false,
+      document_verified: true,
+    });
     account.resolveCurrentPlan.mockResolvedValue(PLAN_FREE_CPF);
 
     const r = await getPublicationOptions({ userId: "u1", adId: "ad-1" });
@@ -237,7 +252,9 @@ describe("publication-options — Start ativo", () => {
     });
     account.resolveCurrentPlan.mockResolvedValue(PLAN_START);
     db.query.mockResolvedValue({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-start", status: "active", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-start", status: "active", created_at: "2026-04-01" },
+      ],
     });
   });
 
@@ -287,7 +304,9 @@ describe("publication-options — Pro ativo", () => {
     });
     account.resolveCurrentPlan.mockResolvedValue(PLAN_PRO);
     db.query.mockResolvedValue({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "active", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "active", created_at: "2026-04-01" },
+      ],
     });
     account.countActiveAdsByUser.mockResolvedValue(50);
   });
@@ -317,7 +336,9 @@ describe("publication-options — sub pending (aguardando autorização MP)", ()
     });
     account.resolveCurrentPlan.mockResolvedValue(PLAN_FREE_CNPJ);
     db.query.mockResolvedValue({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-start", status: "pending", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-start", status: "pending", created_at: "2026-04-01" },
+      ],
     });
     account.countActiveAdsByUser.mockResolvedValue(0);
 

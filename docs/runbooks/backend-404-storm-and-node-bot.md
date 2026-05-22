@@ -26,21 +26,21 @@ Os slugs eram concatenações de modelos: `jeep-renegade-byd-yuan-plus-nissan-ki
 
 ## Arquivos alterados
 
-| Arquivo | Mudança |
-| --- | --- |
-| [src/shared/middlewares/bot-blocker.middleware.js](../../src/shared/middlewares/bot-blocker.middleware.js) | UA literal `node` adicionado à blocklist. Allowlist forte: UA `cnc-internal/1.0` + `X-Internal-Token === INTERNAL_API_TOKEN`. **Compat fraca temporária**: UA `node` + `X-Cnc-Client-Ip` (marca do BFF) passa — protege frontend SSR enquanto não migra para UA interno. Outras UAs (Ahrefs, python-requests etc.) NÃO ganham compat. |
-| [src/shared/middlewares/rateLimit.middleware.js](../../src/shared/middlewares/rateLimit.middleware.js) | `clientRateLimitKey` agora prefere `CF-Connecting-IP` → `X-Cnc-Client-Ip` → `X-Forwarded-For` → `req.ip`. |
+| Arquivo                                                                                                                    | Mudança                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [src/shared/middlewares/bot-blocker.middleware.js](../../src/shared/middlewares/bot-blocker.middleware.js)                 | UA literal `node` adicionado à blocklist. Allowlist forte: UA `cnc-internal/1.0` + `X-Internal-Token === INTERNAL_API_TOKEN`. **Compat fraca temporária**: UA `node` + `X-Cnc-Client-Ip` (marca do BFF) passa — protege frontend SSR enquanto não migra para UA interno. Outras UAs (Ahrefs, python-requests etc.) NÃO ganham compat.                            |
+| [src/shared/middlewares/rateLimit.middleware.js](../../src/shared/middlewares/rateLimit.middleware.js)                     | `clientRateLimitKey` agora prefere `CF-Connecting-IP` → `X-Cnc-Client-Ip` → `X-Forwarded-For` → `req.ip`.                                                                                                                                                                                                                                                        |
 | [src/shared/middlewares/legacy-routes-guard.middleware.js](../../src/shared/middlewares/legacy-routes-guard.middleware.js) | **Novo.** Intercepta prefixos legacy/inexistentes (`/catalog/ads/*`, `/public/listings/*`, `/public/ads/*`, `/ads/<slug>`, `/api/ads/slug/*`, `/api/ads/by-slug/*`, `/listings*`) ANTES de qualquer router. Responde 410 leve com `Cache-Control: public, max-age=300`. Também detecta slug abusivo (>120 chars ou >8 hífens) em paths que parecem rota pública. |
-| [src/shared/middlewares/404-storm-guard.middleware.js](../../src/shared/middlewares/404-storm-guard.middleware.js) | **Novo.** Counter em memória por (IP real, UA). Após `PUBLIC_404_STORM_THRESHOLD` 404s em 60s, bloqueia o par por `PUBLIC_404_STORM_BLOCK_SECONDS` (default 1h) — responde 429 leve. Controlado por `PUBLIC_404_STORM_GUARD_ENABLED`. Emite linha `"event":"public_404_storm_blocked"` em stdout. |
-| [src/shared/middlewares/error.middleware.js](../../src/shared/middlewares/error.middleware.js) | 404 operacional vira `logger.warn` (sem stack) e responde corpo mínimo `{success:false,error:"not_found"}` + `Cache-Control: public, max-age=60`. 5xx e outros 4xx mantêm `logger.error`. |
-| [src/app.js](../../src/app.js) | Plug do `legacyRoutesGuardMiddleware` e `publicStormGuardMiddleware` depois do bot blocker e antes dos routers. |
-| [.env.example](../../.env.example) | `PUBLIC_404_STORM_GUARD_ENABLED`, `INTERNAL_API_TOKEN`, tuning vars. |
-| **Testes:** | |
-| [tests/shared/bot-blocker.middleware.test.js](../../tests/shared/bot-blocker.middleware.test.js) | +18 testes (UA `node`, allowlist interna, BFF compat). 59 total. |
-| [tests/shared/rateLimit.middleware.test.js](../../tests/shared/rateLimit.middleware.test.js) | +3 testes (CF-Connecting-IP). 10 total. |
-| [tests/shared/legacy-routes-guard.middleware.test.js](../../tests/shared/legacy-routes-guard.middleware.test.js) | **Novo**, 31 testes — todos os prefixos legados, slug abusivo, falsos positivos. |
-| [tests/shared/404-storm-guard.middleware.test.js](../../tests/shared/404-storm-guard.middleware.test.js) | **Novo**, 8 testes — counter, isolamento por IP/UA, /health allowlisted, evento stdout, TTL. |
-| [tests/shared/error-middleware-404.test.js](../../tests/shared/error-middleware-404.test.js) | **Novo**, 6 testes — 404 vira warn, sem stack, corpo mínimo. |
+| [src/shared/middlewares/404-storm-guard.middleware.js](../../src/shared/middlewares/404-storm-guard.middleware.js)         | **Novo.** Counter em memória por (IP real, UA). Após `PUBLIC_404_STORM_THRESHOLD` 404s em 60s, bloqueia o par por `PUBLIC_404_STORM_BLOCK_SECONDS` (default 1h) — responde 429 leve. Controlado por `PUBLIC_404_STORM_GUARD_ENABLED`. Emite linha `"event":"public_404_storm_blocked"` em stdout.                                                                |
+| [src/shared/middlewares/error.middleware.js](../../src/shared/middlewares/error.middleware.js)                             | 404 operacional vira `logger.warn` (sem stack) e responde corpo mínimo `{success:false,error:"not_found"}` + `Cache-Control: public, max-age=60`. 5xx e outros 4xx mantêm `logger.error`.                                                                                                                                                                        |
+| [src/app.js](../../src/app.js)                                                                                             | Plug do `legacyRoutesGuardMiddleware` e `publicStormGuardMiddleware` depois do bot blocker e antes dos routers.                                                                                                                                                                                                                                                  |
+| [.env.example](../../.env.example)                                                                                         | `PUBLIC_404_STORM_GUARD_ENABLED`, `INTERNAL_API_TOKEN`, tuning vars.                                                                                                                                                                                                                                                                                             |
+| **Testes:**                                                                                                                |                                                                                                                                                                                                                                                                                                                                                                  |
+| [tests/shared/bot-blocker.middleware.test.js](../../tests/shared/bot-blocker.middleware.test.js)                           | +18 testes (UA `node`, allowlist interna, BFF compat). 59 total.                                                                                                                                                                                                                                                                                                 |
+| [tests/shared/rateLimit.middleware.test.js](../../tests/shared/rateLimit.middleware.test.js)                               | +3 testes (CF-Connecting-IP). 10 total.                                                                                                                                                                                                                                                                                                                          |
+| [tests/shared/legacy-routes-guard.middleware.test.js](../../tests/shared/legacy-routes-guard.middleware.test.js)           | **Novo**, 31 testes — todos os prefixos legados, slug abusivo, falsos positivos.                                                                                                                                                                                                                                                                                 |
+| [tests/shared/404-storm-guard.middleware.test.js](../../tests/shared/404-storm-guard.middleware.test.js)                   | **Novo**, 8 testes — counter, isolamento por IP/UA, /health allowlisted, evento stdout, TTL.                                                                                                                                                                                                                                                                     |
+| [tests/shared/error-middleware-404.test.js](../../tests/shared/error-middleware-404.test.js)                               | **Novo**, 6 testes — 404 vira warn, sem stack, corpo mínimo.                                                                                                                                                                                                                                                                                                     |
 
 ## Envs no Render `carros-na-cidade-core`
 
@@ -56,6 +56,7 @@ INTERNAL_API_TOKEN=<valor já configurado no Render para /api/internal/regions>
 ```
 
 Opcional (tuning do storm guard):
+
 ```
 PUBLIC_404_STORM_THRESHOLD=15           # default 15
 PUBLIC_404_STORM_BLOCK_SECONDS=3600     # default 3600 (1h)
@@ -132,22 +133,22 @@ Com `BACKEND_BANDWIDTH_DIAGNOSTICS_ENABLED=true` + `PUBLIC_404_STORM_GUARD_ENABL
 
 ## Riscos
 
-| Risco | Mitigação |
-|---|---|
-| Frontend SSR usa UA `node` literal e sem `X-Cnc-Client-Ip` em algumas rotas → cortado | Compat fraca (UA `node` + `X-Cnc-Client-Ip` libera). Frontend já manda esse header em todas as chamadas BFF. Próximo PR migra para UA `cnc-internal/1.0` + token explicitamente. |
-| Bot forja `X-Cnc-Client-Ip` para burlar | É camada FRACA. Mas (a) é header custom específico do projeto que bots casuais não conhecem; (b) bot ainda passa pelo rate limit normal por IP forjado; (c) caminho preferido é `cnc-internal/1.0 + token` (forte). |
-| `PUBLIC_404_STORM_THRESHOLD=15` muito baixo, bloqueia humanos navegando | Improvável: humano não bate 15 URLs 404 em 60s. Caso aconteça, aumentar via env (suporta até 1000). |
-| Slug abusivo legítimo (anúncio com nome ultra longo) | Limite é 120 chars OU 9+ hífens — anúncios reais raramente têm slug assim. Se acontecer, ajustar `MAX_SAFE_SLUG_LENGTH`. |
+| Risco                                                                                 | Mitigação                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend SSR usa UA `node` literal e sem `X-Cnc-Client-Ip` em algumas rotas → cortado | Compat fraca (UA `node` + `X-Cnc-Client-Ip` libera). Frontend já manda esse header em todas as chamadas BFF. Próximo PR migra para UA `cnc-internal/1.0` + token explicitamente.                                    |
+| Bot forja `X-Cnc-Client-Ip` para burlar                                               | É camada FRACA. Mas (a) é header custom específico do projeto que bots casuais não conhecem; (b) bot ainda passa pelo rate limit normal por IP forjado; (c) caminho preferido é `cnc-internal/1.0 + token` (forte). |
+| `PUBLIC_404_STORM_THRESHOLD=15` muito baixo, bloqueia humanos navegando               | Improvável: humano não bate 15 URLs 404 em 60s. Caso aconteça, aumentar via env (suporta até 1000).                                                                                                                 |
+| Slug abusivo legítimo (anúncio com nome ultra longo)                                  | Limite é 120 chars OU 9+ hífens — anúncios reais raramente têm slug assim. Se acontecer, ajustar `MAX_SAFE_SLUG_LENGTH`.                                                                                            |
 
 ## Rollback (sem deploy)
 
-| Mudança | Reverso |
-|---|---|
-| Bot blocker (incluindo UA `node`) | `BAD_BOTS_BLOCKED=false` |
-| 404 storm guard | `PUBLIC_404_STORM_GUARD_ENABLED=false` |
-| Legacy routes guard | `git revert` (sem env — sempre ligado, é puramente defensivo) |
-| Error handler 404 enxuto | `git revert` (não tem env) |
-| CF-Connecting-IP | `git revert` |
+| Mudança                           | Reverso                                                       |
+| --------------------------------- | ------------------------------------------------------------- |
+| Bot blocker (incluindo UA `node`) | `BAD_BOTS_BLOCKED=false`                                      |
+| 404 storm guard                   | `PUBLIC_404_STORM_GUARD_ENABLED=false`                        |
+| Legacy routes guard               | `git revert` (sem env — sempre ligado, é puramente defensivo) |
+| Error handler 404 enxuto          | `git revert` (não tem env)                                    |
+| CF-Connecting-IP                  | `git revert`                                                  |
 
 Nada toca banco, `request_audit_logs`, frontend, ranking, planos, layout, design system ou monetização.
 

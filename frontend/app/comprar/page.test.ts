@@ -77,9 +77,7 @@ describe("/comprar — sem território explícito", () => {
   });
 
   it("infere o estado pelo sufixo do slug se o cookie não trouxer state", async () => {
-    setCookie(
-      encodeURIComponent(JSON.stringify({ slug: "curitiba-pr", name: "Curitiba" }))
-    );
+    setCookie(encodeURIComponent(JSON.stringify({ slug: "curitiba-pr", name: "Curitiba" })));
     const ComprarEntryPage = await importPage();
     // Quando state não está no cookie, parseCityCookieValue assume "SP" como
     // fallback. Não inferimos UF pelo slug nesse caso — comportamento
@@ -106,9 +104,9 @@ describe("/comprar — com território explícito (redirect canonical)", () => {
   it("redireciona para /comprar/cidade/[slug] quando city_slug é válido", async () => {
     const ComprarEntryPage = await importPage();
 
-    await expect(
-      ComprarEntryPage({ searchParams: { city_slug: "atibaia-sp" } })
-    ).rejects.toThrow(/NEXT_REDIRECT/);
+    await expect(ComprarEntryPage({ searchParams: { city_slug: "atibaia-sp" } })).rejects.toThrow(
+      /NEXT_REDIRECT/
+    );
 
     expect(redirectMock).toHaveBeenCalledTimes(1);
     const target = redirectMock.mock.calls[0][0];
@@ -142,9 +140,9 @@ describe("/comprar — com território explícito (redirect canonical)", () => {
 
   it("city_slug inválido (sem UF) cai no redirect default do estado", async () => {
     const ComprarEntryPage = await importPage();
-    await expect(
-      ComprarEntryPage({ searchParams: { city_slug: "cidade-fake" } })
-    ).rejects.toThrow(/NEXT_REDIRECT/);
+    await expect(ComprarEntryPage({ searchParams: { city_slug: "cidade-fake" } })).rejects.toThrow(
+      /NEXT_REDIRECT/
+    );
     const target = redirectMock.mock.calls[0][0];
     expect(target).toMatch(/^\/comprar\/estado\/sp(?:\?|$)/);
   });

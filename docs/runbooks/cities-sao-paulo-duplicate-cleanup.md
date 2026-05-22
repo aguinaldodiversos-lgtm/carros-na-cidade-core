@@ -48,10 +48,10 @@ vez de simplesmente renomear uma.
 
 Auditoria identificou 2 ads ativos com `city_id=1`:
 
-| ad.id | title | hipótese |
-|---|---|---|
-| `80` | `Test Vehicle Test` | provavelmente teste (texto genérico) |
-| `9` | `Carro teste (seed)` | claramente seed/teste (palavra "seed") |
+| ad.id | title                | hipótese                               |
+| ----- | -------------------- | -------------------------------------- |
+| `80`  | `Test Vehicle Test`  | provavelmente teste (texto genérico)   |
+| `9`   | `Carro teste (seed)` | claramente seed/teste (palavra "seed") |
 
 **Hipótese forte:** ambos são lixo de seed/desenvolvimento. Confirmar em
 §2.6. Se confirmado, cenário A de §3 aplica: despublicar os ads,
@@ -91,11 +91,11 @@ ORDER BY city_id;
 
 **Decisão por cenário:**
 
-| Resultado | Cenário inicial provável |
-|---|---|
-| `city_id=1` tem 2 active (e §2.6 confirma "teste") | **A** — despublicar testes. |
-| `city_id=1` tem ≥ 1 active e §2.6 mostra ad real | **B** — migrar `city_id`. |
-| `city_id=1` tem ads em outras tabelas além de `ads` (§2.7) | **C** — merge complexo. |
+| Resultado                                                  | Cenário inicial provável    |
+| ---------------------------------------------------------- | --------------------------- |
+| `city_id=1` tem 2 active (e §2.6 confirma "teste")         | **A** — despublicar testes. |
+| `city_id=1` tem ≥ 1 active e §2.6 mostra ad real           | **B** — migrar `city_id`.   |
+| `city_id=1` tem ads em outras tabelas além de `ads` (§2.7) | **C** — merge complexo.     |
 
 ### 2.3 Listar TODOS os ads de `city_id=1` (não só os 2 já conhecidos)
 
@@ -115,6 +115,7 @@ ORDER BY created_at DESC;
 ```
 
 **Verificar visualmente:**
+
 - `title` parece teste/seed ("test", "seed", "lorem", etc)?
 - `user_id` é de uma conta de teste/dev (ex.: `dev@`, `seed@`)?
 - `brand`/`model` são placeholders genéricos?
@@ -131,10 +132,10 @@ WHERE city_id = 5278
 
 **Resultado importa para o sitemap:**
 
-| `total` | Implicação |
-|---|---|
-| `0` | Mesmo após cleanup, São Paulo (id=5278) só entra no sitemap se ganhar ad real. Hoje não entra de jeito nenhum. |
-| `>= 1` | Após cleanup (e migração de §3.B se for o caso), São Paulo passa a aparecer no fallback do bootstrap. |
+| `total` | Implicação                                                                                                     |
+| ------- | -------------------------------------------------------------------------------------------------------------- |
+| `0`     | Mesmo após cleanup, São Paulo (id=5278) só entra no sitemap se ganhar ad real. Hoje não entra de jeito nenhum. |
+| `>= 1`  | Após cleanup (e migração de §3.B se for o caso), São Paulo passa a aparecer no fallback do bootstrap.          |
 
 ### 2.5 Confirmar índice UNIQUE em `cities.slug`
 
@@ -169,6 +170,7 @@ ORDER BY id;
 ```
 
 **Critério forte para "é teste":**
+
 - `title` casa o regex de palavras de teste; OU
 - `user_id` é uma conta marcada como `is_test` / `email LIKE '%@test%'`
   (ver §2.6.1); OU
@@ -217,10 +219,10 @@ ORDER BY tabela;
 
 **Resultado importa para definir o cenário:**
 
-| Cenário | Critério |
-|---|---|
-| **A (testes)** | Apenas `ads` referencia `city_id=1`, com 1-2 linhas todas marcadas como teste em §2.6. |
-| **B (ads reais)** | Apenas `ads` referencia `city_id=1`, mas alguma linha NÃO é teste. |
+| Cenário             | Critério                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| **A (testes)**      | Apenas `ads` referencia `city_id=1`, com 1-2 linhas todas marcadas como teste em §2.6.                    |
+| **B (ads reais)**   | Apenas `ads` referencia `city_id=1`, mas alguma linha NÃO é teste.                                        |
 | **C (refs fortes)** | Outras tabelas (`city_scores`, `city_metrics`, `seo_cluster_plans`, etc.) também referenciam `city_id=1`. |
 
 ### 2.8 Confirmar schema de `cities` (colunas relevantes)
@@ -233,6 +235,7 @@ ORDER BY ordinal_position;
 ```
 
 **Verificar:**
+
 - `is_active` existe? (decisão: marcar `id=1` como inativo em vez de
   deletar — opção em §3.A).
 - `updated_at` existe? (decisão: incluir/omitir do `SET`).
@@ -246,12 +249,14 @@ ORDER BY ordinal_position;
 ### 3.A — Ads de `city_id=1` são testes (cenário esperado)
 
 **Pré-condições (todas devem ser TRUE):**
+
 - §2.6 mostrou todos os ads de `city_id=1` como `parece_teste != 'nao'`.
 - §2.7 não retornou outras tabelas referenciando `city_id=1`.
 - §2.5 confirmou índice UNIQUE em slug (não vamos colidir, mas é
   contexto importante).
 
 **Plano:**
+
 1. Despublicar/arquivar os ads de teste (sem deletar — conservador).
 2. Opcionalmente marcar `cities.id=1` como `is_active=FALSE` (se a
    coluna existir) — fica fora de qualquer query pública mas preserva
@@ -318,6 +323,7 @@ COMMIT;
 ```
 
 **Rollback:**
+
 ```sql
 -- A1 reverso (se ainda quisermos os ads ativos):
 UPDATE ads SET status = 'active', updated_at = NOW()
@@ -333,11 +339,13 @@ WHERE id = 1;
 ### 3.B — Ads de `city_id=1` são reais (precisam ser preservados)
 
 **Pré-condições:**
+
 - §2.6 mostrou ≥ 1 ad com `parece_teste = 'nao'`.
 - §2.7 não retornou outras tabelas (caso contrário, vai para §3.C).
 - §2.5 confirmou UNIQUE em slug.
 
 **Plano:**
+
 1. **Migrar** `ads.city_id` de `1` para `5278` (a referência canônica).
 2. Validar que nenhum ad ficou com `city_id=1`.
 3. Após migração, opcionalmente desativar `id=1` (passo A2).
@@ -379,6 +387,7 @@ COMMIT;
 **Após COMMIT, opcionalmente Passo A2** (desativar `cities.id=1`).
 
 **Rollback:**
+
 ```sql
 -- Volta os ads pra city_id=1, usando o timestamp capturado:
 BEGIN;
@@ -400,6 +409,7 @@ COMMIT;
 ### 3.C — Há referências fortes em métricas/scores
 
 **Pré-condições:**
+
 - §2.7 retornou ≥ 1 tabela além de `ads` referenciando `city_id=1`
   (ex.: `city_scores`, `city_metrics`, `city_targets`,
   `seo_cluster_plans`, `seo_publications`).
@@ -429,6 +439,7 @@ Não tentar resolver dentro deste runbook.
 **Manter São Paulo FORA do sitemap até a limpeza acontecer.**
 
 Já está fora hoje:
+
 - `id=1` é filtrado pelo regex de slug canônico no fallback do bootstrap.
 - `id=5278` não tem ads ativos (ou tem zero — confirmar §2.4) → não
   passa o filtro de `JOIN ads` no fallback.
@@ -461,6 +472,7 @@ estoque.
 ## 5. Checklist de execução por cenário
 
 ### Antes de qualquer SQL de §3:
+
 - [ ] §2.1 confirmou exatamente 2 linhas (`id=1` e `id=5278`).
 - [ ] §2.2 contagens registradas.
 - [ ] §2.3 todos os ads de `city_id=1` listados (não só os 2 conhecidos).
@@ -468,23 +480,25 @@ estoque.
 - [ ] §2.5 índice UNIQUE em `slug` confirmado.
 - [ ] §2.6 cada ad classificado como teste/real.
 - [ ] §2.7 outras tabelas referenciantes mapeadas (cenário A só vale
-       se ZERO outras tabelas).
+      se ZERO outras tabelas).
 - [ ] §2.8 schema de `cities` confirmado (`is_active`, `updated_at`,
-       `deleted_at` existem ou não).
+      `deleted_at` existem ou não).
 
 ### Cenário escolhido:
+
 - [ ] **A** se §2.6 = todos teste e §2.7 = vazio.
 - [ ] **B** se §2.6 = ≥ 1 real e §2.7 = vazio.
 - [ ] **C** se §2.7 ≠ vazio → abrir runbook próprio, parar aqui.
 
 ### Pós-execução (apenas se A ou B foram aplicados):
+
 - [ ] Validação imediata via `SELECT` (já dentro da transação).
 - [ ] `COMMIT` (não `ROLLBACK`).
 - [ ] Rodar `node scripts/seo/bootstrap-cluster-plans.mjs --dry-run --limit=10`.
 - [ ] Verificar log: `totalErrors=0`, sem `sæo`, samples coerentes com a
-       expectativa.
+      expectativa.
 - [ ] Decidir se aplica passo A2 (`cities.id=1 → is_active=FALSE`) em
-       runbook próprio.
+      runbook próprio.
 
 ---
 
@@ -492,17 +506,17 @@ estoque.
 
 - ❌ **NÃO** executar §3 sem completar §2.
 - ❌ **NÃO** rodar `UPDATE cities SET slug='sao-paulo-sp' WHERE id=1`
-      — quebra UNIQUE.
+  — quebra UNIQUE.
 - ❌ **NÃO** `DELETE FROM cities WHERE id=1` sem antes resolver as FKs
-      (preferir `is_active=FALSE`).
+  (preferir `is_active=FALSE`).
 - ❌ **NÃO** estender este runbook para outras cidades duplicadas
-      (cada caso é caso).
+  (cada caso é caso).
 - ❌ **NÃO** rodar `bootstrap-cluster-plans.mjs --yes` durante a
-      execução de §3 (risco de criar `seo_cluster_plans` com state
-      intermediário).
+  execução de §3 (risco de criar `seo_cluster_plans` com state
+  intermediário).
 - ❌ **NÃO** alterar layout, frontend, sitemap em código, canonical em
-      código, robots, rotas, ranking, planos, Página Regional,
-      RUN_WORKERS, env do Render.
+  código, robots, rotas, ranking, planos, Página Regional,
+  RUN_WORKERS, env do Render.
 
 ---
 
@@ -522,6 +536,7 @@ node scripts/maintenance/audit-sao-paulo-duplicate.mjs --json
 ```
 
 O script:
+
 - Compara `cities` id=1 vs id=5278 vs qualquer outro com slug/nome
   parecido com São Paulo.
 - Lista e classifica todos os ads de city_id=1 e city_id=5278 (regex
@@ -549,6 +564,7 @@ node scripts/maintenance/cleanup-sao-paulo-duplicate.mjs --scenario=archive-test
 ```
 
 O script:
+
 - Aborta se `--scenario` ausente.
 - Aborta se cenário desconhecido.
 - Re-valida invariantes (slug atual de id=1 e id=5278; ads esperados
@@ -565,6 +581,7 @@ node scripts/maintenance/cleanup-sao-paulo-duplicate.mjs --scenario=archive-test
 ```
 
 Mesmo com `--yes`, o script **aborta antes do BEGIN** se detectar:
+
 - Evento sensível (paid / price > 0) em `city_id=1`.
 - `region_memberships` referenciando `city_id=1`.
 
@@ -602,14 +619,14 @@ node scripts/maintenance/cleanup-sao-paulo-duplicate.mjs \
 
 **O que faz dentro de uma única transação (BEGIN/COMMIT, ROLLBACK em erro):**
 
-| # | Operação | Tabela | Tipo |
-|---|---|---|---|
-| 1 | `status='cancelled', payment_status='test_cancelled', price=0` | `events` (id=4) | UPDATE |
-| 2 | `status='archived'` | `ads` (id IN (9,80)) | UPDATE |
-| 3 | `DELETE` linha autorreferente quebrada (base=1, member=1, dist=0) | `region_memberships` | DELETE |
-| 4 | `DELETE` métricas zeradas | `city_metrics` (city_id=1) | DELETE |
-| 5 | `DELETE` city_status='exploring' score=0 | `city_status` (city_id=1) | DELETE |
-| 6 | `is_active=false` (NÃO deleta) | `cities` (id=1) | UPDATE |
+| #   | Operação                                                          | Tabela                     | Tipo   |
+| --- | ----------------------------------------------------------------- | -------------------------- | ------ |
+| 1   | `status='cancelled', payment_status='test_cancelled', price=0`    | `events` (id=4)            | UPDATE |
+| 2   | `status='archived'`                                               | `ads` (id IN (9,80))       | UPDATE |
+| 3   | `DELETE` linha autorreferente quebrada (base=1, member=1, dist=0) | `region_memberships`       | DELETE |
+| 4   | `DELETE` métricas zeradas                                         | `city_metrics` (city_id=1) | DELETE |
+| 5   | `DELETE` city_status='exploring' score=0                          | `city_status` (city_id=1)  | DELETE |
+| 6   | `is_active=false` (NÃO deleta)                                    | `cities` (id=1)            | UPDATE |
 
 **O que o script NÃO faz:**
 
@@ -618,7 +635,7 @@ node scripts/maintenance/cleanup-sao-paulo-duplicate.mjs \
 - ❌ NÃO tenta `slug='sao-paulo-sp'` em id=1 (quebraria UNIQUE).
 - ❌ NÃO mexe em outras cidades.
 - ❌ NÃO toca `seo_cluster_plans`, `seo_publications`, `leads`,
-   `dealer_leads`, `event_queue`, `city_scores` — pré-condição #8 abortaria.
+  `dealer_leads`, `event_queue`, `city_scores` — pré-condição #8 abortaria.
 
 **8 categorias de pré-condição checadas antes do BEGIN:**
 
@@ -652,6 +669,7 @@ node scripts/maintenance/audit-sao-paulo-duplicate.mjs --json
 ```
 
 **Esperado:**
+
 - `events city_id=1`: 1 linha com `status='cancelled'`, `payment_status='test_cancelled'`, `price=0` → `sensivel=false`.
 - `ads city_id=1`: 0 ativos (2 com `status='archived'`).
 - `city_metrics city_id=1`: 0 linhas (ou seja, sem registro).

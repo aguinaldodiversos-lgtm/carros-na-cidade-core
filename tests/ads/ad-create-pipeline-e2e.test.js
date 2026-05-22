@@ -47,19 +47,11 @@ vi.mock("../../src/modules/fipe/fipe.provider.js", () => ({
   __fipeProviderCacheSize: vi.fn(),
 }));
 
-const eligibility = await import(
-  "../../src/modules/ads/ads.publish.eligibility.service.js"
-);
-const persistence = await import(
-  "../../src/modules/ads/ads.persistence.service.js"
-);
-const riskRepo = await import(
-  "../../src/modules/ads/risk/ad-risk.repository.js"
-);
+const eligibility = await import("../../src/modules/ads/ads.publish.eligibility.service.js");
+const persistence = await import("../../src/modules/ads/ads.persistence.service.js");
+const riskRepo = await import("../../src/modules/ads/risk/ad-risk.repository.js");
 const provider = await import("../../src/modules/fipe/fipe.provider.js");
-const { createAdNormalized } = await import(
-  "../../src/modules/ads/ads.create.pipeline.service.js"
-);
+const { createAdNormalized } = await import("../../src/modules/ads/ads.create.pipeline.service.js");
 
 /** Códigos FIPE canônicos válidos para o pipeline cotar via provider. */
 const FIPE_CODES = {
@@ -133,40 +125,31 @@ describe("E2E — pipeline de criação", () => {
     // Provider real retorna 100_000; cliente tenta enviar 70_000 (igual ao preço)
     // como tentativa de spoof. Backend ignora o hint e usa 100_000.
     provider.quoteByCodes.mockResolvedValue({ ok: true, price: 100_000 });
-    const result = await createAdNormalized(
-      basePayload({ price: 70_000, fipe_value: 70_000 }),
-      { id: "user-1" }
-    );
+    const result = await createAdNormalized(basePayload({ price: 70_000, fipe_value: 70_000 }), {
+      id: "user-1",
+    });
     expect(result.status).toBe("pending_review");
     expect(result.moderation_status).toBe("pending_review");
     const codes = result.risk_reasons.map((r) => r.code);
     expect(codes).toContain("PRICE_BELOW_FIPE_REVIEW");
-    const eventTypes = riskRepo.recordModerationEvent.mock.calls.map(
-      ([e]) => e.eventType
-    );
+    const eventTypes = riskRepo.recordModerationEvent.mock.calls.map(([e]) => e.eventType);
     expect(eventTypes).toContain("sent_to_review");
   });
 
   it("C. FIPE server-side detecta -45% → PENDING_REVIEW critical", async () => {
     provider.quoteByCodes.mockResolvedValue({ ok: true, price: 100_000 });
-    const result = await createAdNormalized(
-      basePayload({ price: 55_000, fipe_value: 55_000 }),
-      { id: "user-1" }
-    );
+    const result = await createAdNormalized(basePayload({ price: 55_000, fipe_value: 55_000 }), {
+      id: "user-1",
+    });
     expect(result.status).toBe("pending_review");
     expect(result.risk_level).toBe("critical");
-    const critical = result.risk_reasons.find(
-      (r) => r.code === "PRICE_FAR_BELOW_FIPE_CRITICAL"
-    );
+    const critical = result.risk_reasons.find((r) => r.code === "PRICE_FAR_BELOW_FIPE_CRITICAL");
     expect(critical?.severity).toBe("critical");
   });
 
   it("D. FIPE indisponível (provider retorna ok=false) → ACTIVE + FIPE_UNAVAILABLE", async () => {
     provider.quoteByCodes.mockResolvedValue({ ok: false, reason: "network_error" });
-    const result = await createAdNormalized(
-      basePayload({ fipe_value: null }),
-      { id: "user-1" }
-    );
+    const result = await createAdNormalized(basePayload({ fipe_value: null }), { id: "user-1" });
     expect(result.status).toBe("active");
     const codes = result.risk_reasons.map((r) => r.code);
     expect(codes).toContain("FIPE_UNAVAILABLE");
@@ -174,9 +157,7 @@ describe("E2E — pipeline de criação", () => {
 
   it("preço inválido (zero) → AppError 400 sem INSERT", async () => {
     let err;
-    await createAdNormalized(basePayload({ price: 0 }), { id: "user-1" }).catch(
-      (e) => (err = e)
-    );
+    await createAdNormalized(basePayload({ price: 0 }), { id: "user-1" }).catch((e) => (err = e));
     expect(err).toBeTruthy();
     expect(err.statusCode).toBe(400);
     // Nenhum INSERT, nenhum snapshot — anúncio nunca existiu.
@@ -202,9 +183,7 @@ describe("E2E — filtros públicos só ACTIVE (Tarefa 7 saneamento)", () => {
       expect(String(countQuery)).toMatch(/a\.status\s*=\s*'active'/);
       // Nenhum SQL público filtra explicitamente por outros status.
       for (const blocked of ["pending_review", "rejected", "sold", "expired"]) {
-        expect(String(dataQuery)).not.toMatch(
-          new RegExp(`a\\.status\\s*=\\s*'${blocked}'`)
-        );
+        expect(String(dataQuery)).not.toMatch(new RegExp(`a\\.status\\s*=\\s*'${blocked}'`));
       }
     }
   });

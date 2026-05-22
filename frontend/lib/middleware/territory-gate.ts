@@ -19,9 +19,7 @@ import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
  * facilitar teste unitário e portabilidade.
  */
 
-const VALID_UFS: ReadonlySet<string> = new Set<string>(
-  BRAZIL_UFS.map((u) => u.value)
-);
+const VALID_UFS: ReadonlySet<string> = new Set<string>(BRAZIL_UFS.map((u) => u.value));
 
 /**
  * Captura `/carros-usados/[uf]` (2 segmentos). NÃO casa com

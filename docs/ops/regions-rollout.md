@@ -21,14 +21,14 @@ Tempo total esperado: **~5-10 minutos**, sendo ~3-5 min de execução do
 
 ## Pré-requisitos
 
-| Item | Verificação |
-|---|---|
-| Migration 020 aplicada | `SELECT 1 FROM subscription_plans LIMIT 1;` retorna 1 row. |
-| Migration 021 aplicada | `\d region_memberships` mostra a tabela; `\d cities` mostra colunas `latitude` e `longitude`. |
-| `cities` populado (5570 municípios IBGE) | `SELECT COUNT(*) FROM cities;` ≈ 5570. Se < 5000, rodar `npm run seed:cities` ANTES. |
-| Acesso ao Render Shell | Painel Render → service `carros-na-cidade-core` → `Shell`. |
-| Acesso ao DB de prod (read-only) | psql ou GUI com `DATABASE_URL` (Render → Environment). |
-| Node 20+ no laptop do operador | `node --version` para rodar o smoke. |
+| Item                                     | Verificação                                                                                   |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Migration 020 aplicada                   | `SELECT 1 FROM subscription_plans LIMIT 1;` retorna 1 row.                                    |
+| Migration 021 aplicada                   | `\d region_memberships` mostra a tabela; `\d cities` mostra colunas `latitude` e `longitude`. |
+| `cities` populado (5570 municípios IBGE) | `SELECT COUNT(*) FROM cities;` ≈ 5570. Se < 5000, rodar `npm run seed:cities` ANTES.          |
+| Acesso ao Render Shell                   | Painel Render → service `carros-na-cidade-core` → `Shell`.                                    |
+| Acesso ao DB de prod (read-only)         | psql ou GUI com `DATABASE_URL` (Render → Environment).                                        |
+| Node 20+ no laptop do operador           | `node --version` para rodar o smoke.                                                          |
 
 ---
 
@@ -62,7 +62,7 @@ echo "$NEW_TOKEN"
 
 1. Render dashboard → service `carros-na-cidade-portal` → tab `Environment`.
 2. `Add Environment Variable`:
-   - Key: `INTERNAL_API_TOKEN`  ← **mesmo nome, MESMO valor** do backend.
+   - Key: `INTERNAL_API_TOKEN` ← **mesmo nome, MESMO valor** do backend.
    - Value: cola o `NEW_TOKEN` (idêntico ao do backend).
    - Sync: **OFF**.
    - **Atenção**: NÃO usar prefixo `NEXT_PUBLIC_*`. O `import "server-only"`
@@ -352,13 +352,13 @@ finais.** Cache Redis (TTL 5 min) flusha sozinho.
 
 ## Quando re-rodar
 
-| Gatilho | Ação |
-|---|---|
-| Trimestralmente (manutenção) | `npm run seed:cities-geo && npm run regions:build`. Cache > 30 dias força refetch da fonte. |
+| Gatilho                                    | Ação                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Trimestralmente (manutenção)               | `npm run seed:cities-geo && npm run regions:build`. Cache > 30 dias força refetch da fonte.  |
 | Após `npm run seed:cities` (cidades novas) | `npm run seed:cities-geo && npm run regions:build`. Sem `--force` — só popula cidades novas. |
-| Após mudança de schema em `cities` | Reavaliar — nova coluna pode requerer ajuste. |
-| Após bump dos limiares de layer (worker) | `npm run regions:build` (NÃO precisa re-popular geo). |
-| Após detecção de slug malformado | Corrigir em `cities` primeiro, depois `seed:cities-geo --force`. |
+| Após mudança de schema em `cities`         | Reavaliar — nova coluna pode requerer ajuste.                                                |
+| Após bump dos limiares de layer (worker)   | `npm run regions:build` (NÃO precisa re-popular geo).                                        |
+| Após detecção de slug malformado           | Corrigir em `cities` primeiro, depois `seed:cities-geo --force`.                             |
 
 ---
 
@@ -369,6 +369,7 @@ finais.** Cache Redis (TTL 5 min) flusha sozinho.
 Causa: GitHub raw rate-limited, fonte movida, ou rede do Render bloqueada.
 
 Mitigação:
+
 - Se cache local existe (mesmo stale): script cai automaticamente nele.
   Verificar `ls -la /opt/render/project/src/scripts/data/`.
 - Se cache não existe e a fonte está fora: salvar manualmente o JSON
@@ -380,6 +381,7 @@ Mitigação:
 Causa: primeira execução em ambiente sem rede.
 
 Mitigação:
+
 - `export CITIES_GEO_SOURCE_FILE=/path/to/local/fixture.json` e rerodar.
   Útil em ambientes air-gapped.
 
@@ -388,6 +390,7 @@ Mitigação:
 Causa: I/O do Postgres saturado (uma transação por cidade-base).
 
 Mitigação:
+
 - Verificar Render metrics (CPU/memory do DB).
 - Abortar (Ctrl+C); o estado em `region_memberships` fica parcial mas
   consistente (cada base é uma transação isolada).
@@ -398,6 +401,7 @@ Mitigação:
 Causa: cidade-base com poucos vizinhos < 60 km.
 
 Mitigação:
+
 - Se o slug for de capital: erro real. Investigar `regions:build` logs;
   rodar `regions:build --force` (se script tiver flag — hoje não tem;
   basta rerodar, é idempotente) ou repopular geo com `--force`.
@@ -407,6 +411,7 @@ Mitigação:
 ### Smoke retorna 404 com token correto
 
 Causas possíveis:
+
 1. Token no env do laptop ≠ token no Render (typo, copy-paste corrompido).
 2. `INTERNAL_API_TOKEN` não está setado no service Render (verificar
    Environment tab — value não vazio).
@@ -417,6 +422,7 @@ Causas possíveis:
 Causa: cidade-base existe mas `regions:build` ainda não processou.
 
 Mitigação:
+
 - Confirmar que `regions:build` rodou com sucesso (etapa 3).
 - Verificar SQL: `SELECT COUNT(*) FROM region_memberships WHERE base_city_id = (SELECT id FROM cities WHERE slug = 'sao-paulo-sp') AND member_city_id != base_city_id;` — se 0, rodar build.
 

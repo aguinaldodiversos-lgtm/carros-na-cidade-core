@@ -92,9 +92,7 @@ describe("createBoostCheckout — preço fixo do backend (anti-spoof)", () => {
       String(sql).includes("INSERT INTO payment_intents")
     );
     // metadata é serializado como JSON string nos params
-    const metaParam = insertCall[1].find(
-      (p) => typeof p === "string" && p.includes("boost_days")
-    );
+    const metaParam = insertCall[1].find((p) => typeof p === "string" && p.includes("boost_days"));
     expect(metaParam).toBeTruthy();
     const parsed = JSON.parse(metaParam);
     expect(parsed.boost_days).toBe("7");
@@ -218,9 +216,7 @@ describe("applyBoostApproval — regra de prazo +N dias", () => {
     expect(updateCall).toBeTruthy();
     const [sql, params] = updateCall;
     // Branch de extensão: `highlight_until + ($2 || ' days')::interval`
-    expect(String(sql)).toMatch(
-      /highlight_until\s*\+\s*\(\$2\s*\|\|\s*' days'\)::interval/
-    );
+    expect(String(sql)).toMatch(/highlight_until\s*\+\s*\(\$2\s*\|\|\s*' days'\)::interval/);
     // Branch de início do zero: `NOW() + ($2 || ' days')::interval`
     expect(String(sql)).toMatch(/NOW\(\)\s*\+\s*\(\$2\s*\|\|\s*' days'\)::interval/);
     // Anúncio soft-deleted é defendido

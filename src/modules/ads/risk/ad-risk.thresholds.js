@@ -79,10 +79,7 @@ export const NEW_ACCOUNT_DAYS_THRESHOLD = parseIntOrFallback(
  * e gera rejeição imediata. NÃO é o piso comercial — é só uma sentinela
  * contra valores claramente impossíveis (R$ 1, R$ 100, R$ 999).
  */
-export const PRICE_MIN_VALID_BRL = parseIntOrFallback(
-  process.env.PRICE_MIN_VALID_BRL,
-  1000
-);
+export const PRICE_MIN_VALID_BRL = parseIntOrFallback(process.env.PRICE_MIN_VALID_BRL, 1000);
 
 /**
  * Conversor uniforme de score numérico em risk_level textual.

@@ -6,12 +6,12 @@ Data: 2026-05-17
 
 ## 1. Stack confirmada
 
-| Aspecto | Valor |
-|---|---|
-| Framework | Next.js 14.2.35 — **App Router** (`frontend/app/`) |
-| Linguagem | TypeScript 5.6.3 (strict mode) |
-| ORM | Nenhum — raw SQL + `pg@8.x` |
-| Banco | PostgreSQL (Render) — sem PostGIS, sem `earthdistance` |
+| Aspecto              | Valor                                                     |
+| -------------------- | --------------------------------------------------------- |
+| Framework            | Next.js 14.2.35 — **App Router** (`frontend/app/`)        |
+| Linguagem            | TypeScript 5.6.3 (strict mode)                            |
+| ORM                  | Nenhum — raw SQL + `pg@8.x`                               |
+| Banco                | PostgreSQL (Render) — sem PostGIS, sem `earthdistance`    |
 | `region_memberships` | Tabela existe (migration 021) com `distance_km` e `layer` |
 
 ---
@@ -23,20 +23,20 @@ SELECT id, name, slug, state FROM cities
 WHERE name IN ('Atibaia', 'São Paulo', 'Campinas') LIMIT 10;
 ```
 
-| id   | name       | slug           | state |
-|------|------------|----------------|-------|
-| 4761 | Atibaia    | atibaia-sp     | SP    |
-| 4822 | Campinas   | campinas-sp    | SP    |
-| 5278 | São Paulo  | sao-paulo-sp   | SP    |
+| id   | name      | slug         | state |
+| ---- | --------- | ------------ | ----- |
+| 4761 | Atibaia   | atibaia-sp   | SP    |
+| 4822 | Campinas  | campinas-sp  | SP    |
+| 5278 | São Paulo | sao-paulo-sp | SP    |
 
 Amostra geral (primeiras 10 linhas, todos os estados):
 
-| id | name              | slug                 | state |
-|----|-------------------|----------------------|-------|
-| 1  | SÆo Paulo (¹)     | sæo-paulo (¹)        | SP    |
-| 2  | Acrelândia        | acrelandia-ac        | AC    |
-| 3  | Assis Brasil      | assis-brasil-ac      | AC    |
-| 7  | Cruzeiro do Sul   | cruzeiro-do-sul-ac   | AC    |
+| id  | name            | slug               | state |
+| --- | --------------- | ------------------ | ----- |
+| 1   | SÆo Paulo (¹)   | sæo-paulo (¹)      | SP    |
+| 2   | Acrelândia      | acrelandia-ac      | AC    |
+| 3   | Assis Brasil    | assis-brasil-ac    | AC    |
+| 7   | Cruzeiro do Sul | cruzeiro-do-sul-ac | AC    |
 
 > (¹) Linha `id=1` tem encoding corrompido — slug `sæo-paulo` sem sufixo UF.
 > É um artefato de seed antigo; o canonical de São Paulo é `id=5278` / `sao-paulo-sp`.
@@ -78,6 +78,7 @@ O `[uf]` já está no path — repetir o UF no slug âncora seria redundante e f
 ```
 
 **Mapeamento de slug:**
+
 - DB slug: `atibaia-sp` (formato atual)
 - Âncora na nova URL: `atibaia` (slug sem sufixo UF)
 - Transformação: `slug.replace(/-{uf}$/, '')` onde `uf = state.toLowerCase()`
@@ -92,6 +93,7 @@ pra mapear `atibaia-sp` → `atibaia` quando construir as URLs `/sp/regiao/[anco
 ### 5a. Fix urgente: 404 de `/carros-usados/regiao/[cidade]-sp`
 
 Em Next.js, `:cidade-sp` captura tudo antes do literal `-sp`:
+
 - `/carros-usados/regiao/atibaia-sp` → `cidade = "atibaia"`
 - `/carros-usados/regiao/sao-paulo-sp` → `cidade = "sao-paulo"`
 
@@ -132,6 +134,7 @@ Estes ficam para a Fase 4 porque as rotas destino (`/sp`, `/sp/regiao/*`, `/sp/c
 ## 6. Anomalia: linha `id=1` com slug corrompido
 
 A cidade `id=1` tem:
+
 - `name = 'SÆo Paulo'` (encoding quebrado)
 - `slug = 'sæo-paulo'` (sem sufixo UF, com caracter especial)
 
@@ -142,7 +145,8 @@ Recomendo investigar em Fase 2 se essa linha causa conflito ou simplesmente é i
 
 ## 7. Decisão sobre migrar slug para sem sufixo UF
 
-**Recomendação:** manter o formato atual (`atibaia-sp`) no banco por ora.  
+**Recomendação:** manter o formato atual (`atibaia-sp`) no banco por ora.
+
 - Todas as rotas existentes usam esse formato.
 - Mudar agora quebraria `/carros-em/`, `/cidade/`, e as queries de cidade.
 - A nova arquitetura deriva o âncora-slug na camada de aplicação: `slug.split('-').slice(0,-1).join('-')`.

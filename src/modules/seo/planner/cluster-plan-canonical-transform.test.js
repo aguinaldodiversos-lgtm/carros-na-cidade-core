@@ -91,7 +91,9 @@ describe("transformClusterPlanToCanonicalPath — skip explícito (bootstrap Op�
 
 describe("transformClusterPlanToCanonicalPath — validação fail-fast", () => {
   it("cluster null → throw", () => {
-    expect(() => transformClusterPlanToCanonicalPath(null, ATIBAIA)).toThrow(/cluster.*obrigatório/);
+    expect(() => transformClusterPlanToCanonicalPath(null, ATIBAIA)).toThrow(
+      /cluster.*obrigatório/
+    );
   });
 
   it("city null → throw", () => {

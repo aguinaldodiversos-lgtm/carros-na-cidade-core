@@ -82,7 +82,9 @@ describe("TerritorialFooterLinks — flag REGIONAL_PAGE_ENABLED ligada", () => {
   });
 
   it("hrefs corretos com encoding e UF lowercase", () => {
-    render(<TerritorialFooterLinks slug="rio-de-janeiro-rj" cityName="Rio de Janeiro" state="rj" />);
+    render(
+      <TerritorialFooterLinks slug="rio-de-janeiro-rj" cityName="Rio de Janeiro" state="rj" />
+    );
     expect(screen.getByTestId("region-cta-link").getAttribute("href")).toBe(
       "/carros-usados/regiao/rio-de-janeiro-rj"
     );

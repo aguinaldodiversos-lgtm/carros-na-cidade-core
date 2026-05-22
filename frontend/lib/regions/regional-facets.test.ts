@@ -99,10 +99,7 @@ describe("aggregateCityCountsFromAds", () => {
   });
 
   it("ignora cidade que não é base nem membro (defesa contra vazamento)", () => {
-    const ads = [
-      makeAd({ city: "Curitiba" }),
-      makeAd({ city: "Atibaia" }),
-    ];
+    const ads = [makeAd({ city: "Curitiba" }), makeAd({ city: "Atibaia" })];
     const out = aggregateCityCountsFromAds(ads, BASE, MEMBERS);
     expect(out.find((c) => c.slug === "atibaia-sp")?.count).toBe(1);
     expect(out.every((c) => c.slug !== "curitiba-pr")).toBe(true);
@@ -171,10 +168,7 @@ describe("sortAdsByPriorityAndProximity", () => {
   });
 
   it("anúncios de cidade fora do mapa caem para o final do grupo", () => {
-    const ads = [
-      makeAd({ id: 1, city: "Curitiba" }),
-      makeAd({ id: 2, city: "Atibaia" }),
-    ];
+    const ads = [makeAd({ id: 1, city: "Curitiba" }), makeAd({ id: 2, city: "Atibaia" })];
     const out = sortAdsByPriorityAndProximity(ads, BASE, MEMBERS);
     expect(out.map((a) => a.id)).toEqual([2, 1]);
   });
@@ -320,9 +314,7 @@ describe("computeAdPriorityTier — fonte canônica vs fallback heurístico", ()
     // Backend pode evoluir tier; valores fora de 1..4 são ignorados defensivamente.
     expect(computeAdPriorityTier(makeAd({ priority_tier: 0 as 1 }))).toBe(1);
     expect(computeAdPriorityTier(makeAd({ priority_tier: 5 as 4 }))).toBe(1);
-    expect(
-      computeAdPriorityTier(makeAd({ priority_tier: "3" as unknown as 3 }))
-    ).toBe(1);
+    expect(computeAdPriorityTier(makeAd({ priority_tier: "3" as unknown as 3 }))).toBe(1);
   });
 });
 
@@ -382,7 +374,10 @@ describe("pickDynamicOgImage", () => {
 
   it("descarta URL inválida (não-http) e tenta próximo candidato", () => {
     const ads = [
-      makeAd({ image_url: "data:image/png;base64,abc", cover_image_url: "https://cdn.example.com/ok.jpg" }),
+      makeAd({
+        image_url: "data:image/png;base64,abc",
+        cover_image_url: "https://cdn.example.com/ok.jpg",
+      }),
     ];
     expect(pickDynamicOgImage(ads)).toBe("https://cdn.example.com/ok.jpg");
   });

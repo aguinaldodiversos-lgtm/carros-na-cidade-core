@@ -92,12 +92,7 @@ function formatActiveOffers(total: number | undefined): string | null {
   return `+${rounded} ofertas ativas`;
 }
 
-export function HomeHero({
-  defaultCitySlug,
-  cityName,
-  stateName,
-  totalAds,
-}: HomeHeroProps) {
+export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: HomeHeroProps) {
   const router = useRouter();
   // Quando há cidade detectada, microcopy fala na cidade. Sem cidade, fala
   // no estado (vitrine estadual padrão).

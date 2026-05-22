@@ -46,9 +46,7 @@ function buildModel(variant: LocalSeoLandingModel["variant"]): LocalSeoLandingMo
 describe("buildLocalSeoMetadata — Fase 1: canonical de transição", () => {
   it("variant 'em' canonicaliza para si mesma (/carros-em/[slug])", () => {
     const meta = buildLocalSeoMetadata(buildModel("em"));
-    expect(meta.alternates?.canonical).toBe(
-      "https://carrosnacidade.com/carros-em/atibaia-sp"
-    );
+    expect(meta.alternates?.canonical).toBe("https://carrosnacidade.com/carros-em/atibaia-sp");
   });
 
   it("variant 'baratos' canonicaliza para si mesma (/carros-baratos-em/[slug])", () => {
@@ -60,9 +58,7 @@ describe("buildLocalSeoMetadata — Fase 1: canonical de transição", () => {
 
   it("variant 'automaticos' canonicaliza para /carros-em/[slug] (indexável da intenção mais próxima)", () => {
     const meta = buildLocalSeoMetadata(buildModel("automaticos"));
-    expect(meta.alternates?.canonical).toBe(
-      "https://carrosnacidade.com/carros-em/atibaia-sp"
-    );
+    expect(meta.alternates?.canonical).toBe("https://carrosnacidade.com/carros-em/atibaia-sp");
   });
 
   it("variant 'em' e 'baratos' permanecem indexáveis", () => {
@@ -130,9 +126,7 @@ describe("buildLocalSeoJsonLd — url alinhada à canonical de transição", () 
 
   it("variant 'baratos' devolve url self (/carros-baratos-em/[slug]) no JSON-LD", () => {
     const jsonLd = buildLocalSeoJsonLd(buildModel("baratos")) as { url?: string };
-    expect(jsonLd.url).toBe(
-      "https://carrosnacidade.com/carros-baratos-em/atibaia-sp"
-    );
+    expect(jsonLd.url).toBe("https://carrosnacidade.com/carros-baratos-em/atibaia-sp");
   });
 
   it("variant 'automaticos' devolve url /carros-em/[slug] no JSON-LD", () => {

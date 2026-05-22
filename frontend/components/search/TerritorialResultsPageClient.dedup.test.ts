@@ -22,12 +22,7 @@ import { describe, expect, it } from "vitest";
  */
 
 describe("TerritorialResultsPageClient — bloco 'Continuar em [cidade]' único", () => {
-  const filePath = join(
-    process.cwd(),
-    "components",
-    "search",
-    "TerritorialResultsPageClient.tsx"
-  );
+  const filePath = join(process.cwd(), "components", "search", "TerritorialResultsPageClient.tsx");
   const source = readFileSync(filePath, "utf8");
 
   it("renderiza <TerritorialInternalLinksSection> exatamente UMA vez", () => {

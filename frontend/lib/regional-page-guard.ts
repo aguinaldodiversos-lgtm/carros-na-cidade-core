@@ -74,9 +74,7 @@ export function extractRegionalSlug(pathname: string): string | null {
  * Esta função existe só para o middleware emitir o redirect 301 e para
  * compatibilidade com testes herdados — não usar em código novo.
  */
-export function extractAncoraParams(
-  pathname: string
-): { uf: string; ancora: string } | null {
+export function extractAncoraParams(pathname: string): { uf: string; ancora: string } | null {
   const match = ANCORA_PATH_REGEX.exec(pathname);
   if (!match) return null;
   return { uf: match[1], ancora: match[2] };
@@ -252,8 +250,13 @@ export async function validateAncoraPath(
   ancora: string,
   config: SlugValidationConfig = {}
 ): Promise<SlugValidation> {
-  const safeUf = String(uf || "").trim().toLowerCase().slice(0, 2);
-  const safeAncora = String(ancora || "").trim().toLowerCase();
+  const safeUf = String(uf || "")
+    .trim()
+    .toLowerCase()
+    .slice(0, 2);
+  const safeAncora = String(ancora || "")
+    .trim()
+    .toLowerCase();
   if (!safeUf || !safeAncora) return { kind: "not_found" };
 
   const apiBase = (config.apiBase ?? process.env.BACKEND_API_URL ?? "").replace(/\/+$/, "");
@@ -284,10 +287,7 @@ export async function validateAncoraPath(
       signal: controller.signal,
       next: {
         revalidate,
-        tags: [
-          "internal:regions",
-          `internal:regions:ancora:${safeUf}:${safeAncora}`,
-        ],
+        tags: ["internal:regions", `internal:regions:ancora:${safeUf}:${safeAncora}`],
       },
     });
 

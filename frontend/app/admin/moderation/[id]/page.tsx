@@ -16,11 +16,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
-import {
-  adminApi,
-  type ModerationAdDetail,
-  type ModerationRiskReason,
-} from "@/lib/admin/api";
+import { adminApi, type ModerationAdDetail, type ModerationRiskReason } from "@/lib/admin/api";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
 
 function fmtMoney(n: unknown) {
@@ -64,13 +60,11 @@ function parseReasons(raw: unknown): ModerationRiskReason[] {
 }
 
 function parseImages(raw: unknown): string[] {
-  if (Array.isArray(raw))
-    return raw.filter((u): u is string => typeof u === "string");
+  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string");
   if (typeof raw === "string") {
     try {
       const p = JSON.parse(raw);
-      if (Array.isArray(p))
-        return p.filter((u): u is string => typeof u === "string");
+      if (Array.isArray(p)) return p.filter((u): u is string => typeof u === "string");
     } catch {
       /* noop */
     }
@@ -94,8 +88,7 @@ export default function ModerationDetailPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (detail.loading) return <AdminLoadingState />;
-  if (detail.error)
-    return <AdminErrorState message={String(detail.error)} />;
+  if (detail.error) return <AdminErrorState message={String(detail.error)} />;
   if (!detail.data) return null;
 
   const { ad, signals, events } = detail.data.data;
@@ -148,8 +141,7 @@ export default function ModerationDetailPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-[#1f2c47]">{ad.title}</h1>
           <p className="mt-1 text-sm text-[#5e6b85]">
-            ID #{ad.id} · {ad.brand} {ad.model} {ad.year} · {ad.city ?? "—"}/
-            {ad.state ?? "—"}
+            ID #{ad.id} · {ad.brand} {ad.model} {ad.year} · {ad.city ?? "—"}/{ad.state ?? "—"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -216,13 +208,9 @@ export default function ModerationDetailPage() {
               <dt className="text-[#5e6b85]">Preço anunciado</dt>
               <dd className="font-bold text-[#0e62d8]">{fmtMoney(ad.price)}</dd>
               <dt className="text-[#5e6b85]">FIPE de referência</dt>
-              <dd className="font-semibold text-[#1f2c47]">
-                {fmtMoney(ad.fipe_reference_value)}
-              </dd>
+              <dd className="font-semibold text-[#1f2c47]">{fmtMoney(ad.fipe_reference_value)}</dd>
               <dt className="text-[#5e6b85]">Diferença vs FIPE</dt>
-              <dd className="font-semibold text-[#9a3412]">
-                {fmtPercent(ad.fipe_diff_percent)}
-              </dd>
+              <dd className="font-semibold text-[#9a3412]">{fmtPercent(ad.fipe_diff_percent)}</dd>
             </dl>
 
             {ad.description && (
@@ -242,13 +230,16 @@ export default function ModerationDetailPage() {
               <p className="text-sm text-[#5e6b85]">Nenhum sinal registrado.</p>
             ) : (
               <ul className="space-y-2 text-sm">
-                {(reasons.length > 0 ? reasons : signals.map((s) => ({
-                  code: s.signal_code,
-                  message: s.message,
-                  severity: s.severity,
-                  scoreDelta: s.score_delta,
-                  metadata: s.metadata,
-                }))).map((r, idx) => (
+                {(reasons.length > 0
+                  ? reasons
+                  : signals.map((s) => ({
+                      code: s.signal_code,
+                      message: s.message,
+                      severity: s.severity,
+                      scoreDelta: s.score_delta,
+                      metadata: s.metadata,
+                    }))
+                ).map((r, idx) => (
                   <li
                     key={`${r.code}-${idx}`}
                     className="rounded-md border border-[#e2e7f1] bg-[#f8fafe] p-3"
@@ -266,15 +257,9 @@ export default function ModerationDetailPage() {
                         </span>
                         <code className="text-xs text-[#1f2c47]">{r.code}</code>
                       </div>
-                      <span className="text-xs text-[#5e6b85]">
-                        +{r.scoreDelta ?? 0}
-                      </span>
+                      <span className="text-xs text-[#5e6b85]">+{r.scoreDelta ?? 0}</span>
                     </div>
-                    {r.message && (
-                      <p className="mt-1 text-[13px] text-[#34405e]">
-                        {r.message}
-                      </p>
-                    )}
+                    {r.message && <p className="mt-1 text-[13px] text-[#34405e]">{r.message}</p>}
                   </li>
                 ))}
               </ul>
@@ -303,9 +288,7 @@ export default function ModerationDetailPage() {
                         </span>
                       )}
                       {ev.reason && (
-                        <p className="mt-0.5 text-[12px] text-[#34405e]">
-                          {ev.reason}
-                        </p>
+                        <p className="mt-0.5 text-[12px] text-[#34405e]">{ev.reason}</p>
                       )}
                     </div>
                     <span className="text-[11px] text-[#5e6b85]">
@@ -327,21 +310,15 @@ export default function ModerationDetailPage() {
             <dl className="space-y-1 text-sm">
               <div>
                 <dt className="text-[#5e6b85]">Nome</dt>
-                <dd className="font-semibold text-[#1f2c47]">
-                  {ad.advertiser_name ?? "—"}
-                </dd>
+                <dd className="font-semibold text-[#1f2c47]">{ad.advertiser_name ?? "—"}</dd>
               </div>
               <div>
                 <dt className="text-[#5e6b85]">Empresa</dt>
-                <dd className="text-[#1f2c47]">
-                  {ad.advertiser_company ?? "—"}
-                </dd>
+                <dd className="text-[#1f2c47]">{ad.advertiser_company ?? "—"}</dd>
               </div>
               <div>
                 <dt className="text-[#5e6b85]">User ID</dt>
-                <dd className="font-mono text-xs text-[#1f2c47]">
-                  {ad.advertiser_user_id ?? "—"}
-                </dd>
+                <dd className="font-mono text-xs text-[#1f2c47]">{ad.advertiser_user_id ?? "—"}</dd>
               </div>
             </dl>
           </section>

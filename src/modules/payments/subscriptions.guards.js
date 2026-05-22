@@ -19,10 +19,7 @@ import { query } from "../../infrastructure/database/db.js";
  * que admin cadastre um plano novo no banco e ele escape acidentalmente
  * para esse fluxo sem revisão de produto.
  */
-export const ALLOWED_SUBSCRIPTION_PLAN_IDS = Object.freeze([
-  "cnpj-store-start",
-  "cnpj-store-pro",
-]);
+export const ALLOWED_SUBSCRIPTION_PLAN_IDS = Object.freeze(["cnpj-store-start", "cnpj-store-pro"]);
 
 /**
  * Planos explicitamente REJEITADOS mesmo que retornem como
@@ -31,10 +28,7 @@ export const ALLOWED_SUBSCRIPTION_PLAN_IDS = Object.freeze([
  *   - cnpj-evento-premium: produto Evento dormente
  *   - cpf-premium-highlight: descontinuado, substituído por boost-7d
  */
-const REJECTED_PLAN_IDS = Object.freeze([
-  "cnpj-evento-premium",
-  "cpf-premium-highlight",
-]);
+const REJECTED_PLAN_IDS = Object.freeze(["cnpj-evento-premium", "cpf-premium-highlight"]);
 
 /**
  * Estados locais que contam como "assinatura ainda viva". Bloqueiam
@@ -59,10 +53,7 @@ const LIVE_SUBSCRIPTION_STATUSES = Object.freeze(["active", "pending", "paused"]
 export function assertSubscriptionPlanAllowed(planId) {
   const id = String(planId || "").trim();
   if (REJECTED_PLAN_IDS.includes(id)) {
-    throw new AppError(
-      `Plano ${id} indisponivel para assinatura recorrente.`,
-      410
-    );
+    throw new AppError(`Plano ${id} indisponivel para assinatura recorrente.`, 410);
   }
   if (!ALLOWED_SUBSCRIPTION_PLAN_IDS.includes(id)) {
     throw new AppError(

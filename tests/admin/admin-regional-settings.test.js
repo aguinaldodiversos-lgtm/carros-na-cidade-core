@@ -100,9 +100,9 @@ describe("admin regional-settings: updateRegionalSettings", () => {
   });
 
   it("rejeita sem campo radius_km", async () => {
-    await expect(
-      updateRegionalSettings({ adminUserId: "1", payload: {} })
-    ).rejects.toThrow(/radius_km/);
+    await expect(updateRegionalSettings({ adminUserId: "1", payload: {} })).rejects.toThrow(
+      /radius_km/
+    );
   });
 
   it("rejeita radius_km não-numérico", async () => {

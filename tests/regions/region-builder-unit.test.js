@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  haversineKm,
-  pickRegionMembers,
-} from "../../scripts/build-region-memberships.mjs";
+import { haversineKm, pickRegionMembers } from "../../scripts/build-region-memberships.mjs";
 
 describe("haversineKm", () => {
   it("retorna 0 para o mesmo ponto", () => {

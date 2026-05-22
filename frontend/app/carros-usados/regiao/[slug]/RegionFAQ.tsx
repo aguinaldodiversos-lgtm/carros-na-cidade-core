@@ -28,13 +28,7 @@ interface RegionFAQProps {
   radiusKm: number;
 }
 
-export function RegionFAQ({
-  cityName,
-  citySlug,
-  stateUF,
-  members,
-  radiusKm,
-}: RegionFAQProps) {
+export function RegionFAQ({ cityName, citySlug, stateUF, members, radiusKm }: RegionFAQProps) {
   const entries = buildRegionFaqEntries({
     cityName,
     citySlug,
@@ -58,10 +52,7 @@ export function RegionFAQ({
 
       <div className="mt-4 divide-y divide-cnc-line">
         {entries.map((entry) => (
-          <details
-            key={entry.id}
-            className="group py-3 [&_summary::-webkit-details-marker]:hidden"
-          >
+          <details key={entry.id} className="group py-3 [&_summary::-webkit-details-marker]:hidden">
             <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-cnc-text-strong sm:text-[15px]">
               <span>{entry.question}</span>
               <span
@@ -81,9 +72,7 @@ export function RegionFAQ({
                 </svg>
               </span>
             </summary>
-            <p className="mt-2 text-sm leading-relaxed text-cnc-muted">
-              {entry.answer}
-            </p>
+            <p className="mt-2 text-sm leading-relaxed text-cnc-muted">{entry.answer}</p>
           </details>
         ))}
       </div>

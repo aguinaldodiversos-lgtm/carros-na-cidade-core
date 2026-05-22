@@ -184,13 +184,17 @@ async function fetchWithTimeout(url, timeoutMs) {
  */
 async function loadRawSource() {
   if (SOURCE_FILE_OVERRIDE) {
-    console.log(`[seed:cities-geo] Usando fonte via env CITIES_GEO_SOURCE_FILE=${SOURCE_FILE_OVERRIDE}`);
+    console.log(
+      `[seed:cities-geo] Usando fonte via env CITIES_GEO_SOURCE_FILE=${SOURCE_FILE_OVERRIDE}`
+    );
     const buf = await fs.readFile(SOURCE_FILE_OVERRIDE, "utf8");
     return JSON.parse(buf);
   }
 
   if (existsSync(DEFAULT_CACHE_PATH) && isCacheFresh(DEFAULT_CACHE_PATH, CACHE_MAX_AGE_DAYS)) {
-    console.log(`[seed:cities-geo] Cache fresco em ${DEFAULT_CACHE_PATH} (< ${CACHE_MAX_AGE_DAYS} dias). Usando.`);
+    console.log(
+      `[seed:cities-geo] Cache fresco em ${DEFAULT_CACHE_PATH} (< ${CACHE_MAX_AGE_DAYS} dias). Usando.`
+    );
     const buf = await fs.readFile(DEFAULT_CACHE_PATH, "utf8");
     return JSON.parse(buf);
   }
@@ -203,7 +207,9 @@ async function loadRawSource() {
     }
     await fs.mkdir(dirname(DEFAULT_CACHE_PATH), { recursive: true });
     await fs.writeFile(DEFAULT_CACHE_PATH, JSON.stringify(data, null, 2), "utf8");
-    console.log(`[seed:cities-geo] Cache atualizado em ${DEFAULT_CACHE_PATH} (${data.length} entries).`);
+    console.log(
+      `[seed:cities-geo] Cache atualizado em ${DEFAULT_CACHE_PATH} (${data.length} entries).`
+    );
     return data;
   } catch (err) {
     console.warn(`[seed:cities-geo] Falha ao buscar fonte: ${err?.message || err}`);
@@ -275,10 +281,11 @@ export async function seedCitiesGeo({ force = false, sourceEntries = null } = {}
       continue;
     }
 
-    await pool.query(
-      `UPDATE cities SET latitude = $1, longitude = $2 WHERE slug = $3`,
-      [geo.latitude, geo.longitude, city.slug]
-    );
+    await pool.query(`UPDATE cities SET latitude = $1, longitude = $2 WHERE slug = $3`, [
+      geo.latitude,
+      geo.longitude,
+      city.slug,
+    ]);
     updated += 1;
   }
 

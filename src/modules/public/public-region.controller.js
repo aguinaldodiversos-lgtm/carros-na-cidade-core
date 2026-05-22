@@ -27,7 +27,9 @@ import { logger } from "../../shared/logger.js";
  *     resposta semanticamente correta.
  */
 export async function getPublicRegionByCitySlug(req, res, next) {
-  const citySlug = String(req.params.citySlug || "").trim().toLowerCase();
+  const citySlug = String(req.params.citySlug || "")
+    .trim()
+    .toLowerCase();
   if (!citySlug) {
     return res.status(404).json({ success: false, error: "Region not found" });
   }
@@ -41,9 +43,7 @@ export async function getPublicRegionByCitySlug(req, res, next) {
     const baseSlug = String(region.base.slug || "").toLowerCase();
     const uf = String(region.base.state || "").toUpperCase();
     const ufLower = uf.toLowerCase();
-    const radiusKm = Number.isFinite(Number(region.radius_km))
-      ? Number(region.radius_km)
-      : 80;
+    const radiusKm = Number.isFinite(Number(region.radius_km)) ? Number(region.radius_km) : 80;
 
     // Sanitiza membros — somente campos públicos.
     const members = Array.isArray(region.members)

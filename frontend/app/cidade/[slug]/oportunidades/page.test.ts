@@ -38,17 +38,13 @@ describe("/cidade/[slug]/oportunidades — redirect 308 para /abaixo-da-fipe", (
     const Page = await importPage();
     expect(() => Page({ params: { slug: "sao-paulo-sp" } })).toThrow(/NEXT_REDIRECT/);
     expect(permanentRedirectMock).toHaveBeenCalledTimes(1);
-    expect(permanentRedirectMock.mock.calls[0][0]).toBe(
-      "/cidade/sao-paulo-sp/abaixo-da-fipe"
-    );
+    expect(permanentRedirectMock.mock.calls[0][0]).toBe("/cidade/sao-paulo-sp/abaixo-da-fipe");
   });
 
   it("encoda slugs com caracteres especiais", async () => {
     const Page = await importPage();
     expect(() => Page({ params: { slug: "são-paulo-sp" } })).toThrow(/NEXT_REDIRECT/);
-    expect(permanentRedirectMock.mock.calls[0][0]).toBe(
-      "/cidade/s%C3%A3o-paulo-sp/abaixo-da-fipe"
-    );
+    expect(permanentRedirectMock.mock.calls[0][0]).toBe("/cidade/s%C3%A3o-paulo-sp/abaixo-da-fipe");
   });
 
   it("preserva sort/brand/model nos searchParams (filtros não-territoriais)", async () => {
@@ -107,8 +103,6 @@ describe("/cidade/[slug]/oportunidades — redirect 308 para /abaixo-da-fipe", (
         searchParams: { utm_source: "fb" },
       })
     ).toThrow(/NEXT_REDIRECT/);
-    expect(permanentRedirectMock.mock.calls[0][0]).toBe(
-      "/cidade/atibaia-sp/abaixo-da-fipe"
-    );
+    expect(permanentRedirectMock.mock.calls[0][0]).toBe("/cidade/atibaia-sp/abaixo-da-fipe");
   });
 });

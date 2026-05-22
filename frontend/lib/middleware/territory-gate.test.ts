@@ -1,19 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import {
-  decideTerritoryGate,
-  extractSlugUf,
-  isValidBrUf,
-} from "./territory-gate";
+import { decideTerritoryGate, extractSlugUf, isValidBrUf } from "./territory-gate";
 
 describe("isValidBrUf — UFs brasileiras canônicas", () => {
-  it.each(["SP", "MG", "RJ", "PR", "PE", "BA", "RS", "SC", "GO", "DF"])(
-    "%s é UF válida",
-    (uf) => {
-      expect(isValidBrUf(uf)).toBe(true);
-    }
-  );
+  it.each(["SP", "MG", "RJ", "PR", "PE", "BA", "RS", "SC", "GO", "DF"])("%s é UF válida", (uf) => {
+    expect(isValidBrUf(uf)).toBe(true);
+  });
 
   it("aceita lowercase ('sp')", () => {
     expect(isValidBrUf("sp")).toBe(true);

@@ -22,10 +22,9 @@ import { resolveLocation } from "./location.service.js";
 
 export async function resolveLocationEndpoint(req, res, next) {
   try {
-    const body = (req.body || {});
+    const body = req.body || {};
     const lat = typeof body.latitude === "number" ? body.latitude : Number(body.latitude);
-    const lng =
-      typeof body.longitude === "number" ? body.longitude : Number(body.longitude);
+    const lng = typeof body.longitude === "number" ? body.longitude : Number(body.longitude);
 
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
       return res.status(400).json({ ok: false, error: "latitude inválida" });
@@ -41,10 +40,7 @@ export async function resolveLocationEndpoint(req, res, next) {
     // "sem cidade no raio aceitável" e cai para fallback estadual.
     return res.status(200).json({ ok: true, data: result });
   } catch (err) {
-    logger.error(
-      { err: err?.message || String(err) },
-      "[location] resolveLocation falhou"
-    );
+    logger.error({ err: err?.message || String(err) }, "[location] resolveLocation falhou");
     return next(err);
   }
 }

@@ -3,7 +3,9 @@ import { buildAdsSearchQuery } from "../../src/modules/ads/filters/ads-filter.bu
 import { adsFilterQuerySchema } from "../../src/modules/ads/filters/ads-filter.schema.js";
 
 function normalize(sql) {
-  return String(sql || "").replace(/\s+/g, " ").trim();
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

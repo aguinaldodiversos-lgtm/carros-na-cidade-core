@@ -44,11 +44,17 @@ const HIGH_TITLE_PATTERNS = [
 const MEDIUM_TITLE_PATTERNS = [
   { re: /^teste\b/i, label: "Título começa com 'teste'" },
   { re: /^test\b/i, label: "Título começa com 'test'" },
-  { re: /\b(test|teste|mock|fake|demo|exemplo|seed|dummy)\b/i, label: "Título contém palavra de teste" },
+  {
+    re: /\b(test|teste|mock|fake|demo|exemplo|seed|dummy)\b/i,
+    label: "Título contém palavra de teste",
+  },
 ];
 
 const HIGH_SLUG_PATTERNS = [
-  { re: /^(test|teste|mock|fake|demo|seed|dummy|deploy)[-_]/i, label: "Slug começa com prefixo de teste" },
+  {
+    re: /^(test|teste|mock|fake|demo|seed|dummy|deploy)[-_]/i,
+    label: "Slug começa com prefixo de teste",
+  },
   { re: /deploymodel/i, label: "Slug contém 'deploymodel'" },
   { re: /\d{10,}/, label: "Slug contém timestamp/ID artificial" },
 ];
@@ -164,7 +170,8 @@ export function detectTestAd(ad) {
     }
   }
 
-  const confidence = severity === 3 ? "high" : severity === 2 ? "medium" : severity === 1 ? "low" : "none";
+  const confidence =
+    severity === 3 ? "high" : severity === 2 ? "medium" : severity === 1 ? "low" : "none";
   return {
     isSuspect: severity > 0,
     confidence,

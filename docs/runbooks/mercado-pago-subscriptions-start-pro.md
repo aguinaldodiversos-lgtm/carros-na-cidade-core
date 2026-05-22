@@ -3,18 +3,19 @@
 > **Status:** arquitetura pronta + endpoints dedicados + subscription
 > client + testes + migration 024 (NÃO aplicada). Aguarda
 > validação ponta a ponta em sandbox antes de:
+>
 > 1. Aplicar migration 024 em produção
 > 2. Trocar CTAs de `/planos` para usar `/api/payments/subscriptions/checkout`
 > 3. Configurar credenciais MP de produção
 
 ## Política comercial desta fase
 
-| Plano | Preço/mês | ID canônico | Visível em /planos? | Checkout pronto? |
-|---|---|---|---|---|
-| Lojista Start | R$ 79,90 | `cnpj-store-start` | sim, com CTA `/anunciar?plano=start` (não MP) | sim, atrás de endpoint dedicado |
-| Lojista Pro | R$ 149,90 | `cnpj-store-pro` | sim, com CTA `/anunciar?plano=pro` (não MP) | sim, atrás de endpoint dedicado |
-| ~~Evento Premium~~ | bloqueado | `cnpj-evento-premium` | NÃO (flag desligada + is_active=false no fallback) | endpoint REJEITA com 410 |
-| ~~CPF Premium Highlight~~ | descontinuado | `cpf-premium-highlight` | NÃO | endpoint REJEITA com 410 |
+| Plano                     | Preço/mês     | ID canônico             | Visível em /planos?                                | Checkout pronto?                |
+| ------------------------- | ------------- | ----------------------- | -------------------------------------------------- | ------------------------------- |
+| Lojista Start             | R$ 79,90      | `cnpj-store-start`      | sim, com CTA `/anunciar?plano=start` (não MP)      | sim, atrás de endpoint dedicado |
+| Lojista Pro               | R$ 149,90     | `cnpj-store-pro`        | sim, com CTA `/anunciar?plano=pro` (não MP)        | sim, atrás de endpoint dedicado |
+| ~~Evento Premium~~        | bloqueado     | `cnpj-evento-premium`   | NÃO (flag desligada + is_active=false no fallback) | endpoint REJEITA com 410        |
+| ~~CPF Premium Highlight~~ | descontinuado | `cpf-premium-highlight` | NÃO                                                | endpoint REJEITA com 410        |
 
 **Trava de produto:** `/planos` continua estática até checklist final ser validado em sandbox. Os endpoints abaixo são acessíveis via JWT autenticado e podem ser testados por admin/sandbox sem expor para usuário comum.
 
@@ -22,12 +23,12 @@
 
 Mesmas da Fase 3B (boost-7d):
 
-| Var | Sandbox | Produção |
-|---|---|---|
-| `MP_ACCESS_TOKEN` | `TEST-...` | `APP_USR-...` (NÃO configurar até migration 024 aplicada e checklist completo) |
-| `MP_WEBHOOK_SECRET` | qualquer | obrigatório (boot falha sem ele em prod) |
-| `MP_PUBLIC_KEY` | `TEST-pk-...` | `APP_USR-pk-...` |
-| `APP_BASE_URL` | URL pública staging | URL pública prod |
+| Var                 | Sandbox             | Produção                                                                       |
+| ------------------- | ------------------- | ------------------------------------------------------------------------------ |
+| `MP_ACCESS_TOKEN`   | `TEST-...`          | `APP_USR-...` (NÃO configurar até migration 024 aplicada e checklist completo) |
+| `MP_WEBHOOK_SECRET` | qualquer            | obrigatório (boot falha sem ele em prod)                                       |
+| `MP_PUBLIC_KEY`     | `TEST-pk-...`       | `APP_USR-pk-...`                                                               |
+| `APP_BASE_URL`      | URL pública staging | URL pública prod                                                               |
 
 Sem `MP_ACCESS_TOKEN`, todo o fluxo cai em modo MOCK: cliente devolve preapproval id sintético, webhook não recebe nada real. Útil em dev local.
 
@@ -47,6 +48,7 @@ Sem `MP_ACCESS_TOKEN`, todo o fluxo cai em modo MOCK: cliente devolve preapprova
 Atualiza `user_subscriptions_status_check` para incluir 6 estados locais alvo (`pending, active, paused, cancelled, payment_failed, expired`) **mantendo `canceled` legado** para compat de rows pré-migration.
 
 Garantias:
+
 - 100% idempotente (`ADD COLUMN IF NOT EXISTS`, `CREATE UNIQUE INDEX IF NOT EXISTS`)
 - Zero DROP/DELETE de coluna ou linha
 - Validação `DO $$ ... RAISE EXCEPTION` no fim — falha se schema inconsistente
@@ -94,34 +96,34 @@ COMMIT;
 
 ## Endpoints (já no código, NÃO acionados pela /planos)
 
-| Método | Rota | Auth | Body | Comportamento |
-|---|---|---|---|---|
-| POST | `/api/payments/subscriptions/checkout` | JWT | `{ plan_id }` | whitelist Start/Pro, anti-Evento, bloqueia duplicata, cria preapproval no MP, retorna `init_point` |
-| POST | `/api/payments/subscriptions/cancel` | JWT | `{}` | cancela sub viva do user no MP, marca `cancel_at_period_end=true`, status local pelo `mapPreapprovalStatusToLocal` |
-| POST | `/api/payments/webhook` | nenhuma (HMAC) | payload MP | já trata preapproval; idempotente via `payment_resource_id UNIQUE` + `FOR UPDATE` |
+| Método | Rota                                   | Auth           | Body          | Comportamento                                                                                                      |
+| ------ | -------------------------------------- | -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/payments/subscriptions/checkout` | JWT            | `{ plan_id }` | whitelist Start/Pro, anti-Evento, bloqueia duplicata, cria preapproval no MP, retorna `init_point`                 |
+| POST   | `/api/payments/subscriptions/cancel`   | JWT            | `{}`          | cancela sub viva do user no MP, marca `cancel_at_period_end=true`, status local pelo `mapPreapprovalStatusToLocal` |
+| POST   | `/api/payments/webhook`                | nenhuma (HMAC) | payload MP    | já trata preapproval; idempotente via `payment_resource_id UNIQUE` + `FOR UPDATE`                                  |
 
 ### Defesas no checkout
 
-| Risco | Defesa |
-|---|---|
-| Cliente assinar Evento Premium | Whitelist explícita em `ALLOWED_SUBSCRIPTION_PLAN_IDS` rejeita com **410** |
-| Cliente assinar CPF Premium Highlight (descontinuado) | Mesma whitelist rejeita com **410** |
-| Cliente alterar preço (R$ 0,01) | `createPlanSubscription` lê preço de `subscription_plans.price` (banco) ou `DEFAULT_PLANS` (fallback). Função NÃO aceita `amount/price/unit_price` na assinatura |
-| Cliente criar 2 subs simultâneas (cobrar 2x) | `findLiveSubscriptionForUser` rejeita com **409** se status `active/pending/paused` |
-| Cliente cancelar sub de outro user | `cancelUserSubscription` busca a sub VIA `userId` autenticado — não aceita `subscription_id` arbitrário no body |
-| Webhook duplicado renovar período 2x | `payment_intents.payment_resource_id UNIQUE` + `FOR UPDATE` lock + check `intent.status === 'approved'` antes de renovar |
-| `payment_failed` cancelar acesso imediato | Política conservadora: status local vira `payment_failed` (visível no painel), mas `users.plan_id` NÃO é rebaixado até `expired` |
+| Risco                                                 | Defesa                                                                                                                                                           |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cliente assinar Evento Premium                        | Whitelist explícita em `ALLOWED_SUBSCRIPTION_PLAN_IDS` rejeita com **410**                                                                                       |
+| Cliente assinar CPF Premium Highlight (descontinuado) | Mesma whitelist rejeita com **410**                                                                                                                              |
+| Cliente alterar preço (R$ 0,01)                       | `createPlanSubscription` lê preço de `subscription_plans.price` (banco) ou `DEFAULT_PLANS` (fallback). Função NÃO aceita `amount/price/unit_price` na assinatura |
+| Cliente criar 2 subs simultâneas (cobrar 2x)          | `findLiveSubscriptionForUser` rejeita com **409** se status `active/pending/paused`                                                                              |
+| Cliente cancelar sub de outro user                    | `cancelUserSubscription` busca a sub VIA `userId` autenticado — não aceita `subscription_id` arbitrário no body                                                  |
+| Webhook duplicado renovar período 2x                  | `payment_intents.payment_resource_id UNIQUE` + `FOR UPDATE` lock + check `intent.status === 'approved'` antes de renovar                                         |
+| `payment_failed` cancelar acesso imediato             | Política conservadora: status local vira `payment_failed` (visível no painel), mas `users.plan_id` NÃO é rebaixado até `expired`                                 |
 
 ## Estados locais — fluxos
 
-| Estado | Origem | Ação no painel | `users.plan_id` |
-|---|---|---|---|
-| `pending` | Checkout criado, aguardando autorização MP | Avisar usuário pra completar pagamento | inalterado |
-| `active` | Webhook autorização recebido (status=approved/authorized) | Acesso liberado | atualizado para Start/Pro |
-| `paused` | User pausou no portal MP | Aviso + botão "reativar" | mantém Start/Pro até expirar |
-| `cancelled` | User cancelou (endpoint local ou portal MP) | Confirmação cancelamento | rebaixa para Free no fim do período |
-| `payment_failed` | Cobrança recusada | Aviso vermelho + botão "atualizar cartão" | mantém Start/Pro (1 ciclo de carência) |
-| `expired` | Vigência terminou sem renovar | Convite a reassinar | rebaixa para Free |
+| Estado           | Origem                                                    | Ação no painel                            | `users.plan_id`                        |
+| ---------------- | --------------------------------------------------------- | ----------------------------------------- | -------------------------------------- |
+| `pending`        | Checkout criado, aguardando autorização MP                | Avisar usuário pra completar pagamento    | inalterado                             |
+| `active`         | Webhook autorização recebido (status=approved/authorized) | Acesso liberado                           | atualizado para Start/Pro              |
+| `paused`         | User pausou no portal MP                                  | Aviso + botão "reativar"                  | mantém Start/Pro até expirar           |
+| `cancelled`      | User cancelou (endpoint local ou portal MP)               | Confirmação cancelamento                  | rebaixa para Free no fim do período    |
+| `payment_failed` | Cobrança recusada                                         | Aviso vermelho + botão "atualizar cartão" | mantém Start/Pro (1 ciclo de carência) |
+| `expired`        | Vigência terminou sem renovar                             | Convite a reassinar                       | rebaixa para Free                      |
 
 ## Sandbox — primeiro fluxo ponta a ponta
 

@@ -191,8 +191,7 @@ type ModelsSnapshotModule = { default: ModelsSnapshot };
 const modelsSnapshotPath: Record<FipeVehicleType, () => Promise<ModelsSnapshotModule>> = {
   carros: () => import("./snapshots/modelos-carros.json") as Promise<ModelsSnapshotModule>,
   motos: () => import("./snapshots/modelos-motos.json") as Promise<ModelsSnapshotModule>,
-  caminhoes: () =>
-    import("./snapshots/modelos-caminhoes.json") as Promise<ModelsSnapshotModule>,
+  caminhoes: () => import("./snapshots/modelos-caminhoes.json") as Promise<ModelsSnapshotModule>,
 };
 
 async function loadModelsFromSnapshot(

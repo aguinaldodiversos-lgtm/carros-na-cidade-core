@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-import { buildReport, diffPlan, EXPECTED } from "../../scripts/maintenance/audit-subscription-plans.mjs";
+import {
+  buildReport,
+  diffPlan,
+  EXPECTED,
+} from "../../scripts/maintenance/audit-subscription-plans.mjs";
 
 /**
  * Fase 2A — alinhamento de planos com a oferta oficial.
@@ -48,12 +52,114 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────
 
 const POST_MIGRATION_ROWS = [
-  { id: "cpf-free-essential", name: "Plano Gratuito (Essencial)", type: "CPF", price: 0, ad_limit: 3, is_featured_enabled: false, has_store_profile: false, priority_level: 0, is_active: true, validity_days: null, billing_model: "free", description: "x", benefits: [], recommended: false, created_at: "2026-01-01", updated_at: "2026-05-05" },
-  { id: "cpf-premium-highlight", name: "Plano Destaque Premium", type: "CPF", price: 79.9, ad_limit: 10, is_featured_enabled: true, has_store_profile: false, priority_level: 50, is_active: false, validity_days: 30, billing_model: "one_time", description: "x", benefits: [], recommended: false, created_at: "2026-01-01", updated_at: "2026-05-05" },
-  { id: "cnpj-free-store", name: "Plano Gratuito Loja", type: "CNPJ", price: 0, ad_limit: 10, is_featured_enabled: false, has_store_profile: true, priority_level: 5, is_active: true, validity_days: null, billing_model: "free", description: "x", benefits: [], recommended: false, created_at: "2026-01-01", updated_at: "2026-05-05" },
-  { id: "cnpj-store-start", name: "Plano Loja Start", type: "CNPJ", price: 79.9, ad_limit: 20, is_featured_enabled: true, has_store_profile: true, priority_level: 60, is_active: true, validity_days: 30, billing_model: "monthly", description: "x", benefits: [], recommended: false, created_at: "2026-01-01", updated_at: "2026-05-05" },
-  { id: "cnpj-store-pro", name: "Plano Loja Pro", type: "CNPJ", price: 149.9, ad_limit: 1000, is_featured_enabled: true, has_store_profile: true, priority_level: 80, is_active: true, validity_days: 30, billing_model: "monthly", description: "x", benefits: [], recommended: true, created_at: "2026-01-01", updated_at: "2026-05-05" },
-  { id: "cnpj-evento-premium", name: "Plano Evento Premium", type: "CNPJ", price: 999.9, ad_limit: 350, is_featured_enabled: true, has_store_profile: true, priority_level: 100, is_active: false, validity_days: 30, billing_model: "monthly", description: "x", benefits: [], recommended: false, created_at: "2026-01-01", updated_at: "2026-05-05" },
+  {
+    id: "cpf-free-essential",
+    name: "Plano Gratuito (Essencial)",
+    type: "CPF",
+    price: 0,
+    ad_limit: 3,
+    is_featured_enabled: false,
+    has_store_profile: false,
+    priority_level: 0,
+    is_active: true,
+    validity_days: null,
+    billing_model: "free",
+    description: "x",
+    benefits: [],
+    recommended: false,
+    created_at: "2026-01-01",
+    updated_at: "2026-05-05",
+  },
+  {
+    id: "cpf-premium-highlight",
+    name: "Plano Destaque Premium",
+    type: "CPF",
+    price: 79.9,
+    ad_limit: 10,
+    is_featured_enabled: true,
+    has_store_profile: false,
+    priority_level: 50,
+    is_active: false,
+    validity_days: 30,
+    billing_model: "one_time",
+    description: "x",
+    benefits: [],
+    recommended: false,
+    created_at: "2026-01-01",
+    updated_at: "2026-05-05",
+  },
+  {
+    id: "cnpj-free-store",
+    name: "Plano Gratuito Loja",
+    type: "CNPJ",
+    price: 0,
+    ad_limit: 10,
+    is_featured_enabled: false,
+    has_store_profile: true,
+    priority_level: 5,
+    is_active: true,
+    validity_days: null,
+    billing_model: "free",
+    description: "x",
+    benefits: [],
+    recommended: false,
+    created_at: "2026-01-01",
+    updated_at: "2026-05-05",
+  },
+  {
+    id: "cnpj-store-start",
+    name: "Plano Loja Start",
+    type: "CNPJ",
+    price: 79.9,
+    ad_limit: 20,
+    is_featured_enabled: true,
+    has_store_profile: true,
+    priority_level: 60,
+    is_active: true,
+    validity_days: 30,
+    billing_model: "monthly",
+    description: "x",
+    benefits: [],
+    recommended: false,
+    created_at: "2026-01-01",
+    updated_at: "2026-05-05",
+  },
+  {
+    id: "cnpj-store-pro",
+    name: "Plano Loja Pro",
+    type: "CNPJ",
+    price: 149.9,
+    ad_limit: 1000,
+    is_featured_enabled: true,
+    has_store_profile: true,
+    priority_level: 80,
+    is_active: true,
+    validity_days: 30,
+    billing_model: "monthly",
+    description: "x",
+    benefits: [],
+    recommended: true,
+    created_at: "2026-01-01",
+    updated_at: "2026-05-05",
+  },
+  {
+    id: "cnpj-evento-premium",
+    name: "Plano Evento Premium",
+    type: "CNPJ",
+    price: 999.9,
+    ad_limit: 350,
+    is_featured_enabled: true,
+    has_store_profile: true,
+    priority_level: 100,
+    is_active: false,
+    validity_days: 30,
+    billing_model: "monthly",
+    description: "x",
+    benefits: [],
+    recommended: false,
+    created_at: "2026-01-01",
+    updated_at: "2026-05-05",
+  },
 ];
 
 const PRE_MIGRATION_ROWS = POST_MIGRATION_ROWS.map((row) => {
@@ -81,28 +187,39 @@ function mockPoolWithPlans(rows) {
 
 describe("diffPlan — helper de auditoria", () => {
   it("retorna [] quando plano bate com expected (sem divergência)", () => {
-    expect(diffPlan({ price: 79.9, ad_limit: 20, is_active: true }, EXPECTED["cnpj-store-start"]))
-      .toEqual([]);
+    expect(
+      diffPlan({ price: 79.9, ad_limit: 20, is_active: true }, EXPECTED["cnpj-store-start"])
+    ).toEqual([]);
   });
 
   it("acusa preço divergente", () => {
-    const r = diffPlan({ price: 299.9, ad_limit: 20, is_active: true }, EXPECTED["cnpj-store-start"]);
+    const r = diffPlan(
+      { price: 299.9, ad_limit: 20, is_active: true },
+      EXPECTED["cnpj-store-start"]
+    );
     expect(r.join(" ")).toMatch(/price=299\.9.*esperado 79\.9/);
   });
 
   it("acusa ad_limit divergente", () => {
-    const r = diffPlan({ price: 79.9, ad_limit: 80, is_active: true }, EXPECTED["cnpj-store-start"]);
+    const r = diffPlan(
+      { price: 79.9, ad_limit: 80, is_active: true },
+      EXPECTED["cnpj-store-start"]
+    );
     expect(r.join(" ")).toMatch(/ad_limit=80.*esperado 20/);
   });
 
   it("acusa is_active divergente", () => {
-    const r = diffPlan({ price: 0, ad_limit: 350, is_active: true }, EXPECTED["cnpj-evento-premium"]);
+    const r = diffPlan(
+      { price: 0, ad_limit: 350, is_active: true },
+      EXPECTED["cnpj-evento-premium"]
+    );
     expect(r.join(" ")).toMatch(/is_active=true.*esperado false/);
   });
 
   it("trata price string ('79.90') como número equivalente", () => {
-    expect(diffPlan({ price: "79.90", ad_limit: 20, is_active: true }, EXPECTED["cnpj-store-start"]))
-      .toEqual([]);
+    expect(
+      diffPlan({ price: "79.90", ad_limit: 20, is_active: true }, EXPECTED["cnpj-store-start"])
+    ).toEqual([]);
   });
 });
 

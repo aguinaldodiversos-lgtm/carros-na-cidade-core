@@ -75,8 +75,7 @@ export default async function ComprarEntryPage({ searchParams = {} }: ComprarPag
   const fromCookie = parseCityCookieValue(cookieStore.get(CITY_COOKIE_NAME)?.value);
   const cookieUf =
     (fromCookie?.state || "").toUpperCase() || ufFromCitySlug(fromCookie?.slug ?? null);
-  const resolvedUf =
-    (cookieUf && stateFromUf(cookieUf)?.code) || getDefaultTerritoryState().code;
+  const resolvedUf = (cookieUf && stateFromUf(cookieUf)?.code) || getDefaultTerritoryState().code;
 
   redirect(buildStatePath(resolvedUf, rawFilters));
 }

@@ -7,10 +7,7 @@ import {
   createPlanSubscription,
   handleWebhookNotification,
 } from "./payments.service.js";
-import {
-  cancelUserSubscription,
-  createSubscriptionCheckout,
-} from "./subscriptions.service.js";
+import { cancelUserSubscription, createSubscriptionCheckout } from "./subscriptions.service.js";
 
 const router = express.Router();
 

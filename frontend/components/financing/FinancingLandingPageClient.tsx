@@ -384,9 +384,7 @@ export function FinancingLandingPageClient({
                         isActive ? "border-primary bg-white" : "border-cnc-muted-soft bg-white"
                       }`}
                     >
-                      {isActive ? (
-                        <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                      ) : null}
+                      {isActive ? <span className="h-2.5 w-2.5 rounded-full bg-primary" /> : null}
                     </span>
                     <span
                       className={`text-[14px] font-semibold ${
@@ -601,7 +599,10 @@ function SelectField({
             </option>
           ))}
         </select>
-        <span aria-hidden="true" className="pointer-events-none absolute right-3 text-cnc-muted-soft">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 text-cnc-muted-soft"
+        >
           <ChevronDownIcon />
         </span>
       </span>

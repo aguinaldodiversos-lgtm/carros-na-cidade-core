@@ -250,7 +250,9 @@ export function buildSafeColumnList(available, requested) {
   const unsafe = [];
 
   for (const raw of requested) {
-    const col = String(raw || "").trim().toLowerCase();
+    const col = String(raw || "")
+      .trim()
+      .toLowerCase();
     if (!col) continue;
     if (!SAFE_IDENTIFIER_RE.test(col)) {
       unsafe.push(raw);

@@ -25,8 +25,10 @@ const MAX_IMAGE_COUNT = 30;
 
 const LEGACY_LOCAL_PATTERN = /^\/?uploads\/(ads|vehicles?)\//i;
 const RENDER_DOMAIN_PATTERN = /\b[a-z0-9-]+\.onrender\.com\b/i;
-const PLACEHOLDER_HINTS = /\b(placeholder|default[-_]?image|no[-_]?image|missing|fallback|no[-_]?photo)\b/i;
-const KNOWN_GOOD_HOSTS = /\b(carros-?na-?cidade\.com|cdn\.cnc\.br|r2\.cloudflarestorage\.com|images\.cncar\.com\.br)\b/i;
+const PLACEHOLDER_HINTS =
+  /\b(placeholder|default[-_]?image|no[-_]?image|missing|fallback|no[-_]?photo)\b/i;
+const KNOWN_GOOD_HOSTS =
+  /\b(carros-?na-?cidade\.com|cdn\.cnc\.br|r2\.cloudflarestorage\.com|images\.cncar\.com\.br)\b/i;
 const PROBABLE_IMAGE_EXT = /\.(jpe?g|png|webp|avif|gif|bmp)(\?.*)?$/i;
 
 const MOJIBAKE_RE = /Ã[¡-ÿ]|Æ/;
@@ -163,7 +165,11 @@ export function detectImageIssues(ad) {
       const label = labels[i];
 
       let codeSeverity = "low";
-      if (code === "url_legacy_uploads" || code === "url_malformed_scheme" || code === "url_mojibake") {
+      if (
+        code === "url_legacy_uploads" ||
+        code === "url_malformed_scheme" ||
+        code === "url_mojibake"
+      ) {
         codeSeverity = "high";
       } else if (code === "url_render_storage") {
         codeSeverity = "medium";

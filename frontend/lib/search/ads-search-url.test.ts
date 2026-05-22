@@ -367,24 +367,35 @@ describe("parseAdsSearchFiltersFromSearchParams — filtros canônicos da Fase 3
   }
 
   it("priority_tier=4 vira number 4 (Destaques)", () => {
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: "4" })).priority_tier).toBe(4);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: "4" })).priority_tier
+    ).toBe(4);
   });
 
   it("priority_tier 1..4 são aceitos", () => {
     for (const v of [1, 2, 3, 4]) {
-      expect(parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: String(v) })).priority_tier).toBe(v);
+      expect(
+        parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: String(v) }))
+          .priority_tier
+      ).toBe(v);
     }
   });
 
   it("priority_tier fora de 1..4 vira undefined (defesa)", () => {
     for (const v of ["0", "5", "-1", "abc", ""]) {
-      expect(parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: v })).priority_tier).toBeUndefined();
+      expect(
+        parseAdsSearchFiltersFromSearchParams(makeParams({ priority_tier: v })).priority_tier
+      ).toBeUndefined();
     }
   });
 
   it("opportunity=true é parseado como boolean true", () => {
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ opportunity: "true" })).opportunity).toBe(true);
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ opportunity: "1" })).opportunity).toBe(true);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ opportunity: "true" })).opportunity
+    ).toBe(true);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ opportunity: "1" })).opportunity
+    ).toBe(true);
   });
 
   it("opportunity ausente vira undefined", () => {
@@ -392,13 +403,19 @@ describe("parseAdsSearchFiltersFromSearchParams — filtros canônicos da Fase 3
   });
 
   it("seller_kind 'dealer' e 'private' são aceitos", () => {
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: "dealer" })).seller_kind).toBe("dealer");
-    expect(parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: "private" })).seller_kind).toBe("private");
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: "dealer" })).seller_kind
+    ).toBe("dealer");
+    expect(
+      parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: "private" })).seller_kind
+    ).toBe("private");
   });
 
   it("seller_kind inválido vira undefined (defesa contra valor não-canônico)", () => {
     for (const v of ["DEALER", "loja", "verified", ""]) {
-      expect(parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: v })).seller_kind).toBeUndefined();
+      expect(
+        parseAdsSearchFiltersFromSearchParams(makeParams({ seller_kind: v })).seller_kind
+      ).toBeUndefined();
     }
   });
 });
@@ -419,15 +436,27 @@ describe("buildSearchQueryString — filtros canônicos da Fase 3", () => {
   });
 
   it("emite opportunity=true quando true; omite quando false ou undefined", () => {
-    expect(new URLSearchParams(buildSearchQueryString({ opportunity: true })).get("opportunity")).toBe("true");
-    expect(new URLSearchParams(buildSearchQueryString({ opportunity: false })).get("opportunity")).toBeNull();
+    expect(
+      new URLSearchParams(buildSearchQueryString({ opportunity: true })).get("opportunity")
+    ).toBe("true");
+    expect(
+      new URLSearchParams(buildSearchQueryString({ opportunity: false })).get("opportunity")
+    ).toBeNull();
     expect(new URLSearchParams(buildSearchQueryString({})).get("opportunity")).toBeNull();
   });
 
   it("emite seller_kind apenas para 'dealer' ou 'private'", () => {
-    expect(new URLSearchParams(buildSearchQueryString({ seller_kind: "dealer" })).get("seller_kind")).toBe("dealer");
-    expect(new URLSearchParams(buildSearchQueryString({ seller_kind: "private" })).get("seller_kind")).toBe("private");
-    expect(new URLSearchParams(buildSearchQueryString({ seller_kind: "DEALER" as "dealer" })).get("seller_kind")).toBeNull();
+    expect(
+      new URLSearchParams(buildSearchQueryString({ seller_kind: "dealer" })).get("seller_kind")
+    ).toBe("dealer");
+    expect(
+      new URLSearchParams(buildSearchQueryString({ seller_kind: "private" })).get("seller_kind")
+    ).toBe("private");
+    expect(
+      new URLSearchParams(buildSearchQueryString({ seller_kind: "DEALER" as "dealer" })).get(
+        "seller_kind"
+      )
+    ).toBeNull();
   });
 });
 

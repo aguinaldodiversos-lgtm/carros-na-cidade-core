@@ -39,21 +39,21 @@ um padrão misto de `noindex` que protege parcialmente o domínio:**
     sem query. Sinal de que o builder de canonical está vazando o default
     da query.
   - Title duplica o sufixo da brand: `"... | Carros na Cidade | Carros na
-    Cidade"` em 5 das 7 rotas. Provavelmente concatenação dupla no `<head>`.
+Cidade"` em 5 das 7 rotas. Provavelmente concatenação dupla no `<head>`.
 
 ---
 
 ## 2. Tabela de rotas auditadas
 
-| # | Rota | HTTP | URL final | Redirect? | Canonical (HTML) | Robots (HTML) | Title | Diagnóstico |
-|---|---|---|---|---|---|---|---|---|
-| 1 | `/comprar/cidade/atibaia-sp` | 200 | mesma | não | `…/comprar/cidade/atibaia-sp?sort=recent&limit=50` ⚠️ | `index, follow` | "Carros usados em Atibaia - SP \| Comprar \| …" | **Compete com #3.** Canonical com query é atípico. |
-| 2 | `/cidade/atibaia-sp` | 200 | mesma | não | `…/cidade/atibaia-sp` | **`noindex, follow`** | "Carros em Atibaia - SP \| Carros na Cidade \| Carros na Cidade" | Já protegida por noindex. Canonical próprio em página noindex = sinal contraditório (preferir omitir canonical OU canonicalizar para a versão indexável). |
-| 3 | `/carros-em/atibaia-sp` | 200 | mesma | não | `…/carros-em/atibaia-sp` | `index, follow` | "Carros em Atibaia - SP — 4 anúncios \| …" | **Compete com #1.** Title menciona contagem de anúncios — bom para CTR, mas duplica intenção da #1. |
-| 4 | `/cidade/atibaia-sp/oportunidades` | 200 | mesma | não | `…/cidade/atibaia-sp/oportunidades` | **`noindex, follow`** | "Oportunidades de carros em Atibaia - SP \| …" | Mesma intenção da #5 e #6. Já protegida por noindex. |
-| 5 | `/cidade/atibaia-sp/abaixo-da-fipe` | 200 | mesma | não | `…/cidade/atibaia-sp/abaixo-da-fipe` | **`noindex, follow`** | "Carros abaixo da FIPE em Atibaia - SP \| …" | Mesma intenção da #4 e #6. Já protegida por noindex. |
-| 6 | `/carros-baratos-em/atibaia-sp` | 200 | mesma | não | `…/carros-baratos-em/atibaia-sp` | `index, follow` | "Carros baratos em Atibaia - SP — 2 abaixo da FIPE \| …" | **Única indexável da intenção "barato/abaixo-da-fipe".** Sem competição direta. |
-| 7 | `/carros-automaticos-em/atibaia-sp` | 200 | mesma | não | `…/carros-automaticos-em/atibaia-sp` | `index, follow` | "Carros automáticos em Atibaia - SP — 4 ofertas \| …" | Única na intenção "automáticos". Sem competição. |
+| #   | Rota                                | HTTP | URL final | Redirect? | Canonical (HTML)                                      | Robots (HTML)         | Title                                                            | Diagnóstico                                                                                                                                               |
+| --- | ----------------------------------- | ---- | --------- | --------- | ----------------------------------------------------- | --------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `/comprar/cidade/atibaia-sp`        | 200  | mesma     | não       | `…/comprar/cidade/atibaia-sp?sort=recent&limit=50` ⚠️ | `index, follow`       | "Carros usados em Atibaia - SP \| Comprar \| …"                  | **Compete com #3.** Canonical com query é atípico.                                                                                                        |
+| 2   | `/cidade/atibaia-sp`                | 200  | mesma     | não       | `…/cidade/atibaia-sp`                                 | **`noindex, follow`** | "Carros em Atibaia - SP \| Carros na Cidade \| Carros na Cidade" | Já protegida por noindex. Canonical próprio em página noindex = sinal contraditório (preferir omitir canonical OU canonicalizar para a versão indexável). |
+| 3   | `/carros-em/atibaia-sp`             | 200  | mesma     | não       | `…/carros-em/atibaia-sp`                              | `index, follow`       | "Carros em Atibaia - SP — 4 anúncios \| …"                       | **Compete com #1.** Title menciona contagem de anúncios — bom para CTR, mas duplica intenção da #1.                                                       |
+| 4   | `/cidade/atibaia-sp/oportunidades`  | 200  | mesma     | não       | `…/cidade/atibaia-sp/oportunidades`                   | **`noindex, follow`** | "Oportunidades de carros em Atibaia - SP \| …"                   | Mesma intenção da #5 e #6. Já protegida por noindex.                                                                                                      |
+| 5   | `/cidade/atibaia-sp/abaixo-da-fipe` | 200  | mesma     | não       | `…/cidade/atibaia-sp/abaixo-da-fipe`                  | **`noindex, follow`** | "Carros abaixo da FIPE em Atibaia - SP \| …"                     | Mesma intenção da #4 e #6. Já protegida por noindex.                                                                                                      |
+| 6   | `/carros-baratos-em/atibaia-sp`     | 200  | mesma     | não       | `…/carros-baratos-em/atibaia-sp`                      | `index, follow`       | "Carros baratos em Atibaia - SP — 2 abaixo da FIPE \| …"         | **Única indexável da intenção "barato/abaixo-da-fipe".** Sem competição direta.                                                                           |
+| 7   | `/carros-automaticos-em/atibaia-sp` | 200  | mesma     | não       | `…/carros-automaticos-em/atibaia-sp`                  | `index, follow`       | "Carros automáticos em Atibaia - SP — 4 ofertas \| …"            | Única na intenção "automáticos". Sem competição.                                                                                                          |
 
 Headers HTTP de todas as 7 rotas são uniformes:
 `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`,
@@ -160,17 +160,17 @@ HTTP/1.1 200 OK
 `/sitemap.xml` é um índice. Listou **8 sitemaps filhos**. Todos retornam
 HTTP 200; o tamanho denuncia o estado:
 
-| Sitemap | HTTP | Tamanho | URLs territoriais | Padrões duplicados | Diagnóstico |
-|---|---|---|---|---|---|
-| `/sitemap.xml` (índice) | 200 | 1116 B | — | — | OK. Aponta para 8 filhos. |
-| `/sitemaps/core.xml` | 200 | 1221 B | 0 | 0 | Só rotas institucionais (`/`, `/anuncios`, `/comprar`, `/blog`, `/planos`, `/simulador-financiamento`, `/tabela-fipe`). Nenhuma cidade. |
-| `/sitemaps/content.xml` | 200 | 21 822 B | 0 | 0 | Só posts de blog (`/blog/<cidade>-<uf>`). Não conta como rota territorial — é conteúdo editorial. |
-| `/sitemaps/cities.xml` | 200 | **107 B** | **0** ⚠️ | — | **VAZIO.** `<urlset></urlset>` literal. Esperado conter páginas de cidade. |
-| `/sitemaps/local-seo.xml` | 200 | **107 B** | **0** ⚠️ | — | **VAZIO.** Esperado conter `/carros-em/<slug>`, `/carros-baratos-em/<slug>`, `/carros-automaticos-em/<slug>`. |
-| `/sitemaps/opportunities.xml` | 200 | **107 B** | **0** ⚠️ | — | **VAZIO.** Esperado conter `/cidade/<slug>/oportunidades`. |
-| `/sitemaps/below-fipe.xml` | 200 | **107 B** | **0** ⚠️ | — | **VAZIO.** Esperado conter `/cidade/<slug>/abaixo-da-fipe`. |
-| `/sitemaps/brands.xml` | 200 | **107 B** | 0 | — | **VAZIO.** Sem páginas de marca declaradas. |
-| `/sitemaps/models.xml` | 200 | **107 B** | 0 | — | **VAZIO.** Sem páginas de modelo declaradas. |
+| Sitemap                       | HTTP | Tamanho   | URLs territoriais | Padrões duplicados | Diagnóstico                                                                                                                             |
+| ----------------------------- | ---- | --------- | ----------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sitemap.xml` (índice)       | 200  | 1116 B    | —                 | —                  | OK. Aponta para 8 filhos.                                                                                                               |
+| `/sitemaps/core.xml`          | 200  | 1221 B    | 0                 | 0                  | Só rotas institucionais (`/`, `/anuncios`, `/comprar`, `/blog`, `/planos`, `/simulador-financiamento`, `/tabela-fipe`). Nenhuma cidade. |
+| `/sitemaps/content.xml`       | 200  | 21 822 B  | 0                 | 0                  | Só posts de blog (`/blog/<cidade>-<uf>`). Não conta como rota territorial — é conteúdo editorial.                                       |
+| `/sitemaps/cities.xml`        | 200  | **107 B** | **0** ⚠️          | —                  | **VAZIO.** `<urlset></urlset>` literal. Esperado conter páginas de cidade.                                                              |
+| `/sitemaps/local-seo.xml`     | 200  | **107 B** | **0** ⚠️          | —                  | **VAZIO.** Esperado conter `/carros-em/<slug>`, `/carros-baratos-em/<slug>`, `/carros-automaticos-em/<slug>`.                           |
+| `/sitemaps/opportunities.xml` | 200  | **107 B** | **0** ⚠️          | —                  | **VAZIO.** Esperado conter `/cidade/<slug>/oportunidades`.                                                                              |
+| `/sitemaps/below-fipe.xml`    | 200  | **107 B** | **0** ⚠️          | —                  | **VAZIO.** Esperado conter `/cidade/<slug>/abaixo-da-fipe`.                                                                             |
+| `/sitemaps/brands.xml`        | 200  | **107 B** | 0                 | —                  | **VAZIO.** Sem páginas de marca declaradas.                                                                                             |
+| `/sitemaps/models.xml`        | 200  | **107 B** | 0                 | —                  | **VAZIO.** Sem páginas de modelo declaradas.                                                                                            |
 
 **Implicação principal:** mesmo as 4 rotas indexáveis
 (`/comprar/cidade/`, `/carros-em/`, `/carros-baratos-em/`,
@@ -187,11 +187,11 @@ implementado.
 
 ### 5.1 Intenção "comprar carros na cidade"
 
-| Rota | Robots | Canonical | Título |
-|---|---|---|---|
+| Rota                         | Robots    | Canonical                | Título                                     |
+| ---------------------------- | --------- | ------------------------ | ------------------------------------------ |
 | `/comprar/cidade/atibaia-sp` | **index** | self (com `?sort&limit`) | "Carros usados em Atibaia - SP \| Comprar" |
-| `/cidade/atibaia-sp` | noindex | self | "Carros em Atibaia - SP" |
-| `/carros-em/atibaia-sp` | **index** | self | "Carros em Atibaia - SP — 4 anúncios" |
+| `/cidade/atibaia-sp`         | noindex   | self                     | "Carros em Atibaia - SP"                   |
+| `/carros-em/atibaia-sp`      | **index** | self                     | "Carros em Atibaia - SP — 4 anúncios"      |
 
 **Conflito real**: `/comprar/cidade/` e `/carros-em/` competem. Mesma
 intenção ("ver carros à venda em Atibaia"), ambas indexáveis, ambas com
@@ -205,11 +205,11 @@ mesma intenção).
 
 ### 5.2 Intenção "abaixo da FIPE / oportunidades"
 
-| Rota | Robots | Canonical | Título |
-|---|---|---|---|
-| `/cidade/atibaia-sp/oportunidades` | noindex | self | "Oportunidades de carros em Atibaia - SP" |
-| `/cidade/atibaia-sp/abaixo-da-fipe` | noindex | self | "Carros abaixo da FIPE em Atibaia - SP" |
-| `/carros-baratos-em/atibaia-sp` | **index** | self | "Carros baratos em Atibaia - SP — 2 abaixo da FIPE" |
+| Rota                                | Robots    | Canonical | Título                                              |
+| ----------------------------------- | --------- | --------- | --------------------------------------------------- |
+| `/cidade/atibaia-sp/oportunidades`  | noindex   | self      | "Oportunidades de carros em Atibaia - SP"           |
+| `/cidade/atibaia-sp/abaixo-da-fipe` | noindex   | self      | "Carros abaixo da FIPE em Atibaia - SP"             |
+| `/carros-baratos-em/atibaia-sp`     | **index** | self      | "Carros baratos em Atibaia - SP — 2 abaixo da FIPE" |
 
 **Sem conflito ativo de indexação**: só `/carros-baratos-em/` está indexável,
 e seu título inclusive cita "abaixo da FIPE". As duas variantes em
@@ -218,9 +218,9 @@ estrutural da intenção 5.1: canonical próprio em página noindex.
 
 ### 5.3 Intenção "automáticos"
 
-| Rota | Robots | Canonical | Título |
-|---|---|---|---|
-| `/carros-automaticos-em/atibaia-sp` | **index** | self | "Carros automáticos em Atibaia - SP — 4 ofertas" |
+| Rota                                | Robots    | Canonical | Título                                           |
+| ----------------------------------- | --------- | --------- | ------------------------------------------------ |
+| `/carros-automaticos-em/atibaia-sp` | **index** | self      | "Carros automáticos em Atibaia - SP — 4 ofertas" |
 
 **Sem competição.** Única rota servindo essa intenção.
 
@@ -231,11 +231,11 @@ estrutural da intenção 5.1: canonical próprio em página noindex.
 > **Apenas proposta.** Não implementa. A decisão final deve passar pelo
 > responsável SEO antes de qualquer alteração de código.
 
-| Intenção | URL canônica recomendada | Variantes que devem canonicalizar para ela | Variantes que devem virar `noindex` (sem canonical próprio) | Sair do sitemap |
-|---|---|---|---|---|
-| Comprar / listar carros na cidade | **`/carros-em/[slug]`** (mais semântica, título mais informativo, já tem contagem de anúncios) | `/comprar/cidade/[slug]` (ajustar canonical para `/carros-em/[slug]`); `/cidade/[slug]` (ajustar canonical para `/carros-em/[slug]`, manter noindex) | nenhuma adicional | `/comprar/cidade/`, `/cidade/` (já fora — sitemaps vazios) |
-| Oportunidades / abaixo da FIPE / baratos | **`/carros-baratos-em/[slug]`** (única indexável; título já cobre as 3 variações) | `/cidade/[slug]/oportunidades` (canonical → `/carros-baratos-em/[slug]`); `/cidade/[slug]/abaixo-da-fipe` (canonical → `/carros-baratos-em/[slug]`) | manter ambas em noindex | já estão fora |
-| Automáticos | **`/carros-automaticos-em/[slug]`** (já é única) | nenhuma | nenhuma | manter fora até definição |
+| Intenção                                 | URL canônica recomendada                                                                       | Variantes que devem canonicalizar para ela                                                                                                           | Variantes que devem virar `noindex` (sem canonical próprio) | Sair do sitemap                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| Comprar / listar carros na cidade        | **`/carros-em/[slug]`** (mais semântica, título mais informativo, já tem contagem de anúncios) | `/comprar/cidade/[slug]` (ajustar canonical para `/carros-em/[slug]`); `/cidade/[slug]` (ajustar canonical para `/carros-em/[slug]`, manter noindex) | nenhuma adicional                                           | `/comprar/cidade/`, `/cidade/` (já fora — sitemaps vazios) |
+| Oportunidades / abaixo da FIPE / baratos | **`/carros-baratos-em/[slug]`** (única indexável; título já cobre as 3 variações)              | `/cidade/[slug]/oportunidades` (canonical → `/carros-baratos-em/[slug]`); `/cidade/[slug]/abaixo-da-fipe` (canonical → `/carros-baratos-em/[slug]`)  | manter ambas em noindex                                     | já estão fora                                              |
+| Automáticos                              | **`/carros-automaticos-em/[slug]`** (já é única)                                               | nenhuma                                                                                                                                              | nenhuma                                                     | manter fora até definição                                  |
 
 **Regra geral aplicada:** quando a página é `noindex`, o `<link rel="canonical">`
 deve ou ser **omitido** ou apontar para a **versão indexável da mesma intenção**.

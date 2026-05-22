@@ -108,9 +108,7 @@ export default function PagamentoSucessoPage() {
       <section className="rounded-2xl border border-[#dfe4ef] bg-white p-8 text-center shadow-[0_2px_18px_rgba(10,20,40,0.06)]">
         {state === "checking" ? (
           <>
-            <h1 className="text-3xl font-extrabold text-[#1d2538]">
-              Validando seu pagamento...
-            </h1>
+            <h1 className="text-3xl font-extrabold text-[#1d2538]">Validando seu pagamento...</h1>
             <p className="mt-2 text-sm text-[#53607b]">
               Recebemos a confirmacao do Mercado Pago. Aguarde alguns segundos enquanto o backend
               registra a ativacao do seu plano.

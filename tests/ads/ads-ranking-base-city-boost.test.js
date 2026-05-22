@@ -6,7 +6,9 @@ import {
 import { buildAdsSearchQuery } from "../../src/modules/ads/filters/ads-filter.builder.js";
 
 function normalize(sql) {
-  return String(sql || "").replace(/\s+/g, " ").trim();
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 describe("baseCityBoostExpr", () => {
@@ -48,11 +50,7 @@ describe("buildAdsSearchQuery — base-city boost (multi-cidade)", () => {
     expect(params).toContain("atibaia-sp");
 
     // Param do array continua presente (city_slugs ANY).
-    expect(params.find((p) => Array.isArray(p))).toEqual([
-      "atibaia-sp",
-      "santos-sp",
-      "jundiai-sp",
-    ]);
+    expect(params.find((p) => Array.isArray(p))).toEqual(["atibaia-sp", "santos-sp", "jundiai-sp"]);
   });
 
   it("city_slugs com 1 cidade NÃO injeta boost (nenhuma vizinha — boost sem alvo)", () => {

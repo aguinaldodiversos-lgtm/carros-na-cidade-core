@@ -29,7 +29,8 @@ function makePoolByMatcher(matchers) {
       calls.push({ sql: text, params });
       for (const m of matchers) {
         if (m.match.test(text)) {
-          const r = typeof m.response === "function" ? m.response({ sql: text, params }) : m.response;
+          const r =
+            typeof m.response === "function" ? m.response({ sql: text, params }) : m.response;
           if (r instanceof Error) throw r;
           return r;
         }

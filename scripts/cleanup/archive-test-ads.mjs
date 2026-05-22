@@ -79,8 +79,12 @@ async function fetchInventoryRow(client, { excludeIds, availableColumns }) {
   const queries = buildInventoryQueries({ excludeIds, availableColumns });
   const [totalRes, byStateRes, byCityRes] = await Promise.all([
     client.query(queries.total.sql, queries.total.params),
-    queries.byState ? client.query(queries.byState.sql, queries.byState.params) : Promise.resolve({ rows: [] }),
-    queries.byCity ? client.query(queries.byCity.sql, queries.byCity.params) : Promise.resolve({ rows: [] }),
+    queries.byState
+      ? client.query(queries.byState.sql, queries.byState.params)
+      : Promise.resolve({ rows: [] }),
+    queries.byCity
+      ? client.query(queries.byCity.sql, queries.byCity.params)
+      : Promise.resolve({ rows: [] }),
   ]);
 
   return {
@@ -242,7 +246,9 @@ async function main() {
       });
       const updRes = await client.query(updBuild.sql, updBuild.params);
       updatedRows = updRes.rows;
-      log(`[archive-test-ads] UPDATE executado (rehearsal): ${updatedRows.length} linha(s) atualizadas`);
+      log(
+        `[archive-test-ads] UPDATE executado (rehearsal): ${updatedRows.length} linha(s) atualizadas`
+      );
 
       if (args.willWrite) {
         await client.query("COMMIT");
@@ -289,7 +295,10 @@ async function main() {
       },
       inventoryAfter: rolledBack
         ? inventoryAfterPreview // preview (não foi aplicado)
-        : { totalActive: inventoryAfterPreview.totalActive, byState: inventoryAfterPreview.byState },
+        : {
+            totalActive: inventoryAfterPreview.totalActive,
+            byState: inventoryAfterPreview.byState,
+          },
       inventoryAlerts: previewAlerts,
       seoRecommendation:
         previewAlerts.length > 0
@@ -305,7 +314,9 @@ async function main() {
   }
 
   log("");
-  log(args.willWrite ? "EXECUTE concluído." : "DRY-RUN concluído. Use --execute --yes para aplicar.");
+  log(
+    args.willWrite ? "EXECUTE concluído." : "DRY-RUN concluído. Use --execute --yes para aplicar."
+  );
 }
 
 main()

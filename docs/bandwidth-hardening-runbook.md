@@ -18,26 +18,26 @@ switch + checklist de reativação do sitemap.
 
 ### Backend (carros-na-cidade-core)
 
-| Env | Default | Função |
-| --- | --- | --- |
-| `INTERNAL_API_TOKEN` | (vazio) | Token comparado via `timingSafeEqual` contra `X-Internal-Token`. UA `cnc-internal/1.0` sem token = 429. |
-| `BAD_BOTS_BLOCKED` | `true` | Bloqueia crawlers SEO/AI e clients HTTP genéricos. |
-| `LEGACY_BFF_COMPAT` | `false` | **Rollback emergencial.** Quando `true`, UA `node` + `X-Cnc-Client-Ip` ainda passa. Default OFF — alvo é remover de vez no próximo PR. |
-| `SITEMAP_PUBLIC_ENABLED` | `false` | Kill switch dos sitemaps públicos (4 endpoints). |
-| `BACKEND_BANDWIDTH_DIAGNOSTICS_ENABLED` | `true` em janela de triagem, depois `false` | Logs agregados em stdout, sem PII (IP hashado, UA categorizado, body nunca logado). |
-| `PUBLIC_404_STORM_GUARD_ENABLED` | `true` | 404 storm guard por (IP, UA). |
-| `SERVE_UPLOADS_STATIC` | `false` em prod | Liga `/uploads` via `express.static`. Default OFF. |
-| `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED` | `false` | Fallback de imagem via origin (caro). |
+| Env                                     | Default                                     | Função                                                                                                                                 |
+| --------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `INTERNAL_API_TOKEN`                    | (vazio)                                     | Token comparado via `timingSafeEqual` contra `X-Internal-Token`. UA `cnc-internal/1.0` sem token = 429.                                |
+| `BAD_BOTS_BLOCKED`                      | `true`                                      | Bloqueia crawlers SEO/AI e clients HTTP genéricos.                                                                                     |
+| `LEGACY_BFF_COMPAT`                     | `false`                                     | **Rollback emergencial.** Quando `true`, UA `node` + `X-Cnc-Client-Ip` ainda passa. Default OFF — alvo é remover de vez no próximo PR. |
+| `SITEMAP_PUBLIC_ENABLED`                | `false`                                     | Kill switch dos sitemaps públicos (4 endpoints).                                                                                       |
+| `BACKEND_BANDWIDTH_DIAGNOSTICS_ENABLED` | `true` em janela de triagem, depois `false` | Logs agregados em stdout, sem PII (IP hashado, UA categorizado, body nunca logado).                                                    |
+| `PUBLIC_404_STORM_GUARD_ENABLED`        | `true`                                      | 404 storm guard por (IP, UA).                                                                                                          |
+| `SERVE_UPLOADS_STATIC`                  | `false` em prod                             | Liga `/uploads` via `express.static`. Default OFF.                                                                                     |
+| `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED`  | `false`                                     | Fallback de imagem via origin (caro).                                                                                                  |
 
 ### Frontend (carros-na-cidade-portal)
 
-| Env | Server/Client | Função |
-| --- | --- | --- |
-| `INTERNAL_API_TOKEN` | server-only | Token enviado em `X-Internal-Token` para todo fetch SSR/BFF. Idêntico ao backend. |
-| `INTERNAL_BACKEND_API_URL` | server-only | URL da Private Network do Render. Quando setada, fetch server-side resolve via ela (reduz bandwidth público). |
-| `BACKEND_INTERNAL_URL` | server-only | Alias aceito (resolução cai em fallback público se ambas vazias). |
-| `AUTH_API_BASE_URL`, `BACKEND_API_URL`, `API_URL` | server-only (mas hoje públicas) | URL pública do backend. Fallback quando `INTERNAL_BACKEND_API_URL` ausente. |
-| `NEXT_PUBLIC_API_URL` | client | URL pública usada por fetches do browser (autocomplete, leads). NUNCA contém token. |
+| Env                                               | Server/Client                   | Função                                                                                                        |
+| ------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `INTERNAL_API_TOKEN`                              | server-only                     | Token enviado em `X-Internal-Token` para todo fetch SSR/BFF. Idêntico ao backend.                             |
+| `INTERNAL_BACKEND_API_URL`                        | server-only                     | URL da Private Network do Render. Quando setada, fetch server-side resolve via ela (reduz bandwidth público). |
+| `BACKEND_INTERNAL_URL`                            | server-only                     | Alias aceito (resolução cai em fallback público se ambas vazias).                                             |
+| `AUTH_API_BASE_URL`, `BACKEND_API_URL`, `API_URL` | server-only (mas hoje públicas) | URL pública do backend. Fallback quando `INTERNAL_BACKEND_API_URL` ausente.                                   |
+| `NEXT_PUBLIC_API_URL`                             | client                          | URL pública usada por fetches do browser (autocomplete, leads). NUNCA contém token.                           |
 
 **Atenção:** `INTERNAL_API_TOKEN`, `INTERNAL_BACKEND_API_URL` e
 `BACKEND_INTERNAL_URL` **não podem ter prefixo `NEXT_PUBLIC_*`** —
@@ -145,18 +145,18 @@ curl -I https://carros-na-cidade-core.onrender.com/api/public/seo/sitemap
 - Ausência de `other:node` em `/api/ads*` confirma que a compat fraca
   realmente saiu de cena.
 - Warning único `[bot-blocker] UA cnc-internal/1.0 recebido SEM
-  X-Internal-Token valido em producao` indica problema de sincronização
+X-Internal-Token valido em producao` indica problema de sincronização
   de envs — verificar `INTERNAL_API_TOKEN` em ambos os serviços.
 
 ---
 
 ## 4. Como validar redução de bandwidth
 
-| Métrica | Antes (pre-fix) | Pós-emergency | Pós-hardening (este PR) |
-| --- | --- | --- | --- |
-| Backend Outbound 1h | GB/h | MB/h | MB/h (estável; idealmente menor) |
-| Frontend Outbound 1h | GB/h | MB/h | MB/h (Private Network reduz mais) |
-| Payload médio `/api/ads` (12 ads) | ~110 KB | ~110 KB | ~30-50 KB (slim) |
+| Métrica                           | Antes (pre-fix) | Pós-emergency | Pós-hardening (este PR)           |
+| --------------------------------- | --------------- | ------------- | --------------------------------- |
+| Backend Outbound 1h               | GB/h            | MB/h          | MB/h (estável; idealmente menor)  |
+| Frontend Outbound 1h              | GB/h            | MB/h          | MB/h (Private Network reduz mais) |
+| Payload médio `/api/ads` (12 ads) | ~110 KB         | ~110 KB       | ~30-50 KB (slim)                  |
 
 ### Onde olhar
 
@@ -216,17 +216,17 @@ Volta a responder 503 + Retry-After:3600. Não quebra robots.txt nem o sitemap d
 Cada peça é controlável independentemente por env. Em caso de regressão de
 bandwidth ou tráfego cortado errado:
 
-| Cenário | Rollback |
-| --- | --- |
-| Frontend SSR cortado em 429 após deploy | `LEGACY_BFF_COMPAT=true` no backend (aceita UA node + X-Cnc-Client-Ip por algumas horas) |
-| Token não sincronizado entre services | Verificar `INTERNAL_API_TOKEN` no backend E no frontend Render Environment |
-| Private Network inacessível | Remover `INTERNAL_BACKEND_API_URL` do frontend → volta para origin público |
-| Slim payload quebrou card específico | Reverter `ads.public.service.js` para `data: normalized` sem chamar `serializeAdsForListing` (1 linha) |
-| `allowedQueryKeys` ignorou filtro legítimo | Remover whitelist em `ads.routes.js` ou adicionar o param em `ADS_ALLOWED_QUERY_KEYS` |
-| Sitemap reativado mas bandwidth subiu | `SITEMAP_PUBLIC_ENABLED=false` |
-| Bot blocker cortando demais | `BAD_BOTS_BLOCKED=false` (último recurso — abre crawler-storm) |
-| 404 guard cortando demais | `PUBLIC_404_STORM_GUARD_ENABLED=false` |
-| Diagnostics fica pesado nos logs | `BACKEND_BANDWIDTH_DIAGNOSTICS_ENABLED=false` |
+| Cenário                                    | Rollback                                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Frontend SSR cortado em 429 após deploy    | `LEGACY_BFF_COMPAT=true` no backend (aceita UA node + X-Cnc-Client-Ip por algumas horas)               |
+| Token não sincronizado entre services      | Verificar `INTERNAL_API_TOKEN` no backend E no frontend Render Environment                             |
+| Private Network inacessível                | Remover `INTERNAL_BACKEND_API_URL` do frontend → volta para origin público                             |
+| Slim payload quebrou card específico       | Reverter `ads.public.service.js` para `data: normalized` sem chamar `serializeAdsForListing` (1 linha) |
+| `allowedQueryKeys` ignorou filtro legítimo | Remover whitelist em `ads.routes.js` ou adicionar o param em `ADS_ALLOWED_QUERY_KEYS`                  |
+| Sitemap reativado mas bandwidth subiu      | `SITEMAP_PUBLIC_ENABLED=false`                                                                         |
+| Bot blocker cortando demais                | `BAD_BOTS_BLOCKED=false` (último recurso — abre crawler-storm)                                         |
+| 404 guard cortando demais                  | `PUBLIC_404_STORM_GUARD_ENABLED=false`                                                                 |
+| Diagnostics fica pesado nos logs           | `BACKEND_BANDWIDTH_DIAGNOSTICS_ENABLED=false`                                                          |
 
 ---
 
@@ -243,7 +243,7 @@ bandwidth ou tráfego cortado errado:
 
 - Top user agents no diagnostics dominado por `bot:cnc-internal` e
   `browser:chrome`.
-- Ausência de `other:node` em rotas /api/ads*.
+- Ausência de `other:node` em rotas /api/ads\*.
 - Cache HIT ratio de /api/ads/list e /api/ads/search se mantém ou
   melhora (allowedQueryKeys → menos cache key explosion).
 

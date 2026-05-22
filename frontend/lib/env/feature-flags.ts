@@ -138,8 +138,5 @@ export function isRegionalPageCanonicalSelf(): boolean {
  * `docs/runbooks/events-feature-shutdown.md`.
  */
 export function isEventsPublicEnabled(): boolean {
-  return (
-    process.env.EVENTS_ENABLED === "true" &&
-    process.env.EVENTS_PUBLIC_ENABLED === "true"
-  );
+  return process.env.EVENTS_ENABLED === "true" && process.env.EVENTS_PUBLIC_ENABLED === "true";
 }

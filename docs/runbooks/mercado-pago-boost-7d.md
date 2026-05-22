@@ -6,26 +6,26 @@
 
 ## Visão geral
 
-| Item | Valor |
-|---|---|
-| Produto | Destaque 7 dias em um anúncio existente |
-| Preço fixo | R$ 39,90 (definido no backend, anti-spoof) |
-| Disponibilidade | CPF e CNPJ (ambos com anúncio próprio) |
-| Duração | 7 dias |
-| Compras duplicadas | Estendem o prazo (`highlight_until + 7 dias`), não trocam |
-| Não libera | vídeo 360, novos slots de fotos, novos slots de anúncios |
-| Endpoint dedicado | `POST /api/payments/boost-7d/checkout` |
+| Item                   | Valor                                                        |
+| ---------------------- | ------------------------------------------------------------ |
+| Produto                | Destaque 7 dias em um anúncio existente                      |
+| Preço fixo             | R$ 39,90 (definido no backend, anti-spoof)                   |
+| Disponibilidade        | CPF e CNPJ (ambos com anúncio próprio)                       |
+| Duração                | 7 dias                                                       |
+| Compras duplicadas     | Estendem o prazo (`highlight_until + 7 dias`), não trocam    |
+| Não libera             | vídeo 360, novos slots de fotos, novos slots de anúncios     |
+| Endpoint dedicado      | `POST /api/payments/boost-7d/checkout`                       |
 | Endpoint legacy aceito | `POST /api/payments/create` com `{ ad_id, boost_option_id }` |
-| Webhook | `POST /api/payments/webhook` (compartilhado com planos) |
+| Webhook                | `POST /api/payments/webhook` (compartilhado com planos)      |
 
 ## Variáveis de ambiente
 
-| Var | Sandbox | Produção | Descrição |
-|---|---|---|---|
-| `MP_ACCESS_TOKEN` | TEST-... | APP_USR-... | Bearer token API MP. Ausente → modo MOCK (init_point falso) |
-| `MP_WEBHOOK_SECRET` | qualquer | obrigatório | HMAC-SHA256 do webhook. Em `NODE_ENV=production` o boot **falha** se ausente (defesa anti-spoof) |
-| `MP_PUBLIC_KEY` | TEST-pk-... | APP_USR-pk-... | Public key (usada no front; opcional aqui) |
-| `APP_BASE_URL` / `API_URL` / `NEXT_PUBLIC_API_URL` | obrigatório | obrigatório | URL pública do backend para callback do webhook |
+| Var                                                | Sandbox     | Produção       | Descrição                                                                                        |
+| -------------------------------------------------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| `MP_ACCESS_TOKEN`                                  | TEST-...    | APP_USR-...    | Bearer token API MP. Ausente → modo MOCK (init_point falso)                                      |
+| `MP_WEBHOOK_SECRET`                                | qualquer    | obrigatório    | HMAC-SHA256 do webhook. Em `NODE_ENV=production` o boot **falha** se ausente (defesa anti-spoof) |
+| `MP_PUBLIC_KEY`                                    | TEST-pk-... | APP_USR-pk-... | Public key (usada no front; opcional aqui)                                                       |
+| `APP_BASE_URL` / `API_URL` / `NEXT_PUBLIC_API_URL` | obrigatório | obrigatório    | URL pública do backend para callback do webhook                                                  |
 
 Sem `MP_ACCESS_TOKEN`, `createBoostCheckout` ainda registra `payment_intents` com `checkout_resource_id = mock-preference-...` e devolve um `init_point` mock (`successUrl?mock=1`). Útil em dev local.
 
@@ -53,6 +53,7 @@ Resposta 200:
 ```
 
 Erros:
+
 - `400 ad_id e obrigatorio` — body sem `ad_id`
 - `404 Anuncio nao encontrado.` — anúncio não existe ou não pertence ao user
 - `401` — sem JWT ou expirado (frontend redireciona para `/login?next=`)
@@ -60,16 +61,16 @@ Erros:
 
 ## Defesas implementadas
 
-| Risco | Defesa |
-|---|---|
-| Cliente alterar preço (pagar R$ 0,01) | `createBoostCheckout` lê `price` do `BOOST_OPTIONS` no servidor. Não há param `amount`/`price`/`unit_price` na assinatura. Teste de regressão em [tests/payments/boost-7d-flow.test.js](../../tests/payments/boost-7d-flow.test.js) |
-| Cliente boostar anúncio de terceiro | `getOwnedAd(userId, adId)` joga 404 se `advertisers.user_id != userId` |
-| Cliente comprar boost de plano que não existe | Rota dedicada FIXA `boost_option_id="boost-7d"` no servidor — cliente não consegue trocar para `boost-fake` |
-| Webhook falsificado | `MP_WEBHOOK_SECRET` HMAC-SHA256 + `verifyWebhookSignature`. Em prod, boot falha sem o secret |
-| Webhook duplicado processando 2x | `payment_intents.payment_resource_id UNIQUE` + `FOR UPDATE` lock + check `intent.status === 'approved'` antes de chamar `applyBoostApproval` |
-| Race condition em compras simultâneas | `withTransaction` envolve todo o handler do webhook; lock `FOR UPDATE` em `payment_intents` |
-| Boost em anúncio soft-deleted | SQL de `applyBoostApproval` tem `WHERE status != 'deleted'` |
-| Compras duplicadas trocarem o prazo em vez de estender | SQL `CASE WHEN highlight_until > NOW() THEN highlight_until + Ndays ELSE NOW() + Ndays END` — alinhado à oferta oficial |
+| Risco                                                  | Defesa                                                                                                                                                                                                                              |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cliente alterar preço (pagar R$ 0,01)                  | `createBoostCheckout` lê `price` do `BOOST_OPTIONS` no servidor. Não há param `amount`/`price`/`unit_price` na assinatura. Teste de regressão em [tests/payments/boost-7d-flow.test.js](../../tests/payments/boost-7d-flow.test.js) |
+| Cliente boostar anúncio de terceiro                    | `getOwnedAd(userId, adId)` joga 404 se `advertisers.user_id != userId`                                                                                                                                                              |
+| Cliente comprar boost de plano que não existe          | Rota dedicada FIXA `boost_option_id="boost-7d"` no servidor — cliente não consegue trocar para `boost-fake`                                                                                                                         |
+| Webhook falsificado                                    | `MP_WEBHOOK_SECRET` HMAC-SHA256 + `verifyWebhookSignature`. Em prod, boot falha sem o secret                                                                                                                                        |
+| Webhook duplicado processando 2x                       | `payment_intents.payment_resource_id UNIQUE` + `FOR UPDATE` lock + check `intent.status === 'approved'` antes de chamar `applyBoostApproval`                                                                                        |
+| Race condition em compras simultâneas                  | `withTransaction` envolve todo o handler do webhook; lock `FOR UPDATE` em `payment_intents`                                                                                                                                         |
+| Boost em anúncio soft-deleted                          | SQL de `applyBoostApproval` tem `WHERE status != 'deleted'`                                                                                                                                                                         |
+| Compras duplicadas trocarem o prazo em vez de estender | SQL `CASE WHEN highlight_until > NOW() THEN highlight_until + Ndays ELSE NOW() + Ndays END` — alinhado à oferta oficial                                                                                                             |
 
 ## Sandbox — primeiro teste ponta a ponta
 

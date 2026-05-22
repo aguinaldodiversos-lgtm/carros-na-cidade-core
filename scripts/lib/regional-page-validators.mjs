@@ -76,9 +76,7 @@ export function checkStatus(actualStatus, expected) {
  *  - contém `nofollow` (deve ser `follow` na Fase A→B).
  */
 export function checkRobots(html) {
-  const match = html.match(
-    /<meta[^>]*name=["']robots["'][^>]*content=["']([^"']+)["']/i
-  );
+  const match = html.match(/<meta[^>]*name=["']robots["'][^>]*content=["']([^"']+)["']/i);
   if (!match) {
     return {
       ok: false,
@@ -110,9 +108,7 @@ export function checkRobots(html) {
  * regional) é REJEITADO nesta fase — runbook §5 Fase A/B/C.
  */
 export function checkCanonical(html, baseSlug) {
-  const match = html.match(
-    /<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i
-  );
+  const match = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i);
   if (!match) {
     return { ok: false, message: "<link rel='canonical'> ausente" };
   }
@@ -168,11 +164,12 @@ export function checkContent(html, { baseSlug, cityNameHints }) {
   // 2. Algum hint do nome da cidade aparece (mínimo viável: o slug bruto
   //    aparece em algum href; se houver hints específicos, casa contra
   //    eles).
-  const hints = Array.isArray(cityNameHints) && cityNameHints.length > 0
-    ? cityNameHints
-    : [baseSlug.split("-").slice(0, -1).join(" ").toLowerCase()];
-  const cityVisible = hints.some((hint) =>
-    typeof hint === "string" && hint.length > 0 && lower.includes(hint.toLowerCase())
+  const hints =
+    Array.isArray(cityNameHints) && cityNameHints.length > 0
+      ? cityNameHints
+      : [baseSlug.split("-").slice(0, -1).join(" ").toLowerCase()];
+  const cityVisible = hints.some(
+    (hint) => typeof hint === "string" && hint.length > 0 && lower.includes(hint.toLowerCase())
   );
   if (!cityVisible) {
     return {
@@ -218,9 +215,7 @@ export function checkContent(html, { baseSlug, cityNameHints }) {
  *    distinguir "tem cards" de "tem fallback".
  */
 export function checkAdsOrFallback(html) {
-  const hasFallback = html.includes(
-    "Ainda não encontramos veículos nesta região"
-  );
+  const hasFallback = html.includes("Ainda não encontramos veículos nesta região");
 
   // AdCard renderiza um Link com /veiculo/ ou data-ad-id. Heurística
   // duplamente segura: se o HTML tiver pelo menos 1 href para /veiculo/
@@ -247,8 +242,7 @@ export function checkAdsOrFallback(html) {
   }
   return {
     ok: false,
-    message:
-      "nem anúncios nem fallback detectados — página parece vazia/quebrada",
+    message: "nem anúncios nem fallback detectados — página parece vazia/quebrada",
     kind: "empty",
     adCount: 0,
   };

@@ -22,12 +22,7 @@ import { describe, expect, it } from "vitest";
  */
 
 describe("SellPublishFlowClient — sem texto técnico/meta visível", () => {
-  const filePath = join(
-    process.cwd(),
-    "components",
-    "sell",
-    "SellPublishFlowClient.tsx"
-  );
+  const filePath = join(process.cwd(), "components", "sell", "SellPublishFlowClient.tsx");
   const source = readFileSync(filePath, "utf8");
 
   it('NÃO contém "Destino pós-acesso"', () => {

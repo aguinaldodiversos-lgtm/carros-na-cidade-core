@@ -18,13 +18,13 @@ A auditoria identificou três vetores convergindo no origin Render:
 
 ## O que foi corrigido (PR E1+E2)
 
-| Arquivo | Mudança |
-| --- | --- |
+| Arquivo                                                                                                                  | Mudança                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [src/modules/vehicle-images/vehicle-images.controller.js](../../src/modules/vehicle-images/vehicle-images.controller.js) | Caminho padrão é **302 redirect** para `R2_PUBLIC_BASE_URL/{key}`. Validação rigorosa de `?key=` (rejeita `..`, `\`, URLs absolutas, schemes perigosos, protocol-relative). Streaming SDK só com `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED=true`. Sem R2 público e sem fallback → 404 leve (`max-age=60`). |
-| [src/modules/public/public-seo.controller.js](../../src/modules/public/public-seo.controller.js) | Os 4 endpoints de sitemap agora respondem com `Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800`. Erros mantêm `no-store`. |
-| [src/app.js](../../src/app.js) | `/uploads` só monta com `SERVE_UPLOADS_STATIC === "true"` (default OFF). |
-| [.env.example](../../.env.example) | Documentadas `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED` e nova semântica de `SERVE_UPLOADS_STATIC`. |
-| **Testes novos** | [tests/vehicle-images/vehicle-images.controller.test.js](../../tests/vehicle-images/vehicle-images.controller.test.js) (24 cenários), [tests/public/public-seo-sitemap-cache.test.js](../../tests/public/public-seo-sitemap-cache.test.js) (8 cenários). |
+| [src/modules/public/public-seo.controller.js](../../src/modules/public/public-seo.controller.js)                         | Os 4 endpoints de sitemap agora respondem com `Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800`. Erros mantêm `no-store`.                                                                                                                                           |
+| [src/app.js](../../src/app.js)                                                                                           | `/uploads` só monta com `SERVE_UPLOADS_STATIC === "true"` (default OFF).                                                                                                                                                                                                                               |
+| [.env.example](../../.env.example)                                                                                       | Documentadas `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED` e nova semântica de `SERVE_UPLOADS_STATIC`.                                                                                                                                                                                                        |
+| **Testes novos**                                                                                                         | [tests/vehicle-images/vehicle-images.controller.test.js](../../tests/vehicle-images/vehicle-images.controller.test.js) (24 cenários), [tests/public/public-seo-sitemap-cache.test.js](../../tests/public/public-seo-sitemap-cache.test.js) (8 cenários).                                               |
 
 ### Política nova
 
@@ -46,11 +46,11 @@ A auditoria identificou três vetores convergindo no origin Render:
 
 ## Envs a setar no Render
 
-| Env | Valor recomendado | Efeito |
-| --- | --- | --- |
-| `R2_PUBLIC_BASE_URL` | `https://pub-662ff7f9e6a946168e27ca660899bc3f.r2.dev` | habilita 302 redirect |
-| `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED` | `false` (omitir = false) | mantém origin protegido |
-| `SERVE_UPLOADS_STATIC` | `false` (omitir = false) | impede `/uploads` static |
+| Env                                    | Valor recomendado                                     | Efeito                   |
+| -------------------------------------- | ----------------------------------------------------- | ------------------------ |
+| `R2_PUBLIC_BASE_URL`                   | `https://pub-662ff7f9e6a946168e27ca660899bc3f.r2.dev` | habilita 302 redirect    |
+| `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED` | `false` (omitir = false)                              | mantém origin protegido  |
+| `SERVE_UPLOADS_STATIC`                 | `false` (omitir = false)                              | impede `/uploads` static |
 
 ## Validação com curl (após deploy)
 
@@ -61,6 +61,7 @@ curl -I "https://carros-na-cidade-core.onrender.com/api/vehicle-images?key=vehic
 ```
 
 Esperado:
+
 ```
 HTTP/1.1 302 Found
 Location: https://pub-662ff7f9e6a946168e27ca660899bc3f.r2.dev/vehicles/alguma-chave.webp
@@ -83,6 +84,7 @@ done
 ```
 
 Esperado em cada uma:
+
 ```
 cache-control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800
 ```
@@ -97,20 +99,20 @@ cache-control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=6048
 
 ## Riscos
 
-| Risco | Mitigação |
-| --- | --- |
-| `R2_PUBLIC_BASE_URL` esquecido no Render | 404 leve em vez de fluxo legado — visível em staging antes de prod |
-| Anúncios antigos com `/api/vehicle-images?key=` linkados em emails/marketing | Browser recebe 302 → CDN. Funciona transparente. |
-| CDN R2 fora do ar | `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED=true` → volta a streamar. Bandwidth Render aumenta enquanto ligado. |
-| Sitemap precisa atualizar em tempo real | Cache 1h no browser; CDN/edge invalidate via deploy (muda artefato). |
+| Risco                                                                        | Mitigação                                                                                                 |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `R2_PUBLIC_BASE_URL` esquecido no Render                                     | 404 leve em vez de fluxo legado — visível em staging antes de prod                                        |
+| Anúncios antigos com `/api/vehicle-images?key=` linkados em emails/marketing | Browser recebe 302 → CDN. Funciona transparente.                                                          |
+| CDN R2 fora do ar                                                            | `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED=true` → volta a streamar. Bandwidth Render aumenta enquanto ligado. |
+| Sitemap precisa atualizar em tempo real                                      | Cache 1h no browser; CDN/edge invalidate via deploy (muda artefato).                                      |
 
 ## Plano de rollback
 
-| Mudança | Reverso |
-| --- | --- |
-| 302 redirect | `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED=true` (apenas env, sem deploy de código) |
-| Cache forte sitemap | `git revert` do commit; volta para 60s/300s/sem cache |
-| `/uploads` default OFF | `SERVE_UPLOADS_STATIC=true` no Render (apenas env) |
+| Mudança                | Reverso                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| 302 redirect           | `BACKEND_IMAGE_PROXY_FALLBACK_ENABLED=true` (apenas env, sem deploy de código) |
+| Cache forte sitemap    | `git revert` do commit; volta para 60s/300s/sem cache                          |
+| `/uploads` default OFF | `SERVE_UPLOADS_STATIC=true` no Render (apenas env)                             |
 
 Nenhuma mudança é destrutiva. Trigger temporário do banco continua intocado. Frontend continua intocado.
 

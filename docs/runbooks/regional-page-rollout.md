@@ -36,12 +36,12 @@ visitante para anúncios em outros estados ou regiões distantes.
 
 ## 2. Regra arquitetural — quatro superfícies territoriais
 
-| Superfície | Escopo | Exemplo de URL atual |
-|---|---|---|
-| **Estadual** | UF inteira | _(não existe ainda; futura)_ |
-| **Regional** | cidade-base + região aproximada (≤60 km) | _(não existe ainda; futura — este runbook)_ |
-| **Cidade** | local apenas (1 cidade) | `/comprar/cidade/[slug]`, `/cidade/[slug]`, `/carros-em/[slug]` |
-| **Busca livre** | escolha do visitante (qualquer combinação de filtros) | `/comprar?...` |
+| Superfície      | Escopo                                                | Exemplo de URL atual                                            |
+| --------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| **Estadual**    | UF inteira                                            | _(não existe ainda; futura)_                                    |
+| **Regional**    | cidade-base + região aproximada (≤60 km)              | _(não existe ainda; futura — este runbook)_                     |
+| **Cidade**      | local apenas (1 cidade)                               | `/comprar/cidade/[slug]`, `/cidade/[slug]`, `/carros-em/[slug]` |
+| **Busca livre** | escolha do visitante (qualquer combinação de filtros) | `/comprar?...`                                                  |
 
 **Cada superfície tem intenção SEO distinta.** A Regional **não** substitui
 a Cidade; a Cidade **não** substitui a Estadual. Cada uma resolve uma
@@ -74,10 +74,10 @@ ao padrão semântico das outras superfícies territoriais (`/carros-em/`).
 Trocar esta URL depois de indexada implicaria 301 em massa — operação
 que este rollout existe justamente para evitar.
 
-| URL | Status |
-|---|---|
+| URL                            | Status                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
 | `/carros-usados/regiao/[slug]` | **Canônica.** Implementada como `frontend/app/carros-usados/regiao/[slug]/page.tsx`. |
-| `/regiao/[slug]` | **Não usada.** Foi descartada em favor da canônica acima. |
+| `/regiao/[slug]`               | **Não usada.** Foi descartada em favor da canônica acima.                            |
 
 ---
 
@@ -122,12 +122,12 @@ Cada fase tem regras explícitas. Não pular fases.
 
 ## 6. Regra de noindex
 
-| Estado | Robots |
-|---|---|
-| Regional desabilitada (flag false) | `noindex, follow` se servida acidentalmente |
-| Regional em staging (flag true) | `noindex, follow` |
-| Regional em produção antes da aprovação SEO | `noindex, follow` |
-| Regional aprovada para indexação | `index, follow` **se** cumprir critério de estoque/conteúdo |
+| Estado                                      | Robots                                                      |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| Regional desabilitada (flag false)          | `noindex, follow` se servida acidentalmente                 |
+| Regional em staging (flag true)             | `noindex, follow`                                           |
+| Regional em produção antes da aprovação SEO | `noindex, follow`                                           |
+| Regional aprovada para indexação            | `index, follow` **se** cumprir critério de estoque/conteúdo |
 
 **Critério de estoque/conteúdo** (a definir formalmente antes da Fase D):
 mínimo de N anúncios ativos na região, mínimo de M cidades-membro com
@@ -244,7 +244,7 @@ A página usa raio dinâmico configurável pelo admin (default 80 km, range
   fail-safe para default em caso de erro de leitura).
 - **Endpoints admin:**
   - `GET /api/admin/regional-settings` → `{ radius_km, radius_min_km,
-    radius_max_km, radius_default_km }`.
+radius_max_km, radius_default_km }`.
   - `PATCH /api/admin/regional-settings` body `{ radius_km, reason? }` —
     valida 10..150, integer, transacional, audita em `admin_actions` com
     action `update_regional_radius`, invalida cache Redis `internal:regions:*`.

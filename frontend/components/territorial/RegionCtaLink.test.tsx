@@ -21,33 +21,25 @@ afterEach(() => {
 describe("RegionCtaLink — gate por feature flag", () => {
   it("retorna null quando REGIONAL_PAGE_ENABLED não está em 'true' exato", () => {
     process.env.REGIONAL_PAGE_ENABLED = "false";
-    const { container } = render(
-      <RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />
-    );
+    const { container } = render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
     expect(container.innerHTML).toBe("");
   });
 
   it("retorna null quando flag ausente", () => {
     delete process.env.REGIONAL_PAGE_ENABLED;
-    const { container } = render(
-      <RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />
-    );
+    const { container } = render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
     expect(container.innerHTML).toBe("");
   });
 
   it("retorna null quando flag é 'TRUE' (contrato estrito case-sensitive)", () => {
     process.env.REGIONAL_PAGE_ENABLED = "TRUE";
-    const { container } = render(
-      <RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />
-    );
+    const { container } = render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
     expect(container.innerHTML).toBe("");
   });
 
   it("retorna null quando flag é '1'", () => {
     process.env.REGIONAL_PAGE_ENABLED = "1";
-    const { container } = render(
-      <RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />
-    );
+    const { container } = render(<RegionCtaLink slug="atibaia-sp" cityName="Atibaia" />);
     expect(container.innerHTML).toBe("");
   });
 });
@@ -67,10 +59,18 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
   it("funciona para qualquer cidade brasileira (Campinas, BH, Salvador, Curitiba)", () => {
     const samples: Array<{ slug: string; city: string; expected: string }> = [
       { slug: "campinas-sp", city: "Campinas", expected: "/carros-usados/regiao/campinas-sp" },
-      { slug: "belo-horizonte-mg", city: "Belo Horizonte", expected: "/carros-usados/regiao/belo-horizonte-mg" },
+      {
+        slug: "belo-horizonte-mg",
+        city: "Belo Horizonte",
+        expected: "/carros-usados/regiao/belo-horizonte-mg",
+      },
       { slug: "salvador-ba", city: "Salvador", expected: "/carros-usados/regiao/salvador-ba" },
       { slug: "curitiba-pr", city: "Curitiba", expected: "/carros-usados/regiao/curitiba-pr" },
-      { slug: "sao-jose-dos-campos-sp", city: "São José dos Campos", expected: "/carros-usados/regiao/sao-jose-dos-campos-sp" },
+      {
+        slug: "sao-jose-dos-campos-sp",
+        city: "São José dos Campos",
+        expected: "/carros-usados/regiao/sao-jose-dos-campos-sp",
+      },
     ];
     for (const { slug, city, expected } of samples) {
       const { unmount } = render(<RegionCtaLink slug={slug} cityName={city} />);
@@ -88,9 +88,7 @@ describe("RegionCtaLink — renderização com flag ligada", () => {
   it("aria-label inclui nome da cidade para acessibilidade", () => {
     render(<RegionCtaLink slug="campinas-sp" cityName="Campinas" />);
     const link = screen.getByTestId("region-cta-link");
-    expect(link.getAttribute("aria-label")).toBe(
-      "Ver carros na região de Campinas"
-    );
+    expect(link.getAttribute("aria-label")).toBe("Ver carros na região de Campinas");
   });
 
   it("encoda o slug no href", () => {

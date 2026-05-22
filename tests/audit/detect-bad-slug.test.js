@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  detectBadSlug,
-  suggestAdSlug,
-} from "../../scripts/audit/lib/detect-bad-slug.mjs";
+import { detectBadSlug, suggestAdSlug } from "../../scripts/audit/lib/detect-bad-slug.mjs";
 
 describe("detectBadSlug — slugs válidos não são flagados", () => {
   it("'honda-civic-lxr-2019-12345' não é bad", () => {
@@ -119,9 +116,9 @@ describe("detectBadSlug — LOW (estética)", () => {
 
 describe("suggestAdSlug — sugestões canônicas", () => {
   it("brand+model+year+id forma slug semantic", () => {
-    expect(
-      suggestAdSlug({ brand: "Honda", model: "Civic", year: 2019, id: 42 })
-    ).toBe("honda-civic-2019-42");
+    expect(suggestAdSlug({ brand: "Honda", model: "Civic", year: 2019, id: 42 })).toBe(
+      "honda-civic-2019-42"
+    );
   });
 
   it("normaliza acento", () => {

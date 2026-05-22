@@ -381,10 +381,7 @@ export async function fetchBlogPageContent(citySlug: string): Promise<BlogPageCo
 
 export async function fetchBlogCategoryContent(citySlug: string, categoryId: BlogCategoryId) {
   const content = await fetchBlogPageContent(citySlug);
-  const allPosts: BlogPost[] = [
-    ...(content.featuredPosts || []),
-    ...(content.popularPosts || []),
-  ];
+  const allPosts: BlogPost[] = [...(content.featuredPosts || []), ...(content.popularPosts || [])];
 
   const posts = allPosts.filter((post) => post.categoryId === categoryId);
   const definition = findCategoryDefinition(categoryId);

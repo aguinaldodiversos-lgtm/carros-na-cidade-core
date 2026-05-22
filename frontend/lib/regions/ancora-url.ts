@@ -63,8 +63,13 @@ export const slugToAncoraHref = slugToRegionHref;
  * @param ancora parte de ancora sem sufixo UF
  */
 export function ancoraHrefFromParts(uf: string, ancora: string): string {
-  const ufNorm = String(uf || "").trim().toLowerCase().slice(0, 2);
-  const ancoraNorm = String(ancora || "").trim().toLowerCase();
+  const ufNorm = String(uf || "")
+    .trim()
+    .toLowerCase()
+    .slice(0, 2);
+  const ancoraNorm = String(ancora || "")
+    .trim()
+    .toLowerCase();
   if (!ufNorm || !ancoraNorm) return "/";
   return slugToRegionHref(`${ancoraNorm}-${ufNorm}`);
 }
@@ -75,8 +80,13 @@ export function ancoraHrefFromParts(uf: string, ancora: string): string {
  * para a URL canônica.
  */
 export function slugFromAncoraParts(uf: string, ancora: string): string {
-  const ufNorm = String(uf || "").trim().toLowerCase().slice(0, 2);
-  const ancoraNorm = String(ancora || "").trim().toLowerCase();
+  const ufNorm = String(uf || "")
+    .trim()
+    .toLowerCase()
+    .slice(0, 2);
+  const ancoraNorm = String(ancora || "")
+    .trim()
+    .toLowerCase();
   if (!ufNorm || !ancoraNorm) return "";
   return `${ancoraNorm}-${ufNorm}`;
 }

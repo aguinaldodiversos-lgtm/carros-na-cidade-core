@@ -9,10 +9,7 @@ import AdCard from "@/components/ads/AdCard";
 import type { BaseAdData } from "@/components/ads/AdCard";
 import { trackAdEvent } from "@/lib/analytics/public-events";
 import { submitVehicleLead } from "@/lib/leads/public-leads";
-import {
-  buildFinanceLink,
-  buildVehicleWhatsappHref,
-} from "@/lib/vehicle/detail-utils";
+import { buildFinanceLink, buildVehicleWhatsappHref } from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
@@ -68,14 +65,11 @@ export default function VehicleDetailMobileShell({
   );
 
   // Texto compacto: "2020 · 41.000 km · Atibaia (SP)"
-  const metaPieces = [
-    primaryYear(vehicle.year),
-    vehicle.km,
-    vehicle.city,
-  ].filter((piece) => piece && piece !== "Não informado" && piece !== "Ano não informado");
+  const metaPieces = [primaryYear(vehicle.year), vehicle.km, vehicle.city].filter(
+    (piece) => piece && piece !== "Não informado" && piece !== "Ano não informado"
+  );
 
-  const sellerKind: "dealer" | "private" =
-    vehicle.seller.type === "dealer" ? "dealer" : "private";
+  const sellerKind: "dealer" | "private" = vehicle.seller.type === "dealer" ? "dealer" : "private";
 
   const cityName = vehicle.city.split(" (")[0] || vehicle.city || "sua cidade";
 
@@ -333,15 +327,7 @@ function primaryYear(value: string): string {
   return raw.split("/")[0] || raw;
 }
 
-function SpecRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+function SpecRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2.5 rounded-xl px-2 py-1.5">
       <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#eef5ff] text-[#0e62d8]">
@@ -533,12 +519,7 @@ function LocationPinIcon() {
 
 function WhatsappIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="currentColor"
-    >
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="currentColor">
       <path d="M19.05 4.91A10 10 0 0 0 12.04 2c-5.46 0-9.9 4.45-9.9 9.92 0 1.75.46 3.46 1.34 4.97L2 22l5.31-1.39a9.86 9.86 0 0 0 4.73 1.21h.01c5.46 0 9.9-4.45 9.9-9.92a9.92 9.92 0 0 0-2.9-7Zm-7.01 15.27h-.01a8.27 8.27 0 0 1-4.21-1.16l-.3-.18-3.15.83.84-3.07-.2-.32a8.26 8.26 0 0 1-1.27-4.39c0-4.55 3.7-8.25 8.26-8.25 2.2 0 4.27.86 5.83 2.42a8.2 8.2 0 0 1 2.42 5.84c0 4.55-3.7 8.25-8.21 8.28Zm4.52-6.18c-.25-.13-1.46-.72-1.69-.8-.23-.08-.39-.13-.56.13s-.65.8-.79.97c-.15.17-.29.19-.54.06-.25-.13-1.04-.38-1.99-1.22-.74-.65-1.23-1.46-1.38-1.71-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.17.04-.32-.02-.45-.06-.13-.56-1.34-.77-1.84-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.45.06-.69.32-.23.25-.9.88-.9 2.15 0 1.27.92 2.5 1.05 2.67.13.17 1.81 2.76 4.39 3.87.61.27 1.09.42 1.46.54.61.19 1.17.16 1.61.1.49-.07 1.46-.6 1.66-1.18.21-.58.21-1.07.14-1.18-.06-.11-.23-.17-.48-.3Z" />
     </svg>
   );

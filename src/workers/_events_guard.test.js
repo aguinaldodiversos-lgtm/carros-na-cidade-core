@@ -1,14 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  refuseIfEventsWorkerDisabled,
-  refuseIfAiBannerDisabled,
-} from "./_events_guard.cjs";
+import { refuseIfEventsWorkerDisabled, refuseIfAiBannerDisabled } from "./_events_guard.cjs";
 
-const ALL_KEYS = [
-  "EVENTS_ENABLED",
-  "EVENTS_WORKER_ENABLED",
-  "EVENTS_AI_BANNER_ENABLED",
-];
+const ALL_KEYS = ["EVENTS_ENABLED", "EVENTS_WORKER_ENABLED", "EVENTS_AI_BANNER_ENABLED"];
 
 let saved = {};
 beforeEach(() => {

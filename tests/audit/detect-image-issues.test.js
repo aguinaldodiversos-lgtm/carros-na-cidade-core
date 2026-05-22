@@ -71,10 +71,7 @@ describe("detectImageIssues — HIGH (legacy /uploads, malformed scheme)", () =>
 
   it("capa é placeholder → high (impacto direto na vitrine)", () => {
     const result = detectImageIssues({
-      images: [
-        "https://cdn.cnc.br/placeholder.png",
-        "https://cdn.cnc.br/real-photo-2.jpg",
-      ],
+      images: ["https://cdn.cnc.br/placeholder.png", "https://cdn.cnc.br/real-photo-2.jpg"],
     });
     expect(result.severity).toBe("high");
     expect(result.issues.some((i) => i.code === "cover_is_placeholder")).toBe(true);
@@ -93,11 +90,7 @@ describe("detectImageIssues — MEDIUM (render storage, duplicates, too many)", 
 
   it("duplicatas dentro do array → medium", () => {
     const result = detectImageIssues({
-      images: [
-        "https://cdn.cnc.br/a.jpg",
-        "https://cdn.cnc.br/b.jpg",
-        "https://cdn.cnc.br/a.jpg",
-      ],
+      images: ["https://cdn.cnc.br/a.jpg", "https://cdn.cnc.br/b.jpg", "https://cdn.cnc.br/a.jpg"],
     });
     expect(result.issues.some((i) => i.code === "duplicate_images")).toBe(true);
   });
@@ -110,10 +103,7 @@ describe("detectImageIssues — MEDIUM (render storage, duplicates, too many)", 
 
   it("placeholder em foto não-capa → medium (não high)", () => {
     const result = detectImageIssues({
-      images: [
-        "https://cdn.cnc.br/real-cover.jpg",
-        "https://cdn.cnc.br/placeholder.png",
-      ],
+      images: ["https://cdn.cnc.br/real-cover.jpg", "https://cdn.cnc.br/placeholder.png"],
     });
     // Severity não pode ser critical/high só por causa de placeholder fora da capa.
     expect(["medium", "low", "ok"]).toContain(result.severity);

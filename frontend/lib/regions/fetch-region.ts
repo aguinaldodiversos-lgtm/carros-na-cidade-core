@@ -197,9 +197,7 @@ function normalizeMember(value: unknown): RegionMember | null {
  * lat/lng do baseCity). O caller não precisa saber dessa diferença —
  * o adapter mantém o contrato `RegionPayload` consistente.
  */
-function adaptPublicToRegionPayload(
-  envelope: PublicBackendEnvelope
-): RegionPayload | null {
+function adaptPublicToRegionPayload(envelope: PublicBackendEnvelope): RegionPayload | null {
   const data = envelope?.data;
   if (!data || !data.baseCity) return null;
   const baseCity = data.baseCity;
@@ -330,9 +328,7 @@ async function fetchFromInternalEndpoint(safeSlug: string): Promise<RegionPayloa
 
   if (!getBackendApiBaseUrl()) return null;
 
-  const url = resolveInternalBackendApiUrl(
-    `/api/internal/regions/${encodeURIComponent(safeSlug)}`
-  );
+  const url = resolveInternalBackendApiUrl(`/api/internal/regions/${encodeURIComponent(safeSlug)}`);
   if (!url) return null;
 
   let response: Response;

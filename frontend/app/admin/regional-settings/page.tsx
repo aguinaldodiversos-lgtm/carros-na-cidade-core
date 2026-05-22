@@ -79,8 +79,7 @@ export default function AdminRegionalSettingsPage() {
   }
 
   if (loading) return <AdminLoadingState message="Carregando configurações…" />;
-  if (loadError)
-    return <AdminErrorState message={loadError} onRetry={() => void load()} />;
+  if (loadError) return <AdminErrorState message={loadError} onRetry={() => void load()} />;
   if (!settings) return null;
 
   const isDirty = String(settings.radius_km) !== radiusInput.trim();
@@ -92,16 +91,13 @@ export default function AdminRegionalSettingsPage() {
       <div className="rounded-xl border border-cnc-line bg-white p-5 shadow-card">
         <h2 className="text-sm font-bold text-cnc-text mb-1">Raio regional</h2>
         <p className="text-xs text-cnc-muted-soft mb-4 leading-relaxed">
-          Define a distância usada para montar as páginas regionais a partir da cidade base.
-          A cidade base sempre é incluída e tem prioridade no ranking de anúncios.
+          Define a distância usada para montar as páginas regionais a partir da cidade base. A
+          cidade base sempre é incluída e tem prioridade no ranking de anúncios.
         </p>
 
         <form onSubmit={handleSave} className="space-y-4 max-w-md">
           <div>
-            <label
-              htmlFor="radius_km"
-              className="block text-xs font-semibold text-cnc-text mb-1"
-            >
+            <label htmlFor="radius_km" className="block text-xs font-semibold text-cnc-text mb-1">
               Raio em km
             </label>
             <div className="flex items-center gap-2">
@@ -125,8 +121,8 @@ export default function AdminRegionalSettingsPage() {
               <span className="text-xs text-cnc-muted">km</span>
             </div>
             <p className="mt-1.5 text-[11px] text-cnc-muted-soft">
-              Entre {settings.radius_min_km} e {settings.radius_max_km} km.
-              Valor padrão: {settings.radius_default_km} km.
+              Entre {settings.radius_min_km} e {settings.radius_max_km} km. Valor padrão:{" "}
+              {settings.radius_default_km} km.
             </p>
           </div>
 

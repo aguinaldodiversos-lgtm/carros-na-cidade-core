@@ -23,16 +23,11 @@ interface AlsoInRegionBlockProps {
   cityAdsTotal?: number;
 }
 
-export function AlsoInRegionBlock({
-  slug,
-  cityName,
-  cityAdsTotal = 0,
-}: AlsoInRegionBlockProps) {
+export function AlsoInRegionBlock({ slug, cityName, cityAdsTotal = 0 }: AlsoInRegionBlockProps) {
   if (!slug) return null;
 
-  const headline = cityAdsTotal > 0
-    ? `Poucas opções em ${cityName}?`
-    : `Sem ofertas em ${cityName} no momento?`;
+  const headline =
+    cityAdsTotal > 0 ? `Poucas opções em ${cityName}?` : `Sem ofertas em ${cityName} no momento?`;
 
   return (
     <section
@@ -49,8 +44,7 @@ export function AlsoInRegionBlock({
             {headline}
           </h2>
           <p className="mt-1 text-sm text-cnc-muted">
-            Também encontramos veículos na região de {cityName} — cidades próximas
-            no mesmo entorno.
+            Também encontramos veículos na região de {cityName} — cidades próximas no mesmo entorno.
           </p>
         </div>
         <Link

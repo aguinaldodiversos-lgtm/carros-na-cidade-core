@@ -96,10 +96,10 @@ export async function createAd(data) {
 }
 
 export async function findById(id) {
-  const { rows } = await db.query(
-    `SELECT * FROM ads WHERE id = $1 AND status != $2`,
-    [id, AD_STATUS.DELETED]
-  );
+  const { rows } = await db.query(`SELECT * FROM ads WHERE id = $1 AND status != $2`, [
+    id,
+    AD_STATUS.DELETED,
+  ]);
 
   return rows[0] || null;
 }

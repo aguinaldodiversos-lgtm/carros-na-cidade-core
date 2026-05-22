@@ -24,9 +24,7 @@ describe("slugToRegionHref — contrato canônico /carros-usados/regiao/{slug}",
   it("emite URL canônica com slug completo nome-uf", () => {
     expect(slugToRegionHref("atibaia-sp")).toBe("/carros-usados/regiao/atibaia-sp");
     expect(slugToRegionHref("campinas-sp")).toBe("/carros-usados/regiao/campinas-sp");
-    expect(slugToRegionHref("belo-horizonte-mg")).toBe(
-      "/carros-usados/regiao/belo-horizonte-mg"
-    );
+    expect(slugToRegionHref("belo-horizonte-mg")).toBe("/carros-usados/regiao/belo-horizonte-mg");
   });
 
   it("NUNCA emite o formato legado /uf/regiao/ancora", () => {
@@ -88,9 +86,7 @@ describe("slugToAncoraHref — alias deprecated mantido para backward compat", (
 
 describe("ancoraHrefFromParts — reconstrói canônica a partir de (uf, ancora)", () => {
   it("monta canônica a partir das partes do path legado", () => {
-    expect(ancoraHrefFromParts("sp", "atibaia")).toBe(
-      "/carros-usados/regiao/atibaia-sp"
-    );
+    expect(ancoraHrefFromParts("sp", "atibaia")).toBe("/carros-usados/regiao/atibaia-sp");
     expect(ancoraHrefFromParts("MG", "Belo-Horizonte")).toBe(
       "/carros-usados/regiao/belo-horizonte-mg"
     );

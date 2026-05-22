@@ -9,10 +9,7 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
   ssrResilientFetch: vi.fn(),
 }));
 
-import {
-  getBackendApiBaseUrl,
-  resolveBackendApiUrl,
-} from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 import { fetchStateRegions } from "./fetch-state-regions";
@@ -142,7 +139,10 @@ describe("fetchStateRegions — happy path", () => {
 
   it("aceita regions vazias (UF sem cobertura)", async () => {
     mockedFetch.mockResolvedValueOnce(
-      buildResponse(200, { success: true, data: { state: { code: "SP", slug: "sp" }, regions: [] } })
+      buildResponse(200, {
+        success: true,
+        data: { state: { code: "SP", slug: "sp" }, regions: [] },
+      })
     );
 
     const result = await fetchStateRegions("SP");
@@ -184,9 +184,7 @@ describe("fetchStateRegions — degrade gracioso", () => {
   });
 
   it("envelope sem state.code/slug → null", async () => {
-    mockedFetch.mockResolvedValueOnce(
-      buildResponse(200, { success: true, data: { regions: [] } })
-    );
+    mockedFetch.mockResolvedValueOnce(buildResponse(200, { success: true, data: { regions: [] } }));
     const result = await fetchStateRegions("SP");
     expect(result).toBeNull();
   });
@@ -198,10 +196,32 @@ describe("fetchStateRegions — degrade gracioso", () => {
         data: {
           state: { code: "SP", slug: "sp" },
           regions: [
-            { slug: "valida-sp", name: "Região Válida", baseCitySlug: "valida-sp", baseCityName: "Válida", href: "/x", cityNames: ["A"], citySlugs: ["a"], adsCount: 1, featuredCount: 0, radiusKm: 80 },
+            {
+              slug: "valida-sp",
+              name: "Região Válida",
+              baseCitySlug: "valida-sp",
+              baseCityName: "Válida",
+              href: "/x",
+              cityNames: ["A"],
+              citySlugs: ["a"],
+              adsCount: 1,
+              featuredCount: 0,
+              radiusKm: 80,
+            },
             null,
             { slug: "incompleta-sp", name: "Incompleta" },
-            { slug: "outra-sp", name: "Outra", baseCitySlug: "outra-sp", baseCityName: "Outra", href: "/y", cityNames: ["B"], citySlugs: ["b"], adsCount: 2, featuredCount: 1, radiusKm: 80 },
+            {
+              slug: "outra-sp",
+              name: "Outra",
+              baseCitySlug: "outra-sp",
+              baseCityName: "Outra",
+              href: "/y",
+              cityNames: ["B"],
+              citySlugs: ["b"],
+              adsCount: 2,
+              featuredCount: 1,
+              radiusKm: 80,
+            },
           ],
         },
       })

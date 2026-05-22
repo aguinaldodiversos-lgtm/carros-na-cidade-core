@@ -41,13 +41,7 @@ const noop = () => {};
 
 describe("AdCard — badges e bloqueios por status", () => {
   it("ACTIVE: badge 'Ativo', Pausar habilitado, Impulsionar é link", () => {
-    render(
-      <AdCard
-        ad={makeAd({ status: "active" })}
-        onToggleStatus={noop}
-        onDelete={noop}
-      />
-    );
+    render(<AdCard ad={makeAd({ status: "active" })} onToggleStatus={noop} onDelete={noop} />);
     // Badge: "Ativo" aparece no header card. Status section também mostra "Ativo".
     expect(screen.getAllByText(/ativo/i).length).toBeGreaterThan(0);
 
@@ -62,18 +56,12 @@ describe("AdCard — badges e bloqueios por status", () => {
 
   it("PENDING_REVIEW: badge 'Em análise', botão Pausar bloqueado, Impulsionar bloqueado", () => {
     render(
-      <AdCard
-        ad={makeAd({ status: "pending_review" })}
-        onToggleStatus={noop}
-        onDelete={noop}
-      />
+      <AdCard ad={makeAd({ status: "pending_review" })} onToggleStatus={noop} onDelete={noop} />
     );
     expect(screen.getAllByText(/em análise/i).length).toBeGreaterThan(0);
 
     // Banner de moderação visível
-    expect(
-      screen.getByText(/análise de segurança/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/análise de segurança/i)).toBeInTheDocument();
 
     // O botão de status mostra "Aguardando" e está disabled.
     const statusButton = screen.getByRole("button", { name: /aguardando/i });
@@ -86,18 +74,10 @@ describe("AdCard — badges e bloqueios por status", () => {
   });
 
   it("REJECTED: badge 'Rejeitado', mensagem explicativa, ações bloqueadas", () => {
-    render(
-      <AdCard
-        ad={makeAd({ status: "rejected" })}
-        onToggleStatus={noop}
-        onDelete={noop}
-      />
-    );
+    render(<AdCard ad={makeAd({ status: "rejected" })} onToggleStatus={noop} onDelete={noop} />);
     expect(screen.getAllByText(/rejeitado/i).length).toBeGreaterThan(0);
     // Banner de moderação (role="status") explica o bloqueio para o anunciante.
-    expect(
-      screen.getByText(/anúncio foi rejeitado.*verifique os dados/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/anúncio foi rejeitado.*verifique os dados/i)).toBeInTheDocument();
 
     const statusBtn = screen.getByRole("button", { name: /aguardando/i });
     expect(statusBtn).toBeDisabled();
@@ -108,13 +88,7 @@ describe("AdCard — badges e bloqueios por status", () => {
   });
 
   it("PAUSED: badge 'Pausado', botão 'Ativar' habilitado, Impulsionar bloqueado (não é ACTIVE)", () => {
-    render(
-      <AdCard
-        ad={makeAd({ status: "paused" })}
-        onToggleStatus={noop}
-        onDelete={noop}
-      />
-    );
+    render(<AdCard ad={makeAd({ status: "paused" })} onToggleStatus={noop} onDelete={noop} />);
     expect(screen.getAllByText(/pausado/i).length).toBeGreaterThan(0);
 
     const ativar = screen.getByRole("button", { name: /ativar/i });

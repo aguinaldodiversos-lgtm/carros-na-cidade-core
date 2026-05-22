@@ -13,11 +13,13 @@ Render Billing mostrou consumo extremo de **Outbound Bandwidth**, quase todo em 
 Três caminhos somados estavam canalizando bytes de imagem pelo Render:
 
 1. **`/api/vehicle-images` streamando bytes** ([frontend/app/api/vehicle-images/route.ts](../../frontend/app/api/vehicle-images/route.ts)).
+
    - Para `?key=` lia o R2 via BFF (`readImageFromR2Direct`) e devolvia o buffer.
    - Para `?src=` lia disco local + backend e devolvia o blob.
    - Resultado: cada imagem de anúncio ia para o R2/backend, atravessava o Render como response, e saía pelo origin.
 
 2. **Otimizador `/_next/image` aberto para qualquer HTTPS** ([frontend/next.config.mjs](../../frontend/next.config.mjs)).
+
    - `remotePatterns` incluía `{ hostname: "**" }`.
    - O componente `<VehicleImage>` chamava `next/image` sem `unoptimized` para URLs do R2, do backend e do próprio proxy `/api/vehicle-images`.
    - Resultado: caminho duplo — browser → `/_next/image?url=...` → Render busca do R2/proxy → Render reotimiza → Render serve. Bandwidth contado duas vezes.
@@ -30,14 +32,14 @@ Combinação: cada visita (humana ou bot) que carregava um card ou galeria deton
 
 ## O que foi corrigido
 
-| Arquivo | Mudança |
-| --- | --- |
-| [frontend/app/api/vehicle-images/route.ts](../../frontend/app/api/vehicle-images/route.ts) | **Caminho padrão agora é 302 redirect.** `?key=` → `R2_PUBLIC_BASE_URL`/`NEXT_PUBLIC_R2_PUBLIC_BASE_URL`. `?src=` ou `?key=` sem base → 302 para `/images/vehicle-placeholder.svg`. Streaming só atrás de `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` (default false). Diagnósticos JSON em stdout atrás de `IMAGE_PROXY_DIAGNOSTICS_ENABLED=true`. |
-| [frontend/lib/images/image-optimization.ts](../../frontend/lib/images/image-optimization.ts) | `shouldSkipNextImageOptimizer` agora pula `/api/vehicle-images`, `/uploads/`, `/_next/image`, `/images/`, host R2 público (lido de `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`), e qualquer `*.onrender.com`. Mantém otimização só para SVG/data:/hosts externos legítimos (Unsplash). |
-| [frontend/lib/vehicle/detail-utils.ts](../../frontend/lib/vehicle/detail-utils.ts) | `buildVehicleImageProxyUrlFromStorageKey` agora gera URL absoluta direta no CDN quando `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` está setado. `normalizeVehicleImageUrl` re-hidrata `/api/vehicle-images?key=...` persistido em DB para CDN direto em runtime. Conversão `/uploads/` → proxy passou a respeitar `PUBLIC_EMIT_LEGACY_IMAGE_PROXY` (default false em prod): em prod, `/uploads/` cai no placeholder. |
-| [frontend/next.config.mjs](../../frontend/next.config.mjs) | Removido `{ hostname: "**" }`. Apenas `images.unsplash.com` e `localhost` permanecem. |
-| [frontend/lib/config/feature-flags.ts](../../frontend/lib/config/feature-flags.ts) | Documentadas três novas envs: `publicR2BaseUrl`, `vehicleImageProxyFallback`, `imageProxyDiagnostics`. |
-| [frontend/components/ui/VehicleImage.tsx](../../frontend/components/ui/VehicleImage.tsx) | Sem mudança de lógica: já consumia `shouldSkipNextImageOptimizer`. Comentário atualizado. |
+| Arquivo                                                                                      | Mudança                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [frontend/app/api/vehicle-images/route.ts](../../frontend/app/api/vehicle-images/route.ts)   | **Caminho padrão agora é 302 redirect.** `?key=` → `R2_PUBLIC_BASE_URL`/`NEXT_PUBLIC_R2_PUBLIC_BASE_URL`. `?src=` ou `?key=` sem base → 302 para `/images/vehicle-placeholder.svg`. Streaming só atrás de `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` (default false). Diagnósticos JSON em stdout atrás de `IMAGE_PROXY_DIAGNOSTICS_ENABLED=true`.                                                       |
+| [frontend/lib/images/image-optimization.ts](../../frontend/lib/images/image-optimization.ts) | `shouldSkipNextImageOptimizer` agora pula `/api/vehicle-images`, `/uploads/`, `/_next/image`, `/images/`, host R2 público (lido de `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`), e qualquer `*.onrender.com`. Mantém otimização só para SVG/data:/hosts externos legítimos (Unsplash).                                                                                                                               |
+| [frontend/lib/vehicle/detail-utils.ts](../../frontend/lib/vehicle/detail-utils.ts)           | `buildVehicleImageProxyUrlFromStorageKey` agora gera URL absoluta direta no CDN quando `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` está setado. `normalizeVehicleImageUrl` re-hidrata `/api/vehicle-images?key=...` persistido em DB para CDN direto em runtime. Conversão `/uploads/` → proxy passou a respeitar `PUBLIC_EMIT_LEGACY_IMAGE_PROXY` (default false em prod): em prod, `/uploads/` cai no placeholder. |
+| [frontend/next.config.mjs](../../frontend/next.config.mjs)                                   | Removido `{ hostname: "**" }`. Apenas `images.unsplash.com` e `localhost` permanecem.                                                                                                                                                                                                                                                                                                                     |
+| [frontend/lib/config/feature-flags.ts](../../frontend/lib/config/feature-flags.ts)           | Documentadas três novas envs: `publicR2BaseUrl`, `vehicleImageProxyFallback`, `imageProxyDiagnostics`.                                                                                                                                                                                                                                                                                                    |
+| [frontend/components/ui/VehicleImage.tsx](../../frontend/components/ui/VehicleImage.tsx)     | Sem mudança de lógica: já consumia `shouldSkipNextImageOptimizer`. Comentário atualizado.                                                                                                                                                                                                                                                                                                                 |
 
 ## Fluxos
 
@@ -83,11 +85,11 @@ Render só vê o 302 (alguns bytes de header). Zero bytes de imagem.
 
 ## Riscos e fallback
 
-| Risco | Mitigação |
-| --- | --- |
+| Risco                                                           | Mitigação                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Anúncios antigos sem `storage_key` mas com `/uploads/...` no DB | Em produção (`legacyImageProxy=false`) renderizam o placeholder. Se necessário, set `PUBLIC_EMIT_LEGACY_IMAGE_PROXY=true` + `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` temporariamente, e migrar os anúncios para storage_key em background. |
-| CDN R2 fora do ar | Set `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` no Render. Mas o overage de bandwidth volta enquanto estiver ligado. |
-| `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` esquecido no Render | `buildVehicleImageProxyUrlFromStorageKey` cai no proxy `/api/vehicle-images?key=...`, que sem fallback responde 302 para placeholder → tudo aparece como "sem foto". Sintoma visível e óbvio em staging. |
+| CDN R2 fora do ar                                               | Set `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` no Render. Mas o overage de bandwidth volta enquanto estiver ligado.                                                                                                                          |
+| `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` esquecido no Render            | `buildVehicleImageProxyUrlFromStorageKey` cai no proxy `/api/vehicle-images?key=...`, que sem fallback responde 302 para placeholder → tudo aparece como "sem foto". Sintoma visível e óbvio em staging.                                      |
 
 ## Como validar no navegador
 
@@ -107,12 +109,12 @@ Render só vê o 302 (alguns bytes de header). Zero bytes de imagem.
 
 ## Plano de rollback
 
-| Mudança | Como reverter |
-| --- | --- |
-| `route.ts` 302 redirect | Set `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` no Render. Volta a streamar — mas o ganho de bandwidth desaparece. |
-| `image-optimization.ts` skip otimizer | `git revert` do commit. Volta `/_next/image` para hosts internos. Não recomendado. |
+| Mudança                                    | Como reverter                                                                                                                                                                                             |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `route.ts` 302 redirect                    | Set `VEHICLE_IMAGE_PROXY_FALLBACK_ENABLED=true` no Render. Volta a streamar — mas o ganho de bandwidth desaparece.                                                                                        |
+| `image-optimization.ts` skip otimizer      | `git revert` do commit. Volta `/_next/image` para hosts internos. Não recomendado.                                                                                                                        |
 | `detail-utils.ts` redirect /uploads → null | Set `PUBLIC_EMIT_LEGACY_IMAGE_PROXY=true` no Render. Volta a converter `/uploads/` para proxy (que agora responde 302 para placeholder de qualquer jeito, então o efeito visual é o mesmo — placeholder). |
-| `next.config.mjs` sem `**` | `git revert`. Re-abre o otimizador para qualquer HTTPS. Não recomendado. |
+| `next.config.mjs` sem `**`                 | `git revert`. Re-abre o otimizador para qualquer HTTPS. Não recomendado.                                                                                                                                  |
 
 `git revert` do commit inteiro é seguro e completamente reversível — nenhuma das mudanças é destrutiva.
 
@@ -133,15 +135,16 @@ A validação no DevTools após a 1ª iteração mostrou que imagens R2 **ainda 
 
 ### Correções aplicadas
 
-| Arquivo | Mudança |
-| --- | --- |
-| [frontend/next.config.mjs](../../frontend/next.config.mjs) | **`images.unoptimized = true`** — kill switch global. Qualquer `<Image>` no app renderiza `<img>` com src original, sem prefixo `/_next/image`. Zero bytes pelo origin do Render. |
-| [frontend/lib/images/image-optimization.ts](../../frontend/lib/images/image-optimization.ts) | `shouldSkipNextImageOptimizer` agora reconhece qualquer host terminando em `.r2.dev` ou `.r2.cloudflarestorage.com` por padrão, sem depender de env. Defesa em profundidade. |
-| Testes | +5 testes cobrindo o exato sintoma do incidente (`pub-*.r2.dev` sem env, host R2 case-insensitive, kill switch ativo no config). |
+| Arquivo                                                                                      | Mudança                                                                                                                                                                           |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [frontend/next.config.mjs](../../frontend/next.config.mjs)                                   | **`images.unoptimized = true`** — kill switch global. Qualquer `<Image>` no app renderiza `<img>` com src original, sem prefixo `/_next/image`. Zero bytes pelo origin do Render. |
+| [frontend/lib/images/image-optimization.ts](../../frontend/lib/images/image-optimization.ts) | `shouldSkipNextImageOptimizer` agora reconhece qualquer host terminando em `.r2.dev` ou `.r2.cloudflarestorage.com` por padrão, sem depender de env. Defesa em profundidade.      |
+| Testes                                                                                       | +5 testes cobrindo o exato sintoma do incidente (`pub-*.r2.dev` sem env, host R2 case-insensitive, kill switch ativo no config).                                                  |
 
 ### Trade-off do kill switch
 
 `unoptimized: true` global desliga otimização de variantes responsivas para **todas** as imagens da aplicação, incluindo Unsplash e assets locais. Isso pode aumentar marginalmente o peso de algumas imagens externas (banners CMS, hero), mas:
+
 - O ganho real para imagens internas era pequeno (R2 já entrega WebP otimizado em CDN edge).
 - O custo do otimizador era pago em bandwidth do Render, o flanco que estamos protegendo.
 - A perda visual é zero — só muda o pipeline.
@@ -165,13 +168,14 @@ Para um dia voltar a otimizar imagens externas (Unsplash etc.):
 ### Validação final no DevTools
 
 Após este deploy:
+
 - Network → **Img** deve mostrar requests indo para `pub-*.r2.dev` ou domínio R2 público direto.
 - Não deve aparecer `/_next/image?...` para nenhuma imagem — nem mesmo Unsplash.
 - Não deve aparecer `/api/vehicle-images?...` como caminho padrão (raro fallback ainda possível para anúncios sem `storage_key`).
 
 ### Rollback adicional
 
-| Mudança | Como reverter |
-| --- | --- |
-| `images.unoptimized: true` | Remover a linha. Voltar a depender só do `shouldSkipNextImageOptimizer` + listar todos os hosts no `remotePatterns`. Não recomendado enquanto os 8 bypasses não forem migrados. |
-| Detecção de `.r2.dev`/`.r2.cloudflarestorage.com` | `git revert` do commit. Volta a depender de `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` estar setado. |
+| Mudança                                           | Como reverter                                                                                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `images.unoptimized: true`                        | Remover a linha. Voltar a depender só do `shouldSkipNextImageOptimizer` + listar todos os hosts no `remotePatterns`. Não recomendado enquanto os 8 bypasses não forem migrados. |
+| Detecção de `.r2.dev`/`.r2.cloudflarestorage.com` | `git revert` do commit. Volta a depender de `NEXT_PUBLIC_R2_PUBLIC_BASE_URL` estar setado.                                                                                      |

@@ -51,10 +51,7 @@ export default async function BlogCategoryPage({ params }: PageProps) {
   const definition = findCategoryDefinition(params.categoria);
   if (!definition) notFound();
 
-  const content = await fetchBlogCategoryContent(
-    params.cidade,
-    definition.id as BlogCategoryId
-  );
+  const content = await fetchBlogCategoryContent(params.cidade, definition.id as BlogCategoryId);
 
   return <BlogCategoryPageClient content={content} />;
 }

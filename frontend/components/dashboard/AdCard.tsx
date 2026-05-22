@@ -34,13 +34,7 @@ type BadgeVariant = AdBadgeVariant;
 const BADGE_STYLE = AD_BADGE_STYLE;
 const resolveBadgeVariant = resolveAdBadgeVariant;
 
-function StatusBadge({
-  status,
-  highlighted,
-}: {
-  status: string;
-  highlighted: boolean;
-}) {
+function StatusBadge({ status, highlighted }: { status: string; highlighted: boolean }) {
   const variant = resolveBadgeVariant(status, highlighted);
   const cfg = BADGE_STYLE[variant];
   return (

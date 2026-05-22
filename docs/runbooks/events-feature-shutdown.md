@@ -9,7 +9,7 @@
 > exige flags + revisão deste runbook.
 >
 > **NÃO confundir com Boost de anúncio (Destaque pago):** o `Plano
-> Destaque Premium`, o `Boost 7d/30d`, a página `/impulsionar/[adId]` e
+Destaque Premium`, o `Boost 7d/30d`, a página `/impulsionar/[adId]` e
 > os componentes `BoostCheckout`/`BoostModal` continuam **funcionando
 > normalmente**. Eles são parte do produto principal, não do produto
 > Evento.
@@ -40,29 +40,29 @@ disponível quando o portal ganhar tração.
 
 ## 2. Superfície de Eventos — mapa completo
 
-| Camada | Arquivo | Função | Estado pós-PR |
-|---|---|---|---|
-| **Backend / data** | `cities`, `events` (out-of-band, sem migration), `subscription_plans` | Tabelas | **mantidas intactas**; `events` row de teste preservada para auditoria. |
-| **Backend / plano** | [src/modules/account/account.service.js](../../src/modules/account/account.service.js) `DEFAULT_PLANS[5]` | Plano `cnpj-evento-premium` hardcoded | **mantido**, mas FILTRADO por `listPlans` quando `EVENTS_PUBLIC_ENABLED!="true"`. |
-| **Backend / plano** | [src/database/migrations/020_subscription_plans_and_billing.sql](../../src/database/migrations/020_subscription_plans_and_billing.sql) | Seed SQL do plano evento | **mantida**; cleanup do row em `subscription_plans` (se quiser remover do banco) é runbook próprio. |
-| **Backend / payments** | [src/modules/payments/payments.service.js](../../src/modules/payments/payments.service.js) `createPlanCheckout`, `createPlanSubscription` | Mercado Pago checkout | **bloqueado para `cnpj-evento-premium`** se `EVENTS_PAYMENTS_ENABLED!="true"` — retorna 410 Gone. |
-| **Backend / rotas** | [src/events/bannerApproval.routes.js](../../src/events/bannerApproval.routes.js) | POST /:eventId/approve, /:eventId/reject | **órfão**; middleware retorna 410 Gone se montado e `EVENTS_CREATION_ENABLED!="true"`. |
-| **Backend / rotas** | [src/modules/ads/events.routes.js](../../src/modules/ads/events.routes.js) e `ads.events.routes.js` | POST /api/events e /api/ads/event | **NÃO bloqueada** — registra impressão/clique de anúncio (ad_events), nada a ver com produto Evento. Permanece como está. |
-| **Backend / workers** | [src/workers/event_scheduler.worker.js](../../src/workers/event_scheduler.worker.js) | Ativa/finaliza eventos por janela | **órfão**; `startEventSchedulerWorker` aborta se flag false. |
-| **Backend / workers** | [src/workers/event_broadcast.worker.js](../../src/workers/event_broadcast.worker.js) | Marca eventos como broadcast_sent | **órfão**; guard idem. |
-| **Backend / workers** | [src/workers/event_dispatch.worker.js](../../src/workers/event_dispatch.worker.js) | Dispara WhatsApp/Email/Social | **órfão**; guard idem. |
-| **Backend / workers** | [src/workers/event_fail_safe.worker.js](../../src/workers/event_fail_safe.worker.js) | Detecta eventos vencidos paid e alerta admin | **órfão**; guard idem. |
-| **Backend / workers** | [src/workers/event_banner.worker.js](../../src/workers/event_banner.worker.js) | Gera banner via DALL-E | **órfão**; guard de worker + guard de IA em `generateBanner`. |
-| **Backend / workers** | [src/workers/banner_generator.worker.js](../../src/workers/banner_generator.worker.js) | DALL-E `generateBanner` (versão 2) | **órfão**; guard de IA em `generateBanner`. |
-| **Backend / workers** | [src/workers/banner_auto_approve.worker.js](../../src/workers/banner_auto_approve.worker.js) | Auto-aprova banners pending por 48h | **órfão**; guard idem. |
-| **Backend / config** | [src/shared/config/features.js](../../src/shared/config/features.js) | Feature flags | **6 flags novas**: `eventsEnabled`, `eventsPublicEnabled`, `eventsCreationEnabled`, `eventsPaymentsEnabled`, `eventsWorkerEnabled`, `eventsAiBannerEnabled` (todas `envBoolStrict` — somente `"true"` libera). |
-| **Backend / guard** | [src/workers/_events_guard.cjs](../../src/workers/_events_guard.cjs) | Helper kill-switch CommonJS | **novo**; usado pelos 7 workers. |
-| **Frontend / planos** | [frontend/lib/plans/plan-store.ts](../../frontend/lib/plans/plan-store.ts) linhas 159-178 | Plano `cnpj-evento-premium` em fallback local | **não tocado**; backend `/api/plans` filtra antes do frontend receber. Card `PlanCard` simplesmente não renderiza porque o plano não chega no array. **Zero alteração de layout/components.** |
-| **Frontend / boost** | `frontend/app/impulsionar/[adId]/page.tsx`, `BoostCheckout`, `BoostModal` | **PRODUTO PRINCIPAL** — destaque pago de anúncio | **NÃO tocado**, NÃO bloqueado. |
-| **Frontend / página regional** | `frontend/lib/env/feature-flags.ts` `REGIONAL_PAGE_ENABLED` | Flag pré-existente (default false) | **não tocada**; rota `/regiao/[slug]` continua off como já estava. |
-| **SEO** | `seo_cluster_plans` cluster_types | `city_home`, `city_below_fipe`, `city_opportunities`, `city_brand`, `city_brand_model` | **nenhum cluster_type de evento existe**. Sitemap não tem nem nunca teve URL de evento. |
-| **SEO** | `frontend/lib/seo/sitemap-static.ts` | Sitemap estático | **nenhuma entry de evento**. Confirmado por grep. |
-| **Documentação** | `.env.example` | Referência de flags | **6 flags EVENTS_\* documentadas, todas comentadas (default off)**. |
+| Camada                         | Arquivo                                                                                                                                   | Função                                                                                 | Estado pós-PR                                                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Backend / data**             | `cities`, `events` (out-of-band, sem migration), `subscription_plans`                                                                     | Tabelas                                                                                | **mantidas intactas**; `events` row de teste preservada para auditoria.                                                                                                                                        |
+| **Backend / plano**            | [src/modules/account/account.service.js](../../src/modules/account/account.service.js) `DEFAULT_PLANS[5]`                                 | Plano `cnpj-evento-premium` hardcoded                                                  | **mantido**, mas FILTRADO por `listPlans` quando `EVENTS_PUBLIC_ENABLED!="true"`.                                                                                                                              |
+| **Backend / plano**            | [src/database/migrations/020_subscription_plans_and_billing.sql](../../src/database/migrations/020_subscription_plans_and_billing.sql)    | Seed SQL do plano evento                                                               | **mantida**; cleanup do row em `subscription_plans` (se quiser remover do banco) é runbook próprio.                                                                                                            |
+| **Backend / payments**         | [src/modules/payments/payments.service.js](../../src/modules/payments/payments.service.js) `createPlanCheckout`, `createPlanSubscription` | Mercado Pago checkout                                                                  | **bloqueado para `cnpj-evento-premium`** se `EVENTS_PAYMENTS_ENABLED!="true"` — retorna 410 Gone.                                                                                                              |
+| **Backend / rotas**            | [src/events/bannerApproval.routes.js](../../src/events/bannerApproval.routes.js)                                                          | POST /:eventId/approve, /:eventId/reject                                               | **órfão**; middleware retorna 410 Gone se montado e `EVENTS_CREATION_ENABLED!="true"`.                                                                                                                         |
+| **Backend / rotas**            | [src/modules/ads/events.routes.js](../../src/modules/ads/events.routes.js) e `ads.events.routes.js`                                       | POST /api/events e /api/ads/event                                                      | **NÃO bloqueada** — registra impressão/clique de anúncio (ad_events), nada a ver com produto Evento. Permanece como está.                                                                                      |
+| **Backend / workers**          | [src/workers/event_scheduler.worker.js](../../src/workers/event_scheduler.worker.js)                                                      | Ativa/finaliza eventos por janela                                                      | **órfão**; `startEventSchedulerWorker` aborta se flag false.                                                                                                                                                   |
+| **Backend / workers**          | [src/workers/event_broadcast.worker.js](../../src/workers/event_broadcast.worker.js)                                                      | Marca eventos como broadcast_sent                                                      | **órfão**; guard idem.                                                                                                                                                                                         |
+| **Backend / workers**          | [src/workers/event_dispatch.worker.js](../../src/workers/event_dispatch.worker.js)                                                        | Dispara WhatsApp/Email/Social                                                          | **órfão**; guard idem.                                                                                                                                                                                         |
+| **Backend / workers**          | [src/workers/event_fail_safe.worker.js](../../src/workers/event_fail_safe.worker.js)                                                      | Detecta eventos vencidos paid e alerta admin                                           | **órfão**; guard idem.                                                                                                                                                                                         |
+| **Backend / workers**          | [src/workers/event_banner.worker.js](../../src/workers/event_banner.worker.js)                                                            | Gera banner via DALL-E                                                                 | **órfão**; guard de worker + guard de IA em `generateBanner`.                                                                                                                                                  |
+| **Backend / workers**          | [src/workers/banner_generator.worker.js](../../src/workers/banner_generator.worker.js)                                                    | DALL-E `generateBanner` (versão 2)                                                     | **órfão**; guard de IA em `generateBanner`.                                                                                                                                                                    |
+| **Backend / workers**          | [src/workers/banner_auto_approve.worker.js](../../src/workers/banner_auto_approve.worker.js)                                              | Auto-aprova banners pending por 48h                                                    | **órfão**; guard idem.                                                                                                                                                                                         |
+| **Backend / config**           | [src/shared/config/features.js](../../src/shared/config/features.js)                                                                      | Feature flags                                                                          | **6 flags novas**: `eventsEnabled`, `eventsPublicEnabled`, `eventsCreationEnabled`, `eventsPaymentsEnabled`, `eventsWorkerEnabled`, `eventsAiBannerEnabled` (todas `envBoolStrict` — somente `"true"` libera). |
+| **Backend / guard**            | [src/workers/\_events_guard.cjs](../../src/workers/_events_guard.cjs)                                                                     | Helper kill-switch CommonJS                                                            | **novo**; usado pelos 7 workers.                                                                                                                                                                               |
+| **Frontend / planos**          | [frontend/lib/plans/plan-store.ts](../../frontend/lib/plans/plan-store.ts) linhas 159-178                                                 | Plano `cnpj-evento-premium` em fallback local                                          | **não tocado**; backend `/api/plans` filtra antes do frontend receber. Card `PlanCard` simplesmente não renderiza porque o plano não chega no array. **Zero alteração de layout/components.**                  |
+| **Frontend / boost**           | `frontend/app/impulsionar/[adId]/page.tsx`, `BoostCheckout`, `BoostModal`                                                                 | **PRODUTO PRINCIPAL** — destaque pago de anúncio                                       | **NÃO tocado**, NÃO bloqueado.                                                                                                                                                                                 |
+| **Frontend / página regional** | `frontend/lib/env/feature-flags.ts` `REGIONAL_PAGE_ENABLED`                                                                               | Flag pré-existente (default false)                                                     | **não tocada**; rota `/regiao/[slug]` continua off como já estava.                                                                                                                                             |
+| **SEO**                        | `seo_cluster_plans` cluster_types                                                                                                         | `city_home`, `city_below_fipe`, `city_opportunities`, `city_brand`, `city_brand_model` | **nenhum cluster_type de evento existe**. Sitemap não tem nem nunca teve URL de evento.                                                                                                                        |
+| **SEO**                        | `frontend/lib/seo/sitemap-static.ts`                                                                                                      | Sitemap estático                                                                       | **nenhuma entry de evento**. Confirmado por grep.                                                                                                                                                              |
+| **Documentação**               | `.env.example`                                                                                                                            | Referência de flags                                                                    | **6 flags EVENTS\_\* documentadas, todas comentadas (default off)**.                                                                                                                                           |
 
 ---
 
@@ -72,14 +72,14 @@ Todas em `src/shared/config/features.js`. Usam `envBoolStrict` — apenas
 `"true"` (lowercase exato) ativa. `"TRUE"`, `"1"`, `"yes"`, `"on"`,
 vazio ou ausência = `false`. Default fechado.
 
-| Flag (env var) | Propriedade JS | Domínio que controla |
-|---|---|---|
-| `EVENTS_ENABLED` | `features.eventsEnabled` | **Master kill-switch.** Se `false`, todas as outras EVENTS_* são efetivamente off (gate AND). |
-| `EVENTS_PUBLIC_ENABLED` | `features.eventsPublicEnabled` | Plano `cnpj-evento-premium` em `/planos`, exposição pública. |
-| `EVENTS_CREATION_ENABLED` | `features.eventsCreationEnabled` | Rotas POST de aprovação/rejeição/criação de evento. |
-| `EVENTS_PAYMENTS_ENABLED` | `features.eventsPaymentsEnabled` | Checkout/subscription Mercado Pago para plano de evento. |
-| `EVENTS_WORKER_ENABLED` | `features.eventsWorkerEnabled` | 7 workers `event_*` / `banner_*`. |
-| `EVENTS_AI_BANNER_ENABLED` | `features.eventsAiBannerEnabled` | Chamadas a DALL-E (custo OpenAI). |
+| Flag (env var)             | Propriedade JS                   | Domínio que controla                                                                            |
+| -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `EVENTS_ENABLED`           | `features.eventsEnabled`         | **Master kill-switch.** Se `false`, todas as outras EVENTS\_\* são efetivamente off (gate AND). |
+| `EVENTS_PUBLIC_ENABLED`    | `features.eventsPublicEnabled`   | Plano `cnpj-evento-premium` em `/planos`, exposição pública.                                    |
+| `EVENTS_CREATION_ENABLED`  | `features.eventsCreationEnabled` | Rotas POST de aprovação/rejeição/criação de evento.                                             |
+| `EVENTS_PAYMENTS_ENABLED`  | `features.eventsPaymentsEnabled` | Checkout/subscription Mercado Pago para plano de evento.                                        |
+| `EVENTS_WORKER_ENABLED`    | `features.eventsWorkerEnabled`   | 7 workers `event_*` / `banner_*`.                                                               |
+| `EVENTS_AI_BANNER_ENABLED` | `features.eventsAiBannerEnabled` | Chamadas a DALL-E (custo OpenAI).                                                               |
 
 Helper de composição: `isEventsDomainEnabled("public" | "creation" |
 "payments" | "worker" | "ai_banner")` retorna `true` apenas se master
@@ -92,14 +92,14 @@ E o domínio específico estiverem em `"true"`.
 - ✅ **Anúncios** (CRUD, listagem, busca, sitemap por cidade).
 - ✅ **Planos Grátis / Start / Pro / Destaque Premium** — listados em `/planos`.
 - ✅ **Boost de anúncio** (`/impulsionar/[adId]`, `BoostCheckout`,
-   `BoostModal`, `Boost 7d/30d`) — pagamento Mercado Pago intacto.
+  `BoostModal`, `Boost 7d/30d`) — pagamento Mercado Pago intacto.
 - ✅ **Sitemap piloto** (`/carros-em/atibaia-sp` etc.) — não toca eventos.
 - ✅ **Workers de cidade/anúncio/SEO** (cluster-planner, sitemap, etc).
 - ✅ **Login, dashboard, admin** — nenhum CTA público de evento existia
-   (confirmado por mapeamento), nada a esconder.
+  (confirmado por mapeamento), nada a esconder.
 - ✅ **Rotas `/api/events` e `/api/ads/event`** — apesar do nome,
-   registram impressão/clique de **anúncio** (ad_events), não evento
-   do produto Evento.
+  registram impressão/clique de **anúncio** (ad_events), não evento
+  do produto Evento.
 
 ## 5. O que está bloqueado (com flag false)
 
@@ -194,9 +194,9 @@ design.
    - `EVENTS_PAYMENTS_ENABLED=true`
    - `EVENTS_WORKER_ENABLED=true`
    - `EVENTS_AI_BANNER_ENABLED=true`
-   Idealmente em ondas — ativar `PUBLIC` primeiro (apenas listar plano)
-   sem ativar `PAYMENTS`/`CREATION` para validar interesse, depois
-   habilitar checkout, depois workers.
+     Idealmente em ondas — ativar `PUBLIC` primeiro (apenas listar plano)
+     sem ativar `PAYMENTS`/`CREATION` para validar interesse, depois
+     habilitar checkout, depois workers.
 10. ✅ Smoke test em staging antes de produção.
 11. ✅ Atualizar este runbook com data e responsável da reativação.
 
@@ -223,16 +223,16 @@ design.
 
 ## 10. Relação com planos comerciais (NÃO afeta)
 
-| Plano | Status pós-shutdown | Onde |
-|---|---|---|
-| Plano Gratuito (CPF) | ✅ ativo | `cpf-free-essential` |
-| Plano Destaque Premium (CPF, one_time R$79,90) | ✅ ativo | `cpf-premium-highlight` |
-| Plano Gratuito Loja (CNPJ) | ✅ ativo | `cnpj-free-store` |
-| Plano Loja Start (CNPJ, R$299,90/mês) | ✅ ativo | `cnpj-store-start` |
-| Plano Loja Pro (CNPJ, R$599,90/mês) | ✅ ativo | `cnpj-store-pro` |
-| **Plano Evento Premium (CNPJ, R$999,90/mês)** | ❌ **OCULTO** (filtrado de `/api/plans`) | `cnpj-evento-premium` |
-| Boost 7d (R$39,90 avulso) | ✅ ativo | `boost-7d` |
-| Boost 30d (R$129,90 avulso) | ✅ ativo | `boost-30d` |
+| Plano                                          | Status pós-shutdown                      | Onde                    |
+| ---------------------------------------------- | ---------------------------------------- | ----------------------- |
+| Plano Gratuito (CPF)                           | ✅ ativo                                 | `cpf-free-essential`    |
+| Plano Destaque Premium (CPF, one_time R$79,90) | ✅ ativo                                 | `cpf-premium-highlight` |
+| Plano Gratuito Loja (CNPJ)                     | ✅ ativo                                 | `cnpj-free-store`       |
+| Plano Loja Start (CNPJ, R$299,90/mês)          | ✅ ativo                                 | `cnpj-store-start`      |
+| Plano Loja Pro (CNPJ, R$599,90/mês)            | ✅ ativo                                 | `cnpj-store-pro`        |
+| **Plano Evento Premium (CNPJ, R$999,90/mês)**  | ❌ **OCULTO** (filtrado de `/api/plans`) | `cnpj-evento-premium`   |
+| Boost 7d (R$39,90 avulso)                      | ✅ ativo                                 | `boost-7d`              |
+| Boost 30d (R$129,90 avulso)                    | ✅ ativo                                 | `boost-30d`             |
 
 ---
 
@@ -259,12 +259,12 @@ design.
 - ✅ Não executados UPDATE/INSERT/DELETE.
 - ✅ Não rodados scripts com `--yes`.
 - ✅ Não alterados layout, frontend (components/), styles, Home,
-   catálogo, header/footer.
+  catálogo, header/footer.
 - ✅ Não alterados sitemap em código, canonical, robots, rotas
-   públicas, ranking, planos principais.
+  públicas, ranking, planos principais.
 - ✅ Não criada Página Regional, não rodado bootstrap de cluster plans.
 - ✅ Não alteradas RUN_WORKERS, env do Render, `frontend/lib/env/feature-flags.ts`.
 - ✅ Boot do backend continua íntegro (módulo de features adicionado;
-   imports em payments.service.js e account.service.js compatíveis;
-   workers órfãos não afetam boot).
+  imports em payments.service.js e account.service.js compatíveis;
+  workers órfãos não afetam boot).
 - ✅ Build do frontend não tocado.

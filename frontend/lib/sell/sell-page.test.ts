@@ -55,10 +55,7 @@ describe("/anunciar copy — termos proibidos", () => {
     const flat = flattenContent(content);
 
     for (const pattern of FORBIDDEN_PATTERNS) {
-      expect(
-        flat,
-        `termo proibido ${pattern} apareceu na copy de /anunciar`
-      ).not.toMatch(pattern);
+      expect(flat, `termo proibido ${pattern} apareceu na copy de /anunciar`).not.toMatch(pattern);
     }
   });
 

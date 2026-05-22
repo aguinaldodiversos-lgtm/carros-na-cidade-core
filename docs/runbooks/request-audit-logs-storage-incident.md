@@ -8,15 +8,15 @@
 
 Banco PostgreSQL do Render suspenso. Diagnóstico direto:
 
-| Métrica | Valor |
-| --- | --- |
-| Banco total | 15 GB |
-| `public.request_audit_logs` (total) | 15 GB |
-| `request_audit_logs` heap | 12 GB |
-| Índices + toast | 3 233 MB |
-| Linhas estimadas | 53 617 764 |
-| `idx_request_audit_logs_created_at` | 2 075 MB |
-| `request_audit_logs_pkey` | 1 155 MB |
+| Métrica                             | Valor      |
+| ----------------------------------- | ---------- |
+| Banco total                         | 15 GB      |
+| `public.request_audit_logs` (total) | 15 GB      |
+| `request_audit_logs` heap           | 12 GB      |
+| Índices + toast                     | 3 233 MB   |
+| Linhas estimadas                    | 53 617 764 |
+| `idx_request_audit_logs_created_at` | 2 075 MB   |
+| `request_audit_logs_pkey`           | 1 155 MB   |
 
 O resto do banco é ≪ 1 GB. **Toda a capacidade do plano foi consumida por uma única tabela observacional.**
 
@@ -33,14 +33,14 @@ Combinação: a tabela cresceu a ~1 GB / semana até o disco encher.
 
 ## O que foi corrigido no código
 
-| Arquivo | Mudança |
-| --- | --- |
-| [src/shared/middlewares/httpLogger.middleware.js](../../src/shared/middlewares/httpLogger.middleware.js) | Passa a usar `features.requestAuditLogs` (default `false`). Adicionado allow/deny list de paths, amostragem de 2xx/3xx (default 1 %), gravação garantida de 4xx/5xx, truncamento de `path` (512) e `user_agent` (256), bloqueio de `OPTIONS`. |
-| [.env.example](../../.env.example) | Documentadas novas envs: `REQUEST_AUDIT_LOGS_ENABLED`, `REQUEST_AUDIT_SAMPLE_SUCCESS_RATE`, `REQUEST_AUDIT_RETENTION_DAYS`. |
-| [scripts/maintenance/diagnose-request-audit-logs.mjs](../../scripts/maintenance/diagnose-request-audit-logs.mjs) | Diagnóstico read-only: tamanho, top paths, top user-agents, status, volume diário. |
-| [scripts/maintenance/cleanup-request-audit-logs.mjs](../../scripts/maintenance/cleanup-request-audit-logs.mjs) | TRUNCATE controlado (dry-run default). |
-| [scripts/maintenance/sql/cleanup-request-audit-logs-emergency.sql](../../scripts/maintenance/sql/cleanup-request-audit-logs-emergency.sql) | Equivalente SQL puro, executável direto via `psql` se o app não estiver subindo. |
-| [scripts/maintenance/prune-request-audit-logs.mjs](../../scripts/maintenance/prune-request-audit-logs.mjs) | Retention job em lotes para rodar em cron. |
+| Arquivo                                                                                                                                    | Mudança                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [src/shared/middlewares/httpLogger.middleware.js](../../src/shared/middlewares/httpLogger.middleware.js)                                   | Passa a usar `features.requestAuditLogs` (default `false`). Adicionado allow/deny list de paths, amostragem de 2xx/3xx (default 1 %), gravação garantida de 4xx/5xx, truncamento de `path` (512) e `user_agent` (256), bloqueio de `OPTIONS`. |
+| [.env.example](../../.env.example)                                                                                                         | Documentadas novas envs: `REQUEST_AUDIT_LOGS_ENABLED`, `REQUEST_AUDIT_SAMPLE_SUCCESS_RATE`, `REQUEST_AUDIT_RETENTION_DAYS`.                                                                                                                   |
+| [scripts/maintenance/diagnose-request-audit-logs.mjs](../../scripts/maintenance/diagnose-request-audit-logs.mjs)                           | Diagnóstico read-only: tamanho, top paths, top user-agents, status, volume diário.                                                                                                                                                            |
+| [scripts/maintenance/cleanup-request-audit-logs.mjs](../../scripts/maintenance/cleanup-request-audit-logs.mjs)                             | TRUNCATE controlado (dry-run default).                                                                                                                                                                                                        |
+| [scripts/maintenance/sql/cleanup-request-audit-logs-emergency.sql](../../scripts/maintenance/sql/cleanup-request-audit-logs-emergency.sql) | Equivalente SQL puro, executável direto via `psql` se o app não estiver subindo.                                                                                                                                                              |
+| [scripts/maintenance/prune-request-audit-logs.mjs](../../scripts/maintenance/prune-request-audit-logs.mjs)                                 | Retention job em lotes para rodar em cron.                                                                                                                                                                                                    |
 
 ### Política nova de logs (resumo)
 
@@ -57,6 +57,7 @@ Combinação: a tabela cresceu a ~1 GB / semana até o disco encher.
 Deploy normal de `main`. Como a flag passa a ser default `false`, a partir do deploy **nenhuma nova linha** será gravada, mesmo que o restante do procedimento ainda não tenha rodado. Isso para o sangramento imediatamente.
 
 > Se quiser manter audit ligado em produção mesmo após o fix:
+>
 > ```
 > REQUEST_AUDIT_LOGS_ENABLED=true
 > REQUEST_AUDIT_SAMPLE_SUCCESS_RATE=0.01
@@ -118,12 +119,12 @@ Após deploy + cleanup:
 
 ## Plano de rollback
 
-| Coisa | Reverso |
-| --- | --- |
-| **Middleware** | `git revert` do commit. Volta ao comportamento anterior (grava tudo). Não recomendado — re-introduz o bug raiz. |
-| **Default OFF** | Setar `REQUEST_AUDIT_LOGS_ENABLED=true` no Render. Não restaura comportamento antigo de "logar tudo" — paths/sampling continuam ativos por design. Esse é o estado seguro. |
-| **TRUNCATE** | Irreversível pós-COMMIT. Plano: restore parcial do snapshot CSV (Passo 1 do `.sql`) ou restore do backup automático do Render para uma base secundária. Como a tabela é puramente observacional, perda total é aceitável. |
-| **Prune job** | Desligar o cron job no Render. Sem efeito retroativo. |
+| Coisa           | Reverso                                                                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Middleware**  | `git revert` do commit. Volta ao comportamento anterior (grava tudo). Não recomendado — re-introduz o bug raiz.                                                                                                           |
+| **Default OFF** | Setar `REQUEST_AUDIT_LOGS_ENABLED=true` no Render. Não restaura comportamento antigo de "logar tudo" — paths/sampling continuam ativos por design. Esse é o estado seguro.                                                |
+| **TRUNCATE**    | Irreversível pós-COMMIT. Plano: restore parcial do snapshot CSV (Passo 1 do `.sql`) ou restore do backup automático do Render para uma base secundária. Como a tabela é puramente observacional, perda total é aceitável. |
+| **Prune job**   | Desligar o cron job no Render. Sem efeito retroativo.                                                                                                                                                                     |
 
 ## Lições / follow-ups
 

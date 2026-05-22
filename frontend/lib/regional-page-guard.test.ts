@@ -45,26 +45,46 @@ describe("REGIONAL_PATH_REGEX e extractRegionalSlug", () => {
 
 describe("isFlagEnabled — contrato estrito", () => {
   it("retorna true só com a string exata 'true'", () => {
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "true" } as unknown as NodeJS.ProcessEnv)).toBe(true);
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "true" } as unknown as NodeJS.ProcessEnv)).toBe(
+      true
+    );
   });
 
   it("rejeita 'True', 'TRUE', '1', 'yes', 'sim'", () => {
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "True" } as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "TRUE" } as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "1" } as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "yes" } as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "sim" } as unknown as NodeJS.ProcessEnv)).toBe(false);
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "True" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "TRUE" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "1" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "yes" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "sim" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
   });
 
   it("rejeita string vazia, undefined, e espaços", () => {
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "" } as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: " true " } as unknown as NodeJS.ProcessEnv)).toBe(false);
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: " true " } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
     expect(isFlagEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false);
   });
 
   it("rejeita 'false' explícito", () => {
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "false" } as unknown as NodeJS.ProcessEnv)).toBe(false);
-    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "False" } as unknown as NodeJS.ProcessEnv)).toBe(false);
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "false" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
+    expect(isFlagEnabled({ REGIONAL_PAGE_ENABLED: "False" } as unknown as NodeJS.ProcessEnv)).toBe(
+      false
+    );
   });
 });
 
@@ -190,7 +210,9 @@ describe("validateRegionalSlug — fetch ao backend privado", () => {
   });
 
   it("fetch lança (rede offline) → unavailable com reason 'fetch-error'", async () => {
-    const fetchImpl = vi.fn().mockRejectedValue(new Error("ECONNREFUSED")) as unknown as typeof fetch;
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValue(new Error("ECONNREFUSED")) as unknown as typeof fetch;
     const result = await validateRegionalSlug("atibaia-sp", {
       apiBase: BASE,
       token: TOKEN,

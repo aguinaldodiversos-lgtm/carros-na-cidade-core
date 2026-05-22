@@ -65,48 +65,48 @@ describe("isRegionalPageEnabled — default seguro", () => {
   });
 });
 
-describe("isRegionalPageEnabled — contrato estrito (apenas \"true\" ativa)", () => {
-  it("\"true\" minúsculo → true", () => {
+describe('isRegionalPageEnabled — contrato estrito (apenas "true" ativa)', () => {
+  it('"true" minúsculo → true', () => {
     setFlag("true");
     expect(isRegionalPageEnabled()).toBe(true);
   });
 
-  it("\"TRUE\" maiúsculo → false (sem coerção indulgente)", () => {
+  it('"TRUE" maiúsculo → false (sem coerção indulgente)', () => {
     setFlag("TRUE");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\"True\" capitalizado → false", () => {
+  it('"True" capitalizado → false', () => {
     setFlag("True");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\"1\" → false", () => {
+  it('"1" → false', () => {
     setFlag("1");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\"yes\" → false", () => {
+  it('"yes" → false', () => {
     setFlag("yes");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\"sim\" → false", () => {
+  it('"sim" → false', () => {
     setFlag("sim");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\" true \" com espaços → false (contrato exige string exata)", () => {
+  it('" true " com espaços → false (contrato exige string exata)', () => {
     setFlag(" true ");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\"false\" → false", () => {
+  it('"false" → false', () => {
     setFlag("false");
     expect(isRegionalPageEnabled()).toBe(false);
   });
 
-  it("\"0\" → false", () => {
+  it('"0" → false', () => {
     setFlag("0");
     expect(isRegionalPageEnabled()).toBe(false);
   });
@@ -131,22 +131,22 @@ describe("isRegionalPageIndexable — default seguro (PR 2)", () => {
     expect(isRegionalPageIndexable()).toBe(false);
   });
 
-  it("\"true\" minúsculo exato → true", () => {
+  it('"true" minúsculo exato → true', () => {
     setIndexable("true");
     expect(isRegionalPageIndexable()).toBe(true);
   });
 
-  it("\"TRUE\" maiúsculo → false (contrato estrito)", () => {
+  it('"TRUE" maiúsculo → false (contrato estrito)', () => {
     setIndexable("TRUE");
     expect(isRegionalPageIndexable()).toBe(false);
   });
 
-  it("\"1\" → false", () => {
+  it('"1" → false', () => {
     setIndexable("1");
     expect(isRegionalPageIndexable()).toBe(false);
   });
 
-  it("\" true \" com espaços → false", () => {
+  it('" true " com espaços → false', () => {
     setIndexable(" true ");
     expect(isRegionalPageIndexable()).toBe(false);
   });
@@ -158,17 +158,17 @@ describe("isRegionalPageCanonicalSelf — default seguro (PR 2)", () => {
     expect(isRegionalPageCanonicalSelf()).toBe(false);
   });
 
-  it("\"true\" minúsculo exato → true", () => {
+  it('"true" minúsculo exato → true', () => {
     setCanonicalSelf("true");
     expect(isRegionalPageCanonicalSelf()).toBe(true);
   });
 
-  it("\"TRUE\" maiúsculo → false (contrato estrito)", () => {
+  it('"TRUE" maiúsculo → false (contrato estrito)', () => {
     setCanonicalSelf("TRUE");
     expect(isRegionalPageCanonicalSelf()).toBe(false);
   });
 
-  it("\"1\" → false", () => {
+  it('"1" → false', () => {
     setCanonicalSelf("1");
     expect(isRegionalPageCanonicalSelf()).toBe(false);
   });

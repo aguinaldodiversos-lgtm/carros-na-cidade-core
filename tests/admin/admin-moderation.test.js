@@ -85,11 +85,7 @@ describe("moderationService.approve", () => {
 
 describe("moderationService.reject", () => {
   it("PENDING_REVIEW → REJECTED com motivo obrigatório", async () => {
-    mockSequence([
-      [{ id: "ad-1", status: "pending_review" }],
-      [],
-      [],
-    ]);
+    mockSequence([[{ id: "ad-1", status: "pending_review" }], [], []]);
 
     const result = await moderationService.reject(
       "admin-id",
@@ -107,9 +103,7 @@ describe("moderationService.reject", () => {
 
   it("exige motivo (string vazia → 400)", async () => {
     let err;
-    await moderationService
-      .reject("admin-id", "ad-1", "   ")
-      .catch((e) => (err = e));
+    await moderationService.reject("admin-id", "ad-1", "   ").catch((e) => (err = e));
     expect(err).toBeTruthy();
     expect(err.statusCode).toBe(400);
   });
@@ -117,11 +111,7 @@ describe("moderationService.reject", () => {
 
 describe("moderationService.requestCorrection", () => {
   it("permanece em PENDING_REVIEW com correction_requested_reason", async () => {
-    mockSequence([
-      [{ id: "ad-1", status: "pending_review" }],
-      [],
-      [],
-    ]);
+    mockSequence([[{ id: "ad-1", status: "pending_review" }], [], []]);
 
     const result = await moderationService.requestCorrection(
       "admin-id",

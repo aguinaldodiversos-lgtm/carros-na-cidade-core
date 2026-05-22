@@ -30,9 +30,7 @@ vi.mock("../../src/infrastructure/storage/r2.service.js", () => ({
 }));
 
 const adsRepository = await import("../../src/modules/ads/ads.repository.js");
-const riskRepo = await import(
-  "../../src/modules/ads/risk/ad-risk.repository.js"
-);
+const riskRepo = await import("../../src/modules/ads/risk/ad-risk.repository.js");
 const { updateAd } = await import("../../src/modules/ads/ads.panel.service.js");
 
 beforeEach(() => {
@@ -49,9 +47,7 @@ describe("Tarefa 11 — campos estruturais bloqueados após publicação", () =>
     });
 
     let err;
-    await updateAd("ad-1", { brand: "Toyota" }, { id: "owner-id" }).catch(
-      (e) => (err = e)
-    );
+    await updateAd("ad-1", { brand: "Toyota" }, { id: "owner-id" }).catch((e) => (err = e));
 
     expect(err).toBeTruthy();
     expect(err.statusCode).toBe(400);
@@ -72,9 +68,7 @@ describe("Tarefa 11 — campos estruturais bloqueados após publicação", () =>
     });
 
     let err;
-    await updateAd("ad-1", { city_id: 99 }, { id: "owner-id" }).catch(
-      (e) => (err = e)
-    );
+    await updateAd("ad-1", { city_id: 99 }, { id: "owner-id" }).catch((e) => (err = e));
 
     expect(err.statusCode).toBe(400);
   });

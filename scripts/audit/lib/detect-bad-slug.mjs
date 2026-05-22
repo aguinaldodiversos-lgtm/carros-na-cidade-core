@@ -25,9 +25,21 @@ const SLUG_VALID_CHARS = /^[a-z0-9-]+$/;
 // caem em LOW severity dedicada.
 const SLUG_PERMISSIVE_CHARS = /^[a-zA-Z0-9_-]+$/;
 const RESERVED_PATHS = [
-  "wp-admin", "wp-login", "wp-content", ".env", ".git", "phpmyadmin",
-  "admin", "api", "login", "logout", "register", "signup", "robots.txt",
-  "sitemap.xml", "favicon.ico",
+  "wp-admin",
+  "wp-login",
+  "wp-content",
+  ".env",
+  ".git",
+  "phpmyadmin",
+  "admin",
+  "api",
+  "login",
+  "logout",
+  "register",
+  "signup",
+  "robots.txt",
+  "sitemap.xml",
+  "favicon.ico",
 ];
 
 const MAX_SAFE_LENGTH = 200;
@@ -39,9 +51,7 @@ function safeString(value) {
 }
 
 function normalizeAscii(text) {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 function slugifyToken(text) {

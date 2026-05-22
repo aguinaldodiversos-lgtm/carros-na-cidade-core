@@ -72,9 +72,7 @@ describe("adsPanelService.updateAd — guard de owner + status", () => {
     });
 
     let err;
-    await updateAd("ad-1", { advertiser_id: "adv-X" }, { id: "owner-id" }).catch(
-      (e) => (err = e)
-    );
+    await updateAd("ad-1", { advertiser_id: "adv-X" }, { id: "owner-id" }).catch((e) => (err = e));
     expect(err).toBeTruthy();
     expect(err.statusCode).toBe(400);
   });

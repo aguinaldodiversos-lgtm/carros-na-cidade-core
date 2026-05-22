@@ -60,8 +60,7 @@ function makeReq({ query = {}, params = {} } = {}) {
   return { query, params };
 }
 
-const EXPECTED_CACHE =
-  "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
+const EXPECTED_CACHE = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
 
 const envBackup = {};
 

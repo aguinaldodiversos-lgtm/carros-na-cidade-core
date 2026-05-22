@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./site", () => ({
   toAbsoluteUrl: (path: string) =>
-    path.startsWith("http") ? path : `https://example.test${path.startsWith("/") ? path : `/${path}`}`,
+    path.startsWith("http")
+      ? path
+      : `https://example.test${path.startsWith("/") ? path : `/${path}`}`,
 }));
 
 import {

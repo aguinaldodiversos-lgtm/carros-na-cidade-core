@@ -134,9 +134,7 @@ function buildReport({ schema, plans, subImpact }) {
   }
 
   // Planos extras que NÃO estão na oferta oficial — apenas informativo
-  const extraIds = plans
-    .map((p) => p.id)
-    .filter((id) => !(id in EXPECTED));
+  const extraIds = plans.map((p) => p.id).filter((id) => !(id in EXPECTED));
 
   return {
     schema_columns: schema.columns,
@@ -180,23 +178,20 @@ function printHuman(report) {
     } else if (d.status === "MISSING") {
       log("error", `  ✗ ${d.id} MISSING`);
     } else {
-      log(
-        "error",
-        `  ✗ ${d.id} DIVERGENT (${d.active_subscriptions ?? 0} subs ativas):`
-      );
+      log("error", `  ✗ ${d.id} DIVERGENT (${d.active_subscriptions ?? 0} subs ativas):`);
       for (const r of d.reasons) log("error", `      - ${r}`);
     }
   }
   if (report.extra_plans_in_db.length > 0) {
     log("info", "");
-    log(
-      "info",
-      `═══ planos extras no banco (não estão na oferta oficial) ═══`
-    );
+    log("info", `═══ planos extras no banco (não estão na oferta oficial) ═══`);
     for (const id of report.extra_plans_in_db) log("info", `  - ${id}`);
   }
   log("info", "");
-  log("info", report.aligned ? "✓ ALINHADO com oferta oficial" : "✗ DIVERGENTE — rodar migration 023");
+  log(
+    "info",
+    report.aligned ? "✓ ALINHADO com oferta oficial" : "✗ DIVERGENTE — rodar migration 023"
+  );
 }
 
 async function main() {

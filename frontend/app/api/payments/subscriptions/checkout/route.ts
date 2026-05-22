@@ -64,10 +64,7 @@ export async function POST(request: NextRequest) {
 
     const backendUrl = resolveInternalBackendApiUrl("/api/payments/subscriptions/checkout");
     if (!backendUrl) {
-      return NextResponse.json(
-        { error: "Backend nao configurado" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Backend nao configurado" }, { status: 500 });
     }
 
     const origin = request.nextUrl.origin;
@@ -90,9 +87,7 @@ export async function POST(request: NextRequest) {
       cache: "no-store",
     });
 
-    const responseBody = await response
-      .json()
-      .catch(() => ({}) as Record<string, unknown>);
+    const responseBody = await response.json().catch(() => ({}) as Record<string, unknown>);
 
     if (!response.ok) {
       const message =

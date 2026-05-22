@@ -44,9 +44,7 @@ export default async function UpgradeAnuncioPage({ params }: PageProps) {
   const cookieStore = cookies();
   const raw = getSessionDataFromCookieStore(cookieStore, headers());
   if (!raw) {
-    redirect(
-      `/login?next=${encodeURIComponent(`/painel/anuncios/${params.id}/upgrade`)}`
-    );
+    redirect(`/login?next=${encodeURIComponent(`/painel/anuncios/${params.id}/upgrade`)}`);
   }
 
   if (!raw.accessToken && !raw.refreshToken) {
@@ -55,9 +53,7 @@ export default async function UpgradeAnuncioPage({ params }: PageProps) {
 
   const ensured = await ensureSessionWithFreshBackendTokens(raw);
   if (!ensured.ok) {
-    redirect(
-      `/login?next=${encodeURIComponent(`/painel/anuncios/${params.id}/upgrade`)}`
-    );
+    redirect(`/login?next=${encodeURIComponent(`/painel/anuncios/${params.id}/upgrade`)}`);
   }
   const session = ensured.session;
 

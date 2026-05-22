@@ -41,10 +41,7 @@ export async function generateMetadata({ params, searchParams }: CityPageProps):
  * Cobre os shapes comuns sem importar tipos privados — o link é cosmético
  * e a falta de nome não pode quebrar a página: cai no slug formatado.
  */
-function getCityDisplayName(
-  data: unknown,
-  slug: string
-): string {
+function getCityDisplayName(data: unknown, slug: string): string {
   const obj = (data ?? {}) as Record<string, unknown>;
   const city = (obj.city ?? obj.location ?? {}) as Record<string, unknown>;
   const name = (city as { name?: unknown }).name;

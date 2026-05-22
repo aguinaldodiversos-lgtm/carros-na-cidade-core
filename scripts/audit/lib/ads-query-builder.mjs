@@ -94,7 +94,9 @@ export function buildAdsQualityQuery({ availableColumns, args, targetTable = "ad
  */
 export function buildDuplicateSlugsQuery({ availableColumns, args, targetTable = "ads" }) {
   if (!availableColumns.has("slug")) {
-    throw new Error(`[audit-ads-quality] tabela ${targetTable} sem coluna 'slug' — incompatível com auditoria.`);
+    throw new Error(
+      `[audit-ads-quality] tabela ${targetTable} sem coluna 'slug' — incompatível com auditoria.`
+    );
   }
   const hasStatus = availableColumns.has("status");
   const params = [];

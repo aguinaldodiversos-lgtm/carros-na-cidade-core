@@ -24,15 +24,9 @@ vi.mock("../../src/modules/ads/ads.persistence.service.js", () => ({
   executeAdInsert: vi.fn(),
 }));
 
-const { createAdNormalized } = await import(
-  "../../src/modules/ads/ads.create.pipeline.service.js"
-);
-const persistence = await import(
-  "../../src/modules/ads/ads.persistence.service.js"
-);
-const eligibility = await import(
-  "../../src/modules/ads/ads.publish.eligibility.service.js"
-);
+const { createAdNormalized } = await import("../../src/modules/ads/ads.create.pipeline.service.js");
+const persistence = await import("../../src/modules/ads/ads.persistence.service.js");
+const eligibility = await import("../../src/modules/ads/ads.publish.eligibility.service.js");
 
 describe("createAdNormalized — invariante de imagem mínima", () => {
   it("rejeita criação sem imagem válida com erro 400 e código ADS_REQUIRE_AT_LEAST_ONE_IMAGE", async () => {

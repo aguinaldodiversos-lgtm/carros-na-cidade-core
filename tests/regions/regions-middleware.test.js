@@ -17,9 +17,7 @@ function makeRes() {
 }
 
 function makeReq(headers = {}) {
-  const lower = Object.fromEntries(
-    Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
-  );
+  const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
   return {
     header(name) {
       return lower[String(name || "").toLowerCase()];

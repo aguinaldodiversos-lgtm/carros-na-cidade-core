@@ -38,10 +38,7 @@ function isDisabled() {
 }
 
 function getBaseUrl() {
-  const v = String(process.env.FIPE_API_BASE_URL || DEFAULT_BASE_URL).replace(
-    /\/+$/,
-    ""
-  );
+  const v = String(process.env.FIPE_API_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
   return v;
 }
 
@@ -150,8 +147,7 @@ export async function quoteByCodes(input, deps = {}) {
   const value = {
     price,
     fipeCode: String(data?.CodigoFipe ?? data?.fipeCode ?? "").trim() || null,
-    referenceMonth:
-      String(data?.MesReferencia ?? data?.referenceMonth ?? "").trim() || null,
+    referenceMonth: String(data?.MesReferencia ?? data?.referenceMonth ?? "").trim() || null,
     raw: data ?? {},
   };
 

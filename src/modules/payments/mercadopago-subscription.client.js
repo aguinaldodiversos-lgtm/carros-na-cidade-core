@@ -32,13 +32,7 @@ const PREAPPROVAL_BASE = "/preapproval";
  * @returns {Promise<{id: string, init_point: string, status: string}>}
  *   ID, link de autorização e status inicial (geralmente 'pending').
  */
-export async function createPreapproval({
-  planName,
-  amount,
-  payerEmail,
-  backUrl,
-  metadata = {},
-}) {
+export async function createPreapproval({ planName, amount, payerEmail, backUrl, metadata = {} }) {
   if (isMercadoPagoMockMode()) {
     const mockId = `mock-preapproval-${Date.now()}`;
     return {

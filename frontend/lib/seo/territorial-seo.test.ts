@@ -29,9 +29,7 @@ describe("buildTerritorialMetadata canonical override (transição)", () => {
     const meta = buildTerritorialMetadata(baseData, "city", {
       canonicalPathOverride: "/comprar/cidade/atibaia-sp",
     });
-    expect(meta.alternates?.canonical).toBe(
-      "https://carrosnacidade.com/comprar/cidade/atibaia-sp"
-    );
+    expect(meta.alternates?.canonical).toBe("https://carrosnacidade.com/comprar/cidade/atibaia-sp");
   });
 
   it("override também propaga para openGraph.url para consistência SEO", () => {

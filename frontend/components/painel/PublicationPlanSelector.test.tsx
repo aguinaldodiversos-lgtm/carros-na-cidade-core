@@ -1,17 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import PublicationPlanSelector from "./PublicationPlanSelector";
-import type {
-  PublicationOptionsPayload,
-} from "@/lib/painel/publication-options-types";
+import type { PublicationOptionsPayload } from "@/lib/painel/publication-options-types";
 
 /**
  * Fase 4 — tela interna pós-revisão.
@@ -56,9 +48,7 @@ const BASE_AD = {
   highlight_active: false,
 };
 
-function payload(
-  overrides: Partial<PublicationOptionsPayload>
-): PublicationOptionsPayload {
+function payload(overrides: Partial<PublicationOptionsPayload>): PublicationOptionsPayload {
   return {
     ad: BASE_AD,
     user: {
@@ -133,9 +123,7 @@ describe("PublicationPlanSelector — loading / error / empty", () => {
     mockOptionsFetch({ ok: false, status: 401 });
     render(<PublicationPlanSelector adId="ad-1" />);
     await waitFor(() =>
-      expect(window.location.assign).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/login\?next=/)
-      )
+      expect(window.location.assign).toHaveBeenCalledWith(expect.stringMatching(/^\/login\?next=/))
     );
   });
 
@@ -251,9 +239,7 @@ describe("PublicationPlanSelector — perfil Free CNPJ verificado", () => {
     });
 
     render(<PublicationPlanSelector adId="ad-1" />);
-    expect((await screen.findByTestId("price-subscribe_start")).textContent).toMatch(
-      /79,90/
-    );
+    expect((await screen.findByTestId("price-subscribe_start")).textContent).toMatch(/79,90/);
     expect(screen.getByTestId("price-subscribe_pro").textContent).toMatch(/149,90/);
   });
 });
@@ -402,9 +388,7 @@ describe("PublicationPlanSelector — checkout boost", () => {
 
     fireEvent.click(cta);
 
-    await waitFor(() =>
-      expect(window.location.href).toBe("https://mp.example/abc")
-    );
+    await waitFor(() => expect(window.location.href).toBe("https://mp.example/abc"));
 
     const checkoutCall = fetchSpy.mock.calls.find(
       ([u]) => typeof u === "string" && u.includes("/api/payments/boost-7d/checkout")

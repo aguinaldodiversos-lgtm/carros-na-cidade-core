@@ -22,9 +22,7 @@ describe("isAllowedSmokeUrl — guard contra produção", () => {
   });
 
   it("aceita hostnames com 'staging' como segmento", () => {
-    expect(
-      isAllowedSmokeUrl("https://carros-na-cidade-staging.onrender.com")
-    ).toBe(true);
+    expect(isAllowedSmokeUrl("https://carros-na-cidade-staging.onrender.com")).toBe(true);
     expect(isAllowedSmokeUrl("https://staging.carrosnacidade.com")).toBe(true);
     expect(isAllowedSmokeUrl("https://app-staging-xyz.onrender.com")).toBe(true);
   });
@@ -36,9 +34,7 @@ describe("isAllowedSmokeUrl — guard contra produção", () => {
 
   it("REJEITA produção", () => {
     expect(isAllowedSmokeUrl("https://carrosnacidade.com")).toBe(false);
-    expect(
-      isAllowedSmokeUrl("https://carros-na-cidade-core.onrender.com")
-    ).toBe(false);
+    expect(isAllowedSmokeUrl("https://carros-na-cidade-core.onrender.com")).toBe(false);
     expect(isAllowedSmokeUrl("https://www.carrosnacidade.com")).toBe(false);
   });
 
@@ -172,19 +168,19 @@ describe("checkContent — heurísticas de conteúdo essencial", () => {
   });
 
   it("REJEITA quando nome da cidade não aparece", () => {
-    const r = checkContent(
-      "<h1>Carros usados na região de Outro Lugar</h1><p>80 km</p>",
-      { baseSlug: "atibaia-sp", cityNameHints: ["Atibaia"] }
-    );
+    const r = checkContent("<h1>Carros usados na região de Outro Lugar</h1><p>80 km</p>", {
+      baseSlug: "atibaia-sp",
+      cityNameHints: ["Atibaia"],
+    });
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/nome da cidade/);
   });
 
   it("REJEITA quando raio em km ausente", () => {
-    const r = checkContent(
-      "<h1>Carros usados na região de Atibaia</h1>",
-      { baseSlug: "atibaia-sp", cityNameHints: ["Atibaia"] }
-    );
+    const r = checkContent("<h1>Carros usados na região de Atibaia</h1>", {
+      baseSlug: "atibaia-sp",
+      cityNameHints: ["Atibaia"],
+    });
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/raio/);
   });

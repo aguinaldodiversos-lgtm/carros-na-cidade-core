@@ -92,7 +92,10 @@ async function main() {
       id: ad.id,
       severity: r.severity,
       issue_codes: r.issues.map((i) => i.code).join("|"),
-      issue_labels: r.issues.map((i) => i.label).slice(0, 5).join(" | "),
+      issue_labels: r.issues
+        .map((i) => i.label)
+        .slice(0, 5)
+        .join(" | "),
       issue_count: r.issues.length,
       title: truncate(ad.title, 60),
       slug: ad.slug,
@@ -103,10 +106,7 @@ async function main() {
         : typeof ad.images === "string"
           ? "stringified"
           : 0,
-      sample_url: truncate(
-        r.issues.find((i) => i.sampleUrl)?.sampleUrl ?? "",
-        120
-      ),
+      sample_url: truncate(r.issues.find((i) => i.sampleUrl)?.sampleUrl ?? "", 120),
     });
   }
 

@@ -1,6 +1,12 @@
 import "server-only";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
-import { cityContextFromRef, cityContextFromSlug, hasRestrictiveFilters, normalizeCityFilters, type SearchParams } from "@/lib/buy/territory-variant";
+import {
+  cityContextFromRef,
+  cityContextFromSlug,
+  hasRestrictiveFilters,
+  normalizeCityFilters,
+  type SearchParams,
+} from "@/lib/buy/territory-variant";
 import { resolveCityMeta } from "@/lib/city/resolve-city-meta";
 import {
   fetchAdsFacets,

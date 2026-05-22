@@ -13,10 +13,7 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
   ssrResilientFetch: vi.fn(),
 }));
 
-import {
-  getBackendApiBaseUrl,
-  resolveInternalBackendApiUrl,
-} from "@/lib/env/backend-api";
+import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import {
   fetchRegionByCitySlug,
@@ -68,9 +65,7 @@ function buildHappyPayload() {
 beforeEach(() => {
   process.env.INTERNAL_API_TOKEN = VALID_TOKEN;
   mockedBackendBase.mockReturnValue("https://backend.example.com");
-  mockedResolveUrl.mockImplementation(
-    (path: string) => `https://backend.example.com${path}`
-  );
+  mockedResolveUrl.mockImplementation((path: string) => `https://backend.example.com${path}`);
   mockedFetch.mockReset();
 });
 
@@ -226,7 +221,14 @@ describe("fetchRegionByCitySlug — happy path 200", () => {
         data: {
           base: { id: 1, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
           members: [
-            { city_id: 2, slug: "valida-sp", name: "Valida", state: "SP", layer: 1, distance_km: 5 },
+            {
+              city_id: 2,
+              slug: "valida-sp",
+              name: "Valida",
+              state: "SP",
+              layer: 1,
+              distance_km: 5,
+            },
             { slug: "sem-id-sp", name: "Sem ID", state: "SP", layer: 1, distance_km: 10 }, // inválido
             null,
             { city_id: 3, slug: "outra-sp", name: "Outra", state: "SP", layer: 2, distance_km: 40 },
@@ -311,9 +313,7 @@ describe("fetchRegionByCitySlug — degrade gracioso em erros", () => {
   });
 
   it("envelope com ok:false → null + console.error", async () => {
-    mockedFetch.mockResolvedValueOnce(
-      buildResponse(200, { ok: false, error: "ops" })
-    );
+    mockedFetch.mockResolvedValueOnce(buildResponse(200, { ok: false, error: "ops" }));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await fetchRegionByCitySlug("atibaia-sp");
@@ -378,11 +378,7 @@ describe("regionToAdsSearchFilters — city_slugs e ordem", () => {
 
   it("preserva a ordem dos members após a base", () => {
     const result = regionToAdsSearchFilters(buildRegion());
-    expect(result.city_slugs).toEqual([
-      "atibaia-sp",
-      "bom-jesus-dos-perdoes-sp",
-      "campinas-sp",
-    ]);
+    expect(result.city_slugs).toEqual(["atibaia-sp", "bom-jesus-dos-perdoes-sp", "campinas-sp"]);
   });
 
   it("remove duplicado quando member tem o mesmo slug da base", () => {
@@ -474,11 +470,7 @@ describe("regionToAdsSearchFilters — overrides", () => {
         typeof regionToAdsSearchFilters
       >[1]
     );
-    expect(result.city_slugs).toEqual([
-      "atibaia-sp",
-      "bom-jesus-dos-perdoes-sp",
-      "campinas-sp",
-    ]);
+    expect(result.city_slugs).toEqual(["atibaia-sp", "bom-jesus-dos-perdoes-sp", "campinas-sp"]);
   });
 });
 
@@ -513,14 +505,12 @@ describe("regionToAdsSearchFilters — includeState", () => {
 
 describe("regionToAdsSearchFilters — null safety", () => {
   it("region null → lança erro claro (sem retornar {} silencioso)", () => {
-    expect(() =>
-      regionToAdsSearchFilters(null as unknown as RegionPayload)
-    ).toThrow(/region/i);
+    expect(() => regionToAdsSearchFilters(null as unknown as RegionPayload)).toThrow(/region/i);
   });
 
   it("region undefined → lança erro claro", () => {
-    expect(() =>
-      regionToAdsSearchFilters(undefined as unknown as RegionPayload)
-    ).toThrow(/region/i);
+    expect(() => regionToAdsSearchFilters(undefined as unknown as RegionPayload)).toThrow(
+      /region/i
+    );
   });
 });

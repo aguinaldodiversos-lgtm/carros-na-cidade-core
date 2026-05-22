@@ -53,7 +53,10 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
  *     (sort/order != null derruba index pra evitar variantes de ordenação no SERP)
  *   - filters.highlight_only / city_slug → keys comportadas
  */
-function buildTerritorialPayload(slug: string, canonicalFromBackend: string): TerritorialPagePayload {
+function buildTerritorialPayload(
+  slug: string,
+  canonicalFromBackend: string
+): TerritorialPagePayload {
   return {
     city: { id: 1, name: "Atibaia", slug, state: "SP", region: null },
     brand: null,
@@ -157,9 +160,7 @@ describe("/cidade/[slug] — generateMetadata (Fase 1)", () => {
       params: { slug: SLUG },
       searchParams: {},
     });
-    expect(meta.alternates?.canonical).toBe(
-      `https://carrosnacidade.com/carros-em/${SLUG}`
-    );
+    expect(meta.alternates?.canonical).toBe(`https://carrosnacidade.com/carros-em/${SLUG}`);
   });
 
   it("robots permanecem noindex,follow (backend devolve robots:'noindex,follow')", async () => {
@@ -185,9 +186,7 @@ describe("/cidade/[slug]/oportunidades — generateMetadata (Fase 1)", () => {
       params: { slug: SLUG },
       searchParams: {},
     });
-    expect(meta.alternates?.canonical).toBe(
-      `https://carrosnacidade.com/carros-baratos-em/${SLUG}`
-    );
+    expect(meta.alternates?.canonical).toBe(`https://carrosnacidade.com/carros-baratos-em/${SLUG}`);
   });
 
   it("robots permanecem noindex,follow", async () => {
@@ -205,9 +204,7 @@ describe("/cidade/[slug]/abaixo-da-fipe — generateMetadata (Fase 1)", () => {
       params: { slug: SLUG },
       searchParams: {},
     });
-    expect(meta.alternates?.canonical).toBe(
-      `https://carrosnacidade.com/carros-baratos-em/${SLUG}`
-    );
+    expect(meta.alternates?.canonical).toBe(`https://carrosnacidade.com/carros-baratos-em/${SLUG}`);
   });
 
   it("robots permanecem noindex,follow", async () => {

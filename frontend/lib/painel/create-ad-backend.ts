@@ -189,9 +189,7 @@ export function buildBackendCreateAdPayload(
     ...(n.fipeModelCode?.trim() ? { fipe_model_code: n.fipeModelCode.trim() } : {}),
     ...(n.fipeYearCode?.trim() ? { fipe_year_code: n.fipeYearCode.trim() } : {}),
     ...(n.fipeCode?.trim() ? { fipe_code: n.fipeCode.trim() } : {}),
-    ...(n.fipeReferenceMonth?.trim()
-      ? { fipe_reference_month: n.fipeReferenceMonth.trim() }
-      : {}),
+    ...(n.fipeReferenceMonth?.trim() ? { fipe_reference_month: n.fipeReferenceMonth.trim() } : {}),
     ...(n.fipeVehicleType === "motos" || n.fipeVehicleType === "caminhoes"
       ? { vehicle_type: n.fipeVehicleType }
       : {}),

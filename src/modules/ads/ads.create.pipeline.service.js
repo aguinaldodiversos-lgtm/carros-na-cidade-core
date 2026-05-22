@@ -16,10 +16,7 @@ import {
 } from "./risk/ad-risk.repository.js";
 import { markCityAsAncoraIfEligible } from "../cities/cities.anchor.service.js";
 import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
-import {
-  resolveFipeReference,
-  fipeValueForRiskScoring,
-} from "../fipe/fipe.service.js";
+import { resolveFipeReference, fipeValueForRiskScoring } from "../fipe/fipe.service.js";
 
 /**
  * Invariante: anúncio só nasce `active` se tiver pelo menos 1 imagem válida.
@@ -177,8 +174,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
             source: fipeSnapshot.fipe_source,
             fipe_code: fipeSnapshot.fipe_code,
             used_client_hint: Boolean(fipeSnapshot.used_client_hint),
-            client_hint_value:
-              fipeSnapshot.client_hint_value ?? validated.fipe_value ?? null,
+            client_hint_value: fipeSnapshot.client_hint_value ?? validated.fipe_value ?? null,
             reference_month: fipeSnapshot.reference_month ?? null,
           },
         });
@@ -259,8 +255,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
       risk_score: riskResult.riskScore,
       risk_level: riskResult.riskLevel,
       risk_reasons: riskResult.reasons,
-      moderation_status:
-        initialStatus === AD_STATUS.PENDING_REVIEW ? "pending_review" : "approved",
+      moderation_status: initialStatus === AD_STATUS.PENDING_REVIEW ? "pending_review" : "approved",
     };
   } catch (err) {
     const cityId =

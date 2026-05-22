@@ -30,7 +30,8 @@ function makePoolByMatcher(matchers) {
       calls.push({ sql: text, params });
       for (const m of matchers) {
         if (m.match.test(text)) {
-          const r = typeof m.response === "function" ? m.response({ sql: text, params }) : m.response;
+          const r =
+            typeof m.response === "function" ? m.response({ sql: text, params }) : m.response;
           if (r instanceof Error) throw r;
           return r;
         }
@@ -82,8 +83,20 @@ const CANONICAL_CITY = {
   is_active: true,
   ibge_code: 3550308,
 };
-const TEST_AD_9 = { id: 9, title: "Carro teste (seed)", slug: "carro-teste-seed", status: "active", city_id: 1 };
-const TEST_AD_80 = { id: 80, title: "Test Vehicle Test", slug: "test-vehicle-test", status: "active", city_id: 1 };
+const TEST_AD_9 = {
+  id: 9,
+  title: "Carro teste (seed)",
+  slug: "carro-teste-seed",
+  status: "active",
+  city_id: 1,
+};
+const TEST_AD_80 = {
+  id: 80,
+  title: "Test Vehicle Test",
+  slug: "test-vehicle-test",
+  status: "active",
+  city_id: 1,
+};
 const PAID_EVENT_4 = {
   id: 4,
   city_id: 1,
@@ -164,7 +177,9 @@ function happyPathMatchers(overrides = {}) {
     // city_metrics columns introspect
     {
       match: /information_schema\.columns WHERE table_name='city_metrics'/,
-      response: { rows: [{ column_name: "city_id" }, { column_name: "visits" }, { column_name: "leads" }] },
+      response: {
+        rows: [{ column_name: "city_id" }, { column_name: "visits" }, { column_name: "leads" }],
+      },
     },
     // city_metrics rows
     {
@@ -174,7 +189,9 @@ function happyPathMatchers(overrides = {}) {
     // city_status columns introspect
     {
       match: /information_schema\.columns WHERE table_name='city_status'/,
-      response: { rows: [{ column_name: "city_id" }, { column_name: "status" }, { column_name: "score" }] },
+      response: {
+        rows: [{ column_name: "city_id" }, { column_name: "status" }, { column_name: "score" }],
+      },
     },
     // city_status rows
     {
@@ -184,21 +201,30 @@ function happyPathMatchers(overrides = {}) {
     // region_memberships columns introspect
     {
       match: /information_schema\.columns WHERE table_name='region_memberships'/,
-      response: { rows: [{ column_name: "base_city_id" }, { column_name: "member_city_id" }, { column_name: "distance_km" }] },
+      response: {
+        rows: [
+          { column_name: "base_city_id" },
+          { column_name: "member_city_id" },
+          { column_name: "distance_km" },
+        ],
+      },
     },
     // region_memberships SELECT broken — agora com LEFT JOIN cities
     {
-      match: /FROM region_memberships rm[\s\S]*WHERE rm\.base_city_id = \$1 OR rm\.member_city_id = \$1/,
+      match:
+        /FROM region_memberships rm[\s\S]*WHERE rm\.base_city_id = \$1 OR rm\.member_city_id = \$1/,
       response: { rows: overrides.rmBroken ?? [RM_SELF_BROKEN] },
     },
     // region_memberships canonical — agora com LEFT JOIN cities + LIMIT 1
     {
-      match: /FROM region_memberships rm[\s\S]*WHERE rm\.base_city_id = \$1 AND rm\.member_city_id = \$1[\s\S]*LIMIT 1/,
+      match:
+        /FROM region_memberships rm[\s\S]*WHERE rm\.base_city_id = \$1 AND rm\.member_city_id = \$1[\s\S]*LIMIT 1/,
       response: { rows: overrides.rmCanonical ?? [RM_SELF_CANONICAL] },
     },
     // tableHasColumn — para FORBIDDEN_REF_TABLES
     {
-      match: /FROM information_schema\.columns\s+WHERE table_name = \$1 AND column_name = \$2\s+LIMIT 1/,
+      match:
+        /FROM information_schema\.columns\s+WHERE table_name = \$1 AND column_name = \$2\s+LIMIT 1/,
       response: ({ params }) => {
         // Forbidden tables não existem por default → retorna 0 rows
         const tbl = params?.[0];
@@ -219,7 +245,10 @@ function happyPathMatchers(overrides = {}) {
       },
     },
     // captureSnapshot queries
-    { match: /SELECT \* FROM cities WHERE id = \$1/, response: { rows: [overrides.broken ?? BROKEN_CITY] } },
+    {
+      match: /SELECT \* FROM cities WHERE id = \$1/,
+      response: { rows: [overrides.broken ?? BROKEN_CITY] },
+    },
     {
       match: /SELECT \* FROM ads WHERE id = ANY\(\$1::int\[\]\)/,
       response: { rows: [TEST_AD_9, TEST_AD_80] },
@@ -229,7 +258,8 @@ function happyPathMatchers(overrides = {}) {
       response: { rows: [PAID_EVENT_4] },
     },
     {
-      match: /SELECT \* FROM region_memberships WHERE base_city_id = \$1 AND member_city_id = \$1\b/,
+      match:
+        /SELECT \* FROM region_memberships WHERE base_city_id = \$1 AND member_city_id = \$1\b/,
       response: { rows: [RM_SELF_BROKEN] },
     },
   ];
@@ -417,9 +447,7 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
   });
 
   it("evento com id ≠ 4 → aborta", async () => {
-    const pg = makePoolByMatcher(
-      happyPathMatchers({ events: [{ ...PAID_EVENT_4, id: 99 }] })
-    );
+    const pg = makePoolByMatcher(happyPathMatchers({ events: [{ ...PAID_EVENT_4, id: 99 }] }));
     const r = await validatePreconditions({
       pg,
       scenario: "confirmed-test-data-cleanup",
@@ -446,9 +474,7 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
 
   it("region_memberships com linha extra (não-autoref) → aborta", async () => {
     const extra = { base_city_id: 1, member_city_id: 999, distance_km: 10 };
-    const pg = makePoolByMatcher(
-      happyPathMatchers({ rmBroken: [RM_SELF_BROKEN, extra] })
-    );
+    const pg = makePoolByMatcher(happyPathMatchers({ rmBroken: [RM_SELF_BROKEN, extra] }));
     const r = await validatePreconditions({
       pg,
       scenario: "confirmed-test-data-cleanup",
@@ -475,9 +501,7 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
       member_slug: "sæo-paulo",
       member_state: "SP",
     };
-    const pg = makePoolByMatcher(
-      happyPathMatchers({ rmBroken: [memberOnly] })
-    );
+    const pg = makePoolByMatcher(happyPathMatchers({ rmBroken: [memberOnly] }));
     const r = await validatePreconditions({
       pg,
       scenario: "confirmed-test-data-cleanup",
@@ -524,7 +548,13 @@ describe("confirmed-test-data-cleanup — pré-condições", () => {
   });
 
   it("ads ativos diferentes de [9, 80] → aborta", async () => {
-    const adReal = { id: 99, title: "Honda Civic 2018", slug: "honda-civic-2018", status: "active", city_id: 1 };
+    const adReal = {
+      id: 99,
+      title: "Honda Civic 2018",
+      slug: "honda-civic-2018",
+      status: "active",
+      city_id: 1,
+    };
     const pg = makePoolByMatcher(happyPathMatchers({ activeAds: [adReal] }));
     const r = await validatePreconditions({
       pg,
@@ -900,7 +930,7 @@ describe("validatePreconditions — region_memberships com tipos mistos", () => 
     confirmCanonicalCityId: 5278,
   };
 
-  it("autoref com strings (\"1\"/\"1\"/\"0\") — caso real produção — passa", async () => {
+  it('autoref com strings ("1"/"1"/"0") — caso real produção — passa', async () => {
     // Estado encontrado no dry-run de prod (2026-05-04): pg driver
     // devolveu base_city_id="1", member_city_id="1", distance_km="0"
     // (numeric/decimal ou parseInt8=false). Antes da correção, `===`
@@ -931,7 +961,7 @@ describe("validatePreconditions — region_memberships com tipos mistos", () => 
     expect(r.ok).toBe(true);
   });
 
-  it("autoref com distance_km=\"10\" (string) — aborta", async () => {
+  it('autoref com distance_km="10" (string) — aborta', async () => {
     const pg = makePoolByMatcher(
       happyPathMatchers({
         rmBroken: [{ base_city_id: "1", member_city_id: "1", distance_km: "10" }],
@@ -947,7 +977,7 @@ describe("validatePreconditions — region_memberships com tipos mistos", () => 
     expect(r.reasons.join(" ")).toMatch(/distance_km=10 ≠ 0/);
   });
 
-  it("base=\"1\" / member=\"200\" (string) — classifica como otherRef e aborta", async () => {
+  it('base="1" / member="200" (string) — classifica como otherRef e aborta', async () => {
     const pg = makePoolByMatcher(
       happyPathMatchers({
         rmBroken: [
@@ -966,7 +996,7 @@ describe("validatePreconditions — region_memberships com tipos mistos", () => 
     expect(r.reasons.join(" ")).toMatch(/1 linha\(s\) extras/);
   });
 
-  it("base=\"200\" / member=\"1\" (string) — classifica como otherRef e aborta", async () => {
+  it('base="200" / member="1" (string) — classifica como otherRef e aborta', async () => {
     const pg = makePoolByMatcher(
       happyPathMatchers({
         rmBroken: [

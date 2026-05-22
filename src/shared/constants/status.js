@@ -99,9 +99,7 @@ export const AD_STATUS_OWNER_OPERABLE = Object.freeze([
 
 export const AD_STATUS_CAN_RECEIVE_BOOST = Object.freeze([AD_STATUS.ACTIVE]);
 
-export const AD_STATUS_REQUIRES_ADMIN_ACTION = Object.freeze([
-  AD_STATUS.PENDING_REVIEW,
-]);
+export const AD_STATUS_REQUIRES_ADMIN_ACTION = Object.freeze([AD_STATUS.PENDING_REVIEW]);
 
 export const AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC = Object.freeze([
   AD_STATUS.DRAFT,

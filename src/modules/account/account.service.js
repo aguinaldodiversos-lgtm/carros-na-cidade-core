@@ -18,7 +18,11 @@ import { getAccountUser } from "./account.user.read.js";
 const EVENT_PLAN_IDS = new Set(["cnpj-evento-premium"]);
 
 export function isEventPlanId(planId) {
-  return EVENT_PLAN_IDS.has(String(planId || "").trim().toLowerCase());
+  return EVENT_PLAN_IDS.has(
+    String(planId || "")
+      .trim()
+      .toLowerCase()
+  );
 }
 
 export { getAccountUser };
@@ -443,10 +447,7 @@ async function getPlanIdFromUsersColumn(userId) {
       return null;
     }
 
-    const result = await pool.query(
-      `SELECT plan_id FROM users WHERE id = $1 LIMIT 1`,
-      [userId]
-    );
+    const result = await pool.query(`SELECT plan_id FROM users WHERE id = $1 LIMIT 1`, [userId]);
 
     return result.rows[0]?.plan_id ? String(result.rows[0].plan_id) : null;
   } catch {
@@ -610,9 +611,7 @@ export async function resolveCurrentPlan(user) {
     ? null
     : await getCurrentPlanIdFromDatabase(user.id);
   const hasHistory =
-    planIdFromUsersColumn || planIdFromSubscription
-      ? false
-      : await hasSubscriptionHistory(user.id);
+    planIdFromUsersColumn || planIdFromSubscription ? false : await hasSubscriptionHistory(user.id);
 
   const preferredId =
     planIdFromUsersColumn ||
@@ -1040,10 +1039,7 @@ export async function updateOwnedAdStatus(userId, adId, action) {
   if (action === "activate" && currentStatus !== AD_STATUS.ACTIVE) {
     const eligibility = await resolvePublishEligibility(userId);
     if (!eligibility.allowed) {
-      throw new AppError(
-        eligibility.reason || "Publicacao nao permitida no momento.",
-        403
-      );
+      throw new AppError(eligibility.reason || "Publicacao nao permitida no momento.", 403);
     }
   }
 

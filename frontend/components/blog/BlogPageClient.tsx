@@ -98,7 +98,15 @@ function CategoryGlyph({ id }: { id: BlogCategoryId }) {
   switch (id) {
     case "compra":
       return (
-        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6" />
           <circle cx="9" cy="20" r="1.4" />
           <circle cx="17" cy="20" r="1.4" />
@@ -106,20 +114,44 @@ function CategoryGlyph({ id }: { id: BlogCategoryId }) {
       );
     case "venda":
       return (
-        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M20.5 13.5 13 21a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h7.4a2 2 0 0 1 1.4.6l7.3 7.3a2 2 0 0 1 0 2.6Z" />
           <circle cx="8.5" cy="8.5" r="1.4" />
         </svg>
       );
     case "manutencao":
       return (
-        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M14.7 6.3a4 4 0 0 1 5.4 5.3l-3 3 5.6 5.6-2.1 2.1-5.6-5.6-3 3a4 4 0 0 1-5.4-5.3l3.4 3.4 2.1-2.1-3.4-3.4a4 4 0 0 1 5.3-5.4" />
         </svg>
       );
     case "mercado":
       return (
-        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M4 19V9" />
           <path d="M10 19V5" />
           <path d="M16 19v-7" />
@@ -128,14 +160,30 @@ function CategoryGlyph({ id }: { id: BlogCategoryId }) {
       );
     case "financiamento":
       return (
-        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M12 3v18" />
           <path d="M16.5 7.5h-6a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5h-6" />
         </svg>
       );
     case "cidades":
       return (
-        <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M12 22s7-7.6 7-13A7 7 0 1 0 5 9c0 5.4 7 13 7 13Z" />
           <circle cx="12" cy="9" r="2.5" />
         </svg>
@@ -222,7 +270,14 @@ function FeaturedHeroBanner({
 
         {readTime ? (
           <p className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-white/90 sm:text-[13px] md:mt-4 md:text-[14px]">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
             </svg>
@@ -236,7 +291,14 @@ function FeaturedHeroBanner({
 
 export function ClockIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
     </svg>
@@ -287,7 +349,15 @@ function FeaturedPostCard({ post, citySlug }: { post: BlogPost; citySlug: string
             className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-[#1D2440] shadow-[0_4px_12px_rgba(20,30,60,0.18)] transition hover:bg-white"
             onClick={(event) => event.preventDefault()}
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
             </svg>
           </button>
@@ -300,7 +370,14 @@ function FeaturedPostCard({ post, citySlug }: { post: BlogPost; citySlug: string
 
           {readTime ? (
             <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#7A8197] md:mt-3 md:gap-2 md:text-[13px]">
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 md:h-4 md:w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5 md:h-4 md:w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              >
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v5l3 2" />
               </svg>
@@ -367,7 +444,14 @@ function PopularPostRow({ post, citySlug }: { post: BlogPost; citySlug: string }
           <p className="mt-1 line-clamp-2 hidden text-[14px] text-[#636C82] md:block">{excerpt}</p>
         ) : null}
         <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#7A8197]">
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          >
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3 2" />
           </svg>
@@ -383,10 +467,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
   const cityName = toText(content.cityName, "São Paulo");
 
   const heroBadge = toText(content.heroBanner?.badge, "DICA");
-  const heroTitle = toText(
-    content.heroBanner?.title,
-    `Os carros que estão em alta em ${cityName}`
-  );
+  const heroTitle = toText(content.heroBanner?.title, `Os carros que estão em alta em ${cityName}`);
   const heroSubtitle = toText(
     content.heroBanner?.subtitle,
     "Confira os modelos mais procurados, as tendências do mercado e dicas para fazer a melhor escolha."
@@ -472,7 +553,15 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
             className="inline-flex items-center gap-1 text-[14px] font-semibold text-[#2F67F6] transition hover:text-[#234EC1] md:text-[15px]"
           >
             Ver todos
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="m9 6 6 6-6 6" />
             </svg>
           </Link>
@@ -489,7 +578,15 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
         <section className="mx-auto w-full max-w-7xl px-4 pt-8 sm:px-6 md:pt-10">
           <div className="mb-4 flex items-end justify-between">
             <h2 className="inline-flex items-center gap-2 text-[22px] font-extrabold tracking-[-0.01em] text-[#1D2440] md:text-[28px]">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#1FAE6A]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5 text-[#1FAE6A]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M3 17 9 11l4 4 8-8" />
                 <path d="M14 7h7v7" />
               </svg>
@@ -500,7 +597,15 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
               className="inline-flex items-center gap-1 text-[14px] font-semibold text-[#2F67F6] transition hover:text-[#234EC1] md:text-[15px]"
             >
               Ver mais
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="m9 6 6 6-6 6" />
               </svg>
             </Link>
@@ -535,7 +640,15 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
           <div className="flex flex-col items-start gap-5 px-5 py-6 md:flex-row md:items-center md:justify-between md:px-8 md:py-7">
             <div className="flex items-start gap-4">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2F67F6] text-white shadow-[0_6px_16px_rgba(47,103,246,0.35)]">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M12 22s7-7.6 7-13A7 7 0 1 0 5 9c0 5.4 7 13 7 13Z" />
                   <circle cx="12" cy="9" r="2.5" />
                 </svg>
@@ -555,7 +668,15 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
               className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#2F67F6] px-6 text-[16px] font-extrabold text-white transition hover:bg-[#2457DC] md:w-auto md:text-[17px]"
             >
               {bottomBannerCta}
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="m9 6 6 6-6 6" />
               </svg>
             </Link>

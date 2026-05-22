@@ -124,7 +124,10 @@ export async function fetchStateRegions(
       },
     });
   } catch (err) {
-    logWarn("falha de rede", { uf: ufNorm, error: err instanceof Error ? err.message : String(err) });
+    logWarn("falha de rede", {
+      uf: ufNorm,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 
@@ -139,7 +142,10 @@ export async function fetchStateRegions(
   try {
     envelope = (await response.json()) as BackendEnvelope;
   } catch (err) {
-    logWarn("body não é JSON", { uf: ufNorm, error: err instanceof Error ? err.message : String(err) });
+    logWarn("body não é JSON", {
+      uf: ufNorm,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 

@@ -31,7 +31,9 @@ function buildCitiesParagraph(cityName: string, members: RegionMember[], radiusK
   const preview = members.slice(0, 4).map((m) => m.name);
   const remaining = Math.max(0, members.length - preview.length);
   const list =
-    remaining > 0 ? `${preview.join(", ")} e mais ${remaining} cidade${remaining === 1 ? "" : "s"}` : preview.join(", ");
+    remaining > 0
+      ? `${preview.join(", ")} e mais ${remaining} cidade${remaining === 1 ? "" : "s"}`
+      : preview.join(", ");
 
   return `A Região de ${cityName} reúne ${cityName} e ${list}, todas dentro de até ${radiusKm} km da cidade-base. Os anúncios destas cidades aparecem ordenados por proximidade — você vê primeiro o que está mais perto de ${cityName}.`;
 }

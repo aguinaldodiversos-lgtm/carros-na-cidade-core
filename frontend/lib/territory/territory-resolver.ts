@@ -5,11 +5,7 @@ import { fetchCityMetaBySlug } from "@/lib/city/fetch-city-meta-server";
 import { fetchRegionByCitySlug } from "@/lib/regions/fetch-region";
 import { slugToRegionHref } from "@/lib/regions/ancora-url";
 
-import {
-  getDefaultTerritoryState,
-  stateFromUf,
-  ufFromCitySlug,
-} from "./territory-defaults";
+import { getDefaultTerritoryState, stateFromUf, ufFromCitySlug } from "./territory-defaults";
 import type {
   TerritoryBreadcrumb,
   TerritoryContext,

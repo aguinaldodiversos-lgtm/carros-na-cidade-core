@@ -102,9 +102,7 @@ afterEach(() => {
 describe("/carros-em/[slug] — generateMetadata (Fase 3 integrado)", () => {
   it("canonical = /carros-em/[slug] (URL absoluta, limpa)", async () => {
     const meta = await generateMetadataEm({ params: { slug: SLUG } });
-    expect(meta.alternates?.canonical).toBe(
-      `https://carrosnacidade.com/carros-em/${SLUG}`
-    );
+    expect(meta.alternates?.canonical).toBe(`https://carrosnacidade.com/carros-em/${SLUG}`);
   });
 
   it("robots: index,follow (página indexável)", async () => {
@@ -122,9 +120,7 @@ describe("/carros-em/[slug] — generateMetadata (Fase 3 integrado)", () => {
 describe("/carros-baratos-em/[slug] — generateMetadata (Fase 3 integrado)", () => {
   it("canonical = /carros-baratos-em/[slug] (URL absoluta, limpa)", async () => {
     const meta = await generateMetadataBaratos({ params: { slug: SLUG } });
-    expect(meta.alternates?.canonical).toBe(
-      `https://carrosnacidade.com/carros-baratos-em/${SLUG}`
-    );
+    expect(meta.alternates?.canonical).toBe(`https://carrosnacidade.com/carros-baratos-em/${SLUG}`);
   });
 
   it("robots: index,follow (página indexável da intenção 'abaixo da FIPE')", async () => {
@@ -145,9 +141,7 @@ describe("/carros-automaticos-em/[slug] — generateMetadata (Fase 3 integrado)"
     // consolida sinal SEO na indexável da intenção mais próxima
     // (/carros-em). Confirmar que o canonical NÃO é self.
     const meta = await generateMetadataAutomaticos({ params: { slug: SLUG } });
-    expect(meta.alternates?.canonical).toBe(
-      `https://carrosnacidade.com/carros-em/${SLUG}`
-    );
+    expect(meta.alternates?.canonical).toBe(`https://carrosnacidade.com/carros-em/${SLUG}`);
     expect(String(meta.alternates?.canonical)).not.toContain("automaticos");
   });
 
@@ -210,8 +204,8 @@ describe("Fase 3 — invariantes globais (3 page.tsx integradas)", () => {
     // brasileira válida no final, bloqueando o canonical inválido na
     // origem. Combinado com middleware territory-gate, garante 404 HTTP
     // real para qualquer slug fora do contrato `nome-uf-br`.
-    await expect(
-      generateMetadataEm({ params: { slug: "atibaia sp" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    await expect(generateMetadataEm({ params: { slug: "atibaia sp" } })).rejects.toThrow(
+      /NEXT_NOT_FOUND/
+    );
   });
 });

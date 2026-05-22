@@ -20,9 +20,7 @@ describe("rewriteCityHomeEntries (cities.xml)", () => {
   });
 
   it("reescreve URL absoluta /cidade/[slug] preservando host", () => {
-    const input: PublicSitemapEntry[] = [
-      { loc: "https://carrosnacidade.com/cidade/atibaia-sp" },
-    ];
+    const input: PublicSitemapEntry[] = [{ loc: "https://carrosnacidade.com/cidade/atibaia-sp" }];
     const out = rewriteCityHomeEntries(input);
     expect(out[0].loc).toBe("https://carrosnacidade.com/comprar/cidade/atibaia-sp");
   });

@@ -157,8 +157,7 @@ function fallbackContent(): SellPageContent {
       },
       {
         title: "Hierarquia comercial de exposição",
-        description:
-          "Destaque, plano Pro e plano Start respeitam posição comercial no catálogo.",
+        description: "Destaque, plano Pro e plano Start respeitam posição comercial no catálogo.",
       },
       {
         title: "Base pronta para organizar estoque e contatos",

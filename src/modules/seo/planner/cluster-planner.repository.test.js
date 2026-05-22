@@ -167,14 +167,12 @@ describe("listTopCitiesForClusterPlanning — fallback (ads + cities)", () => {
 
   it("fallback preserva ordem do SQL (DESC active_ads); o repo NÃO reordena", async () => {
     // SQL faz ORDER BY COUNT(a.id) DESC; aqui simulamos o resultado já ordenado.
-    pool.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({
-        rows: [
-          ATIBAIA_FALLBACK_ROW, // 4 ads
-          BRAGANCA_FALLBACK_ROW, // 3 ads
-        ],
-      });
+    pool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+      rows: [
+        ATIBAIA_FALLBACK_ROW, // 4 ads
+        BRAGANCA_FALLBACK_ROW, // 3 ads
+      ],
+    });
 
     const result = await listTopCitiesForClusterPlanning(10);
     expect(result[0].city_id).toBe(4761);
@@ -182,9 +180,7 @@ describe("listTopCitiesForClusterPlanning — fallback (ads + cities)", () => {
   });
 
   it("retorna [] quando ambas primary e fallback retornam [] (sem ads ativos)", async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
+    pool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
 
     const result = await listTopCitiesForClusterPlanning(10);
     expect(result).toEqual([]);
@@ -242,19 +238,15 @@ describe("listTopCitiesForClusterPlanning — filtro de slug canônico no fallba
   });
 
   it("ordena por active_ads DESC (primário pelo SQL ORDER BY; teste preserva a ordem)", async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({
-        rows: [
-          { ...ATIBAIA_FALLBACK_ROW, active_ads: 9 },
-          { ...BRAGANCA_FALLBACK_ROW, active_ads: 3 },
-        ],
-      });
+    pool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+      rows: [
+        { ...ATIBAIA_FALLBACK_ROW, active_ads: 9 },
+        { ...BRAGANCA_FALLBACK_ROW, active_ads: 3 },
+      ],
+    });
 
     const result = await listTopCitiesForClusterPlanning(10);
-    expect(result[0].active_ads ?? result[0].total_ads).toBeGreaterThanOrEqual(
-      result[1].total_ads
-    );
+    expect(result[0].active_ads ?? result[0].total_ads).toBeGreaterThanOrEqual(result[1].total_ads);
     expect(result[0].slug).toBe("atibaia-sp"); // 9 ads vem antes
   });
 

@@ -32,7 +32,9 @@ export async function fetchRegionByAncora(
     .trim()
     .toUpperCase()
     .slice(0, 2);
-  const ancoraNorm = String(ancora || "").trim().toLowerCase();
+  const ancoraNorm = String(ancora || "")
+    .trim()
+    .toLowerCase();
 
   if (!/^[A-Z]{2}$/.test(ufNorm) || !ancoraNorm) return null;
 
@@ -55,10 +57,7 @@ export async function fetchRegionByAncora(
       logTag: "fetch-region-ancora",
       next: {
         revalidate: REVALIDATE_SECONDS,
-        tags: [
-          "internal:regions",
-          `internal:regions:ancora:${ufNorm.toLowerCase()}:${ancoraNorm}`,
-        ],
+        tags: ["internal:regions", `internal:regions:ancora:${ufNorm.toLowerCase()}:${ancoraNorm}`],
       },
     });
   } catch (err) {

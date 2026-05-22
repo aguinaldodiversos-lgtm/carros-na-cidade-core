@@ -51,6 +51,7 @@ o último deploy do Render reflete `main`.
 ### 1.2 Confirmar que a flag está ausente/false em produção
 
 No painel Render do service do **frontend**:
+
 - Settings → Environment → Variables.
 - Confirmar que `REGIONAL_PAGE_ENABLED` está **ausente** OU igual a
   qualquer valor diferente da string exata `"true"` (`"false"`, `"True"`,
@@ -101,6 +102,7 @@ LIMIT 1;
 ```
 
 **Esperado:**
+
 - `exists_table = platform_settings` (não `NULL`).
 - 1 linha com `key = regional.radius_km`, `value = 80`.
 - `name = 027_platform_settings.sql` aplicada.
@@ -133,6 +135,7 @@ LIMIT 10;
 ```
 
 **Decisão por resultado:**
+
 - `cidades_sem_geo = 0` → ideal, prosseguir.
 - `cidades_sem_geo > 0` mas as 3 cidades do smoke (Atibaia, Campinas,
   São Paulo) têm coordenadas → prosseguir, anotar para popular depois:
@@ -185,11 +188,12 @@ INTERNAL_API_TOKEN=<token-do-Render> \
 Painel Render → service `carros-na-cidade-portal` → Settings →
 Environment → **Add Environment Variable**:
 
-| Key | Value | Sync |
-|---|---|---|
-| `REGIONAL_PAGE_ENABLED` | `true` | OFF |
+| Key                     | Value  | Sync |
+| ----------------------- | ------ | ---- |
+| `REGIONAL_PAGE_ENABLED` | `true` | OFF  |
 
 **Notas:**
+
 - Valor é a string exata `true` (lowercase, sem aspas, sem espaço).
   Qualquer outro valor (`"True"`, `"1"`, `"yes"`) é tratado como
   desligado (contrato estrito de `isRegionalPageEnabled()`).
@@ -211,6 +215,7 @@ independentes**, na ordem em que são atravessadas pela request:
 `frontend/middleware.ts` intercepta `/carros-usados/regiao/:slug`
 ANTES do App Router. Lê `REGIONAL_PAGE_ENABLED` direto de
 `process.env`:
+
 - `!== "true"` → retorna `NextResponse(null, { status: 404 })`
   imediatamente. Sem fetch, sem render.
 - `=== "true"` → chama `validateRegionalSlug(slug)` em
@@ -241,11 +246,11 @@ A rota também usa `export const dynamic = "force-dynamic"` (sem
 
 Para que a Camada 1 funcione corretamente:
 
-| Variável | Origem | Para quê |
-|---|---|---|
-| `REGIONAL_PAGE_ENABLED` | painel Render, sync OFF | Gate principal. Apenas `"true"` libera. |
-| `BACKEND_API_URL` | já no `render.yaml` | URL do backend para validação de slug. |
-| `INTERNAL_API_TOKEN` | painel Render, sync OFF | Mesmo token usado pelo BFF `fetch-region.ts`. |
+| Variável                | Origem                  | Para quê                                      |
+| ----------------------- | ----------------------- | --------------------------------------------- |
+| `REGIONAL_PAGE_ENABLED` | painel Render, sync OFF | Gate principal. Apenas `"true"` libera.       |
+| `BACKEND_API_URL`       | já no `render.yaml`     | URL do backend para validação de slug.        |
+| `INTERNAL_API_TOKEN`    | painel Render, sync OFF | Mesmo token usado pelo BFF `fetch-region.ts`. |
 
 Se `BACKEND_API_URL` ou `INTERNAL_API_TOKEN` ausentes com flag on,
 o middleware degrada para `fail-open` e a page.tsx assume — page.tsx
@@ -295,6 +300,7 @@ STAGING_PUBLIC_BASE_URL=https://carros-na-cidade-portal.onrender.com \
 ```
 
 **Esperado (todos PASS):**
+
 - status `200` para os 3 slugs default
 - robots `noindex,follow` em todas as 3
 - canonical → `/carros-em/<slug>` em todas as 3 (não self-canonical)
@@ -408,6 +414,7 @@ Se qualquer FAIL no smoke ou problema na validação manual:
 ### 5.1 Desligar a flag
 
 Painel Render → service do frontend → Settings → Environment:
+
 - **Remover** `REGIONAL_PAGE_ENABLED` (preferível) **ou** alterar para
   qualquer valor diferente de `true` (ex.: `false`).
 

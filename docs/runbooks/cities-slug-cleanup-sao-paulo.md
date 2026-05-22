@@ -16,12 +16,12 @@
 Auditoria do bootstrap de cluster plans (2026-05-04) identificou registro
 malformado em `cities`:
 
-| Campo | Valor atual | Problema |
-|---|---|---|
-| `id` | `1` | — |
-| `name` | `SÆo Paulo` | Caractere `Æ` (U+00C6, ligature) em vez de `ã` (U+00E3 LATIN SMALL LETTER A WITH TILDE). |
-| `slug` | `sæo-paulo` | Não-ASCII (`æ` U+00E6) **e** sem sufixo de UF. |
-| `state` | `SP` | OK. |
+| Campo   | Valor atual | Problema                                                                                 |
+| ------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `id`    | `1`         | —                                                                                        |
+| `name`  | `SÆo Paulo` | Caractere `Æ` (U+00C6, ligature) em vez de `ã` (U+00E3 LATIN SMALL LETTER A WITH TILDE). |
+| `slug`  | `sæo-paulo` | Não-ASCII (`æ` U+00E6) **e** sem sufixo de UF.                                           |
+| `state` | `SP`        | OK.                                                                                      |
 
 **Consequência operacional:** o slug não passa no padrão canônico
 [`VALID_SLUG_REGEX = /^[a-z0-9-]+-[a-z]{2}$/`](../../src/modules/seo/planner/cluster-plan-canonical-transform.js)
@@ -61,11 +61,11 @@ ORDER BY id;
 
 **Resultados possíveis:**
 
-| Cenário | Linhas devolvidas | Decisão |
-|---|---|---|
-| **A — caminho feliz** | 1 linha (`id=1`, `slug='sæo-paulo'`); nenhuma com `slug='sao-paulo-sp'` | Aplicar UPDATE de §3. |
-| **B — conflito** | 2 linhas: `id=1` + outra com `slug='sao-paulo-sp'` | **PARAR.** Outra cidade já reivindicou o slug alvo. Investigar duplicidade antes de qualquer UPDATE. |
-| **C — já corrigido** | 1 linha (`id=1`, `slug='sao-paulo-sp'`) | Dado já está bom. Nada a fazer. Re-validar §6.2 para confirmar. |
+| Cenário               | Linhas devolvidas                                                       | Decisão                                                                                              |
+| --------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **A — caminho feliz** | 1 linha (`id=1`, `slug='sæo-paulo'`); nenhuma com `slug='sao-paulo-sp'` | Aplicar UPDATE de §3.                                                                                |
+| **B — conflito**      | 2 linhas: `id=1` + outra com `slug='sao-paulo-sp'`                      | **PARAR.** Outra cidade já reivindicou o slug alvo. Investigar duplicidade antes de qualquer UPDATE. |
+| **C — já corrigido**  | 1 linha (`id=1`, `slug='sao-paulo-sp'`)                                 | Dado já está bom. Nada a fazer. Re-validar §6.2 para confirmar.                                      |
 
 > ⚠️ Se aparecer cenário B, **não** rodar o UPDATE. Abrir investigação
 > separada para entender por que existem dois registros para São Paulo.
@@ -79,10 +79,10 @@ FROM ads
 WHERE city_id = 1;
 ```
 
-| Resultado | Implicação |
-|---|---|
-| `0` | Cidade sem ads. UPDATE é trivial — nenhum efeito em sitemap (Atibaia/Bragança permanecem). |
-| `1+` | UPDATE é seguro (não muda `id`, só `name`/`slug`); ads continuam vinculados. Após o cleanup, São Paulo passa a entrar no fallback do bootstrap (se `active_ads` > 0 e slug for canônico). |
+| Resultado | Implicação                                                                                                                                                                                |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`       | Cidade sem ads. UPDATE é trivial — nenhum efeito em sitemap (Atibaia/Bragança permanecem).                                                                                                |
+| `1+`      | UPDATE é seguro (não muda `id`, só `name`/`slug`); ads continuam vinculados. Após o cleanup, São Paulo passa a entrar no fallback do bootstrap (se `active_ads` > 0 e slug for canônico). |
 
 ### 2.3 Sample dos ads de São Paulo (auditoria visual)
 
@@ -109,12 +109,12 @@ ORDER BY ordinal_position;
 
 **O que verificar:**
 
-| Coluna | UPDATE depende? |
-|---|---|
-| `id` | Sim, no `WHERE`. |
-| `name` | Sim, é o que vamos setar. |
-| `slug` | Sim, é o que vamos setar e usamos no `WHERE` para garantir idempotência. |
-| `state` | Sim, no `WHERE` defensivo. |
+| Coluna       | UPDATE depende?                                                                                          |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `id`         | Sim, no `WHERE`.                                                                                         |
+| `name`       | Sim, é o que vamos setar.                                                                                |
+| `slug`       | Sim, é o que vamos setar e usamos no `WHERE` para garantir idempotência.                                 |
+| `state`      | Sim, no `WHERE` defensivo.                                                                               |
 | `updated_at` | **Se existir**, incluir `updated_at = NOW()` no SET. **Se não existir**, omitir essa cláusula do UPDATE. |
 
 ### 2.5 Garantia de idempotência adicional (opcional, recomendada)
@@ -127,10 +127,10 @@ FROM cities
 WHERE slug = 'sao-paulo-sp';
 ```
 
-| Resultado | Decisão |
-|---|---|
-| `0` | OK, segue para §3. |
-| `>= 1` | PARAR. Mesmo cenário B de §2.1. |
+| Resultado | Decisão                         |
+| --------- | ------------------------------- |
+| `0`       | OK, segue para §3.              |
+| `>= 1`    | PARAR. Mesmo cenário B de §2.1. |
 
 ---
 
@@ -186,11 +186,11 @@ COMMIT;
 
 ### 3.3 Por que essas cláusulas no `WHERE`?
 
-| Cláusula | Propósito |
-|---|---|
-| `id = 1` | Targeting cirúrgico — apenas a linha problemática. |
+| Cláusula             | Propósito                                                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id = 1`             | Targeting cirúrgico — apenas a linha problemática.                                                                                                                      |
 | `slug = 'sæo-paulo'` | **Idempotência.** Se o UPDATE já rodou (e slug agora é `sao-paulo-sp`), o WHERE não bate em ninguém — `0 rows affected`, sem efeito. Re-rodar não duplica nem corrompe. |
-| `state = 'SP'` | Defesa em profundidade. Se por algum acaso `id=1` virou outra coisa em algum ambiente, o UPDATE não toca. |
+| `state = 'SP'`       | Defesa em profundidade. Se por algum acaso `id=1` virou outra coisa em algum ambiente, o UPDATE não toca.                                                               |
 
 ### 3.4 Linhas afetadas esperadas
 
@@ -283,9 +283,9 @@ WHERE id = 1;
 
 **Esperado:**
 
-| id | name | state | slug |
-|---|---|---|---|
-| `1` | `São Paulo` | `SP` | `sao-paulo-sp` |
+| id  | name        | state | slug           |
+| --- | ----------- | ----- | -------------- |
+| `1` | `São Paulo` | `SP`  | `sao-paulo-sp` |
 
 Verificar visualmente que o `name` aparece com `ã` (U+00E3) — se ainda
 aparecer `Æ`, o terminal/cliente psql está com problema de encoding,
@@ -326,10 +326,10 @@ WHERE slug IS NOT NULL
 ORDER BY id;
 ```
 
-| Resultado | Implicação |
-|---|---|
-| `0 rows` | São Paulo era um caso isolado. Cleanup completo. |
-| `>= 1` | Outras cidades têm slug malformado. Cada uma exige investigação própria — repetir este runbook por linha (cada caso pode ter sua própria nuance: encoding diferente, ausência de UF, slug uppercase, etc.). |
+| Resultado | Implicação                                                                                                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0 rows`  | São Paulo era um caso isolado. Cleanup completo.                                                                                                                                                            |
+| `>= 1`    | Outras cidades têm slug malformado. Cada uma exige investigação própria — repetir este runbook por linha (cada caso pode ter sua própria nuance: encoding diferente, ausência de UF, slug uppercase, etc.). |
 
 ---
 
@@ -343,14 +343,14 @@ ORDER BY id;
 - [ ] §2.4 confirma se `updated_at` existe — escolher §3.1 ou §3.2.
 - [ ] §2.5 retornou `conflitos = 0`.
 - [ ] §3 executado dentro de `BEGIN`/`COMMIT` no Render Shell de produção
-       (não staging — dado malformado está em prod e ambos têm que ficar
-       coerentes; staging também precisa do mesmo fix se o estado do
-       banco for replicado).
+      (não staging — dado malformado está em prod e ambos têm que ficar
+      coerentes; staging também precisa do mesmo fix se o estado do
+      banco for replicado).
 - [ ] §6.1 confirmou `name='São Paulo'`, `slug='sao-paulo-sp'`.
 - [ ] §6.2 dry-run mostrou São Paulo entrando, `totalErrors=0`,
-       nenhum `sæo-paulo` em sample.
+      nenhum `sæo-paulo` em sample.
 - [ ] §6.3 confirmou que não há outras cidades quebradas (ou abriu
-       runbook próprio se houver).
+      runbook próprio se houver).
 
 ---
 
@@ -358,16 +358,16 @@ ORDER BY id;
 
 - ❌ **NÃO** rodar o UPDATE sem antes completar §2 (cenário A confirmado).
 - ❌ **NÃO** rodar o UPDATE em staging sem ter rodado em prod primeiro
-      (ou simultaneamente sob janela controlada). Divergência de slug
-      entre ambientes pode mascarar bugs futuros.
+  (ou simultaneamente sob janela controlada). Divergência de slug
+  entre ambientes pode mascarar bugs futuros.
 - ❌ **NÃO** estender este runbook para corrigir outros municípios.
-      Cada caso de slug malformado exige investigação própria.
+  Cada caso de slug malformado exige investigação própria.
 - ❌ **NÃO** rodar `bootstrap-cluster-plans.mjs --yes` neste runbook.
-      A persistência do batch novo (com São Paulo incluído) é decisão
-      de outro prompt.
+  A persistência do batch novo (com São Paulo incluído) é decisão
+  de outro prompt.
 - ❌ **NÃO** alterar layout, frontend, sitemap em código, canonical em
-      código, robots, rotas, ranking, planos comerciais, Página
-      Regional, RUN_WORKERS, env do Render.
+  código, robots, rotas, ranking, planos comerciais, Página
+  Regional, RUN_WORKERS, env do Render.
 
 ---
 
@@ -375,6 +375,7 @@ ORDER BY id;
 
 > **Tarefa:** Executar §2 (read-only) no Render Shell de produção.
 > Reportar:
+>
 > - Resultado de §2.1: cenário A, B ou C?
 > - Resultado de §2.2: quantos ads em `city_id=1`?
 > - Resultado de §2.4: existe `updated_at` em `cities`?

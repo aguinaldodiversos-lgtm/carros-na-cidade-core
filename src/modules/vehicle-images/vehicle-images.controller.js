@@ -58,10 +58,7 @@ function isFallbackEnabled() {
  * NEXT_PUBLIC_R2_PUBLIC_BASE_URL como cortesia (a env do frontend).
  */
 function readPublicBaseUrl() {
-  const raw =
-    process.env.R2_PUBLIC_BASE_URL ||
-    process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ||
-    "";
+  const raw = process.env.R2_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || "";
   return String(raw).trim().replace(/\/+$/, "");
 }
 

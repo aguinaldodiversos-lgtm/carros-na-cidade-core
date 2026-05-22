@@ -64,9 +64,7 @@ function normalizeCitySlugs(rawValues: Iterable<string>): string[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-function readCitySlugsFromSearchParams(
-  searchParams: SearchParamsReader
-): string[] | undefined {
+function readCitySlugsFromSearchParams(searchParams: SearchParamsReader): string[] | undefined {
   // Preferência: getAll() quando disponível (URLSearchParams nativo) — captura
   // tanto `?city_slugs=a,b` (1 entry com CSV) quanto `?city_slugs=a&city_slugs=b`
   // (2 entries). normalizeCitySlugs faz split CSV em qualquer elemento.

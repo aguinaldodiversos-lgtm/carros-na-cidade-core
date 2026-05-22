@@ -98,8 +98,7 @@ vi.mock("@/lib/territory/territory-resolver", () => ({
 }));
 
 vi.mock("@/lib/regions/regional-facets", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/regions/regional-facets")>();
+  const actual = await importOriginal<typeof import("@/lib/regions/regional-facets")>();
   return {
     ...actual,
     pickDynamicOgImage: vi.fn().mockReturnValue(null),
@@ -187,16 +186,14 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(false);
 
-    await expect(
-      pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    await expect(pageModule.generateMetadata({ params: { slug: "atibaia-sp" } })).rejects.toThrow(
+      /NEXT_NOT_FOUND/
+    );
   });
 
   it("flag = 'true' + loader retorna null (slug inexistente) → chama notFound()", async () => {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { loadRegionalCatalogData } = await import(
-      "@/lib/buy/region-catalog-loader"
-    );
+    const { loadRegionalCatalogData } = await import("@/lib/buy/region-catalog-loader");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
     vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(null);
 
@@ -209,13 +206,9 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
 describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (PR 2)", () => {
   async function buildMetadata() {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { loadRegionalCatalogData } = await import(
-      "@/lib/buy/region-catalog-loader"
-    );
+    const { loadRegionalCatalogData } = await import("@/lib/buy/region-catalog-loader");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
-    vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(
-      VALID_CATALOG as never
-    );
+    vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(VALID_CATALOG as never);
 
     return pageModule.generateMetadata({ params: { slug: "atibaia-sp" } });
   }
@@ -295,21 +288,19 @@ describe("Page (default export) — defesa em profundidade", () => {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(false);
 
-    await expect(
-      pageModule.default({ params: { slug: "atibaia-sp" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    await expect(pageModule.default({ params: { slug: "atibaia-sp" } })).rejects.toThrow(
+      /NEXT_NOT_FOUND/
+    );
   });
 
   it("flag true + loader retorna null → notFound()", async () => {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
-    const { loadRegionalCatalogData } = await import(
-      "@/lib/buy/region-catalog-loader"
-    );
+    const { loadRegionalCatalogData } = await import("@/lib/buy/region-catalog-loader");
     vi.mocked(isRegionalPageEnabled).mockReturnValue(true);
     vi.mocked(loadRegionalCatalogData).mockResolvedValueOnce(null);
 
-    await expect(
-      pageModule.default({ params: { slug: "regiao-fake-zz" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    await expect(pageModule.default({ params: { slug: "regiao-fake-zz" } })).rejects.toThrow(
+      /NEXT_NOT_FOUND/
+    );
   });
 });

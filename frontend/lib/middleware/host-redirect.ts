@@ -24,9 +24,7 @@
 
 export const CANONICAL_HOST = "www.carrosnacidade.com";
 
-export type HostRedirectDecision =
-  | { kind: "pass" }
-  | { kind: "redirect"; target: string };
+export type HostRedirectDecision = { kind: "pass" } | { kind: "redirect"; target: string };
 
 const HEALTHCHECK_PATHS = new Set(["/", "/healthcheck", "/api/healthcheck"]);
 

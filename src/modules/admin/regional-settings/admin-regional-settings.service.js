@@ -106,16 +106,10 @@ export async function updateRegionalSettings({ adminUserId, payload }) {
     throw new AppError("radius_km deve ser inteiro", 400);
   }
   if (n < REGIONAL_RADIUS_MIN) {
-    throw new AppError(
-      `radius_km mínimo é ${REGIONAL_RADIUS_MIN} km`,
-      400
-    );
+    throw new AppError(`radius_km mínimo é ${REGIONAL_RADIUS_MIN} km`, 400);
   }
   if (n > REGIONAL_RADIUS_MAX) {
-    throw new AppError(
-      `radius_km máximo é ${REGIONAL_RADIUS_MAX} km`,
-      400
-    );
+    throw new AppError(`radius_km máximo é ${REGIONAL_RADIUS_MAX} km`, 400);
   }
 
   const oldValue = await getRegionalRadiusKm();
@@ -124,8 +118,7 @@ export async function updateRegionalSettings({ adminUserId, payload }) {
     key: REGIONAL_RADIUS_KEY,
     value: n,
     updatedBy: adminUserId,
-    description:
-      "Raio em km usado para montar a Página Regional a partir da cidade base.",
+    description: "Raio em km usado para montar a Página Regional a partir da cidade base.",
   });
 
   // Side-effects best-effort. Falha em audit/invalidação NUNCA pode

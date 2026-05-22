@@ -7,17 +7,17 @@
 
 ## 1. Ambiente
 
-| Item | Valor |
-|---|---|
-| Ambiente alvo (intencional) | Staging — Render Shell de `carros-na-cidade-core` (staging) |
-| Ambiente disponível para esta auditoria | **Apenas localhost (sem DB) + curl read-only contra `www.carrosnacidade.com` (prod)** |
-| Sem acesso a | Render Shell de staging, `psql` em staging/prod, `DATABASE_URL` de qualquer ambiente |
-| Por quê | Ambiente do assistente não tem `render` CLI, `psql` instalado, nem `.env.DATABASE_URL` (removido do git em commit `4250060` por segurança) |
-| Data/hora | 2026-05-03, ~22:00 UTC (curls de produção) |
-| Comando que SERIA executado | `node scripts/seo/bootstrap-cluster-plans.mjs --dry-run --limit=3` (no Render Shell de staging) |
-| Comando efetivamente tentado localmente | mesmo, falhou no boot por env (ver §4) |
-| `--yes` foi usado? | **NÃO.** Em ambiente algum. |
-| Persistência ocorreu? | **NÃO.** `seo_cluster_plans` não recebeu nenhum INSERT/UPDATE. |
+| Item                                    | Valor                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ambiente alvo (intencional)             | Staging — Render Shell de `carros-na-cidade-core` (staging)                                                                                |
+| Ambiente disponível para esta auditoria | **Apenas localhost (sem DB) + curl read-only contra `www.carrosnacidade.com` (prod)**                                                      |
+| Sem acesso a                            | Render Shell de staging, `psql` em staging/prod, `DATABASE_URL` de qualquer ambiente                                                       |
+| Por quê                                 | Ambiente do assistente não tem `render` CLI, `psql` instalado, nem `.env.DATABASE_URL` (removido do git em commit `4250060` por segurança) |
+| Data/hora                               | 2026-05-03, ~22:00 UTC (curls de produção)                                                                                                 |
+| Comando que SERIA executado             | `node scripts/seo/bootstrap-cluster-plans.mjs --dry-run --limit=3` (no Render Shell de staging)                                            |
+| Comando efetivamente tentado localmente | mesmo, falhou no boot por env (ver §4)                                                                                                     |
+| `--yes` foi usado?                      | **NÃO.** Em ambiente algum.                                                                                                                |
+| Persistência ocorreu?                   | **NÃO.** `seo_cluster_plans` não recebeu nenhum INSERT/UPDATE.                                                                             |
 
 ---
 
@@ -25,13 +25,13 @@
 
 > **Status: PENDENTE — operador deve rodar via Render Shell de staging e atualizar este apêndice.**
 
-| Query | Resultado real | Esperado (baseado em código + curl de prod) |
-|---|---|---|
-| `SELECT COUNT(*) FROM seo_cluster_plans` | _(operador preencher)_ | **0** ou pequeno legado (5 endpoints prod via curl em [sitemap-empty-investigation.md](./sitemap-empty-investigation.md) confirmaram `data:[]`) |
-| `SELECT cluster_type, status, COUNT(*) FROM seo_cluster_plans GROUP BY 1,2 ORDER BY 1,2` | _(operador preencher)_ | esperado: nenhuma linha |
-| `SELECT COUNT(*) FROM cities` | _(operador preencher)_ | ~5570 (seed IBGE) |
-| `SELECT COUNT(*) FROM ads WHERE status = 'active'` | _(operador preencher)_ | desconhecido — em [seo-cluster-plans-state-machine.md §1.3](./seo-cluster-plans-state-machine.md) tem o template |
-| `SELECT COUNT(*) FROM ads WHERE status='active' AND city_id IS NOT NULL` | _(operador preencher)_ | provavelmente igual ou levemente menor |
+| Query                                                                                    | Resultado real         | Esperado (baseado em código + curl de prod)                                                                                                     |
+| ---------------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SELECT COUNT(*) FROM seo_cluster_plans`                                                 | _(operador preencher)_ | **0** ou pequeno legado (5 endpoints prod via curl em [sitemap-empty-investigation.md](./sitemap-empty-investigation.md) confirmaram `data:[]`) |
+| `SELECT cluster_type, status, COUNT(*) FROM seo_cluster_plans GROUP BY 1,2 ORDER BY 1,2` | _(operador preencher)_ | esperado: nenhuma linha                                                                                                                         |
+| `SELECT COUNT(*) FROM cities`                                                            | _(operador preencher)_ | ~5570 (seed IBGE)                                                                                                                               |
+| `SELECT COUNT(*) FROM ads WHERE status = 'active'`                                       | _(operador preencher)_ | desconhecido — em [seo-cluster-plans-state-machine.md §1.3](./seo-cluster-plans-state-machine.md) tem o template                                |
+| `SELECT COUNT(*) FROM ads WHERE status='active' AND city_id IS NOT NULL`                 | _(operador preencher)_ | provavelmente igual ou levemente menor                                                                                                          |
 
 Comandos copy-paste (já documentados em [seo-cluster-plans-state-machine.md §1.3](./seo-cluster-plans-state-machine.md)):
 
@@ -63,21 +63,21 @@ ORDER BY ordinal_position;
 
 **Compatibilidade exigida por [`upsertClusterPlan`](../../src/modules/seo/planner/cluster-plan.repository.js)** (extraído via grep):
 
-| Coluna | Tipo esperado | Pelo INSERT em `cluster-plan.repository.js:17-31` | Nullable? |
-|---|---|---|---|
-| `city_id` | inteiro (FK→cities) | `$1` | obrigatório |
-| `cluster_type` | text | `$2` | obrigatório |
-| `path` | text (UNIQUE — `ON CONFLICT (path)`) | `$3` | obrigatório |
-| `brand` | text | `$4` | nullable (default `null`) |
-| `model` | text | `$5` | nullable (default `null`) |
-| `money_page` | boolean | `$6` (`Boolean(moneyPage)`) | obrigatório |
-| `priority` | numérico | `$7` (`Number(priority \|\| 0)`) | obrigatório |
-| `status` | text | `$8` (default `'planned'`) | obrigatório |
-| `stage` | text | `$9` (default `'discovery'`) | obrigatório |
-| `payload` | jsonb | `$10::jsonb` (`JSON.stringify(payload \|\| {})`) | obrigatório |
-| `created_at` | timestamptz | `NOW()` | obrigatório |
-| `updated_at` | timestamptz | `NOW()` (`DO UPDATE SET updated_at = NOW()`) | obrigatório |
-| `last_generated_at` | timestamptz | NÃO escrita pelo upsert (mas é lida em `public-seo.service.js:70` no `COALESCE` do `lastmod`) | nullable provável |
+| Coluna              | Tipo esperado                        | Pelo INSERT em `cluster-plan.repository.js:17-31`                                             | Nullable?                 |
+| ------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------- |
+| `city_id`           | inteiro (FK→cities)                  | `$1`                                                                                          | obrigatório               |
+| `cluster_type`      | text                                 | `$2`                                                                                          | obrigatório               |
+| `path`              | text (UNIQUE — `ON CONFLICT (path)`) | `$3`                                                                                          | obrigatório               |
+| `brand`             | text                                 | `$4`                                                                                          | nullable (default `null`) |
+| `model`             | text                                 | `$5`                                                                                          | nullable (default `null`) |
+| `money_page`        | boolean                              | `$6` (`Boolean(moneyPage)`)                                                                   | obrigatório               |
+| `priority`          | numérico                             | `$7` (`Number(priority \|\| 0)`)                                                              | obrigatório               |
+| `status`            | text                                 | `$8` (default `'planned'`)                                                                    | obrigatório               |
+| `stage`             | text                                 | `$9` (default `'discovery'`)                                                                  | obrigatório               |
+| `payload`           | jsonb                                | `$10::jsonb` (`JSON.stringify(payload \|\| {})`)                                              | obrigatório               |
+| `created_at`        | timestamptz                          | `NOW()`                                                                                       | obrigatório               |
+| `updated_at`        | timestamptz                          | `NOW()` (`DO UPDATE SET updated_at = NOW()`)                                                  | obrigatório               |
+| `last_generated_at` | timestamptz                          | NÃO escrita pelo upsert (mas é lida em `public-seo.service.js:70` no `COALESCE` do `lastmod`) | nullable provável         |
 
 **Risco se schema diverge em prod:** lembrar que [seo-cluster-plans-state-machine.md §1.2](./seo-cluster-plans-state-machine.md) já documentou que `seo_cluster_plans` **não tem migration oficial** — foi criada out-of-band. Schema real precisa ser confirmado antes do `--yes`. Se faltar `payload jsonb`, falha no INSERT. Se faltar `path UNIQUE`, `ON CONFLICT (path)` falha.
 
@@ -126,17 +126,18 @@ Os testes unitários do script ([tests/scripts/bootstrap-cluster-plans.test.js](
 
 Tabela baseada em comportamento determinístico do transformer
 ([cluster-plan-canonical-transform.js](../../src/modules/seo/planner/cluster-plan-canonical-transform.js))
-+ testes
-([cluster-plan-canonical-transform.test.js](../../src/modules/seo/planner/cluster-plan-canonical-transform.test.js),
-20/20 passando):
 
-| `cluster_type` | Path original (do builder) | Path transformado | Decisão | Aprovado? |
-|---|---|---|---|---|
-| `city_home` | `/cidade/atibaia-sp` | `/carros-em/atibaia-sp` | Reescreve para canônica intermediária Fase 1 | ⚠️ **Bloqueado por §7** (Fase 1 não deployada em prod) |
-| `city_below_fipe` | `/cidade/atibaia-sp/abaixo-da-fipe` | `/carros-baratos-em/atibaia-sp` | Reescreve para canônica intermediária Fase 1 | ⚠️ **Bloqueado por §7** |
-| `city_opportunities` | `/cidade/atibaia-sp/oportunidades` | `null` (skip) | Skip — canonicaliza pra mesma URL que below_fipe | ✅ Comportamento correto |
-| `city_brand` | `/cidade/atibaia-sp/marca/<brand>` | preserva | Fase 1 não tocou | ⚠️ **Bloqueado por §6** (página é `noindex,follow` em prod) |
-| `city_brand_model` | `/cidade/atibaia-sp/marca/<brand>/modelo/<model>` | preserva | Fase 1 não tocou | ⚠️ **Bloqueado por §6** (página é `noindex,follow` em prod) |
+- testes
+  ([cluster-plan-canonical-transform.test.js](../../src/modules/seo/planner/cluster-plan-canonical-transform.test.js),
+  20/20 passando):
+
+| `cluster_type`       | Path original (do builder)                        | Path transformado               | Decisão                                          | Aprovado?                                                   |
+| -------------------- | ------------------------------------------------- | ------------------------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+| `city_home`          | `/cidade/atibaia-sp`                              | `/carros-em/atibaia-sp`         | Reescreve para canônica intermediária Fase 1     | ⚠️ **Bloqueado por §7** (Fase 1 não deployada em prod)      |
+| `city_below_fipe`    | `/cidade/atibaia-sp/abaixo-da-fipe`               | `/carros-baratos-em/atibaia-sp` | Reescreve para canônica intermediária Fase 1     | ⚠️ **Bloqueado por §7**                                     |
+| `city_opportunities` | `/cidade/atibaia-sp/oportunidades`                | `null` (skip)                   | Skip — canonicaliza pra mesma URL que below_fipe | ✅ Comportamento correto                                    |
+| `city_brand`         | `/cidade/atibaia-sp/marca/<brand>`                | preserva                        | Fase 1 não tocou                                 | ⚠️ **Bloqueado por §6** (página é `noindex,follow` em prod) |
+| `city_brand_model`   | `/cidade/atibaia-sp/marca/<brand>/modelo/<model>` | preserva                        | Fase 1 não tocou                                 | ⚠️ **Bloqueado por §6** (página é `noindex,follow` em prod) |
 
 **Apenas `city_opportunities` (skip) está aprovado por design**. Os outros 4 dependem dos achados §6 e §7 abaixo.
 
@@ -144,12 +145,12 @@ Tabela baseada em comportamento determinístico do transformer
 
 ## 6. Auditoria canonical das rotas brand/model em prod
 
-| URL | HTTP | Canonical encontrado | Robots | Diagnóstico |
-|---|---|---|---|---|
-| `/cidade/atibaia-sp/marca/honda` | 200 | `…/cidade/atibaia-sp/marca/honda` (self) | **`noindex, follow`** | Página atual é noindex. Persistir esse path no sitemap publicaria URL noindex no XML — sinal contraditório (sitemap diz "indexe", meta diz "não indexe"). |
-| `/cidade/atibaia-sp/marca/honda/modelo/civic` | 200 | `…/cidade/atibaia-sp/marca/honda/modelo/civic` (self) | **`noindex, follow`** | Mesma situação. |
-| `/cidade/atibaia-sp/marca/vw%20-%20volkswagen` | 200 | `…/cidade/atibaia-sp/marca/vw%20-%20volkswagen` (self) | `noindex, follow` | Mesma situação + path com espaço (já encoded — bug existente, fora do escopo). |
-| `/cidade/atibaia-sp/marca/fiat` | 200 | `…/cidade/atibaia-sp/marca/fiat` (self) | `noindex, follow` | Mesma situação. |
+| URL                                            | HTTP | Canonical encontrado                                   | Robots                | Diagnóstico                                                                                                                                               |
+| ---------------------------------------------- | ---- | ------------------------------------------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/cidade/atibaia-sp/marca/honda`               | 200  | `…/cidade/atibaia-sp/marca/honda` (self)               | **`noindex, follow`** | Página atual é noindex. Persistir esse path no sitemap publicaria URL noindex no XML — sinal contraditório (sitemap diz "indexe", meta diz "não indexe"). |
+| `/cidade/atibaia-sp/marca/honda/modelo/civic`  | 200  | `…/cidade/atibaia-sp/marca/honda/modelo/civic` (self)  | **`noindex, follow`** | Mesma situação.                                                                                                                                           |
+| `/cidade/atibaia-sp/marca/vw%20-%20volkswagen` | 200  | `…/cidade/atibaia-sp/marca/vw%20-%20volkswagen` (self) | `noindex, follow`     | Mesma situação + path com espaço (já encoded — bug existente, fora do escopo).                                                                            |
+| `/cidade/atibaia-sp/marca/fiat`                | 200  | `…/cidade/atibaia-sp/marca/fiat` (self)                | `noindex, follow`     | Mesma situação.                                                                                                                                           |
 
 **Diagnóstico:** rotas brand/model estão **todas sob `noindex, follow` em prod**. O transformer atual da Opção 2 PRESERVA esses paths, o que significa que rodar `--yes` populariam `seo_cluster_plans` com `city_brand`/`city_brand_model` cujos paths o sitemap depois publicaria — mas o frontend serve a página com `noindex`. Inconsistência SEO.
 
@@ -159,23 +160,26 @@ Tabela baseada em comportamento determinístico do transformer
 
 ## 7. Auditoria canonical da Fase 1 em prod
 
-| URL | Canonical encontrado | Robots | Esperado pós-Fase 1 (commit `24009155`) | Status do deploy |
-|---|---|---|---|---|
-| `/cidade/atibaia-sp` | `…/cidade/atibaia-sp` (**self**) | `noindex, follow` | canonical = `…/carros-em/atibaia-sp` | ❌ **Fase 1 NÃO deployada** |
-| `/carros-em/atibaia-sp` | `…/carros-em/atibaia-sp` (**self**) | `index, follow` | canonical = self | ✅ OK (esperado mesmo pré-Fase 1, pois `local-seo-metadata` antiga também canonicalizava — porém para `/comprar/cidade/[slug]`. Conferir abaixo.) |
-| `/cidade/atibaia-sp/abaixo-da-fipe` | `…/cidade/atibaia-sp/abaixo-da-fipe` (**self**) | `noindex, follow` | canonical = `…/carros-baratos-em/atibaia-sp` | ❌ **Fase 1 NÃO deployada** |
-| `/carros-baratos-em/atibaia-sp` | `…/carros-baratos-em/atibaia-sp` (**self**) | `index, follow` | canonical = self | ✅ OK (esperado mesmo pré-Fase 1, conferir bug "antes/depois" abaixo) |
+| URL                                 | Canonical encontrado                            | Robots            | Esperado pós-Fase 1 (commit `24009155`)      | Status do deploy                                                                                                                                  |
+| ----------------------------------- | ----------------------------------------------- | ----------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/cidade/atibaia-sp`                | `…/cidade/atibaia-sp` (**self**)                | `noindex, follow` | canonical = `…/carros-em/atibaia-sp`         | ❌ **Fase 1 NÃO deployada**                                                                                                                       |
+| `/carros-em/atibaia-sp`             | `…/carros-em/atibaia-sp` (**self**)             | `index, follow`   | canonical = self                             | ✅ OK (esperado mesmo pré-Fase 1, pois `local-seo-metadata` antiga também canonicalizava — porém para `/comprar/cidade/[slug]`. Conferir abaixo.) |
+| `/cidade/atibaia-sp/abaixo-da-fipe` | `…/cidade/atibaia-sp/abaixo-da-fipe` (**self**) | `noindex, follow` | canonical = `…/carros-baratos-em/atibaia-sp` | ❌ **Fase 1 NÃO deployada**                                                                                                                       |
+| `/carros-baratos-em/atibaia-sp`     | `…/carros-baratos-em/atibaia-sp` (**self**)     | `index, follow`   | canonical = self                             | ✅ OK (esperado mesmo pré-Fase 1, conferir bug "antes/depois" abaixo)                                                                             |
 
 **Wait — `/carros-em/[slug]` e `/carros-baratos-em/[slug]` retornam canonical SELF.** Isso é **compatível com a Fase 1** (que fez essas duas serem self-canonical). Mas era ALSO compatível com a auditoria pré-Fase 1 ([territorial-canonical-audit.md §3](./territorial-canonical-audit.md)) que mostrou:
+
 - `/carros-em/atibaia-sp` → canonical `/carros-em/atibaia-sp` (self) — **antes da Fase 1**
 
 Então essas duas URLs sempre foram self-canonical. **Mas a Fase 1 mudou o `local-seo-metadata.transitionCanonicalPath`** para que `/carros-em` aponte pra self em vez de pra `/comprar/cidade/`. O fato de prod mostrar self pode significar:
+
 - (a) Fase 1 está deployada e funcionando (esperado)
 - (b) prod já estava self-canonical por outro motivo (improvável; auditoria anterior mostrou exatamente o oposto pra `/comprar/cidade/[slug]?sort=recent&limit=50` que era a antiga canônica)
 
 **Mas para `/cidade/atibaia-sp` o teste é decisivo:** a Fase 1 mudou `transitionCanonicalPath(slug)` para retornar `/carros-em/[slug]`. Prod ainda retorna self-canonical = bug deployment. **Fase 1 está parcialmente deployada ou não deployada.**
 
 Possíveis causas:
+
 - (i) Render auto-deploy não rolou ainda (commit recente, ainda no pipeline).
 - (ii) Cache CDN segurando HTML antigo (Cloudflare s-maxage=3600+swr=86400 do path).
 - (iii) Cache do Next ISR (1h padrão).
@@ -218,7 +222,6 @@ Possíveis causas:
 >    - `gh api /repos/aguinaldodiversos-lgtm/carros-na-cidade-core/deployments?per_page=10` ou pelo painel Render manualmente.
 >    - Quando foi o último deploy? Status (success/failed/in_progress)?
 >    - O último deploy é >= o commit `24009155`?
->
 > 2. **Forçar bypass de cache CDN** e re-curl:
 >    ```bash
 >    curl -sSL --max-time 25 -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
@@ -226,24 +229,20 @@ Possíveis causas:
 >      | grep -oiE '<link[^>]*rel="canonical"[^>]*>'
 >    ```
 >    Comparar com a curl sem bypass. Se mudou: cache CDN/Next stuck. Se igual: deploy não rolou.
->
 > 3. **Documentar** em runbook novo `docs/runbooks/fase1-deploy-investigation.md`:
 >    - Resultado da investigação de deploy (Render).
 >    - Resultado do bypass de cache.
 >    - Causa raiz: deploy pendente, deploy falho, cache stuck, ou outro?
 >    - Recomendação de próxima ação (esperar deploy, purge cache, re-trigger build, etc).
->
 > 4. **Em paralelo** (independente, pode ser PR separado): criar runbook
 >    `docs/runbooks/cluster-plan-brand-model-policy.md` decidindo o que fazer
 >    com `city_brand`/`city_brand_model`:
 >    - Reposicionar páginas como `index,follow` (com canonical próprio + JSON-LD)?
 >    - Manter `noindex` e skipar do bootstrap (transformer retorna `null`)?
 >    - Trade-offs.
->
 > 5. **Só depois** de Fase 1 confirmadamente deployada **+** decisão sobre brand/model documentada, voltar a este runbook (`bootstrap-staging-dry-run-results.md`) e:
 >    - Atualizar §2/§3 com SQL real do operador.
 >    - Re-rodar dry-run em staging (com DATABASE_URL configurado).
 >    - Atualizar §4 com output real.
 >    - Atualizar §5/§8 com decisão final (provavelmente: aprovar `--yes --limit=3` em staging).
->
 > 6. **NÃO alterar:** frontend, layout, components, sitemap em código, canonical em código, robots, rotas, ranking, planos, Página Regional, `RUN_WORKERS`, env, dados em prod, código backend nesta etapa. Apenas leitura, curls, e markdown.

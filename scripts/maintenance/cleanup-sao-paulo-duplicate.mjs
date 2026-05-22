@@ -78,10 +78,7 @@ const EXPECTED_EVENT_PRICE = 499;
 // 'blocked'. Validado dinamicamente contra `ads_status_check`.
 export const TARGET_AD_STATUS = AD_STATUS.DELETED;
 const REPORT_DIR = "reports";
-const SUPPORTED_SCENARIOS = new Set([
-  "archive-test-data",
-  "confirmed-test-data-cleanup",
-]);
+const SUPPORTED_SCENARIOS = new Set(["archive-test-data", "confirmed-test-data-cleanup"]);
 
 // Tabelas que NÃO devem ter referências para BROKEN_ID — se aparecer,
 // abortar (sinal de produto novo apontando pra cidade quebrada).
@@ -174,7 +171,8 @@ export function parseArgs(argv) {
 
 function defaultLog(level, message, meta) {
   const prefix = "[cleanup-sao-paulo]";
-  const line = meta !== undefined ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
+  const line =
+    meta !== undefined ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
   if (level === "error") {
     // eslint-disable-next-line no-console
     console.error(line);
@@ -235,12 +233,7 @@ async function tableHasColumn(pg, tableName, columnName) {
  * @param {object} [opts.args] — flags já parseadas (usadas pelo
  *   confirmed-test-data-cleanup para validar `--confirm-*`).
  */
-export async function validatePreconditions({
-  pg,
-  scenario,
-  args = {},
-  log = defaultLog,
-}) {
+export async function validatePreconditions({ pg, scenario, args = {}, log = defaultLog }) {
   const reasons = [];
 
   // 1. id=1 ainda tem slug='sæo-paulo'
@@ -301,9 +294,7 @@ async function validateArchiveTestData({ pg, reasons }) {
       );
     }
     if (row.city_id !== BROKEN_ID) {
-      reasons.push(
-        `ad id=${expected} não está em city_id=${BROKEN_ID} (atual=${row.city_id})`
-      );
+      reasons.push(`ad id=${expected} não está em city_id=${BROKEN_ID} (atual=${row.city_id})`);
     }
   }
 
@@ -344,13 +335,7 @@ async function validateArchiveTestData({ pg, reasons }) {
  * Pré-condições do cenário `confirmed-test-data-cleanup`. 8 categorias
  * de invariante; qualquer falha aborta antes do BEGIN.
  */
-async function validateConfirmedCleanup({
-  pg,
-  args,
-  reasons,
-  broken,
-  canonical,
-}) {
+async function validateConfirmedCleanup({ pg, args, reasons, broken, canonical }) {
   // 0. flags --confirm-* presentes E batendo nos IDs esperados
   if (args.confirmEventId !== EXPECTED_EVENT_ID) {
     reasons.push(
@@ -380,7 +365,9 @@ async function validateConfirmedCleanup({
     const c = canonical.rows[0];
     if (c.state !== "SP") reasons.push(`cities.id=${CANONICAL_ID} state≠'SP' (${c.state})`);
     if (c.is_active !== true) {
-      reasons.push(`cities.id=${CANONICAL_ID} is_active=false — abortar (canônica deve estar ativa)`);
+      reasons.push(
+        `cities.id=${CANONICAL_ID} is_active=false — abortar (canônica deve estar ativa)`
+      );
     }
     if (Number(c.ibge_code) !== 3550308) {
       reasons.push(
@@ -442,11 +429,18 @@ async function validateConfirmedCleanup({
     );
   } else {
     const e = events.rows[0];
-    if (e.id !== EXPECTED_EVENT_ID) reasons.push(`events.id=${e.id} ≠ esperado ${EXPECTED_EVENT_ID}`);
-    if (e.title !== EXPECTED_EVENT_TITLE) reasons.push(`events.title≠${JSON.stringify(EXPECTED_EVENT_TITLE)} (${JSON.stringify(e.title)})`);
-    if (String(e.status).toLowerCase() !== "paid") reasons.push(`events.status≠'paid' (${e.status})`);
-    if (String(e.payment_status).toLowerCase() !== "paid") reasons.push(`events.payment_status≠'paid' (${e.payment_status})`);
-    if (Number(e.price) !== EXPECTED_EVENT_PRICE) reasons.push(`events.price≠${EXPECTED_EVENT_PRICE} (${e.price})`);
+    if (e.id !== EXPECTED_EVENT_ID)
+      reasons.push(`events.id=${e.id} ≠ esperado ${EXPECTED_EVENT_ID}`);
+    if (e.title !== EXPECTED_EVENT_TITLE)
+      reasons.push(
+        `events.title≠${JSON.stringify(EXPECTED_EVENT_TITLE)} (${JSON.stringify(e.title)})`
+      );
+    if (String(e.status).toLowerCase() !== "paid")
+      reasons.push(`events.status≠'paid' (${e.status})`);
+    if (String(e.payment_status).toLowerCase() !== "paid")
+      reasons.push(`events.payment_status≠'paid' (${e.payment_status})`);
+    if (Number(e.price) !== EXPECTED_EVENT_PRICE)
+      reasons.push(`events.price≠${EXPECTED_EVENT_PRICE} (${e.price})`);
     if (hasPaymentId && e.payment_id !== null && String(e.payment_id).trim() !== "") {
       reasons.push(
         `events.payment_id=${JSON.stringify(e.payment_id)} — não é vazio. Pagamento real, abortar.`
@@ -533,7 +527,16 @@ async function validateConfirmedCleanup({
     } else if (cm.rows.length === 1) {
       const m = cm.rows[0];
       const numeric = (v) => (v == null ? 0 : Number(typeof v === "string" ? v.trim() : v));
-      const allowed = ["visits", "leads", "ads_count", "advertisers_count", "total_leads", "demand_score", "dealer_pipeline_leads", "dealer_outreach_sent"];
+      const allowed = [
+        "visits",
+        "leads",
+        "ads_count",
+        "advertisers_count",
+        "total_leads",
+        "demand_score",
+        "dealer_pipeline_leads",
+        "dealer_outreach_sent",
+      ];
       for (const col of allowed) {
         if (col in m && numeric(m[col]) !== 0) {
           reasons.push(`city_metrics.${col}=${m[col]} ≠ 0 — não é zerada`);
@@ -610,16 +613,16 @@ async function validateConfirmedCleanup({
     // exatamente o que existe no banco. Cada linha vira uma `reason`
     // legível (formato consistente com o log do audit).
     const shapeOk =
-      selfRefs.length === 1 &&
-      otherRefs.length === 0 &&
-      isZeroDistance(selfRefs[0]?.distance_km);
+      selfRefs.length === 1 && otherRefs.length === 0 && isZeroDistance(selfRefs[0]?.distance_km);
     if (!shapeOk) {
       if (rm1.rows.length === 0) {
         reasons.push(
           `region_memberships: zero linhas referenciando city_id=${BROKEN_ID} — investigar se cleanup parcial anterior já removeu`
         );
       } else {
-        reasons.push(`region_memberships envolvendo city_id=${BROKEN_ID}: ${rm1.rows.length} linha(s) reais →`);
+        reasons.push(
+          `region_memberships envolvendo city_id=${BROKEN_ID}: ${rm1.rows.length} linha(s) reais →`
+        );
         for (const r of rm1.rows) {
           reasons.push(
             `  base=${r.base_city_id}/${r.base_slug ?? "?"} (${r.base_name ?? "?"}, ${r.base_state ?? "?"}) → member=${r.member_city_id}/${r.member_slug ?? "?"} (${r.member_name ?? "?"}, ${r.member_state ?? "?"}) distance_km=${r.distance_km ?? "—"}`
@@ -653,11 +656,9 @@ async function validateConfirmedCleanup({
   for (const tbl of FORBIDDEN_REF_TABLES) {
     const exists = await tableHasColumn(pg, tbl, "city_id");
     if (!exists) continue;
-    const r = await safeSelect(
-      pg,
-      `SELECT COUNT(*)::int AS n FROM ${tbl} WHERE city_id = $1`,
-      [BROKEN_ID]
-    );
+    const r = await safeSelect(pg, `SELECT COUNT(*)::int AS n FROM ${tbl} WHERE city_id = $1`, [
+      BROKEN_ID,
+    ]);
     if (r.ok && r.rows[0]?.n > 0) {
       reasons.push(
         `${tbl} tem ${r.rows[0].n} linha(s) com city_id=${BROKEN_ID} — abortar (referência inesperada)`
@@ -679,10 +680,7 @@ export async function captureSnapshot({ pg, scenario }) {
   const cities = await pg.query(`SELECT * FROM cities WHERE id = $1`, [BROKEN_ID]);
   snapshot.cities_id_1 = cities.rows;
 
-  const ads = await pg.query(
-    `SELECT * FROM ads WHERE id = ANY($1::int[])`,
-    [EXPECTED_TEST_AD_IDS]
-  );
+  const ads = await pg.query(`SELECT * FROM ads WHERE id = ANY($1::int[])`, [EXPECTED_TEST_AD_IDS]);
   snapshot.ads = ads.rows;
 
   const ev = await pg.query(`SELECT * FROM events WHERE id = $1`, [EXPECTED_EVENT_ID]);
@@ -741,9 +739,7 @@ function buildRollbackSql(snapshot) {
 
   // ads: TARGET_AD_STATUS → status original do snapshot (active na captura)
   for (const a of snapshot.ads || []) {
-    lines.push(
-      `UPDATE ads SET status = ${escSql(a.status)} WHERE id = ${a.id};`
-    );
+    lines.push(`UPDATE ads SET status = ${escSql(a.status)} WHERE id = ${a.id};`);
   }
 
   // region_memberships: re-INSERT

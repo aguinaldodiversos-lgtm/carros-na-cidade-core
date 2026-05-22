@@ -56,17 +56,17 @@ Os relatórios saem em `reports/audit/<nome>-<timestamp>.json` (ou .csv).
 
 ## Flags suportadas (todas opcionais)
 
-| Flag | Default | O que faz |
-|---|---|---|
-| `--limit=N` | 1000 | Cap de linhas (hard cap 50.000). |
-| `--out=DIR` | `./reports/audit` | Diretório do relatório. |
-| `--format=csv\|json` | `json` | Formato. |
-| `--status=X` | `active` | Filtro por `ads.status`. |
-| `--all-statuses` | off | Remove o filtro de status. |
-| `--since-days=N` | off | Só anúncios criados nos últimos N dias. |
-| `--sample` | off | Atalho: limit=100. |
-| `--silent` | off | Suprime saída no console. |
-| `--print-schema` | off | **Diagnóstico (PR 6)**: imprime as colunas detectadas em `information_schema.columns`, mostra quais o script vai usar (PRESENT) e quais estão ausentes (MISSING). Sai sem extrair dados. |
+| Flag                 | Default           | O que faz                                                                                                                                                                                |
+| -------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--limit=N`          | 1000              | Cap de linhas (hard cap 50.000).                                                                                                                                                         |
+| `--out=DIR`          | `./reports/audit` | Diretório do relatório.                                                                                                                                                                  |
+| `--format=csv\|json` | `json`            | Formato.                                                                                                                                                                                 |
+| `--status=X`         | `active`          | Filtro por `ads.status`.                                                                                                                                                                 |
+| `--all-statuses`     | off               | Remove o filtro de status.                                                                                                                                                               |
+| `--since-days=N`     | off               | Só anúncios criados nos últimos N dias.                                                                                                                                                  |
+| `--sample`           | off               | Atalho: limit=100.                                                                                                                                                                       |
+| `--silent`           | off               | Suprime saída no console.                                                                                                                                                                |
+| `--print-schema`     | off               | **Diagnóstico (PR 6)**: imprime as colunas detectadas em `information_schema.columns`, mostra quais o script vai usar (PRESENT) e quais estão ausentes (MISSING). Sai sem extrair dados. |
 
 ## Schema dinâmico (incidente PR 5 → PR 6)
 
@@ -86,6 +86,7 @@ corrige isso introspectando o schema antes de cada SELECT:
    rodar `--print-schema`.
 
 **Para confirmar o schema antes de uma corrida real:**
+
 ```bash
 node scripts/audit/audit-production-ads-quality.mjs --print-schema
 node scripts/audit/audit-production-city-integrity.mjs --print-schema
@@ -93,6 +94,7 @@ node scripts/audit/audit-production-image-integrity.mjs --print-schema
 ```
 
 Saída de `--print-schema` para `ads`:
+
 ```
 === Schema diagnostic: ads ===
   Colunas detectadas (24):
@@ -105,12 +107,12 @@ Saída de `--print-schema` para `ads`:
 
 As colunas REQUIRED de cada script:
 
-| Script | REQUIRED (sem isso o script aborta) |
-|---|---|
-| `ads-quality` | `id`, `title`, `slug`, `status` |
-| `city-integrity` (cities) | `id`, `name`, `slug`, `state` |
-| `city-integrity` (ads) | `id`, `status` |
-| `image-integrity` | `id`, `images` |
+| Script                    | REQUIRED (sem isso o script aborta) |
+| ------------------------- | ----------------------------------- |
+| `ads-quality`             | `id`, `title`, `slug`, `status`     |
+| `city-integrity` (cities) | `id`, `name`, `slug`, `state`       |
+| `city-integrity` (ads)    | `id`, `status`                      |
+| `image-integrity`         | `id`, `images`                      |
 
 Todas as outras (brand, model, version, description, city_id, etc.) são
 OPCIONAIS — ausência apenas reduz a cobertura do detector, mas não
@@ -159,6 +161,7 @@ PII já redactada. Pronto para abrir no Google Sheets para revisão manual.
 um diretório acessível (ex.: storage interno, ou anexar ao runbook).
 
 **Comando:**
+
 ```bash
 node scripts/audit/audit-production-ads-quality.mjs
 node scripts/audit/audit-production-city-integrity.mjs
@@ -205,6 +208,7 @@ dry-run) sem alterar dados. Apenas `--execute --yes` (ambos juntos)
 disparam COMMIT.
 
 **Comando (dry-run obrigatório antes):**
+
 ```bash
 # 1. Lê reports/audit/ads-quality-LATEST.json automaticamente, mostra
 #    inventário ATUAL + SIMULADO, gera snapshot, faz UPDATE em TX,
@@ -240,6 +244,7 @@ anúncios após cleanup, emite alerta:
   alerts, seoRecommendation).
 
 **Risco:** médio (modifica produção). Mitigado por:
+
 - dry-run rehearsal (valida constraint, captura rowcount).
 - Dois flags obrigatórios para escrever (`--execute --yes`).
 - Snapshot transacional ANTES do UPDATE.
@@ -247,7 +252,8 @@ anúncios após cleanup, emite alerta:
   linhas que mudaram de status entre audit e execute.
 - Sem DELETE (validado por teste estático em `tests/cleanup/no-delete.test.js`).
 
-**Rollback:** 
+**Rollback:**
+
 ```bash
 node scripts/cleanup/restore-archived-ads.mjs \
   --snapshot-file=reports/cleanup/archive-test-ads-snapshot-<ts>.json
@@ -276,6 +282,7 @@ O restore só toca linhas que ainda estão em `targetStatus` (default
 **Não fazer parte deste PR.**
 
 **Comando previsto:**
+
 ```bash
 node scripts/audit/cleanup-city-integrity.mjs --decision-file=... --dry-run
 ```
@@ -321,13 +328,13 @@ staging. Não em produção até PR 6.
 
 ## Riscos cross-fase
 
-| Risco | Mitigação |
-|---|---|
-| Falso positivo em "test_ad_suspect" | Confidence buckets — `low` é dica, não auto-fix. Revisão manual obrigatória antes de despublicar. |
-| Cliente real com slug "TESTE" | Detectado mas requer revisão (motorista que digitou "TESTE DRIVE" no título — improvável mas possível). |
-| Coordenada faltante mas anúncio real | Detector flagra `city_missing_coords` separado; sem impacto se o anúncio existe em outra cidade. |
-| Imagem `/uploads/` ainda funcional | Script só audita; migração só com `migrate-legacy-ad-images-to-r2.mjs --execute`. |
-| Mojibake em nome de cidade | Detector flagra; correção pode ser manual ou via UPDATE com `convert_from(convert_to(name, 'LATIN1'), 'UTF8')` — testar em staging primeiro. |
+| Risco                                | Mitigação                                                                                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Falso positivo em "test_ad_suspect"  | Confidence buckets — `low` é dica, não auto-fix. Revisão manual obrigatória antes de despublicar.                                            |
+| Cliente real com slug "TESTE"        | Detectado mas requer revisão (motorista que digitou "TESTE DRIVE" no título — improvável mas possível).                                      |
+| Coordenada faltante mas anúncio real | Detector flagra `city_missing_coords` separado; sem impacto se o anúncio existe em outra cidade.                                             |
+| Imagem `/uploads/` ainda funcional   | Script só audita; migração só com `migrate-legacy-ad-images-to-r2.mjs --execute`.                                                            |
+| Mojibake em nome de cidade           | Detector flagra; correção pode ser manual ou via UPDATE com `convert_from(convert_to(name, 'LATIN1'), 'UTF8')` — testar em staging primeiro. |
 
 ## Próximo passo recomendado
 

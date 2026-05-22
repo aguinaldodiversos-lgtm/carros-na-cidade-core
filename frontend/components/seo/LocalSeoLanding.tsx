@@ -37,12 +37,12 @@ export function LocalSeoLanding({ model, compactBelow = false }: LocalSeoLanding
   return (
     <div className={compactBelow ? "bg-[#f6f7fb]" : "min-h-screen bg-[#f6f7fb]"}>
       {compactBelow ? null : (
-      <header className="border-b border-slate-200/80 bg-white">
-        {/* Topo mobile mais enxuto (py-5) — auditoria 2026-05-11
+        <header className="border-b border-slate-200/80 bg-white">
+          {/* Topo mobile mais enxuto (py-5) — auditoria 2026-05-11
             relatou hero alto demais no celular. Desktop preserva
             py-10 para a aparência institucional. */}
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-5 sm:gap-4 sm:px-6 sm:py-10">
-          {/*
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-5 sm:gap-4 sm:px-6 sm:py-10">
+            {/*
             Breadcrumb visível com 3 níveis (Início > UF > Cidade).
             Auditoria 2026-05-11 detectou que a rota canônica
             /carros-em/[slug] não tinha breadcrumb visível nem
@@ -51,54 +51,60 @@ export function LocalSeoLanding({ model, compactBelow = false }: LocalSeoLanding
             Quando `model.state` está ausente, cai para o formato
             antigo de 2 níveis (defesa contra payload legado).
           */}
-          <nav className="text-sm text-slate-600" aria-label="Trilha">
-            <Link href="/" className="hover:text-[#0e62d8]">
-              Início
-            </Link>
-            <span className="mx-2 text-slate-400">/</span>
-            {model.state ? (
-              <>
-                <Link
-                  href={`/comprar/estado/${model.state.toLowerCase()}`}
-                  className="hover:text-[#0e62d8]"
-                >
-                  {model.state}
-                </Link>
-                <span className="mx-2 text-slate-400">/</span>
-              </>
-            ) : null}
-            <Link href={hubHref} className="hover:text-[#0e62d8]">
-              {model.cityName}
-            </Link>
-          </nav>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-4xl">{h1}</h1>
-          <dl className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-              <dt className="text-xs font-medium uppercase text-slate-500">Anúncios (recorte)</dt>
-              <dd className="text-lg font-semibold text-slate-900">{model.totalAds}</dd>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-              <dt className="text-xs font-medium uppercase text-slate-500">Na cidade (catálogo)</dt>
-              <dd className="text-lg font-semibold text-slate-900">{model.catalogTotalAds}</dd>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-              <dt className="text-xs font-medium uppercase text-slate-500">
-                Preço médio (amostra)
-              </dt>
-              <dd className="text-lg font-semibold text-slate-900">
-                {model.avgPrice !== null ? formatMoney(model.avgPrice) : "—"}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </header>
+            <nav className="text-sm text-slate-600" aria-label="Trilha">
+              <Link href="/" className="hover:text-[#0e62d8]">
+                Início
+              </Link>
+              <span className="mx-2 text-slate-400">/</span>
+              {model.state ? (
+                <>
+                  <Link
+                    href={`/comprar/estado/${model.state.toLowerCase()}`}
+                    className="hover:text-[#0e62d8]"
+                  >
+                    {model.state}
+                  </Link>
+                  <span className="mx-2 text-slate-400">/</span>
+                </>
+              ) : null}
+              <Link href={hubHref} className="hover:text-[#0e62d8]">
+                {model.cityName}
+              </Link>
+            </nav>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-4xl">
+              {h1}
+            </h1>
+            <dl className="grid gap-2 sm:grid-cols-3 sm:gap-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                <dt className="text-xs font-medium uppercase text-slate-500">Anúncios (recorte)</dt>
+                <dd className="text-lg font-semibold text-slate-900">{model.totalAds}</dd>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                <dt className="text-xs font-medium uppercase text-slate-500">
+                  Na cidade (catálogo)
+                </dt>
+                <dd className="text-lg font-semibold text-slate-900">{model.catalogTotalAds}</dd>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                <dt className="text-xs font-medium uppercase text-slate-500">
+                  Preço médio (amostra)
+                </dt>
+                <dd className="text-lg font-semibold text-slate-900">
+                  {model.avgPrice !== null ? formatMoney(model.avgPrice) : "—"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </header>
       )}
 
-      <article className={
-        compactBelow
-          ? "mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8"
-          : "mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6"
-      }>
+      <article
+        className={
+          compactBelow
+            ? "mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8"
+            : "mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6"
+        }
+      >
         <section className="prose prose-slate max-w-none prose-p:text-slate-700 prose-p:leading-relaxed">
           {paragraphs.map((p, i) => (
             <p key={i}>{p}</p>

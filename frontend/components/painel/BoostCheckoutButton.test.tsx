@@ -76,9 +76,7 @@ describe("BoostCheckoutButton — endpoint dedicado boost-7d", () => {
     const { getByRole } = render(<BoostCheckoutButton adId="ad-1" />);
     fireEvent.click(getByRole("button"));
 
-    await waitFor(() =>
-      expect(window.location.href).toBe("https://mercadopago.com/sandbox/xyz")
-    );
+    await waitFor(() => expect(window.location.href).toBe("https://mercadopago.com/sandbox/xyz"));
   });
 
   it("401 → redireciona para /login?next=PATH atual", async () => {
@@ -88,9 +86,7 @@ describe("BoostCheckoutButton — endpoint dedicado boost-7d", () => {
     fireEvent.click(getByRole("button"));
 
     await waitFor(() => expect(window.location.assign).toHaveBeenCalledTimes(1));
-    expect(window.location.assign).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/login\?next=/)
-    );
+    expect(window.location.assign).toHaveBeenCalledWith(expect.stringMatching(/^\/login\?next=/));
   });
 
   it("erro do backend (4xx ≠ 401) → mostra mensagem amigável", async () => {

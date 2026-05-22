@@ -21,12 +21,7 @@ import { describe, expect, it } from "vitest";
  */
 
 describe("FipePageClient — sem CTA in-page para /anunciar/novo", () => {
-  const filePath = join(
-    process.cwd(),
-    "components",
-    "fipe",
-    "FipePageClient.tsx"
-  );
+  const filePath = join(process.cwd(), "components", "fipe", "FipePageClient.tsx");
   const source = readFileSync(filePath, "utf8");
 
   it("NÃO renderiza nenhum href para /anunciar/novo na página FIPE", () => {

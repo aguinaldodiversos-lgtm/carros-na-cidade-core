@@ -56,9 +56,7 @@ function buildPrimaryRouteItems(data: TerritorialPagePayload, links: Territorial
           href: links.belowFipe,
           // Soma o que vinha em totalOpportunityAds (mesma intenção):
           // se o backend devolve só um dos dois campos, usamos o disponível.
-          badge: toTotalBadge(
-            data.stats?.totalBelowFipeAds ?? data.stats?.totalOpportunityAds
-          ),
+          badge: toTotalBadge(data.stats?.totalBelowFipeAds ?? data.stats?.totalOpportunityAds),
         }
       : null,
     links.brand && data.brand?.name && !isCurrentPath(data, links.brand)

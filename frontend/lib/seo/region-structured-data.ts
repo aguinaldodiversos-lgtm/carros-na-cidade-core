@@ -144,8 +144,7 @@ export function buildRegionBreadcrumbJsonLd(input: RegionStructuredDataInput) {
 export function buildRegionItemListJsonLd(input: RegionStructuredDataInput) {
   const items = input.sampleAds.slice(0, 12).map((ad, index) => {
     const fallbackName =
-      [ad.brand, ad.model, ad.year].filter(Boolean).join(" ").trim() ||
-      `Veículo ${index + 1}`;
+      [ad.brand, ad.model, ad.year].filter(Boolean).join(" ").trim() || `Veículo ${index + 1}`;
     return {
       "@type": "ListItem",
       position: index + 1,
@@ -172,12 +171,7 @@ export function buildRegionCollectionPageJsonLd(input: RegionStructuredDataInput
   const { base } = input;
   const canonical = toAbsoluteUrl(regionPath(base.slug));
   const title = buildPageTitle(base.name, base.state);
-  const description = buildPageDescription(
-    base.name,
-    base.state,
-    input.totalAds,
-    input.radiusKm
-  );
+  const description = buildPageDescription(base.name, base.state, input.totalAds, input.radiusKm);
 
   return {
     "@context": "https://schema.org",

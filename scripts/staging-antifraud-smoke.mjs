@@ -58,8 +58,7 @@ function envOptional(key, fallback) {
 }
 
 function refuseIfProdLooking(url) {
-  const allowProd =
-    String(process.env.ALLOW_PRODUCTION || "").toLowerCase() === "true";
+  const allowProd = String(process.env.ALLOW_PRODUCTION || "").toLowerCase() === "true";
   let parsed;
   try {
     parsed = new URL(url);
@@ -91,10 +90,7 @@ function refuseIfProdLooking(url) {
 const BASE_URL = envRequired("STAGING_BASE_URL").replace(/\/+$/, "");
 refuseIfProdLooking(BASE_URL);
 
-const PUBLIC_URL = envOptional("STAGING_PUBLIC_BASE_URL", BASE_URL).replace(
-  /\/+$/,
-  ""
-);
+const PUBLIC_URL = envOptional("STAGING_PUBLIC_BASE_URL", BASE_URL).replace(/\/+$/, "");
 const QA_EMAIL = envRequired("STAGING_QA_EMAIL");
 const QA_PASSWORD = envRequired("STAGING_QA_PASSWORD");
 const BOOST_OPTION_ID = envOptional("STAGING_BOOST_OPTION_ID", "boost-7d");
@@ -116,10 +112,13 @@ function record(id, status, message) {
   results.push({ id, status, message });
   const tag = `[${id}][${status}]`;
   const colored =
-    status === "PASS" ? `\x1b[32m${tag}\x1b[0m`
-    : status === "FAIL" ? `\x1b[31m${tag}\x1b[0m`
-    : status === "SKIP" ? `\x1b[33m${tag}\x1b[0m`
-    : `\x1b[31m\x1b[1m${tag}\x1b[0m`;
+    status === "PASS"
+      ? `\x1b[32m${tag}\x1b[0m`
+      : status === "FAIL"
+        ? `\x1b[31m${tag}\x1b[0m`
+        : status === "SKIP"
+          ? `\x1b[33m${tag}\x1b[0m`
+          : `\x1b[31m\x1b[1m${tag}\x1b[0m`;
   console.log(`${colored} ${message}`);
 }
 
@@ -160,11 +159,7 @@ async function login() {
   if (status !== 200 && status !== 201) {
     throw new Error(`login HTTP ${status}: ${JSON.stringify(body).slice(0, 200)}`);
   }
-  const token =
-    body?.access_token ||
-    body?.token ||
-    body?.data?.access_token ||
-    body?.data?.token;
+  const token = body?.access_token || body?.token || body?.data?.access_token || body?.data?.token;
   if (!token) {
     throw new Error("login sem access_token na resposta");
   }
@@ -236,11 +231,7 @@ async function preflightSchemaCheck() {
     return;
   }
   if (status >= 500) {
-    record(
-      "PRE",
-      "FATAL",
-      `/health retornou ${status}: ${JSON.stringify(body).slice(0, 240)}`
-    );
+    record("PRE", "FATAL", `/health retornou ${status}: ${JSON.stringify(body).slice(0, 240)}`);
     return;
   }
   const checks = body?.checks || {};
@@ -289,11 +280,7 @@ async function scenarioB(token, ctx) {
   if (ad?.status === "pending_review") {
     ctx.pendingAdId = ad.id;
     ctx.pendingAdSlug = ad.slug || null;
-    return record(
-      "B",
-      "PASS",
-      `ad ${ad.id} → pending_review (risk_level=${ad.risk_level})`
-    );
+    return record("B", "PASS", `ad ${ad.id} → pending_review (risk_level=${ad.risk_level})`);
   }
   return record("B", "FAIL", `esperado pending_review, recebido status="${ad?.status}"`);
 }

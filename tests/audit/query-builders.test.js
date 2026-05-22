@@ -13,9 +13,7 @@ import {
   buildMissingCoordsQuery,
   buildOrphanAdsQuery,
 } from "../../scripts/audit/lib/city-integrity-query-builder.mjs";
-import {
-  buildImagesAuditQuery,
-} from "../../scripts/audit/lib/image-integrity-query-builder.mjs";
+import { buildImagesAuditQuery } from "../../scripts/audit/lib/image-integrity-query-builder.mjs";
 
 const DEFAULT_ARGS = { limit: 1000, statusFilter: "active", sinceDays: null };
 
@@ -43,10 +41,20 @@ describe("buildAdsQualityQuery — schema completo (caso ideal)", () => {
 describe("buildAdsQualityQuery — coluna 'version' inexistente (incidente PR5)", () => {
   it("NÃO inclui 'version' no SELECT quando coluna não existe", () => {
     const available = new Set([
-      "id", "title", "slug", "status",
-      "brand", "model", "description",
-      "city", "state", "city_id", "plan", "created_at",
-      "advertiser_id", "user_id",
+      "id",
+      "title",
+      "slug",
+      "status",
+      "brand",
+      "model",
+      "description",
+      "city",
+      "state",
+      "city_id",
+      "plan",
+      "created_at",
+      "advertiser_id",
+      "user_id",
       // dealership_id e version AUSENTES de propósito
     ]);
     const { sql, missing } = buildAdsQualityQuery({
@@ -61,9 +69,7 @@ describe("buildAdsQualityQuery — coluna 'version' inexistente (incidente PR5)"
   });
 
   it("retorna present sem 'version' quando ausente", () => {
-    const available = new Set([
-      "id", "title", "slug", "status", "brand", "model", "created_at",
-    ]);
+    const available = new Set(["id", "title", "slug", "status", "brand", "model", "created_at"]);
     const { present } = buildAdsQualityQuery({
       availableColumns: available,
       args: DEFAULT_ARGS,
@@ -77,23 +83,23 @@ describe("buildAdsQualityQuery — coluna 'version' inexistente (incidente PR5)"
 describe("buildAdsQualityQuery — colunas REQUIRED ausentes", () => {
   it("aborta com erro claro quando 'id' está ausente", () => {
     const available = new Set(["title", "slug", "status"]); // id missing
-    expect(() =>
-      buildAdsQualityQuery({ availableColumns: available, args: DEFAULT_ARGS })
-    ).toThrow(/coluna obrigatória 'id'/);
+    expect(() => buildAdsQualityQuery({ availableColumns: available, args: DEFAULT_ARGS })).toThrow(
+      /coluna obrigatória 'id'/
+    );
   });
 
   it("aborta com erro claro quando 'slug' está ausente", () => {
     const available = new Set(["id", "title", "status"]);
-    expect(() =>
-      buildAdsQualityQuery({ availableColumns: available, args: DEFAULT_ARGS })
-    ).toThrow(/coluna obrigatória 'slug'/);
+    expect(() => buildAdsQualityQuery({ availableColumns: available, args: DEFAULT_ARGS })).toThrow(
+      /coluna obrigatória 'slug'/
+    );
   });
 
   it("mensagem de erro orienta a rodar --print-schema", () => {
     const available = new Set(["id"]); // title, slug, status ausentes
-    expect(() =>
-      buildAdsQualityQuery({ availableColumns: available, args: DEFAULT_ARGS })
-    ).toThrow(/--print-schema/);
+    expect(() => buildAdsQualityQuery({ availableColumns: available, args: DEFAULT_ARGS })).toThrow(
+      /--print-schema/
+    );
   });
 });
 
@@ -230,7 +236,10 @@ describe("buildOrphanAdsQuery", () => {
 
   it("com city_id, monta WHERE city_id IS NULL", () => {
     const available = new Set(["id", "city_id", "title", "city", "state", "status", "created_at"]);
-    const { sql, params } = buildOrphanAdsQuery({ availableColumns: available, args: DEFAULT_ARGS });
+    const { sql, params } = buildOrphanAdsQuery({
+      availableColumns: available,
+      args: DEFAULT_ARGS,
+    });
     expect(sql).toContain("city_id IS NULL");
     expect(sql).toContain("status = $1");
     expect(params).toEqual(["active"]);
@@ -280,9 +289,7 @@ describe("buildImagesAuditQuery", () => {
 
 describe("REQUIRED_ADS_COLUMNS — contrato mínimo", () => {
   it("contém id, title, slug, status (e nada mais como required)", () => {
-    expect(new Set(REQUIRED_ADS_COLUMNS)).toEqual(
-      new Set(["id", "title", "slug", "status"])
-    );
+    expect(new Set(REQUIRED_ADS_COLUMNS)).toEqual(new Set(["id", "title", "slug", "status"]));
   });
 
   it("'version' está em OPTIONAL, não em REQUIRED (lição PR5)", () => {

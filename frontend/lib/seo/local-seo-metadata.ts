@@ -134,14 +134,10 @@ function buildTitle(model: LocalSeoLandingModel): string {
   }
 
   if (variant === "baratos") {
-    return truncateTitle(
-      `Carros baratos em ${cityName}${uf} — ${totalAds} abaixo da FIPE`
-    );
+    return truncateTitle(`Carros baratos em ${cityName}${uf} — ${totalAds} abaixo da FIPE`);
   }
 
-  return truncateTitle(
-    `Carros automáticos em ${cityName}${uf} — ${totalAds} ofertas`
-  );
+  return truncateTitle(`Carros automáticos em ${cityName}${uf} — ${totalAds} ofertas`);
 }
 
 function buildKeywords(model: LocalSeoLandingModel): string[] {

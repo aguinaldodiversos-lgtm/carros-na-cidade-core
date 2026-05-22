@@ -240,9 +240,7 @@ export async function updateAd(id, data, user, ctx = {}) {
     // moderação (PENDING_REVIEW), recusamos com mensagem clara e gravamos
     // um evento de auditoria para o admin enxergar a tentativa.
     const attemptedStructural = data
-      ? STRUCTURAL_FIELDS.filter((field) =>
-          Object.prototype.hasOwnProperty.call(data, field)
-        )
+      ? STRUCTURAL_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(data, field))
       : [];
 
     const ownerContext = await adsRepository.findOwnerContextById(id);

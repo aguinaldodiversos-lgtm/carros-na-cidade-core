@@ -100,7 +100,11 @@ async function main() {
       } else {
         // Linha não está mais em targetStatus (alguém mexeu, ou nunca foi
         // arquivada). Não é erro fatal, mas registramos.
-        restoredRows.push({ id, restoredTo: null, note: "skipped (current status != snapshot.targetStatus)" });
+        restoredRows.push({
+          id,
+          restoredTo: null,
+          note: "skipped (current status != snapshot.targetStatus)",
+        });
       }
     }
 
@@ -146,7 +150,9 @@ async function main() {
   log(`[restore] resultado salvo: ${resultPath}`);
 
   log("");
-  log(args.willWrite ? "RESTORE concluído." : "DRY-RUN concluído. Use --execute --yes para aplicar.");
+  log(
+    args.willWrite ? "RESTORE concluído." : "DRY-RUN concluído. Use --execute --yes para aplicar."
+  );
 }
 
 main()

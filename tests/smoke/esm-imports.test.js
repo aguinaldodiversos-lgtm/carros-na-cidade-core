@@ -27,9 +27,7 @@ vi.mock("../../src/infrastructure/database/db.js", () => ({
 
 describe("ESM smoke — backend modules booteam sem named-export ausente", () => {
   it("ads.publication-options.service.js resolve todos os named imports", async () => {
-    const mod = await import(
-      "../../src/modules/ads/ads.publication-options.service.js"
-    );
+    const mod = await import("../../src/modules/ads/ads.publication-options.service.js");
     expect(typeof mod.getPublicationOptions).toBe("function");
   });
 
@@ -54,9 +52,7 @@ describe("ESM smoke — backend modules booteam sem named-export ausente", () =>
   it("payments routes + subscriptions guards resolvem", async () => {
     const routes = await import("../../src/modules/payments/payments.routes.js");
     expect(routes.default).toBeDefined();
-    const guards = await import(
-      "../../src/modules/payments/subscriptions.guards.js"
-    );
+    const guards = await import("../../src/modules/payments/subscriptions.guards.js");
     expect(typeof guards.findLiveSubscriptionForUser).toBe("function");
   });
 
@@ -75,9 +71,7 @@ describe("ESM smoke — backend modules booteam sem named-export ausente", () =>
     }
     if (error) {
       expect(error.name).not.toBe("SyntaxError");
-      expect(String(error.message)).not.toMatch(
-        /does not provide an export named/i
-      );
+      expect(String(error.message)).not.toMatch(/does not provide an export named/i);
     }
   });
 });

@@ -80,7 +80,9 @@ const NONEXISTENT_SLUG = "regiao-fake-zz-smoke-only";
 
 // Constrói o path canônico da Página Regional a partir do citySlug.
 function regionPathFromSlug(slug) {
-  const clean = String(slug || "").trim().toLowerCase();
+  const clean = String(slug || "")
+    .trim()
+    .toLowerCase();
   if (!clean) return null;
   return `/carros-usados/regiao/${encodeURIComponent(clean)}`;
 }
@@ -100,7 +102,9 @@ const FRONTEND_BASE = stripTrailingSlash(
 );
 const BACKEND_BASE = stripTrailingSlash(process.env.STAGING_BASE_URL || "");
 const SLUGS_CSV = process.env.REGIONAL_SMOKE_SLUGS || DEFAULT_SLUGS.join(",");
-const SLUGS = SLUGS_CSV.split(",").map((s) => s.trim()).filter(Boolean);
+const SLUGS = SLUGS_CSV.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 const EXPECT_FLAG = (process.env.EXPECT_FLAG || "on").toLowerCase();
 const ADMIN_EMAIL = process.env.STAGING_ADMIN_EMAIL || "";
 const ADMIN_PASSWORD = process.env.STAGING_ADMIN_PASSWORD || "";
@@ -443,10 +447,7 @@ async function smokeLegacyRedirect(slug) {
   }
   const location = response.headers?.get?.("location") || "";
   if (!location.endsWith(canonicalPath)) {
-    recordFail(
-      `[301 legacy ${slug}]`,
-      `Location="${location}" não termina com "${canonicalPath}"`
-    );
+    recordFail(`[301 legacy ${slug}]`, `Location="${location}" não termina com "${canonicalPath}"`);
     return;
   }
   recordPass(`[301 legacy ${slug}]`, `301 → ${canonicalPath}`);
@@ -560,9 +561,7 @@ async function main() {
   console.log("[smoke:regional-page] iniciando");
 
   if (!FRONTEND_BASE) {
-    console.error(
-      "ERRO: STAGING_PUBLIC_BASE_URL (ou SMOKE_BASE_URL) não definido."
-    );
+    console.error("ERRO: STAGING_PUBLIC_BASE_URL (ou SMOKE_BASE_URL) não definido.");
     console.error(
       "  Exemplo: STAGING_PUBLIC_BASE_URL=https://carros-na-cidade-staging.onrender.com npm run smoke:regional-page"
     );
@@ -572,20 +571,14 @@ async function main() {
   const allowed = isAllowedSmokeUrl(FRONTEND_BASE);
   if (!allowed) {
     if (!ALLOW_PRODUCTION) {
-      console.error(
-        `ERRO: ${FRONTEND_BASE} não está na allowlist (staging/localhost/preview).`
-      );
-      console.error(
-        "  O smoke não roda contra produção por default. Use staging."
-      );
+      console.error(`ERRO: ${FRONTEND_BASE} não está na allowlist (staging/localhost/preview).`);
+      console.error("  O smoke não roda contra produção por default. Use staging.");
       process.exit(1);
     }
     console.warn(
       `AVISO: rodando contra ${FRONTEND_BASE} (fora da allowlist) com ALLOW_PRODUCTION=true`
     );
-    console.warn(
-      `       Caso de uso esperado: ativação controlada em produção (Fase C).`
-    );
+    console.warn(`       Caso de uso esperado: ativação controlada em produção (Fase C).`);
     console.warn(
       `       EXPECT_FLAG atual: ${EXPECT_FLAG} — confirme antes/depois de mexer na flag no Render.`
     );

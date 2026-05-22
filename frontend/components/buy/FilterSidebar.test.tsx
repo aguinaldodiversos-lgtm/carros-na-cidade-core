@@ -18,13 +18,7 @@ function renderSidebar(
   filters: AdsSearchFilters,
   onPatch: (patch: Partial<AdsSearchFilters>) => void
 ) {
-  return render(
-    <FilterSidebar
-      filters={filters}
-      onPatch={onPatch}
-      {...baseProps}
-    />
-  );
+  return render(<FilterSidebar filters={filters} onPatch={onPatch} {...baseProps} />);
 }
 
 afterEach(() => {
@@ -108,30 +102,24 @@ describe("FilterSidebar — chips de filtros canônicos (Fase 3)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Lojas" }));
     expect(onPatch).toHaveBeenLastCalledWith({ seller_kind: undefined, page: 1 });
 
-    rerender(
-      <FilterSidebar
-        filters={{}}
-        onPatch={onPatch}
-        {...baseProps}
-      />
-    );
+    rerender(<FilterSidebar filters={{}} onPatch={onPatch} {...baseProps} />);
     fireEvent.click(screen.getByRole("button", { name: "Particulares" }));
     expect(onPatch).toHaveBeenLastCalledWith({ seller_kind: "private", page: 1 });
   });
 
   it("chip ativo tem aria-pressed=true; inativo tem aria-pressed=false", () => {
     renderSidebar({ priority_tier: 4, opportunity: true }, vi.fn());
-    expect(
-      screen.getByRole("button", { name: "Destaques" }).getAttribute("aria-pressed")
-    ).toBe("true");
-    expect(
-      screen.getByRole("button", { name: "Oportunidades" }).getAttribute("aria-pressed")
-    ).toBe("true");
+    expect(screen.getByRole("button", { name: "Destaques" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Oportunidades" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
     expect(
       screen.getByRole("button", { name: "Abaixo da FIPE" }).getAttribute("aria-pressed")
     ).toBe("false");
-    expect(
-      screen.getByRole("button", { name: "Lojas" }).getAttribute("aria-pressed")
-    ).toBe("false");
+    expect(screen.getByRole("button", { name: "Lojas" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
   });
 });

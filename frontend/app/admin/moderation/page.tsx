@@ -76,7 +76,10 @@ function reasonsTopCodes(reasons: ModerationAdRow["risk_reasons"]): string[] {
           return [];
         }
       })();
-  return arr.slice(0, 3).map((r) => String(r?.code || "")).filter(Boolean);
+  return arr
+    .slice(0, 3)
+    .map((r) => String(r?.code || ""))
+    .filter(Boolean);
 }
 
 export default function ModerationListPage() {
@@ -102,12 +105,10 @@ export default function ModerationListPage() {
     <main className="mx-auto max-w-[1400px] px-5 py-6">
       <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#1a56db]">
-            Fila de moderação
-          </h1>
+          <h1 className="text-2xl font-extrabold text-[#1a56db]">Fila de moderação</h1>
           <p className="mt-1 text-sm text-[#5e6b85]">
-            Anúncios em <code>pending_review</code> aguardando decisão. Ordenados
-            por <strong>risk_score</strong> ↓ e data de criação ↑.
+            Anúncios em <code>pending_review</code> aguardando decisão. Ordenados por{" "}
+            <strong>risk_score</strong> ↓ e data de criação ↑.
           </p>
         </div>
         <div className="text-sm text-[#5e6b85]" aria-live="polite">
@@ -175,10 +176,7 @@ export default function ModerationListPage() {
             <tbody>
               {ads.data.data.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={12}
-                    className="px-3 py-8 text-center text-[#5e6b85]"
-                  >
+                  <td colSpan={12} className="px-3 py-8 text-center text-[#5e6b85]">
                     Nenhum anúncio aguardando moderação.
                   </td>
                 </tr>
@@ -186,32 +184,22 @@ export default function ModerationListPage() {
               {ads.data.data.map((row) => {
                 const top = reasonsTopCodes(row.risk_reasons);
                 return (
-                  <tr
-                    key={row.id}
-                    className="border-t border-[#e2e7f1] hover:bg-[#fafbff]"
-                  >
-                    <td className="px-3 py-2 font-mono text-xs text-[#5e6b85]">
-                      {row.id}
-                    </td>
+                  <tr key={row.id} className="border-t border-[#e2e7f1] hover:bg-[#fafbff]">
+                    <td className="px-3 py-2 font-mono text-xs text-[#5e6b85]">{row.id}</td>
                     <td className="px-3 py-2 font-bold text-[#1f2c47]">
-                      {row.brand} {row.model}{" "}
-                      <span className="text-[#5e6b85]">{row.year}</span>
+                      {row.brand} {row.model} <span className="text-[#5e6b85]">{row.year}</span>
                     </td>
                     <td className="px-3 py-2 text-[#34405e]">
                       {row.city ?? "—"}/{row.state ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-[#34405e]">
-                      {row.advertiser_name ?? "—"}
-                    </td>
+                    <td className="px-3 py-2 text-[#34405e]">{row.advertiser_name ?? "—"}</td>
                     <td className="px-3 py-2 text-right font-bold text-[#0e62d8]">
                       {fmtMoney(row.price)}
                     </td>
                     <td className="px-3 py-2 text-right text-[#34405e]">
                       {fmtMoney(row.fipe_reference_value)}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      {fmtPercent(row.fipe_diff_percent)}
-                    </td>
+                    <td className="px-3 py-2 text-right">{fmtPercent(row.fipe_diff_percent)}</td>
                     <td className="px-3 py-2 text-right font-bold text-[#1f2c47]">
                       {row.risk_score}
                     </td>

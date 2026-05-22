@@ -24,10 +24,7 @@ export type AdBadgeVariant =
   | "expired"
   | "blocked";
 
-export const AD_BADGE_STYLE: Record<
-  AdBadgeVariant,
-  { bg: string; label: string }
-> = {
+export const AD_BADGE_STYLE: Record<AdBadgeVariant, { bg: string; label: string }> = {
   highlighted: { bg: "#e43358", label: "Destaque" },
   active: { bg: "#198754", label: "Ativo" },
   pending_review: { bg: "#d97706", label: "Em análise" },
@@ -52,10 +49,7 @@ const HIDE_HIGHLIGHT_STATUSES = new Set<string>([
   "paused",
 ]);
 
-export function resolveAdBadgeVariant(
-  status: string,
-  highlighted: boolean
-): AdBadgeVariant {
+export function resolveAdBadgeVariant(status: string, highlighted: boolean): AdBadgeVariant {
   if (status === "pending_review") return "pending_review";
   if (status === "rejected") return "rejected";
   if (status === "blocked") return "blocked";

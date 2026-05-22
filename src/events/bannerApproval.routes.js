@@ -26,8 +26,7 @@ router.use((req, res, next) => {
     return res.status(410).json({
       ok: false,
       error: "events_disabled",
-      message:
-        "Produto Evento está desligado. Aprovação/rejeição de banner indisponível.",
+      message: "Produto Evento está desligado. Aprovação/rejeição de banner indisponível.",
     });
   }
   return next();

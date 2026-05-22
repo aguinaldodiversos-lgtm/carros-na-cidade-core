@@ -79,10 +79,7 @@ export async function getPublicationOptions({ userId, adId }) {
 
   // 2. Status publicável.
   if (!PUBLISHABLE_STATUSES.has(String(ad.status))) {
-    throw new AppError(
-      `Anuncio em status '${ad.status}' nao admite acoes de publicacao.`,
-      410
-    );
+    throw new AppError(`Anuncio em status '${ad.status}' nao admite acoes de publicacao.`, 410);
   }
 
   const user = await getAccountUser(userId);
@@ -95,7 +92,8 @@ export async function getPublicationOptions({ userId, adId }) {
   ]);
 
   const isOnLiveSubscription =
-    liveSub && (liveSub.status === "active" || liveSub.status === "pending" || liveSub.status === "paused");
+    liveSub &&
+    (liveSub.status === "active" || liveSub.status === "pending" || liveSub.status === "paused");
   const isOnActiveStart =
     isOnLiveSubscription && liveSub.status === "active" && liveSub.plan_id === PLAN_ID.start;
   const isOnActivePro =
@@ -172,9 +170,7 @@ export async function getPublicationOptions({ userId, adId }) {
     days: 7,
     already_active: highlightActive,
     highlight_until: ad.highlight_until || null,
-    note: highlightActive
-      ? "Comprar novamente prorroga o prazo (não troca)."
-      : null,
+    note: highlightActive ? "Comprar novamente prorroga o prazo (não troca)." : null,
   });
 
   // Assinatura Start/Pro: somente se user é CNPJ verificado E NÃO

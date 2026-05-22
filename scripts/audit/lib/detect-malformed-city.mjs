@@ -30,9 +30,33 @@
  */
 
 const BRAZIL_UFS = new Set([
-  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
-  "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
-  "RS","RO","RR","SC","SP","SE","TO",
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ]);
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -117,7 +141,10 @@ export function detectMalformedCity(row) {
 
   // High: shape do slug
   if (slug && !SLUG_PATTERN.test(slug)) {
-    issues.push({ code: "slug_invalid_chars", label: `Slug contém caracteres inválidos: '${slug}'` });
+    issues.push({
+      code: "slug_invalid_chars",
+      label: `Slug contém caracteres inválidos: '${slug}'`,
+    });
     severity = severity === "critical" ? "critical" : "high";
   }
 
@@ -163,7 +190,10 @@ export function detectMalformedCity(row) {
 
   // Medium: city_id null quando esperado
   if (cityId == null && row?.expect_city_id) {
-    issues.push({ code: "city_id_missing", label: "ads.city_id ausente quando deveria estar setado" });
+    issues.push({
+      code: "city_id_missing",
+      label: "ads.city_id ausente quando deveria estar setado",
+    });
     severity = severity === "ok" || severity === "low" ? "medium" : severity;
   }
 

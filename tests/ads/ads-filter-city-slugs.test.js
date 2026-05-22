@@ -4,7 +4,9 @@ import { buildAdsSearchQuery } from "../../src/modules/ads/filters/ads-filter.bu
 import { ADS_FILTER_LIMITS } from "../../src/modules/ads/filters/ads-filter.constants.js";
 
 function normalize(sql) {
-  return String(sql || "").replace(/\s+/g, " ").trim();
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

@@ -254,9 +254,7 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
   // "Indicador de mercado", "Insights IA" nem o carrossel de veículos
   // sugeridos por IA — então não pagamos a latência dessas chamadas
   // no SSR. Mantemos apenas relatedResult para "Mais carros em [Cidade]".
-  const [relatedResult] = await Promise.allSettled([
-    fetchRelatedListingsForAdPage(ad, vehicle),
-  ]);
+  const [relatedResult] = await Promise.allSettled([fetchRelatedListingsForAdPage(ad, vehicle)]);
 
   const aiInsights: string[] = [];
 

@@ -27,8 +27,7 @@ const MAX_INTERNAL_LINKS_LIMIT = 1000;
  *
  * Erros (4xx/5xx) mantêm `no-store`: não queremos cachear falhas.
  */
-const SITEMAP_CACHE_CONTROL =
-  "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
+const SITEMAP_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
 
 /**
  * Kill switch temporário (2026-05-14, terceira iteração do fix de bandwidth).
@@ -301,13 +300,10 @@ export async function getPublicSitemapByType(req, res, next) {
     const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
     const data = await sitemapPublicService.getPublicSitemapByType(req.params.type, limit);
 
-    return res
-      .status(200)
-      .set("Cache-Control", SITEMAP_CACHE_CONTROL)
-      .json({
-        success: true,
-        data,
-      });
+    return res.status(200).set("Cache-Control", SITEMAP_CACHE_CONTROL).json({
+      success: true,
+      data,
+    });
   } catch (err) {
     logger.error(
       { error: err, type: req.params.type },
@@ -325,13 +321,10 @@ export async function getPublicSitemapByRegion(req, res, next) {
     const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
     const data = await sitemapPublicService.getPublicSitemapByRegion(req.params.state, limit);
 
-    return res
-      .status(200)
-      .set("Cache-Control", SITEMAP_CACHE_CONTROL)
-      .json({
-        success: true,
-        data,
-      });
+    return res.status(200).set("Cache-Control", SITEMAP_CACHE_CONTROL).json({
+      success: true,
+      data,
+    });
   } catch (err) {
     logger.error(
       { error: err, state: req.params.state },

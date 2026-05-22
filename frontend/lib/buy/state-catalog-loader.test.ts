@@ -5,9 +5,8 @@ const fetchAdsSearchMock = vi.fn();
 const fetchAdsFacetsMock = vi.fn();
 
 vi.mock("@/lib/search/ads-search", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/search/ads-search")>(
-    "@/lib/search/ads-search"
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/search/ads-search")>("@/lib/search/ads-search");
   return {
     ...actual,
     fetchAdsSearch: (...args: unknown[]) => fetchAdsSearchMock(...args),

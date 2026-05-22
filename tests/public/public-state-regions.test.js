@@ -121,9 +121,7 @@ describe("listFeaturedRegionsByUf — validação de UF", () => {
 
 describe("listFeaturedRegionsByUf — montagem de regiões", () => {
   it("monta região válida com cityNames, citySlugs e href correto", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
       buildRegion("atibaia-sp", "Atibaia", [
         { slug: "itatiba-sp", name: "Itatiba" },
@@ -147,9 +145,7 @@ describe("listFeaturedRegionsByUf — montagem de regiões", () => {
   });
 
   it("baseCitySlug aparece em [0] de citySlugs (alinhado com boost regional)", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
       buildRegion("atibaia-sp", "Atibaia", [{ slug: "vizinha-sp", name: "Vizinha" }])
     );
@@ -168,9 +164,7 @@ describe("listFeaturedRegionsByUf — dedup territorial", () => {
     ]);
     mocks.getRegionByBaseSlugDynamic
       .mockResolvedValueOnce(
-        buildRegion("atibaia-sp", "Atibaia", [
-          { slug: "itatiba-sp", name: "Itatiba" },
-        ])
+        buildRegion("atibaia-sp", "Atibaia", [{ slug: "itatiba-sp", name: "Itatiba" }])
       )
       .mockResolvedValueOnce(buildRegion("campinas-sp", "Campinas", []));
     // Itatiba não deve ser consultada (consumida por Atibaia).
@@ -202,9 +196,7 @@ describe("listFeaturedRegionsByUf — não mistura UFs", () => {
   });
 
   it("members de UF diferente não entram em cityNames/citySlugs", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce({
       base: { id: 1, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
       members: [
@@ -222,9 +214,7 @@ describe("listFeaturedRegionsByUf — não mistura UFs", () => {
 
 describe("listFeaturedRegionsByUf — contagem agregada de anúncios", () => {
   it("soma active_count e featured_count de todas as cidades da região", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
       buildRegion("atibaia-sp", "Atibaia", [
         { slug: "itatiba-sp", name: "Itatiba" },
@@ -245,9 +235,7 @@ describe("listFeaturedRegionsByUf — contagem agregada de anúncios", () => {
   });
 
   it("contagem ausente → 0 (sem inventar)", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
       buildRegion("atibaia-sp", "Atibaia", [])
     );
@@ -291,9 +279,7 @@ describe("listFeaturedRegionsByUf — ordenação", () => {
 
 describe("listFeaturedRegionsByUf — limite", () => {
   it("respeita default maxRegions=8", async () => {
-    const cities = Array.from({ length: 20 }, (_, i) =>
-      buildCity(`cidade-${i}-sp`, `Cidade ${i}`)
-    );
+    const cities = Array.from({ length: 20 }, (_, i) => buildCity(`cidade-${i}-sp`, `Cidade ${i}`));
     mocks.findCitiesByStateVariants.mockResolvedValue(cities);
     for (let i = 0; i < 20; i++) {
       mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
@@ -306,9 +292,7 @@ describe("listFeaturedRegionsByUf — limite", () => {
   });
 
   it("aceita maxRegions custom até o hard cap (12)", async () => {
-    const cities = Array.from({ length: 20 }, (_, i) =>
-      buildCity(`cidade-${i}-sp`, `Cidade ${i}`)
-    );
+    const cities = Array.from({ length: 20 }, (_, i) => buildCity(`cidade-${i}-sp`, `Cidade ${i}`));
     mocks.findCitiesByStateVariants.mockResolvedValue(cities);
     for (let i = 0; i < 20; i++) {
       mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
@@ -339,12 +323,8 @@ describe("listFeaturedRegionsByUf — resiliência", () => {
   });
 
   it("contagem agregada que falha → adsCount=0, lista ainda retorna", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("ok-sp", "OK"),
-    ]);
-    mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
-      buildRegion("ok-sp", "OK", [])
-    );
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("ok-sp", "OK")]);
+    mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(buildRegion("ok-sp", "OK", []));
     mocks.poolQuery.mockRejectedValueOnce(new Error("DB down"));
 
     const result = await listFeaturedRegionsByUf("SP");
@@ -356,9 +336,7 @@ describe("listFeaturedRegionsByUf — resiliência", () => {
 
 describe("controller GET /api/public/states/:uf/regions", () => {
   it("UF válida → 200 com envelope { success, data: { state, regions } }", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
       buildRegion("atibaia-sp", "Atibaia", [])
     );
@@ -404,9 +382,7 @@ describe("controller GET /api/public/states/:uf/regions", () => {
   });
 
   it("payload não traz fotos/descrição/dados de admin", async () => {
-    mocks.findCitiesByStateVariants.mockResolvedValue([
-      buildCity("atibaia-sp", "Atibaia"),
-    ]);
+    mocks.findCitiesByStateVariants.mockResolvedValue([buildCity("atibaia-sp", "Atibaia")]);
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce(
       buildRegion("atibaia-sp", "Atibaia", [{ slug: "itatiba-sp", name: "Itatiba" }])
     );

@@ -27,9 +27,7 @@ describe("inferAdTier — preferência ao canônico", () => {
   });
 
   it("priority_tier=1 retorna 1 (mesmo com dealership_id ou plan='pro' que heurística promoveria)", () => {
-    expect(
-      inferAdTier(ad({ priority_tier: 1, dealership_id: 99, plan: "pro" }))
-    ).toBe(1);
+    expect(inferAdTier(ad({ priority_tier: 1, dealership_id: 99, plan: "pro" }))).toBe(1);
   });
 
   it("priority_tier canônico vence highlight_until ativo (cnpj-free-store com highlight expirado mal classificado)", () => {
@@ -66,9 +64,7 @@ describe("inferAdTier — fallback heurístico (priority_tier ausente/inválido)
   it("priority_tier inválido (0, 5, string) cai para heurística", () => {
     expect(inferAdTier(ad({ priority_tier: 0 as 1 }))).toBe(1);
     expect(inferAdTier(ad({ priority_tier: 5 as 4, plan: "pro" }))).toBe(3);
-    expect(
-      inferAdTier(ad({ priority_tier: "3" as unknown as 3, dealership_id: 99 }))
-    ).toBe(2);
+    expect(inferAdTier(ad({ priority_tier: "3" as unknown as 3, dealership_id: 99 }))).toBe(2);
   });
 });
 
@@ -93,9 +89,7 @@ describe("resolvePublicAdBadges — vitrine pública (sem nomes de plano)", () =
   });
 
   it("priority_tier=3 + dealer renderiza 'LOJA', não 'LOJISTA PRO'", () => {
-    const out = resolvePublicAdBadges(
-      ad({ priority_tier: 3, seller_kind: "dealer" })
-    );
+    const out = resolvePublicAdBadges(ad({ priority_tier: 3, seller_kind: "dealer" }));
     const ids = out.map((b) => b.id);
     expect(ids).toContain("loja");
     expect(ids).not.toContain("pro");
@@ -103,9 +97,7 @@ describe("resolvePublicAdBadges — vitrine pública (sem nomes de plano)", () =
   });
 
   it("priority_tier=2 + dealer renderiza 'LOJA', não 'LOJISTA START'", () => {
-    const out = resolvePublicAdBadges(
-      ad({ priority_tier: 2, seller_kind: "dealer" })
-    );
+    const out = resolvePublicAdBadges(ad({ priority_tier: 2, seller_kind: "dealer" }));
     const ids = out.map((b) => b.id);
     expect(ids).toContain("loja");
     expect(ids).not.toContain("start");
@@ -113,9 +105,7 @@ describe("resolvePublicAdBadges — vitrine pública (sem nomes de plano)", () =
   });
 
   it("priority_tier=1 + private renderiza 'PARTICULAR'", () => {
-    const out = resolvePublicAdBadges(
-      ad({ priority_tier: 1, seller_kind: "private" })
-    );
+    const out = resolvePublicAdBadges(ad({ priority_tier: 1, seller_kind: "private" }));
     const ids = out.map((b) => b.id);
     expect(ids).toContain("particular");
     expect(out.find((b) => b.id === "particular")?.label).toBe("PARTICULAR");
@@ -247,16 +237,12 @@ describe("resolvePublicAdBadges — combinações realistas", () => {
   });
 
   it("Start internamente vira 'Loja' publicamente", () => {
-    const out = resolvePublicAdBadges(
-      ad({ priority_tier: 2, seller_kind: "dealer" })
-    );
+    const out = resolvePublicAdBadges(ad({ priority_tier: 2, seller_kind: "dealer" }));
     expect(out.map((b) => b.id)).toEqual(["loja"]);
   });
 
   it("Grátis (cpf-free-essential) + Particular", () => {
-    const out = resolvePublicAdBadges(
-      ad({ priority_tier: 1, seller_kind: "private" })
-    );
+    const out = resolvePublicAdBadges(ad({ priority_tier: 1, seller_kind: "private" }));
     expect(out.map((b) => b.id)).toEqual(["particular"]);
   });
 
@@ -276,12 +262,7 @@ describe("resolvePublicAdBadges — combinações realistas", () => {
         seller_kind: "private",
       })
     );
-    expect(out.map((b) => b.id)).toEqual([
-      "destaque",
-      "opportunity",
-      "reviewed",
-      "particular",
-    ]);
+    expect(out.map((b) => b.id)).toEqual(["destaque", "opportunity", "reviewed", "particular"]);
   });
 });
 

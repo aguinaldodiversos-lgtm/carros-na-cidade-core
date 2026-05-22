@@ -9,7 +9,15 @@ import {
 } from "../../scripts/cleanup/lib/archive-helpers.mjs";
 
 describe("buildSnapshotSelectQuery — SELECT do snapshot pré-update", () => {
-  const baseAvailable = new Set(["id", "status", "title", "slug", "city_id", "state", "created_at"]);
+  const baseAvailable = new Set([
+    "id",
+    "status",
+    "title",
+    "slug",
+    "city_id",
+    "state",
+    "created_at",
+  ]);
 
   it("monta SELECT com colunas presentes + WHERE id=ANY + status filter", () => {
     const { sql, params, present } = buildSnapshotSelectQuery({
@@ -167,9 +175,7 @@ describe("buildInventoryQueries — total + por estado + por cidade", () => {
   });
 
   it("erro quando status ausente", () => {
-    expect(() =>
-      buildInventoryQueries({ availableColumns: new Set(["id"]) })
-    ).toThrow(/'status'/);
+    expect(() => buildInventoryQueries({ availableColumns: new Set(["id"]) })).toThrow(/'status'/);
   });
 });
 

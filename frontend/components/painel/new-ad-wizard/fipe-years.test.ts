@@ -27,9 +27,7 @@ describe("extractModelBase — colapsa nomes plenos da FIPE pública em modelo b
 
   it("preserva 2ª palavra quando 1ª é um prefixo curto (NEW/GRAND/AMG)", () => {
     expect(extractModelBase("New Beetle 2.0 Mi Mec./Aut.")).toBe("NEW BEETLE");
-    expect(extractModelBase("Grand Saveiro Xtreme/Street 1.6/1.8/2.0")).toBe(
-      "GRAND SAVEIRO"
-    );
+    expect(extractModelBase("Grand Saveiro Xtreme/Street 1.6/1.8/2.0")).toBe("GRAND SAVEIRO");
   });
 
   it("normaliza pontuação e parênteses sem perder identidade do modelo", () => {
@@ -56,14 +54,7 @@ describe("uniqueModelBases — reduz drasticamente o select de Modelo", () => {
       { code: "8", name: "Grand Saveiro 1.6" },
     ];
     const bases = uniqueModelBases(flat);
-    expect(bases).toEqual([
-      "AMAROK",
-      "GOL",
-      "GRAND SAVEIRO",
-      "NEW BEETLE",
-      "POLO",
-      "SAVEIRO",
-    ]);
+    expect(bases).toEqual(["AMAROK", "GOL", "GRAND SAVEIRO", "NEW BEETLE", "POLO", "SAVEIRO"]);
   });
 
   it("array vazio devolve []", () => {

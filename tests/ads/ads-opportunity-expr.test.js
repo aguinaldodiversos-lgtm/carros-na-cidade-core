@@ -6,7 +6,9 @@ import {
 import { buildAdsSearchQuery } from "../../src/modules/ads/filters/ads-filter.builder.js";
 
 function normalize(sql) {
-  return String(sql || "").replace(/\s+/g, " ").trim();
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 describe("opportunityExpr — estrutura da regra de produto (>=10% abaixo da FIPE)", () => {

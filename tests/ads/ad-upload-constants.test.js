@@ -24,9 +24,7 @@ describe("ads.upload.constants — fonte única de limite de fotos", () => {
 
 describe("multer/validator/routes consomem a mesma constante", () => {
   it("Zod CreateAdSchema usa o mesmo teto", async () => {
-    const { validateCreateAdPayload } = await import(
-      "../../src/modules/ads/ads.validators.js"
-    );
+    const { validateCreateAdPayload } = await import("../../src/modules/ads/ads.validators.js");
 
     const tooMany = Array.from(
       { length: VEHICLE_IMAGE_MAX_FILES + 1 },
@@ -50,9 +48,7 @@ describe("multer/validator/routes consomem a mesma constante", () => {
   });
 
   it("Zod CreateAdSchema rejeita zero imagens (invariante mínima)", async () => {
-    const { validateCreateAdPayload } = await import(
-      "../../src/modules/ads/ads.validators.js"
-    );
+    const { validateCreateAdPayload } = await import("../../src/modules/ads/ads.validators.js");
     expect(() =>
       validateCreateAdPayload({
         title: "Teste",

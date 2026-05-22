@@ -141,7 +141,10 @@ async function rebuildMembershipsForBase(client, baseCity, candidatesInState) {
     throw err;
   }
 
-  return { layer1: members.filter((m) => m.layer === 1).length, layer2: members.filter((m) => m.layer === 2).length };
+  return {
+    layer1: members.filter((m) => m.layer === 1).length,
+    layer2: members.filter((m) => m.layer === 2).length,
+  };
 }
 
 /**
@@ -374,9 +377,7 @@ export async function buildRegionMemberships({ ufFilter } = {}) {
     let totalBase = 0;
     for (const row of coberturaPorUf) {
       const pct =
-        row.total_cities > 0
-          ? ((row.com_vizinhanca / row.total_cities) * 100).toFixed(0)
-          : "0";
+        row.total_cities > 0 ? ((row.com_vizinhanca / row.total_cities) * 100).toFixed(0) : "0";
       console.log(
         `[regions:build] ${row.state}  | ${String(row.total_cities).padStart(5)} | ${String(row.com_vizinhanca).padStart(5)}          | ${pct.padStart(3)}%`
       );

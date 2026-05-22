@@ -54,9 +54,7 @@ import { transformClusterPlanToCanonicalPath } from "../../src/modules/seo/plann
  * Exportada para teste; também chamada antes de qualquer import dinâmico
  * que precise de process.env populado (`db.js` → `env.js#parseEnv`).
  */
-export async function loadDotenvIfAvailable({
-  importer = (spec) => import(spec),
-} = {}) {
+export async function loadDotenvIfAvailable({ importer = (spec) => import(spec) } = {}) {
   try {
     const dotenv = await importer("dotenv");
     const config =
@@ -111,7 +109,8 @@ export function parseArgs(argv) {
 
 function defaultLog(level, message, meta) {
   const prefix = "[bootstrap-cluster-plans]";
-  const line = meta !== undefined ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
+  const line =
+    meta !== undefined ? `${prefix} ${message} ${JSON.stringify(meta)}` : `${prefix} ${message}`;
   if (level === "error") {
     // eslint-disable-next-line no-console
     console.error(line);
@@ -211,10 +210,7 @@ export async function runBootstrap({
     for (const e of transformErrors.slice(0, SAMPLE_LOG_MAX)) {
       log("error", `  [${e.cluster_type}/${e.city}] ${e.error}`);
     }
-    log(
-      "error",
-      "fail-fast: ABORTANDO antes de qualquer escrita. Lote parcial NÃO persistido."
-    );
+    log("error", "fail-fast: ABORTANDO antes de qualquer escrita. Lote parcial NÃO persistido.");
     return {
       ok: false,
       reason: "transform_errors",
@@ -284,7 +280,8 @@ export async function runBootstrap({
 
 // Entry-point CLI — só roda quando o arquivo é invocado diretamente, não
 // quando importado por testes (vitest importa pra exportar runBootstrap).
-const isMainModule = import.meta.url === `file://${process.argv[1]}` ||
+const isMainModule =
+  import.meta.url === `file://${process.argv[1]}` ||
   import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, "/") || "__nope__");
 
 if (isMainModule) {
@@ -296,12 +293,11 @@ if (isMainModule) {
 
   let closeDatabasePool = async () => {};
   try {
-    const [{ buildTopCitiesClusterPlans }, { upsertClusterPlan }, dbModule] =
-      await Promise.all([
-        import("../../src/modules/seo/planner/cluster-planner.service.js"),
-        import("../../src/modules/seo/planner/cluster-plan.repository.js"),
-        import("../../src/infrastructure/database/db.js"),
-      ]);
+    const [{ buildTopCitiesClusterPlans }, { upsertClusterPlan }, dbModule] = await Promise.all([
+      import("../../src/modules/seo/planner/cluster-planner.service.js"),
+      import("../../src/modules/seo/planner/cluster-plan.repository.js"),
+      import("../../src/infrastructure/database/db.js"),
+    ]);
     closeDatabasePool = dbModule.closeDatabasePool;
 
     const result = await runBootstrap({

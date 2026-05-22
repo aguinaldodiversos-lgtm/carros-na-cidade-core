@@ -59,17 +59,15 @@ const NATIONAL_CAPITALS = [
 ];
 
 // 4 cidades FORA da lista de destaque — prova que cobertura é nacional.
-const CITIES_OUTSIDE_CURATED = [
-  "sumare-sp",
-  "ipatinga-mg",
-  "barreiras-ba",
-  "guarapuava-pr",
-];
+const CITIES_OUTSIDE_CURATED = ["sumare-sp", "ipatinga-mg", "barreiras-ba", "guarapuava-pr"];
 
 const FAKE_SLUG = "cidade-que-nao-existe-zz";
 
-const FRONTEND_BASE = (process.env.STAGING_PUBLIC_BASE_URL || process.env.SMOKE_BASE_URL || "")
-  .replace(/\/+$/, "");
+const FRONTEND_BASE = (
+  process.env.STAGING_PUBLIC_BASE_URL ||
+  process.env.SMOKE_BASE_URL ||
+  ""
+).replace(/\/+$/, "");
 const ALLOW_PRODUCTION = process.env.ALLOW_PRODUCTION === "true";
 
 if (!FRONTEND_BASE) {
@@ -77,7 +75,8 @@ if (!FRONTEND_BASE) {
   process.exit(1);
 }
 
-const isProductionHost = !FRONTEND_BASE.includes("staging") &&
+const isProductionHost =
+  !FRONTEND_BASE.includes("staging") &&
   !FRONTEND_BASE.includes("localhost") &&
   !FRONTEND_BASE.includes("preview");
 if (isProductionHost && !ALLOW_PRODUCTION) {
@@ -130,10 +129,7 @@ async function checkRegional(slug, { expectStatus, expectMw }) {
     return;
   }
   if (result.status !== expectStatus) {
-    fail(
-      `[${slug}]`,
-      `status ${result.status} (esperado ${expectStatus}), mw=${result.mw}`
-    );
+    fail(`[${slug}]`, `status ${result.status} (esperado ${expectStatus}), mw=${result.mw}`);
     return;
   }
   if (expectMw && result.mw !== expectMw) {

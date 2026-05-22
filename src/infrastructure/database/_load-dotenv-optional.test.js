@@ -70,7 +70,9 @@ describe("loadDotenvIfAvailable — carregamento opcional", () => {
   });
 
   it("dotenv presente mas SEM função config → reporta loaded=false (no_config_function)", () => {
-    const requireFn = vi.fn(() => ({ /* sem config */ }));
+    const requireFn = vi.fn(() => ({
+      /* sem config */
+    }));
 
     const result = loadDotenvIfAvailable({ requireFn });
 

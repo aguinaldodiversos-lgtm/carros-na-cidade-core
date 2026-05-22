@@ -31,9 +31,7 @@ interface PageParams {
  * sem slot — propositalmente — para manter a Página Regional como saída
  * apenas da intenção principal "comprar carros em [cidade]".
  */
-export type LocalSeoRenderSlot = (
-  model: LocalSeoLandingModel
-) => React.ReactNode;
+export type LocalSeoRenderSlot = (model: LocalSeoLandingModel) => React.ReactNode;
 
 export interface CreateLocalSeoPageOptions {
   /** Conteúdo opcional renderizado após `LocalSeoLanding`. */
@@ -58,8 +56,7 @@ export function createLocalSeoPage(
     // BreadcrumbList complementar — só para variant "em" (canônica
     // indexável). Variantes baratos/automaticos canonicalizam em /carros-em
     // e emitir Breadcrumb duplicaria sinal para o Google.
-    const breadcrumbJsonLd =
-      variant === "em" ? buildLocalSeoBreadcrumbJsonLd(model) : null;
+    const breadcrumbJsonLd = variant === "em" ? buildLocalSeoBreadcrumbJsonLd(model) : null;
 
     return (
       <>

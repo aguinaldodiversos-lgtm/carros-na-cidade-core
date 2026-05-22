@@ -99,7 +99,14 @@ describe("GET /api/public/regions/:citySlug — universalidade nacional", () => 
           longitude: -46,
         },
         members: [
-          { id: 200, slug: "vizinha-1-" + stateSlug, name: "Vizinha 1", state, layer: 1, distance_km: 10 },
+          {
+            id: 200,
+            slug: "vizinha-1-" + stateSlug,
+            name: "Vizinha 1",
+            state,
+            layer: 1,
+            distance_km: 10,
+          },
         ],
         radius_km: 80,
       });
@@ -160,9 +167,7 @@ describe("GET /api/public/regions/:citySlug — universalidade nacional", () => 
   });
 
   it("serviço lança → next(err) (não 500 direto)", async () => {
-    mocks.getRegionByBaseSlugDynamic.mockRejectedValueOnce(
-      new Error("db offline")
-    );
+    mocks.getRegionByBaseSlugDynamic.mockRejectedValueOnce(new Error("db offline"));
     const req = { params: { citySlug: "atibaia-sp" } };
     const res = makeRes();
     const next = vi.fn();

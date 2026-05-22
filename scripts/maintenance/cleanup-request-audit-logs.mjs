@@ -74,7 +74,9 @@ async function main() {
   if (!APPLY) {
     console.log("\nDRY-RUN. Para executar:");
     console.log("  node scripts/maintenance/cleanup-request-audit-logs.mjs --yes");
-    console.log("\nO comando executará: TRUNCATE TABLE public.request_audit_logs RESTART IDENTITY;");
+    console.log(
+      "\nO comando executará: TRUNCATE TABLE public.request_audit_logs RESTART IDENTITY;"
+    );
     return;
   }
 

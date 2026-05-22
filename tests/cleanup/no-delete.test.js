@@ -61,8 +61,11 @@ describe("Scripts de cleanup NÃO contêm DELETE SQL (proteção crítica)", () 
       const absolute = resolve(process.cwd(), relativePath);
       const source = readFileSync(absolute, "utf8");
       // Pelo menos os arquivos de SQL builder devem mencionar UPDATE.
-      if (relativePath.includes("helpers") || relativePath.includes("archive-test-ads") ||
-          relativePath.includes("restore-archived-ads")) {
+      if (
+        relativePath.includes("helpers") ||
+        relativePath.includes("archive-test-ads") ||
+        relativePath.includes("restore-archived-ads")
+      ) {
         expect(source).toMatch(/UPDATE\s+ads/i);
       }
     });

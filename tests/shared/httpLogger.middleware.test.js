@@ -85,9 +85,7 @@ describe("shouldPersistAuditLog", () => {
   };
 
   it("returns false when feature flag is OFF, regardless of anything else", () => {
-    expect(
-      shouldPersistAuditLog({ ...base, featureEnabled: false, statusCode: 500 })
-    ).toBe(false);
+    expect(shouldPersistAuditLog({ ...base, featureEnabled: false, statusCode: 500 })).toBe(false);
   });
 
   it("returns false for OPTIONS even on a valid path", () => {
@@ -143,9 +141,9 @@ describe("shouldPersistAuditLog", () => {
 
   it("sampleRate=0 drops all 2xx/3xx", () => {
     // rng < 0 é sempre falso -> nunca grava
-    expect(
-      shouldPersistAuditLog({ ...base, statusCode: 200, sampleRate: 0, rng: () => 0 })
-    ).toBe(false);
+    expect(shouldPersistAuditLog({ ...base, statusCode: 200, sampleRate: 0, rng: () => 0 })).toBe(
+      false
+    );
   });
 
   it("sampleRate=1 keeps all 2xx/3xx", () => {
@@ -212,7 +210,9 @@ describe("features.requestAuditLogs default (env ausente)", () => {
     const env = { ...process.env };
     delete env.REQUEST_AUDIT_LOGS_ENABLED;
     Object.assign(env, envOverrides);
-    const featuresPath = path.join(REPO_ROOT, "src", "shared", "config", "features.js").replace(/\\/g, "/");
+    const featuresPath = path
+      .join(REPO_ROOT, "src", "shared", "config", "features.js")
+      .replace(/\\/g, "/");
     const code = `
       import("file:///${featuresPath}").then(m => {
         process.stdout.write(JSON.stringify({ value: m.features.requestAuditLogs }));

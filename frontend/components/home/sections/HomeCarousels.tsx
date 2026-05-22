@@ -33,11 +33,7 @@ interface HomeCarouselsProps {
  *     fetchHomeCarousels). Não usamos recentAds como fallback aqui — isso
  *     seria mentir sobre "abaixo da FIPE".
  */
-export async function HomeCarousels({
-  stateUf,
-  stateName,
-  detectedCityName,
-}: HomeCarouselsProps) {
+export async function HomeCarousels({ stateUf, stateName, detectedCityName }: HomeCarouselsProps) {
   const { highlightAds, opportunityAds, recentAds } = await fetchHomeCarousels(stateUf);
 
   const hasHighlight = highlightAds.length > 0;
@@ -46,9 +42,7 @@ export async function HomeCarousels({
   const highlightItems = (hasHighlight ? highlightAds : recentAds) as VehicleCardItem[];
   const opportunityItems = opportunityAds as VehicleCardItem[];
 
-  const scope = detectedCityName
-    ? `${detectedCityName} e ${stateName}`
-    : stateName;
+  const scope = detectedCityName ? `${detectedCityName} e ${stateName}` : stateName;
 
   const highlightTitle = hasHighlight ? "Veículos em destaque" : "Veículos recentes";
   const highlightSubtitle = hasHighlight

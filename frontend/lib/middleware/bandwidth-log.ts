@@ -74,7 +74,9 @@ export function classifyUserAgent(userAgent: string | null | undefined): UserAge
   if (!userAgent) return "empty";
   const ua = userAgent.trim();
   if (ua.length === 0) return "empty";
-  if (/googlebot|bingbot|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver/i.test(ua)) {
+  if (
+    /googlebot|bingbot|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver/i.test(ua)
+  ) {
     return "bot";
   }
   if (/curl|wget|python|java|go-http-client|libwww|httpclient|axios|node-fetch/i.test(ua)) {
@@ -107,9 +109,7 @@ export type BuildBandwidthLogEntryInput = {
   durationMs: number;
 };
 
-export function buildBandwidthLogEntry(
-  input: BuildBandwidthLogEntryInput
-): BandwidthLogEntry {
+export function buildBandwidthLogEntry(input: BuildBandwidthLogEntryInput): BandwidthLogEntry {
   return {
     event: "bandwidth",
     timestamp: new Date().toISOString(),

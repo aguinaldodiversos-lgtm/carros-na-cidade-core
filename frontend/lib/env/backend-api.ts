@@ -33,10 +33,7 @@ const BACKEND_API_ENV_KEYS = [
  *     "Private network" para o hostname exato. NAO assuma o formato.
  *   - Porta interna padrao do backend e a mesma do build (4000 em dev).
  */
-const INTERNAL_BACKEND_API_ENV_KEYS = [
-  "INTERNAL_BACKEND_API_URL",
-  "BACKEND_INTERNAL_URL",
-] as const;
+const INTERNAL_BACKEND_API_ENV_KEYS = ["INTERNAL_BACKEND_API_URL", "BACKEND_INTERNAL_URL"] as const;
 
 type BackendApiEnvKey = (typeof BACKEND_API_ENV_KEYS)[number];
 type InternalBackendApiEnvKey = (typeof INTERNAL_BACKEND_API_ENV_KEYS)[number];

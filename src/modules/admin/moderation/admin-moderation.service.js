@@ -15,10 +15,7 @@ import db from "../../../infrastructure/database/db.js";
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { AD_STATUS } from "../../../shared/constants/status.js";
 import { recordAdminAction } from "../admin.audit.js";
-import {
-  fetchModerationDetail,
-  recordModerationEvent,
-} from "../../ads/risk/ad-risk.repository.js";
+import { fetchModerationDetail, recordModerationEvent } from "../../ads/risk/ad-risk.repository.js";
 import { MODERATION_EVENT } from "../../ads/risk/ad-risk.thresholds.js";
 import { invalidateAdsCachesAfterMutation } from "../../ads/ads.mutation-cache.js";
 
@@ -92,10 +89,7 @@ export async function getDetail(adId) {
 }
 
 async function loadAdForModeration(adId) {
-  const result = await db.query(
-    `SELECT id, status FROM ads WHERE id = $1 LIMIT 1`,
-    [adId]
-  );
+  const result = await db.query(`SELECT id, status FROM ads WHERE id = $1 LIMIT 1`, [adId]);
   const row = result.rows[0];
   if (!row) throw new AppError("Anúncio não encontrado", 404);
   return row;

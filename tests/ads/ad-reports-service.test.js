@@ -56,9 +56,9 @@ describe("ad-reports.service.createReport — validação", () => {
 
   it("rejeita reason ausente", async () => {
     const { createReport } = await importService();
-    await expect(
-      createReport({ adId: 42, reason: "", reporterIp: "1.2.3.4" })
-    ).rejects.toThrow(/Motivo/i);
+    await expect(createReport({ adId: 42, reason: "", reporterIp: "1.2.3.4" })).rejects.toThrow(
+      /Motivo/i
+    );
   });
 
   it("rejeita reason fora da whitelist", async () => {
@@ -71,9 +71,7 @@ describe("ad-reports.service.createReport — validação", () => {
   it("aceita TODOS os 6 motivos canônicos", async () => {
     const { createReport } = await importService();
     for (const reason of AD_REPORT_REASONS) {
-      await expect(
-        createReport({ adId: 42, reason, reporterIp: "1.2.3.4" })
-      ).resolves.toBeTruthy();
+      await expect(createReport({ adId: 42, reason, reporterIp: "1.2.3.4" })).resolves.toBeTruthy();
     }
     expect(insertReportMock).toHaveBeenCalledTimes(AD_REPORT_REASONS.length);
   });
@@ -89,9 +87,7 @@ describe("ad-reports.service.createReport — validação", () => {
 
 describe("ad-reports.service.createReport — rate limit", () => {
   it("bloqueia quando IP já fez MAX_PER_AD_PER_IP denúncias no mesmo anúncio", async () => {
-    countRecentByIpHashAndAdMock.mockResolvedValue(
-      AD_REPORTS_RATE_LIMIT.MAX_PER_AD_PER_IP
-    );
+    countRecentByIpHashAndAdMock.mockResolvedValue(AD_REPORTS_RATE_LIMIT.MAX_PER_AD_PER_IP);
     const { createReport } = await importService();
     await expect(
       createReport({ adId: 42, reason: "suspicious_price", reporterIp: "1.2.3.4" })

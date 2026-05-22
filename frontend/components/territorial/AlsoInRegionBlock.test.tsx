@@ -20,31 +20,23 @@ describe("AlsoInRegionBlock", () => {
   });
 
   it("usa microcopy 'Poucas opções' quando cidade tem ao menos 1 anúncio", () => {
-    render(
-      <AlsoInRegionBlock slug="atibaia-sp" cityName="Atibaia" cityAdsTotal={3} />
-    );
+    render(<AlsoInRegionBlock slug="atibaia-sp" cityName="Atibaia" cityAdsTotal={3} />);
     expect(screen.getByRole("heading").textContent).toMatch(/poucas/i);
   });
 
   it("usa microcopy 'Sem ofertas' quando cidade está vazia", () => {
-    render(
-      <AlsoInRegionBlock slug="atibaia-sp" cityName="Atibaia" cityAdsTotal={0} />
-    );
+    render(<AlsoInRegionBlock slug="atibaia-sp" cityName="Atibaia" cityAdsTotal={0} />);
     expect(screen.getByRole("heading").textContent).toMatch(/sem ofertas/i);
   });
 
   it("não renderiza quando slug ausente", () => {
-    const { container } = render(
-      <AlsoInRegionBlock slug="" cityName="Atibaia" />
-    );
+    const { container } = render(<AlsoInRegionBlock slug="" cityName="Atibaia" />);
     expect(container.innerHTML).toBe("");
   });
 
   it("inclui aria-label descritivo no CTA", () => {
     render(<AlsoInRegionBlock slug="campinas-sp" cityName="Campinas" />);
     const cta = screen.getByTestId("also-in-region-cta");
-    expect(cta.getAttribute("aria-label")).toBe(
-      "Ver veículos na região de Campinas"
-    );
+    expect(cta.getAttribute("aria-label")).toBe("Ver veículos na região de Campinas");
   });
 });

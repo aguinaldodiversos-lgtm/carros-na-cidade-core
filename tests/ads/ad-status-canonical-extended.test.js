@@ -35,9 +35,7 @@ describe("AD_STATUS — enum canônico expandido (rodada antifraude)", () => {
   });
 
   it("AD_STATUS_REQUIRES_ADMIN_ACTION = [pending_review]", () => {
-    expect([...AD_STATUS_REQUIRES_ADMIN_ACTION]).toEqual([
-      AD_STATUS.PENDING_REVIEW,
-    ]);
+    expect([...AD_STATUS_REQUIRES_ADMIN_ACTION]).toEqual([AD_STATUS.PENDING_REVIEW]);
   });
 
   it("AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC NÃO inclui ACTIVE nem DELETED", () => {
@@ -53,9 +51,7 @@ describe("AD_STATUS — enum canônico expandido (rodada antifraude)", () => {
   });
 
   it("AD_RISK_LEVEL tem 4 níveis", () => {
-    expect([...AD_RISK_LEVEL_VALUES].sort()).toEqual(
-      ["critical", "high", "low", "medium"].sort()
-    );
+    expect([...AD_RISK_LEVEL_VALUES].sort()).toEqual(["critical", "high", "low", "medium"].sort());
     expect(AD_RISK_LEVEL.LOW).toBe("low");
     expect(AD_RISK_LEVEL.CRITICAL).toBe("critical");
   });

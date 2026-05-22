@@ -64,9 +64,7 @@ describe("adRiskService.calculateForAd", () => {
       fipeValue: 100_000, // diff = -45%
     });
     expect(r.shouldSendToReview).toBe(true);
-    const critical = r.reasons.find(
-      (x) => x.code === "PRICE_FAR_BELOW_FIPE_CRITICAL"
-    );
+    const critical = r.reasons.find((x) => x.code === "PRICE_FAR_BELOW_FIPE_CRITICAL");
     expect(critical).toBeTruthy();
     expect(critical.severity).toBe("critical");
     expect(r.riskLevel).toBe("critical");
@@ -111,8 +109,7 @@ describe("adRiskService.calculateForAd", () => {
     const r = await calculateForAd({
       ad: {
         ...baseAd,
-        description:
-          "Vendo carro. Liga (11) 99999-9999 e veja em https://exemplo.com",
+        description: "Vendo carro. Liga (11) 99999-9999 e veja em https://exemplo.com",
         images: ["https://r2/img-1.webp"], // poucas fotos
       },
       account: {
@@ -136,9 +133,7 @@ describe("adRiskService.calculateForAd", () => {
       context: { structuralFieldChanges: { brand: "Toyota" } },
     });
     expect(r.shouldSendToReview).toBe(true);
-    expect(r.reasons.some((x) => x.code === "STRUCTURAL_FIELD_CHANGE")).toBe(
-      true
-    );
+    expect(r.reasons.some((x) => x.code === "STRUCTURAL_FIELD_CHANGE")).toBe(true);
   });
 
   it("PHONE_REUSED_ACROSS_ACCOUNTS é emitido quando dependency reporta >= 2 donos", async () => {
@@ -151,9 +146,7 @@ describe("adRiskService.calculateForAd", () => {
       },
       { countDistinctOwnersForPhone: async () => 3 }
     );
-    expect(r.reasons.some((x) => x.code === "PHONE_REUSED_ACROSS_ACCOUNTS")).toBe(
-      true
-    );
+    expect(r.reasons.some((x) => x.code === "PHONE_REUSED_ACROSS_ACCOUNTS")).toBe(true);
   });
 
   it("falha do dependency PHONE_REUSED não derruba o cálculo", async () => {
@@ -164,11 +157,13 @@ describe("adRiskService.calculateForAd", () => {
         advertiser: baseAdvertiser,
         fipeValue: 85_000,
       },
-      { countDistinctOwnersForPhone: async () => { throw new Error("db down"); } }
+      {
+        countDistinctOwnersForPhone: async () => {
+          throw new Error("db down");
+        },
+      }
     );
     // Não deve incluir o sinal, mas tampouco derrubar.
-    expect(r.reasons.some((x) => x.code === "PHONE_REUSED_ACROSS_ACCOUNTS")).toBe(
-      false
-    );
+    expect(r.reasons.some((x) => x.code === "PHONE_REUSED_ACROSS_ACCOUNTS")).toBe(false);
   });
 });

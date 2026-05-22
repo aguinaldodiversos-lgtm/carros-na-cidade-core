@@ -34,9 +34,7 @@ vi.mock("../../src/shared/config/features.js", () => ({
   isEventsDomainEnabled: vi.fn(() => false),
 }));
 
-const { applyBoostApproval } = await import(
-  "../../src/modules/payments/payments.service.js"
-);
+const { applyBoostApproval } = await import("../../src/modules/payments/payments.service.js");
 
 function makeClient(rows) {
   return {
@@ -71,9 +69,7 @@ describe("applyBoostApproval — revalidação de vínculo dono↔ad↔intent", 
   });
 
   it("rejeita quando ad está deletado", async () => {
-    const client = makeClient([
-      { id: "ad-1", status: "deleted", advertiser_user_id: "u1" },
-    ]);
+    const client = makeClient([{ id: "ad-1", status: "deleted", advertiser_user_id: "u1" }]);
     const result = await applyBoostApproval(client, {
       id: "intent-1",
       user_id: "u1",
@@ -87,9 +83,7 @@ describe("applyBoostApproval — revalidação de vínculo dono↔ad↔intent", 
   });
 
   it("rejeita quando o pagador não é mais dono do anúncio", async () => {
-    const client = makeClient([
-      { id: "ad-1", status: "active", advertiser_user_id: "outro-user" },
-    ]);
+    const client = makeClient([{ id: "ad-1", status: "active", advertiser_user_id: "outro-user" }]);
     const result = await applyBoostApproval(client, {
       id: "intent-1",
       user_id: "pagador-original",

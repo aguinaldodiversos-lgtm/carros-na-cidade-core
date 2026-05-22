@@ -72,9 +72,7 @@ async function main() {
 
   if (!args.silent) {
     /* eslint-disable-next-line no-console */
-    console.log(
-      `[audit-city-integrity] reading cities + ad joins (limit=${args.limit})…`
-    );
+    console.log(`[audit-city-integrity] reading cities + ad joins (limit=${args.limit})…`);
   }
 
   const citiesScan = buildCitiesScanQuery({ availableColumns: citiesColumns, args });

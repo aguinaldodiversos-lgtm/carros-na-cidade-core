@@ -9,10 +9,7 @@ import { buildSafeColumnList } from "./audit-shared.mjs";
 
 export const REQUIRED_ADS_IMAGE_COLUMNS = ["id", "images"];
 export const OPTIONAL_ADS_IMAGE_COLUMNS = ["title", "slug", "status", "created_at", "city_id"];
-export const ALL_ADS_IMAGE_COLUMNS = [
-  ...REQUIRED_ADS_IMAGE_COLUMNS,
-  ...OPTIONAL_ADS_IMAGE_COLUMNS,
-];
+export const ALL_ADS_IMAGE_COLUMNS = [...REQUIRED_ADS_IMAGE_COLUMNS, ...OPTIONAL_ADS_IMAGE_COLUMNS];
 
 export function buildImagesAuditQuery({ availableColumns, args }) {
   const { present, missing } = buildSafeColumnList(availableColumns, ALL_ADS_IMAGE_COLUMNS);

@@ -53,9 +53,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
   });
 
   const detectedCity =
-    fromCookie?.slug && fromCookie?.name
-      ? { slug: fromCookie.slug, name: fromCookie.name }
-      : null;
+    fromCookie?.slug && fromCookie?.name ? { slug: fromCookie.slug, name: fromCookie.name } : null;
 
   // Bloco "Explore por região" leve na Home — só renderiza com regional
   // flag on E com regiões disponíveis no endpoint. Quando flag está off,
@@ -65,9 +63,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
 
   const [aboveFold, stateRegionsPayload] = await Promise.all([
     fetchHomeAboveFold(),
-    regionalEnabled
-      ? fetchStateRegions(territory.state.code, { limit: 6 })
-      : Promise.resolve(null),
+    regionalEnabled ? fetchStateRegions(territory.state.code, { limit: 6 }) : Promise.resolve(null),
   ]);
 
   const stateRegions = stateRegionsPayload?.regions ?? [];

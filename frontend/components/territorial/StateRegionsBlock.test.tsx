@@ -25,9 +25,7 @@ afterEach(() => cleanup());
 
 describe("StateRegionsBlock — supressão", () => {
   it("regions=[] → não renderiza nada (sem caixa promissora vazia)", () => {
-    const { container } = render(
-      <StateRegionsBlock stateName="São Paulo" regions={[]} />
-    );
+    const { container } = render(<StateRegionsBlock stateName="São Paulo" regions={[]} />);
     expect(container.innerHTML).toBe("");
   });
 });
@@ -40,7 +38,13 @@ describe("StateRegionsBlock — renderização básica", () => {
 
   it("renderiza um card por região (com limite default 8)", () => {
     const many = Array.from({ length: 10 }, (_, i) =>
-      buildRegion({ slug: `regiao-${i}-sp`, baseCitySlug: `regiao-${i}-sp`, baseCityName: `Região ${i}`, name: `Região de Região ${i}`, href: `/carros-usados/regiao/regiao-${i}-sp` })
+      buildRegion({
+        slug: `regiao-${i}-sp`,
+        baseCitySlug: `regiao-${i}-sp`,
+        baseCityName: `Região ${i}`,
+        name: `Região de Região ${i}`,
+        href: `/carros-usados/regiao/regiao-${i}-sp`,
+      })
     );
     render(<StateRegionsBlock stateName="São Paulo" regions={many} />);
     const cards = screen.getAllByTestId(/^state-region-card-/);
@@ -49,7 +53,13 @@ describe("StateRegionsBlock — renderização básica", () => {
 
   it("respeita maxCards quando passado", () => {
     const many = Array.from({ length: 10 }, (_, i) =>
-      buildRegion({ slug: `r-${i}-sp`, baseCitySlug: `r-${i}-sp`, baseCityName: `R${i}`, name: `Região de R${i}`, href: `/x/${i}` })
+      buildRegion({
+        slug: `r-${i}-sp`,
+        baseCitySlug: `r-${i}-sp`,
+        baseCityName: `R${i}`,
+        name: `Região de R${i}`,
+        href: `/x/${i}`,
+      })
     );
     render(<StateRegionsBlock stateName="São Paulo" regions={many} maxCards={4} />);
     expect(screen.getAllByTestId(/^state-region-card-/)).toHaveLength(4);

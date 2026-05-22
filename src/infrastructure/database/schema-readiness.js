@@ -39,10 +39,7 @@ export const ANTIFRAUD_REQUIRED_COLUMNS = Object.freeze([
 ]);
 
 /** Tabelas auxiliares introduzidas pela migration 025. */
-export const ANTIFRAUD_REQUIRED_TABLES = Object.freeze([
-  "ad_risk_signals",
-  "ad_moderation_events",
-]);
+export const ANTIFRAUD_REQUIRED_TABLES = Object.freeze(["ad_risk_signals", "ad_moderation_events"]);
 
 /**
  * Verifica que todas as colunas e tabelas exigidas pela migration 025
@@ -58,9 +55,7 @@ export const ANTIFRAUD_REQUIRED_TABLES = Object.freeze([
  */
 export async function checkAntifraudSchema(db) {
   if (!db || typeof db.query !== "function") {
-    throw new TypeError(
-      "checkAntifraudSchema: parâmetro `db` deve ter método query(sql, params)."
-    );
+    throw new TypeError("checkAntifraudSchema: parâmetro `db` deve ter método query(sql, params).");
   }
 
   const checkedAt = new Date().toISOString();
@@ -85,19 +80,11 @@ export async function checkAntifraudSchema(db) {
     db.query(tableSql, [ANTIFRAUD_REQUIRED_TABLES.slice()]),
   ]);
 
-  const presentColumns = new Set(
-    (colsRes?.rows || []).map((r) => r.column_name)
-  );
-  const presentTables = new Set(
-    (tablesRes?.rows || []).map((r) => r.table_name)
-  );
+  const presentColumns = new Set((colsRes?.rows || []).map((r) => r.column_name));
+  const presentTables = new Set((tablesRes?.rows || []).map((r) => r.table_name));
 
-  const missingColumns = ANTIFRAUD_REQUIRED_COLUMNS.filter(
-    (c) => !presentColumns.has(c)
-  );
-  const missingTables = ANTIFRAUD_REQUIRED_TABLES.filter(
-    (t) => !presentTables.has(t)
-  );
+  const missingColumns = ANTIFRAUD_REQUIRED_COLUMNS.filter((c) => !presentColumns.has(c));
+  const missingTables = ANTIFRAUD_REQUIRED_TABLES.filter((t) => !presentTables.has(t));
 
   return {
     ok: missingColumns.length === 0 && missingTables.length === 0,

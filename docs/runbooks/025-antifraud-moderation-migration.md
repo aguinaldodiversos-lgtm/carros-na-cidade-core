@@ -89,12 +89,12 @@ ORDER BY total DESC;
 
 Tabela esperada hoje (baseado em auditoria do código em 2026-05-08):
 
-| status   | situação esperada            |
-|----------|------------------------------|
-| active   | OK (uso oficial)             |
-| paused   | OK (uso oficial)             |
-| deleted  | OK (uso oficial — soft)      |
-| blocked  | OK (uso oficial — admin)     |
+| status  | situação esperada        |
+| ------- | ------------------------ |
+| active  | OK (uso oficial)         |
+| paused  | OK (uso oficial)         |
+| deleted | OK (uso oficial — soft)  |
+| blocked | OK (uso oficial — admin) |
 
 Se aparecer **qualquer outro** valor (`archived`, `pending`, `draft`, etc.) parar e abrir incidente:
 
@@ -109,14 +109,15 @@ LIMIT 50;
 
 ### Estratégia de normalização (apenas se necessário)
 
-| Encontrado    | Ação                                       |
-|---------------|--------------------------------------------|
-| `archived`    | `UPDATE ads SET status='deleted' WHERE status='archived';` (alinhar ao soft-delete real) |
-| `pending`     | Investigar — pode ser legado de subscription confundido. NÃO migrar sem confirmar dono do dado. |
-| `draft`       | Manter — a migration 025 já adiciona DRAFT ao enum canônico. |
-| outro         | Triagem manual com PO antes de qualquer UPDATE. |
+| Encontrado | Ação                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| `archived` | `UPDATE ads SET status='deleted' WHERE status='archived';` (alinhar ao soft-delete real)        |
+| `pending`  | Investigar — pode ser legado de subscription confundido. NÃO migrar sem confirmar dono do dado. |
+| `draft`    | Manter — a migration 025 já adiciona DRAFT ao enum canônico.                                    |
+| outro      | Triagem manual com PO antes de qualquer UPDATE.                                                 |
 
 > Toda normalização deve ser feita em transação:
+>
 > ```sql
 > BEGIN;
 > UPDATE ads SET status='deleted' WHERE status='archived';
@@ -256,6 +257,7 @@ Esperado pós-migration:
 Se aparecer `"antifraud": "missing"`, **parar** — o pipeline tem `try/catch` que mascara a ausência das colunas e a auditoria fica vazia. A migration 025 precisa rodar antes de promover qualquer release.
 
 Implementação:
+
 - check puro: [src/infrastructure/database/schema-readiness.js](../../src/infrastructure/database/schema-readiness.js)
 - hook de boot: [src/index.js](../../src/index.js) (`verifyAntifraudSchemaReady`)
 - exposição em healthcheck: [src/routes/health.js](../../src/routes/health.js)
@@ -279,19 +281,20 @@ npm run smoke:antifraud-staging
 
 Cenários executados:
 
-| ID | Cenário                                         | PASS quando                                      |
-|----|-------------------------------------------------|--------------------------------------------------|
-| PRE| `/health` healthy + `antifraud_schema=ok`       | migration 025 está aplicada                      |
-| LOGIN | autentica com QA user                        | `access_token` retornado                         |
-| A  | preço compatível com FIPE                       | ad criado com `status=active`                    |
-| B  | preço −30% FIPE (códigos canônicos)             | ad criado com `status=pending_review`            |
-| C  | preço −45% FIPE                                 | `pending_review` + `risk_level=critical`         |
-| D  | preço inválido (R$ 0)                           | HTTP 400, sem INSERT                             |
-| E  | sem códigos FIPE (provider indisponível)        | ad criado, `risk_reasons` contém `FIPE_UNAVAILABLE` |
-| F  | busca pública após cenário B                    | ad de B NÃO aparece, todos os listados são `active` |
-| G  | tentativa de boost no ad de B (`pending_review`)| HTTP 400 (`ad ativo` na mensagem)                |
+| ID    | Cenário                                          | PASS quando                                         |
+| ----- | ------------------------------------------------ | --------------------------------------------------- |
+| PRE   | `/health` healthy + `antifraud_schema=ok`        | migration 025 está aplicada                         |
+| LOGIN | autentica com QA user                            | `access_token` retornado                            |
+| A     | preço compatível com FIPE                        | ad criado com `status=active`                       |
+| B     | preço −30% FIPE (códigos canônicos)              | ad criado com `status=pending_review`               |
+| C     | preço −45% FIPE                                  | `pending_review` + `risk_level=critical`            |
+| D     | preço inválido (R$ 0)                            | HTTP 400, sem INSERT                                |
+| E     | sem códigos FIPE (provider indisponível)         | ad criado, `risk_reasons` contém `FIPE_UNAVAILABLE` |
+| F     | busca pública após cenário B                     | ad de B NÃO aparece, todos os listados são `active` |
+| G     | tentativa de boost no ad de B (`pending_review`) | HTTP 400 (`ad ativo` na mensagem)                   |
 
 Exit codes:
+
 - `0` — todos os cenários PASS/SKIP justificado.
 - `1` — algum FAIL ou FATAL — produção continua bloqueada.
 - `2` — env obrigatória ausente ou guard de produção bloqueou.
@@ -307,14 +310,14 @@ Implementação: [scripts/staging-antifraud-smoke.mjs](../../scripts/staging-ant
 
 ### 6.1 Sinais de falha no smoke
 
-| Sintoma                                | Diagnóstico                                                    |
-|----------------------------------------|----------------------------------------------------------------|
-| `[PRE][FATAL] migration 025 ausente…`  | rodar §4 antes de tentar de novo                               |
-| `[LOGIN][FATAL] login HTTP 401`        | senha do QA user errada ou conta bloqueada                     |
-| `[A][FAIL] esperado active, recebido pending_review` | regras FIPE_REVIEW_PCT/CRITICAL_PCT em valor inesperado, ou provider FIPE retornou preço diferente do esperado |
-| `[B][FAIL] esperado pending_review, recebido active` | `fipe_brand_code/model/year` inválidos para staging — backend caiu em FIPE_UNAVAILABLE; ajustar `STAGING_FIPE_*` |
-| `[F][FAIL] vazamento`                  | `ads-filter.builder` regrediu o WHERE `status='active'`. INCIDENTE |
-| `[G][FAIL] HTTP 200`                   | webhook/checkout aceitou boost em `pending_review`. INCIDENTE  |
+| Sintoma                                              | Diagnóstico                                                                                                       |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `[PRE][FATAL] migration 025 ausente…`                | rodar §4 antes de tentar de novo                                                                                  |
+| `[LOGIN][FATAL] login HTTP 401`                      | senha do QA user errada ou conta bloqueada                                                                        |
+| `[A][FAIL] esperado active, recebido pending_review` | regras FIPE_REVIEW_PCT/CRITICAL_PCT em valor inesperado, ou provider FIPE retornou preço diferente do esperado    |
+| `[B][FAIL] esperado pending_review, recebido active` | `fipe_brand_code/model/year` inválidos para staging — backend caiu em FIPE*UNAVAILABLE; ajustar `STAGING_FIPE*\*` |
+| `[F][FAIL] vazamento`                                | `ads-filter.builder` regrediu o WHERE `status='active'`. INCIDENTE                                                |
+| `[G][FAIL] HTTP 200`                                 | webhook/checkout aceitou boost em `pending_review`. INCIDENTE                                                     |
 
 Mantenha a saída do smoke arquivada antes de qualquer release de produção.
 
@@ -645,6 +648,7 @@ Login com usuário admin (ver A.8) e abrir
 `https://staging.carrosnacidade.com.br/admin/moderation`.
 
 Esperado:
+
 - Caso B e Caso D aparecem na lista, ordenados por `risk_score` ↓.
 - Caso A não aparece (foi para `active`).
 - Botão "Revisar" leva ao detalhe; ações `approve / reject / request-correction`

@@ -43,10 +43,8 @@ export default function BoostCheckoutButton({
   const [error, setError] = useState("");
 
   const styleByVariant = {
-    primary:
-      "bg-[linear-gradient(120deg,#f59e0b_0%,#f97316_100%)] text-white hover:brightness-110",
-    subtle:
-      "bg-white text-cnc-warning border border-cnc-warning hover:bg-cnc-warning/5",
+    primary: "bg-[linear-gradient(120deg,#f59e0b_0%,#f97316_100%)] text-white hover:brightness-110",
+    subtle: "bg-white text-cnc-warning border border-cnc-warning hover:bg-cnc-warning/5",
   };
 
   const handleClick = async () => {

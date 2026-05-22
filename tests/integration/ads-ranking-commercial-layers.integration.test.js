@@ -88,11 +88,9 @@ function buildBaseEnv(dbUrl) {
     TEST_DATABASE_URL: dbUrl,
     NODE_ENV: "test",
     RUN_WORKERS: "false",
-    JWT_SECRET:
-      process.env.JWT_SECRET || "integration-jwt-secret-minimum-32-characters-long-rank",
+    JWT_SECRET: process.env.JWT_SECRET || "integration-jwt-secret-minimum-32-characters-long-rank",
     JWT_REFRESH_SECRET:
-      process.env.JWT_REFRESH_SECRET ||
-      "integration-refresh-secret-minimum-32-characters-long",
+      process.env.JWT_REFRESH_SECRET || "integration-refresh-secret-minimum-32-characters-long",
   };
 }
 
@@ -269,10 +267,9 @@ describe.sequential("integração — camadas comerciais (Destaque > Pro > Start
       try {
         const seeded = await seedRankingFixtures(db);
         // Free CPF compra boost (R$ 39,90/7d) — vira camada 4 (Destaque).
-        await db.query(
-          `UPDATE ads SET highlight_until = NOW() + interval '7 days' WHERE id = $1`,
-          [seeded.freeCpfAdId]
-        );
+        await db.query(`UPDATE ads SET highlight_until = NOW() + interval '7 days' WHERE id = $1`, [
+          seeded.freeCpfAdId,
+        ]);
 
         const ids = await executeSearch(db, { city_slug: "test-rank-tt", limit: 50 });
 
@@ -324,10 +321,9 @@ describe.sequential("integração — camadas comerciais (Destaque > Pro > Start
         const seeded = await seedRankingFixtures(db);
         // Atualiza títulos para criar diferença textual: só Free CPF combina com "fusca".
         // Pro continua "Anuncio Pro" (sem "fusca").
-        await db.query(
-          `UPDATE ads SET title = 'Volkswagen Fusca 1978' WHERE id = $1`,
-          [seeded.freeCpfAdId]
-        );
+        await db.query(`UPDATE ads SET title = 'Volkswagen Fusca 1978' WHERE id = $1`, [
+          seeded.freeCpfAdId,
+        ]);
         // Força repopular search_vector (trigger BEFORE UPDATE deve ter feito isso, mas
         // chamamos um UPDATE explícito por garantia).
         await db.query(`UPDATE ads SET updated_at = NOW() WHERE id = $1`, [seeded.freeCpfAdId]);

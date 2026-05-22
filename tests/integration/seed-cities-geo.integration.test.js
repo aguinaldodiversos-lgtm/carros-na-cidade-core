@@ -85,8 +85,7 @@ function buildBaseEnv(dbUrl) {
     JWT_SECRET:
       process.env.JWT_SECRET || "integration-jwt-secret-minimum-32-characters-long-geoseed",
     JWT_REFRESH_SECRET:
-      process.env.JWT_REFRESH_SECRET ||
-      "integration-refresh-secret-minimum-32-characters-long",
+      process.env.JWT_REFRESH_SECRET || "integration-refresh-secret-minimum-32-characters-long",
   };
 }
 
@@ -137,12 +136,42 @@ async function writeTempFixture(label, content) {
  */
 function buildSourceFixture() {
   return [
-    { codigo_ibge: 3550308, nome: "São Paulo", latitude: -23.5505, longitude: -46.6333, codigo_uf: 35 },
-    { codigo_ibge: 3304557, nome: "Rio de Janeiro", latitude: -22.9068, longitude: -43.1729, codigo_uf: 33 },
-    { codigo_ibge: 3504503, nome: "Atibaia", latitude: -23.1171, longitude: -46.5503, codigo_uf: 35 },
+    {
+      codigo_ibge: 3550308,
+      nome: "São Paulo",
+      latitude: -23.5505,
+      longitude: -46.6333,
+      codigo_uf: 35,
+    },
+    {
+      codigo_ibge: 3304557,
+      nome: "Rio de Janeiro",
+      latitude: -22.9068,
+      longitude: -43.1729,
+      codigo_uf: 33,
+    },
+    {
+      codigo_ibge: 3504503,
+      nome: "Atibaia",
+      latitude: -23.1171,
+      longitude: -46.5503,
+      codigo_uf: 35,
+    },
     // Extras sem cidade local correspondente.
-    { codigo_ibge: 4106902, nome: "Curitiba", latitude: -25.4284, longitude: -49.2733, codigo_uf: 41 },
-    { codigo_ibge: 2927408, nome: "Salvador", latitude: -12.9714, longitude: -38.5014, codigo_uf: 29 },
+    {
+      codigo_ibge: 4106902,
+      nome: "Curitiba",
+      latitude: -25.4284,
+      longitude: -49.2733,
+      codigo_uf: 41,
+    },
+    {
+      codigo_ibge: 2927408,
+      nome: "Salvador",
+      latitude: -12.9714,
+      longitude: -38.5014,
+      codigo_uf: 29,
+    },
   ];
 }
 

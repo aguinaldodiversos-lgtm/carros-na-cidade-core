@@ -23,9 +23,7 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/env/backend-api", () => ({
   getBackendApiBaseUrl: vi.fn(() => "https://backend.example.com"),
-  resolveInternalBackendApiUrl: vi.fn(
-    (path: string) => `https://backend.example.com${path}`
-  ),
+  resolveInternalBackendApiUrl: vi.fn((path: string) => `https://backend.example.com${path}`),
 }));
 
 vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
@@ -239,9 +237,7 @@ describe("smoke: null safety — region indisponível NUNCA vira busca ampla", (
     // retornar `{}` silenciosamente — `{}` viraria uma busca nacional sem
     // território, que em prod seria uma página regional listando o Brasil
     // inteiro (regressão de SEO + bug visível).
-    expect(() =>
-      regionToAdsSearchFilters(region as unknown as RegionPayload)
-    ).toThrow(/region/i);
+    expect(() => regionToAdsSearchFilters(region as unknown as RegionPayload)).toThrow(/region/i);
   });
 
   it("padrão idiomático: caller checa null e simplesmente não chama o pipeline", async () => {

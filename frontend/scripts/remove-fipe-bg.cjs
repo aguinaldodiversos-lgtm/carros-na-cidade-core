@@ -67,9 +67,7 @@ async function processOne({ label, inCandidates, out }) {
 
   // Resize para tamanho web-ótimo antes de mexer no alpha — reduz o
   // PNG final de ~2MB para ~150-300KB sem perda visível.
-  const img = sharp(inPath)
-    .resize({ width: OUTPUT_WIDTH, withoutEnlargement: true })
-    .ensureAlpha();
+  const img = sharp(inPath).resize({ width: OUTPUT_WIDTH, withoutEnlargement: true }).ensureAlpha();
   const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
   const buf = Buffer.from(data);
 

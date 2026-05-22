@@ -358,9 +358,7 @@ describe.sequential("integração — compatibilidade de migrations", () => {
         const userColumns = await listColumns(db, "users");
         expect(userColumns.has("plan_id")).toBe(true);
 
-        const seededPlans = await db.query(
-          `SELECT id FROM subscription_plans ORDER BY id ASC`
-        );
+        const seededPlans = await db.query(`SELECT id FROM subscription_plans ORDER BY id ASC`);
         const seededIds = seededPlans.rows.map((row) => row.id);
         expect(seededIds).toEqual([
           "cnpj-evento-premium",
@@ -401,9 +399,7 @@ describe.sequential("integração — compatibilidade de migrations", () => {
         const result = await db.query(
           `SELECT email, plan_id FROM users WHERE email LIKE '%@test.local' ORDER BY email ASC`
         );
-        const byEmail = Object.fromEntries(
-          result.rows.map((row) => [row.email, row.plan_id])
-        );
+        const byEmail = Object.fromEntries(result.rows.map((row) => [row.email, row.plan_id]));
 
         expect(byEmail["cpf-free@test.local"]).toBe("cpf-free-essential");
         expect(byEmail["cnpj-free@test.local"]).toBe("cnpj-free-store");

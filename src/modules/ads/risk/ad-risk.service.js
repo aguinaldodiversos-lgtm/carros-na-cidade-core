@@ -218,10 +218,7 @@ export async function calculateForAd(input, dependencies = {}) {
   // 6. Conta recém-criada
   // ─────────────────────────────────────────────────────────────────────
   const accountAgeDays = dayDiff(account?.created_at);
-  if (
-    accountAgeDays != null &&
-    accountAgeDays < NEW_ACCOUNT_DAYS_THRESHOLD
-  ) {
+  if (accountAgeDays != null && accountAgeDays < NEW_ACCOUNT_DAYS_THRESHOLD) {
     reasons.push(
       buildSignal({
         code: RISK_SIGNAL_CODE.NEW_ACCOUNT,
@@ -236,10 +233,11 @@ export async function calculateForAd(input, dependencies = {}) {
   // ─────────────────────────────────────────────────────────────────────
   // 7. WhatsApp/telefone reutilizado em múltiplas contas
   // ─────────────────────────────────────────────────────────────────────
-  const phoneToCheck =
-    String(account?.whatsapp || account?.phone || advertiser?.whatsapp || advertiser?.phone || "")
-      .replace(/\D/g, "")
-      .slice(-11);
+  const phoneToCheck = String(
+    account?.whatsapp || account?.phone || advertiser?.whatsapp || advertiser?.phone || ""
+  )
+    .replace(/\D/g, "")
+    .slice(-11);
 
   if (
     phoneToCheck &&
@@ -289,9 +287,7 @@ export async function calculateForAd(input, dependencies = {}) {
   const riskScore = Math.max(0, Math.min(100, Math.round(rawScore)));
   const riskLevel = scoreToLevel(riskScore);
 
-  const hasHighOrCritical = reasons.some(
-    (r) => r.severity === "high" || r.severity === "critical"
-  );
+  const hasHighOrCritical = reasons.some((r) => r.severity === "high" || r.severity === "critical");
 
   const shouldRejectImmediately = priceInvalid;
   const shouldSendToReview =

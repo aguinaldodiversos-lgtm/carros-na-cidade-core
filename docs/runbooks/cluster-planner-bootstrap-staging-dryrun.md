@@ -27,22 +27,24 @@
 
 ## 1. Ambiente
 
-| Item | Valor |
-|---|---|
-| Serviço Render usado | _(ex.: `carros-na-cidade-core-staging` shell)_ |
-| Banco staging | _(ex.: `cnc-staging` no Render Postgres; confirmar via `echo $DATABASE_URL \| sed 's/:[^@]*@/:***@/'`)_ |
-| Data/hora de execução | _(UTC, ex.: `2026-05-03 14:32 UTC`)_ |
-| Operador | _(Aguinaldo)_ |
-| Versão do Node | _(saída de `node --version`; esperado >= v20)_ |
-| Branch / commit do código no Render | _(saída de `git rev-parse --short HEAD` no shell do serviço)_ |
-| Comando exato executado | `node scripts/seo/bootstrap-cluster-plans.mjs --dry-run --limit=3` |
-| **Confirmação:** `--yes` foi usado? | **NÃO** |
-| **Confirmação:** comando bateu em prod? | **NÃO** (somente staging) |
+| Item                                    | Valor                                                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Serviço Render usado                    | _(ex.: `carros-na-cidade-core-staging` shell)_                                                          |
+| Banco staging                           | _(ex.: `cnc-staging` no Render Postgres; confirmar via `echo $DATABASE_URL \| sed 's/:[^@]*@/:***@/'`)_ |
+| Data/hora de execução                   | _(UTC, ex.: `2026-05-03 14:32 UTC`)_                                                                    |
+| Operador                                | _(Aguinaldo)_                                                                                           |
+| Versão do Node                          | _(saída de `node --version`; esperado >= v20)_                                                          |
+| Branch / commit do código no Render     | _(saída de `git rev-parse --short HEAD` no shell do serviço)_                                           |
+| Comando exato executado                 | `node scripts/seo/bootstrap-cluster-plans.mjs --dry-run --limit=3`                                      |
+| **Confirmação:** `--yes` foi usado?     | **NÃO**                                                                                                 |
+| **Confirmação:** comando bateu em prod? | **NÃO** (somente staging)                                                                               |
 
 > ⚠️ Antes de rodar, confirmar com:
+>
 > ```bash
 > echo $DATABASE_URL | sed 's/:[^@]*@/:***@/'
 > ```
+>
 > O host deve ser o do banco de **staging**, não de prod. Se houver dúvida,
 > **abortar**.
 
@@ -76,13 +78,13 @@ WHERE status = 'active' AND city_id IS NOT NULL;
 
 ### Resultado
 
-| # | Métrica | Valor encontrado | Esperado / sanity |
-|---|---|---|---|
-| Q1 | `seo_cluster_plans` total | _( )_ | 0 ou pequeno legado. Se >> 0, parar e investigar antes do dry-run. |
-| Q2 | distribuição cluster_type × status | _( colar saída )_ | Tipos esperados: `city_home`, `city_below_fipe`, `city_opportunities`, `city_brand`, `city_brand_model`. Status: `planned`, `generated`, `published`. |
-| Q3 | `cities` total | _( )_ | ~5570 (staging deve refletir prod). Se for muito baixo, top-N pode não ter cidades suficientes para `--limit=3`. |
-| Q4 | `ads` ativos | _( )_ | Sanity: precisa ser > 0 para o **fallback** ads+cities encontrar cidades. |
-| Q5 | `ads` ativos com `city_id` | _( )_ | Se `city_scores` estiver vazia, este é o universo elegível para o fallback. **Q5 = 0 → dry-run retorna `totalCities=0`**. |
+| #   | Métrica                            | Valor encontrado  | Esperado / sanity                                                                                                                                     |
+| --- | ---------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | `seo_cluster_plans` total          | _( )_             | 0 ou pequeno legado. Se >> 0, parar e investigar antes do dry-run.                                                                                    |
+| Q2  | distribuição cluster_type × status | _( colar saída )_ | Tipos esperados: `city_home`, `city_below_fipe`, `city_opportunities`, `city_brand`, `city_brand_model`. Status: `planned`, `generated`, `published`. |
+| Q3  | `cities` total                     | _( )_             | ~5570 (staging deve refletir prod). Se for muito baixo, top-N pode não ter cidades suficientes para `--limit=3`.                                      |
+| Q4  | `ads` ativos                       | _( )_             | Sanity: precisa ser > 0 para o **fallback** ads+cities encontrar cidades.                                                                             |
+| Q5  | `ads` ativos com `city_id`         | _( )_             | Se `city_scores` estiver vazia, este é o universo elegível para o fallback. **Q5 = 0 → dry-run retorna `totalCities=0`**.                             |
 
 ### Diagnóstico complementar (decide se a primária ou o fallback será usado)
 
@@ -91,8 +93,8 @@ WHERE status = 'active' AND city_id IS NOT NULL;
 SELECT COUNT(*) AS total FROM city_scores;
 ```
 
-| Métrica | Valor | Implicação |
-|---|---|---|
+| Métrica             | Valor | Implicação                                                                                         |
+| ------------------- | ----- | -------------------------------------------------------------------------------------------------- |
 | `city_scores` total | _( )_ | `> 0` → primária usada (esperar `stage` real nas saídas). `= 0` → fallback usado (`stage='seed'`). |
 
 ---
@@ -115,22 +117,22 @@ ORDER BY ordinal_position;
 faz `INSERT … ON CONFLICT (path) DO UPDATE` usando os campos abaixo. Cada
 linha precisa existir no schema; tipos e nullability têm que ser compatíveis.
 
-| Coluna | Tipo encontrado | Nullable | Default | Esperado | Compatível? |
-|---|---|---|---|---|---|
-| `id` | _( )_ | _( )_ | _( )_ | PK qualquer (não usado por upsert) | _( )_ |
-| `city_id` | _( )_ | _( )_ | _( )_ | int / bigint, FK para `cities.id` | _( )_ |
-| `cluster_type` | _( )_ | _( )_ | _( )_ | text / varchar | _( )_ |
-| `path` | _( )_ | _( )_ | _( )_ | text **com UNIQUE/PK** (usado em `ON CONFLICT (path)`) | _( )_ |
-| `brand` | _( )_ | _( )_ | _( )_ | text nullable | _( )_ |
-| `model` | _( )_ | _( )_ | _( )_ | text nullable | _( )_ |
-| `money_page` | _( )_ | _( )_ | _( )_ | boolean | _( )_ |
-| `priority` | _( )_ | _( )_ | _( )_ | int / numeric | _( )_ |
-| `status` | _( )_ | _( )_ | _( )_ | text (`planned` / `generated` / `published`) | _( )_ |
-| `stage` | _( )_ | _( )_ | _( )_ | text (`discovery` / `expansion` / …) | _( )_ |
-| `payload` | _( )_ | _( )_ | _( )_ | `jsonb` (cast `$10::jsonb` no INSERT) | _( )_ |
-| `created_at` | _( )_ | _( )_ | _( )_ | timestamptz, default `NOW()` aceitável | _( )_ |
-| `updated_at` | _( )_ | _( )_ | _( )_ | timestamptz, default `NOW()` aceitável | _( )_ |
-| `last_generated_at` | _( )_ | _( )_ | _( )_ | timestamptz nullable (usado por `markClusterPlanGenerated`) | _( )_ |
+| Coluna              | Tipo encontrado | Nullable | Default | Esperado                                                    | Compatível? |
+| ------------------- | --------------- | -------- | ------- | ----------------------------------------------------------- | ----------- |
+| `id`                | _( )_           | _( )_    | _( )_   | PK qualquer (não usado por upsert)                          | _( )_       |
+| `city_id`           | _( )_           | _( )_    | _( )_   | int / bigint, FK para `cities.id`                           | _( )_       |
+| `cluster_type`      | _( )_           | _( )_    | _( )_   | text / varchar                                              | _( )_       |
+| `path`              | _( )_           | _( )_    | _( )_   | text **com UNIQUE/PK** (usado em `ON CONFLICT (path)`)      | _( )_       |
+| `brand`             | _( )_           | _( )_    | _( )_   | text nullable                                               | _( )_       |
+| `model`             | _( )_           | _( )_    | _( )_   | text nullable                                               | _( )_       |
+| `money_page`        | _( )_           | _( )_    | _( )_   | boolean                                                     | _( )_       |
+| `priority`          | _( )_           | _( )_    | _( )_   | int / numeric                                               | _( )_       |
+| `status`            | _( )_           | _( )_    | _( )_   | text (`planned` / `generated` / `published`)                | _( )_       |
+| `stage`             | _( )_           | _( )_    | _( )_   | text (`discovery` / `expansion` / …)                        | _( )_       |
+| `payload`           | _( )_           | _( )_    | _( )_   | `jsonb` (cast `$10::jsonb` no INSERT)                       | _( )_       |
+| `created_at`        | _( )_           | _( )_    | _( )_   | timestamptz, default `NOW()` aceitável                      | _( )_       |
+| `updated_at`        | _( )_           | _( )_    | _( )_   | timestamptz, default `NOW()` aceitável                      | _( )_       |
+| `last_generated_at` | _( )_           | _( )_    | _( )_   | timestamptz nullable (usado por `markClusterPlanGenerated`) | _( )_       |
 
 ### Verificação adicional do índice UNIQUE em `path`
 
@@ -144,8 +146,8 @@ Esperado: existir índice `UNIQUE` ou constraint `PRIMARY KEY` cobrindo
 `path`. Sem isso, `ON CONFLICT (path)` falhará no `--yes`.
 
 | Índice encontrado | Cobre `path` UNIQUE? |
-|---|---|
-| _( colar saída )_ | _( sim / não )_ |
+| ----------------- | -------------------- |
+| _( colar saída )_ | _( sim / não )_      |
 
 ---
 
@@ -168,15 +170,15 @@ Política Opção A com `--limit=3`: 3 cidades × 5 cluster_types = 15 generated
 9 skipped (`opportunities` + `brand` + `brand_model` por cidade);
 6 transformados/persistíveis (`home` + `below_fipe` por cidade); 0 erros.
 
-| Métrica | Esperado | Encontrado | Match? |
-|---|---|---|---|
-| `totalCities` | 3 | _( )_ | _( )_ |
-| `totalGenerated` | 15 | _( )_ | _( )_ |
-| `totalSkipped` | 9 | _( )_ | _( )_ |
-| `totalTransformed` | 6 | _( )_ | _( )_ |
-| `totalToPersist` | 6 | _( )_ | _( )_ |
-| `totalErrors` | 0 | _( )_ | _( )_ |
-| `totalPersisted` | 0 (dry-run) | _( )_ | _( )_ |
+| Métrica            | Esperado    | Encontrado | Match? |
+| ------------------ | ----------- | ---------- | ------ |
+| `totalCities`      | 3           | _( )_      | _( )_  |
+| `totalGenerated`   | 15          | _( )_      | _( )_  |
+| `totalSkipped`     | 9           | _( )_      | _( )_  |
+| `totalTransformed` | 6           | _( )_      | _( )_  |
+| `totalToPersist`   | 6           | _( )_      | _( )_  |
+| `totalErrors`      | 0           | _( )_      | _( )_  |
+| `totalPersisted`   | 0 (dry-run) | _( )_      | _( )_  |
 
 > Se `totalCities < 3`: top-N do builder não retornou 3 cidades — checar
 > `cities` populadas em staging. Se `totalErrors > 0`: ler `transformErrors`
@@ -186,24 +188,24 @@ Política Opção A com `--limit=3`: 3 cidades × 5 cluster_types = 15 generated
 
 ## 6. Validação dos paths (samples)
 
-| cluster_type | path original | path transformado | Decisão | Aprovado? |
-|---|---|---|---|---|
-| `city_home` | `/cidade/<slug-1>` | _( esperado: `/carros-em/<slug-1>` )_ | persistir | _( sim / não )_ |
-| `city_below_fipe` | `/cidade/<slug-1>/abaixo-da-fipe` | _( esperado: `/carros-baratos-em/<slug-1>` )_ | persistir | _( sim / não )_ |
-| `city_opportunities` | `/cidade/<slug-1>/oportunidades` | _( esperado: não aparece como sample — é skip )_ | skip | _( sim / não )_ |
-| `city_brand` | `/cidade/<slug-1>/marca/<brand>` | _( esperado: não aparece como sample — é skip )_ | skip | _( sim / não )_ |
-| `city_brand_model` | `/cidade/<slug-1>/marca/<brand>/modelo/<model>` | _( esperado: não aparece como sample — é skip )_ | skip | _( sim / não )_ |
-| `city_home` | `/cidade/<slug-2>` | _( esperado: `/carros-em/<slug-2>` )_ | persistir | _( sim / não )_ |
-| `city_below_fipe` | `/cidade/<slug-2>/abaixo-da-fipe` | _( esperado: `/carros-baratos-em/<slug-2>` )_ | persistir | _( sim / não )_ |
+| cluster_type         | path original                                   | path transformado                                | Decisão   | Aprovado?       |
+| -------------------- | ----------------------------------------------- | ------------------------------------------------ | --------- | --------------- |
+| `city_home`          | `/cidade/<slug-1>`                              | _( esperado: `/carros-em/<slug-1>` )_            | persistir | _( sim / não )_ |
+| `city_below_fipe`    | `/cidade/<slug-1>/abaixo-da-fipe`               | _( esperado: `/carros-baratos-em/<slug-1>` )_    | persistir | _( sim / não )_ |
+| `city_opportunities` | `/cidade/<slug-1>/oportunidades`                | _( esperado: não aparece como sample — é skip )_ | skip      | _( sim / não )_ |
+| `city_brand`         | `/cidade/<slug-1>/marca/<brand>`                | _( esperado: não aparece como sample — é skip )_ | skip      | _( sim / não )_ |
+| `city_brand_model`   | `/cidade/<slug-1>/marca/<brand>/modelo/<model>` | _( esperado: não aparece como sample — é skip )_ | skip      | _( sim / não )_ |
+| `city_home`          | `/cidade/<slug-2>`                              | _( esperado: `/carros-em/<slug-2>` )_            | persistir | _( sim / não )_ |
+| `city_below_fipe`    | `/cidade/<slug-2>/abaixo-da-fipe`               | _( esperado: `/carros-baratos-em/<slug-2>` )_    | persistir | _( sim / não )_ |
 
 ### Asserções negativas (devem ser TODAS verdadeiras)
 
-| Asserção | Resultado |
-|---|---|
-| Nenhum sample contém `/cidade/<slug>/marca/` (sem `modelo/`) | _( pass / fail )_ |
-| Nenhum sample contém `/cidade/<slug>/marca/<brand>/modelo/` | _( pass / fail )_ |
-| Nenhum sample contém `/cidade/<slug>/oportunidades` como path transformado | _( pass / fail )_ |
-| Nenhum sample contém `/comprar/cidade/` (canônica antiga pré-Fase 1) | _( pass / fail )_ |
+| Asserção                                                                        | Resultado         |
+| ------------------------------------------------------------------------------- | ----------------- |
+| Nenhum sample contém `/cidade/<slug>/marca/` (sem `modelo/`)                    | _( pass / fail )_ |
+| Nenhum sample contém `/cidade/<slug>/marca/<brand>/modelo/`                     | _( pass / fail )_ |
+| Nenhum sample contém `/cidade/<slug>/oportunidades` como path transformado      | _( pass / fail )_ |
+| Nenhum sample contém `/comprar/cidade/` (canônica antiga pré-Fase 1)            | _( pass / fail )_ |
 | Todos os paths transformados começam com `/carros-em/` ou `/carros-baratos-em/` | _( pass / fail )_ |
 
 ---
@@ -237,6 +239,7 @@ Marcar **uma** opção:
 > **Tarefa:** Persistência controlada em **staging** (não prod) com `--yes --limit=3`.
 >
 > Pré-condições:
+>
 > - §7 deste runbook = **APROVADO**.
 > - Capturar timestamp ANTES do batch para rollback pontual:
 >   ```sql
@@ -246,12 +249,14 @@ Marcar **uma** opção:
 >   o banco de **staging**.
 >
 > Execução:
+>
 > ```bash
 > node scripts/seo/bootstrap-cluster-plans.mjs --yes --limit=3
 > ```
 >
 > Validação SQL após (esperado: 6 linhas novas em `seo_cluster_plans` com
 > status `planned`):
+>
 > ```sql
 > SELECT cluster_type, COUNT(*) FROM seo_cluster_plans
 >   GROUP BY cluster_type ORDER BY cluster_type;
@@ -268,6 +273,7 @@ Marcar **uma** opção:
 > ```
 >
 > Plano de rollback se algo divergir:
+>
 > ```sql
 > DELETE FROM seo_cluster_plans
 > WHERE created_at >= '<timestamp do SELECT NOW() acima>'

@@ -6,11 +6,7 @@ import { useCallback, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { VehicleImage } from "@/components/ui/VehicleImage";
-import {
-  type AdBadge,
-  inferAdTier,
-  resolvePublicAdBadges,
-} from "@/lib/ads/ad-badges";
+import { type AdBadge, inferAdTier, resolvePublicAdBadges } from "@/lib/ads/ad-badges";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
@@ -313,9 +309,7 @@ function resolveBadge(item: BaseAdData): SimpleBadgeChip | null {
   if (firstSimple) {
     // Capitaliza ("OFERTA DESTAQUE" → "Oferta Destaque") para variant Badge.
     return {
-      label: firstSimple.label
-        .toLowerCase()
-        .replace(/(^|\s)\S/g, (m) => m.toUpperCase()),
+      label: firstSimple.label.toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()),
       variant: firstSimple.variant as SimpleBadgeVariant,
     };
   }

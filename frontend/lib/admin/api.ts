@@ -80,8 +80,7 @@ export const adminApi = {
       adminFetch<ApiOne<SeoCityMetric[]>>("metrics/seo/cities", { params: { limit } }),
   },
   regional: {
-    getSettings: () =>
-      adminFetch<ApiOne<RegionalSettings>>("regional-settings"),
+    getSettings: () => adminFetch<ApiOne<RegionalSettings>>("regional-settings"),
     updateSettings: (radius_km: number, reason?: string) =>
       adminFetch<ApiOne<RegionalSettings>>("regional-settings", {
         method: "PATCH",
@@ -95,18 +94,17 @@ export const adminApi = {
           Object.entries({ limit: 50, ...p }).map(([k, v]) => [k, String(v)])
         ),
       }),
-    detail: (id: string | number) =>
-      adminFetch<ApiOne<ModerationAdDetail>>(`moderation/ads/${id}`),
+    detail: (id: string | number) => adminFetch<ApiOne<ModerationAdDetail>>(`moderation/ads/${id}`),
     approve: (id: string | number) =>
-      adminFetch<ApiOne<{ ok: boolean; status: string }>>(
-        `moderation/ads/${id}/approve`,
-        { method: "POST", body: {} }
-      ),
+      adminFetch<ApiOne<{ ok: boolean; status: string }>>(`moderation/ads/${id}/approve`, {
+        method: "POST",
+        body: {},
+      }),
     reject: (id: string | number, reason: string) =>
-      adminFetch<ApiOne<{ ok: boolean; status: string }>>(
-        `moderation/ads/${id}/reject`,
-        { method: "POST", body: { reason } }
-      ),
+      adminFetch<ApiOne<{ ok: boolean; status: string }>>(`moderation/ads/${id}/reject`, {
+        method: "POST",
+        body: { reason },
+      }),
     requestCorrection: (id: string | number, reason: string) =>
       adminFetch<ApiOne<{ ok: boolean; status: string }>>(
         `moderation/ads/${id}/request-correction`,

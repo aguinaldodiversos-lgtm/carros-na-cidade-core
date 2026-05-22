@@ -66,10 +66,9 @@ export async function getSetting(key, defaultValue) {
   if (cached !== undefined) return cached;
 
   try {
-    const result = await pool.query(
-      `SELECT value FROM platform_settings WHERE key = $1 LIMIT 1`,
-      [safeKey]
-    );
+    const result = await pool.query(`SELECT value FROM platform_settings WHERE key = $1 LIMIT 1`, [
+      safeKey,
+    ]);
     if (!result.rows[0]) {
       // Cacheia o default também — evita SELECT repetido para keys ausentes.
       setCached(safeKey, defaultValue);

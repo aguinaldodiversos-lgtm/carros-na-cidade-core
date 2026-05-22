@@ -15,11 +15,7 @@ describe("decideHostRedirect — hosts onrender.com → canônico", () => {
   });
 
   it("hosts onrender com porta também são detectados", () => {
-    const out = decideHostRedirect(
-      "carros-na-cidade-portal.onrender.com:443",
-      "/blog",
-      ""
-    );
+    const out = decideHostRedirect("carros-na-cidade-portal.onrender.com:443", "/blog", "");
     expect(out.kind).toBe("redirect");
   });
 
@@ -38,11 +34,7 @@ describe("decideHostRedirect — hosts onrender.com → canônico", () => {
 
 describe("decideHostRedirect — exceções (healthcheck do Render)", () => {
   it("pathname='/' NÃO redireciona (Render usa raiz como healthcheck)", () => {
-    const out = decideHostRedirect(
-      "carros-na-cidade-portal.onrender.com",
-      "/",
-      ""
-    );
+    const out = decideHostRedirect("carros-na-cidade-portal.onrender.com", "/", "");
     expect(out.kind).toBe("pass");
   });
 

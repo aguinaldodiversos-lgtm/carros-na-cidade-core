@@ -7,7 +7,9 @@ import {
 } from "../../src/modules/ads/filters/ads-ranking.sql.js";
 
 function normalize(sql) {
-  return String(sql || "").replace(/\s+/g, " ").trim();
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 describe("commercialLayerExpr", () => {
@@ -76,9 +78,7 @@ describe("buildSortClause — sort modes que NÃO mudam (intenção explícita d
   });
 
   it("year_asc/year_desc/mileage_asc/mileage_desc seguem comportamento original", () => {
-    expect(normalize(buildSortClause("year_asc"))).toBe(
-      "a.year ASC NULLS LAST, a.created_at DESC"
-    );
+    expect(normalize(buildSortClause("year_asc"))).toBe("a.year ASC NULLS LAST, a.created_at DESC");
     expect(normalize(buildSortClause("year_desc"))).toBe(
       "a.year DESC NULLS LAST, a.created_at DESC"
     );

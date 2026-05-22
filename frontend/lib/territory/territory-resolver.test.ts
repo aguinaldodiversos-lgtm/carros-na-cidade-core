@@ -122,7 +122,14 @@ describe("resolveTerritory — input explícito de região", () => {
     mockedRegion.mockResolvedValue({
       base: { id: 1, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
       members: [
-        { city_id: 2, slug: "braganca-paulista-sp", name: "Bragança Paulista", state: "SP", layer: 1, distance_km: 25 },
+        {
+          city_id: 2,
+          slug: "braganca-paulista-sp",
+          name: "Bragança Paulista",
+          state: "SP",
+          layer: 1,
+          distance_km: 25,
+        },
         { city_id: 3, slug: "itatiba-sp", name: "Itatiba", state: "SP", layer: 1, distance_km: 28 },
       ],
       radius_km: 80,

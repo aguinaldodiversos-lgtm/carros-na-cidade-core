@@ -61,11 +61,7 @@ describe("buildInternalBackendHeaders", () => {
     buildInternalBackendHeaders();
     buildInternalBackendHeaders();
 
-    const allCalls = [
-      ...errSpy.mock.calls,
-      ...warnSpy.mock.calls,
-      ...logSpy.mock.calls,
-    ].flat();
+    const allCalls = [...errSpy.mock.calls, ...warnSpy.mock.calls, ...logSpy.mock.calls].flat();
 
     for (const c of allCalls) {
       const s = typeof c === "string" ? c : JSON.stringify(c);

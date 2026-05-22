@@ -35,7 +35,9 @@ describe("/planos — metadata SEO", () => {
 
   it("description menciona oferta sem promessas vazias", () => {
     expect(String(metadata.description || "")).toMatch(/anuncie|grátis|destaque/i);
-    expect(String(metadata.description || "")).not.toMatch(/evento premium|feirão|banner regional|crm/i);
+    expect(String(metadata.description || "")).not.toMatch(
+      /evento premium|feirão|banner regional|crm/i
+    );
   });
 
   it("canonical = /planos (limpo, sem query)", () => {
@@ -173,16 +175,12 @@ describe("/planos — CTAs apontam para login → fluxo do anúncio (Mercado Pag
 
   it("Start → /login?next=/anunciar?plano=start", () => {
     const { container } = renderPage();
-    expect(hrefOfCta(container, "lojista-start")).toBe(
-      "/login?next=/anunciar?plano=start"
-    );
+    expect(hrefOfCta(container, "lojista-start")).toBe("/login?next=/anunciar?plano=start");
   });
 
   it("Pro → /login?next=/anunciar?plano=pro", () => {
     const { container } = renderPage();
-    expect(hrefOfCta(container, "lojista-pro")).toBe(
-      "/login?next=/anunciar?plano=pro"
-    );
+    expect(hrefOfCta(container, "lojista-pro")).toBe("/login?next=/anunciar?plano=pro");
   });
 
   it("Destaque 7 dias → /login?next=/anunciar?acao=destaque (NÃO checkout MP — exige ad_id)", () => {
@@ -190,9 +188,7 @@ describe("/planos — CTAs apontam para login → fluxo do anúncio (Mercado Pag
     // CTA público leva ao fluxo de criar/escolher anúncio; Mercado Pago
     // é acionado APENAS pelo BoostCheckoutButton no painel pós-revisão.
     const { container } = renderPage();
-    expect(hrefOfCta(container, "destaque-7-dias")).toBe(
-      "/login?next=/anunciar?acao=destaque"
-    );
+    expect(hrefOfCta(container, "destaque-7-dias")).toBe("/login?next=/anunciar?acao=destaque");
   });
 
   it("TODAS as 4 CTAs começam com /login?next= (forçam autenticação antes de qualquer ação comercial)", () => {
@@ -206,7 +202,9 @@ describe("/planos — CTAs apontam para login → fluxo do anúncio (Mercado Pag
 
   it("nenhum link da página aponta para mercadopago.com / /api/payments diretamente", () => {
     const { container } = renderPage();
-    const hrefs = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href") || "");
+    const hrefs = Array.from(container.querySelectorAll("a")).map(
+      (a) => a.getAttribute("href") || ""
+    );
     for (const href of hrefs) {
       expect(href).not.toMatch(/mercadopago/i);
       expect(href).not.toMatch(/^\/api\/payments/);

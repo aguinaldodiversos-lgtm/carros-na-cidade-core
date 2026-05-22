@@ -64,10 +64,7 @@ export async function countRecentByIpHashAndAd(reporter_ip_hash, ad_id, windowSe
  * inexistente/removido é descartada com 404 (sem cair em 500).
  */
 export async function adExistsForReport(ad_id) {
-  const { rows } = await db.query(
-    `SELECT id, status FROM ads WHERE id = $1 LIMIT 1`,
-    [ad_id]
-  );
+  const { rows } = await db.query(`SELECT id, status FROM ads WHERE id = $1 LIMIT 1`, [ad_id]);
   const row = rows[0];
   if (!row) return false;
   // Permite denúncia em pending_review/active. Bloqueamos só status

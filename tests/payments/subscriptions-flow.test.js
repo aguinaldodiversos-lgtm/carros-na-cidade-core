@@ -22,7 +22,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../src/infrastructure/database/db.js", () => ({
   query: vi.fn(),
-  withTransaction: vi.fn((fn) => fn({ query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }) })),
+  withTransaction: vi.fn((fn) =>
+    fn({ query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }) })
+  ),
   pool: { query: vi.fn() },
 }));
 
@@ -40,14 +42,11 @@ vi.mock("../../src/shared/config/features.js", () => ({
 
 const account = await import("../../src/modules/account/account.service.js");
 const db = await import("../../src/infrastructure/database/db.js");
-const {
-  createSubscriptionCheckout,
-  cancelUserSubscription,
-  ALLOWED_SUBSCRIPTION_PLAN_IDS,
-} = await import("../../src/modules/payments/subscriptions.service.js");
-const {
-  mapPreapprovalStatusToLocal,
-} = await import("../../src/modules/payments/mercadopago-subscription.client.js");
+const { createSubscriptionCheckout, cancelUserSubscription, ALLOWED_SUBSCRIPTION_PLAN_IDS } =
+  await import("../../src/modules/payments/subscriptions.service.js");
+const { mapPreapprovalStatusToLocal } = await import(
+  "../../src/modules/payments/mercadopago-subscription.client.js"
+);
 
 const PLAN_START = {
   id: "cnpj-store-start",
@@ -73,9 +72,11 @@ beforeEach(() => {
   account.getPlanById.mockReset();
   account.isEventPlanId.mockReset().mockImplementation((id) => id === "cnpj-evento-premium");
   db.query.mockReset();
-  db.withTransaction.mockReset().mockImplementation((fn) =>
-    fn({ query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }) })
-  );
+  db.withTransaction
+    .mockReset()
+    .mockImplementation((fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }) })
+    );
 
   // Default: nenhuma sub viva (findLiveSubscriptionForUser → null)
   db.query.mockResolvedValue({ rows: [] });
@@ -251,7 +252,9 @@ describe("createSubscriptionCheckout — bloqueio de duplicata", () => {
 
   it("409 quando user tem sub pending (aguardando autorização MP)", async () => {
     db.query.mockResolvedValueOnce({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "pending", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "pending", created_at: "2026-04-01" },
+      ],
     });
 
     await expect(
@@ -265,7 +268,9 @@ describe("createSubscriptionCheckout — bloqueio de duplicata", () => {
 
   it("409 quando user tem sub paused (deve reativar, não criar nova)", async () => {
     db.query.mockResolvedValueOnce({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "paused", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "paused", created_at: "2026-04-01" },
+      ],
     });
 
     await expect(

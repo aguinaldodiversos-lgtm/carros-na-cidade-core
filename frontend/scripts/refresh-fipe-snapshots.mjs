@@ -58,9 +58,7 @@ async function fetchBrands(type) {
 }
 
 async function fetchModels(type, brandCode) {
-  const data = await fetchJson(
-    `${BASE}/${type}/marcas/${encodeURIComponent(brandCode)}/modelos`
-  );
+  const data = await fetchJson(`${BASE}/${type}/marcas/${encodeURIComponent(brandCode)}/modelos`);
   const list = Array.isArray(data?.modelos) ? data.modelos : [];
   return list.map(normalizeOption).filter((m) => m.code && m.name);
 }

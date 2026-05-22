@@ -82,8 +82,33 @@ describe("getStateCuratedCities", () => {
 describe("getStateCuratedCities — DESTAQUE NÃO LIMITA COBERTURA", () => {
   it("cobre os 27 UFs do Brasil (cobertura nacional de destaque)", () => {
     const allUfs = [
-      "ac","al","am","ap","ba","ce","df","es","go","ma","mg","ms","mt",
-      "pa","pb","pe","pi","pr","rj","rn","ro","rr","rs","sc","se","sp","to",
+      "ac",
+      "al",
+      "am",
+      "ap",
+      "ba",
+      "ce",
+      "df",
+      "es",
+      "go",
+      "ma",
+      "mg",
+      "ms",
+      "mt",
+      "pa",
+      "pb",
+      "pe",
+      "pi",
+      "pr",
+      "rj",
+      "rn",
+      "ro",
+      "rr",
+      "rs",
+      "sc",
+      "se",
+      "sp",
+      "to",
     ];
     for (const uf of allUfs) {
       const cities = getStateCuratedCities(uf);

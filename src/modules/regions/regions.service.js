@@ -236,10 +236,7 @@ export async function getRegionByBaseSlugDynamic(slug) {
   try {
     radius = await getRegionalRadiusKm();
   } catch (err) {
-    logger.warn(
-      { err: err?.message },
-      "[regions] falha ao ler radius_km — usando 80 km"
-    );
+    logger.warn({ err: err?.message }, "[regions] falha ao ler radius_km — usando 80 km");
   }
 
   let rows = null;
@@ -296,8 +293,12 @@ export async function getRegionByBaseSlugDynamic(slug) {
  *  - cidade existe mas is_ancora = false (sem anúncios ativos)
  */
 export async function getAncoraBySlugPart(ancoraPart, uf) {
-  const part = String(ancoraPart || "").trim().toLowerCase();
-  const state = String(uf || "").trim().toUpperCase();
+  const part = String(ancoraPart || "")
+    .trim()
+    .toLowerCase();
+  const state = String(uf || "")
+    .trim()
+    .toUpperCase();
   if (!part || !state) return null;
 
   const fullSlug = `${part}-${state.toLowerCase()}`;
@@ -324,7 +325,8 @@ export async function getAncoraBySlugPart(ancoraPart, uf) {
  */
 export async function getCidadeAncoraProxima(lat, lng, uf) {
   if (
-    lat == null || lng == null ||
+    lat == null ||
+    lng == null ||
     !Number.isFinite(Number(lat)) ||
     !Number.isFinite(Number(lng))
   ) {
@@ -333,7 +335,9 @@ export async function getCidadeAncoraProxima(lat, lng, uf) {
 
   const baseLat = Number(lat);
   const baseLon = Number(lng);
-  const state = String(uf || "").trim().toUpperCase();
+  const state = String(uf || "")
+    .trim()
+    .toUpperCase();
   if (!state) return null;
 
   let radius = 80;
@@ -428,8 +432,8 @@ export async function getAnunciosNaRegiao(ancoraPart, uf, options = {}) {
 
   const baseLat = ancora.latitude != null ? Number(ancora.latitude) : null;
   const baseLon = ancora.longitude != null ? Number(ancora.longitude) : null;
-  const hasCoords = baseLat != null && baseLon != null &&
-    Number.isFinite(baseLat) && Number.isFinite(baseLon);
+  const hasCoords =
+    baseLat != null && baseLon != null && Number.isFinite(baseLat) && Number.isFinite(baseLon);
 
   const latDelta = hasCoords ? radius / 111.32 : 0;
 

@@ -69,24 +69,18 @@ describe("Escala nacional — cidades em múltiplos estados (briefing item 6)", 
     }
   );
 
-  it.each(SAMPLE_CITIES)(
-    "$slug → não vaza state/city/city_id no payload",
-    ({ slug }) => {
-      const filters = normalizeCityFilters(slug, {});
-      expect(filters.state).toBeUndefined();
-      expect(filters.city).toBeUndefined();
-      expect(filters.city_id).toBeUndefined();
-    }
-  );
+  it.each(SAMPLE_CITIES)("$slug → não vaza state/city/city_id no payload", ({ slug }) => {
+    const filters = normalizeCityFilters(slug, {});
+    expect(filters.state).toBeUndefined();
+    expect(filters.city).toBeUndefined();
+    expect(filters.city_id).toBeUndefined();
+  });
 });
 
 describe("Escala nacional — UFs válidas (briefing item 6)", () => {
-  it.each(SAMPLE_UFS)(
-    "$uf normalizeUf retorna uppercase canônico",
-    ({ uf }) => {
-      expect(normalizeUf(uf)).toBe(uf.toUpperCase());
-    }
-  );
+  it.each(SAMPLE_UFS)("$uf normalizeUf retorna uppercase canônico", ({ uf }) => {
+    expect(normalizeUf(uf)).toBe(uf.toUpperCase());
+  });
 
   it.each(SAMPLE_UFS)(
     "$uf stateNameFromUf retorna nome completo do estado",
@@ -95,26 +89,20 @@ describe("Escala nacional — UFs válidas (briefing item 6)", () => {
     }
   );
 
-  it.each(SAMPLE_UFS)(
-    "$uf normalizeStateFilters envia state=UF e remove city_slug",
-    ({ uf }) => {
-      const filters = normalizeStateFilters(uf.toUpperCase(), {
-        city_slug: "atibaia-sp",
-        brand: "Toyota",
-      });
-      expect(filters.state).toBe(uf.toUpperCase());
-      expect(filters.brand).toBe("Toyota");
-      expect(filters.city_slug).toBeUndefined();
-    }
-  );
+  it.each(SAMPLE_UFS)("$uf normalizeStateFilters envia state=UF e remove city_slug", ({ uf }) => {
+    const filters = normalizeStateFilters(uf.toUpperCase(), {
+      city_slug: "atibaia-sp",
+      brand: "Toyota",
+    });
+    expect(filters.state).toBe(uf.toUpperCase());
+    expect(filters.brand).toBe("Toyota");
+    expect(filters.city_slug).toBeUndefined();
+  });
 
-  it.each(SAMPLE_UFS)(
-    "$uf normalizeStateFilters default sort='relevance'",
-    ({ uf }) => {
-      const filters = normalizeStateFilters(uf.toUpperCase(), {});
-      expect(filters.sort).toBe("relevance");
-    }
-  );
+  it.each(SAMPLE_UFS)("$uf normalizeStateFilters default sort='relevance'", ({ uf }) => {
+    const filters = normalizeStateFilters(uf.toUpperCase(), {});
+    expect(filters.sort).toBe("relevance");
+  });
 });
 
 describe("Escala nacional — UFs inválidas retornam null (404 real downstream)", () => {

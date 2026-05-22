@@ -80,12 +80,7 @@ export function aggregateCityCountsFromAds(
   base: RegionBase,
   members: RegionMember[]
 ): CityCount[] {
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .trim();
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
   const baseNameNorm = norm(base.name);
   const memberMap = new Map<string, RegionMember>();
@@ -225,20 +220,16 @@ export function sortAdsByPriorityAndProximity(
 ): AdItem[] {
   if (!Array.isArray(ads) || ads.length === 0) return [];
 
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .trim();
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
   const cityDistance = new Map<string, number>();
   cityDistance.set(norm(base.name), 0);
   for (const m of members) {
     const key = norm(m.name);
-    const d = typeof m.distance_km === "number" && Number.isFinite(m.distance_km)
-      ? m.distance_km
-      : Number.POSITIVE_INFINITY;
+    const d =
+      typeof m.distance_km === "number" && Number.isFinite(m.distance_km)
+        ? m.distance_km
+        : Number.POSITIVE_INFINITY;
     if (!cityDistance.has(key) || d < (cityDistance.get(key) as number)) {
       cityDistance.set(key, d);
     }
@@ -250,7 +241,7 @@ export function sortAdsByPriorityAndProximity(
     tier: computeAdPriorityTier(ad),
     distance:
       typeof ad.city === "string" && ad.city.trim()
-        ? cityDistance.get(norm(ad.city)) ?? Number.POSITIVE_INFINITY
+        ? (cityDistance.get(norm(ad.city)) ?? Number.POSITIVE_INFINITY)
         : Number.POSITIVE_INFINITY,
   }));
 

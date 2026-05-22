@@ -84,8 +84,7 @@ function buildBaseEnv(dbUrl) {
     JWT_SECRET:
       process.env.JWT_SECRET || "integration-jwt-secret-minimum-32-characters-long-basecity",
     JWT_REFRESH_SECRET:
-      process.env.JWT_REFRESH_SECRET ||
-      "integration-refresh-secret-minimum-32-characters-long",
+      process.env.JWT_REFRESH_SECRET || "integration-refresh-secret-minimum-32-characters-long",
   };
 }
 

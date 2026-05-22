@@ -80,8 +80,7 @@ router.get("/health", async (req, res) => {
       };
     }
 
-    const allCriticalUp =
-      dbOk && (!isCriticalEnv || schema.ok);
+    const allCriticalUp = dbOk && (!isCriticalEnv || schema.ok);
 
     const payload = {
       ok: allCriticalUp,

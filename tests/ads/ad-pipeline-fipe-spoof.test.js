@@ -47,20 +47,12 @@ vi.mock("../../src/modules/fipe/fipe.provider.js", () => ({
   __fipeProviderCacheSize: vi.fn(),
 }));
 
-const eligibility = await import(
-  "../../src/modules/ads/ads.publish.eligibility.service.js"
-);
-const persistence = await import(
-  "../../src/modules/ads/ads.persistence.service.js"
-);
-const riskRepo = await import(
-  "../../src/modules/ads/risk/ad-risk.repository.js"
-);
+const eligibility = await import("../../src/modules/ads/ads.publish.eligibility.service.js");
+const persistence = await import("../../src/modules/ads/ads.persistence.service.js");
+const riskRepo = await import("../../src/modules/ads/risk/ad-risk.repository.js");
 const provider = await import("../../src/modules/fipe/fipe.provider.js");
 
-const { createAdNormalized } = await import(
-  "../../src/modules/ads/ads.create.pipeline.service.js"
-);
+const { createAdNormalized } = await import("../../src/modules/ads/ads.create.pipeline.service.js");
 
 const baseAdvertiser = { id: "adv-1" };
 const baseAccount = {
@@ -109,10 +101,9 @@ beforeEach(() => {
 describe("E2E anti-spoof — fipe_value do cliente NÃO altera decisão", () => {
   it("1. cliente envia fipe_value alto sem códigos → ACTIVE, snapshot=client_hint", async () => {
     // Sem códigos canônicos, o provider nunca é chamado.
-    const result = await createAdNormalized(
-      payload({ price: 80_000, fipe_value: 200_000 }),
-      { id: "user-1" }
-    );
+    const result = await createAdNormalized(payload({ price: 80_000, fipe_value: 200_000 }), {
+      id: "user-1",
+    });
     expect(result.status).toBe("active");
     // Risk reasons NÃO incluem PRICE_BELOW_FIPE_* — o hint do cliente foi descartado.
     const codes = result.risk_reasons.map((r) => r.code);
@@ -156,8 +147,9 @@ describe("E2E anti-spoof — fipe_value do cliente NÃO altera decisão", () => 
     expect(codes).toContain("PRICE_BELOW_FIPE_REVIEW");
     expect(codes).not.toContain("FIPE_UNAVAILABLE");
     // O valor persistido é o do servidor, não o do cliente.
-    expect(result.risk_reasons.find((r) => r.code === "PRICE_BELOW_FIPE_REVIEW")
-      .metadata.fipeValue).toBe(120_000);
+    expect(
+      result.risk_reasons.find((r) => r.code === "PRICE_BELOW_FIPE_REVIEW").metadata.fipeValue
+    ).toBe(120_000);
     // Provider foi consultado.
     expect(provider.quoteByCodes).toHaveBeenCalledTimes(1);
     expect(provider.quoteByCodes).toHaveBeenCalledWith(

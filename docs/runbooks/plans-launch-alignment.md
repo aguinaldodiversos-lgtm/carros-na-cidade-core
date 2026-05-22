@@ -1,19 +1,20 @@
 # Alinhamento de Planos Comerciais — Oferta de Lançamento
 
 > **Status:**
+>
 > - **Fase 1** (fallbacks + copy): entregue, em main.
 > - **Fase 2A** (migration de preço/limite/is_active): **migration pronta + script de auditoria + testes**, AGUARDANDO execução com revisão. Detalhes abaixo.
 > - **Fase 2B** (colunas novas: max_photos/weight/video_360_enabled/monthly_highlight_credits): pendente, requer runbook próprio.
 
 ## Oferta oficial de lançamento
 
-| Plano | Preço | Anúncios | Fotos | Peso | Vídeo 360 | Destaques/mês incluídos |
-|---|---|---|---|---|---|---|
-| Grátis CPF | R$ 0 | 3 | 8 | 1 | ❌ | 0 |
-| Grátis CNPJ | R$ 0 | 10 | 8 | 1 | ❌ | 0 |
-| Lojista Start | **R$ 79,90/mês** | 20 | 12 | 2 | ❌ | 1 |
-| Lojista Pro | **R$ 149,90/mês** | ilimitado (trava 1000) | 15 | 3 | ✅ | 3 |
-| Destaque 7 dias | **R$ 39,90** (boost avulso) | — | — | 4 enquanto ativo | ❌ | — |
+| Plano           | Preço                       | Anúncios               | Fotos | Peso             | Vídeo 360 | Destaques/mês incluídos |
+| --------------- | --------------------------- | ---------------------- | ----- | ---------------- | --------- | ----------------------- |
+| Grátis CPF      | R$ 0                        | 3                      | 8     | 1                | ❌        | 0                       |
+| Grátis CNPJ     | R$ 0                        | 10                     | 8     | 1                | ❌        | 0                       |
+| Lojista Start   | **R$ 79,90/mês**            | 20                     | 12    | 2                | ❌        | 1                       |
+| Lojista Pro     | **R$ 149,90/mês**           | ilimitado (trava 1000) | 15    | 3                | ✅        | 3                       |
+| Destaque 7 dias | **R$ 39,90** (boost avulso) | —                      | —     | 4 enquanto ativo | ❌        | —                       |
 
 Destaque 7 dias é boost avulso (não plano), válido para CPF e CNPJ, duração 7 dias, **compras duplicadas estendem prazo, não aumentam prioridade**.
 
@@ -44,13 +45,13 @@ Destaque 7 dias é boost avulso (não plano), válido para CPF e CNPJ, duração
 A migration **não toca** `user_subscriptions` ou `payments`. Política
 operacional:
 
-| Caso | Política |
-|---|---|
-| Lojista com Start ativo (R$ 299,90, ciclo em curso) | Mantém o ciclo até `expires_at`. Mercado Pago não é re-cobrado pela migration; renovação automática usa o preço NOVO (R$ 79,90) lido do banco. |
-| Lojista com Pro ativo (R$ 599,90, ciclo em curso) | Idem: ciclo atual continua, próxima cobrança em R$ 149,90. |
-| Lojista com `cpf-premium-highlight` (one-time 30 dias) | Mantém destaque até `expires_at`. Não há renovação automática (one-time). Após vencer, plano fica indisponível para nova compra. |
-| Lojista com `cnpj-evento-premium` ativo | Cenário improvável (produto desligado por flag). Se existir, mantém até `expires_at`. Não há nova venda possível enquanto flag e is_active estiverem desligados. |
-| Nova assinatura criada após migration | Usa preço novo automaticamente (frontend lê de `/api/account/plans`, backend valida `subscription_plans.price` no `createPlanSubscription`). |
+| Caso                                                   | Política                                                                                                                                                         |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lojista com Start ativo (R$ 299,90, ciclo em curso)    | Mantém o ciclo até `expires_at`. Mercado Pago não é re-cobrado pela migration; renovação automática usa o preço NOVO (R$ 79,90) lido do banco.                   |
+| Lojista com Pro ativo (R$ 599,90, ciclo em curso)      | Idem: ciclo atual continua, próxima cobrança em R$ 149,90.                                                                                                       |
+| Lojista com `cpf-premium-highlight` (one-time 30 dias) | Mantém destaque até `expires_at`. Não há renovação automática (one-time). Após vencer, plano fica indisponível para nova compra.                                 |
+| Lojista com `cnpj-evento-premium` ativo                | Cenário improvável (produto desligado por flag). Se existir, mantém até `expires_at`. Não há nova venda possível enquanto flag e is_active estiverem desligados. |
+| Nova assinatura criada após migration                  | Usa preço novo automaticamente (frontend lê de `/api/account/plans`, backend valida `subscription_plans.price` no `createPlanSubscription`).                     |
 
 **Comunicação obrigatória ANTES de rodar 2A em produção** (script de
 auditoria mostra a contagem real):
@@ -68,11 +69,11 @@ auditoria mostra a contagem real):
 Esta seção foi promovida do "proposto" para "pronto para revisão". Os
 artefatos abaixo já estão no repo:
 
-| Artefato | Caminho |
-|---|---|
-| Migration idempotente | [src/database/migrations/023_subscription_plans_launch_alignment.sql](../../src/database/migrations/023_subscription_plans_launch_alignment.sql) |
-| Script de auditoria read-only | [scripts/maintenance/audit-subscription-plans.mjs](../../scripts/maintenance/audit-subscription-plans.mjs) |
-| Testes de contrato (16 asserts) | [tests/account/list-plans-launch-alignment.test.js](../../tests/account/list-plans-launch-alignment.test.js) |
+| Artefato                        | Caminho                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migration idempotente           | [src/database/migrations/023_subscription_plans_launch_alignment.sql](../../src/database/migrations/023_subscription_plans_launch_alignment.sql) |
+| Script de auditoria read-only   | [scripts/maintenance/audit-subscription-plans.mjs](../../scripts/maintenance/audit-subscription-plans.mjs)                                       |
+| Testes de contrato (16 asserts) | [tests/account/list-plans-launch-alignment.test.js](../../tests/account/list-plans-launch-alignment.test.js)                                     |
 
 ### 2A.1. Pré-flight — auditoria read-only em produção
 
@@ -263,13 +264,13 @@ Antes de rodar 2.2 em produção:
 
 ### 2.4. Implementações dependentes (issues separadas)
 
-| Item | Onde | Bloqueia oferta? |
-|---|---|---|
-| Tabela `plan_credits` + worker mensal de concessão | `src/database/migrations/0XX_plan_credits.sql` | ✅ destaques mensais inclusos |
-| Coluna `ads.video_360_url` + upload no wizard | `src/database/migrations/0XX_ads_video_360.sql` | ✅ vídeo 360 do Pro |
-| Validação `max_photos` por plano no controller de criar/editar ad | `src/modules/ads/ads.controller.js` | ⚠️ usuário pode contornar UI sem isso |
-| Desativar hard-cap global de 10 fotos no wizard | `frontend/components/painel/new-ad-wizard/WizardSteps.tsx:427` | ⚠️ Pro travado em 10 fotos hoje |
-| UI admin para editar planos | `frontend/app/admin/planos/page.tsx` (novo) | ❌ não bloqueia lançamento |
+| Item                                                              | Onde                                                           | Bloqueia oferta?                      |
+| ----------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------- |
+| Tabela `plan_credits` + worker mensal de concessão                | `src/database/migrations/0XX_plan_credits.sql`                 | ✅ destaques mensais inclusos         |
+| Coluna `ads.video_360_url` + upload no wizard                     | `src/database/migrations/0XX_ads_video_360.sql`                | ✅ vídeo 360 do Pro                   |
+| Validação `max_photos` por plano no controller de criar/editar ad | `src/modules/ads/ads.controller.js`                            | ⚠️ usuário pode contornar UI sem isso |
+| Desativar hard-cap global de 10 fotos no wizard                   | `frontend/components/painel/new-ad-wizard/WizardSteps.tsx:427` | ⚠️ Pro travado em 10 fotos hoje       |
+| UI admin para editar planos                                       | `frontend/app/admin/planos/page.tsx` (novo)                    | ❌ não bloqueia lançamento            |
 
 ### 2.5. Pós-deploy — smoke tests
 

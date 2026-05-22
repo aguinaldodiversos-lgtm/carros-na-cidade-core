@@ -52,9 +52,7 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
       .then((data) => {
         if (cancelled) return;
         setBrands(data);
-        setLoadError((current) =>
-          current && current.includes("marcas") ? null : current
-        );
+        setLoadError((current) => (current && current.includes("marcas") ? null : current));
       })
       .catch(() => {
         if (!cancelled) setLoadError("Não foi possível carregar marcas da FIPE.");
@@ -75,9 +73,7 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
       .then((data) => {
         if (cancelled) return;
         setModels(data);
-        setLoadError((current) =>
-          current && current.includes("modelos") ? null : current
-        );
+        setLoadError((current) => (current && current.includes("modelos") ? null : current));
       })
       .catch(() => {
         if (!cancelled) setLoadError("Não foi possível carregar modelos.");
@@ -97,9 +93,7 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
       .then((data) => {
         if (cancelled) return;
         setYearOptions(data);
-        setLoadError((current) =>
-          current && current.includes("anos") ? null : current
-        );
+        setLoadError((current) => (current && current.includes("anos") ? null : current));
       })
       .catch(() => {
         if (!cancelled) setLoadError("Não foi possível carregar anos/versões.");
@@ -121,10 +115,7 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
   }, [models, state.modelLabel]);
 
   const modelBaseChoices = useMemo(() => uniqueModelBases(models), [models]);
-  const variantChoices = useMemo(
-    () => variantsOfBase(models, modelBase),
-    [models, modelBase]
-  );
+  const variantChoices = useMemo(() => variantsOfBase(models, modelBase), [models, modelBase]);
 
   const modelYears = useMemo(() => uniqueModelYears(yearOptions), [yearOptions]);
   const selectedModelYear = state.yearModel ? parseInt(state.yearModel, 10) : null;
@@ -332,9 +323,7 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
             data-testid="wizard-model-variant-select"
             onChange={(e) => onModelChange(e.target.value)}
           >
-            <option value="">
-              {modelBase ? "Escolha uma..." : "Escolha o modelo primeiro"}
-            </option>
+            <option value="">{modelBase ? "Escolha uma..." : "Escolha o modelo primeiro"}</option>
             {variantChoices.map((m) => (
               <option key={m.code} value={m.code}>
                 {m.name}

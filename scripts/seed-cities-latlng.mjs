@@ -106,8 +106,7 @@ async function batchUpdate(client, batch) {
 }
 
 async function main() {
-  const dbUrl =
-    process.env.DATABASE_URL1 || process.env.DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL1 || process.env.DATABASE_URL;
   if (!dbUrl) {
     console.error("DATABASE_URL1 ou DATABASE_URL não definido.");
     process.exitCode = 1;
@@ -115,9 +114,7 @@ async function main() {
   }
 
   const useSSL =
-    dbUrl.includes("render.com") ||
-    dbUrl.includes("neon") ||
-    dbUrl.includes("supabase");
+    dbUrl.includes("render.com") || dbUrl.includes("neon") || dbUrl.includes("supabase");
 
   const client = new Client({
     connectionString: dbUrl,
@@ -181,13 +178,13 @@ async function main() {
       const batch = toUpdate.slice(i, i + BATCH_SIZE);
       const count = await batchUpdate(client, batch);
       totalUpdated += count;
-      process.stdout.write(`\r[seed:latlng] Batch ${Math.ceil((i + 1) / BATCH_SIZE)}/${Math.ceil(toUpdate.length / BATCH_SIZE)} — ${totalUpdated} atualizadas`);
+      process.stdout.write(
+        `\r[seed:latlng] Batch ${Math.ceil((i + 1) / BATCH_SIZE)}/${Math.ceil(toUpdate.length / BATCH_SIZE)} — ${totalUpdated} atualizadas`
+      );
     }
     console.log(); // newline após o progress
 
-    console.log(
-      `[seed:latlng] OK — ${totalUpdated} cidades com lat/lng atualizado.`
-    );
+    console.log(`[seed:latlng] OK — ${totalUpdated} cidades com lat/lng atualizado.`);
     if (totalUpdated < toUpdate.length) {
       console.warn(
         `[seed:latlng] ATENÇÃO: ${toUpdate.length - totalUpdated} registros não foram atualizados ` +

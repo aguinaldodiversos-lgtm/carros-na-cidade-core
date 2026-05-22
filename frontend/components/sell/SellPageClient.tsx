@@ -504,9 +504,7 @@ export default function SellPageClient({ content }: Props) {
                     <div className="text-[17px] font-bold leading-snug text-[#1D2440]">
                       {item.title}
                     </div>
-                    <p className="mt-3 text-[15px] leading-7 text-[#4B536A]">
-                      {item.description}
-                    </p>
+                    <p className="mt-3 text-[15px] leading-7 text-[#4B536A]">{item.description}</p>
                   </div>
                 ))}
               </div>

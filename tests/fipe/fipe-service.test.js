@@ -119,9 +119,7 @@ describe("resolveFipeReference — fonte autoritativa do valor FIPE", () => {
 
 describe("fipeValueForRiskScoring — extração para o adRiskService", () => {
   it("retorna o valor SOMENTE quando confidence='high'", () => {
-    expect(
-      fipeValueForRiskScoring({ ok: true, value: 85_000, confidence: "high" })
-    ).toBe(85_000);
+    expect(fipeValueForRiskScoring({ ok: true, value: 85_000, confidence: "high" })).toBe(85_000);
   });
 
   it("retorna null para confidence='low' (hint do cliente)", () => {
@@ -138,8 +136,6 @@ describe("fipeValueForRiskScoring — extração para o adRiskService", () => {
   it("retorna null quando snapshot inválido", () => {
     expect(fipeValueForRiskScoring(null)).toBe(null);
     expect(fipeValueForRiskScoring(undefined)).toBe(null);
-    expect(fipeValueForRiskScoring({ ok: true, value: 0, confidence: "high" })).toBe(
-      null
-    );
+    expect(fipeValueForRiskScoring({ ok: true, value: 0, confidence: "high" })).toBe(null);
   });
 });

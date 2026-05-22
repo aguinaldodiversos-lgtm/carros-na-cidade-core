@@ -178,9 +178,7 @@ describe("location.service — resolveLocation (integração com região)", () =
     "coordenada de $cityName → resolve $citySlug + href canônico universal",
     async ({ id, cityName, citySlug, stateCode, regionName, expectedHref }) => {
       mocks.poolQuery.mockResolvedValueOnce({
-        rows: [
-          { id, slug: citySlug, name: cityName, state: stateCode, distance_km: "3.2" },
-        ],
+        rows: [{ id, slug: citySlug, name: cityName, state: stateCode, distance_km: "3.2" }],
       });
       mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce({
         base: { id, slug: citySlug, name: cityName, state: stateCode },
@@ -203,15 +201,11 @@ describe("location.service — resolveLocation (integração com região)", () =
 
   it("coordenada de Atibaia → resolve atibaia-sp + Região de Atibaia", async () => {
     mocks.poolQuery.mockResolvedValueOnce({
-      rows: [
-        { id: 7, slug: "atibaia-sp", name: "Atibaia", state: "SP", distance_km: "3.2" },
-      ],
+      rows: [{ id: 7, slug: "atibaia-sp", name: "Atibaia", state: "SP", distance_km: "3.2" }],
     });
     mocks.getRegionByBaseSlugDynamic.mockResolvedValueOnce({
       base: { id: 7, slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-      members: [
-        { slug: "itatiba-sp", name: "Itatiba", state: "SP", layer: 1, distance_km: 20 },
-      ],
+      members: [{ slug: "itatiba-sp", name: "Itatiba", state: "SP", layer: 1, distance_km: 20 }],
       radius_km: 80,
     });
 

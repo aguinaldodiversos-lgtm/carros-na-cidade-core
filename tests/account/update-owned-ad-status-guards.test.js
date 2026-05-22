@@ -88,9 +88,9 @@ describe("updateOwnedAdStatus — status-guard (deleted / blocked)", () => {
       status: "blocked",
     });
 
-    await expect(
-      accountService.updateOwnedAdStatus("u1", "ad-1", "pause")
-    ).rejects.toMatchObject({ statusCode: 410 });
+    await expect(accountService.updateOwnedAdStatus("u1", "ad-1", "pause")).rejects.toMatchObject({
+      statusCode: 410,
+    });
   });
 });
 

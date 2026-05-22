@@ -58,11 +58,7 @@ const FAKE_PLANS = [
   },
 ];
 
-const ALL_EVENT_KEYS = [
-  "EVENTS_ENABLED",
-  "EVENTS_PUBLIC_ENABLED",
-  "EVENTS_PAYMENTS_ENABLED",
-];
+const ALL_EVENT_KEYS = ["EVENTS_ENABLED", "EVENTS_PUBLIC_ENABLED", "EVENTS_PAYMENTS_ENABLED"];
 let savedEnv = {};
 
 beforeEach(() => {

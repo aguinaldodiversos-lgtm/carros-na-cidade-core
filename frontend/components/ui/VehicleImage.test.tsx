@@ -255,9 +255,7 @@ describe("VehicleImage", () => {
   // window.location, então conferir presença da substring é robusto).
 
   function rendersWithoutOptimizer(src: string) {
-    const { container } = render(
-      <VehicleImage src={src} alt="x" width={400} height={300} />
-    );
+    const { container } = render(<VehicleImage src={src} alt="x" width={400} height={300} />);
     const finalSrc = container.querySelector("img")?.getAttribute("src") || "";
     expect(finalSrc, `src final foi ${finalSrc}`).not.toContain("/_next/image");
     expect(finalSrc).toContain(src);

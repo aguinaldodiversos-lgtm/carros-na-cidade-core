@@ -97,9 +97,11 @@ beforeEach(() => {
   });
   account.getPlanById.mockReset();
   db.query.mockReset().mockResolvedValue({ rows: [] }); // sem sub viva por default
-  db.withTransaction.mockReset().mockImplementation((fn) =>
-    fn({ query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }) })
-  );
+  db.withTransaction
+    .mockReset()
+    .mockImplementation((fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }) })
+    );
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -134,9 +136,9 @@ describe("AUDIT — createPlanSubscription (legacy POST /subscription)", () => {
       validity_days: 30,
     });
 
-    await expect(
-      createPlanSubscription({ userId: "u1", planId: "plan-fake" })
-    ).rejects.toThrow(/cnpj-store-start.*cnpj-store-pro/);
+    await expect(createPlanSubscription({ userId: "u1", planId: "plan-fake" })).rejects.toThrow(
+      /cnpj-store-start.*cnpj-store-pro/
+    );
   });
 
   it("REJEITA criar 2ª assinatura quando user tem sub active (409)", async () => {
@@ -161,14 +163,18 @@ describe("AUDIT — createPlanSubscription (legacy POST /subscription)", () => {
     account.getPlanById.mockResolvedValue(PLAN_START);
 
     db.query.mockResolvedValueOnce({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "pending", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "pending", created_at: "2026-04-01" },
+      ],
     });
     await expect(
       createPlanSubscription({ userId: "u1", planId: "cnpj-store-start" })
     ).rejects.toMatchObject({ statusCode: 409 });
 
     db.query.mockResolvedValueOnce({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "paused", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "paused", created_at: "2026-04-01" },
+      ],
     });
     await expect(
       createPlanSubscription({ userId: "u1", planId: "cnpj-store-start" })
@@ -231,14 +237,18 @@ describe("AUDIT — simetria entre /subscriptions/checkout (nova) e /subscriptio
     account.getPlanById.mockResolvedValue(PLAN_START);
 
     db.query.mockResolvedValueOnce({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "active", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "active", created_at: "2026-04-01" },
+      ],
     });
     await expect(
       createSubscriptionCheckout({ userId: "u1", planId: "cnpj-store-start" })
     ).rejects.toMatchObject({ statusCode: 409 });
 
     db.query.mockResolvedValueOnce({
-      rows: [{ user_id: "u1", plan_id: "cnpj-store-pro", status: "active", created_at: "2026-04-01" }],
+      rows: [
+        { user_id: "u1", plan_id: "cnpj-store-pro", status: "active", created_at: "2026-04-01" },
+      ],
     });
     await expect(
       createPlanSubscription({ userId: "u1", planId: "cnpj-store-start" })
@@ -255,13 +265,13 @@ describe("AUDIT — simetria entre /subscriptions/checkout (nova) e /subscriptio
       validity_days: 30,
     });
 
-    await expect(
-      createSubscriptionCheckout({ userId: "u1", planId: "plan-fake" })
-    ).rejects.toThrow(/cnpj-store-start.*cnpj-store-pro/);
+    await expect(createSubscriptionCheckout({ userId: "u1", planId: "plan-fake" })).rejects.toThrow(
+      /cnpj-store-start.*cnpj-store-pro/
+    );
 
-    await expect(
-      createPlanSubscription({ userId: "u1", planId: "plan-fake" })
-    ).rejects.toThrow(/cnpj-store-start.*cnpj-store-pro/);
+    await expect(createPlanSubscription({ userId: "u1", planId: "plan-fake" })).rejects.toThrow(
+      /cnpj-store-start.*cnpj-store-pro/
+    );
   });
 });
 
@@ -286,9 +296,9 @@ describe("AUDIT — createPlanCheckout (POST /create one-time) não vira canal d
   it("rejeita Pro também (mesma defesa)", async () => {
     account.getPlanById.mockResolvedValue(PLAN_PRO);
 
-    await expect(
-      createPlanCheckout({ userId: "u1", planId: "cnpj-store-pro" })
-    ).rejects.toThrow(/pagamento[s]?\s+\(one_time|apenas pagamento/i);
+    await expect(createPlanCheckout({ userId: "u1", planId: "cnpj-store-pro" })).rejects.toThrow(
+      /pagamento[s]?\s+\(one_time|apenas pagamento/i
+    );
   });
 });
 
@@ -302,10 +312,7 @@ describe("AUDIT — /planos não chama nenhum endpoint MP", async () => {
   // Sem render — é uma checagem estática rápida do código atual.
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
-  const filePath = path.resolve(
-    process.cwd(),
-    "frontend/app/planos/page.tsx"
-  );
+  const filePath = path.resolve(process.cwd(), "frontend/app/planos/page.tsx");
   const source = await fs.readFile(filePath, "utf-8");
 
   it("não importa PlanCheckoutButton (legacy)", () => {

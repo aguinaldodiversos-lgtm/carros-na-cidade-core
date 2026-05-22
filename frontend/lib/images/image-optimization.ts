@@ -31,12 +31,7 @@ const ONRENDER_DOMAIN_SUFFIX = ".onrender.com";
 // primeiro fix em 2026-05-13.
 const R2_DOMAIN_SUFFIXES = [".r2.dev", ".r2.cloudflarestorage.com"];
 
-const SAME_ORIGIN_PREFIXES = [
-  "/api/vehicle-images",
-  "/uploads/",
-  "/_next/image",
-  "/images/",
-];
+const SAME_ORIGIN_PREFIXES = ["/api/vehicle-images", "/uploads/", "/_next/image", "/images/"];
 
 function getPublicR2Host(): string | null {
   const raw = (process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || "").trim();

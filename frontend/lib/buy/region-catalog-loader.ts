@@ -170,8 +170,7 @@ export async function loadRegionalCatalogData(
   const region = await fetchRegionByCitySlug(safeSlug);
   if (!region || !region.base) return null;
 
-  const radiusKm =
-    (region as RegionPayload & { radius_km?: number }).radius_km ?? 80;
+  const radiusKm = (region as RegionPayload & { radius_km?: number }).radius_km ?? 80;
   const stateUf = region.base.state.toUpperCase();
 
   const city: BuyCityContext = {
@@ -223,11 +222,7 @@ export async function loadRegionalCatalogData(
   // `baseCityBoostExpr`. Este sort garante a regra "tier domina,
   // cidade-base só desempata dentro do tier" mesmo se um cache antigo
   // do BFF servir resultados com tier inconsistente.
-  const sortedData = sortAdsByPriorityAndProximity(
-    filteredData,
-    region.base,
-    region.members
-  );
+  const sortedData = sortAdsByPriorityAndProximity(filteredData, region.base, region.members);
 
   initialResults = {
     ...initialResults,

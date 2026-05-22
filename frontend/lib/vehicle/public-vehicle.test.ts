@@ -67,17 +67,13 @@ describe("adaptAdDetailToVehicle — reconciliação anti-incoerência", () => {
   });
 
   it("respeita 'Mec.' na versão e não declara câmbio automático", () => {
-    const v = adaptAdDetailToVehicle(
-      makeAd({ version: "1.0 Mec.", transmission: "automatico" })
-    );
+    const v = adaptAdDetailToVehicle(makeAd({ version: "1.0 Mec.", transmission: "automatico" }));
     expect(v.transmission).toBe("Manual");
     expect(v.optionalItems).toContain("Câmbio Manual");
   });
 
   it("respeita 'Aut.' na versão quando o backend manda 'manual' por engano", () => {
-    const v = adaptAdDetailToVehicle(
-      makeAd({ version: "2.0 16V Aut.", transmission: "manual" })
-    );
+    const v = adaptAdDetailToVehicle(makeAd({ version: "2.0 16V Aut.", transmission: "manual" }));
     expect(v.transmission).toBe("Automático");
   });
 
@@ -96,9 +92,7 @@ describe("adaptAdDetailToVehicle — reconciliação anti-incoerência", () => {
   });
 
   it("identifica loja via dealership_id válido", () => {
-    const v = adaptAdDetailToVehicle(
-      makeAd({ seller_kind: null, dealership_id: 42 })
-    );
+    const v = adaptAdDetailToVehicle(makeAd({ seller_kind: null, dealership_id: 42 }));
     expect(v.seller.type).toBe("dealer");
   });
 

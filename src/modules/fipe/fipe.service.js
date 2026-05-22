@@ -68,9 +68,7 @@ function isAllowClientHint() {
 }
 
 function plausiblePrice(n) {
-  return (
-    Number.isFinite(n) && n >= PRICE_MIN_PLAUSIBLE && n <= PRICE_MAX_PLAUSIBLE
-  );
+  return Number.isFinite(n) && n >= PRICE_MIN_PLAUSIBLE && n <= PRICE_MAX_PLAUSIBLE;
 }
 
 function snapshotUnavailable(failure_reason, extras = {}) {
@@ -138,10 +136,7 @@ export async function resolveFipeReference(input = {}, deps = {}) {
       return {
         ok: true,
         value: Number(q.price),
-        fipe_code:
-          q.fipeCode ??
-          (input?.fipe_code ? String(input.fipe_code).trim() : null) ??
-          null,
+        fipe_code: q.fipeCode ?? (input?.fipe_code ? String(input.fipe_code).trim() : null) ?? null,
         fipe_source: "parallelum",
         fipe_snapshot_at: nowIso(),
         confidence: "high",
@@ -194,7 +189,5 @@ export async function resolveFipeReference(input = {}, deps = {}) {
 export function fipeValueForRiskScoring(snapshot) {
   if (!snapshot || !snapshot.ok) return null;
   if (snapshot.confidence !== "high") return null;
-  return Number.isFinite(snapshot.value) && snapshot.value > 0
-    ? Number(snapshot.value)
-    : null;
+  return Number.isFinite(snapshot.value) && snapshot.value > 0 ? Number(snapshot.value) : null;
 }

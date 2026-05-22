@@ -473,12 +473,10 @@ export async function createBoostCheckout({
   // PENDING_REVIEW / REJECTED / PAUSED / SOLD / EXPIRED / DELETED nunca
   // entram no checkout. O webhook (applyBoostApproval) também revalida.
   if (String(ad.status) !== "active") {
-    throw new AppError(
-      "Este anúncio precisa estar ativo para receber destaque.",
-      400,
-      true,
-      { code: "BOOST_REQUIRES_ACTIVE_STATUS", currentStatus: ad.status }
-    );
+    throw new AppError("Este anúncio precisa estar ativo para receber destaque.", 400, true, {
+      code: "BOOST_REQUIRES_ACTIVE_STATUS",
+      currentStatus: ad.status,
+    });
   }
 
   const intentId = crypto.randomUUID();

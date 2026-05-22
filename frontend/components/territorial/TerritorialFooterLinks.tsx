@@ -51,12 +51,10 @@ const PRIMARY_BTN =
 const SECONDARY_BTN =
   "inline-flex items-center gap-2 rounded-lg border border-cnc-line bg-white px-4 py-2 text-sm font-semibold text-cnc-text hover:border-primary hover:text-primary transition-colors";
 
-export function TerritorialFooterLinks({
-  slug,
-  cityName,
-  state,
-}: TerritorialFooterLinksProps) {
-  const stateUpper = String(state || "").toUpperCase().slice(0, 2);
+export function TerritorialFooterLinks({ slug, cityName, state }: TerritorialFooterLinksProps) {
+  const stateUpper = String(state || "")
+    .toUpperCase()
+    .slice(0, 2);
   const stateLower = stateUpper.toLowerCase();
   const regionalEnabled = isRegionalPageEnabled();
 

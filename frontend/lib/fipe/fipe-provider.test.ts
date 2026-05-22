@@ -77,10 +77,7 @@ describe("getFipeBrands — fallback para snapshot quando provider falha", () =>
   });
 
   it("provider erro de rede → fallback usa snapshot (motos)", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("ECONNREFUSED"))
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
 
     const out = await getFipeBrands("motos");
     expect(out.length).toBe(FIPE_BRAND_SNAPSHOT.motos.length);
@@ -149,10 +146,7 @@ describe("getFipeModels — fallback para snapshot por marca quando provider fal
   });
 
   it("provider erro de rede → fallback usa snapshot (motos / Honda=80)", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("ECONNREFUSED"))
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
 
     const out = await getFipeModels("80", "motos");
     expect(out.length).toBeGreaterThan(0);
@@ -175,10 +169,7 @@ describe("getFipeModels — fallback para snapshot por marca quando provider fal
   });
 
   it("provider falha + brandCode inexistente no snapshot → throw original error", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("network down"))
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
     await expect(getFipeModels("999999", "carros")).rejects.toThrow();
   });

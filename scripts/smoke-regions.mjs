@@ -27,10 +27,9 @@
  * Exit code: 0 se todos os checks passam, 1 se qualquer falha.
  */
 
-const API_BASE_URL = (process.env.API_BASE_URL || "https://carros-na-cidade-core.onrender.com").replace(
-  /\/+$/,
-  ""
-);
+const API_BASE_URL = (
+  process.env.API_BASE_URL || "https://carros-na-cidade-core.onrender.com"
+).replace(/\/+$/, "");
 const TOKEN = process.env.INTERNAL_API_TOKEN || "";
 
 // Matriz nacional default — uma cidade-base por região do Brasil, escolhida
@@ -51,8 +50,7 @@ const DEFAULT_SLUGS = [
   "goiania-go",
 ];
 const SLUGS_RAW = process.argv[2] || process.env.REGIONS_SMOKE_SLUGS || DEFAULT_SLUGS.join(",");
-const SLUGS = SLUGS_RAW
-  .split(",")
+const SLUGS = SLUGS_RAW.split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 const NONEXISTENT_SLUG = process.argv[3] || "cidade-que-nao-existe-tt";
@@ -142,7 +140,10 @@ async function checkValidTokenAndSlug(slug) {
   const hasLayer1 = members.some((m) => Number(m.layer) === 1);
   const hasLayer2 = members.some((m) => Number(m.layer) === 2);
   if (!hasLayer1) {
-    fail(label, `Nenhum membro em layer 1 (≤30 km). Indica raio mal calibrado ou worker incompleto.`);
+    fail(
+      label,
+      `Nenhum membro em layer 1 (≤30 km). Indica raio mal calibrado ou worker incompleto.`
+    );
     return;
   }
   if (!hasLayer2) {

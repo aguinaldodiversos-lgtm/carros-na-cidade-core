@@ -13,13 +13,7 @@ export const OPTIONAL_CITIES_COLUMNS = ["latitude", "longitude"];
 export const ALL_CITIES_COLUMNS = [...REQUIRED_CITIES_COLUMNS, ...OPTIONAL_CITIES_COLUMNS];
 
 export const REQUIRED_ADS_BASE_COLUMNS = ["id", "status"];
-export const OPTIONAL_ADS_COLUMNS_FOR_CITY = [
-  "title",
-  "city",
-  "state",
-  "city_id",
-  "created_at",
-];
+export const OPTIONAL_ADS_COLUMNS_FOR_CITY = ["title", "city", "state", "city_id", "created_at"];
 export const ALL_ADS_COLUMNS_FOR_CITY = [
   ...REQUIRED_ADS_BASE_COLUMNS,
   ...OPTIONAL_ADS_COLUMNS_FOR_CITY,

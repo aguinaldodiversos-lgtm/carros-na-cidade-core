@@ -69,11 +69,7 @@ function withPathnameHeader(request: NextRequest) {
 
 const LEGACY_ANCORA_RE = /^\/([a-z]{2})\/regiao\/([a-z0-9-]+)\/?$/;
 
-function maybeLogBandwidth(
-  request: NextRequest,
-  response: NextResponse,
-  startedAt: number
-): void {
+function maybeLogBandwidth(request: NextRequest, response: NextResponse, startedAt: number): void {
   if (!isBandwidthDiagnosticsEnabled()) return;
   try {
     const entry = buildBandwidthLogEntry({
@@ -95,11 +91,7 @@ function maybeLogBandwidth(
 }
 
 /** Envolve qualquer response com o logging de bandwidth condicional. */
-function respond(
-  request: NextRequest,
-  startedAt: number,
-  response: NextResponse
-): NextResponse {
+function respond(request: NextRequest, startedAt: number, response: NextResponse): NextResponse {
   maybeLogBandwidth(request, response, startedAt);
   return response;
 }
@@ -110,20 +102,13 @@ export async function middleware(request: NextRequest) {
   const territorialContext = withPathnameHeader(request);
 
   // ── 0a. Redirect 301 onrender → canônico (defesa de bandwidth).
-  const hostDecision = decideHostRedirect(
-    request.headers.get("host"),
-    pathname,
-    search
-  );
+  const hostDecision = decideHostRedirect(request.headers.get("host"), pathname, search);
   if (hostDecision.kind === "redirect") {
     return respond(request, startedAt, NextResponse.redirect(hostDecision.target, 301));
   }
 
   // ── 0b. Bot guard: 429 para UA vazio em rotas SSR pesadas.
-  const botDecision = decideBotGuard(
-    request.headers.get("user-agent"),
-    pathname
-  );
+  const botDecision = decideBotGuard(request.headers.get("user-agent"), pathname);
   if (botDecision.kind === "block-429") {
     const blocked = new NextResponse(null, {
       status: 429,

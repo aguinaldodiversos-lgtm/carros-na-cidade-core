@@ -36,10 +36,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       `/api/ads/${encodeURIComponent(adId)}/publication-options`
     );
     if (!backendUrl) {
-      return NextResponse.json(
-        { error: "Backend nao configurado" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Backend nao configurado" }, { status: 500 });
     }
 
     const response = await fetch(backendUrl, {
@@ -70,9 +67,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     }
 
     const data =
-      body && typeof body === "object" && "data" in body
-        ? (body as { data: unknown }).data
-        : body;
+      body && typeof body === "object" && "data" in body ? (body as { data: unknown }).data : body;
 
     return applyBffCookies(NextResponse.json(data), auth.ctx);
   } catch (error) {

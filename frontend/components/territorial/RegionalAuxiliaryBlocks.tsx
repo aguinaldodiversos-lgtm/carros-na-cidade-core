@@ -91,9 +91,7 @@ export function RegionalAuxiliaryBlocks({
                   title={`${c.name} — cidade base da região`}
                 >
                   {c.name}
-                  <span className="text-[10px] uppercase tracking-wide opacity-80">
-                    base
-                  </span>
+                  <span className="text-[10px] uppercase tracking-wide opacity-80">base</span>
                 </span>
               ) : (
                 <Link
@@ -174,10 +172,10 @@ export function RegionalAuxiliaryBlocks({
             Por que comprar na região de {base.name}
           </h3>
           <p className="mt-2 text-sm leading-relaxed text-cnc-muted">
-            Quando você amplia a busca para a região de {base.name}, encontra mais
-            oferta, mais variedade de marcas e mais flexibilidade para negociar sem
-            precisar viajar para longe. Carros de cidades vizinhas costumam estar a
-            poucos quilômetros e podem ser visitados no mesmo dia.
+            Quando você amplia a busca para a região de {base.name}, encontra mais oferta, mais
+            variedade de marcas e mais flexibilidade para negociar sem precisar viajar para longe.
+            Carros de cidades vizinhas costumam estar a poucos quilômetros e podem ser visitados no
+            mesmo dia.
           </p>
           <Link
             href={cityHref}
@@ -208,14 +206,13 @@ export function RegionalAuxiliaryBlocks({
                     {remainingMembers > 0 ? ` e mais ${remainingMembers}` : ""}
                   </>
                 ) : null}
-                . Todas dentro do alcance de até {radiusKm} km a partir da
-                cidade-base.
+                . Todas dentro do alcance de até {radiusKm} km a partir da cidade-base.
               </>
             ) : (
               <>
-                No momento, a região de {base.name} mostra anúncios apenas da própria
-                cidade-base. Conforme novos veículos forem cadastrados em cidades
-                vizinhas, eles aparecem aqui automaticamente.
+                No momento, a região de {base.name} mostra anúncios apenas da própria cidade-base.
+                Conforme novos veículos forem cadastrados em cidades vizinhas, eles aparecem aqui
+                automaticamente.
               </>
             )}
           </p>
@@ -226,11 +223,10 @@ export function RegionalAuxiliaryBlocks({
             Como funciona o alcance regional
           </h3>
           <p className="mt-2 text-sm leading-relaxed text-cnc-muted">
-            O alcance regional une {base.name} às cidades vizinhas dentro de{" "}
-            {radiusKm} km e prioriza anúncios mais próximos da cidade-base — você
-            vê primeiro o que está perto, sem precisar configurar filtros. Dentro do
-            mesmo tipo de anúncio, anúncios em {base.name} aparecem antes dos das
-            cidades vizinhas.
+            O alcance regional une {base.name} às cidades vizinhas dentro de {radiusKm} km e
+            prioriza anúncios mais próximos da cidade-base — você vê primeiro o que está perto, sem
+            precisar configurar filtros. Dentro do mesmo tipo de anúncio, anúncios em {base.name}{" "}
+            aparecem antes dos das cidades vizinhas.
           </p>
           <Link
             href={stateHref}
@@ -240,7 +236,6 @@ export function RegionalAuxiliaryBlocks({
           </Link>
         </article>
       </section>
-
     </div>
   );
 }

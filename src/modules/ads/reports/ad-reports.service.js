@@ -39,13 +39,7 @@ function normalizeDescription(value) {
   return trimmed.slice(0, AD_REPORT_DESCRIPTION_MAX_LENGTH);
 }
 
-export async function createReport({
-  adId,
-  reason,
-  description,
-  reporterUserId,
-  reporterIp,
-}) {
+export async function createReport({ adId, reason, description, reporterUserId, reporterIp }) {
   const numericAdId = Number(adId);
   if (!Number.isInteger(numericAdId) || numericAdId <= 0) {
     throw new AppError("ID do anúncio inválido", 400);
@@ -83,10 +77,7 @@ export async function createReport({
       AD_REPORTS_RATE_LIMIT.WINDOW_SECONDS
     );
     if (recentGlobal >= AD_REPORTS_RATE_LIMIT.MAX_PER_IP) {
-      throw new AppError(
-        "Limite de denúncias atingido. Tente novamente mais tarde.",
-        429
-      );
+      throw new AppError("Limite de denúncias atingido. Tente novamente mais tarde.", 429);
     }
   }
 

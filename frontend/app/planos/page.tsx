@@ -146,8 +146,7 @@ const KEY_BENEFITS = [
   },
   {
     title: "Mais alcance local e regional",
-    description:
-      "O catálogo organiza estoque pela cidade do anúncio e aparece em buscas locais.",
+    description: "O catálogo organiza estoque pela cidade do anúncio e aparece em buscas locais.",
   },
   {
     title: "Página com visual profissional",
@@ -156,8 +155,7 @@ const KEY_BENEFITS = [
   },
   {
     title: "Sem promessas confusas",
-    description:
-      "Cobramos apenas o que entregamos hoje. Sem letras pequenas, sem pegadinha.",
+    description: "Cobramos apenas o que entregamos hoje. Sem letras pequenas, sem pegadinha.",
   },
 ] as const;
 
@@ -195,7 +193,10 @@ function HeroChip({ children }: { children: React.ReactNode }) {
 
 function PlanCardView({ plan }: { plan: PlanCardData }) {
   // Variantes locais — nada novo no design system. Usa tokens cnc-* existentes.
-  const styleByVariant: Record<PlanCardData["style"], { card: string; cta: string; badge: string }> = {
+  const styleByVariant: Record<
+    PlanCardData["style"],
+    { card: string; cta: string; badge: string }
+  > = {
     highlight: {
       card: "border-primary/60 ring-2 ring-primary/30 shadow-premium bg-white",
       cta: "bg-primary text-white hover:bg-primary/90",
@@ -242,7 +243,10 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
       <ul className="mt-4 flex-1 space-y-2 text-[13px] text-cnc-text-strong sm:text-sm">
         {plan.benefits.map((b) => (
           <li key={b} className="flex items-start gap-2">
-            <span aria-hidden="true" className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-cnc-success" />
+            <span
+              aria-hidden="true"
+              className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-cnc-success"
+            />
             <span>{b}</span>
           </li>
         ))}
@@ -252,7 +256,10 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
         <ul className="mt-3 space-y-1 text-[11px] text-cnc-muted sm:text-[12px]">
           {plan.cautions.map((c) => (
             <li key={c} className="flex items-start gap-2">
-              <span aria-hidden="true" className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-cnc-muted" />
+              <span
+                aria-hidden="true"
+                className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-cnc-muted"
+              />
               <span>{c}</span>
             </li>
           ))}
@@ -309,8 +316,8 @@ export default function PlanosPage() {
           Escolha o plano ideal para anunciar seu veículo
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-cnc-muted sm:text-base">
-          Venda com presença local e regional, mais confiança para o comprador e cadastro simples — sem
-          comissão e sem promessas confusas.
+          Venda com presença local e regional, mais confiança para o comprador e cadastro simples —
+          sem comissão e sem promessas confusas.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           {HERO_CHIPS.map((chip) => (

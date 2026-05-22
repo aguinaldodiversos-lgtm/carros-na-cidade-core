@@ -95,10 +95,7 @@ export function HomeTrustStrip() {
     >
       <ul className="grid grid-cols-3 gap-2 sm:gap-4">
         {ITEMS.map(({ title, subtitle, icon }) => (
-          <li
-            key={title}
-            className="flex flex-col items-start gap-1.5 rounded-xl px-1 sm:px-0"
-          >
+          <li key={title} className="flex flex-col items-start gap-1.5 rounded-xl px-1 sm:px-0">
             <span aria-hidden="true" className="text-slate-700">
               {icon}
             </span>

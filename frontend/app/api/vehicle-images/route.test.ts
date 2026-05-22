@@ -61,10 +61,14 @@ describe("GET /api/vehicle-images?key=...", () => {
   it("com R2_PUBLIC_BASE_URL setado: 302 redirect para URL pública direta — não streamia bytes", async () => {
     process.env.R2_PUBLIC_BASE_URL = "https://cdn.carrosnacidade.com";
 
-    const res = await GET(makeRequest("http://localhost/api/vehicle-images?key=vehicles/abc/foto.webp"));
+    const res = await GET(
+      makeRequest("http://localhost/api/vehicle-images?key=vehicles/abc/foto.webp")
+    );
 
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("https://cdn.carrosnacidade.com/vehicles/abc/foto.webp");
+    expect(res.headers.get("location")).toBe(
+      "https://cdn.carrosnacidade.com/vehicles/abc/foto.webp"
+    );
     expect(res.headers.get("x-vehicle-images-source")).toBe("redirect-r2");
     expect(mocks.readImageFromR2Direct).not.toHaveBeenCalled();
   });
@@ -82,7 +86,9 @@ describe("GET /api/vehicle-images?key=...", () => {
     process.env.R2_PUBLIC_BASE_URL = "https://cdn.example.com";
 
     const res = await GET(
-      makeRequest("http://localhost/api/vehicle-images?key=vehicles%2Fdraft%20id%2Ffoto%20bonita.webp")
+      makeRequest(
+        "http://localhost/api/vehicle-images?key=vehicles%2Fdraft%20id%2Ffoto%20bonita.webp"
+      )
     );
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe(
@@ -116,9 +122,7 @@ describe("GET /api/vehicle-images?key=...", () => {
   it("path traversal em ?key= retorna 400", async () => {
     process.env.R2_PUBLIC_BASE_URL = "https://cdn.example.com";
 
-    const res = await GET(
-      makeRequest("http://localhost/api/vehicle-images?key=..%2Fetc%2Fpasswd")
-    );
+    const res = await GET(makeRequest("http://localhost/api/vehicle-images?key=..%2Fetc%2Fpasswd"));
 
     expect(res.status).toBe(400);
     expect(mocks.readImageFromR2Direct).not.toHaveBeenCalled();

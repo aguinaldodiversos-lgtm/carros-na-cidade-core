@@ -448,7 +448,12 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   // Filtros canônicos da Fase 3 — emite só quando o valor é semanticamente
   // útil (filtros são "apenas anúncios X" — não há valor `false` que
   // restringe o resultado, então tratamos isso como "filtro ausente").
-  if (filters.priority_tier === 1 || filters.priority_tier === 2 || filters.priority_tier === 3 || filters.priority_tier === 4) {
+  if (
+    filters.priority_tier === 1 ||
+    filters.priority_tier === 2 ||
+    filters.priority_tier === 3 ||
+    filters.priority_tier === 4
+  ) {
     params.set("priority_tier", String(filters.priority_tier));
   }
   if (filters.opportunity === true) {

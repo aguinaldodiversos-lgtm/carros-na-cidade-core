@@ -79,13 +79,7 @@ describe("RegionalAuxiliaryBlocks — cidades incluídas", () => {
   });
 
   it("suprime o bloco de cidades quando memberCount=0 (região só com cidade-base)", () => {
-    render(
-      <RegionalAuxiliaryBlocks
-        base={ATIBAIA_BASE}
-        members={[]}
-        radiusKm={80}
-      />
-    );
+    render(<RegionalAuxiliaryBlocks base={ATIBAIA_BASE} members={[]} radiusKm={80} />);
     expect(screen.queryByTestId("regional-cities-block")).toBeNull();
   });
 });
@@ -105,9 +99,7 @@ describe("RegionalAuxiliaryBlocks — marcas frequentes", () => {
     expect(block.textContent).toContain("Honda");
 
     const toyotaLink = screen.getByRole("link", { name: /Toyota/i });
-    expect(toyotaLink.getAttribute("href")).toBe(
-      "/carros-em/atibaia-sp?brand=Toyota"
-    );
+    expect(toyotaLink.getAttribute("href")).toBe("/carros-em/atibaia-sp?brand=Toyota");
   });
 
   it("suprime o bloco de marcas quando topBrands está vazio", () => {
@@ -125,13 +117,7 @@ describe("RegionalAuxiliaryBlocks — marcas frequentes", () => {
 
 describe("RegionalAuxiliaryBlocks — SEO blocks", () => {
   it("renderiza os 3 artigos SEO com nome da cidade e raio", () => {
-    render(
-      <RegionalAuxiliaryBlocks
-        base={ATIBAIA_BASE}
-        members={ATIBAIA_MEMBERS}
-        radiusKm={80}
-      />
-    );
+    render(<RegionalAuxiliaryBlocks base={ATIBAIA_BASE} members={ATIBAIA_MEMBERS} radiusKm={80} />);
     const block = screen.getByTestId("regional-seo-blocks");
     expect(block.textContent).toContain("Atibaia");
     expect(block.textContent).toContain("80 km");
@@ -139,25 +125,13 @@ describe("RegionalAuxiliaryBlocks — SEO blocks", () => {
   });
 
   it("link de 'Ver apenas [cidade]' aponta para /carros-em/[slug]", () => {
-    render(
-      <RegionalAuxiliaryBlocks
-        base={ATIBAIA_BASE}
-        members={ATIBAIA_MEMBERS}
-        radiusKm={80}
-      />
-    );
+    render(<RegionalAuxiliaryBlocks base={ATIBAIA_BASE} members={ATIBAIA_MEMBERS} radiusKm={80} />);
     const cityLink = screen.getByRole("link", { name: /Ver apenas Atibaia/i });
     expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp");
   });
 
   it("link de 'Ver catálogo de [UF]' aponta para /comprar/estado/[uf]", () => {
-    render(
-      <RegionalAuxiliaryBlocks
-        base={ATIBAIA_BASE}
-        members={ATIBAIA_MEMBERS}
-        radiusKm={80}
-      />
-    );
+    render(<RegionalAuxiliaryBlocks base={ATIBAIA_BASE} members={ATIBAIA_MEMBERS} radiusKm={80} />);
     const stateLink = screen.getByRole("link", { name: /Ver catálogo de SP/i });
     expect(stateLink.getAttribute("href")).toBe("/comprar/estado/sp");
   });

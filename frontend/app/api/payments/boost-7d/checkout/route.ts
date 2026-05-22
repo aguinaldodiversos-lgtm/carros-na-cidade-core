@@ -42,10 +42,7 @@ export async function POST(request: NextRequest) {
 
     const backendUrl = resolveInternalBackendApiUrl("/api/payments/boost-7d/checkout");
     if (!backendUrl) {
-      return NextResponse.json(
-        { error: "Backend nao configurado" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Backend nao configurado" }, { status: 500 });
     }
 
     const origin = request.nextUrl.origin;
@@ -68,9 +65,7 @@ export async function POST(request: NextRequest) {
       cache: "no-store",
     });
 
-    const responseBody = await response
-      .json()
-      .catch(() => ({}) as Record<string, unknown>);
+    const responseBody = await response.json().catch(() => ({}) as Record<string, unknown>);
 
     if (!response.ok) {
       const message =
@@ -89,9 +84,6 @@ export async function POST(request: NextRequest) {
       "[POST /api/payments/boost-7d/checkout]",
       error instanceof Error ? error.message : error
     );
-    return NextResponse.json(
-      { error: "Falha ao iniciar checkout do destaque." },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: "Falha ao iniciar checkout do destaque." }, { status: 502 });
   }
 }

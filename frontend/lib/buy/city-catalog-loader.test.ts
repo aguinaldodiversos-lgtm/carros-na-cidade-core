@@ -7,9 +7,8 @@ const fetchFallbackMock = vi.fn();
 const resolveCityMetaMock = vi.fn();
 
 vi.mock("@/lib/search/ads-search", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/search/ads-search")>(
-    "@/lib/search/ads-search"
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/search/ads-search")>("@/lib/search/ads-search");
   return {
     ...actual,
     fetchAdsSearch: (...args: unknown[]) => fetchAdsSearchMock(...args),
@@ -93,11 +92,7 @@ describe("loadCityCatalogData — fallback territorial", () => {
     fetchAdsSearchMock.mockResolvedValueOnce(emptyResults);
     fetchAdsFacetsMock.mockResolvedValueOnce(emptyFacets);
 
-    const result = await loadCityCatalogData(
-      "atibaia-sp",
-      {},
-      { applyTerritoryFallback: false }
-    );
+    const result = await loadCityCatalogData("atibaia-sp", {}, { applyTerritoryFallback: false });
 
     // Garantia central do briefing: a listagem nunca pode misturar
     // anúncios de cidades vizinhas. Confirma que (a) o fallback nem é

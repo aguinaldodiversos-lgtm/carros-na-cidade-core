@@ -305,11 +305,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const reason = String(req.body?.reason || "").trim();
     if (!reason) throw new AppError("Motivo da solicitação é obrigatório.", 400);
-    const result = await moderationService.requestCorrection(
-      req.user.id,
-      req.params.id,
-      reason
-    );
+    const result = await moderationService.requestCorrection(req.user.id, req.params.id, reason);
     res.json({ ok: true, data: result });
   })
 );

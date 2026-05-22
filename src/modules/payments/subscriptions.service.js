@@ -23,9 +23,7 @@ import {
   cancelPreapproval,
   mapPreapprovalStatusToLocal,
 } from "./mercadopago-subscription.client.js";
-import {
-  createPlanSubscription,
-} from "./payments.service.js";
+import { createPlanSubscription } from "./payments.service.js";
 import {
   ALLOWED_SUBSCRIPTION_PLAN_IDS,
   assertNoLiveSubscriptionFor,
@@ -149,10 +147,7 @@ export async function cancelUserSubscription({ userId, requestId }) {
       },
       "[subscriptions] cancel falhou no MP"
     );
-    throw new AppError(
-      "Falha ao cancelar no Mercado Pago. Tente novamente em instantes.",
-      502
-    );
+    throw new AppError("Falha ao cancelar no Mercado Pago. Tente novamente em instantes.", 502);
   }
 
   // Atualiza local conforme resposta do MP. Se MP confirmou cancelled,

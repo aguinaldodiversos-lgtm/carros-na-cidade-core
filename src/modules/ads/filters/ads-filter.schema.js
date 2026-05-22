@@ -125,7 +125,11 @@ const citySlugsParam = () =>
         const cleaned = Array.from(
           new Set(
             value
-              .map((s) => String(s ?? "").trim().toLowerCase())
+              .map((s) =>
+                String(s ?? "")
+                  .trim()
+                  .toLowerCase()
+              )
               .filter(Boolean)
           )
         );

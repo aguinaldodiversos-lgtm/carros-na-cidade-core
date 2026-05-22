@@ -80,9 +80,7 @@ describe("isReviewedAfterBelowFipe — selo 'Anúncio analisado'", () => {
   });
 
   it("status pending_review NÃO recebe selo (anúncio nem é público ainda)", () => {
-    expect(isReviewedAfterBelowFipe({ ...baseRow, status: "pending_review" })).toBe(
-      false
-    );
+    expect(isReviewedAfterBelowFipe({ ...baseRow, status: "pending_review" })).toBe(false);
   });
 
   it("status rejected NÃO recebe selo", () => {

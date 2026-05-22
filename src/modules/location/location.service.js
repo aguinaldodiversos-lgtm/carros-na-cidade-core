@@ -108,10 +108,7 @@ export async function findNearestCity(latitude, longitude) {
     );
     row = result.rows[0] || null;
   } catch (err) {
-    logger.warn(
-      { err: err?.message || String(err) },
-      "[location] haversine SQL falhou"
-    );
+    logger.warn({ err: err?.message || String(err) }, "[location] haversine SQL falhou");
     return null;
   }
 
@@ -156,9 +153,7 @@ export async function resolveLocation(latitude, longitude) {
         slug: regionPayload.base.slug,
         name: `Região de ${regionPayload.base.name}`,
         href: `/carros-usados/regiao/${regionPayload.base.slug}`,
-        memberCount: Array.isArray(regionPayload.members)
-          ? regionPayload.members.length
-          : 0,
+        memberCount: Array.isArray(regionPayload.members) ? regionPayload.members.length : 0,
       };
     }
   } catch (err) {
@@ -169,7 +164,9 @@ export async function resolveLocation(latitude, longitude) {
     region = null;
   }
 
-  const stateCode = String(nearest.city.state || "").toUpperCase().slice(0, 2);
+  const stateCode = String(nearest.city.state || "")
+    .toUpperCase()
+    .slice(0, 2);
 
   // Log SEM coordenadas — só city_slug + distância arredondada + confidence.
   // Útil para diagnóstico de cobertura sem expor PII.

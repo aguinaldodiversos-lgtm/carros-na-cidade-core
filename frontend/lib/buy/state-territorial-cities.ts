@@ -187,9 +187,7 @@ const CURATED_BY_UF: Readonly<Record<string, ReadonlyArray<StateCuratedCity>>> =
   ],
 
   // ── Centro-Oeste ───────────────────────────────────────────────────
-  df: [
-    { slug: "brasilia-df", name: "Brasília" },
-  ],
+  df: [{ slug: "brasilia-df", name: "Brasília" }],
   go: [
     { slug: "goiania-go", name: "Goiânia" },
     { slug: "aparecida-de-goiania-go", name: "Aparecida de Goiânia" },
@@ -305,7 +303,9 @@ export function getStateCuratedCities(
   uf: string | null | undefined,
   limit = DEFAULT_CURATED_LIMIT
 ): StateCuratedCity[] {
-  const key = String(uf || "").trim().toLowerCase();
+  const key = String(uf || "")
+    .trim()
+    .toLowerCase();
   if (!key) return [];
   const list = CURATED_BY_UF[key];
   if (!list) return [];
@@ -317,9 +317,5 @@ export function getStateCuratedCities(
 }
 
 function normalizeCitySlug(raw: string): string {
-  return raw
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+  return raw.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }

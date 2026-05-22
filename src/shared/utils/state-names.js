@@ -41,7 +41,10 @@ const STATE_NAMES = Object.freeze({
 });
 
 export function stateNameFromUf(uf) {
-  const key = String(uf || "").trim().toUpperCase().slice(0, 2);
+  const key = String(uf || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 2);
   if (!key) return null;
   return STATE_NAMES[key] ?? null;
 }

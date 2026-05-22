@@ -1,10 +1,7 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 const OpenAI = require("openai");
-const {
-  refuseIfEventsWorkerDisabled,
-  refuseIfAiBannerDisabled,
-} = require("./_events_guard.cjs");
+const { refuseIfEventsWorkerDisabled, refuseIfAiBannerDisabled } = require("./_events_guard.cjs");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

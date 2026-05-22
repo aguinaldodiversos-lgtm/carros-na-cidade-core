@@ -61,7 +61,9 @@ export function FipeVehicleCarousel({ title, subtitle, items, variant }: FipeVeh
     <section className="mt-10">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-[18px] font-extrabold leading-tight text-[#1b2436] sm:text-[22px] md:text-[28px]">{title}</h2>
+          <h2 className="text-[18px] font-extrabold leading-tight text-[#1b2436] sm:text-[22px] md:text-[28px]">
+            {title}
+          </h2>
           <p className="mt-1 text-[12.5px] text-[#6d768b] sm:text-[14px]">{subtitle}</p>
         </div>
 

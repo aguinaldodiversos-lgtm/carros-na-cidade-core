@@ -5,7 +5,11 @@ vi.mock("../../src/infrastructure/database/db.js", () => ({
   pool: { query: vi.fn().mockResolvedValue({ rows: [] }) },
   query: vi.fn().mockResolvedValue({ rows: [] }),
   withTransaction: vi.fn(async (cb) =>
-    cb({ query: vi.fn().mockResolvedValue({ rows: [{ key: "regional.radius_km", value: 80, updated_at: "2026-05-09T10:00:00Z" }] }) })
+    cb({
+      query: vi.fn().mockResolvedValue({
+        rows: [{ key: "regional.radius_km", value: 80, updated_at: "2026-05-09T10:00:00Z" }],
+      }),
+    })
   ),
 }));
 
