@@ -237,9 +237,7 @@ export function CatalogPageHeader({
   // não existe em BRAZIL_UFS). Em estadual/cidade mantém o comportamento
   // anterior (UF da rota).
   const activeStateUf =
-    variant === "nacional"
-      ? filters.state || ""
-      : stateUf || filters.state || city.state || "SP";
+    variant === "nacional" ? filters.state || "" : stateUf || filters.state || city.state || "SP";
   const stateName = activeStateUf ? stateNameFromUf(activeStateUf) : "";
 
   const breadcrumbItems = useMemo(() => {
@@ -277,9 +275,7 @@ export function CatalogPageHeader({
     // No catálogo nacional, primeira opção é "Todos os estados" (vazia)
     // — sem isso o Select renderiza fora de qualquer opção e o usuário
     // não consegue voltar para Brasil-todo após filtrar por estado.
-    return variant === "nacional"
-      ? [{ label: "Todos os estados", value: "" }, ...ufs]
-      : ufs;
+    return variant === "nacional" ? [{ label: "Todos os estados", value: "" }, ...ufs] : ufs;
   }, [variant]);
 
   const submitSearch = useCallback(

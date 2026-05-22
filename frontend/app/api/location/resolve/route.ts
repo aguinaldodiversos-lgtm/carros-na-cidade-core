@@ -92,18 +92,12 @@ export async function POST(request: NextRequest) {
   try {
     raw = await request.json();
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "invalid_json" },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
   const parsed = parseBody(raw);
   if (!parsed) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_coordinates" },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false, error: "invalid_coordinates" }, { status: 400 });
   }
 
   const url = resolveBackendApiUrl("/api/internal/location/resolve");

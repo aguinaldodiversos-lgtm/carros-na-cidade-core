@@ -129,9 +129,7 @@ export default async function CarrosUsadosUfPage({
   // Bloco "Explore por região" só faz fetch quando a flag regional
   // estiver ativa — links regionais com flag off são 404, não vale
   // pagar a chamada nem montar a UI.
-  const stateRegionsPayload = regionalEnabled
-    ? await fetchStateRegions(uf, { limit: 8 })
-    : null;
+  const stateRegionsPayload = regionalEnabled ? await fetchStateRegions(uf, { limit: 8 }) : null;
   const stateRegions = stateRegionsPayload?.regions ?? [];
 
   // Contexto territorial para o sub-bloco "Cidades próximas de [cidade]"
@@ -186,11 +184,7 @@ export default async function CarrosUsadosUfPage({
             links 404, ou quando o estado não tem cobertura regional
             cadastrada ainda. */}
         {regionalEnabled && stateRegions.length > 0 ? (
-          <StateRegionsBlock
-            stateName={stateName}
-            regions={stateRegions}
-            maxCards={8}
-          />
+          <StateRegionsBlock stateName={stateName} regions={stateRegions} maxCards={8} />
         ) : null}
       </div>
     </>

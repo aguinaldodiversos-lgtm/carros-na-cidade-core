@@ -88,8 +88,7 @@ export function useNearbyRegionRedirect(
   const { regionalEnabled = true, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const router = useRouter();
   const [state, setState] = useState<NearbyState>({ kind: "idle" });
-  const [resolvedLocation, setResolvedLocation] =
-    useState<ResolvedLocation | null>(null);
+  const [resolvedLocation, setResolvedLocation] = useState<ResolvedLocation | null>(null);
   // Guarda contra double-trigger (clique duplo, re-render em strict mode).
   const inFlightRef = useRef(false);
 

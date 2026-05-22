@@ -166,9 +166,7 @@ describe("CatalogPageHeader — variant 'regional' (briefing 2026-05-20)", () =>
     expect(screen.getByText(/cidades próximas/i)).toBeTruthy();
     // O nome da cidade aparece no subtítulo (verificação via DOM strong tag).
     const subtitleStrong = document.querySelectorAll("strong");
-    const cityFound = Array.from(subtitleStrong).some((el) =>
-      el.textContent?.includes("Atibaia")
-    );
+    const cityFound = Array.from(subtitleStrong).some((el) => el.textContent?.includes("Atibaia"));
     expect(cityFound).toBe(true);
   });
 
@@ -257,18 +255,23 @@ describe("CatalogPageHeader — variant 'estadual' (briefing 2026-05-20)", () =>
   it("placeholder da busca: 'Buscar marca, modelo ou cidade em [Estado]'", () => {
     renderEstadualHeader({}, vi.fn());
     const search = screen.getByRole("searchbox");
-    expect(search.getAttribute("placeholder")).toBe(
-      "Buscar marca, modelo ou cidade em São Paulo"
-    );
+    expect(search.getAttribute("placeholder")).toBe("Buscar marca, modelo ou cidade em São Paulo");
   });
 
   it("renderiza os 8 chips canônicos (mesmo padrão da Cidade)", () => {
     renderEstadualHeader({}, vi.fn());
-    ["Até R$ 50 mil", "SUV", "Automático", "Abaixo da FIPE", "Loja", "Particular", "Oportunidade", "Destaque"].forEach(
-      (label) => {
-        expect(screen.getByRole("button", { name: label })).toBeTruthy();
-      }
-    );
+    [
+      "Até R$ 50 mil",
+      "SUV",
+      "Automático",
+      "Abaixo da FIPE",
+      "Loja",
+      "Particular",
+      "Oportunidade",
+      "Destaque",
+    ].forEach((label) => {
+      expect(screen.getByRole("button", { name: label })).toBeTruthy();
+    });
   });
 
   it("não exibe selos de plano comercial nos chips (Pro/Start/Grátis/verificada/premium)", () => {

@@ -18,9 +18,8 @@ vi.mock("next/navigation", () => ({
 import { useNearbyRegionRedirect } from "./useNearbyRegionRedirect";
 
 const originalFetch = global.fetch;
-const originalGeolocation = (
-  globalThis as typeof globalThis & { navigator?: Navigator }
-).navigator?.geolocation;
+const originalGeolocation = (globalThis as typeof globalThis & { navigator?: Navigator }).navigator
+  ?.geolocation;
 
 function setupGeoSuccess(latitude = -23.117, longitude = -46.55) {
   Object.defineProperty(window.navigator, "geolocation", {
@@ -136,12 +135,8 @@ describe("useNearbyRegionRedirect — destino é sempre Regional", () => {
       expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp");
     });
     // NUNCA chamou para Cidade ou Estado.
-    expect(pushMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/^\/carros-em\//)
-    );
-    expect(pushMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/^\/carros-usados\/[a-z]{2}$/)
-    );
+    expect(pushMock).not.toHaveBeenCalledWith(expect.stringMatching(/^\/carros-em\//));
+    expect(pushMock).not.toHaveBeenCalledWith(expect.stringMatching(/^\/carros-usados\/[a-z]{2}$/));
   });
 
   it("backend devolve city mas region=null → constrói /carros-usados/regiao/[citySlug]", async () => {
@@ -176,9 +171,7 @@ describe("useNearbyRegionRedirect — destino é sempre Regional", () => {
       distanceKm: 3.2,
     });
 
-    const { result } = renderHook(() =>
-      useNearbyRegionRedirect({ regionalEnabled: false })
-    );
+    const { result } = renderHook(() => useNearbyRegionRedirect({ regionalEnabled: false }));
     act(() => result.current.trigger());
 
     await waitFor(() => {
@@ -248,8 +241,7 @@ describe("useNearbyRegionRedirect — estados de erro", () => {
   it("BFF responde 200 + data:null → state=out_of_coverage", async () => {
     setupGeoSuccess(0, 0);
     global.fetch = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
+      async () => new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
     ) as unknown as typeof fetch;
 
     const { result } = renderHook(() => useNearbyRegionRedirect());
@@ -285,12 +277,13 @@ describe("useNearbyRegionRedirect — privacidade e idempotência", () => {
     // Storage não pode conter coordenadas em nenhuma forma.
     const storageDump = JSON.stringify({
       cookie: document.cookie,
-      localStorage: typeof localStorage !== "undefined"
-        ? Object.entries(localStorage).reduce(
-            (acc, [k, v]) => ({ ...acc, [k]: v }),
-            {} as Record<string, string>
-          )
-        : {},
+      localStorage:
+        typeof localStorage !== "undefined"
+          ? Object.entries(localStorage).reduce(
+              (acc, [k, v]) => ({ ...acc, [k]: v }),
+              {} as Record<string, string>
+            )
+          : {},
     });
     expect(storageDump.toLowerCase()).not.toContain("latitude");
     expect(storageDump.toLowerCase()).not.toContain("longitude");

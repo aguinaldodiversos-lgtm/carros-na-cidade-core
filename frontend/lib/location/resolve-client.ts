@@ -1,7 +1,4 @@
-import {
-  writeCityCookie,
-  writeCityToLocalStorage,
-} from "@/lib/city/city-storage";
+import { writeCityCookie, writeCityToLocalStorage } from "@/lib/city/city-storage";
 import { writeTerritorialPrefs } from "@/lib/territory/territorial-prefs";
 
 /**

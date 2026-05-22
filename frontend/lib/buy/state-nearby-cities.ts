@@ -44,7 +44,9 @@ export async function resolveStateNearbyContext(
   uf: string,
   regions: StateRegionSummary[] | null | undefined
 ): Promise<StateNearbyContext | null> {
-  const ufUpper = String(uf || "").trim().toUpperCase();
+  const ufUpper = String(uf || "")
+    .trim()
+    .toUpperCase();
   if (ufUpper.length !== 2) return null;
 
   const cookieValue = cookies().get(CITY_COOKIE_NAME)?.value;
@@ -62,12 +64,10 @@ export async function resolveStateNearbyContext(
     r.citySlugs.some((s) => s.toLowerCase() === citySlug)
   );
   if (matchingRegion) {
-    const nearbyCities: StateCuratedCity[] = matchingRegion.citySlugs.map(
-      (slug, idx) => ({
-        slug,
-        name: matchingRegion.cityNames[idx] || slug,
-      })
-    );
+    const nearbyCities: StateCuratedCity[] = matchingRegion.citySlugs.map((slug, idx) => ({
+      slug,
+      name: matchingRegion.cityNames[idx] || slug,
+    }));
     if (nearbyCities.length > 0) {
       return { activeCityName: cityRef.name, nearbyCities };
     }

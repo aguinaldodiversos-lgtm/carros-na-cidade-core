@@ -9,7 +9,12 @@ import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton"
 import { TerritorialFooterLinks } from "@/components/territorial/TerritorialFooterLinks";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
-import { isValidCitySlug, hasRestrictiveFilters, normalizeUf, type SearchParams } from "@/lib/buy/territory-variant";
+import {
+  isValidCitySlug,
+  hasRestrictiveFilters,
+  normalizeUf,
+  type SearchParams,
+} from "@/lib/buy/territory-variant";
 import {
   buildLocalSeoBreadcrumbJsonLd,
   buildLocalSeoJsonLd,
@@ -94,10 +99,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return buildLocalSeoMetadata(model);
 }
 
-export default async function CarrosEmCidadePage({
-  params,
-  searchParams = {},
-}: PageProps) {
+export default async function CarrosEmCidadePage({ params, searchParams = {} }: PageProps) {
   const slug = String(params.slug || "").trim();
   if (!isValidCitySlug(slug) || !slugHasValidBrazilianUf(slug)) notFound();
 
@@ -118,8 +120,7 @@ export default async function CarrosEmCidadePage({
 
   const totalAds = initialResults.pagination.total || 0;
   const noFilters = !hasRestrictiveFilters(filters);
-  const showAlsoInRegion =
-    regionalEnabled && noFilters && totalAds < FEW_ADS_THRESHOLD;
+  const showAlsoInRegion = regionalEnabled && noFilters && totalAds < FEW_ADS_THRESHOLD;
 
   // BreadcrumbList canônico — usa o builder existente do LocalSeoLanding
   // (mesma estrutura usada na variant SEO stand-alone). ItemList só é
@@ -190,20 +191,12 @@ export default async function CarrosEmCidadePage({
         />
 
         {showAlsoInRegion ? (
-          <AlsoInRegionBlock
-            slug={slug}
-            cityName={ctx.name}
-            cityAdsTotal={totalAds}
-          />
+          <AlsoInRegionBlock slug={slug} cityName={ctx.name} cityAdsTotal={totalAds} />
         ) : null}
 
         <LocalSeoLanding model={model} compactBelow />
 
-        <TerritorialFooterLinks
-          slug={model.slug}
-          cityName={model.cityName}
-          state={model.state}
-        />
+        <TerritorialFooterLinks slug={model.slug} cityName={model.cityName} state={model.state} />
       </div>
     </>
   );

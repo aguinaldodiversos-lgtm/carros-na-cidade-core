@@ -150,30 +150,24 @@ export default async function ComprarEstadualPage({
   // Regiões só são buscadas com a flag regional ativa (sem flag os
   // links regionais 404; não vale pagar o fetch).
   const regionalEnabled = isRegionalPageEnabled();
-  const [resultsResponse, facetsResponse, territory, stateRegionsPayload] =
-    await Promise.all([
-      fetchAdsSearch(filters).then(
-        (v) => ({ status: "fulfilled" as const, value: v }),
-        (e) => ({ status: "rejected" as const, reason: e })
-      ),
-      fetchAdsFacets(filters).then(
-        (v) => ({ status: "fulfilled" as const, value: v }),
-        (e) => ({ status: "rejected" as const, reason: e })
-      ),
-      resolveTerritory({ level: "state", stateUf: uf }),
-      regionalEnabled
-        ? fetchStateRegions(uf, { limit: 8 })
-        : Promise.resolve(null),
-    ]);
+  const [resultsResponse, facetsResponse, territory, stateRegionsPayload] = await Promise.all([
+    fetchAdsSearch(filters).then(
+      (v) => ({ status: "fulfilled" as const, value: v }),
+      (e) => ({ status: "rejected" as const, reason: e })
+    ),
+    fetchAdsFacets(filters).then(
+      (v) => ({ status: "fulfilled" as const, value: v }),
+      (e) => ({ status: "rejected" as const, reason: e })
+    ),
+    resolveTerritory({ level: "state", stateUf: uf }),
+    regionalEnabled ? fetchStateRegions(uf, { limit: 8 }) : Promise.resolve(null),
+  ]);
 
   // Sub-bloco contextual "Cidades próximas de [cidade]" (briefing
   // 2026-05-21 item 12). Lê o cookie cnc_city e mapeia para a região
   // que contém a cidade do visitante. Sem cookie ou sem match no UF
   // atual: contexto fica nulo e renderiza só "Principais cidades".
-  const stateNearby = await resolveStateNearbyContext(
-    uf,
-    stateRegionsPayload?.regions
-  );
+  const stateNearby = await resolveStateNearbyContext(uf, stateRegionsPayload?.regions);
 
   const initialResultsRaw =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)

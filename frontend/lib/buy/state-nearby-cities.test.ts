@@ -197,9 +197,6 @@ describe("resolveStateNearbyContext — estágio 2 (fetch dedicado)", () => {
     );
 
     const ctx = await resolveStateNearbyContext("SP", []);
-    expect(ctx?.nearbyCities.map((c) => c.slug)).toEqual([
-      "atibaia-sp",
-      "jarinu-sp",
-    ]);
+    expect(ctx?.nearbyCities.map((c) => c.slug)).toEqual(["atibaia-sp", "jarinu-sp"]);
   });
 });

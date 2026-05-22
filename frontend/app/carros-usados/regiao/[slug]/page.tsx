@@ -64,11 +64,9 @@ interface RegionPageProps {
   searchParams?: SearchParams;
 }
 
-const loadCatalog = cache(
-  async (slug: string, searchParams: SearchParams) => {
-    return loadRegionalCatalogData(slug, searchParams);
-  }
-);
+const loadCatalog = cache(async (slug: string, searchParams: SearchParams) => {
+  return loadRegionalCatalogData(slug, searchParams);
+});
 
 const getTerritoryContext = cache(async (slug: string) => {
   return resolveTerritory({ level: "region", regionSlug: slug });
@@ -123,8 +121,7 @@ export async function generateMetadata({
   const ads = Array.isArray(initialResults?.data) ? initialResults.data : [];
   const ogImage = pickDynamicOgImage(ads) ?? undefined;
   const totalAdsForIndex =
-    typeof initialResults?.pagination?.total === "number" &&
-    initialResults.pagination.total >= 0
+    typeof initialResults?.pagination?.total === "number" && initialResults.pagination.total >= 0
       ? initialResults.pagination.total
       : ads.length;
 
@@ -194,10 +191,7 @@ function buildFaqJsonLd(args: {
   };
 }
 
-export default async function RegionPage({
-  params,
-  searchParams = {},
-}: RegionPageProps) {
+export default async function RegionPage({ params, searchParams = {} }: RegionPageProps) {
   // Dupla proteção: generateMetadata acima JÁ chama notFound() nos
   // mesmos cenários. Os checks aqui são defesa em profundidade.
   if (!isRegionalPageEnabled()) {
@@ -209,13 +203,11 @@ export default async function RegionPage({
     notFound();
   }
 
-  const { region, city, stateUf, radiusKm, filters, initialResults, initialFacets } =
-    catalog;
+  const { region, city, stateUf, radiusKm, filters, initialResults, initialFacets } = catalog;
 
   const ads = initialResults.data;
   const totalAds =
-    typeof initialResults?.pagination?.total === "number" &&
-    initialResults.pagination.total >= 0
+    typeof initialResults?.pagination?.total === "number" && initialResults.pagination.total >= 0
       ? initialResults.pagination.total
       : ads.length;
 

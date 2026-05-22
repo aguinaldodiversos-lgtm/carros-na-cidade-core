@@ -87,9 +87,7 @@ afterEach(() => {
 
 describe("/carros-usados/[uf] — generateMetadata", () => {
   it("title segue o briefing — o root layout aplica template '| Carros na Cidade'", async () => {
-    const { loadStateCatalogData } = await import(
-      "@/lib/buy/state-catalog-loader"
-    );
+    const { loadStateCatalogData } = await import("@/lib/buy/state-catalog-loader");
     vi.mocked(loadStateCatalogData).mockResolvedValue(VALID_CATALOG as never);
 
     const md = await pageModule.generateMetadata({
@@ -126,9 +124,9 @@ describe("/carros-usados/[uf] — generateMetadata", () => {
     // generateMetadata também chama notFound() para fechar o gate caso
     // o middleware seja mudado no futuro. Ambos garantem 404 HTTP real
     // ao invés do bug Next 14.2 (200 + soft-404 UI).
-    await expect(
-      pageModule.generateMetadata({ params: { uf: "xx" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    await expect(pageModule.generateMetadata({ params: { uf: "xx" } })).rejects.toThrow(
+      /NEXT_NOT_FOUND/
+    );
   });
 
   it("filtros restritivos (brand/model/q) emitem robots noindex mas mantêm canonical limpo", async () => {
@@ -149,26 +147,18 @@ describe("/carros-usados/[uf] — generateMetadata", () => {
 
 describe("/carros-usados/[uf] — Page (gate de UF inválida)", () => {
   it("UF inválida → notFound() (404 real, não soft-404)", async () => {
-    const { loadStateCatalogData } = await import(
-      "@/lib/buy/state-catalog-loader"
-    );
+    const { loadStateCatalogData } = await import("@/lib/buy/state-catalog-loader");
     vi.mocked(loadStateCatalogData).mockResolvedValue(null);
 
-    await expect(
-      pageModule.default({ params: { uf: "zz" } })
-    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    await expect(pageModule.default({ params: { uf: "zz" } })).rejects.toThrow(/NEXT_NOT_FOUND/);
   });
 
   it("UF válida → resolve catalog sem 404", async () => {
-    const { loadStateCatalogData } = await import(
-      "@/lib/buy/state-catalog-loader"
-    );
+    const { loadStateCatalogData } = await import("@/lib/buy/state-catalog-loader");
     vi.mocked(loadStateCatalogData).mockResolvedValue(VALID_CATALOG as never);
 
     // Page é Server Component async — chamar como função retorna o tree.
-    await expect(
-      pageModule.default({ params: { uf: "sp" } })
-    ).resolves.toBeTruthy();
+    await expect(pageModule.default({ params: { uf: "sp" } })).resolves.toBeTruthy();
   });
 });
 

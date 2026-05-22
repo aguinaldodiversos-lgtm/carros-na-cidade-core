@@ -185,10 +185,8 @@ export default function BuyMarketplacePageClient({
 
   const emptyContext = {
     variant,
-    citySlug:
-      variant === "cidade" || variant === "regional" ? city.slug : undefined,
-    cityName:
-      variant === "cidade" || variant === "regional" ? city.name : undefined,
+    citySlug: variant === "cidade" || variant === "regional" ? city.slug : undefined,
+    cityName: variant === "cidade" || variant === "regional" ? city.name : undefined,
     stateUf: variant === "nacional" ? undefined : stateUf || city.state,
     hasFilters,
   };

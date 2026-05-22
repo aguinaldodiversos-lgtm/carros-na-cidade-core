@@ -66,9 +66,7 @@ export function StateLocationPrompt({ stateUf }: StateLocationPromptProps) {
       >
         <div className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-primary-soft/50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-cnc-text-strong">
-              Sua região está pronta
-            </p>
+            <p className="text-sm font-semibold text-cnc-text-strong">Sua região está pronta</p>
             <p className="mt-0.5 text-xs text-cnc-muted">
               Ver ofertas em volta de {knownCity.name} sem ter que filtrar de novo.
             </p>

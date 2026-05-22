@@ -107,9 +107,7 @@ describe("BFF /api/location/resolve — validação local", () => {
 
 describe("BFF /api/location/resolve — proxy ao backend", () => {
   it("envia POST para /api/internal/location/resolve com headers internos", async () => {
-    mocks.fetchSpy.mockResolvedValueOnce(
-      jsonResponse(200, { ok: true, data: null })
-    );
+    mocks.fetchSpy.mockResolvedValueOnce(jsonResponse(200, { ok: true, data: null }));
 
     await POST(makeRequest({ latitude: -23.117, longitude: -46.55 }));
 
@@ -151,9 +149,7 @@ describe("BFF /api/location/resolve — proxy ao backend", () => {
   });
 
   it("backend data:null (fora de cobertura) → 200 data:null", async () => {
-    mocks.fetchSpy.mockResolvedValueOnce(
-      jsonResponse(200, { ok: true, data: null })
-    );
+    mocks.fetchSpy.mockResolvedValueOnce(jsonResponse(200, { ok: true, data: null }));
     const res = await POST(makeRequest({ latitude: 0, longitude: 0 }));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -183,18 +179,14 @@ describe("BFF /api/location/resolve — proxy ao backend", () => {
 
 describe("BFF /api/location/resolve — segurança", () => {
   it("Cache-Control private/no-store para evitar caching de CDN", async () => {
-    mocks.fetchSpy.mockResolvedValueOnce(
-      jsonResponse(200, { ok: true, data: null })
-    );
+    mocks.fetchSpy.mockResolvedValueOnce(jsonResponse(200, { ok: true, data: null }));
     const res = await POST(makeRequest({ latitude: -23, longitude: -46 }));
     expect(res.headers.get("Cache-Control")).toContain("private");
     expect(res.headers.get("Cache-Control")).toContain("no-store");
   });
 
   it("token interno NÃO aparece no body de resposta para o client", async () => {
-    mocks.fetchSpy.mockResolvedValueOnce(
-      jsonResponse(200, { ok: true, data: null })
-    );
+    mocks.fetchSpy.mockResolvedValueOnce(jsonResponse(200, { ok: true, data: null }));
     const res = await POST(makeRequest({ latitude: -23, longitude: -46 }));
     const text = await res.text();
     expect(text).not.toContain("test-token-32-chars");
@@ -202,9 +194,7 @@ describe("BFF /api/location/resolve — segurança", () => {
   });
 
   it("token interno NÃO aparece nos headers de resposta para o client", async () => {
-    mocks.fetchSpy.mockResolvedValueOnce(
-      jsonResponse(200, { ok: true, data: null })
-    );
+    mocks.fetchSpy.mockResolvedValueOnce(jsonResponse(200, { ok: true, data: null }));
     const res = await POST(makeRequest({ latitude: -23, longitude: -46 }));
     expect(res.headers.get("X-Internal-Token")).toBeNull();
     expect(res.headers.get("Authorization")).toBeNull();
@@ -216,9 +206,7 @@ describe("BFF /api/location/resolve — rate limit", () => {
     // mockImplementation cria um Response novo a cada call — Response.body
     // é stream consumível, mockResolvedValue reusa o mesmo objeto e a 2ª
     // leitura quebra com "body already used".
-    mocks.fetchSpy.mockImplementation(async () =>
-      jsonResponse(200, { ok: true, data: null })
-    );
+    mocks.fetchSpy.mockImplementation(async () => jsonResponse(200, { ok: true, data: null }));
     const ip = `192.168.1.${Math.floor(Math.random() * 200)}`;
 
     // 15 deve passar.

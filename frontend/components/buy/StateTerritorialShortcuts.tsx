@@ -2,10 +2,7 @@ import Link from "next/link";
 
 import { stateNameFromUf } from "@/lib/buy/territory-variant";
 import { slugToRegionHref } from "@/lib/regions/ancora-url";
-import {
-  getStateCuratedCities,
-  type StateCuratedCity,
-} from "@/lib/buy/state-territorial-cities";
+import { getStateCuratedCities, type StateCuratedCity } from "@/lib/buy/state-territorial-cities";
 
 /**
  * Bloco de navegação territorial ao final da Página Estadual.
@@ -102,14 +99,14 @@ export function StateTerritorialShortcuts({
   nearbyCities,
   activeCityName,
 }: StateTerritorialShortcutsProps) {
-  const ufLower = String(uf || "").trim().toLowerCase();
+  const ufLower = String(uf || "")
+    .trim()
+    .toLowerCase();
   const ufUpper = ufLower.toUpperCase();
   const fallbackCities = getStateCuratedCities(ufLower);
 
   const hasNearby =
-    Array.isArray(nearbyCities) &&
-    nearbyCities.length > 0 &&
-    Boolean(activeCityName?.trim());
+    Array.isArray(nearbyCities) && nearbyCities.length > 0 && Boolean(activeCityName?.trim());
 
   // Suprime o componente inteiro se não há nem fallback nem contexto.
   // Melhor render zero do que listar 0 cidades.
@@ -138,10 +135,7 @@ export function StateTerritorialShortcuts({
       ) : null}
 
       {fallbackCities.length > 0 ? (
-        <div
-          className={hasNearby ? "mt-8" : undefined}
-          data-testid="state-shortcuts-fallback"
-        >
+        <div className={hasNearby ? "mt-8" : undefined} data-testid="state-shortcuts-fallback">
           <header>
             <h2 className="text-lg font-bold text-cnc-text-strong sm:text-xl">
               {hasNearby ? "Outras cidades em" : "Principais cidades em"}{" "}
@@ -156,9 +150,7 @@ export function StateTerritorialShortcuts({
           <CityGrid
             cities={
               hasNearby
-                ? fallbackCities.filter(
-                    (c) => !nearbyCities!.some((n) => n.slug === c.slug)
-                  )
+                ? fallbackCities.filter((c) => !nearbyCities!.some((n) => n.slug === c.slug))
                 : fallbackCities
             }
             ufUpper={ufUpper}

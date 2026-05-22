@@ -113,10 +113,7 @@ function MapIllustration({ className = "h-16 w-16 sm:h-20 sm:w-20" }: { classNam
       <rect x="0" y="55" width="16" height="7" rx="3" fill="#DBEAFE" opacity="0.5" />
       <rect x="24" y="55" width="17" height="7" rx="3" fill="#DBEAFE" opacity="0.6" />
       {/* Location pin */}
-      <path
-        d="M47 43 C47 43 38 34 38 28 A9 9 0 0 1 56 28 C56 34 47 43 47 43Z"
-        fill="#2563EB"
-      />
+      <path d="M47 43 C47 43 38 34 38 28 A9 9 0 0 1 56 28 C56 34 47 43 47 43Z" fill="#2563EB" />
       <circle cx="47" cy="28" r="4" fill="white" />
       {/* Sparkles */}
       <path
@@ -196,8 +193,7 @@ export function LocationRegionalPrompt({
 
     let target: string;
     if (regionalEnabled) {
-      target =
-        region?.href || slugToRegionHref(city.slug);
+      target = region?.href || slugToRegionHref(city.slug);
     } else {
       target = `/carros-em/${encodeURIComponent(city.slug)}`;
     }
@@ -420,8 +416,8 @@ export function LocationRegionalPrompt({
                 Quer ver carros próximos de você?
               </p>
               <p className="mt-0.5 text-[10.5px] leading-snug text-slate-500 sm:text-[11px]">
-                Usamos sua localização só para sugerir a região mais relevante — não
-                salvamos a coordenada nem enviamos para terceiros.
+                Usamos sua localização só para sugerir a região mais relevante — não salvamos a
+                coordenada nem enviamos para terceiros.
               </p>
             </div>
             <button

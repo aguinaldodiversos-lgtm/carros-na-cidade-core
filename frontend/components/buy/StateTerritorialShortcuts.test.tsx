@@ -25,9 +25,7 @@ describe("StateTerritorialShortcuts — Estado → Regional (briefing 2026-05-21
 
   it("nenhum card primário vai direto para /carros-em/[slug]", () => {
     const { container } = render(<StateTerritorialShortcuts uf="sp" />);
-    const primaryLinks = container.querySelectorAll(
-      '[data-testid^="state-shortcut-region-"]'
-    );
+    const primaryLinks = container.querySelectorAll('[data-testid^="state-shortcut-region-"]');
     expect(primaryLinks.length).toBeGreaterThan(0);
     for (const link of primaryLinks) {
       expect(link.getAttribute("href")).toMatch(/^\/carros-usados\/regiao\//);
@@ -86,9 +84,7 @@ describe("StateTerritorialShortcuts — sub-bloco contextual (briefing item 12)"
   });
 
   it("contexto sem cidades válidas (vazio) cai no fallback simples", () => {
-    render(
-      <StateTerritorialShortcuts uf="sp" activeCityName="Atibaia" nearbyCities={[]} />
-    );
+    render(<StateTerritorialShortcuts uf="sp" activeCityName="Atibaia" nearbyCities={[]} />);
 
     expect(screen.queryByTestId("state-shortcuts-nearby")).toBeNull();
     const fallback = screen.getByTestId("state-shortcuts-fallback");

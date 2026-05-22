@@ -51,10 +51,7 @@ type NearbyRegionButtonProps = {
   className?: string;
 };
 
-const COPY: Record<
-  Context,
-  { title: string; subtitle: string; button: string }
-> = {
+const COPY: Record<Context, { title: string; subtitle: string; button: string }> = {
   estadual: {
     title: "Quer ver ofertas perto de você?",
     subtitle: "Use sua localização para encontrar veículos na sua região.",
@@ -106,8 +103,7 @@ export function NearbyRegionButton({
   const copy = COPY[context];
 
   const isBusy = state.kind === "locating" || state.kind === "redirecting";
-  const busyLabel =
-    state.kind === "redirecting" ? "Abrindo região..." : "Localizando...";
+  const busyLabel = state.kind === "redirecting" ? "Abrindo região..." : "Localizando...";
 
   // ───── Erro / fallback ─────────────────────────────────────────────
   if (
@@ -125,28 +121,18 @@ export function NearbyRegionButton({
             ? "Não conseguimos encontrar sua região automaticamente. Escolha uma cidade para continuar."
             : "Não encontramos uma cidade próxima na nossa cobertura. Escolha manualmente.";
 
-    const showRetry =
-      state.kind === "backend_error" || state.kind === "unavailable";
+    const showRetry = state.kind === "backend_error" || state.kind === "unavailable";
 
-    const fallbackHref = stateUf
-      ? `/carros-usados/${stateUf.toLowerCase()}`
-      : "/comprar";
+    const fallbackHref = stateUf ? `/carros-usados/${stateUf.toLowerCase()}` : "/comprar";
 
     return (
       <section
         aria-label="Localização indisponível"
-        className={
-          className ??
-          "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"
-        }
+        className={className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"}
         data-testid="nearby-region-fallback"
       >
         <div className="rounded-xl border border-cnc-line bg-white p-3 sm:p-4">
-          <p
-            className="text-sm text-cnc-muted"
-            role="status"
-            aria-live="polite"
-          >
+          <p className="text-sm text-cnc-muted" role="status" aria-live="polite">
             {message}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -186,16 +172,12 @@ export function NearbyRegionButton({
     return (
       <section
         aria-label="Encontrar ofertas perto de você"
-        className={
-          className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"
-        }
+        className={className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"}
         data-testid="nearby-region-button"
         data-variant="compact"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cnc-line bg-white px-3 py-2 sm:px-4">
-          <p className="text-sm font-medium text-cnc-text-strong">
-            {copy.title}
-          </p>
+          <p className="text-sm font-medium text-cnc-text-strong">{copy.title}</p>
           <button
             type="button"
             onClick={trigger}
@@ -215,17 +197,13 @@ export function NearbyRegionButton({
   return (
     <section
       aria-label="Encontrar ofertas perto de você"
-      className={
-        className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"
-      }
+      className={className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"}
       data-testid="nearby-region-button"
       data-variant="default"
     >
       <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary-soft/40 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-cnc-text-strong sm:text-[15px]">
-            {copy.title}
-          </p>
+          <p className="text-sm font-semibold text-cnc-text-strong sm:text-[15px]">{copy.title}</p>
           <p className="mt-0.5 text-xs text-cnc-muted">{copy.subtitle}</p>
         </div>
         <button

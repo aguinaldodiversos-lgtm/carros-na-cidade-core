@@ -90,12 +90,7 @@ describe("NearbyRegionButton — UI por contexto", () => {
 
   it("variant='compact' não mostra subtítulo (one-liner)", () => {
     render(
-      <NearbyRegionButton
-        regionalEnabled
-        context="regional"
-        variant="compact"
-        stateUf="SP"
-      />
+      <NearbyRegionButton regionalEnabled context="regional" variant="compact" stateUf="SP" />
     );
     const container = screen.getByTestId("nearby-region-button");
     expect(container.getAttribute("data-variant")).toBe("compact");
@@ -104,12 +99,7 @@ describe("NearbyRegionButton — UI por contexto", () => {
 
   it("variant='default' mostra título + subtítulo + botão", () => {
     render(
-      <NearbyRegionButton
-        regionalEnabled
-        context="estadual"
-        variant="default"
-        stateUf="SP"
-      />
+      <NearbyRegionButton regionalEnabled context="estadual" variant="default" stateUf="SP" />
     );
     const container = screen.getByTestId("nearby-region-button");
     expect(container.getAttribute("data-variant")).toBe("default");
@@ -144,15 +134,9 @@ describe("NearbyRegionButton — comportamento de geo", () => {
     render(<NearbyRegionButton regionalEnabled context="cidade" stateUf="SP" />);
     fireEvent.click(screen.getByTestId("nearby-region-trigger"));
 
-    await waitFor(() =>
-      expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp")
-    );
-    expect(pushMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/^\/carros-em\//)
-    );
-    expect(pushMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/^\/carros-usados\/[a-z]{2}$/)
-    );
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/carros-usados/regiao/atibaia-sp"));
+    expect(pushMock).not.toHaveBeenCalledWith(expect.stringMatching(/^\/carros-em\//));
+    expect(pushMock).not.toHaveBeenCalledWith(expect.stringMatching(/^\/carros-usados\/[a-z]{2}$/));
   });
 
   it("permissão negada → fallback com mensagem manual", async () => {
@@ -161,9 +145,7 @@ describe("NearbyRegionButton — comportamento de geo", () => {
     fireEvent.click(screen.getByTestId("nearby-region-trigger"));
 
     await waitFor(() => screen.getByTestId("nearby-region-fallback"));
-    expect(
-      screen.getByText(/Não foi possível acessar sua localização/i)
-    ).toBeTruthy();
+    expect(screen.getByText(/Não foi possível acessar sua localização/i)).toBeTruthy();
     expect(screen.queryByTestId("nearby-region-retry")).toBeNull();
     expect(screen.getByTestId("nearby-region-manual")).toBeTruthy();
   });
@@ -181,9 +163,7 @@ describe("NearbyRegionButton — comportamento de geo", () => {
     fireEvent.click(screen.getByTestId("nearby-region-trigger"));
 
     await waitFor(() => screen.getByTestId("nearby-region-fallback"));
-    expect(
-      screen.getByText(/Não conseguimos encontrar sua região automaticamente/i)
-    ).toBeTruthy();
+    expect(screen.getByText(/Não conseguimos encontrar sua região automaticamente/i)).toBeTruthy();
     expect(screen.getByTestId("nearby-region-retry")).toBeTruthy();
   });
 

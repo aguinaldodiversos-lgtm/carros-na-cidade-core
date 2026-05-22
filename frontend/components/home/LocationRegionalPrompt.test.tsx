@@ -99,9 +99,7 @@ describe("LocationRegionalPrompt — estado idle (sem auto-prompt)", () => {
       value: { getCurrentPosition: geoSpy },
     });
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
 
     expect(geoSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId("location-prompt-idle")).toBeInTheDocument();
@@ -109,9 +107,7 @@ describe("LocationRegionalPrompt — estado idle (sem auto-prompt)", () => {
   });
 
   it("microcopy explica uso da localização (LGPD: consentimento informado)", () => {
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     expect(
       screen.getByText(/não salvamos a coordenada nem enviamos para terceiros/i)
     ).toBeInTheDocument();
@@ -121,29 +117,28 @@ describe("LocationRegionalPrompt — estado idle (sem auto-prompt)", () => {
 describe("LocationRegionalPrompt — fluxo de sucesso", () => {
   it("clique → chama navigator.geolocation com timeout/enableHighAccuracy=false", async () => {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          data: {
-            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-            state: { code: "SP", slug: "sp" },
-            region: {
-              slug: "atibaia-sp",
-              name: "Região de Atibaia",
-              href: "/carros-usados/regiao/atibaia-sp",
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+              state: { code: "SP", slug: "sp" },
+              region: {
+                slug: "atibaia-sp",
+                name: "Região de Atibaia",
+                href: "/carros-usados/regiao/atibaia-sp",
+              },
+              confidence: "high",
+              distanceKm: 3.2,
             },
-            confidence: "high",
-            distanceKm: 3.2,
-          },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
 
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
@@ -162,29 +157,28 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
 
   it("após sucesso, mostra CTA regional primário + cidade + estado", async () => {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          data: {
-            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-            state: { code: "SP", slug: "sp" },
-            region: {
-              slug: "atibaia-sp",
-              name: "Região de Atibaia",
-              href: "/carros-usados/regiao/atibaia-sp",
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+              state: { code: "SP", slug: "sp" },
+              region: {
+                slug: "atibaia-sp",
+                name: "Região de Atibaia",
+                href: "/carros-usados/regiao/atibaia-sp",
+              },
+              confidence: "high",
+              distanceKm: 3.2,
             },
-            confidence: "high",
-            distanceKm: 3.2,
-          },
-        }),
-        { status: 200 }
-      )
+          }),
+          { status: 200 }
+        )
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() =>
@@ -203,33 +197,28 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
 
   it("regionalEnabled=false: CTA regional NÃO aparece, headline fala em cidade", async () => {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          data: {
-            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-            state: { code: "SP", slug: "sp" },
-            region: {
-              slug: "atibaia-sp",
-              name: "Região de Atibaia",
-              href: "/carros-usados/regiao/atibaia-sp",
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+              state: { code: "SP", slug: "sp" },
+              region: {
+                slug: "atibaia-sp",
+                name: "Região de Atibaia",
+                href: "/carros-usados/regiao/atibaia-sp",
+              },
+              confidence: "high",
+              distanceKm: 3.2,
             },
-            confidence: "high",
-            distanceKm: 3.2,
-          },
-        }),
-        { status: 200 }
-      )
+          }),
+          { status: 200 }
+        )
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt
-        regionalEnabled={false}
-        stateName="São Paulo"
-        stateCode="SP"
-      />
-    );
+    render(<LocationRegionalPrompt regionalEnabled={false} stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() =>
@@ -240,29 +229,28 @@ describe("LocationRegionalPrompt — fluxo de sucesso", () => {
 
   it("clique em 'Ver ofertas da região' salva prefs no cookie territorial", async () => {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          data: {
-            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-            state: { code: "SP", slug: "sp" },
-            region: {
-              slug: "atibaia-sp",
-              name: "Região de Atibaia",
-              href: "/carros-usados/regiao/atibaia-sp",
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+              state: { code: "SP", slug: "sp" },
+              region: {
+                slug: "atibaia-sp",
+                name: "Região de Atibaia",
+                href: "/carros-usados/regiao/atibaia-sp",
+              },
+              confidence: "high",
+              distanceKm: 3.2,
             },
-            confidence: "high",
-            distanceKm: 3.2,
-          },
-        }),
-        { status: 200 }
-      )
+          }),
+          { status: 200 }
+        )
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => screen.getByTestId("location-prompt-region-cta"));
@@ -284,9 +272,7 @@ describe("LocationRegionalPrompt — permissão negada", () => {
   it("PERMISSION_DENIED → mostra fallback de escolha manual", async () => {
     setupGeolocationDenied();
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => {
@@ -322,9 +308,7 @@ describe("LocationRegionalPrompt — navigator.geolocation ausente", () => {
     const fetchSpy = vi.fn();
     global.fetch = fetchSpy as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     expect(screen.getByTestId("location-prompt-fallback")).toBeInTheDocument();
@@ -335,13 +319,11 @@ describe("LocationRegionalPrompt — navigator.geolocation ausente", () => {
 describe("LocationRegionalPrompt — fora de cobertura", () => {
   it("backend retorna data:null → estado out_of_coverage com fallback estadual", async () => {
     setupGeolocationSuccess(0, 0); // meio do oceano
-    global.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
+    global.fetch = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => screen.getByTestId("location-prompt-fallback"));
@@ -352,15 +334,14 @@ describe("LocationRegionalPrompt — fora de cobertura", () => {
 describe("LocationRegionalPrompt — backend offline / 502 (fix 2026-05-21)", () => {
   it("BFF responde 502 → mostra 'tente novamente' (NÃO 'fora de cobertura')", async () => {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: false, error: "backend_error" }), {
-        status: 502,
-      })
+    global.fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: false, error: "backend_error" }), {
+          status: 502,
+        })
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => screen.getByTestId("location-prompt-fallback"));
@@ -398,9 +379,7 @@ describe("LocationRegionalPrompt — backend offline / 502 (fix 2026-05-21)", ()
       );
     }) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => screen.getByTestId("location-prompt-retry-cta"));
@@ -413,13 +392,11 @@ describe("LocationRegionalPrompt — backend offline / 502 (fix 2026-05-21)", ()
 
   it("BFF responde 200 com data:null → ainda mostra 'fora de cobertura' (mensagem distinta)", async () => {
     setupGeolocationSuccess(0, 0);
-    global.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
+    global.fetch = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true, data: null }), { status: 200 })
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => screen.getByTestId("location-prompt-fallback"));
@@ -431,33 +408,32 @@ describe("LocationRegionalPrompt — backend offline / 502 (fix 2026-05-21)", ()
 describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 2026-05-19)", () => {
   function mockResolvedAtibaia() {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          data: {
-            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-            state: { code: "SP", slug: "sp" },
-            region: {
-              slug: "atibaia-sp",
-              name: "Região de Atibaia",
-              href: "/carros-usados/regiao/atibaia-sp",
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+              state: { code: "SP", slug: "sp" },
+              region: {
+                slug: "atibaia-sp",
+                name: "Região de Atibaia",
+                href: "/carros-usados/regiao/atibaia-sp",
+              },
+              confidence: "high",
+              distanceKm: 3.2,
             },
-            confidence: "high",
-            distanceKm: 3.2,
-          },
-        }),
-        { status: 200 }
-      )
+          }),
+          { status: 200 }
+        )
     ) as unknown as typeof fetch;
   }
 
   it("regionalEnabled=true → navega para /carros-usados/regiao/{slug} automaticamente", async () => {
     mockResolvedAtibaia();
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => {
@@ -468,27 +444,26 @@ describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 20
 
   it("regionalEnabled=true + region=null → constrói /carros-usados/regiao/{citySlug} (fix 2026-05-21)", async () => {
     setupGeolocationSuccess(-23.117, -46.55);
-    global.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          data: {
-            city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
-            state: { code: "SP", slug: "sp" },
-            // Backend resolveu a cidade mas não consolidou a região (rollout
-            // incompleto). Frontend deve construir a URL regional pelo slug.
-            region: null,
-            confidence: "medium",
-            distanceKm: 3.2,
-          },
-        }),
-        { status: 200 }
-      )
+    global.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              city: { slug: "atibaia-sp", name: "Atibaia", state: "SP" },
+              state: { code: "SP", slug: "sp" },
+              // Backend resolveu a cidade mas não consolidou a região (rollout
+              // incompleto). Frontend deve construir a URL regional pelo slug.
+              region: null,
+              confidence: "medium",
+              distanceKm: 3.2,
+            },
+          }),
+          { status: 200 }
+        )
     ) as unknown as typeof fetch;
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => {
@@ -499,9 +474,7 @@ describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 20
   it("regionalEnabled=false → navega para /carros-em/{slug} (fallback cidade)", async () => {
     mockResolvedAtibaia();
 
-    render(
-      <LocationRegionalPrompt regionalEnabled={false} stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled={false} stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => {
@@ -528,9 +501,7 @@ describe("LocationRegionalPrompt — auto-navegação pós-consentimento (fix 20
   it("persiste cidade no cookie antes de navegar (prefs salvas mesmo sem 2º clique)", async () => {
     mockResolvedAtibaia();
 
-    render(
-      <LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />
-    );
+    render(<LocationRegionalPrompt regionalEnabled stateName="São Paulo" stateCode="SP" />);
     fireEvent.click(screen.getByTestId("location-prompt-trigger"));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalled());
