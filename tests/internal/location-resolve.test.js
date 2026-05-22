@@ -36,12 +36,19 @@ function makeRes() {
   const res = {
     statusCode: 200,
     body: undefined,
+    headers: {},
     status(code) {
       this.statusCode = code;
       return this;
     },
     json(payload) {
       this.body = payload;
+      return this;
+    },
+    // O controller usa `res.setHeader` (Express) para diagnóstico
+    // (`X-Diag-Cities`). Mock simples para o teste.
+    setHeader(name, value) {
+      this.headers[name] = value;
       return this;
     },
   };
@@ -317,11 +324,27 @@ describe("controller POST /api/internal/location/resolve", () => {
   });
 
   it("fora de cobertura → 200 com data:null", async () => {
-    mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
+    // 1ª chamada: haversine vazio. 2ª chamada: probe diagnóstico do controller.
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+      rows: [{ total: 5500, with_geo: 5500, in_bbox: 0 }],
+    });
     const req = { body: { latitude: 0, longitude: 0 } };
     const res = makeRes();
     await resolveLocationEndpoint(req, res, vi.fn());
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ ok: true, data: null });
+    expect(res.headers["X-Diag-Cities"]).toBe("total=5500;with_geo=5500;in_bbox=0");
+  });
+
+  it("fora de cobertura + probe SQL falha → ainda devolve 200 com data:null + header de erro", async () => {
+    mocks.poolQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    const req = { body: { latitude: 0, longitude: 0 } };
+    const res = makeRes();
+    await resolveLocationEndpoint(req, res, vi.fn());
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true, data: null });
+    expect(res.headers["X-Diag-Cities"]).toMatch(/^probe_failed:/);
   });
 });

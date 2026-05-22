@@ -57,17 +57,17 @@ export async function resolveLocationEndpoint(req, res, next) {
             )::int AS in_bbox
           FROM cities
           `,
-          [lat],
+          [lat]
         );
         const row = probe.rows[0] || {};
         res.setHeader(
           "X-Diag-Cities",
-          `total=${row.total ?? 0};with_geo=${row.with_geo ?? 0};in_bbox=${row.in_bbox ?? 0}`,
+          `total=${row.total ?? 0};with_geo=${row.with_geo ?? 0};in_bbox=${row.in_bbox ?? 0}`
         );
       } catch (probeErr) {
         res.setHeader(
           "X-Diag-Cities",
-          `probe_failed:${(probeErr?.message || "unknown").slice(0, 60)}`,
+          `probe_failed:${(probeErr?.message || "unknown").slice(0, 60)}`
         );
       }
     }

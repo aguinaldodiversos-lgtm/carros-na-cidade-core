@@ -63,44 +63,55 @@ function classifyConfidence(distanceKm) {
 export async function findNearestCity(latitude, longitude) {
   if (!isValidLat(latitude) || !isValidLng(longitude)) return null;
 
+  // Reescrita 2026-05-22 — removida bbox CTE.
+  //
+  // Versão anterior usava `WITH candidates AS (... WHERE c.latitude BETWEEN
+  // $1 - $3 AND $1 + $3) SELECT ... FROM candidates WHERE haversine <= $4`.
+  // Em produção, a query estava devolvendo 0 linhas para coords reais de SP
+  // capital (-23.5505, -46.6333), mesmo com `/api/public/regions/sao-paulo-sp`
+  // confirmando que a cidade existe no DB com lat -23.5329 lng -46.6395.
+  //
+  // Causa raiz suspeita (não 100% confirmada — sem X-Diag-Cities do backend
+  // em prod): o planejador do Postgres, com a CTE materializada e a função
+  // `acos(...)` composta, pode estar produzindo um plano ruim ou perdendo
+  // linhas em borda. A reescrita usa SELECT direto, calcula a distância em
+  // subquery e filtra pelo resultado. Brasil tem ~5500 cidades — fazer
+  // haversine em todas é < 20ms e elimina classe inteira de bug de plano.
+  //
+  // Para evitar full scan inútil, mantemos um pre-filtro bbox simples na
+  // mesma cláusula (sem CTE) — Postgres usa esse predicado para reduzir o
+  // conjunto antes da função `acos`. Se ainda assim falhar, o caller verá
+  // null e o header X-Diag-Cities (controller) já distingue entre tabela
+  // vazia, sem geo, ou bbox vazia.
   const latDelta = MAX_DISTANCE_KM / DEG_LAT_KM;
 
   let row = null;
   try {
     const result = await pool.query(
       `
-      WITH candidates AS (
+      SELECT id, slug, name, state, distance_km
+      FROM (
         SELECT
-          c.id, c.slug, c.name, c.state,
-          c.latitude, c.longitude
-        FROM cities c
-        WHERE c.latitude IS NOT NULL
-          AND c.longitude IS NOT NULL
-          AND c.latitude BETWEEN $1 - $3 AND $1 + $3
-      )
-      SELECT
-        id, slug, name, state,
-        ROUND(
-          (
-            ${EARTH_RADIUS_KM} * acos(
-              LEAST(1.0, GREATEST(-1.0,
-                sin(radians($1)) * sin(radians(latitude))
-                + cos(radians($1)) * cos(radians(latitude))
-                * cos(radians(longitude) - radians($2))
-              ))
-            )
-          )::numeric,
-          2
-        ) AS distance_km
-      FROM candidates
-      WHERE
-        ${EARTH_RADIUS_KM} * acos(
-          LEAST(1.0, GREATEST(-1.0,
-            sin(radians($1)) * sin(radians(latitude))
-            + cos(radians($1)) * cos(radians(latitude))
-            * cos(radians(longitude) - radians($2))
-          ))
-        ) <= $4
+          id, slug, name, state,
+          ROUND(
+            (
+              ${EARTH_RADIUS_KM} * acos(
+                LEAST(1.0, GREATEST(-1.0,
+                  sin(radians($1::double precision)) * sin(radians(latitude))
+                  + cos(radians($1::double precision)) * cos(radians(latitude))
+                  * cos(radians(longitude) - radians($2::double precision))
+                ))
+              )
+            )::numeric,
+            2
+          ) AS distance_km
+        FROM cities
+        WHERE latitude IS NOT NULL
+          AND longitude IS NOT NULL
+          AND latitude BETWEEN $1::double precision - $3::double precision
+                           AND $1::double precision + $3::double precision
+      ) AS scored
+      WHERE distance_km <= $4
       ORDER BY distance_km ASC
       LIMIT 1
       `,

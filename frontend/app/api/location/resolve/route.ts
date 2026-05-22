@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
         }),
         ...(backendDiagCities ? { "X-Diag-Cities": backendDiagCities } : {}),
       },
-    },
+    }
   );
 }
 
