@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import { LocalSeoLanding } from "@/components/seo/LocalSeoLanding";
 import { AlsoInRegionBlock } from "@/components/territorial/AlsoInRegionBlock";
+import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import { TerritorialFooterLinks } from "@/components/territorial/TerritorialFooterLinks";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
@@ -177,6 +178,17 @@ export default async function CarrosEmCidadePage({
           mas tudo que renderiza DEPOIS do shell precisa replicar o
           mesmo padding para não ficar coberto pela bottom nav. */}
       <div className="bg-cnc-bg pb-20 md:pb-0">
+        {/* Briefing 2026-05-21: toda página pública de catálogo precisa
+            de um atalho de geolocalização — visitante pode cair pelo
+            Google em cidade errada. CTA leva direto para a Regional
+            mais próxima via /carros-usados/regiao/[slug-detectado]. */}
+        <NearbyRegionButton
+          regionalEnabled={regionalEnabled}
+          context="cidade"
+          variant="compact"
+          stateUf={ctx.state}
+        />
+
         {showAlsoInRegion ? (
           <AlsoInRegionBlock
             slug={slug}

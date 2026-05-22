@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
+import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import { RegionalAuxiliaryBlocks } from "@/components/territorial/RegionalAuxiliaryBlocks";
 import {
   isRegionalPageCanonicalSelf,
@@ -283,6 +284,16 @@ export default async function RegionPage({
           que renderiza DEPOIS do shell precisa replicar o mesmo padding
           para não ficar coberto pela bottom nav. */}
       <div className="bg-cnc-bg pb-20 md:pb-0">
+        {/* Briefing 2026-05-21: visitante pode ter caído numa região
+            diferente da sua localização — atalho compacto manda para a
+            Regional correta sem precisar voltar para a Home. */}
+        <NearbyRegionButton
+          regionalEnabled
+          context="regional"
+          variant="compact"
+          stateUf={stateUf}
+        />
+
         <RegionalAuxiliaryBlocks
           base={region.base}
           members={region.members}

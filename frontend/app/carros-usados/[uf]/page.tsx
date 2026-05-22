@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
+import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import { StateLocationPrompt } from "@/components/territorial/StateLocationPrompt";
 import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";

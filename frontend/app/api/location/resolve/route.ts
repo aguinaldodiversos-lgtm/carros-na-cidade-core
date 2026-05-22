@@ -110,16 +110,21 @@ export async function POST(request: NextRequest) {
   if (!url) {
     return NextResponse.json(
       { ok: false, error: "backend_unavailable" },
-      { status: 503 }
+      { status: 503, headers: { ...buildDiagnosticHeaders("backend_unavailable") } }
     );
   }
+
+  const internalHeaders = buildInternalBackendHeaders();
+  // Diagnóstico operacional (NUNCA o valor do token, apenas a presença
+  // — confirma que `INTERNAL_API_TOKEN` está configurado no service).
+  const tokenConfigured = "X-Internal-Token" in internalHeaders;
 
   let backendResponse: Response;
   try {
     backendResponse = await fetch(url, {
       method: "POST",
       headers: {
-        ...buildInternalBackendHeaders(),
+        ...internalHeaders,
         "Content-Type": "application/json",
         Accept: "application/json",
       },
@@ -131,21 +136,83 @@ export async function POST(request: NextRequest) {
     // Não logamos coordenadas, apenas o evento "rede falhou".
     return NextResponse.json(
       { ok: false, error: "backend_unreachable" },
-      { status: 502 }
+      {
+        status: 502,
+        headers: { ...buildDiagnosticHeaders("backend_unreachable", { tokenConfigured }) },
+      }
     );
   }
 
+  // Diferencia claramente 401/403 (token errado/negado) de 4xx/5xx genéricos.
+  // Mantém código de status 502 para o client (uniformiza tratamento), mas
+  // expõe o motivo via header `X-Diag-Reason` para operadores diagnosticarem
+  // sem precisar entrar nos logs do Render.
   if (backendResponse.status === 400) {
     return NextResponse.json(
       { ok: false, error: "invalid_coordinates" },
-      { status: 400 }
+      {
+        status: 400,
+        headers: {
+          ...buildDiagnosticHeaders("invalid_coordinates", {
+            tokenConfigured,
+            backendStatus: backendResponse.status,
+          }),
+        },
+      }
+    );
+  }
+
+  if (backendResponse.status === 401 || backendResponse.status === 403) {
+    // Token errado, ou backend devolveu rejeição autenticada (raro).
+    // backend.requireInternalToken devolve 404 para token errado/ausente —
+    // 401/403 só aparece em integrações futuras. Mantemos como erro de
+    // backend para o client, mas com diagnóstico explícito.
+    return NextResponse.json(
+      { ok: false, error: "backend_error" },
+      {
+        status: 502,
+        headers: {
+          ...buildDiagnosticHeaders("backend_auth_rejected", {
+            tokenConfigured,
+            backendStatus: backendResponse.status,
+          }),
+        },
+      }
+    );
+  }
+
+  if (backendResponse.status === 404) {
+    // 404 do backend tem dois significados possíveis:
+    //   - rota não montada (deploy do backend antigo)
+    //   - `requireInternalToken` rejeitou (token errado/ausente)
+    // Diferenciamos via `tokenConfigured`: se o frontend tem token mas
+    // o backend devolve 404, provavelmente é token inválido.
+    return NextResponse.json(
+      { ok: false, error: "backend_error" },
+      {
+        status: 502,
+        headers: {
+          ...buildDiagnosticHeaders(
+            tokenConfigured ? "backend_404_token_mismatch" : "backend_404_no_token",
+            { tokenConfigured, backendStatus: backendResponse.status }
+          ),
+        },
+      }
     );
   }
 
   if (!backendResponse.ok) {
     return NextResponse.json(
       { ok: false, error: "backend_error" },
-      { status: 502 }
+      {
+        status: 502,
+        headers: {
+          ...buildDiagnosticHeaders("backend_5xx", {
+            tokenConfigured,
+            backendStatus: backendResponse.status,
+          }),
+        },
+      }
     );
   }
 
@@ -155,21 +222,59 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { ok: false, error: "invalid_backend_response" },
-      { status: 502 }
+      {
+        status: 502,
+        headers: {
+          ...buildDiagnosticHeaders("invalid_backend_response", {
+            tokenConfigured,
+            backendStatus: backendResponse.status,
+          }),
+        },
+      }
     );
   }
 
-  // Repassa o data como veio do backend. data === null significa "fora
-  // de cobertura" — o client decide o fallback (estado / escolha manual).
   const data = (envelope as { ok?: boolean; data?: unknown })?.data ?? null;
   return NextResponse.json(
     { ok: true, data },
     {
       status: 200,
       headers: {
-        // Cache OFF: coordenadas variam por usuário, não há reutilização.
         "Cache-Control": "private, no-store",
+        ...buildDiagnosticHeaders(data ? "ok" : "out_of_coverage", {
+          tokenConfigured,
+          backendStatus: backendResponse.status,
+        }),
       },
     }
   );
+}
+
+/**
+ * Headers de diagnóstico não-sensíveis para depurar o BFF em produção
+ * sem precisar dos logs. NUNCA inclui token nem coordenadas.
+ *
+ * - `X-Diag-Reason`: motivo enumerado (ok / out_of_coverage /
+ *   backend_404_token_mismatch / etc.) para distinguir cenários sem
+ *   ambiguidade.
+ * - `X-Diag-Token-Configured`: "true" / "false" — confirma se o
+ *   `INTERNAL_API_TOKEN` foi lido com sucesso pelo BFF. Sem isso, o
+ *   operador não sabe se o problema é configuração ou backend.
+ * - `X-Diag-Backend-Status`: status HTTP devolvido pelo backend
+ *   interno. Só presente quando houve resposta do backend.
+ */
+function buildDiagnosticHeaders(
+  reason: string,
+  extra?: { tokenConfigured?: boolean; backendStatus?: number }
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "X-Diag-Reason": reason,
+  };
+  if (extra?.tokenConfigured !== undefined) {
+    headers["X-Diag-Token-Configured"] = extra.tokenConfigured ? "true" : "false";
+  }
+  if (extra?.backendStatus !== undefined) {
+    headers["X-Diag-Backend-Status"] = String(extra.backendStatus);
+  }
+  return headers;
 }

@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { writeCityCookie, writeCityToLocalStorage } from "@/lib/city/city-storage";
+import {
+  persistResolvedCity,
+  postResolveLocation as sharedPostResolveLocation,
+  type ResolveOutcome,
+  type ResolvedLocation as SharedResolvedLocation,
+} from "@/lib/location/resolve-client";
 import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import { writeTerritorialPrefs } from "@/lib/territory/territorial-prefs";
 
@@ -39,13 +44,7 @@ import { writeTerritorialPrefs } from "@/lib/territory/territorial-prefs";
  *     da Home não muda.
  */
 
-interface ResolvedLocation {
-  city: { slug: string; name: string; state: string } | null;
-  state: { code: string; slug: string };
-  region: { slug: string; name: string; href: string } | null;
-  confidence: "high" | "medium" | "low";
-  distanceKm: number;
-}
+type ResolvedLocation = SharedResolvedLocation;
 
 interface LocationRegionalPromptProps {
   /** Vem do server: a flag REGIONAL_PAGE_ENABLED. */
@@ -134,82 +133,14 @@ function MapIllustration({ className = "h-16 w-16 sm:h-20 sm:w-20" }: { classNam
   );
 }
 
-type ResolveOutcome =
-  | { kind: "ok"; data: ResolvedLocation }
-  | { kind: "empty" } // backend respondeu 200 mas sem cidade (fora de cobertura)
-  | { kind: "backend_error"; status: number }; // backend offline / token / outro 4xx-5xx
+// `postResolveLocation` agora é importado de `@/lib/location/resolve-client`.
+// Tipo alias mantido para os call sites locais não mudarem.
+const postResolveLocation = sharedPostResolveLocation;
+type _ResolveOutcomeAlias = ResolveOutcome;
+void (0 as unknown as _ResolveOutcomeAlias);
 
-async function postResolveLocation(
-  latitude: number,
-  longitude: number
-): Promise<ResolveOutcome> {
-  let response: Response;
-  try {
-    response = await fetch("/api/location/resolve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ latitude, longitude }),
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-  } catch {
-    return { kind: "backend_error", status: 0 };
-  }
-
-  // BFF retorna 502 quando o backend interno está offline / token ausente.
-  // Tratamos como erro recuperável, NÃO como "fora de cobertura" — o usuário
-  // não merece ver "não encontramos sua cidade" quando o problema é nosso.
-  if (!response.ok) {
-    return { kind: "backend_error", status: response.status };
-  }
-
-  let envelope: { ok?: boolean; data?: ResolvedLocation | null };
-  try {
-    envelope = await response.json();
-  } catch {
-    return { kind: "backend_error", status: response.status };
-  }
-
-  if (!envelope?.ok) {
-    return { kind: "backend_error", status: response.status };
-  }
-
-  const data = envelope.data ?? null;
-  if (!data || !data.city) {
-    return { kind: "empty" };
-  }
-  return { kind: "ok", data };
-}
-
-function persistPrefsForCity(
-  city: { slug: string; name: string; state: string },
-  region: { slug: string } | null,
-  source: "geolocation" | "manual"
-) {
-  // 1. CityRef compatível com CityContext / cnc_city
-  writeCityCookie({
-    slug: city.slug,
-    name: city.name,
-    state: city.state,
-    label: `${city.name} (${city.state})`,
-  });
-  writeCityToLocalStorage(
-    {
-      slug: city.slug,
-      name: city.name,
-      state: city.state,
-      label: `${city.name} (${city.state})`,
-    },
-    { userConfirmed: true }
-  );
-  // 2. Prefs territoriais — região preferida + source + timestamp.
-  writeTerritorialPrefs({
-    citySlug: city.slug,
-    regionSlug: region?.slug ?? null,
-    state: city.state,
-    source,
-  });
-}
+// `persistPrefsForCity` agora delega para o helper compartilhado.
+const persistPrefsForCity = persistResolvedCity;
 
 function persistPrefsForState(stateCode: string) {
   writeTerritorialPrefs({
