@@ -10,6 +10,7 @@ import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { StateTerritorialShortcuts } from "@/components/buy/StateTerritorialShortcuts";
+import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import type { StateCuratedCity } from "@/lib/buy/state-territorial-cities";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
@@ -290,6 +291,31 @@ export default function BuyMarketplacePageClient({
             </aside>
 
             <div className="min-w-0 flex-1">
+              {/* CTA compacto "Ver carros perto de mim" (briefing 2026-05-21).
+                  Aparece em TODA página pública de catálogo (estadual, regional,
+                  cidade) logo acima do grid, próximo aos filtros — visível
+                  imediatamente, sem precisar rolar para o rodapé. Faz geo →
+                  resolve cidade → redireciona para a Página Regional dentro
+                  do raio de 80 km (configurado no backend). */}
+              {(variant === "estadual" || variant === "regional" || variant === "cidade") &&
+              (stateUf || city.state) ? (
+                <div className="mb-4 sm:mb-5">
+                  <NearbyRegionButton
+                    regionalEnabled={regionalEnabled}
+                    context={
+                      variant === "regional"
+                        ? "regional"
+                        : variant === "cidade"
+                          ? "cidade"
+                          : "estadual"
+                    }
+                    variant="compact"
+                    stateUf={stateUf || city.state}
+                    className=""
+                  />
+                </div>
+              ) : null}
+
               <VehicleGrid items={items} inferWeight={inferWeight} emptyContext={emptyContext} />
               <CatalogPagination
                 page={currentPage}

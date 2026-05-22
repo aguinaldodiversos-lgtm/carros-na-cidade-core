@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { useNearbyRegionRedirect } from "@/hooks/useNearbyRegionRedirect";
 import { readCityFromLocalStorage } from "@/lib/city/city-storage";
 import { slugToRegionHref } from "@/lib/regions/ancora-url";
 
@@ -30,8 +29,6 @@ import { slugToRegionHref } from "@/lib/regions/ancora-url";
  * `useNearbyRegionRedirect` documenta as garantias.
  */
 
-import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
-
 type StateLocationPromptProps = {
   /**
    * UF da Página Estadual em foco (ex.: "SP"). Usado para filtrar a
@@ -57,45 +54,37 @@ export function StateLocationPrompt({ stateUf }: StateLocationPromptProps) {
     setKnownCity({ slug: stored.slug, name: stored.name });
   }, [stateUf]);
 
-  if (knownCity) {
-    return (
-      <section
-        aria-label="Sua região"
-        className="mx-auto w-full max-w-7xl px-3 pb-3 pt-1 sm:px-6 sm:pb-4 lg:px-8"
-        data-testid="state-location-prompt"
-      >
-        <div className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-primary-soft/50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-cnc-text-strong">Sua região está pronta</p>
-            <p className="mt-0.5 text-xs text-cnc-muted">
-              Ver ofertas em volta de {knownCity.name} sem ter que filtrar de novo.
-            </p>
-          </div>
-          <Link
-            href={slugToRegionHref(knownCity.slug)}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
-            data-testid="state-location-known-city-cta"
-            aria-label={`Ver ofertas na região de ${knownCity.name}`}
-          >
-            <PinIcon />
-            Ver ofertas na região de {knownCity.name}
-          </Link>
-        </div>
-      </section>
-    );
+  if (!knownCity) {
+    // Sem cidade conhecida o catálogo já mostra o NearbyRegionButton
+    // (injetado pelo BuyMarketplacePageClient acima do grid). Não
+    // duplicamos aqui — manteria dois CTAs idênticos competindo.
+    return null;
   }
 
-  // Sem cidade conhecida: delega para o componente comum que executa
-  // o fluxo de geolocalização real (não só scroll). O hook do
-  // NearbyRegionButton cuida do redirect para /carros-usados/regiao/[slug].
   return (
-    <NearbyRegionButton
-      regionalEnabled
-      context="estadual"
-      variant="default"
-      stateUf={stateUf}
+    <section
+      aria-label="Sua região"
       className="mx-auto w-full max-w-7xl px-3 pb-3 pt-1 sm:px-6 sm:pb-4 lg:px-8"
-    />
+      data-testid="state-location-prompt"
+    >
+      <div className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-primary-soft/50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-cnc-text-strong">Sua região está pronta</p>
+          <p className="mt-0.5 text-xs text-cnc-muted">
+            Ver ofertas em volta de {knownCity.name} sem ter que filtrar de novo.
+          </p>
+        </div>
+        <Link
+          href={slugToRegionHref(knownCity.slug)}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
+          data-testid="state-location-known-city-cta"
+          aria-label={`Ver ofertas na região de ${knownCity.name}`}
+        >
+          <PinIcon />
+          Ver ofertas na região de {knownCity.name}
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -116,7 +105,3 @@ function PinIcon() {
     </svg>
   );
 }
-
-// Reusada pelo hook — mantida explícita aqui para o teste antigo poder
-// importar useNearbyRegionRedirect indiretamente, caso necessário.
-export { useNearbyRegionRedirect };
