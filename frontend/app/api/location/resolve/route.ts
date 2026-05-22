@@ -229,6 +229,13 @@ export async function POST(request: NextRequest) {
   }
 
   const data = (envelope as { ok?: boolean; data?: unknown })?.data ?? null;
+
+  // Propaga `X-Diag-Cities` do backend quando data:null (contagem
+  // agregada da tabela `cities` — sem coords). Permite diagnosticar
+  // bugs do haversine direto pelo DevTools sem precisar dos logs do
+  // Render.
+  const backendDiagCities = backendResponse.headers.get("X-Diag-Cities");
+
   return NextResponse.json(
     { ok: true, data },
     {
@@ -239,8 +246,9 @@ export async function POST(request: NextRequest) {
           tokenConfigured,
           backendStatus: backendResponse.status,
         }),
+        ...(backendDiagCities ? { "X-Diag-Cities": backendDiagCities } : {}),
       },
-    }
+    },
   );
 }
 

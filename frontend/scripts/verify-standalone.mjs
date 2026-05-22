@@ -104,8 +104,12 @@ async function run() {
     path.join("images", "favicon.png"),
     path.join("images", "logo.png"),
     "site.webmanifest",
-    path.join("images", "home-banner-1.png"),
-    path.join("images", "home-banner-2.png"),
+    // `home-hero-banner.png` é o banner real da HomeHero hoje (verificado
+    // em `components/home/sections/HomeHero.tsx`). Os antigos `home-banner-1.png`
+    // / `home-banner-2.png` foram retirados desta lista em 2026-05-22 —
+    // nunca foram criados em `public/images/` e nenhum componente da Home
+    // os referencia. Estavam só gerando warnings ⚠️ no log do build.
+    path.join("images", "home-hero-banner.png"),
   ];
 
   console.log("\n🔎 Verificando assets críticos...\n");
