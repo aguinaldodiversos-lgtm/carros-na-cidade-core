@@ -195,11 +195,16 @@ export default async function ComprarCidadePage({
       : buildEmptyFacets();
 
   /**
-   * Fallback territorial: se a cidade pedida não tem estoque ativo e o usuário
-   * não aplicou filtros específicos, consultamos o backend para descobrir a
-   * cidade-vizinha mais forte no mesmo UF e refazemos a busca. Mantemos os
-   * metadados da cidade original (ctx/SEO/canonical) e informamos o cliente
-   * via `fallbackTerritory` para exibir aviso amarelo "mostrando ofertas em X".
+   * Fallback territorial: se a cidade pedida não tem estoque ativo e o
+   * usuário não aplicou filtros específicos, consultamos o backend para
+   * descobrir a cidade-vizinha mais forte no mesmo UF e refazemos a
+   * busca. Mantemos os metadados da cidade original (ctx/SEO/canonical)
+   * e informamos o cliente via `fallbackTerritory`. O briefing
+   * 2026-05-22 SUBSTITUIU o aviso amarelo grande por uma frase discreta
+   * cinza abaixo do subtítulo — o cliente
+   * (`BuyMarketplacePageClient` → `CatalogPageHeader.softFallbackMessage`)
+   * converte o objeto numa linha curta "Mostrando ofertas próximas em
+   * [cidade] ([UF])." sem cor de alerta.
    */
   let fallbackTerritory:
     | { requestedName: string; actualName: string; actualState: string; actualSlug: string }

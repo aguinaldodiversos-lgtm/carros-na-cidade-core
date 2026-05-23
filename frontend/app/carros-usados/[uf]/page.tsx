@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
-import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
-import { StateLocationPrompt } from "@/components/territorial/StateLocationPrompt";
 import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadStateCatalogData } from "@/lib/buy/state-catalog-loader";
@@ -173,11 +171,12 @@ export default async function CarrosUsadosUfPage({
       />
 
       <div className="bg-cnc-bg pb-20 md:pb-0">
-        {/* CTA de localização — fica logo abaixo do catálogo para
-            convidar usuários "novos" (sem cidade confirmada) a se
-            localizar OU descer para os blocos de descoberta abaixo.
-            Não redireciona agressivamente; só guia via scroll. */}
-        <StateLocationPrompt stateUf={uf} />
+        {/* `StateLocationPrompt` removido no briefing 2026-05-22: o
+            CTA "Ver carros perto de mim" agora vive no top-right do
+            `CatalogPageHeader` desktop, na sidebar `Localização` e na
+            `CatalogActionBar` mobile. Repetir uma quarta instância
+            abaixo do catálogo violaria a regra "não deve repetir três
+            vezes na mesma tela". */}
 
         {/* Bloco "Explore por região" — caminho de conversão para a
             Regional. Suprimido quando a flag está OFF para não criar

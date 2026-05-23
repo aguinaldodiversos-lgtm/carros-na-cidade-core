@@ -4,17 +4,16 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { BuyPageShell } from "@/components/buy/BuyPageShell";
+import { CatalogActionBar } from "@/components/buy/CatalogActionBar";
 import { CatalogPageHeader } from "@/components/buy/CatalogPageHeader";
 import { CatalogPagination } from "@/components/buy/CatalogPagination";
+import { CatalogResultsHeader } from "@/components/buy/CatalogResultsHeader";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { StateTerritorialShortcuts } from "@/components/buy/StateTerritorialShortcuts";
-import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import type { StateCuratedCity } from "@/lib/buy/state-territorial-cities";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
-import { QuickActionTile } from "@/components/ui/QuickActionTile";
-import { IconTable } from "@/components/home/icons";
 import type {
   AdsFacetsResponse,
   AdsSearchFilters,
@@ -49,19 +48,22 @@ interface BuyMarketplacePageClientProps {
   stateUf?: string;
   /** Ativa GeoToCityRedirect apenas em páginas estaduais. */
   enableGeoRedirect?: boolean;
-  /** Preenchido quando SSR fez fallback automatico para outra cidade do mesmo UF. */
+  /**
+   * Quando o SSR fez fallback automático, passa só os nomes para que
+   * o header exiba a frase discreta cinza (sem alerta amarelo). Não
+   * propagamos mais para o `CatalogPageHeader` o objeto completo — o
+   * briefing 2026-05-22 baniu o yellow-alert.
+   */
   fallbackTerritory?: FallbackTerritoryInfo;
   /**
-   * Resolvido em SSR via `isRegionalPageEnabled()`. Quando true e
-   * variant="cidade", o `CatalogPageHeader` renderiza o CTA pill
-   * primário "Veículos na região de [cidade]".
+   * Resolvido em SSR via `isRegionalPageEnabled()`. Repassa para o
+   * `NearbyRegionButton` no header + ações.
    */
   regionalEnabled?: boolean;
   /**
    * Cidades a renderizar no sub-bloco contextual "Cidades próximas
-   * de [cidade]" do StateTerritorialShortcuts (briefing 2026-05-21
-   * item 12). Resolvido pelo SSR caller usando cidade detectada do
-   * cookie/preferência + membros da Região correspondente.
+   * de [cidade]" do StateTerritorialShortcuts. Só usado em
+   * variant="estadual".
    */
   stateNearbyCities?: StateCuratedCity[];
   /** Nome da cidade que ancora o sub-bloco contextual. */
@@ -165,8 +167,6 @@ export default function BuyMarketplacePageClient({
   const currentPage = initialResults?.pagination?.page || initialFilters.page || 1;
   const totalPages = initialResults?.pagination?.totalPages || 1;
 
-  // Sinal de "usuário aplicou filtro" — muda copy do empty state para
-  // "Tente remover filtros" em vez de "Não há anúncios cadastrados".
   const hasFilters = Boolean(
     initialFilters.q ||
       initialFilters.brand ||
@@ -191,6 +191,10 @@ export default function BuyMarketplacePageClient({
     hasFilters,
   };
 
+  const softFallbackMessage = fallbackTerritory
+    ? `Mostrando ofertas próximas em ${fallbackTerritory.actualName} (${fallbackTerritory.actualState}).`
+    : undefined;
+
   const sidebarProps = {
     filters: initialFilters,
     city,
@@ -200,36 +204,17 @@ export default function BuyMarketplacePageClient({
     totalResults: totalAds,
     onPatch: (patch: Partial<AdsSearchFilters>) => pushFilters(patch),
     onClear: clearFilters,
+    regionalEnabled,
   };
 
   return (
     <BuyPageShell
       mobileFilterTrigger={
         <>
-          {/* Botão flutuante "Filtros" — fica acima do BottomNav
-              (z-30 vs BottomNav z-40) e ancorado no canto direito
-              (não centralizado) para não colidir com CTAs centrais
-              de EmptyState/SectionHeader em telas estreitas (320-375).
-              `bottom-20` deixa espaço para os 64px do BottomNav. */}
-          <button
-            type="button"
-            onClick={() => setMobileFiltersOpen(true)}
-            className="fixed bottom-20 right-4 z-30 inline-flex items-center gap-2 rounded-full border border-cnc-line bg-cnc-surface px-4 py-2.5 text-sm font-bold text-cnc-text-strong shadow-premium transition hover:bg-cnc-bg lg:hidden"
-            aria-label="Abrir filtros"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5 text-primary"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
-            </svg>
-            Filtros
-          </button>
-
+          {/* Painel mobile de Filtros — abre via CatalogActionBar
+              ("Filtrar"). Briefing 2026-05-22 removeu o FAB
+              flutuante porque a action bar 3 botões já provê o
+              acesso visível, sem ícone solto sobre o conteúdo. */}
           {mobileFiltersOpen ? (
             <div
               className="fixed inset-0 z-50 lg:hidden"
@@ -255,13 +240,17 @@ export default function BuyMarketplacePageClient({
                   </button>
                 </div>
                 <div className="max-h-[calc(90vh-52px)] overflow-y-auto overscroll-contain px-3 pb-8 pt-3">
-                  <FilterSidebar {...sidebarProps} />
+                  <FilterSidebar
+                    {...sidebarProps}
+                    showApplyCta
+                    onApply={() => setMobileFiltersOpen(false)}
+                  />
                 </div>
               </div>
             </div>
           ) : null}
 
-          {/* BottomNav mobile — "Buscar" ativo automaticamente em
+          {/* BottomNav mobile — "Comprar" ativo automaticamente em
               /comprar/* via pathname matching do <BottomNav>. */}
           <SiteBottomNav />
         </>
@@ -278,8 +267,8 @@ export default function BuyMarketplacePageClient({
         onPatch={(patch) => pushFilters(patch)}
         variant={variant}
         stateUf={stateUf}
-        fallbackTerritory={fallbackTerritory}
         regionalEnabled={regionalEnabled}
+        softFallbackMessage={softFallbackMessage}
       />
 
       <main>
@@ -290,30 +279,26 @@ export default function BuyMarketplacePageClient({
             </aside>
 
             <div className="min-w-0 flex-1">
-              {/* CTA compacto "Ver carros perto de mim" (briefing 2026-05-21).
-                  Aparece em TODA página pública de catálogo (estadual, regional,
-                  cidade) logo acima do grid, próximo aos filtros — visível
-                  imediatamente, sem precisar rolar para o rodapé. Faz geo →
-                  resolve cidade → redireciona para a Página Regional dentro
-                  do raio de 80 km (configurado no backend). */}
-              {(variant === "estadual" || variant === "regional" || variant === "cidade") &&
-              (stateUf || city.state) ? (
-                <div className="mb-4 sm:mb-5">
-                  <NearbyRegionButton
-                    regionalEnabled={regionalEnabled}
-                    context={
-                      variant === "regional"
-                        ? "regional"
-                        : variant === "cidade"
-                          ? "cidade"
-                          : "estadual"
-                    }
-                    variant="compact"
-                    stateUf={stateUf || city.state}
-                    className=""
-                  />
-                </div>
-              ) : null}
+              {/* Mobile: barra de ações Ver perto / Ordenar / Filtrar.
+                  Substitui o FAB flutuante e os chips quick-filter do
+                  header anterior. Desktop: oculta (`lg:hidden`
+                  interno). */}
+              <CatalogActionBar
+                filters={initialFilters}
+                onPatch={(patch) => pushFilters(patch)}
+                regionalEnabled={regionalEnabled}
+                onOpenFilters={() => setMobileFiltersOpen(true)}
+              />
+
+              {/* Contagem + sort. No mobile o sort fica na action bar
+                  (Ordenar), então escondemos o <select> aqui via
+                  hideSort para evitar duplicação. */}
+              <CatalogResultsHeader
+                totalResults={totalAds}
+                sort={initialFilters.sort}
+                onPatch={(patch) => pushFilters(patch)}
+                hideSort={false}
+              />
 
               <VehicleGrid items={items} inferWeight={inferWeight} emptyContext={emptyContext} />
               <CatalogPagination
@@ -322,32 +307,11 @@ export default function BuyMarketplacePageClient({
                 onPatch={(patch) => pushPage(patch)}
               />
 
-              {/* Promo bottom (mockup `pagina catalogo.png`): convida o usuário
-                  a consultar a FIPE da cidade ativa antes de fechar negócio.
-                  No modo "nacional" não há cidade ativa — o card aponta para
-                  a busca geral da FIPE em vez de forçar São Paulo. */}
-              <div className="mt-6 sm:mt-8">
-                <QuickActionTile
-                  href={
-                    variant === "nacional"
-                      ? "/tabela-fipe"
-                      : `/tabela-fipe/${encodeURIComponent(city.slug)}`
-                  }
-                  title="Consulte a FIPE em segundos"
-                  subtitle={
-                    variant === "nacional"
-                      ? "Compare valores antes de fechar negócio"
-                      : `Compare valores em ${city.name}`
-                  }
-                  icon={<IconTable className="h-full w-full" />}
-                />
-              </div>
-
-              {/* Navegação cross-territorial — só em modo estadual. Bloco
-                  curado de cidades destacadas com links canônicos
-                  (/carros-em/[slug]) e regional (/carros-usados/regiao/
-                  [slug]). Adicionado na auditoria 2026-05-11 para
-                  conectar Estado → Cidade canônica e Estado → Regional. */}
+              {/* Navegação cross-territorial — só em modo estadual. A
+                  Estadual é "porta de entrada e distribuição" segundo
+                  o briefing 2026-05-22 — preservamos o bloco de
+                  "Cidades próximas de [cidade]" + "Principais cidades
+                  em [estado]" que afunilam Estado → Regional. */}
               {variant === "estadual" && (stateUf || city.state) ? (
                 <StateTerritorialShortcuts
                   uf={stateUf || city.state}
@@ -361,13 +325,14 @@ export default function BuyMarketplacePageClient({
       </main>
 
       {/*
-        Bloco "Comprar carros usados em [cidade] é fácil e seguro" foi
-        REMOVIDO em 2026-05-22 (briefing item "Correção no final da página
-        Comprar/Catálogo"). Ele criava sensação de segundo rodapé antes
-        do rodapé institucional oficial. As informações úteis (modelos
-        populares, cidades, ferramentas) foram incorporadas ao
-        `PublicFooter` com 6 colunas. Também ficou banido o copy
-        "anúncios verificados" enquanto não houver verificação canônica.
+        Briefing 2026-05-22 — "Atualizar página Comprar/Catálogo":
+        Página termina limpa: grid/paginação → (CompactCitySeoBlock
+        renderizado no caller para variant="cidade") → PublicFooter
+        azul de 6 colunas. Removidos QuickActionTile "Consulte a
+        FIPE" e o NearbyRegionButton compacto que ficava acima do
+        grid (o CTA agora vive no top-right do header desktop e
+        dentro da seção Localização da sidebar + na CatalogActionBar
+        mobile).
       */}
     </BuyPageShell>
   );

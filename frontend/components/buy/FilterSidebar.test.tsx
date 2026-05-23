@@ -2,6 +2,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
+const triggerGeo = vi.fn();
+vi.mock("@/hooks/useNearbyRegionRedirect", () => ({
+  useNearbyRegionRedirect: () => ({
+    state: { kind: "idle" },
+    trigger: triggerGeo,
+    reset: vi.fn(),
+    resolvedLocation: null,
+  }),
+}));
+
 import { FilterSidebar } from "./FilterSidebar";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 
@@ -121,5 +135,65 @@ describe("FilterSidebar — chips de filtros canônicos (Fase 3)", () => {
     expect(screen.getByRole("button", { name: "Lojas" }).getAttribute("aria-pressed")).toBe(
       "false"
     );
+  });
+});
+
+describe("FilterSidebar — seções do briefing 2026-05-22", () => {
+  it("renderiza títulos de seções Ofertas / Vendedor / Localização", () => {
+    renderSidebar({}, vi.fn());
+    expect(screen.getByText(/^Ofertas$/i)).toBeTruthy();
+    expect(screen.getByText(/^Vendedor$/i)).toBeTruthy();
+    expect(screen.getByText(/^Localização$/i)).toBeTruthy();
+  });
+
+  it("seção Localização renderiza botão 'Ver carros perto de mim' que dispara hook geo", () => {
+    triggerGeo.mockClear();
+    renderSidebar({}, vi.fn());
+    const geoBtn = screen.getByTestId("sidebar-nearby-region-button");
+    expect(geoBtn).toBeTruthy();
+    expect(geoBtn.textContent).toMatch(/Ver carros perto de mim/i);
+    fireEvent.click(geoBtn);
+    expect(triggerGeo).toHaveBeenCalledTimes(1);
+  });
+
+  it("seção Localização renderiza atalho 'Região de [cidade]' quando há cidade no contexto", () => {
+    renderSidebar({}, vi.fn());
+    const regionLink = screen.getByTestId("sidebar-region-link");
+    expect(regionLink).toBeTruthy();
+    expect(regionLink.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
+  });
+
+  it("seção Localização renderiza atalho 'Apenas [cidade]' quando há cidade no contexto", () => {
+    renderSidebar({}, vi.fn());
+    const cityLink = screen.getByTestId("sidebar-city-link");
+    expect(cityLink).toBeTruthy();
+    expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp");
+  });
+
+  it("renderiza seção Opcionais com hint 'Em breve' (UI presente, dispatch inerte)", () => {
+    renderSidebar({}, vi.fn());
+    const hint = screen.getAllByText(/Em breve/i);
+    expect(hint.length).toBeGreaterThan(0);
+  });
+
+  it("renderiza seção 'Apenas anúncios com foto' (toggle visível)", () => {
+    renderSidebar({}, vi.fn());
+    expect(screen.getByText(/Apenas anúncios com foto/i)).toBeTruthy();
+    expect(screen.getByText(/Mostrar somente ofertas com fotos/i)).toBeTruthy();
+  });
+
+  it("renderiza seção Cor (não disabled — visível ao lado das demais)", () => {
+    renderSidebar({}, vi.fn());
+    expect(screen.getByText(/^Cor$/i)).toBeTruthy();
+    const colorSelect = document.getElementById("fs-color") as HTMLSelectElement | null;
+    expect(colorSelect).toBeTruthy();
+    // Não está com o atributo `disabled` aplicado (briefing pede destravar).
+    expect(colorSelect?.disabled).toBe(false);
+  });
+
+  it("NÃO renderiza aside 'Quer vender seu carro?' (removido no briefing 2026-05-22)", () => {
+    renderSidebar({}, vi.fn());
+    expect(screen.queryByText(/Quer vender seu carro/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /Anuncie agora/i })).toBeNull();
   });
 });

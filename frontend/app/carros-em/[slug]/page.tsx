@@ -3,9 +3,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
-import { LocalSeoLanding } from "@/components/seo/LocalSeoLanding";
+import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
 import { AlsoInRegionBlock } from "@/components/territorial/AlsoInRegionBlock";
-import { TerritorialFooterLinks } from "@/components/territorial/TerritorialFooterLinks";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
 import {
@@ -29,15 +28,16 @@ import { toAbsoluteUrl } from "@/lib/seo/site";
  * catálogo híbrido:
  *
  *   1. Topo = catálogo transacional (`BuyMarketplacePageClient` com
- *      variant="cidade") — espelha a imagem `atualização-catalogo.png`:
- *      breadcrumb + H1 + subtítulo + CTA "Veículos na região de [cidade]"
- *      + busca + chips + cards horizontais + bottom nav.
+ *      variant="cidade") — espelha as imagens
+ *      `atualização_catalogo_desktop.png` e
+ *      `atualização_catalogo_celular.png` (briefing 2026-05-22):
+ *      breadcrumb + H1 + busca + sidebar/action-bar + cards + bottom nav.
  *   2. Meio (condicional) = bloco "Também na região de [cidade]" quando
  *      a cidade tem poucos anúncios e a flag regional está ativa.
- *   3. Final = `LocalSeoLanding` em modo `compactBelow` — preserva o
- *      conteúdo SEO textual (parágrafos, top brands, links irmãos) sem
- *      duplicar hero/H1 que o catálogo já renderiza.
- *   4. Footer = `TerritorialFooterLinks` (CTA regional + estado).
+ *   3. Final = `CompactCitySeoBlock` — h2 + parágrafo curto + marcas
+ *      frequentes. Sinal SEO preservado, sem virar "segundo rodapé".
+ *      Substituiu o `LocalSeoLanding compactBelow` + `TerritorialFooterLinks`
+ *      removidos no briefing 2026-05-22.
  *
  * Variantes irmãs (`/carros-baratos-em/`, `/carros-automaticos-em/`)
  * continuam usando a factory `createLocalSeoPage` stand-alone — nesta
@@ -178,17 +178,18 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
           mas tudo que renderiza DEPOIS do shell precisa replicar o
           mesmo padding para não ficar coberto pela bottom nav. */}
       <div className="bg-cnc-bg pb-20 md:pb-0">
-        {/* NearbyRegionButton agora vem do `BuyMarketplacePageClient` —
-            renderizado no topo do catálogo, acima do grid. Centralizado
-            ali para garantir visibilidade imediata e evitar duplicação
-            entre páginas estadual/regional/cidade. */}
+        {/* NearbyRegionButton vive no top-right do `CatalogPageHeader`
+            desktop, na seção Localização da `FilterSidebar`, e na
+            `CatalogActionBar` mobile. Sem duplicação entre páginas. */}
         {showAlsoInRegion ? (
           <AlsoInRegionBlock slug={slug} cityName={ctx.name} cityAdsTotal={totalAds} />
         ) : null}
 
-        <LocalSeoLanding model={model} compactBelow />
-
-        <TerritorialFooterLinks slug={model.slug} cityName={model.cityName} state={model.state} />
+        {/* Bloco SEO mínimo pós-paginação. Sem stats grandes, sem
+            "Continue explorando", sem CTAs grandes — o briefing
+            2026-05-22 vetou expressamente o "segundo rodapé".
+            Renderiza apenas h2 + parágrafo curto + marcas frequentes. */}
+        <CompactCitySeoBlock model={model} />
       </div>
     </>
   );

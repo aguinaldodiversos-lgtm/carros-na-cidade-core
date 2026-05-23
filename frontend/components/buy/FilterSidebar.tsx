@@ -1,10 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo, type ReactNode } from "react";
 
+import { useNearbyRegionRedirect } from "@/hooks/useNearbyRegionRedirect";
+import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { formatTotal, type BrandFacet, type BuyCityContext } from "@/lib/buy/catalog-helpers";
+
+/**
+ * Sidebar de filtros do catálogo. Briefing 2026-05-22 — "Atualizar
+ * página Comprar/Catálogo conforme base visual obrigatória":
+ *
+ *   "Complexidade dentro dos filtros; simplicidade na vitrine."
+ *
+ * Seções na ordem do briefing (item 8):
+ *   1. Ofertas    — chips Destaques / Oportunidades / Abaixo da FIPE
+ *   2. Vendedor   — chips Lojas / Particulares (mutuamente exclusivos)
+ *   3. Localização— Ver carros perto de mim + Estado/Região/Cidade
+ *   4. Marca / Modelo / Preço / Ano / KM / Câmbio / Combustível /
+ *      Carroceria / Opcionais / Cor / Apenas anúncios com foto
+ *
+ * Tokens do DS (cnc-*) em vez de slate / blue hardcoded. Aside
+ * "Quer vender seu carro?" removido — Anuncie grátis já está no
+ * header global e no `PublicFooter` de 6 colunas.
+ *
+ * `Opcionais` e `Apenas anúncios com foto` são UI presente mas
+ * desabilitada ("em breve") porque `features[]` e `has_photo` ainda
+ * não fazem parte de `AdsSearchFilters` — habilitam quando o backend
+ * aceitar.
+ */
 
 type SelectOption = { label: string; value: string };
 
@@ -17,6 +44,20 @@ type FilterSidebarProps = {
   totalResults: number;
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
   onClear: () => void;
+  /**
+   * Quando true, exibe o CTA inferior "Ver N ofertas" que confirma a
+   * seleção e fecha a sheet. Useful no painel mobile. No desktop a
+   * sidebar é persistente e o CTA é redundante.
+   */
+  showApplyCta?: boolean;
+  /** Callback do botão "Ver N ofertas" (default: noop). */
+  onApply?: () => void;
+  /**
+   * Flag REGIONAL_PAGE_ENABLED — gate para que o link "Ver carros perto
+   * de mim" use o hook geo apontando para a Regional (default). Quando
+   * false, o hook cai para `/carros-em/[slug]`.
+   */
+  regionalEnabled?: boolean;
   className?: string;
 };
 
@@ -68,41 +109,62 @@ const COLOR_OPTIONS: SelectOption[] = [
   { label: "Azul", value: "Azul" },
 ];
 
+const OPCIONAIS = [
+  "Ar-condicionado",
+  "Direção elétrica",
+  "Multimídia",
+  "Câmera de ré",
+  "Sensor de estacionamento",
+  "Teto solar",
+  "Bancos em couro",
+  "Faróis de LED",
+];
+
 function FieldGroup({
   label,
   htmlFor,
   children,
+  hint,
 }: {
   label: string;
   htmlFor?: string;
   children: ReactNode;
+  hint?: string;
 }) {
   return (
     <div className="space-y-1.5">
       <label
         htmlFor={htmlFor}
-        className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-500"
+        className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-cnc-muted"
       >
         {label}
       </label>
       {children}
+      {hint ? <p className="text-[11px] text-cnc-muted-soft">{hint}</p> : null}
     </div>
   );
 }
 
-const selectClasses =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20";
+function SectionHeading({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="text-[13px] font-bold uppercase tracking-[0.08em] text-cnc-text-strong">
+      {children}
+    </h3>
+  );
+}
 
-const inputClasses =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20";
+const selectClasses =
+  "h-11 w-full rounded-xl border border-cnc-line bg-cnc-surface px-3 text-[14px] font-medium text-cnc-text-strong shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
+
+const inputClasses = selectClasses;
 
 const chipBase =
   "inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold transition";
 
 function chipClass(active: boolean): string {
   return active
-    ? `${chipBase} border border-blue-600 bg-blue-600 text-white`
-    : `${chipBase} border border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-white hover:text-blue-700`;
+    ? `${chipBase} border border-primary bg-primary text-white`
+    : `${chipBase} border border-cnc-line bg-cnc-bg text-cnc-text hover:border-primary/40 hover:bg-cnc-surface hover:text-primary`;
 }
 
 export function FilterSidebar({
@@ -114,9 +176,36 @@ export function FilterSidebar({
   totalResults,
   onPatch,
   onClear,
+  showApplyCta = false,
+  onApply,
+  regionalEnabled = false,
   className = "",
 }: FilterSidebarProps) {
-  const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
+  const { trigger: triggerGeo, state: geoState } = useNearbyRegionRedirect({ regionalEnabled });
+
+  const stateOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: "Todos os estados", value: "" },
+      ...BRAZIL_UFS.map((uf) => ({ label: `${uf.label} (${uf.value})`, value: uf.value })),
+    ],
+    []
+  );
+
+  const currentUf = (filters.state || city.state || "").toUpperCase();
+  const currentCitySlug = filters.city_slug || city.slug || "";
+  const currentCityName = city.name || "";
+
+  const handleStateChange = useCallback(
+    (uf: string) => {
+      if (!uf) {
+        router.push("/comprar");
+        return;
+      }
+      router.push(`/carros-usados/${uf.toLowerCase()}`);
+    },
+    [router]
+  );
 
   const handleYearMin = useCallback(
     (value: string) => {
@@ -134,28 +223,28 @@ export function FilterSidebar({
     [onPatch]
   );
 
+  const geoLocating = geoState.kind === "locating" || geoState.kind === "redirecting";
+
   return (
     <div className={`space-y-4 ${className}`}>
-      <div className="rounded-2xl border border-slate-200/90 bg-white shadow-[0_8px_30px_-14px_rgba(15,23,42,0.18)]">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-extrabold text-slate-900">Filtros</h2>
+      <div className="rounded-2xl border border-cnc-line bg-cnc-surface shadow-card">
+        <div className="flex items-center justify-between border-b border-cnc-line px-5 py-4">
+          <h2 className="text-base font-extrabold text-cnc-text-strong">Filtros</h2>
           <button
             type="button"
             onClick={onClear}
-            className="text-[12px] font-semibold text-blue-700 transition hover:text-blue-800"
+            className="text-[12px] font-semibold text-primary transition hover:text-primary-strong"
           >
             Limpar filtros
           </button>
         </div>
 
-        <div className="space-y-4 px-5 py-5">
-          {/*
-            Chips de filtros públicos (Fase 3 — selos viraram filtros).
-            Cada chip é toggle. Lojas/Particulares são mutuamente exclusivos
-            (selecionar um troca o outro). Não exibimos chips para "Lojista
-            Pro"/"Start" — bastidor comercial fica fora da vitrine.
-          */}
-          <FieldGroup label="Ofertas">
+        <div className="space-y-5 px-5 py-5">
+          {/* 1. OFERTAS — chips Destaques / Oportunidades / Abaixo da FIPE */}
+          <section className="space-y-2" aria-labelledby="filter-ofertas">
+            <SectionHeading>
+              <span id="filter-ofertas">Ofertas</span>
+            </SectionHeading>
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
@@ -196,6 +285,15 @@ export function FilterSidebar({
               >
                 Abaixo da FIPE
               </button>
+            </div>
+          </section>
+
+          {/* 2. VENDEDOR — chips Lojas / Particulares (mutex via seller_kind) */}
+          <section className="space-y-2" aria-labelledby="filter-vendedor">
+            <SectionHeading>
+              <span id="filter-vendedor">Vendedor</span>
+            </SectionHeading>
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 aria-pressed={filters.seller_kind === "dealer"}
@@ -223,8 +321,88 @@ export function FilterSidebar({
                 Particulares
               </button>
             </div>
-          </FieldGroup>
+          </section>
 
+          {/* 3. LOCALIZAÇÃO — geo + Estado + atalhos contextuais Região/Cidade */}
+          <section className="space-y-3" aria-labelledby="filter-localizacao">
+            <SectionHeading>
+              <span id="filter-localizacao">Localização</span>
+            </SectionHeading>
+
+            <button
+              type="button"
+              onClick={triggerGeo}
+              disabled={geoLocating}
+              data-testid="sidebar-nearby-region-button"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary-soft px-3 py-2.5 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary-soft/80 disabled:opacity-60"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
+                <circle cx="12" cy="9" r="2.2" />
+              </svg>
+              {geoLocating ? "Localizando…" : "Ver carros perto de mim"}
+            </button>
+
+            <FieldGroup label="Estado" htmlFor="fs-state">
+              <select
+                id="fs-state"
+                value={currentUf}
+                onChange={(event) => handleStateChange(event.target.value)}
+                className={selectClasses}
+              >
+                {stateOptions.map((opt) => (
+                  <option key={`fs-state-${opt.value || "all"}`} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </FieldGroup>
+
+            {/*
+              Região e Cidade são atalhos contextuais quando há cidade
+              na rota atual. Sem fetch extra: usamos o slug que o SSR
+              já passou e geramos as URLs canônicas (regiao/* e
+              carros-em/*). Quando a página é estadual sem cidade
+              ativa, escondemos os atalhos para não exibir Selects
+              vazios.
+            */}
+            {currentCitySlug ? (
+              <FieldGroup label="Região">
+                <Link
+                  href={slugToRegionHref(currentCitySlug)}
+                  className="inline-flex w-full items-center justify-between rounded-xl border border-cnc-line bg-cnc-surface px-3 py-2.5 text-sm font-semibold text-primary transition hover:border-primary"
+                  data-testid="sidebar-region-link"
+                >
+                  Região de {currentCityName || currentCitySlug}
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </FieldGroup>
+            ) : null}
+
+            {currentCitySlug ? (
+              <FieldGroup label="Cidade">
+                <Link
+                  href={`/carros-em/${encodeURIComponent(currentCitySlug)}`}
+                  className="inline-flex w-full items-center justify-between rounded-xl border border-cnc-line bg-cnc-surface px-3 py-2.5 text-sm font-semibold text-primary transition hover:border-primary"
+                  data-testid="sidebar-city-link"
+                >
+                  Apenas {currentCityName || currentCitySlug}
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </FieldGroup>
+            ) : null}
+          </section>
+
+          {/* 4+. CAMPOS PADRÃO de busca */}
           <FieldGroup label="Marca" htmlFor="fs-brand">
             <select
               id="fs-brand"
@@ -304,7 +482,7 @@ export function FilterSidebar({
             </div>
           </FieldGroup>
 
-          <FieldGroup label="Quilometragem" htmlFor="fs-km">
+          <FieldGroup label="KM" htmlFor="fs-km">
             <select
               id="fs-km"
               value={String(filters.mileage_max || "")}
@@ -325,15 +503,17 @@ export function FilterSidebar({
             </select>
           </FieldGroup>
 
-          <FieldGroup label="Carroceria" htmlFor="fs-body">
+          <FieldGroup label="Câmbio" htmlFor="fs-trans">
             <select
-              id="fs-body"
-              value={filters.body_type || ""}
-              onChange={(event) => onPatch({ body_type: event.target.value || undefined, page: 1 })}
+              id="fs-trans"
+              value={filters.transmission || ""}
+              onChange={(event) =>
+                onPatch({ transmission: event.target.value || undefined, page: 1 })
+              }
               className={selectClasses}
             >
-              {BODY_TYPES.map((opt) => (
-                <option key={`fs-body-${opt.value}`} value={opt.value}>
+              {TRANSMISSION_TYPES.map((opt) => (
+                <option key={`fs-trans-${opt.value}`} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
@@ -355,31 +535,57 @@ export function FilterSidebar({
             </select>
           </FieldGroup>
 
-          <FieldGroup label="Câmbio" htmlFor="fs-trans">
+          <FieldGroup label="Carroceria" htmlFor="fs-body">
             <select
-              id="fs-trans"
-              value={filters.transmission || ""}
-              onChange={(event) =>
-                onPatch({ transmission: event.target.value || undefined, page: 1 })
-              }
+              id="fs-body"
+              value={filters.body_type || ""}
+              onChange={(event) => onPatch({ body_type: event.target.value || undefined, page: 1 })}
               className={selectClasses}
             >
-              {TRANSMISSION_TYPES.map((opt) => (
-                <option key={`fs-trans-${opt.value}`} value={opt.value}>
+              {BODY_TYPES.map((opt) => (
+                <option key={`fs-body-${opt.value}`} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
             </select>
           </FieldGroup>
 
+          {/* OPCIONAIS — UI presente mas inerte (backend ainda não
+              aceita `features[]`). Marcada com hint "Em breve" para
+              evitar expectativa de comportamento. */}
+          <FieldGroup label="Opcionais" hint="Em breve — backend irá incorporar `features[]`.">
+            <div className="grid grid-cols-1 gap-1.5">
+              {OPCIONAIS.map((opt) => (
+                <label
+                  key={opt}
+                  className="inline-flex cursor-not-allowed items-center gap-2 text-[13px] text-cnc-muted opacity-70"
+                >
+                  <input
+                    type="checkbox"
+                    disabled
+                    aria-label={opt}
+                    className="h-4 w-4 rounded border-cnc-line text-primary focus:ring-primary"
+                  />
+                  {opt}
+                </label>
+              ))}
+            </div>
+          </FieldGroup>
+
+          {/* COR — agora destravado (briefing item 8 lista no escopo). */}
           <FieldGroup label="Cor" htmlFor="fs-color">
             <select
               id="fs-color"
               value=""
-              onChange={() => undefined}
-              disabled
-              className={`${selectClasses} opacity-70`}
-              title="Filtro de cor em breve"
+              onChange={() => {
+                /* Filtro de cor: o backend não consome `color` hoje;
+                   mantemos o select habilitado para alinhar ao mockup
+                   mas o submit não envia o valor. Quando o
+                   ads-search aceitar `color`, basta dispatch via
+                   onPatch. */
+              }}
+              className={selectClasses}
+              aria-describedby="fs-color-hint"
             >
               {COLOR_OPTIONS.map((opt) => (
                 <option key={`fs-color-${opt.value}`} value={opt.value}>
@@ -387,9 +593,33 @@ export function FilterSidebar({
                 </option>
               ))}
             </select>
+            <p id="fs-color-hint" className="text-[11px] text-cnc-muted-soft">
+              Em breve — backend irá incorporar `color`.
+            </p>
           </FieldGroup>
 
-          {expanded ? (
+          {/* APENAS ANÚNCIOS COM FOTO — UI presente mas inerte (toggle
+              visual). Quando o backend aceitar `has_photo`, basta
+              dispatchar. */}
+          <FieldGroup label="Apenas anúncios com foto">
+            <label className="inline-flex cursor-not-allowed items-center gap-3 text-[13px] text-cnc-muted opacity-90">
+              <input
+                type="checkbox"
+                disabled
+                defaultChecked
+                aria-label="Apenas anúncios com foto"
+                className="h-4 w-4 rounded border-cnc-line text-primary focus:ring-primary"
+              />
+              Mostrar somente ofertas com fotos
+            </label>
+            <p className="text-[11px] text-cnc-muted-soft">
+              Em breve — backend irá incorporar `has_photo`.
+            </p>
+          </FieldGroup>
+
+          {/* Marcas populares — atalho secundário, mantido como aside
+              de descoberta. Compacto, dentro da própria seção Marca. */}
+          {popularBrands.length > 0 ? (
             <FieldGroup label="Marcas populares">
               <div className="flex flex-wrap gap-1.5">
                 {popularBrands.slice(0, 8).map((item) => (
@@ -397,11 +627,11 @@ export function FilterSidebar({
                     key={`pop-${item.brand}`}
                     type="button"
                     onClick={() => onPatch({ brand: item.brand, model: undefined, page: 1 })}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[12px] font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-white hover:text-blue-700"
+                    className="inline-flex items-center gap-1 rounded-full border border-cnc-line bg-cnc-bg px-2.5 py-1 text-[12px] font-semibold text-cnc-text transition hover:border-primary/40 hover:bg-cnc-surface hover:text-primary"
                   >
                     {item.brand}
                     {item.total > 0 ? (
-                      <span className="text-[11px] font-bold text-slate-400">
+                      <span className="text-[11px] font-bold text-cnc-muted-soft">
                         {formatTotal(item.total)}
                       </span>
                     ) : null}
@@ -410,62 +640,23 @@ export function FilterSidebar({
               </div>
             </FieldGroup>
           ) : null}
-
-          <button
-            type="button"
-            onClick={() => setExpanded((prev) => !prev)}
-            className="text-[13px] font-semibold text-blue-700 transition hover:text-blue-800"
-          >
-            {expanded ? "Ocultar filtros avançados" : "Mostrar mais filtros"}
-          </button>
         </div>
 
-        <div className="border-t border-slate-100 px-5 py-4">
-          <button
-            type="button"
-            onClick={() => undefined}
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
-          >
-            Ver {formatTotal(totalResults)} ofertas
-          </button>
-          <p className="mt-2 text-center text-[11px] text-slate-500">{city.label}</p>
-        </div>
-      </div>
-
-      <aside
-        className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-5 shadow-[0_8px_30px_-16px_rgba(14,98,216,0.35)]"
-        aria-label="Quer vender seu carro?"
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_8px_20px_-8px_rgba(14,98,216,0.8)]">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden
+        {/* CTA inferior — visível só dentro do painel mobile (showApplyCta=true).
+            Desktop: a sidebar é persistente e o CTA seria redundante. */}
+        {showApplyCta ? (
+          <div className="border-t border-cnc-line px-5 py-4">
+            <button
+              type="button"
+              onClick={onApply}
+              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong"
             >
-              <path d="M3 13h13l-2-4H5l-2 4Z" />
-              <circle cx="7.5" cy="16.5" r="1.5" />
-              <circle cx="16.5" cy="16.5" r="1.5" />
-              <path d="M16 13V8h3l2 3v2" />
-            </svg>
+              Ver {formatTotal(totalResults)} ofertas
+            </button>
+            <p className="mt-2 text-center text-[11px] text-cnc-muted-soft">{city.label}</p>
           </div>
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-extrabold text-slate-900">Quer vender seu carro?</h3>
-            <p className="mt-1 text-[13px] leading-relaxed text-slate-600">
-              Anuncie grátis e alcance compradores da sua cidade com contexto regional.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/anunciar/novo"
-          className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-blue-700 px-4 text-[13px] font-bold text-white transition hover:bg-blue-800"
-        >
-          Anuncie agora
-        </Link>
-      </aside>
+        ) : null}
+      </div>
     </div>
   );
 }

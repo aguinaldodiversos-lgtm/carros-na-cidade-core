@@ -18,8 +18,12 @@ import { BottomNav, type BottomNavItem } from "@/components/ui/BottomNav";
  * automático.
  *
  *   - Início (home): activePattern = ^/$ (somente "/" exato)
- *   - Buscar:        href "/comprar" — ativo em /comprar e
+ *   - Comprar:       href "/comprar" — ativo em /comprar e
  *                    /comprar/cidade/[slug] e /comprar/estado/[uf]
+ *                    (briefing 2026-05-22: label "Comprar" — antes
+ *                    era "Buscar"; o item representa a área de
+ *                    catálogo/compra do portal, alinhado ao menu
+ *                    superior e ao mockup `atualização_catalogo_celular.png`).
  *   - Favoritos:     ativo em /favoritos
  *   - Anunciar:      FAB; ativo em /anunciar/*
  *   - Menu:          ativo em /dashboard/* e /dashboard-loja/* (link para
@@ -123,8 +127,10 @@ const ITEMS: ReadonlyArray<BottomNavItem> = [
     activePattern: /^\/$/,
   },
   {
+    // id permanece "buscar" para compat com testes/snapshots — só o
+    // label exibido virou "Comprar" (briefing 2026-05-22).
     id: "buscar",
-    label: "Buscar",
+    label: "Comprar",
     href: "/comprar",
     icon: <SearchIcon />,
     activePattern:
