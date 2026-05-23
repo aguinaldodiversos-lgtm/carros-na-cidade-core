@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { BuyPageShell } from "@/components/buy/BuyPageShell";
 import { CatalogPageHeader } from "@/components/buy/CatalogPageHeader";
 import { CatalogPagination } from "@/components/buy/CatalogPagination";
-import { CatalogSeoBlock } from "@/components/buy/CatalogSeoBlock";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { StateTerritorialShortcuts } from "@/components/buy/StateTerritorialShortcuts";
@@ -362,14 +361,14 @@ export default function BuyMarketplacePageClient({
       </main>
 
       {/*
-        Bloco SEO institucional só faz sentido com cidade real (territorial).
-        No modo "nacional" não temos territory; no modo "regional" a página
-        injeta seus próprios blocos SEO regionais via children — suprimir aqui
-        evita duplicação. Em cidade/estadual mantém o comportamento legado.
+        Bloco "Comprar carros usados em [cidade] é fácil e seguro" foi
+        REMOVIDO em 2026-05-22 (briefing item "Correção no final da página
+        Comprar/Catálogo"). Ele criava sensação de segundo rodapé antes
+        do rodapé institucional oficial. As informações úteis (modelos
+        populares, cidades, ferramentas) foram incorporadas ao
+        `PublicFooter` com 6 colunas. Também ficou banido o copy
+        "anúncios verificados" enquanto não houver verificação canônica.
       */}
-      {variant === "cidade" || variant === "estadual" ? (
-        <CatalogSeoBlock city={city} brands={brandFacets} />
-      ) : null}
     </BuyPageShell>
   );
 }

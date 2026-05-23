@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
 import { useCityOptional } from "@/lib/city/CityContext";
 import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/public-config";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
-import { buildFooterNavSections, SITE_CONTACT, SITE_ROUTES } from "@/lib/site/site-navigation";
+import {
+  buildFooterNavSections,
+  SITE_CONTACT,
+  SITE_ROUTES,
+  type SiteNavSection,
+  type TerritorialContext,
+} from "@/lib/site/site-navigation";
 
 type FooterLinkItem = {
   label: string;
@@ -62,41 +69,154 @@ function FooterLegalLinks({ className }: { className?: string }) {
   );
 }
 
-function FooterNavColumns({
+/**
+ * Coluna do footer.
+ *
+ * Mobile (< sm): renderiza como `<details>` nativo (accordion sem JS) —
+ *   evita o footer virar uma lista vertical gigante no celular. Header
+ *   visível, links recolhidos por padrão.
+ * Desktop (sm+):  renderiza com a lista sempre aberta. `<summary>` perde
+ *   o triângulo via CSS (`list-none`) e vira só o título da coluna.
+ *
+ * Acessibilidade: `<details>` é interativo nativo, com role implícito de
+ * "group" e estado de toggle anunciado pelo screen reader.
+ */
+function FooterColumn({
+  section,
   headingClass,
+  linkClass,
+}: {
+  section: SiteNavSection;
+  headingClass: string;
+  linkClass: string;
+}) {
+  return (
+    <details
+      open
+      className="group border-b border-white/10 pb-4 sm:border-none sm:pb-0 [&[open]>summary>svg]:rotate-180"
+      data-footer-col={section.id}
+    >
+      <summary
+        className={`${headingClass} flex cursor-pointer list-none items-center justify-between py-2 sm:cursor-default sm:py-0 [&::-webkit-details-marker]:hidden`}
+      >
+        <span>{section.title}</span>
+        {/* Chevron — visível só no mobile, apontando para direção do toggle */}
+        <svg
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+          className="h-4 w-4 shrink-0 transition-transform sm:hidden"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M5 7.5 10 12.5l5-5" />
+        </svg>
+      </summary>
+      <ul className="mt-3 space-y-2.5 text-sm sm:mt-4">
+        {section.links.map((link) => (
+          <li key={`${section.id}-${link.id}`}>
+            <FooterAnchor item={link} className={linkClass} />
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function FooterNavGrid({
+  headingClass,
+  linkClass,
   sections,
 }: {
   headingClass: string;
-  sections: ReturnType<typeof buildFooterNavSections>;
+  linkClass: string;
+  sections: SiteNavSection[];
 }) {
   return (
-    <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-      {sections.map((group) => (
-        <div key={group.id}>
-          <h3 className={headingClass}>{group.title}</h3>
-          <ul className="mt-4 space-y-2.5 text-sm">
-            {group.links.map((link) => (
-              <li key={`${group.id}-${link.id}`}>
-                <FooterAnchor
-                  item={link}
-                  className="inline-flex min-h-9 items-center text-white/70 transition hover:text-white"
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
+    <div className="grid gap-1 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-8 lg:grid-cols-3 xl:grid-cols-6">
+      {sections.map((section) => (
+        <FooterColumn
+          key={section.id}
+          section={section}
+          headingClass={headingClass}
+          linkClass={linkClass}
+        />
       ))}
     </div>
   );
+}
+
+/**
+ * Deriva contexto territorial a partir do pathname atual.
+ *
+ * Convenções de rota:
+ *   /carros-em/{citySlug}             → city ativa
+ *   /carros-usados/regiao/{citySlug}  → city ativa (slug da base)
+ *   /carros-usados/{uf}               → UF ativa (sem city)
+ *   /comprar/estado/{uf}              → UF ativa (legado)
+ *
+ * Quando não casa, retorna {} e o footer usa fallback nacional.
+ *
+ * Não toca em `CityContext` porque ele nem sempre está disponível em
+ * rotas server-rendered (catálogo, blog, sobre). Pathname é universal.
+ */
+function deriveTerritorialContext(
+  pathname: string | null,
+  cityFromCtx: { slug?: string; state?: string } | null
+): TerritorialContext {
+  if (cityFromCtx?.slug) {
+    return { citySlug: cityFromCtx.slug, stateUf: cityFromCtx.state };
+  }
+
+  const safe = pathname || "";
+
+  const cidadeMatch = safe.match(/^\/carros-em\/([a-z0-9-]+)/i);
+  if (cidadeMatch?.[1]) {
+    const slug = cidadeMatch[1];
+    const uf = slug.match(/-([a-z]{2})$/i)?.[1]?.toUpperCase();
+    return { citySlug: slug, stateUf: uf };
+  }
+
+  const regionalMatch = safe.match(/^\/carros-usados\/regiao\/([a-z0-9-]+)/i);
+  if (regionalMatch?.[1]) {
+    const slug = regionalMatch[1];
+    const uf = slug.match(/-([a-z]{2})$/i)?.[1]?.toUpperCase();
+    return { citySlug: slug, stateUf: uf };
+  }
+
+  const estadualMatch = safe.match(/^\/carros-usados\/([a-z]{2})(?:[/?]|$)/i);
+  if (estadualMatch?.[1]) {
+    return { stateUf: estadualMatch[1].toUpperCase() };
+  }
+
+  const legacyEstadualMatch = safe.match(/^\/comprar\/estado\/([a-z]{2})(?:[/?]|$)/i);
+  if (legacyEstadualMatch?.[1]) {
+    return { stateUf: legacyEstadualMatch[1].toUpperCase() };
+  }
+
+  return {};
 }
 
 export function PublicFooter() {
   const currentYear = new Date().getFullYear();
   const socials = getPublicSocialLinks();
   const cityCtx = useCityOptional();
+  const pathname = usePathname();
+
+  const territorial = useMemo(
+    () =>
+      deriveTerritorialContext(
+        pathname,
+        cityCtx?.city ? { slug: cityCtx.city.slug, state: cityCtx.city.state } : null
+      ),
+    [pathname, cityCtx?.city]
+  );
+
   const footerSections = useMemo(
-    () => buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG),
-    [cityCtx?.city.slug]
+    () => buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG, territorial),
+    [cityCtx?.city.slug, territorial]
   );
 
   return (
@@ -104,8 +224,8 @@ export function PublicFooter() {
       data-public-footer
       className="mt-auto border-t border-white/10 bg-[linear-gradient(165deg,#1a3a7a_0%,#0f2249_45%,#0a1833_100%)] text-white"
     >
-      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
-        <div className="grid gap-12 border-b border-white/12 pb-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+        <div className="grid gap-10 border-b border-white/12 pb-10 lg:grid-cols-[1fr_2fr] lg:gap-14 xl:grid-cols-[1fr_3fr]">
           <div>
             <Link href={SITE_ROUTES.home} className="inline-block" aria-label="Carros na Cidade">
               {/*
@@ -158,8 +278,9 @@ export function PublicFooter() {
             ) : null}
           </div>
 
-          <FooterNavColumns
+          <FooterNavGrid
             headingClass="text-[13px] font-extrabold uppercase tracking-[0.18em] text-white/95"
+            linkClass="inline-flex min-h-8 items-center text-white/70 transition hover:text-white"
             sections={footerSections}
           />
         </div>
