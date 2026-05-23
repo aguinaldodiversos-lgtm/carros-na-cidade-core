@@ -84,6 +84,16 @@ export function buildAdsSearchQuery(filters = {}) {
   // E há vizinhança (length > 1). Permanece null nos outros caminhos —
   // hybridScoreExpr abaixo injeta `0` (no-op) quando null.
   let baseCitySlugParamIdx = null;
+  // O slug da cidade-base é usado APENAS no hybridScoreExpr do SELECT
+  // (não no WHERE). Capturamos aqui e empurramos no `params` *depois* de
+  // todo o WHERE estar pronto — caso contrário o countQuery (que reusa
+  // só o WHERE) recebe um param a mais que o número de placeholders e
+  // o Postgres rejeita com "bind message supplies N parameters, but
+  // prepared statement requires N-1". Bug detectado em produção quando
+  // a Página Regional manda city_slugs com 2+ membros e o COUNT(*) do
+  // total quebra silenciosamente, retornando data:[] / total:0 e
+  // forçando o catálogo a renderizar "0 ofertas".
+  let pendingBaseCitySlug = null;
 
   if (city_slug) {
     pushFilter(where, params, `c.slug = ?`, city_slug);
@@ -98,13 +108,10 @@ export function buildAdsSearchQuery(filters = {}) {
 
     // Preferência cidade-base: city_slugs[0] é a base por convenção.
     // SÓ aplica quando length > 1 (com 1 cidade não há "vizinha" — boost
-    // sem alvo). Slug é capturado AQUI como param SQL preparado: o caller
-    // NUNCA passa base_city_id pela URL pública (ver normalizeTerritoryFilters,
-    // que stripa base_city_id defensivamente, e ads-ranking.sql.js
-    // que documenta a regra).
+    // sem alvo). O push do slug é DIFERIDO para depois do WHERE — ver
+    // `pendingBaseCitySlug` acima.
     if (city_slugs.length > 1 && typeof city_slugs[0] === "string" && city_slugs[0]) {
-      params.push(city_slugs[0]);
-      baseCitySlugParamIdx = params.length;
+      pendingBaseCitySlug = city_slugs[0];
     }
 
     if (state)
@@ -166,6 +173,19 @@ export function buildAdsSearchQuery(filters = {}) {
 
   const whereClause = `WHERE ${where.join(" AND ")}`;
   const orderByClause = buildSortClause(sort, { useTextRank });
+
+  // Snapshot do tamanho de params no fim do WHERE — define o countParams
+  // exato (countQuery NÃO usa o baseCityBoostExpr nem o LIMIT/OFFSET, só
+  // o WHERE). Ver comentário em `pendingBaseCitySlug` acima.
+  const whereParamsLength = params.length;
+
+  // Diferimos o push do slug da cidade-base para DEPOIS do WHERE: assim
+  // o countParams = params.slice(0, whereParamsLength) fica exatamente
+  // alinhado com o número de placeholders do countQuery.
+  if (pendingBaseCitySlug !== null) {
+    params.push(pendingBaseCitySlug);
+    baseCitySlugParamIdx = params.length;
+  }
 
   // Boost intra-camada para cidade-base (multi-cidade). `0` quando não há
   // city_slugs[0] válido com vizinhança — no-op no hybrid_score, comportamento
@@ -232,8 +252,14 @@ export function buildAdsSearchQuery(filters = {}) {
   return {
     dataQuery,
     countQuery,
+    // countParams usa o snapshot do fim do WHERE — exclui tanto o
+    // baseCitySlug (referenciado só pelo SELECT) quanto o limit/offset.
+    // O `params.slice(0, -2)` antigo arrastava o baseCitySlug e
+    // quebrava o COUNT(*) com "bind message supplies N parameters, but
+    // prepared statement requires N-1" sempre que city_slugs tinha 2+
+    // elementos (cenário primário da Página Regional).
     params,
-    countParams: params.slice(0, -2),
+    countParams: params.slice(0, whereParamsLength),
     pagination: {
       page: safePage,
       limit: safeLimit,

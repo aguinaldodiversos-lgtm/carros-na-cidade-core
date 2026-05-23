@@ -187,6 +187,99 @@ describe("city_slugs — SQL builder", () => {
   });
 });
 
+describe("city_slugs — countParams x dataParams (regressão: bind 2 params, requires 1)", () => {
+  /**
+   * Bug em produção (2026-05-23): a Página Regional manda
+   * `city_slugs: ["atibaia-sp", "<vizinha-1>", ...]` e o backend retorna
+   * `success:true, ok:false, error: "bind message supplies 2 parameters,
+   *  but prepared statement \"\" requires 1", data:[], total:0`.
+   *
+   * Causa: o slug da cidade-base era empurrado em `params` no MEIO da
+   * construção do WHERE (para o hybridScoreExpr do SELECT), e o
+   * `countParams: params.slice(0, -2)` arrastava esse param para o
+   * countQuery — que só tem o WHERE (sem hybrid_score). Postgres reclama
+   * porque o número de binds não bate com o número de placeholders.
+   *
+   * Fix: diferir o push do baseCitySlug para DEPOIS do WHERE estar
+   * pronto, e construir `countParams = params.slice(0, whereParamsLength)`.
+   *
+   * Esses testes blindam o invariante: para city_slugs com 2+ elementos,
+   * countParams.length === número de placeholders $N referenciados no
+   * countQuery.
+   */
+  function placeholdersIn(sql) {
+    const matches = String(sql || "").match(/\$\d+/g) || [];
+    return new Set(matches);
+  }
+
+  it("city_slugs length 2: countParams.length bate com placeholders do countQuery", () => {
+    const { countQuery, countParams } = buildAdsSearchQuery({
+      city_slugs: ["atibaia-sp", "jarinu-sp"],
+    });
+    const placeholders = placeholdersIn(countQuery);
+    expect(countParams.length).toBe(placeholders.size);
+    // ANY($1) deve usar apenas $1
+    expect(placeholders.has("$1")).toBe(true);
+  });
+
+  it("city_slugs length 15 (cenário real Atibaia): countParams.length === placeholders countQuery", () => {
+    const slugs = Array.from({ length: 15 }, (_, i) => `cidade-${i}-sp`);
+    const { countQuery, countParams } = buildAdsSearchQuery({ city_slugs: slugs });
+    const placeholders = placeholdersIn(countQuery);
+    expect(countParams.length).toBe(placeholders.size);
+  });
+
+  it("city_slugs length 2 + filtros adicionais: countParams cobre todos placeholders do WHERE", () => {
+    const { countQuery, countParams } = buildAdsSearchQuery({
+      city_slugs: ["atibaia-sp", "jarinu-sp"],
+      brand: "Honda",
+      price_max: 50000,
+      state: "SP",
+    });
+    const placeholders = placeholdersIn(countQuery);
+    expect(countParams.length).toBe(placeholders.size);
+  });
+
+  it("city_slugs length 1 (sem vizinhança): countParams.length === placeholders countQuery", () => {
+    // length=1 não dispara baseCityBoost, mas o invariante precisa
+    // continuar válido.
+    const { countQuery, countParams } = buildAdsSearchQuery({
+      city_slugs: ["atibaia-sp"],
+    });
+    const placeholders = placeholdersIn(countQuery);
+    expect(countParams.length).toBe(placeholders.size);
+  });
+
+  it("city_slug singular: countParams.length === placeholders countQuery (caminho não-regional)", () => {
+    const { countQuery, countParams } = buildAdsSearchQuery({
+      city_slug: "atibaia-sp",
+    });
+    const placeholders = placeholdersIn(countQuery);
+    expect(countParams.length).toBe(placeholders.size);
+  });
+
+  it("city_slugs length 2: dataParams.length === placeholders dataQuery (consistência cruzada)", () => {
+    const { dataQuery, params } = buildAdsSearchQuery({
+      city_slugs: ["atibaia-sp", "jarinu-sp"],
+    });
+    const placeholders = placeholdersIn(dataQuery);
+    // dataQuery tem ANY($1) + baseCityBoost($2 quando length>1) + LIMIT/OFFSET
+    expect(params.length).toBe(placeholders.size);
+  });
+
+  it("countParams NÃO inclui o slug da cidade-base (é usado só no SELECT/hybridScoreExpr)", () => {
+    const { countParams } = buildAdsSearchQuery({
+      city_slugs: ["atibaia-sp", "jarinu-sp", "braganca-paulista-sp"],
+    });
+    // O slug da base ("atibaia-sp") como STRING não deve estar em
+    // countParams — só o array completo.
+    const stringEntries = countParams.filter((p) => typeof p === "string");
+    expect(stringEntries).not.toContain("atibaia-sp");
+    // O array com TODAS as cidades deve estar lá (para o ANY).
+    expect(countParams.some((p) => Array.isArray(p) && p[0] === "atibaia-sp")).toBe(true);
+  });
+});
+
 describe("city_slugs — payload público de /api/ads/search inalterado", () => {
   it("buildAdsSearchQuery sem city_slugs continua emitindo o mesmo SELECT (regressão)", () => {
     const { dataQuery, countQuery } = buildAdsSearchQuery({ city_slug: "sao-paulo-sp" });

@@ -431,6 +431,25 @@ describe("regionToAdsSearchFilters — city_slugs e ordem", () => {
     expect(result.city_slugs).toEqual(["atibaia-sp", "campinas-sp"]);
   });
 
+  it("members vazio → city_slugs = [baseSlug] (não retorna [] silenciosamente)", () => {
+    // Fallback obrigatório (briefing 2026-05-23, bug regional Atibaia=0): se
+    // a região vier sem vizinhos cadastrados, o filtro precisa AINDA incluir
+    // a cidade-base. Sem isso, a Página Regional renderiza "0 ofertas" mesmo
+    // quando /carros-em/[base] tem inventário.
+    const region = buildRegion({ members: [] });
+    const result = regionToAdsSearchFilters(region);
+    expect(result.city_slugs).toEqual(["atibaia-sp"]);
+    expect(result.city_slugs).toHaveLength(1);
+  });
+
+  it("members ausente (undefined) → city_slugs = [baseSlug]", () => {
+    // Defesa contra envelope público degradado (sem o array `members`).
+    const region = buildRegion();
+    delete (region as { members?: unknown }).members;
+    const result = regionToAdsSearchFilters(region);
+    expect(result.city_slugs).toEqual(["atibaia-sp"]);
+  });
+
   it("respeita o cap de 30 slugs (1 base + 29 members)", () => {
     const members = Array.from({ length: 50 }, (_, i) => ({
       city_id: i + 100,
