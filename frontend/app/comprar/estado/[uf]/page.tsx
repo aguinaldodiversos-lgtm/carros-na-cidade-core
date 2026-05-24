@@ -5,6 +5,7 @@ import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient"
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
+import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import {
   fetchAdsFacets,
@@ -91,19 +92,26 @@ export async function generateMetadata({
   const brand = filters.brand?.trim();
   const model = filters.model?.trim();
 
+  // Briefing P2 2026-05-25 — base de copy vem do `publicCatalogPageCopy`
+  // (fonte única); título refina com brand/model quando aplicável.
+  // Mantém SEO atual + descrição focada em brand/model quando o user
+  // filtrou (variantes mais específicas que a copy base).
+  const baseCopy = publicCatalogPageCopy("state", { label: stateName, uf });
+
   const title =
     brand && model
       ? `${brand} ${model} em ${stateName} | Comprar`
       : brand
         ? `${brand} em ${stateName} | Comprar`
-        : `Catálogo de veículos em ${stateName} | Comprar`;
+        : baseCopy.metaTitle ?? `Catálogo de veículos em ${stateName} | Comprar`;
 
   const description =
     brand && model
       ? `${brand} ${model} em ${stateName}: catálogo estadual com filtros e oportunidades por cidade no Carros na Cidade.`
       : brand
         ? `Carros ${brand} em ${stateName}: vitrine estadual com filtros inteligentes e anúncios reais em todas as cidades — Carros na Cidade.`
-        : `Catálogo de veículos em ${stateName}: explore anúncios do estado inteiro e refine pela sua cidade no Carros na Cidade.`;
+        : baseCopy.metaDescription ??
+          `Catálogo de veículos em ${stateName}: explore anúncios do estado inteiro e refine pela sua cidade no Carros na Cidade.`;
 
   // PR 3 (briefing 2026-05-20): `/carros-usados/[uf]` é a canônica
   // estadual. Esta rota (`/comprar/estado/[uf]`) continua respondendo
@@ -163,11 +171,17 @@ export default async function ComprarEstadualPage({
       ? resultsResponse.value
       : buildEmptyResults(filters);
 
-  // Defesa em profundidade contra placeholder R$ 0 — vitrine pública
-  // nunca pode mostrar card sem preço real.
+  // Defesa em profundidade — briefing P2 2026-05-25:
+  //   - `hasRealPrice` (P0) já filtra preço zero.
+  //   - `normalizePublicAd` (P2) adiciona checks de slug válido + dirty
+  //     data como safety net redundante ao DIRTY_TEST_AD_GUARD do backend.
+  //   Não muda o tipo (`AdItem`) porque o BuyMarketplacePageClient
+  //   espera shape original — só dropamos os que falhariam no card.
   const initialResults: AdsSearchResponse = {
     ...initialResultsRaw,
-    data: (initialResultsRaw.data || []).filter(hasRealPrice),
+    data: (initialResultsRaw.data || [])
+      .filter(hasRealPrice)
+      .filter((ad) => normalizePublicAd(ad) !== null),
   };
 
   const initialFacets =

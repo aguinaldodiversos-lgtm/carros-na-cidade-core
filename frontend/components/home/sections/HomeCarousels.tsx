@@ -2,6 +2,18 @@ import { IconPriceTag, IconStar } from "@/components/home/icons";
 import { VehicleCarouselSection } from "@/components/home/sections/VehicleCarouselSection";
 import type { VehicleCardItem } from "@/components/home/sections/types";
 import { fetchHomeCarousels } from "@/lib/home/public-home";
+import { buildEmptyStateCopy, normalizePublicAd } from "@/lib/public-contracts";
+
+/**
+ * Filtro de defesa em profundidade para cards públicos. Roda
+ * `normalizePublicAd` (briefing P2 2026-05-25) — se a normalização
+ * devolve `null`, o ad NÃO é renderizável (sem preço, sem slug, ou
+ * dirty data que escapou do backend). Preserva o tipo original do
+ * caller (AdItem/VehicleCardItem).
+ */
+function keepRenderableAd<T>(ad: T): boolean {
+  return normalizePublicAd(ad) !== null;
+}
 
 interface HomeCarouselsProps {
   /** UF do estado em foco (ex: "SP"). Vem do TerritoryResolver. */
@@ -34,7 +46,15 @@ interface HomeCarouselsProps {
  *     seria mentir sobre "abaixo da FIPE".
  */
 export async function HomeCarousels({ stateUf, stateName, detectedCityName }: HomeCarouselsProps) {
-  const { highlightAds, opportunityAds, recentAds } = await fetchHomeCarousels(stateUf);
+  const raw = await fetchHomeCarousels(stateUf);
+
+  // Briefing P2 2026-05-25 — defesa em profundidade: nenhum card público
+  // pode aparecer com R$ 0, sem slug ou com dirty data. Backend já filtra
+  // via DIRTY_TEST_AD_GUARD, mas aplicamos `normalizePublicAd` aqui como
+  // safety net. Slugs/preços inválidos somem antes de virar card.
+  const highlightAds = raw.highlightAds.filter(keepRenderableAd);
+  const opportunityAds = raw.opportunityAds.filter(keepRenderableAd);
+  const recentAds = raw.recentAds.filter(keepRenderableAd);
 
   const hasHighlight = highlightAds.length > 0;
   const hasRecent = recentAds.length > 0;
@@ -51,6 +71,12 @@ export async function HomeCarousels({ stateUf, stateName, detectedCityName }: Ho
       ? `Nenhum destaque pago no momento — veja anúncios recentes em ${stateName}.`
       : `Anúncios adicionados recentemente em ${stateName}.`;
 
+  // Empty state copy unificada (briefing P2 2026-05-25) — fonte única em
+  // `buildEmptyStateCopy` evita divergência entre Home/Estado/Cidade.
+  const stateEmptyBody = buildEmptyStateCopy("state-no-ads", { label: stateName }).body;
+  const opportunityEmptyBody =
+    "Nenhuma oferta abaixo da FIPE no momento. Volte a verificar em breve.";
+
   return (
     <>
       <VehicleCarouselSection
@@ -60,7 +86,7 @@ export async function HomeCarousels({ stateUf, stateName, detectedCityName }: Ho
         link={{ label: "Ver todos", href: "/comprar" }}
         items={highlightItems}
         variant="highlight"
-        emptyMessage="Nenhum anúncio disponível no momento."
+        emptyMessage={stateEmptyBody}
       />
 
       {opportunityAds.length > 0 ? (
@@ -71,7 +97,7 @@ export async function HomeCarousels({ stateUf, stateName, detectedCityName }: Ho
           link={{ label: "Ver todos", href: "/comprar?below_fipe=true" }}
           items={opportunityItems}
           variant="opportunity"
-          emptyMessage="Nenhuma oportunidade abaixo da FIPE agora."
+          emptyMessage={opportunityEmptyBody}
         />
       ) : null}
     </>
