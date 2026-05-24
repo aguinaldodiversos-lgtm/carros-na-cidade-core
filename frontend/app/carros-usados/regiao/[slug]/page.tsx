@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
-import { RegionalAuxiliaryBlocks } from "@/components/territorial/RegionalAuxiliaryBlocks";
 import {
   isRegionalPageCanonicalSelf,
   isRegionalPageEnabled,
@@ -11,17 +10,10 @@ import {
 } from "@/lib/env/feature-flags";
 import { loadRegionalCatalogData } from "@/lib/buy/region-catalog-loader";
 import type { SearchParams } from "@/lib/buy/territory-variant";
-import {
-  aggregateBrandsFromAds,
-  aggregateCityCountsFromAds,
-  pickDynamicOgImage,
-} from "@/lib/regions/regional-facets";
+import { pickDynamicOgImage } from "@/lib/regions/regional-facets";
 import { buildRegionStructuredDataBlocks } from "@/lib/seo/region-structured-data";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
-
-import { buildRegionFaqEntries } from "./region-faq-entries";
-import { RegionFAQ } from "./RegionFAQ";
 
 /**
  * `force-dynamic` (NÃO mudar para `revalidate`) — bug crítico do Next 14.2:
@@ -161,35 +153,6 @@ export async function generateMetadata({
   };
 }
 
-function buildFaqJsonLd(args: {
-  cityName: string;
-  citySlug: string;
-  stateUF: string;
-  members: Parameters<typeof buildRegionFaqEntries>[0]["members"];
-  radiusKm: number;
-}) {
-  const entries = buildRegionFaqEntries({
-    cityName: args.cityName,
-    citySlug: args.citySlug,
-    stateUF: args.stateUF,
-    members: args.members,
-    radiusKm: args.radiusKm,
-  });
-
-  return {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: entries.map((entry) => ({
-      "@type": "Question",
-      name: entry.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: entry.answer,
-      },
-    })),
-  };
-}
-
 export default async function RegionPage({ params, searchParams = {} }: RegionPageProps) {
   // Dupla proteção: generateMetadata acima JÁ chama notFound() nos
   // mesmos cenários. Os checks aqui são defesa em profundidade.
@@ -210,11 +173,17 @@ export default async function RegionPage({ params, searchParams = {} }: RegionPa
       ? initialResults.pagination.total
       : ads.length;
 
-  // Facets locais sobre a amostra atual — alimentam os blocos auxiliares
-  // (cidades + marcas) sem chamar facets do backend de novo.
-  const topBrands = aggregateBrandsFromAds(ads);
-  const cityCounts = aggregateCityCountsFromAds(ads, region.base, region.members);
-
+  // JSON-LD do tipo Place/Region — mantido (invisível, sinal SEO local).
+  // Briefing 2026-05-23: blocos visuais auxiliares (cidades incluídas,
+  // marcas frequentes, "Por que comprar...", "Como funciona o alcance
+  // regional") e o FAQ ("Perguntas frequentes sobre a Região...") foram
+  // REMOVIDOS por explicarem como o site funciona — informação irrelevante
+  // para o visitante. A página termina no catálogo + paginação +
+  // PublicFooter azul, sem segundo rodapé.
+  //
+  // FAQPage JSON-LD também removido junto com a UI: anunciar FAQ schema
+  // sem perguntas visíveis na página viola a diretriz do Google de
+  // structured data e pode gerar penalidade.
   const structuredData = buildRegionStructuredDataBlocks({
     base: region.base,
     members: region.members,
@@ -228,20 +197,10 @@ export default async function RegionPage({ params, searchParams = {} }: RegionPa
       year: ad.year,
     })),
   });
-
-  // FAQ JSON-LD só faz sentido quando a página é indexável — sem isso
-  // estaríamos alimentando rich snippets do Google a partir de uma URL
-  // marcada como noindex (desperdício).
-  const indexable = shouldIndexRegionalPage(totalAds);
-  const faqJsonLd = indexable
-    ? buildFaqJsonLd({
-        cityName: region.base.name,
-        citySlug: region.base.slug,
-        stateUF: stateUf,
-        members: region.members,
-        radiusKm,
-      })
-    : null;
+  // Mantemos a referência para evitar warning de "unused import"; a flag
+  // pode voltar a ser consumida quando a regional ganhar outro bloco
+  // condicional gateado por indexabilidade.
+  void shouldIndexRegionalPage(totalAds);
 
   return (
     <>
@@ -252,13 +211,6 @@ export default async function RegionPage({ params, searchParams = {} }: RegionPa
           dangerouslySetInnerHTML={{ __html: JSON.stringify(block) }}
         />
       ))}
-      {faqJsonLd ? (
-        <script
-          type="application/ld+json"
-          data-testid="regional-faq-jsonld"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-        />
-      ) : null}
 
       <BuyMarketplacePageClient
         initialResults={initialResults}
@@ -269,33 +221,6 @@ export default async function RegionPage({ params, searchParams = {} }: RegionPa
         stateUf={stateUf}
         regionalEnabled
       />
-
-      {/* Wrapper com pb-20 md:pb-0 — o `BuyPageShell` reserva esse espaço
-          internamente porque o `SiteBottomNav` mobile é fixed, mas tudo
-          que renderiza DEPOIS do shell precisa replicar o mesmo padding
-          para não ficar coberto pela bottom nav. */}
-      <div className="bg-cnc-bg pb-20 md:pb-0">
-        {/* NearbyRegionButton agora é injetado pelo BuyMarketplacePageClient
-            no topo do catálogo — visível imediatamente, sem precisar
-            rolar até os blocos auxiliares. */}
-        <RegionalAuxiliaryBlocks
-          base={region.base}
-          members={region.members}
-          radiusKm={radiusKm}
-          topBrands={topBrands}
-          cityCounts={cityCounts}
-        />
-
-        <div className="mx-auto w-full max-w-7xl px-3 pb-8 sm:px-6 lg:px-8">
-          <RegionFAQ
-            cityName={region.base.name}
-            citySlug={region.base.slug}
-            stateUF={stateUf}
-            members={region.members}
-            radiusKm={radiusKm}
-          />
-        </div>
-      </div>
     </>
   );
 }
