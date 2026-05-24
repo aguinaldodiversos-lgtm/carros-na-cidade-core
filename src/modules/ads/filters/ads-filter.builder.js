@@ -19,30 +19,46 @@ import { AD_STATUS } from "../ads.canonical.constants.js";
  *
  * Detectado em 2026-05-24: produção mostrava cards "Teste alerta",
  * "Carro teste WhatsApp", "Teste fila worker", "DeployModel" no
- * /comprar/estado/sp. Causa: ambientes compartilham banco (ou seed
- * antigo nunca foi limpo).
+ * /comprar/estado/sp + "Auto Center Teste" como seller no autocomplete.
+ * Causa: ambientes compartilham banco (ou seed antigo nunca foi limpo).
  *
- * Padrões cobrem:
- *   - title/model/slug/version começando ou contendo as palavras
- *     (case-insensitive): test, teste, seed, deploy, worker, alerta,
- *     fake, dummy, sample.
- *   - "deploymodel" / "deployads" colados (sem espaço).
+ * Estrutura em 2 partes (refactor pós-incidente 2026-05-24 20:53):
  *
- * Implementação SQL: bloco `NOT (...)` adicionado ao WHERE com `ILIKE`
- * sobre as colunas relevantes. Sem parâmetros — padrões hardcoded para
- * que o filtro NUNCA dependa de input externo.
+ *   `DIRTY_AD_FIELDS_SQL`         — só toca `a.title`/`a.model`/`a.slug`.
+ *                                   Safe em qualquer query que SELECTe da
+ *                                   tabela `ads` com alias `a`, sem precisar
+ *                                   de JOIN. Usado por autocomplete e
+ *                                   free-query dictionaries (que NÃO
+ *                                   joinam advertisers).
  *
- * NÃO INCLUI seller_name/dealer_name/dealership_name (incidente
- * 2026-05-24 20:53 UTC): tentei estender o filtro para esses campos
- * mas eles NÃO são colunas diretas de \`ads\` — vêm de JOIN com
- * advertisers/users. Adicionar \`a.seller_name\` no WHERE quebrou o
- * SELECT com "column a.seller_name does not exist" e zerou o catálogo
- * público inteiro (total=0 em SP/Atibaia/Campinas). Revert preserva
- * o filtro original que só toca colunas reais de \`ads\`. Pendência
- * real: investigar qual é o JOIN/alias correto e adicionar filtro
- * sobre essa coluna sem quebrar o SELECT — fica como follow-up.
+ *   `DIRTY_ADVERTISER_FIELDS_SQL` — toca `adv.name` (alias seller_name) e
+ *                                   `adv.company_name` (alias
+ *                                   dealership_name). REQUER que o caller
+ *                                   tenha `LEFT JOIN advertisers adv ON
+ *                                   adv.id = a.advertiser_id` na FROM.
+ *                                   Word-boundary `~*` evita FP em nomes
+ *                                   compostos como "Autotest" / "Atestado".
+ *
+ *   `DIRTY_TEST_AD_GUARD_SQL`     — combinação dos dois. Usado pelo
+ *                                   buildAdsSearchQuery (já tem JOIN) e
+ *                                   buildAdsFacetWhere (callers garantem
+ *                                   o JOIN — ver ads-filter.facets.js).
+ *
+ * Implementação SQL: blocos `NOT (...)` no WHERE com `ILIKE` (substring)
+ * para campos do anúncio e `~*` (regex word-boundary) para nomes de
+ * vendedor. Sem parâmetros — padrões hardcoded para que o filtro NUNCA
+ * dependa de input externo.
+ *
+ * Política conservadora para nomes de vendedor:
+ *   - "teste"/"fake"/"dummy"/"deploy"/"worker"/"sample" só batem como
+ *     PALAVRA INTEIRA (`\\mfoo\\M`). Loja "Teste Multimarcas" → bloqueia.
+ *     "Atestado Veículos" / "Autotest Performance" → NÃO bloqueiam.
+ *   - "test" (inglês) NÃO entra em advertiser — alto risco FP em nomes
+ *     brasileiros compostos (Testdrive, Stress Test, etc.).
+ *   - "seed"/"alerta" NÃO entram em advertiser — palavras comuns em
+ *     nomes legítimos ("Alerta Segurança", "Seed Investimentos").
  */
-const DIRTY_TEST_AD_GUARD_SQL = `
+export const DIRTY_AD_FIELDS_SQL = `
   NOT (
     COALESCE(a.title, '') ILIKE '%test%'
     OR COALESCE(a.title, '') ILIKE '%teste%'
@@ -62,6 +78,11 @@ const DIRTY_TEST_AD_GUARD_SQL = `
     OR COALESCE(a.model, '') ILIKE 'dummy%'
     OR COALESCE(a.model, '') ILIKE 'sample%'
     OR COALESCE(a.model, '') ILIKE '%deploymodel%'
+    OR COALESCE(a.brand, '') ILIKE 'test%'
+    OR COALESCE(a.brand, '') ILIKE 'teste%'
+    OR COALESCE(a.brand, '') ILIKE 'deploy%'
+    OR COALESCE(a.brand, '') ILIKE 'fake%'
+    OR COALESCE(a.brand, '') ILIKE 'dummy%'
     OR COALESCE(a.slug, '') ILIKE 'test-%'
     OR COALESCE(a.slug, '') ILIKE 'teste-%'
     OR COALESCE(a.slug, '') ILIKE 'seed-%'
@@ -72,6 +93,30 @@ const DIRTY_TEST_AD_GUARD_SQL = `
     OR COALESCE(a.slug, '') ILIKE 'sample-%'
   )
 `;
+
+export const DIRTY_ADVERTISER_FIELDS_SQL = `
+  NOT (
+    COALESCE(adv.name, '') ~* '\\mteste\\M'
+    OR COALESCE(adv.name, '') ~* '\\mfake\\M'
+    OR COALESCE(adv.name, '') ~* '\\mdummy\\M'
+    OR COALESCE(adv.name, '') ~* '\\mdeploy\\M'
+    OR COALESCE(adv.name, '') ~* '\\mworker\\M'
+    OR COALESCE(adv.name, '') ~* '\\msample\\M'
+    OR COALESCE(adv.company_name, '') ~* '\\mteste\\M'
+    OR COALESCE(adv.company_name, '') ~* '\\mfake\\M'
+    OR COALESCE(adv.company_name, '') ~* '\\mdummy\\M'
+    OR COALESCE(adv.company_name, '') ~* '\\mdeploy\\M'
+    OR COALESCE(adv.company_name, '') ~* '\\mworker\\M'
+    OR COALESCE(adv.company_name, '') ~* '\\msample\\M'
+  )
+`;
+
+const DIRTY_TEST_AD_GUARD_SQL = `
+  ${DIRTY_AD_FIELDS_SQL}
+  AND ${DIRTY_ADVERTISER_FIELDS_SQL}
+`;
+
+export { DIRTY_TEST_AD_GUARD_SQL };
 
 function shouldApplyDirtyAdGuard() {
   const explicit = String(process.env.PUBLIC_TEST_AD_FILTER || "")
@@ -315,10 +360,19 @@ export function buildAdsSearchQuery(filters = {}) {
     OFFSET $${offsetIndex}
   `;
 
+  // CRÍTICO: countQuery DEVE espelhar exatamente os JOINs do dataQuery
+  // que aparecem no WHERE clause. Quando o DIRTY_TEST_AD_GUARD_SQL
+  // referencia `adv.name`/`adv.company_name` (briefing P0 2026-05-25),
+  // a ausência de `LEFT JOIN advertisers adv` no countQuery quebra o
+  // SELECT com "missing FROM-clause entry for table 'adv'" e zera o
+  // total. Foi exatamente esse modo de falha que vitimou o catálogo
+  // em 2026-05-24 (sem o JOIN, com `a.seller_name` no WHERE) e que
+  // agora protegemos com o JOIN aqui.
   const countQuery = `
     SELECT COUNT(*)::int AS total
     FROM ads a
     LEFT JOIN cities c ON c.id = a.city_id
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
     ${whereClause}
   `;
 

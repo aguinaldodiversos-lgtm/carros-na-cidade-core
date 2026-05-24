@@ -10,6 +10,7 @@ export async function getAdsFacets(filters = {}) {
       SELECT a.brand, COUNT(*)::int AS total
       FROM ads a
       LEFT JOIN cities c ON c.id = a.city_id
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
       ${whereClause}
         AND a.brand IS NOT NULL
       GROUP BY a.brand
@@ -23,6 +24,7 @@ export async function getAdsFacets(filters = {}) {
       SELECT a.brand, a.model, COUNT(*)::int AS total
       FROM ads a
       LEFT JOIN cities c ON c.id = a.city_id
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
       ${whereClause}
         AND a.brand IS NOT NULL
         AND a.model IS NOT NULL
@@ -37,6 +39,7 @@ export async function getAdsFacets(filters = {}) {
       SELECT a.fuel_type, COUNT(*)::int AS total
       FROM ads a
       LEFT JOIN cities c ON c.id = a.city_id
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
       ${whereClause}
         AND a.fuel_type IS NOT NULL
       GROUP BY a.fuel_type
@@ -50,6 +53,7 @@ export async function getAdsFacets(filters = {}) {
       SELECT a.body_type, COUNT(*)::int AS total
       FROM ads a
       LEFT JOIN cities c ON c.id = a.city_id
+      LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
       ${whereClause}
         AND a.body_type IS NOT NULL
       GROUP BY a.body_type

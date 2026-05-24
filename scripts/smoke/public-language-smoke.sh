@@ -55,12 +55,26 @@ ROUTES=(
 )
 
 # Strings PROIBIDAS em qualquer rota pública.
+# Briefing P0 2026-05-24 + extensão briefing P0 2026-05-25.
 FORBIDDEN_STRINGS=(
+  # textos técnicos no FilterSidebar (removidos em ce48eb83):
   "backend irá incorporar"
   "Em breve — backend"
+  "features[]"
+  "has_photo"
+  # leak de ads de teste no autocomplete/listagem:
   "DeployModel"
+  "FORD DeployModel"
   "Teste alerta"
+  "Teste alerta final"
+  "Teste alerta API"
+  "Teste fila worker"
+  "Carro teste"
+  "Carro teste WhatsApp"
+  "TEST Test"
+  # encoding quebrado em cidades:
   "SÆo Paulo"
+  # dirty seller_name (filtrado pelo DIRTY_ADVERTISER_FIELDS_SQL):
   "Auto Center Teste"
 )
 
@@ -152,7 +166,30 @@ else
 fi
 
 echo ""
-echo "── 4. R$ 0 em página de detalhe real ──"
+echo "── 4. Autocomplete público SEM dirty brands/models (briefing P0 2026-05-25) ──"
+# /api/ads/autocomplete?q=t deve retornar JSON sem "TEST", "DeployModel",
+# "Teste", "FAKE", "DUMMY" no array de brands/models. O dicionário do
+# autocomplete usa loadBrandDictionary/loadModelDictionary, que antes
+# NÃO aplicavam DIRTY_AD_FIELDS_SQL.
+body=$(mktemp)
+status=$(fetch_to_tmp "$BASE_URL/api/ads/autocomplete?q=t" "$body")
+if [[ "$status" == "200" ]]; then
+  for pattern in 'TEST' 'DeployModel' 'Teste alerta' 'FAKE' 'DUMMY' 'Sample'; do
+    if grep -qiE "\"$pattern" "$body" 2>/dev/null; then
+      echo -e "  ${RED}FAIL autocomplete contém brand/model com '$pattern'${NC}"
+      failures=$((failures + 1))
+    fi
+  done
+  # Sucesso silencioso — só reporta o status.
+  echo -e "  ${GREEN}OK autocomplete sem dirty patterns${NC}"
+else
+  echo -e "  ${YELLOW}WARN autocomplete status $status — não checado${NC}"
+  warnings=$((warnings + 1))
+fi
+rm -f "$body"
+
+echo ""
+echo "── 5. R$ 0 em página de detalhe real ──"
 # Pega o primeiro href /veiculo/* listado em /comprar/estado/sp e abre.
 body=$(mktemp)
 fetch_to_tmp "$BASE_URL/comprar/estado/sp" "$body" > /dev/null

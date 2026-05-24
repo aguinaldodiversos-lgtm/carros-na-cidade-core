@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildAdsSearchQuery } from "../../src/modules/ads/filters/ads-filter.builder.js";
+import {
+  buildAdsSearchQuery,
+  DIRTY_AD_FIELDS_SQL,
+  DIRTY_ADVERTISER_FIELDS_SQL,
+} from "../../src/modules/ads/filters/ads-filter.builder.js";
 
 function normalize(sql) {
   return String(sql || "")
@@ -17,7 +21,7 @@ afterEach(() => {
   else process.env.PUBLIC_TEST_AD_FILTER = ORIGINAL_FILTER;
 });
 
-describe("DIRTY_TEST_AD_GUARD — fix 2026-05-24", () => {
+describe("DIRTY_TEST_AD_GUARD — fix 2026-05-24 + extensão briefing P0 2026-05-25", () => {
   beforeEach(() => {
     process.env.NODE_ENV = "production";
     delete process.env.PUBLIC_TEST_AD_FILTER;
@@ -36,19 +40,56 @@ describe("DIRTY_TEST_AD_GUARD — fix 2026-05-24", () => {
     expect(sql).toContain("ILIKE '%fake%'");
     // Cobre slug:
     expect(sql).toContain("ILIKE 'test-%'");
+    // Cobre brand (briefing P0 2026-05-25 — antes só title/model/slug):
+    expect(sql).toContain("a.brand");
   });
 
-  // Filtro de seller_name/dealer_name/dealership_name REVERTIDO no
-  // incidente 2026-05-24 20:53 UTC: assumi que eram colunas diretas de
-  // \`ads\` mas vêm de JOIN com advertisers/users. Adicionar
-  // \`a.seller_name\` no WHERE quebrou o SELECT com "column
-  // a.seller_name does not exist" e zerou o catálogo público.
-  it("NÃO referencia colunas de vendedor diretamente em \`a.*\` (regression guard)", () => {
+  it("filtra advertiser fields via JOIN (adv.name, adv.company_name) — fix briefing P0 2026-05-25", () => {
     const { dataQuery } = buildAdsSearchQuery({});
     const sql = normalize(dataQuery);
+
+    // Word-boundary com \m...\M evita FP em nomes compostos como
+    // "Autotest Performance" ou "Atestado Veículos".
+    expect(sql).toContain("adv.name");
+    expect(sql).toContain("adv.company_name");
+    expect(sql).toContain("\\mteste\\M");
+    expect(sql).toContain("\\mfake\\M");
+    expect(sql).toContain("\\mdummy\\M");
+    expect(sql).toContain("\\mdeploy\\M");
+  });
+
+  it("REGRESSION GUARD: NÃO referencia colunas como a.seller_name (vitimou prod em 2026-05-24)", () => {
+    const { dataQuery } = buildAdsSearchQuery({});
+    const sql = normalize(dataQuery);
+    // Patterns DEVEM usar `adv.name` (JOIN), nunca `a.seller_name`/
+    // `a.dealer_name`/`a.dealership_name` (não existem em ads).
     expect(sql).not.toContain("a.seller_name");
     expect(sql).not.toContain("a.dealer_name");
     expect(sql).not.toContain("a.dealership_name");
+  });
+
+  it("countQuery DEVE ter LEFT JOIN advertisers — caso contrário SQL quebra (fix briefing P0 2026-05-25)", () => {
+    const { countQuery } = buildAdsSearchQuery({});
+    const sql = normalize(countQuery);
+    expect(sql).toContain("LEFT JOIN advertisers adv");
+    expect(sql).toContain("ON adv.id = a.advertiser_id");
+  });
+
+  it("DIRTY_AD_FIELDS_SQL é exportado e só toca a.* (safe sem JOIN advertisers)", () => {
+    const sql = normalize(DIRTY_AD_FIELDS_SQL);
+    expect(sql).toContain("a.title");
+    expect(sql).toContain("a.model");
+    expect(sql).toContain("a.slug");
+    expect(sql).not.toContain("adv.");
+    expect(sql).not.toContain("u.");
+  });
+
+  it("DIRTY_ADVERTISER_FIELDS_SQL é exportado e só toca adv.* (requer JOIN advertisers)", () => {
+    const sql = normalize(DIRTY_ADVERTISER_FIELDS_SQL);
+    expect(sql).toContain("adv.name");
+    expect(sql).toContain("adv.company_name");
+    expect(sql).not.toContain("a.title");
+    expect(sql).not.toContain("a.model");
   });
 
   it("respeita PUBLIC_TEST_AD_FILTER=disabled para diagnóstico", () => {

@@ -3,6 +3,24 @@
 import { pool } from "../../../infrastructure/database/db.js";
 import { logger } from "../../../shared/logger.js";
 import { AD_STATUS } from "../ads.canonical.constants.js";
+import { DIRTY_AD_FIELDS_SQL } from "../filters/ads-filter.builder.js";
+
+/**
+ * Filtro de dados sujos aplicado aos DICIONÁRIOS de brand/model que
+ * alimentam o autocomplete público `/api/ads/autocomplete`.
+ *
+ * Por que aqui (briefing P0 2026-05-25): o catálogo `/api/ads/search`
+ * já filtrava test/teste/deploy via DIRTY_TEST_AD_GUARD_SQL, mas o
+ * dropdown de autocomplete chamava `loadBrandDictionary` /
+ * `loadModelDictionary` SEM esse filtro. Resultado: usuário via "TEST",
+ * "DeployModel..." na sugestão de marca/modelo mesmo com o catálogo
+ * limpo. Aplicar `DIRTY_AD_FIELDS_SQL` aqui fecha o vazamento sem
+ * tocar no autocomplete service ou no contrato HTTP.
+ *
+ * DIRTY_AD_FIELDS_SQL não precisa de JOIN com advertisers (só toca
+ * a.title/a.model/a.slug/a.brand). Compatível com os SELECTs aqui.
+ */
+const DIRTY_AUTOCOMPLETE_FILTER = `AND ${DIRTY_AD_FIELDS_SQL}`;
 
 /* =====================================================
    DICTIONARIES
@@ -19,6 +37,7 @@ export async function loadBrandDictionary(limit = 400) {
     FROM ads a
     WHERE a.status = '${AD_STATUS.ACTIVE}'
       AND a.brand IS NOT NULL
+      ${DIRTY_AUTOCOMPLETE_FILTER}
     GROUP BY a.brand
     ORDER BY total DESC, a.brand ASC
     LIMIT $1
@@ -42,6 +61,7 @@ export async function loadModelDictionary(limit = 2500) {
     WHERE a.status = '${AD_STATUS.ACTIVE}'
       AND a.brand IS NOT NULL
       AND a.model IS NOT NULL
+      ${DIRTY_AUTOCOMPLETE_FILTER}
     GROUP BY a.brand, a.model
     ORDER BY total DESC, a.brand ASC, a.model ASC
     LIMIT $1
@@ -116,6 +136,7 @@ export async function loadCityBrandPresence(limit = 5000) {
     JOIN cities c ON c.id = a.city_id
     WHERE a.status = '${AD_STATUS.ACTIVE}'
       AND a.brand IS NOT NULL
+      ${DIRTY_AUTOCOMPLETE_FILTER}
     GROUP BY c.slug, c.name, c.state, a.brand
     ORDER BY total DESC, c.name ASC, a.brand ASC
     LIMIT $1
