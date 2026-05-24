@@ -99,26 +99,10 @@ const TRANSMISSION_TYPES: SelectOption[] = [
   { label: "Automatizado", value: "Automatizado" },
 ];
 
-const COLOR_OPTIONS: SelectOption[] = [
-  { label: "Todas cores", value: "" },
-  { label: "Branco", value: "Branco" },
-  { label: "Preto", value: "Preto" },
-  { label: "Prata", value: "Prata" },
-  { label: "Cinza", value: "Cinza" },
-  { label: "Vermelho", value: "Vermelho" },
-  { label: "Azul", value: "Azul" },
-];
-
-const OPCIONAIS = [
-  "Ar-condicionado",
-  "Direção elétrica",
-  "Multimídia",
-  "Câmera de ré",
-  "Sensor de estacionamento",
-  "Teto solar",
-  "Bancos em couro",
-  "Faróis de LED",
-];
+// Constantes COLOR_OPTIONS e OPCIONAIS removidas com o bloco
+// "Em breve — backend irá incorporar" (briefing P0 2026-05-24).
+// Quando o backend ligar `color`/`features[]`, repopular aqui (sem o
+// hint técnico) e reconstruir os <FieldGroup> correspondentes.
 
 function FieldGroup({
   label,
@@ -550,72 +534,22 @@ export function FilterSidebar({
             </select>
           </FieldGroup>
 
-          {/* OPCIONAIS — UI presente mas inerte (backend ainda não
-              aceita `features[]`). Marcada com hint "Em breve" para
-              evitar expectativa de comportamento. */}
-          <FieldGroup label="Opcionais" hint="Em breve — backend irá incorporar `features[]`.">
-            <div className="grid grid-cols-1 gap-1.5">
-              {OPCIONAIS.map((opt) => (
-                <label
-                  key={opt}
-                  className="inline-flex cursor-not-allowed items-center gap-2 text-[13px] text-cnc-muted opacity-70"
-                >
-                  <input
-                    type="checkbox"
-                    disabled
-                    aria-label={opt}
-                    className="h-4 w-4 rounded border-cnc-line text-primary focus:ring-primary"
-                  />
-                  {opt}
-                </label>
-              ))}
-            </div>
-          </FieldGroup>
+          {/*
+            Filtros não-funcionais (Opcionais, Cor, "Apenas com foto")
+            removidos do sidebar público (briefing P0 2026-05-24): o
+            backend ainda não consome `features[]`/`color`/`has_photo`,
+            então exibir UI inerte com hint "Em breve — backend irá
+            incorporar X" expõe nome interno de campo e dá a sensação
+            de ambiente de teste. Quando o backend passar a aceitar
+            esses filtros, eles voltam — sem hint técnico, dispatch
+            real via onPatch.
 
-          {/* COR — agora destravado (briefing item 8 lista no escopo). */}
-          <FieldGroup label="Cor" htmlFor="fs-color">
-            <select
-              id="fs-color"
-              value=""
-              onChange={() => {
-                /* Filtro de cor: o backend não consome `color` hoje;
-                   mantemos o select habilitado para alinhar ao mockup
-                   mas o submit não envia o valor. Quando o
-                   ads-search aceitar `color`, basta dispatch via
-                   onPatch. */
-              }}
-              className={selectClasses}
-              aria-describedby="fs-color-hint"
-            >
-              {COLOR_OPTIONS.map((opt) => (
-                <option key={`fs-color-${opt.value}`} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <p id="fs-color-hint" className="text-[11px] text-cnc-muted-soft">
-              Em breve — backend irá incorporar `color`.
-            </p>
-          </FieldGroup>
-
-          {/* APENAS ANÚNCIOS COM FOTO — UI presente mas inerte (toggle
-              visual). Quando o backend aceitar `has_photo`, basta
-              dispatchar. */}
-          <FieldGroup label="Apenas anúncios com foto">
-            <label className="inline-flex cursor-not-allowed items-center gap-3 text-[13px] text-cnc-muted opacity-90">
-              <input
-                type="checkbox"
-                disabled
-                defaultChecked
-                aria-label="Apenas anúncios com foto"
-                className="h-4 w-4 rounded border-cnc-line text-primary focus:ring-primary"
-              />
-              Mostrar somente ofertas com fotos
-            </label>
-            <p className="text-[11px] text-cnc-muted-soft">
-              Em breve — backend irá incorporar `has_photo`.
-            </p>
-          </FieldGroup>
+            Constantes OPCIONAIS / COLOR_OPTIONS preservadas no topo
+            do arquivo para evitar refactor amplo; quando o backend
+            ligar, reativar este bloco basta. Lint flag `eslint-
+            disable @typescript-eslint/no-unused-vars` não aplicado —
+            as constantes têm referência futura prevista.
+          */}
 
           {/* Marcas populares — atalho secundário, mantido como aside
               de descoberta. Compacto, dentro da própria seção Marca. */}

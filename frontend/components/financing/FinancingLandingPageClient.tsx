@@ -34,7 +34,16 @@ interface FinancingLandingPageClientProps {
   citySlug: string;
   cityName: string;
   cityLabel: string;
-  heroVehicle: AdItem;
+  /**
+   * Anúncio em destaque para o hero — `null` quando não há anúncio real
+   * disponível na cidade. Briefing P0 2026-05-24 vetou o fallback fake
+   * (T-Cross R$ 105.900 sintético). Hoje o componente já não usa o
+   * `heroVehicle` no JSX — o redesign manteve apenas formulário +
+   * parcelas + carrosséis "Carros compatíveis" — então `null` aqui é
+   * inofensivo. Quando o hero visual voltar, deve renderizar versão
+   * institucional (sem preço/modelo) quando `null`.
+   */
+  heroVehicle: AdItem | null;
   highlightAds: AdItem[];
   opportunityAds: AdItem[];
   initialVehicleValue?: number;

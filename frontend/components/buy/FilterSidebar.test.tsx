@@ -170,25 +170,25 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
     expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp");
   });
 
-  it("renderiza seção Opcionais com hint 'Em breve' (UI presente, dispatch inerte)", () => {
+  // Briefing P0 2026-05-24 removeu Opcionais/Cor/"Apenas com foto" do
+  // sidebar público — backend não consome features[]/color/has_photo e
+  // o hint "Em breve — backend irá incorporar X" expunha nome interno.
+  it("NÃO renderiza seção Opcionais (filtro inerte removido P0 2026-05-24)", () => {
     renderSidebar({}, vi.fn());
-    const hint = screen.getAllByText(/Em breve/i);
-    expect(hint.length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Opcionais$/i)).toBeNull();
+    expect(screen.queryByText(/Em breve.*incorporar/i)).toBeNull();
   });
 
-  it("renderiza seção 'Apenas anúncios com foto' (toggle visível)", () => {
+  it("NÃO renderiza seção 'Apenas anúncios com foto' (filtro inerte removido P0 2026-05-24)", () => {
     renderSidebar({}, vi.fn());
-    expect(screen.getByText(/Apenas anúncios com foto/i)).toBeTruthy();
-    expect(screen.getByText(/Mostrar somente ofertas com fotos/i)).toBeTruthy();
+    expect(screen.queryByText(/Apenas anúncios com foto/i)).toBeNull();
+    expect(screen.queryByText(/Mostrar somente ofertas com fotos/i)).toBeNull();
   });
 
-  it("renderiza seção Cor (não disabled — visível ao lado das demais)", () => {
+  it("NÃO renderiza seção Cor (filtro inerte removido P0 2026-05-24)", () => {
     renderSidebar({}, vi.fn());
-    expect(screen.getByText(/^Cor$/i)).toBeTruthy();
-    const colorSelect = document.getElementById("fs-color") as HTMLSelectElement | null;
-    expect(colorSelect).toBeTruthy();
-    // Não está com o atributo `disabled` aplicado (briefing pede destravar).
-    expect(colorSelect?.disabled).toBe(false);
+    expect(screen.queryByText(/^Cor$/i)).toBeNull();
+    expect(document.getElementById("fs-color")).toBeNull();
   });
 
   it("NÃO renderiza aside 'Quer vender seu carro?' (removido no briefing 2026-05-22)", () => {

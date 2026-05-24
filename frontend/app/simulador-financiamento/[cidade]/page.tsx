@@ -1,8 +1,8 @@
 // frontend/app/simulador-financiamento/[cidade]/page.tsx
 import type { Metadata } from "next";
 import { FinancingLandingPageClient } from "@/components/financing/FinancingLandingPageClient";
+import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
-import type { AdItem } from "@/lib/search/ads-search";
 
 type PageProps = {
   params: {
@@ -53,23 +53,10 @@ function prettifyCitySlug(slug: string) {
   };
 }
 
-function fallbackHero(cityName: string, state: string): AdItem {
-  return {
-    id: 999001,
-    slug: "volkswagen-t-cross-2022-2023",
-    title: "2022/2023 Volkswagen T-Cross",
-    brand: "Volkswagen",
-    model: "T-Cross",
-    city: cityName,
-    state,
-    year: 2023,
-    mileage: 28000,
-    price: 105900,
-    below_fipe: false,
-    image_url: "/images/vehicle-placeholder.svg",
-    images: ["/images/vehicle-placeholder.svg"],
-  };
-}
+// `fallbackHero` (T-Cross fake R$ 105.900, id 999001, slug
+// "volkswagen-t-cross-2022-2023") REMOVIDO no briefing P0 2026-05-24.
+// Quando os 3 fetches falham, `heroVehicle` agora é `null` e o cliente
+// renderiza hero institucional sem veículo/preço/modelo inventado.
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = prettifyCitySlug(params.cidade);
@@ -123,19 +110,29 @@ export default async function SimuladorFinanciamentoCidadePage({
     }),
   ]);
 
-  const recentAds = recentResult.status === "fulfilled" ? recentResult.value.data || [] : [];
+  // Defesa em profundidade contra placeholder R$ 0 — vitrine pública
+  // nunca pode mostrar card sem preço real (briefing P0 2026-05-24).
+  const recentAds = (
+    recentResult.status === "fulfilled" ? recentResult.value.data || [] : []
+  ).filter(hasRealPrice);
 
-  const opportunityAds =
-    opportunitiesResult.status === "fulfilled" && opportunitiesResult.value.data?.length > 0
-      ? opportunitiesResult.value.data
-      : recentAds.slice(0, 6);
+  const opportunityAdsRaw =
+    opportunitiesResult.status === "fulfilled" ? opportunitiesResult.value.data || [] : [];
+  const opportunityAds = opportunityAdsRaw.length > 0
+    ? opportunityAdsRaw.filter(hasRealPrice)
+    : recentAds.slice(0, 6);
 
-  const highlightAds =
-    highlightResult.status === "fulfilled" && highlightResult.value.data?.length > 0
-      ? highlightResult.value.data
-      : recentAds.slice(0, 4);
+  const highlightAdsRaw =
+    highlightResult.status === "fulfilled" ? highlightResult.value.data || [] : [];
+  const highlightAds = highlightAdsRaw.length > 0
+    ? highlightAdsRaw.filter(hasRealPrice)
+    : recentAds.slice(0, 4);
 
-  const heroVehicle = highlightAds[0] || opportunityAds[0] || fallbackHero(city.name, city.state);
+  // heroVehicle = primeiro anúncio real com preço; `null` quando nenhum
+  // anúncio real está disponível. O `FinancingLandingPageClient`
+  // renderiza hero institucional (sem veículo/preço/modelo) nesse caso —
+  // briefing P0 2026-05-24 vetou o T-Cross fake R$ 105.900.
+  const heroVehicle = highlightAds[0] ?? opportunityAds[0] ?? null;
 
   return (
     <FinancingLandingPageClient

@@ -71,5 +71,32 @@ describe("fetchAdDetail — regressão 2026-05-24", () => {
     expect(result?.id).toBe(42);
     expect(result?.slug).toBe("honda-civic-2020");
     expect(result?.price).toBe(89900);
+    expect(result?.city).toBe("Campinas");
+    expect(result?.state).toBe("SP");
+  });
+
+  it("NÃO defaulta city/state para 'São Paulo'/'SP' quando backend omite (briefing P0 2026-05-24)", async () => {
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          id: 42,
+          slug: "honda-civic-sem-cidade",
+          title: "Honda Civic",
+          price: 89900,
+          // city e state propositalmente omitidos do payload.
+          brand: "Honda",
+          model: "Civic",
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchAdDetail("honda-civic-sem-cidade");
+    expect(result).not.toBeNull();
+    // Antes: city="São Paulo", state="SP" (default sintético fake).
+    // Agora: null — adapter `deriveCityDisplay` traduz para
+    // "Localização não informada" na UI.
+    expect(result?.city).toBeNull();
+    expect(result?.state).toBeNull();
   });
 });

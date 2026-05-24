@@ -215,21 +215,51 @@ function formatMileage(value?: number | string | null) {
   return `${numeric.toLocaleString("pt-BR")} km`;
 }
 
+/**
+ * Display textual de "Cidade (UF)" para o detalhe e cards de loja.
+ *
+ * Briefing P0 2026-05-24: SEM defaults sintéticos para "São Paulo (SP)"
+ * quando o anúncio não tem cidade. Antes, anúncio sem city no payload
+ * era exibido como "São Paulo (SP)" — sinal de dado falso para o
+ * usuário, e contradição com a cidade-base do catálogo de origem.
+ *
+ * Política nova:
+ *   - city presente, state presente  → "Cidade (UF)"
+ *   - city presente, state ausente   → "Cidade"
+ *   - city ausente, state presente   → "UF"
+ *   - ambos ausentes                 → "Localização não informada"
+ *
+ * Retorna sempre string não-vazia para que callers (`vehicle.city`,
+ * `seller.address`) não precisem checar truthiness — o texto neutro
+ * é a fallback semântica explícita.
+ */
 function deriveCityDisplay(city?: string | null, state?: string | null) {
-  const cleanCity = sanitizeText(city, "São Paulo");
-  const cleanState = sanitizeText(state, "SP").toUpperCase();
+  const cleanCity = sanitizeText(city);
+  const cleanState = sanitizeText(state).toUpperCase();
 
-  if (cleanCity.includes("(")) {
-    return cleanCity;
-  }
-
-  return `${toTitleCase(cleanCity)} (${cleanState})`;
+  if (!cleanCity && !cleanState) return "Localização não informada";
+  if (cleanCity && cleanCity.includes("(")) return cleanCity;
+  if (cleanCity && cleanState) return `${toTitleCase(cleanCity)} (${cleanState})`;
+  if (cleanCity) return toTitleCase(cleanCity);
+  return cleanState;
 }
 
+/**
+ * Slug canônico "cidade-uf" para hrefs e fetch de relacionados.
+ *
+ * Briefing P0 2026-05-24: SEM defaults "sao-paulo-sp" quando o anúncio
+ * não tem cidade — gerava `/veiculo/<slug>` cujo link "Mais carros em
+ * São Paulo" apontava pra cidade errada.
+ *
+ * Retorna string vazia quando ambos os inputs estão ausentes —
+ * `fetchRelatedListingsForAdPage` já trata `citySlug` falsy como
+ * "sem proximidade conhecida".
+ */
 function deriveCitySlug(city?: string | null, state?: string | null) {
-  const cleanCity = sanitizeText(city, "sao paulo");
-  const cleanState = sanitizeText(state, "sp").toLowerCase();
-  return slugify(`${cleanCity} ${cleanState}`);
+  const cleanCity = sanitizeText(city);
+  const cleanState = sanitizeText(state).toLowerCase();
+  if (!cleanCity && !cleanState) return "";
+  return slugify(`${cleanCity} ${cleanState}`.trim());
 }
 
 function parseImages(ad: PublicAdDetail): string[] {

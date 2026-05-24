@@ -27,10 +27,26 @@ import { AD_STATUS } from "../ads.canonical.constants.js";
  *     (case-insensitive): test, teste, seed, deploy, worker, alerta,
  *     fake, dummy, sample.
  *   - "deploymodel" / "deployads" colados (sem espaço).
+ *   - seller_name / dealer_name / dealership_name com palavra
+ *     "teste"/"fake"/"dummy" como token isolado (regex word-boundary
+ *     com `~*` — case-insensitive). Cobre "Auto Center Teste" sem
+ *     bloquear lojas reais como "Autotest Performance" (substring
+ *     "test" em palavra composta não casa `\\mtest\\M`).
  *
  * Implementação SQL: bloco `NOT (...)` adicionado ao WHERE com `ILIKE`
- * sobre as colunas relevantes. Sem parâmetros — padrões hardcoded para
+ * (substring) para title/model/slug e `~*` (regex word-boundary) para
+ * campos de nome de vendedor. Sem parâmetros — padrões hardcoded para
  * que o filtro NUNCA dependa de input externo.
+ *
+ * Política conservadora para nomes de vendedor (briefing P0 2026-05-24):
+ *   - "teste" / "fake" / "dummy" só batem como PALAVRA INTEIRA
+ *     (`\mteste\M`). Loja "Teste Multimarcas" → bloqueia. "Atestado
+ *     Veículos" → NÃO bloqueia (token é "atestado", não "teste").
+ *   - "test" (inglês) NÃO entra na lista — alto risco de FP em nomes
+ *     brasileiros legítimos (Autotest, Testdrive, etc.).
+ *   - "seed"/"deploy"/"worker"/"alerta" NÃO entram em nomes de vendedor —
+ *     são marcadores de origem técnica que só aparecem em campos de
+ *     anúncio (title/model/slug), nunca em nome de loja real.
  */
 const DIRTY_TEST_AD_GUARD_SQL = `
   NOT (
@@ -60,6 +76,15 @@ const DIRTY_TEST_AD_GUARD_SQL = `
     OR COALESCE(a.slug, '') ILIKE 'fake-%'
     OR COALESCE(a.slug, '') ILIKE 'dummy-%'
     OR COALESCE(a.slug, '') ILIKE 'sample-%'
+    OR COALESCE(a.seller_name, '') ~* '\\mteste\\M'
+    OR COALESCE(a.seller_name, '') ~* '\\mfake\\M'
+    OR COALESCE(a.seller_name, '') ~* '\\mdummy\\M'
+    OR COALESCE(a.dealer_name, '') ~* '\\mteste\\M'
+    OR COALESCE(a.dealer_name, '') ~* '\\mfake\\M'
+    OR COALESCE(a.dealer_name, '') ~* '\\mdummy\\M'
+    OR COALESCE(a.dealership_name, '') ~* '\\mteste\\M'
+    OR COALESCE(a.dealership_name, '') ~* '\\mfake\\M'
+    OR COALESCE(a.dealership_name, '') ~* '\\mdummy\\M'
   )
 `;
 

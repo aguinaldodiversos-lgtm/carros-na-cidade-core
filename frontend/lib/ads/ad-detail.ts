@@ -152,8 +152,13 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
     title: toNullableText(item.title) || titleFallback,
     description: toNullableText(item.description),
     price: toNumberOrString(item.price),
-    city: toNullableText(item.city) || "São Paulo",
-    state: toNullableText(item.state) || "SP",
+    // city/state SEM defaults sintéticos (briefing P0 2026-05-24): se
+    // backend não enviar, fica `null` — UI trata como "Localização não
+    // informada" via `deriveCityDisplay` em `lib/vehicle/public-vehicle.ts`.
+    // Antes defaultávamos para "São Paulo"/"SP", o que mostrava anúncio
+    // de Atibaia como se fosse de SP no header do detalhe.
+    city: toNullableText(item.city),
+    state: toNullableText(item.state),
     brand: toNullableText(item.brand),
     model: toNullableText(item.model),
     version: toNullableText(item.version),
