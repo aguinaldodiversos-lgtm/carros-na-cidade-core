@@ -239,46 +239,25 @@ export function CatalogPageHeader({
               {cityPillLabel}
             </span>
             {/*
-              Labels do CTA geo por variant (briefing 2026-05-23 — jornada
-              Estadual → Regional → Cidade → Regional):
+              CTA geo por variant (briefing 2026-05-23 → ajuste 2026-05-23b):
 
-                ▸ Estadual: "Ver carros perto de mim" (geo → Regional do
-                  visitante). Default do COPY.regional.
+                ▸ Estadual: "Ver carros perto de mim" — porta de entrada;
+                  visitante precisa do CTA visível para descobrir a região
+                  dele. Mantém o card NearbyRegionButton.
 
-                ▸ Regional: DOIS botões:
-                  1. "Ver carros em minha região" — geo → Regional do
-                     visitante (útil quando caiu numa região errada pelo
-                     Google).
-                  2. "Ver carros da cidade" — geo com regionalEnabled=false
-                     → /carros-em/[slug-detectado]. Permite restringir à
-                     cidade do visitante.
+                ▸ Regional: SEM card geo no top-right. Os 2 botões
+                  ("Ver carros em minha região" + "Ver carros da cidade")
+                  ficavam visualmente pesados ali ("não está de forma
+                  profissional"). As mesmas intenções já estão expostas
+                  na sidebar `Localização`:
+                    - "Ver carros perto de mim" (geo → Regional)
+                    - "Região de X" (link direto)
+                    - "Apenas X" (link direto)
 
-                ▸ Cidade: NÃO usa geo — link direto para a Regional do
-                  slug atual (`slugToRegionHref(city.slug)`). Label:
-                  "Ver carros na Região". Geo aqui seria redundante: o
-                  visitante já está numa cidade; ampliar para a região
-                  é a mesma cidade-base mais vizinhas.
+                ▸ Cidade: link direto "Ver carros na Região" — pill
+                  outlined elegante, sem geo (slug já é conhecido).
             */}
-            {variant === "regional" ? (
-              <>
-                <NearbyRegionButton
-                  regionalEnabled={regionalEnabled}
-                  context="regional"
-                  variant="compact"
-                  stateUf={stateUf || city.state}
-                  testIdSuffix="regional-self"
-                />
-                <NearbyRegionButton
-                  regionalEnabled={false}
-                  context="regional"
-                  variant="compact"
-                  stateUf={stateUf || city.state}
-                  label="Ver carros da cidade"
-                  title="Quer ver só a sua cidade?"
-                  testIdSuffix="regional-city"
-                />
-              </>
-            ) : variant === "cidade" ? (
+            {variant === "regional" ? null : variant === "cidade" ? (
               <Link
                 href={slugToRegionHref(city.slug)}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong"

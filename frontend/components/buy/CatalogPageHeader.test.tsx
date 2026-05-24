@@ -186,15 +186,18 @@ describe("CatalogPageHeader — variant 'regional'", () => {
     expect(screen.queryByTestId("regional-state-cta")).toBeNull();
   });
 
-  it("renderiza 2 CTAs geo (briefing 2026-05-23): 'Ver carros em minha região' + 'Ver carros da cidade'", () => {
+  it("NÃO renderiza os 2 CTAs geo no top-right (briefing 2026-05-23b — visualmente pesado, intenções já estão na sidebar Localização)", () => {
     renderRegional();
-    // Botão 1 (data-testid="nearby-region-regional-self-button")
-    expect(screen.getByTestId("nearby-region-regional-self-button")).toBeTruthy();
-    // Botão 2 (data-testid="nearby-region-regional-city-button")
-    expect(screen.getByTestId("nearby-region-regional-city-button")).toBeTruthy();
-    // Os 2 botões aparecem na seção: pelo label visível dentro do botão.
-    expect(screen.getByRole("button", { name: /Ver carros em minha região/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Ver carros da cidade/i })).toBeTruthy();
+    expect(screen.queryByTestId("nearby-region-regional-self-button")).toBeNull();
+    expect(screen.queryByTestId("nearby-region-regional-city-button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ver carros em minha região/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ver carros da cidade/i })).toBeNull();
+  });
+
+  it("pill 'Cidade, UF' permanece no top-right da regional", () => {
+    renderRegional();
+    const pill = screen.getByTestId("catalog-city-pill");
+    expect(pill.textContent).toMatch(/Atibaia, SP/i);
   });
 });
 
