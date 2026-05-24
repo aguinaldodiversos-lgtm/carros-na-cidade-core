@@ -84,6 +84,12 @@ describe("validateAdIdentifier", () => {
     expect(result).toEqual({ kind: "not_found" });
   });
 
+  it("backend 410 Gone → not_found (briefing P1 2026-05-25 — semanticamente equivalente)", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 410 }));
+    const result = await validateAdIdentifier("anuncio-removido", { ...baseConfig, fetchImpl });
+    expect(result).toEqual({ kind: "not_found" });
+  });
+
   it("backend 401 → unavailable(backend-401)", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
     const result = await validateAdIdentifier("x", { ...baseConfig, fetchImpl });

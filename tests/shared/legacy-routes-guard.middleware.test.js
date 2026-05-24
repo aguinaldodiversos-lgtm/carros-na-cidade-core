@@ -89,6 +89,53 @@ describe("isAbusivePath", () => {
     expect(isAbusivePath("/")).toBe(false);
     expect(isAbusivePath("/api/ads")).toBe(false);
   });
+
+  // briefing P1 2026-05-25 — slug de anúncio real terminado em
+  // -<13 dígitos> (Unix ms timestamp) NÃO deve cair no anti-bot,
+  // mesmo com 13 hifens. Antes desta exceção, o guard bloqueava
+  // 6 de 7 anúncios reais do catálogo SP.
+  describe("whitelist real-ad: slugs terminados em -<13 dígitos>", () => {
+    const realSlugs = [
+      // do catálogo /comprar/estado/sp 2026-05-25:
+      "byd-dolphin-mini-eletrico-2026-1776912624710", // 5 hífens, ok via threshold
+      "fiat-pulse-drive-1-3-8v-flex-aut-2024-1776035190091", // 9 hífens, antes 410
+      "gm-chevrolet-onix-hatch-1-0-12v-flex-5p-mec-2024-1778119090914", // 11 hífens, antes 410
+      "gm-chevrolet-onix-sedan-plus-1-0-12v-tb-flex-aut-2024-1776302907782", // 12 hífens, antes 410
+      "vw-volkswagen-nivus-comfortline-1-0-200-tsi-flex-aut-2024-1776912109892", // 11 hífens, antes 410
+      "vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992", // 13 hífens, antes 410
+    ];
+    for (const slug of realSlugs) {
+      it(`real-ad slug NÃO é abusivo: ${slug}`, () => {
+        expect(isAbusivePath(`/api/ads/${slug}`)).toBe(false);
+      });
+    }
+
+    it("slug sem sufixo -<13 dígitos> mas com 9+ hífens AINDA é abusivo", () => {
+      // mesmo do teste anterior, garantia de que a whitelist é específica.
+      expect(
+        isAbusivePath("/api/ads/jeep-renegade-byd-yuan-plus-nissan-kicks-honda-civic-caoa-chery")
+      ).toBe(true);
+    });
+
+    it("slug com sufixo -<11 dígitos> (curto) ainda é abusivo se >8 hífens", () => {
+      // padrão visto em log de bot (2026-05-24): -17754205033 tem 11 dígitos,
+      // não os 13 do unix ms timestamp.
+      expect(
+        isAbusivePath(
+          "/api/ads/honda-civic-nissan-kicks-nissan-kicks-honda-civic-byd-yuan-plus-fiat-pulse-drive-1-0-turbo-200-flex-aut-2023-17754205033"
+        )
+      ).toBe(true);
+    });
+
+    it("slug com sufixo -<14 dígitos> (longo, fora do range Unix ms) ainda é abusivo", () => {
+      // proteção contra forja: bot adicionar 14 dígitos não passa.
+      expect(
+        isAbusivePath(
+          "/api/ads/jeep-renegade-honda-civic-nissan-kicks-volkswagen-taos-fiat-pulse-12345678901234"
+        )
+      ).toBe(true);
+    });
+  });
 });
 
 describe("legacyRoutesGuardMiddleware", () => {

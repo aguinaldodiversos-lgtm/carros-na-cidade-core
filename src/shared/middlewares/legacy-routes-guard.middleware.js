@@ -51,10 +51,28 @@ const LEGACY_PATH_PATTERNS = [
  * Critério:
  *   - segmento >120 chars
  *   - OU >=8 hífens no segmento (modelos colados)
+ *
+ * EXCEÇÃO — anúncios reais (briefing P1 2026-05-25): slugs gerados pelo
+ * wizard de publicação seguem o formato canônico
+ * `<brand>-<model>-<spec>-<year>-<id>` onde `<id>` é o timestamp Unix em
+ * milissegundos (13 dígitos). Esses slugs frequentemente passam de 8
+ * hífens porque `<spec>` carrega motor/câmbio/portas com hífens próprios
+ * (ex.: `1-0-12v-flex-5p-mec` no Onix). Sem essa exceção, o guard
+ * antibot bloqueia 6 de 7 anúncios reais listados no catálogo de SP —
+ * exatamente o sintoma que vitimava o middleware ad-detail-gate como
+ * `passed-unavailable` em 2026-05-24.
+ *
+ * O sufixo `-\\d{13}$` é específico o bastante para não ser bypass
+ * trivial: 13 dígitos é o tamanho exato do Unix ms timestamp desde
+ * 2001-09 (1e12 ms). Bots vistos em log usam sufixos de 5-11 dígitos
+ * ("-17752", "-17754205033") — esses CONTINUAM caindo no guard.
+ * Bots que aprenderem a forjar 13 dígitos ainda batem o controller, que
+ * já 404a slug ausente em DB (ads.public.service.js:30).
  */
 const ABUSIVE_SLUG_PATTERN = /\/[a-z0-9-]+\/?$/i;
 const MAX_SAFE_SLUG_LENGTH = 120;
 const MAX_SAFE_SLUG_HYPHENS = 8;
+const REAL_AD_ID_SUFFIX = /-\d{13}$/;
 
 export function isAbusivePath(path) {
   if (!path) return false;
@@ -62,6 +80,11 @@ export function isAbusivePath(path) {
   const lastMatch = cleaned.match(ABUSIVE_SLUG_PATTERN);
   if (!lastMatch) return false;
   const lastSeg = lastMatch[0].replace(/^\//, "").replace(/\/$/, "");
+
+  // Whitelist real-ad: slug terminado em -<13 dígitos> é o formato
+  // canônico do wizard. Não rodar o anti-bot check.
+  if (REAL_AD_ID_SUFFIX.test(lastSeg)) return false;
+
   if (lastSeg.length > MAX_SAFE_SLUG_LENGTH) return true;
   const hyphenCount = (lastSeg.match(/-/g) || []).length;
   if (hyphenCount > MAX_SAFE_SLUG_HYPHENS) return true;

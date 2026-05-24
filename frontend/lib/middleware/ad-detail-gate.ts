@@ -146,6 +146,13 @@ export async function validateAdIdentifier(
 
     if (response.status === 200) return { kind: "valid" };
     if (response.status === 404) return { kind: "not_found" };
+    // 410 Gone = "esse recurso existiu mas foi removido em definitivo".
+    // Semanticamente equivalente a not_found para o usuário final. Sem
+    // este mapeamento, 410 caía no catch-all `unavailable` (rotulado
+    // backend-5xx por engano) e o middleware fazia pass-unavailable,
+    // levando a soft-404 com status 200 — exatamente o bug que o
+    // ad-detail-gate existe para evitar (briefing P1 2026-05-25).
+    if (response.status === 410) return { kind: "not_found" };
     if (response.status === 401) return { kind: "unavailable", reason: "backend-401" };
     if (response.status === 403) return { kind: "unavailable", reason: "backend-403" };
     if (response.status >= 500 && response.status < 600) {
