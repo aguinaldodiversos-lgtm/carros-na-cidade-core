@@ -12,6 +12,11 @@ import {
   isFlagEnabled,
   validateRegionalSlug,
 } from "@/lib/regional-page-guard";
+import {
+  decideAdDetailMiddlewareAction,
+  extractAdDetailMatch,
+  validateAdIdentifier,
+} from "@/lib/middleware/ad-detail-gate";
 import { decideTerritoryGate } from "@/lib/middleware/territory-gate";
 
 /**
@@ -187,6 +192,46 @@ export async function middleware(request: NextRequest) {
     const blocked = new NextResponse(null, { status: 404 });
     blocked.headers.set("X-Middleware-City", "blocked-slug-invalid");
     return respond(request, startedAt, blocked);
+  }
+
+  // ── 2c. Hard gate de existência para /veiculo/[slug] e
+  //        /anuncios/[identifier] (auditoria 2026-05-24).
+  //
+  // Mesmo bug do Next 14.2.35: `notFound()` em server component — mesmo
+  // com `dynamic = "force-dynamic"` + segment-level `not-found.tsx` —
+  // renderiza o body do not-found mas comita HTTP 200 (soft-404).
+  // Comprovado empiricamente em produção 2026-05-24. Sem este gate o
+  // Googlebot indexa páginas de anúncios inexistentes.
+  //
+  // Política diferente do `regional-page-guard`: `unavailable` aqui
+  // resulta em `pass-unavailable` (não 503), porque este gate roda em
+  // TODO request a /veiculo/* — falhar 503 em cold-start do backend
+  // quebraria todo anúncio real. A defesa em profundidade vem do
+  // `page.tsx` que ainda chama `notFound()` quando `fetchAdDetail`
+  // retorna null. Ver `lib/middleware/ad-detail-gate.ts`.
+  const adDetailMatch = extractAdDetailMatch(pathname);
+  if (adDetailMatch) {
+    const validation = await validateAdIdentifier(adDetailMatch.identifier);
+    const action = decideAdDetailMiddlewareAction(validation);
+
+    if (action.kind === "block-not-found") {
+      const blocked = new NextResponse(null, { status: 404 });
+      blocked.headers.set("X-Middleware-Ad", "blocked-not-found");
+      blocked.headers.set("X-Middleware-Ad-Route", adDetailMatch.route);
+      return respond(request, startedAt, blocked);
+    }
+
+    if (action.kind === "pass-unavailable") {
+      const passed = NextResponse.next(territorialContext);
+      passed.headers.set("X-Middleware-Ad", "passed-unavailable");
+      passed.headers.set("X-Middleware-Ad-Reason", action.reason);
+      return respond(request, startedAt, passed);
+    }
+
+    // pass-valid: deixa o App Router renderizar normalmente.
+    const passed = NextResponse.next(territorialContext);
+    passed.headers.set("X-Middleware-Ad", "passed-valid");
+    return respond(request, startedAt, passed);
   }
 
   // ── 3. Redirects 301 legados (hífen único → barra). ────────────────
