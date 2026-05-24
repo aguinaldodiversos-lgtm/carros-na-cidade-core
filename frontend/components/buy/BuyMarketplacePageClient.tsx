@@ -10,8 +10,6 @@ import { CatalogPagination } from "@/components/buy/CatalogPagination";
 import { CatalogResultsHeader } from "@/components/buy/CatalogResultsHeader";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
-import { StateTerritorialShortcuts } from "@/components/buy/StateTerritorialShortcuts";
-import type { StateCuratedCity } from "@/lib/buy/state-territorial-cities";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import type {
@@ -60,14 +58,6 @@ interface BuyMarketplacePageClientProps {
    * `NearbyRegionButton` no header + ações.
    */
   regionalEnabled?: boolean;
-  /**
-   * Cidades a renderizar no sub-bloco contextual "Cidades próximas
-   * de [cidade]" do StateTerritorialShortcuts. Só usado em
-   * variant="estadual".
-   */
-  stateNearbyCities?: StateCuratedCity[];
-  /** Nome da cidade que ancora o sub-bloco contextual. */
-  stateActiveCityName?: string;
 }
 
 export default function BuyMarketplacePageClient({
@@ -80,8 +70,6 @@ export default function BuyMarketplacePageClient({
   enableGeoRedirect = false,
   fallbackTerritory,
   regionalEnabled = false,
-  stateNearbyCities,
-  stateActiveCityName,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -308,19 +296,6 @@ export default function BuyMarketplacePageClient({
                 totalPages={totalPages}
                 onPatch={(patch) => pushPage(patch)}
               />
-
-              {/* Navegação cross-territorial — só em modo estadual. A
-                  Estadual é "porta de entrada e distribuição" segundo
-                  o briefing 2026-05-22 — preservamos o bloco de
-                  "Cidades próximas de [cidade]" + "Principais cidades
-                  em [estado]" que afunilam Estado → Regional. */}
-              {variant === "estadual" && (stateUf || city.state) ? (
-                <StateTerritorialShortcuts
-                  uf={stateUf || city.state}
-                  nearbyCities={stateNearbyCities}
-                  activeCityName={stateActiveCityName}
-                />
-              ) : null}
             </div>
           </div>
         </div>

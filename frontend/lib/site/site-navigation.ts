@@ -112,11 +112,8 @@ const POPULAR_MODELS: ReadonlyArray<{ label: string; query: string }> = [
 
 /**
  * Cidades com mais carros — fallback nacional (capitais + polos
- * regionais com maior liquidez histórica em SP). Quando há contexto
- * territorial (UF da cidade ativa), substituiríamos pelas cidades
- * curadas do estado correspondente (helper `getStateCuratedCities`).
- * Aqui mantemos o fallback simples para não forçar import de pesquisa
- * dinâmica num footer puramente declarativo. Re-curar quando rolar
+ * regionais com maior liquidez histórica em SP). Footer declarativo:
+ * sem fetch, sem pesquisa dinâmica. Re-curar manualmente quando rolar
  * expansão para outros estados.
  */
 const POPULAR_CITIES_FALLBACK: ReadonlyArray<{ name: string; slug: string }> = [

@@ -5,7 +5,6 @@ import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient"
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
-import { resolveStateNearbyContext } from "@/lib/buy/state-nearby-cities";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 import {
   fetchAdsFacets,
@@ -22,7 +21,6 @@ import {
   stateNameFromUf,
   type SearchParams,
 } from "@/lib/buy/territory-variant";
-import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
 type ComprarEstadualPageProps = {
@@ -145,12 +143,10 @@ export default async function ComprarEstadualPage({
   const stateName = stateNameFromUf(uf);
   const filters = normalizeStateFilters(uf, searchParams);
 
-  // TerritoryContext unificado para o estado — consumido pelo bloco SEO
-  // e por crosslinks futuros. Resolvido em paralelo com ads/facets.
-  // Regiões só são buscadas com a flag regional ativa (sem flag os
-  // links regionais 404; não vale pagar o fetch).
+  // TerritoryContext unificado para o estado — consumido por crosslinks
+  // futuros e pelo breadcrumb. Resolvido em paralelo com ads/facets.
   const regionalEnabled = isRegionalPageEnabled();
-  const [resultsResponse, facetsResponse, territory, stateRegionsPayload] = await Promise.all([
+  const [resultsResponse, facetsResponse, territory] = await Promise.all([
     fetchAdsSearch(filters).then(
       (v) => ({ status: "fulfilled" as const, value: v }),
       (e) => ({ status: "rejected" as const, reason: e })
@@ -160,14 +156,7 @@ export default async function ComprarEstadualPage({
       (e) => ({ status: "rejected" as const, reason: e })
     ),
     resolveTerritory({ level: "state", stateUf: uf }),
-    regionalEnabled ? fetchStateRegions(uf, { limit: 8 }) : Promise.resolve(null),
   ]);
-
-  // Sub-bloco contextual "Cidades próximas de [cidade]" (briefing
-  // 2026-05-21 item 12). Lê o cookie cnc_city e mapeia para a região
-  // que contém a cidade do visitante. Sem cookie ou sem match no UF
-  // atual: contexto fica nulo e renderiza só "Principais cidades".
-  const stateNearby = await resolveStateNearbyContext(uf, stateRegionsPayload?.regions);
 
   const initialResultsRaw =
     resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
@@ -224,9 +213,9 @@ export default async function ComprarEstadualPage({
       />
       {/*
         Briefing 2026-05-20: Página Estadual abre direto com o catálogo
-        (H1, busca, chips, listagem). Bloco regional não vai no topo —
-        navegação territorial fica nos blocos auxiliares ao final
-        (StateTerritorialShortcuts dentro de BuyMarketplacePageClient).
+        (H1, busca, chips, listagem). Briefing 2026-05-24: removido o
+        bloco "Cidades próximas de [cidade]" + "Outras cidades em
+        [estado]" que ficava ao fim da página — parecia segundo rodapé.
       */}
       <BuyMarketplacePageClient
         initialResults={initialResults}
@@ -237,8 +226,6 @@ export default async function ComprarEstadualPage({
         stateUf={uf}
         enableGeoRedirect
         regionalEnabled={regionalEnabled}
-        stateNearbyCities={stateNearby?.nearbyCities}
-        stateActiveCityName={stateNearby?.activeCityName}
       />
     </>
   );

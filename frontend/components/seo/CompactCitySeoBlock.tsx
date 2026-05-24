@@ -29,9 +29,8 @@ import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
  *   - CTA grande de ampliação Cidade → Regional/Estado (briefing
  *     reserva isso para o fluxo principal/PublicFooter).
  *
- * Variantes Estado e Regional NÃO usam este bloco — elas têm seus
- * próprios blocos territoriais (StateTerritorialShortcuts /
- * RegionalAuxiliaryBlocks) e não precisam de SEO compacto por cima.
+ * Variantes Estado e Regional NÃO usam este bloco — não precisam de
+ * SEO compacto extra por cima do catálogo.
  */
 
 export interface CompactCitySeoBlockProps {

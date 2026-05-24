@@ -30,12 +30,6 @@ vi.mock("@/lib/env/feature-flags", () => ({
   isRegionalPageEnabled: vi.fn().mockReturnValue(false),
 }));
 
-// Mock do resolver SSR — evita `cookies()` chamado fora de request scope
-// nos testes que invocam `pageModule.default()` direto.
-vi.mock("@/lib/buy/state-nearby-cities", () => ({
-  resolveStateNearbyContext: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock("@/lib/seo/site", () => ({
   toAbsoluteUrl: (p: string) => `https://example.test${p}`,
 }));
