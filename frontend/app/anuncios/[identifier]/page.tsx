@@ -8,7 +8,12 @@ interface AdDetailPageProps {
   };
 }
 
-export const dynamic = "force-dynamic";
+// `revalidate` (NÃO `force-dynamic`) — Next 14.2 não comita HTTP 404
+// em resposta streamed mesmo com `notFound()`. Com `revalidate` +
+// segment-level `not-found.tsx`, a resposta é não-streamed e o status
+// 404 é commitado corretamente. Rota é só alias/redirect para
+// /veiculo/[slug]; 60s de cache não tem impacto visível.
+export const revalidate = 60;
 
 /**
  * Comita HTTP 404 ANTES do Page rodar quando o anúncio não existe.

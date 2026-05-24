@@ -20,10 +20,13 @@ type PageProps = {
   searchParams?: SearchParams;
 };
 
-// `force-dynamic` (não `revalidate`) — bug Next 14.2: ISR + notFound() em
-// server component emite HTTP 200 com body not-found (soft-404). Detalhe é
-// página de transação; tem que retornar 404 real quando o anúncio sumiu.
-export const dynamic = "force-dynamic";
+// `revalidate` (NÃO `force-dynamic`) — Next 14.2 retorna HTTP 200 em
+// rotas streamed (force-dynamic) mesmo quando `notFound()` é chamado.
+// Com `revalidate` + segment-level `not-found.tsx`, a resposta é não-
+// streamed e o Next comita HTTP 404 real. 60s é compromisso entre
+// frescor (anúncio criado/pausado aparece/desaparece rápido) e custo
+// de SSR para rotas de transação.
+export const revalidate = 60;
 
 function getFirstValue(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? "";
