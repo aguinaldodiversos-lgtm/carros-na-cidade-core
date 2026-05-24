@@ -38,24 +38,17 @@ describe("DIRTY_TEST_AD_GUARD — fix 2026-05-24", () => {
     expect(sql).toContain("ILIKE 'test-%'");
   });
 
-  it("cobre seller_name / dealer_name / dealership_name com word-boundary (briefing P0 2026-05-24)", () => {
+  // Filtro de seller_name/dealer_name/dealership_name REVERTIDO no
+  // incidente 2026-05-24 20:53 UTC: assumi que eram colunas diretas de
+  // \`ads\` mas vêm de JOIN com advertisers/users. Adicionar
+  // \`a.seller_name\` no WHERE quebrou o SELECT com "column
+  // a.seller_name does not exist" e zerou o catálogo público.
+  it("NÃO referencia colunas de vendedor diretamente em \`a.*\` (regression guard)", () => {
     const { dataQuery } = buildAdsSearchQuery({});
     const sql = normalize(dataQuery);
-
-    // Word-boundary com \m...\M evita FP em nomes compostos como
-    // "Autotest Performance" ou "Atestado Veículos".
-    expect(sql).toContain("a.seller_name");
-    expect(sql).toContain("a.dealer_name");
-    expect(sql).toContain("a.dealership_name");
-    expect(sql).toContain("\\mteste\\M");
-    expect(sql).toContain("\\mfake\\M");
-    expect(sql).toContain("\\mdummy\\M");
-
-    // Política conservadora: "test" inglês NÃO entra para seller fields
-    // (alto risco FP em nomes brasileiros legítimos). Confirma que só os
-    // 3 patterns (teste/fake/dummy) estão presentes para os 3 campos.
-    const sellerNamePatterns = sql.match(/a\.seller_name[^O]*~\* '\\m\w+\\M'/g) || [];
-    expect(sellerNamePatterns.length).toBe(3);
+    expect(sql).not.toContain("a.seller_name");
+    expect(sql).not.toContain("a.dealer_name");
+    expect(sql).not.toContain("a.dealership_name");
   });
 
   it("respeita PUBLIC_TEST_AD_FILTER=disabled para diagnóstico", () => {
