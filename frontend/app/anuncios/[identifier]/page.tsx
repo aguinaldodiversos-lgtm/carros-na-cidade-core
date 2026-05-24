@@ -8,12 +8,16 @@ interface AdDetailPageProps {
   };
 }
 
-// `revalidate` (NÃO `force-dynamic`) — Next 14.2 não comita HTTP 404
-// em resposta streamed mesmo com `notFound()`. Com `revalidate` +
-// segment-level `not-found.tsx`, a resposta é não-streamed e o status
-// 404 é commitado corretamente. Rota é só alias/redirect para
-// /veiculo/[slug]; 60s de cache não tem impacto visível.
-export const revalidate = 60;
+// `force-dynamic` (NÃO `revalidate`) — empiricamente verificado em
+// produção 2026-05-24 com Next 14.2.35: `revalidate=N` + segment-level
+// `not-found.tsx` continua devolvendo HTTP 200 quando `notFound()` é
+// chamado (soft-404). Já `force-dynamic` + `notFound()` em
+// `generateMetadata` comita HTTP 404 real — comportamento confirmado
+// nas rotas irmãs `/carros-em/[slug]` e `/carros-usados/regiao/[slug]`,
+// que mantiveram `force-dynamic`. Esta rota não pode ser ISR enquanto
+// o Next 14.2 apresentar esse soft-404 (rota é alias para
+// /veiculo/[slug] e precisa do mesmo contrato de status).
+export const dynamic = "force-dynamic";
 
 /**
  * Comita HTTP 404 ANTES do Page rodar quando o anúncio não existe.
