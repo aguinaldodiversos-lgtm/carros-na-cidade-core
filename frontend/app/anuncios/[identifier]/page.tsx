@@ -1,4 +1,4 @@
-import { permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { fetchAdDetail } from "../../../lib/ads/ad-detail";
 
 interface AdDetailPageProps {
@@ -7,7 +7,10 @@ interface AdDetailPageProps {
   };
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function AdDetailPage({ params }: AdDetailPageProps) {
   const ad = await fetchAdDetail(params.identifier);
+  if (!ad) notFound();
   permanentRedirect(`/veiculo/${ad.slug || ad.id}`);
 }

@@ -253,14 +253,37 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Timeout defensivo (8s): se /api/dashboard/me travar (backend down,
+    // CORS, proxy), o gate `dashboardFetchDone` nunca virava true e a
+    // tela renderizava "Carregando fluxo de anúncio…" para sempre. Após
+    // o timeout, libera o gate para que: (a) usuário logado veja o form
+    // sem dados de plano (com aviso); (b) usuário deslogado seja
+    // redirecionado pela checagem 401.
+    const watchdog = setTimeout(() => {
+      if (cancelled) return;
+      setDashboardError(
+        "Não conseguimos confirmar seu plano agora. Você pode preencher o anúncio mesmo assim."
+      );
+      setDashboardFetchDone(true);
+    }, 8000);
+
     fetchDashboardPayloadClient()
       .then((result) => {
         if (!result.ok) {
           if (result.status === 401) {
-            if (!cancelled) {
-              setDashboard(null);
-              setDashboardError(null);
-            }
+            if (cancelled) return;
+            // Visitante anônimo NÃO pode ver o formulário (POST de
+            // /api/painel/anuncios falharia no submit). Redireciona
+            // imediatamente para /login com `next` preservando esta rota.
+            // Mantém localStorage do wizard intacto — ao voltar do login,
+            // o rehydrate restaura o rascunho.
+            const next = encodeURIComponent(
+              `${pathname || "/anunciar/novo"}${
+                searchParams?.toString() ? `?${searchParams.toString()}` : ""
+              }`
+            );
+            router.replace(`/login?next=${next}`);
             return;
           }
           throw new Error("Falha ao carregar painel.");
@@ -277,12 +300,14 @@ export default function NewAdWizardClient({ initialType }: Props) {
           );
       })
       .finally(() => {
+        clearTimeout(watchdog);
         if (!cancelled) setDashboardFetchDone(true);
       });
     return () => {
       cancelled = true;
+      clearTimeout(watchdog);
     };
-  }, [step, dashboardReload]);
+  }, [step, dashboardReload, router, pathname, searchParams]);
 
   const boostOptions = dashboard?.boost_options ?? [];
 

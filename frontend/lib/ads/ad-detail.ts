@@ -210,50 +210,6 @@ function extractPayload(json: unknown): unknown {
   return payload;
 }
 
-function buildFallbackAd(identifier: string): PublicAdDetail {
-  return {
-    id: identifier,
-    slug: identifier,
-    title: "Veículo não encontrado",
-    description:
-      "Não foi possível carregar os dados completos deste anúncio no momento. Tente novamente em instantes.",
-    price: null,
-    city: "São Paulo",
-    state: "SP",
-    brand: null,
-    model: null,
-    version: null,
-    year: null,
-    mileage: null,
-    body_type: null,
-    fuel_type: null,
-    transmission: null,
-    below_fipe: null,
-    highlight_until: null,
-    plan: null,
-    advertiser_id: null,
-    city_slug: null,
-    seller_name: null,
-    seller_type: null,
-    seller_kind: null,
-    account_type: null,
-    dealership_id: null,
-    reviewed_after_below_fipe: false,
-    dealership_name: null,
-    color: null,
-    phone: null,
-    whatsapp: null,
-    whatsapp_number: null,
-    image_url: null,
-    cover_image: null,
-    thumbnail: null,
-    photo: null,
-    images: [],
-    created_at: null,
-    updated_at: null,
-  };
-}
-
 function buildCandidatePaths(identifier: string): string[] {
   const encoded = encodeURIComponent(identifier);
 
@@ -287,12 +243,16 @@ async function tryFetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail> {
+/**
+ * Retorna o detalhe do anúncio ou `null` quando nenhum candidato de
+ * endpoint backend devolve um registro válido. NUNCA monta um anúncio
+ * sintético — chamadores devem mapear `null` para `notFound()` para que
+ * o navegador receba 404 real (vitrine pública nunca pode renderizar
+ * "Veículo não encontrado" com R$ 0/São Paulo fake).
+ */
+export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail | null> {
   const safeIdentifier = toText(identifier, "").trim();
-
-  if (!safeIdentifier) {
-    return buildFallbackAd("sem-identificador");
-  }
+  if (!safeIdentifier) return null;
 
   const apiBase = getApiBaseUrl();
   const candidatePaths = buildCandidatePaths(safeIdentifier);
@@ -303,11 +263,8 @@ export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail>
 
     const payload = extractPayload(json);
     const normalized = normalizeAdDetail(payload, safeIdentifier);
-
-    if (normalized) {
-      return normalized;
-    }
+    if (normalized) return normalized;
   }
 
-  return buildFallbackAd(safeIdentifier);
+  return null;
 }

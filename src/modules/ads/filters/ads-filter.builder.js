@@ -12,6 +12,66 @@ import {
 import { ADS_FILTER_LIMITS } from "./ads-filter.constants.js";
 import { AD_STATUS } from "../ads.canonical.constants.js";
 
+/**
+ * Guard de produção contra anúncios de teste/seed/deploy/worker/etc
+ * vazando para a vitrine pública. Ligado por padrão em `production` e
+ * pode ser desligado via `PUBLIC_TEST_AD_FILTER=disabled` para depurar.
+ *
+ * Detectado em 2026-05-24: produção mostrava cards "Teste alerta",
+ * "Carro teste WhatsApp", "Teste fila worker", "DeployModel" no
+ * /comprar/estado/sp. Causa: ambientes compartilham banco (ou seed
+ * antigo nunca foi limpo).
+ *
+ * Padrões cobrem:
+ *   - title/model/slug/version começando ou contendo as palavras
+ *     (case-insensitive): test, teste, seed, deploy, worker, alerta,
+ *     fake, dummy, sample.
+ *   - "deploymodel" / "deployads" colados (sem espaço).
+ *
+ * Implementação SQL: bloco `NOT (...)` adicionado ao WHERE com `ILIKE`
+ * sobre as colunas relevantes. Sem parâmetros — padrões hardcoded para
+ * que o filtro NUNCA dependa de input externo.
+ */
+const DIRTY_TEST_AD_GUARD_SQL = `
+  NOT (
+    COALESCE(a.title, '') ILIKE '%test%'
+    OR COALESCE(a.title, '') ILIKE '%teste%'
+    OR COALESCE(a.title, '') ILIKE '%seed%'
+    OR COALESCE(a.title, '') ILIKE '%deploy%'
+    OR COALESCE(a.title, '') ILIKE '%worker%'
+    OR COALESCE(a.title, '') ILIKE '%alerta%'
+    OR COALESCE(a.title, '') ILIKE '%fake%'
+    OR COALESCE(a.title, '') ILIKE '%dummy%'
+    OR COALESCE(a.title, '') ILIKE '%sample%'
+    OR COALESCE(a.model, '') ILIKE 'test%'
+    OR COALESCE(a.model, '') ILIKE 'teste%'
+    OR COALESCE(a.model, '') ILIKE 'seed%'
+    OR COALESCE(a.model, '') ILIKE 'deploy%'
+    OR COALESCE(a.model, '') ILIKE 'worker%'
+    OR COALESCE(a.model, '') ILIKE 'fake%'
+    OR COALESCE(a.model, '') ILIKE 'dummy%'
+    OR COALESCE(a.model, '') ILIKE 'sample%'
+    OR COALESCE(a.model, '') ILIKE '%deploymodel%'
+    OR COALESCE(a.slug, '') ILIKE 'test-%'
+    OR COALESCE(a.slug, '') ILIKE 'teste-%'
+    OR COALESCE(a.slug, '') ILIKE 'seed-%'
+    OR COALESCE(a.slug, '') ILIKE 'deploy-%'
+    OR COALESCE(a.slug, '') ILIKE 'worker-%'
+    OR COALESCE(a.slug, '') ILIKE 'fake-%'
+    OR COALESCE(a.slug, '') ILIKE 'dummy-%'
+    OR COALESCE(a.slug, '') ILIKE 'sample-%'
+  )
+`;
+
+function shouldApplyDirtyAdGuard() {
+  const explicit = String(process.env.PUBLIC_TEST_AD_FILTER || "")
+    .trim()
+    .toLowerCase();
+  if (explicit === "disabled") return false;
+  if (explicit === "enabled") return true;
+  return process.env.NODE_ENV === "production";
+}
+
 function pushFilter(where, params, expression, ...values) {
   let sql = expression;
 
@@ -68,6 +128,9 @@ export function buildAdsSearchQuery(filters = {}) {
   const offset = (safePage - 1) * safeLimit;
 
   const where = [`a.status = '${AD_STATUS.ACTIVE}'`];
+  if (shouldApplyDirtyAdGuard()) {
+    where.push(DIRTY_TEST_AD_GUARD_SQL);
+  }
   const params = [];
   let useTextRank = false;
   let textRankExpression = "0";
@@ -270,12 +333,37 @@ export function buildAdsSearchQuery(filters = {}) {
 
 export function buildAdsFacetWhere(filters = {}) {
   const where = [`a.status = '${AD_STATUS.ACTIVE}'`];
+  if (shouldApplyDirtyAdGuard()) {
+    where.push(DIRTY_TEST_AD_GUARD_SQL);
+  }
   const params = [];
 
   if (filters.city_slug) {
     pushFilter(where, params, `c.slug = ?`, filters.city_slug);
+  } else if (Array.isArray(filters.city_slugs) && filters.city_slugs.length > 0) {
+    // Espelha o comportamento do buildAdsSearchQuery — facets regionais
+    // (multi-cidade) devem agregar marcas/modelos do conjunto de city_slugs
+    // da Página Regional. Sem isso, /carros-usados/regiao/* mostrava
+    // facets vazias.
+    params.push(filters.city_slugs);
+    where.push(`c.slug = ANY($${params.length})`);
+    if (filters.state) {
+      pushFilter(
+        where,
+        params,
+        `UPPER(COALESCE(a.state, c.state)) = ?`,
+        String(filters.state).toUpperCase()
+      );
+    }
   } else if (filters.city_id) {
     pushFilter(where, params, `a.city_id = ?`, Number(filters.city_id));
+  } else if (filters.state) {
+    pushFilter(
+      where,
+      params,
+      `UPPER(COALESCE(a.state, c.state)) = ?`,
+      String(filters.state).toUpperCase()
+    );
   }
   if (filters.brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${filters.brand}%`);
   if (filters.model) pushFilter(where, params, `a.model ILIKE ?`, `%${filters.model}%`);

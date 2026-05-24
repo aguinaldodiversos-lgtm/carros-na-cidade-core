@@ -170,6 +170,19 @@ export async function loadRegionalCatalogData(
   const region = await fetchRegionByCitySlug(safeSlug);
   if (!region || !region.base) return null;
 
+  // Fallback explícito + log: region.members vazio significa "cidade-base
+  // sem vizinhança calculada em region_memberships". O regionToAdsSearchFilters
+  // já garante que city_slugs[0] = base mesmo sem members, então o catálogo
+  // ainda retorna anúncios da própria cidade. O warn destaca regiões que
+  // precisam de backfill em region_memberships (briefing 2026-05-24).
+  if (!Array.isArray(region.members) || region.members.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[region-catalog-loader] members vazio para ${region.base.slug} (${region.base.state}). ` +
+        `Caindo em fallback [baseCitySlug]. Verifique region_memberships e o radius_km no admin.`
+    );
+  }
+
   const radiusKm = (region as RegionPayload & { radius_km?: number }).radius_km ?? 80;
   const stateUf = region.base.state.toUpperCase();
 

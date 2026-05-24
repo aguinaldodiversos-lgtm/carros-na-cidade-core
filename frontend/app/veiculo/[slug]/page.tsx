@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import AdEventTracker from "@/components/analytics/AdEventTracker";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
@@ -10,13 +11,7 @@ import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import { fetchRelatedListingsForAdPage } from "@/lib/vehicle/related-ads";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
-import {
-  adaptAdDetailToVehicle,
-  buildCityVehicles,
-  formatListingDateLabels,
-} from "@/lib/vehicle/public-vehicle";
-
-import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
+import { adaptAdDetailToVehicle, formatListingDateLabels } from "@/lib/vehicle/public-vehicle";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -25,8 +20,10 @@ type PageProps = {
   searchParams?: SearchParams;
 };
 
-export const revalidate = 1800;
-export const dynamicParams = true;
+// `force-dynamic` (não `revalidate`) — bug Next 14.2: ISR + notFound() em
+// server component emite HTTP 200 com body not-found (soft-404). Detalhe é
+// página de transação; tem que retornar 404 real quando o anúncio sumiu.
+export const dynamic = "force-dynamic";
 
 function getFirstValue(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? "";
@@ -42,84 +39,6 @@ function safeText(value: unknown, fallback = ""): string {
 function extractYear(value: string): string {
   const match = String(value || "").match(/\d{4}/);
   return match?.[0] || "2024";
-}
-
-function slugToReadableText(slug: string): string {
-  const cleaned = String(slug || "")
-    .replace(/^\/+|\/+$/g, "")
-    .replace(/^veiculo\//, "")
-    .replace(/-/g, " ")
-    .trim();
-
-  if (!cleaned) return "Veículo";
-
-  return cleaned
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function buildFallbackVehicle(slug: string, ref?: string): VehicleDetail {
-  const fullName = slugToReadableText(slug);
-  const year = extractYear(fullName);
-  const model = fullName || "Veículo";
-
-  return {
-    id: ref || slug || "fallback-vehicle",
-    slug: safeText(slug, "veiculo-sem-slug"),
-    brand: "",
-    model,
-    version: "",
-    fullName,
-    price: "R$ 0",
-    priceNumeric: null,
-    condition: "Usado",
-    year: `${year}/${year}`,
-    km: "Km não informado",
-    fuel: "Não informado",
-    transmission: "Não informado",
-    bodyType: "Não informado",
-    color: "Não informado",
-    city: "São Paulo (SP)",
-    citySlug: DEFAULT_PUBLIC_CITY_SLUG,
-    adCode: ref || slug || "fallback",
-    adPublishedAt: null,
-    adUpdatedAt: null,
-    isBelowFipe: false,
-    fipePrice: "Consulte",
-    fipeDeltaBrl: null,
-    fipeDeltaPercent: null,
-    isPaidListing: false,
-    advertiserId: null,
-    reviewedAfterBelowFipe: false,
-    images: [],
-    hasRealImages: false,
-    description:
-      "As informações completas deste veículo estão temporariamente indisponíveis. Tente novamente em instantes ou volte para a listagem.",
-    optionalItems: [
-      "Dados em atualização",
-      "Consulte disponibilidade com o anunciante",
-      "Use o simulador para estimar financiamento",
-    ],
-    safetyItems: [
-      "Verifique histórico do veículo",
-      "Confira documentação antes da compra",
-      "Faça vistoria cautelar",
-    ],
-    comfortItems: [
-      "Contato direto pelo portal",
-      "Experiência otimizada para mobile",
-      "Acesso rápido à listagem da cidade",
-    ],
-    sellerNotes:
-      "Os dados deste anúncio estão em atualização. Recomendamos confirmar disponibilidade, preço e opcionais diretamente com o anunciante.",
-    seller: {
-      type: "private",
-      name: "Anunciante no Carros na Cidade",
-      phone: "",
-    },
-  };
 }
 
 function formatBrlAbs(value: number) {
@@ -156,42 +75,33 @@ type PublicVehiclePayload = {
   vehicle: VehicleDetail;
 };
 
-async function getPublicAdAndVehicle(slug: string, ref?: string): Promise<PublicVehiclePayload> {
+/**
+ * Resolve o anúncio público pelo slug e, opcionalmente, por um `ref`
+ * (id numérico ou slug alternativo no querystring). Retorna `null`
+ * quando nenhum candidato é encontrado — caller deve chamar
+ * `notFound()` para emitir 404 real (vetado fallback fake com R$ 0).
+ */
+async function getPublicAdAndVehicle(
+  slug: string,
+  ref?: string
+): Promise<PublicVehiclePayload | null> {
   const candidates = Array.from(new Set([safeText(ref), safeText(slug)].filter(Boolean)));
 
   for (const candidate of candidates) {
-    try {
-      const ad = await fetchAdDetail(candidate);
-      const vehicle = adaptAdDetailToVehicle(ad);
-
-      return {
-        ad,
-        vehicle: {
-          ...vehicle,
-          slug: safeText(vehicle.slug, slug),
-          adCode: safeText(vehicle.adCode, candidate),
-        },
-      };
-    } catch {
-      // tenta o próximo identificador
-    }
+    const ad = await fetchAdDetail(candidate);
+    if (!ad) continue;
+    const vehicle = adaptAdDetailToVehicle(ad);
+    return {
+      ad,
+      vehicle: {
+        ...vehicle,
+        slug: safeText(vehicle.slug, slug),
+        adCode: safeText(vehicle.adCode, candidate),
+      },
+    };
   }
 
-  const fallbackVehicle = buildFallbackVehicle(slug, ref);
-
-  const fallbackAd: PublicAdDetail = {
-    id: fallbackVehicle.id,
-    slug: fallbackVehicle.slug,
-    plan: "free",
-    highlight_until: null,
-    advertiser_id: null,
-    city_slug: fallbackVehicle.citySlug,
-  };
-
-  return {
-    ad: fallbackAd,
-    vehicle: fallbackVehicle,
-  };
+  return null;
 }
 
 function buildPageTitle(vehicle: VehicleDetail): string {
@@ -209,7 +119,11 @@ export async function generateMetadata({
   searchParams = {},
 }: PageProps): Promise<Metadata> {
   const ref = getFirstValue(searchParams.ref);
-  const { vehicle } = await getPublicAdAndVehicle(params.slug, ref);
+  const payload = await getPublicAdAndVehicle(params.slug, ref);
+  // Comitar 404 ANTES do Page (Next 14.2: notFound() no Page já é tarde
+  // para trocar o status code — o body troca, mas o status fica 200).
+  if (!payload) notFound();
+  const { vehicle } = payload;
 
   return {
     title: buildPageTitle(vehicle),
@@ -248,7 +162,9 @@ export async function generateMetadata({
 
 export default async function VehicleDetailPage({ params, searchParams = {} }: PageProps) {
   const ref = getFirstValue(searchParams.ref);
-  const { ad, vehicle } = await getPublicAdAndVehicle(params.slug, ref);
+  const payload = await getPublicAdAndVehicle(params.slug, ref);
+  if (!payload) notFound();
+  const { ad, vehicle } = payload;
 
   // O redesign da rota /veiculo (mockup detalhes.png) não usa mais
   // "Indicador de mercado", "Insights IA" nem o carrossel de veículos
@@ -258,12 +174,13 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
 
   const aiInsights: string[] = [];
 
-  let sellerVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
-  let cityVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
-
-  if (relatedResult.status !== "fulfilled") {
-    cityVehicles = buildCityVehicles(vehicle);
-  }
+  // Sem fallback sintético quando o fetch de relacionados falha: seed
+  // hardcoded (`buyCars`) com preços de placeholder gerava cards
+  // confusos no detalhe ("R$ 119.990 Corolla XEi" abaixo do veículo
+  // real, sem relação com a cidade do anúncio). Lista vazia é melhor
+  // que falsa.
+  const sellerVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.seller : [];
+  const cityVehicles = relatedResult.status === "fulfilled" ? relatedResult.value.city : [];
 
   const canonicalSlug = safeText(vehicle.slug, params.slug);
   const year = extractYear(vehicle.year);

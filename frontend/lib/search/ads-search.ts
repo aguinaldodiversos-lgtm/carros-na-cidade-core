@@ -524,9 +524,14 @@ export async function fetchAdsFacets(
   signal?: AbortSignal
 ): Promise<AdsFacetsResponse> {
   const apiBase = getApiBaseUrl();
+  // PROPAGA `city_slugs` para o backend — sem ele as facets regionais
+  // retornavam vazias mesmo quando o catálogo regional tinha anúncios,
+  // produzindo "0 ofertas" em /carros-usados/regiao/* (bug reportado
+  // em produção 2026-05-24: Atibaia/Campinas).
   const params = buildAdsSearchParams({
     city_slug: filters.city_slug,
     city_id: filters.city_id,
+    city_slugs: filters.city_slugs,
     city: filters.city,
     state: filters.state,
     brand: filters.brand,

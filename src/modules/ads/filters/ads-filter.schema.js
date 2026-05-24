@@ -305,6 +305,11 @@ export const AdsFacetFilterSchema = adsFilterQueryBase
   .pick({
     q: true,
     city: true,
+    // `city_slugs` é obrigatório aqui para facets regionais — sem ele, o
+    // /api/ads/facets só agregaria marcas/modelos pela cidade-base e
+    // /carros-usados/regiao/* mostraria 0 ofertas mesmo com anúncios
+    // reais nas cidades vizinhas (bug reportado em produção 2026-05-24).
+    city_slugs: true,
     state: true,
     brand: true,
     model: true,

@@ -1,3 +1,4 @@
+import type { BaseAdData } from "@/components/ads/AdCard";
 import type { ListingCar } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { fetchAdsSearch, type AdItem } from "@/lib/search/ads-search";
@@ -18,6 +19,14 @@ function formatBrl(value: number) {
   }).format(value);
 }
 
+/**
+ * Adapter para o legado ListingCar (rotas que ainda usam o tipo antigo
+ * de car-data). NÃO usar para alimentar `<AdCard />` — o AdCard espera
+ * BaseAdData com `price` numérico; passar uma string formatada como
+ * "R$ 103.900" faz o parseNumber interno do AdCard interpretar como
+ * 103.9 (parseFloat após strip de chars não-decimais), produzindo
+ * "R$ 104" no card (bug 2026-05-24 nos relacionados do detalhe).
+ */
 export function mapAdItemToListingCar(item: AdItem): ListingCar {
   const year = item.year ?? new Date().getFullYear();
   const yearModel = `${year}/${year}`;
@@ -64,12 +73,56 @@ export function mapAdItemToListingCar(item: AdItem): ListingCar {
   };
 }
 
-function filterOtherAds(items: AdItem[], currentId: number | null, limit: number): ListingCar[] {
-  const out: ListingCar[] = [];
+/**
+ * Mapeia AdItem → BaseAdData (shape consumido por `<AdCard />`). Preserva
+ * o `price` como número para que o AdCard formate uma única vez via
+ * Intl.NumberFormat. Usado nas seções "Mais carros em [Cidade]" e
+ * "Outros carros da loja" no detalhe do veículo.
+ */
+export function mapAdItemToBaseAdData(item: AdItem): BaseAdData {
+  return {
+    id: item.id,
+    slug: item.slug ?? null,
+    title: item.title ?? null,
+    brand: item.brand ?? null,
+    model: item.model ?? null,
+    version: item.version ?? null,
+    year: item.year ?? null,
+    yearLabel: item.year_model ?? (item.year ? String(item.year) : null),
+    year_model: item.year_model ?? null,
+    city: item.city ?? null,
+    state: item.state ?? null,
+    price: item.price ?? null,
+    mileage: item.mileage ?? null,
+    image: item.image ?? null,
+    image_url: item.image_url ?? null,
+    cover_image_url: item.cover_image_url ?? null,
+    cover_image: item.cover_image ?? null,
+    storage_key: item.storage_key ?? null,
+    images: item.images ?? null,
+    photos: item.photos,
+    gallery: item.gallery,
+    below_fipe: item.below_fipe ?? null,
+    opportunity: item.opportunity ?? null,
+    highlight_until: item.highlight_until ?? null,
+    priority_tier: item.priority_tier ?? null,
+    plan: item.plan ?? null,
+    dealership_id: item.dealership_id ?? null,
+    dealership_name: item.dealership_name ?? null,
+    dealer_name: item.dealer_name ?? null,
+    seller_type: item.seller_type ?? null,
+    seller_kind: item.seller_kind ?? null,
+    account_type: item.account_type ?? null,
+    reviewed_after_below_fipe: item.reviewed_after_below_fipe ?? null,
+  };
+}
+
+function filterOtherAds(items: AdItem[], currentId: number | null, limit: number): BaseAdData[] {
+  const out: BaseAdData[] = [];
 
   for (const item of items) {
     if (currentId !== null && item.id === currentId) continue;
-    out.push(mapAdItemToListingCar(item));
+    out.push(mapAdItemToBaseAdData(item));
     if (out.length >= limit) break;
   }
 
@@ -89,18 +142,24 @@ function parseAdvertiserId(ad: PublicAdDetail, vehicle: VehicleDetail): number |
 
 /**
  * Carrega carrosséis para a página do anúncio: loja + pago → mesma conta; caso contrário (ou vazio) → cidade.
+ *
+ * Retorna `BaseAdData[]` (price numérico) — o `<AdCard />` formata uma
+ * única vez via Intl.NumberFormat. Anteriormente retornávamos
+ * `ListingCar[]` (price string formatado "R$ 103.900"), e o AdCard
+ * re-parseava com parseFloat após strip → "103.900" virava 103.9 →
+ * formatava como "R$ 104". Bug reportado em produção 2026-05-24.
  */
 export async function fetchRelatedListingsForAdPage(
   ad: PublicAdDetail,
   vehicle: VehicleDetail
-): Promise<{ seller: ListingCar[]; city: ListingCar[] }> {
+): Promise<{ seller: BaseAdData[]; city: BaseAdData[] }> {
   const currentId = toCurrentAdId(ad);
   const citySlug = ad.city_slug?.trim() || vehicle.citySlug;
   const isPaid = vehicle.isPaidListing;
   const isDealer = vehicle.seller.type === "dealer";
   const advertiserId = parseAdvertiserId(ad, vehicle);
 
-  let seller: ListingCar[] = [];
+  let seller: BaseAdData[] = [];
 
   if (isDealer && isPaid && advertiserId != null) {
     const res = await fetchAdsSearch({
@@ -118,7 +177,7 @@ export async function fetchRelatedListingsForAdPage(
 
   const showCity = seller.length === 0 || !isDealer || !isPaid;
 
-  let city: ListingCar[] = [];
+  let city: BaseAdData[] = [];
 
   if (showCity) {
     const res = await fetchAdsSearch({
