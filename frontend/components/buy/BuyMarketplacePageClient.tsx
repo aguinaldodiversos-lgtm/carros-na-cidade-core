@@ -288,6 +288,8 @@ export default function BuyMarketplacePageClient({
                 onPatch={(patch) => pushFilters(patch)}
                 regionalEnabled={regionalEnabled}
                 onOpenFilters={() => setMobileFiltersOpen(true)}
+                variant={variant}
+                citySlug={city.slug}
               />
 
               {/* Contagem + sort. No mobile o sort fica na action bar

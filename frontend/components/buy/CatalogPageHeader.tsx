@@ -1,12 +1,14 @@
 // frontend/components/buy/CatalogPageHeader.tsx
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/ui/SearchBar";
+import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import { type BuyCityContext } from "@/lib/buy/catalog-helpers";
@@ -236,20 +238,76 @@ export function CatalogPageHeader({
               </svg>
               {cityPillLabel}
             </span>
-            <NearbyRegionButton
-              regionalEnabled={regionalEnabled}
-              context={
-                variant === "regional"
-                  ? "regional"
-                  : variant === "cidade"
-                    ? "cidade"
-                    : variant === "estadual"
-                      ? "estadual"
-                      : "catalogo"
-              }
-              variant="compact"
-              stateUf={stateUf || city.state}
-            />
+            {/*
+              Labels do CTA geo por variant (briefing 2026-05-23 — jornada
+              Estadual → Regional → Cidade → Regional):
+
+                ▸ Estadual: "Ver carros perto de mim" (geo → Regional do
+                  visitante). Default do COPY.regional.
+
+                ▸ Regional: DOIS botões:
+                  1. "Ver carros em minha região" — geo → Regional do
+                     visitante (útil quando caiu numa região errada pelo
+                     Google).
+                  2. "Ver carros da cidade" — geo com regionalEnabled=false
+                     → /carros-em/[slug-detectado]. Permite restringir à
+                     cidade do visitante.
+
+                ▸ Cidade: NÃO usa geo — link direto para a Regional do
+                  slug atual (`slugToRegionHref(city.slug)`). Label:
+                  "Ver carros na Região". Geo aqui seria redundante: o
+                  visitante já está numa cidade; ampliar para a região
+                  é a mesma cidade-base mais vizinhas.
+            */}
+            {variant === "regional" ? (
+              <>
+                <NearbyRegionButton
+                  regionalEnabled={regionalEnabled}
+                  context="regional"
+                  variant="compact"
+                  stateUf={stateUf || city.state}
+                  testIdSuffix="regional-self"
+                />
+                <NearbyRegionButton
+                  regionalEnabled={false}
+                  context="regional"
+                  variant="compact"
+                  stateUf={stateUf || city.state}
+                  label="Ver carros da cidade"
+                  title="Quer ver só a sua cidade?"
+                  testIdSuffix="regional-city"
+                />
+              </>
+            ) : variant === "cidade" ? (
+              <Link
+                href={slugToRegionHref(city.slug)}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong"
+                data-testid="catalog-city-to-region-link"
+                aria-label={`Ver carros na Região de ${city.name}`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
+                  <circle cx="12" cy="9" r="2.2" />
+                </svg>
+                Ver carros na Região
+              </Link>
+            ) : (
+              <NearbyRegionButton
+                regionalEnabled={regionalEnabled}
+                context={variant === "estadual" ? "estadual" : "catalogo"}
+                variant="compact"
+                stateUf={stateUf || city.state}
+              />
+            )}
           </div>
         </div>
 

@@ -49,8 +49,37 @@ type NearbyRegionButtonProps = {
   stateUf?: string;
   /** ClassName extra (margem/padding ao redor do card). */
   className?: string;
+  /**
+   * Override do label do botão. Quando ausente, usa o `copy.button`
+   * do contexto. Útil quando a mesma página renderiza 2 botões com
+   * intenções diferentes (ex.: Regional com "Ver carros em minha
+   * região" + "Ver carros da cidade").
+   */
+  label?: string;
+  /**
+   * Override do título acima do botão (variante compact). Quando
+   * ausente, usa o `copy.title` do contexto.
+   */
+  title?: string;
+  /**
+   * Sufixo para o `data-testid` quando há mais de um botão na mesma
+   * página (Regional renderiza 2). Default: vazio.
+   */
+  testIdSuffix?: string;
 };
 
+/**
+ * Copy padrão por contexto (briefing 2026-05-23). O caller pode
+ * overridar via prop `label`/`title` quando precisar de uma intenção
+ * específica que não cabe num único default.
+ *
+ *   - estadual: "Ver carros perto de mim" → geo → Regional do visitante
+ *   - regional: "Ver carros em minha região" → geo → Regional do visitante
+ *     (útil quando o visitante caiu na regional de outra cidade pelo Google)
+ *   - cidade:   "Ver carros perto de mim" → geo (raro nesta página; o
+ *     CTA principal aqui costuma ser o link direto "Ver carros na Região"
+ *     que NÃO usa geo, ver `CatalogPageHeader`)
+ */
 const COPY: Record<Context, { title: string; subtitle: string; button: string }> = {
   estadual: {
     title: "Quer ver ofertas perto de você?",
@@ -60,7 +89,7 @@ const COPY: Record<Context, { title: string; subtitle: string; button: string }>
   regional: {
     title: "Está em outra região?",
     subtitle: "Use sua localização para abrir a região correta.",
-    button: "Ver carros perto de mim",
+    button: "Ver carros em minha região",
   },
   cidade: {
     title: "Quer ver veículos próximos de você?",
@@ -98,9 +127,21 @@ export function NearbyRegionButton({
   variant = "default",
   stateUf,
   className,
+  label,
+  title,
+  testIdSuffix = "",
 }: NearbyRegionButtonProps) {
   const { state, trigger, reset } = useNearbyRegionRedirect({ regionalEnabled });
-  const copy = COPY[context];
+  const defaults = COPY[context];
+  const copy = {
+    title: title ?? defaults.title,
+    subtitle: defaults.subtitle,
+    button: label ?? defaults.button,
+  };
+  const testIdRoot = testIdSuffix ? `nearby-region-${testIdSuffix}` : "nearby-region";
+  const testIdButton = testIdSuffix
+    ? `nearby-region-trigger-${testIdSuffix}`
+    : "nearby-region-trigger";
 
   const isBusy = state.kind === "locating" || state.kind === "redirecting";
   const busyLabel = state.kind === "redirecting" ? "Abrindo região..." : "Localizando...";
@@ -171,9 +212,9 @@ export function NearbyRegionButton({
   if (variant === "compact") {
     return (
       <section
-        aria-label="Encontrar ofertas perto de você"
+        aria-label={copy.button}
         className={className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"}
-        data-testid="nearby-region-button"
+        data-testid={`${testIdRoot}-button`}
         data-variant="compact"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cnc-line bg-white px-3 py-2 sm:px-4">
@@ -183,7 +224,7 @@ export function NearbyRegionButton({
             onClick={trigger}
             disabled={isBusy}
             className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong disabled:opacity-60"
-            data-testid="nearby-region-trigger"
+            data-testid={testIdButton}
           >
             <PinIcon />
             {isBusy ? busyLabel : copy.button}
@@ -196,9 +237,9 @@ export function NearbyRegionButton({
   // ───── Variante default (card médio) ───────────────────────────────
   return (
     <section
-      aria-label="Encontrar ofertas perto de você"
+      aria-label={copy.button}
       className={className ?? "mx-auto w-full max-w-7xl px-4 pt-2 sm:px-6 lg:px-8"}
-      data-testid="nearby-region-button"
+      data-testid={`${testIdRoot}-button`}
       data-variant="default"
     >
       <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary-soft/40 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
@@ -211,7 +252,7 @@ export function NearbyRegionButton({
           onClick={trigger}
           disabled={isBusy}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white shadow-card transition hover:bg-primary-strong disabled:opacity-60 sm:w-auto"
-          data-testid="nearby-region-trigger"
+          data-testid={testIdButton}
         >
           <PinIcon />
           {isBusy ? busyLabel : copy.button}
