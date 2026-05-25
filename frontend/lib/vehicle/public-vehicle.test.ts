@@ -138,3 +138,45 @@ describe("adaptAdDetailToVehicle — reconciliação anti-incoerência", () => {
     expect(v.optionalItems.find((i) => i.startsWith("Carroceria"))).toBeUndefined();
   });
 });
+
+/**
+ * P2-E (Contract Lock) 2026-05-25 — garante que `adaptAdDetailToVehicle`
+ * delega a formatação de preço/território ao contrato público
+ * (`formatPricePublic` + `buildPublicTerritoryLabel`) e não regride para
+ * as cópias locais antigas (que retornavam "R$ 0" e "São Paulo (SP)"
+ * sintético).
+ */
+describe("adaptAdDetailToVehicle — contrato público P2-E", () => {
+  it("nunca renderiza 'R$ 0' quando price=0", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ price: 0 }));
+    expect(v.price).not.toMatch(/R\$\s?0(?![0-9])/);
+    expect(v.price).toBe("Sob consulta");
+  });
+
+  it("nunca renderiza 'R$ 0' quando price=null", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ price: null }));
+    expect(v.price).toBe("Sob consulta");
+  });
+
+  it("formata price válido como 'R$ 65.000'", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ price: 65000 }));
+    expect(v.price).toMatch(/R\$\s?65\.000/);
+  });
+
+  it("city ausente vira 'Localização não informada' (sem default 'São Paulo (SP)')", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ city: null, state: null }));
+    expect(v.city).toBe("Localização não informada");
+    expect(v.city).not.toMatch(/São Paulo/i);
+  });
+
+  it("city + state preenchidos viram 'Cidade (UF)' via contrato", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ city: "Atibaia", state: "SP" }));
+    expect(v.city).toBe("Atibaia (SP)");
+  });
+
+  it("state em minúsculo é normalizado para uppercase no display", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ city: "Curitiba", state: "pr" }));
+    expect(v.city).toBe("Curitiba (PR)");
+  });
+});
+

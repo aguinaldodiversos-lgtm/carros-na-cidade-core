@@ -110,9 +110,19 @@ async function getPublicAdAndVehicle(
   return null;
 }
 
+/**
+ * Extrai a parte de cidade do `vehicle.city` (que já é "Cidade (UF)" ou
+ * texto neutro via `buildPublicTerritoryLabel`). NUNCA usa "São Paulo"
+ * como fallback (P2-E 2026-05-25): se a cidade não está informada, o
+ * neutro do contrato público entra naturalmente em SEO sem mentir.
+ */
+function cityNameFromVehicle(vehicle: VehicleDetail): string {
+  return safeText(vehicle.city.split(" (")[0], vehicle.city);
+}
+
 function buildPageTitle(vehicle: VehicleDetail): string {
   const year = extractYear(vehicle.year);
-  const cityName = safeText(vehicle.city.split(" (")[0], "São Paulo");
+  const cityName = cityNameFromVehicle(vehicle);
   return `${vehicle.model} ${year} à venda em ${cityName}`;
 }
 
@@ -153,15 +163,9 @@ export async function generateMetadata({
       type: "website",
     },
     keywords: [
-      `${vehicle.model.toLowerCase()} ${safeText(
-        vehicle.city.split(" (")[0],
-        "sao paulo"
-      ).toLowerCase()}`,
-      `comprar ${vehicle.model.toLowerCase()} ${safeText(
-        vehicle.city.split(" (")[0],
-        "sao paulo"
-      ).toLowerCase()}`,
-      `veículo ${safeText(vehicle.city.split(" (")[0], "sao paulo").toLowerCase()}`,
+      `${vehicle.model.toLowerCase()} ${cityNameFromVehicle(vehicle).toLowerCase()}`,
+      `comprar ${vehicle.model.toLowerCase()} ${cityNameFromVehicle(vehicle).toLowerCase()}`,
+      `veículo ${cityNameFromVehicle(vehicle).toLowerCase()}`,
     ],
   };
 }

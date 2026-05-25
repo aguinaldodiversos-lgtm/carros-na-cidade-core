@@ -1,5 +1,4 @@
 import type { BaseAdData } from "@/components/ads/AdCard";
-import type { ListingCar } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { buildPublicVehicleHref, normalizePublicAd } from "@/lib/public-contracts";
 import { fetchAdsSearch, type AdItem } from "@/lib/search/ads-search";
@@ -30,68 +29,6 @@ function toCurrentAdId(ad: PublicAdDetail): number | null {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string" && /^\d+$/.test(raw.trim())) return Number.parseInt(raw.trim(), 10);
   return null;
-}
-
-function formatBrl(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-/**
- * Adapter para o legado ListingCar (rotas que ainda usam o tipo antigo
- * de car-data). NÃO usar para alimentar `<AdCard />` — o AdCard espera
- * BaseAdData com `price` numérico; passar uma string formatada como
- * "R$ 103.900" faz o parseNumber interno do AdCard interpretar como
- * 103.9 (parseFloat após strip de chars não-decimais), produzindo
- * "R$ 104" no card (bug 2026-05-24 nos relacionados do detalhe).
- */
-export function mapAdItemToListingCar(item: AdItem): ListingCar {
-  const year = item.year ?? new Date().getFullYear();
-  const yearModel = `${year}/${year}`;
-  const kmNum = item.mileage ?? 0;
-  const km =
-    typeof kmNum === "number" && kmNum > 0
-      ? `${kmNum.toLocaleString("pt-BR")} Km`
-      : "Km não informado";
-
-  const priceNum = item.price ?? 0;
-  const price = priceNum > 0 ? formatBrl(priceNum) : "Consulte";
-
-  const title =
-    item.title || [item.brand, item.model].filter(Boolean).join(" ").trim() || "Veículo";
-
-  const brandUpper = (item.brand || title.split(" ")[0] || "Veículo").toUpperCase();
-  const modelRest = item.model
-    ? item.model
-    : title.replace(new RegExp(`^${item.brand || ""}`, "i"), "").trim() || title;
-
-  const cityLabel = item.city && item.state ? `${item.city} (${item.state})` : item.city || "";
-
-  const hl = item.highlight_until ? new Date(item.highlight_until).getTime() : NaN;
-  const hasHighlight = Number.isFinite(hl) && hl > Date.now();
-
-  const badge = hasHighlight ? "destaque" : item.below_fipe ? "fipe" : undefined;
-
-  const image =
-    item.image_url ||
-    (Array.isArray(item.images) && item.images[0]) ||
-    "/images/vehicle-placeholder.svg";
-
-  return {
-    id: String(item.id),
-    slug: item.slug,
-    model: brandUpper,
-    version: modelRest,
-    yearModel,
-    km,
-    city: cityLabel,
-    price,
-    image,
-    badge,
-  };
 }
 
 /**

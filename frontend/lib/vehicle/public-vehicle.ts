@@ -1,6 +1,7 @@
 import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
+import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { normalizeVehicleGalleryImages } from "@/lib/vehicle/detail-utils";
 import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
@@ -161,30 +162,6 @@ function isMeaningfulVehicleText(value: unknown) {
   return !blockedSnippets.some((snippet) => text.includes(snippet));
 }
 
-function formatPrice(value?: number | string | null) {
-  const numeric =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(
-            String(value)
-              .replace(/[^\d,.-]/g, "")
-              .replace(/\.(?=\d{3}(\D|$))/g, "")
-              .replace(",", ".")
-          )
-        : NaN;
-
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return "R$ 0";
-  }
-
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(numeric);
-}
-
 function toNumber(value?: number | string | null) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return null;
@@ -218,30 +195,13 @@ function formatMileage(value?: number | string | null) {
 /**
  * Display textual de "Cidade (UF)" para o detalhe e cards de loja.
  *
- * Briefing P0 2026-05-24: SEM defaults sintéticos para "São Paulo (SP)"
- * quando o anúncio não tem cidade. Antes, anúncio sem city no payload
- * era exibido como "São Paulo (SP)" — sinal de dado falso para o
- * usuário, e contradição com a cidade-base do catálogo de origem.
- *
- * Política nova:
- *   - city presente, state presente  → "Cidade (UF)"
- *   - city presente, state ausente   → "Cidade"
- *   - city ausente, state presente   → "UF"
- *   - ambos ausentes                 → "Localização não informada"
- *
- * Retorna sempre string não-vazia para que callers (`vehicle.city`,
- * `seller.address`) não precisem checar truthiness — o texto neutro
- * é a fallback semântica explícita.
+ * P2-E 2026-05-25: agora delega ao contrato público único
+ * `buildPublicTerritoryLabel` — antes era cópia local com a mesma lógica.
+ * A função do contrato já garante: nunca default "São Paulo (SP)"; nunca
+ * double-format quando city já vem como "Cidade (UF)".
  */
 function deriveCityDisplay(city?: string | null, state?: string | null) {
-  const cleanCity = sanitizeText(city);
-  const cleanState = sanitizeText(state).toUpperCase();
-
-  if (!cleanCity && !cleanState) return "Localização não informada";
-  if (cleanCity && cleanCity.includes("(")) return cleanCity;
-  if (cleanCity && cleanState) return `${toTitleCase(cleanCity)} (${cleanState})`;
-  if (cleanCity) return toTitleCase(cleanCity);
-  return cleanState;
+  return buildPublicTerritoryLabel({ city, state });
 }
 
 /**
@@ -383,7 +343,7 @@ function buildFipeReferenceAmount(price: number | null, belowFipe: boolean): num
 function buildFipeReference(price: number | null, belowFipe: boolean) {
   const estimated = buildFipeReferenceAmount(price, belowFipe);
   if (estimated == null) return "Consulte";
-  return formatPrice(estimated);
+  return formatPricePublic(estimated) ?? "Consulte";
 }
 
 function computeIsPaidListing(
@@ -519,7 +479,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     model,
     version,
     fullName,
-    price: formatPrice(ad.price),
+    price: formatPricePublic(ad.price) ?? "Sob consulta",
     priceNumeric: priceNumber,
     condition: "Usado",
     year: formatYear(ad.year),

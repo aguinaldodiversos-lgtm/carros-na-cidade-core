@@ -9,6 +9,7 @@ import { VehicleImage } from "@/components/ui/VehicleImage";
 import { type AdBadge, inferAdTier, resolvePublicAdBadges } from "@/lib/ads/ad-badges";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
+import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
 
@@ -260,14 +261,6 @@ function parseNumber(value?: string | number | null): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatCurrency(value?: number | string | null): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(parseNumber(value));
-}
-
 function formatNumber(value?: number | string | null): string {
   return new Intl.NumberFormat("pt-BR").format(parseNumber(value));
 }
@@ -377,10 +370,11 @@ type NormalizedAd = {
   model?: string | null;
   version?: string | null;
   year?: string | number | null;
-  city: string;
-  state: string;
+  /** Label "Cidade (UF)" pronto via buildPublicTerritoryLabel. */
+  locationLabel: string;
   yearLabel: string;
-  price: number;
+  /** Texto pronto via formatPricePublic — "R$ 89.900" ou "Sob consulta". NUNCA "R$ 0". */
+  priceLabel: string;
   mileage: number;
   image: string;
   // Singular: só as variantes que `resolveBadge` realmente emite. O Badge
@@ -406,10 +400,13 @@ function normalizeAdData(source?: BaseAdData): NormalizedAd {
     model: item.model,
     version: item.version,
     year: item.year,
-    city: String(item.city || "São Paulo"),
-    state: String(item.state || "SP"),
+    // P2-E 2026-05-25: territorial via contrato público — nunca default
+    // sintético "São Paulo (SP)" quando backend omite cidade.
+    locationLabel: buildPublicTerritoryLabel({ city: item.city, state: item.state }),
     yearLabel: String(item.yearLabel || item.year_model || item.year || "").trim(),
-    price: parseNumber(item.price),
+    // P2-E 2026-05-25: preço via contrato público — "Sob consulta" quando
+    // ausente/zero, jamais "R$ 0" fake.
+    priceLabel: formatPricePublic(item.price ?? null) ?? "Sob consulta",
     mileage: parseNumber(item.mileage),
     image: resolvePublicListingImageUrl({
       image: item.image,
@@ -683,14 +680,12 @@ function VerticalLayout({
         {config.showLocation && (
           <p className={locationClass}>
             <PinIcon />
-            <span className="truncate">
-              {normalized.city} ({normalized.state})
-            </span>
+            <span className="truncate">{normalized.locationLabel}</span>
           </p>
         )}
 
         <div className={footerWrapClass}>
-          <strong className={priceClass}>{formatCurrency(normalized.price)}</strong>
+          <strong className={priceClass}>{normalized.priceLabel}</strong>
           {actions ? (
             <div>{actions}</div>
           ) : isShowcase ? (
@@ -865,9 +860,7 @@ function HorizontalLayout({
         )}
 
         <div className="mt-auto flex items-center justify-between gap-2">
-          <strong className="text-base font-bold text-primary">
-            {formatCurrency(normalized.price)}
-          </strong>
+          <strong className="text-base font-bold text-primary">{normalized.priceLabel}</strong>
           {actions && <div onClick={(e) => e.stopPropagation()}>{actions}</div>}
         </div>
       </div>
