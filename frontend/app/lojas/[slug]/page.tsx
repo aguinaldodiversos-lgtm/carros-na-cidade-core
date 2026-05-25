@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdCard } from "@/components/ads/AdCard";
+import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { fetchPublicDealer, type PublicDealer } from "@/lib/dealers/fetch-public-dealer";
 import {
   buildEmptyStateCopy,
@@ -137,100 +138,157 @@ export default async function PublicDealerPage({ params }: PageProps) {
   const renderableAds = rawAds.filter((ad) => buildPublicVehicleHref(ad) !== null);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-      <nav aria-label="Trilha" className="text-sm text-cnc-muted">
-        <Link href="/" className="hover:text-primary">
-          Início
-        </Link>
-        <span className="mx-2 text-cnc-muted/60">/</span>
-        <Link href="/comprar" className="hover:text-primary">
-          Comprar
-        </Link>
-        <span className="mx-2 text-cnc-muted/60">/</span>
-        <span className="text-cnc-text-strong">{dealer.name}</span>
-      </nav>
-
-      <header className="mt-4 flex flex-col gap-4 rounded-2xl border border-cnc-line bg-cnc-surface p-5 shadow-card sm:flex-row sm:items-center sm:gap-5">
-        <span
-          aria-hidden="true"
-          className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-[28px] font-extrabold text-primary"
+    <>
+      {/*
+        Layout mobile-first:
+        - `pb-24` em vez de `pb-16` para reservar espaço para o
+          SiteBottomNav (h-16+) sem cortar o último card.
+        - `pt-3 sm:pt-6` reduz topo no celular (header da loja é
+          alto o bastante).
+        - `px-3 sm:px-6 lg:px-8` — celular usa 12px (alinha com o
+          padrão do detalhe e catálogo).
+      */}
+      <main className="mx-auto w-full max-w-7xl px-3 pb-24 pt-3 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+        <nav
+          aria-label="Trilha"
+          className="flex items-center gap-1 overflow-hidden text-[13px] text-cnc-muted sm:text-sm"
         >
-          {initials || "C"}
-        </span>
+          <Link href="/" className="shrink-0 hover:text-primary">
+            Início
+          </Link>
+          <span aria-hidden="true" className="text-cnc-muted/60">
+            /
+          </span>
+          <Link href="/comprar" className="shrink-0 hover:text-primary">
+            Comprar
+          </Link>
+          <span aria-hidden="true" className="text-cnc-muted/60">
+            /
+          </span>
+          <span className="truncate font-medium text-cnc-text-strong">{dealer.name}</span>
+        </nav>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-extrabold tracking-tight text-cnc-text-strong sm:text-3xl">
+        {/*
+          Header da loja:
+          - Mobile: avatar 56px + texto em coluna única, gap-3 (compacto,
+            sem desperdiçar viewport).
+          - sm+: avatar 80px, gap-5.
+          O `items-center` aplica em todos os breakpoints porque a
+          coluna direita pode ter 2-3 linhas — `items-start` deixava
+          o avatar voando no topo.
+        */}
+        <header className="mt-3 flex items-center gap-3 rounded-2xl border border-cnc-line bg-cnc-surface p-3.5 shadow-card sm:mt-4 sm:gap-5 sm:p-5">
+          <span
+            aria-hidden="true"
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-[18px] font-extrabold text-primary sm:h-20 sm:w-20 sm:text-[28px]"
+          >
+            {initials || "C"}
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <h1 className="line-clamp-2 text-[17px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-2xl md:text-3xl">
               {dealer.name}
             </h1>
-            <span className="inline-flex items-center rounded-full bg-primary-soft px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-              Loja parceira
-            </span>
-            {dealer.verified ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-cnc-success/12 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-cnc-success">
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  className="h-3 w-3"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-                Loja verificada
+
+            {/*
+              Badges: gap-1.5 + flex-wrap. No mobile vêm na linha
+              seguinte ao H1 (a depender do tamanho). `mt-1.5` casa
+              com o espaçamento das demais linhas.
+            */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center rounded-full bg-primary-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-primary sm:px-2.5 sm:text-[11px]">
+                Loja parceira
               </span>
-            ) : null}
+              {dealer.verified ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-cnc-success/12 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-cnc-success sm:px-2.5 sm:text-[11px]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    className="h-3 w-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                  Loja verificada
+                </span>
+              ) : null}
+            </div>
+
+            <p className="mt-1.5 truncate text-[12.5px] text-cnc-muted sm:text-sm">
+              {territoryLabel}
+            </p>
+            <p className="mt-0.5 truncate text-[12.5px] font-semibold text-cnc-text-strong sm:text-sm">
+              {dealer.totalActiveAds > 0
+                ? `${dealer.totalActiveAds} ${dealer.totalActiveAds === 1 ? "anúncio ativo" : "anúncios ativos"}`
+                : "Sem anúncios ativos no momento"}
+            </p>
           </div>
+        </header>
 
-          <p className="mt-1.5 text-sm text-cnc-muted">{territoryLabel}</p>
-          <p className="mt-1 text-sm font-semibold text-cnc-text-strong">
-            {dealer.totalActiveAds > 0
-              ? `${dealer.totalActiveAds} ${dealer.totalActiveAds === 1 ? "anúncio ativo" : "anúncios ativos"}`
-              : "Sem anúncios ativos no momento"}
-          </p>
-        </div>
-      </header>
-
-      {renderableAds.length > 0 ? (
-        <section aria-labelledby="ofertas-da-loja" className="mt-8">
-          <h2 id="ofertas-da-loja" className="text-lg font-extrabold text-cnc-text-strong">
-            Ofertas da loja
-          </h2>
-          <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {renderableAds.map((ad) => (
-              <li key={ad.id}>
-                <AdCard ad={ad} variant="grid" />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <section
-          aria-labelledby="loja-sem-ofertas"
-          className="mt-8 rounded-2xl border border-cnc-line bg-cnc-surface p-8 text-center shadow-card"
-        >
-          <h2 id="loja-sem-ofertas" className="text-lg font-extrabold text-cnc-text-strong">
-            {emptyCopy.title}
-          </h2>
-          <p className="mt-2 text-sm text-cnc-muted">{emptyCopy.body}</p>
-          {emptyCopy.cta ? (
-            <Link
-              href={emptyCopy.cta.href}
-              className="mt-5 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong"
+        {renderableAds.length > 0 ? (
+          <section aria-labelledby="ofertas-da-loja" className="mt-5 sm:mt-8">
+            <h2
+              id="ofertas-da-loja"
+              className="text-[15px] font-extrabold text-cnc-text-strong sm:text-lg"
             >
-              {emptyCopy.cta.label}
-            </Link>
-          ) : null}
-        </section>
-      )}
+              Ofertas da loja
+            </h2>
+            {/*
+              Grid mobile-first: 1 col (default) → 2 cols sm+ → 3 cols lg+.
+              `gap-3 sm:gap-4` aperta gutter no mobile sem encostar
+              os cards. O AdCard variant="grid" já é mobile-horizontal
+              internamente (imagem 42% à esquerda + texto à direita)
+              — densifica a listagem single-column no celular.
+            */}
+            <ul className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+              {renderableAds.map((ad) => (
+                <li key={ad.id}>
+                  <AdCard ad={ad} variant="grid" />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : (
+          <section
+            aria-labelledby="loja-sem-ofertas"
+            className="mt-5 rounded-2xl border border-cnc-line bg-cnc-surface p-5 text-center shadow-card sm:mt-8 sm:p-8"
+          >
+            <h2
+              id="loja-sem-ofertas"
+              className="text-[15px] font-extrabold text-cnc-text-strong sm:text-lg"
+            >
+              {emptyCopy.title}
+            </h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-cnc-muted sm:text-sm">
+              {emptyCopy.body}
+            </p>
+            {emptyCopy.cta ? (
+              <Link
+                href={emptyCopy.cta.href}
+                className="mt-4 inline-flex h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong sm:mt-5"
+              >
+                {emptyCopy.cta.label}
+              </Link>
+            ) : null}
+          </section>
+        )}
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildDealerJsonLd(dealer)) }}
-      />
-    </main>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(buildDealerJsonLd(dealer)) }}
+        />
+      </main>
+
+      {/*
+        Bottom nav fixa do projeto — todas as rotas públicas mobile
+        têm. Sem ela o usuário acessando /lojas/[slug] no celular
+        ficava sem retorno fácil para Home/Comprar/Anunciar.
+      */}
+      <SiteBottomNav />
+    </>
   );
 }
