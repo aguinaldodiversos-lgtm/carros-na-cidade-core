@@ -1,0 +1,85 @@
+name: Public Contract Smoke
+
+# P3-A (2026-05-25) — automatiza scripts/smoke/public-contract-smoke.mjs:
+#   - schedule 2x/dia (UTC)
+#   - workflow_dispatch (manual, com BASE_URL override)
+#
+# O job só FALHA se o smoke retornar exit code != 0 — ou seja, se houver
+# pelo menos uma falha crítica (status errado, string proibida, R$ 0 fake,
+# href quebrado, soft-404, fallback fake, cidade hardcoded, ou
+# x-middleware-ad ausente em anúncio real).
+#
+# Runbook: docs/runbooks/public-contract-smoke-cron.md
+
+on:
+  schedule:
+    # 2x ao dia em UTC. Brasil é UTC-3 → janelas locais:
+    #   - 06:15 UTC = 03:15 BRT  (pós-deploy noturno automático, antes do tráfego)
+    #   - 18:15 UTC = 15:15 BRT  (pico de tráfego — pega regressões de deploy do dia)
+    # Minuto 15 (não :00) reduz contention com cron jobs mais comuns.
+    - cron: "15 6 * * *"
+    - cron: "15 18 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "BASE_URL alvo do smoke"
+        required: false
+        default: "https://www.carrosnacidade.com"
+        type: string
+      verbose:
+        description: "Imprimir detalhes em todas as checks"
+        required: false
+        default: false
+        type: boolean
+
+# Não cancela runs anteriores: smoke é idempotente e duas execuções
+# simultâneas (cron + dispatch manual) não interferem. Cancelar um
+# scheduled run para liberar um manual perde o sinal histórico.
+concurrency:
+  group: public-contract-smoke-${{ github.event.inputs.base_url || 'default' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke público (contrato)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: ${{ github.event.inputs.base_url || 'https://www.carrosnacidade.com' }}
+      SMOKE_VERBOSE: ${{ github.event.inputs.verbose && '1' || '' }}
+      # SMOKE_GITHUB=1 ativa annotations + step summary no script.
+      # GITHUB_ACTIONS=true já é setado pelo runner → o script detecta
+      # automaticamente, mas marcamos explícito por clareza.
+      SMOKE_GITHUB: "1"
+    steps:
+      - name: Checkout (sparse — só o script + runbook)
+        uses: actions/checkout@v4
+        with:
+          # Não precisa do monorepo todo; smoke é Node puro com zero deps.
+          sparse-checkout: |
+            scripts/smoke/public-contract-smoke.mjs
+            docs/runbooks/public-contract-smoke-cron.md
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run smoke
+        run: node scripts/smoke/public-contract-smoke.mjs --github
+
+      - name: Job summary (sucesso)
+        if: success()
+        run: echo "### ✅ Smoke público OK contra \`$BASE_URL\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Job summary (falha)
+        if: failure()
+        run: |
+          echo "### ❌ Smoke público FALHOU contra \`$BASE_URL\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ver detalhes acima (annotations + grupos)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Runbook: [docs/runbooks/public-contract-smoke-cron.md](../blob/main/docs/runbooks/public-contract-smoke-cron.md)" >> "$GITHUB_STEP_SUMMARY"
