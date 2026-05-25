@@ -14,7 +14,7 @@ import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 export default function DealerNotFound() {
   return (
     <>
-      <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center px-4 pb-24 pt-10 text-center sm:px-6 sm:pb-16 sm:pt-16">
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center overflow-x-hidden px-4 pb-24 pt-10 text-center sm:px-6 sm:pb-16 sm:pt-16">
         <h1 className="text-xl font-extrabold tracking-tight text-cnc-text-strong sm:text-2xl md:text-3xl">
           Loja não encontrada
         </h1>

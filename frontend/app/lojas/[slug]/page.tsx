@@ -148,7 +148,7 @@ export default async function PublicDealerPage({ params }: PageProps) {
         - `px-3 sm:px-6 lg:px-8` — celular usa 12px (alinha com o
           padrão do detalhe e catálogo).
       */}
-      <main className="mx-auto w-full max-w-7xl px-3 pb-24 pt-3 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-3 pb-24 pt-3 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
         <nav
           aria-label="Trilha"
           className="flex items-center gap-1 overflow-hidden text-[13px] text-cnc-muted sm:text-sm"
