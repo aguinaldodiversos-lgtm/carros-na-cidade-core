@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPricePublic } from "@/lib/public-contracts";
 import type { AdsSearchFilters } from "../../lib/search/ads-search";
 
 interface AppliedFilterChipsProps {
@@ -9,13 +10,17 @@ interface AppliedFilterChipsProps {
   lockedKeys?: Array<keyof AdsSearchFilters>;
 }
 
-function formatCurrency(value?: number) {
-  if (value === undefined) return null;
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(value);
+/**
+ * Wrapper sobre formatPricePublic — quando o valor é ausente devolve `null`
+ * para que o caller (chip de filtro) renderize a copy semântica
+ * ("qualquer valor") em vez de literal "R$ 0".
+ *
+ * P3-B 2026-05-25: substitui o `formatCurrency` local que retornava
+ * "R$ 0" como fallback, criando ruído no smoke público.
+ */
+function formatChipPrice(value?: number) {
+  if (value === undefined || value === null) return null;
+  return formatPricePublic(value, { whenAbsent: "null" });
 }
 
 export function AppliedFilterChips({
@@ -77,11 +82,12 @@ export function AppliedFilterChips({
   }
 
   if (filters.min_price !== undefined || filters.max_price !== undefined) {
+    const minLabel = formatChipPrice(filters.min_price) ?? "qualquer valor";
+    const maxLabel =
+      filters.max_price !== undefined ? ` até ${formatChipPrice(filters.max_price)}` : " ou mais";
     chips.push({
       key: "price",
-      label: `Preço: ${formatCurrency(filters.min_price) || "R$ 0"}${
-        filters.max_price !== undefined ? ` até ${formatCurrency(filters.max_price)}` : " ou mais"
-      }`,
+      label: `Preço: ${minLabel}${maxLabel}`,
       remove: () =>
         onRemove({
           min_price: undefined,

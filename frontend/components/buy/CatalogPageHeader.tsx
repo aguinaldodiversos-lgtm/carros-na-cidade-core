@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/ui/SearchBar";
+import { buildPublicTerritoryLabel } from "@/lib/public-contracts";
 import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
@@ -93,8 +94,11 @@ export function CatalogPageHeader({
   const pathname = usePathname();
   const [query, setQuery] = useState(filters.q || "");
 
+  // P3-B 2026-05-25 — fallback final "SP" removido: o resolver
+  // territorial garante state em variants `cidade`/`regional`/`estadual`;
+  // se ainda assim ausente, usar vazio (sem inventar SP).
   const activeStateUf =
-    variant === "nacional" ? filters.state || "" : stateUf || filters.state || city.state || "SP";
+    variant === "nacional" ? filters.state || "" : stateUf || filters.state || city.state || "";
   const stateName = activeStateUf ? stateNameFromUf(activeStateUf) : "";
 
   const breadcrumbItems = useMemo(() => {
@@ -102,7 +106,8 @@ export function CatalogPageHeader({
       return [
         { label: "Home", href: "/" },
         { label: "Comprar", href: "/comprar" },
-        { label: `${city.name} (${city.state})` },
+        // P3-B 2026-05-25 — usa contrato público para o label "Cidade (UF)".
+        { label: buildPublicTerritoryLabel({ city: city.name, state: city.state }) },
       ];
     }
     if (variant === "regional") {

@@ -1,14 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
+import { formatPricePublic } from "@/lib/public-contracts";
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
 
+/**
+ * Wrapper sobre formatPricePublic para a landing SEO local. P3-B
+ * 2026-05-25: substitui o `formatMoney` local — usa o contrato público
+ * único e elimina risco de "R$ 0" em variantes /carros-baratos-em/ e
+ * /carros-automaticos-em/ se backend mandar price=0.
+ */
 function formatMoney(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatPricePublic(value, { whenAbsent: "null" }) ?? "—";
 }
 
 function cx(...parts: Array<string | false | null | undefined>) {
