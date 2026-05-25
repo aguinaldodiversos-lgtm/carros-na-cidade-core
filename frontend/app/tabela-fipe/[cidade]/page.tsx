@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { FipePageClient } from "@/components/fipe/FipePageClient";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
+import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 
 type PageProps = {
@@ -34,9 +35,16 @@ function prettifyCitySlug(slug: string) {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = prettifyCitySlug(params.cidade);
 
+  // Briefing P2-D 2026-05-25 — copy oficial via helper único.
+  // Preservamos fallback inline (drop-in compatível).
+  const baseCopy = publicCatalogPageCopy("fipe", { label: city.name });
+
   return {
-    title: `Tabela FIPE em ${city.name} | Consulte o valor do seu veículo`,
-    description: `Consulte a Tabela FIPE em ${city.name}, compare o valor do seu veículo com anúncios locais e veja destaques e oportunidades abaixo da FIPE na sua cidade.`,
+    title:
+      baseCopy.metaTitle ?? `Tabela FIPE em ${city.name} | Consulte o valor do seu veículo`,
+    description:
+      baseCopy.metaDescription ??
+      `Consulte a Tabela FIPE em ${city.name}, compare o valor do seu veículo com anúncios locais e veja destaques e oportunidades abaixo da FIPE na sua cidade.`,
     alternates: {
       canonical: `/tabela-fipe/${params.cidade}`,
     },
@@ -78,17 +86,23 @@ export default async function TabelaFipeCidadePage({ params }: PageProps) {
     }),
   ]);
 
+  // Defesa em profundidade — briefing P0 2026-05-24 (hasRealPrice) +
+  // briefing P2-D 2026-05-25 (normalizePublicAd: drop slug inválido,
+  // dirty data residual, price ≤ 0).
+  const filterPublic = <T,>(ad: T) =>
+    hasRealPrice(ad as Parameters<typeof hasRealPrice>[0]) && normalizePublicAd(ad) !== null;
+
   const fallbackRecent = (
     fallbackRecentResult.status === "fulfilled" ? fallbackRecentResult.value.data || [] : []
-  ).filter(hasRealPrice);
+  ).filter(filterPublic);
 
   const highlightFromBackend = (
     highlightResult.status === "fulfilled" ? highlightResult.value.data || [] : []
-  ).filter(hasRealPrice);
+  ).filter(filterPublic);
 
   const opportunityFromBackend = (
     belowFipeResult.status === "fulfilled" ? belowFipeResult.value.data || [] : []
-  ).filter(hasRealPrice);
+  ).filter(filterPublic);
 
   const highlightAds = highlightFromBackend.length > 0 ? highlightFromBackend : fallbackRecent;
   const opportunityAds =

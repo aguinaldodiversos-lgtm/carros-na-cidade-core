@@ -156,8 +156,15 @@ function fallbackContent(): SellPageContent {
         description: "Sua operação ganha presença profissional e mais autoridade na sua cidade.",
       },
       {
-        title: "Hierarquia comercial de exposição",
-        description: "Destaque, plano Pro e plano Start respeitam posição comercial no catálogo.",
+        // Briefing P2-D 2026-05-25: NÃO expor nomes internos de plano
+        // (Pro/Start/Grátis) na vitrine pública — esses são bastidor
+        // comercial. Linguagem reescrita para descrever o BENEFÍCIO para
+        // o lojista sem citar o nome técnico do plano. Selos vistos pelo
+        // comprador (Destaque/Loja/Oportunidade) continuam canônicos via
+        // `resolvePublicAdBadges` (sem exposição de tier 2/3).
+        title: "Posições de destaque para planos pagos",
+        description:
+          "Anúncios em planos comerciais ganham posições mais visíveis no catálogo, com selo público claro para o comprador.",
       },
       {
         title: "Base pronta para organizar estoque e contatos",

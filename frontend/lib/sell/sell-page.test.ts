@@ -59,14 +59,21 @@ describe("/anunciar copy — termos proibidos", () => {
     }
   });
 
-  it("a copy ainda menciona Start, Pro e Destaque (oferta atual)", async () => {
+  it("a copy NÃO expõe nomes internos de plano (briefing P2-D 2026-05-25)", async () => {
+    // ATUALIZADO: o teste antigo exigia "plano Pro" / "plano Start" na
+    // copy pública, mas o briefing P2-D vetou exposição de nomes internos
+    // de plano. Linguagem reescrita para falar de "planos pagos" e
+    // "destaque" em termos comerciais limpos. Selos vistos pelo
+    // comprador (Destaque/Loja/Oportunidade) continuam canônicos via
+    // `resolvePublicAdBadges` (sem expor priority_tier 2/3 = Pro/Start).
     const content = await getSellPageContent();
     const flat = flattenContent(content);
 
-    // Garante que a substituição não eliminou os nomes corretos do produto.
-    expect(flat).toMatch(/\bplano Start\b/);
-    expect(flat).toMatch(/\bplano Pro\b/);
-    expect(flat).toMatch(/\bdestaque 7 dias\b/i);
+    expect(flat).not.toMatch(/\bplano Start\b/);
+    expect(flat).not.toMatch(/\bplano Pro\b/);
+    // Linguagem comercial limpa permitida — destaque sem qualificador
+    // técnico continua OK (selo público visível ao comprador).
+    expect(flat).toMatch(/destaque/i);
   });
 
   it("a copy mantém a proposta principal (FIPE, WhatsApp, presença local)", async () => {

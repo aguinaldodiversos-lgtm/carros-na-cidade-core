@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { FinancingLandingPageClient } from "@/components/financing/FinancingLandingPageClient";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
+import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 
 type PageProps = {
@@ -61,9 +62,15 @@ function prettifyCitySlug(slug: string) {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = prettifyCitySlug(params.cidade);
 
+  // Briefing P2-D 2026-05-25 — copy oficial vem do helper único.
+  // Preservamos fallback inline com o que tinha (drop-in compatível).
+  const baseCopy = publicCatalogPageCopy("simulator", { label: city.name, uf: city.state });
+
   return {
-    title: `Simule o financiamento do seu carro em ${city.name}`,
-    description: `Descubra parcelas, taxas e condições de financiamento em ${city.name}. Veja ofertas locais, oportunidades abaixo da FIPE e anuncie seu carro grátis no Carros na Cidade.`,
+    title: baseCopy.metaTitle ?? `Simule o financiamento do seu carro em ${city.name}`,
+    description:
+      baseCopy.metaDescription ??
+      `Descubra parcelas, taxas e condições de financiamento em ${city.name}. Veja ofertas locais, oportunidades abaixo da FIPE e anuncie seu carro grátis no Carros na Cidade.`,
     alternates: {
       canonical: `/simulador-financiamento/${params.cidade}`,
     },
@@ -110,22 +117,27 @@ export default async function SimuladorFinanciamentoCidadePage({
     }),
   ]);
 
-  // Defesa em profundidade contra placeholder R$ 0 — vitrine pública
-  // nunca pode mostrar card sem preço real (briefing P0 2026-05-24).
+  // Defesa em profundidade — briefing P0 2026-05-24 (hasRealPrice) +
+  // briefing P2-D 2026-05-25 (normalizePublicAd: drop slug inválido,
+  // dirty data residual, price ≤ 0). Filtros aplicados em sequência:
+  // backend já filtra DIRTY; este pipeline é safety net redundante.
+  const filterPublic = <T,>(ad: T) =>
+    hasRealPrice(ad as Parameters<typeof hasRealPrice>[0]) && normalizePublicAd(ad) !== null;
+
   const recentAds = (
     recentResult.status === "fulfilled" ? recentResult.value.data || [] : []
-  ).filter(hasRealPrice);
+  ).filter(filterPublic);
 
   const opportunityAdsRaw =
     opportunitiesResult.status === "fulfilled" ? opportunitiesResult.value.data || [] : [];
   const opportunityAds = opportunityAdsRaw.length > 0
-    ? opportunityAdsRaw.filter(hasRealPrice)
+    ? opportunityAdsRaw.filter(filterPublic)
     : recentAds.slice(0, 6);
 
   const highlightAdsRaw =
     highlightResult.status === "fulfilled" ? highlightResult.value.data || [] : [];
   const highlightAds = highlightAdsRaw.length > 0
-    ? highlightAdsRaw.filter(hasRealPrice)
+    ? highlightAdsRaw.filter(filterPublic)
     : recentAds.slice(0, 4);
 
   // heroVehicle = primeiro anúncio real com preço; `null` quando nenhum
