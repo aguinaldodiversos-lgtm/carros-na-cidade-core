@@ -1,0 +1,104 @@
+﻿
+==============================================
+ CNC smoke público — Contract Lock (P3-A)
+ BASE_URL = https://www.carrosnacidade.com
+ UA       = cnc-contract-smoke/2026-05-25
+ MODE     = plain
+==============================================
+
+[PASS] / — status 200
+[PASS] / — sem strings proibidas
+[PASS] / — sem fallback fake (T-Cross 999001)
+[PASS] /comprar/estado/sp — status 200
+[PASS] /comprar/estado/sp — sem strings proibidas
+[PASS] /comprar/estado/sp — sem fallback fake (T-Cross 999001)
+[PASS] /carros-em/atibaia-sp — status 200
+[PASS] /carros-em/atibaia-sp — sem strings proibidas
+[PASS] /carros-em/atibaia-sp — sem fallback fake (T-Cross 999001)
+[PASS] /carros-em/atibaia-sp — body menciona "Atibaia"
+[PASS] /carros-em/atibaia-sp — <title> sem "São Paulo" hardcoded
+[PASS] /carros-em/campinas-sp — status 200
+[PASS] /carros-em/campinas-sp — sem strings proibidas
+[PASS] /carros-em/campinas-sp — sem fallback fake (T-Cross 999001)
+[PASS] /carros-em/campinas-sp — body menciona "Campinas"
+[PASS] /carros-em/campinas-sp — <title> sem "São Paulo" hardcoded
+[PASS] /carros-usados/regiao/atibaia-sp — status 200|404
+[PASS] /carros-usados/regiao/atibaia-sp — sem strings proibidas
+[PASS] /carros-usados/regiao/atibaia-sp — sem fallback fake (T-Cross 999001)
+[PASS] /carros-usados/regiao/atibaia-sp — body menciona "Atibaia"
+[PASS] /carros-usados/regiao/atibaia-sp — <title> sem "São Paulo" hardcoded
+[PASS] /carros-usados/regiao/campinas-sp — status 200|404
+[PASS] /carros-usados/regiao/campinas-sp — sem strings proibidas
+[PASS] /carros-usados/regiao/campinas-sp — sem fallback fake (T-Cross 999001)
+[PASS] /carros-usados/regiao/campinas-sp — body menciona "Campinas"
+[PASS] /carros-usados/regiao/campinas-sp — <title> sem "São Paulo" hardcoded
+[PASS] /veiculo/anuncio-inexistente-xyz-999 — status 404
+[PASS] /anuncios/slug-fantasma — status 404
+[PASS] /simulador-financiamento — status 200
+[PASS] /simulador-financiamento — sem strings proibidas
+[PASS] /simulador-financiamento — sem fallback fake (T-Cross 999001)
+[PASS] /simulador-financiamento/sao-paulo-sp — status 200
+[PASS] /simulador-financiamento/sao-paulo-sp — sem strings proibidas
+[PASS] /simulador-financiamento/sao-paulo-sp — sem fallback fake (T-Cross 999001)
+[PASS] /simulador-financiamento/sao-paulo-sp — body menciona "São Paulo"
+[PASS] /simulador-financiamento/atibaia-sp — status 200
+[PASS] /simulador-financiamento/atibaia-sp — sem strings proibidas
+[PASS] /simulador-financiamento/atibaia-sp — sem fallback fake (T-Cross 999001)
+[PASS] /simulador-financiamento/atibaia-sp — body menciona "Atibaia"
+[PASS] /simulador-financiamento/atibaia-sp — <title> sem "São Paulo" hardcoded
+[PASS] /tabela-fipe — status 200
+[PASS] /tabela-fipe — sem strings proibidas
+[PASS] /tabela-fipe — sem fallback fake (T-Cross 999001)
+[PASS] /tabela-fipe/sao-paulo-sp — status 200
+[PASS] /tabela-fipe/sao-paulo-sp — sem strings proibidas
+[PASS] /tabela-fipe/sao-paulo-sp — sem fallback fake (T-Cross 999001)
+[PASS] /tabela-fipe/sao-paulo-sp — body menciona "São Paulo"
+[PASS] /tabela-fipe/atibaia-sp — status 200
+[PASS] /tabela-fipe/atibaia-sp — sem strings proibidas
+[PASS] /tabela-fipe/atibaia-sp — sem fallback fake (T-Cross 999001)
+[PASS] /tabela-fipe/atibaia-sp — body menciona "Atibaia"
+[PASS] /tabela-fipe/atibaia-sp — <title> sem "São Paulo" hardcoded
+[PASS] /anunciar — status 200
+[PASS] /anunciar — sem strings proibidas
+[PASS] /anunciar — sem fallback fake (T-Cross 999001)
+[PASS] hrefs /veiculo/* extraídos das listagens (≥1)
+[PASS] /veiculo/gm-chevrolet-onix-hatch-1-0-12v-flex-5p-mec-2024-1778119090914 — HTTP 200
+[PASS] /veiculo/gm-chevrolet-onix-hatch-1-0-12v-flex-5p-mec-2024-1778119090914 — x-middleware-ad: passed-valid
+[PASS] /veiculo/gm-chevrolet-onix-hatch-1-0-12v-flex-5p-mec-2024-1778119090914 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/gm-chevrolet-onix-hatch-1-0-12v-flex-5p-mec-2024-1778119090914 — sem fallback fake
+[PASS] /veiculo/gm-chevrolet-onix-hatch-1-0-12v-flex-5p-mec-2024-1778119090914 — sem strings proibidas
+[PASS] /veiculo/byd-dolphin-mini-eletrico-2026-1776912624710 — HTTP 200
+[PASS] /veiculo/byd-dolphin-mini-eletrico-2026-1776912624710 — x-middleware-ad: passed-valid
+[PASS] /veiculo/byd-dolphin-mini-eletrico-2026-1776912624710 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/byd-dolphin-mini-eletrico-2026-1776912624710 — sem fallback fake
+[PASS] /veiculo/byd-dolphin-mini-eletrico-2026-1776912624710 — sem strings proibidas
+[PASS] /veiculo/vw-volkswagen-nivus-comfortline-1-0-200-tsi-flex-aut-2024-1776912109892 — HTTP 200
+[PASS] /veiculo/vw-volkswagen-nivus-comfortline-1-0-200-tsi-flex-aut-2024-1776912109892 — x-middleware-ad: passed-valid
+[PASS] /veiculo/vw-volkswagen-nivus-comfortline-1-0-200-tsi-flex-aut-2024-1776912109892 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/vw-volkswagen-nivus-comfortline-1-0-200-tsi-flex-aut-2024-1776912109892 — sem fallback fake
+[PASS] /veiculo/vw-volkswagen-nivus-comfortline-1-0-200-tsi-flex-aut-2024-1776912109892 — sem strings proibidas
+[PASS] /veiculo/gm-chevrolet-onix-sedan-plus-1-0-12v-tb-flex-aut-2024-1776302907782 — HTTP 200
+[PASS] /veiculo/gm-chevrolet-onix-sedan-plus-1-0-12v-tb-flex-aut-2024-1776302907782 — x-middleware-ad: passed-valid
+[PASS] /veiculo/gm-chevrolet-onix-sedan-plus-1-0-12v-tb-flex-aut-2024-1776302907782 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/gm-chevrolet-onix-sedan-plus-1-0-12v-tb-flex-aut-2024-1776302907782 — sem fallback fake
+[PASS] /veiculo/gm-chevrolet-onix-sedan-plus-1-0-12v-tb-flex-aut-2024-1776302907782 — sem strings proibidas
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1776119538480 — HTTP 200
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1776119538480 — x-middleware-ad: passed-valid
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1776119538480 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1776119538480 — sem fallback fake
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1776119538480 — sem strings proibidas
+[PASS] /veiculo/fiat-pulse-drive-1-3-8v-flex-aut-2024-1776035190091 — HTTP 200
+[PASS] /veiculo/fiat-pulse-drive-1-3-8v-flex-aut-2024-1776035190091 — x-middleware-ad: passed-valid
+[PASS] /veiculo/fiat-pulse-drive-1-3-8v-flex-aut-2024-1776035190091 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/fiat-pulse-drive-1-3-8v-flex-aut-2024-1776035190091 — sem fallback fake
+[PASS] /veiculo/fiat-pulse-drive-1-3-8v-flex-aut-2024-1776035190091 — sem strings proibidas
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992 — HTTP 200
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992 — x-middleware-ad: passed-valid
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992 — sem "Veículo não encontrado" em 200
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992 — sem fallback fake
+[PASS] /veiculo/vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992 — sem strings proibidas
+
+----------------------------------------------
+ 91/91 checks passaram
+----------------------------------------------
+
