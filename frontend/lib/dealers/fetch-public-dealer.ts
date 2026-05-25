@@ -54,8 +54,31 @@ function getApiBaseUrl(): string {
   return getBackendApiBaseUrl();
 }
 
+/**
+ * Lojas Públicas 2026-05-25 — defesa contra encoding quebrado vazado
+ * do banco. Algumas linhas em `cities`/`advertisers` foram salvas com
+ * Latin-1 lido como UTF-8 ("São Paulo" → "SÆo Paulo"). O smoke
+ * público (FORBIDDEN_PATTERNS.encoding-sao-paulo) bloqueia esse
+ * padrão. Sanitizamos no fetcher para impedir que vaze ao HTML.
+ *
+ * Lista é estreita por design — sanitiza apenas padrões conhecidos,
+ * sem tentar "consertar" bytes arbitrários. Quando aparecer outro
+ * padrão, estende aqui (e marca para corrigir o dado no banco).
+ */
+const ENCODING_FIXES: Array<[RegExp, string]> = [
+  [/SÆo Paulo/g, "São Paulo"], // "SÆo Paulo" → "São Paulo"
+];
+
+function fixEncoding(value: string): string {
+  let out = value;
+  for (const [pattern, replacement] of ENCODING_FIXES) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
 function toStringSafe(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string" ? fixEncoding(value.trim()) : "";
 }
 
 function toBooleanSafe(value: unknown): boolean {

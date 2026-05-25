@@ -49,15 +49,12 @@ function buildDescription(dealer: PublicDealer): string {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const payload = await fetchPublicDealer(params.slug);
-  if (!payload) {
-    // Comitar metadata mínimo coerente — Next chama generateMetadata e
-    // depois Page, e Page chama notFound() de novo. Metadata aqui não
-    // precisa ser "404" formal.
-    return {
-      title: "Loja não encontrada | Carros na Cidade",
-      robots: { index: false, follow: false },
-    };
-  }
+  // Lojas Públicas 2026-05-25 — comitar 404 ANTES do Page renderizar.
+  // Mesmo padrão do `/veiculo/[slug]/page.tsx`: em Next 14.2 com
+  // `force-dynamic`, chamar `notFound()` somente no Page comita HTTP
+  // 200 com body de not-found (soft-404). Comitar em generateMetadata
+  // garante o status code real 404 — smoke valida isso.
+  if (!payload) notFound();
 
   const { dealer } = payload;
   const title = `${buildTitle(dealer)} | Carros na Cidade`;

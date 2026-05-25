@@ -135,4 +135,23 @@ describe("fetchPublicDealer — Lojas Públicas 2026-05-25", () => {
     const out = await fetchPublicDealer("auto-center-7");
     expect(out?.dealer.verified).toBe(true);
   });
+
+  it("corrige encoding quebrado 'SÆo Paulo' → 'São Paulo' em city/name", async () => {
+    // Caso real detectado pelo smoke pós-deploy 2026-05-25: backend
+    // tinha city gravada com Latin-1 lido como UTF-8 ("SÆo Paulo"),
+    // o que vazava como string proibida no HTML público.
+    mockedFetch.mockResolvedValue({
+      ok: true,
+      json: async () =>
+        dealerPayload({
+          city: "SÆo Paulo",
+          name: "Loja SÆo Paulo Motors",
+        }),
+    } as unknown as Response);
+
+    const out = await fetchPublicDealer("loja-x");
+    expect(out?.dealer.city).toBe("São Paulo");
+    expect(out?.dealer.name).toBe("Loja São Paulo Motors");
+    expect(`${out?.dealer.city} ${out?.dealer.name}`).not.toContain("SÆo");
+  });
 });
