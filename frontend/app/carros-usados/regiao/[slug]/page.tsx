@@ -10,6 +10,7 @@ import {
 } from "@/lib/env/feature-flags";
 import { loadRegionalCatalogData } from "@/lib/buy/region-catalog-loader";
 import type { SearchParams } from "@/lib/buy/territory-variant";
+import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
 import { pickDynamicOgImage } from "@/lib/regions/regional-facets";
 import { buildRegionStructuredDataBlocks } from "@/lib/seo/region-structured-data";
 import { toAbsoluteUrl } from "@/lib/seo/site";
@@ -63,12 +64,21 @@ const getTerritoryContext = cache(async (slug: string) => {
   return resolveTerritory({ level: "region", regionSlug: slug });
 });
 
+// Title/description usam o helper único `publicCatalogPageCopy("region")`
+// (briefing P2-B 2026-05-25). Preserva o sufixo "| Carros na Cidade" do
+// metaTitle canônico mas converge nas frases base. Quando publicCatalogPageCopy
+// não tem o que precisamos (ex.: subtítulo) os defaults aqui são fallback.
 function buildTitle(cityName: string) {
-  return `Carros usados em ${cityName} e região | Carros na Cidade`;
+  const copy = publicCatalogPageCopy("region", { label: cityName });
+  return copy.metaTitle ?? `Carros usados em ${cityName} e região | Carros na Cidade`;
 }
 
 function buildDescription(cityName: string) {
-  return `Veja ofertas de carros usados em ${cityName} e cidades próximas. Compare veículos de lojas e particulares na região.`;
+  const copy = publicCatalogPageCopy("region", { label: cityName });
+  return (
+    copy.metaDescription ??
+    `Veja ofertas de carros usados em ${cityName} e cidades próximas. Compare veículos de lojas e particulares na região.`
+  );
 }
 
 export async function generateMetadata({
@@ -165,7 +175,17 @@ export default async function RegionPage({ params, searchParams = {} }: RegionPa
     notFound();
   }
 
-  const { region, city, stateUf, radiusKm, filters, initialResults, initialFacets } = catalog;
+  const { region, city, stateUf, radiusKm, filters, initialResults: rawResults, initialFacets } =
+    catalog;
+
+  // Defesa em profundidade — briefing P2-B 2026-05-25:
+  // backend já filtra DIRTY + price>0; `normalizePublicAd` é o último
+  // gate antes do card, eliminando: ad sem slug, dirty data residual,
+  // e price 0 (substring de "R$ 0" no card).
+  const initialResults = {
+    ...rawResults,
+    data: (rawResults.data || []).filter((ad) => normalizePublicAd(ad) !== null),
+  };
 
   const ads = initialResults.data;
   const totalAds =

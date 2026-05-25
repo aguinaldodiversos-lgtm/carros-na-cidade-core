@@ -13,6 +13,7 @@ import {
   normalizeUf,
   type SearchParams,
 } from "@/lib/buy/territory-variant";
+import { normalizePublicAd } from "@/lib/public-contracts";
 import {
   buildLocalSeoBreadcrumbJsonLd,
   buildLocalSeoJsonLd,
@@ -115,7 +116,16 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
   ]);
 
-  const { ctx, filters, initialResults, initialFacets } = catalog;
+  const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
+
+  // Defesa em profundidade — briefing P2-B 2026-05-25:
+  // backend já filtra DIRTY + price>0; `normalizePublicAd` é o último
+  // gate antes do card, eliminando: ad sem slug (impossível link),
+  // dirty data residual, e price 0 (substring de "R$ 0" no card).
+  const initialResults = {
+    ...rawResults,
+    data: (rawResults.data || []).filter((ad) => normalizePublicAd(ad) !== null),
+  };
 
   const totalAds = initialResults.pagination.total || 0;
   const noFilters = !hasRestrictiveFilters(filters);

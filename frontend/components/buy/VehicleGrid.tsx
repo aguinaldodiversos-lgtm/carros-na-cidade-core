@@ -7,6 +7,10 @@ import { Card } from "@/components/ui/Card";
 import type { CatalogItem } from "@/components/buy/CatalogVehicleCard";
 import CatalogVehicleCard from "@/components/buy/CatalogVehicleCard";
 import { stateNameFromUf } from "@/lib/buy/territory-variant";
+import {
+  buildEmptyStateCopy,
+  type EmptyStateVariant,
+} from "@/lib/public-contracts";
 
 /**
  * VehicleGrid + Empty State.
@@ -20,6 +24,11 @@ import { stateNameFromUf } from "@/lib/buy/territory-variant";
  *   - cidade  → limpar filtros · ver estado inteiro · trocar cidade · anunciar
  *   - estado  → limpar filtros · catálogo Brasil · anunciar
  *   - nacional→ limpar filtros · escolher estado/cidade · anunciar
+ *
+ * Briefing P2-B 2026-05-25: title/body do empty state vêm do helper
+ * único `buildEmptyStateCopy` em `lib/public-contracts/`. CTAs (Limpar
+ * filtros, Ver outro escopo, Trocar cidade, Anunciar) ficam aqui — são
+ * lógica de roteamento + componente Button visual, não copy de produto.
  *
  * O CatalogVehicleCard é o adapter que renderiza <AdCard variant="grid">.
  */
@@ -42,39 +51,30 @@ type VehicleGridProps = {
   emptyContext?: EmptyStateContext;
 };
 
-function buildEmptyTitle(ctx: EmptyStateContext): string {
-  if (ctx.hasFilters) return "Nenhum anúncio encontrado com esses filtros";
-  if (ctx.variant === "cidade" && ctx.cityName) {
-    return `Ainda não há veículos cadastrados em ${ctx.cityName}`;
-  }
-  if (ctx.variant === "regional" && ctx.cityName) {
-    return `Ainda não há veículos na região de ${ctx.cityName}`;
-  }
-  if (ctx.variant === "estadual" && ctx.stateUf) {
-    return `Ainda não há veículos cadastrados em ${stateNameFromUf(ctx.stateUf)}`;
-  }
-  return "Ainda não há veículos cadastrados";
+function resolveEmptyVariant(ctx: EmptyStateContext): EmptyStateVariant {
+  if (ctx.hasFilters) return "filters-no-results";
+  if (ctx.variant === "cidade") return "city-no-ads";
+  if (ctx.variant === "regional") return "region-no-ads";
+  if (ctx.variant === "estadual") return "state-no-ads";
+  // 'nacional' sem cidade definida cai em filters-no-results (texto neutro).
+  return "filters-no-results";
 }
 
-function buildEmptyDescription(ctx: EmptyStateContext): string {
-  if (ctx.hasFilters) {
-    return "Tente remover algum filtro, ampliar a faixa de preço/ano, ou buscar em outra cidade.";
+function resolveEmptyLabel(ctx: EmptyStateContext): string | null {
+  if ((ctx.variant === "cidade" || ctx.variant === "regional") && ctx.cityName) {
+    return ctx.cityName;
   }
-  if (ctx.variant === "cidade") {
-    return "Nenhum anúncio ativo no momento. Veja o catálogo do estado, troque de cidade ou seja o primeiro a anunciar aqui.";
+  if (ctx.variant === "estadual" && ctx.stateUf) {
+    return stateNameFromUf(ctx.stateUf);
   }
-  if (ctx.variant === "regional") {
-    return "Nenhum anúncio ativo nesta região no momento. Veja o catálogo do estado ou anuncie agora.";
-  }
-  if (ctx.variant === "estadual") {
-    return "Nenhum anúncio ativo no momento neste estado. Veja o catálogo Brasil ou anuncie agora.";
-  }
-  return "Nenhum anúncio ativo no momento. Tente novamente em instantes ou seja o primeiro a anunciar.";
+  return null;
 }
 
 function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
-  const title = buildEmptyTitle(ctx);
-  const description = buildEmptyDescription(ctx);
+  // Copy unificada via lib/public-contracts (briefing P2-B 2026-05-25).
+  const { title, body: description } = buildEmptyStateCopy(resolveEmptyVariant(ctx), {
+    label: resolveEmptyLabel(ctx),
+  });
 
   // Ação primária: limpar filtros (cidade/regional/estado mantém pathname
   // para preservar canonical; nacional sempre vai para /comprar limpo).
