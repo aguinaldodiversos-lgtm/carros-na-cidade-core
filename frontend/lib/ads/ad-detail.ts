@@ -41,6 +41,12 @@ export interface PublicAdDetail {
   /** id do registro em advertisers (loja registrada). */
   dealership_id?: number | string | null;
   /**
+   * Slug canônico do `advertisers.slug` (gerado em `ensureAdvertiserForUser`).
+   * Quando presente + `seller_kind === "dealer"`, frontend pode linkar o
+   * card da loja para `/lojas/[advertiser_slug]`. Ausência → não linkar.
+   */
+  advertiser_slug?: string | null;
+  /**
    * Backend marca true quando o anúncio entrou em pending_review por
    * sinal de preço abaixo da FIPE e foi aprovado pela moderação.
    * Renderizar como selo "Anúncio analisado" — nunca como garantia.
@@ -183,6 +189,9 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
       item.dealership_id != null && item.dealership_id !== ""
         ? toNumberOrString(item.dealership_id)
         : null,
+    advertiser_slug: toNullableText(
+      item.advertiser_slug ?? item.advertiserSlug ?? item.dealership_slug
+    ),
     reviewed_after_below_fipe: item.reviewed_after_below_fipe === true,
     dealership_name: toNullableText(
       item.dealership_name ?? item.dealershipName ?? item.store_name ?? item.dealer_name

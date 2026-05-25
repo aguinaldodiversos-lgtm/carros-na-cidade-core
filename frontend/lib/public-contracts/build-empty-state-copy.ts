@@ -21,7 +21,8 @@ export type EmptyStateVariant =
   | "state-no-ads"
   | "search-no-results"
   | "filters-no-results"
-  | "detail-not-found";
+  | "detail-not-found"
+  | "dealer-no-ads";
 
 export interface EmptyStateContext {
   /** Nome humano do território/contexto (ex.: "Atibaia", "São Paulo"). */
@@ -85,6 +86,13 @@ export function buildEmptyStateCopy(
       return {
         title: "Veículo não encontrado",
         body: "Este anúncio pode ter sido removido pelo anunciante, expirado, ou está temporariamente indisponível.",
+        cta: { href: "/comprar", label: "Ver carros disponíveis" },
+      };
+
+    case "dealer-no-ads":
+      return {
+        title: label ? `${label} ainda não tem anúncios ativos` : "Sem anúncios ativos no momento",
+        body: "Esta loja não está com veículos publicados no momento. Volte em breve ou explore outras lojas.",
         cta: { href: "/comprar", label: "Ver carros disponíveis" },
       };
 

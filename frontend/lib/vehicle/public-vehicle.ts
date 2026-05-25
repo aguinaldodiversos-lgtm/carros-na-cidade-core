@@ -392,6 +392,17 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
   if (isDealer) {
     const cityDisplay = deriveCityDisplay(ad.city, ad.state);
 
+    // P3-C/Lojas 2026-05-25 — `advertiser_slug` é o slug canônico em
+    // `advertisers.slug` (vindo do backend). Quando presente, o card da
+    // loja no detalhe linka para `/lojas/[storeSlug]`. Fallback antigo
+    // (`slugify(name)`) NUNCA bate com `/api/public/dealers/:slug`
+    // porque a coluna inclui o userId — então usamos string vazia
+    // como sinal "sem slug confiável → não linkar" (ver
+    // VehicleDetailMobileShell::SellerCard).
+    const canonicalStoreSlug = sanitizeText(
+      (ad as PublicAdDetail & { advertiser_slug?: string | null }).advertiser_slug
+    );
+
     return {
       type: "dealer",
       name: sellerName,
@@ -399,7 +410,7 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
       address: cityDisplay,
       rating: 4.8,
       phone: sellerPhone,
-      storeSlug: slugify(sellerName || "lojista"),
+      storeSlug: canonicalStoreSlug,
     };
   }
 

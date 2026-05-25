@@ -75,6 +75,47 @@ describe("fetchAdDetail — regressão 2026-05-24", () => {
     expect(result?.state).toBe("SP");
   });
 
+  it("propaga advertiser_slug quando backend emite (Lojas Públicas 2026-05-25)", async () => {
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          id: 42,
+          slug: "honda-civic-2020",
+          title: "Honda Civic",
+          price: 89900,
+          brand: "Honda",
+          model: "Civic",
+          advertiser_id: 7,
+          advertiser_slug: "auto-center-7",
+          seller_kind: "dealer",
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchAdDetail("honda-civic-2020");
+    expect(result?.advertiser_slug).toBe("auto-center-7");
+    expect(result?.seller_kind).toBe("dealer");
+  });
+
+  it("advertiser_slug aceita aliases legados (advertiserSlug / dealership_slug)", async () => {
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          id: 42,
+          slug: "honda-civic-2020",
+          title: "Honda Civic",
+          price: 89900,
+          advertiserSlug: "loja-x-99",
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchAdDetail("honda-civic-2020");
+    expect(result?.advertiser_slug).toBe("loja-x-99");
+  });
+
   it("NÃO defaulta city/state para 'São Paulo'/'SP' quando backend omite (briefing P0 2026-05-24)", async () => {
     mockedFetch.mockResolvedValueOnce({
       ok: true,

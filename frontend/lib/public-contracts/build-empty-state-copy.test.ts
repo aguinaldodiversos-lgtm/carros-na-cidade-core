@@ -11,6 +11,7 @@ describe("buildEmptyStateCopy — briefing P2 2026-05-25", () => {
     "search-no-results",
     "filters-no-results",
     "detail-not-found",
+    "dealer-no-ads",
   ] as const)("variant '%s' devolve title e body não-vazios", (variant) => {
     const copy = buildEmptyStateCopy(variant, { label: "Atibaia" });
     expect(copy.title.length).toBeGreaterThan(0);
@@ -41,6 +42,7 @@ describe("buildEmptyStateCopy — briefing P2 2026-05-25", () => {
       "search-no-results",
       "filters-no-results",
       "detail-not-found",
+      "dealer-no-ads",
     ] as const;
 
     const forbidden = [

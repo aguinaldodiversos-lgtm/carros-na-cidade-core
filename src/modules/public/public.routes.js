@@ -15,6 +15,7 @@ import {
 } from "./public-city-query.controller.js";
 import { getFeaturedRegionsByState } from "./public-state.controller.js";
 import { getPublicRegionByCitySlug } from "./public-region.controller.js";
+import { getPublicDealerBySlug } from "./public-dealer.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 
@@ -103,6 +104,19 @@ router.get(
   "/cities/:slug/below-fipe",
   cacheGet({ prefix: "public:city:below-fipe", ttlSeconds: 60, varyBy: ["params", "query"] }),
   getCityBelowFipeClusterPage
+);
+
+/**
+ * Página pública da loja (briefing 2026-05-25):
+ *   GET /api/public/dealers/:slug → dealer + anúncios ativos sanitizados.
+ *
+ * Cache curto (60s) porque inventário de loja muda durante o dia. `varyBy:
+ * ["params"]` é suficiente — sem querystring nesta versão.
+ */
+router.get(
+  "/dealers/:slug",
+  cacheGet({ prefix: "public:dealer", ttlSeconds: 60, varyBy: ["params"] }),
+  getPublicDealerBySlug
 );
 
 export default router;

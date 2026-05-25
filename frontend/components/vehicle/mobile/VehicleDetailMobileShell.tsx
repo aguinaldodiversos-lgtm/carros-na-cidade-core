@@ -368,7 +368,11 @@ function SellerCard({ vehicle }: { vehicle: VehicleDetail }) {
   const cityLabel = vehicle.city || "Brasil";
   const partnerSince = isDealer ? "No Carros na Cidade" : "Anunciante particular";
 
-  const href = isDealer && seller.storeSlug ? `/loja/${seller.storeSlug}` : null;
+  // P3-C/Lojas 2026-05-25 — rota canônica `/lojas/[slug]` (PLURAL).
+  // Só linka quando há slug canônico do `advertisers.slug` (não o slug
+  // antigo derivado do nome do vendedor — esse não bate com o endpoint
+  // /api/public/dealers/:slug).
+  const href = isDealer && seller.storeSlug ? `/lojas/${seller.storeSlug}` : null;
 
   const Wrapper: React.ElementType = href ? Link : "div";
   const wrapperProps = href ? { href } : {};

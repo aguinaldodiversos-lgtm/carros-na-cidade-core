@@ -163,6 +163,9 @@ const ROUTES = [
     forbidCityInTitle: "São Paulo",
   },
   { path: "/anunciar", expected: [200] },
+  // P3-C/Lojas 2026-05-25 — loja inexistente deve 404 real (mesma
+  // garantia que /veiculo/<inexistente>). Slug obviamente fake.
+  { path: "/lojas/loja-inexistente-smoke-zz", expected: [404], skipStringChecks: true },
 ];
 
 /**
@@ -287,6 +290,26 @@ function extractAdsCount(html) {
 function extractVehicleHrefs(html, limit = 5) {
   if (typeof html !== "string" || !html) return [];
   const matches = html.matchAll(/\/veiculo\/[a-z0-9][a-z0-9-]+/g);
+  const unique = new Set();
+  for (const m of matches) {
+    unique.add(m[0]);
+    if (unique.size >= limit) break;
+  }
+  return [...unique];
+}
+
+/**
+ * Extrai hrefs `/lojas/[slug]` (PLURAL — rota nova 2026-05-25). Usado
+ * para descobrir lojas reais a partir do card do dealer no detalhe do
+ * veículo. Smoke valida que cada loja responde 200 + tem ao menos um
+ * card de anúncio válido.
+ */
+function extractDealerHrefs(html, limit = 3) {
+  if (typeof html !== "string" || !html) return [];
+  // Regex aceita slug com letras minúsculas, dígitos e hifens.
+  // `/lojas/` (plural) — não confundir com `/loja/[slug]` legado que
+  // ainda pode existir em HTML cacheado durante a transição.
+  const matches = html.matchAll(/\/lojas\/[a-z0-9][a-z0-9-]+/g);
   const unique = new Set();
   for (const m of matches) {
     unique.add(m[0]);
@@ -550,6 +573,9 @@ async function main() {
     detail: `found=${vehicleHrefs.length}`,
   });
 
+  // Guarda HTMLs dos detalhes para extrair hrefs `/lojas/*` na seção 3.
+  const vehicleDetailHtmls = [];
+
   for (const href of vehicleHrefs) {
     const fetched = await fetchRoute(base, href);
     const ok200 = fetched.status === 200;
@@ -565,6 +591,8 @@ async function main() {
       }),
     });
     if (!ok200) continue;
+
+    vehicleDetailHtmls.push(fetched.html);
 
     // x-middleware-ad: passed-valid OBRIGATÓRIO em anúncio real (P3-A 2026-05-25):
     // anúncio extraído de catálogo é um anúncio que o backend considera
@@ -637,7 +665,107 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // 3. Relatório
+  // 3. Extrai hrefs /lojas/* dos detalhes (card de loja parceira) e valida
+  //    cada loja real: 200, sem strings proibidas, com ao menos 1 href de
+  //    veículo (anúncio listado ou empty state honesto). Briefing Lojas
+  //    Públicas 2026-05-25.
+  // -------------------------------------------------------------------------
+
+  const seenDealerHrefs = new Set();
+  for (const html of vehicleDetailHtmls) {
+    for (const href of extractDealerHrefs(html, 3)) {
+      seenDealerHrefs.add(href);
+    }
+  }
+
+  const dealerHrefs = [...seenDealerHrefs].slice(0, 4);
+
+  if (dealerHrefs.length > 0) {
+    for (const href of dealerHrefs) {
+      const fetched = await fetchRoute(base, href);
+      const ok200 = fetched.status === 200;
+      checks.push({
+        id: `dealer-status:${href}`,
+        label: `${href} — HTTP 200 (loja real)`,
+        pass: ok200,
+        severity: "critical",
+        detail: buildDetail({
+          reason: ok200 ? "status-ok" : "status-mismatch",
+          status: fetched.status,
+          extra: fetched.error ? `err=${fetched.error}` : null,
+        }),
+      });
+      if (!ok200) continue;
+
+      const fakeHits = findFallbackFake(fetched.html);
+      checks.push({
+        id: `dealer-fallback:${href}`,
+        label: `${href} — sem fallback fake`,
+        pass: fakeHits.length === 0,
+        severity: "critical",
+        detail: fakeHits.length
+          ? buildDetail({
+              reason: "fallback-fake",
+              hits: fakeHits,
+              snippet: fakeHits[0].snippet,
+            })
+          : "ok",
+      });
+
+      const forbiddenHits = findForbidden(fetched.html);
+      checks.push({
+        id: `dealer-strings:${href}`,
+        label: `${href} — sem strings proibidas`,
+        pass: forbiddenHits.length === 0,
+        severity: "critical",
+        detail: forbiddenHits.length
+          ? buildDetail({
+              reason: "forbidden-string",
+              hits: forbiddenHits,
+              snippet: forbiddenHits[0].snippet,
+            })
+          : "ok",
+      });
+
+      // Briefing Lojas Públicas 2026-05-25: cada anúncio listado na loja
+      // deve apontar para /veiculo/<slug> válido (≥1 quando há estoque).
+      // Empty state honesto (sem anúncios) também é ok — detecta pela
+      // copy do buildEmptyStateCopy("dealer-no-ads").
+      const adHrefs = extractVehicleHrefs(fetched.html, 2);
+      const hasEmpty = /Sem an[uú]ncios ativos|ainda n[ãa]o tem an[uú]ncios ativos/i.test(
+        fetched.html
+      );
+      checks.push({
+        id: `dealer-ads-shape:${href}`,
+        label: `${href} — tem ≥1 href /veiculo/* OU empty state honesto`,
+        pass: adHrefs.length > 0 || hasEmpty,
+        severity: "critical",
+        detail:
+          adHrefs.length > 0
+            ? `vehicleHrefs=${adHrefs.length}`
+            : hasEmpty
+              ? "empty-state-ok"
+              : buildDetail({
+                  reason: "dealer-without-ads-and-without-empty-state",
+                  snippet: "(no /veiculo/* links and no recognized empty-state copy)",
+                }),
+      });
+    }
+  } else {
+    // Não bloqueia: prod pode estar sem dealer real no momento; sinaliza
+    // como warn-only (severity warn) — falha "soft" sem subir exit code.
+    // Documenta no log que não houve dealer real para validar.
+    checks.push({
+      id: "dealer-hrefs:none-extracted",
+      label: "nenhum href /lojas/* extraído dos detalhes (warn)",
+      pass: true, // pass=true para não falhar o job; o detalhe documenta
+      severity: "warn",
+      detail: "warn: no dealer found in vehicle detail pages (sample size limit)",
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // 4. Relatório
   // -------------------------------------------------------------------------
 
   const passed = checks.filter((c) => c.pass);
