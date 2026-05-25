@@ -71,7 +71,22 @@ export default function VehicleDetailMobileShell({
 
   const sellerKind: "dealer" | "private" = vehicle.seller.type === "dealer" ? "dealer" : "private";
 
-  const cityName = vehicle.city.split(" (")[0] || vehicle.city || "sua cidade";
+  // Briefing P2-C 2026-05-25 — quando cidade real é desconhecida
+  // (vehicle.city === "Localização não informada" por
+  // `deriveCityDisplay`), usar título NEUTRO em vez de "Mais carros
+  // em Localização não informada" / "Mais carros em sua cidade"
+  // (defaults antigos fake).
+  //
+  // Outras shapes esperadas:
+  //   - "Atibaia (SP)" → "Atibaia"
+  //   - "Bragança Paulista (SP)" → "Bragança Paulista"
+  //   - "Localização não informada" → ""  (vira fallback neutro abaixo)
+  const cityRaw = vehicle.city === "Localização não informada" ? "" : vehicle.city;
+  const cityName = cityRaw.split(" (")[0]?.trim() || "";
+  const moreCarsTitle = cityName ? `Mais carros em ${cityName}` : "Mais ofertas disponíveis";
+  const moreCarsHref = vehicle.citySlug
+    ? `/comprar?city_slug=${encodeURIComponent(vehicle.citySlug)}`
+    : "/comprar";
 
   return (
     <>
@@ -265,15 +280,13 @@ export default function VehicleDetailMobileShell({
           </button>
         </section>
 
-        {/* ---- Mais carros em [Cidade] ---- */}
+        {/* ---- Mais carros em [Cidade] / Mais ofertas disponíveis ---- */}
         {cityVehicles.length > 0 ? (
-          <section aria-label={`Mais carros em ${cityName}`} className="pt-7">
+          <section aria-label={moreCarsTitle} className="pt-7">
             <div className="flex items-center justify-between gap-3 px-4">
-              <h3 className="text-[15px] font-extrabold text-slate-900">
-                Mais carros em {cityName}
-              </h3>
+              <h3 className="text-[15px] font-extrabold text-slate-900">{moreCarsTitle}</h3>
               <Link
-                href={`/comprar?city_slug=${encodeURIComponent(vehicle.citySlug)}`}
+                href={moreCarsHref}
                 className="shrink-0 text-[12.5px] font-bold text-[#0e62d8] hover:underline"
               >
                 Ver todos

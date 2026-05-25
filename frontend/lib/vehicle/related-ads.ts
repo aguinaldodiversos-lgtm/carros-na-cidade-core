@@ -1,8 +1,29 @@
 import type { BaseAdData } from "@/components/ads/AdCard";
 import type { ListingCar } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
+import { buildPublicVehicleHref, normalizePublicAd } from "@/lib/public-contracts";
 import { fetchAdsSearch, type AdItem } from "@/lib/search/ads-search";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
+
+/**
+ * Predicate: ad relacionado é renderizável? (briefing P2-C 2026-05-25)
+ *
+ * Critérios (defesa em profundidade — backend já filtra DIRTY/price≤0):
+ *   - `normalizePublicAd(ad) !== null` (price > 0, sem dirty data,
+ *     slug OU id válido)
+ *   - `buildPublicVehicleHref(ad) !== null` (href válido para /veiculo)
+ *
+ * Sem isso, um ad com slug vazio + id ausente vazaria como card com
+ * href quebrado ("/veiculo/undefined"). Sem isso, um ad com price 0
+ * vazaria como "R$ 0" se o componente downstream não filtrar.
+ *
+ * Exportado para testabilidade direta (sem mockar fetchAdsSearch).
+ */
+export function keepRenderableRelated(ad: AdItem): boolean {
+  if (normalizePublicAd(ad) === null) return false;
+  if (buildPublicVehicleHref(ad) === null) return false;
+  return true;
+}
 
 function toCurrentAdId(ad: PublicAdDetail): number | null {
   const raw = ad.id;
@@ -122,6 +143,9 @@ function filterOtherAds(items: AdItem[], currentId: number | null, limit: number
 
   for (const item of items) {
     if (currentId !== null && item.id === currentId) continue;
+    // Briefing P2-C 2026-05-25 — defesa em profundidade:
+    // dropa relacionados sem href válido / sem preço real / dirty.
+    if (!keepRenderableRelated(item)) continue;
     out.push(mapAdItemToBaseAdData(item));
     if (out.length >= limit) break;
   }
