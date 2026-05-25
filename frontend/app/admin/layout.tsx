@@ -1,29 +1,18 @@
-"use client";
-
+import type { Metadata } from "next";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
-import { useAdminGuard } from "@/lib/admin/useAdmin";
+import { requireAdminSession } from "@/lib/admin/server-admin-session";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { status } = useAdminGuard();
+export const metadata: Metadata = {
+  title: "Painel administrativo",
+  description: "Painel administrativo — Carros na Cidade.",
+  robots: { index: false, follow: false },
+};
 
-  if (status === "loading") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-cnc-bg">
-        <div className="flex items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <span className="text-sm text-cnc-muted">Verificando acesso…</span>
-        </div>
-      </div>
-    );
-  }
+// Garante avaliação server-side a cada request — sem cache estático do shell.
+export const dynamic = "force-dynamic";
 
-  if (status === "forbidden") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-cnc-bg">
-        <p className="text-sm text-cnc-muted">Redirecionando…</p>
-      </div>
-    );
-  }
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await requireAdminSession();
 
   return (
     <div className="min-h-screen bg-cnc-bg">

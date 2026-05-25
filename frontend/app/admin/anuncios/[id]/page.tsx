@@ -31,11 +31,37 @@ function fmtDate(d: string | undefined | null) {
   }
 }
 
+type StatusTarget = "active" | "paused" | "blocked";
+
 type DialogState =
   | { type: "none" }
-  | { type: "status"; target: string }
+  | { type: "status"; target: StatusTarget }
   | { type: "highlight" }
+  | { type: "clearHighlight" }
   | { type: "priority" };
+
+const SENSITIVE_STATUS: ReadonlyArray<StatusTarget> = ["blocked", "paused"];
+
+const STATUS_DIALOG_CONFIG: Record<
+  StatusTarget,
+  { title: string; confirmLabel: string; confirmColor: "primary" | "danger" | "warning" }
+> = {
+  active: {
+    title: "Ativar anúncio?",
+    confirmLabel: "Ativar",
+    confirmColor: "primary",
+  },
+  paused: {
+    title: "Pausar anúncio?",
+    confirmLabel: "Pausar",
+    confirmColor: "warning",
+  },
+  blocked: {
+    title: "Bloquear anúncio?",
+    confirmLabel: "Bloquear",
+    confirmColor: "danger",
+  },
+};
 
 export default function AdminAnuncioDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +80,7 @@ export default function AdminAnuncioDetalhe() {
   const [dialog, setDialog] = useState<DialogState>({ type: "none" });
   const [highlightDays, setHighlightDays] = useState(7);
   const [priorityVal, setPriorityVal] = useState(0);
+  const [flash, setFlash] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   if (ad.loading) return <AdminLoadingState message="Carregando anúncio…" />;
   if (ad.error) return <AdminErrorState message={ad.error} onRetry={ad.reload} />;
@@ -64,23 +91,50 @@ export default function AdminAnuncioDetalhe() {
   const m = metrics.data?.data;
   const evts = events.data?.data ?? [];
 
-  async function handleStatusChange(reason: string) {
-    if (dialog.type !== "status") return;
-    await adminApi.ads.changeStatus(d!.id, dialog.target, reason || undefined);
-    setDialog({ type: "none" });
-    ad.reload();
+  const hasActiveHighlight =
+    d.highlight_until != null && new Date(d.highlight_until).getTime() > Date.now();
+
+  function showFlash(kind: "success" | "error", text: string) {
+    setFlash({ kind, text });
+    window.setTimeout(() => setFlash((current) => (current?.text === text ? null : current)), 4000);
   }
 
-  async function handleHighlight() {
-    await adminApi.ads.setHighlight(d!.id, highlightDays);
-    setDialog({ type: "none" });
-    ad.reload();
+  async function refreshAll() {
+    await Promise.all([ad.reload(), metrics.reload(), events.reload()]);
   }
 
-  async function handlePriority() {
-    await adminApi.ads.setPriority(d!.id, priorityVal);
+  async function handleStatusChange(target: StatusTarget, reason: string) {
+    await adminApi.ads.changeStatus(d!.id, target, reason || undefined);
     setDialog({ type: "none" });
-    ad.reload();
+    await refreshAll();
+    showFlash("success", `Status atualizado para "${target}".`);
+  }
+
+  async function handleSetHighlight(reason: string) {
+    if (!Number.isFinite(highlightDays) || highlightDays < 1 || highlightDays > 365) {
+      throw new Error("Informe um período entre 1 e 365 dias.");
+    }
+    await adminApi.ads.setHighlight(d!.id, highlightDays, reason || undefined);
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash("success", `Destaque concedido por ${highlightDays} dia(s).`);
+  }
+
+  async function handleClearHighlight(reason: string) {
+    await adminApi.ads.clearHighlight(d!.id, reason || undefined);
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash("success", "Destaque removido.");
+  }
+
+  async function handleSetPriority(reason: string) {
+    if (!Number.isFinite(priorityVal) || priorityVal < 0 || priorityVal > 100) {
+      throw new Error("Prioridade deve estar entre 0 e 100.");
+    }
+    await adminApi.ads.setPriority(d!.id, priorityVal, reason || undefined);
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash("success", `Prioridade ajustada para ${priorityVal}.`);
   }
 
   return (
@@ -88,6 +142,7 @@ export default function AdminAnuncioDetalhe() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={() => router.push("/admin/anuncios")}
           className="rounded-lg border border-cnc-line px-3 py-1.5 text-xs font-medium text-cnc-muted hover:bg-cnc-bg transition-colors"
         >
@@ -101,6 +156,20 @@ export default function AdminAnuncioDetalhe() {
         </div>
         <AdminStatusBadge status={d.status} />
       </div>
+
+      {flash && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+            flash.kind === "success"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+              : "border-cnc-danger/40 bg-cnc-danger/10 text-cnc-danger"
+          }`}
+        >
+          {flash.text}
+        </div>
+      )}
 
       {/* Info + Actions Grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -189,11 +258,17 @@ export default function AdminAnuncioDetalhe() {
                 label="Destacar"
                 color="bg-purple-600 text-white"
                 onClick={() => {
-                  setPriorityVal(d.priority);
                   setHighlightDays(7);
                   setDialog({ type: "highlight" });
                 }}
               />
+              {hasActiveHighlight && (
+                <ActionBtn
+                  label="Remover destaque"
+                  color="bg-cnc-muted text-white"
+                  onClick={() => setDialog({ type: "clearHighlight" })}
+                />
+              )}
               <ActionBtn
                 label="Prioridade"
                 color="bg-indigo-600 text-white"
@@ -242,91 +317,96 @@ export default function AdminAnuncioDetalhe() {
       </div>
 
       {/* Dialogs */}
-      <AdminActionDialog
-        open={dialog.type === "status"}
-        title={`Alterar status para "${dialog.type === "status" ? dialog.target : ""}"?`}
-        description={`Anúncio #${d.id} — ${d.title}`}
-        confirmLabel="Confirmar"
-        confirmColor={
-          dialog.type === "status" && dialog.target === "blocked" ? "danger" : "primary"
-        }
-        showReason
-        onConfirm={handleStatusChange}
-        onCancel={() => setDialog({ type: "none" })}
-      />
+      {dialog.type === "status" &&
+        (() => {
+          const cfg = STATUS_DIALOG_CONFIG[dialog.target];
+          const sensitive = SENSITIVE_STATUS.includes(dialog.target);
+          const target = dialog.target;
+          return (
+            <AdminActionDialog
+              open
+              title={cfg.title}
+              description={`Anúncio #${d.id} — ${d.title}`}
+              confirmLabel={cfg.confirmLabel}
+              confirmColor={cfg.confirmColor}
+              showReason
+              requireReason={sensitive}
+              reasonPlaceholder={
+                sensitive ? "Motivo (será registrado na auditoria)" : "Motivo (opcional)"
+              }
+              onConfirm={(reason) => handleStatusChange(target, reason)}
+              onCancel={() => setDialog({ type: "none" })}
+            />
+          );
+        })()}
 
       {dialog.type === "highlight" && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={() => setDialog({ type: "none" })}
-        >
-          <div
-            className="w-full max-w-sm rounded-xl border border-cnc-line bg-white p-6 shadow-premium"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-bold text-cnc-text">Destacar anúncio</h3>
-            <p className="mt-1 text-sm text-cnc-muted">Dias de destaque:</p>
-            <input
-              type="number"
-              min={1}
-              max={365}
-              value={highlightDays}
-              onChange={(e) => setHighlightDays(Number(e.target.value))}
-              className="mt-2 w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-            />
-            <div className="mt-4 flex justify-end gap-3">
-              <button
-                onClick={() => setDialog({ type: "none" })}
-                className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleHighlight}
-                className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 transition-colors"
-              >
-                Destacar
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminActionDialog
+          open
+          title="Destacar anúncio?"
+          description={`Anúncio #${d.id} ficará em destaque pelo período abaixo.`}
+          confirmLabel="Destacar"
+          confirmColor="warning"
+          showReason
+          reasonPlaceholder="Motivo (opcional — ex.: cortesia, ajuste comercial)"
+          extra={
+            <label className="block text-xs font-medium text-cnc-muted">
+              <span className="mb-1 block">Dias de destaque (1–365)</span>
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={highlightDays}
+                onChange={(e) => setHighlightDays(Number(e.target.value))}
+                className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+              />
+            </label>
+          }
+          onConfirm={handleSetHighlight}
+          onCancel={() => setDialog({ type: "none" })}
+        />
+      )}
+
+      {dialog.type === "clearHighlight" && (
+        <AdminActionDialog
+          open
+          title="Remover destaque?"
+          description={`Anúncio #${d.id} perderá o destaque imediatamente.`}
+          confirmLabel="Remover destaque"
+          confirmColor="warning"
+          showReason
+          requireReason
+          reasonPlaceholder="Motivo (será registrado na auditoria)"
+          onConfirm={handleClearHighlight}
+          onCancel={() => setDialog({ type: "none" })}
+        />
       )}
 
       {dialog.type === "priority" && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={() => setDialog({ type: "none" })}
-        >
-          <div
-            className="w-full max-w-sm rounded-xl border border-cnc-line bg-white p-6 shadow-premium"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-bold text-cnc-text">Ajustar prioridade</h3>
-            <p className="mt-1 text-sm text-cnc-muted">Prioridade (0 = normal):</p>
-            <input
-              type="number"
-              min={0}
-              max={1000}
-              value={priorityVal}
-              onChange={(e) => setPriorityVal(Number(e.target.value))}
-              className="mt-2 w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-            />
-            <div className="mt-4 flex justify-end gap-3">
-              <button
-                onClick={() => setDialog({ type: "none" })}
-                className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handlePriority}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminActionDialog
+          open
+          title="Ajustar prioridade?"
+          description={`Anúncio #${d.id} — prioridade atual: ${d.priority}.`}
+          confirmLabel="Salvar"
+          confirmColor="primary"
+          showReason
+          reasonPlaceholder="Motivo (opcional)"
+          extra={
+            <label className="block text-xs font-medium text-cnc-muted">
+              <span className="mb-1 block">Prioridade (0–100)</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={priorityVal}
+                onChange={(e) => setPriorityVal(Number(e.target.value))}
+                className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+              />
+            </label>
+          }
+          onConfirm={handleSetPriority}
+          onCancel={() => setDialog({ type: "none" })}
+        />
       )}
     </div>
   );
@@ -365,6 +445,7 @@ function ActionBtn({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${color}`}
     >

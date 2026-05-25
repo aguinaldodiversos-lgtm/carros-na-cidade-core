@@ -46,24 +46,26 @@ export async function changeAdStatus(adminUserId, adId, newStatus, reason = null
   return updated;
 }
 
-export async function setAdHighlight(adminUserId, adId, highlightUntil) {
+export async function setAdHighlight(adminUserId, adId, highlightUntil, reason = null) {
   const ad = await repo.findById(adId);
   if (!ad) throw new AppError("Anúncio não encontrado", 404);
 
-  if (ad.status !== AD_STATUS.ACTIVE) {
+  const clearing = highlightUntil == null;
+  if (!clearing && ad.status !== AD_STATUS.ACTIVE) {
     throw new AppError("Apenas anúncios ativos podem ser destacados", 400);
   }
 
   const oldHighlight = ad.highlight_until;
-  const updated = await repo.updateHighlight(adId, highlightUntil);
+  const updated = await repo.updateHighlight(adId, clearing ? null : highlightUntil);
 
   await recordAdminAction({
     adminUserId,
-    action: "set_ad_highlight",
+    action: clearing ? "clear_ad_highlight" : "set_ad_highlight",
     targetType: "ad",
     targetId: adId,
     oldValue: { highlight_until: oldHighlight },
-    newValue: { highlight_until: highlightUntil },
+    newValue: { highlight_until: clearing ? null : highlightUntil },
+    reason,
   });
 
   return updated;

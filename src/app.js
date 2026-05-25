@@ -62,6 +62,7 @@ import {
   publicCitiesRateLimit,
   searchRateLimit,
   uploadsRateLimit,
+  adminApiRateLimit,
 } from "./shared/middlewares/rateLimit.middleware.js";
 import { bandwidthDiagnosticsMiddleware } from "./shared/middlewares/bandwidth-diagnostics.middleware.js";
 import {
@@ -285,7 +286,10 @@ app.use("/api/search", searchRateLimit);
 
 app.use("/api/dealer-acquisition", dealerAcquisitionInboundRoutes);
 app.use("/api/vehicle-images", vehicleImagesRateLimit, vehicleImagesRoutes);
-app.use("/api/admin", adminRoutes);
+
+// Rate limit dedicado ANTES do mount admin (sem remover o global). 300/15min
+// por IP real — ver shared/middlewares/rateLimit.middleware.js#adminApiRateLimit.
+app.use("/api/admin", adminApiRateLimit, adminRoutes);
 
 // Endpoint privado (X-Internal-Token). Não documentado em /api/public, não
 // aparece em sitemap, base da futura Página Regional. Sem token = 404.

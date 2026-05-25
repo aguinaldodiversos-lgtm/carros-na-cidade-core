@@ -155,3 +155,35 @@ export const adsSearchRateLimit = buildPerMinuteLimit("ads-search", 20);
 export const publicCitiesRateLimit = buildPerMinuteLimit("public-cities", 30);
 export const searchRateLimit = buildPerMinuteLimit("search", 20);
 export const uploadsRateLimit = buildPerMinuteLimit("uploads", 5);
+
+/**
+ * Rate limit dedicado a /api/admin/**.
+ *
+ * Janela de 15 minutos com 300 requisições por IP real (X-Cnc-Client-Ip via
+ * `clientRateLimitKey`). O painel admin é interativo: lista + detalhe + ações
+ * pontuais. 300/15min = ~20 req/min sustentado por usuário — folgado para uso
+ * normal, restritivo o suficiente para conter scraping ou abuso.
+ *
+ * Diferente dos limits públicos, NÃO pulamos chamadas internas: o frontend BFF
+ * forwarda `X-Cnc-Client-Ip` do navegador admin, então cada usuário admin tem
+ * seu próprio bucket independente. Se o token interno vazar, o atacante ainda
+ * fica preso ao limite por IP.
+ *
+ * Override via env `RATE_LIMIT_ADMIN_MAX` (default 300).
+ */
+export const adminApiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_ADMIN_MAX || 300),
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `admin:${clientRateLimitKey(req)}`,
+  handler(req, res) {
+    res.set("Cache-Control", "no-store");
+    res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    return res.status(429).json({
+      ok: false,
+      error: "rate_limited",
+      message: "Muitas requisições ao painel admin. Aguarde alguns minutos.",
+    });
+  },
+});

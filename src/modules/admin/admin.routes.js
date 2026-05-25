@@ -89,23 +89,45 @@ router.patch(
 router.patch(
   "/ads/:id/highlight",
   asyncHandler(async (req, res) => {
-    const { highlight_until, days } = req.body || {};
+    const body = req.body || {};
+    const { days, reason } = body;
+    const hasHighlightField = Object.prototype.hasOwnProperty.call(body, "highlight_until");
+    const highlightUntil = body.highlight_until;
 
-    if (days) {
+    if (days != null && days !== "") {
       const result = await adsService.grantManualBoost(
         req.user.id,
         req.params.id,
         days,
-        req.body.reason
+        reason
       );
       return res.json({ ok: true, data: result });
     }
 
-    if (!highlight_until) {
-      throw new AppError("Informe highlight_until ou days", 400);
+    // highlight_until: null (ou string vazia) => remove o destaque explicitamente.
+    if (hasHighlightField && (highlightUntil === null || highlightUntil === "")) {
+      const updated = await adsService.setAdHighlight(
+        req.user.id,
+        req.params.id,
+        null,
+        reason
+      );
+      return res.json({ ok: true, data: updated });
     }
 
-    const updated = await adsService.setAdHighlight(req.user.id, req.params.id, highlight_until);
+    if (!highlightUntil) {
+      throw new AppError(
+        "Informe highlight_until, days, ou highlight_until: null para remover",
+        400
+      );
+    }
+
+    const updated = await adsService.setAdHighlight(
+      req.user.id,
+      req.params.id,
+      highlightUntil,
+      reason
+    );
     res.json({ ok: true, data: updated });
   })
 );

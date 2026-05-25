@@ -46,8 +46,16 @@ export const adminApi = {
       adminFetch<ApiOne<AdRow>>(`ads/${id}/status`, { method: "PATCH", body: { status, reason } }),
     setHighlight: (id: string | number, days: number, reason?: string) =>
       adminFetch<ApiOne<AdRow>>(`ads/${id}/highlight`, { method: "PATCH", body: { days, reason } }),
-    setPriority: (id: string | number, priority: number) =>
-      adminFetch<ApiOne<AdRow>>(`ads/${id}/priority`, { method: "PATCH", body: { priority } }),
+    clearHighlight: (id: string | number, reason?: string) =>
+      adminFetch<ApiOne<AdRow>>(`ads/${id}/highlight`, {
+        method: "PATCH",
+        body: { highlight_until: null, reason },
+      }),
+    setPriority: (id: string | number, priority: number, reason?: string) =>
+      adminFetch<ApiOne<AdRow>>(`ads/${id}/priority`, {
+        method: "PATCH",
+        body: { priority, reason },
+      }),
     metrics: (id: string | number) => adminFetch<ApiOne<AdMetrics>>(`ads/${id}/metrics`),
     events: (id: string | number, limit = 50) =>
       adminFetch<ApiOne<AdEvent[]>>(`ads/${id}/events`, { params: { limit } }),
