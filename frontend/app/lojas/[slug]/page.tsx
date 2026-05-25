@@ -238,16 +238,32 @@ export default async function PublicDealerPage({ params }: PageProps) {
               Ofertas da loja
             </h2>
             {/*
-              Grid mobile-first: 1 col (default) → 2 cols sm+ → 3 cols lg+.
-              `gap-3 sm:gap-4` aperta gutter no mobile sem encostar
-              os cards. O AdCard variant="grid" já é mobile-horizontal
-              internamente (imagem 42% à esquerda + texto à direita)
-              — densifica a listagem single-column no celular.
+              Mobile-first grid (briefing 2026-05-25):
+                - base (≤sm)  → 1 coluna, card vertical.
+                - sm (≥640px) → 2 colunas.
+                - lg (≥1024px) → 3 colunas.
+
+              Por que `variant="carousel"` (e não `"grid"`) na página
+              de loja: o variant "grid" do AdCard tem layout
+              HORIZONTAL no mobile (imagem 42% + texto 58% + CTA), que
+              é ideal para o catálogo /comprar — mas em uma listagem
+              single-column da loja, esse layout estoura a viewport
+              em telas <420 px (Onix, Fiat Pulse, T-Cross todos com
+              CTA "Ver oferta" cortado na borda direita, observado
+              em 2026-05-25).
+
+              "carousel" é SEMPRE vertical (imagem topo + texto +
+              CTA full-width) — exatamente o pattern pedido pelo
+              briefing. Em desktop os dois variants renderizam
+              vertical, então não há diferença visual no >=sm.
+
+              `min-w-0` no <li> defende contra qualquer filho intrínseco
+              forçando largura além do track do grid.
             */}
             <ul className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
               {renderableAds.map((ad) => (
-                <li key={ad.id}>
-                  <AdCard ad={ad} variant="grid" />
+                <li key={ad.id} className="min-w-0">
+                  <AdCard ad={ad} variant="carousel" />
                 </li>
               ))}
             </ul>
