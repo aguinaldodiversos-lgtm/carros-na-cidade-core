@@ -13,6 +13,7 @@ import * as reportsService from "./reports/admin-reports.service.js";
 import * as plansService from "./plans/admin-plans.service.js";
 import * as highlightsService from "./highlights/admin-highlights.service.js";
 import * as commercialSettingsService from "./commercial-settings/admin-commercial-settings.service.js";
+import * as seoService from "./seo/admin-seo.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
@@ -537,6 +538,83 @@ router.patch(
       payload,
       reason,
     });
+    res.json({ ok: true, data });
+  })
+);
+
+// =========================================================================
+// SEO — Fase 3: visibilidade e controle sobre seo_publications +
+// seo_cluster_plans + sitemaps. Audita em admin_actions com
+// target_type='seo_publication'. Sem mutation em massa: edicao 1-a-1.
+// =========================================================================
+
+router.get(
+  "/seo/overview",
+  asyncHandler(async (_req, res) => {
+    const data = await seoService.getOverview();
+    res.json({ ok: true, data });
+  })
+);
+
+router.get(
+  "/seo/publications",
+  asyncHandler(async (req, res) => {
+    const indexableRaw = req.query.is_indexable;
+    const filters = {
+      status: req.query.status || undefined,
+      publication_type: req.query.publication_type || undefined,
+      is_indexable:
+        indexableRaw === "true" ? true : indexableRaw === "false" ? false : undefined,
+      has_error: req.query.has_error === "true" ? true : undefined,
+      uf: req.query.uf || undefined,
+      city: req.query.city || undefined,
+      q:
+        typeof req.query.q === "string" && req.query.q.trim()
+          ? req.query.q.trim()
+          : undefined,
+      limit: parseIntParam(req.query.limit, 50),
+      offset: parseIntParam(req.query.offset, 0),
+    };
+    const result = await seoService.listPublications(filters);
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.get(
+  "/seo/publications/:id",
+  asyncHandler(async (req, res) => {
+    const data = await seoService.getPublicationById(req.params.id);
+    res.json({ ok: true, data });
+  })
+);
+
+router.patch(
+  "/seo/publications/:id",
+  asyncHandler(async (req, res) => {
+    const { reason, ...payload } = req.body || {};
+    const updated = await seoService.updatePublication(
+      req.user.id,
+      req.params.id,
+      payload,
+      reason
+    );
+    res.json({ ok: true, data: updated });
+  })
+);
+
+router.get(
+  "/seo/sitemaps",
+  asyncHandler(async (_req, res) => {
+    const result = await seoService.listSitemaps();
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.get(
+  "/seo/issues",
+  asyncHandler(async (req, res) => {
+    const limit = parseIntParam(req.query.limit, 100);
+    const data = await seoService.listIssues({ limit });
     res.json({ ok: true, data });
   })
 );

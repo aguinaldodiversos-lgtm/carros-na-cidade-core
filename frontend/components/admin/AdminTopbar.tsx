@@ -10,6 +10,7 @@ const NAV = [
   { label: "Anúncios", href: "/admin/anuncios" },
   { label: "Anunciantes", href: "/admin/anunciantes" },
   { label: "Comercial", href: "/admin/comercial" },
+  { label: "SEO", href: "/admin/seo" },
   { label: "Pagamentos", href: "/admin/pagamentos" },
   { label: "Métricas", href: "/admin/metricas" },
   { label: "Configurações", href: "/admin/configuracoes" },

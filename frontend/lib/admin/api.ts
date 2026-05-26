@@ -95,6 +95,25 @@ export const adminApi = {
         body: { radius_km, reason },
       }),
   },
+  seo: {
+    overview: () => adminFetch<ApiOne<SeoOverview>>("seo/overview"),
+    publications: (params: Record<string, string | number | boolean> = {}) =>
+      adminFetch<ApiList<SeoPublicationRow>>("seo/publications", {
+        params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      }),
+    publication: (id: string | number) =>
+      adminFetch<ApiOne<SeoPublicationDetail>>(`seo/publications/${id}`),
+    updatePublication: (id: string | number, patch: SeoPublicationPatch, reason?: string) =>
+      adminFetch<ApiOne<SeoPublicationRow>>(`seo/publications/${id}`, {
+        method: "PATCH",
+        body: { ...patch, ...(reason ? { reason } : {}) },
+      }),
+    sitemaps: () => adminFetch<{ ok: boolean; data: SeoSitemapEntry[]; summary: SeoSitemapSummary }>(
+      "seo/sitemaps"
+    ),
+    issues: (limit = 100) =>
+      adminFetch<ApiOne<SeoIssue[]>>("seo/issues", { params: { limit: String(limit) } }),
+  },
   plans: {
     list: (params: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<PlanRow>>("plans", {
@@ -175,6 +194,127 @@ export const adminApi = {
         { method: "POST", body: { reason } }
       ),
   },
+};
+
+// ── SEO (Fase 3) ──
+
+export type SeoOverview = {
+  publications: {
+    total: number;
+    published: number;
+    planned: number;
+    with_error: number;
+    indexable: number;
+    non_indexable: number;
+    last_update: string | null;
+  };
+  clusters: {
+    total: number;
+    sitemap_eligible: number;
+    last_update: string | null;
+  };
+  coverage: {
+    active_states: number;
+    cities_with_active_ads: number;
+  };
+  sitemaps: {
+    total_buckets: number;
+    detected_buckets: number;
+    empty_buckets: number;
+    total_eligible_clusters: number;
+  };
+};
+
+export type SeoPublicationRow = {
+  id: number;
+  path: string;
+  title: string | null;
+  excerpt: string | null;
+  publication_type: string | null;
+  content_provider: string | null;
+  content_stage: string | null;
+  status: string | null;
+  is_indexable: boolean;
+  is_money_page: boolean;
+  health_status: string | null;
+  cluster_plan_id: number | null;
+  city_id: number | null;
+  brand: string | null;
+  model: string | null;
+  published_at: string | null;
+  updated_at: string | null;
+  created_at: string | null;
+  city_slug: string | null;
+  city_name: string | null;
+  city_state: string | null;
+  content_length: number;
+};
+
+export type SeoPublicationAudit = {
+  id: number;
+  publication_id: number;
+  audit_status: string;
+  issues: unknown[] | null;
+  warnings: unknown[] | null;
+  score: number;
+  audited_at: string;
+};
+
+export type SeoPublicationHistory = {
+  id: number;
+  admin_user_id: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  reason: string | null;
+  created_at: string;
+  admin_email: string | null;
+  admin_name: string | null;
+};
+
+export type SeoPublicationDetail = SeoPublicationRow & {
+  content?: string | null;
+  audits: SeoPublicationAudit[];
+  history: SeoPublicationHistory[];
+};
+
+export type SeoPublicationPatch = Partial<{
+  title: string;
+  is_indexable: boolean;
+  status: string;
+  health_status: string;
+}>;
+
+export type SeoSitemapEntry = {
+  name: string;
+  url: string;
+  cluster_type?: string | null;
+  type: "static" | "cluster" | "dynamic";
+  eligible_urls: number | null;
+  total_clusters: number | null;
+  last_update: string | null;
+  empty: boolean;
+  per_region?: { state: string; total: number; last_update: string | null }[];
+};
+
+export type SeoSitemapSummary = {
+  total: number;
+  empty: number;
+  total_eligible_urls: number;
+};
+
+export type SeoIssue = {
+  severity: "critical" | "high" | "medium" | "low";
+  kind: string;
+  title: string;
+  detail: string;
+  publication_id?: number;
+  cluster_plan_id?: number;
+  path?: string;
+  publication_type?: string;
+  health_status?: string;
 };
 
 // ── Plans / Highlights / Commercial settings (Fase 2) ──
