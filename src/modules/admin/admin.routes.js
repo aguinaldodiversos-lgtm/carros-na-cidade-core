@@ -135,11 +135,16 @@ router.patch(
 router.patch(
   "/ads/:id/priority",
   asyncHandler(async (req, res) => {
-    const { priority } = req.body || {};
+    const { priority, reason } = req.body || {};
     if (priority === undefined || priority === null) {
       throw new AppError("Campo priority é obrigatório", 400);
     }
-    const updated = await adsService.setAdPriority(req.user.id, req.params.id, priority);
+    const updated = await adsService.setAdPriority(
+      req.user.id,
+      req.params.id,
+      priority,
+      reason
+    );
     res.json({ ok: true, data: updated });
   })
 );

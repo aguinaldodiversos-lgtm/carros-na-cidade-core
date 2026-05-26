@@ -71,7 +71,7 @@ export async function setAdHighlight(adminUserId, adId, highlightUntil, reason =
   return updated;
 }
 
-export async function setAdPriority(adminUserId, adId, priority) {
+export async function setAdPriority(adminUserId, adId, priority, reason = null) {
   const numPriority = Number(priority);
   if (!Number.isFinite(numPriority) || numPriority < 0 || numPriority > 100) {
     throw new AppError("Priority deve ser entre 0 e 100", 400);
@@ -90,6 +90,7 @@ export async function setAdPriority(adminUserId, adId, priority) {
     targetId: adId,
     oldValue: { priority: oldPriority },
     newValue: { priority: numPriority },
+    reason,
   });
 
   return updated;
