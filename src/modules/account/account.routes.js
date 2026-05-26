@@ -5,7 +5,7 @@ import {
   deleteOwnedAd,
   getDashboardPayload,
   getOwnedAd,
-  listBoostOptions,
+  listBoostOptionsAsync,
   listPlans,
   resolvePublishEligibility,
   updateOwnedAdStatus,
@@ -69,7 +69,7 @@ router.get(
   "/boost-options",
   asyncHandler(async (_req, res) => {
     res.json({
-      boost_options: listBoostOptions(),
+      boost_options: await listBoostOptionsAsync(),
     });
   })
 );
@@ -77,10 +77,13 @@ router.get(
 router.get(
   "/ads/:id",
   asyncHandler(async (req, res) => {
-    const ad = await getOwnedAd(req.user.id, req.params.id);
+    const [ad, boostOptions] = await Promise.all([
+      getOwnedAd(req.user.id, req.params.id),
+      listBoostOptionsAsync(),
+    ]);
     res.json({
       ad,
-      boost_options: listBoostOptions(),
+      boost_options: boostOptions,
     });
   })
 );

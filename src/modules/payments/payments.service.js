@@ -15,6 +15,10 @@ import {
   assertNoLiveSubscriptionFor,
   assertSubscriptionPlanAllowed,
 } from "./subscriptions.guards.js";
+import {
+  getBoostOptions,
+  getCommercialRules,
+} from "../commercial/commercial-rules.service.js";
 
 /**
  * Guard: bloqueia checkout/subscription para planos do produto Evento
@@ -462,11 +466,46 @@ export async function createBoostCheckout({
   pendingUrl,
   requestId,
 }) {
-  const [user, ad] = await Promise.all([getAccountUser(userId), getOwnedAd(userId, adId)]);
-  const boostOption = listBoostOptions().find((option) => option.id === boostOptionId);
+  const [user, ad, boostOptions, rules] = await Promise.all([
+    getAccountUser(userId),
+    getOwnedAd(userId, adId),
+    getBoostOptions(),
+    getCommercialRules(),
+  ]);
 
+  // Fase 2.1 — boost options canônicos vêm de platform_settings (boost-7d)
+  // + fallback estático (boost-30d). Não mais hardcode neste service.
+  const boostOption = boostOptions.find((option) => option.id === boostOptionId);
   if (!boostOption) {
     throw new AppError("Opcao de impulsionamento invalida.", 400);
+  }
+
+  // Fase 2.1 — allowlist por tipo de documento (CPF/CNPJ).
+  // 'pending' (sem documento) NUNCA pode comprar destaque — sempre bloqueado.
+  // Quem já é admin não passa por aqui (rota é de usuário final).
+  if (user.type === "pending") {
+    throw new AppError(
+      "Verifique seu CPF ou CNPJ antes de comprar destaque.",
+      400,
+      true,
+      { code: "BOOST_REQUIRES_VERIFIED_DOCUMENT" }
+    );
+  }
+  if (user.type === "CPF" && !rules.allow_boost_cpf) {
+    throw new AppError(
+      "Compra de destaque por CPF esta desabilitada no momento.",
+      403,
+      true,
+      { code: "BOOST_BLOCKED_FOR_CPF" }
+    );
+  }
+  if (user.type === "CNPJ" && !rules.allow_boost_cnpj) {
+    throw new AppError(
+      "Compra de destaque por CNPJ esta desabilitada no momento.",
+      403,
+      true,
+      { code: "BOOST_BLOCKED_FOR_CNPJ" }
+    );
   }
 
   // Tarefa 9 — destaque só pode ser comprado para anúncios ACTIVE.

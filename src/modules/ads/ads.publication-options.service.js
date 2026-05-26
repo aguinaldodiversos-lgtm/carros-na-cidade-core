@@ -24,28 +24,57 @@ import {
   countActiveAdsByUser,
   getAccountUser,
   getOwnedAd,
+  getPlanById,
   resolveCurrentPlan,
 } from "../account/account.service.js";
 import { findLiveSubscriptionForUser } from "../payments/subscriptions.guards.js";
+import { getCommercialRules } from "../commercial/commercial-rules.service.js";
 import { AD_STATUS, AD_STATUS_OWNER_OPERABLE } from "./ads.canonical.constants.js";
 
 /**
- * Preços oficiais em CENTAVOS — bate com a oferta de lançamento e
- * com `subscription_plans.price` (Start 79.90, Pro 149.90) e
- * BOOST_OPTIONS (boost-7d 39.90). Hardcoded aqui apenas para
- * exposição na UI; o cobrador real (createBoostCheckout /
- * createPlanSubscription) sempre lê do banco.
+ * IDs canônicos dos planos. Estáveis: são FKs em payments/subscriptions
+ * e não devem mudar. Preços/limites desses planos são lidos do banco
+ * (subscription_plans) ao montar o payload — Fase 2.1.
  */
-const PRICE_CENTS = Object.freeze({
-  boost_7d: 3990,
-  subscribe_start: 7990,
-  subscribe_pro: 14990,
-});
-
 const PLAN_ID = Object.freeze({
   start: "cnpj-store-start",
   pro: "cnpj-store-pro",
 });
+
+/**
+ * Valores de último recurso usados APENAS se o banco/platform_settings
+ * estiver indisponível. Bate com os defaults de
+ * commercial-rules.service.js#DEFAULTS e o seed da migration 031.
+ *
+ * Em operação normal:
+ *   - boost_7d: vem de platform_settings.commercial.boost_default_*
+ *   - subscribe_start/pro: vem de subscription_plans.price * 100
+ */
+const PRICE_CENTS_FALLBACK = Object.freeze({
+  boost_7d: 3990,
+  subscribe_start: 7990,
+  subscribe_pro: 14990,
+});
+const BOOST_DAYS_FALLBACK = 7;
+
+function priceToCents(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100);
+}
+
+async function resolvePlanPriceCents(planId) {
+  try {
+    const plan = await getPlanById(planId);
+    const cents = priceToCents(plan?.price);
+    if (cents != null) return cents;
+  } catch {
+    // fall through to fallback
+  }
+  if (planId === PLAN_ID.start) return PRICE_CENTS_FALLBACK.subscribe_start;
+  if (planId === PLAN_ID.pro) return PRICE_CENTS_FALLBACK.subscribe_pro;
+  return 0;
+}
 
 /**
  * Status do anúncio que admitem ações de publicação/destaque.
@@ -84,12 +113,28 @@ export async function getPublicationOptions({ userId, adId }) {
 
   const user = await getAccountUser(userId);
 
-  // 3. Plano atual + assinatura viva + anúncios ativos.
-  const [currentPlan, liveSub, activeAdsCount] = await Promise.all([
-    resolveCurrentPlan(user),
-    findLiveSubscriptionForUser(userId),
-    countActiveAdsByUser(userId),
-  ]);
+  // 3. Plano atual + assinatura viva + anúncios ativos + regras comerciais
+  //    + preços canônicos dos planos Start/Pro lidos do banco.
+  //    Fase 2.1: preço/dias do destaque vêm de platform_settings; preço dos
+  //    planos vem de subscription_plans. NÃO ler hardcode da publication-options.
+  const [currentPlan, liveSub, activeAdsCount, commercialRules, startCents, proCents] =
+    await Promise.all([
+      resolveCurrentPlan(user),
+      findLiveSubscriptionForUser(userId),
+      countActiveAdsByUser(userId),
+      getCommercialRules(),
+      resolvePlanPriceCents(PLAN_ID.start),
+      resolvePlanPriceCents(PLAN_ID.pro),
+    ]);
+
+  const boost7dCents =
+    typeof commercialRules.boost_default_price_cents === "number"
+      ? commercialRules.boost_default_price_cents
+      : PRICE_CENTS_FALLBACK.boost_7d;
+  const boost7dDays =
+    typeof commercialRules.boost_default_days === "number"
+      ? commercialRules.boost_default_days
+      : BOOST_DAYS_FALLBACK;
 
   const isOnLiveSubscription =
     liveSub &&
@@ -160,17 +205,28 @@ export async function getPublicationOptions({ userId, adId }) {
     });
   }
 
-  // Boost 7 dias: disponível para CPF e CNPJ se anúncio em status
-  // publicável. Preço FIXO no backend; frontend só mostra.
+  // Boost 7 dias: respeita allow_boost_cpf/cnpj de platform_settings.
+  // Preço/dias vêm de commercial.boost_default_price_cents/days. Cobrador
+  // real (createBoostCheckout) revalida ambos antes de ir ao MP.
+  const boostAllowedForUser =
+    user.type === "CPF"
+      ? commercialRules.allow_boost_cpf
+      : user.type === "CNPJ"
+        ? commercialRules.allow_boost_cnpj
+        : false; // 'pending' não compra destaque
   actions.push({
     id: "boost_7d",
-    enabled: true,
+    enabled: boostAllowedForUser,
     ad_id: ad.id,
-    price_cents: PRICE_CENTS.boost_7d,
-    days: 7,
+    price_cents: boost7dCents,
+    days: boost7dDays,
     already_active: highlightActive,
     highlight_until: ad.highlight_until || null,
-    note: highlightActive ? "Comprar novamente prorroga o prazo (não troca)." : null,
+    note: !boostAllowedForUser
+      ? "Compra de destaque desabilitada para este tipo de conta."
+      : highlightActive
+        ? "Comprar novamente prorroga o prazo (não troca)."
+        : null,
   });
 
   // Assinatura Start/Pro: somente se user é CNPJ verificado E NÃO
@@ -182,13 +238,13 @@ export async function getPublicationOptions({ userId, adId }) {
       id: "subscribe_start",
       enabled: true,
       plan_id: PLAN_ID.start,
-      price_cents: PRICE_CENTS.subscribe_start,
+      price_cents: startCents,
     });
     actions.push({
       id: "subscribe_pro",
       enabled: true,
       plan_id: PLAN_ID.pro,
-      price_cents: PRICE_CENTS.subscribe_pro,
+      price_cents: proCents,
     });
   }
 

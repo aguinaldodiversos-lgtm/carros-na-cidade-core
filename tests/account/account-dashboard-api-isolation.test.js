@@ -25,6 +25,10 @@ vi.mock("../../src/modules/account/account.service.js", () => ({
   listPlans: vi.fn(),
   resolvePublishEligibility: vi.fn(),
   listBoostOptions: vi.fn(() => []),
+  // Fase 2.1 — account.routes.js passou a usar listBoostOptionsAsync para
+  // refletir edições admin em platform_settings.commercial.*. Stub seguro
+  // (array vazio) basta para os testes de isolamento de rota.
+  listBoostOptionsAsync: vi.fn(() => Promise.resolve([])),
   updateOwnedAdStatus: vi.fn(),
   deleteOwnedAd: vi.fn(),
 }));

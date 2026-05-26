@@ -803,7 +803,11 @@ export async function getOwnedAd(userId, adId) {
  */
 export async function getDashboardPayload(userId, options = {}) {
   const uid = String(userId);
-  const emptyBoost = BOOST_OPTIONS.map((option) => ({ ...option }));
+  // Fase 2.1 — reflete edição admin em platform_settings.commercial.*
+  // Fallback estático seguro se a leitura falhar (mantém SLA do dashboard).
+  const emptyBoost = await listBoostOptionsAsync().catch(() =>
+    BOOST_OPTIONS.map((option) => ({ ...option }))
+  );
   const fallbackAccountType =
     options.accountType === "CNPJ" ? "CNPJ" : options.accountType === "pending" ? "pending" : "CPF";
 
@@ -1007,8 +1011,29 @@ export async function validatePlanEligibility(userId, preloadedUser = null) {
   return resolvePublishEligibility(userId, preloadedUser);
 }
 
+/**
+ * @deprecated Use `listBoostOptionsAsync()` para refletir edições admin de
+ * platform_settings.commercial.boost_default_price_cents/days. Esta versão
+ * síncrona retorna o snapshot estático (fallback) e NÃO reflete mudanças
+ * comerciais aplicadas pelo painel /admin/comercial. Mantida apenas para
+ * compatibilidade com callers que não podem ser convertidos para async.
+ */
 export function listBoostOptions() {
   return BOOST_OPTIONS.map((option) => ({ ...option }));
+}
+
+/**
+ * Versão async — devolve boost options com preço/dias do boost-7d
+ * resolvidos via platform_settings (Fase 2.1). boost-30d permanece estático
+ * até existirem chaves dedicadas. Fallback seguro se a leitura falhar.
+ */
+export async function listBoostOptionsAsync() {
+  const { getBoostOptions } = await import("../commercial/commercial-rules.service.js");
+  try {
+    return await getBoostOptions();
+  } catch {
+    return BOOST_OPTIONS.map((option) => ({ ...option }));
+  }
 }
 
 export async function updateOwnedAdStatus(userId, adId, action) {
