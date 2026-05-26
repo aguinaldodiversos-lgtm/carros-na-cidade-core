@@ -95,6 +95,21 @@ export const adminApi = {
         body: { radius_km, reason },
       }),
   },
+  reports: {
+    list: (p: Record<string, string | number> = {}) =>
+      adminFetch<ApiList<ReportRow>>("reports", {
+        params: Object.fromEntries(
+          Object.entries({ limit: 50, ...p }).map(([k, v]) => [k, String(v)])
+        ),
+      }),
+    summary: () => adminFetch<ApiOne<ReportsSummary>>("reports/summary"),
+    get: (id: string | number) => adminFetch<ApiOne<ReportDetail>>(`reports/${id}`),
+    changeStatus: (id: string | number, status: ReportStatus, reason?: string) =>
+      adminFetch<ApiOne<ReportRow>>(`reports/${id}/status`, {
+        method: "PATCH",
+        body: { status, reason },
+      }),
+  },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<ModerationAdRow>>("moderation/ads", {
@@ -119,6 +134,84 @@ export const adminApi = {
         { method: "POST", body: { reason } }
       ),
   },
+};
+
+// ── Reports (fila de denúncias — Fase 1) ──
+
+export type ReportStatus = "new" | "in_review" | "resolved" | "dismissed";
+
+export type ReportReason =
+  | "suspicious_price"
+  | "incorrect_data"
+  | "vehicle_does_not_exist"
+  | "scam_or_advance_pay"
+  | "fake_photos"
+  | "other";
+
+export const REPORT_REASON_LABEL: Record<ReportReason, string> = {
+  suspicious_price: "Preço suspeito",
+  incorrect_data: "Dados incorretos",
+  vehicle_does_not_exist: "Veículo não existe",
+  scam_or_advance_pay: "Golpe / pagamento antecipado",
+  fake_photos: "Fotos falsas",
+  other: "Outro motivo",
+};
+
+export const REPORT_STATUS_LABEL: Record<ReportStatus, string> = {
+  new: "Aberta",
+  in_review: "Em análise",
+  resolved: "Resolvida",
+  dismissed: "Rejeitada",
+};
+
+export type ReportRow = {
+  id: number;
+  ad_id: number;
+  reporter_user_id: string | null;
+  reason: ReportReason;
+  description: string | null;
+  status: ReportStatus;
+  created_at: string;
+  updated_at: string;
+  ad_title: string | null;
+  ad_slug: string | null;
+  ad_status: string | null;
+  ad_city: string | null;
+  ad_state: string | null;
+  ad_price: string | null;
+  advertiser_id: number | null;
+  advertiser_name: string | null;
+};
+
+export type ReportHistoryRow = {
+  id: number;
+  admin_user_id: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  reason: string | null;
+  created_at: string;
+  admin_email: string | null;
+  admin_name: string | null;
+};
+
+export type ReportDetail = ReportRow & {
+  ad_brand: string | null;
+  ad_model: string | null;
+  ad_year: number | null;
+  ad_priority: number | null;
+  ad_highlight_until: string | null;
+  ad_blocked_reason: string | null;
+  advertiser_email: string | null;
+  advertiser_status: string | null;
+  history: ReportHistoryRow[];
+};
+
+export type ReportsSummary = {
+  counts: { new: number; in_review: number; resolved: number; dismissed: number };
+  total: number;
 };
 
 export type ModerationRiskReason = {

@@ -9,6 +9,7 @@ import * as advertisersService from "./advertisers/admin-advertisers.service.js"
 import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";
 import * as moderationService from "./moderation/admin-moderation.service.js";
+import * as reportsService from "./reports/admin-reports.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
@@ -357,6 +358,64 @@ router.patch(
       payload: req.body || {},
     });
     res.json({ ok: true, data });
+  })
+);
+
+// =========================================================================
+// REPORTS — fila de denuncias de anuncios (ad_reports / migration 026)
+// Triagem admin: lista + detalhe + mudanca de status. Audita em
+// admin_actions com target_type='ad_report'. Acoes sobre o anuncio
+// relacionado reutilizam os endpoints existentes /ads/:id/*.
+// =========================================================================
+
+router.get(
+  "/reports",
+  asyncHandler(async (req, res) => {
+    const filters = {
+      status: req.query.status || undefined,
+      reason: req.query.reason || undefined,
+      ad_id: req.query.ad_id ? Number(req.query.ad_id) : undefined,
+      q: typeof req.query.q === "string" && req.query.q.trim() ? req.query.q.trim() : undefined,
+      from: req.query.from || undefined,
+      to: req.query.to || undefined,
+      limit: parseIntParam(req.query.limit, 50),
+      offset: parseIntParam(req.query.offset, 0),
+    };
+    const result = await reportsService.listReports(filters);
+    res.json({ ok: true, ...result });
+  })
+);
+
+// IMPORTANTE: declarar /reports/summary ANTES de /reports/:id para o
+// roteador casar o path correto (senao :id captura 'summary' como id).
+router.get(
+  "/reports/summary",
+  asyncHandler(async (_req, res) => {
+    const summary = await reportsService.getReportsSummary();
+    res.json({ ok: true, data: summary });
+  })
+);
+
+router.get(
+  "/reports/:id",
+  asyncHandler(async (req, res) => {
+    const report = await reportsService.getReportById(req.params.id);
+    res.json({ ok: true, data: report });
+  })
+);
+
+router.patch(
+  "/reports/:id/status",
+  asyncHandler(async (req, res) => {
+    const { status, reason } = req.body || {};
+    if (!status) throw new AppError("Campo status é obrigatório", 400);
+    const updated = await reportsService.changeReportStatus(
+      req.user.id,
+      req.params.id,
+      status,
+      reason
+    );
+    res.json({ ok: true, data: updated });
   })
 );
 

@@ -9,6 +9,11 @@ const MAP: Record<string, { bg: string; text: string; label: string }> = {
   rejected: { bg: "bg-red-100", text: "text-red-700", label: "Rejeitado" },
   canceled: { bg: "bg-gray-200", text: "text-gray-600", label: "Cancelado" },
   refunded: { bg: "bg-purple-100", text: "text-purple-700", label: "Estornado" },
+  // Status de denuncia (ad_reports) — Fase 1
+  new: { bg: "bg-red-100", text: "text-red-700", label: "Aberta" },
+  in_review: { bg: "bg-amber-100", text: "text-amber-700", label: "Em análise" },
+  resolved: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Resolvida" },
+  dismissed: { bg: "bg-gray-200", text: "text-gray-600", label: "Rejeitada" },
 };
 
 export function AdminStatusBadge({ status }: { status: string }) {
