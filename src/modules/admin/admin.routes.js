@@ -10,6 +10,9 @@ import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";
 import * as moderationService from "./moderation/admin-moderation.service.js";
 import * as reportsService from "./reports/admin-reports.service.js";
+import * as plansService from "./plans/admin-plans.service.js";
+import * as highlightsService from "./highlights/admin-highlights.service.js";
+import * as commercialSettingsService from "./commercial-settings/admin-commercial-settings.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
@@ -416,6 +419,125 @@ router.patch(
       reason
     );
     res.json({ ok: true, data: updated });
+  })
+);
+
+// =========================================================================
+// COMMERCIAL — Fase 2: planos, destaques, regras comerciais.
+// Protecao herdada de router.use(authMiddleware) + requireAdmin(). Reuso de
+// endpoints existentes: PATCH /ads/:id/highlight (grantManualBoost / clear)
+// continua sendo o ponto unico de MUTATION para destaque — esta seccao so
+// EXPOE listagem/summary novos. Audit em admin_actions:
+// target_type='subscription_plan' | 'commercial_settings' | 'ad'.
+// =========================================================================
+
+// ───── Plans ─────────────────────────────────────────────────────────────
+
+router.get(
+  "/plans",
+  asyncHandler(async (req, res) => {
+    const includeInactive = String(req.query.include_inactive ?? "true").toLowerCase() !== "false";
+    const result = await plansService.listPlans({ includeInactive });
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.get(
+  "/plans/:id",
+  asyncHandler(async (req, res) => {
+    const plan = await plansService.getPlanById(req.params.id);
+    res.json({ ok: true, data: plan });
+  })
+);
+
+router.get(
+  "/plans/:id/subscriptions",
+  asyncHandler(async (req, res) => {
+    const limit = parseIntParam(req.query.limit, 100);
+    const offset = parseIntParam(req.query.offset, 0);
+    const result = await plansService.listPlanSubscriptions(req.params.id, { limit, offset });
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.post(
+  "/plans",
+  asyncHandler(async (req, res) => {
+    const { reason, ...payload } = req.body || {};
+    const created = await plansService.createPlan(req.user.id, payload, reason);
+    res.status(201).json({ ok: true, data: created });
+  })
+);
+
+router.patch(
+  "/plans/:id",
+  asyncHandler(async (req, res) => {
+    const { reason, ...payload } = req.body || {};
+    const updated = await plansService.updatePlan(req.user.id, req.params.id, payload, reason);
+    res.json({ ok: true, data: updated });
+  })
+);
+
+router.patch(
+  "/plans/:id/status",
+  asyncHandler(async (req, res) => {
+    const { is_active, reason } = req.body || {};
+    if (typeof is_active !== "boolean") {
+      throw new AppError("Campo is_active (boolean) é obrigatório", 400);
+    }
+    const updated = await plansService.setPlanActive(req.user.id, req.params.id, is_active, reason);
+    res.json({ ok: true, data: updated });
+  })
+);
+
+// ───── Highlights ────────────────────────────────────────────────────────
+
+router.get(
+  "/highlights/summary",
+  asyncHandler(async (req, res) => {
+    const summary = await highlightsService.getHighlightsSummary({
+      expiring_days: req.query.expiring_days,
+    });
+    res.json({ ok: true, data: summary });
+  })
+);
+
+router.get(
+  "/highlights",
+  asyncHandler(async (req, res) => {
+    const result = await highlightsService.listHighlights({
+      mode: req.query.mode,
+      city: req.query.city,
+      advertiser_id: req.query.advertiser_id,
+      ad_id: req.query.ad_id,
+      expiring_days: req.query.expiring_days,
+      limit: parseIntParam(req.query.limit, 50),
+      offset: parseIntParam(req.query.offset, 0),
+    });
+    res.json({ ok: true, ...result });
+  })
+);
+
+// ───── Commercial settings (platform_settings#commercial.*) ──────────────
+
+router.get(
+  "/commercial-settings",
+  asyncHandler(async (_req, res) => {
+    const data = await commercialSettingsService.getCommercialSettings();
+    res.json({ ok: true, data });
+  })
+);
+
+router.patch(
+  "/commercial-settings",
+  asyncHandler(async (req, res) => {
+    const { reason, ...payload } = req.body || {};
+    const data = await commercialSettingsService.updateCommercialSettings({
+      adminUserId: req.user.id,
+      payload,
+      reason,
+    });
+    res.json({ ok: true, data });
   })
 );
 

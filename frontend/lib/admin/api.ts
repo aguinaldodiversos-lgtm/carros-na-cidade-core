@@ -95,6 +95,47 @@ export const adminApi = {
         body: { radius_km, reason },
       }),
   },
+  plans: {
+    list: (params: Record<string, string | number | boolean> = {}) =>
+      adminFetch<ApiList<PlanRow>>("plans", {
+        params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      }),
+    get: (id: string) => adminFetch<ApiOne<PlanRow>>(`plans/${id}`),
+    subscriptions: (id: string, params: Record<string, string | number> = {}) =>
+      adminFetch<ApiList<PlanSubscriptionRow>>(`plans/${id}/subscriptions`, {
+        params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      }),
+    create: (payload: PlanCreatePayload, reason: string) =>
+      adminFetch<ApiOne<PlanRow>>(`plans`, { method: "POST", body: { ...payload, reason } }),
+    update: (id: string, patch: PlanPatchPayload, reason?: string) =>
+      adminFetch<ApiOne<PlanRow>>(`plans/${id}`, {
+        method: "PATCH",
+        body: { ...patch, ...(reason ? { reason } : {}) },
+      }),
+    setActive: (id: string, is_active: boolean, reason: string) =>
+      adminFetch<ApiOne<PlanRow>>(`plans/${id}/status`, {
+        method: "PATCH",
+        body: { is_active, reason },
+      }),
+  },
+  highlights: {
+    summary: (params: { expiring_days?: number } = {}) =>
+      adminFetch<ApiOne<HighlightSummary>>(`highlights/summary`, {
+        params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      }),
+    list: (params: Record<string, string | number> = {}) =>
+      adminFetch<ApiList<HighlightRow>>(`highlights`, {
+        params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      }),
+  },
+  commercialSettings: {
+    get: () => adminFetch<ApiOne<CommercialSettingsResponse>>(`commercial-settings`),
+    update: (payload: Partial<CommercialSettings>, reason: string) =>
+      adminFetch<ApiOne<CommercialSettingsResponse>>(`commercial-settings`, {
+        method: "PATCH",
+        body: { ...payload, reason },
+      }),
+  },
   reports: {
     list: (p: Record<string, string | number> = {}) =>
       adminFetch<ApiList<ReportRow>>("reports", {
@@ -134,6 +175,116 @@ export const adminApi = {
         { method: "POST", body: { reason } }
       ),
   },
+};
+
+// ── Plans / Highlights / Commercial settings (Fase 2) ──
+
+export type PlanType = "CPF" | "CNPJ";
+export type PlanBillingModel = "free" | "one_time" | "monthly";
+
+export type PlanRow = {
+  id: string;
+  name: string;
+  type: PlanType;
+  price: string | number;
+  ad_limit: number;
+  is_featured_enabled: boolean;
+  has_store_profile: boolean;
+  priority_level: number;
+  is_active: boolean;
+  validity_days: number | null;
+  billing_model: PlanBillingModel;
+  description: string;
+  benefits: string[] | string | null;
+  recommended: boolean;
+  max_photos: number;
+  weight: number;
+  video_360_enabled: boolean;
+  monthly_highlight_credits: number;
+  sort_order: number;
+  public_visible: boolean;
+  created_at: string;
+  updated_at: string;
+  active_subscriptions: number;
+};
+
+export type PlanCreatePayload = {
+  id: string;
+  name: string;
+  type: PlanType;
+  price: number;
+  ad_limit: number;
+  priority_level: number;
+  weight: number;
+  billing_model: PlanBillingModel;
+  validity_days: number | null;
+  max_photos: number;
+  monthly_highlight_credits: number;
+  description: string;
+  benefits: string[];
+  sort_order: number;
+  is_active?: boolean;
+  is_featured_enabled?: boolean;
+  has_store_profile?: boolean;
+  recommended?: boolean;
+  video_360_enabled?: boolean;
+  public_visible?: boolean;
+};
+
+export type PlanPatchPayload = Partial<PlanCreatePayload>;
+
+export type PlanSubscriptionRow = {
+  user_id: string;
+  plan_id: string;
+  status: string;
+  expires_at: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  created_at: string;
+  updated_at: string | null;
+  user_name: string | null;
+  user_email: string | null;
+};
+
+export type HighlightRow = {
+  ad_id: number;
+  ad_title: string | null;
+  ad_slug: string | null;
+  ad_status: string;
+  ad_city: string | null;
+  ad_state: string | null;
+  ad_price: string | number | null;
+  ad_brand: string | null;
+  ad_model: string | null;
+  ad_priority: number;
+  highlight_until: string | null;
+  ad_updated_at: string;
+  advertiser_id: number | null;
+  advertiser_name: string | null;
+  user_plan_id: string | null;
+};
+
+export type HighlightSummary = { active: number; expiring: number; expired: number };
+
+export type CommercialSettings = {
+  boost_default_price_cents: number;
+  boost_default_days: number;
+  boost_duplicate_behavior: "extend_duration" | "replace" | "block_duplicate";
+  boost_max_extension_days: number;
+  allow_boost_cpf: boolean;
+  allow_boost_cnpj: boolean;
+  pro_ad_limit_guard: number;
+};
+
+export type CommercialSettingsResponse = {
+  settings: CommercialSettings;
+  duplicate_behaviors_supported: ReadonlyArray<CommercialSettings["boost_duplicate_behavior"]>;
+  ranges: {
+    boost_default_price_cents: { min: number; max: number };
+    boost_default_days: { min: number; max: number };
+    boost_max_extension_days: { min: number; max: number };
+    pro_ad_limit_guard: { min: number; max: number };
+  };
 };
 
 // ── Reports (fila de denúncias — Fase 1) ──
