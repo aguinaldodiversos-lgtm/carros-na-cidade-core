@@ -1,5 +1,6 @@
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { recordAdminAction } from "../admin.audit.js";
+import { CLUSTER_TYPES } from "../../seo/constants/seo-status.js";
 import * as repo from "./admin-seo.repository.js";
 
 const VALID_STATUS = Object.freeze(["draft", "planned", "published", "archived"]);
@@ -7,18 +8,31 @@ const VALID_HEALTH = Object.freeze(["healthy", "ok", "degraded", "stale", "error
 
 /**
  * Lista de sitemaps canonicos (corresponde aos arquivos em
- * frontend/app/sitemaps/). Mapeia cluster_type → arquivo. `regiao/[state]`
- * tem um arquivo por UF — agrupamos com `dynamic: true`.
+ * frontend/app/sitemaps/). `cluster_type` é o valor real persistido em
+ * `seo_cluster_plans.cluster_type` — alinhado a
+ * src/modules/seo/constants/seo-status.js#CLUSTER_TYPES.
+ *
+ * `regiao/[state]` tem um arquivo por UF — agrupamos com `dynamic: true`.
+ * `local_seo` continua sem cluster_type associado (vazio por design — ver
+ * docs/runbooks/sitemap-empty-investigation.md §8).
  */
 const SITEMAP_INDEX = Object.freeze([
   { name: "core", url: "/sitemaps/core.xml", cluster_type: null, fixed_paths: true },
   { name: "content", url: "/sitemaps/content.xml", cluster_type: null, fixed_paths: true },
-  { name: "cities", url: "/sitemaps/cities.xml", cluster_type: "city" },
-  { name: "brands", url: "/sitemaps/brands.xml", cluster_type: "brands" },
-  { name: "models", url: "/sitemaps/models.xml", cluster_type: "models" },
-  { name: "below_fipe", url: "/sitemaps/below-fipe.xml", cluster_type: "below_fipe" },
-  { name: "opportunities", url: "/sitemaps/opportunities.xml", cluster_type: "opportunities" },
-  { name: "local_seo", url: "/sitemaps/local-seo.xml", cluster_type: "local_seo" },
+  { name: "cities", url: "/sitemaps/cities.xml", cluster_type: CLUSTER_TYPES.CITY_HOME },
+  { name: "brands", url: "/sitemaps/brands.xml", cluster_type: CLUSTER_TYPES.CITY_BRAND },
+  { name: "models", url: "/sitemaps/models.xml", cluster_type: CLUSTER_TYPES.CITY_BRAND_MODEL },
+  {
+    name: "below_fipe",
+    url: "/sitemaps/below-fipe.xml",
+    cluster_type: CLUSTER_TYPES.CITY_BELOW_FIPE,
+  },
+  {
+    name: "opportunities",
+    url: "/sitemaps/opportunities.xml",
+    cluster_type: CLUSTER_TYPES.CITY_OPPORTUNITIES,
+  },
+  { name: "local_seo", url: "/sitemaps/local-seo.xml", cluster_type: null, fixed_paths: true },
   { name: "regiao", url: "/sitemaps/regiao/[state].xml", cluster_type: null, dynamic: true },
 ]);
 

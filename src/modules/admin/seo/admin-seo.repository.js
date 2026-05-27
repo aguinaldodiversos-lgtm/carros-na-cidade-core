@@ -1,4 +1,11 @@
 import { query } from "../../../infrastructure/database/db.js";
+import {
+  SITEMAP_ELIGIBLE_SCP_STATUSES,
+  SITEMAP_BUCKET_TO_CLUSTER_TYPE,
+  sqlInLiteral,
+} from "../../seo/constants/seo-status.js";
+
+const SCP_STATUS_FILTER = sqlInLiteral(SITEMAP_ELIGIBLE_SCP_STATUSES);
 
 /**
  * Introspeccao do schema real de `seo_publications` em runtime.
@@ -278,7 +285,7 @@ export async function overviewSummary() {
      clusters AS (
        SELECT
          COUNT(*)::int AS total_clusters,
-         COUNT(*) FILTER (WHERE status IN ('planned','generated'))::int AS sitemap_eligible_clusters,
+         COUNT(*) FILTER (WHERE status ${SCP_STATUS_FILTER})::int AS sitemap_eligible_clusters,
          MAX(updated_at) AS last_cluster_update
        FROM seo_cluster_plans
      ),
@@ -318,7 +325,7 @@ export async function sitemapCounts() {
     `SELECT
        cluster_type,
        COUNT(*)::int AS total,
-       COUNT(*) FILTER (WHERE status IN ('planned','generated'))::int AS eligible,
+       COUNT(*) FILTER (WHERE status ${SCP_STATUS_FILTER})::int AS eligible,
        MAX(updated_at) AS last_update
      FROM seo_cluster_plans
      GROUP BY cluster_type
@@ -339,7 +346,7 @@ export async function sitemapRegionCounts() {
        MAX(scp.updated_at) AS last_update
      FROM seo_cluster_plans scp
      JOIN cities c ON c.id = scp.city_id
-     WHERE scp.status IN ('planned','generated')
+     WHERE scp.status ${SCP_STATUS_FILTER}
      GROUP BY c.state
      ORDER BY c.state`
   );
@@ -408,16 +415,20 @@ export async function listIssues({ limit = 100 } = {}) {
   }
 
   // 3. Sitemap vazio (cluster_type sem nenhum cluster elegivel) — alto
-  const sitemapBuckets = ["city", "below_fipe", "brands", "models", "opportunities", "local_seo"];
+  // Antes da Fase 3.1 os nomes em sitemapBuckets eram aliases ("city", "below_fipe", ...)
+  // que NÃO batiam com os cluster_type reais ("city_home", "city_below_fipe", ...)
+  // — resultado: 6 buckets sempre apareciam vazios mesmo com clusters persistidos.
+  // Agora cada bucket é traduzido pelo SITEMAP_BUCKET_TO_CLUSTER_TYPE.
   const counts = await sitemapCounts();
   const countsByType = Object.fromEntries(counts.map((r) => [r.cluster_type, r.eligible]));
-  for (const bucket of sitemapBuckets) {
-    if (!countsByType[bucket] || countsByType[bucket] === 0) {
+  for (const [bucket, clusterType] of Object.entries(SITEMAP_BUCKET_TO_CLUSTER_TYPE)) {
+    const eligible = countsByType[clusterType] || 0;
+    if (!eligible) {
       issues.push({
         severity: "high",
         kind: "empty_sitemap_bucket",
         title: `Sitemap bucket vazio: ${bucket}`,
-        detail: `seo_cluster_plans sem cluster_type='${bucket}' elegível (status IN planned/generated).`,
+        detail: `seo_cluster_plans sem cluster_type='${clusterType}' elegível (status ${SITEMAP_ELIGIBLE_SCP_STATUSES.join("/")}).`,
       });
     }
   }
@@ -427,7 +438,7 @@ export async function listIssues({ limit = 100 } = {}) {
     `SELECT scp.id, scp.path, scp.cluster_type, scp.status, scp.updated_at
      FROM seo_cluster_plans scp
      LEFT JOIN seo_publications sp ON sp.cluster_plan_id = scp.id
-     WHERE scp.status IN ('planned','generated')
+     WHERE scp.status ${SCP_STATUS_FILTER}
        AND sp.id IS NULL
      ORDER BY scp.priority DESC, scp.updated_at DESC
      LIMIT $1`,

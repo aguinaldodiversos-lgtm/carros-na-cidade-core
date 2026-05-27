@@ -1,4 +1,12 @@
 import { query } from "../../infrastructure/database/db.js";
+import {
+  SITEMAP_ELIGIBLE_SCP_STATUSES,
+  SITEMAP_ELIGIBLE_SP_STATUSES,
+  sqlInLiteral,
+} from "../seo/constants/seo-status.js";
+
+const SCP_STATUS_FILTER = sqlInLiteral(SITEMAP_ELIGIBLE_SCP_STATUSES);
+const SP_STATUS_FILTER = sqlInLiteral(SITEMAP_ELIGIBLE_SP_STATUSES);
 
 function clampLimit(limit) {
   const n = Number(limit);
@@ -43,9 +51,9 @@ async function listEntries({ limit = 10000, type = null, state = null } = {}) {
   const safeLimit = clampLimit(limit);
   const conditions = [
     `scp.path IS NOT NULL`,
-    `scp.status IN ('published', 'planned')`,
+    `scp.status ${SCP_STATUS_FILTER}`,
     `(sp.id IS NULL OR sp.is_indexable = TRUE)`,
-    `(sp.id IS NULL OR sp.status IN ('published', 'review_required'))`,
+    `(sp.id IS NULL OR sp.status ${SP_STATUS_FILTER})`,
   ];
 
   const params = [];
