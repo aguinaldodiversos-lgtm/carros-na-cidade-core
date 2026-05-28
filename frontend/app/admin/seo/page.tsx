@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   adminApi,
   type SeoOverview,
@@ -9,6 +9,11 @@ import {
   type SeoSitemapSummary,
   type SeoIssue,
 } from "@/lib/admin/api";
+import {
+  sortPublicationsById,
+  nextIndexableValue,
+  applyIndexableUpdate,
+} from "@/lib/admin/seo-publications";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
 import { AdminKpiCard } from "@/components/admin/AdminKpiCard";
 import { AdminFiltersBar } from "@/components/admin/AdminFiltersBar";
@@ -169,7 +174,16 @@ function PublicationsTab() {
 
   const list = useAdminFetch(() => adminApi.seo.publications(buildParams()), [offset, activeFilters]);
 
-  const rows = (list.data?.data ?? []) as SeoPublicationRow[];
+  // Estado local das linhas, sincronizado com o fetch. Permite update otimista
+  // após uma mutação SEM reload (a linha não recarrega nem "pula" de posição).
+  const [rows, setRows] = useState<SeoPublicationRow[]>([]);
+  useEffect(() => {
+    setRows((list.data?.data ?? []) as SeoPublicationRow[]);
+  }, [list.data]);
+
+  // Ordenação estável por id: independente do updated_at retornado pelo backend,
+  // a linha alvo permanece na mesma posição entre ações consecutivas.
+  const sortedRows = sortPublicationsById(rows);
   const total = list.data?.total ?? 0;
 
   function handleSearch() {
@@ -188,13 +202,20 @@ function PublicationsTab() {
   }
 
   async function handleToggleIndexable(row: SeoPublicationRow, reason: string) {
+    // Valor-alvo capturado explicitamente da linha clicada (puro, testável).
+    // Não recomputar `!row.is_indexable` em pontos diferentes — o payload tem
+    // que casar exatamente com o rótulo do botão que o operador viu.
+    const targetIndexable = nextIndexableValue(row);
     try {
-      await adminApi.seo.updatePublication(row.id, { is_indexable: !row.is_indexable }, reason);
+      await adminApi.seo.updatePublication(row.id, { is_indexable: targetIndexable }, reason);
       setSelected(null);
-      await list.reload();
+      // Update otimista SOMENTE da linha alvo (por id): mantém posição e ordem,
+      // evita o reload que reordenava a tabela e fazia o operador errar o alvo
+      // na ação seguinte.
+      setRows((cur) => applyIndexableUpdate(cur, row.id, targetIndexable));
       showFlash(
         "success",
-        `Publicação #${row.id} ${row.is_indexable ? "noindex" : "indexável"}.`
+        `Publicação #${row.id} marcada como ${targetIndexable ? "indexável" : "noindex"}.`
       );
     } catch (err) {
       showFlash("error", err instanceof Error ? err.message : "Falha ao atualizar.");
@@ -258,7 +279,7 @@ function PublicationsTab() {
         <AdminLoadingState message="Carregando publicações…" />
       ) : list.error ? (
         <AdminErrorState message={list.error} onRetry={list.reload} />
-      ) : rows.length === 0 ? (
+      ) : sortedRows.length === 0 ? (
         <div className="rounded-xl border border-cnc-line bg-white shadow-card">
           <AdminEmptyState message="Nenhuma publicação encontrada com esses filtros." />
         </div>
@@ -281,7 +302,7 @@ function PublicationsTab() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {sortedRows.map((r) => (
                   <tr key={r.id} className="border-t border-cnc-line/60">
                     <td className="px-4 py-2.5 font-mono text-cnc-muted">#{r.id}</td>
                     <td className="px-4 py-2.5 font-mono text-cnc-text max-w-[280px] truncate">
