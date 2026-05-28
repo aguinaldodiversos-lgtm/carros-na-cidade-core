@@ -1,4 +1,23 @@
 // frontend/lib/seo/sitemap-client.ts
+//
+// Cliente SSR/BFF para os endpoints públicos de sitemap do backend core.
+//
+// Histórico (Fase 3.1): este módulo usava um `getApiBaseUrl()` próprio (lia só
+// API_URL/NEXT_PUBLIC_API_URL, SEM fallback de produção) e um `fetchJsonSafe`
+// cru que NÃO enviava os headers internos (UA cnc-internal/1.0 + X-Internal-Token).
+// Resultado em prod: os XML de /sitemaps/*.xml ficavam vazios porque:
+//   1. sem env explícita, a base resolvia "" → retorno [] imediato;
+//   2. mesmo resolvendo, o backend (BAD_BOTS_BLOCKED + sitemapRateLimit 5/min)
+//      bloqueava a chamada sem token.
+//
+// Correção: alinhar ao mesmo padrão dos demais loaders SSR do frontend —
+//   - `resolveInternalBackendApiUrl()` (Private Network quando configurada,
+//     fallback público com URL de produção embutida);
+//   - `ssrResilientFetch()` que injeta os internal headers em server-side e
+//     faz retry/backoff para cold-start e 429.
+
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 export interface PublicSitemapEntry {
   loc: string;
@@ -16,39 +35,7 @@ interface PublicSitemapResponse {
   data: PublicSitemapEntry[];
 }
 
-function stripTrailingSlash(url: string) {
-  return url.replace(/\/+$/, "");
-}
-
-function getApiBaseUrl(): string {
-  // prioridade: API_URL (server) > NEXT_PUBLIC_API_URL (client) > vazio
-  const api = process.env.API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim() || "";
-
-  return api ? stripTrailingSlash(api) : "";
-}
-
-async function fetchJsonSafe<T>(
-  url: string,
-  revalidateSeconds = 3600,
-  timeoutMs = 8000
-): Promise<T | null> {
-  try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), timeoutMs);
-
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      next: { revalidate: revalidateSeconds },
-      signal: controller.signal,
-    }).finally(() => clearTimeout(t));
-
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
+const SITEMAP_REVALIDATE_SECONDS = 3600;
 
 function normalizeEntry(entry: PublicSitemapEntry): PublicSitemapEntry {
   return {
@@ -86,49 +73,60 @@ function dedupeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {
   return [...map.values()];
 }
 
+/**
+ * Busca uma resposta de sitemap do backend e devolve as entries normalizadas.
+ *
+ * Degrade gracioso: retorna `[]` em qualquer falha (URL não resolvida, !ok,
+ * parse, rede). NÃO lança — os `route.ts` de sitemap dependem disso para nunca
+ * quebrar o build/runtime quando o backend está fora ou em cold-start.
+ *
+ * `ssrResilientFetch` injeta os headers internos (UA cnc-internal/1.0 +
+ * X-Internal-Token) automaticamente em server-side, então a chamada bypassa o
+ * bot-blocker e o rate-limit de sitemap (5/min) do backend.
+ */
+async function fetchSitemapEntries(path: string): Promise<PublicSitemapEntry[]> {
+  const url = resolveInternalBackendApiUrl(path);
+  if (!url) return [];
+
+  try {
+    const res = await ssrResilientFetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      logTag: "sitemap-client",
+      next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
+    });
+
+    if (!res.ok) return [];
+
+    const json = (await res.json()) as PublicSitemapResponse;
+    if (!json?.success || !Array.isArray(json.data)) return [];
+
+    return dedupeEntries(json.data.map(normalizeEntry));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchPublicSitemap(limit = 50000): Promise<PublicSitemapEntry[]> {
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) return []; // não força localhost em build
-
-  const json = await fetchJsonSafe<PublicSitemapResponse>(
-    `${apiBase}/api/public/seo/sitemap.json?limit=${limit}`,
-    3600
-  );
-
-  if (!json?.success || !Array.isArray(json.data)) return [];
-  return dedupeEntries(json.data.map(normalizeEntry));
+  return fetchSitemapEntries(`/api/public/seo/sitemap.json?limit=${limit}`);
 }
 
 export async function fetchPublicSitemapByType(
   type: string,
   limit = 50000
 ): Promise<PublicSitemapEntry[]> {
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) return [];
-
-  const json = await fetchJsonSafe<PublicSitemapResponse>(
-    `${apiBase}/api/public/seo/sitemap/type/${encodeURIComponent(type)}?limit=${limit}`,
-    3600
+  return fetchSitemapEntries(
+    `/api/public/seo/sitemap/type/${encodeURIComponent(type)}?limit=${limit}`
   );
-
-  if (!json?.success || !Array.isArray(json.data)) return [];
-  return dedupeEntries(json.data.map(normalizeEntry));
 }
 
 export async function fetchPublicSitemapByRegion(
   state: string,
   limit = 50000
 ): Promise<PublicSitemapEntry[]> {
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) return [];
-
-  const json = await fetchJsonSafe<PublicSitemapResponse>(
-    `${apiBase}/api/public/seo/sitemap/region/${encodeURIComponent(state)}?limit=${limit}`,
-    3600
+  return fetchSitemapEntries(
+    `/api/public/seo/sitemap/region/${encodeURIComponent(state)}?limit=${limit}`
   );
-
-  if (!json?.success || !Array.isArray(json.data)) return [];
-  return dedupeEntries(json.data.map(normalizeEntry));
 }
 
 export async function fetchPublicSitemapByTypes(
