@@ -3,7 +3,9 @@ frontend/node_modules/
 .next/
 dist/
 coverage/
-report/
+# Apenas /report na raiz (artefatos do jscpd) — não pegar diretórios `report`
+# aninhados em frontend/app/api/ads/[id]/report (BFF route real da Fase 3.4).
+/report/
 .env
 
 # Cache de fontes de dados externas (gerado por scripts; o .gitkeep mantem o diretorio).

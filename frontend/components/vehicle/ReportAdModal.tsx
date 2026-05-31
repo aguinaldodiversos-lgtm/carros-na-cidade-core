@@ -120,7 +120,7 @@ export function ReportAdModal({ open, onClose, adId, vehicleName }: ReportAdModa
 
       setSuccess(
         payload?.message ||
-          "Denúncia recebida. Nossa equipe vai revisar este anúncio. Obrigado por ajudar a manter o portal seguro."
+          "Denúncia enviada. O anúncio continuará visível até análise da equipe, para evitar bloqueios indevidos por denúncias falsas."
       );
     } catch {
       setError("Falha de conexão. Verifique sua internet e tente novamente.");
