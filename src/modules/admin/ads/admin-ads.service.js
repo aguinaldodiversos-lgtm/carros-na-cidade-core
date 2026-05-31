@@ -3,6 +3,44 @@ import { AD_STATUS, isValidAdStatus } from "../../../shared/constants/status.js"
 import { recordAdminAction } from "../admin.audit.js";
 import * as repo from "./admin-ads.repository.js";
 
+/**
+ * Reason mínimo aceito em ações sensíveis de destaque (Fase 3.2).
+ *
+ * 3 chars permitem "POC", "OK", "ok" se trim. Mas em prática queremos algo
+ * substantivo. O número 3 está alinhado com a regra default discutida no
+ * escopo da Fase 3.2 ("trim().length >= 3"). Mantemos curto para não
+ * frustrar admin com motivos legítimos abreviados; o que NÃO aceitamos é
+ * reason vazio/null/whitespace.
+ *
+ * Limite superior 500 chars (alinhado a admin-seo.service.js:139).
+ */
+const REASON_MIN_LENGTH = 3;
+const REASON_MAX_LENGTH = 500;
+
+/**
+ * Valida reason para ações de destaque manual (grantManualBoost,
+ * setAdHighlight set/clear). Lança AppError 400 se inválido.
+ *
+ * Defesa em profundidade: o frontend já bloqueia o botão via
+ * AdminActionDialog#requireReason, mas qualquer chamada direta ao endpoint
+ * (curl, integração) precisa ser barrada aqui ANTES da mutation/audit.
+ *
+ * @returns {string} reason normalizado (trim + slice MAX)
+ */
+function requireReasonForHighlightAction(reason, action) {
+  if (typeof reason !== "string") {
+    throw new AppError(`Motivo obrigatório para ${action}`, 400);
+  }
+  const trimmed = reason.trim();
+  if (trimmed.length < REASON_MIN_LENGTH) {
+    throw new AppError(
+      `Motivo obrigatório para ${action} (mínimo ${REASON_MIN_LENGTH} caracteres)`,
+      400
+    );
+  }
+  return trimmed.slice(0, REASON_MAX_LENGTH);
+}
+
 export async function listAds(filters) {
   return repo.listAds(filters);
 }
@@ -47,10 +85,17 @@ export async function changeAdStatus(adminUserId, adId, newStatus, reason = null
 }
 
 export async function setAdHighlight(adminUserId, adId, highlightUntil, reason = null) {
+  const clearing = highlightUntil == null;
+  // Reason OBRIGATÓRIO — ação sensível registrada em admin_actions.
+  // Validar ANTES de buscar o anúncio para falhar fechado (Fase 3.2).
+  const normalizedReason = requireReasonForHighlightAction(
+    reason,
+    clearing ? "remover destaque manual" : "definir destaque manual"
+  );
+
   const ad = await repo.findById(adId);
   if (!ad) throw new AppError("Anúncio não encontrado", 404);
 
-  const clearing = highlightUntil == null;
   if (!clearing && ad.status !== AD_STATUS.ACTIVE) {
     throw new AppError("Apenas anúncios ativos podem ser destacados", 400);
   }
@@ -65,7 +110,7 @@ export async function setAdHighlight(adminUserId, adId, highlightUntil, reason =
     targetId: adId,
     oldValue: { highlight_until: oldHighlight },
     newValue: { highlight_until: clearing ? null : highlightUntil },
-    reason,
+    reason: normalizedReason,
   });
 
   return updated;
@@ -97,6 +142,10 @@ export async function setAdPriority(adminUserId, adId, priority, reason = null) 
 }
 
 export async function grantManualBoost(adminUserId, adId, days, reason = null) {
+  // Reason OBRIGATÓRIO — Fase 3.2. Validar ANTES de qualquer leitura ou
+  // mutação, com mensagem específica da ação para facilitar diagnóstico.
+  const normalizedReason = requireReasonForHighlightAction(reason, "aplicar destaque manual");
+
   const numDays = Number(days);
   if (!Number.isFinite(numDays) || numDays < 1 || numDays > 365) {
     throw new AppError("Dias de boost deve ser entre 1 e 365", 400);
@@ -128,7 +177,7 @@ export async function grantManualBoost(adminUserId, adId, days, reason = null) {
     targetId: adId,
     oldValue: { highlight_until: currentHighlight, priority: ad.priority },
     newValue: { highlight_until: newHighlight.toISOString(), priority: newPriority, days: numDays },
-    reason,
+    reason: normalizedReason,
   });
 
   return { ...updated, priority: newPriority, highlight_until: newHighlight.toISOString() };

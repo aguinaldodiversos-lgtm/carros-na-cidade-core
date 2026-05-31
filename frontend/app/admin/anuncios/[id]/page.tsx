@@ -114,14 +114,17 @@ export default function AdminAnuncioDetalhe() {
     if (!Number.isFinite(highlightDays) || highlightDays < 1 || highlightDays > 365) {
       throw new Error("Informe um período entre 1 e 365 dias.");
     }
-    await adminApi.ads.setHighlight(d!.id, highlightDays, reason || undefined);
+    // Reason vem do AdminActionDialog com requireReason — já trimmed e não-vazio.
+    // Não converter para undefined: ação é sensível, audit trail exige o motivo.
+    await adminApi.ads.setHighlight(d!.id, highlightDays, reason);
     setDialog({ type: "none" });
     await refreshAll();
     showFlash("success", `Destaque concedido por ${highlightDays} dia(s).`);
   }
 
   async function handleClearHighlight(reason: string) {
-    await adminApi.ads.clearHighlight(d!.id, reason || undefined);
+    // Dialog "Remover destaque" já tem requireReason; reason vem trimmed e não-vazio.
+    await adminApi.ads.clearHighlight(d!.id, reason);
     setDialog({ type: "none" });
     await refreshAll();
     showFlash("success", "Destaque removido.");
@@ -348,7 +351,8 @@ export default function AdminAnuncioDetalhe() {
           confirmLabel="Destacar"
           confirmColor="warning"
           showReason
-          reasonPlaceholder="Motivo (opcional — ex.: cortesia, ajuste comercial)"
+          requireReason
+          reasonPlaceholder="Motivo (obrigatório — ex.: cortesia, ajuste comercial)"
           extra={
             <label className="block text-xs font-medium text-cnc-muted">
               <span className="mb-1 block">Dias de destaque (1–365)</span>

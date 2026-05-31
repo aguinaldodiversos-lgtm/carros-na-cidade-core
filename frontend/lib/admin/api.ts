@@ -44,9 +44,14 @@ export const adminApi = {
     get: (id: string | number) => adminFetch<ApiOne<AdDetail>>(`ads/${id}`),
     changeStatus: (id: string | number, status: string, reason?: string) =>
       adminFetch<ApiOne<AdRow>>(`ads/${id}/status`, { method: "PATCH", body: { status, reason } }),
-    setHighlight: (id: string | number, days: number, reason?: string) =>
+    // Reason OBRIGATÓRIO em ações de destaque manual (Fase 3.2):
+    // - UI já usa AdminActionDialog#requireReason
+    // - Backend valida em admin-ads.service.js#requireReasonForHighlightAction
+    // O tipo obrigatório no client garante que callers TypeScript não
+    // omitam o campo. Min 3 chars / max 500 — alinhado ao backend.
+    setHighlight: (id: string | number, days: number, reason: string) =>
       adminFetch<ApiOne<AdRow>>(`ads/${id}/highlight`, { method: "PATCH", body: { days, reason } }),
-    clearHighlight: (id: string | number, reason?: string) =>
+    clearHighlight: (id: string | number, reason: string) =>
       adminFetch<ApiOne<AdRow>>(`ads/${id}/highlight`, {
         method: "PATCH",
         body: { highlight_until: null, reason },
