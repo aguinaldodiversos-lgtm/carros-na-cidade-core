@@ -167,8 +167,13 @@ export async function grantManualBoost(adminUserId, adId, days, reason = null) {
 
   const updated = await repo.updateHighlight(adId, newHighlight.toISOString());
 
-  const newPriority = Math.min(99, (ad.priority || 0) + 8);
-  await repo.updatePriority(adId, newPriority);
+  // Fase 3.3: destaque manual mexe APENAS em highlight_until.
+  // O ranking comercial é decidido por `commercialLayerExpr` em
+  // ads-ranking.sql.js — anúncio com `highlight_until > NOW()` já vai
+  // para a camada 4 (acima de Pro/Start/Free) automaticamente. NÃO mexer
+  // em `ads.priority`: priority é eixo manual/admin separado (set_ad_priority),
+  // e somar 8 distorcia o tiebreaker do hybrid_score sem justificativa
+  // documentada (gerou priority=9 inconsistente em prod).
 
   await recordAdminAction({
     adminUserId,
@@ -176,11 +181,15 @@ export async function grantManualBoost(adminUserId, adId, days, reason = null) {
     targetType: "ad",
     targetId: adId,
     oldValue: { highlight_until: currentHighlight, priority: ad.priority },
-    newValue: { highlight_until: newHighlight.toISOString(), priority: newPriority, days: numDays },
+    newValue: {
+      highlight_until: newHighlight.toISOString(),
+      priority: ad.priority, // preservado (informativo no audit)
+      days: numDays,
+    },
     reason: normalizedReason,
   });
 
-  return { ...updated, priority: newPriority, highlight_until: newHighlight.toISOString() };
+  return { ...updated, highlight_until: newHighlight.toISOString() };
 }
 
 export async function getAdMetrics(adId) {

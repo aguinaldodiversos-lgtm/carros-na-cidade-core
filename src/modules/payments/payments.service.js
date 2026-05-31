@@ -946,6 +946,11 @@ export async function applyBoostApproval(client, intent) {
     return { applied: false, reason: "ownership_mismatch" };
   }
 
+  // Fase 3.3: boost mexe APENAS em highlight_until. O ranking comercial
+  // detecta destaque ativo via `highlight_until > NOW()` em commercialLayerExpr
+  // (ads-ranking.sql.js) — anúncio entra na camada 4 automaticamente sem
+  // depender de priority. Somar 8 em priority distorcia o tiebreaker do
+  // hybrid_score e gerou valores inconsistentes (ex: #82 com priority=9).
   await client.query(
     `
     UPDATE ads
@@ -955,7 +960,6 @@ export async function applyBoostApproval(client, intent) {
           THEN highlight_until + ($2 || ' days')::interval
         ELSE NOW() + ($2 || ' days')::interval
       END,
-      priority = LEAST(99, COALESCE(priority, 1) + 8),
       updated_at = NOW()
     WHERE id = $1
       AND status != 'deleted'

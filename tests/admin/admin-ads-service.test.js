@@ -104,7 +104,7 @@ describe("admin ads service", () => {
       );
     });
 
-    it("successfully grants boost and records audit", async () => {
+    it("successfully grants boost and records audit (sem alterar priority — Fase 3.3)", async () => {
       vi.mocked(repo.findById).mockResolvedValue({
         id: "1",
         status: "active",
@@ -112,12 +112,12 @@ describe("admin ads service", () => {
         priority: 5,
       });
       vi.mocked(repo.updateHighlight).mockResolvedValue({ id: "1" });
-      vi.mocked(repo.updatePriority).mockResolvedValue({ id: "1" });
 
       await grantManualBoost("admin1", "1", 7, "promotional");
 
       expect(repo.updateHighlight).toHaveBeenCalled();
-      expect(repo.updatePriority).toHaveBeenCalledWith("1", 13);
+      // Fase 3.3: destaque NÃO mexe em priority — ranking detecta via highlight_until > NOW().
+      expect(repo.updatePriority).not.toHaveBeenCalled();
       expect(recordAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "grant_manual_boost",
@@ -165,7 +165,7 @@ describe("admin ads service", () => {
       );
     });
 
-    it("aceita reason válido, persiste highlight e grava admin_actions com reason trimmed", async () => {
+    it("aceita reason válido, persiste highlight e grava admin_actions com reason trimmed (Fase 3.3: sem priority bump)", async () => {
       vi.mocked(repo.findById).mockResolvedValue({
         id: "82",
         status: "active",
@@ -173,11 +173,12 @@ describe("admin ads service", () => {
         priority: 5,
       });
       vi.mocked(repo.updateHighlight).mockResolvedValue({ id: "82" });
-      vi.mocked(repo.updatePriority).mockResolvedValue({ id: "82" });
 
       await grantManualBoost("admin1", "82", 7, "  Campanha aprovada  ");
 
       expect(repo.updateHighlight).toHaveBeenCalledTimes(1);
+      // Fase 3.3: priority não é alterado (destaque entra na camada 4 via highlight_until).
+      expect(repo.updatePriority).not.toHaveBeenCalled();
       expect(recordAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "grant_manual_boost",
@@ -185,7 +186,7 @@ describe("admin ads service", () => {
           targetId: "82",
           reason: "Campanha aprovada", // trimmed
           oldValue: expect.objectContaining({ highlight_until: null, priority: 5 }),
-          newValue: expect.objectContaining({ days: 7, priority: 13 }),
+          newValue: expect.objectContaining({ days: 7, priority: 5 }), // preservado, não +8
         })
       );
     });
@@ -198,13 +199,56 @@ describe("admin ads service", () => {
         priority: 0,
       });
       vi.mocked(repo.updateHighlight).mockResolvedValue({ id: "1" });
-      vi.mocked(repo.updatePriority).mockResolvedValue({ id: "1" });
 
       const longReason = "A".repeat(800);
       await grantManualBoost("admin1", "1", 7, longReason);
 
       const call = recordAdminAction.mock.calls[0][0];
       expect(call.reason.length).toBe(500);
+    });
+
+    // Fase 3.3 — regressão do bug priority=9
+    it("destaque duplicado alonga prazo mas NÃO altera priority", async () => {
+      // Anúncio JÁ destacado: highlight_until no futuro, priority manual=2
+      const currentHighlight = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      vi.mocked(repo.findById).mockResolvedValue({
+        id: "82",
+        status: "active",
+        highlight_until: currentHighlight,
+        priority: 2,
+      });
+      vi.mocked(repo.updateHighlight).mockResolvedValue({ id: "82" });
+
+      await grantManualBoost("admin1", "82", 7, "Renovação de campanha");
+
+      // highlight_until somou +7 dias (alonga) sem mexer em priority
+      expect(repo.updatePriority).not.toHaveBeenCalled();
+      const updateCall = repo.updateHighlight.mock.calls[0];
+      const persistedHighlight = new Date(updateCall[1]);
+      const expected = new Date(new Date(currentHighlight).getTime() + 7 * 24 * 60 * 60 * 1000);
+      expect(Math.abs(persistedHighlight.getTime() - expected.getTime())).toBeLessThan(2000);
+
+      // newValue do audit preserva priority original
+      const audit = recordAdminAction.mock.calls[0][0];
+      expect(audit.newValue.priority).toBe(2);
+    });
+
+    it("anúncio com priority=1 e boost → newValue.priority continua 1 (não vira 9)", async () => {
+      // Regressão direta do bug observado em #82: priority começou em 1, virou 9 após boost.
+      vi.mocked(repo.findById).mockResolvedValue({
+        id: "82",
+        status: "active",
+        highlight_until: null,
+        priority: 1,
+      });
+      vi.mocked(repo.updateHighlight).mockResolvedValue({ id: "82" });
+
+      await grantManualBoost("admin1", "82", 7, "Validação Fase 3.3");
+
+      expect(repo.updatePriority).not.toHaveBeenCalled();
+      const audit = recordAdminAction.mock.calls[0][0];
+      expect(audit.newValue.priority).toBe(1);
+      expect(audit.newValue.priority).not.toBe(9);
     });
   });
 

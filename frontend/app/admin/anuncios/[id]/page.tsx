@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { adminApi, type AdDetail, type AdMetrics, type AdEvent } from "@/lib/admin/api";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
+import { isHighlightActive } from "@/lib/admin/ads-display";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
@@ -182,10 +183,16 @@ export default function AdminAnuncioDetalhe() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
             <InfoRow label="Preço" value={money(d.price)} />
             <InfoRow label="Plano" value={d.plan || "—"} />
-            <InfoRow label="Prioridade" value={String(d.priority)} />
+            <InfoRow label="Prioridade interna" value={String(d.priority)} />
             <InfoRow
               label="Destaque até"
-              value={d.highlight_until ? fmtDate(d.highlight_until) : "Sem destaque"}
+              value={
+                isHighlightActive(d.highlight_until)
+                  ? `${fmtDate(d.highlight_until)} (★ ativo)`
+                  : d.highlight_until
+                    ? `${fmtDate(d.highlight_until)} (expirado)`
+                    : "Sem destaque"
+              }
             />
             <InfoRow label="Combustível" value={d.fuel_type || "—"} />
             <InfoRow label="Câmbio" value={d.transmission || "—"} />

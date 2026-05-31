@@ -166,6 +166,31 @@ describe("buildAdsSearchQuery — filtros combinados (Fase 3 ortogonal aos legad
     // (Decisão dessa fase: countQuery atual continua simples.)
     expect(sql).toContain("a.status");
   });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Fase 3.3 — regressão: anúncio blocked não pode vazar no público
+  // ──────────────────────────────────────────────────────────────────
+  it("status SEMPRE filtrado por 'active' (defesa contra regressão Fase 3.3)", () => {
+    const cases = [{}, { city_slug: "atibaia-sp" }, { brand: "honda" }, { highlight_only: true }];
+    for (const filters of cases) {
+      const { dataQuery, countQuery } = buildAdsSearchQuery(filters);
+      // dataQuery e countQuery devem incluir literalmente "status = 'active'".
+      // Nunca aceitar 'status != deleted' / 'status IN (...amplo...)' nem filtro ausente
+      // — anúncios blocked/paused/rejected nunca podem aparecer em listagem pública.
+      expect(normalize(dataQuery)).toMatch(/a\.status\s*=\s*'active'/i);
+      expect(normalize(countQuery)).toMatch(/a\.status\s*=\s*'active'/i);
+      expect(normalize(dataQuery)).not.toMatch(/a\.status\s*!=\s*'deleted'/i);
+      expect(normalize(dataQuery)).not.toMatch(/a\.status\s+IN\s*\(/i);
+    }
+  });
+
+  it("anúncio blocked: query NUNCA contém status='blocked' como aceito", () => {
+    const { dataQuery } = buildAdsSearchQuery({ city_slug: "atibaia-sp" });
+    const sql = normalize(dataQuery);
+    expect(sql).not.toMatch(/status\s*=\s*'blocked'/i);
+    expect(sql).not.toMatch(/status\s*=\s*'paused'/i);
+    expect(sql).not.toMatch(/status\s*=\s*'rejected'/i);
+  });
 });
 
 describe("adsFilterQuerySchema — validação dos novos filtros", () => {

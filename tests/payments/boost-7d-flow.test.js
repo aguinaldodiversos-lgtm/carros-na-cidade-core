@@ -240,7 +240,7 @@ describe("applyBoostApproval — regra de prazo +N dias", () => {
     expect(String(sql)).toMatch(/ELSE\s+NOW\(\)/i);
   });
 
-  it("priority sobe no MÁXIMO até 99 (não dispara escala infinita em compras múltiplas)", async () => {
+  it("boost NÃO altera priority (Fase 3.3 — destaque entra na camada 4 via highlight_until > NOW())", async () => {
     const client = makeClient();
     await applyBoostApproval(client, {
       id: "intent-1",
@@ -250,7 +250,14 @@ describe("applyBoostApproval — regra de prazo +N dias", () => {
     });
     const updateCall = findUpdateAdsCall(client);
     const [sql] = updateCall;
-    expect(String(sql)).toMatch(/LEAST\(99,\s*COALESCE\(priority,\s*1\)\s*\+\s*8\)/);
+    // Antes da Fase 3.3 o SQL fazia `priority = LEAST(99, COALESCE(priority, 1) + 8)`.
+    // Isso distorcia o tiebreaker do hybrid_score sem justificativa e gerava
+    // valores inconsistentes em prod (ex: ad #82 com priority=9). O destaque já é
+    // detectado pelo commercialLayerExpr (ads-ranking.sql.js) via `highlight_until > NOW()`.
+    expect(String(sql)).not.toMatch(/priority\s*=/i);
+    expect(String(sql)).not.toMatch(/LEAST\s*\(\s*99/i);
+    // highlight_until continua a ser estendido
+    expect(String(sql)).toMatch(/highlight_until\s*=/i);
   });
 
   it("no-op quando ad_id ausente (não toca banco)", async () => {

@@ -4,6 +4,11 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi, type AdRow } from "@/lib/admin/api";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
+import {
+  isHighlightActive,
+  ADMIN_PRIORITY_COLUMN_LABEL,
+  ADMIN_PRIORITY_COLUMN_HINT,
+} from "@/lib/admin/ads-display";
 import { AdminFiltersBar } from "@/components/admin/AdminFiltersBar";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminPagination } from "@/components/admin/AdminPagination";
@@ -108,7 +113,13 @@ export default function AdminAnuncios() {
                     Plano
                   </th>
                   <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
-                    Prioridade
+                    Destaque
+                  </th>
+                  <th
+                    className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider"
+                    title={ADMIN_PRIORITY_COLUMN_HINT}
+                  >
+                    {ADMIN_PRIORITY_COLUMN_LABEL}
                   </th>
                   <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
                     Data
@@ -140,6 +151,22 @@ export default function AdminAnuncios() {
                       <AdminStatusBadge status={ad.status} />
                     </td>
                     <td className="px-4 py-2.5 capitalize text-cnc-muted">{ad.plan || "—"}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      {isHighlightActive(ad.highlight_until) ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800"
+                          title={
+                            ad.highlight_until
+                              ? `Destaque ativo até ${new Date(ad.highlight_until).toLocaleString("pt-BR")}`
+                              : "Destaque ativo"
+                          }
+                        >
+                          ★ Destaque
+                        </span>
+                      ) : (
+                        <span className="text-cnc-muted">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-center font-mono text-cnc-muted">
                       {ad.priority}
                     </td>
