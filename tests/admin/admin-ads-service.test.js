@@ -21,6 +21,8 @@ vi.mock("../../src/modules/admin/ads/admin-ads.repository.js", () => ({
   getAdMetrics: vi.fn(),
   getAdEvents: vi.fn(),
   listAds: vi.fn(),
+  archiveAd: vi.fn(),
+  restoreAd: vi.fn(),
 }));
 
 import * as repo from "../../src/modules/admin/ads/admin-ads.repository.js";
@@ -29,6 +31,8 @@ import {
   setAdPriority,
   grantManualBoost,
   setAdHighlight,
+  archiveAd,
+  restoreAd,
 } from "../../src/modules/admin/ads/admin-ads.service.js";
 
 const VALID_REASON = "Campanha promocional aprovada";
@@ -328,6 +332,154 @@ describe("admin ads service", () => {
         setAdHighlight("admin1", "1", "2026-06-30T00:00:00.000Z", VALID_REASON)
       ).rejects.toThrow(/anúncios ativos podem ser destacados/);
       expect(recordAdminAction).not.toHaveBeenCalled();
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // Fase 3.5 — Arquivar / restaurar anúncio (preserva histórico)
+  // ──────────────────────────────────────────────────────────────────
+  describe("archiveAd — reason obrigatório (Fase 3.5)", () => {
+    it("rejeita sem reason ANTES de qualquer leitura/escrita", async () => {
+      await expect(archiveAd("admin1", "1", null)).rejects.toThrow(/Motivo obrigatório/);
+      expect(repo.findById).not.toHaveBeenCalled();
+      expect(repo.archiveAd).not.toHaveBeenCalled();
+      expect(recordAdminAction).not.toHaveBeenCalled();
+    });
+
+    it("rejeita reason undefined/vazio/whitespace/curto", async () => {
+      await expect(archiveAd("admin1", "1", undefined)).rejects.toThrow(/Motivo obrigatório/);
+      await expect(archiveAd("admin1", "1", "")).rejects.toThrow(/Motivo obrigatório/);
+      await expect(archiveAd("admin1", "1", "   ")).rejects.toThrow(/Motivo obrigatório/);
+      await expect(archiveAd("admin1", "1", "ok")).rejects.toThrow(/mínimo 3/);
+      expect(repo.archiveAd).not.toHaveBeenCalled();
+    });
+
+    it("rejeita 404 quando anúncio não existe (com reason válido)", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce(null);
+      await expect(archiveAd("admin1", "999", VALID_REASON)).rejects.toThrow(/não encontrado/);
+      expect(repo.archiveAd).not.toHaveBeenCalled();
+    });
+
+    it("rejeita arquivar anúncio já deletado", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce({ id: "1", status: "deleted" });
+      await expect(archiveAd("admin1", "1", VALID_REASON)).rejects.toThrow(
+        /deletado não pode ser arquivado/
+      );
+      expect(repo.archiveAd).not.toHaveBeenCalled();
+    });
+
+    it("idempotência: arquivar archived é no-op (sem repo.archiveAd, sem admin_action)", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce({
+        id: "1",
+        status: "archived",
+        archived_at: "2026-05-31T00:00:00Z",
+      });
+      const result = await archiveAd("admin1", "1", VALID_REASON);
+      expect(repo.archiveAd).not.toHaveBeenCalled();
+      expect(recordAdminAction).not.toHaveBeenCalled();
+      expect(result.status).toBe("archived");
+    });
+
+    it("happy path: archiveAd grava status='archived' + archived_at + admin_action com old/new snapshot", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce({
+        id: "82",
+        status: "active",
+        highlight_until: "2026-06-01T00:00:00Z",
+        priority: 3,
+      });
+      vi.mocked(repo.archiveAd).mockResolvedValueOnce({
+        id: "82",
+        status: "archived",
+        archived_at: "2026-05-31T12:00:00Z",
+        archived_by_user_id: "admin1",
+        archive_reason: "Limpeza operacional",
+      });
+
+      const result = await archiveAd("admin1", "82", "  Limpeza operacional  ");
+
+      expect(repo.archiveAd).toHaveBeenCalledWith("82", "admin1", "Limpeza operacional");
+      expect(recordAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "archive_ad",
+          targetType: "ad",
+          targetId: "82",
+          reason: "Limpeza operacional",
+          oldValue: expect.objectContaining({
+            status: "active",
+            highlight_until: "2026-06-01T00:00:00Z",
+            priority: 3,
+          }),
+          newValue: expect.objectContaining({
+            status: "archived",
+            reason: "Limpeza operacional",
+          }),
+        })
+      );
+      expect(result.status).toBe("archived");
+    });
+
+    it("rejeita reason não-string (number, object)", async () => {
+      await expect(archiveAd("admin1", "1", 42)).rejects.toThrow(/Motivo obrigatório/);
+      await expect(archiveAd("admin1", "1", { reason: "x" })).rejects.toThrow(/Motivo obrigatório/);
+    });
+  });
+
+  describe("restoreAd (Fase 3.5)", () => {
+    it("rejeita sem reason", async () => {
+      await expect(restoreAd("admin1", "1", null)).rejects.toThrow(/Motivo obrigatório/);
+      expect(repo.restoreAd).not.toHaveBeenCalled();
+    });
+
+    it("rejeita status alvo inválido (ex: blocked, archived)", async () => {
+      await expect(restoreAd("admin1", "1", VALID_REASON, "blocked")).rejects.toThrow(/inválido/);
+      await expect(restoreAd("admin1", "1", VALID_REASON, "archived")).rejects.toThrow(/inválido/);
+      expect(repo.restoreAd).not.toHaveBeenCalled();
+    });
+
+    it("rejeita quando anúncio não está archived (ex: active)", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce({ id: "1", status: "active" });
+      await expect(restoreAd("admin1", "1", VALID_REASON)).rejects.toThrow(/não está arquivado/);
+      expect(repo.restoreAd).not.toHaveBeenCalled();
+    });
+
+    it("happy path: restore arquivado → ativo, registra admin_action restore_ad", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce({
+        id: "82",
+        status: "archived",
+        archived_at: "2026-05-31T12:00:00Z",
+        archive_reason: "Limpeza operacional",
+      });
+      vi.mocked(repo.restoreAd).mockResolvedValueOnce({ id: "82", status: "active" });
+
+      await restoreAd("admin1", "82", "Anunciante pediu retorno", "active");
+
+      expect(repo.restoreAd).toHaveBeenCalledWith("82", "active");
+      expect(recordAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "restore_ad",
+          targetType: "ad",
+          targetId: "82",
+          reason: "Anunciante pediu retorno",
+          oldValue: expect.objectContaining({
+            status: "archived",
+            archive_reason: "Limpeza operacional",
+          }),
+          newValue: expect.objectContaining({ status: "active" }),
+        })
+      );
+    });
+
+    it("happy path: restore para paused também é permitido", async () => {
+      vi.mocked(repo.findById).mockResolvedValueOnce({ id: "82", status: "archived" });
+      vi.mocked(repo.restoreAd).mockResolvedValueOnce({ id: "82", status: "paused" });
+      await restoreAd("admin1", "82", VALID_REASON, "paused");
+      expect(repo.restoreAd).toHaveBeenCalledWith("82", "paused");
+      expect(recordAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "restore_ad",
+          newValue: expect.objectContaining({ status: "paused" }),
+        })
+      );
     });
   });
 });

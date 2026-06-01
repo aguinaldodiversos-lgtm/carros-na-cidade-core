@@ -162,6 +162,25 @@ router.get(
   })
 );
 
+// Fase 3.5 — Arquivar / restaurar anúncio
+router.patch(
+  "/ads/:id/archive",
+  asyncHandler(async (req, res) => {
+    const { reason } = req.body || {};
+    const updated = await adsService.archiveAd(req.user.id, req.params.id, reason);
+    res.json({ ok: true, data: updated });
+  })
+);
+
+router.patch(
+  "/ads/:id/restore",
+  asyncHandler(async (req, res) => {
+    const { reason, status } = req.body || {};
+    const updated = await adsService.restoreAd(req.user.id, req.params.id, reason, status);
+    res.json({ ok: true, data: updated });
+  })
+);
+
 router.get(
   "/ads/:id/events",
   asyncHandler(async (req, res) => {

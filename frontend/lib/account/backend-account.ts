@@ -361,6 +361,17 @@ export async function fetchOwnedAd(session: SessionData, adId: string) {
   });
 }
 
+/**
+ * Histórico de anúncios do dono: archived / sold / expired.
+ * NÃO inclui ativos nem em moderação (esses ficam em /dashboard).
+ * Fase 3.5.
+ */
+export async function fetchOwnedHistoryAds(session: SessionData) {
+  return fetchBackendJson<{ ads: DashboardPayload["active_ads"] }>(`/api/account/ads/history`, {
+    accessToken: assertAccessToken(session),
+  });
+}
+
 export async function fetchPlanEligibility(session: SessionData) {
   return fetchBackendJson<{
     allowed: boolean;

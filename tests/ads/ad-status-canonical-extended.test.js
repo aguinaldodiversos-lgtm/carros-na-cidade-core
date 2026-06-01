@@ -12,8 +12,8 @@ import {
   isValidAdStatus,
 } from "../../src/shared/constants/status.js";
 
-describe("AD_STATUS — enum canônico expandido (rodada antifraude)", () => {
-  it("inclui todos os 9 status do contrato atual", () => {
+describe("AD_STATUS — enum canônico expandido (rodada antifraude + Fase 3.5 archived)", () => {
+  it("inclui todos os 10 status do contrato atual", () => {
     expect(AD_STATUS.DRAFT).toBe("draft");
     expect(AD_STATUS.PENDING_REVIEW).toBe("pending_review");
     expect(AD_STATUS.ACTIVE).toBe("active");
@@ -23,6 +23,7 @@ describe("AD_STATUS — enum canônico expandido (rodada antifraude)", () => {
     expect(AD_STATUS.REJECTED).toBe("rejected");
     expect(AD_STATUS.DELETED).toBe("deleted");
     expect(AD_STATUS.BLOCKED).toBe("blocked");
+    expect(AD_STATUS.ARCHIVED).toBe("archived"); // Fase 3.5
   });
 
   it("AD_STATUS_PUBLIC contém SOMENTE active", () => {
@@ -43,6 +44,10 @@ describe("AD_STATUS — enum canônico expandido (rodada antifraude)", () => {
     expect(AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC).not.toContain(AD_STATUS.DELETED);
   });
 
+  it("AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC inclui ARCHIVED (Fase 3.5)", () => {
+    expect(AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC).toContain(AD_STATUS.ARCHIVED);
+  });
+
   it("AD_STATUS_OWNER_OPERABLE inclui pending_review e rejected (dono pode visualizar/corrigir)", () => {
     expect(AD_STATUS_OWNER_OPERABLE).toContain(AD_STATUS.PENDING_REVIEW);
     expect(AD_STATUS_OWNER_OPERABLE).toContain(AD_STATUS.REJECTED);
@@ -56,11 +61,12 @@ describe("AD_STATUS — enum canônico expandido (rodada antifraude)", () => {
     expect(AD_RISK_LEVEL.CRITICAL).toBe("critical");
   });
 
-  it("isValidAdStatus aceita todos os 9 status e rejeita unknown", () => {
+  it("isValidAdStatus aceita todos os 10 status (incl. archived) e rejeita unknown", () => {
     for (const v of Object.values(AD_STATUS)) {
       expect(isValidAdStatus(v)).toBe(true);
     }
-    expect(isValidAdStatus("archived")).toBe(false);
+    expect(isValidAdStatus("archived")).toBe(true); // Fase 3.5
     expect(isValidAdStatus("foo")).toBe(false);
+    expect(isValidAdStatus("reserved")).toBe(false);
   });
 });

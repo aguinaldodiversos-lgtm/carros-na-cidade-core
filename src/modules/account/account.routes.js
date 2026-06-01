@@ -6,6 +6,7 @@ import {
   getDashboardPayload,
   getOwnedAd,
   listBoostOptionsAsync,
+  listOwnedHistoryAds,
   listPlans,
   resolvePublishEligibility,
   updateOwnedAdStatus,
@@ -71,6 +72,16 @@ router.get(
     res.json({
       boost_options: await listBoostOptionsAsync(),
     });
+  })
+);
+
+// Fase 3.5 — Histórico do anunciante (archived/sold/expired)
+// Não inclui ativos nem em moderação (esses ficam em /dashboard.ads).
+router.get(
+  "/ads/history",
+  asyncHandler(async (req, res) => {
+    const ads = await listOwnedHistoryAds(req.user.id);
+    res.json({ ads });
   })
 );
 

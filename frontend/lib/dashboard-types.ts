@@ -24,7 +24,9 @@ export type DashboardAdStatus =
   | "rejected"
   | "sold"
   | "expired"
-  | "blocked";
+  | "blocked"
+  // Fase 3.5 — anúncio arquivado: sai do público, aparece em Histórico do dono.
+  | "archived";
 export type DashboardPriorityLevel = "normal" | "high";
 
 export type DashboardAd = {

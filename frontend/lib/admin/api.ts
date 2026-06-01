@@ -56,6 +56,17 @@ export const adminApi = {
         method: "PATCH",
         body: { highlight_until: null, reason },
       }),
+    // Fase 3.5 — Arquivar / restaurar anúncio (reason obrigatório)
+    archive: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<AdRow>>(`ads/${id}/archive`, {
+        method: "PATCH",
+        body: { reason },
+      }),
+    restore: (id: string | number, reason: string, status: "active" | "paused" = "active") =>
+      adminFetch<ApiOne<AdRow>>(`ads/${id}/restore`, {
+        method: "PATCH",
+        body: { reason, status },
+      }),
     setPriority: (id: string | number, priority: number, reason?: string) =>
       adminFetch<ApiOne<AdRow>>(`ads/${id}/priority`, {
         method: "PATCH",

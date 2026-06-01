@@ -39,7 +39,9 @@ type DialogState =
   | { type: "status"; target: StatusTarget }
   | { type: "highlight" }
   | { type: "clearHighlight" }
-  | { type: "priority" };
+  | { type: "priority" }
+  | { type: "archive" }
+  | { type: "restore" };
 
 const SENSITIVE_STATUS: ReadonlyArray<StatusTarget> = ["blocked", "paused"];
 
@@ -129,6 +131,21 @@ export default function AdminAnuncioDetalhe() {
     setDialog({ type: "none" });
     await refreshAll();
     showFlash("success", "Destaque removido.");
+  }
+
+  // Fase 3.5 — arquivar/restaurar (reason obrigatório, dialog com requireReason).
+  async function handleArchive(reason: string) {
+    await adminApi.ads.archive(d!.id, reason);
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash("success", `Anúncio #${d!.id} arquivado. Continua no histórico.`);
+  }
+
+  async function handleRestore(reason: string) {
+    await adminApi.ads.restore(d!.id, reason, "active");
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash("success", `Anúncio #${d!.id} restaurado para ativo.`);
   }
 
   async function handleSetPriority(reason: string) {
@@ -287,6 +304,20 @@ export default function AdminAnuncioDetalhe() {
                   setDialog({ type: "priority" });
                 }}
               />
+              {d.status !== "archived" && d.status !== "deleted" && (
+                <ActionBtn
+                  label="Arquivar"
+                  color="bg-slate-600 text-white"
+                  onClick={() => setDialog({ type: "archive" })}
+                />
+              )}
+              {d.status === "archived" && (
+                <ActionBtn
+                  label="Restaurar (ativar)"
+                  color="bg-cnc-success text-white"
+                  onClick={() => setDialog({ type: "restore" })}
+                />
+              )}
             </div>
           </div>
 
@@ -416,6 +447,43 @@ export default function AdminAnuncioDetalhe() {
             </label>
           }
           onConfirm={handleSetPriority}
+          onCancel={() => setDialog({ type: "none" })}
+        />
+      )}
+
+      {dialog.type === "archive" && (
+        <AdminActionDialog
+          open
+          title="Arquivar anúncio?"
+          description={
+            `Anúncio #${d.id} será removido das páginas públicas (catálogo, busca, sitemap, detalhe), ` +
+            `mas continuará salvo no histórico do anunciante e visível no painel admin com filtro "Arquivado". ` +
+            `Não é exclusão definitiva.`
+          }
+          confirmLabel="Arquivar"
+          confirmColor="warning"
+          showReason
+          requireReason
+          reasonPlaceholder="Motivo (obrigatório — registrado em admin_actions)"
+          onConfirm={handleArchive}
+          onCancel={() => setDialog({ type: "none" })}
+        />
+      )}
+
+      {dialog.type === "restore" && (
+        <AdminActionDialog
+          open
+          title="Restaurar anúncio?"
+          description={
+            `Anúncio #${d.id} sairá do histórico arquivado e voltará para "Ativo". ` +
+            `Passará a aparecer no catálogo público novamente.`
+          }
+          confirmLabel="Restaurar como ativo"
+          confirmColor="primary"
+          showReason
+          requireReason
+          reasonPlaceholder="Motivo (obrigatório — registrado em admin_actions)"
+          onConfirm={handleRestore}
           onCancel={() => setDialog({ type: "none" })}
         />
       )}

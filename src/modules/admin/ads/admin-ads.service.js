@@ -41,6 +41,24 @@ function requireReasonForHighlightAction(reason, action) {
   return trimmed.slice(0, REASON_MAX_LENGTH);
 }
 
+/**
+ * Validação compartilhada de reason para arquivar/restaurar (Fase 3.5).
+ * Mesma regra de min/max do destaque manual — mensagem específica por ação.
+ */
+function requireReasonForArchiveAction(reason, action) {
+  if (typeof reason !== "string") {
+    throw new AppError(`Motivo obrigatório para ${action}`, 400);
+  }
+  const trimmed = reason.trim();
+  if (trimmed.length < REASON_MIN_LENGTH) {
+    throw new AppError(
+      `Motivo obrigatório para ${action} (mínimo ${REASON_MIN_LENGTH} caracteres)`,
+      400
+    );
+  }
+  return trimmed.slice(0, REASON_MAX_LENGTH);
+}
+
 export async function listAds(filters) {
   return repo.listAds(filters);
 }
@@ -190,6 +208,108 @@ export async function grantManualBoost(adminUserId, adId, days, reason = null) {
   });
 
   return { ...updated, highlight_until: newHighlight.toISOString() };
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Fase 3.5 — Arquivar / restaurar anúncio (substitui "deletar" como
+// ação operacional comum, preservando histórico)
+// ───────────────────────────────────────────────────────────────────
+
+/**
+ * Arquiva um anúncio (remove do catálogo público preservando o registro
+ * para histórico do anunciante, auditoria e métricas).
+ *
+ * Diferenças em relação a outros estados:
+ *   - blocked  → moderação/fraude (preenche blocked_reason/blocked_at)
+ *   - deleted  → soft-delete (legado, evitar como ação comum)
+ *   - archived → limpeza operacional, NÃO é punição
+ *
+ * Reason OBRIGATÓRIO (defesa em profundidade — UI também exige).
+ * Idempotência: se já archived, no-op (sem nova admin_action, sem update).
+ */
+export async function archiveAd(adminUserId, adId, reason) {
+  const normalizedReason = requireReasonForArchiveAction(reason, "arquivar anúncio");
+
+  const ad = await repo.findById(adId);
+  if (!ad) throw new AppError("Anúncio não encontrado", 404);
+
+  if (ad.status === AD_STATUS.ARCHIVED) {
+    // Já arquivado — devolver o estado atual sem registrar admin_action
+    // (evita poluir auditoria com duplicatas em retries idempotentes).
+    return ad;
+  }
+
+  if (ad.status === AD_STATUS.DELETED) {
+    throw new AppError("Anúncio deletado não pode ser arquivado por esta via", 400);
+  }
+
+  const updated = await repo.archiveAd(adId, String(adminUserId), normalizedReason);
+
+  await recordAdminAction({
+    adminUserId,
+    action: "archive_ad",
+    targetType: "ad",
+    targetId: adId,
+    oldValue: {
+      status: ad.status,
+      highlight_until: ad.highlight_until,
+      priority: ad.priority,
+    },
+    newValue: {
+      status: AD_STATUS.ARCHIVED,
+      archived_at: updated?.archived_at ?? null,
+      reason: normalizedReason,
+    },
+    reason: normalizedReason,
+  });
+
+  return updated;
+}
+
+/**
+ * Restaura um anúncio arquivado para um status operacional.
+ * Default `'active'`; caller pode passar `'paused'` se preferir reativar em
+ * modo silencioso. `'archived' → 'blocked'` NÃO é permitido por esta via
+ * (use changeAdStatus se a intenção for bloquear após restauração).
+ */
+const RESTORE_ALLOWED_TARGETS = Object.freeze([AD_STATUS.ACTIVE, AD_STATUS.PAUSED]);
+
+export async function restoreAd(adminUserId, adId, reason, newStatus = AD_STATUS.ACTIVE) {
+  if (!RESTORE_ALLOWED_TARGETS.includes(newStatus)) {
+    throw new AppError(
+      `Status alvo de restauração inválido. Use um de: ${RESTORE_ALLOWED_TARGETS.join(", ")}`,
+      400
+    );
+  }
+  const normalizedReason = requireReasonForArchiveAction(reason, "restaurar anúncio arquivado");
+
+  const ad = await repo.findById(adId);
+  if (!ad) throw new AppError("Anúncio não encontrado", 404);
+
+  if (ad.status !== AD_STATUS.ARCHIVED) {
+    throw new AppError(
+      `Anúncio não está arquivado (status atual: ${ad.status}). Use changeAdStatus para outros estados.`,
+      400
+    );
+  }
+
+  const updated = await repo.restoreAd(adId, newStatus);
+
+  await recordAdminAction({
+    adminUserId,
+    action: "restore_ad",
+    targetType: "ad",
+    targetId: adId,
+    oldValue: {
+      status: AD_STATUS.ARCHIVED,
+      archived_at: ad.archived_at,
+      archive_reason: ad.archive_reason,
+    },
+    newValue: { status: newStatus, reason: normalizedReason },
+    reason: normalizedReason,
+  });
+
+  return updated;
 }
 
 export async function getAdMetrics(adId) {

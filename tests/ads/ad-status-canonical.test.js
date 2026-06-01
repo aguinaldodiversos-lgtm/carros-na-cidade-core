@@ -36,14 +36,15 @@ describe("AD_STATUS — enum canônico de status de anúncio", () => {
     expect(AD_STATUS_OWNER_OPERABLE).toContain(AD_STATUS.PAUSED);
   });
 
-  it("isKnownAdStatus aceita os status do enum e rejeita strings desconhecidas", () => {
+  it("isKnownAdStatus aceita os status do enum (incl. archived na Fase 3.5) e rejeita strings desconhecidas", () => {
     for (const v of AD_STATUS_VALUES) {
       expect(isKnownAdStatus(v)).toBe(true);
     }
-    // pending_review agora É conhecido (parte do enum).
+    // pending_review e archived são conhecidos.
     expect(isKnownAdStatus("pending_review")).toBe(true);
-    // 'archived' continua não sendo válido.
-    expect(isKnownAdStatus("archived")).toBe(false);
+    expect(isKnownAdStatus("archived")).toBe(true); // Fase 3.5
+    // Strings inexistentes continuam rejeitadas.
+    expect(isKnownAdStatus("reserved")).toBe(false);
     expect(isKnownAdStatus("")).toBe(false);
     expect(isKnownAdStatus(null)).toBe(false);
   });

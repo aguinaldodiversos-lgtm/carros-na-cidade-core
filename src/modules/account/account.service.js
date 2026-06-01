@@ -766,6 +766,53 @@ export async function listOwnedAds(userId) {
   }
 }
 
+/**
+ * Lista anúncios em "histórico" do dono — encerrados/arquivados que NÃO
+ * aparecem em "Meus anúncios" ativos, mas continuam acessíveis para
+ * consulta. Fase 3.5: archived é o foco; sold/expired são preservados
+ * para futuras vendas e expirações automáticas.
+ *
+ * Critério obrigatório: a query NÃO retorna ads com status='active' nem
+ * 'pending_review'/'paused'/'rejected' (esses ficam em listOwnedAds).
+ * `deleted` continua fora — soft-delete não aparece nem aqui.
+ */
+export async function listOwnedHistoryAds(userId) {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        a.id,
+        adv.user_id AS owner_user_id,
+        a.title,
+        a.price,
+        a.status,
+        a.highlight_until,
+        a.created_at,
+        a.updated_at,
+        a.archived_at,
+        a.archive_reason,
+        a.images
+      FROM ads a
+      JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE a.status IN (
+        '${AD_STATUS.ARCHIVED}',
+        '${AD_STATUS.SOLD}',
+        '${AD_STATUS.EXPIRED}'
+      )
+        AND adv.user_id = $1
+      ORDER BY
+        COALESCE(a.archived_at, a.updated_at) DESC NULLS LAST,
+        a.created_at DESC NULLS LAST
+      `,
+      [userId]
+    );
+
+    return result.rows.map(normalizeDashboardAd);
+  } catch {
+    return [];
+  }
+}
+
 export async function getOwnedAd(userId, adId) {
   const result = await pool.query(
     `

@@ -27,6 +27,12 @@
  * blocked         — Administratively blocked (e.g. policy violation). Hidden
  *                   from catalog. Owner sees "blocked" in dashboard. Only admin
  *                   can unblock.
+ * archived        — (Fase 3.5) Removed from catalog as operational cleanup.
+ *                   NÃO é punição. Hidden everywhere public, preserved in
+ *                   owner's history tab and in admin (filter Arquivados).
+ *                   Auditoria em ads.archived_at / archive_reason +
+ *                   admin_actions com action='archive_ad'. Admin pode
+ *                   restaurar via action='restore_ad'.
  *
  * Catalog visibility rule: ONLY ads with status = 'active' appear in public
  * listings and searches. The "highlighted" state is NOT a status — it is
@@ -65,6 +71,7 @@ export const AD_STATUS = Object.freeze({
   REJECTED: "rejected",
   DELETED: "deleted",
   BLOCKED: "blocked",
+  ARCHIVED: "archived",
 });
 
 /**
@@ -109,6 +116,19 @@ export const AD_STATUS_OWNER_HIDDEN_FROM_PUBLIC = Object.freeze([
   AD_STATUS.EXPIRED,
   AD_STATUS.REJECTED,
   AD_STATUS.BLOCKED,
+  AD_STATUS.ARCHIVED, // Fase 3.5 — hidden public, mostrado em histórico do dono
+]);
+
+/**
+ * Status equivalentes a "encerrado / fora de operação" para fins de histórico
+ * do anunciante. archived é o foco (operacional), sold e expired são naturais.
+ * blocked NÃO entra aqui — bloqueio é punição/moderação ativa, deve ter aba
+ * própria caso o produto queira diferenciar.
+ */
+export const AD_STATUS_OWNER_HISTORY = Object.freeze([
+  AD_STATUS.ARCHIVED,
+  AD_STATUS.SOLD,
+  AD_STATUS.EXPIRED,
 ]);
 
 // Compat: nome legado mantido para callers existentes (busca pública).
@@ -121,6 +141,7 @@ export const AD_OWNER_VISIBLE_STATUSES = Object.freeze([
   AD_STATUS.REJECTED,
   AD_STATUS.SOLD,
   AD_STATUS.BLOCKED,
+  AD_STATUS.ARCHIVED, // Fase 3.5 — dono vê em aba Histórico
 ]);
 
 export const AD_NON_DELETED_STATUSES = Object.freeze([
@@ -132,6 +153,7 @@ export const AD_NON_DELETED_STATUSES = Object.freeze([
   AD_STATUS.EXPIRED,
   AD_STATUS.REJECTED,
   AD_STATUS.BLOCKED,
+  AD_STATUS.ARCHIVED, // Fase 3.5 — archived preserva o registro (não é deleted)
 ]);
 
 /** Severidade de risco antifraude (alinhada a ad_risk_signals.severity). */

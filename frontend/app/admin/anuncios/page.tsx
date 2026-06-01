@@ -20,6 +20,7 @@ const STATUS_OPTIONS = [
   { value: "active", label: "Ativo" },
   { value: "paused", label: "Pausado" },
   { value: "blocked", label: "Bloqueado" },
+  { value: "archived", label: "Arquivado" },
   { value: "deleted", label: "Deletado" },
 ];
 

@@ -191,6 +191,16 @@ describe("buildAdsSearchQuery — filtros combinados (Fase 3 ortogonal aos legad
     expect(sql).not.toMatch(/status\s*=\s*'paused'/i);
     expect(sql).not.toMatch(/status\s*=\s*'rejected'/i);
   });
+
+  // Fase 3.5 — regressão: archived nunca aparece no público
+  it("anúncio archived: query NUNCA contém status='archived' como aceito", () => {
+    const cases = [{}, { city_slug: "atibaia-sp" }, { highlight_only: true }];
+    for (const filters of cases) {
+      const { dataQuery, countQuery } = buildAdsSearchQuery(filters);
+      expect(normalize(dataQuery)).not.toMatch(/status\s*=\s*'archived'/i);
+      expect(normalize(countQuery)).not.toMatch(/status\s*=\s*'archived'/i);
+    }
+  });
 });
 
 describe("adsFilterQuerySchema — validação dos novos filtros", () => {

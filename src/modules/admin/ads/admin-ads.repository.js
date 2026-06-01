@@ -103,6 +103,52 @@ export async function updateBlockedReason(id, reason) {
   return result.rows[0] || null;
 }
 
+/**
+ * Arquiva o anúncio (Fase 3.5): seta status='archived' + popula
+ * archived_at/archived_by_user_id/archive_reason atomicamente.
+ *
+ * NÃO mexe em highlight_until ou priority — só status + auditoria. O ranking
+ * já não exibe archived no público (filtro `status='active'` em todos os
+ * caminhos, validado na Fase 3.3).
+ */
+export async function archiveAd(id, archivedByUserId, archiveReason) {
+  const result = await query(
+    `UPDATE ads
+       SET status = 'archived',
+           archived_at = NOW(),
+           archived_by_user_id = $2,
+           archive_reason = $3,
+           updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, archivedByUserId, archiveReason]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Restaura um anúncio arquivado (Fase 3.5): seta status para o valor passado
+ * (default 'active'), limpa archived_at / archived_by_user_id / archive_reason
+ * atomicamente.
+ *
+ * Caller deve validar que o status alvo é compatível (active/paused) e que
+ * o anúncio ESTÁ archived antes de chamar.
+ */
+export async function restoreAd(id, newStatus) {
+  const result = await query(
+    `UPDATE ads
+       SET status = $2,
+           archived_at = NULL,
+           archived_by_user_id = NULL,
+           archive_reason = NULL,
+           updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, newStatus]
+  );
+  return result.rows[0] || null;
+}
+
 export async function getAdMetrics(adId) {
   const result = await query(`SELECT * FROM ad_metrics WHERE ad_id = $1 LIMIT 1`, [adId]);
   return result.rows[0] || { ad_id: adId, views: 0, clicks: 0, leads: 0, ctr: 0 };
