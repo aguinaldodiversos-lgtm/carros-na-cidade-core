@@ -262,8 +262,22 @@ export function HomeHero({
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Slide individual — encapsula um banner. Fallback por campo para
-// preservar a UX original quando admin não definiu o campo.
+// Slide individual — DOIS MODOS DE RENDER (Fase 4.1.2):
+//
+//   Modo "arte pronta" (image_desktop_url existe):
+//     Renderiza apenas a imagem dentro de um <Link>. SEM gradiente
+//     escurecedor, SEM H1 sobreposto, SEM CTA fake — porque a imagem
+//     enviada pelo admin já é uma peça publicitária COMPLETA. Qualquer
+//     overlay polui a arte e tira o controle visual do admin.
+//
+//   Modo "fallback textual" (sem imagem):
+//     Mantém o layout legado (pílula, H1, subtítulo, CTA pílula). Útil
+//     no estado inicial (admin não configurou nada → cai no fallback
+//     hardcoded com microcopy regional) e em campanhas só-texto.
+//
+// O alt do <Image> é o `image_alt` definido pelo admin — invisível na
+// tela, lido por leitores de tela. Vazio (string vazia) é aceitável
+// para imagens decorativas, mas no nosso fluxo backend é obrigatório.
 // ──────────────────────────────────────────────────────────────────────
 
 function HeroSlide({
@@ -283,12 +297,6 @@ function HeroSlide({
 }) {
   const overrideCtaUrl = hasContent(slide.cta_url) ? slide.cta_url : null;
   const overrideImage = hasContent(slide.image_desktop_url) ? slide.image_desktop_url : null;
-  // mobile só substitui no breakpoint mobile — usamos srcSet emulado pelo
-  // Image via `unoptimized` + URL única. Aqui escolhemos desktop como
-  // base (LCP). Quando mobile_url existir, renderizamos um `<source>`
-  // adjacente via Image alternativo seria custoso; ficamos com a regra:
-  // desktop como Image principal + classe `md:hidden`/`hidden md:block`
-  // para um <img> de mobile quando configurado.
   const overrideMobile = hasContent(slide.image_mobile_url) ? slide.image_mobile_url : null;
   const overrideAlt = hasContent(slide.image_alt) ? slide.image_alt : null;
   const overrideTitle = hasContent(slide.title) ? slide.title : null;
@@ -297,8 +305,6 @@ function HeroSlide({
 
   const scopeLabel = cityName ? `${cityName} e região` : stateName;
   const pillLabel = cityName ? `${cityName} e região` : `${stateName} e região`;
-
-  const bannerSrc = overrideImage || HOME_HERO_BANNER;
 
   const offersHref = useMemo(() => {
     if (overrideCtaUrl) return overrideCtaUrl;
@@ -310,45 +316,75 @@ function HeroSlide({
     return "/comprar";
   }, [defaultCitySlug, overrideCtaUrl]);
 
+  // ─── Modo "arte pronta" ─────────────────────────────────────────────
+  if (overrideImage) {
+    const altText = overrideAlt ?? "";
+    const isExternal = /^https?:\/\//i.test(offersHref);
+    const linkProps = isExternal
+      ? { rel: "noopener noreferrer", target: "_blank" as const }
+      : {};
+    return (
+      <Link
+        href={offersHref}
+        aria-label={altText || "Abrir oferta"}
+        className="block relative h-full w-full overflow-hidden"
+        {...linkProps}
+      >
+        {/* Desktop — escondido quando há imagem mobile dedicada. */}
+        <div className={overrideMobile ? "hidden md:block absolute inset-0" : "absolute inset-0"}>
+          <Image
+            src={overrideImage}
+            alt={altText}
+            fill
+            priority={priority}
+            loading={priority ? undefined : "lazy"}
+            sizes="(min-width: 1280px) 1440px, 100vw"
+            className="object-cover object-center"
+            unoptimized
+          />
+        </div>
+        {/* Mobile dedicada quando admin configurou. */}
+        {overrideMobile && (
+          <div className="absolute inset-0 md:hidden">
+            <Image
+              src={overrideMobile}
+              alt={altText}
+              fill
+              priority={priority}
+              loading={priority ? undefined : "lazy"}
+              sizes="100vw"
+              className="object-cover object-center"
+              unoptimized
+            />
+          </div>
+        )}
+        {/* Altura mínima compatível com o fallback textual para evitar
+            CLS quando carrossel troca entre modos. SEM overlay/gradient. */}
+        <div className="invisible min-h-[220px] sm:min-h-[300px] md:min-h-[380px]" aria-hidden="true" />
+      </Link>
+    );
+  }
+
+  // ─── Modo "fallback textual" ────────────────────────────────────────
+  // Layout original: pílula + H1 + microcopy + CTA pílula. Mantém o
+  // gradient suave por cima da imagem hardcoded (HOME_HERO_BANNER) para
+  // garantir legibilidade. Esse modo só roda quando ADMIN NÃO TEM
+  // IMAGEM — então o gradient sempre roda sobre a imagem hardcoded,
+  // nunca sobre uma arte do admin.
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {/* Imagem desktop (LCP candidato quando priority). */}
-      <div className={overrideMobile ? "hidden md:block absolute inset-0" : "absolute inset-0"}>
+      <div className="absolute inset-0">
         <Image
-          src={bannerSrc}
-          alt={
-            overrideAlt ||
-            (cityName
-              ? `Carros usados em ${cityName} no Carros na Cidade`
-              : `Carros usados em ${stateName} no Carros na Cidade`)
-          }
+          src={HOME_HERO_BANNER}
+          alt=""
           fill
           priority={priority}
           loading={priority ? undefined : "lazy"}
           sizes="(min-width: 1280px) 1440px, 100vw"
           className="object-cover object-right"
-          unoptimized={Boolean(overrideImage)}
         />
       </div>
-
-      {/* Imagem mobile dedicada quando admin configurou. */}
-      {overrideMobile && (
-        <div className="absolute inset-0 md:hidden">
-          <Image
-            src={overrideMobile}
-            alt={overrideAlt || ""}
-            fill
-            priority={priority}
-            loading={priority ? undefined : "lazy"}
-            sizes="100vw"
-            className="object-cover object-center"
-            unoptimized
-          />
-        </div>
-      )}
-
       <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a via-cnc-footer-a/70 to-transparent" />
-
       <div className="relative grid min-h-[220px] items-center px-5 py-6 sm:min-h-[300px] sm:px-8 sm:py-9 md:min-h-[380px] lg:px-12">
         <div className="max-w-xl">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm sm:text-[12px]">

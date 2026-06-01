@@ -246,40 +246,64 @@ export default function AdminHomePage() {
     activeServer.is_active && !activeDraft.is_active && activeCountAfterSave === 0;
 
   /**
-   * Validação client-side espelhando regras do backend — evita um round-trip
-   * que vai falhar com 400. NÃO substitui a validação do backend (autoridade
-   * final); só antecipa a mensagem para o admin.
+   * Validação client-side espelhando a regra DUAL do backend
+   * (admin-home.service):
    *
-   * Regras:
-   *   1. Se há imagem desktop OU mobile no draft, image_alt é obrigatório.
-   *   2. Para ativar um banner, precisa ter pelo menos título ou uma imagem.
-   *   3. CTA url precisa começar com '/' (não '//') ou ser http(s).
+   *   Modo A — arte pronta (há imagem): exige alt; para ATIVAR exige
+   *     também o link de destino.
+   *   Modo B — fallback textual (sem imagem): para ATIVAR exige
+   *     título + texto do botão + link do botão.
+   *
+   * Não substitui a validação do backend (autoridade final); só antecipa
+   * a mensagem para o admin, evitando round-trip com 400.
    */
   const clientValidationError: string | null = (() => {
     const hasImage = Boolean(activeDraft.image_desktop_url || activeDraft.image_mobile_url);
-    if (hasImage && !activeDraft.image_alt.trim()) {
-      return "Informe o texto alternativo (alt) — obrigatório quando há imagem.";
+    const altOk = activeDraft.image_alt.trim().length > 0;
+    const ctaOk = activeDraft.cta_url.trim().length > 0;
+    const titleOk = activeDraft.title.trim().length > 0;
+    const labelOk = activeDraft.cta_label.trim().length > 0;
+
+    // Alt obrigatório sempre que há imagem (mesmo se inativo).
+    if (hasImage && !altOk) {
+      return "Informe o texto alternativo da imagem (acessibilidade).";
     }
-    if (activeDraft.is_active) {
-      const hasAny = activeDraft.title.trim() || hasImage;
-      if (!hasAny) {
-        return "Para ativar este banner, defina ao menos um título ou uma imagem.";
-      }
-    }
+
+    // Validação de scheme do CTA quando preenchido.
     const cta = activeDraft.cta_url.trim();
     if (cta) {
-      if (cta.startsWith("//")) return "Link do botão inválido — use /caminho ou https://...";
+      if (cta.startsWith("//")) {
+        return "Link de destino inválido — use /caminho ou https://...";
+      }
       if (!cta.startsWith("/")) {
         try {
           const u = new URL(cta);
           if (u.protocol !== "http:" && u.protocol !== "https:") {
-            return "Link do botão deve ser /caminho ou https://...";
+            return "Link de destino deve ser /caminho ou https://...";
           }
         } catch {
-          return "Link do botão deve ser /caminho ou https://...";
+          return "Link de destino deve ser /caminho ou https://...";
         }
       }
     }
+
+    // Regras de ATIVAÇÃO.
+    if (activeDraft.is_active) {
+      if (hasImage) {
+        if (!ctaOk) {
+          return "Para ativar um banner com imagem, defina o link de destino.";
+        }
+      } else {
+        const missing: string[] = [];
+        if (!titleOk) missing.push("título");
+        if (!labelOk) missing.push("texto do botão");
+        if (!ctaOk) missing.push("link do botão");
+        if (missing.length > 0) {
+          return `Para ativar um banner sem imagem, defina: ${missing.join(", ")}.`;
+        }
+      }
+    }
+
     return null;
   })();
 
@@ -353,74 +377,19 @@ export default function AdminHomePage() {
             )}
           </div>
 
-          <Field id="title" label="Título" hint="Aparece como H1 (até 140 caracteres).">
-            <input
-              id="title"
-              type="text"
-              maxLength={140}
-              value={activeDraft.title}
-              onChange={(e) => patchActiveDraft({ title: e.target.value })}
-              className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
-            />
-          </Field>
+          {/* Aviso sobre arte pronta. Aparece sempre — orienta o admin desde
+              o primeiro contato com a tela. */}
+          <p className="rounded-md border border-cnc-line/60 bg-cnc-bg/40 px-3 py-2 text-[11px] leading-snug text-cnc-muted">
+            Se você subir uma arte pronta, o texto e botão dentro da imagem
+            <strong> não serão duplicados</strong> por cima do banner — o link
+            de destino é aplicado ao clique no banner inteiro. Os campos de
+            texto abaixo só aparecem quando não há imagem (fallback).
+          </p>
 
-          <Field id="subtitle" label="Subtítulo" hint="Linha curta (até 240 caracteres).">
-            <textarea
-              id="subtitle"
-              rows={2}
-              maxLength={240}
-              value={activeDraft.subtitle}
-              onChange={(e) => patchActiveDraft({ subtitle: e.target.value })}
-              className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="cta_label" label="Texto do botão" hint="Máx. 40 caracteres.">
-              <input
-                id="cta_label"
-                type="text"
-                maxLength={40}
-                value={activeDraft.cta_label}
-                onChange={(e) => patchActiveDraft({ cta_label: e.target.value })}
-                className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
-              />
-            </Field>
-            <Field
-              id="cta_url"
-              label="Link do botão"
-              hint="Caminho interno (/comprar) ou URL http/https."
-            >
-              <input
-                id="cta_url"
-                type="text"
-                maxLength={500}
-                value={activeDraft.cta_url}
-                onChange={(e) => patchActiveDraft({ cta_url: e.target.value })}
-                placeholder="/comprar"
-                className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
-              />
-            </Field>
-          </div>
-
-          <Field
-            id="image_alt"
-            label="Texto alternativo da imagem (alt)"
-            hint="Obrigatório quando há imagem desktop configurada."
-          >
-            <input
-              id="image_alt"
-              type="text"
-              maxLength={240}
-              value={activeDraft.image_alt}
-              onChange={(e) => patchActiveDraft({ image_alt: e.target.value })}
-              className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
-            />
-          </Field>
-
+          {/* ─── 1) IMAGEM (peça principal) ─── */}
           <div className="grid gap-4 sm:grid-cols-2">
             <ImageField
-              label="Imagem desktop (horizontal)"
+              label="Imagem desktop do banner"
               currentUrl={activeDraft.image_desktop_url}
               uploading={uploadingVariant === "desktop"}
               inputRef={desktopInputRef}
@@ -430,7 +399,7 @@ export default function AdminHomePage() {
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             />
             <ImageField
-              label="Imagem mobile (opcional)"
+              label="Imagem mobile do banner (opcional)"
               currentUrl={activeDraft.image_mobile_url}
               uploading={uploadingVariant === "mobile"}
               inputRef={mobileInputRef}
@@ -449,6 +418,91 @@ export default function AdminHomePage() {
               {uploadError}
             </p>
           )}
+
+          {/* ─── 2) LINK + ALT (obrigatórios na ativação) ─── */}
+          <Field
+            id="cta_url"
+            label="Link de destino do banner"
+            hint="Caminho interno (ex.: /anunciar) ou URL http/https. Aplicado ao clique."
+          >
+            <input
+              id="cta_url"
+              type="text"
+              maxLength={500}
+              value={activeDraft.cta_url}
+              onChange={(e) => patchActiveDraft({ cta_url: e.target.value })}
+              placeholder="/anunciar"
+              className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
+            />
+          </Field>
+
+          <Field
+            id="image_alt"
+            label="Texto alternativo da imagem (obrigatório para acessibilidade)"
+            hint="Lido por leitores de tela. Não aparece visualmente no banner."
+          >
+            <input
+              id="image_alt"
+              type="text"
+              maxLength={240}
+              value={activeDraft.image_alt}
+              onChange={(e) => patchActiveDraft({ image_alt: e.target.value })}
+              className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
+            />
+          </Field>
+
+          {/* ─── 3) Textos opcionais (fallback sem imagem) ─── */}
+          <details className="rounded-lg border border-cnc-line/60 bg-cnc-bg/30">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-cnc-text">
+              Campos opcionais para fallback textual (sem imagem)
+            </summary>
+            <div className="space-y-3 border-t border-cnc-line/60 p-3">
+              <Field
+                id="title"
+                label="Título opcional (fallback/acessibilidade)"
+                hint="Usado apenas quando não há imagem. Não é renderizado por cima da arte."
+              >
+                <input
+                  id="title"
+                  type="text"
+                  maxLength={140}
+                  value={activeDraft.title}
+                  onChange={(e) => patchActiveDraft({ title: e.target.value })}
+                  className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
+                />
+              </Field>
+
+              <Field
+                id="subtitle"
+                label="Subtítulo opcional"
+                hint="Usado apenas quando não há imagem."
+              >
+                <textarea
+                  id="subtitle"
+                  rows={2}
+                  maxLength={240}
+                  value={activeDraft.subtitle}
+                  onChange={(e) => patchActiveDraft({ subtitle: e.target.value })}
+                  className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
+                />
+              </Field>
+
+              <Field
+                id="cta_label"
+                label="Texto do botão opcional"
+                hint="Usado apenas quando não há imagem (rótulo do CTA pílula)."
+              >
+                <input
+                  id="cta_label"
+                  type="text"
+                  maxLength={40}
+                  value={activeDraft.cta_label}
+                  onChange={(e) => patchActiveDraft({ cta_label: e.target.value })}
+                  className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
+                />
+              </Field>
+            </div>
+          </details>
 
           <div className="flex items-center gap-3 rounded-lg border border-cnc-line/60 bg-cnc-bg/40 px-3 py-2.5">
             <input
@@ -660,6 +714,18 @@ function ImageField({
   );
 }
 
+/**
+ * Preview do banner — sem overlay, sem texto sobreposto.
+ *
+ * Modo "arte pronta" (imageDesktopUrl): mostra a imagem na proporção
+ * cinematográfica do hero (16:6), exatamente como vai aparecer na Home.
+ * Logo abaixo, metadados (link de destino, alt, status) em chips
+ * informativos — para o admin validar visualmente E semanticamente.
+ *
+ * Modo "fallback textual" (sem imagem): renderiza a pílula + H1 + CTA
+ * pílula em um card com gradient navy, replicando o fallback do frontend
+ * público. Permite o admin ver como ficaria caso não suba imagem.
+ */
 function HeroPreview({
   title,
   subtitle,
@@ -678,36 +744,79 @@ function HeroPreview({
   isActive: boolean;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-[#0b1f3a] shadow-card">
+    <div className="space-y-2">
       {imageDesktopUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imageDesktopUrl}
-          alt={imageAlt || ""}
-          className="absolute inset-0 h-full w-full object-cover object-right"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0b1f3a] to-[#1a3a6a]" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0b1f3a] via-[#0b1f3a]/70 to-transparent" />
-      <div className="relative min-h-[180px] p-5 sm:min-h-[220px]">
-        <div className="max-w-xs">
-          <h3 className="text-base font-extrabold leading-tight text-white sm:text-lg">
-            {title || <span className="text-white/40">Título…</span>}
-          </h3>
-          {subtitle && <p className="mt-2 text-xs leading-snug text-white/85">{subtitle}</p>}
-          {ctaLabel && ctaUrl && (
-            <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11px] font-bold text-white">
-              {ctaLabel} →
+        <>
+          {/* Arte pronta — limpa, sem overlay. */}
+          <div className="relative overflow-hidden rounded-2xl bg-cnc-line/30 shadow-card">
+            <div className="relative aspect-[16/6] w-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageDesktopUrl}
+                alt={imageAlt || ""}
+                className="absolute inset-0 h-full w-full object-cover object-center"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span
+              className={`rounded-full px-2 py-0.5 font-semibold ${
+                isActive
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {isActive ? "Ativo no carrossel" : "Inativo — fora do carrossel"}
             </span>
-          )}
-          {!isActive && (
-            <p className="mt-3 inline-flex rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-200">
-              Banner desativado — fora do carrossel
-            </p>
-          )}
-        </div>
-      </div>
+            <span className="rounded-full bg-cnc-line/40 px-2 py-0.5 text-cnc-muted">
+              Link: {ctaUrl || <em className="text-cnc-muted-soft">não definido</em>}
+            </span>
+            <span className="rounded-full bg-cnc-line/40 px-2 py-0.5 text-cnc-muted">
+              Alt: {imageAlt ? `"${imageAlt.slice(0, 40)}${imageAlt.length > 40 ? "…" : ""}"` : (
+                <em className="text-cnc-danger">faltando</em>
+              )}
+            </span>
+          </div>
+          <p className="text-[10px] text-cnc-muted-soft">
+            A imagem é renderizada limpa na Home — sem overlay nem texto adicional sobreposto.
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Fallback textual — replica o layout legado da Home. */}
+          <div className="relative overflow-hidden rounded-2xl bg-[#0b1f3a] shadow-card">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0b1f3a] to-[#1a3a6a]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0b1f3a] via-[#0b1f3a]/70 to-transparent" />
+            <div className="relative min-h-[180px] p-5 sm:min-h-[220px]">
+              <div className="max-w-xs">
+                <h3 className="text-base font-extrabold leading-tight text-white sm:text-lg">
+                  {title || <span className="text-white/40">Título do fallback…</span>}
+                </h3>
+                {subtitle && <p className="mt-2 text-xs leading-snug text-white/85">{subtitle}</p>}
+                {ctaLabel && ctaUrl && (
+                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11px] font-bold text-white">
+                    {ctaLabel} →
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span
+              className={`rounded-full px-2 py-0.5 font-semibold ${
+                isActive
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {isActive ? "Ativo (modo textual)" : "Inativo — fora do carrossel"}
+            </span>
+          </div>
+          <p className="text-[10px] text-cnc-muted-soft">
+            Sem imagem configurada → fallback textual. Suba uma arte desktop para usar como banner pronto.
+          </p>
+        </>
+      )}
     </div>
   );
 }

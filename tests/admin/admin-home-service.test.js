@@ -172,7 +172,7 @@ describe("admin-home.service · updateHeroBanner — validações", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it("exige image_alt quando há imagem desktop", async () => {
+  it("exige alt quando há imagem (acessibilidade)", async () => {
     findByPosition.mockResolvedValue(makeBanner(1, { image_alt: "ok", image_desktop_url: "https://x" }));
     await expect(
       updateHeroBanner({
@@ -181,28 +181,148 @@ describe("admin-home.service · updateHeroBanner — validações", () => {
         payload: { image_alt: "" },
         reason: "r",
       })
-    ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/image_alt/) });
+    ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/alt/i) });
   });
 
-  it("bloqueia ativar banner sem qualquer conteúdo", async () => {
-    findByPosition.mockResolvedValue(
-      makeBanner(2, {
-        is_active: false,
-        title: null,
-        image_desktop_url: null,
-        image_mobile_url: null,
-      })
-    );
-    await expect(
-      updateHeroBanner({
+  // Regra dual de ativação (Fase 4.1.2).
+  describe("regra dual de ativação", () => {
+    it("modo A — ativar com imagem + alt + link funciona SEM title/subtitle/cta_label", async () => {
+      findByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: false,
+          title: null,
+          subtitle: null,
+          cta_label: null,
+          cta_url: null,
+          image_desktop_url: null,
+          image_mobile_url: null,
+          image_alt: null,
+        })
+      );
+      updateByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: true,
+          image_desktop_url: "https://cdn.example.com/x.webp",
+          image_alt: "Banner",
+          cta_url: "/anunciar",
+        })
+      );
+      const data = await updateHeroBanner({
         adminUserId: "admin-1",
         position: 2,
-        payload: { is_active: true },
+        payload: {
+          image_desktop_url: "https://cdn.example.com/x.webp",
+          image_alt: "Banner",
+          cta_url: "/anunciar",
+          is_active: true,
+        },
+        reason: "publicidade",
+      });
+      expect(data.is_active).toBe(true);
+    });
+
+    it("modo A — ativar com imagem SEM link → 400", async () => {
+      findByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: false,
+          image_desktop_url: "https://x",
+          image_alt: "Banner",
+          cta_url: null,
+          title: null,
+        })
+      );
+      await expect(
+        updateHeroBanner({
+          adminUserId: "admin-1",
+          position: 2,
+          payload: { is_active: true },
+          reason: "r",
+        })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringMatching(/link de destino/i),
+      });
+    });
+
+    it("modo A — ativar com imagem SEM alt → 400 (mesmo se já existe link)", async () => {
+      findByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: false,
+          image_desktop_url: "https://x",
+          image_alt: null,
+          cta_url: "/anunciar",
+        })
+      );
+      await expect(
+        updateHeroBanner({
+          adminUserId: "admin-1",
+          position: 2,
+          payload: { is_active: true },
+          reason: "r",
+        })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringMatching(/alt/i),
+      });
+    });
+
+    it("modo B — ativar sem imagem exige title + cta_label + cta_url", async () => {
+      findByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: false,
+          title: null,
+          cta_label: null,
+          cta_url: null,
+          image_desktop_url: null,
+          image_mobile_url: null,
+          image_alt: null,
+        })
+      );
+      await expect(
+        updateHeroBanner({
+          adminUserId: "admin-1",
+          position: 2,
+          payload: { is_active: true },
+          reason: "r",
+        })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringMatching(/título.*texto do botão.*link do botão/i),
+      });
+    });
+
+    it("modo B — ativar sem imagem com title + cta_label + cta_url funciona", async () => {
+      findByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: false,
+          title: null,
+          cta_label: null,
+          cta_url: null,
+          image_desktop_url: null,
+          image_mobile_url: null,
+          image_alt: null,
+        })
+      );
+      updateByPosition.mockResolvedValue(
+        makeBanner(2, {
+          is_active: true,
+          title: "Compre carros usados",
+          cta_label: "Ver ofertas",
+          cta_url: "/comprar",
+        })
+      );
+      const data = await updateHeroBanner({
+        adminUserId: "admin-1",
+        position: 2,
+        payload: {
+          is_active: true,
+          title: "Compre carros usados",
+          cta_label: "Ver ofertas",
+          cta_url: "/comprar",
+        },
         reason: "r",
-      })
-    ).rejects.toMatchObject({
-      statusCode: 400,
-      message: expect.stringMatching(/título ou uma imagem/i),
+      });
+      expect(data.is_active).toBe(true);
     });
   });
 

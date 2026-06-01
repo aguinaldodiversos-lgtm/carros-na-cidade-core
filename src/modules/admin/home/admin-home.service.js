@@ -248,28 +248,66 @@ export async function updateHeroBanner({ adminUserId, position, payload, reason 
       : before[field];
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // Regra dual de banner (Fase 4.1.2)
+  // ──────────────────────────────────────────────────────────────────
+  // O admin sobe banners como PEÇAS PRONTAS — a imagem já contém texto,
+  // CTA e identidade visual. Não devemos exigir título/subtítulo nesse
+  // caso. Por outro lado, se NÃO há imagem, o frontend só consegue
+  // renderizar fallback textual, e exigimos os campos mínimos para isso.
+  //
+  // Modo A — arte pronta: image_desktop_url OU image_mobile_url +
+  //   image_alt (acessibilidade) + cta_url (banner clicável).
+  //   title/subtitle/cta_label opcionais.
+  //
+  // Modo B — fallback textual: sem imagem. Precisa de title +
+  //   cta_label + cta_url para o frontend ter o que renderizar.
+  //
+  // Alt é exigido SEMPRE que houver imagem (mesmo se banner estiver
+  // inativo no patch) porque o admin pode ativar depois e o constraint
+  // tem que segurar a invariância.
+  // ──────────────────────────────────────────────────────────────────
   const finalAlt = effective("image_alt");
   const finalDesktop = effective("image_desktop_url");
-  if (finalDesktop && (!finalAlt || !String(finalAlt).trim())) {
+  const finalMobile = effective("image_mobile_url");
+  const finalTitle = effective("title");
+  const finalCtaLabel = effective("cta_label");
+  const finalCtaUrl = effective("cta_url");
+  const hasImage = Boolean(finalDesktop || finalMobile);
+
+  function nonEmpty(value) {
+    return value != null && String(value).trim().length > 0;
+  }
+
+  if (hasImage && !nonEmpty(finalAlt)) {
     throw new AppError(
-      "image_alt é obrigatório quando há imagem desktop configurada.",
+      "Texto alternativo (alt) é obrigatório quando há imagem — usado por leitores de tela.",
       400
     );
   }
 
-  // Ativando um banner sem nada para mostrar polui a Home — bloqueia.
   const becomingActive = effective("is_active") === true;
   if (becomingActive) {
-    const finalTitle = effective("title");
-    const hasAnyContent =
-      (finalTitle && String(finalTitle).trim()) ||
-      finalDesktop ||
-      effective("image_mobile_url");
-    if (!hasAnyContent) {
-      throw new AppError(
-        "Para ativar este banner, defina ao menos um título ou uma imagem.",
-        400
-      );
+    if (hasImage) {
+      // Modo A — só falta o link.
+      if (!nonEmpty(finalCtaUrl)) {
+        throw new AppError(
+          "Para ativar um banner com imagem, defina o link de destino.",
+          400
+        );
+      }
+    } else {
+      // Modo B — fallback textual.
+      const missing = [];
+      if (!nonEmpty(finalTitle)) missing.push("título");
+      if (!nonEmpty(finalCtaLabel)) missing.push("texto do botão");
+      if (!nonEmpty(finalCtaUrl)) missing.push("link do botão");
+      if (missing.length > 0) {
+        throw new AppError(
+          `Para ativar um banner sem imagem, defina: ${missing.join(", ")}.`,
+          400
+        );
+      }
     }
   }
 
