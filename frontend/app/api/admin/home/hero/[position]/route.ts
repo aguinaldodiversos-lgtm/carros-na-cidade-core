@@ -25,9 +25,51 @@ const VALID_POSITIONS = new Set(["1", "2", "3"]);
 
 function deny(status: number, error: string) {
   return NextResponse.json(
-    { ok: false, error },
+    { ok: false, success: false, error, message: error },
     { status, headers: { "Cache-Control": "private, no-store" } }
   );
+}
+
+/**
+ * Garante um shape previsível para o client:
+ *   - sucesso: mantém o payload do backend intacto (já é { ok, data }).
+ *   - erro:    força `{ ok:false, success:false, message:<string humana>, status }`.
+ *     O backend retorna `error: true` (boolean — flag, não texto), o que
+ *     fazia o adminFetch antigo renderizar "true" no modal. Aqui
+ *     reescrevemos para que QUALQUER consumidor leia `message` confiável.
+ *     Campos originais do backend (requestId, details) são preservados.
+ */
+function normalizeUpstreamPayload(
+  upstreamOk: boolean,
+  upstreamStatus: number,
+  payload: unknown
+): unknown {
+  if (upstreamOk) return payload;
+
+  const out: Record<string, unknown> = {
+    ok: false,
+    success: false,
+    status: upstreamStatus,
+  };
+
+  if (payload && typeof payload === "object") {
+    const src = payload as Record<string, unknown>;
+    const msg =
+      typeof src.message === "string" && src.message.trim()
+        ? src.message
+        : typeof src.error === "string" && src.error.trim()
+        ? src.error
+        : `Erro ${upstreamStatus}`;
+    out.message = msg;
+    out.error = msg; // string — nunca boolean.
+    for (const k of ["requestId", "details", "code"]) {
+      if (k in src) out[k] = src[k];
+    }
+  } else {
+    out.message = `Erro ${upstreamStatus}`;
+    out.error = `Erro ${upstreamStatus}`;
+  }
+  return out;
 }
 
 async function proxy(request: NextRequest, { params }: { params: { position: string } }) {
@@ -86,12 +128,13 @@ async function proxy(request: NextRequest, { params }: { params: { position: str
     });
 
     const text = await upstream.text();
-    let data: unknown;
+    let parsed: unknown;
     try {
-      data = text ? JSON.parse(text) : { ok: upstream.ok };
+      parsed = text ? JSON.parse(text) : { ok: upstream.ok };
     } catch {
-      data = { ok: false, error: "Resposta inválida do backend" };
+      parsed = { ok: false, message: "Resposta inválida do backend" };
     }
+    const data = normalizeUpstreamPayload(upstream.ok, upstream.status, parsed);
 
     const response = NextResponse.json(data, {
       status: upstream.status,

@@ -245,6 +245,44 @@ export default function AdminHomePage() {
   const willDeactivateLastActive =
     activeServer.is_active && !activeDraft.is_active && activeCountAfterSave === 0;
 
+  /**
+   * Validação client-side espelhando regras do backend — evita um round-trip
+   * que vai falhar com 400. NÃO substitui a validação do backend (autoridade
+   * final); só antecipa a mensagem para o admin.
+   *
+   * Regras:
+   *   1. Se há imagem desktop OU mobile no draft, image_alt é obrigatório.
+   *   2. Para ativar um banner, precisa ter pelo menos título ou uma imagem.
+   *   3. CTA url precisa começar com '/' (não '//') ou ser http(s).
+   */
+  const clientValidationError: string | null = (() => {
+    const hasImage = Boolean(activeDraft.image_desktop_url || activeDraft.image_mobile_url);
+    if (hasImage && !activeDraft.image_alt.trim()) {
+      return "Informe o texto alternativo (alt) — obrigatório quando há imagem.";
+    }
+    if (activeDraft.is_active) {
+      const hasAny = activeDraft.title.trim() || hasImage;
+      if (!hasAny) {
+        return "Para ativar este banner, defina ao menos um título ou uma imagem.";
+      }
+    }
+    const cta = activeDraft.cta_url.trim();
+    if (cta) {
+      if (cta.startsWith("//")) return "Link do botão inválido — use /caminho ou https://...";
+      if (!cta.startsWith("/")) {
+        try {
+          const u = new URL(cta);
+          if (u.protocol !== "http:" && u.protocol !== "https:") {
+            return "Link do botão deve ser /caminho ou https://...";
+          }
+        } catch {
+          return "Link do botão deve ser /caminho ou https://...";
+        }
+      }
+    }
+    return null;
+  })();
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -438,10 +476,19 @@ export default function AdminHomePage() {
             </p>
           )}
 
+          {clientValidationError && (
+            <p
+              role="alert"
+              className="rounded-md border border-cnc-danger/40 bg-cnc-danger/10 px-3 py-2 text-xs font-medium text-cnc-danger"
+            >
+              {clientValidationError}
+            </p>
+          )}
+
           <div className="flex items-center gap-3 pt-1">
             <button
               type="submit"
-              disabled={!dirty || saveStatus === "saving"}
+              disabled={!dirty || saveStatus === "saving" || Boolean(clientValidationError)}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-strong transition-colors disabled:opacity-50"
             >
               {saveStatus === "saving" ? "Publicando…" : `Publicar Banner ${active}`}

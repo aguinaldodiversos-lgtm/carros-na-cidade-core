@@ -1,5 +1,38 @@
 type FetchOpts = { method?: string; body?: unknown; params?: Record<string, string | number> };
 
+/**
+ * Extrai uma mensagem HUMANA de um envelope de erro vindo do backend ou BFF.
+ *
+ * Por que existe: o backend Express devolve `{ success:false, error:true, message:"..." }`
+ * (error é boolean — flag, não texto). Versões anteriores deste módulo faziam
+ * `json.error || json.message`, e como `true || "msg"` resolve para `true`, o
+ * `new Error(true)` produzia a infame mensagem "true" no modal admin.
+ *
+ * Política:
+ *   1. `message` string > tudo.
+ *   2. `error` string (mas NÃO boolean — usado por alguns endpoints legados).
+ *   3. `details.message` quando presente.
+ *   4. Fallback: "Erro <status>".
+ *
+ * Boolean `error` é IGNORADO de propósito.
+ */
+export function extractAdminApiErrorMessage(
+  payload: unknown,
+  fallbackStatus: number | string
+): string {
+  if (payload && typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    if (typeof obj.message === "string" && obj.message.trim()) return obj.message;
+    if (typeof obj.error === "string" && obj.error.trim()) return obj.error;
+    const details = obj.details;
+    if (details && typeof details === "object") {
+      const detailMessage = (details as Record<string, unknown>).message;
+      if (typeof detailMessage === "string" && detailMessage.trim()) return detailMessage;
+    }
+  }
+  return `Erro ${fallbackStatus}`;
+}
+
 async function adminFetch<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T> {
   const { method = "GET", body, params } = opts;
   let url = `/api/admin/${path.replace(/^\//, "")}`;
@@ -24,8 +57,13 @@ async function adminFetch<T = unknown>(path: string, opts: FetchOpts = {}): Prom
     credentials: "include",
     cache: "no-store",
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || json?.message || `Erro ${res.status}`);
+  let json: unknown = null;
+  try {
+    json = await res.json();
+  } catch {
+    json = null;
+  }
+  if (!res.ok) throw new Error(extractAdminApiErrorMessage(json, res.status));
   return json as T;
 }
 
@@ -215,8 +253,15 @@ export const adminApi = {
           cache: "no-store",
         }
       );
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || `Erro ${res.status}`);
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      if (!res.ok) {
+        throw new Error(extractAdminApiErrorMessage(json, res.status));
+      }
       return json as ApiOne<HomeHeroUpload>;
     },
   },

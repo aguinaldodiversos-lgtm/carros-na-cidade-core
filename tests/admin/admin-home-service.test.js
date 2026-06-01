@@ -232,6 +232,53 @@ describe("admin-home.service · updateHeroBanner — validações", () => {
 });
 
 describe("admin-home.service · updateHeroBanner — isolamento + audit", () => {
+  // Smoke esperado da Fase 4.1.1 (bug "true" do Banner 2):
+  // Banner 2 vazio + admin envia todos os campos válidos + reason → 200.
+  it("smoke Banner 2: payload completo válido publica e audita target_id=home_hero_2", async () => {
+    findByPosition.mockResolvedValue(
+      makeBanner(2, {
+        title: null,
+        subtitle: null,
+        cta_label: null,
+        cta_url: null,
+        image_alt: null,
+        image_desktop_url: null,
+        image_mobile_url: null,
+        is_active: false,
+      })
+    );
+    updateByPosition.mockResolvedValue(
+      makeBanner(2, {
+        title: "Anuncie seu veículo grátis",
+        subtitle:
+          "Publique em poucos minutos e alcance compradores da sua cidade e região.",
+        cta_label: "Anunciar grátis",
+        cta_url: "/anunciar",
+        image_alt: "Banner para anunciar veículo grátis no Carros na Cidade",
+        is_active: true,
+        version: 2,
+      })
+    );
+    const data = await updateHeroBanner({
+      adminUserId: "admin-9",
+      position: 2,
+      payload: {
+        title: "Anuncie seu veículo grátis",
+        subtitle:
+          "Publique em poucos minutos e alcance compradores da sua cidade e região.",
+        cta_label: "Anunciar grátis",
+        cta_url: "/anunciar",
+        image_alt: "Banner para anunciar veículo grátis no Carros na Cidade",
+        is_active: true,
+      },
+      reason: "publicidade",
+    });
+    expect(data.position).toBe(2);
+    expect(data.is_active).toBe(true);
+    expect(recordAdminAction).toHaveBeenCalledTimes(1);
+    expect(recordAdminAction.mock.calls[0][0].targetId).toBe("home_hero_2");
+  });
+
   it("audit recebe target_id correto (home_hero_<position>)", async () => {
     findByPosition.mockResolvedValue(makeBanner(2, { title: "antigo" }));
     updateByPosition.mockResolvedValue(makeBanner(2, { title: "novo", version: 2 }));

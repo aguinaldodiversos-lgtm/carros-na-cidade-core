@@ -21,9 +21,45 @@ const VALID_POSITIONS = new Set(["1", "2", "3"]);
 
 function deny(status: number, error: string) {
   return NextResponse.json(
-    { ok: false, error },
+    { ok: false, success: false, error, message: error },
     { status, headers: { "Cache-Control": "private, no-store" } }
   );
+}
+
+/**
+ * Mesma normalização da rota /:position — força `message` string nos
+ * erros para o client não renderizar `error: true` literal. Mantém
+ * payload de sucesso intacto.
+ */
+function normalizeUpstreamPayload(
+  upstreamOk: boolean,
+  upstreamStatus: number,
+  payload: unknown
+): unknown {
+  if (upstreamOk) return payload;
+  const out: Record<string, unknown> = {
+    ok: false,
+    success: false,
+    status: upstreamStatus,
+  };
+  if (payload && typeof payload === "object") {
+    const src = payload as Record<string, unknown>;
+    const msg =
+      typeof src.message === "string" && src.message.trim()
+        ? src.message
+        : typeof src.error === "string" && src.error.trim()
+        ? src.error
+        : `Erro ${upstreamStatus}`;
+    out.message = msg;
+    out.error = msg;
+    for (const k of ["requestId", "details", "code"]) {
+      if (k in src) out[k] = src[k];
+    }
+  } else {
+    out.message = `Erro ${upstreamStatus}`;
+    out.error = `Erro ${upstreamStatus}`;
+  }
+  return out;
 }
 
 export async function POST(
@@ -83,12 +119,13 @@ export async function POST(
       duplex: "half",
     });
     const text = await upstream.text();
-    let data: unknown;
+    let parsed: unknown;
     try {
-      data = text ? JSON.parse(text) : { ok: upstream.ok };
+      parsed = text ? JSON.parse(text) : { ok: upstream.ok };
     } catch {
-      data = { ok: false, error: "Resposta inválida do backend" };
+      parsed = { ok: false, message: "Resposta inválida do backend" };
     }
+    const data = normalizeUpstreamPayload(upstream.ok, upstream.status, parsed);
     const response = NextResponse.json(data, {
       status: upstream.status,
       headers: { "Cache-Control": "private, no-store" },
