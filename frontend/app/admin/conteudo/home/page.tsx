@@ -1,22 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { adminApi, type HomeHeroDto, type HomeHeroPatch } from "@/lib/admin/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  adminApi,
+  type HomeHeroBannerDto,
+  type HomeHeroPatch,
+} from "@/lib/admin/api";
 import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
 import { AdminActionDialog } from "@/components/admin/AdminActionDialog";
 
 /**
- * Gestão da Home — Hero (Fase 4.1).
+ * Gestão da Home — Carrossel de 3 banners (Fase 4.1.1).
  *
- * Fluxo:
- *   1. load() → GET /api/admin/home/hero (snapshot atual).
- *   2. Form edita um draft local; upload de imagem é IMEDIATO (POST
- *      multipart) e devolve URL pública R2, mas só é GRAVADO no banco
- *      após o admin clicar "Publicar" e informar motivo.
- *   3. "Publicar" abre AdminActionDialog (reason obrigatório) → PATCH.
- *   4. Após PATCH ok, BFF dispara revalidate da Home (transparente).
+ * Modelo de estado
+ * ----------------
+ * Para cada banner (1, 2, 3) mantemos:
+ *   - server: snapshot que voltou do backend (referência de "limpo")
+ *   - draft: o que o admin está editando
+ *   - dirty: derivado (draft != server)
+ *
+ * EDIÇÃO ISOLADA: editar Banner 1 muda apenas drafts[1], nunca drafts[2/3].
+ * Salvar Banner 1 só chama PATCH /home/hero/1 — backend garante o resto.
+ *
+ * Trocar de aba com alterações pendentes NÃO descarta o draft — ele
+ * permanece em memória. Um aviso visual mostra que há rascunho em outras
+ * abas. Recarregar a página descarta drafts.
  */
+
+type Position = 1 | 2 | 3;
+const POSITIONS: readonly Position[] = [1, 2, 3];
+
+type Draft = {
+  title: string;
+  subtitle: string;
+  cta_label: string;
+  cta_url: string;
+  image_alt: string;
+  image_desktop_url: string | null;
+  image_mobile_url: string | null;
+  is_active: boolean;
+};
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -24,77 +48,153 @@ function asString(v: string | null | undefined): string {
   return typeof v === "string" ? v : "";
 }
 
+function toDraft(b: HomeHeroBannerDto): Draft {
+  return {
+    title: asString(b.title),
+    subtitle: asString(b.subtitle),
+    cta_label: asString(b.cta_label),
+    cta_url: asString(b.cta_url),
+    image_alt: asString(b.image_alt),
+    image_desktop_url: b.image_desktop_url ?? null,
+    image_mobile_url: b.image_mobile_url ?? null,
+    is_active: b.is_active,
+  };
+}
+
+function isDirty(server: HomeHeroBannerDto | undefined, draft: Draft | undefined): boolean {
+  if (!server || !draft) return false;
+  return (
+    draft.title !== asString(server.title) ||
+    draft.subtitle !== asString(server.subtitle) ||
+    draft.cta_label !== asString(server.cta_label) ||
+    draft.cta_url !== asString(server.cta_url) ||
+    draft.image_alt !== asString(server.image_alt) ||
+    draft.image_desktop_url !== (server.image_desktop_url ?? null) ||
+    draft.image_mobile_url !== (server.image_mobile_url ?? null) ||
+    draft.is_active !== server.is_active
+  );
+}
+
+function buildPatch(server: HomeHeroBannerDto, draft: Draft): HomeHeroPatch {
+  const patch: HomeHeroPatch = {};
+  if (draft.title !== asString(server.title)) patch.title = draft.title.trim() || null;
+  if (draft.subtitle !== asString(server.subtitle))
+    patch.subtitle = draft.subtitle.trim() || null;
+  if (draft.cta_label !== asString(server.cta_label))
+    patch.cta_label = draft.cta_label.trim() || null;
+  if (draft.cta_url !== asString(server.cta_url))
+    patch.cta_url = draft.cta_url.trim() || null;
+  if (draft.image_alt !== asString(server.image_alt))
+    patch.image_alt = draft.image_alt.trim() || null;
+  if (draft.image_desktop_url !== (server.image_desktop_url ?? null))
+    patch.image_desktop_url = draft.image_desktop_url;
+  if (draft.image_mobile_url !== (server.image_mobile_url ?? null))
+    patch.image_mobile_url = draft.image_mobile_url;
+  if (draft.is_active !== server.is_active) patch.is_active = draft.is_active;
+  return patch;
+}
+
 export default function AdminHomePage() {
-  const [hero, setHero] = useState<HomeHeroDto | null>(null);
+  const [servers, setServers] = useState<Record<Position, HomeHeroBannerDto | undefined>>({
+    1: undefined,
+    2: undefined,
+    3: undefined,
+  });
+  const [drafts, setDrafts] = useState<Record<Position, Draft | undefined>>({
+    1: undefined,
+    2: undefined,
+    3: undefined,
+  });
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // Draft local
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [ctaLabel, setCtaLabel] = useState("");
-  const [ctaUrl, setCtaUrl] = useState("");
-  const [imageAlt, setImageAlt] = useState("");
-  const [imageDesktopUrl, setImageDesktopUrl] = useState<string | null>(null);
-  const [imageMobileUrl, setImageMobileUrl] = useState<string | null>(null);
-  const [isActive, setIsActive] = useState(true);
+  const [active, setActive] = useState<Position>(1);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadingVariant, setUploadingVariant] = useState<null | "desktop" | "mobile">(null);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const desktopInputRef = useRef<HTMLInputElement | null>(null);
   const mobileInputRef = useRef<HTMLInputElement | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await adminApi.home.getHero();
-      const data = res.data;
-      setHero(data);
-      setTitle(asString(data?.title));
-      setSubtitle(asString(data?.subtitle));
-      setCtaLabel(asString(data?.cta_label));
-      setCtaUrl(asString(data?.cta_url));
-      setImageAlt(asString(data?.image_alt));
-      setImageDesktopUrl(data?.image_desktop_url ?? null);
-      setImageMobileUrl(data?.image_mobile_url ?? null);
-      setIsActive(data?.is_active ?? true);
+      const res = await adminApi.home.listHero();
+      const list = res.data.banners || [];
+      const nextServers: Record<Position, HomeHeroBannerDto | undefined> = {
+        1: undefined,
+        2: undefined,
+        3: undefined,
+      };
+      const nextDrafts: Record<Position, Draft | undefined> = {
+        1: undefined,
+        2: undefined,
+        3: undefined,
+      };
+      for (const b of list) {
+        if (b.position === 1 || b.position === 2 || b.position === 3) {
+          nextServers[b.position] = b;
+          nextDrafts[b.position] = toDraft(b);
+        }
+      }
+      setServers(nextServers);
+      setDrafts(nextDrafts);
+      setSaveStatus("idle");
+      setSaveError(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Erro ao carregar");
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load();
   }, []);
 
-  const dirty = useMemo(() => {
-    if (!hero) return false;
-    return (
-      title !== asString(hero.title) ||
-      subtitle !== asString(hero.subtitle) ||
-      ctaLabel !== asString(hero.cta_label) ||
-      ctaUrl !== asString(hero.cta_url) ||
-      imageAlt !== asString(hero.image_alt) ||
-      imageDesktopUrl !== (hero.image_desktop_url ?? null) ||
-      imageMobileUrl !== (hero.image_mobile_url ?? null) ||
-      isActive !== hero.is_active
-    );
-  }, [hero, title, subtitle, ctaLabel, ctaUrl, imageAlt, imageDesktopUrl, imageMobileUrl, isActive]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Calculamos dirty por banner para mostrar marcador nas tabs.
+  const dirtyByPosition = useMemo(() => {
+    const out: Record<Position, boolean> = { 1: false, 2: false, 3: false };
+    for (const p of POSITIONS) out[p] = isDirty(servers[p], drafts[p]);
+    return out;
+  }, [servers, drafts]);
+
+  const activeServer = servers[active];
+  const activeDraft = drafts[active];
+  const dirty = dirtyByPosition[active];
+
+  const activeCountAfterSave = useMemo(() => {
+    // Quantos banners ficariam ativos se este draft virasse o estado final.
+    // Usa drafts dos outros e draft do ativo.
+    return POSITIONS.filter((p) => {
+      const d = drafts[p];
+      return d ? d.is_active : Boolean(servers[p]?.is_active);
+    }).length;
+  }, [drafts, servers]);
+
+  function patchActiveDraft(partial: Partial<Draft>) {
+    setDrafts((prev) => {
+      const cur = prev[active];
+      if (!cur) return prev;
+      return { ...prev, [active]: { ...cur, ...partial } };
+    });
+    if (saveStatus !== "idle") setSaveStatus("idle");
+    if (saveError) setSaveError(null);
+  }
 
   async function handleUpload(file: File, variant: "desktop" | "mobile") {
     setUploadError(null);
     setUploadingVariant(variant);
     try {
-      const res = await adminApi.home.uploadImage(file, variant);
-      if (variant === "desktop") setImageDesktopUrl(res.data.url);
-      else setImageMobileUrl(res.data.url);
+      const res = await adminApi.home.uploadImage(active, file, variant);
+      if (variant === "desktop") patchActiveDraft({ image_desktop_url: res.data.url });
+      else patchActiveDraft({ image_mobile_url: res.data.url });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Falha no upload");
     } finally {
@@ -102,61 +202,99 @@ export default function AdminHomePage() {
     }
   }
 
+  function clearImage(variant: "desktop" | "mobile") {
+    if (variant === "desktop") patchActiveDraft({ image_desktop_url: null });
+    else patchActiveDraft({ image_mobile_url: null });
+  }
+
+  function discardActive() {
+    if (!activeServer) return;
+    setDrafts((prev) => ({ ...prev, [active]: toDraft(activeServer) }));
+    setSaveStatus("idle");
+    setSaveError(null);
+  }
+
   async function handleConfirmPublish(reason: string) {
-    if (!hero) return;
+    if (!activeServer || !activeDraft) return;
+    const patch = buildPatch(activeServer, activeDraft);
+    if (Object.keys(patch).length === 0) {
+      setConfirmOpen(false);
+      return;
+    }
     setSaveStatus("saving");
     setSaveError(null);
-
-    const patch: HomeHeroPatch = {};
-    if (title !== asString(hero.title)) patch.title = title.trim() || null;
-    if (subtitle !== asString(hero.subtitle)) patch.subtitle = subtitle.trim() || null;
-    if (ctaLabel !== asString(hero.cta_label)) patch.cta_label = ctaLabel.trim() || null;
-    if (ctaUrl !== asString(hero.cta_url)) patch.cta_url = ctaUrl.trim() || null;
-    if (imageAlt !== asString(hero.image_alt)) patch.image_alt = imageAlt.trim() || null;
-    if (imageDesktopUrl !== (hero.image_desktop_url ?? null)) {
-      patch.image_desktop_url = imageDesktopUrl;
-    }
-    if (imageMobileUrl !== (hero.image_mobile_url ?? null)) {
-      patch.image_mobile_url = imageMobileUrl;
-    }
-    if (isActive !== hero.is_active) patch.is_active = isActive;
-
     try {
-      const res = await adminApi.home.updateHero(patch, reason);
-      setHero(res.data);
+      const res = await adminApi.home.updateBanner(active, patch, reason);
+      setServers((prev) => ({ ...prev, [active]: res.data }));
+      setDrafts((prev) => ({ ...prev, [active]: toDraft(res.data) }));
       setSaveStatus("saved");
       setConfirmOpen(false);
     } catch (err) {
       setSaveStatus("error");
-      setSaveError(err instanceof Error ? err.message : "Erro ao salvar");
+      const msg = err instanceof Error ? err.message : "Erro ao salvar";
+      setSaveError(msg);
       throw err; // mantém o modal aberto exibindo o erro
     }
   }
 
-  if (loading) return <AdminLoadingState message="Carregando conteúdo da Home…" />;
+  if (loading) return <AdminLoadingState message="Carregando carrossel da Home…" />;
   if (loadError) return <AdminErrorState message={loadError} onRetry={() => void load()} />;
-  if (!hero) return <AdminErrorState message="Seção home_hero não encontrada" />;
+  if (!activeServer || !activeDraft)
+    return <AdminErrorState message="Banners do hero não inicializados — rode a migration 034." />;
+
+  const willDeactivateLastActive =
+    activeServer.is_active && !activeDraft.is_active && activeCountAfterSave === 0;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-lg font-bold text-cnc-text">Conteúdo · Home — Hero</h1>
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-            hero.is_active
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-cnc-line/40 text-cnc-muted"
-          }`}
-        >
-          {hero.is_active ? "Ativo" : "Inativo"} · v{hero.version}
-        </span>
-        <span className="text-[11px] text-cnc-muted-soft">
-          Última atualização: {new Date(hero.updated_at).toLocaleString("pt-BR")}
+        <h1 className="text-lg font-bold text-cnc-text">Conteúdo · Home — Carrossel</h1>
+        <span className="rounded-full bg-cnc-line/40 px-2 py-0.5 text-[11px] font-semibold text-cnc-muted">
+          {activeCountAfterSave} ativo{activeCountAfterSave === 1 ? "" : "s"} de 3
         </span>
       </div>
 
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Banners">
+        {POSITIONS.map((p) => {
+          const s = servers[p];
+          const d = dirtyByPosition[p];
+          const isCur = p === active;
+          return (
+            <button
+              key={p}
+              role="tab"
+              aria-selected={isCur}
+              type="button"
+              onClick={() => setActive(p)}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                isCur
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-cnc-line bg-white text-cnc-text hover:bg-cnc-bg"
+              }`}
+            >
+              Banner {p}
+              <span
+                className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  s?.is_active
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-cnc-line/40 text-cnc-muted"
+                }`}
+              >
+                {s?.is_active ? "Ativo" : "Inativo"}
+              </span>
+              {d && (
+                <span
+                  className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"
+                  title="Alterações pendentes"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
-        {/* Form */}
         <form
           className="space-y-4 rounded-xl border border-cnc-line bg-white p-5 shadow-card"
           onSubmit={(e) => {
@@ -164,32 +302,37 @@ export default function AdminHomePage() {
             setConfirmOpen(true);
           }}
         >
-          <Field
-            id="title"
-            label="Título"
-            hint="Aparece como H1 no hero (até 140 caracteres)."
-          >
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-cnc-muted-soft">
+            <span>
+              <strong>v{activeServer.version}</strong> · atualizado em{" "}
+              {new Date(activeServer.updated_at).toLocaleString("pt-BR")}
+            </span>
+            {activeServer.image_desktop_url && (
+              <span className="rounded-full bg-cnc-line/40 px-2 py-0.5">desktop ✓</span>
+            )}
+            {activeServer.image_mobile_url && (
+              <span className="rounded-full bg-cnc-line/40 px-2 py-0.5">mobile ✓</span>
+            )}
+          </div>
+
+          <Field id="title" label="Título" hint="Aparece como H1 (até 140 caracteres).">
             <input
               id="title"
               type="text"
               maxLength={140}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={activeDraft.title}
+              onChange={(e) => patchActiveDraft({ title: e.target.value })}
               className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
             />
           </Field>
 
-          <Field
-            id="subtitle"
-            label="Subtítulo"
-            hint="Linha curta de copy abaixo do título (até 240 caracteres)."
-          >
+          <Field id="subtitle" label="Subtítulo" hint="Linha curta (até 240 caracteres).">
             <textarea
               id="subtitle"
               rows={2}
               maxLength={240}
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
+              value={activeDraft.subtitle}
+              onChange={(e) => patchActiveDraft({ subtitle: e.target.value })}
               className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
             />
           </Field>
@@ -200,8 +343,8 @@ export default function AdminHomePage() {
                 id="cta_label"
                 type="text"
                 maxLength={40}
-                value={ctaLabel}
-                onChange={(e) => setCtaLabel(e.target.value)}
+                value={activeDraft.cta_label}
+                onChange={(e) => patchActiveDraft({ cta_label: e.target.value })}
                 className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
               />
             </Field>
@@ -214,8 +357,8 @@ export default function AdminHomePage() {
                 id="cta_url"
                 type="text"
                 maxLength={500}
-                value={ctaUrl}
-                onChange={(e) => setCtaUrl(e.target.value)}
+                value={activeDraft.cta_url}
+                onChange={(e) => patchActiveDraft({ cta_url: e.target.value })}
                 placeholder="/comprar"
                 className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
               />
@@ -231,8 +374,8 @@ export default function AdminHomePage() {
               id="image_alt"
               type="text"
               maxLength={240}
-              value={imageAlt}
-              onChange={(e) => setImageAlt(e.target.value)}
+              value={activeDraft.image_alt}
+              onChange={(e) => patchActiveDraft({ image_alt: e.target.value })}
               className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 text-sm text-cnc-text focus:border-primary focus:outline-none"
             />
           </Field>
@@ -240,21 +383,21 @@ export default function AdminHomePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <ImageField
               label="Imagem desktop (horizontal)"
-              currentUrl={imageDesktopUrl}
+              currentUrl={activeDraft.image_desktop_url}
               uploading={uploadingVariant === "desktop"}
               inputRef={desktopInputRef}
               onPick={() => desktopInputRef.current?.click()}
-              onClear={() => setImageDesktopUrl(null)}
+              onClear={() => clearImage("desktop")}
               onChange={(file) => void handleUpload(file, "desktop")}
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             />
             <ImageField
               label="Imagem mobile (opcional)"
-              currentUrl={imageMobileUrl}
+              currentUrl={activeDraft.image_mobile_url}
               uploading={uploadingVariant === "mobile"}
               inputRef={mobileInputRef}
               onPick={() => mobileInputRef.current?.click()}
-              onClear={() => setImageMobileUrl(null)}
+              onClear={() => clearImage("mobile")}
               onChange={(file) => void handleUpload(file, "mobile")}
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             />
@@ -273,17 +416,27 @@ export default function AdminHomePage() {
             <input
               id="is_active"
               type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
+              checked={activeDraft.is_active}
+              onChange={(e) => patchActiveDraft({ is_active: e.target.checked })}
               className="h-4 w-4 rounded border-cnc-line text-primary"
             />
             <label htmlFor="is_active" className="text-xs font-semibold text-cnc-text">
-              Banner ativo na Home pública
+              Banner {active} ativo no carrossel
             </label>
             <span className="ml-auto text-[11px] text-cnc-muted-soft">
-              Desativar mantém o conteúdo salvo mas faz a Home cair no fallback.
+              Desativar mantém o conteúdo salvo, mas o banner sai do carrossel público.
             </span>
           </div>
+
+          {willDeactivateLastActive && (
+            <p
+              role="alert"
+              className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+            >
+              Atenção: este é o último banner ativo. Ao publicar, a Home pública cairá no
+              fallback hardcoded.
+            </p>
+          )}
 
           <div className="flex items-center gap-3 pt-1">
             <button
@@ -291,23 +444,31 @@ export default function AdminHomePage() {
               disabled={!dirty || saveStatus === "saving"}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-strong transition-colors disabled:opacity-50"
             >
-              {saveStatus === "saving" ? "Publicando…" : "Publicar"}
+              {saveStatus === "saving" ? "Publicando…" : `Publicar Banner ${active}`}
             </button>
             <button
               type="button"
-              onClick={() => void load()}
-              disabled={saveStatus === "saving" || uploadingVariant !== null}
+              onClick={discardActive}
+              disabled={!dirty || saveStatus === "saving" || uploadingVariant !== null}
               className="rounded-lg border border-cnc-line px-4 py-2 text-xs font-semibold text-cnc-muted hover:bg-cnc-bg transition-colors disabled:opacity-50"
             >
               Descartar alterações
             </button>
             {saveStatus === "saved" && (
-              <span className="text-xs font-semibold text-emerald-700" role="status" aria-live="polite">
-                Publicado com sucesso.
+              <span
+                className="text-xs font-semibold text-emerald-700"
+                role="status"
+                aria-live="polite"
+              >
+                Banner {active} publicado.
               </span>
             )}
             {saveStatus === "error" && saveError && (
-              <span className="text-xs font-semibold text-cnc-danger" role="alert" aria-live="assertive">
+              <span
+                className="text-xs font-semibold text-cnc-danger"
+                role="alert"
+                aria-live="assertive"
+              >
                 {saveError}
               </span>
             )}
@@ -316,28 +477,28 @@ export default function AdminHomePage() {
 
         {/* Preview */}
         <aside className="space-y-3">
-          <h2 className="text-sm font-bold text-cnc-text">Pré-visualização</h2>
+          <h2 className="text-sm font-bold text-cnc-text">Pré-visualização · Banner {active}</h2>
           <HeroPreview
-            title={title}
-            subtitle={subtitle}
-            ctaLabel={ctaLabel}
-            ctaUrl={ctaUrl}
-            imageDesktopUrl={imageDesktopUrl}
-            imageAlt={imageAlt}
-            isActive={isActive}
+            title={activeDraft.title}
+            subtitle={activeDraft.subtitle}
+            ctaLabel={activeDraft.cta_label}
+            ctaUrl={activeDraft.cta_url}
+            imageDesktopUrl={activeDraft.image_desktop_url}
+            imageAlt={activeDraft.image_alt}
+            isActive={activeDraft.is_active}
           />
           <p className="text-[11px] text-cnc-muted-soft leading-relaxed">
-            A pré-visualização aproxima o resultado final. Após publicar, a Home
-            pública pode levar até 60s para refletir o conteúdo novo.
+            Apenas o banner editado é enviado. Os outros banners ficam intactos até serem
+            editados em suas próprias abas. Pode levar até 60s para refletir na Home.
           </p>
         </aside>
       </div>
 
       <AdminActionDialog
         open={confirmOpen}
-        title="Publicar alterações no hero da Home"
-        description="Esta ação será registrada em admin_actions com motivo obrigatório."
-        confirmLabel="Publicar"
+        title={`Publicar Banner ${active}`}
+        description="A alteração será registrada em admin_actions com motivo obrigatório. Os demais banners não serão alterados."
+        confirmLabel={`Publicar Banner ${active}`}
         confirmColor="primary"
         showReason
         requireReason
@@ -444,7 +605,7 @@ function ImageField({
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) onChange(file);
-            e.target.value = ""; // permite re-upload do mesmo arquivo
+            e.target.value = "";
           }}
         />
       </div>
@@ -495,7 +656,7 @@ function HeroPreview({
           )}
           {!isActive && (
             <p className="mt-3 inline-flex rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-200">
-              Banner desativado — fallback ativo
+              Banner desativado — fora do carrossel
             </p>
           )}
         </div>

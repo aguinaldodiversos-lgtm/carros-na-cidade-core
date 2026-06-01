@@ -6,7 +6,11 @@ import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { ContentCardsSection } from "@/components/home/sections/ContentCardsSection";
 import { ExploreByState } from "@/components/home/sections/ExploreByState";
 import { HomeCarouselsSkeleton } from "@/components/home/sections/HomeCarouselsSkeleton";
-import { HomeHero, type HomeHeroOverride } from "@/components/home/sections/HomeHero";
+import {
+  HomeHero,
+  type HomeHeroBannerOverride,
+  type HomeHeroOverride,
+} from "@/components/home/sections/HomeHero";
 import { HomePrimaryActions } from "@/components/home/sections/HomePrimaryActions";
 import { HomeSearchCard } from "@/components/home/sections/HomeSearchCard";
 import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
@@ -83,10 +87,15 @@ interface HomePageClientProps {
    */
   regionalEnabled: boolean;
   /**
-   * Override do hero vindo do painel admin (Fase 4.1). Quando presente,
-   * substitui os textos/imagem hardcoded. Null = sem override = layout atual.
+   * Override LEGADO do hero (Fase 4.1). Banner único. Usado apenas se
+   * `heroBanners` estiver vazio.
    */
   heroOverride?: HomeHeroOverride | null;
+  /**
+   * Lista de banners ativos vindos do admin (Fase 4.1.1). Quando 1 entry,
+   * a Home renderiza estático; 2-3, carrossel CSS scroll-snap.
+   */
+  heroBanners?: readonly HomeHeroBannerOverride[] | null;
 }
 
 function parseTotalAds(value: number | string | undefined): number | undefined {
@@ -107,6 +116,7 @@ export function HomePageClient({
   stateRegions = null,
   regionalEnabled,
   heroOverride = null,
+  heroBanners = null,
 }: HomePageClientProps) {
   const totalAds = parseTotalAds(data?.stats?.total_ads);
 
@@ -142,6 +152,7 @@ export function HomePageClient({
           stateName={stateName}
           totalAds={totalAds}
           override={heroOverride}
+          banners={heroBanners}
         />
 
         <HomePrimaryActions />

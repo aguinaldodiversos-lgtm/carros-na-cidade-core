@@ -118,19 +118,17 @@ export async function fetchHomeAboveFold(): Promise<HomeAboveFoldData> {
 }
 
 /**
- * Hero customizável da Home (Fase 4.1).
+ * Banners do carrossel hero (Fase 4.1.1).
  *
- * Vem do backend (`/api/public/home/hero`) que lê a tabela `home_sections`
- * editável pelo admin em `/admin/conteudo/home`. Quando nenhum hero está
- * ativo (ou em caso de falha), retorna null e o componente HomeHero cai
- * no fallback hardcoded (textos atuais + imagem estática
- * `/images/home-hero-banner.jpg`).
+ * Backend (`/api/public/home/hero`) retorna lista de banners ATIVOS
+ * ordenados por position. Quando lista vazia (ou erro), frontend cai no
+ * fallback hardcoded (textos hardcoded + `/images/home-hero-banner.jpg`).
  *
- * Cache: 60s + tags `public-home-hero` / `public-home`. Quando admin
- * publica, o BFF chama `/api/revalidate` com tag `public-home-hero`,
- * convergindo em segundos sem esperar o TTL.
+ * Cache: 60s + tags `public-home-hero` / `public-home`. PATCH no admin
+ * dispara `revalidateTag('public-home-hero')`, convergindo em segundos.
  */
-export interface HomeHeroDto {
+export interface HomeHeroBanner {
+  position: 1 | 2 | 3;
   title: string | null;
   subtitle: string | null;
   cta_label: string | null;
@@ -143,21 +141,27 @@ export interface HomeHeroDto {
   updated_at: string;
 }
 
-export async function fetchHomeHero(): Promise<HomeHeroDto | null> {
+/**
+ * Retorna array de banners ativos ordenados por position. Array vazio =
+ * sem banner configurado → frontend usa fallback hardcoded.
+ */
+export async function fetchHomeHero(): Promise<HomeHeroBanner[]> {
   const apiBase = getApiBaseUrl();
   const tags = ["public-home-hero", "public-home"];
 
-  const json = await fetchJson<{ success?: boolean; data?: HomeHeroDto | null }>(
-    `${apiBase}/api/public/home/hero`,
-    tags
-  );
-  if (!json || json.success === false) return null;
-  const data = json.data ?? null;
-  if (!data) return null;
-  // Defensivo: backend só devolve com is_active=true, mas a checagem
-  // aqui evita acidentes caso o contrato mude.
-  if (!data.is_active) return null;
-  return data;
+  const json = await fetchJson<{
+    success?: boolean;
+    data?: { banners?: HomeHeroBanner[] } | null;
+  }>(`${apiBase}/api/public/home/hero`, tags);
+
+  if (!json || json.success === false || !json.data) return [];
+  const banners = Array.isArray(json.data.banners) ? json.data.banners : [];
+  // Defensivo: backend só devolve ativos, mas filtramos de novo para
+  // proteger contra mudanças de contrato.
+  return banners
+    .filter((b) => b && b.is_active)
+    .sort((a, b) => a.position - b.position)
+    .slice(0, 3);
 }
 
 export type HomeCarouselsData = {

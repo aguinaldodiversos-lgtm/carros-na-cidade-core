@@ -642,10 +642,13 @@ router.get(
 );
 
 // =========================================================================
-// HOME / CONTEÚDO — Fase 4.1: gestão do hero da Home.
-// Audita em admin_actions com target_type='home_content' (target_id =
-// 'home_hero'). Upload de imagem reusa pipeline R2 (uploadSiteImage) —
-// converte para WebP, EXIF strip, key estável em site/home-hero/...
+// HOME / CONTEÚDO — Fase 4.1.1: carrossel de até 3 banners do hero.
+// Cada banner é uma row em home_sections (section_type='home_hero',
+// position=1..3). PATCH em :position altera APENAS aquele banner; os
+// demais nunca são tocados (repository.updateByPosition filtra no WHERE).
+// Audit em admin_actions: action='update_home_hero_banner',
+// target_type='home_content', target_id='home_hero_<position>'.
+// Upload R2: site/home-hero/<position>/<variant>/<yyyy>/<mm>/<uuid>.webp.
 // =========================================================================
 
 const homeImageUpload = multer({
@@ -672,20 +675,47 @@ const homeImageUpload = multer({
   },
 });
 
+/**
+ * Lista os 3 banners (Banner 1/2/3) — ordenados por position. Inclui
+ * inativos (admin precisa enxergar para editar/ativar).
+ *
+ * Contrato: { ok: true, data: { banners: HomeHeroBanner[] } }. Embrulhar
+ * em objeto (em vez de array no topo) facilita extensão (ex.: adicionar
+ * `max_banners` ou `section_meta` no futuro).
+ */
 router.get(
   "/home/hero",
   asyncHandler(async (_req, res) => {
-    const data = await homeService.getHero();
+    const banners = await homeService.listHeroBanners();
+    res.json({ ok: true, data: { banners } });
+  })
+);
+
+/**
+ * Detalhe de um banner único — útil para tela de edição focada. Mesma
+ * autorização que /home/hero (requireAdmin global). Validação de
+ * position vive no service.
+ */
+router.get(
+  "/home/hero/:position",
+  asyncHandler(async (req, res) => {
+    const data = await homeService.getHeroBanner(req.params.position);
+    if (!data) throw new AppError("Banner não encontrado.", 404);
     res.json({ ok: true, data });
   })
 );
 
+/**
+ * PATCH em um banner específico. Body: { ...campos, reason }. Reason
+ * obrigatório. Audit registra com target_id = home_hero_<position>.
+ */
 router.patch(
-  "/home/hero",
+  "/home/hero/:position",
   asyncHandler(async (req, res) => {
     const { reason, ...payload } = req.body || {};
-    const data = await homeService.updateHero({
+    const data = await homeService.updateHeroBanner({
       adminUserId: req.user.id,
+      position: req.params.position,
       payload,
       reason,
     });
@@ -693,13 +723,19 @@ router.patch(
   })
 );
 
+/**
+ * Upload de imagem para um banner específico. variant=desktop|mobile via
+ * querystring OU body. Retorna URL pública R2 — gravação no banco só
+ * ocorre quando admin clica "Publicar" e dispara PATCH.
+ */
 router.post(
-  "/home/hero/image",
+  "/home/hero/:position/image",
   homeImageUpload.single("image"),
   asyncHandler(async (req, res) => {
     const variant = String(req.query.variant || req.body?.variant || "desktop").toLowerCase();
     const data = await homeService.uploadHeroImage({
       adminUserId: req.user.id,
+      position: req.params.position,
       file: req.file,
       variant,
     });

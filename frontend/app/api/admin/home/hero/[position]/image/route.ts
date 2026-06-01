@@ -8,15 +8,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * BFF de upload de imagem do hero (Fase 4.1).
+ * BFF de upload por banner (Fase 4.1.1).
  *
- * Pass-through multipart para POST /api/admin/home/hero/image. Não dispara
- * revalidate (upload sozinho não muda nada visível — só gera URL; a
- * publicação só ocorre quando PATCH /api/admin/home/hero é salvo com a
- * nova URL).
+ * Pass-through multipart para POST /api/admin/home/hero/:position/image.
+ * Não dispara revalidate — upload sozinho não muda nada visível; a
+ * imagem só vira o banner ativo quando o admin clica "Publicar" e o
+ * PATCH em /api/admin/home/hero/:position é aceito.
  */
 
 const PROXY_TIMEOUT_MS = 60_000;
+const VALID_POSITIONS = new Set(["1", "2", "3"]);
 
 function deny(status: number, error: string) {
   return NextResponse.json(
@@ -25,7 +26,10 @@ function deny(status: number, error: string) {
   );
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { position: string } }
+) {
   const session = getSessionDataFromRequest(request);
   const assertion = await assertAdminSession(session);
   if (!assertion.ok) {
@@ -33,6 +37,12 @@ export async function POST(request: NextRequest) {
     if (assertion.reason === "forbidden") return deny(403, "Acesso restrito ao painel admin");
     return deny(503, "Backend indisponível para validar sessão");
   }
+
+  const position = String(params?.position || "").trim();
+  if (!VALID_POSITIONS.has(position)) {
+    return deny(400, "position inválido");
+  }
+
   const { session: ensured } = assertion;
   const persistCookies =
     ensured.accessToken !== session?.accessToken ||
@@ -41,7 +51,9 @@ export async function POST(request: NextRequest) {
       : null;
 
   const search = request.nextUrl.search || "";
-  const backendUrl = resolveInternalBackendApiUrl(`/api/admin/home/hero/image${search}`);
+  const backendUrl = resolveInternalBackendApiUrl(
+    `/api/admin/home/hero/${position}/image${search}`
+  );
   if (!backendUrl) return deny(502, "Backend não configurado");
 
   const contentType = request.headers.get("content-type") || "";
@@ -56,7 +68,6 @@ export async function POST(request: NextRequest) {
     ...buildBffBackendForwardHeaders(request),
   };
 
-  // Repassa o body cru para o backend preservando o boundary do multipart.
   const body = await request.arrayBuffer();
 
   const controller = new AbortController();
@@ -71,7 +82,6 @@ export async function POST(request: NextRequest) {
       // @ts-expect-error — duplex é exigido pelo Node 20+ para POST com body, não tipado ainda.
       duplex: "half",
     });
-
     const text = await upstream.text();
     let data: unknown;
     try {
@@ -79,7 +89,6 @@ export async function POST(request: NextRequest) {
     } catch {
       data = { ok: false, error: "Resposta inválida do backend" };
     }
-
     const response = NextResponse.json(data, {
       status: upstream.status,
       headers: { "Cache-Control": "private, no-store" },

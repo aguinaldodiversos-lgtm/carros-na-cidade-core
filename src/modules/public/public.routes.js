@@ -1,6 +1,6 @@
 import express from "express";
 import { getHomeData } from "./public.controller.js";
-import { getPublicHero } from "../admin/home/admin-home.service.js";
+import { listPublicHeroBanners } from "../admin/home/admin-home.service.js";
 import {
   getCityPage,
   getCityBrandClusterPage,
@@ -25,22 +25,30 @@ const router = express.Router();
 router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
 
 /**
- * Hero da Home — conteúdo editável pelo admin (Fase 4.1).
+ * Carrossel do hero da Home — conteúdo editável pelo admin (Fase 4.1.1).
  *
- * Cache 60s: alinhado a `/home`. Quando admin salva, o BFF chama
- * revalidateTag('public-home-hero') no Next; isto aqui também tem TTL
- * curto para garantir convergência em caso de tag-miss.
+ * Retorna até 3 banners ATIVOS, ordenados por position. Quando nenhum
+ * está ativo, retorna lista vazia — frontend público cai no fallback
+ * hardcoded sem precisar tratar erro.
  *
- * Retorna 200 sempre, com { data: null } quando nenhum hero está ativo
- * — frontend público cai no fallback hardcoded sem precisar tratar erro.
+ * Contrato:
+ *   { success: true, data: { banners: HomeHeroBanner[] } }
+ *
+ * Por que embrulhar em objeto?
+ *   Compatibilidade com mock retornado pela 4.1 (data: null). O frontend
+ *   trata data como objeto-ou-null. Embrulhar também antecipa metadados
+ *   futuros (TTL hint, version cap) sem quebrar o contrato.
+ *
+ * Cache 60s alinhado a `/home`. PATCH no admin dispara
+ * revalidateTag('public-home-hero') via BFF Next; este TTL é fallback.
  */
 router.get(
   "/home/hero",
   cacheGet({ prefix: "public:home:hero", ttlSeconds: 60, varyBy: [] }),
   async (_req, res, next) => {
     try {
-      const data = await getPublicHero();
-      res.json({ success: true, data });
+      const banners = await listPublicHeroBanners();
+      res.json({ success: true, data: { banners } });
     } catch (err) {
       next(err);
     }

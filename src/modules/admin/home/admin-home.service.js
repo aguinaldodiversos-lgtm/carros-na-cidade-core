@@ -2,33 +2,41 @@ import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { logger } from "../../../shared/logger.js";
 import { uploadSiteImage } from "../../../infrastructure/storage/r2.service.js";
 import { recordAdminAction } from "../admin.audit.js";
-import { findByKey, updateByKey } from "./admin-home.repository.js";
+import {
+  listBySectionType,
+  findByPosition,
+  updateByPosition,
+} from "./admin-home.repository.js";
 
 /**
- * Gestão do hero da Home (Fase 4.1).
+ * Gestão do carrossel de hero da Home (Fase 4.1.1).
  *
- * Por que reason obrigatório?
- * ---------------------------
- * Alinhado a commercial-settings e arquivamento de anúncios: alterações de
- * conteúdo público devem ter trilha de auditoria forte. O custo é mínimo
- * (1 campo no modal) e o ganho é grande quando precisamos investigar quem
- * trocou o banner em uma campanha.
+ * Modelo
+ * ------
+ * Cada banner é uma row em `home_sections` identificada por
+ * (section_type='home_hero', position=1..3). PATCH em um banner NUNCA
+ * altera os demais — o repository.updateByPosition filtra por position
+ * no WHERE.
  *
- * Por que CTA URL validada aqui?
- * ------------------------------
- * Banner principal é exposição máxima — link malicioso (`javascript:`,
- * `data:`) cria XSS. Caminho interno (`/comprar`, `/anuncios/...`) é o
- * uso esperado; http(s) externo é permitido mas com whitelist explícita.
+ * Audit
+ * -----
+ * action='update_home_hero_banner', target_type='home_content',
+ * target_id='home_hero_<position>'. Snapshot old/new contém SOMENTE o
+ * banner alterado (não os 3) — para que a leitura de admin_actions seja
+ * direta ("quem mudou o banner 2 em DD/MM").
  *
- * Fallback do frontend
- * --------------------
- * O service NÃO devolve fallback hardcoded — esse é trabalho do frontend
- * (HomeHero.tsx). O backend reflete fielmente o que está no banco; se a
- * linha não existir (migration não rodou), o public.controller devolve
- * null e o frontend cai em seu próprio fallback.
+ * Reason obrigatório — alinhado a 4.1, commercial-settings e
+ * arquivamento de anúncios.
+ *
+ * Fallback público
+ * ----------------
+ * `listPublicHeroBanners()` retorna apenas ativos, ordenados por
+ * position. Se nenhum estiver ativo, retorna []. O frontend trata []
+ * como fallback hardcoded (mesma semântica do null da 4.1).
  */
 
-const HERO_KEY = "home_hero";
+const SECTION_TYPE = "home_hero";
+const VALID_POSITIONS = [1, 2, 3];
 
 const LIMITS = Object.freeze({
   title: 140,
@@ -41,19 +49,28 @@ const LIMITS = Object.freeze({
 
 const ALLOWED_URL_PROTOCOLS = new Set(["http:", "https:"]);
 
+function assertValidPosition(position) {
+  const n = Number(position);
+  if (!Number.isInteger(n) || !VALID_POSITIONS.includes(n)) {
+    throw new AppError(
+      `position inválido. Aceitos: ${VALID_POSITIONS.join(", ")}.`,
+      400
+    );
+  }
+  return n;
+}
+
 function trimOrNull(value, max) {
   if (value === null) return null;
   if (typeof value !== "string") return undefined; // sinaliza "não tocar"
   const trimmed = value.trim();
-  if (trimmed === "") return null; // string vazia limpa o campo
+  if (trimmed === "") return null;
   return trimmed.slice(0, max);
 }
 
 /**
- * CTA URL: aceita caminho interno (começa com '/') ou http(s) absoluto.
- * Rejeita javascript:, data:, file:, etc.
- *
- * Retorna { ok: true, value } | { ok: false, message }.
+ * CTA URL: caminho interno '/...' OU http(s). Rejeita javascript:, data:,
+ * file:, protocol-relative '//', etc.
  */
 function validateCtaUrl(raw) {
   if (raw === null) return { ok: true, value: null };
@@ -63,13 +80,9 @@ function validateCtaUrl(raw) {
   if (trimmed.length > LIMITS.cta_url) {
     return { ok: false, message: `cta_url excede ${LIMITS.cta_url} caracteres.` };
   }
-
-  // Caminho interno: começa com '/' e NÃO com '//' (protocol-relative).
   if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
     return { ok: true, value: trimmed };
   }
-
-  // URL absoluta: precisa ser http/https.
   try {
     const url = new URL(trimmed);
     if (!ALLOWED_URL_PROTOCOLS.has(url.protocol)) {
@@ -87,10 +100,6 @@ function validateCtaUrl(raw) {
   }
 }
 
-/**
- * Valida URL de imagem (vinda do upload R2). Aceita só http/https absoluto
- * para evitar gravar `javascript:` ou caminho local malformado.
- */
 function validateImageUrl(raw, fieldName) {
   if (raw === null) return { ok: true, value: null };
   if (typeof raw !== "string") return { ok: true, value: undefined };
@@ -112,6 +121,8 @@ function rowToDto(row) {
   return {
     id: row.id,
     key: row.key,
+    section_type: row.section_type,
+    position: row.position,
     title: row.title,
     subtitle: row.subtitle,
     cta_label: row.cta_label,
@@ -128,35 +139,40 @@ function rowToDto(row) {
 }
 
 /**
- * Leitura admin do hero atual. NÃO filtra por is_active — admin precisa
- * ver mesmo quando desativado para editar/reativar.
+ * Lista admin: 3 banners (todos), ordenados por position. Inclui inativos.
  */
-export async function getHero() {
-  const row = await findByKey(HERO_KEY);
+export async function listHeroBanners() {
+  const rows = await listBySectionType(SECTION_TYPE, { includeInactive: true });
+  return rows.map(rowToDto);
+}
+
+/**
+ * Lista pública: somente ativos, ordenados por position.
+ */
+export async function listPublicHeroBanners() {
+  const rows = await listBySectionType(SECTION_TYPE, { includeInactive: false });
+  return rows.map(rowToDto);
+}
+
+/**
+ * Banner único por position (admin).
+ */
+export async function getHeroBanner(position) {
+  const pos = assertValidPosition(position);
+  const row = await findByPosition(SECTION_TYPE, pos);
   return rowToDto(row);
 }
 
 /**
- * Leitura pública do hero. Só devolve quando is_active = true. Se não
- * existir ou estiver inativo, retorna null — frontend cai no fallback.
- */
-export async function getPublicHero() {
-  const row = await findByKey(HERO_KEY);
-  if (!row || !row.is_active) return null;
-  return rowToDto(row);
-}
-
-/**
- * PATCH semântico do hero. Aceita apenas campos conhecidos.
+ * PATCH semântico em UM banner. Demais banners ficam intactos.
  *
- * - title/subtitle/cta_label/image_alt: trim, limites.
- * - cta_url: caminho interno OU http/https.
- * - image_desktop_url/image_mobile_url: http/https (vêm do endpoint de
- *   upload; admin não digita à mão).
- * - is_active: boolean explícito.
- * - reason: OBRIGATÓRIO (consistência com outras ações sensíveis admin).
+ * Quando ativando uma row sem conteúdo mínimo (sem title nem imagem),
+ * rejeitamos — banner ativo no carrossel sem nada pra mostrar polui
+ * a Home. Esta regra evita ativação acidental do Banner 2/3 vazios.
  */
-export async function updateHero({ adminUserId, payload, reason }) {
+export async function updateHeroBanner({ adminUserId, position, payload, reason }) {
+  const pos = assertValidPosition(position);
+
   if (!payload || typeof payload !== "object") {
     throw new AppError("Body inválido.", 400);
   }
@@ -166,12 +182,11 @@ export async function updateHero({ adminUserId, payload, reason }) {
       ? reason.trim().slice(0, LIMITS.reason)
       : null;
   if (!trimmedReason) {
-    throw new AppError("Motivo (reason) é obrigatório para alterar o hero.", 400);
+    throw new AppError("Motivo (reason) é obrigatório para alterar o banner.", 400);
   }
 
   const updates = {};
 
-  // Campos texto simples
   if (Object.prototype.hasOwnProperty.call(payload, "title")) {
     const v = trimOrNull(payload.title, LIMITS.title);
     if (v !== undefined) updates.title = v;
@@ -189,14 +204,12 @@ export async function updateHero({ adminUserId, payload, reason }) {
     if (v !== undefined) updates.image_alt = v;
   }
 
-  // cta_url validada
   if (Object.prototype.hasOwnProperty.call(payload, "cta_url")) {
     const check = validateCtaUrl(payload.cta_url);
     if (!check.ok) throw new AppError(check.message, 400);
     if (check.value !== undefined) updates.cta_url = check.value;
   }
 
-  // imagens (http/https)
   if (Object.prototype.hasOwnProperty.call(payload, "image_desktop_url")) {
     const check = validateImageUrl(payload.image_desktop_url, "image_desktop_url");
     if (!check.ok) throw new AppError(check.message, 400);
@@ -208,7 +221,6 @@ export async function updateHero({ adminUserId, payload, reason }) {
     if (check.value !== undefined) updates.image_mobile_url = check.value;
   }
 
-  // is_active boolean
   if (Object.prototype.hasOwnProperty.call(payload, "is_active")) {
     if (typeof payload.is_active !== "boolean") {
       throw new AppError("is_active deve ser boolean.", 400);
@@ -220,44 +232,58 @@ export async function updateHero({ adminUserId, payload, reason }) {
     throw new AppError("Nenhum campo válido para atualizar.", 400);
   }
 
-  const before = await findByKey(HERO_KEY);
+  const before = await findByPosition(SECTION_TYPE, pos);
   if (!before) {
-    // Defensivo: a migration cria seed; só aconteceria com banco fora de
-    // sync. Não criamos a linha aqui para forçar atenção ao desvio.
     throw new AppError(
-      "Seção home_hero não inicializada. Rode a migration 033_home_sections.",
+      `Banner position=${pos} não inicializado. Rode a migration 034_home_sections_carousel.`,
       500
     );
   }
 
-  // Validação adicional: se é troca de imagem, image_alt precisa existir
-  // (no DB OU no payload). Acessibilidade não-negociável.
-  const finalAltAfter =
-    Object.prototype.hasOwnProperty.call(updates, "image_alt")
-      ? updates.image_alt
-      : before.image_alt;
-  const hasDesktopImageAfter =
-    (Object.prototype.hasOwnProperty.call(updates, "image_desktop_url")
-      ? updates.image_desktop_url
-      : before.image_desktop_url) != null;
-  if (hasDesktopImageAfter && (!finalAltAfter || !finalAltAfter.trim())) {
+  // Compõe estado final por campo (existente OU patch) para validar
+  // regras pós-merge sem efetuar UPDATE prematuro.
+  function effective(field) {
+    return Object.prototype.hasOwnProperty.call(updates, field)
+      ? updates[field]
+      : before[field];
+  }
+
+  const finalAlt = effective("image_alt");
+  const finalDesktop = effective("image_desktop_url");
+  if (finalDesktop && (!finalAlt || !String(finalAlt).trim())) {
     throw new AppError(
       "image_alt é obrigatório quando há imagem desktop configurada.",
       400
     );
   }
 
-  const after = await updateByKey(HERO_KEY, updates, adminUserId);
-  if (!after) throw new AppError("Falha ao atualizar hero.", 500);
+  // Ativando um banner sem nada para mostrar polui a Home — bloqueia.
+  const becomingActive = effective("is_active") === true;
+  if (becomingActive) {
+    const finalTitle = effective("title");
+    const hasAnyContent =
+      (finalTitle && String(finalTitle).trim()) ||
+      finalDesktop ||
+      effective("image_mobile_url");
+    if (!hasAnyContent) {
+      throw new AppError(
+        "Para ativar este banner, defina ao menos um título ou uma imagem.",
+        400
+      );
+    }
+  }
+
+  const after = await updateByPosition(SECTION_TYPE, pos, updates, adminUserId);
+  if (!after) throw new AppError("Falha ao atualizar banner.", 500);
 
   const oldValue = rowToDto(before);
   const newValue = rowToDto(after);
 
   await recordAdminAction({
     adminUserId,
-    action: "update_home_hero",
+    action: "update_home_hero_banner",
     targetType: "home_content",
-    targetId: HERO_KEY,
+    targetId: after.key, // home_hero_1 | home_hero_2 | home_hero_3
     oldValue,
     newValue,
     reason: trimmedReason,
@@ -267,15 +293,15 @@ export async function updateHero({ adminUserId, payload, reason }) {
 }
 
 /**
- * Upload da imagem do hero (desktop ou mobile). Reutiliza o pipeline R2
- * (uploadSiteImage). Retorna URL pública; admin chama PATCH em seguida
- * para confirmar gravação no banco — assim a imagem anterior permanece
- * ativa até o admin clicar "Salvar" com a nova URL.
+ * Upload de imagem para um banner específico.
  *
- * Limita variant a 'desktop' | 'mobile' — qualquer outro valor cai como
- * desktop (defensivo).
+ * Estrutura de pasta R2: `site/home-hero/<position>/<variant>/<yyyy>/<mm>/<uuid>.webp`.
+ * Confirmação da URL no banco só ocorre via PATCH (admin clica "Publicar"
+ * com reason) — assim a imagem anterior do banner permanece ativa até a
+ * decisão consciente do admin.
  */
-export async function uploadHeroImage({ adminUserId, file, variant }) {
+export async function uploadHeroImage({ adminUserId, position, file, variant }) {
+  const pos = assertValidPosition(position);
   if (!file) throw new AppError("Arquivo de imagem ausente.", 400);
 
   const normalizedVariant = variant === "mobile" ? "mobile" : "desktop";
@@ -283,16 +309,16 @@ export async function uploadHeroImage({ adminUserId, file, variant }) {
   try {
     const upload = await uploadSiteImage({
       file,
-      section: "home-hero",
+      // Section diferencia por posição para que listagem do R2 fique
+      // organizada por banner.
+      section: `home-hero/${pos}`,
       variant: normalizedVariant,
       uploadedByUserId: adminUserId,
     });
 
     if (!upload.publicUrl) {
-      // R2_PUBLIC_BASE_URL não configurada — não é prático servir via BFF
-      // para conteúdo público da home. Falha explícita.
       logger.error(
-        { key: upload.key, adminUserId },
+        { key: upload.key, adminUserId, position: pos },
         "[admin-home] upload OK mas publicUrl vazio (R2_PUBLIC_BASE_URL não configurada)"
       );
       throw new AppError(
@@ -304,6 +330,7 @@ export async function uploadHeroImage({ adminUserId, file, variant }) {
     return {
       url: upload.publicUrl,
       key: upload.key,
+      position: pos,
       variant: normalizedVariant,
       size_bytes: upload.sizeBytes,
       mime_type: upload.mimeType,
@@ -311,7 +338,6 @@ export async function uploadHeroImage({ adminUserId, file, variant }) {
   } catch (err) {
     if (err instanceof AppError) throw err;
     const message = err?.message || "Falha no upload da imagem.";
-    // Erros vindos do validator R2 (mime, tamanho) começam com "[r2]"; mapeia 400.
     if (typeof message === "string" && message.startsWith("[r2]")) {
       throw new AppError(message.replace(/^\[r2\]\s*/, ""), 400);
     }

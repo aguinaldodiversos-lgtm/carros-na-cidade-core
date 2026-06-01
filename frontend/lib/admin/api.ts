@@ -187,26 +187,34 @@ export const adminApi = {
       }),
   },
   home: {
-    getHero: () => adminFetch<ApiOne<HomeHeroDto | null>>("home/hero"),
-    updateHero: (patch: HomeHeroPatch, reason: string) =>
-      adminFetch<ApiOne<HomeHeroDto>>("home/hero", {
+    /** Lista 3 banners (inclui inativos). */
+    listHero: () => adminFetch<ApiOne<{ banners: HomeHeroBannerDto[] }>>("home/hero"),
+    getBanner: (position: 1 | 2 | 3) =>
+      adminFetch<ApiOne<HomeHeroBannerDto>>(`home/hero/${position}`),
+    /** PATCH em UM banner. Reason obrigatório. */
+    updateBanner: (position: 1 | 2 | 3, patch: HomeHeroPatch, reason: string) =>
+      adminFetch<ApiOne<HomeHeroBannerDto>>(`home/hero/${position}`, {
         method: "PATCH",
         body: { ...patch, reason },
       }),
-    // Upload é multipart — fetch direto, fora do helper JSON.
+    /** Upload multipart — devolve URL pública. Gravação só via updateBanner. */
     uploadImage: async (
+      position: 1 | 2 | 3,
       file: File,
       variant: "desktop" | "mobile"
     ): Promise<ApiOne<HomeHeroUpload>> => {
       const fd = new FormData();
       fd.append("image", file);
       fd.append("variant", variant);
-      const res = await fetch(`/api/admin/home/hero/image?variant=${variant}`, {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/admin/home/hero/${position}/image?variant=${variant}`,
+        {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || `Erro ${res.status}`);
       return json as ApiOne<HomeHeroUpload>;
@@ -781,11 +789,17 @@ export type SeoCityMetric = {
   avg_position: number;
 };
 
-// ── Home (Fase 4.1) ──
+// ── Home (Fase 4.1.1 — carrossel) ──
 
-export type HomeHeroDto = {
+/**
+ * Banner individual do hero. position 1..3. PATCH em um banner não
+ * altera os demais.
+ */
+export type HomeHeroBannerDto = {
   id: number;
-  key: "home_hero";
+  key: string; // home_hero_1 | home_hero_2 | home_hero_3
+  section_type: "home_hero";
+  position: 1 | 2 | 3;
   title: string | null;
   subtitle: string | null;
   cta_label: string | null;
@@ -814,6 +828,7 @@ export type HomeHeroPatch = Partial<{
 export type HomeHeroUpload = {
   url: string;
   key: string;
+  position: 1 | 2 | 3;
   variant: "desktop" | "mobile";
   size_bytes: number;
   mime_type: string;

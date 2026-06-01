@@ -61,7 +61,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
   // fazemos fetch.
   const regionalEnabled = isRegionalPageEnabled();
 
-  const [aboveFold, stateRegionsPayload, heroOverride] = await Promise.all([
+  const [aboveFold, stateRegionsPayload, heroBanners] = await Promise.all([
     fetchHomeAboveFold(),
     regionalEnabled ? fetchStateRegions(territory.state.code, { limit: 6 }) : Promise.resolve(null),
     fetchHomeHero(),
@@ -86,7 +86,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
       detectedCity={detectedCity}
       stateRegions={homeRegionsBlock}
       regionalEnabled={regionalEnabled}
-      heroOverride={heroOverride}
+      heroBanners={heroBanners}
       carousels={
         <HomeCarousels
           stateUf={territory.state.code}
