@@ -14,10 +14,13 @@ import * as plansService from "./plans/admin-plans.service.js";
 import * as highlightsService from "./highlights/admin-highlights.service.js";
 import * as commercialSettingsService from "./commercial-settings/admin-commercial-settings.service.js";
 import * as seoService from "./seo/admin-seo.service.js";
+import * as homeService from "./home/admin-home.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
 } from "./regional-settings/admin-regional-settings.service.js";
+import multer from "multer";
+import { ACCEPTED_INPUT_MIMES } from "../../infrastructure/storage/image-normalizer.js";
 
 const router = express.Router();
 
@@ -634,6 +637,72 @@ router.get(
   asyncHandler(async (req, res) => {
     const limit = parseIntParam(req.query.limit, 100);
     const data = await seoService.listIssues({ limit });
+    res.json({ ok: true, data });
+  })
+);
+
+// =========================================================================
+// HOME / CONTEÚDO — Fase 4.1: gestão do hero da Home.
+// Audita em admin_actions com target_type='home_content' (target_id =
+// 'home_hero'). Upload de imagem reusa pipeline R2 (uploadSiteImage) —
+// converte para WebP, EXIF strip, key estável em site/home-hero/...
+// =========================================================================
+
+const homeImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 8 * 1024 * 1024, // 8MB — banner de campanha; menor que veículo (10MB)
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^image\/(jpg|x-jpg|pjpeg)$/, "image/jpeg");
+    if (ACCEPTED_INPUT_MIMES.has(mime)) {
+      cb(null, true);
+      return;
+    }
+    cb(
+      new AppError(
+        `Formato não suportado: "${file.mimetype || "desconhecido"}". Aceitos: JPEG, PNG, WebP, HEIC/HEIF.`,
+        400
+      )
+    );
+  },
+});
+
+router.get(
+  "/home/hero",
+  asyncHandler(async (_req, res) => {
+    const data = await homeService.getHero();
+    res.json({ ok: true, data });
+  })
+);
+
+router.patch(
+  "/home/hero",
+  asyncHandler(async (req, res) => {
+    const { reason, ...payload } = req.body || {};
+    const data = await homeService.updateHero({
+      adminUserId: req.user.id,
+      payload,
+      reason,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+router.post(
+  "/home/hero/image",
+  homeImageUpload.single("image"),
+  asyncHandler(async (req, res) => {
+    const variant = String(req.query.variant || req.body?.variant || "desktop").toLowerCase();
+    const data = await homeService.uploadHeroImage({
+      adminUserId: req.user.id,
+      file: req.file,
+      variant,
+    });
     res.json({ ok: true, data });
   })
 );

@@ -9,6 +9,20 @@ import { useRouter } from "next/navigation";
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
 
 /**
+ * Override do hero vindo do admin (Fase 4.1). Todos campos opcionais —
+ * o componente cai no fallback hardcoded para cada campo ausente.
+ */
+export interface HomeHeroOverride {
+  title: string | null;
+  subtitle: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  image_desktop_url: string | null;
+  image_mobile_url: string | null;
+  image_alt: string | null;
+}
+
+/**
  * HomeHero — banner regional alinhado ao mockup `pagina Home.png`.
  *
  * Renderiza o card herói abaixo da `HomeSearchCard` e da `HomeShortcuts`:
@@ -27,6 +41,10 @@ import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
  * SUV continua visível à direita, igual ao mockup.
  */
 
+function hasContent(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 interface HomeHeroProps {
   /**
    * Slug da cidade detectada (cookie/query). Quando presente, o CTA "Ver
@@ -44,6 +62,12 @@ interface HomeHeroProps {
   stateName: string;
   /** Total de anúncios ativos (para a "+N mil ofertas ativas"). */
   totalAds?: number;
+  /**
+   * Override editável pelo admin (Fase 4.1). Quando um campo está
+   * presente, substitui o equivalente hardcoded — granular por campo,
+   * para que admin possa só trocar a imagem sem reescrever o título.
+   */
+  override?: HomeHeroOverride | null;
 }
 
 function PinIcon() {
@@ -92,14 +116,23 @@ function formatActiveOffers(total: number | undefined): string | null {
   return `+${rounded} ofertas ativas`;
 }
 
-export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: HomeHeroProps) {
+export function HomeHero({
+  defaultCitySlug,
+  cityName,
+  stateName,
+  totalAds,
+  override = null,
+}: HomeHeroProps) {
   const router = useRouter();
   // Quando há cidade detectada, microcopy fala na cidade. Sem cidade, fala
   // no estado (vitrine estadual padrão).
   const scopeLabel = cityName ? `${cityName} e região` : stateName;
   const pillLabel = cityName ? `${cityName} e região` : `${stateName} e região`;
 
+  const overrideCtaUrl = hasContent(override?.cta_url) ? override.cta_url : null;
+
   const offersHref = useMemo(() => {
+    if (overrideCtaUrl) return overrideCtaUrl;
     // Cidade detectada → preserva no link (rota canonicaliza para /comprar/cidade/X).
     // Sem cidade → /comprar puro (cai no /comprar/estado/[default]).
     if (defaultCitySlug) {
@@ -108,7 +141,17 @@ export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: Hom
       return `/comprar?${params.toString()}`;
     }
     return "/comprar";
-  }, [defaultCitySlug]);
+  }, [defaultCitySlug, overrideCtaUrl]);
+
+  // Sources finais: override > default.
+  const overrideImage = hasContent(override?.image_desktop_url)
+    ? override.image_desktop_url
+    : null;
+  const bannerSrc = overrideImage || HOME_HERO_BANNER;
+  const overrideAlt = hasContent(override?.image_alt) ? override.image_alt : null;
+  const overrideTitle = hasContent(override?.title) ? override.title : null;
+  const overrideSubtitle = hasContent(override?.subtitle) ? override.subtitle : null;
+  const overrideCtaLabel = hasContent(override?.cta_label) ? override.cta_label : null;
 
   const handleCtaClick = useCallback(() => {
     // Mantém SSR-friendly via Link do next; este onClick é só fallback
@@ -121,16 +164,20 @@ export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: Hom
     <section className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8">
       <div className="relative overflow-hidden rounded-2xl bg-cnc-footer-a shadow-premium md:rounded-3xl">
         <Image
-          src={HOME_HERO_BANNER}
+          src={bannerSrc}
           alt={
-            cityName
+            overrideAlt ||
+            (cityName
               ? `Carros usados em ${cityName} no Carros na Cidade`
-              : `Carros usados em ${stateName} no Carros na Cidade`
+              : `Carros usados em ${stateName} no Carros na Cidade`)
           }
           fill
           priority
           sizes="(min-width: 1280px) 1440px, 100vw"
           className="object-cover object-right"
+          /* `unoptimized` quando a URL é externa (R2 CDN). Evita exigir
+             configuração de domain em next.config para cada CDN novo. */
+          unoptimized={Boolean(overrideImage)}
         />
         {/*
          * Gradient suave da esquerda (forte) para o centro (transparente)
@@ -150,7 +197,9 @@ export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: Hom
             </span>
 
             <h1 className="mt-3 text-[22px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[28px] md:text-[36px]">
-              {cityName ? (
+              {overrideTitle ? (
+                overrideTitle
+              ) : cityName ? (
                 <>
                   Encontre
                   <br />
@@ -168,7 +217,9 @@ export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: Hom
             </h1>
 
             <p className="mt-2 max-w-md text-[13px] leading-snug text-white/85 sm:mt-3 sm:text-[15px]">
-              {cityName
+              {overrideSubtitle
+                ? overrideSubtitle
+                : cityName
                 ? `Carros, lojas e ofertas reais em ${scopeLabel}.`
                 : `Ofertas selecionadas em todo o estado de ${stateName} — informe sua cidade para ver carros próximos.`}
             </p>
@@ -178,7 +229,7 @@ export function HomeHero({ defaultCitySlug, cityName, stateName, totalAds }: Hom
                 href={offersHref}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13.5px] font-extrabold text-white shadow-card transition hover:bg-primary-strong sm:px-6 sm:py-3 sm:text-[15px]"
               >
-                Ver ofertas
+                {overrideCtaLabel || "Ver ofertas"}
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/15 sm:h-6 sm:w-6">
                   <ArrowRightIcon />
                 </span>

@@ -117,6 +117,49 @@ export async function fetchHomeAboveFold(): Promise<HomeAboveFoldData> {
   };
 }
 
+/**
+ * Hero customizável da Home (Fase 4.1).
+ *
+ * Vem do backend (`/api/public/home/hero`) que lê a tabela `home_sections`
+ * editável pelo admin em `/admin/conteudo/home`. Quando nenhum hero está
+ * ativo (ou em caso de falha), retorna null e o componente HomeHero cai
+ * no fallback hardcoded (textos atuais + imagem estática
+ * `/images/home-hero-banner.jpg`).
+ *
+ * Cache: 60s + tags `public-home-hero` / `public-home`. Quando admin
+ * publica, o BFF chama `/api/revalidate` com tag `public-home-hero`,
+ * convergindo em segundos sem esperar o TTL.
+ */
+export interface HomeHeroDto {
+  title: string | null;
+  subtitle: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  image_desktop_url: string | null;
+  image_mobile_url: string | null;
+  image_alt: string | null;
+  is_active: boolean;
+  version: number;
+  updated_at: string;
+}
+
+export async function fetchHomeHero(): Promise<HomeHeroDto | null> {
+  const apiBase = getApiBaseUrl();
+  const tags = ["public-home-hero", "public-home"];
+
+  const json = await fetchJson<{ success?: boolean; data?: HomeHeroDto | null }>(
+    `${apiBase}/api/public/home/hero`,
+    tags
+  );
+  if (!json || json.success === false) return null;
+  const data = json.data ?? null;
+  if (!data) return null;
+  // Defensivo: backend só devolve com is_active=true, mas a checagem
+  // aqui evita acidentes caso o contrato mude.
+  if (!data.is_active) return null;
+  return data;
+}
+
 export type HomeCarouselsData = {
   highlightAds: AdItem[];
   opportunityAds: AdItem[];

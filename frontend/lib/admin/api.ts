@@ -186,6 +186,32 @@ export const adminApi = {
         body: { status, reason },
       }),
   },
+  home: {
+    getHero: () => adminFetch<ApiOne<HomeHeroDto | null>>("home/hero"),
+    updateHero: (patch: HomeHeroPatch, reason: string) =>
+      adminFetch<ApiOne<HomeHeroDto>>("home/hero", {
+        method: "PATCH",
+        body: { ...patch, reason },
+      }),
+    // Upload é multipart — fetch direto, fora do helper JSON.
+    uploadImage: async (
+      file: File,
+      variant: "desktop" | "mobile"
+    ): Promise<ApiOne<HomeHeroUpload>> => {
+      const fd = new FormData();
+      fd.append("image", file);
+      fd.append("variant", variant);
+      const res = await fetch(`/api/admin/home/hero/image?variant=${variant}`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || `Erro ${res.status}`);
+      return json as ApiOne<HomeHeroUpload>;
+    },
+  },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<ModerationAdRow>>("moderation/ads", {
@@ -753,6 +779,44 @@ export type SeoCityMetric = {
   clicks: number;
   ctr: number;
   avg_position: number;
+};
+
+// ── Home (Fase 4.1) ──
+
+export type HomeHeroDto = {
+  id: number;
+  key: "home_hero";
+  title: string | null;
+  subtitle: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  image_desktop_url: string | null;
+  image_mobile_url: string | null;
+  image_alt: string | null;
+  is_active: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by_admin_id: string | null;
+};
+
+export type HomeHeroPatch = Partial<{
+  title: string | null;
+  subtitle: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  image_desktop_url: string | null;
+  image_mobile_url: string | null;
+  image_alt: string | null;
+  is_active: boolean;
+}>;
+
+export type HomeHeroUpload = {
+  url: string;
+  key: string;
+  variant: "desktop" | "mobile";
+  size_bytes: number;
+  mime_type: string;
 };
 
 export type RegionalSettings = {

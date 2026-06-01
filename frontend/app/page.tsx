@@ -7,7 +7,7 @@ import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
-import { fetchHomeAboveFold } from "@/lib/home/public-home";
+import { fetchHomeAboveFold, fetchHomeHero } from "@/lib/home/public-home";
 import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
@@ -61,9 +61,10 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
   // fazemos fetch.
   const regionalEnabled = isRegionalPageEnabled();
 
-  const [aboveFold, stateRegionsPayload] = await Promise.all([
+  const [aboveFold, stateRegionsPayload, heroOverride] = await Promise.all([
     fetchHomeAboveFold(),
     regionalEnabled ? fetchStateRegions(territory.state.code, { limit: 6 }) : Promise.resolve(null),
+    fetchHomeHero(),
   ]);
 
   const stateRegions = stateRegionsPayload?.regions ?? [];
@@ -85,6 +86,7 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
       detectedCity={detectedCity}
       stateRegions={homeRegionsBlock}
       regionalEnabled={regionalEnabled}
+      heroOverride={heroOverride}
       carousels={
         <HomeCarousels
           stateUf={territory.state.code}

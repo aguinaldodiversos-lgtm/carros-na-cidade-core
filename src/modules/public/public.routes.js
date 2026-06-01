@@ -1,5 +1,6 @@
 import express from "express";
 import { getHomeData } from "./public.controller.js";
+import { getPublicHero } from "../admin/home/admin-home.service.js";
 import {
   getCityPage,
   getCityBrandClusterPage,
@@ -22,6 +23,29 @@ import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middle
 const router = express.Router();
 
 router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
+
+/**
+ * Hero da Home — conteúdo editável pelo admin (Fase 4.1).
+ *
+ * Cache 60s: alinhado a `/home`. Quando admin salva, o BFF chama
+ * revalidateTag('public-home-hero') no Next; isto aqui também tem TTL
+ * curto para garantir convergência em caso de tag-miss.
+ *
+ * Retorna 200 sempre, com { data: null } quando nenhum hero está ativo
+ * — frontend público cai no fallback hardcoded sem precisar tratar erro.
+ */
+router.get(
+  "/home/hero",
+  cacheGet({ prefix: "public:home:hero", ttlSeconds: 60, varyBy: [] }),
+  async (_req, res, next) => {
+    try {
+      const data = await getPublicHero();
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /**
  * Regiões destacadas por estado — alimenta o bloco "Explore por região" da

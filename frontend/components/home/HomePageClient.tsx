@@ -6,7 +6,7 @@ import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { ContentCardsSection } from "@/components/home/sections/ContentCardsSection";
 import { ExploreByState } from "@/components/home/sections/ExploreByState";
 import { HomeCarouselsSkeleton } from "@/components/home/sections/HomeCarouselsSkeleton";
-import { HomeHero } from "@/components/home/sections/HomeHero";
+import { HomeHero, type HomeHeroOverride } from "@/components/home/sections/HomeHero";
 import { HomePrimaryActions } from "@/components/home/sections/HomePrimaryActions";
 import { HomeSearchCard } from "@/components/home/sections/HomeSearchCard";
 import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
@@ -82,6 +82,11 @@ interface HomePageClientProps {
    * e estado como destinos.
    */
   regionalEnabled: boolean;
+  /**
+   * Override do hero vindo do painel admin (Fase 4.1). Quando presente,
+   * substitui os textos/imagem hardcoded. Null = sem override = layout atual.
+   */
+  heroOverride?: HomeHeroOverride | null;
 }
 
 function parseTotalAds(value: number | string | undefined): number | undefined {
@@ -101,6 +106,7 @@ export function HomePageClient({
   carousels,
   stateRegions = null,
   regionalEnabled,
+  heroOverride = null,
 }: HomePageClientProps) {
   const totalAds = parseTotalAds(data?.stats?.total_ads);
 
@@ -135,6 +141,7 @@ export function HomePageClient({
           cityName={detectedCityName}
           stateName={stateName}
           totalAds={totalAds}
+          override={heroOverride}
         />
 
         <HomePrimaryActions />

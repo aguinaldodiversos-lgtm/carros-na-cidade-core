@@ -623,3 +623,78 @@ export function toVehicleImageRecord(upload, extra = {}) {
     ...extra,
   };
 }
+
+/**
+ * Upload de imagem institucional do site (hero da Home, banners promo, etc.).
+ *
+ * Diferenças vs. uploadVehicleImage:
+ *   - Key prefix configurável (`site/<section>/<variant>/<yyyy>/<mm>/<uuid>.webp`),
+ *     sem vehicleId. Padrão: section='home-hero', variant='desktop'.
+ *   - Sem metadata vehicle_id/sort_order/is_cover.
+ *   - Mesmo pipeline de normalização (WebP, EXIF strip, maxDim 2048).
+ *   - Mesmo whitelist de MIME (`ACCEPTED_INPUT_MIMES`).
+ *
+ * @param {{
+ *   file: any,
+ *   section?: string,        // default 'home-hero'
+ *   variant?: string,        // default 'desktop'
+ *   uploadedByUserId?: string|number|null,
+ *   cacheControl?: string,
+ * }} params
+ */
+export async function uploadSiteImage({
+  file,
+  section = "home-hero",
+  variant = "desktop",
+  uploadedByUserId = null,
+  cacheControl = DEFAULT_CACHE_CONTROL,
+}) {
+  const client = getR2Client();
+  const { bucketName } = getR2Config();
+
+  const validated = await validateVehicleImageFile(file);
+  const normalized = await normalizeVehicleImage(validated.buffer);
+
+  const safeSection = sanitizePathSegment(section || "site", "site");
+  const safeVariant = sanitizePathSegment(variant || "default", "default");
+  const safeStem = sanitizeFilenameStem(validated.originalName);
+  const now = new Date();
+  const year = String(now.getUTCFullYear());
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const uuid = crypto.randomUUID();
+  const key = `site/${safeSection}/${safeVariant}/${year}/${month}/${uuid}-${safeStem}.webp`;
+
+  const metadata = {
+    section: sanitizeS3MetadataValue(safeSection, 64),
+    variant: sanitizeS3MetadataValue(safeVariant, 64),
+    original_name: sanitizeS3MetadataValue(validated.originalName || ""),
+  };
+  if (uploadedByUserId != null && uploadedByUserId !== "") {
+    metadata.uploaded_by_user_id = sanitizeS3MetadataValue(String(uploadedByUserId));
+  }
+
+  const result = await client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: normalized.buffer,
+      ContentType: normalized.mimeType,
+      ContentLength: normalized.normalizedSize,
+      CacheControl: cacheControl,
+      Metadata: metadata,
+    })
+  );
+
+  return {
+    provider: "cloudflare_r2",
+    bucket: bucketName,
+    key,
+    section: safeSection,
+    variant: safeVariant,
+    originalName: validated.originalName,
+    mimeType: normalized.mimeType,
+    sizeBytes: normalized.normalizedSize,
+    etag: result?.ETag ? String(result.ETag).replace(/"/g, "") : null,
+    publicUrl: buildR2PublicUrl(key),
+  };
+}
