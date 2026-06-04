@@ -3,9 +3,33 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
+
+/** Intervalo de autoplay em ms (Fase 4.1.3). */
+const AUTOPLAY_INTERVAL_MS = 6000;
+
+/**
+ * Quando o admin clica num dot, pausamos o autoplay por este tempo para
+ * dar espaço ao usuário ler o slide escolhido antes de continuar a
+ * rotação automática.
+ */
+const MANUAL_PAUSE_MS = 12000;
+
+/**
+ * Detecta a preferência `prefers-reduced-motion: reduce`. Em SSR / sem
+ * matchMedia, assume false (autoplay habilitado por padrão para a
+ * maioria dos usuários).
+ */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Override de um único banner (Fase 4.1) — todos campos opcionais; o
@@ -176,86 +200,128 @@ export function HomeHero({
   const offersBadge = formatActiveOffers(totalAds);
   const showCarousel = slides.length > 1;
 
-  const [activeDot, setActiveDot] = useState(0);
+  // Índice ativo (0..slides.length-1).
+  const [activeIdx, setActiveIdx] = useState(0);
+  // Pause manual ou hover.
+  const [paused, setPaused] = useState(false);
+  // Timer da pausa temporária após clique em dot (limpa em unmount).
+  const manualPauseTimerRef = useRef<number | null>(null);
 
-  const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    const w = el.clientWidth || 1;
-    const idx = Math.round(el.scrollLeft / w);
-    setActiveDot(idx);
-  }, []);
+  // Clamp se o array encolher (ex.: admin desativa o último banner).
+  useEffect(() => {
+    if (activeIdx >= slides.length) setActiveIdx(0);
+  }, [slides.length, activeIdx]);
 
-  function goToSlide(idx: number) {
-    const el = document.getElementById("home-hero-track");
-    if (!el) return;
-    const w = el.clientWidth || 1;
-    el.scrollTo({ left: idx * w, behavior: "smooth" });
-  }
+  // Autoplay (Fase 4.1.3).
+  //
+  // Política:
+  //   - só roda quando há 2+ banners (showCarousel);
+  //   - pausa quando `paused` (hover ou clique manual em dot);
+  //   - respeita `prefers-reduced-motion: reduce`;
+  //   - cleanup ao desmontar / mudar deps.
+  useEffect(() => {
+    if (!showCarousel) return;
+    if (paused) return;
+    if (prefersReducedMotion()) return;
+    if (typeof window === "undefined") return;
+
+    const id = window.setInterval(() => {
+      setActiveIdx((cur) => (cur + 1) % slides.length);
+    }, AUTOPLAY_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [showCarousel, paused, slides.length]);
+
+  // Cleanup do timer manual no unmount.
+  useEffect(
+    () => () => {
+      if (manualPauseTimerRef.current != null && typeof window !== "undefined") {
+        window.clearTimeout(manualPauseTimerRef.current);
+      }
+    },
+    []
+  );
+
+  const handleDotClick = useCallback(
+    (idx: number) => {
+      if (typeof window === "undefined") return;
+      const normalized = ((idx % slides.length) + slides.length) % slides.length;
+      setActiveIdx(normalized);
+      // Pausa temporária — usuário escolheu um slide; respeita por 12s.
+      setPaused(true);
+      if (manualPauseTimerRef.current != null) {
+        window.clearTimeout(manualPauseTimerRef.current);
+      }
+      manualPauseTimerRef.current = window.setTimeout(
+        () => setPaused(false),
+        MANUAL_PAUSE_MS
+      );
+    },
+    [slides.length]
+  );
 
   return (
-    <section className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8">
-      <div className="relative overflow-hidden rounded-2xl bg-cnc-footer-a shadow-premium md:rounded-3xl">
-        {showCarousel ? (
-          <div
-            id="home-hero-track"
-            className="flex w-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
-            onScroll={onScroll}
-            role="region"
-            aria-roledescription="carousel"
-            aria-label="Banners principais"
-          >
-            {slides.map((slide, idx) => (
-              <div
-                key={`slide-${slide.position}-${idx}`}
-                className="relative w-full flex-none snap-start"
-                aria-roledescription="slide"
-                aria-label={`Banner ${idx + 1} de ${slides.length}`}
-              >
-                <HeroSlide
-                  slide={slide}
-                  cityName={cityName}
-                  stateName={stateName}
-                  defaultCitySlug={defaultCitySlug}
-                  offersBadge={offersBadge}
-                  priority={idx === 0}
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <HeroSlide
-            slide={slides[0]}
-            cityName={cityName}
-            stateName={stateName}
-            defaultCitySlug={defaultCitySlug}
-            offersBadge={offersBadge}
-            priority
-          />
-        )}
+    <section
+      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* Wrapper: overflow-hidden + rounded + shadow. SEM background — cada
+          slide controla o seu (arte pronta usa bg neutro claro; fallback
+          textual usa bg-cnc-footer-a). */}
+      <div className="relative w-full overflow-hidden rounded-2xl shadow-premium md:rounded-3xl">
+        {/* Track: flex linear; movimento via transform: translateX. Não usa
+            scroll-snap → não cria barra horizontal nativa. */}
+        <div
+          className="flex w-full transition-transform duration-500 ease-out motion-reduce:transition-none"
+          style={{ transform: `translateX(-${activeIdx * 100}%)` }}
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="Banners principais"
+          aria-live={showCarousel && !paused ? "off" : "polite"}
+        >
+          {slides.map((slide, idx) => (
+            <div
+              key={`slide-${slide.position}-${idx}`}
+              className="w-full flex-shrink-0"
+              aria-roledescription="slide"
+              aria-label={`Banner ${idx + 1} de ${slides.length}`}
+              aria-hidden={showCarousel && idx !== activeIdx}
+            >
+              <HeroSlide
+                slide={slide}
+                cityName={cityName}
+                stateName={stateName}
+                defaultCitySlug={defaultCitySlug}
+                offersBadge={offersBadge}
+                priority={idx === 0}
+              />
+            </div>
+          ))}
+        </div>
 
-        {/* Dots — visuais quando 1; navegáveis quando 2-3 */}
-        <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 sm:bottom-5">
-          {(showCarousel ? slides : [slides[0], null, null, null]).map((_, idx) => {
-            const isActive = showCarousel ? idx === activeDot : idx === 0;
-            const Tag = showCarousel ? "button" : "span";
-            const className = `rounded-full transition-all ${
-              isActive ? "h-1.5 w-6 bg-white/90" : "h-1.5 w-1.5 bg-white/40"
-            }`;
-            if (Tag === "button") {
+        {/* Dots — só quando há 2+ banners. Cor primary contrasta tanto em
+            bg claro (arte pronta) quanto em bg escuro (fallback textual). */}
+        {showCarousel && (
+          <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 sm:bottom-5">
+            {slides.map((_, idx) => {
+              const isActive = idx === activeIdx;
               return (
                 <button
                   key={idx}
                   type="button"
                   aria-label={`Ir para o banner ${idx + 1}`}
                   aria-current={isActive}
-                  onClick={() => goToSlide(idx)}
-                  className={className}
+                  onClick={() => handleDotClick(idx)}
+                  className={`rounded-full ring-1 ring-cnc-bg/30 transition-all hover:bg-primary/80 ${
+                    isActive
+                      ? "h-1.5 w-6 bg-primary"
+                      : "h-1.5 w-1.5 bg-cnc-text/30"
+                  }`}
                 />
               );
-            }
-            return <span key={idx} aria-hidden="true" className={className} />;
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -323,11 +389,25 @@ function HeroSlide({
     const linkProps = isExternal
       ? { rel: "noopener noreferrer", target: "_blank" as const }
       : {};
+
+    // Aspect-ratio do CONTAINER define a altura do slide (não a imagem).
+    // Com object-contain, a arte é mostrada inteira; bandas vazias
+    // recebem o background neutro #f3f7ff (cor sugerida pela spec).
+    //
+    // - Quando há mobile_url: assume arte vertical (1080x1080 / 1080x1350)
+    //   e usa aspect-[4/5] no mobile + aspect-[16/5] no desktop.
+    // - Sem mobile_url: aspect-[16/6] no mobile (compacto) e
+    //   aspect-[16/5] no desktop (panorâmico). Ambos object-contain
+    //   nunca cortam a arte.
+    const aspectClass = overrideMobile
+      ? "aspect-[4/5] md:aspect-[16/5]"
+      : "aspect-[16/6] md:aspect-[16/5]";
+
     return (
       <Link
         href={offersHref}
         aria-label={altText || "Abrir oferta"}
-        className="block relative h-full w-full overflow-hidden"
+        className={`block relative w-full overflow-hidden bg-[#f3f7ff] ${aspectClass}`}
         {...linkProps}
       >
         {/* Desktop — escondido quando há imagem mobile dedicada. */}
@@ -339,7 +419,7 @@ function HeroSlide({
             priority={priority}
             loading={priority ? undefined : "lazy"}
             sizes="(min-width: 1280px) 1440px, 100vw"
-            className="object-cover object-center"
+            className="object-contain object-center"
             unoptimized
           />
         </div>
@@ -353,14 +433,11 @@ function HeroSlide({
               priority={priority}
               loading={priority ? undefined : "lazy"}
               sizes="100vw"
-              className="object-cover object-center"
+              className="object-contain object-center"
               unoptimized
             />
           </div>
         )}
-        {/* Altura mínima compatível com o fallback textual para evitar
-            CLS quando carrossel troca entre modos. SEM overlay/gradient. */}
-        <div className="invisible min-h-[220px] sm:min-h-[300px] md:min-h-[380px]" aria-hidden="true" />
       </Link>
     );
   }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -35,8 +35,39 @@ vi.mock("next/image", () => ({
 
 import { HomeHero } from "./HomeHero";
 
+/**
+ * matchMedia mock controlável. Cada teste pode setar
+ * `reducedMotionMatches` true/false e o componente respeita.
+ *
+ * Em jsdom não há `window.matchMedia` por padrão — o mock é instalado
+ * dentro de beforeEach para que cada teste fique isolado.
+ */
+let reducedMotionMatches = false;
+
+beforeEach(() => {
+  reducedMotionMatches = false;
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches:
+        typeof query === "string" && query.includes("prefers-reduced-motion")
+          ? reducedMotionMatches
+          : false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
+
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe("HomeHero — regra dual de render (Fase 4.1.2)", () => {
@@ -105,7 +136,7 @@ describe("HomeHero — regra dual de render (Fase 4.1.2)", () => {
   });
 
   it("carrossel 2 banners ambos com imagem: dois links, nenhum H1", () => {
-    render(
+    const { container } = render(
       <HomeHero
         stateName="São Paulo"
         banners={[
@@ -132,9 +163,10 @@ describe("HomeHero — regra dual de render (Fase 4.1.2)", () => {
         ]}
       />
     );
-    const links = screen.getAllByRole("link");
-    // Os 2 slides são <Link>. Os 2 botões de dot também são role=button,
-    // então buscamos apenas pelos hrefs dos slides.
+    // Usamos querySelectorAll porque slides inativos têm aria-hidden=true,
+    // que esconde o role=link da accessibility tree (e do getByRole). Os
+    // 2 <a> existem no DOM mesmo assim.
+    const links = Array.from(container.querySelectorAll("a[href]"));
     const slideLinks = links.filter((el) => {
       const href = el.getAttribute("href") || "";
       return href === "/comprar" || href === "/anunciar";
@@ -190,5 +222,170 @@ describe("HomeHero — regra dual de render (Fase 4.1.2)", () => {
     const srcs = imgs.map((i) => i.getAttribute("src"));
     expect(srcs).toContain("https://cdn.example.com/desktop.webp");
     expect(srcs).toContain("https://cdn.example.com/mobile.webp");
+  });
+});
+
+describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
+  const artBanner = {
+    position: 1 as const,
+    title: null,
+    subtitle: null,
+    cta_label: null,
+    cta_url: "/anunciar",
+    image_desktop_url: "https://cdn.example.com/banner.webp",
+    image_mobile_url: null,
+    image_alt: "Banner pronto",
+  };
+
+  it("Link do slide tem aspect-ratio definido (16/6 mobile, 16/5 desktop)", () => {
+    render(<HomeHero stateName="SP" banners={[artBanner]} />);
+    const link = screen.getByRole("link");
+    expect(link.className).toMatch(/aspect-\[16\/6\]/);
+    expect(link.className).toMatch(/md:aspect-\[16\/5\]/);
+  });
+
+  it("quando há image_mobile_url, mobile usa aspect-[4/5]", () => {
+    render(
+      <HomeHero
+        stateName="SP"
+        banners={[{ ...artBanner, image_mobile_url: "https://cdn.example.com/m.webp" }]}
+      />
+    );
+    const link = screen.getByRole("link");
+    expect(link.className).toMatch(/aspect-\[4\/5\]/);
+    expect(link.className).toMatch(/md:aspect-\[16\/5\]/);
+  });
+
+  it("imagem usa object-contain (NÃO object-cover)", () => {
+    render(<HomeHero stateName="SP" banners={[artBanner]} />);
+    const img = screen.getByAltText("Banner pronto");
+    expect(img.className).toMatch(/object-contain/);
+    expect(img.className).not.toMatch(/object-cover/);
+  });
+
+  it("Link do slide tem background neutro #f3f7ff (sem azul navy escuro)", () => {
+    render(<HomeHero stateName="SP" banners={[artBanner]} />);
+    const link = screen.getByRole("link");
+    expect(link.className).toMatch(/bg-\[#f3f7ff\]/);
+  });
+});
+
+describe("HomeHero — sem overflow horizontal nativo (Fase 4.1.3)", () => {
+  const twoBanners = [
+    {
+      position: 1 as const,
+      title: null,
+      subtitle: null,
+      cta_label: null,
+      cta_url: "/comprar",
+      image_desktop_url: "https://cdn.example.com/1.webp",
+      image_mobile_url: null,
+      image_alt: "1",
+    },
+    {
+      position: 2 as const,
+      title: null,
+      subtitle: null,
+      cta_label: null,
+      cta_url: "/anunciar",
+      image_desktop_url: "https://cdn.example.com/2.webp",
+      image_mobile_url: null,
+      image_alt: "2",
+    },
+  ];
+
+  it("track usa transform translateX (NUNCA overflow-x-auto/scroll)", () => {
+    const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const carouselRegion = container.querySelector('[role="region"]');
+    expect(carouselRegion).not.toBeNull();
+    // O track tem transition-transform e style="translateX(0%)".
+    expect(carouselRegion!.className).toMatch(/transition-transform/);
+    expect((carouselRegion as HTMLElement).style.transform).toBe("translateX(-0%)");
+    // E ABSOLUTAMENTE NÃO pode ter overflow-x-auto (que seria o scroll nativo).
+    expect(carouselRegion!.className).not.toMatch(/overflow-x-auto/);
+    expect(carouselRegion!.className).not.toMatch(/snap-x/);
+  });
+
+  it("wrapper imediato tem overflow-hidden", () => {
+    const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const carouselRegion = container.querySelector('[role="region"]') as HTMLElement;
+    const wrapper = carouselRegion.parentElement!;
+    expect(wrapper.className).toMatch(/overflow-hidden/);
+  });
+});
+
+describe("HomeHero — autoplay (Fase 4.1.3)", () => {
+  const twoBanners = [
+    {
+      position: 1 as const,
+      title: null,
+      subtitle: null,
+      cta_label: null,
+      cta_url: "/comprar",
+      image_desktop_url: "https://cdn.example.com/1.webp",
+      image_mobile_url: null,
+      image_alt: "1",
+    },
+    {
+      position: 2 as const,
+      title: null,
+      subtitle: null,
+      cta_label: null,
+      cta_url: "/anunciar",
+      image_desktop_url: "https://cdn.example.com/2.webp",
+      image_mobile_url: null,
+      image_alt: "2",
+    },
+  ];
+
+  it("com 2+ banners: setInterval com AUTOPLAY_INTERVAL_MS (6000) e avança o slide", () => {
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const region = container.querySelector('[role="region"]') as HTMLElement;
+    expect(region.style.transform).toBe("translateX(-0%)");
+    // O autoplay foi instalado com 6000ms.
+    const autoplayCalls = setIntervalSpy.mock.calls.filter((c) => c[1] === 6000);
+    expect(autoplayCalls.length).toBeGreaterThan(0);
+
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(region.style.transform).toBe("translateX(-100%)");
+
+    // Wrap após dois ciclos: idx 0 → 1 → 0.
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(region.style.transform).toBe("translateX(-0%)");
+  });
+
+  it("com 1 banner: NÃO instala autoplay (nenhum setInterval(6000))", () => {
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    render(<HomeHero stateName="SP" banners={[twoBanners[0]]} />);
+    const autoplayCalls = setIntervalSpy.mock.calls.filter((c) => c[1] === 6000);
+    expect(autoplayCalls).toHaveLength(0);
+  });
+
+  it("prefers-reduced-motion → autoplay desabilitado (nenhum setInterval(6000))", () => {
+    reducedMotionMatches = true;
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const autoplayCalls = setIntervalSpy.mock.calls.filter((c) => c[1] === 6000);
+    expect(autoplayCalls).toHaveLength(0);
+  });
+
+  it("clicar em dot navega instantaneamente para o slide", () => {
+    vi.useFakeTimers();
+    const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const region = container.querySelector('[role="region"]') as HTMLElement;
+    const dots = screen.getAllByRole("button", { name: /Ir para o banner/i });
+    expect(dots).toHaveLength(2);
+    act(() => {
+      dots[1].click();
+    });
+    expect(region.style.transform).toBe("translateX(-100%)");
   });
 });

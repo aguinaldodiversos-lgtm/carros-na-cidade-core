@@ -377,19 +377,31 @@ export default function AdminHomePage() {
             )}
           </div>
 
-          {/* Aviso sobre arte pronta. Aparece sempre — orienta o admin desde
-              o primeiro contato com a tela. */}
-          <p className="rounded-md border border-cnc-line/60 bg-cnc-bg/40 px-3 py-2 text-[11px] leading-snug text-cnc-muted">
-            Se você subir uma arte pronta, o texto e botão dentro da imagem
-            <strong> não serão duplicados</strong> por cima do banner — o link
-            de destino é aplicado ao clique no banner inteiro. Os campos de
-            texto abaixo só aparecem quando não há imagem (fallback).
-          </p>
+          {/* Aviso sobre arte pronta + recomendação de dimensões.
+              Aparece sempre — orienta o admin desde o primeiro contato. */}
+          <div className="rounded-md border border-cnc-line/60 bg-cnc-bg/40 px-3 py-2 text-[11px] leading-snug text-cnc-muted space-y-1">
+            <p>
+              Se você subir uma arte pronta, o texto e botão dentro da imagem
+              <strong> não serão duplicados</strong> por cima do banner — o link
+              de destino é aplicado ao clique no banner inteiro. Os campos de
+              texto abaixo só aparecem quando não há imagem (fallback).
+            </p>
+            <p>
+              <strong>Dimensões recomendadas:</strong> desktop 1920×720 ou
+              1920×640 px · mobile 1080×1080 ou 1080×1350 px.
+            </p>
+            <p>
+              A Home renderiza o banner com <em>object-fit: contain</em> sobre
+              um fundo neutro — a arte aparece inteira, sem cortes mesmo se a
+              proporção não bater exatamente com o container.
+            </p>
+          </div>
 
           {/* ─── 1) IMAGEM (peça principal) ─── */}
           <div className="grid gap-4 sm:grid-cols-2">
             <ImageField
               label="Imagem desktop do banner"
+              hint="Recomendado: 1920×720 ou 1920×640 px."
               currentUrl={activeDraft.image_desktop_url}
               uploading={uploadingVariant === "desktop"}
               inputRef={desktopInputRef}
@@ -400,6 +412,7 @@ export default function AdminHomePage() {
             />
             <ImageField
               label="Imagem mobile do banner (opcional)"
+              hint="Recomendado: 1080×1080 ou 1080×1350 px."
               currentUrl={activeDraft.image_mobile_url}
               uploading={uploadingVariant === "mobile"}
               inputRef={mobileInputRef}
@@ -637,6 +650,7 @@ function Field({
 
 function ImageField({
   label,
+  hint,
   currentUrl,
   uploading,
   inputRef,
@@ -646,6 +660,7 @@ function ImageField({
   accept,
 }: {
   label: string;
+  hint?: string;
   currentUrl: string | null;
   uploading: boolean;
   inputRef: React.RefObject<HTMLInputElement>;
@@ -657,6 +672,7 @@ function ImageField({
   return (
     <div>
       <label className="block text-xs font-semibold text-cnc-text mb-1">{label}</label>
+      {hint && <p className="mb-1.5 text-[11px] text-cnc-muted-soft">{hint}</p>}
       <div className="rounded-lg border border-dashed border-cnc-line bg-cnc-bg/40 p-3">
         {currentUrl ? (
           <div className="space-y-2">
