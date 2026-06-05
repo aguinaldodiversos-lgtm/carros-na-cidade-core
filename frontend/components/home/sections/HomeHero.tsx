@@ -394,14 +394,17 @@ function HeroSlide({
     // Com object-contain, a arte é mostrada inteira; bandas vazias
     // recebem o background neutro #f3f7ff (cor sugerida pela spec).
     //
-    // - Quando há mobile_url: assume arte vertical (1080x1080 / 1080x1350)
-    //   e usa aspect-[4/5] no mobile + aspect-[16/5] no desktop.
-    // - Sem mobile_url: aspect-[16/6] no mobile (compacto) e
-    //   aspect-[16/5] no desktop (panorâmico). Ambos object-contain
-    //   nunca cortam a arte.
-    const aspectClass = overrideMobile
-      ? "aspect-[4/5] md:aspect-[16/5]"
-      : "aspect-[16/6] md:aspect-[16/5]";
+    // Alturas calculadas para reproduzir o tamanho histórico do banner
+    // (versão 4.1.0): 220 px no mobile, ~380 px no desktop.
+    //   - Mobile (default): aspect-[16/9] = 375 * 9/16 ≈ 211 px (≈ 220 antigo).
+    //   - md+ (≥768):       aspect-[16/5] = 1280 * 5/16 = 400 px (≈ 380 antigo).
+    //
+    // O aspect-ratio independe de ter image_mobile_url — quando há
+    // arte mobile dedicada (4/5 ou 1/1), ela é renderizada com
+    // object-contain dentro do container 16/9, com bandas laterais
+    // sobre o fundo neutro. Decisão tomada para evitar banner gigante
+    // (aspect-[4/5] em 375 wide = 469 px, quase 2× o tamanho original).
+    const aspectClass = "aspect-[16/9] md:aspect-[16/5]";
 
     return (
       <Link

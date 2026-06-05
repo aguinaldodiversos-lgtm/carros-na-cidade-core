@@ -237,14 +237,15 @@ describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
     image_alt: "Banner pronto",
   };
 
-  it("Link do slide tem aspect-ratio definido (16/6 mobile, 16/5 desktop)", () => {
+  it("Link do slide tem aspect-ratio compatível com altura histórica (~220px mobile)", () => {
     render(<HomeHero stateName="SP" banners={[artBanner]} />);
     const link = screen.getByRole("link");
-    expect(link.className).toMatch(/aspect-\[16\/6\]/);
+    // aspect-[16/9] em 375px = 211px (≈ 220 antigo).
+    expect(link.className).toMatch(/aspect-\[16\/9\]/);
     expect(link.className).toMatch(/md:aspect-\[16\/5\]/);
   });
 
-  it("quando há image_mobile_url, mobile usa aspect-[4/5]", () => {
+  it("aspect-ratio mobile NÃO muda quando há image_mobile_url (evita banner gigante)", () => {
     render(
       <HomeHero
         stateName="SP"
@@ -252,7 +253,10 @@ describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
       />
     );
     const link = screen.getByRole("link");
-    expect(link.className).toMatch(/aspect-\[4\/5\]/);
+    // Mantém aspect-[16/9] no mobile mesmo com mobile_url — arte vertical
+    // é renderizada com object-contain dentro do mesmo container.
+    expect(link.className).toMatch(/aspect-\[16\/9\]/);
+    expect(link.className).not.toMatch(/aspect-\[4\/5\]/);
     expect(link.className).toMatch(/md:aspect-\[16\/5\]/);
   });
 
