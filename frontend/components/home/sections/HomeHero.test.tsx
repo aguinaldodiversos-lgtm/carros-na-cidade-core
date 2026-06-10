@@ -237,12 +237,13 @@ describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
     image_alt: "Banner pronto",
   };
 
-  it("Link do slide tem aspect-ratio compatível com altura histórica (~220px mobile)", () => {
+  it("Link do slide usa aspect-[2000/1400] mobile + md:aspect-[2120/640] desktop", () => {
     render(<HomeHero stateName="SP" banners={[artBanner]} />);
     const link = screen.getByRole("link");
-    // aspect-[16/9] em 375px = 211px (≈ 220 antigo).
-    expect(link.className).toMatch(/aspect-\[16\/9\]/);
-    expect(link.className).toMatch(/md:aspect-\[16\/5\]/);
+    // Mobile: aspect-[2000/1400] (= 10/7), produz ~262px em 375px.
+    expect(link.className).toMatch(/aspect-\[2000\/1400\]/);
+    // Desktop: aspect-[2120/640] (= 53/16), produz ~386px em 1280px.
+    expect(link.className).toMatch(/md:aspect-\[2120\/640\]/);
   });
 
   it("aspect-ratio mobile NÃO muda quando há image_mobile_url (evita banner gigante)", () => {
@@ -253,11 +254,11 @@ describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
       />
     );
     const link = screen.getByRole("link");
-    // Mantém aspect-[16/9] no mobile mesmo com mobile_url — arte vertical
-    // é renderizada com object-contain dentro do mesmo container.
-    expect(link.className).toMatch(/aspect-\[16\/9\]/);
+    // Mantém o mesmo aspect mobile mesmo com mobile_url — arte mobile é
+    // renderizada com object-contain dentro do mesmo container.
+    expect(link.className).toMatch(/aspect-\[2000\/1400\]/);
     expect(link.className).not.toMatch(/aspect-\[4\/5\]/);
-    expect(link.className).toMatch(/md:aspect-\[16\/5\]/);
+    expect(link.className).toMatch(/md:aspect-\[2120\/640\]/);
   });
 
   it("imagem usa object-contain (NÃO object-cover)", () => {
@@ -271,6 +272,76 @@ describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
     render(<HomeHero stateName="SP" banners={[artBanner]} />);
     const link = screen.getByRole("link");
     expect(link.className).toMatch(/bg-\[#f3f7ff\]/);
+  });
+
+  // CRÍTICO Fase 4.1.4: altura idêntica entre modos arte-pronta e
+  // fallback textual evita "pulo de layout" ao trocar de slide quando
+  // um banner tem imagem e o outro não.
+  it("modos arte-pronta e fallback textual usam EXATAMENTE o mesmo aspect-ratio", () => {
+    const { container: container1 } = render(<HomeHero stateName="SP" banners={[artBanner]} />);
+    const arteLink = container1.querySelector("a[href]") as HTMLElement;
+    cleanup();
+    const { container: container2 } = render(
+      <HomeHero
+        stateName="SP"
+        banners={[
+          {
+            position: 1,
+            title: "Texto fallback",
+            subtitle: null,
+            cta_label: "Ver",
+            cta_url: "/comprar",
+            image_desktop_url: null,
+            image_mobile_url: null,
+            image_alt: null,
+          },
+        ]}
+      />
+    );
+    const fallbackContainer = container2.querySelector('[aria-roledescription="slide"]')
+      ?.firstElementChild as HTMLElement | null;
+    // Tanto arte-pronta quanto fallback compartilham as MESMAS classes
+    // críticas de aspect — extraímos só os tokens aspect-* / md:aspect-*.
+    const aspectTokens = (el: HTMLElement) =>
+      (el.className.match(/(?:md:)?aspect-\[[^\]]+\]/g) || []).sort();
+    expect(aspectTokens(arteLink)).toEqual(aspectTokens(fallbackContainer!));
+    // E ambos devem ter pelo menos o aspect mobile + desktop esperados.
+    expect(aspectTokens(arteLink)).toEqual(
+      expect.arrayContaining(["aspect-[2000/1400]", "md:aspect-[2120/640]"])
+    );
+  });
+
+  it("carrossel misto (banner com imagem + banner sem) → ambos slides com mesma altura", () => {
+    const banners = [
+      {
+        position: 1 as const,
+        title: null,
+        subtitle: null,
+        cta_label: null,
+        cta_url: "/comprar",
+        image_desktop_url: "https://cdn.example.com/1.webp",
+        image_mobile_url: null,
+        image_alt: "Banner 1",
+      },
+      {
+        position: 2 as const,
+        title: "Anuncie",
+        subtitle: null,
+        cta_label: "Anunciar",
+        cta_url: "/anunciar",
+        image_desktop_url: null, // fallback textual
+        image_mobile_url: null,
+        image_alt: null,
+      },
+    ];
+    const { container } = render(<HomeHero stateName="SP" banners={banners} />);
+    const slideWrappers = container.querySelectorAll('[aria-roledescription="slide"]');
+    expect(slideWrappers).toHaveLength(2);
+    const aspectTokens = (el: Element) =>
+      (el.firstElementChild?.className.match(/(?:md:)?aspect-\[[^\]]+\]/g) || []).sort();
+    // Os elementos internos (Link ou div) de cada slide devem ter as
+    // MESMAS classes de aspect.
+    expect(aspectTokens(slideWrappers[0])).toEqual(aspectTokens(slideWrappers[1]));
   });
 });
 
@@ -315,6 +386,28 @@ describe("HomeHero — sem overflow horizontal nativo (Fase 4.1.3)", () => {
     const carouselRegion = container.querySelector('[role="region"]') as HTMLElement;
     const wrapper = carouselRegion.parentElement!;
     expect(wrapper.className).toMatch(/overflow-hidden/);
+  });
+
+  it("cada slide tem w-full + flex-shrink-0 (sem comprimir nem expandir)", () => {
+    const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const slides = container.querySelectorAll('[aria-roledescription="slide"]');
+    expect(slides.length).toBe(2);
+    slides.forEach((s) => {
+      expect(s.className).toMatch(/w-full/);
+      expect(s.className).toMatch(/flex-shrink-0/);
+    });
+  });
+
+  it("NENHUM banner com imagem usa object-cover (sempre object-contain)", () => {
+    const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
+    const imgs = Array.from(container.querySelectorAll("img"));
+    // Cada Image renderizada para arte-pronta deve ter object-contain.
+    const bannerImgs = imgs.filter((i) => (i.getAttribute("src") || "").startsWith("https://cdn"));
+    expect(bannerImgs.length).toBeGreaterThan(0);
+    bannerImgs.forEach((i) => {
+      expect(i.className).toMatch(/object-contain/);
+      expect(i.className).not.toMatch(/object-cover/);
+    });
   });
 });
 

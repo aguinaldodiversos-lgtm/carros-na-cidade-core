@@ -387,8 +387,14 @@ export default function AdminHomePage() {
               texto abaixo só aparecem quando não há imagem (fallback).
             </p>
             <p>
-              <strong>Dimensões recomendadas:</strong> desktop 1920×720 ou
-              1920×640 px · mobile 1080×1080 ou 1080×1350 px.
+              <strong>Dimensões recomendadas:</strong> desktop{" "}
+              <strong>2120×640 px</strong> · mobile{" "}
+              <strong>2000×1400 px</strong>.
+            </p>
+            <p>
+              <strong>Use imagens do mesmo tamanho para todos os banners.</strong>{" "}
+              No mobile, envie uma versão própria para evitar cortes ou
+              diferença de altura entre os slides do carrossel.
             </p>
             <p>
               A Home renderiza o banner com <em>object-fit: contain</em> sobre
@@ -401,7 +407,7 @@ export default function AdminHomePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <ImageField
               label="Imagem desktop do banner"
-              hint="Recomendado: 1920×720 ou 1920×640 px."
+              hint="Recomendado: 2120×640 px (proporção ~3,3:1)."
               currentUrl={activeDraft.image_desktop_url}
               uploading={uploadingVariant === "desktop"}
               inputRef={desktopInputRef}
@@ -412,7 +418,7 @@ export default function AdminHomePage() {
             />
             <ImageField
               label="Imagem mobile do banner (opcional)"
-              hint="Recomendado: 1080×1080 ou 1080×1350 px."
+              hint="Recomendado: 2000×1400 px (proporção ~10:7)."
               currentUrl={activeDraft.image_mobile_url}
               uploading={uploadingVariant === "mobile"}
               inputRef={mobileInputRef}

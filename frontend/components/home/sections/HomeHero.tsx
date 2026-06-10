@@ -7,6 +7,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
 
+/**
+ * Aspect-ratio único do slide do carrossel (Fase 4.1.4).
+ *
+ * Aplicado IGUAL nos dois modos do HeroSlide (arte pronta e fallback
+ * textual) para garantir que TODOS os slides — independente do conteúdo —
+ * ocupem exatamente a mesma área visual no mesmo breakpoint. Isso
+ * elimina o "pulo de layout" quando o carrossel troca de slide.
+ *
+ * Mobile (default): aspect-[2000/1400] = 10/7 ≈ 1.43
+ *   - 375 px de viewport → 262 px de altura
+ *   - Casa com a recomendação de upload mobile: 2000×1400 px.
+ *
+ * md+ (≥768 px): aspect-[2120/640] = 53/16 ≈ 3.31
+ *   - 1280 px de viewport → 386 px de altura (≈ histórico 380 px).
+ *   - Casa com a recomendação de upload desktop: 2120×640 px.
+ */
+const BANNER_ASPECT_CLASS = "aspect-[2000/1400] md:aspect-[2120/640]";
+
 /** Intervalo de autoplay em ms (Fase 4.1.3). */
 const AUTOPLAY_INTERVAL_MS = 6000;
 
@@ -390,27 +408,13 @@ function HeroSlide({
       ? { rel: "noopener noreferrer", target: "_blank" as const }
       : {};
 
-    // Aspect-ratio do CONTAINER define a altura do slide (não a imagem).
-    // Com object-contain, a arte é mostrada inteira; bandas vazias
-    // recebem o background neutro #f3f7ff (cor sugerida pela spec).
-    //
-    // Alturas calculadas para reproduzir o tamanho histórico do banner
-    // (versão 4.1.0): 220 px no mobile, ~380 px no desktop.
-    //   - Mobile (default): aspect-[16/9] = 375 * 9/16 ≈ 211 px (≈ 220 antigo).
-    //   - md+ (≥768):       aspect-[16/5] = 1280 * 5/16 = 400 px (≈ 380 antigo).
-    //
-    // O aspect-ratio independe de ter image_mobile_url — quando há
-    // arte mobile dedicada (4/5 ou 1/1), ela é renderizada com
-    // object-contain dentro do container 16/9, com bandas laterais
-    // sobre o fundo neutro. Decisão tomada para evitar banner gigante
-    // (aspect-[4/5] em 375 wide = 469 px, quase 2× o tamanho original).
-    const aspectClass = "aspect-[16/9] md:aspect-[16/5]";
-
+    // Container usa BANNER_ASPECT_CLASS — mesmo aspect-ratio do fallback
+    // textual. Garante que TROCAR de slide nunca muda a altura.
     return (
       <Link
         href={offersHref}
         aria-label={altText || "Abrir oferta"}
-        className={`block relative w-full overflow-hidden bg-[#f3f7ff] ${aspectClass}`}
+        className={`block relative w-full overflow-hidden bg-[#f3f7ff] ${BANNER_ASPECT_CLASS}`}
         {...linkProps}
       >
         {/* Desktop — escondido quando há imagem mobile dedicada. */}
@@ -451,8 +455,14 @@ function HeroSlide({
   // garantir legibilidade. Esse modo só roda quando ADMIN NÃO TEM
   // IMAGEM — então o gradient sempre roda sobre a imagem hardcoded,
   // nunca sobre uma arte do admin.
+  //
+  // CRÍTICO: usa BANNER_ASPECT_CLASS (mesma que arte pronta) para que
+  // a altura seja IDÊNTICA entre modos. Conteúdo textual posicionado
+  // absoluto dentro do container; padding interno controla o offset.
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div
+      className={`relative w-full overflow-hidden bg-cnc-footer-a ${BANNER_ASPECT_CLASS}`}
+    >
       <div className="absolute inset-0">
         <Image
           src={HOME_HERO_BANNER}
@@ -465,7 +475,7 @@ function HeroSlide({
         />
       </div>
       <div className="absolute inset-0 bg-gradient-to-r from-cnc-footer-a via-cnc-footer-a/70 to-transparent" />
-      <div className="relative grid min-h-[220px] items-center px-5 py-6 sm:min-h-[300px] sm:px-8 sm:py-9 md:min-h-[380px] lg:px-12">
+      <div className="absolute inset-0 grid items-center px-5 py-6 sm:px-8 sm:py-9 lg:px-12">
         <div className="max-w-xl">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm sm:text-[12px]">
             <PinIcon />
