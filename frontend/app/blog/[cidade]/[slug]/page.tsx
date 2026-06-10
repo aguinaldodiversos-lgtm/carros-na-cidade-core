@@ -1,12 +1,25 @@
 // frontend/app/blog/[cidade]/[slug]/page.tsx
 //
-// PR L — shell visual do post individual (/blog/[cidade]/[slug]).
-// Resolve o 404 dos cards do grid sem entrar em arquitetura de
-// conteúdo completo (PR L.2 separado). Reusa fetchBlogPageContent
-// para encontrar o post pelo slug nos posts do fallback/remoto.
+// Post individual em /blog/[cidade]/[slug].
+//
+// Fase 4.2: a página tenta primeiro o CMS (blog_posts, apenas published).
+// Encontrando, renderiza o artigo COMPLETO (markdown seguro + SEO do
+// banco) com canonical GLOBAL /blog/<slug> — o post é único, as URLs por
+// cidade continuam funcionando mas apontam o canonical para a versão
+// global (evita conteúdo duplicado entre cidades).
+//
+// Sem post no CMS, mantém o comportamento legado (PR L): procura nos
+// posts do fallback/remoto e exibe o shell visual.
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogPostPageClient } from "@/components/blog/BlogPostPageClient";
+import { CmsBlogPostArticle } from "@/components/blog/CmsBlogPostArticle";
+import {
+  buildCmsPostJsonLd,
+  buildCmsPostMetadata,
+  fetchPublishedBlogPost,
+  fetchPublishedBlogPosts,
+} from "@/lib/blog/blog-cms";
 import { fetchBlogPageContent, prettifyCitySlug, type BlogPost } from "@/lib/blog/blog-page";
 
 type PageProps = {
@@ -35,6 +48,14 @@ async function findPost(citySlug: string, postSlug: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  // 1) CMS primeiro — SEO vem do banco (meta_title/meta_description/
+  //    canonical/og/is_indexable), com fallbacks de title/excerpt.
+  const cmsPost = await fetchPublishedBlogPost(params.slug);
+  if (cmsPost) {
+    return buildCmsPostMetadata(cmsPost, `/blog/${cmsPost.slug}`);
+  }
+
+  // 2) Legado (conteúdo estático).
   const found = await findPost(params.cidade, params.slug);
   if (!found) {
     return {
@@ -71,16 +92,60 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
-  const found = await findPost(params.cidade, params.slug);
-  if (!found) notFound();
-
   const city = prettifyCitySlug(params.cidade);
-  const { post, relatedPosts } = found;
-
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.carrosnacidade.com").replace(
     /\/+$/,
     ""
   );
+
+  // ── Fase 4.2: post do CMS tem prioridade ────────────────────────────────
+  const cmsPost = await fetchPublishedBlogPost(params.slug);
+  if (cmsPost) {
+    const { posts: recent } = await fetchPublishedBlogPosts({ limit: 4 });
+    const pageUrl = `${siteUrl}/blog/${cmsPost.slug}`;
+
+    const articleLd = buildCmsPostJsonLd(cmsPost, pageUrl);
+    const breadcrumbLd = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: `${siteUrl}/` },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Blog",
+          item: `${siteUrl}/blog/${params.cidade}`,
+        },
+        { "@type": "ListItem", position: 3, name: cmsPost.title, item: pageUrl },
+      ],
+    };
+
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+        />
+        <CmsBlogPostArticle
+          post={cmsPost}
+          relatedPosts={recent}
+          citySlug={params.cidade}
+          cityName={city.name}
+          cityLabel={city.label}
+        />
+      </>
+    );
+  }
+
+  // ── Legado: posts do fallback estático ──────────────────────────────────
+  const found = await findPost(params.cidade, params.slug);
+  if (!found) notFound();
+
+  const { post, relatedPosts } = found;
   const pageUrl = `${siteUrl}/blog/${params.cidade}/${params.slug}`;
   const coverImage = post.coverImage?.startsWith("http")
     ? post.coverImage

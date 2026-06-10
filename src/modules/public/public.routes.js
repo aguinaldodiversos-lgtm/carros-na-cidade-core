@@ -17,6 +17,10 @@ import {
 import { getFeaturedRegionsByState } from "./public-state.controller.js";
 import { getPublicRegionByCitySlug } from "./public-region.controller.js";
 import { getPublicDealerBySlug } from "./public-dealer.controller.js";
+import {
+  listPublicBlogPosts,
+  getPublicBlogPostBySlug,
+} from "./public-blog.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
 
@@ -149,6 +153,29 @@ router.get(
   "/dealers/:slug",
   cacheGet({ prefix: "public:dealer", ttlSeconds: 60, varyBy: ["params"] }),
   getPublicDealerBySlug
+);
+
+/**
+ * Blog público (Fase 4.2) — somente posts status='published'.
+ *
+ * Lista: paginada (limit/offset), filtro opcional por category. Cache 60s
+ * com varyBy query (cada combinação de filtro/página tem sua chave).
+ * Detalhe: por slug; draft/unpublished/archived retornam 404. Cache 60s.
+ *
+ * O TTL de 60s é o fallback — publicar/despublicar no admin dispara
+ * revalidateTag('public-blog') no Next via BFF, então o conteúdo novo
+ * aparece imediatamente na navegação e o cache daqui expira sozinho.
+ */
+router.get(
+  "/blog/posts",
+  cacheGet({ prefix: "public:blog:list", ttlSeconds: 60, varyBy: ["query"] }),
+  listPublicBlogPosts
+);
+
+router.get(
+  "/blog/posts/:slug",
+  cacheGet({ prefix: "public:blog:post", ttlSeconds: 60, varyBy: ["params"] }),
+  getPublicBlogPostBySlug
 );
 
 export default router;

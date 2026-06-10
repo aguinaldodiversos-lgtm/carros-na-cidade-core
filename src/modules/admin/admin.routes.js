@@ -15,6 +15,7 @@ import * as highlightsService from "./highlights/admin-highlights.service.js";
 import * as commercialSettingsService from "./commercial-settings/admin-commercial-settings.service.js";
 import * as seoService from "./seo/admin-seo.service.js";
 import * as homeService from "./home/admin-home.service.js";
+import * as blogService from "./blog/admin-blog.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
@@ -738,6 +739,172 @@ router.post(
       position: req.params.position,
       file: req.file,
       variant,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+// =========================================================================
+// BLOG — Fase 4.2: CMS editorial do Blog.
+// Posts vivem em blog_posts. Workflow: draft → published → unpublished →
+// archived (restore volta para draft/unpublished). Público vê APENAS
+// published (rotas em public.routes.js). Transições têm endpoints
+// dedicados com reason obrigatório; PATCH genérico não altera status.
+// Audit em admin_actions: create/update/publish/unpublish/archive/
+// restore_blog_post, target_type='blog_post', target_id=<id>.
+// Upload R2: site/blog/cover/<yyyy>/<mm>/<uuid>.webp.
+// =========================================================================
+
+const blogCoverUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 8 * 1024 * 1024, // 8MB — capa editorial; mesmo teto dos banners da Home
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^image\/(jpg|x-jpg|pjpeg)$/, "image/jpeg");
+    if (ACCEPTED_INPUT_MIMES.has(mime)) {
+      cb(null, true);
+      return;
+    }
+    cb(
+      new AppError(
+        `Formato não suportado: "${file.mimetype || "desconhecido"}". Aceitos: JPEG, PNG, WebP, HEIC/HEIF.`,
+        400
+      )
+    );
+  },
+});
+
+/**
+ * Lista posts com filtros: status, search (título/slug), limit, offset.
+ * Contrato: { ok: true, data: [...], total, limit, offset }.
+ */
+router.get(
+  "/blog/posts",
+  asyncHandler(async (req, res) => {
+    const result = await blogService.listAdminPosts({
+      status: req.query.status || undefined,
+      search: req.query.search || undefined,
+      limit: parseIntParam(req.query.limit, 50),
+      offset: parseIntParam(req.query.offset, 0),
+    });
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.get(
+  "/blog/posts/:id",
+  asyncHandler(async (req, res) => {
+    const data = await blogService.getAdminPostById(req.params.id);
+    res.json({ ok: true, data });
+  })
+);
+
+/**
+ * Cria post como DRAFT. Exige título; slug é derivado quando ausente.
+ * reason opcional (criar rascunho não exige motivo).
+ */
+router.post(
+  "/blog/posts",
+  asyncHandler(async (req, res) => {
+    const data = await blogService.createPost({
+      adminUserId: req.user.id,
+      payload: req.body || {},
+    });
+    res.status(201).json({ ok: true, data });
+  })
+);
+
+/**
+ * PATCH de campos do post. Status NÃO é editável aqui (use as transições
+ * abaixo). reason opcional — auditoria update_blog_post sempre registrada.
+ */
+router.patch(
+  "/blog/posts/:id",
+  asyncHandler(async (req, res) => {
+    const { reason, ...payload } = req.body || {};
+    const data = await blogService.updatePost({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      payload,
+      reason,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+/** Publica (draft|unpublished → published). reason OBRIGATÓRIO. */
+router.patch(
+  "/blog/posts/:id/publish",
+  asyncHandler(async (req, res) => {
+    const data = await blogService.publishPost({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      reason: req.body?.reason,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+/** Despublica (published → unpublished). reason OBRIGATÓRIO. */
+router.patch(
+  "/blog/posts/:id/unpublish",
+  asyncHandler(async (req, res) => {
+    const data = await blogService.unpublishPost({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      reason: req.body?.reason,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+/** Arquiva (draft|published|unpublished → archived). reason OBRIGATÓRIO. */
+router.patch(
+  "/blog/posts/:id/archive",
+  asyncHandler(async (req, res) => {
+    const data = await blogService.archivePost({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      reason: req.body?.reason,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+/**
+ * Restaura post arquivado → draft (default) ou unpublished
+ * (body.to_status). reason OBRIGATÓRIO.
+ */
+router.patch(
+  "/blog/posts/:id/restore",
+  asyncHandler(async (req, res) => {
+    const data = await blogService.restorePost({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      reason: req.body?.reason,
+      toStatus: req.body?.to_status,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+/**
+ * Upload da imagem de capa. Retorna URL pública R2 — gravação no banco só
+ * ocorre quando o admin salva o post (PATCH com cover_image_url + alt).
+ */
+router.post(
+  "/blog/posts/:id/cover-image",
+  blogCoverUpload.single("image"),
+  asyncHandler(async (req, res) => {
+    const data = await blogService.uploadCoverImage({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      file: req.file,
     });
     res.json({ ok: true, data });
   })

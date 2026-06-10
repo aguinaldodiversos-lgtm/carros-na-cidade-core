@@ -38,8 +38,8 @@ export const dynamic = "force-dynamic";
  * Bearer constante compartilhada é suficiente e mais simples que CSRF.
  */
 
-const ALLOWED_PATHS = new Set<string>(["/"]);
-const ALLOWED_TAGS = new Set<string>(["public-home-hero", "public-home"]);
+const ALLOWED_PATHS = new Set<string>(["/", "/blog"]);
+const ALLOWED_TAGS = new Set<string>(["public-home-hero", "public-home", "public-blog"]);
 
 function getExpectedToken(): { token: string | null; allowDev: boolean } {
   const token = (process.env.REVALIDATE_TOKEN || "").trim();

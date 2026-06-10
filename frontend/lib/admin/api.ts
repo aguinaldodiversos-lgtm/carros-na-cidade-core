@@ -265,6 +265,63 @@ export const adminApi = {
       return json as ApiOne<HomeHeroUpload>;
     },
   },
+  blog: {
+    /** Lista posts (todos os status) com filtros. */
+    list: (p: Record<string, string | number> = {}) =>
+      adminFetch<ApiList<BlogPostDto>>("blog/posts", { params: { limit: 50, ...p } }),
+    get: (id: string | number) => adminFetch<ApiOne<BlogPostDto>>(`blog/posts/${id}`),
+    /** Cria post como DRAFT. Apenas título é obrigatório (slug derivado). */
+    create: (payload: BlogPostCreatePayload) =>
+      adminFetch<ApiOne<BlogPostDto>>("blog/posts", { method: "POST", body: payload }),
+    /** PATCH de campos (status NÃO — use as transições). reason opcional. */
+    update: (id: string | number, patch: BlogPostPatch, reason?: string) =>
+      adminFetch<ApiOne<BlogPostDto>>(`blog/posts/${id}`, {
+        method: "PATCH",
+        body: { ...patch, ...(reason ? { reason } : {}) },
+      }),
+    // Transições com reason OBRIGATÓRIO (validado também no backend).
+    publish: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<BlogPostDto>>(`blog/posts/${id}/publish`, {
+        method: "PATCH",
+        body: { reason },
+      }),
+    unpublish: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<BlogPostDto>>(`blog/posts/${id}/unpublish`, {
+        method: "PATCH",
+        body: { reason },
+      }),
+    archive: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<BlogPostDto>>(`blog/posts/${id}/archive`, {
+        method: "PATCH",
+        body: { reason },
+      }),
+    restore: (id: string | number, reason: string, toStatus: "draft" | "unpublished" = "draft") =>
+      adminFetch<ApiOne<BlogPostDto>>(`blog/posts/${id}/restore`, {
+        method: "PATCH",
+        body: { reason, to_status: toStatus },
+      }),
+    /** Upload multipart da capa — devolve URL pública. Gravação só via update(). */
+    uploadCover: async (id: string | number, file: File): Promise<ApiOne<BlogCoverUpload>> => {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`/api/admin/blog/posts/${id}/cover-image`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+        cache: "no-store",
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      if (!res.ok) {
+        throw new Error(extractAdminApiErrorMessage(json, res.status));
+      }
+      return json as ApiOne<BlogCoverUpload>;
+    },
+  },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<ModerationAdRow>>("moderation/ads", {
@@ -875,6 +932,84 @@ export type HomeHeroUpload = {
   key: string;
   position: 1 | 2 | 3;
   variant: "desktop" | "mobile";
+  size_bytes: number;
+  mime_type: string;
+};
+
+// ── Blog (Fase 4.2 — CMS editorial) ──
+
+export type BlogPostStatus = "draft" | "published" | "unpublished" | "archived";
+
+export type BlogCategoryId =
+  | "compra"
+  | "venda"
+  | "manutencao"
+  | "mercado"
+  | "financiamento"
+  | "cidades";
+
+export const BLOG_STATUS_LABEL: Record<BlogPostStatus, string> = {
+  draft: "Rascunho",
+  published: "Publicado",
+  unpublished: "Despublicado",
+  archived: "Arquivado",
+};
+
+export type BlogPostDto = {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string | null;
+  cover_image_url: string | null;
+  cover_image_alt: string | null;
+  category: BlogCategoryId | null;
+  tags: string[];
+  author_id: string | null;
+  status: BlogPostStatus;
+  published_at: string | null;
+  archived_at: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  canonical_url: string | null;
+  og_image_url: string | null;
+  is_indexable: boolean;
+  reading_time_minutes: number | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by_admin_id: string | null;
+};
+
+export type BlogPostCreatePayload = {
+  title: string;
+  slug?: string;
+  excerpt?: string | null;
+  content?: string | null;
+  category?: BlogCategoryId | null;
+  tags?: string[];
+};
+
+export type BlogPostPatch = Partial<{
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string | null;
+  cover_image_url: string | null;
+  cover_image_alt: string | null;
+  category: BlogCategoryId | null;
+  tags: string[];
+  meta_title: string | null;
+  meta_description: string | null;
+  canonical_url: string | null;
+  og_image_url: string | null;
+  is_indexable: boolean;
+}>;
+
+export type BlogCoverUpload = {
+  url: string;
+  key: string;
+  post_id: number;
   size_bytes: number;
   mime_type: string;
 };
