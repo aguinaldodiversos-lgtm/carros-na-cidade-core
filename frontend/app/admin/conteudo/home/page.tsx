@@ -387,19 +387,23 @@ export default function AdminHomePage() {
               texto abaixo só aparecem quando não há imagem (fallback).
             </p>
             <p>
-              <strong>Dimensões recomendadas:</strong> desktop{" "}
-              <strong>2120×640 px</strong> · mobile{" "}
-              <strong>2000×1400 px</strong>.
+              <strong>Desktop preenche todo o container</strong> (object-fit:
+              cover) — use <strong>exatamente 2120×640 px</strong>.{" "}
+              <strong>Evite textos colados nas bordas</strong>: deixe pelo menos
+              60 px de respiro em volta para que a arte fique fora da zona de
+              corte em viewports ultrawide.
+            </p>
+            <p>
+              <strong>Mobile preserva a arte inteira</strong> (object-fit:
+              contain) sobre fundo neutro #f3f7ff — use{" "}
+              <strong>exatamente 2000×1400 px</strong> para não aparecerem
+              bandas.
             </p>
             <p>
               <strong>Use imagens do mesmo tamanho para todos os banners.</strong>{" "}
-              No mobile, envie uma versão própria para evitar cortes ou
-              diferença de altura entre os slides do carrossel.
-            </p>
-            <p>
-              A Home renderiza o banner com <em>object-fit: contain</em> sobre
-              um fundo neutro — a arte aparece inteira, sem cortes mesmo se a
-              proporção não bater exatamente com o container.
+              Quando os 3 banners têm exatamente a proporção recomendada, o
+              carrossel rende com altura idêntica em todos os slides e zero
+              espaço vazio.
             </p>
           </div>
 
@@ -407,7 +411,7 @@ export default function AdminHomePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <ImageField
               label="Imagem desktop do banner"
-              hint="Recomendado: 2120×640 px (proporção ~3,3:1)."
+              hint="Use exatamente 2120×640 px. Essa versão preenche todo o banner da Home (cover)."
               currentUrl={activeDraft.image_desktop_url}
               uploading={uploadingVariant === "desktop"}
               inputRef={desktopInputRef}
@@ -418,7 +422,7 @@ export default function AdminHomePage() {
             />
             <ImageField
               label="Imagem mobile do banner (opcional)"
-              hint="Recomendado: 2000×1400 px (proporção ~10:7)."
+              hint="Use exatamente 2000×1400 px. Essa versão será usada em celulares (contain)."
               currentUrl={activeDraft.image_mobile_url}
               uploading={uploadingVariant === "mobile"}
               inputRef={mobileInputRef}

@@ -417,7 +417,13 @@ function HeroSlide({
         className={`block relative w-full overflow-hidden bg-[#f3f7ff] ${BANNER_ASPECT_CLASS}`}
         {...linkProps}
       >
-        {/* Desktop — escondido quando há imagem mobile dedicada. */}
+        {/* Desktop — escondido quando há imagem mobile dedicada.
+            object-fit dual (Fase 4.1.5):
+              - mobile (default): object-contain — preserva arte inteira
+                quando este element está visível como fallback de mobile.
+              - md+ (≥768): object-cover — PREENCHE todo o container
+                aspect-[2120/640]. Como o admin é orientado a subir
+                exatamente 2120×640 px, o cover não causa corte. */}
         <div className={overrideMobile ? "hidden md:block absolute inset-0" : "absolute inset-0"}>
           <Image
             src={overrideImage}
@@ -426,11 +432,13 @@ function HeroSlide({
             priority={priority}
             loading={priority ? undefined : "lazy"}
             sizes="(min-width: 1280px) 1440px, 100vw"
-            className="object-contain object-center"
+            className="object-contain md:object-cover object-center"
             unoptimized
           />
         </div>
-        {/* Mobile dedicada quando admin configurou. */}
+        {/* Mobile dedicada quando admin configurou. object-contain mantém
+            a arte mobile (2000×1400) inteira no container 2000/1400 e
+            também protege quando o admin subir outras proporções. */}
         {overrideMobile && (
           <div className="absolute inset-0 md:hidden">
             <Image

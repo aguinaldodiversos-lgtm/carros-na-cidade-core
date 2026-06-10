@@ -261,11 +261,32 @@ describe("HomeHero — proporção e encaixe sem corte (Fase 4.1.3)", () => {
     expect(link.className).toMatch(/md:aspect-\[2120\/640\]/);
   });
 
-  it("imagem usa object-contain (NÃO object-cover)", () => {
+  it("imagem desktop usa object-contain mobile + md:object-cover desktop (Fase 4.1.5)", () => {
+    // Sem image_mobile_url, o mesmo <img> serve mobile e desktop:
+    //   - Mobile (default): object-contain → arte aparece inteira.
+    //   - md+ (≥768): md:object-cover → preenche todo o container 2120/640.
     render(<HomeHero stateName="SP" banners={[artBanner]} />);
     const img = screen.getByAltText("Banner pronto");
     expect(img.className).toMatch(/object-contain/);
-    expect(img.className).not.toMatch(/object-cover/);
+    expect(img.className).toMatch(/md:object-cover/);
+    // object-center sempre presente para centralizar a arte.
+    expect(img.className).toMatch(/object-center/);
+  });
+
+  it("quando há image_mobile_url, a Image MOBILE dedicada usa object-contain (sem cover)", () => {
+    render(
+      <HomeHero
+        stateName="SP"
+        banners={[{ ...artBanner, image_mobile_url: "https://cdn.example.com/m.webp" }]}
+      />
+    );
+    const imgs = screen.getAllByAltText("Banner pronto");
+    // 2 imagens: uma desktop (em hidden md:block) e uma mobile (em md:hidden).
+    expect(imgs).toHaveLength(2);
+    const mobileImg = imgs.find((i) => i.getAttribute("src")?.endsWith("/m.webp"))!;
+    expect(mobileImg.className).toMatch(/object-contain/);
+    // Mobile dedicada NÃO usa object-cover — mantém arte mobile inteira.
+    expect(mobileImg.className).not.toMatch(/object-cover/);
   });
 
   it("Link do slide tem background neutro #f3f7ff (sem azul navy escuro)", () => {
@@ -398,15 +419,22 @@ describe("HomeHero — sem overflow horizontal nativo (Fase 4.1.3)", () => {
     });
   });
 
-  it("NENHUM banner com imagem usa object-cover (sempre object-contain)", () => {
+  it("imagens de banner usam object-contain (mobile) + md:object-cover apenas nas desktop (Fase 4.1.5)", () => {
+    // Regra: cada <img> sempre tem object-contain como base. As imagens
+    // que servem o slot desktop adicionalmente recebem md:object-cover
+    // para preencher o container desktop (2120/640). Imagens mobile
+    // dedicadas (md:hidden) NÃO recebem md:object-cover — mantêm contain.
     const { container } = render(<HomeHero stateName="SP" banners={twoBanners} />);
     const imgs = Array.from(container.querySelectorAll("img"));
-    // Cada Image renderizada para arte-pronta deve ter object-contain.
-    const bannerImgs = imgs.filter((i) => (i.getAttribute("src") || "").startsWith("https://cdn"));
+    const bannerImgs = imgs.filter((i) =>
+      (i.getAttribute("src") || "").startsWith("https://cdn")
+    );
     expect(bannerImgs.length).toBeGreaterThan(0);
     bannerImgs.forEach((i) => {
+      // Object-contain sempre presente (regra base).
       expect(i.className).toMatch(/object-contain/);
-      expect(i.className).not.toMatch(/object-cover/);
+      // Cover SEM o prefixo `md:` é PROIBIDO — nunca corta arte no mobile.
+      expect(i.className).not.toMatch(/(^|\s)object-cover/);
     });
   });
 });
