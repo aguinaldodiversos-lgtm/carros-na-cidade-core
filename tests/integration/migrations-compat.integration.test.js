@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -593,6 +594,120 @@ describe.sequential("integração — compatibilidade de migrations", () => {
           `
         );
         expect(tableExists.rows[0].n).toBe(0);
+      } finally {
+        await db.end();
+      }
+    });
+  }, 120000);
+
+  it("035 adota blog_posts legado do motor SEO: adiciona colunas do CMS, preserva SEO e é idempotente", async () => {
+    await withDatabase("blog_posts_legacy", async ({ dbUrl }) => {
+      // Pré-condição: blog_posts criada FORA das migrations pelo motor de SEO
+      // (seoEngine.service.js / seo-pages.repository.js), com city NOT NULL,
+      // slug UNIQUE e SEM nenhuma coluna do CMS — exatamente o estado que
+      // derrubava o boot em produção («column "published_at" does not exist»).
+      const seedDb = await openPool(dbUrl);
+      try {
+        await seedDb.query(`
+          CREATE TABLE blog_posts (
+            id BIGSERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE,
+            content TEXT,
+            city TEXT NOT NULL,
+            brand TEXT,
+            model TEXT,
+            status TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+        `);
+        await seedDb.query(
+          `INSERT INTO blog_posts (title, slug, content, city, status)
+           VALUES ('Carros em São Paulo', 'carros-em-sao-paulo-sp', '<h1>x</h1>', 'São Paulo', 'published')`
+        );
+      } finally {
+        await seedDb.end();
+      }
+
+      // Antes da correção: falhava aqui. Agora aplica de forma aditiva.
+      await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+
+      const db = await openPool(dbUrl);
+      try {
+        // 1. Migration 035 registrada em schema_migrations.
+        const filenames = await getMigrationFilenames(db);
+        expect(filenames).toContain("035_blog_posts.sql");
+
+        // 2. Colunas do CMS adicionadas à tabela legada (incl. published_at).
+        const cols = await listColumns(db, "blog_posts");
+        for (const c of [
+          "published_at",
+          "archived_at",
+          "excerpt",
+          "cover_image_url",
+          "cover_image_alt",
+          "category",
+          "tags",
+          "author_id",
+          "meta_title",
+          "meta_description",
+          "canonical_url",
+          "og_image_url",
+          "is_indexable",
+          "reading_time_minutes",
+          "version",
+          "updated_by_admin_id",
+          "source",
+        ]) {
+          expect(cols.has(c)).toBe(true);
+        }
+
+        // 3. Linha legada marcada como source='seo' + defaults preenchidos.
+        const legacy = await db.query(
+          `SELECT source, version, is_indexable FROM blog_posts WHERE slug = 'carros-em-sao-paulo-sp'`
+        );
+        expect(legacy.rows[0].source).toBe("seo");
+        expect(legacy.rows[0].version).toBe(1);
+        expect(legacy.rows[0].is_indexable).toBe(true);
+
+        // 4. city deixou de ser NOT NULL → INSERT do CMS (sem city) funciona.
+        await expect(
+          db.query(
+            `INSERT INTO blog_posts (title, slug, status, source)
+             VALUES ('Post do CMS', 'post-do-cms', 'draft', 'cms')`
+          )
+        ).resolves.toBeDefined();
+
+        // 5. INSERT do motor de SEO segue válido (ON CONFLICT (slug) intacto).
+        await expect(
+          db.query(
+            `INSERT INTO blog_posts (city, title, slug, content)
+             VALUES ('Campinas', 'Carros em Campinas', 'carros-em-campinas-sp', '<h1>y</h1>')
+             ON CONFLICT (slug) DO NOTHING`
+          )
+        ).resolves.toBeDefined();
+
+        // 6. Isolamento: o público do CMS (status=published AND source=cms) NÃO
+        //    enxerga a landing page publicada pelo motor de SEO.
+        const cmsPublished = await db.query(
+          `SELECT slug FROM blog_posts WHERE status = 'published' AND source = 'cms'`
+        );
+        expect(cmsPublished.rows.map((r) => r.slug)).not.toContain("carros-em-sao-paulo-sp");
+
+        // 7. Idempotência REAL: reaplicar o SQL da migration não falha nem
+        //    duplica a coluna published_at.
+        const migrationSql = await readFile(
+          path.join(workspaceRoot, "src/database/migrations/035_blog_posts.sql"),
+          "utf8"
+        );
+        await expect(db.query(migrationSql)).resolves.toBeDefined();
+        const dupCol = await db.query(
+          `SELECT COUNT(*)::int AS n
+           FROM information_schema.columns
+           WHERE table_name = 'blog_posts' AND column_name = 'published_at'`
+        );
+        expect(dupCol.rows[0].n).toBe(1);
       } finally {
         await db.end();
       }

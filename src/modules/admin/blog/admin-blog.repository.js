@@ -7,6 +7,17 @@ import { pool } from "../../../infrastructure/database/db.js";
  * transições de status, monta diff e dispara audit. Repository devolve row
  * crua ou null.
  *
+ * Tabela COMPARTILHADA com o motor de SEO
+ * ---------------------------------------
+ * `blog_posts` também é escrita pelo motor de SEO (seoEngine.service.js,
+ * seo-pages/seo-content.repository.js), cujas linhas têm `source='seo'` (a
+ * migration 035 marca todo o legado como 'seo' e o default da coluna é 'seo').
+ * O CMS cria SEMPRE com `source='cms'` e TODAS as leituras do CMS filtram
+ * `source='cms'` — assim landing pages de SEO nunca aparecem no painel nem no
+ * blog público. Exceção: `findBySlug` (checagem de unicidade) NÃO filtra por
+ * source, porque o índice único do banco é global em (slug) — checar só o CMS
+ * deixaria passar uma colisão com um slug de SEO que estouraria no INSERT.
+ *
  * Convenções:
  *   - Mutação parcial via updateById com build dinâmico de SET (mesmo padrão
  *     de admin-home.repository.updateByPosition): colunas não tocadas nunca
@@ -15,6 +26,9 @@ import { pool } from "../../../infrastructure/database/db.js";
  *   - Leitura pública (apenas published) vive aqui também para o controller
  *     público não duplicar SQL — mas só expõe SELECT.
  */
+
+/** Origem das linhas gerenciadas pelo CMS (vs. 'seo' do motor de SEO). */
+const CMS_SOURCE = "cms";
 
 const SELECT_COLS = `id, title, slug, excerpt, content,
   cover_image_url, cover_image_alt, category, tags, author_id,
@@ -56,9 +70,10 @@ function serializeValue(col, value) {
  * projeto: { data, total, limit, offset }.
  */
 export async function listPosts({ status, search, limit = 50, offset = 0 } = {}) {
-  const where = [];
-  const params = [];
-  let i = 1;
+  // source='cms' filtra fora o conteúdo do motor de SEO (ver cabeçalho).
+  const where = [`source = $${1}`];
+  const params = [CMS_SOURCE];
+  let i = 2;
 
   if (status) {
     where.push(`status = $${i++}`);
@@ -100,9 +115,11 @@ export async function listPosts({ status, search, limit = 50, offset = 0 } = {})
 export async function findById(id) {
   const numericId = Number(id);
   if (!Number.isInteger(numericId) || numericId <= 0) return null;
-  const { rows } = await pool.query(`SELECT ${SELECT_COLS} FROM blog_posts WHERE id = $1 LIMIT 1`, [
-    numericId,
-  ]);
+  // source='cms': o painel não edita/abre linhas do motor de SEO.
+  const { rows } = await pool.query(
+    `SELECT ${SELECT_COLS} FROM blog_posts WHERE id = $1 AND source = $2 LIMIT 1`,
+    [numericId, CMS_SOURCE]
+  );
   return rows[0] || null;
 }
 
@@ -126,8 +143,13 @@ export async function findBySlug(slug, { excludeId = null } = {}) {
   return rows[0] || null;
 }
 
+/** Colunas aceitas no INSERT além das atualizáveis. */
+const INSERT_EXTRA_COLS = new Set(["author_id", "updated_by_admin_id"]);
+
 /**
- * INSERT de post novo (sempre nasce draft — service garante).
+ * INSERT de post novo (sempre nasce draft — service garante). Carimba
+ * `source='cms'` para que o post fique visível ao CMS e separado do conteúdo
+ * do motor de SEO (source='seo').
  */
 export async function insertPost(fields) {
   const cols = [];
@@ -135,8 +157,12 @@ export async function insertPost(fields) {
   const params = [];
   let i = 1;
 
-  for (const [col, value] of Object.entries(fields)) {
-    if (!UPDATABLE_COLS.has(col) && col !== "author_id" && col !== "updated_by_admin_id") continue;
+  // source é invariante do repositório do CMS — sempre 'cms', sem depender
+  // do default do banco (que é 'seo', pensado para escritas do motor de SEO).
+  const insertFields = { ...fields, source: CMS_SOURCE };
+
+  for (const [col, value] of Object.entries(insertFields)) {
+    if (!UPDATABLE_COLS.has(col) && !INSERT_EXTRA_COLS.has(col) && col !== "source") continue;
     cols.push(col);
     placeholders.push(col === "tags" ? `$${i++}::jsonb` : `$${i++}`);
     params.push(serializeValue(col, value));
@@ -197,9 +223,10 @@ export async function updateById(id, fields, adminUserId) {
  * published_at DESC. Filtro opcional por categoria.
  */
 export async function listPublishedPosts({ category, limit = 12, offset = 0 } = {}) {
-  const where = [`status = 'published'`];
-  const params = [];
-  let i = 1;
+  // source='cms': não expõe landing pages do motor de SEO no blog público.
+  const where = [`status = 'published'`, `source = $${1}`];
+  const params = [CMS_SOURCE];
+  let i = 2;
 
   if (category && String(category).trim()) {
     where.push(`category = $${i++}`);
@@ -242,9 +269,9 @@ export async function findPublishedBySlug(slug) {
   const { rows } = await pool.query(
     `SELECT ${SELECT_COLS}
        FROM blog_posts
-      WHERE slug = $1 AND status = 'published'
+      WHERE slug = $1 AND status = 'published' AND source = $2
       LIMIT 1`,
-    [safeSlug]
+    [safeSlug, CMS_SOURCE]
   );
   return rows[0] || null;
 }
