@@ -25,7 +25,12 @@ import {
   fetchPublishedBlogPost,
   fetchPublishedBlogPosts,
 } from "@/lib/blog/blog-cms";
-import { fetchBlogPageContent, prettifyCitySlug, type BlogPost } from "@/lib/blog/blog-page";
+import {
+  fetchBlogPageContent,
+  prettifyCitySlug,
+  type BlogPost,
+  type BlogTrendingItem,
+} from "@/lib/blog/blog-page";
 
 type PageProps = {
   params: {
@@ -119,19 +124,19 @@ export default async function BlogCityPage({ params }: PageProps) {
     fetchPublishedBlogPosts({ limit: 12 }),
   ]);
 
-  // Posts reais do CMS entram NA FRENTE; fallback preenche o restante do
-  // layout. Dedup por slug protege contra fallback espelhando post real.
+  // CMS é a fonte canônica (Fase 4.2.1): havendo posts, o hub mostra SOMENTE
+  // CMS. O fallback hardcoded (blog-page.ts) só aparece quando o CMS está
+  // vazio — assim matérias adotadas não duplicam com o fallback legado.
   if (cms.posts.length > 0) {
     const cmsCards: BlogPost[] = cms.posts.map((p) => cmsPostToBlogPost(p, city.label));
-    const cmsSlugs = new Set(cmsCards.map((p) => p.slug));
-
-    const fillFeatured = (content.featuredPosts || []).filter((p) => !cmsSlugs.has(p.slug));
-    content.featuredPosts = [...cmsCards, ...fillFeatured].slice(
-      0,
-      Math.max(6, Math.min(cmsCards.length, 12))
-    );
-
-    content.popularPosts = (content.popularPosts || []).filter((p) => !cmsSlugs.has(p.slug));
+    content.featuredPosts = cmsCards.slice(0, 6);
+    content.popularPosts = cmsCards.slice(6, 9);
+    content.trendingPosts = cmsCards.slice(0, 4).map<BlogTrendingItem>((p) => ({
+      id: `trend-${p.id}`,
+      title: p.title,
+      image: p.coverImage,
+      href: `/blog/${encodeURIComponent(params.cidade)}/${p.slug}`,
+    }));
   }
 
   const pageUrl = `${siteUrl}/blog/${params.cidade}`;
