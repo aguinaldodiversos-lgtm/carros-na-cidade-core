@@ -14,6 +14,7 @@ import * as plansService from "./plans/admin-plans.service.js";
 import * as highlightsService from "./highlights/admin-highlights.service.js";
 import * as commercialSettingsService from "./commercial-settings/admin-commercial-settings.service.js";
 import * as seoService from "./seo/admin-seo.service.js";
+import { getAiHealth } from "./seo/admin-seo-ai.service.js";
 import * as homeService from "./home/admin-home.service.js";
 import * as blogService from "./blog/admin-blog.service.js";
 import {
@@ -104,23 +105,13 @@ router.patch(
     const highlightUntil = body.highlight_until;
 
     if (days != null && days !== "") {
-      const result = await adsService.grantManualBoost(
-        req.user.id,
-        req.params.id,
-        days,
-        reason
-      );
+      const result = await adsService.grantManualBoost(req.user.id, req.params.id, days, reason);
       return res.json({ ok: true, data: result });
     }
 
     // highlight_until: null (ou string vazia) => remove o destaque explicitamente.
     if (hasHighlightField && (highlightUntil === null || highlightUntil === "")) {
-      const updated = await adsService.setAdHighlight(
-        req.user.id,
-        req.params.id,
-        null,
-        reason
-      );
+      const updated = await adsService.setAdHighlight(req.user.id, req.params.id, null, reason);
       return res.json({ ok: true, data: updated });
     }
 
@@ -148,12 +139,7 @@ router.patch(
     if (priority === undefined || priority === null) {
       throw new AppError("Campo priority é obrigatório", 400);
     }
-    const updated = await adsService.setAdPriority(
-      req.user.id,
-      req.params.id,
-      priority,
-      reason
-    );
+    const updated = await adsService.setAdPriority(req.user.id, req.params.id, priority, reason);
     res.json({ ok: true, data: updated });
   })
 );
@@ -586,15 +572,11 @@ router.get(
     const filters = {
       status: req.query.status || undefined,
       publication_type: req.query.publication_type || undefined,
-      is_indexable:
-        indexableRaw === "true" ? true : indexableRaw === "false" ? false : undefined,
+      is_indexable: indexableRaw === "true" ? true : indexableRaw === "false" ? false : undefined,
       has_error: req.query.has_error === "true" ? true : undefined,
       uf: req.query.uf || undefined,
       city: req.query.city || undefined,
-      q:
-        typeof req.query.q === "string" && req.query.q.trim()
-          ? req.query.q.trim()
-          : undefined,
+      q: typeof req.query.q === "string" && req.query.q.trim() ? req.query.q.trim() : undefined,
       limit: parseIntParam(req.query.limit, 50),
       offset: parseIntParam(req.query.offset, 0),
     };
@@ -615,12 +597,7 @@ router.patch(
   "/seo/publications/:id",
   asyncHandler(async (req, res) => {
     const { reason, ...payload } = req.body || {};
-    const updated = await seoService.updatePublication(
-      req.user.id,
-      req.params.id,
-      payload,
-      reason
-    );
+    const updated = await seoService.updatePublication(req.user.id, req.params.id, payload, reason);
     res.json({ ok: true, data: updated });
   })
 );
@@ -638,6 +615,20 @@ router.get(
   asyncHandler(async (req, res) => {
     const limit = parseIntParam(req.query.limit, 100);
     const data = await seoService.listIssues({ limit });
+    res.json({ ok: true, data });
+  })
+);
+
+/**
+ * Saúde SEO/IA (Fase 4.3, §15): qualidade dos anúncios ativos (score, sem
+ * preço/cidade/imagem/descrição), posts do CMS (publicados sem meta, curtos,
+ * slug duplicado) e páginas territoriais indexáveis/noindex por tipo.
+ */
+router.get(
+  "/seo/ai-health",
+  asyncHandler(async (req, res) => {
+    const limit = parseIntParam(req.query.limit, 1000);
+    const data = await getAiHealth({ limit });
     res.json({ ok: true, data });
   })
 );

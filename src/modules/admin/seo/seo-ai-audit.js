@@ -30,6 +30,7 @@ export function analyzeAds(ads = []) {
   const problems = [];
   let scoreSum = 0;
   let ready = 0; // score >= 80
+  let low = 0; // score < 50
 
   for (const ad of ads) {
     const id = ad.id ?? ad.ad_id ?? null;
@@ -58,13 +59,66 @@ export function analyzeAds(ads = []) {
     const { score } = calculateAdSeoAiScore(ad);
     scoreSum += score;
     if (score >= 80) ready += 1;
+    if (score < 50) low += 1;
   }
 
   return {
     total: ads.length,
     avg_score: ads.length ? Math.round(scoreSum / ads.length) : 0,
     ready_80_plus: ready,
+    low_score: low,
     problems,
+  };
+}
+
+/** Conta problemas por `kind` (para o painel de saúde). */
+export function countByKind(problems = []) {
+  const out = {};
+  for (const p of problems) {
+    if (!p || !p.kind) continue;
+    out[p.kind] = (out[p.kind] || 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * Monta o relatório de "saúde SEO/IA" (§15) a partir das análises de anúncios
+ * e posts + linhas de seo_publications (cluster_type + is_indexable). PURO.
+ */
+export function buildAiHealthSummary({ adsAnalysis, blogAnalysis, publicationRows = [] } = {}) {
+  const adsKinds = countByKind(adsAnalysis?.problems || []);
+  const blogKinds = countByKind(blogAnalysis?.problems || []);
+
+  const territorial = {};
+  for (const row of publicationRows) {
+    const type = str(row.cluster_type) || "desconhecido";
+    if (!territorial[type]) territorial[type] = { indexable: 0, noindex: 0 };
+    if (row.is_indexable === true) territorial[type].indexable += 1;
+    else territorial[type].noindex += 1;
+  }
+
+  return {
+    ads: {
+      total: adsAnalysis?.total || 0,
+      avg_score: adsAnalysis?.avg_score || 0,
+      ready_80_plus: adsAnalysis?.ready_80_plus || 0,
+      low_score: adsAnalysis?.low_score || 0,
+      without_price: adsKinds.ad_without_price || 0,
+      without_city: adsKinds.ad_without_city || 0,
+      without_image: adsKinds.ad_without_image || 0,
+      few_images: adsKinds.ad_few_images || 0,
+      without_alt: adsKinds.ad_without_alt || 0,
+      short_description: adsKinds.ad_short_description || 0,
+    },
+    blog: {
+      total: blogAnalysis?.total || 0,
+      published: blogAnalysis?.published || 0,
+      without_meta_description: blogKinds.post_without_meta_description || 0,
+      short_content: blogKinds.post_short_content || 0,
+      duplicate_slug: blogKinds.post_duplicate_slug || 0,
+      without_cover: blogKinds.post_without_cover || 0,
+    },
+    territorial,
   };
 }
 

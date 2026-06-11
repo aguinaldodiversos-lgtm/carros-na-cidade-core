@@ -8,6 +8,7 @@ import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { fetchHomeAboveFold, fetchHomeHero } from "@/lib/home/public-home";
+import { buildHomeJsonLd } from "@/lib/seo/home-structured-data";
 import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
@@ -78,22 +79,34 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
       />
     ) : null;
 
+  // Fase 4.3 (§8) — JSON-LD da Home (WebSite + SearchAction + Organization).
+  const homeJsonLd = buildHomeJsonLd();
+
   return (
-    <HomePageClient
-      data={aboveFold}
-      stateUf={territory.state.code}
-      stateName={territory.state.name}
-      detectedCity={detectedCity}
-      stateRegions={homeRegionsBlock}
-      regionalEnabled={regionalEnabled}
-      heroBanners={heroBanners}
-      carousels={
-        <HomeCarousels
-          stateUf={territory.state.code}
-          stateName={territory.state.name}
-          detectedCityName={detectedCity?.name}
+    <>
+      {homeJsonLd.map((node, i) => (
+        <script
+          key={i}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(node) }}
         />
-      }
-    />
+      ))}
+      <HomePageClient
+        data={aboveFold}
+        stateUf={territory.state.code}
+        stateName={territory.state.name}
+        detectedCity={detectedCity}
+        stateRegions={homeRegionsBlock}
+        regionalEnabled={regionalEnabled}
+        heroBanners={heroBanners}
+        carousels={
+          <HomeCarousels
+            stateUf={territory.state.code}
+            stateName={territory.state.name}
+            detectedCityName={detectedCity?.name}
+          />
+        }
+      />
+    </>
   );
 }

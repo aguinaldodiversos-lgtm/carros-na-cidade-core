@@ -151,6 +151,8 @@ export const adminApi = {
   },
   seo: {
     overview: () => adminFetch<ApiOne<SeoOverview>>("seo/overview"),
+    /** Saúde SEO/IA (Fase 4.3 §15): qualidade de anúncios, posts e território. */
+    aiHealth: () => adminFetch<ApiOne<SeoAiHealth>>("seo/ai-health"),
     publications: (params: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<SeoPublicationRow>>("seo/publications", {
         params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
@@ -162,9 +164,10 @@ export const adminApi = {
         method: "PATCH",
         body: { ...patch, ...(reason ? { reason } : {}) },
       }),
-    sitemaps: () => adminFetch<{ ok: boolean; data: SeoSitemapEntry[]; summary: SeoSitemapSummary }>(
-      "seo/sitemaps"
-    ),
+    sitemaps: () =>
+      adminFetch<{ ok: boolean; data: SeoSitemapEntry[]; summary: SeoSitemapSummary }>(
+        "seo/sitemaps"
+      ),
     issues: (limit = 100) =>
       adminFetch<ApiOne<SeoIssue[]>>("seo/issues", { params: { limit: String(limit) } }),
   },
@@ -244,15 +247,12 @@ export const adminApi = {
       const fd = new FormData();
       fd.append("image", file);
       fd.append("variant", variant);
-      const res = await fetch(
-        `/api/admin/home/hero/${position}/image?variant=${variant}`,
-        {
-          method: "POST",
-          body: fd,
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+      const res = await fetch(`/api/admin/home/hero/${position}/image?variant=${variant}`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+        cache: "no-store",
+      });
       let json: unknown = null;
       try {
         json = await res.json();
@@ -346,6 +346,34 @@ export const adminApi = {
         { method: "POST", body: { reason } }
       ),
   },
+};
+
+// ── SEO/IA health (Fase 4.3 §15) ──
+
+export type SeoAiHealth = {
+  ads: {
+    total: number;
+    avg_score: number;
+    ready_80_plus: number;
+    low_score: number;
+    without_price: number;
+    without_city: number;
+    without_image: number;
+    few_images: number;
+    without_alt: number;
+    short_description: number;
+  };
+  blog: {
+    total: number;
+    published: number;
+    without_meta_description: number;
+    short_content: number;
+    duplicate_slug: number;
+    without_cover: number;
+  };
+  territorial: Record<string, { indexable: number; noindex: number }>;
+  generated_at: string;
+  sampled: { ads: number; posts: number; publications: number };
 };
 
 // ── SEO (Fase 3) ──
