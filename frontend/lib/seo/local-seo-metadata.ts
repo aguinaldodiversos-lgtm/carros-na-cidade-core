@@ -214,6 +214,47 @@ export function buildLocalSeoBreadcrumbJsonLd(
   };
 }
 
+/**
+ * BreadcrumbList para `/carros-baratos-em/[slug]` (Fase 4.3.1).
+ *
+ * A página abaixo-da-FIPE é canônica de SI MESMA (não consolida em
+ * /carros-em), então tem direito ao próprio BreadcrumbList: Início → UF →
+ * "Carros baratos em [Cidade]". Antes desta correção a factory só emitia
+ * Breadcrumb para a variant "em", deixando a página de ofertas sem o sinal.
+ */
+export function buildBaratosBreadcrumbJsonLd(
+  model: LocalSeoLandingModel
+): Record<string, unknown> | null {
+  const slug = (model.slug || "").trim();
+  const cityName = (model.cityName || "").trim();
+  if (!slug || !cityName) return null;
+
+  const stateUpper = (model.state || "").trim().toUpperCase();
+  const items: Array<Record<string, unknown>> = [
+    { "@type": "ListItem", position: 1, name: "Início", item: toAbsoluteUrl("/") },
+  ];
+  if (stateUpper) {
+    items.push({
+      "@type": "ListItem",
+      position: items.length + 1,
+      name: stateUpper,
+      item: toAbsoluteUrl(`/comprar/estado/${stateUpper.toLowerCase()}`),
+    });
+  }
+  items.push({
+    "@type": "ListItem",
+    position: items.length + 1,
+    name: `Carros baratos em ${cityName}`,
+    item: toAbsoluteUrl(`/carros-baratos-em/${encodeURIComponent(slug)}`),
+  });
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items,
+  };
+}
+
 export function buildLocalSeoJsonLd(model: LocalSeoLandingModel): Record<string, unknown> {
   const canonical = resolveCanonical(model);
   const description = buildDescription(model);

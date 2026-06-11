@@ -46,19 +46,21 @@ function vehicle(overrides: Partial<VehicleDetail> = {}): VehicleDetail {
 const URL = "https://www.carrosnacidade.com/veiculo/onix-2024-atibaia";
 
 describe("buildVehicleJsonLd", () => {
-  it("emite Product+Car com Offer UsedCondition e campos de veículo", () => {
-    const ld = buildVehicleJsonLd(vehicle(), { url: URL });
-    expect(ld).toBeTruthy();
-    expect(ld!["@type"]).toEqual(["Product", "Car"]);
-    expect(ld!.name).toBe("Chevrolet Onix Hatch 1.0 Flex");
-    expect((ld!.brand as Record<string, unknown>).name).toBe("Chevrolet");
-    expect(ld!.vehicleModelDate).toBe("2024");
-    expect(ld!.fuelType).toBe("Flex");
-    expect(ld!.vehicleTransmission).toBe("Manual");
-    expect(ld!.color).toBe("Prata");
-    expect((ld!.mileageFromOdometer as Record<string, unknown>).value).toBe(25000);
+  const findType = (nodes: Record<string, unknown>[], type: string) =>
+    nodes.find((n) => n["@type"] === type);
 
-    const offer = ld!.offers as Record<string, unknown>;
+  it("emite Product (tipo único) com Offer UsedCondition dentro", () => {
+    const nodes = buildVehicleJsonLd(vehicle(), { url: URL });
+    const product = findType(nodes, "Product");
+    expect(product).toBeTruthy();
+    expect(product!["@type"]).toBe("Product"); // string, não array
+    expect(product!.name).toBe("Chevrolet Onix Hatch 1.0 Flex");
+    expect((product!.brand as Record<string, unknown>).name).toBe("Chevrolet");
+    expect(product!.category).toBe("Veículo usado");
+    expect(product!.itemCondition).toBe("https://schema.org/UsedCondition");
+    expect(product!.sku).toBe("10");
+
+    const offer = product!.offers as Record<string, unknown>;
     expect(offer["@type"]).toBe("Offer");
     expect(offer.priceCurrency).toBe("BRL");
     expect(offer.price).toBe("88900");
@@ -67,9 +69,30 @@ describe("buildVehicleJsonLd", () => {
     expect(offer.url).toBe(URL);
   });
 
-  it("imagem principal vira ImageObject com caption (alt)", () => {
-    const ld = buildVehicleJsonLd(vehicle(), { url: URL });
-    const image = ld!.image as unknown[];
+  it("emite Car (tipo único) com specs do veículo", () => {
+    const nodes = buildVehicleJsonLd(vehicle(), { url: URL });
+    const car = findType(nodes, "Car");
+    expect(car).toBeTruthy();
+    expect(car!["@type"]).toBe("Car");
+    expect(car!.vehicleModelDate).toBe("2024");
+    expect(car!.fuelType).toBe("Flex");
+    expect(car!.vehicleTransmission).toBe("Manual");
+    expect(car!.color).toBe("Prata");
+    expect((car!.mileageFromOdometer as Record<string, unknown>).value).toBe(25000);
+  });
+
+  it("o veículo NUNCA sai apenas como Thing", () => {
+    const nodes = buildVehicleJsonLd(vehicle(), { url: URL });
+    const types = nodes.map((n) => n["@type"]);
+    expect(types).toContain("Product");
+    expect(types).toContain("Car");
+    expect(types).not.toContain("Thing");
+  });
+
+  it("imagem principal do Product vira ImageObject com caption (alt)", () => {
+    const nodes = buildVehicleJsonLd(vehicle(), { url: URL });
+    const product = findType(nodes, "Product")!;
+    const image = product.image as unknown[];
     const first = image[0] as Record<string, unknown>;
     expect(first["@type"]).toBe("ImageObject");
     expect(first.url).toBe("https://cdn.test/a.webp");
@@ -78,7 +101,7 @@ describe("buildVehicleJsonLd", () => {
   });
 
   it("seller loja vira AutoDealer com url da loja", () => {
-    const ld = buildVehicleJsonLd(
+    const nodes = buildVehicleJsonLd(
       vehicle({
         seller: {
           type: "dealer",
@@ -92,7 +115,8 @@ describe("buildVehicleJsonLd", () => {
       }),
       { url: URL }
     );
-    const seller = (ld!.offers as Record<string, unknown>).seller as Record<string, unknown>;
+    const offer = findType(nodes, "Product")!.offers as Record<string, unknown>;
+    const seller = offer.seller as Record<string, unknown>;
     expect(seller["@type"]).toBe("AutoDealer");
     expect(seller.name).toBe("Loja Exemplo");
     expect(seller.telephone).toBe("1133334444");
@@ -100,27 +124,28 @@ describe("buildVehicleJsonLd", () => {
   });
 
   it("seller particular vira Person", () => {
-    const ld = buildVehicleJsonLd(vehicle(), { url: URL });
-    const seller = (ld!.offers as Record<string, unknown>).seller as Record<string, unknown>;
+    const nodes = buildVehicleJsonLd(vehicle(), { url: URL });
+    const offer = findType(nodes, "Product")!.offers as Record<string, unknown>;
+    const seller = offer.seller as Record<string, unknown>;
     expect(seller["@type"]).toBe("Person");
     expect(seller.name).toBe("João");
   });
 
   it("sem preço: Offer sem campo price (não inventa)", () => {
-    const ld = buildVehicleJsonLd(vehicle({ price: "", priceNumeric: null }), { url: URL });
-    const offer = ld!.offers as Record<string, unknown>;
+    const nodes = buildVehicleJsonLd(vehicle({ price: "", priceNumeric: null }), { url: URL });
+    const offer = findType(nodes, "Product")!.offers as Record<string, unknown>;
     expect(offer.price).toBeUndefined();
   });
 
-  it("sem fullName → null (não emite JSON-LD inválido)", () => {
-    const ld = buildVehicleJsonLd(vehicle({ fullName: "" }), { url: URL });
-    expect(ld).toBe(null);
+  it("sem fullName → [] (não emite JSON-LD inválido)", () => {
+    expect(buildVehicleJsonLd(vehicle({ fullName: "" }), { url: URL })).toEqual([]);
   });
 
   it("novo usa NewCondition e categoria 'Veículo novo'", () => {
-    const ld = buildVehicleJsonLd(vehicle({ condition: "Novo" }), { url: URL });
-    expect(ld!.category).toBe("Veículo novo");
-    expect((ld!.offers as Record<string, unknown>).itemCondition).toBe(
+    const nodes = buildVehicleJsonLd(vehicle({ condition: "Novo" }), { url: URL });
+    const product = findType(nodes, "Product")!;
+    expect(product.category).toBe("Veículo novo");
+    expect((product.offers as Record<string, unknown>).itemCondition).toBe(
       "https://schema.org/NewCondition"
     );
   });

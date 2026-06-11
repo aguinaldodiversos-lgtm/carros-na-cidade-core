@@ -1,16 +1,19 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { LocalSeoLanding } from "@/components/seo/LocalSeoLanding";
+import { FaqBlock } from "@/components/seo/FaqBlock";
 import {
   loadLocalSeoLanding,
   type LocalSeoLandingModel,
   type LocalSeoVariant,
 } from "@/lib/seo/local-seo-data";
 import {
+  buildBaratosBreadcrumbJsonLd,
   buildLocalSeoBreadcrumbJsonLd,
   buildLocalSeoJsonLd,
   buildLocalSeoMetadata,
 } from "@/lib/seo/local-seo-metadata";
+import { buildBelowFipeFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
 
 export const LOCAL_SEO_REVALIDATE = 60;
 
@@ -53,10 +56,22 @@ export function createLocalSeoPage(
     const model = await load(params.slug);
     const jsonLd = buildLocalSeoJsonLd(model);
 
-    // BreadcrumbList complementar — só para variant "em" (canônica
-    // indexável). Variantes baratos/automaticos canonicalizam em /carros-em
-    // e emitir Breadcrumb duplicaria sinal para o Google.
-    const breadcrumbJsonLd = variant === "em" ? buildLocalSeoBreadcrumbJsonLd(model) : null;
+    // BreadcrumbList (Fase 4.3.1):
+    //   - "em": canônica intermediária → breadcrumb /carros-em.
+    //   - "baratos": canônica de si mesma → breadcrumb próprio /carros-baratos-em.
+    //   - "automaticos": noindex,follow (consolida em /carros-em) → sem breadcrumb.
+    const breadcrumbJsonLd =
+      variant === "em"
+        ? buildLocalSeoBreadcrumbJsonLd(model)
+        : variant === "baratos"
+          ? buildBaratosBreadcrumbJsonLd(model)
+          : null;
+
+    // FAQ abaixo da FIPE (Fase 4.3.1) — VISÍVEL (FaqBlock) → emite FAQPage.
+    // Só na variant "baratos"; "automaticos" fica enxuta (noindex).
+    const faqEntries =
+      variant === "baratos" ? buildBelowFipeFaqEntries({ cityName: model.cityName }) : [];
+    const faqJsonLd = faqEntries.length > 0 ? buildFaqPageJsonLd(faqEntries) : null;
 
     return (
       <>
@@ -70,7 +85,19 @@ export function createLocalSeoPage(
             dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
           />
         ) : null}
+        {faqJsonLd ? (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+          />
+        ) : null}
         <LocalSeoLanding model={model} />
+        {faqEntries.length > 0 ? (
+          <FaqBlock
+            title={`Perguntas frequentes sobre carros abaixo da FIPE em ${model.cityName}`}
+            entries={faqEntries}
+          />
+        ) : null}
         {options.renderAfter ? options.renderAfter(model) : null}
       </>
     );

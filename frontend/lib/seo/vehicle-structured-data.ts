@@ -59,14 +59,23 @@ function buildSeller(vehicle: VehicleDetail, siteUrl: string): Record<string, un
 }
 
 /**
- * Constrói o JSON-LD principal do anúncio (Product + Car). Retorna `null`
- * apenas se faltar dado essencial mínimo (nome).
+ * Constrói o JSON-LD do anúncio como DOIS nós de TIPO ÚNICO (Fase 4.3.1):
+ *   - Product (com Offer dentro) — OBRIGATÓRIO;
+ *   - Car (specs do veículo) — quando há nome.
+ *
+ * Por que dois nós de tipo único em vez de um `@type: ["Product","Car"]`?
+ * O array faz o veículo "sumir" da detecção por `"@type":"Product"` (Rich
+ * Results, validadores e o smoke por regex) e o anúncio acaba lido só como
+ * Thing (do WebPage.about). Tipos únicos garantem Product E Car detectáveis.
+ *
+ * §2: só inclui km/preço/cidade quando há dado real (bate com o visível).
+ * Retorna `[]` se faltar dado essencial mínimo (nome).
  */
 export function buildVehicleJsonLd(
   vehicle: VehicleDetail,
   opts: { url: string; siteUrl?: string }
-): Record<string, unknown> | null {
-  if (!vehicle || !vehicle.fullName) return null;
+): Record<string, unknown>[] {
+  if (!vehicle || !vehicle.fullName) return [];
 
   const siteUrl = (opts.siteUrl || "https://www.carrosnacidade.com").replace(/\/+$/, "");
   const { city, state } = splitCityState(vehicle.city);
@@ -91,6 +100,7 @@ export function buildVehicleJsonLd(
   }
   for (const img of images.slice(1)) imageField.push(img);
 
+  // ── Offer (dentro do Product) ──
   const offer: Record<string, unknown> = {
     "@type": "Offer",
     priceCurrency: "BRL",
@@ -102,31 +112,42 @@ export function buildVehicleJsonLd(
   const seller = buildSeller(vehicle, siteUrl);
   if (seller) offer.seller = seller;
 
-  const node: Record<string, unknown> = {
+  // ── Product (tipo único — obrigatório) ──
+  const product: Record<string, unknown> = {
     "@context": "https://schema.org",
-    "@type": ["Product", "Car"],
+    "@type": "Product",
     name: vehicle.fullName,
     category: vehicle.condition === "Novo" ? "Veículo novo" : "Veículo usado",
+    itemCondition: `https://schema.org/${condition}`,
     offers: offer,
   };
-
-  if (vehicle.brand) node.brand = { "@type": "Brand", name: vehicle.brand };
-  if (vehicle.model) node.model = vehicle.model;
-  if (vehicle.version) node.vehicleConfiguration = vehicle.version;
-  if (year) node.vehicleModelDate = year;
-  if (vehicle.fuel) node.fuelType = vehicle.fuel;
-  if (vehicle.transmission) node.vehicleTransmission = vehicle.transmission;
-  if (vehicle.color) node.color = vehicle.color;
-  if (vehicle.bodyType) node.bodyType = vehicle.bodyType;
-  if (km != null) {
-    node.mileageFromOdometer = { "@type": "QuantitativeValue", value: km, unitCode: "KMT" };
-  }
-  if (imageField.length > 0) node.image = imageField;
-  if (vehicle.description) node.description = vehicle.description;
-  if (vehicle.adCode) node.sku = vehicle.adCode;
+  if (vehicle.brand) product.brand = { "@type": "Brand", name: vehicle.brand };
+  if (vehicle.model) product.model = vehicle.model;
+  if (vehicle.adCode) product.sku = vehicle.adCode;
+  if (imageField.length > 0) product.image = imageField;
+  if (vehicle.description) product.description = vehicle.description;
   if (city) {
-    node.areaServed = { "@type": "City", name: state ? `${city} - ${state}` : city };
+    product.areaServed = { "@type": "City", name: state ? `${city} - ${state}` : city };
   }
 
-  return node;
+  // ── Car (tipo único — especificações do veículo) ──
+  const car: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Car",
+    name: vehicle.fullName,
+  };
+  if (vehicle.brand) car.brand = { "@type": "Brand", name: vehicle.brand };
+  if (vehicle.model) car.model = vehicle.model;
+  if (vehicle.version) car.vehicleConfiguration = vehicle.version;
+  if (year) car.vehicleModelDate = year;
+  if (vehicle.fuel) car.fuelType = vehicle.fuel;
+  if (vehicle.transmission) car.vehicleTransmission = vehicle.transmission;
+  if (vehicle.color) car.color = vehicle.color;
+  if (vehicle.bodyType) car.bodyType = vehicle.bodyType;
+  if (km != null) {
+    car.mileageFromOdometer = { "@type": "QuantitativeValue", value: km, unitCode: "KMT" };
+  }
+  if (images.length > 0) car.image = images;
+
+  return [product, car];
 }

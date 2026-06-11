@@ -293,12 +293,13 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
       <AdEventTracker adId={vehicle.id} eventType="view" />
       <BreadcrumbJsonLd items={breadcrumbItems} />
 
-      {schemaVehicle && (
+      {schemaVehicle.map((node, i) => (
         <script
+          key={i}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(node) }}
         />
-      )}
+      ))}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }}
