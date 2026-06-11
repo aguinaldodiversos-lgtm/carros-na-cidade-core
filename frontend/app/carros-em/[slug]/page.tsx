@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
+import { FaqBlock } from "@/components/seo/FaqBlock";
 import { AlsoInRegionBlock } from "@/components/territorial/AlsoInRegionBlock";
+import { buildCityFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
 import {
@@ -139,6 +141,11 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   const jsonLd = buildLocalSeoJsonLd(model);
   const breadcrumbJsonLd = buildLocalSeoBreadcrumbJsonLd(model);
 
+  // Fase 4.3 (§7) — FAQ útil e específico da cidade. O FAQPage JSON-LD só é
+  // emitido porque o FaqBlock abaixo renderiza as MESMAS perguntas (visível).
+  const faqEntries = buildCityFaqEntries({ cityName: ctx.name, stateUf: ctx.state });
+  const faqJsonLd = buildFaqPageJsonLd(faqEntries);
+
   // Sem fallback territorial nesta rota: ItemList sempre reflete a
   // cidade pedida. Quando não há anúncios, emitimos ItemList vazio mas
   // numberOfItems=0 é semântico para o Google ("essa cidade existe,
@@ -172,6 +179,12 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
       />
+      {faqJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
+      ) : null}
 
       <BuyMarketplacePageClient
         initialResults={initialResults}
@@ -200,6 +213,13 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
             2026-05-22 vetou expressamente o "segundo rodapé".
             Renderiza apenas h2 + parágrafo curto + marcas frequentes. */}
         <CompactCitySeoBlock model={model} />
+
+        {/* FAQ visível — perguntas reais e específicas (compra segura, FIPE,
+            documentação) com contexto da cidade. Alimenta o FAQPage acima. */}
+        <FaqBlock
+          title={`Perguntas frequentes sobre comprar carro usado em ${ctx.name}`}
+          entries={faqEntries}
+        />
       </div>
     </>
   );

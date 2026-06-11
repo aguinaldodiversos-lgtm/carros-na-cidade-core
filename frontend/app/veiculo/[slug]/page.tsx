@@ -9,6 +9,9 @@ import VehicleDetailMobileShell from "@/components/vehicle/mobile/VehicleDetailM
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
+import { buildVehicleImageAlt, splitCityState } from "@/lib/seo/vehicle-image-alt";
+import { buildVehicleJsonLd } from "@/lib/seo/vehicle-structured-data";
+import { getSiteUrl } from "@/lib/seo/site";
 import { fetchRelatedListingsForAdPage } from "@/lib/vehicle/related-ads";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import { adaptAdDetailToVehicle, formatListingDateLabels } from "@/lib/vehicle/public-vehicle";
@@ -156,7 +159,13 @@ export async function generateMetadata({
           url: vehicle.images[0] ?? "/images/vehicle-placeholder.svg",
           width: 1200,
           height: 630,
-          alt: vehicle.fullName,
+          alt:
+            buildVehicleImageAlt({
+              brand: vehicle.brand,
+              model: vehicle.model,
+              year: vehicle.year,
+              ...splitCityState(vehicle.city),
+            }) || vehicle.fullName,
         },
       ],
       locale: "pt_BR",
@@ -198,32 +207,12 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
   const publishedLabel = [listingDates.primary, listingDates.secondary].filter(Boolean).join(" · ");
   const fipeDeltaLine = buildFipeDeltaLine(vehicle);
 
-  const schemaVehicle = {
-    "@context": "https://schema.org",
-    "@type": "Vehicle",
-    name: vehicle.fullName,
-    model: vehicle.model,
-    vehicleModelDate: year,
-    fuelType: vehicle.fuel,
-    vehicleTransmission: vehicle.transmission,
-    color: vehicle.color,
-    mileageFromOdometer: {
-      "@type": "QuantitativeValue",
-      value: vehicle.km.replace(/\D/g, ""),
-      unitCode: "KMT",
-    },
-    image: vehicle.images,
-    offers: {
-      "@type": "Offer",
-      priceCurrency: "BRL",
-      price: vehicle.price
-        .replace(/[^\d,]/g, "")
-        .replace(/\.(?=\d{3}(\D|$))/g, "")
-        .replace(",", "."),
-      availability: "https://schema.org/InStock",
-      url: `https://carrosnacidade.com/veiculo/${canonicalSlug}`,
-    },
-  };
+  // Fase 4.3 — Product + Car + Offer (UsedCondition) + ImageObject + AutoDealer
+  // (quando loja). Dados coerentes com o conteúdo visível da página.
+  const schemaVehicle = buildVehicleJsonLd(vehicle, {
+    url: `${getSiteUrl()}/veiculo/${canonicalSlug}`,
+    siteUrl: getSiteUrl(),
+  });
 
   const schemaFaq = {
     "@context": "https://schema.org",
@@ -304,10 +293,12 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
       <AdEventTracker adId={vehicle.id} eventType="view" />
       <BreadcrumbJsonLd items={breadcrumbItems} />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }}
-      />
+      {schemaVehicle && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaVehicle) }}
+        />
+      )}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }}

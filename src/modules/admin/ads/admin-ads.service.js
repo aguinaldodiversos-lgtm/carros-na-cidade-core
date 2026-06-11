@@ -2,6 +2,7 @@ import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { AD_STATUS, isValidAdStatus } from "../../../shared/constants/status.js";
 import { recordAdminAction } from "../admin.audit.js";
 import * as repo from "./admin-ads.repository.js";
+import { calculateAdSeoAiScore } from "./ad-seo-ai-score.js";
 
 /**
  * Reason mínimo aceito em ações sensíveis de destaque (Fase 3.2).
@@ -66,7 +67,9 @@ export async function listAds(filters) {
 export async function getAdById(id) {
   const ad = await repo.findById(id);
   if (!ad) throw new AppError("Anúncio não encontrado", 404);
-  return ad;
+  // Fase 4.3 — anexa o índice de qualidade SEO/IA (não promete ranking;
+  // mede completude/legibilidade do anúncio para busca e IA).
+  return { ...ad, seo_ai: calculateAdSeoAiScore(ad) };
 }
 
 export async function changeAdStatus(adminUserId, adId, newStatus, reason = null) {

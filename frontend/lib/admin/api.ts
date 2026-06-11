@@ -773,6 +773,16 @@ export type AdRow = {
   advertiser_name: string;
 };
 
+/** Qualidade SEO/IA do anúncio (Fase 4.3 — não é promessa de ranking). */
+export type AdSeoAi = {
+  score: number; // 0..100
+  band: "fraco" | "aceitavel" | "pronto";
+  suggested_image_alt?: string;
+  checklist: Array<{ key: string; label: string; ok: boolean; weight: number }>;
+  missing: string[];
+  recommendations: string[];
+};
+
 export type AdDetail = AdRow & {
   description?: string;
   city_name?: string;
@@ -785,6 +795,8 @@ export type AdDetail = AdRow & {
   transmission?: string;
   body_type?: string;
   images?: unknown;
+  /** Índice de qualidade SEO/IA calculado no backend (GET /api/admin/ads/:id). */
+  seo_ai?: AdSeoAi;
 };
 
 export type AdMetrics = {
