@@ -14,23 +14,20 @@
 // Colisão real (post com slug igual a cidade-uf) é evitada com aviso no
 // editor admin quando o slug termina com sigla de UF.
 //
-// SEO: schema Blog (não Article) no hub, canonical self, breadcrumb.
+// O HUB é renderizado pelo componente compartilhado BlogHubServer (Fase
+// 4.2.1), o mesmo usado por /blog — garante posts do CMS no HTML SSR e os 13
+// posts adotados (sem o recorte antigo de 9).
 import type { Metadata } from "next";
-import { BlogPageClient } from "@/components/blog/BlogPageClient";
+
+import { BlogHubServer } from "@/components/blog/BlogHubServer";
 import { CmsBlogPostArticle } from "@/components/blog/CmsBlogPostArticle";
 import {
   buildCmsPostJsonLd,
   buildCmsPostMetadata,
-  cmsPostToBlogPost,
   fetchPublishedBlogPost,
   fetchPublishedBlogPosts,
 } from "@/lib/blog/blog-cms";
-import {
-  fetchBlogPageContent,
-  prettifyCitySlug,
-  type BlogPost,
-  type BlogTrendingItem,
-} from "@/lib/blog/blog-page";
+import { prettifyCitySlug } from "@/lib/blog/blog-page";
 
 type PageProps = {
   params: {
@@ -73,14 +70,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function BlogCityPage({ params }: PageProps) {
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.carrosnacidade.com").replace(
-    /\/+$/,
-    ""
-  );
-
   // ── 1) /blog/<slug> de post do CMS ──────────────────────────────────────
   const cmsPost = await fetchPublishedBlogPost(params.cidade);
   if (cmsPost) {
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.carrosnacidade.com").replace(
+      /\/+$/,
+      ""
+    );
     const { posts: recent } = await fetchPublishedBlogPosts({ limit: 4 });
     const city = prettifyCitySlug("sao-paulo-sp"); // contexto neutro para CTAs locais
     const pageUrl = `${siteUrl}/blog/${cmsPost.slug}`;
@@ -117,80 +113,8 @@ export default async function BlogCityPage({ params }: PageProps) {
     );
   }
 
-  // ── 2) Hub editorial por cidade ──────────────────────────────────────────
-  const city = prettifyCitySlug(params.cidade);
-  const [content, cms] = await Promise.all([
-    fetchBlogPageContent(params.cidade),
-    fetchPublishedBlogPosts({ limit: 12 }),
-  ]);
-
-  // CMS é a fonte canônica (Fase 4.2.1): havendo posts, o hub mostra SOMENTE
-  // CMS. O fallback hardcoded (blog-page.ts) só aparece quando o CMS está
-  // vazio — assim matérias adotadas não duplicam com o fallback legado.
-  if (cms.posts.length > 0) {
-    const cmsCards: BlogPost[] = cms.posts.map((p) => cmsPostToBlogPost(p, city.label));
-    content.featuredPosts = cmsCards.slice(0, 6);
-    content.popularPosts = cmsCards.slice(6, 9);
-    content.trendingPosts = cmsCards.slice(0, 4).map<BlogTrendingItem>((p) => ({
-      id: `trend-${p.id}`,
-      title: p.title,
-      image: p.coverImage,
-      href: `/blog/${encodeURIComponent(params.cidade)}/${p.slug}`,
-    }));
-  }
-
-  const pageUrl = `${siteUrl}/blog/${params.cidade}`;
-
-  // schema Blog: Google entende como hub editorial.
-  const blogLd = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    name: `Blog automotivo em ${city.name}`,
-    description: `Guias, dicas e notícias sobre carros em ${city.name}: compra, venda, manutenção, financiamento e mercado local.`,
-    url: pageUrl,
-    inLanguage: "pt-BR",
-    publisher: {
-      "@type": "Organization",
-      name: "Carros na Cidade",
-      logo: {
-        "@type": "ImageObject",
-        url: `${siteUrl}/images/logo-carros-na-cidade.png`,
-      },
-    },
-    about: {
-      "@type": "Place",
-      name: city.label,
-    },
-    blogPost: (content.featuredPosts || []).slice(0, 6).map((post) => ({
-      "@type": "BlogPosting",
-      headline: post.title,
-      url: `${siteUrl}/blog/${params.cidade}/${post.slug}`,
-      datePublished: post.publishedAt,
-      image: post.coverImage?.startsWith("http") ? post.coverImage : `${siteUrl}${post.coverImage}`,
-      articleSection: post.category,
-    })),
-  };
-
-  const breadcrumbLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: `${siteUrl}/` },
-      { "@type": "ListItem", position: 2, name: "Blog", item: pageUrl },
-    ],
-  };
-
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
-      />
-      <BlogPageClient content={content} />
-    </>
-  );
+  // ── 2) Hub editorial por cidade ─────────────────────────────────────────
+  // Mesmo hub de /blog (componente compartilhado): CMS no HTML SSR, fallback
+  // só quando o CMS está vazio.
+  return <BlogHubServer citySlug={params.cidade} pagePath={`/blog/${params.cidade}`} />;
 }
