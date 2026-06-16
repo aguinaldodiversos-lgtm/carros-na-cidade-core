@@ -13,6 +13,8 @@ import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
 import { AdminActionDialog } from "@/components/admin/AdminActionDialog";
 import { MarkdownContent } from "@/lib/blog/markdown";
+import { MarkdownToolbar } from "@/components/admin/blog/MarkdownToolbar";
+import { analyzeBlogContent } from "@/lib/blog/content-analysis";
 
 /**
  * Conteúdo · Blog — editor de post (Fase 4.2).
@@ -243,6 +245,7 @@ export default function AdminBlogEditPage({ params }: { params: { id: string } }
   const [tab, setTab] = useState<"editar" | "preview">("editar");
 
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -265,6 +268,7 @@ export default function AdminBlogEditPage({ params }: { params: { id: string } }
   const dirty = useMemo(() => isDirty(server, draft), [server, draft]);
   const problems = useMemo(() => (draft ? publishProblems(draft) : []), [draft]);
   const warnings = useMemo(() => (draft ? seoWarnings(draft) : []), [draft]);
+  const contentStats = useMemo(() => analyzeBlogContent(draft?.content || ""), [draft?.content]);
 
   function patchDraft(partial: Partial<Draft>) {
     setDraft((prev) => (prev ? { ...prev, ...partial } : prev));
@@ -340,6 +344,13 @@ export default function AdminBlogEditPage({ params }: { params: { id: string } }
     } finally {
       setUploadBusy(false);
     }
+  }
+
+  /** Upload de imagem no meio do conteúdo — devolve a URL pública (R2). */
+  async function handleContentImageUpload(file: File): Promise<string> {
+    if (!server) throw new Error("Salve o post antes de enviar imagens.");
+    const res = await adminApi.blog.uploadContentImage(server.id, file);
+    return res.data.url;
   }
 
   if (loading) return <AdminLoadingState message="Carregando post…" />;
@@ -571,16 +582,32 @@ export default function AdminBlogEditPage({ params }: { params: { id: string } }
 
               <Field
                 id="content"
-                label={`Conteúdo (Markdown) — ${draft.content.trim().length} caracteres`}
-                hint="Suporta parágrafos (linha em branco separa), ## subtítulo, ### subtítulo menor, - listas, 1. listas numeradas, **negrito**, *itálico* e [links](https://…). Links javascript:/data: são bloqueados."
+                label={`Conteúdo (Markdown) — ${draft.content.trim().length} caracteres · ${contentStats.words} palavra(s) · ~${contentStats.readingMinutes} min de leitura`}
+                hint="Use a barra de ferramentas para formatar. Suporta ## subtítulo, ### subtítulo, - listas, 1. listas, **negrito**, *itálico*, > citação, [links](/comprar), ![imagem](url), --- separador e tabelas. HTML livre e links javascript:/data: são bloqueados."
               >
-                <textarea
-                  id="content"
-                  rows={18}
-                  value={draft.content}
-                  onChange={(e) => patchDraft({ content: e.target.value })}
-                  className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 font-mono text-[13px] leading-relaxed text-cnc-text focus:border-primary focus:outline-none"
-                />
+                <div className="space-y-2">
+                  <MarkdownToolbar
+                    textareaRef={contentRef}
+                    onChange={(next) => patchDraft({ content: next })}
+                    onUploadImage={handleContentImageUpload}
+                    disabled={uploadBusy}
+                  />
+                  <textarea
+                    ref={contentRef}
+                    id="content"
+                    rows={18}
+                    value={draft.content}
+                    onChange={(e) => patchDraft({ content: e.target.value })}
+                    className="w-full rounded-lg border border-cnc-line bg-white px-3 py-2 font-mono text-[13px] leading-relaxed text-cnc-text focus:border-primary focus:outline-none"
+                  />
+                  {contentStats.warnings.length > 0 && (
+                    <ul className="space-y-1 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-800">
+                      {contentStats.warnings.map((w) => (
+                        <li key={w}>• {w}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </Field>
 
               {/* SEO */}

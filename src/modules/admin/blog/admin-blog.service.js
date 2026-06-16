@@ -747,6 +747,52 @@ export async function uploadCoverImage({ adminUserId, id, file }) {
   }
 }
 
+/**
+ * Upload de imagem para o MEIO do conteúdo (Fase 4.2.2). Estrutura:
+ * site/blog/content/<yyyy>/<mm>/<uuid>.webp. Igual à capa, mas variant
+ * 'content' — devolve a URL pública R2 para o editor inserir no Markdown
+ * (![alt](url)); a gravação no banco só ocorre quando o admin salva o post.
+ */
+export async function uploadContentImage({ adminUserId, id, file }) {
+  const post = await getPostOr404(id);
+  if (!file) throw new AppError("Arquivo de imagem ausente.", 400);
+
+  try {
+    const upload = await uploadSiteImage({
+      file,
+      section: "blog",
+      variant: "content",
+      uploadedByUserId: adminUserId,
+    });
+
+    if (!upload.publicUrl) {
+      logger.error(
+        { key: upload.key, adminUserId, postId: post.id },
+        "[admin-blog] upload de conteúdo OK mas publicUrl vazio (R2_PUBLIC_BASE_URL não configurada)"
+      );
+      throw new AppError(
+        "Upload concluído mas URL pública indisponível. Verifique R2_PUBLIC_BASE_URL.",
+        500
+      );
+    }
+
+    return {
+      url: upload.publicUrl,
+      key: upload.key,
+      post_id: post.id,
+      size_bytes: upload.sizeBytes,
+      mime_type: upload.mimeType,
+    };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    const message = err?.message || "Falha no upload da imagem.";
+    if (typeof message === "string" && message.startsWith("[r2]")) {
+      throw new AppError(message.replace(/^\[r2\]\s*/, ""), 400);
+    }
+    throw new AppError(`Falha no upload: ${message}`, 500);
+  }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Público — somente published
 // ───────────────────────────────────────────────────────────────────────────

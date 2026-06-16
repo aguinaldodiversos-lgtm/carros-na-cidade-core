@@ -17,6 +17,7 @@ vi.mock("../../src/modules/admin/blog/admin-blog.service.js", () => ({
   archivePost: vi.fn(),
   restorePost: vi.fn(),
   uploadCoverImage: vi.fn(),
+  uploadContentImage: vi.fn(),
   // Exports usados pelo controller público — noop aqui.
   listPublicPosts: vi.fn(),
   getPublicPostBySlug: vi.fn(),
@@ -44,6 +45,7 @@ import {
   updatePost,
   publishPost,
   archivePost,
+  uploadContentImage,
 } from "../../src/modules/admin/blog/admin-blog.service.js";
 
 const adminUser = { id: "admin-1", role: "admin", plan: "free" };
@@ -112,6 +114,54 @@ describe("/api/admin/blog/posts — autorização", () => {
       .send({ title: "Tentativa anônima" });
     expect(res.status).toBe(401);
     expect(createPost).not.toHaveBeenCalled();
+  });
+});
+
+describe("/api/admin/blog/posts/:id/content-image — upload (Fase 4.2.2)", () => {
+  it("anônimo recebe 401 e não chama o service", async () => {
+    if (!supertest) return;
+    const res = await supertest(createApp(null)).post("/api/admin/blog/posts/7/content-image");
+    expect(res.status).toBe(401);
+    expect(uploadContentImage).not.toHaveBeenCalled();
+  });
+
+  it("user comum recebe 403 e não chama o service", async () => {
+    if (!supertest) return;
+    const res = await supertest(createApp(regularUser)).post(
+      "/api/admin/blog/posts/7/content-image"
+    );
+    expect(res.status).toBe(403);
+    expect(uploadContentImage).not.toHaveBeenCalled();
+  });
+
+  it("admin com imagem válida recebe 200 + URL pública", async () => {
+    if (!supertest) return;
+    uploadContentImage.mockResolvedValueOnce({
+      url: "https://cdn.example.com/site/blog/content/2026/06/x.webp",
+      key: "site/blog/content/2026/06/x.webp",
+      post_id: 7,
+    });
+    const res = await supertest(createApp(adminUser))
+      .post("/api/admin/blog/posts/7/content-image")
+      .attach("image", Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
+        filename: "foto.png",
+        contentType: "image/png",
+      });
+    expect(res.status).toBe(200);
+    expect(res.body?.data?.url).toContain("site/blog/content/");
+    expect(uploadContentImage).toHaveBeenCalledOnce();
+  });
+
+  it("MIME inválido (pdf) recebe 400 e não chama o service", async () => {
+    if (!supertest) return;
+    const res = await supertest(createApp(adminUser))
+      .post("/api/admin/blog/posts/7/content-image")
+      .attach("image", Buffer.from("%PDF-1.4 conteudo"), {
+        filename: "doc.pdf",
+        contentType: "application/pdf",
+      });
+    expect(res.status).toBe(400);
+    expect(uploadContentImage).not.toHaveBeenCalled();
   });
 });
 

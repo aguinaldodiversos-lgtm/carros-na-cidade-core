@@ -90,3 +90,75 @@ describe("markdown · MarkdownContent", () => {
     expect(container.querySelectorAll("p, h2, h3, ul, ol")).toHaveLength(0);
   });
 });
+
+describe("markdown · imagens (Fase 4.2.2)", () => {
+  it("renderiza imagem com src http(s) e alt", () => {
+    const { container } = render(
+      <MarkdownContent content={"![Carro usado em oferta](https://cdn.exemplo.com/carro.webp)"} />
+    );
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe("https://cdn.exemplo.com/carro.webp");
+    expect(img?.getAttribute("alt")).toBe("Carro usado em oferta");
+    expect(img?.getAttribute("loading")).toBe("lazy");
+  });
+
+  it("renderiza imagem com caminho interno", () => {
+    const { container } = render(<MarkdownContent content={"![Capa](/images/blog/x.webp)"} />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/images/blog/x.webp");
+  });
+
+  it("imagem no meio de um parágrafo aparece como <img>", () => {
+    const { container } = render(
+      <MarkdownContent content={"Veja ![um carro](https://x.com/a.webp) aqui."} />
+    );
+    expect(container.querySelector("img")).not.toBe(null);
+    expect(container.textContent).toContain("Veja");
+    expect(container.textContent).toContain("aqui.");
+  });
+
+  it("XSS: imagem com src javascript: não vira <img> (mostra o alt)", () => {
+    const { container } = render(
+      <MarkdownContent content={"![malicioso](javascript:alert(1))"} />
+    );
+    expect(container.querySelector("img")).toBe(null);
+    expect(container.textContent).toContain("malicioso");
+  });
+
+  it("XSS: imagem com src data: não vira <img>", () => {
+    const { container } = render(
+      <MarkdownContent content={"![x](data:text/html,<script>1</script>)"} />
+    );
+    expect(container.querySelector("img")).toBe(null);
+  });
+
+  it("XSS: imagem com src protocol-relative //evil é bloqueada", () => {
+    const { container } = render(<MarkdownContent content={"![x](//evil.com/a.png)"} />);
+    expect(container.querySelector("img")).toBe(null);
+  });
+});
+
+describe("markdown · separador e tabela (Fase 4.2.2)", () => {
+  it("renderiza --- como <hr>", () => {
+    const { container } = render(<MarkdownContent content={"Antes\n\n---\n\nDepois"} />);
+    expect(container.querySelector("hr")).not.toBe(null);
+    expect(container.textContent).toContain("Antes");
+    expect(container.textContent).toContain("Depois");
+  });
+
+  it("renderiza tabela simples (GFM) com cabeçalho e linhas", () => {
+    const content = ["| Item | Valor |", "| --- | --- |", "| Pneu | R$ 400 |", "| Óleo | R$ 120 |"].join(
+      "\n"
+    );
+    const { container } = render(<MarkdownContent content={content} />);
+    expect(container.querySelectorAll("table thead th")).toHaveLength(2);
+    expect(container.querySelectorAll("table tbody tr")).toHaveLength(2);
+    expect(container.textContent).toContain("Pneu");
+    expect(container.textContent).toContain("R$ 120");
+  });
+
+  it("conteúdo com pipes mas sem separador não vira tabela", () => {
+    const { container } = render(<MarkdownContent content={"a | b | c sem separador"} />);
+    expect(container.querySelector("table")).toBe(null);
+    expect(container.querySelector("p")?.textContent).toContain("a | b | c");
+  });
+});

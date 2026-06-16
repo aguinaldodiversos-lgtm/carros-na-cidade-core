@@ -321,6 +321,30 @@ export const adminApi = {
       }
       return json as ApiOne<BlogCoverUpload>;
     },
+    /** Upload de imagem no meio do conteúdo (Fase 4.2.2) — devolve URL pública. */
+    uploadContentImage: async (
+      id: string | number,
+      file: File
+    ): Promise<ApiOne<BlogCoverUpload>> => {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch(`/api/admin/blog/posts/${id}/content-image`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+        cache: "no-store",
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      if (!res.ok) {
+        throw new Error(extractAdminApiErrorMessage(json, res.status));
+      }
+      return json as ApiOne<BlogCoverUpload>;
+    },
   },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>

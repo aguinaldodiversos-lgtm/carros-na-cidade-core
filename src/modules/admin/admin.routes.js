@@ -901,4 +901,22 @@ router.post(
   })
 );
 
+/**
+ * Upload de imagem para o MEIO do conteúdo (Fase 4.2.2). Mesmo limite/filtro
+ * da capa (8MB, JPEG/PNG/WebP/HEIC). Retorna URL pública R2 — gravação no
+ * post só ocorre quando o admin salva (PATCH content com ![alt](url)).
+ */
+router.post(
+  "/blog/posts/:id/content-image",
+  blogCoverUpload.single("image"),
+  asyncHandler(async (req, res) => {
+    const data = await blogService.uploadContentImage({
+      adminUserId: req.user.id,
+      id: req.params.id,
+      file: req.file,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
 export default router;

@@ -25,6 +25,15 @@ export function isSafeMarkdownHref(href: string): boolean {
   return SAFE_LINK_RE.test(String(href || "").trim());
 }
 
+/**
+ * Mesma política para o `src` de imagens: apenas http(s) ou caminho interno.
+ * Bloqueia data:/javascript:/file:/vbscript: — uma imagem com src não seguro
+ * é renderizada como texto (o alt), nunca como <img>.
+ */
+export function isSafeImageSrc(src: string): boolean {
+  return isSafeMarkdownHref(src);
+}
+
 type InlinePattern = {
   re: RegExp;
   render: (
@@ -35,6 +44,7 @@ type InlinePattern = {
 };
 
 // Ordem importa: code antes de bold/italic (conteúdo de `code` é literal),
+// imagem antes de link (![alt](url) começa no "!", antes do "[" do link),
 // link antes de bold para não quebrar colchetes com asteriscos dentro.
 const INLINE_PATTERNS: InlinePattern[] = [
   {
@@ -44,6 +54,27 @@ const INLINE_PATTERNS: InlinePattern[] = [
         {m[1]}
       </code>
     ),
+  },
+  {
+    // Imagem: ![alt](src). src inseguro (data:/javascript:/file:) → texto (alt).
+    re: /!\[([^\]]*)\]\(([^)\s]+)\)/,
+    render: (m, key) => {
+      const alt = m[1];
+      const src = m[2].trim();
+      if (!isSafeImageSrc(src)) {
+        return <span key={key}>{alt}</span>;
+      }
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={key}
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="mx-auto my-4 block h-auto max-w-full rounded-xl"
+        />
+      );
+    },
   },
   {
     re: /\[([^\]]+)\]\(([^)\s]+)\)/,
@@ -105,7 +136,26 @@ export function parseInline(text: string, keyPrefix = "in"): ReactNode[] {
 
 type Block =
   | { type: "h2" | "h3" | "p" | "quote"; text: string }
-  | { type: "ul" | "ol"; items: string[] };
+  | { type: "ul" | "ol"; items: string[] }
+  | { type: "hr" }
+  | { type: "table"; header: string[]; rows: string[][] };
+
+const HR_RE = /^(-{3,}|\*{3,}|_{3,})$/;
+
+/** Divide uma linha de tabela em células, ignorando os pipes das bordas. */
+function parseTableRow(line: string): string[] {
+  return line
+    .replace(/^\s*\|/, "")
+    .replace(/\|\s*$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+/** true quando a linha é o separador de cabeçalho da tabela (| --- | :--: |). */
+function isTableSeparator(line: string, columns: number): boolean {
+  const cells = parseTableRow(line);
+  return cells.length === columns && cells.every((c) => /^:?-{1,}:?$/.test(c.replace(/\s/g, "")));
+}
 
 /** Quebra o markdown em blocos (parágrafos separados por linha em branco). */
 function parseBlocks(content: string): Block[] {
@@ -121,6 +171,16 @@ function parseBlocks(content: string): Block[] {
       .filter(Boolean);
     if (lines.length === 0) continue;
 
+    // Tabela: 1ª linha com pipes + 2ª linha separadora (| --- | --- |).
+    if (lines.length >= 2 && lines[0].includes("|")) {
+      const header = parseTableRow(lines[0]);
+      if (isTableSeparator(lines[1], header.length)) {
+        const rows = lines.slice(2).map(parseTableRow);
+        blocks.push({ type: "table", header, rows });
+        continue;
+      }
+    }
+
     const isUl = lines.every((l) => /^[-*]\s+/.test(l));
     const isOl = lines.every((l) => /^\d+[.)]\s+/.test(l));
 
@@ -133,8 +193,8 @@ function parseBlocks(content: string): Block[] {
       continue;
     }
 
-    // Headings/citações podem vir colados a um parágrafo no mesmo chunk —
-    // processa linha a linha agrupando texto corrido.
+    // Headings/citações/separador podem vir colados a um parágrafo no mesmo
+    // chunk — processa linha a linha agrupando texto corrido.
     let paragraph: string[] = [];
     const flush = () => {
       if (paragraph.length > 0) {
@@ -143,7 +203,10 @@ function parseBlocks(content: string): Block[] {
       }
     };
     for (const line of lines) {
-      if (/^###\s+/.test(line)) {
+      if (HR_RE.test(line)) {
+        flush();
+        blocks.push({ type: "hr" });
+      } else if (/^###\s+/.test(line)) {
         flush();
         blocks.push({ type: "h3", text: line.replace(/^###\s+/, "") });
       } else if (/^##?\s+/.test(line)) {
@@ -223,6 +286,41 @@ export function MarkdownContent({ content, className }: { content: string; class
               >
                 {parseInline(block.text, key)}
               </blockquote>
+            );
+          case "hr":
+            return <hr key={key} className="mt-7 border-t border-cnc-line" />;
+          case "table":
+            return (
+              <div key={key} className="mt-4 overflow-x-auto">
+                <table className="w-full border-collapse text-[14px] text-cnc-text sm:text-[15px]">
+                  <thead>
+                    <tr>
+                      {block.header.map((cell, j) => (
+                        <th
+                          key={`${key}-h-${j}`}
+                          className="border border-cnc-line bg-cnc-bg px-3 py-2 text-left font-bold text-cnc-text-strong"
+                        >
+                          {parseInline(cell, `${key}-h-${j}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, ri) => (
+                      <tr key={`${key}-r-${ri}`}>
+                        {row.map((cell, ci) => (
+                          <td
+                            key={`${key}-r-${ri}-${ci}`}
+                            className="border border-cnc-line px-3 py-2 align-top"
+                          >
+                            {parseInline(cell, `${key}-r-${ri}-${ci}`)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             );
           default:
             return (
