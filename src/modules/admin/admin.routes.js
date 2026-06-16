@@ -258,6 +258,20 @@ router.get(
   })
 );
 
+/**
+ * Fase 5.0 — saúde/diagnóstico do gate de pagamentos. Read-only, admin-only
+ * (herda authMiddleware + requireAdmin). Mostra o modo efetivo (mock|sandbox
+ * |live), se token/segredo estão presentes (sem expor valores) e warnings de
+ * misconfiguração. Use para confirmar, sem deploy, que produção está em mock.
+ */
+router.get(
+  "/payments/health",
+  asyncHandler(async (_req, res) => {
+    const data = paymentsService.getPaymentsHealth();
+    res.json({ ok: true, data });
+  })
+);
+
 // =========================================================================
 // METRICS
 // =========================================================================

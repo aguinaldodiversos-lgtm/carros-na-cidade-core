@@ -1,4 +1,17 @@
 import * as repo from "./admin-payments.repository.js";
+import { getPaymentsGateDiagnostics } from "../../payments/payments.gate.js";
+
+/**
+ * Diagnóstico seguro do gate de pagamentos (Fase 5.0).
+ *
+ * Expõe o estado do kill-switch unificado para o admin verificar, sem
+ * deploy, em que modo o ambiente está (mock | sandbox | live) e se há
+ * misconfiguração. NUNCA retorna o valor de token/segredo — apenas
+ * presença booleana. Ver src/modules/payments/payments.gate.js.
+ */
+export function getPaymentsHealth() {
+  return getPaymentsGateDiagnostics();
+}
 
 /**
  * Lists payment_intents (both plan and boost contexts).

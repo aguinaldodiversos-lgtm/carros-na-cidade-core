@@ -6,7 +6,6 @@ import {
   getOwnedAd,
   getPlanById,
   isEventPlanId,
-  listBoostOptions,
 } from "../account/account.service.js";
 import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import { logger } from "../../shared/logger.js";
@@ -15,10 +14,8 @@ import {
   assertNoLiveSubscriptionFor,
   assertSubscriptionPlanAllowed,
 } from "./subscriptions.guards.js";
-import {
-  getBoostOptions,
-  getCommercialRules,
-} from "../commercial/commercial-rules.service.js";
+import { getBoostOptions, getCommercialRules } from "../commercial/commercial-rules.service.js";
+import { resolveCheckoutExecution, assertSubscriptionsRealAllowed } from "./payments.gate.js";
 
 /**
  * Guard: bloqueia checkout/subscription para planos do produto Evento
@@ -223,7 +220,16 @@ export async function createPlanCheckout({
     payment_type: "one_time",
   };
 
-  if (!MP_ACCESS_TOKEN) {
+  // Fase 5.0 — gate unificado. Mock quando sem token; BLOQUEIA cobrança
+  // real quando o token existe mas PAYMENTS_LIVE/sandbox está desligado.
+  const execution = resolveCheckoutExecution({
+    productType: "plan",
+    userId: user.id,
+    planId: plan.id,
+    requestId,
+  });
+
+  if (execution.mode === "mock") {
     const mercadoPagoId = `mock-preference-${plan.id}-${Date.now()}`;
     await insertPaymentIntent({
       id: intentId,
@@ -363,7 +369,16 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
     payment_type: "recurring",
   };
 
-  if (!MP_ACCESS_TOKEN) {
+  // Fase 5.0 — gate unificado (mesmo do destaque). Mock sem token; bloqueia
+  // cobrança real sem PAYMENTS_LIVE/sandbox.
+  const execution = resolveCheckoutExecution({
+    productType: "subscription",
+    userId: user.id,
+    planId: plan.id,
+    requestId,
+  });
+
+  if (execution.mode === "mock") {
     const mercadoPagoId = `mock-preapproval-${plan.id}-${Date.now()}`;
     await insertPaymentIntent({
       id: intentId,
@@ -401,6 +416,16 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
       public_key: MP_PUBLIC_KEY,
     };
   }
+
+  // Fase 5.0 — assinatura recorrente real exige cadeado ADICIONAL
+  // (subordinado a PAYMENTS_LIVE). Cobre tanto o endpoint legacy
+  // /subscription quanto /subscriptions/checkout (ambos passam por aqui).
+  assertSubscriptionsRealAllowed({
+    mode: execution.mode,
+    userId: user.id,
+    planId: plan.id,
+    requestId,
+  });
 
   const preapproval = await mpRequest("/preapproval", {
     method: "POST",
@@ -484,28 +509,19 @@ export async function createBoostCheckout({
   // 'pending' (sem documento) NUNCA pode comprar destaque — sempre bloqueado.
   // Quem já é admin não passa por aqui (rota é de usuário final).
   if (user.type === "pending") {
-    throw new AppError(
-      "Verifique seu CPF ou CNPJ antes de comprar destaque.",
-      400,
-      true,
-      { code: "BOOST_REQUIRES_VERIFIED_DOCUMENT" }
-    );
+    throw new AppError("Verifique seu CPF ou CNPJ antes de comprar destaque.", 400, true, {
+      code: "BOOST_REQUIRES_VERIFIED_DOCUMENT",
+    });
   }
   if (user.type === "CPF" && !rules.allow_boost_cpf) {
-    throw new AppError(
-      "Compra de destaque por CPF esta desabilitada no momento.",
-      403,
-      true,
-      { code: "BOOST_BLOCKED_FOR_CPF" }
-    );
+    throw new AppError("Compra de destaque por CPF esta desabilitada no momento.", 403, true, {
+      code: "BOOST_BLOCKED_FOR_CPF",
+    });
   }
   if (user.type === "CNPJ" && !rules.allow_boost_cnpj) {
-    throw new AppError(
-      "Compra de destaque por CNPJ esta desabilitada no momento.",
-      403,
-      true,
-      { code: "BOOST_BLOCKED_FOR_CNPJ" }
-    );
+    throw new AppError("Compra de destaque por CNPJ esta desabilitada no momento.", 403, true, {
+      code: "BOOST_BLOCKED_FOR_CNPJ",
+    });
   }
 
   // Tarefa 9 — destaque só pode ser comprado para anúncios ACTIVE.
@@ -529,7 +545,17 @@ export async function createBoostCheckout({
     payment_type: "one_time",
   };
 
-  if (!MP_ACCESS_TOKEN) {
+  // Fase 5.0 — fix do R1: o destaque (boost-7d) agora respeita o MESMO
+  // gate da assinatura. Token presente sem PAYMENTS_LIVE/sandbox NÃO cobra
+  // mais — bloqueia com erro claro. Sem token segue mockando.
+  const execution = resolveCheckoutExecution({
+    productType: "boost",
+    userId: user.id,
+    adId: ad.id,
+    requestId,
+  });
+
+  if (execution.mode === "mock") {
     const mercadoPagoId = `mock-preference-boost-${boostOption.id}-${Date.now()}`;
     await insertPaymentIntent({
       id: intentId,

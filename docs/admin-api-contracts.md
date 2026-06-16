@@ -326,6 +326,48 @@ List of ads belonging to this advertiser.
 
 ---
 
+## GET /api/admin/payments/health
+
+Diagnóstico do gate de pagamentos (Fase 5.0). Read-only, admin-only. Mostra em
+que modo o ambiente está e alerta sobre misconfiguração. **Nunca** retorna o
+valor de tokens/segredos — apenas presença booleana.
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "mode": "mock",
+    "payments_live_enabled": false,
+    "subscriptions_live_enabled": false,
+    "mercado_pago_token_present": false,
+    "webhook_secret_present": false,
+    "checkout_real_enabled": false,
+    "subscriptions_real_enabled": false,
+    "sandbox_enabled": false,
+    "warnings": []
+  }
+}
+```
+
+**Campos:**
+
+- `mode`: `mock` | `sandbox` | `live` — modo EFETIVO de cobrança.
+- `payments_live_enabled` / `subscriptions_live_enabled`: INTENÇÃO (flags
+  `PAYMENTS_LIVE` / `SUBSCRIPTIONS_LIVE` ligados).
+- `checkout_real_enabled` / `subscriptions_real_enabled`: EFETIVO (cobrança
+  realmente possível — exige token + gate; assinatura é subordinada a `PAYMENTS_LIVE`).
+- `mercado_pago_token_present` / `webhook_secret_present`: presença booleana, sem valor.
+- `warnings`: lista de avisos de misconfiguração (ex.: token presente sem
+  `PAYMENTS_LIVE` → checkouts reais bloqueados; cobrança real sem `MP_WEBHOOK_SECRET`).
+
+**Regra de ouro:** `MP_ACCESS_TOKEN` sozinho NÃO liga cobrança. Sem
+`PAYMENTS_LIVE=true` (ou o combo de sandbox), `checkout_real_enabled=false` e
+qualquer tentativa de checkout real responde `403 PAYMENTS_NOT_LIVE`.
+
+---
+
 ## GET /api/admin/metrics/ads/top?limit=20
 
 **Response:**

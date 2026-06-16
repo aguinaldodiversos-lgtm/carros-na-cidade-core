@@ -9,6 +9,7 @@ import { closeWhatsAppQueue } from "./queues/whatsapp.queue.js";
 import { closeQueueRedisConnection } from "./infrastructure/queue/redis.connection.js";
 import { closeDatabasePool, pool } from "./infrastructure/database/db.js";
 import { enforceAntifraudSchemaAtBoot } from "./infrastructure/database/schema-readiness.js";
+import { logPaymentsGateStatus } from "./modules/payments/payments.gate.js";
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -158,6 +159,9 @@ async function startServer() {
 
     await runStartupMigrations();
     await verifyAntifraudSchemaReady();
+    // Fase 5.0 — registra em que modo o gate de pagamentos subiu (sem expor
+    // tokens). Útil para auditar no Render Logs se prod está em mock.
+    logPaymentsGateStatus();
     await createAndListenHttpServer();
     await runStartupWorkers();
   } catch (error) {

@@ -20,12 +20,22 @@
 
 ## Variáveis de ambiente
 
-| Var                                                | Sandbox     | Produção       | Descrição                                                                                        |
-| -------------------------------------------------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------ |
-| `MP_ACCESS_TOKEN`                                  | TEST-...    | APP_USR-...    | Bearer token API MP. Ausente → modo MOCK (init_point falso)                                      |
-| `MP_WEBHOOK_SECRET`                                | qualquer    | obrigatório    | HMAC-SHA256 do webhook. Em `NODE_ENV=production` o boot **falha** se ausente (defesa anti-spoof) |
-| `MP_PUBLIC_KEY`                                    | TEST-pk-... | APP_USR-pk-... | Public key (usada no front; opcional aqui)                                                       |
-| `APP_BASE_URL` / `API_URL` / `NEXT_PUBLIC_API_URL` | obrigatório | obrigatório    | URL pública do backend para callback do webhook                                                  |
+> **⚠️ Fase 5.0 — gate unificado.** Desde a Fase 5.0, **`MP_ACCESS_TOKEN`
+> sozinho NÃO liga cobrança real**. O boost-7d agora respeita o mesmo
+> kill-switch da assinatura: para cobrar de verdade é preciso, **além do
+> token**, um opt-in explícito (`PAYMENTS_LIVE=true` ou o combo de sandbox).
+> Sem isso o sistema fica em mock; com token presente **sem** o opt-in, o
+> checkout real é **bloqueado** (`403 PAYMENTS_NOT_LIVE`), não cobrado.
+> Confira o modo efetivo em `GET /api/admin/payments/health`.
+
+| Var                                                | Sandbox          | Produção       | Descrição                                                                                        |
+| -------------------------------------------------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| `MP_ACCESS_TOKEN`                                  | TEST-...         | APP_USR-...    | Bearer token API MP. Ausente → modo MOCK. **Presente sozinho NÃO cobra** (Fase 5.0)              |
+| `PAYMENTS_LIVE`                                    | —                | `true`         | **Fase 5.0.** Liga cobrança real de produção. Sem isso (`!= true`/`1`) nenhum checkout real ocorre |
+| `MERCADO_PAGO_ENV` + `PAYMENTS_SANDBOX_ENABLED`    | `sandbox`+`true` | —              | **Fase 5.0.** Libera o caminho real contra credencial de TESTE, sem ligar produção (ambas exigidas) |
+| `MP_WEBHOOK_SECRET`                                | qualquer         | obrigatório    | HMAC-SHA256 do webhook. Em `NODE_ENV=production` o boot **falha** se ausente (defesa anti-spoof) |
+| `MP_PUBLIC_KEY`                                    | TEST-pk-...      | APP_USR-pk-... | Public key (usada no front; opcional aqui)                                                       |
+| `APP_BASE_URL` / `API_URL` / `NEXT_PUBLIC_API_URL` | obrigatório      | obrigatório    | URL pública do backend para callback do webhook                                                  |
 
 Sem `MP_ACCESS_TOKEN`, `createBoostCheckout` ainda registra `payment_intents` com `checkout_resource_id = mock-preference-...` e devolve um `init_point` mock (`successUrl?mock=1`). Útil em dev local.
 
@@ -79,6 +89,10 @@ Erros:
 export MP_ACCESS_TOKEN=TEST-...
 export MP_WEBHOOK_SECRET=$(openssl rand -hex 32)
 export APP_BASE_URL=https://staging.carrosnacidade.com
+# Fase 5.0 — libera o caminho REAL em sandbox SEM ligar produção.
+# Sem este combo, o checkout responde 403 PAYMENTS_NOT_LIVE (não cobra).
+export MERCADO_PAGO_ENV=sandbox
+export PAYMENTS_SANDBOX_ENABLED=true
 
 # 2. Sobe backend em modo dev/stg
 
@@ -100,7 +114,9 @@ psql "$DATABASE_URL" -c "SELECT id, context, status, payment_resource_id, proces
 # 6. Confere highlight_until aplicado
 psql "$DATABASE_URL" -c "SELECT id, status, highlight_until, priority FROM ads WHERE id = '<ad>';"
 
-# Esperado: highlight_until ≈ NOW() + 7 dias, priority +8
+# Esperado: highlight_until ≈ NOW() + 7 dias. priority NÃO muda — desde a
+# Fase 3.3 o destaque entra na camada comercial 4 via highlight_until > NOW(),
+# sem tocar priority (o antigo "+8" foi removido; gerava priority=9 espúrio).
 ```
 
 ## Idempotência — teste de webhook duplicado
@@ -139,7 +155,7 @@ GROUP BY ad_id;
 A migration 020 não muda — todo schema necessário já existe (`payment_intents`, `ads.highlight_until`). Logo o rollback é apenas:
 
 1. **Rollback de código** (revert do commit Fase 3B): rota `/boost-7d/checkout` deixa de existir, mas `/api/payments/create` com `{ ad_id, boost_option_id: 'boost-7d' }` continua funcionando — qualquer cliente já apontando para o endpoint legacy não quebra.
-2. **Pausar pagamentos boost** em prod (sem rollback de código): basta unset `MP_ACCESS_TOKEN`. Backend cai no caminho mock e não cria preferência real. Frontend recebe `init_point` mock e não redireciona para MP real.
+2. **Pausar pagamentos boost** em prod (sem rollback de código): **kill-switch canônico da Fase 5.0 → `PAYMENTS_LIVE=false`** (ou remover a var). O backend para de criar cobrança real imediatamente, sem precisar mexer no `MP_ACCESS_TOKEN`. Com o token ainda presente, novos checkouts respondem `403 PAYMENTS_NOT_LIVE`; removendo o token também, voltam ao mock. Confirme o estado em `GET /api/admin/payments/health`.
 3. **Reverter highlights aplicados por engano** (caso muito raro): `UPDATE ads SET highlight_until = NULL, priority = 1 WHERE id = ANY($1::text[])` com lista de IDs do incidente. Documentar antes em `reports/`.
 
 ## Smoke pós-deploy em produção
@@ -170,6 +186,13 @@ curl -i https://carrosnacidade.com/api/payments/webhook
 curl -i -X POST https://carrosnacidade.com/api/payments/webhook \
   -H "Content-Type: application/json" -d '{}'
 # Esperado: HTTP/1.1 401 (invalid signature)
+
+# 6. (Fase 5.0) Health do gate confirma que produção está em mock e não cobra.
+#    Admin-only — autentique no painel e rode no console do navegador:
+#    fetch("/api/admin/payments/health", { credentials: "include" })
+#      .then(r => r.json()).then(console.log)
+# Esperado: data.mode = "mock", checkout_real_enabled = false,
+#           payments_live_enabled = false. NUNCA expõe o valor do token.
 ```
 
 ## O que NÃO foi feito nesta fase
@@ -189,3 +212,5 @@ curl -i -X POST https://carrosnacidade.com/api/payments/webhook \
 - ✅ Tentativa de boost em anúncio de outro usuário retorna 404
 - ✅ `MP_WEBHOOK_SECRET` ausente em produção falha no boot (proteção)
 - ✅ Start/Pro continuam funcionando (regression check via testes existentes)
+- ✅ (Fase 5.0) `MP_ACCESS_TOKEN` presente + `PAYMENTS_LIVE != true` → checkout boost responde `403 PAYMENTS_NOT_LIVE` (não cobra)
+- ✅ (Fase 5.0) `GET /api/admin/payments/health` reporta `mode` e flags sem expor tokens
