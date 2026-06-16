@@ -17,6 +17,7 @@ import * as seoService from "./seo/admin-seo.service.js";
 import { getAiHealth } from "./seo/admin-seo-ai.service.js";
 import * as homeService from "./home/admin-home.service.js";
 import * as blogService from "./blog/admin-blog.service.js";
+import * as analyticsService from "../analytics/analytics.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
@@ -915,6 +916,45 @@ router.post(
       id: req.params.id,
       file: req.file,
     });
+    res.json({ ok: true, data });
+  })
+);
+
+// ───────────────────────────────────────────────────────────────────────────
+// Analytics interno (Fase 4.4) — leituras agregadas (admin-only).
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Overview do dashboard. Filtros: period=7d|30d|90d, state, city_slug.
+ * Retorna totals + timeseries + rankings (cidades/regiões/páginas/anúncios/
+ * posts/origens) + eventos comerciais + anúncios com poucos contatos.
+ */
+router.get(
+  "/analytics/overview",
+  asyncHandler(async (req, res) => {
+    const data = await analyticsService.getOverview({
+      period: req.query.period,
+      state: req.query.state,
+      citySlug: req.query.city_slug,
+    });
+    res.json({ ok: true, data });
+  })
+);
+
+/** Métricas de um anúncio (views 7/30d + cliques + taxa de contato). */
+router.get(
+  "/analytics/ads/:id",
+  asyncHandler(async (req, res) => {
+    const data = await analyticsService.getAdMetrics(req.params.id);
+    res.json({ ok: true, data });
+  })
+);
+
+/** Métricas de um post do blog (views + origens de tráfego). */
+router.get(
+  "/analytics/posts/:id",
+  asyncHandler(async (req, res) => {
+    const data = await analyticsService.getPostMetrics(req.params.id);
     res.json({ ok: true, data });
   })
 );

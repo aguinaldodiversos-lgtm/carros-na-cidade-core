@@ -19,6 +19,7 @@
 // posts adotados (sem o recorte antigo de 9).
 import type { Metadata } from "next";
 
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { BlogHubServer } from "@/components/blog/BlogHubServer";
 import { CmsBlogPostArticle } from "@/components/blog/CmsBlogPostArticle";
 import {
@@ -102,6 +103,7 @@ export default async function BlogCityPage({ params }: PageProps) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
         />
+        <AnalyticsPageView event="blog_view" blogPostId={cmsPost.id} entityId={cmsPost.slug} />
         <CmsBlogPostArticle
           post={cmsPost}
           relatedPosts={recent}

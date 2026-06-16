@@ -10,6 +10,7 @@
 // JSON-LD (Blog + BreadcrumbList), para que /blog e /blog/<cidade> rendam o
 // MESMO hub — com os posts do CMS no HTML SSR — sem duplicar lógica.
 
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { BlogPageClient } from "@/components/blog/BlogPageClient";
 import {
   cmsPostToBlogPost,
@@ -97,6 +98,12 @@ export async function BlogHubServer({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
+      <AnalyticsPageView
+        event="blog_view"
+        entityType="blog_hub"
+        entityId={citySlug}
+        citySlug={citySlug}
       />
       <BlogPageClient content={hubContent} />
     </>

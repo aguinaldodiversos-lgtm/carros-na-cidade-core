@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { trackAdEvent } from "@/lib/analytics/public-events";
+import { trackEvent } from "@/lib/analytics/track";
 import { submitVehicleLead } from "@/lib/leads/public-leads";
 import { useCityOptional } from "@/lib/city/CityContext";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
@@ -127,12 +128,21 @@ export default function VehicleActions({
     }
   }
 
+  // Território do anúncio para os eventos comerciais do analytics (Fase 4.4).
+  const adCitySlug = financeCitySlug?.trim() || cityCtx?.city.slug || null;
+
   function handleFinanceClick() {
     trackAdEvent(vehicleId, "finance");
+    trackEvent("finance_click", { ad_id: vehicleId, city_slug: adCitySlug });
   }
 
   function handleWhatsappClick() {
     trackAdEvent(vehicleId, "whatsapp");
+    trackEvent("whatsapp_click", { ad_id: vehicleId, city_slug: adCitySlug });
+  }
+
+  function handlePhoneClick() {
+    trackEvent("phone_click", { ad_id: vehicleId, city_slug: adCitySlug });
   }
 
   const phoneDigitsLink = digitsOnly(whatsappPhone || sellerPhone || "");
@@ -208,6 +218,7 @@ export default function VehicleActions({
             {telHref && displayedPhone ? (
               <Link
                 href={telHref}
+                onClick={handlePhoneClick}
                 aria-label={`Ligar para ${displayedPhone}`}
                 className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border border-primary/30 bg-cnc-surface px-4 text-[15px] font-bold text-primary transition hover:border-primary hover:bg-primary-soft"
               >

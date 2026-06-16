@@ -16,6 +16,7 @@ import { SITE_FAVICON_SRC, SITE_OG_IMAGE_PATH } from "@/lib/site/brand-assets";
 
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
+import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -189,6 +190,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
     <html lang="pt-BR" className={inter.variable}>
       <body className="min-h-screen bg-[var(--cnc-bg)] font-sans text-[var(--cnc-text)] antialiased">
         <AppProviders initialCity={initialCity}>
+          <AnalyticsTracker />
           <div className="flex min-h-screen flex-col">
             <Suspense
               fallback={

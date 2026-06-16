@@ -21,10 +21,20 @@ import {
   listPublicBlogPosts,
   getPublicBlogPostBySlug,
 } from "./public-blog.controller.js";
+import { collectAnalyticsEvent } from "./public-analytics.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
-import { autocompleteRateLimit } from "../../shared/middlewares/rateLimit.middleware.js";
+import {
+  autocompleteRateLimit,
+  analyticsRateLimit,
+} from "../../shared/middlewares/rateLimit.middleware.js";
 
 const router = express.Router();
+
+/**
+ * Analytics interno first-party (Fase 4.4) — coletor anônimo, sem login.
+ * Rate-limit por IP real; 204 em sucesso. Validação/anonimização no service.
+ */
+router.post("/analytics/events", analyticsRateLimit, collectAnalyticsEvent);
 
 router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
 

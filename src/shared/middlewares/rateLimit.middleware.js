@@ -150,6 +150,11 @@ function buildPerMinuteLimit(prefix, max) {
 
 export const sitemapRateLimit = buildPerMinuteLimit("sitemap", 5);
 export const vehicleImagesRateLimit = buildPerMinuteLimit("vehicle-images", 10);
+
+// Analytics (Fase 4.4): coletor público. Uma navegação dispara poucos eventos
+// (page_view + alguns cliques), mas SPA/prefetch e múltiplas abas somam — 120/min
+// por IP real é folgado para humanos e corta flood. Chamadas internas pulam.
+export const analyticsRateLimit = buildPerMinuteLimit("analytics", 120);
 export const adsListRateLimit = buildPerMinuteLimit("ads-list", 30);
 export const adsSearchRateLimit = buildPerMinuteLimit("ads-search", 20);
 export const publicCitiesRateLimit = buildPerMinuteLimit("public-cities", 30);

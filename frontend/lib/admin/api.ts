@@ -346,6 +346,17 @@ export const adminApi = {
       return json as ApiOne<BlogCoverUpload>;
     },
   },
+  analytics: {
+    /** Overview do dashboard (Fase 4.4). Filtros: period=7d|30d|90d, state, city_slug. */
+    overview: (params: { period?: string; state?: string; city_slug?: string } = {}) =>
+      adminFetch<ApiOne<AnalyticsOverview>>("analytics/overview", {
+        params: Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v != null && v !== "")
+        ) as Record<string, string>,
+      }),
+    adMetrics: (id: string | number) => adminFetch<ApiOne<AdAnalytics>>(`analytics/ads/${id}`),
+    postMetrics: (id: string | number) => adminFetch<ApiOne<PostAnalytics>>(`analytics/posts/${id}`),
+  },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>
       adminFetch<ApiList<ModerationAdRow>>("moderation/ads", {
@@ -1076,6 +1087,82 @@ export type BlogCoverUpload = {
   post_id: number;
   size_bytes: number;
   mime_type: string;
+};
+
+// ── Analytics interno (Fase 4.4) ──
+export type AnalyticsTotals = {
+  visitorsToday: number;
+  viewsToday: number;
+  visitors7d: number;
+  views7d: number;
+  visitors30d: number;
+  views30d: number;
+  whatsappClicks30d: number;
+  phoneClicks30d: number;
+  financeClicks30d: number;
+};
+
+export type AnalyticsCityRow = {
+  city_slug: string;
+  city_name: string | null;
+  state: string | null;
+  views: number;
+  unique_sessions: number;
+  whatsapp_clicks: number;
+  phone_clicks: number;
+  finance_clicks: number;
+};
+
+export type AnalyticsOverview = {
+  period: string;
+  filters: { state: string | null; city_slug: string | null };
+  totals: AnalyticsTotals;
+  timeseries: Array<{ day: string; views: number; visitors: number }>;
+  topCities: AnalyticsCityRow[];
+  topRegions: Array<{ region_slug: string; views: number; unique_sessions: number }>;
+  topPages: Array<{ path: string; views: number; unique_sessions: number }>;
+  topAds: Array<{
+    ad_id: number;
+    views: number;
+    unique_sessions: number;
+    whatsapp_clicks: number;
+    phone_clicks: number;
+  }>;
+  topBlogPosts: Array<{ blog_post_id: number; views: number; unique_sessions: number }>;
+  trafficSources: {
+    referrers: Array<{ source: string; total: number }>;
+    campaigns: Array<{
+      utm_source: string | null;
+      utm_medium: string | null;
+      utm_campaign: string | null;
+      total: number;
+    }>;
+  };
+  commercialEvents: {
+    whatsapp_click: number;
+    phone_click: number;
+    finance_click: number;
+    search_performed: number;
+  };
+  lowContactAds: Array<{ ad_id: number; views: number; contacts: number }>;
+};
+
+export type AdAnalytics = {
+  ad_id: number;
+  views_7d: number;
+  views_30d: number;
+  whatsapp_clicks_30d: number;
+  phone_clicks_30d: number;
+  finance_clicks_30d: number;
+  contact_rate_30d: number;
+};
+
+export type PostAnalytics = {
+  blog_post_id: number;
+  views_7d: number;
+  views_30d: number;
+  unique_sessions_30d: number;
+  traffic_sources: Array<{ source: string; total: number }>;
 };
 
 export type RegionalSettings = {

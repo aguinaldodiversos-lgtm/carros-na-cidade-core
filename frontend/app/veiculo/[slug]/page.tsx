@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import AdEventTracker from "@/components/analytics/AdEventTracker";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import VehicleDetailMobileShell from "@/components/vehicle/mobile/VehicleDetailMobileShell";
@@ -291,6 +292,7 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
       <SiteBottomNav />
 
       <AdEventTracker adId={vehicle.id} eventType="view" />
+      <AnalyticsPageView event="ad_view" adId={vehicle.id} entityId={canonicalSlug} />
       <BreadcrumbJsonLd items={breadcrumbItems} />
 
       {schemaVehicle.map((node, i) => (
