@@ -144,7 +144,7 @@ export async function getActiveGrant(userId) {
             admin_u.name AS granted_by_name, admin_u.email AS granted_by_email
      FROM user_subscriptions us
      LEFT JOIN subscription_plans p ON p.id = us.plan_id
-     LEFT JOIN users admin_u ON admin_u.id = us.granted_by_admin_id
+     LEFT JOIN users admin_u ON admin_u.id::text = us.granted_by_admin_id
      WHERE us.user_id = $1
        AND us.source = $2
        AND us.status = 'active'
