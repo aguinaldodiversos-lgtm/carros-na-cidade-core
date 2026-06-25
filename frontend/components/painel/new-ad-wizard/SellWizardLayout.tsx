@@ -13,6 +13,14 @@ type Props = {
   children: ReactNode;
   messageSlot?: ReactNode;
   footer: ReactNode;
+  /**
+   * "default" — card premium central de 820px (passos 0–3).
+   * "review"  — etapa final de conversão (passo 5): container largo, sem o
+   *             card/título/rodapé padrão (o StepReview controla hero, cards e
+   *             a barra fixa). Sem SiteBottomNav para não conflitar com a
+   *             barra fixa de CTA.
+   */
+  variant?: "default" | "review";
 };
 
 /**
@@ -28,7 +36,27 @@ export default function SellWizardLayout({
   children,
   messageSlot,
   footer,
+  variant = "default",
 }: Props) {
+  if (variant === "review") {
+    return (
+      <main className="min-h-screen bg-cnc-bg">
+        <div className="sticky top-0 z-30 shadow-[0_1px_0_rgba(15,23,42,0.06)]">
+          <SellWizardProgress currentStep={currentStep} />
+        </div>
+
+        <div
+          className="mx-auto max-w-[1180px] px-4 pb-44 pt-6 sm:pt-8"
+          data-testid="wizard-step-container"
+          data-step={currentStep + 1}
+        >
+          {breadcrumb}
+          {children}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="cnc-pb-bottomnav min-h-screen bg-cnc-bg">
       <div className="sticky top-0 z-30 shadow-[0_1px_0_rgba(15,23,42,0.06)]">

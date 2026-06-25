@@ -7,9 +7,8 @@ import { fetchDashboardPayloadClient } from "@/lib/dashboard/fetch-dashboard-me-
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import type { SessionAccountType } from "@/lib/auth/redirects";
 import SellWizardLayout from "./new-ad-wizard/SellWizardLayout";
+import StepReview from "./new-ad-wizard/StepReview";
 import {
-  StepFinalize,
-  StepHighlight,
   StepListingInfo,
   StepOptionals,
   StepPhotos,
@@ -152,6 +151,8 @@ export default function NewAdWizardClient({ initialType }: Props) {
     "idle"
   );
   const [submitMessage, setSubmitMessage] = useState("");
+  const [subscribeState, setSubscribeState] = useState<"idle" | "loading">("idle");
+  const [subscribeMessage, setSubscribeMessage] = useState("");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [sessionAccountType, setSessionAccountType] = useState<SessionAccountType | null>(null);
@@ -393,19 +394,56 @@ export default function NewAdWizardClient({ initialType }: Props) {
     }
   }
 
-  async function handleSubmit() {
-    const firstError = [0, 1, 2, 3, 4].map((s) => validateStep(s, form)).find(Boolean);
-    const err = firstError ?? null;
-    if (err) {
-      setSubmitState("error");
-      setSubmitMessage(err);
-      return;
-    }
+  function loginRedirectHref() {
+    const next = encodeURIComponent(
+      `${pathname || "/anunciar/novo"}${
+        searchParams?.toString() ? `?${searchParams.toString()}` : ""
+      }`
+    );
+    return `/login?next=${next}`;
+  }
 
+  function extractAdId(result: unknown): string | null {
+    const data = (result as { result?: { data?: { id?: unknown; ad?: { id?: unknown } } } })?.result
+      ?.data;
+    const id = data?.id ?? data?.ad?.id;
+    return id != null && String(id).trim() ? String(id) : null;
+  }
+
+  function redirectAfterPublish(moderationStatus: string | null, backendRedirect: string) {
+    const defaultRedirect =
+      sessionAccountType === "CNPJ"
+        ? "/dashboard-loja/meus-anuncios"
+        : "/dashboard/meus-anuncios";
+    const redirectTo = backendRedirect.trim() ? backendRedirect : defaultRedirect;
+    const delay = moderationStatus === "pending_review" ? 2400 : 1200;
+    setTimeout(() => router.push(redirectTo), delay);
+  }
+
+  /**
+   * Publica o anúncio (fluxo único de criação). NÃO redireciona — devolve o
+   * resultado para o chamador decidir (publicar grátis → painel; destaque →
+   * checkout de boost). `boostOptionId` é encaminhado, mas o backend de
+   * publicação hoje aplica destaque só DEPOIS via checkout (precisa de ad_id).
+   */
+  async function runPublish(opts?: { boostOptionId?: string | null }): Promise<{
+    ok: boolean;
+    adId: string | null;
+    moderationStatus: string | null;
+    backendRedirect: string;
+  }> {
+    const fail = { ok: false, adId: null, moderationStatus: null, backendRedirect: "" };
+
+    const firstError = [0, 1, 2, 3, 4].map((s) => validateStep(s, form)).find(Boolean) ?? null;
+    if (firstError) {
+      setSubmitState("error");
+      setSubmitMessage(firstError);
+      return fail;
+    }
     if (form.draftPhotoUrls.length === 0) {
       setSubmitState("error");
       setSubmitMessage("Adicione pelo menos uma foto do veículo.");
-      return;
+      return fail;
     }
 
     setSubmitState("submitting");
@@ -444,8 +482,10 @@ export default function NewAdWizardClient({ initialType }: Props) {
       payload.append("acceptTerms", form.acceptTerms ? "true" : "false");
       payload.append("armored", form.armored ? "true" : "false");
       payload.append("vehicleOptions", JSON.stringify(form.vehicleOptionKeys));
-      if (form.boostOptionId) {
-        payload.append("boostOptionId", form.boostOptionId);
+      const effectiveBoost =
+        opts && "boostOptionId" in opts ? opts.boostOptionId : form.boostOptionId;
+      if (effectiveBoost) {
+        payload.append("boostOptionId", effectiveBoost);
       }
 
       payload.append("draftPhotoUrls", JSON.stringify(form.draftPhotoUrls));
@@ -466,7 +506,9 @@ export default function NewAdWizardClient({ initialType }: Props) {
           process.env.NODE_ENV === "development" && result?.details != null
             ? `${base} (${JSON.stringify(result.details)})`
             : base;
-        throw new Error(withDetails);
+        setSubmitState("error");
+        setSubmitMessage(withDetails);
+        return fail;
       }
 
       try {
@@ -476,8 +518,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
       }
 
       // Tarefa 8 — interpretar moderation_status retornado pelo backend.
-      // O createAdNormalized devolve { ...row, moderation_status: 'pending_review'|'approved' }
-      // dentro de result.result.data. Mensagem ao usuário muda conforme.
       const moderationStatus =
         (typeof result?.result?.data?.moderation_status === "string"
           ? result.result.data.moderation_status
@@ -488,33 +528,103 @@ export default function NewAdWizardClient({ initialType }: Props) {
           : null);
 
       setSubmitState("success");
-      if (moderationStatus === "pending_review") {
-        setSubmitMessage(
-          "Seu anúncio foi recebido e está em análise de segurança. Assim que for aprovado, ele aparecerá no portal."
-        );
-      } else {
-        setSubmitMessage(result?.message || "Anúncio publicado com sucesso!");
-      }
+      setSubmitMessage(
+        moderationStatus === "pending_review"
+          ? "Seu anúncio foi recebido e está em análise de segurança. Assim que for aprovado, ele aparecerá no portal."
+          : result?.message || "Anúncio publicado com sucesso!"
+      );
 
       const backendRedirect =
         result?.result?.redirectTo || result?.result?.redirect_to || result?.result?.url || "";
 
-      const defaultRedirect =
-        sessionAccountType === "CNPJ"
-          ? "/dashboard-loja/meus-anuncios"
-          : "/dashboard/meus-anuncios";
-
-      const redirectTo =
-        typeof backendRedirect === "string" && backendRedirect.trim()
-          ? backendRedirect
-          : defaultRedirect;
-
-      // Mais tempo para o usuário ler a mensagem de "em análise".
-      const delay = moderationStatus === "pending_review" ? 2400 : 1200;
-      setTimeout(() => router.push(redirectTo), delay);
+      return {
+        ok: true,
+        adId: extractAdId(result),
+        moderationStatus,
+        backendRedirect: typeof backendRedirect === "string" ? backendRedirect : "",
+      };
     } catch (e) {
       setSubmitState("error");
       setSubmitMessage(e instanceof Error ? e.message : "Erro ao publicar.");
+      return fail;
+    }
+  }
+
+  async function publishFree() {
+    const r = await runPublish({ boostOptionId: null });
+    if (r.ok) redirectAfterPublish(r.moderationStatus, r.backendRedirect);
+  }
+
+  /**
+   * Destaque 7 dias: publica e, em seguida, tenta o checkout de destaque
+   * (que exige ad_id e aplica o gate de pagamentos no servidor). Se o
+   * pagamento estiver indisponível (mock/gate), o anúncio já está publicado
+   * e o usuário é levado ao painel com instrução amigável — sem bypass.
+   */
+  async function publishWithBoost() {
+    const boostId =
+      boostOptions.find((b) => b.days === 7)?.id ?? boostOptions[0]?.id ?? null;
+    const r = await runPublish({ boostOptionId: boostId });
+    if (!r.ok) return;
+
+    if (r.adId) {
+      try {
+        const resp = await fetch("/api/payments/boost-7d/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ad_id: r.adId }),
+        });
+        if (resp.status === 401) {
+          window.location.assign(loginRedirectHref());
+          return;
+        }
+        if (resp.ok) {
+          const d = (await resp.json().catch(() => ({}))) as { init_point?: string };
+          if (d.init_point) {
+            window.location.href = d.init_point;
+            return;
+          }
+        }
+      } catch {
+        // gate/erro: anúncio publicado; segue para o painel.
+      }
+    }
+
+    setSubmitMessage("Anúncio publicado! Ative o Destaque 7 dias no painel do anúncio.");
+    redirectAfterPublish(r.moderationStatus, r.backendRedirect);
+  }
+
+  /**
+   * Assinatura Start/Pro: aciona a rota dedicada `/api/payments/subscriptions/checkout`,
+   * que fica atrás do gate `SUBSCRIPTIONS_LIVE` (503 amigável em prod até liberar).
+   * NÃO publica o anúncio nem cria cobrança fora do fluxo gated.
+   */
+  async function subscribe(planId: string) {
+    if (subscribeState === "loading") return;
+    setSubscribeState("loading");
+    setSubscribeMessage("");
+    try {
+      const resp = await fetch("/api/payments/subscriptions/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId }),
+      });
+      if (resp.status === 401) {
+        window.location.assign(loginRedirectHref());
+        return;
+      }
+      const d = (await resp.json().catch(() => ({}))) as { init_point?: string; error?: string };
+      if (resp.ok && d.init_point) {
+        window.location.href = d.init_point;
+        return;
+      }
+      setSubscribeMessage(d.error || "Assinaturas em validação. Voltam em breve.");
+    } catch {
+      setSubscribeMessage(
+        "Não foi possível iniciar a assinatura agora. Tente novamente em instantes."
+      );
+    } finally {
+      setSubscribeState("idle");
     }
   }
 
@@ -596,7 +706,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
         ) : (
           <button
             type="button"
-            onClick={handleSubmit}
+            onClick={publishFree}
             disabled={submitState === "submitting"}
             data-testid="wizard-submit-btn"
             className="cnc-btn-primary px-8 py-3.5 text-base"
@@ -631,20 +741,21 @@ export default function NewAdWizardClient({ initialType }: Props) {
     );
   }
 
+  const isReview = step === STEP_COUNT - 1;
+
   return (
     <SellWizardLayout
       currentStep={step}
+      variant={isReview ? "review" : "default"}
       breadcrumb={breadcrumb}
       title={stepTitle}
       subtitle={stepSubtitle[step]}
-      messageSlot={messageSlot}
-      footer={footer}
+      messageSlot={isReview ? null : messageSlot}
+      footer={isReview ? null : footer}
     >
       {/*
-        Renderização agrupada — 5 passos visuais (mockup `pag1 anuncios.png`)
-        sobre os 7 componentes existentes em WizardSteps.tsx. Mudar
-        STEP_COUNT em types.ts mantém a navegação coerente; o agrupamento
-        físico acontece aqui.
+        Passos 0–3 usam o card premium central; o passo 5 (Revisão) é uma
+        tela de conversão dedicada (StepReview) com layout largo e barra fixa.
       */}
       {step === 0 ? <StepVehicle state={form} patch={patch} /> : null}
       {step === 1 ? <StepListingInfo state={form} patch={patch} /> : null}
@@ -664,17 +775,22 @@ export default function NewAdWizardClient({ initialType }: Props) {
           <StepOptionals state={form} patch={patch} />
         </div>
       ) : null}
-      {step === 4 ? (
-        <div className="space-y-10">
-          <StepFinalize
-            state={form}
-            patch={patch}
-            dashboard={dashboard}
-            dashboardError={dashboardError}
-            sessionAccountType={sessionAccountType}
-          />
-          <StepHighlight state={form} patch={patch} boostOptions={boostOptions} />
-        </div>
+      {isReview ? (
+        <StepReview
+          state={form}
+          patch={patch}
+          dashboard={dashboard}
+          dashboardError={dashboardError}
+          boostOptions={boostOptions}
+          submitState={submitState}
+          submitMessage={submitMessage}
+          subscribeState={subscribeState}
+          subscribeMessage={subscribeMessage}
+          onBack={goBack}
+          onPublishFree={publishFree}
+          onPublishBoost={publishWithBoost}
+          onSubscribe={subscribe}
+        />
       ) : null}
     </SellWizardLayout>
   );
