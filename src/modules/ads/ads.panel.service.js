@@ -5,6 +5,7 @@ import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flo
 import * as dbModule from "../../infrastructure/database/db.js";
 import { removeVehicleImages } from "../../infrastructure/storage/r2.service.js";
 import { AD_STATUS } from "./ads.canonical.constants.js";
+import { assertAdOwner, assertCanEditAd } from "./ad-ownership.js";
 import { recordModerationEvent } from "./risk/ad-risk.repository.js";
 import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
 
@@ -28,21 +29,6 @@ const STRUCTURAL_FIELDS = Object.freeze([
 ]);
 
 const tableColumnsCache = new Map();
-
-function assertOwner(ownerContext, userId) {
-  if (!ownerContext) {
-    throw new AppError("Anúncio não encontrado", 404);
-  }
-
-  const advertiserUserId = ownerContext.advertiser_user_id;
-  if (advertiserUserId == null) {
-    throw new AppError("Anúncio não encontrado", 404);
-  }
-
-  if (String(advertiserUserId) !== String(userId)) {
-    throw new AppError("Sem permissão para alterar este anúncio", 403);
-  }
-}
 
 function getDbQueryFn() {
   const candidates = [
@@ -248,7 +234,12 @@ export async function updateAd(id, data, user, ctx = {}) {
       advertiserId = ownerContext.advertiser_id ?? null;
       cityId = ownerContext.city_id ?? null;
     }
-    assertOwner(ownerContext, user.id);
+    // Ownership + status editável (centralizado em ad-ownership.js):
+    //   - admin: bypass
+    //   - dono (PF ou lojista/CNPJ, via advertisers.user_id): permitido
+    //   - terceiro: 403; inexistente/sem dono: 404
+    //   - status sold/expired/archived/blocked/deleted: 409 (não editável)
+    assertCanEditAd(user, ownerContext);
 
     if (attemptedStructural.length > 0) {
       const protectedStatuses = [
@@ -327,7 +318,9 @@ export async function removeAd(id, user, ctx = {}) {
       cityId = ownerContext.city_id ?? null;
     }
 
-    assertOwner(ownerContext, user.id);
+    // Soft-delete tem regra de status própria (pode incidir sobre estados que
+    // a edição de conteúdo recusa), então aqui validamos apenas ownership.
+    assertAdOwner(user, ownerContext);
 
     stage = "softDeleteAd";
     const removed = await adsRepository.softDeleteAd(id);

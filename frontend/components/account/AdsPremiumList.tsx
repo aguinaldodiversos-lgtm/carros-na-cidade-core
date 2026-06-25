@@ -140,7 +140,7 @@ export default function AdsPremiumList({
                         Impulsionar
                       </button>
                       <Link
-                        href="/anunciar"
+                        href={`/painel/anuncios/${ad.id}/editar`}
                         className="rounded-lg border border-[#e2e7f1] px-3 py-1.5 text-xs font-bold text-[#37425d] transition hover:bg-[#f8fafc]"
                       >
                         Editar

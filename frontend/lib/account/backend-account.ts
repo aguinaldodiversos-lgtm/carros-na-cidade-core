@@ -6,7 +6,7 @@ import { getBoostOptions } from "@/services/adService";
 import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import type { SessionData } from "@/services/sessionService";
 
-type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 type JsonObject = Record<string, unknown>;
 
@@ -19,9 +19,45 @@ type FetchInit = {
   headers?: Record<string, string>;
 };
 
+/**
+ * Campos crus do anúncio que a tela de edição pré-preenche.
+ * brand/model/year/city/state vêm para exibição read-only (o backend recusa
+ * alterá-los após a publicação — ver ads.panel.service STRUCTURAL_FIELDS).
+ */
+export type OwnedAdEditable = {
+  title: string;
+  description: string;
+  price: number;
+  mileage: number;
+  brand: string;
+  model: string;
+  year: number | null;
+  city: string;
+  city_id: number | null;
+  state: string;
+  body_type: string;
+  fuel_type: string;
+  transmission: string;
+  below_fipe: boolean;
+  slug: string | null;
+  images: string[];
+};
+
 type OwnedAdResponse = {
-  ad: DashboardPayload["active_ads"][number];
+  ad: DashboardPayload["active_ads"][number] & { editable?: OwnedAdEditable };
   boost_options: DashboardPayload["boost_options"];
+};
+
+/**
+ * Payload aceito pela edição de conteúdo (PUT /api/ads/:id). Apenas campos
+ * NÃO estruturais — preço/título/descrição/quilometragem. Fotos são
+ * preservadas quando o campo `images` é omitido.
+ */
+export type UpdateOwnedAdPayload = {
+  title?: string;
+  price?: number;
+  description?: string | null;
+  mileage?: number;
 };
 
 type PaymentCheckoutResponse = {
@@ -405,6 +441,30 @@ export async function deleteOwnedAd(session: SessionData, adId: string) {
     method: "DELETE",
     accessToken: assertAccessToken(session),
   });
+}
+
+/**
+ * Edição de conteúdo do anúncio do dono. Proxy para o endpoint canônico
+ * `PUT /api/ads/:id` (módulo ads) — NÃO criamos endpoint paralelo. A
+ * autorização (ownership PF/CNPJ + status editável) é resolvida no backend
+ * via ads.panel.service.updateAd → ad-ownership.assertCanEditAd.
+ *
+ * Erros do backend (403/404/409/400) sobem como BackendApiError preservando
+ * status/code/message para o BFF repassar à UI.
+ */
+export async function updateOwnedAd(
+  session: SessionData,
+  adId: string,
+  payload: UpdateOwnedAdPayload
+) {
+  return fetchBackendJson<{ success: boolean; data: OwnedAdResponse["ad"] }>(
+    `/api/ads/${encodeURIComponent(adId)}`,
+    {
+      method: "PUT",
+      accessToken: assertAccessToken(session),
+      body: payload,
+    }
+  );
 }
 
 export async function createPaymentCheckout(

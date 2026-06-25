@@ -820,7 +820,20 @@ export async function getOwnedAd(userId, adId) {
       a.id,
       adv.user_id AS owner_user_id,
       a.title,
+      a.description,
       a.price,
+      a.mileage,
+      a.brand,
+      a.model,
+      a.year,
+      a.city,
+      a.city_id,
+      a.state,
+      a.body_type,
+      a.fuel_type,
+      a.transmission,
+      a.below_fipe,
+      a.slug,
       a.status,
       a.highlight_until,
       a.created_at,
@@ -841,7 +854,32 @@ export async function getOwnedAd(userId, adId) {
     throw new AppError("Anuncio nao encontrado", 404);
   }
 
-  return normalizeDashboardAd(row);
+  // Base = shape de dashboard (compat com /painel/anuncios/[id]/upgrade, que
+  // só lê id/title/price/image_url/status). `editable` é ADITIVO e carrega os
+  // campos crus que a tela de edição precisa pré-preencher. Campos estruturais
+  // (brand/model/year/city/state) vêm para exibição read-only — o backend
+  // recusa alterá-los após a publicação (ver ads.panel.service STRUCTURAL_FIELDS).
+  return {
+    ...normalizeDashboardAd(row),
+    editable: {
+      title: row.title ?? "",
+      description: row.description ?? "",
+      price: toNumber(row.price, 0),
+      mileage: toNumber(row.mileage, 0),
+      brand: row.brand ?? "",
+      model: row.model ?? "",
+      year: row.year ?? null,
+      city: row.city ?? "",
+      city_id: row.city_id ?? null,
+      state: row.state ?? "",
+      body_type: row.body_type ?? "",
+      fuel_type: row.fuel_type ?? "",
+      transmission: row.transmission ?? "",
+      below_fipe: Boolean(row.below_fipe),
+      slug: row.slug ?? null,
+      images: Array.isArray(row.images) ? row.images : [],
+    },
+  };
 }
 
 /**
