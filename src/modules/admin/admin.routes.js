@@ -231,6 +231,45 @@ router.get(
   })
 );
 
+/**
+ * Concessão MANUAL de plano (cortesia / teste / brinde / negociação).
+ * NÃO gera cobrança, NÃO chama Mercado Pago, NÃO depende de PAYMENTS_LIVE.
+ * Herda authMiddleware + requireAdmin (apenas admin concede).
+ */
+router.post(
+  "/advertisers/:id/plan-grant",
+  asyncHandler(async (req, res) => {
+    const {
+      plan_id: planId,
+      duration_days: durationDays,
+      duration_months: durationMonths,
+      reason_type: reasonType,
+      reason_note: reasonNote,
+    } = req.body || {};
+    const granted = await advertisersService.grantAdvertiserPlan(req.user.id, req.params.id, {
+      planId,
+      durationDays,
+      durationMonths,
+      reasonType,
+      reasonNote,
+    });
+    res.status(201).json({ ok: true, data: granted });
+  })
+);
+
+router.post(
+  "/advertisers/:id/plan-grant/cancel",
+  asyncHandler(async (req, res) => {
+    const { reason } = req.body || {};
+    const revoked = await advertisersService.revokeAdvertiserPlan(
+      req.user.id,
+      req.params.id,
+      reason
+    );
+    res.json({ ok: true, data: revoked });
+  })
+);
+
 // =========================================================================
 // PAYMENTS
 // =========================================================================

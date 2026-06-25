@@ -124,6 +124,17 @@ export const adminApi = {
         body: { status, reason },
       }),
     ads: (id: string | number) => adminFetch<ApiOne<AdRow[]>>(`advertisers/${id}/ads`),
+    // Concessão MANUAL de plano (cortesia / teste / brinde). Não gera cobrança.
+    grantPlan: (id: string | number, payload: PlanGrantPayload) =>
+      adminFetch<ApiOne<PlanGrantResult>>(`advertisers/${id}/plan-grant`, {
+        method: "POST",
+        body: payload,
+      }),
+    revokePlan: (id: string | number, reason: string) =>
+      adminFetch<ApiOne<PlanGrantResult>>(`advertisers/${id}/plan-grant/cancel`, {
+        method: "POST",
+        body: { reason },
+      }),
   },
   payments: {
     list: (p: Record<string, string | number> = {}) =>
@@ -889,11 +900,49 @@ export type AdvRow = {
   document_type?: string;
 };
 
+export type AdvertiserPlanGrant = {
+  source: string;
+  reason_type: string;
+  reason_label: string;
+  reason_note: string | null;
+  starts_at: string | null;
+  expires_at: string | null;
+  days_remaining: number | null;
+  granted_by_admin_id: string | null;
+  granted_by_name: string | null;
+};
+
 export type AdvDetail = AdvRow & {
   user_email?: string;
   user_name?: string;
   user_plan?: string;
   status_reason?: string;
+  // Plano efetivo + origem resolvidos pelo backend (concessão manual incluída).
+  effective_plan_id?: string | null;
+  effective_plan_name?: string | null;
+  plan_origin_kind?: string;
+  plan_origin_label?: string;
+  plan_grant?: AdvertiserPlanGrant | null;
+};
+
+export type PlanGrantPayload = {
+  plan_id: string;
+  duration_days?: number;
+  duration_months?: number;
+  reason_type: string;
+  reason_note: string;
+};
+
+export type PlanGrantResult = {
+  advertiser_id: number | string;
+  user_id: string;
+  plan_id?: string;
+  plan_name?: string;
+  expires_at?: string;
+  days_remaining?: number | null;
+  reason_label?: string;
+  revoked_plan_id?: string;
+  reverted_to?: string | null;
 };
 
 export type PaymentRow = {
