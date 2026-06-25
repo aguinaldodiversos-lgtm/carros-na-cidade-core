@@ -42,8 +42,13 @@ export type WizardFormState = {
   whatsapp: string;
   phone: string;
   acceptTerms: boolean;
-  optionalIds: string[];
-  conditionIds: string[];
+  /**
+   * Opcionais do veículo (keys do catálogo categorizado em
+   * `@/lib/ads/vehicle-options`). Substitui os antigos `optionalIds`/
+   * `conditionIds` (lista pequena e sem categoria). Drafts antigos no
+   * localStorage são reidratados com [] via spread ...INITIAL_FORM.
+   */
+  vehicleOptionKeys: string[];
   boostOptionId: string | null;
   /** URLs de fotos já enviadas ao storage (persistem em localStorage). */
   draftPhotoUrls: string[];
@@ -61,7 +66,7 @@ export type WizardFormState = {
  *   0 — Veículo   → StepVehicle
  *   1 — Preço     → StepListingInfo
  *   2 — Fotos     → StepPhotos
- *   3 — Descrição → StepOptionals + StepConditions (concatenados)
+ *   3 — Descrição → StepOptionals (seletor de opcionais categorizado)
  *   4 — Revisão   → StepFinalize + StepHighlight (concatenados)
  */
 export const WIZARD_STORAGE_KEY = "carros-na-cidade:new-ad-wizard:v3";

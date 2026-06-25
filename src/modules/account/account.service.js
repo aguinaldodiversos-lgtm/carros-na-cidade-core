@@ -5,7 +5,24 @@ import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import * as adsRepository from "../ads/ads.repository.js";
 import * as adsPanelService from "../ads/ads.panel.service.js";
 import { AD_STATUS } from "../ads/ads.canonical.constants.js";
+import { normalizeVehicleOptions } from "../ads/ad-options.catalog.js";
 import { getAccountUser } from "./account.user.read.js";
+
+/**
+ * jsonb → objeto agrupado de opcionais, allowlistado pelo catálogo. pg já
+ * desserializa jsonb; só fazemos JSON.parse defensivo se vier string (legado).
+ */
+function parseVehicleOptions(value) {
+  let raw = value;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      raw = null;
+    }
+  }
+  return normalizeVehicleOptions(raw);
+}
 
 /**
  * IDs de planos atrelados ao produto Evento (dormente). Filtrados das
@@ -838,7 +855,8 @@ export async function getOwnedAd(userId, adId) {
       a.highlight_until,
       a.created_at,
       a.updated_at,
-      a.images
+      a.images,
+      a.vehicle_options
     FROM ads a
     JOIN advertisers adv ON adv.id = a.advertiser_id
     WHERE a.id = $1
@@ -878,6 +896,9 @@ export async function getOwnedAd(userId, adId) {
       below_fipe: Boolean(row.below_fipe),
       slug: row.slug ?? null,
       images: Array.isArray(row.images) ? row.images : [],
+      // Objeto agrupado { comfort:[], drivability:[], safety:[] } (jsonb).
+      // pg já desserializa jsonb em objeto; defesa para string/null legado.
+      vehicle_options: parseVehicleOptions(row.vehicle_options),
     },
   };
 }

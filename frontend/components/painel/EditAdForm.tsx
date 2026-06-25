@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OwnedAdEditable } from "@/lib/account/backend-account";
+import { extractSelectedKeys } from "@/lib/ads/vehicle-options";
+import VehicleOptionsSelector from "./VehicleOptionsSelector";
 import {
   formatCurrencyInput,
   formatKm,
@@ -65,6 +67,9 @@ export default function EditAdForm({
   const [mileage, setMileage] = useState(
     editable?.mileage != null ? formatKm(String(editable.mileage)) : ""
   );
+  const [optionKeys, setOptionKeys] = useState<string[]>(() =>
+    extractSelectedKeys(editable?.vehicle_options)
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +103,8 @@ export default function EditAdForm({
       title: title.trim(),
       description: description.trim() ? description.trim() : null,
       price: priceValue,
+      // Lista achatada de keys; backend reagrupa e valida. Array vazio limpa.
+      vehicle_options: optionKeys,
     };
 
     const mileageDigits = parseKmDigits(mileage);
@@ -293,6 +300,15 @@ export default function EditAdForm({
                 className="w-full resize-y rounded-xl border border-cnc-line bg-white px-3.5 py-2.5 text-sm text-cnc-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-soft"
                 placeholder="Detalhe estado de conservação, opcionais, revisões..."
               />
+            </div>
+
+            <div>
+              <h3 className="text-sm font-bold text-cnc-text">Opcionais do veículo</h3>
+              <p className="mb-3 mt-1 text-xs text-cnc-muted">
+                Marque os itens que o veículo possui. Aparecem agrupados por categoria no anúncio
+                público.
+              </p>
+              <VehicleOptionsSelector selected={optionKeys} onChange={setOptionKeys} />
             </div>
 
             <div className="rounded-xl border border-cnc-line bg-cnc-bg/60 px-4 py-3 text-xs text-cnc-muted">

@@ -53,6 +53,8 @@ export type PublishWizardInput = {
   title: string;
   description: string;
   acceptTerms: boolean;
+  /** Keys dos opcionais selecionados no wizard (catálogo categorizado). */
+  vehicleOptionKeys?: string[];
 };
 
 /**
@@ -93,6 +95,8 @@ export type BackendCreateAdPayload = {
   fipe_reference_month?: string;
   vehicle_type?: "carros" | "motos" | "caminhoes";
   images?: string[];
+  /** Opcionais (lista achatada de keys; backend reagrupa e valida). */
+  vehicle_options?: string[];
 };
 
 export function parsePriceBr(value: string): number {
@@ -194,6 +198,9 @@ export function buildBackendCreateAdPayload(
       ? { vehicle_type: n.fipeVehicleType }
       : {}),
     ...(cleanedUrls.length > 0 ? { images: cleanedUrls } : {}),
+    ...(n.vehicleOptionKeys && n.vehicleOptionKeys.length > 0
+      ? { vehicle_options: n.vehicleOptionKeys }
+      : {}),
   };
 }
 

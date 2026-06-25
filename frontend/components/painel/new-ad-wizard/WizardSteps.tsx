@@ -9,7 +9,7 @@ import {
   listFipeModels,
   listFipeYears,
 } from "@/lib/fipe/fipe-client";
-import { CONDITION_ITEMS, OPTIONAL_ITEMS, VEHICLE_COLORS } from "./constants";
+import { VEHICLE_COLORS } from "./constants";
 import { formatCurrencyInput, formatKm, parseCurrency, parseKmDigits } from "./currency";
 import {
   extractModelBase,
@@ -20,7 +20,7 @@ import {
   versionsForYear,
 } from "./fipe-years";
 import type { WizardFormState } from "./types";
-import ChipSelect from "./ChipSelect";
+import VehicleOptionsSelector from "../VehicleOptionsSelector";
 import { FinalizeLocationFields } from "./FinalizeLocationFields";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import type { SessionAccountType } from "@/lib/auth/redirects";
@@ -660,38 +660,13 @@ export function StepPhotos({
 export function StepOptionals({ state, patch }: { state: WizardFormState; patch: Patch }) {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[#6E748A]">Toque para marcar os itens que o veículo possui.</p>
-      <ChipSelect
-        items={OPTIONAL_ITEMS}
-        selected={state.optionalIds}
-        onToggle={(id) =>
-          patch({
-            optionalIds: state.optionalIds.includes(id)
-              ? state.optionalIds.filter((x) => x !== id)
-              : [...state.optionalIds, id],
-          })
-        }
-      />
-    </div>
-  );
-}
-
-export function StepConditions({ state, patch }: { state: WizardFormState; patch: Patch }) {
-  return (
-    <div className="space-y-4">
       <p className="text-sm text-[#6E748A]">
-        Selecione as condições que se aplicam ao veículo ou ao negócio.
+        Marque os itens que o veículo possui. Eles aparecem agrupados por categoria (Conforto,
+        Dirigibilidade, Segurança) no anúncio público.
       </p>
-      <ChipSelect
-        items={CONDITION_ITEMS}
-        selected={state.conditionIds}
-        onToggle={(id) =>
-          patch({
-            conditionIds: state.conditionIds.includes(id)
-              ? state.conditionIds.filter((x) => x !== id)
-              : [...state.conditionIds, id],
-          })
-        }
+      <VehicleOptionsSelector
+        selected={state.vehicleOptionKeys}
+        onChange={(keys) => patch({ vehicleOptionKeys: keys })}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
+import { buildSelectedOptionGroups, type OptionGroup } from "@/lib/ads/vehicle-options";
 import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { normalizeVehicleGalleryImages } from "@/lib/vehicle/detail-utils";
@@ -70,6 +71,13 @@ export type VehicleDetail = {
   optionalItems: string[];
   safetyItems: string[];
   comfortItems: string[];
+  /**
+   * Opcionais selecionados pelo anunciante, agrupados por categoria
+   * (Conforto/Dirigibilidade/Segurança), categorias vazias omitidas. Vazio
+   * quando o anúncio não tem opcionais salvos — nesse caso a UI cai no bloco
+   * derivado (`optionalItems`).
+   */
+  vehicleOptionGroups: OptionGroup[];
   sellerNotes: string;
   seller: SellerInfo;
 };
@@ -517,6 +525,7 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     optionalItems: buildOptionalItems(ad),
     safetyItems: buildSafetyItems(),
     comfortItems: buildComfortItems(ad),
+    vehicleOptionGroups: buildSelectedOptionGroups(ad.vehicle_options),
     sellerNotes:
       "Confirme com o anunciante as condições do veículo, opcionais, documentação e disponibilidade antes de fechar negócio.",
     seller,

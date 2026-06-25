@@ -41,8 +41,17 @@ function pickEditablePayload(raw: unknown): UpdateOwnedAdPayload {
   if (body.mileage !== undefined && body.mileage !== null && body.mileage !== "") {
     payload.mileage = Number(body.mileage);
   }
+  // Opcionais: aceita array de keys ou objeto agrupado; o backend valida as
+  // keys contra o catálogo. Presença (mesmo lista vazia) permite LIMPAR.
+  if (Array.isArray(body.vehicle_options) || isPlainObject(body.vehicle_options)) {
+    payload.vehicle_options = body.vehicle_options as UpdateOwnedAdPayload["vehicle_options"];
+  }
 
   return payload;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export async function GET(request: NextRequest, { params }: Params) {

@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
+import VehicleOptionsGroups from "@/components/vehicle/VehicleOptionsGroups";
 
 /**
  * PR I — VehicleSpecs refatorado para tokens DS.
@@ -105,8 +106,24 @@ export default function VehicleSpecs({ vehicle, aiInsights }: VehicleSpecsProps)
         </div>
       </Card>
 
+      {vehicle.vehicleOptionGroups.length > 0 ? (
+        <Card variant="elevated" padding="lg" as="section">
+          <p className="text-xs font-bold uppercase tracking-wideish text-primary">Equipamentos</p>
+          <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-cnc-text-strong md:text-3xl">
+            Opcionais do veículo
+          </h2>
+          <div className="mt-5">
+            <VehicleOptionsGroups groups={vehicle.vehicleOptionGroups} />
+          </div>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-4">
-        <ItemList title="Destaques" items={vehicle.optionalItems} />
+        {/* Fallback derivado: só quando o anúncio NÃO tem opcionais salvos,
+            para não duplicar com o card categorizado acima. */}
+        {vehicle.vehicleOptionGroups.length === 0 ? (
+          <ItemList title="Destaques" items={vehicle.optionalItems} />
+        ) : null}
         <ItemList title="Itens de segurança" items={vehicle.safetyItems} />
         <ItemList title="Conforto" items={vehicle.comfortItems} />
         {marketInsights.length > 0 ? (

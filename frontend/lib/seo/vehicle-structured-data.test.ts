@@ -37,6 +37,7 @@ function vehicle(overrides: Partial<VehicleDetail> = {}): VehicleDetail {
     optionalItems: [],
     safetyItems: [],
     comfortItems: [],
+    vehicleOptionGroups: [],
     sellerNotes: "",
     seller: { type: "private", name: "João" },
     ...overrides,

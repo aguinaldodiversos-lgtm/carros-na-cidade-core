@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { validateCreateAdPayload } from "../../src/modules/ads/ads.validators.js";
+import {
+  validateCreateAdPayload,
+  validateUpdateAdPayload,
+} from "../../src/modules/ads/ads.validators.js";
 
 const basePayload = {
   title: "Carro teste",
@@ -74,5 +77,45 @@ describe("validateCreateAdPayload", () => {
       expect(data.fipe_code).toBeUndefined();
       expect(data.fipe_reference_month).toBeUndefined();
     });
+  });
+
+  describe("vehicle_options (opcionais)", () => {
+    it("normaliza lista achatada para objeto agrupado + descarta keys inválidas", () => {
+      const data = validateCreateAdPayload({
+        ...basePayload,
+        vehicle_options: ["ar_condicionado", "freios_abs", "key_invalida"],
+      });
+      expect(data.vehicle_options).toEqual({
+        comfort: ["ar_condicionado"],
+        safety: ["freios_abs"],
+      });
+    });
+
+    it("payload sem vehicle_options NÃO injeta o campo (não toca o que já existe)", () => {
+      const data = validateCreateAdPayload({ ...basePayload });
+      expect(Object.prototype.hasOwnProperty.call(data, "vehicle_options")).toBe(false);
+    });
+  });
+});
+
+describe("validateUpdateAdPayload — vehicle_options", () => {
+  it("normaliza no update (parcial) e reagrupa por categoria canônica", () => {
+    const data = validateUpdateAdPayload({
+      vehicle_options: { safety: ["ar_condicionado"], drivability: ["cambio_automatico"] },
+    });
+    expect(data.vehicle_options).toEqual({
+      comfort: ["ar_condicionado"],
+      drivability: ["cambio_automatico"],
+    });
+  });
+
+  it("vehicle_options: [] limpa os opcionais (objeto vazio)", () => {
+    const data = validateUpdateAdPayload({ vehicle_options: [] });
+    expect(data.vehicle_options).toEqual({});
+  });
+
+  it("update sem vehicle_options não inclui o campo", () => {
+    const data = validateUpdateAdPayload({ price: 1000 });
+    expect(Object.prototype.hasOwnProperty.call(data, "vehicle_options")).toBe(false);
   });
 });

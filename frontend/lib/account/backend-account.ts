@@ -41,6 +41,8 @@ export type OwnedAdEditable = {
   below_fipe: boolean;
   slug: string | null;
   images: string[];
+  /** Opcionais agrupados por categoria (comfort/drivability/safety). */
+  vehicle_options: Record<string, string[]>;
 };
 
 type OwnedAdResponse = {
@@ -58,6 +60,11 @@ export type UpdateOwnedAdPayload = {
   price?: number;
   description?: string | null;
   mileage?: number;
+  /**
+   * Opcionais: lista achatada de keys OU objeto agrupado. O backend
+   * (ad-options.catalog) reagrupa, faz allowlist e descarta keys inválidas.
+   */
+  vehicle_options?: string[] | Record<string, string[]>;
 };
 
 type PaymentCheckoutResponse = {

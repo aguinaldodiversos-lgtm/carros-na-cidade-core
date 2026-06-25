@@ -103,4 +103,35 @@ describe("updateAd — guard de status editável", () => {
     expect(result).toBeTruthy();
     expect(persistence.executeAdUpdate).toHaveBeenCalledTimes(1);
   });
+
+  it("vehicle_options é editável em active (não é campo estrutural)", async () => {
+    adsRepository.findOwnerContextById.mockResolvedValue({
+      id: "ad-1",
+      advertiser_user_id: "owner-id",
+      status: "active",
+    });
+
+    const result = await updateAd(
+      "ad-1",
+      { vehicle_options: { comfort: ["ar_condicionado"] } },
+      OWNER
+    );
+    expect(result).toBeTruthy();
+    expect(persistence.executeAdUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("dono em sold NÃO pode editar vehicle_options → 409", async () => {
+    adsRepository.findOwnerContextById.mockResolvedValue({
+      id: "ad-1",
+      advertiser_user_id: "owner-id",
+      status: "sold",
+    });
+
+    let err;
+    await updateAd("ad-1", { vehicle_options: { safety: ["freios_abs"] } }, OWNER).catch(
+      (e) => (err = e)
+    );
+    expect(err?.statusCode).toBe(409);
+    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
+  });
 });

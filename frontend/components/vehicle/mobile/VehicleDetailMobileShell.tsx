@@ -13,6 +13,7 @@ import { buildFinanceLink, buildVehicleWhatsappHref } from "@/lib/vehicle/detail
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
+import VehicleOptionsGroups from "@/components/vehicle/VehicleOptionsGroups";
 
 import MobileHero from "./MobileHero";
 import MobileTopBar from "./MobileTopBar";
@@ -227,7 +228,18 @@ export default function VehicleDetailMobileShell({
         </section>
 
         {/* ---- Opcionais ---- */}
-        {vehicle.optionalItems?.length ? (
+        {vehicle.vehicleOptionGroups.length > 0 ? (
+          // Opcionais selecionados pelo anunciante, agrupados por categoria.
+          <section aria-label="Opcionais do veículo" className="px-4 pt-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <h3 className="text-[15px] font-extrabold text-slate-900">Opcionais do veículo</h3>
+              <div className="mt-3">
+                <VehicleOptionsGroups groups={vehicle.vehicleOptionGroups} />
+              </div>
+            </div>
+          </section>
+        ) : vehicle.optionalItems?.length ? (
+          // Fallback derivado (anúncios sem opcionais salvos ainda).
           <section aria-label="Opcionais do veículo" className="px-4 pt-5">
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="text-[15px] font-extrabold text-slate-900">Opcionais do veículo</h3>

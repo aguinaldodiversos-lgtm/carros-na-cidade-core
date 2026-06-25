@@ -8,7 +8,6 @@ import type { DashboardPayload } from "@/lib/dashboard-types";
 import type { SessionAccountType } from "@/lib/auth/redirects";
 import SellWizardLayout from "./new-ad-wizard/SellWizardLayout";
 import {
-  StepConditions,
   StepFinalize,
   StepHighlight,
   StepListingInfo,
@@ -64,8 +63,7 @@ const INITIAL_FORM: WizardFormState = {
   whatsapp: "",
   phone: "",
   acceptTerms: false,
-  optionalIds: [],
-  conditionIds: [],
+  vehicleOptionKeys: [],
   boostOptionId: null,
   draftPhotoUrls: [],
 };
@@ -75,7 +73,7 @@ const INITIAL_FORM: WizardFormState = {
  *   0 — Veículo   (StepVehicle)
  *   1 — Preço     (StepListingInfo)
  *   2 — Fotos     (StepPhotos)
- *   3 — Descrição (StepOptionals + StepConditions — sem campos obrigatórios)
+ *   3 — Descrição (StepOptionals — seletor de opcionais, sem campos obrigatórios)
  *   4 — Revisão   (StepFinalize + StepHighlight — exige UF/cidade/termos)
  */
 function validateStep(step: number, form: WizardFormState): string | null {
@@ -445,8 +443,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
       payload.append("description", form.description);
       payload.append("acceptTerms", form.acceptTerms ? "true" : "false");
       payload.append("armored", form.armored ? "true" : "false");
-      payload.append("optionalFeatures", JSON.stringify(form.optionalIds));
-      payload.append("conditionFlags", JSON.stringify(form.conditionIds));
+      payload.append("vehicleOptions", JSON.stringify(form.vehicleOptionKeys));
       if (form.boostOptionId) {
         payload.append("boostOptionId", form.boostOptionId);
       }
@@ -665,7 +662,6 @@ export default function NewAdWizardClient({ initialType }: Props) {
       {step === 3 ? (
         <div className="space-y-10">
           <StepOptionals state={form} patch={patch} />
-          <StepConditions state={form} patch={patch} />
         </div>
       ) : null}
       {step === 4 ? (

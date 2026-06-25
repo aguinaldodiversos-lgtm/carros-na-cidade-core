@@ -6,6 +6,7 @@ import {
   transmissionZodField,
 } from "./ads.vehicle-fields.zod.js";
 import { VEHICLE_IMAGE_MAX_FILES } from "./ads.upload.constants.js";
+import { normalizeVehicleOptions } from "./ad-options.catalog.js";
 
 /**
  * Contrato de criação de anúncio.
@@ -70,9 +71,34 @@ const CreateAdSchema = z.object({
    */
   fipe_reference_month: z.string().trim().min(1).max(64).optional().nullable(),
   vehicle_type: z.enum(["carros", "motos", "caminhoes"]).optional().nullable(),
+  /**
+   * Opcionais do veículo. Aceita lista achatada de keys OU objeto agrupado
+   * por categoria — `normalizeVehicleOptions` (catálogo) reagrupa, faz
+   * allowlist das keys e descarta desconhecidas. A validação Zod aqui é só
+   * de forma/limite (anti-abuso); a fonte da verdade das keys é o catálogo.
+   */
+  vehicle_options: z
+    .union([
+      z.array(z.string().max(64)).max(300),
+      z.record(z.string().max(32), z.array(z.string().max(64)).max(300)),
+    ])
+    .optional()
+    .nullable(),
 });
 
 const UpdateAdSchema = CreateAdSchema.partial();
+
+/**
+ * Aplica a normalização do catálogo ao campo `vehicle_options` (quando
+ * presente), no lugar — garante que só keys válidas, agrupadas por categoria
+ * canônica, cheguem à persistência. Compartilhado por create e update.
+ */
+function normalizeOptionsInPlace(data) {
+  if (data && Object.prototype.hasOwnProperty.call(data, "vehicle_options")) {
+    data.vehicle_options = normalizeVehicleOptions(data.vehicle_options);
+  }
+  return data;
+}
 
 export function validateAdIdentifier(value) {
   const identifier = String(value || "").trim();
@@ -101,7 +127,7 @@ export function validateCreateAdPayload(payload) {
     throw new AppError("Payload de anúncio inválido", 400, true, result.error.flatten());
   }
 
-  return result.data;
+  return normalizeOptionsInPlace(result.data);
 }
 
 export function validateUpdateAdPayload(payload) {
@@ -111,5 +137,5 @@ export function validateUpdateAdPayload(payload) {
     throw new AppError("Payload de atualização inválido", 400, true, result.error.flatten());
   }
 
-  return result.data;
+  return normalizeOptionsInPlace(result.data);
 }

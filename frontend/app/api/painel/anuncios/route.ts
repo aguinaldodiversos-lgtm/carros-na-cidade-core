@@ -70,6 +70,9 @@ function parsePublishWizardForm(source: FormData): PublishWizardInput {
     title: firstText(source, "title"),
     description: firstText(source, "description"),
     acceptTerms: toBoolean(firstText(source, "acceptTerms")),
+    // Opcionais: array JSON de keys. O backend valida contra o catálogo
+    // (ad-options.catalog) e descarta keys desconhecidas.
+    vehicleOptionKeys: parseJsonStringArray(firstText(source, "vehicleOptions")),
   };
 }
 
@@ -77,6 +80,20 @@ function uniqueNonEmptyStrings(values: string[]): string[] {
   return Array.from(
     new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))
   );
+}
+
+/** Parse genérico de um campo FormData contendo um array JSON de strings. */
+function parseJsonStringArray(raw: string): string[] {
+  if (!raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return uniqueNonEmptyStrings(
+      parsed.filter((value): value is string => typeof value === "string")
+    );
+  } catch {
+    return [];
+  }
 }
 
 function parseDraftPhotoUrls(raw: string): string[] {

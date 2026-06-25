@@ -1,6 +1,7 @@
 import db from "../../infrastructure/database/db.js";
 import { normalizeAdVehicleFieldsForPersistence } from "./ads.storage-normalize.js";
 import { AD_STATUS } from "./ads.canonical.constants.js";
+import { normalizeVehicleOptions } from "./ad-options.catalog.js";
 
 const UPDATE_FIELDS = [
   "title",
@@ -19,6 +20,7 @@ const UPDATE_FIELDS = [
   "transmission",
   "below_fipe",
   "images",
+  "vehicle_options",
   "highlight_until",
   "plan",
   "status",
@@ -54,12 +56,13 @@ export async function createAd(data) {
       status,
       plan,
       slug,
+      vehicle_options,
       search_vector,
       created_at,
       updated_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,$21::jsonb,
       to_tsvector('portuguese',
         COALESCE($9,'') || ' ' || COALESCE($10,'') || ' ' || COALESCE($2,'') || ' ' || COALESCE($3,'')
       ),
@@ -89,6 +92,7 @@ export async function createAd(data) {
     row.status || AD_STATUS.ACTIVE,
     row.plan || "free",
     row.slug,
+    JSON.stringify(normalizeVehicleOptions(row.vehicle_options)),
   ];
 
   const { rows } = await db.query(query, values);
@@ -174,8 +178,15 @@ export async function updateAd(id, data) {
 
   for (const field of UPDATE_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(normalized, field)) {
-      fields.push(`${field} = $${index++}`);
-      values.push(normalized[field]);
+      if (field === "vehicle_options") {
+        // JSONB: re-normaliza (allowlist do catálogo) + serializa + cast.
+        // Defesa em profundidade — não confia que o caller já validou.
+        fields.push(`${field} = $${index++}::jsonb`);
+        values.push(JSON.stringify(normalizeVehicleOptions(normalized[field])));
+      } else {
+        fields.push(`${field} = $${index++}`);
+        values.push(normalized[field]);
+      }
     }
   }
 

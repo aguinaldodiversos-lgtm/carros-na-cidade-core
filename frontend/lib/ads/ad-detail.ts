@@ -62,6 +62,12 @@ export interface PublicAdDetail {
   thumbnail?: string | null;
   photo?: string | null;
   images?: string[] | string | Record<string, unknown>[] | null;
+  /**
+   * Opcionais do veículo (jsonb agrupado por categoria, vindo do backend).
+   * Forma tolerada: objeto agrupado, array de keys, string JSON ou null.
+   * Interpretado por `buildSelectedOptionGroups` (lib/ads/vehicle-options).
+   */
+  vehicle_options?: Record<string, string[]> | string[] | string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -205,6 +211,7 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
     thumbnail: toNullableText(item.thumbnail ?? item.thumb),
     photo: toNullableText(item.photo),
     images,
+    vehicle_options: (item.vehicle_options ?? null) as PublicAdDetail["vehicle_options"],
     created_at: toNullableText(item.created_at ?? item.createdAt),
     updated_at: toNullableText(item.updated_at ?? item.updatedAt),
   };

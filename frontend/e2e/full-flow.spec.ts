@@ -330,8 +330,7 @@ test.describe.serial("3 — Upload de fotos no wizard [P2]", () => {
           whatsapp: "",
           phone: "",
           acceptTerms: false,
-          optionalIds: [],
-          conditionIds: [],
+          vehicleOptionKeys: [],
           boostOptionId: null,
           draftPhotoUrls: [],
         });
