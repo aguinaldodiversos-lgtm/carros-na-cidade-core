@@ -1,0 +1,11 @@
+===== validação 2026-05-24 — estado pré-deploy (Render ainda não propagou b83fe67e) =====
+
+Local HEAD: b83fe67e788ba8e316df6c87a50430dc9bdc4540
+origin/main: b83fe67e788ba8e316df6c87a50430dc9bdc4540
+
+EVIDÊNCIA: /veiculo/anuncio-inexistente-zzz-validacao-2026-05-24
+HTTP STATUS: 200 (esperado pós-deploy: 404)
+<title>: Veículo Não Encontrado 2024 à venda em São Paulo | Carros na Cidade
+<h2>: Veículo não encontrado  (vindo de VehicleDetailMobileShell renderizando buildFallbackVehicle)
+
+CONCLUSÃO: commit b83fe67e está no origin/main mas Render ainda serve build anterior.
