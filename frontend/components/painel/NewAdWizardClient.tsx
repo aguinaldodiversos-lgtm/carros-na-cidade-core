@@ -22,6 +22,7 @@ import {
   type SellerType,
 } from "./new-ad-wizard/types";
 import { parseCurrency } from "./new-ad-wizard/currency";
+import { resolveInitialStep } from "./new-ad-wizard/resolve-initial-step";
 import CompleteProfileGate from "./CompleteProfileGate";
 
 type Props = {
@@ -117,10 +118,6 @@ function buildTitle(form: WizardFormState) {
   return t || "Novo anúncio";
 }
 
-function clampStep(value: number) {
-  return Math.min(Math.max(value, 0), STEP_COUNT - 1);
-}
-
 function publishReasonRequiresProfileCompletion(reason: string | null | undefined) {
   const normalized = String(reason || "").toLowerCase();
   if (!normalized) return false;
@@ -187,14 +184,10 @@ export default function NewAdWizardClient({ initialType }: Props) {
       const parsed = raw ? (JSON.parse(raw) as Partial<WizardFormState>) : {};
       const params = new URLSearchParams(window.location.search);
       const tipo = params.get("tipo");
-      const stepParam = params.get("step");
-      const n = stepParam ? parseInt(stepParam, 10) : NaN;
-      const urlHasStep = Number.isFinite(n) && n >= 1 && n <= STEP_COUNT;
-      const urlStep = urlHasStep
-        ? n - 1
-        : typeof parsed.step === "number"
-          ? clampStep(parsed.step)
-          : 0;
+      // O passo inicial vem APENAS da URL (`?step=`); o rascunho persistido
+      // pré-preenche os campos, mas não reabre o wizard no meio do fluxo
+      // (corrige "anúncio começando no passo Preço"). Ver resolve-initial-step.
+      const urlStep = resolveInitialStep(params.get("step"));
 
       setForm({
         ...INITIAL_FORM,
@@ -412,9 +405,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
 
   function redirectAfterPublish(moderationStatus: string | null, backendRedirect: string) {
     const defaultRedirect =
-      sessionAccountType === "CNPJ"
-        ? "/dashboard-loja/meus-anuncios"
-        : "/dashboard/meus-anuncios";
+      sessionAccountType === "CNPJ" ? "/dashboard-loja/meus-anuncios" : "/dashboard/meus-anuncios";
     const redirectTo = backendRedirect.trim() ? backendRedirect : defaultRedirect;
     const delay = moderationStatus === "pending_review" ? 2400 : 1200;
     setTimeout(() => router.push(redirectTo), delay);
@@ -562,8 +553,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
    * e o usuário é levado ao painel com instrução amigável — sem bypass.
    */
   async function publishWithBoost() {
-    const boostId =
-      boostOptions.find((b) => b.days === 7)?.id ?? boostOptions[0]?.id ?? null;
+    const boostId = boostOptions.find((b) => b.days === 7)?.id ?? boostOptions[0]?.id ?? null;
     const r = await runPublish({ boostOptionId: boostId });
     if (!r.ok) return;
 
