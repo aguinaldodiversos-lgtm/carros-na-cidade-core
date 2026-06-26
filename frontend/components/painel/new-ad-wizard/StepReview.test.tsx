@@ -56,7 +56,13 @@ type Handlers = {
 };
 
 /** Harness com estado real para refletir patch() (checkbox de termos etc.). */
-function Harness({ initial, handlers }: { initial?: Partial<WizardFormState>; handlers?: Handlers }) {
+function Harness({
+  initial,
+  handlers,
+}: {
+  initial?: Partial<WizardFormState>;
+  handlers?: Handlers;
+}) {
   const [state, setState] = useState<WizardFormState>(makeState(initial));
   return (
     <StepReview
@@ -86,9 +92,7 @@ describe("StepReview — renderização", () => {
   it("mostra o título comercial e o subtítulo", () => {
     render(<Harness />);
     expect(screen.getByText("Seu anúncio está quase no ar")).toBeTruthy();
-    expect(
-      screen.getByText(/Revise os dados e escolha como deseja publicar/i)
-    ).toBeTruthy();
+    expect(screen.getByText(/Revise os dados e escolha como deseja publicar/i)).toBeTruthy();
   });
 
   it("mostra resumo do veículo com preço, km e cidade", () => {
@@ -96,7 +100,17 @@ describe("StepReview — renderização", () => {
     expect(screen.getByText(/2025 Hyundai HB20 Sense 1\.0 Flex 12V/)).toBeTruthy();
     expect(screen.getByText("R$ 69.990,00")).toBeTruthy();
     expect(screen.getByText("35.000 km")).toBeTruthy();
-    expect(screen.getByText("Atibaia/SP")).toBeTruthy();
+    expect(screen.getByText("Atibaia / SP")).toBeTruthy();
+  });
+
+  it("não renderiza mais o hero/card azul envolvendo o título (spec §2)", () => {
+    const { container } = render(<Harness />);
+    const title = screen.getByTestId("review-title");
+    // Título fica sobre o fundo claro (texto escuro), não dentro de um hero azul.
+    expect(title.className).toContain("text-cnc-text-strong");
+    expect(title.className).not.toContain("text-white");
+    // Nenhum elemento usa o gradiente azul do hero antigo.
+    expect(container.querySelector('[class*="linear-gradient"]')).toBeNull();
   });
 
   it("mostra qualidade 100% / Muito boa para anúncio completo", () => {
@@ -112,9 +126,7 @@ describe("StepReview — renderização", () => {
     expect(screen.getByText(/\/1000/)).toBeTruthy();
     expect(screen.getByText(/Estado \(UF\)/)).toBeTruthy();
     expect(screen.getAllByText(/Cidade/).length).toBeGreaterThan(0);
-    expect(
-      screen.getByText(/Confirmo que as informações são verdadeiras/)
-    ).toBeTruthy();
+    expect(screen.getByText(/Confirmo que as informações são verdadeiras/)).toBeTruthy();
   });
 
   it("renderiza os 4 planos na ordem correta com os valores corretos", () => {
