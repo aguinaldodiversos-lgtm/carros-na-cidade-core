@@ -199,7 +199,26 @@ export default async function RootLayout({ children }: RootLayoutProps) {
             >
               <PublicHeader />
             </Suspense>
-            <main id="main-content" className="flex-1">
+            {/*
+              `min-h-[calc(100vh-3.5rem)]`: reserva exatamente a área de
+              conteúdo abaixo do header (sticky, ~3.5rem/57px).
+
+              Páginas públicas que adiam o conteúdo para um boundary de
+              Suspense (ex.: /tabela-fipe — o conteúdo do `<main>` no flush
+              inicial é só `<template id="P:1">`, vazio) faziam o `<footer>`,
+              que é renderizado fora de qualquer Suspense, aparecer durante a
+              janela de streaming, ANTES do conteúdo chegar ao `<main>`. Como
+              o `<main>` era só `flex-1`, ele colapsava enquanto vazio e o
+              footer subia para a viewport.
+
+              Reservando ~(100vh - header), o `<main>` vazio ocupa toda a área
+              visível e empurra o footer para a dobra (fora da tela) até o
+              conteúdo (ou skeleton da própria página) chegar. NÃO altera a
+              ordem do HTML (header → main → footer) nem o SEO — é só reserva
+              de espaço vertical. Mantém `flex-1`, então em páginas curtas o
+              footer continua colado ao rodapé (mesmo comportamento de antes).
+            */}
+            <main id="main-content" className="flex-1 min-h-[calc(100vh-3.5rem)]">
               {children}
             </main>
             <PublicFooter />
