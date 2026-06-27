@@ -154,9 +154,81 @@ describe("buildTerritorialMetadata — indexação dinâmica por estoque (2026-0
       activeCount: 0,
     });
     const meta = buildTerritorialMetadata(data, "brand");
-    expect(meta.alternates?.canonical).toBe("https://carrosnacidade.com/cidade/atibaia-sp/marca/fiat");
+    expect(meta.alternates?.canonical).toBe(
+      "https://carrosnacidade.com/cidade/atibaia-sp/marca/fiat"
+    );
     expect(meta.alternates?.canonical).not.toBe("https://carrosnacidade.com/");
     expect(meta.robots).toMatchObject({ index: false, follow: true });
+  });
+});
+
+describe("buildTerritorialMetadata — variante filtrada vem do searchParams, não de data.filters (fix 2026-06-26)", () => {
+  // Payload fiel ao backend real: data.filters carrega o eco dos filtros
+  // INTERNOS (sort:"relevance", limit, free_query_meta…). Antes, isso derrubava
+  // a página em noindex mesmo na URL limpa com estoque. Agora é ignorado.
+  const stockData = {
+    ...baseData,
+    seo: {
+      title: "Fiat Argo em Atibaia",
+      description: "...",
+      canonicalPath: "/cidade/atibaia-sp/marca/fiat/modelo/argo",
+      robots: "index,follow",
+      indexable: true,
+      hasActiveInventory: true,
+      activeCount: 1,
+      noindexReason: null,
+    },
+    filters: {
+      page: 1,
+      limit: 24,
+      sort: "relevance",
+      brand: "Fiat",
+      model: "Argo",
+      city_slug: "atibaia-sp",
+      free_query_meta: { original_q: null, parsed: false, safe: true },
+    },
+  } as unknown as TerritorialPagePayload;
+
+  it("URL LIMPA (searchParams vazio) com estoque → index,follow — apesar de data.filters.sort", () => {
+    expect(buildTerritorialMetadata(stockData, "model", { searchParams: {} }).robots).toMatchObject(
+      {
+        index: true,
+        follow: true,
+      }
+    );
+  });
+
+  it("sem searchParams (undefined) → index (não cai no eco de data.filters)", () => {
+    expect(buildTerritorialMetadata(stockData, "model").robots).toMatchObject({ index: true });
+  });
+
+  it("?sort=price na URL → noindex (variante de ordenação)", () => {
+    expect(
+      buildTerritorialMetadata(stockData, "model", { searchParams: { sort: "price" } }).robots
+    ).toMatchObject({ index: false });
+  });
+
+  it("?page=2 → noindex; ?page=1 → index", () => {
+    expect(
+      buildTerritorialMetadata(stockData, "model", { searchParams: { page: "2" } }).robots
+    ).toMatchObject({ index: false });
+    expect(
+      buildTerritorialMetadata(stockData, "model", { searchParams: { page: "1" } }).robots
+    ).toMatchObject({ index: true });
+  });
+
+  it("filtro arbitrário na query (?cor=preto) → noindex", () => {
+    expect(
+      buildTerritorialMetadata(stockData, "model", { searchParams: { cor: "preto" } }).robots
+    ).toMatchObject({ index: false });
+  });
+
+  it("params de tracking (utm_source, gclid, fbclid) → continua index", () => {
+    expect(
+      buildTerritorialMetadata(stockData, "model", {
+        searchParams: { utm_source: "instagram", gclid: "abc", fbclid: "xyz" },
+      }).robots
+    ).toMatchObject({ index: true });
   });
 });
 

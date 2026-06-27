@@ -31,8 +31,13 @@ export async function generateMetadata({
   searchParams,
 }: CityBelowFipePageProps): Promise<Metadata> {
   const data = await getCityBelowFipePageData(params.slug, searchParams);
+  // Permanece noindex,follow por design e canonicaliza para
+  // /carros-baratos-em/[slug] (a indexável da intenção "abaixo da FIPE"). O
+  // `forceNoindex` torna o noindex explícito — antes dependia, por acidente,
+  // do eco de filtros internos do backend em data.filters (bug 2026-06-26).
   return buildTerritorialMetadata(data, "below_fipe", {
     canonicalPathOverride: transitionCanonicalPath(params.slug),
+    forceNoindex: true,
   });
 }
 

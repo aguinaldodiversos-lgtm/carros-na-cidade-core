@@ -24,7 +24,7 @@ export async function generateMetadata({
 }: CityBrandPageProps): Promise<Metadata> {
   const data = await getCityBrandPageData(params.slug, params.brand, searchParams);
 
-  return buildTerritorialMetadata(data, "brand");
+  return buildTerritorialMetadata(data, "brand", { searchParams });
 }
 
 export default async function CityBrandPage({ params, searchParams }: CityBrandPageProps) {

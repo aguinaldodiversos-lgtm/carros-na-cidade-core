@@ -31,8 +31,13 @@ function transitionCanonicalPath(slug: string): string {
 
 export async function generateMetadata({ params, searchParams }: CityPageProps): Promise<Metadata> {
   const data = await getCityPageData(params.slug, searchParams);
+  // /cidade/[slug] é uma canônica-de-transição: aponta para /carros-em/[slug]
+  // e permanece noindex,follow por design (a indexável é /carros-em). O
+  // `forceNoindex` torna isso explícito — antes dependia, por acidente, do
+  // eco de filtros internos do backend em data.filters (bug 2026-06-26).
   return buildTerritorialMetadata(data, "city", {
     canonicalPathOverride: transitionCanonicalPath(params.slug),
+    forceNoindex: true,
   });
 }
 

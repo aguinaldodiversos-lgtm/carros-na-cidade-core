@@ -49,8 +49,11 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
  * /api/public/cities/atibaia-sp em 2026-05-03):
  *   - seo.title já vem com sufixo "| Carros na Cidade" → exercita stripSiteTitleSuffix
  *   - seo.robots = "index,follow" → backend NÃO força noindex
- *   - filters.sort = "highlight" → shouldIndexTerritorialPage retorna false
- *     (sort/order != null derruba index pra evitar variantes de ordenação no SERP)
+ *   - filters.sort = "highlight" → eco de filtros INTERNOS do backend; desde
+ *     2026-06-26 NÃO derruba mais index (a indexação por variante é decidida
+ *     pelo searchParams real da URL, não por data.filters). O noindex de
+ *     /cidade/[slug] e /abaixo-da-fipe agora vem de `forceNoindex: true`
+ *     explícito nos respectivos page.tsx (são canônicas-de-transição).
  *   - filters.highlight_only / city_slug → keys comportadas
  */
 function buildTerritorialPayload(

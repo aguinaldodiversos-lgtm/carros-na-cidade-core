@@ -100,9 +100,65 @@ function hasMeaningfulFilterValue(value: unknown): boolean {
   return true;
 }
 
+export type TerritorialSearchParams = Record<string, string | string[] | undefined> | undefined;
+
+/**
+ * Parâmetros de tracking de marketing — NÃO criam recorte de conteúdo, então
+ * não disparam noindex. A página continua indexável (o canonical já é a URL
+ * limpa). Ex.: alguém compartilha `?utm_source=instagram` da página canônica.
+ */
+const TRACKING_PARAM_KEYS = new Set<string>([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "gclid",
+  "fbclid",
+  "ref",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+]);
+
+function firstParamValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/**
+ * Uma "variante filtrada" é qualquer URL com query string que produza um
+ * recorte não-canônico: ordenação (`sort`/`order`), paginação (`page>1`) ou
+ * QUALQUER filtro extra. A URL LIMPA (sem query) é a canônica e DEVE indexar.
+ *
+ * CRÍTICO: a fonte é o `searchParams` REAL da URL — NÃO `data.filters`. Este
+ * último é o eco dos filtros INTERNOS que o backend aplica (`sort:"relevance"`,
+ * `limit:24`, `free_query_meta`, `city_slug`…), que não são escolhas do
+ * usuário. Usar `data.filters` marcava TODA página de cluster como noindex
+ * mesmo na URL limpa com estoque ativo (incidente 2026-06-26).
+ */
+function isFilteredSearchView(searchParams: TerritorialSearchParams): boolean {
+  if (!searchParams) return false;
+
+  for (const [key, rawValue] of Object.entries(searchParams)) {
+    const normalizedKey = key.trim().toLowerCase();
+    if (TRACKING_PARAM_KEYS.has(normalizedKey)) continue;
+    if (!hasMeaningfulFilterValue(rawValue)) continue;
+
+    if (normalizedKey === "page") {
+      if (Number(firstParamValue(rawValue)) > 1) return true;
+      continue;
+    }
+
+    // sort, order ou qualquer outro filtro de query → recorte não-canônico.
+    return true;
+  }
+
+  return false;
+}
+
 function shouldIndexTerritorialPage(
   data: TerritorialPagePayload,
-  mode: TerritorialSeoMode
+  searchParams?: TerritorialSearchParams
 ): boolean {
   const seo = data.seo ?? {};
 
@@ -117,51 +173,9 @@ function shouldIndexTerritorialPage(
   if (typeof seo.activeCount === "number" && seo.activeCount <= 0) return false;
   if (seo.noindexReason) return false;
 
-  const filters = data.filters ?? {};
-  const routeOwnedKeys = new Set<string>([
-    "city",
-    "city_id",
-    "city_slug",
-    "slug",
-    "brand",
-    "brand_slug",
-    "model",
-    "model_slug",
-    "mode",
-    "cluster",
-    "type",
-  ]);
-
-  if (mode === "opportunities") {
-    routeOwnedKeys.add("opportunities");
-  }
-
-  if (mode === "below_fipe") {
-    routeOwnedKeys.add("below_fipe");
-  }
-
-  for (const [key, rawValue] of Object.entries(filters)) {
-    if (!hasMeaningfulFilterValue(rawValue)) {
-      continue;
-    }
-
-    const normalizedKey = key.trim().toLowerCase();
-
-    if (normalizedKey === "page") {
-      if (Number(rawValue) > 1) {
-        return false;
-      }
-      continue;
-    }
-
-    if (normalizedKey === "sort" || normalizedKey === "order") {
-      return false;
-    }
-
-    if (!routeOwnedKeys.has(normalizedKey)) {
-      return false;
-    }
-  }
+  // Variante filtrada/ordenada/paginada (pela query da URL) → noindex; a URL
+  // limpa é a única indexável.
+  if (isFilteredSearchView(searchParams)) return false;
 
   return true;
 }
@@ -180,14 +194,20 @@ function shouldIndexTerritorialPage(
 export function buildTerritorialMetadata(
   data: TerritorialPagePayload,
   mode: TerritorialSeoMode,
-  options: { canonicalPathOverride?: string; forceNoindex?: boolean } = {}
+  options: {
+    canonicalPathOverride?: string;
+    forceNoindex?: boolean;
+    searchParams?: TerritorialSearchParams;
+  } = {}
 ): Metadata {
   const siteUrl = getSiteUrl();
   const title = buildMetadataTitle(data);
   const description = buildMetadataDescription(data);
   const canonical = toAbsoluteUrl(options.canonicalPathOverride || data.seo?.canonicalPath || "/");
   const ogImage = resolveOgImage(data);
-  const indexable = options.forceNoindex ? false : shouldIndexTerritorialPage(data, mode);
+  const indexable = options.forceNoindex
+    ? false
+    : shouldIndexTerritorialPage(data, options.searchParams);
   const followable = !String(data.seo?.robots ?? "")
     .toLowerCase()
     .includes("nofollow");
