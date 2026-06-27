@@ -540,8 +540,11 @@ export default function SellPageClient({ content, heroAd }: Props) {
       <div className="mx-auto max-w-[1180px] px-4 pb-20 sm:px-6">
         {/* --------------------------------------------------------------- *
          * FAIXA DE BENEFÍCIOS                                               *
+         * `relative z-10`: a faixa é puxada para cima (-mt) e sobrepõe a    *
+         * borda do hero. Sem stacking explícito, o hero (position:relative) *
+         * pinta POR CIMA da faixa (estática) e corta o topo dos ícones.     *
          * --------------------------------------------------------------- */}
-        <section className="-mt-10 sm:-mt-12">
+        <section className="relative z-10 -mt-10 sm:-mt-12">
           <div className="grid gap-px overflow-hidden rounded-3xl border border-cnc-line bg-cnc-line shadow-premium md:grid-cols-3">
             {content.benefits.map((benefit, i) => {
               const Icon = [IconMapPin, IconWhatsapp, IconBolt][i] ?? IconCheck;
