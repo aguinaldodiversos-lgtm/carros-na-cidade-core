@@ -132,6 +132,21 @@ export const autocompleteRateLimit = rateLimit({
 //   - search         : 20 req/min  (idem)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve o `max` de um limiter por-minuto, com override por env. Mantém o
+ * valor saneado (inteiro positivo) e cap defensivo para evitar configuração
+ * absurda. Exportado para teste unitário.
+ *
+ * @param {string|undefined} rawEnv valor cru de process.env[...]
+ * @param {number} fallback default quando a env é ausente/inválida
+ * @param {number} [cap=5000] teto defensivo
+ */
+export function resolvePerMinuteMax(rawEnv, fallback, cap = 5000) {
+  const parsed = Number.parseInt(String(rawEnv ?? ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, cap);
+}
+
 function buildPerMinuteLimit(prefix, max) {
   return rateLimit({
     windowMs: 60 * 1000,
@@ -157,7 +172,23 @@ export const vehicleImagesRateLimit = buildPerMinuteLimit("vehicle-images", 10);
 export const analyticsRateLimit = buildPerMinuteLimit("analytics", 120);
 export const adsListRateLimit = buildPerMinuteLimit("ads-list", 30);
 export const adsSearchRateLimit = buildPerMinuteLimit("ads-search", 20);
-export const publicCitiesRateLimit = buildPerMinuteLimit("public-cities", 30);
+
+// /api/public/cities/* alimenta as páginas SEO de cluster (cidade, cidade+marca,
+// cidade+marca+modelo) via SSR + metadata, com cache de 60s no BFF. O cap antigo
+// de 30/min (herdado do fix de bandwidth 2026-05-14) era agressivo DEMAIS para
+// estas money pages: quando o SSR não é reconhecido como interno autenticado
+// (UA cnc-internal/1.0 + X-Internal-Token batendo — ver bot-blocker), as
+// chamadas caíam aqui e, sob crawl/tráfego, estouravam 30/min → 429 →
+// X-Robots-Tag noindex → o frontend degradava a página para noindex,follow
+// MESMO com estoque ativo (incidente 2026-06-26). Subimos o default para 200/min
+// (≈3.3 req/s por IP real) — folgado para Googlebot e SSR legítimo, ainda corta
+// scraping sustentado — e tornamos tunável por env. A defesa primária continua
+// sendo o `skip` interno autenticado (token) + bot-blocker; este cap é a rede de
+// segurança para quando o par UA+token não autenticar.
+export const publicCitiesRateLimit = buildPerMinuteLimit(
+  "public-cities",
+  resolvePerMinuteMax(process.env.RATE_LIMIT_PUBLIC_CITIES_MAX, 200)
+);
 export const searchRateLimit = buildPerMinuteLimit("search", 20);
 export const uploadsRateLimit = buildPerMinuteLimit("uploads", 5);
 
