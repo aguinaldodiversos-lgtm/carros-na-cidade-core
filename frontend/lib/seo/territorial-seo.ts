@@ -104,9 +104,18 @@ function shouldIndexTerritorialPage(
   data: TerritorialPagePayload,
   mode: TerritorialSeoMode
 ): boolean {
-  if (data.seo?.robots === "noindex,nofollow") {
+  const seo = data.seo ?? {};
+
+  // ── Fonte de verdade: o backend decide a indexação a partir do estoque
+  //    ativo. O frontend apenas reforça defensivamente para NUNCA indexar
+  //    acidentalmente (página vazia, fallback de erro, sem estoque).
+  if (typeof seo.robots === "string" && seo.robots.toLowerCase().includes("noindex")) {
     return false;
   }
+  if (seo.indexable === false) return false;
+  if (seo.hasActiveInventory === false) return false;
+  if (typeof seo.activeCount === "number" && seo.activeCount <= 0) return false;
+  if (seo.noindexReason) return false;
 
   const filters = data.filters ?? {};
   const routeOwnedKeys = new Set<string>([
@@ -179,7 +188,9 @@ export function buildTerritorialMetadata(
   const canonical = toAbsoluteUrl(options.canonicalPathOverride || data.seo?.canonicalPath || "/");
   const ogImage = resolveOgImage(data);
   const indexable = options.forceNoindex ? false : shouldIndexTerritorialPage(data, mode);
-  const followable = data.seo?.robots !== "noindex,nofollow";
+  const followable = !String(data.seo?.robots ?? "")
+    .toLowerCase()
+    .includes("nofollow");
 
   return {
     metadataBase: new URL(siteUrl),

@@ -4,6 +4,7 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as cityPublicRepository from "./city-public.repository.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
+import { brandModelSlug } from "../../shared/utils/slugify.js";
 
 /* =====================================================
    HELPERS
@@ -73,13 +74,13 @@ function buildInternalLinks(snapshot, brandFacets = [], modelFacets = []) {
     brands: brandFacets.slice(0, 10).map((item) => ({
       brand: item.brand,
       total: Number(item.total || 0),
-      path: `${cityBase}/marca/${encodeURIComponent(String(item.brand).toLowerCase())}`,
+      path: `${cityBase}/marca/${brandModelSlug(item.brand)}`,
     })),
     models: modelFacets.slice(0, 10).map((item) => ({
       brand: item.brand,
       model: item.model,
       total: Number(item.total || 0),
-      path: `${cityBase}/marca/${encodeURIComponent(String(item.brand).toLowerCase())}/modelo/${encodeURIComponent(String(item.model).toLowerCase())}`,
+      path: `${cityBase}/marca/${brandModelSlug(item.brand)}/modelo/${brandModelSlug(item.model)}`,
     })),
   };
 }

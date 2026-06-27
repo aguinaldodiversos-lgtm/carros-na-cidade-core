@@ -1,7 +1,10 @@
+import { brandModelSlug } from "../../shared/utils/slugify.js";
+
+// Slug canônico de marca/modelo (NFD strip + hifenização) — alinhado ao
+// resolvedor das páginas de cluster. Antes era só `toLowerCase()`, o que
+// gerava links como `/marca/land rover` que NUNCA resolviam para a página.
 function toSlugPart(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
+  return brandModelSlug(value);
 }
 
 export function buildCityTerritorialLinks({

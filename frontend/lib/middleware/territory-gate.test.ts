@@ -96,6 +96,28 @@ describe("decideTerritoryGate — bug Next 14.2 (briefing auditoria 2026-05-21)"
     );
   });
 
+  describe("Família territorial /cidade/[slug]/marca/[brand]/modelo/[model] (indexação dinâmica 2026-06-26)", () => {
+    it.each([
+      "/cidade/atibaia-sp",
+      "/cidade/atibaia-sp/marca/fiat",
+      "/cidade/atibaia-sp/marca/fiat/modelo/argo",
+      "/cidade/belo-horizonte-mg/marca/land-rover",
+      "/cidade/atibaia-sp/abaixo-da-fipe",
+      "/cidade/atibaia-sp/oportunidades",
+    ])("%s (cidade válida) → pass (estoque decide noindex no backend)", (pathname) => {
+      expect(decideTerritoryGate(pathname).kind).toBe("pass");
+    });
+
+    it.each([
+      "/cidade/atibaia/marca/fiat",
+      "/cidade/atibaia-zz/marca/fiat/modelo/argo",
+      "/cidade/cidade-falsa-xx",
+      "/cidade/foo",
+    ])("%s (slug de cidade inválido) → block-city-slug-invalid (404 real)", (pathname) => {
+      expect(decideTerritoryGate(pathname).kind).toBe("block-city-slug-invalid");
+    });
+  });
+
   describe("Precedência: rotas que NÃO devem ser capturadas", () => {
     it.each([
       "/carros-usados/regiao/atibaia-sp",

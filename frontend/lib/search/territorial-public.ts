@@ -47,11 +47,22 @@ export interface TerritorialSignals {
   supplyIndex?: number;
 }
 
+export type TerritorialNoindexReason =
+  | "no_active_inventory"
+  | "invalid_brand_model"
+  | "backend_unavailable"
+  | "not_found";
+
 export interface TerritorialSeoPayload {
   title?: string;
   description?: string;
   canonicalPath?: string;
   robots?: string;
+  /** Indexação decidida pelo backend a partir do estoque ativo. */
+  indexable?: boolean;
+  hasActiveInventory?: boolean;
+  activeCount?: number;
+  noindexReason?: TerritorialNoindexReason | string | null;
 }
 
 export interface TerritorialBrandLink {
@@ -165,19 +176,48 @@ function toSearchParams(input?: TerritorialFetchInput): URLSearchParams {
 }
 
 /**
- * Payload mínimo de fallback quando o backend está indisponível ou
- * sob rate limit (429). Mantém a página renderizando com estado vazio
- * em vez de derrubar com 500 — usuário vê "sem ofertas" ao invés de
- * tela de erro.
- *
- * Extrai o slug da cidade do routePath quando possível para que ao
- * menos a heading regional seja preenchida.
+ * Converte o routePath da API no path público canônico equivalente, para que
+ * o canonical do fallback aponte para a PRÓPRIA página (self) e nunca para a
+ * home "/". Ex.:
+ *   /api/public/cities/atibaia-sp/brand/fiat/model/argo
+ *     → /cidade/atibaia-sp/marca/fiat/modelo/argo
  */
-function buildEmptyTerritorialPayload(routePath: string): TerritorialPagePayload {
+export function apiRouteToPublicPath(routePath: string): string | undefined {
+  const match = routePath.match(
+    /\/cities\/([^/?]+)(?:\/brand\/([^/?]+))?(?:\/model\/([^/?]+))?(?:\/(opportunities|below-fipe))?/
+  );
+  if (!match) return undefined;
+
+  const [, slug, brand, model, suffix] = match;
+  if (!slug) return undefined;
+
+  let path = `/cidade/${slug}`;
+  if (brand) path += `/marca/${brand}`;
+  if (brand && model) path += `/modelo/${model}`;
+  if (suffix === "opportunities") path += `/oportunidades`;
+  if (suffix === "below-fipe") path += `/abaixo-da-fipe`;
+  return path;
+}
+
+/**
+ * Payload mínimo de fallback quando o backend está indisponível, sob rate
+ * limit (429) ou retorna 404. Mantém a página renderizando com estado vazio
+ * em vez de derrubar com 500 — usuário vê "sem ofertas" ao invés de erro.
+ *
+ * CRÍTICO p/ SEO (Fase indexação dinâmica 2026-06-26): o `seo` do fallback é
+ * SEMPRE `noindex,follow` com `canonicalPath` = path self (nunca "/"). Antes
+ * o fallback devolvia `seo: {}`, o que fazia `buildTerritorialMetadata` cair
+ * em canonical "/" e robots index — auto-canonicalizando páginas em erro
+ * transitório para a home, indexadas. `noindexReason` explicita a causa.
+ */
+export function buildEmptyTerritorialPayload(
+  routePath: string,
+  noindexReason: TerritorialNoindexReason = "backend_unavailable"
+): TerritorialPagePayload {
   // routePath: /api/public/cities/{slug}[/brand/{brand}[/model/{model}]]
   //          | /api/public/cities/{slug}/opportunities
   //          | /api/public/cities/{slug}/below-fipe
-  const match = routePath.match(/\/cities\/([^/]+)/);
+  const match = routePath.match(/\/cities\/([^/?]+)/);
   const slug = match ? decodeURIComponent(match[1]) : undefined;
   const cityName = slug
     ? slug
@@ -186,13 +226,22 @@ function buildEmptyTerritorialPayload(routePath: string): TerritorialPagePayload
         .join(" ")
     : undefined;
 
+  const canonicalPath = apiRouteToPublicPath(routePath);
+
   return {
     city: slug && cityName ? { id: 0, name: cityName, slug } : undefined,
     brand: null,
     model: null,
     stats: {},
     signals: {},
-    seo: {},
+    seo: {
+      robots: "noindex,follow",
+      canonicalPath,
+      indexable: false,
+      hasActiveInventory: false,
+      activeCount: 0,
+      noindexReason,
+    },
     filters: {},
     sections: {
       ads: [],
@@ -226,23 +275,25 @@ async function fetchTerritorialPage(
   });
 
   if (!response.ok) {
-    // 429 persistente após retries: o rate-limiter do backend está
-    // saturado (tipicamente em SSG/build paralelo). Fazemos graceful
-    // degradation — a página renderiza vazia em vez de quebrar com 500.
-    if (response.status === 429) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[territorial] 429 persistente em ${routePath} — retornando payload vazio para não derrubar a página`
-      );
-      return buildEmptyTerritorialPayload(routePath);
-    }
-    throw new Error(`Falha ao carregar página territorial (${response.status})`);
+    // Degradação graciosa para TODOS os erros: a página nunca cai em 500 nem
+    // em canonical "/". Em vez disso renderiza vazia + noindex,follow, com o
+    // motivo correto. 404 = cidade/combinação inexistente; 429/5xx = backend
+    // saturado ou indisponível (tipicamente SSG/build paralelo ou cold-start).
+    const reason: TerritorialNoindexReason =
+      response.status === 404 ? "not_found" : "backend_unavailable";
+    // eslint-disable-next-line no-console
+    console.error(
+      `[territorial] ${response.status} em ${routePath} — payload vazio noindex (${reason})`
+    );
+    return buildEmptyTerritorialPayload(routePath, reason);
   }
 
   const json = (await response.json()) as TerritorialPageResponse;
 
   if (!json.success || !json.data) {
-    throw new Error("Payload inválido da página territorial");
+    // eslint-disable-next-line no-console
+    console.error(`[territorial] payload inválido em ${routePath} — payload vazio noindex`);
+    return buildEmptyTerritorialPayload(routePath, "backend_unavailable");
   }
 
   return json.data;

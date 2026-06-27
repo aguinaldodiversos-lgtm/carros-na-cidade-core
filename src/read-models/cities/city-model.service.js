@@ -1,98 +1,112 @@
 // src/read-models/cities/city-model.service.js
 
 import { AppError } from "../../shared/middlewares/error.middleware.js";
-import * as cityModelRepository from "./city-model.repository.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
+import { brandModelSlug } from "../../shared/utils/slugify.js";
+import { resolveCityModel } from "./territorial-resolve.service.js";
+import { buildClusterSeo } from "./territorial-cluster.logic.js";
 
-function normalizeSlugPart(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
+/**
+ * Página de cluster cidade + marca + modelo.
+ *
+ * `brand`/`model` chegam como SLUGS da URL. A resolução
+ * (`resolveCityModel`) encontra os valores reais, conta estoque ativo da
+ * combinação e decide a indexação. Cidade inexistente → 404. Combinação sem
+ * estoque ativo → 200 noindex,follow. O filtro exato por slug evita que
+ * "gol" puxe "Golf" tanto na contagem quanto na listagem.
+ */
 export async function getCityModelPage(citySlug, brand, model, query = {}) {
-  const snapshot = await cityModelRepository.getCityModelSnapshot(citySlug, brand, model);
+  const resolution = await resolveCityModel(citySlug, brand, model);
 
-  if (!snapshot || !snapshot.city_id) {
+  if (!resolution.city) {
     throw new AppError("Página de modelo da cidade não encontrada", 404);
   }
 
-  const scopedFilters = {
-    ...query,
-    city_slug: citySlug,
-    brand,
-    model,
-  };
+  const { city, brandSlug, brand: brandAgg, modelSlug, model: modelAgg } = resolution;
 
-  const [adsResult, facetsResult] = await Promise.all([
-    adsService.search(
-      {
-        ...scopedFilters,
-        limit: 24,
-        sort: "relevance",
-      },
-      "public_city_brand_model",
-      { safeMode: true }
-    ),
-    getFacetsWithFilters(
-      {
-        city_slug: citySlug,
-        brand,
-      },
-      { safeMode: true }
-    ),
-  ]);
+  let ads = [];
+  let adsFilters = {};
+  let adsPagination = undefined;
+  let relatedModels = [];
 
-  const relatedModels = (facetsResult?.facets?.models || []).filter(
-    (item) => String(item.brand || "").toLowerCase() === String(brand).toLowerCase()
-  );
+  if (modelAgg.hasActiveInventory) {
+    const scopedFilters = {
+      ...query,
+      city_slug: city.slug,
+      brand: brandAgg.label,
+      model: modelAgg.label,
+    };
+
+    const [adsResult, facetsResult] = await Promise.all([
+      adsService.search(
+        { ...scopedFilters, limit: 24, sort: "relevance" },
+        "public_city_brand_model",
+        { safeMode: true }
+      ),
+      getFacetsWithFilters({ city_slug: city.slug, brand: brandAgg.label }, { safeMode: true }),
+    ]);
+
+    ads = (adsResult.data || []).filter(
+      (ad) =>
+        (!ad.brand || brandModelSlug(ad.brand) === brandSlug) &&
+        (!ad.model || brandModelSlug(ad.model) === modelSlug)
+    );
+    adsFilters = adsResult.filters || {};
+    adsPagination = adsResult.pagination;
+
+    relatedModels = (facetsResult?.facets?.models || []).filter(
+      (item) => brandModelSlug(item.brand) === brandSlug
+    );
+  }
+
+  const cityLabel = `${city.name}${city.state ? ` - ${city.state}` : ""}`;
 
   return {
     city: {
-      id: snapshot.city_id,
-      name: snapshot.city_name,
-      state: snapshot.city_state,
-      slug: snapshot.city_slug,
-      stage: snapshot.city_stage,
+      id: city.id,
+      name: city.name,
+      state: city.state,
+      slug: city.slug,
+      stage: city.stage,
     },
     brand: {
-      name: snapshot.brand,
-      slug: normalizeSlugPart(snapshot.brand),
+      name: brandAgg.label,
+      slug: brandSlug,
     },
     model: {
-      name: snapshot.model,
-      slug: normalizeSlugPart(snapshot.model),
+      name: modelAgg.label,
+      slug: modelSlug,
     },
     stats: {
-      totalAds: Number(snapshot.total_ads || 0),
-      totalHighlightAds: Number(snapshot.total_highlight_ads || 0),
-      totalBelowFipeAds: Number(snapshot.total_below_fipe_ads || 0),
-      minPrice: snapshot.min_price ? Number(snapshot.min_price) : null,
-      maxPrice: snapshot.max_price ? Number(snapshot.max_price) : null,
-      avgPrice: snapshot.avg_price ? Number(snapshot.avg_price) : null,
-      minYear: snapshot.min_year ? Number(snapshot.min_year) : null,
-      maxYear: snapshot.max_year ? Number(snapshot.max_year) : null,
+      totalAds: modelAgg.stats.total,
+      totalHighlightAds: modelAgg.stats.highlight,
+      totalBelowFipeAds: modelAgg.stats.belowFipe,
+      minPrice: modelAgg.stats.minPrice,
+      maxPrice: modelAgg.stats.maxPrice,
+      avgPrice: modelAgg.stats.avgPrice,
+      minYear: modelAgg.stats.minYear,
+      maxYear: modelAgg.stats.maxYear,
     },
-    seo: {
-      title: `${snapshot.brand} ${snapshot.model} em ${snapshot.city_name}${snapshot.city_state ? ` - ${snapshot.city_state}` : ""} | Carros na Cidade`,
-      description: `Encontre anúncios de ${snapshot.brand} ${snapshot.model} em ${snapshot.city_name}. Veja ofertas locais, preços, destaques e oportunidades.`,
-      canonicalPath: `/cidade/${snapshot.city_slug}/marca/${normalizeSlugPart(snapshot.brand)}/modelo/${normalizeSlugPart(snapshot.model)}`,
-      robots: "index,follow",
-    },
-    filters: adsResult.filters || {},
+    seo: buildClusterSeo({
+      canonicalPath: `/cidade/${city.slug}/marca/${brandSlug}/modelo/${modelSlug}`,
+      title: `${brandAgg.label} ${modelAgg.label} em ${cityLabel} | Carros na Cidade`,
+      description: `Encontre anúncios de ${brandAgg.label} ${modelAgg.label} em ${city.name}. Veja ofertas locais, preços, destaques e oportunidades.`,
+      activeCount: modelAgg.activeCount,
+    }),
+    filters: adsFilters,
     sections: {
-      ads: adsResult.data || [],
+      ads,
       relatedModels,
     },
     pagination: {
-      ads: adsResult.pagination,
+      ads: adsPagination,
     },
     internalLinks: buildCityTerritorialLinks({
-      citySlug: snapshot.city_slug,
-      brand: normalizeSlugPart(snapshot.brand),
-      model: normalizeSlugPart(snapshot.model),
+      citySlug: city.slug,
+      brand: brandSlug,
+      model: modelSlug,
       relatedBrands: [],
       relatedModels,
     }),

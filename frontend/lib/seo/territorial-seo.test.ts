@@ -102,6 +102,64 @@ describe("buildTerritorialMetadata — title NÃO duplica sufixo do site", () =>
   });
 });
 
+describe("buildTerritorialMetadata — indexação dinâmica por estoque (2026-06-26)", () => {
+  function withSeo(extra: Record<string, unknown>): TerritorialPagePayload {
+    return { ...baseData, seo: { ...baseData.seo, ...extra } } as TerritorialPagePayload;
+  }
+
+  it("marca COM estoque ativo (index,follow + activeCount>0) → index true, canonical self", () => {
+    const data = withSeo({
+      canonicalPath: "/cidade/atibaia-sp/marca/fiat/modelo/argo",
+      robots: "index,follow",
+      indexable: true,
+      hasActiveInventory: true,
+      activeCount: 5,
+      noindexReason: null,
+    });
+
+    const meta = buildTerritorialMetadata(data, "model");
+    expect(meta.robots).toMatchObject({ index: true, follow: true });
+    expect(meta.alternates?.canonical).toBe(
+      "https://carrosnacidade.com/cidade/atibaia-sp/marca/fiat/modelo/argo"
+    );
+  });
+
+  it("backend manda noindex,follow → index false, follow true", () => {
+    const data = withSeo({ robots: "noindex,follow", hasActiveInventory: false, activeCount: 0 });
+    const meta = buildTerritorialMetadata(data, "brand");
+    expect(meta.robots).toMatchObject({ index: false, follow: true });
+  });
+
+  it("defesa: hasActiveInventory false força noindex mesmo se robots vier index", () => {
+    const data = withSeo({ robots: "index,follow", hasActiveInventory: false, activeCount: 0 });
+    expect(buildTerritorialMetadata(data, "brand").robots).toMatchObject({ index: false });
+  });
+
+  it("defesa: activeCount 0 força noindex", () => {
+    const data = withSeo({ robots: "index,follow", activeCount: 0 });
+    expect(buildTerritorialMetadata(data, "brand").robots).toMatchObject({ index: false });
+  });
+
+  it("defesa: noindexReason presente força noindex", () => {
+    const data = withSeo({ robots: "index,follow", noindexReason: "backend_unavailable" });
+    expect(buildTerritorialMetadata(data, "model").robots).toMatchObject({ index: false });
+  });
+
+  it("fallback de erro (canonical self + noindex) NÃO canonicaliza para home", () => {
+    const data = withSeo({
+      canonicalPath: "/cidade/atibaia-sp/marca/fiat",
+      robots: "noindex,follow",
+      noindexReason: "not_found",
+      hasActiveInventory: false,
+      activeCount: 0,
+    });
+    const meta = buildTerritorialMetadata(data, "brand");
+    expect(meta.alternates?.canonical).toBe("https://carrosnacidade.com/cidade/atibaia-sp/marca/fiat");
+    expect(meta.alternates?.canonical).not.toBe("https://carrosnacidade.com/");
+    expect(meta.robots).toMatchObject({ index: false, follow: true });
+  });
+});
+
 describe("buildTerritorialJsonLd canonical override", () => {
   it("usa data.seo.canonicalPath quando override é omitido", () => {
     const jsonLd = buildTerritorialJsonLd(baseData, "city") as { url?: string };

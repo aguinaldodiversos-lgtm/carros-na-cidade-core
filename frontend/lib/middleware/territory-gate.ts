@@ -40,6 +40,18 @@ const CITY_ROUTE_RE = /^\/carros-em\/([^/]+)\/?$/;
  */
 const LEGACY_STATE_ROUTE_RE = /^\/comprar\/estado\/([^/]+)\/?$/;
 
+/**
+ * Captura o PREFIXO da família territorial `/cidade/[slug]...` — incluindo
+ * `/cidade/[slug]`, `/cidade/[slug]/marca/[brand]`,
+ * `/cidade/[slug]/marca/[brand]/modelo/[model]`, `/abaixo-da-fipe` e
+ * `/oportunidades`. O primeiro segmento é SEMPRE o slug canônico da cidade
+ * (`nome-uf`). Gate estrutural: slug que não termina em UF brasileira real
+ * → 404 HTTP real (evita o soft-404 do Next 14.2.35 para cidade inexistente
+ * estruturalmente). Não valida EXISTÊNCIA no banco (isso fica com o backend,
+ * que devolve noindex,follow quando a cidade existe mas não há estoque).
+ */
+const CITY_TERRITORIAL_PREFIX_RE = /^\/cidade\/([^/]+)(?:\/|$)/;
+
 export function isValidBrUf(raw: string): boolean {
   if (!raw) return false;
   const upper = String(raw).trim().toUpperCase();
@@ -88,6 +100,16 @@ export function decideTerritoryGate(pathname: string): TerritoryGateDecision {
   const cityMatch = CITY_ROUTE_RE.exec(pathname);
   if (cityMatch) {
     const slug = cityMatch[1];
+    const slugUf = extractSlugUf(slug);
+    if (!slugUf || !isValidBrUf(slugUf)) {
+      return { kind: "block-city-slug-invalid", slug };
+    }
+    return { kind: "pass" };
+  }
+
+  const cityTerritorialMatch = CITY_TERRITORIAL_PREFIX_RE.exec(pathname);
+  if (cityTerritorialMatch) {
+    const slug = cityTerritorialMatch[1];
     const slugUf = extractSlugUf(slug);
     if (!slugUf || !isValidBrUf(slugUf)) {
       return { kind: "block-city-slug-invalid", slug };

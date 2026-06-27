@@ -1,87 +1,109 @@
 // src/read-models/cities/city-brand.service.js
 
 import { AppError } from "../../shared/middlewares/error.middleware.js";
-import * as cityBrandRepository from "./city-brand.repository.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
+import { brandModelSlug } from "../../shared/utils/slugify.js";
+import { resolveCityBrand } from "./territorial-resolve.service.js";
+import { buildClusterSeo } from "./territorial-cluster.logic.js";
 
-function normalizeBrandSlug(brand) {
-  return String(brand || "")
-    .trim()
-    .toLowerCase();
-}
-
+/**
+ * Página de cluster cidade + marca.
+ *
+ * `brand` chega como SLUG da URL (ex.: "fiat", "land-rover"), não como o
+ * texto real do anúncio. A resolução (`resolveCityBrand`) encontra os valores
+ * reais de `ads.brand` cujo slug canônico bate exatamente, conta o estoque
+ * ativo e decide a indexação. Cidade inexistente → 404 real (lançado aqui;
+ * o middleware do frontend também faz o gate estrutural). Cidade válida sem
+ * estoque da marca → HTTP 200 noindex,follow com estado vazio útil.
+ */
 export async function getCityBrandPage(citySlug, brand, query = {}) {
-  const snapshot = await cityBrandRepository.getCityBrandSnapshot(citySlug, brand);
+  const resolution = await resolveCityBrand(citySlug, brand);
 
-  if (!snapshot || !snapshot.city_id) {
+  if (!resolution.city) {
     throw new AppError("Página de marca da cidade não encontrada", 404);
   }
 
-  const scopedFilters = {
-    ...query,
-    city_slug: citySlug,
-    brand,
-  };
+  const { city, brandSlug, brand: brandAgg } = resolution;
 
-  const [adsResult, facetsResult] = await Promise.all([
-    adsService.search(
-      {
-        ...scopedFilters,
-        limit: 24,
-        sort: "relevance",
-      },
-      "public_city_brand",
-      { safeMode: true }
-    ),
-    getFacetsWithFilters(scopedFilters, { safeMode: true }),
-  ]);
+  let ads = [];
+  let adsFilters = {};
+  let adsPagination = undefined;
+  let models = [];
+  let relatedBrands = [];
 
-  const models = (facetsResult?.facets?.models || []).filter(
-    (item) => String(item.brand || "").toLowerCase() === String(brand).toLowerCase()
-  );
+  if (brandAgg.hasActiveInventory) {
+    const scopedFilters = {
+      ...query,
+      city_slug: city.slug,
+      // usa o valor REAL resolvido (não o slug) para o filtro do backend
+      brand: brandAgg.label,
+    };
 
-  const relatedBrands = facetsResult?.facets?.brands || [];
+    const [adsResult, facetsResult] = await Promise.all([
+      adsService.search({ ...scopedFilters, limit: 24, sort: "relevance" }, "public_city_brand", {
+        safeMode: true,
+      }),
+      getFacetsWithFilters(scopedFilters, { safeMode: true }),
+    ]);
+
+    // Defesa anti-divergência: a busca usa ILIKE substring, então pode trazer
+    // marcas que apenas CONTÊM o termo. Filtramos pelo slug canônico exato
+    // para nunca exibir ("gol" não traz "Golf"). Anúncios sem brand não são
+    // descartados (não há como reclassificar).
+    ads = (adsResult.data || []).filter(
+      (ad) => !ad.brand || brandModelSlug(ad.brand) === brandSlug
+    );
+    adsFilters = adsResult.filters || {};
+    adsPagination = adsResult.pagination;
+
+    models = (facetsResult?.facets?.models || []).filter(
+      (item) => brandModelSlug(item.brand) === brandSlug
+    );
+    relatedBrands = facetsResult?.facets?.brands || [];
+  }
+
+  const cityLabel = `${city.name}${city.state ? ` - ${city.state}` : ""}`;
 
   return {
     city: {
-      id: snapshot.city_id,
-      name: snapshot.city_name,
-      state: snapshot.city_state,
-      slug: snapshot.city_slug,
-      stage: snapshot.city_stage,
+      id: city.id,
+      name: city.name,
+      state: city.state,
+      slug: city.slug,
+      stage: city.stage,
     },
     brand: {
-      name: snapshot.brand,
-      slug: normalizeBrandSlug(snapshot.brand),
+      name: brandAgg.label,
+      slug: brandSlug,
     },
     stats: {
-      totalAds: Number(snapshot.total_ads || 0),
-      totalHighlightAds: Number(snapshot.total_highlight_ads || 0),
-      totalBelowFipeAds: Number(snapshot.total_below_fipe_ads || 0),
-      minPrice: snapshot.min_price ? Number(snapshot.min_price) : null,
-      maxPrice: snapshot.max_price ? Number(snapshot.max_price) : null,
-      avgPrice: snapshot.avg_price ? Number(snapshot.avg_price) : null,
+      totalAds: brandAgg.stats.total,
+      totalHighlightAds: brandAgg.stats.highlight,
+      totalBelowFipeAds: brandAgg.stats.belowFipe,
+      minPrice: brandAgg.stats.minPrice,
+      maxPrice: brandAgg.stats.maxPrice,
+      avgPrice: brandAgg.stats.avgPrice,
     },
-    seo: {
-      title: `${snapshot.brand} em ${snapshot.city_name}${snapshot.city_state ? ` - ${snapshot.city_state}` : ""} | Carros na Cidade`,
-      description: `Veja ofertas de ${snapshot.brand} em ${snapshot.city_name}. Compare anúncios, modelos disponíveis, destaques e oportunidades locais.`,
-      canonicalPath: `/cidade/${snapshot.city_slug}/marca/${normalizeBrandSlug(snapshot.brand)}`,
-      robots: "index,follow",
-    },
-    filters: adsResult.filters || {},
+    seo: buildClusterSeo({
+      canonicalPath: `/cidade/${city.slug}/marca/${brandSlug}`,
+      title: `${brandAgg.label} em ${cityLabel} | Carros na Cidade`,
+      description: `Veja ofertas de ${brandAgg.label} em ${city.name}. Compare anúncios, modelos disponíveis, destaques e oportunidades locais.`,
+      activeCount: brandAgg.activeCount,
+    }),
+    filters: adsFilters,
     sections: {
-      ads: adsResult.data || [],
+      ads,
       models,
       relatedBrands,
     },
     pagination: {
-      ads: adsResult.pagination,
+      ads: adsPagination,
     },
     internalLinks: buildCityTerritorialLinks({
-      citySlug: snapshot.city_slug,
-      brand: normalizeBrandSlug(snapshot.brand),
+      citySlug: city.slug,
+      brand: brandSlug,
       model: null,
       relatedBrands,
       relatedModels: models,
