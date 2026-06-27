@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import SellPageClient from "@/components/sell/SellPageClient";
 import { getSellPageContent } from "@/lib/sell/sell-page";
+import { getSellHeroAd } from "@/lib/sell/sell-hero-ad";
 
 export const revalidate = 60;
 
@@ -24,7 +25,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AnunciarPage() {
-  const content = await getSellPageContent();
+  // Conteúdo é estático; o anúncio real do hero é best-effort (cai em
+  // prévia honesta se o backend não devolver nada). Buscados em paralelo.
+  const [content, heroAd] = await Promise.all([getSellPageContent(), getSellHeroAd()]);
 
-  return <SellPageClient content={content} />;
+  return <SellPageClient content={content} heroAd={heroAd} />;
 }

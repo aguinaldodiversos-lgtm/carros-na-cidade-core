@@ -4,15 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import type { SellFaq, SellPageContent, SellProfile } from "@/lib/sell/sell-page";
+import type { SellHeroAd } from "@/lib/sell/sell-hero-ad";
 
 type Props = {
   content: SellPageContent;
+  heroAd?: SellHeroAd | null;
 };
 
 /* ----------------------------------------------------------------------------
- * Ícones locais (stroke currentColor para herdar a cor do contexto).
- * Mantidos no próprio componente: são específicos desta landing e não
- * compartilhados com cards globais de veículo.
+ * Ícones locais (stroke/fill currentColor). Específicos desta landing —
+ * não compartilhados com cards globais de veículo.
  * ------------------------------------------------------------------------- */
 
 type IconProps = { className?: string };
@@ -39,6 +40,19 @@ function IconArrowRight({ className = "h-4 w-4" }: IconProps) {
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconBolt({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M13 3L5 13h6l-1 8 8-10h-6l1-8z"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
     </svg>
@@ -84,27 +98,68 @@ function IconMapPin({ className = "h-5 w-5" }: IconProps) {
   );
 }
 
-function IconTag({ className = "h-5 w-5" }: IconProps) {
+function IconCamera({ className = "h-5 w-5" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
       <path
-        d="M4 11.5V5a1 1 0 011-1h6.5a2 2 0 011.4.6l6.5 6.5a2 2 0 010 2.8l-6.6 6.6a2 2 0 01-2.8 0L4.6 12.9A2 2 0 014 11.5z"
+        d="M4 8h3l1.5-2h7L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.7"
         strokeLinejoin="round"
       />
-      <circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" />
+      <circle cx="12" cy="13" r="3.2" stroke="currentColor" strokeWidth="1.7" />
     </svg>
   );
 }
 
-function IconSparkle({ className = "h-5 w-5" }: IconProps) {
+function IconRocket({ className = "h-5 w-5" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
       <path
-        d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"
+        d="M14 4c3 1 5 4 5 8 0 1.5-.5 3-1 4l-3-1-3-3-1-3 1-3c1-.5 1.6-1.2 3-1z"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 14.5L7 17m0 0l-1.5 3 3-1.5M7 17l-2-2 3-1.5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <circle cx="14.5" cy="9.5" r="1.3" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconChat({ className = "h-5 w-5" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4v-4H6a2 2 0 01-2-2V6z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconHeart({ className = "h-5 w-5" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 20s-7-4.4-9.2-8.4C1.3 8.7 2.7 5.5 6 5.5c2 0 3.2 1.2 4 2.4.8-1.2 2-2.4 4-2.4 3.3 0 4.7 3.2 3.2 6.1C19 15.6 12 20 12 20z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconBookmark({ className = "h-5 w-5" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M6 4h12a1 1 0 011 1v15l-7-4-7 4V5a1 1 0 011-1z"
+        stroke="currentColor"
+        strokeWidth="1.7"
         strokeLinejoin="round"
       />
     </svg>
@@ -117,14 +172,27 @@ function IconShield({ className = "h-5 w-5" }: IconProps) {
       <path
         d="M12 3l7 3v5c0 4.4-3 8.2-7 10-4-1.8-7-5.6-7-10V6l7-3z"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.7"
         strokeLinejoin="round"
       />
       <path
         d="M9 12l2 2 4-4"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.7"
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconSparkle({ className = "h-5 w-5" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"
+        stroke="currentColor"
+        strokeWidth="1.7"
         strokeLinejoin="round"
       />
     </svg>
@@ -142,144 +210,191 @@ function IconWhatsapp({ className = "h-5 w-5" }: IconProps) {
 
 /* ------------------------------------------------------------------------- */
 
-function SectionTitle({
-  eyebrow,
-  title,
-  subtitle,
-  align = "left",
-  invert = false,
-}: {
-  eyebrow?: string;
-  title: string;
-  subtitle?: string;
-  align?: "left" | "center";
-  invert?: boolean;
-}) {
+const brl = (value: number) =>
+  value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  });
+
+const km = (value: number) => `${value.toLocaleString("pt-BR")} km`;
+
+/** Renderiza o título do hero com um trecho destacado em azul. */
+function HeroTitle({ title, highlight }: { title: string; highlight: string }) {
+  const index = highlight ? title.indexOf(highlight) : -1;
+  if (index === -1) {
+    return <>{title}</>;
+  }
+  const before = title.slice(0, index);
+  const after = title.slice(index + highlight.length);
   return (
-    <div className={align === "center" ? "mx-auto max-w-[760px] text-center" : "max-w-[720px]"}>
-      {eyebrow ? (
-        <div
-          className={`mb-3 text-[13px] font-bold uppercase tracking-[0.16em] ${
-            invert ? "text-white/80" : "text-primary"
-          }`}
-        >
-          {eyebrow}
-        </div>
-      ) : null}
-      <h2
-        className={`text-[28px] font-extrabold leading-[1.1] tracking-tight sm:text-[38px] ${
-          invert ? "text-white" : "text-cnc-text-strong"
-        }`}
-      >
-        {title}
-      </h2>
-      {subtitle ? (
-        <p
-          className={`mt-4 text-[15px] leading-7 sm:text-[17px] ${
-            invert ? "text-white/85" : "text-cnc-muted"
-          }`}
-        >
-          {subtitle}
-        </p>
-      ) : null}
-    </div>
+    <>
+      {before}
+      <span className="text-primary">{highlight}</span>
+      {after}
+    </>
   );
 }
 
-function FaqItem({ item, open, onToggle }: { item: SellFaq; open: boolean; onToggle: () => void }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-cnc-line bg-white">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-[#f8faff] sm:px-6"
-      >
-        <span className="text-[16px] font-semibold text-cnc-text-strong sm:text-[17px]">
-          {item.question}
-        </span>
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xl font-semibold text-primary transition ${
-            open ? "rotate-45" : ""
-          }`}
-          aria-hidden="true"
-        >
-          +
-        </span>
-      </button>
+/** View-model unificado do card do hero (anúncio real OU prévia honesta). */
+type HeroCardView = {
+  isReal: boolean;
+  badge: string;
+  href: string | null;
+  imageSrc: string;
+  imageAlt: string;
+  title: string;
+  specs: string;
+  price: string | null;
+  location: string | null;
+  belowFipe: boolean;
+  highlight: boolean;
+  fipeRef: string | null;
+};
 
-      {open ? (
-        <div className="border-t border-cnc-line px-5 py-5 text-[15px] leading-7 text-cnc-muted sm:px-6">
-          {item.answer}
-        </div>
-      ) : null}
-    </div>
-  );
+function buildHeroCard(content: SellPageContent, heroAd?: SellHeroAd | null): HeroCardView {
+  if (heroAd) {
+    const specsParts: string[] = [];
+    if (heroAd.year) specsParts.push(String(heroAd.year));
+    if (heroAd.transmission) specsParts.push(heroAd.transmission);
+    if (heroAd.mileage != null) specsParts.push(km(heroAd.mileage));
+    const location = heroAd.city
+      ? `${heroAd.city}${heroAd.state ? `, ${heroAd.state}` : ""}`
+      : null;
+
+    return {
+      isReal: true,
+      badge: "Exemplo de anúncio real",
+      href: heroAd.href,
+      imageSrc: heroAd.imageSrc,
+      imageAlt: heroAd.imageAlt,
+      title: heroAd.title,
+      specs: specsParts.join(" · "),
+      price: heroAd.price != null ? brl(heroAd.price) : null,
+      location,
+      belowFipe: heroAd.belowFipe,
+      highlight: heroAd.highlight,
+      fipeRef: null,
+    };
+  }
+
+  const { mockup } = content.hero;
+  return {
+    isReal: false,
+    badge: "Prévia do anúncio",
+    href: null,
+    imageSrc: mockup.imageSrc,
+    imageAlt: mockup.imageAlt,
+    title: mockup.name,
+    specs: mockup.specs,
+    price: mockup.price,
+    location: mockup.city,
+    belowFipe: mockup.badges.some((b) => b.toLowerCase().includes("fipe")),
+    highlight: mockup.badges.some((b) => b.toLowerCase().includes("destaque")),
+    fipeRef: mockup.fipeRef,
+  };
 }
 
 /**
- * Mockup do anúncio exibido no hero. Reproduz a aparência de um card de
- * veículo real (selos, foto, preço, FIPE, CTA + WhatsApp) para o visitante
- * visualizar como o anúncio dele será apresentado ao comprador. NÃO usa o
- * card global de veículo — é uma ilustração local desta landing.
+ * Card do hero em formato de post/feed social. O elemento visual principal
+ * da página: foto grande no topo, selos, ações sociais e preço. Quando há
+ * anúncio real, o card inteiro linka para o veículo.
  */
-function AdMockup({ mockup }: { mockup: SellPageContent["hero"]["mockup"] }) {
-  return (
-    <div className="relative">
-      <div className="pointer-events-none absolute -right-6 -top-8 hidden h-40 w-40 rounded-full bg-primary/10 blur-3xl lg:block" />
-      <div className="pointer-events-none absolute -bottom-10 -left-6 hidden h-44 w-44 rounded-full bg-cnc-success/10 blur-3xl lg:block" />
+function HeroAdCard({ view }: { view: HeroCardView }) {
+  const body = (
+    <div className="overflow-hidden rounded-[28px] border border-cnc-line bg-white shadow-premium-lg">
+      <div className="relative aspect-[4/3] w-full bg-[#dbe3f0]">
+        <Image
+          src={view.imageSrc}
+          alt={view.imageAlt}
+          fill
+          sizes="(max-width: 1024px) 100vw, 440px"
+          className="object-cover"
+          priority
+        />
 
-      <div className="relative mx-auto max-w-[420px] overflow-hidden rounded-[26px] border border-cnc-line bg-white shadow-premium-lg">
-        <div className="relative aspect-[16/10] w-full bg-[#dbe3f0]">
-          <Image
-            src={mockup.imageSrc}
-            alt={mockup.imageAlt}
-            fill
-            sizes="(max-width: 1024px) 100vw, 420px"
-            className="object-cover"
-            priority
-          />
-          <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-            {mockup.badges.map((badge, i) => (
-              <span
-                key={badge}
-                className={`rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm ${
-                  i === 0 ? "bg-primary" : "bg-cnc-success"
-                }`}
-              >
-                {badge}
-              </span>
-            ))}
-          </div>
+        {/* Selo de credibilidade (real vs prévia) */}
+        <span
+          className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm backdrop-blur ${
+            view.isReal ? "bg-cnc-success text-white" : "bg-white/90 text-cnc-text-strong"
+          }`}
+        >
+          {view.isReal ? <IconCheck className="h-3.5 w-3.5" /> : <IconSparkle className="h-3.5 w-3.5" />}
+          {view.badge}
+        </span>
+
+        {/* Selos do anúncio */}
+        <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+          {view.highlight ? (
+            <span className="rounded-full bg-primary px-3 py-1 text-xs font-bold text-white shadow-sm">
+              Destaque
+            </span>
+          ) : null}
+          {view.belowFipe ? (
+            <span className="rounded-full bg-cnc-success px-3 py-1 text-xs font-bold text-white shadow-sm">
+              Abaixo da FIPE
+            </span>
+          ) : null}
         </div>
 
-        <div className="p-5">
-          <h3 className="text-[18px] font-bold leading-snug text-cnc-text-strong">{mockup.name}</h3>
-          <p className="mt-1 text-[13px] font-medium text-cnc-muted">{mockup.specs}</p>
+        {/* Ação social: salvar (decorativo, ilustra o card real) */}
+        <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-cnc-text-strong shadow-sm backdrop-blur">
+          <IconBookmark className="h-[18px] w-[18px]" />
+        </span>
+      </div>
 
-          <div className="mt-2 flex items-center gap-1.5 text-[13px] text-cnc-muted">
-            <IconMapPin className="h-4 w-4 text-primary" />
-            {mockup.city}
+      <div className="p-5">
+        {/* Barra de ações estilo feed */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-cnc-muted">
+            <IconHeart className="h-[22px] w-[22px]" />
+            <IconChat className="h-[22px] w-[22px]" />
           </div>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e9f8f1] text-cnc-success">
+            <IconWhatsapp className="h-[22px] w-[22px]" />
+          </span>
+        </div>
 
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <div>
+        <h3 className="mt-3 text-[18px] font-bold leading-snug text-cnc-text-strong">{view.title}</h3>
+        {view.specs ? <p className="mt-1 text-[13px] font-medium text-cnc-muted">{view.specs}</p> : null}
+
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <div>
+            {view.price ? (
               <div className="text-[24px] font-extrabold tracking-tight text-cnc-text-strong">
-                {mockup.price}
+                {view.price}
               </div>
-              <div className="text-xs font-medium text-cnc-success">{mockup.fipeRef}</div>
-            </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e9f8f1] text-cnc-success">
-              <IconWhatsapp className="h-6 w-6" />
-            </div>
+            ) : null}
+            {view.fipeRef ? (
+              <div className="text-xs font-medium text-cnc-success">{view.fipeRef}</div>
+            ) : null}
           </div>
-
-          <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white">
-            Ver oferta
-            <IconArrowRight className="h-4 w-4" />
-          </div>
+          {view.location ? (
+            <div className="flex items-center gap-1 text-[13px] font-medium text-cnc-muted">
+              <IconMapPin className="h-4 w-4 text-primary" />
+              {view.location}
+            </div>
+          ) : null}
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="relative mx-auto w-full max-w-[440px]">
+      <div className="pointer-events-none absolute -right-6 -top-8 hidden h-40 w-40 rounded-full bg-primary/10 blur-3xl lg:block" />
+      <div className="pointer-events-none absolute -bottom-10 -left-6 hidden h-44 w-44 rounded-full bg-cnc-success/10 blur-3xl lg:block" />
+      {view.href ? (
+        <Link
+          href={view.href}
+          className="relative block rounded-[28px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          aria-label={`Ver anúncio: ${view.title}`}
+        >
+          {body}
+        </Link>
+      ) : (
+        <div className="relative">{body}</div>
+      )}
     </div>
   );
 }
@@ -287,7 +402,7 @@ function AdMockup({ mockup }: { mockup: SellPageContent["hero"]["mockup"] }) {
 function ProfileCard({ profile }: { profile: SellProfile }) {
   const isLojista = profile.audience === "lojista";
   return (
-    <div className="flex flex-col rounded-3xl border border-cnc-line bg-white p-6 shadow-card transition hover:border-cnc-line-strong hover:shadow-premium sm:p-7">
+    <div className="flex flex-col rounded-3xl border border-cnc-line bg-white p-7 shadow-card transition hover:border-cnc-line-strong hover:shadow-premium sm:p-8">
       <div
         className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${
           isLojista ? "bg-primary-soft text-primary" : "bg-[#e9f8f1] text-cnc-success"
@@ -296,12 +411,11 @@ function ProfileCard({ profile }: { profile: SellProfile }) {
         {isLojista ? <IconStore className="h-6 w-6" /> : <IconCar className="h-6 w-6" />}
       </div>
 
-      <h3 className="mt-5 text-[24px] font-extrabold tracking-tight text-cnc-text-strong sm:text-[26px]">
+      <h3 className="mt-5 text-[24px] font-extrabold tracking-tight text-cnc-text-strong">
         {profile.title}
       </h3>
-      <p className="mt-3 text-[15px] leading-7 text-cnc-muted">{profile.description}</p>
 
-      <ul className="mt-5 space-y-3">
+      <ul className="mt-5 flex-1 space-y-3">
         {profile.bullets.map((bullet) => (
           <li key={bullet} className="flex items-start gap-3 text-[15px] text-cnc-text">
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
@@ -314,7 +428,11 @@ function ProfileCard({ profile }: { profile: SellProfile }) {
 
       <Link
         href={profile.ctaHref}
-        className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(14,98,216,0.25)] transition hover:bg-primary-strong"
+        className={`mt-7 inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-bold transition ${
+          isLojista
+            ? "border border-cnc-line-strong bg-white text-cnc-text-strong hover:border-primary/40 hover:bg-[#f8faff]"
+            : "bg-primary text-white shadow-[0_10px_24px_rgba(14,98,216,0.25)] hover:bg-primary-strong"
+        }`}
       >
         {profile.ctaLabel}
         <IconArrowRight className="h-4 w-4" />
@@ -323,29 +441,61 @@ function ProfileCard({ profile }: { profile: SellProfile }) {
   );
 }
 
-const REASON_ICONS = [IconMapPin, IconSparkle, IconTag, IconWhatsapp, IconCheck, IconStore];
+function FaqItem({ item, open, onToggle }: { item: SellFaq; open: boolean; onToggle: () => void }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-cnc-line bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-[#f8faff]"
+      >
+        <span className="text-[15px] font-semibold text-cnc-text-strong sm:text-[16px]">
+          {item.question}
+        </span>
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xl font-semibold text-primary transition ${
+            open ? "rotate-45" : ""
+          }`}
+          aria-hidden="true"
+        >
+          +
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-cnc-line px-5 py-4 text-[14px] leading-7 text-cnc-muted">
+          {item.answer}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
-export default function SellPageClient({ content }: Props) {
+const STEP_ICONS = [IconCar, IconCamera, IconRocket, IconChat];
+const ASSURANCE_ICONS = [IconSparkle, IconBolt, IconShield, IconMapPin];
+
+export default function SellPageClient({ content, heroAd }: Props) {
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);
   const { hero } = content;
+  const heroCard = buildHeroCard(content, heroAd);
 
   return (
     <main className="min-h-screen bg-cnc-bg">
       {/* ----------------------------------------------------------------- *
-       * HERO — gradiente claro institucional, duas colunas no desktop.     *
+       * HERO                                                               *
        * ----------------------------------------------------------------- */}
       <section className="relative overflow-hidden bg-[linear-gradient(180deg,#eef4ff_0%,#f5f8ff_55%,#f2f3f7_100%)]">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="mx-auto max-w-[1200px] px-4 pb-14 pt-10 sm:px-6 sm:pt-14">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.04fr_0.96fr]">
-            <div className="max-w-[640px]">
+        <div className="mx-auto max-w-[1180px] px-4 pb-16 pt-10 sm:px-6 sm:pt-16">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="max-w-[600px]">
               <span className="inline-flex items-center gap-2 rounded-full border border-cnc-line bg-white px-4 py-1.5 text-[13px] font-bold text-primary shadow-sm">
-                <IconSparkle className="h-4 w-4" />
+                <IconBolt className="h-4 w-4" />
                 {hero.eyebrow}
               </span>
 
-              <h1 className="mt-5 text-[34px] font-extrabold leading-[1.06] tracking-tight text-cnc-text-strong sm:text-[50px]">
-                {hero.title}
+              <h1 className="mt-5 text-[34px] font-extrabold leading-[1.07] tracking-tight text-cnc-text-strong sm:text-[50px]">
+                <HeroTitle title={hero.title} highlight={hero.titleHighlight} />
               </h1>
 
               <p className="mt-5 text-[16px] leading-7 text-cnc-muted sm:text-[18px]">
@@ -370,19 +520,11 @@ export default function SellPageClient({ content }: Props) {
                 </Link>
               </div>
 
-              <p className="mt-4 flex items-center gap-2 text-[13px] font-medium text-cnc-muted">
-                <IconShield className="h-4 w-4 text-cnc-success" />
-                {hero.microcopy}
-              </p>
-
-              <ul className="mt-7 grid gap-2.5 sm:grid-cols-1">
-                {hero.highlights.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-center gap-3 text-[15px] font-medium text-cnc-text"
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
-                      <IconCheck className="h-3.5 w-3.5" />
+              <ul className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2">
+                {hero.microBenefits.map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-[14px] font-semibold text-cnc-text">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-soft text-primary">
+                      <IconCheck className="h-3 w-3" />
                     </span>
                     {item}
                   </li>
@@ -390,25 +532,25 @@ export default function SellPageClient({ content }: Props) {
               </ul>
             </div>
 
-            <AdMockup mockup={hero.mockup} />
+            <HeroAdCard view={heroCard} />
           </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-[1200px] px-4 pb-20 sm:px-6">
+      <div className="mx-auto max-w-[1180px] px-4 pb-20 sm:px-6">
         {/* --------------------------------------------------------------- *
-         * BARRA DE BENEFÍCIOS RÁPIDOS                                       *
+         * FAIXA DE BENEFÍCIOS                                               *
          * --------------------------------------------------------------- */}
-        <section className="-mt-8 sm:-mt-10">
-          <div className="grid gap-px overflow-hidden rounded-3xl border border-cnc-line bg-cnc-line shadow-premium sm:grid-cols-2 lg:grid-cols-4">
+        <section className="-mt-10 sm:-mt-12">
+          <div className="grid gap-px overflow-hidden rounded-3xl border border-cnc-line bg-cnc-line shadow-premium md:grid-cols-3">
             {content.benefits.map((benefit, i) => {
-              const Icon = [IconSparkle, IconMapPin, IconWhatsapp, IconTag][i] ?? IconCheck;
+              const Icon = [IconMapPin, IconWhatsapp, IconBolt][i] ?? IconCheck;
               return (
-                <div key={benefit.title} className="bg-white p-5 sm:p-6">
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary">
-                    <Icon className="h-5 w-5" />
+                <div key={benefit.title} className="bg-white p-6 sm:p-7">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+                    <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mt-4 text-[16px] font-bold text-cnc-text-strong">{benefit.title}</h3>
+                  <h3 className="mt-4 text-[17px] font-bold text-cnc-text-strong">{benefit.title}</h3>
                   <p className="mt-1.5 text-[14px] leading-6 text-cnc-muted">{benefit.description}</p>
                 </div>
               );
@@ -417,49 +559,54 @@ export default function SellPageClient({ content }: Props) {
         </section>
 
         {/* --------------------------------------------------------------- *
-         * POR QUE ANUNCIAR                                                  *
+         * COMO FUNCIONA                                                     *
          * --------------------------------------------------------------- */}
-        <section className="mt-20">
-          <SectionTitle
-            eyebrow="Por que anunciar aqui"
-            title="Por que anunciar no Carros na Cidade?"
-            subtitle="Tudo o que o seu anúncio ganha em um só lugar: mais gente da sua região, boa apresentação e contato direto com quem quer comprar."
-            align="center"
-          />
+        <section className="mt-20 text-center">
+          <h2 className="text-[28px] font-extrabold tracking-tight text-cnc-text-strong sm:text-[38px]">
+            Anunciar é simples e rápido
+          </h2>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {content.reasons.map((item, i) => {
-              const Icon = REASON_ICONS[i] ?? IconCheck;
-              return (
-                <div
-                  key={item.title}
-                  className="rounded-3xl border border-cnc-line bg-white p-6 shadow-card transition hover:border-cnc-line-strong hover:shadow-premium"
-                >
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-                    <Icon className="h-6 w-6" />
+          <div className="relative mt-12">
+            <div className="absolute left-[12%] right-[12%] top-7 hidden border-t border-dashed border-cnc-line-strong md:block" />
+            <div className="relative grid gap-8 md:grid-cols-4">
+              {content.steps.map((item, i) => {
+                const Icon = STEP_ICONS[i] ?? IconCheck;
+                return (
+                  <div
+                    key={item.step}
+                    className="flex items-start gap-4 text-left md:flex-col md:items-center md:text-center"
+                  >
+                    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_8px_20px_rgba(14,98,216,0.25)]">
+                      <Icon className="h-6 w-6" />
+                      <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-cnc-text-strong text-[11px] font-bold">
+                        {i + 1}
+                      </span>
+                    </div>
+                    <div className="md:mt-4">
+                      <h3 className="text-[17px] font-bold text-cnc-text-strong">{item.title}</h3>
+                      <p className="mt-1 text-[14px] leading-6 text-cnc-muted">{item.description}</p>
+                    </div>
                   </div>
-                  <h3 className="mt-5 text-[19px] font-bold tracking-tight text-cnc-text-strong">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2.5 text-[15px] leading-7 text-cnc-muted">{item.description}</p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </section>
 
         {/* --------------------------------------------------------------- *
-         * ESCOLHA SEU PERFIL (consolida vantagens particular/lojista)      *
+         * ESCOLHA SEU PERFIL                                                *
          * --------------------------------------------------------------- */}
         <section className="mt-20">
-          <SectionTitle
-            eyebrow="Para cada perfil"
-            title="Escolha seu perfil e comece"
-            subtitle="Particular ou lojista: o caminho certo para o seu objetivo, sem confusão."
-            align="center"
-          />
+          <div className="text-center">
+            <h2 className="text-[28px] font-extrabold tracking-tight text-cnc-text-strong sm:text-[38px]">
+              Escolha seu perfil
+            </h2>
+            <p className="mx-auto mt-3 max-w-[520px] text-[16px] leading-7 text-cnc-muted">
+              Particular ou lojista — o caminho certo para o seu objetivo.
+            </p>
+          </div>
 
-          <div className="mt-12 grid gap-6 lg:grid-cols-2">
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
             {content.profiles.map((profile) => (
               <ProfileCard key={profile.audience} profile={profile} />
             ))}
@@ -467,180 +614,38 @@ export default function SellPageClient({ content }: Props) {
         </section>
 
         {/* --------------------------------------------------------------- *
-         * COMO FUNCIONA                                                     *
-         * --------------------------------------------------------------- */}
-        <section className="mt-20 overflow-hidden rounded-[32px] border border-cnc-line bg-[linear-gradient(135deg,#f4f8ff_0%,#eef4ff_100%)] p-6 shadow-card sm:p-10">
-          <SectionTitle
-            eyebrow="Como funciona"
-            title="Do cadastro ao primeiro contato"
-            subtitle="Quatro passos simples para colocar seu veículo no ar e começar a receber interessados."
-          />
-
-          <div className="mt-12 grid gap-5 lg:grid-cols-4">
-            {content.steps.map((item, i) => (
-              <div key={item.step} className="relative rounded-2xl border border-cnc-line bg-white p-6">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-white">
-                    {item.step}
-                  </span>
-                  {i < content.steps.length - 1 ? (
-                    <span className="hidden h-px flex-1 bg-cnc-line lg:block" />
-                  ) : null}
-                </div>
-                <h3 className="mt-4 text-[18px] font-bold tracking-tight text-cnc-text-strong">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-[14px] leading-6 text-cnc-muted">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* --------------------------------------------------------------- *
-         * PRESENÇA LOCAL QUE GERA RESULTADO                                 *
-         * --------------------------------------------------------------- */}
-        <section className="mt-20 grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-center">
-          <div>
-            <SectionTitle
-              eyebrow="Presença local"
-              title="Presença local que gera resultado"
-              subtitle="O Carros na Cidade não é só mais um formulário de anúncio. Ele conecta o seu veículo a páginas locais, com compradores que estão procurando carro perto de você."
-            />
-
-            <ul className="mt-7 grid gap-3 sm:grid-cols-2">
-              {content.localPresence.features.map((feature) => (
-                <li
-                  key={feature}
-                  className="flex items-center gap-3 rounded-2xl border border-cnc-line bg-white px-4 py-3 text-[15px] font-medium text-cnc-text shadow-card"
-                >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
-                    <IconMapPin className="h-4 w-4" />
-                  </span>
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-7">
-              <div className="text-[13px] font-bold uppercase tracking-[0.14em] text-cnc-muted">
-                Buscas que levam até o seu anúncio
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2.5">
-                {content.localPresence.chips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-cnc-line bg-white px-3.5 py-2 text-[13px] font-semibold text-cnc-text shadow-sm"
-                  >
-                    <IconMapPin className="h-3.5 w-3.5 text-primary" />
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Mini mockup de busca regional (desktop + mobile) */}
-          <div className="relative">
-            <div className="pointer-events-none absolute -right-6 -top-6 hidden h-40 w-40 rounded-full bg-primary/10 blur-3xl lg:block" />
-            <div className="relative rounded-[28px] border border-cnc-line bg-white p-5 shadow-premium-lg">
-              <div className="flex items-center gap-2 rounded-xl border border-cnc-line bg-cnc-bg px-4 py-3">
-                <IconMapPin className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-cnc-text">Carros na sua cidade</span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {[0, 1, 2, 3].map((n) => (
-                  <div key={n} className="overflow-hidden rounded-xl border border-cnc-line">
-                    <div className="aspect-[16/10] w-full bg-[linear-gradient(135deg,#e6edfb_0%,#dbe6f7_100%)]">
-                      <div className="flex h-full items-center justify-center text-primary/40">
-                        <IconCar className="h-8 w-8" />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5 p-2.5">
-                      <div className="h-2 w-3/4 rounded-full bg-cnc-line" />
-                      <div className="h-2.5 w-1/2 rounded-full bg-primary/30" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 flex items-center justify-between rounded-xl bg-primary-soft px-4 py-3">
-                <span className="text-sm font-semibold text-primary">Resultados perto de você</span>
-                <IconArrowRight className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* --------------------------------------------------------------- *
-         * CONFIANÇA E MODERAÇÃO                                             *
-         * --------------------------------------------------------------- */}
-        <section className="mt-20" aria-label="Confiança e moderação">
-          {content.testimonials.length > 0 ? (
-            <>
-              <SectionTitle
-                eyebrow="Depoimentos"
-                title="O que vendedores reais já contaram sobre o portal"
-                subtitle="Casos compartilhados publicamente por anunciantes do Carros na Cidade."
-                align="center"
-              />
-
-              <div className="mt-12 grid gap-5 lg:grid-cols-3">
-                {content.testimonials.map((item) => (
-                  <div
-                    key={item.name}
-                    className="rounded-3xl border border-cnc-line bg-white p-6 shadow-card"
-                  >
-                    <p className="text-[16px] leading-8 text-cnc-text">“{item.text}”</p>
-                    <div className="mt-6">
-                      <div className="text-[16px] font-bold text-cnc-text-strong">{item.name}</div>
-                      <div className="text-sm text-cnc-muted">{item.role}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <SectionTitle
-                eyebrow="Confiança e moderação"
-                title="Um ambiente mais seguro para anunciar e negociar"
-                subtitle="Anúncios podem passar por revisão antes de aparecer. Não fazemos consulta Detran nem vistoria física, mas removemos sinais óbvios de risco e aceitamos denúncia pública — para proteger quem compra e quem vende."
-                align="center"
-              />
-
-              <div className="mt-12 grid gap-5 lg:grid-cols-3">
-                {content.trust.map((item) => (
-                  <div
-                    key={item.title}
-                    className="rounded-3xl border border-cnc-line bg-white p-6 shadow-card"
-                  >
-                    <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e9f8f1] text-cnc-success">
-                      <IconShield className="h-5 w-5" />
-                    </div>
-                    <h3 className="mt-4 text-[17px] font-bold leading-snug text-cnc-text-strong">
-                      {item.title}
-                    </h3>
-                    <p className="mt-2.5 text-[15px] leading-7 text-cnc-muted">{item.description}</p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-
-        {/* --------------------------------------------------------------- *
-         * FAQ                                                               *
+         * CONFIANÇA (compacta)                                              *
          * --------------------------------------------------------------- */}
         <section className="mt-20">
-          <SectionTitle
-            eyebrow="Perguntas frequentes"
-            title="Dúvidas comuns antes de começar"
-            subtitle="Respostas diretas sobre como anunciar, receber contatos e o que esperar do fluxo."
-            align="center"
-          />
+          <div className="rounded-[32px] border border-cnc-line bg-white p-7 shadow-card sm:p-10">
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+              {content.assurance.map((item, i) => {
+                const Icon = ASSURANCE_ICONS[i] ?? IconCheck;
+                return (
+                  <div key={item.title} className="flex flex-col items-start">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-[16px] font-bold text-cnc-text-strong">{item.title}</h3>
+                    <p className="mt-1.5 text-[14px] leading-6 text-cnc-muted">{item.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-          <div className="mx-auto mt-10 max-w-[860px] space-y-3.5">
+        {/* --------------------------------------------------------------- *
+         * FAQ (compacto)                                                    *
+         * --------------------------------------------------------------- */}
+        <section className="mt-20">
+          <div className="text-center">
+            <h2 className="text-[28px] font-extrabold tracking-tight text-cnc-text-strong sm:text-[34px]">
+              Perguntas frequentes
+            </h2>
+          </div>
+
+          <div className="mx-auto mt-8 max-w-[760px] space-y-3">
             {content.faq.map((item, index) => (
               <FaqItem
                 key={item.question}
@@ -656,25 +661,19 @@ export default function SellPageClient({ content }: Props) {
          * CTA FINAL                                                         *
          * --------------------------------------------------------------- */}
         <section className="mt-20">
-          <div className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0c4fb0_0%,#0e62d8_55%,#3b82f6_100%)] p-8 text-white shadow-premium-lg sm:p-12">
+          <div className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0c4fb0_0%,#0e62d8_55%,#3b82f6_100%)] p-8 text-center text-white shadow-premium-lg sm:p-14">
             <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
 
-            <div className="relative grid gap-7 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div className="max-w-[720px]">
-                <h2 className="text-[30px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[42px]">
-                  {content.bottomCta.title}
-                </h2>
-                <p className="mt-4 text-[16px] leading-7 text-white/85 sm:text-[18px]">
-                  {content.bottomCta.subtitle}
-                </p>
-                <p className="mt-4 flex items-center gap-2 text-[14px] font-medium text-white/80">
-                  <IconSparkle className="h-4 w-4" />
-                  {content.bottomCta.microcopy}
-                </p>
-              </div>
+            <div className="relative mx-auto max-w-[680px]">
+              <h2 className="text-[30px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[42px]">
+                {content.bottomCta.title}
+              </h2>
+              <p className="mt-4 text-[16px] leading-7 text-white/85 sm:text-[18px]">
+                {content.bottomCta.subtitle}
+              </p>
 
-              <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                 <Link
                   href={content.bottomCta.primaryCtaHref}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-4 text-base font-bold text-primary-strong transition hover:bg-[#f4f7ff]"
@@ -691,6 +690,11 @@ export default function SellPageClient({ content }: Props) {
                   {content.bottomCta.secondaryCtaLabel}
                 </Link>
               </div>
+
+              <p className="mt-5 flex items-center justify-center gap-2 text-[14px] font-medium text-white/80">
+                <IconShield className="h-4 w-4" />
+                {content.bottomCta.microcopy}
+              </p>
             </div>
           </div>
         </section>
