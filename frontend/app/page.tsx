@@ -102,6 +102,25 @@ export default async function HomePage({ searchParams = {} }: { searchParams?: S
           dangerouslySetInnerHTML={{ __html: JSON.stringify(node) }}
         />
       ))}
+      {/*
+        Intro SEO síncrono (server-rendered). Fica ANTES do <HomePageClient>
+        (client) para garantir que o H1 e a proposta principal apareçam no
+        `<main>` no flush inicial — antes de busca, regiões, carrosséis e do
+        footer. Sem isso, o primeiro conteúdo era "Buscar veículos"/"Explore
+        por região", e o Google puxava snippets regionais aleatórios. Bloco
+        discreto, visível, sem texto escondido e integrado ao layout.
+      */}
+      <section className="bg-cnc-bg">
+        <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-8">
+          <h1 className="text-[24px] font-extrabold leading-[1.12] tracking-[-0.02em] text-[#1D2440] sm:text-[30px] md:text-[36px]">
+            Compre e anuncie carros na sua região
+          </h1>
+          <p className="mt-2 max-w-2xl text-[14px] leading-7 text-[#5D667D] sm:text-[15px] md:text-[17px]">
+            Encontre veículos por cidade, marca e modelo, compare preços com a FIPE e fale direto com
+            vendedores próximos.
+          </p>
+        </div>
+      </section>
       <HomePageClient
         data={aboveFold}
         stateUf={territory.state.code}

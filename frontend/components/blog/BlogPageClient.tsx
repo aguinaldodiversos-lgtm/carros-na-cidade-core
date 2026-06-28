@@ -508,29 +508,27 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
 
   return (
     <main className="bg-[#F5F7FC]">
-      <section className="border-b border-[#EDF1F8] bg-white">
-        <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-8 sm:px-6 md:pb-10 md:pt-12">
-          <div className="max-w-3xl">
-            <h1 className="text-[32px] font-extrabold leading-[1.05] tracking-[-0.02em] text-[#1D2440] md:text-[44px]">
-              Blog automotivo
-            </h1>
-            <p className="mt-2 text-[15px] leading-7 text-[#5D667D] md:text-[18px]">
-              Guias, dicas e notícias para comprar, vender e cuidar do seu carro.
-            </p>
-          </div>
-
-          {safeCategories.length > 0 ? (
+      {/*
+        O H1 + subtítulo do hub passaram a ser renderizados no SERVIDOR
+        (BlogHubServer), antes deste client component, para que apareçam no
+        `<main>` no flush inicial (SEO — antes do footer/listas). Aqui fica
+        apenas a barra de categorias (interativa). NÃO reintroduzir o título
+        aqui: duplicaria o H1 e voltaria a depender de client component.
+      */}
+      {safeCategories.length > 0 ? (
+        <section className="border-b border-[#EDF1F8] bg-white">
+          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6">
             <nav
               aria-label="Categorias do blog"
-              className="-mx-4 mt-6 flex gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6 md:mx-0 md:mt-8 md:grid md:grid-cols-6 md:gap-5 md:overflow-visible md:px-0"
+              className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-6 md:gap-5 md:overflow-visible md:px-0"
             >
               {safeCategories.map((category) => (
                 <CategoryButton key={category.id} category={category} />
               ))}
             </nav>
-          ) : null}
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-8">
         <FeaturedHeroBanner

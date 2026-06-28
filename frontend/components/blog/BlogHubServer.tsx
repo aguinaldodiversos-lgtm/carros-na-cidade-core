@@ -105,6 +105,27 @@ export async function BlogHubServer({
         entityId={citySlug}
         citySlug={citySlug}
       />
+      {/*
+        Cabeçalho SEO síncrono (server-rendered). Renderizado AQUI, fora do
+        <BlogPageClient> (client), para garantir que o H1 + a frase apareçam
+        no `<main>` no flush inicial — antes do footer e das listas/cards
+        assíncronos. O título antes vivia dentro do BlogPageClient e era
+        transmitido depois do footer (main praticamente vazio no HTML). Mantém
+        o mesmo visual da seção branca de topo; o BlogPageClient deixou de
+        renderizar o título duplicado.
+      */}
+      <section className="border-b border-[#EDF1F8] bg-white">
+        <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-8 sm:px-6 md:pb-10 md:pt-12">
+          <div className="max-w-3xl">
+            <h1 className="text-[32px] font-extrabold leading-[1.05] tracking-[-0.02em] text-[#1D2440] md:text-[44px]">
+              Blog automotivo em {city.name}
+            </h1>
+            <p className="mt-2 text-[15px] leading-7 text-[#5D667D] md:text-[18px]">
+              Dicas rápidas sobre compra, venda, financiamento e cuidados com veículos na sua região.
+            </p>
+          </div>
+        </div>
+      </section>
       <BlogPageClient content={hubContent} />
     </>
   );
