@@ -11,16 +11,16 @@
 // SSR, com os posts do CMS no HTML. A cidade vem do cookie (ou do padrão) —
 // preservando a personalização que o redirect dava. Canonical próprio: /blog.
 
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
 import { BlogHubServer } from "@/components/blog/BlogHubServer";
+import { BlogContentSkeleton, BlogIntroSync } from "@/components/blog/BlogIntroSync";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
-// `force-dynamic` (correção SSR 2026-06-27): evita o Suspense vazio que
-// transmitia o `<main>` (H1) depois do footer. Mesmo padrão de /carros-em.
 export const dynamic = "force-dynamic";
 
 async function resolveCitySlug(): Promise<string> {
@@ -53,7 +53,25 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function BlogIndexPage() {
+/** Conteúdo assíncrono do índice (resolve cidade do cookie + hub). */
+async function BlogIndexAsyncContent() {
   const citySlug = await resolveCitySlug();
   return <BlogHubServer citySlug={citySlug} pagePath="/blog" />;
+}
+
+/**
+ * BlogIndexPage — SÍNCRONA (NÃO tornar async). O H1 genérico "Blog automotivo"
+ * vem do <BlogIntroSync> síncrono, antes do <Suspense> → entra no `<main>`
+ * antes do footer. A cidade (cookie) é resolvida no conteúdo assíncrono; como
+ * o índice não tem cidade na URL, o cabeçalho usa a variante sem cidade.
+ */
+export default function BlogIndexPage() {
+  return (
+    <>
+      <BlogIntroSync />
+      <Suspense fallback={<BlogContentSkeleton />}>
+        <BlogIndexAsyncContent />
+      </Suspense>
+    </>
+  );
 }

@@ -128,7 +128,11 @@ export function HomePageClient({
 
   return (
     <>
-      <main className="bg-cnc-bg pb-20 md:pb-12">
+      {/*
+        `<div>` (não `<main>`): o `<main id="main-content">` é criado pelo root
+        layout. Evita `<main>` aninhado/duplicado (auditoria SSR 2026-06-27).
+      */}
+      <div className="bg-cnc-bg pb-20 md:pb-12">
         <HomeSearchCard defaultCitySlug={defaultCitySlug} />
 
         {/*
@@ -166,7 +170,7 @@ export function HomePageClient({
         {stateRegions}
 
         <ContentCardsSection />
-      </main>
+      </div>
 
       <SiteBottomNav />
     </>

@@ -507,13 +507,14 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
   }, [content.popularPosts]);
 
   return (
-    <main className="bg-[#F5F7FC]">
+    // `<div>` (não `<main>`): o `<main id="main-content">` é criado pelo root
+    // layout. Evita `<main>` aninhado (auditoria SSR 2026-06-27).
+    <div className="bg-[#F5F7FC]">
       {/*
-        O H1 + subtítulo do hub passaram a ser renderizados no SERVIDOR
-        (BlogHubServer), antes deste client component, para que apareçam no
-        `<main>` no flush inicial (SEO — antes do footer/listas). Aqui fica
-        apenas a barra de categorias (interativa). NÃO reintroduzir o título
-        aqui: duplicaria o H1 e voltaria a depender de client component.
+        O H1 + frase do hub são renderizados pelo <BlogIntroSync> SÍNCRONO na
+        PAGE (antes do <Suspense>), garantindo o H1 no `<main>` antes do footer.
+        Aqui fica apenas a barra de categorias (interativa). NÃO reintroduzir o
+        título: duplicaria o H1 e voltaria a depender de client component.
       */}
       {safeCategories.length > 0 ? (
         <section className="border-b border-[#EDF1F8] bg-white">
@@ -681,7 +682,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 

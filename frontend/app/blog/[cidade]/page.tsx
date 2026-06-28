@@ -17,10 +17,12 @@
 // O HUB é renderizado pelo componente compartilhado BlogHubServer (Fase
 // 4.2.1), o mesmo usado por /blog — garante posts do CMS no HTML SSR e os 13
 // posts adotados (sem o recorte antigo de 9).
+import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { BlogHubServer } from "@/components/blog/BlogHubServer";
+import { BlogContentSkeleton, BlogIntroSync } from "@/components/blog/BlogIntroSync";
 import { CmsBlogPostArticle } from "@/components/blog/CmsBlogPostArticle";
 import {
   buildCmsPostJsonLd,
@@ -36,11 +38,16 @@ type PageProps = {
   };
 };
 
-// `force-dynamic` (correção SSR 2026-06-27): com `revalidate`, o Next emitia
-// o shell (header+footer) e transmitia o `<main>` (H1 "Blog automotivo") DEPOIS
-// do footer num Suspense vazio (intermitente, dependente do tempo do fetch).
-// force-dynamic renderiza inline. Mesmo padrão de /carros-em, /lojas, /veiculo.
 export const dynamic = "force-dynamic";
+
+// Slug de cidade canônico: termina em "-<uf>" (2 letras). Posts do CMS NÃO
+// usam esse padrão (o editor admin avisa contra slug terminado em sigla de
+// UF — ver topo deste arquivo), então dá para decidir SINCRONAMENTE se a rota
+// é um hub de cidade (mostra o H1 síncrono) ou um post (H1 vem do artigo).
+const CITY_SLUG_RE = /^[a-z0-9-]+-[a-z]{2}$/;
+function looksLikeCitySlug(slug: string): boolean {
+  return CITY_SLUG_RE.test((slug || "").trim().toLowerCase());
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   // /blog/<slug-de-post> → metadata do post (canonical global).
@@ -74,9 +81,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function BlogCityPage({ params }: PageProps) {
+/**
+ * Conteúdo assíncrono (post-vs-hub). Fica DENTRO do <Suspense> da page —
+ * pode awaitar/fetchar à vontade sem afetar a ordem do H1 síncrono.
+ */
+async function BlogCityAsyncContent({ cidade }: { cidade: string }) {
   // ── 1) /blog/<slug> de post do CMS ──────────────────────────────────────
-  const cmsPost = await fetchPublishedBlogPost(params.cidade);
+  const cmsPost = await fetchPublishedBlogPost(cidade);
   if (cmsPost) {
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.carrosnacidade.com").replace(
       /\/+$/,
@@ -122,5 +133,27 @@ export default async function BlogCityPage({ params }: PageProps) {
   // ── 2) Hub editorial por cidade ─────────────────────────────────────────
   // Mesmo hub de /blog (componente compartilhado): CMS no HTML SSR, fallback
   // só quando o CMS está vazio.
-  return <BlogHubServer citySlug={params.cidade} pagePath={`/blog/${params.cidade}`} />;
+  return <BlogHubServer citySlug={cidade} pagePath={`/blog/${cidade}`} />;
+}
+
+/**
+ * BlogCityPage — SÍNCRONA de propósito (NÃO tornar async).
+ *
+ * O H1 do hub vem do <BlogIntroSync> síncrono, renderizado ANTES do <Suspense>
+ * → entra no `<main>` antes do footer no HTML real. Para slugs de cidade
+ * (padrão `nome-uf`) mostramos o cabeçalho; para slugs de post o H1 é o título
+ * do artigo (renderizado no conteúdo assíncrono). Sem H1 duplicado.
+ */
+export default function BlogCityPage({ params }: PageProps) {
+  const isCity = looksLikeCitySlug(params.cidade);
+  const cityName = isCity ? prettifyCitySlug(params.cidade).name : undefined;
+
+  return (
+    <>
+      {isCity ? <BlogIntroSync cityName={cityName} /> : null}
+      <Suspense fallback={<BlogContentSkeleton />}>
+        <BlogCityAsyncContent cidade={params.cidade} />
+      </Suspense>
+    </>
+  );
 }
