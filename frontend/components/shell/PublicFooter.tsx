@@ -9,7 +9,6 @@ import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/publi
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import {
   buildFooterNavSections,
-  SITE_CONTACT,
   SITE_ROUTES,
   type SiteNavSection,
   type TerritorialContext,
@@ -246,24 +245,6 @@ export function PublicFooter() {
               Marketplace automotivo regional: catálogo por cidade, referência FIPE local e
               negociação com contexto — sem estoque genérico nacional.
             </p>
-
-            <div className="mt-6 space-y-2 text-sm">
-              <a
-                href={`mailto:${SITE_CONTACT.email}`}
-                className="flex w-fit items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-medium text-white/90 transition hover:border-white/40 hover:bg-white/5"
-              >
-                <span className="text-white/55">E-mail</span>
-                {SITE_CONTACT.email}
-              </a>
-
-              <a
-                href={SITE_CONTACT.phoneHref}
-                className="flex w-fit items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-medium text-white/90 transition hover:border-white/40 hover:bg-white/5"
-              >
-                <span className="text-white/55">Telefone</span>
-                {SITE_CONTACT.phoneDisplay}
-              </a>
-            </div>
 
             {socials.length > 0 ? (
               <div className="mt-6 flex flex-wrap gap-2">
