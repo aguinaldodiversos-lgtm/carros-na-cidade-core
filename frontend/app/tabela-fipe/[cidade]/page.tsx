@@ -58,7 +58,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export const revalidate = 300;
+/**
+ * `force-dynamic` (correção de ordem semântica/SSR 2026-06-27).
+ *
+ * O root layout usa `cookies()`/`headers()` → toda rota já é dinâmica (ƒ).
+ * Com `export const revalidate`, o Next emitia o shell estático (header +
+ * FOOTER) e transmitia o `<main>` (incl. H1 "Consultar Tabela FIPE") DEPOIS
+ * do footer, num Suspense vazio — crawler via rodapé/e-mail antes do H1.
+ * `force-dynamic` renderiza inline (H1 antes do footer). Mesmo padrão de
+ * `/carros-em/[slug]`. `fetchAdsSearch` mantém cache próprio (revalidate 60).
+ */
+export const dynamic = "force-dynamic";
 
 export default async function TabelaFipeCidadePage({ params }: PageProps) {
   const city = prettifyCitySlug(params.cidade);

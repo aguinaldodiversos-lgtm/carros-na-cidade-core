@@ -36,7 +36,11 @@ type PageProps = {
   };
 };
 
-export const revalidate = 300;
+// `force-dynamic` (correção SSR 2026-06-27): com `revalidate`, o Next emitia
+// o shell (header+footer) e transmitia o `<main>` (H1 "Blog automotivo") DEPOIS
+// do footer num Suspense vazio (intermitente, dependente do tempo do fetch).
+// force-dynamic renderiza inline. Mesmo padrão de /carros-em, /lojas, /veiculo.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   // /blog/<slug-de-post> → metadata do post (canonical global).

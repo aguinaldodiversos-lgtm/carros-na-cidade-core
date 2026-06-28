@@ -85,7 +85,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export const revalidate = 300;
+/**
+ * `force-dynamic` (correção de ordem semântica/SSR 2026-06-27).
+ *
+ * O root layout usa `cookies()`/`headers()` → toda rota já é dinâmica (ƒ).
+ * Com `export const revalidate`, o Next emitia o shell estático (header +
+ * FOOTER) e transmitia o `<main>` (incl. H1) DEPOIS do footer, num Suspense
+ * vazio — crawler via rodapé antes do conteúdo. `force-dynamic` renderiza
+ * inline (H1 antes do footer). Mesmo padrão de `/carros-em/[slug]`.
+ */
+export const dynamic = "force-dynamic";
 
 export default async function SimuladorFinanciamentoCidadePage({
   params,

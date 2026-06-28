@@ -32,7 +32,9 @@ type ComprarCidadePageProps = {
   searchParams?: SearchParams;
 };
 
-export const revalidate = 60;
+// `force-dynamic` (correção SSR 2026-06-27): evita o Suspense vazio que
+// transmitia o `<main>` (H1/catálogo) depois do footer. Padrão de /carros-em.
+export const dynamic = "force-dynamic";
 
 function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
   return {

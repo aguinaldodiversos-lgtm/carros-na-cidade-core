@@ -29,7 +29,9 @@ type PageProps = {
   };
 };
 
-export const revalidate = 300;
+// `force-dynamic` (correção SSR 2026-06-27): evita o Suspense vazio que
+// transmitia o `<main>` (H1 do post) depois do footer. Padrão de /carros-em.
+export const dynamic = "force-dynamic";
 
 async function findPost(citySlug: string, postSlug: string) {
   const content = await fetchBlogPageContent(citySlug);

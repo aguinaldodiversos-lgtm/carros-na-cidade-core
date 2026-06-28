@@ -19,7 +19,9 @@ import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
-export const revalidate = 300;
+// `force-dynamic` (correção SSR 2026-06-27): evita o Suspense vazio que
+// transmitia o `<main>` (H1) depois do footer. Mesmo padrão de /carros-em.
+export const dynamic = "force-dynamic";
 
 async function resolveCitySlug(): Promise<string> {
   const cookieStore = await cookies();

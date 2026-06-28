@@ -12,7 +12,18 @@ import { buildHomeJsonLd } from "@/lib/seo/home-structured-data";
 import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
-export const revalidate = 300;
+/**
+ * `force-dynamic` (correção de ordem semântica/SSR 2026-06-27).
+ *
+ * O root layout usa `cookies()`/`headers()` → toda rota já é dinâmica (ƒ).
+ * Com `export const revalidate`, o Next fazia prerender parcial: shell
+ * estático (header + FOOTER) + corpo do `<main>` (incl. H1/proposta)
+ * transmitido DEPOIS do footer, num Suspense vazio. Crawler via o rodapé
+ * antes do conteúdo principal. `force-dynamic` renderiza inline (H1 antes
+ * do footer). Carrosséis seguem em <Suspense> próprio (streaming preservado).
+ * Mesmo padrão de `/carros-em/[slug]`.
+ */
+export const dynamic = "force-dynamic";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 

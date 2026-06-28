@@ -3,7 +3,23 @@ import SellPageClient from "@/components/sell/SellPageClient";
 import { getSellPageContent } from "@/lib/sell/sell-page";
 import { getSellHeroAd } from "@/lib/sell/sell-hero-ad";
 
-export const revalidate = 60;
+/**
+ * `force-dynamic` (NÃO trocar por `revalidate`) — correção de ordem
+ * semântica/SSR 2026-06-27.
+ *
+ * O root layout usa `cookies()`/`headers()`, então TODA rota já é dinâmica
+ * (ƒ). Com `export const revalidate`, o Next tenta um prerender parcial:
+ * emite um shell estático (header + FOOTER) e transmite o corpo do `<main>`
+ * (incluindo o H1) DEPOIS do footer, dentro de um boundary de Suspense
+ * vazio (`<main><template id="P:1"></template></main>`). O crawler então
+ * via footer/e-mail/telefone antes do H1.
+ *
+ * `force-dynamic` desliga esse prerender parcial: a página renderiza inline
+ * num passo só, com H1/conteúdo dentro do `<main>` ANTES do footer. Mesmo
+ * padrão já usado em `/carros-em/[slug]`. Os fetches mantêm cache próprio
+ * (`fetchAdsSearch` → `revalidate: 60`), então o custo é marginal.
+ */
+export const dynamic = "force-dynamic";
 
 /**
  * Metadata da página /anunciar.
