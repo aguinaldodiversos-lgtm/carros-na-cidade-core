@@ -230,6 +230,10 @@ const DEFAULT_PLANS = [
   },
 ];
 
+// Fallback síncrono offline-safe. Só boost-7d: é o único produto de
+// destaque autorizado/configurável (platform_settings). boost-30d foi
+// removido por não ter configuração administrativa real. A fonte canônica
+// com preço/dias do admin é commercial-rules.service#getBoostOptions.
 const BOOST_OPTIONS = [
   {
     id: "boost-7d",
@@ -237,13 +241,6 @@ const BOOST_OPTIONS = [
     price: 39.9,
     label: "Destaque por 7 dias",
     description: "Prioridade alta nas buscas e badge de destaque por 7 dias.",
-  },
-  {
-    id: "boost-30d",
-    days: 30,
-    price: 129.9,
-    label: "Destaque por 30 dias",
-    description: "Exibicao premium no topo, carrossel principal e reforco de recomendacao IA.",
   },
 ];
 
@@ -1130,8 +1127,8 @@ export function listBoostOptions() {
 
 /**
  * Versão async — devolve boost options com preço/dias do boost-7d
- * resolvidos via platform_settings (Fase 2.1). boost-30d permanece estático
- * até existirem chaves dedicadas. Fallback seguro se a leitura falhar.
+ * resolvidos via platform_settings (Fase 2.1). boost-7d é o único produto
+ * de destaque autorizado. Fallback seguro (BOOST_OPTIONS) se a leitura falhar.
  */
 export async function listBoostOptionsAsync() {
   const { getBoostOptions } = await import("../commercial/commercial-rules.service.js");

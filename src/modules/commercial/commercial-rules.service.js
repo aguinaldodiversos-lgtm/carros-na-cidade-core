@@ -25,11 +25,14 @@
  *   4. Sem efeito colateral. Não dispara fetch para terceiros, não toca
  *      em payments, não persiste nada.
  *
- *   5. boost-30d NÃO tem chave dedicada em platform_settings hoje (a
- *      migration 031 só seedou keys para o boost-7d, que é o produto
- *      oficial de lançamento). boost-30d continua como fallback estático
- *      neste service — adicionar chaves específicas é trabalho de fase
- *      futura (commercial.boost_30d_price_cents/days).
+ *   5. boost-7d é o ÚNICO produto de destaque autorizado/configurável hoje.
+ *      Tem chaves dedicadas em platform_settings (migration 031) e é
+ *      editável no admin comercial. boost-30d foi REMOVIDO da oferta: nunca
+ *      teve chaves dedicadas (não era administrável) e não estava autorizado.
+ *      Toda opção exibida ao usuário precisa partir de configuração
+ *      administrativa real — por isso este service só expõe boost-7d.
+ *      Reintroduzir boost-30d exigiria chaves próprias
+ *      (commercial.boost_30d_price_cents/days) + decisão de produto.
  */
 
 import { getSetting } from "../platform/settings.service.js";
@@ -60,8 +63,9 @@ const DEFAULTS = Object.freeze({
 const DUPLICATE_BEHAVIORS = Object.freeze(["extend_duration", "replace", "block_duplicate"]);
 
 /**
- * boost-30d permanece em hardcode até existirem chaves dedicadas.
- * boost-7d preço/dias vêm de platform_settings (este service).
+ * Única opção de destaque autorizada: boost-7d. Preço/dias vêm de
+ * platform_settings (este service) e são editáveis no admin comercial.
+ * boost-30d foi removido por não ter configuração administrativa real.
  */
 export const BOOST_OPTIONS_FALLBACK = Object.freeze([
   Object.freeze({
@@ -70,13 +74,6 @@ export const BOOST_OPTIONS_FALLBACK = Object.freeze([
     price: 39.9,
     label: "Destaque por 7 dias",
     description: "Prioridade alta nas buscas e badge de destaque por 7 dias.",
-  }),
-  Object.freeze({
-    id: "boost-30d",
-    days: 30,
-    price: 129.9,
-    label: "Destaque por 30 dias",
-    description: "Exibicao premium no topo, carrossel principal e reforco de recomendacao IA.",
   }),
 ]);
 
@@ -178,9 +175,12 @@ export async function getCommercialRules() {
 }
 
 /**
- * Devolve a lista canônica de boost options ([boost-7d, boost-30d]) com
- * preço/dias do boost-7d resolvidos via platform_settings. boost-30d
- * permanece estático.
+ * Devolve a lista canônica de boost options ([boost-7d]) com preço/dias
+ * resolvidos via platform_settings — fonte única consumida pelo modal de
+ * impulsionamento, pela página /impulsionar e pelo checkout.
+ *
+ * Só expõe produtos com configuração administrativa real. boost-30d não
+ * tem chaves dedicadas e por isso NÃO é listado/vendido.
  *
  * Forma de cada item bate com BOOST_OPTIONS_FALLBACK (id/days/price/label/description).
  *
@@ -192,7 +192,6 @@ export async function getCommercialRules() {
 export async function getBoostOptions() {
   const rules = await getCommercialRules();
   const boost7dDefault = BOOST_OPTIONS_FALLBACK.find((o) => o.id === "boost-7d");
-  const boost30dDefault = BOOST_OPTIONS_FALLBACK.find((o) => o.id === "boost-30d");
 
   return [
     {
@@ -200,7 +199,6 @@ export async function getBoostOptions() {
       days: rules.boost_default_days,
       price: rules.boost_default_price_cents / 100,
     },
-    { ...boost30dDefault },
   ];
 }
 

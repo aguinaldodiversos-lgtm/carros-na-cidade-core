@@ -140,11 +140,11 @@ router.post(
 /**
  * Rota dedicada do Destaque 7 dias (Fase 3B).
  *
- * Diferente de POST /create (que aceita qualquer boost_option_id e
- * delega), aqui o `boost_option_id` é FIXADO em "boost-7d" no
- * servidor — o cliente não consegue trocar para boost-30d sem ir
- * no /create explicitamente. Reduz superfície de erro e dá um
- * contrato auditável claro: "esta URL só vende boost-7d".
+ * Diferente de POST /create (que aceita um boost_option_id e valida
+ * contra a lista autorizada), aqui o `boost_option_id` é FIXADO em
+ * "boost-7d" no servidor — o cliente não escolhe nada. boost-7d é o
+ * único produto de destaque autorizado hoje. Rota canônica usada pelo
+ * checkout do frontend. Contrato auditável: "esta URL só vende boost-7d".
  *
  * Preço (R$ 39,90) vem 100% do BOOST_OPTIONS no backend (via
  * `listBoostOptions()`), nunca do payload do cliente — defesa
@@ -166,7 +166,7 @@ router.post(
     const payload = await createBoostCheckout({
       userId: req.user.id,
       adId,
-      // Hardcoded — esta rota só vende boost-7d. Para boost-30d use /create.
+      // Hardcoded — esta rota só vende boost-7d (único produto autorizado).
       boostOptionId: "boost-7d",
       requestId: req.requestId,
       ...resolvePublicUrls(req),

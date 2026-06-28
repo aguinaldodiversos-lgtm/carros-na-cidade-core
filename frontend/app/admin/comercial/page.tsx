@@ -426,6 +426,13 @@ function CommercialRulesTab() {
 
   const hasChanges = Object.keys(draft).length > 0;
 
+  // Status derivado do produto avulso: não há flag dedicada "boost ativo"
+  // em platform_settings; o produto está efetivamente ativo enquanto ao
+  // menos um tipo de documento (CPF/CNPJ) pode comprá-lo. Sem criar setting nova.
+  const boostActive = Boolean(val("allow_boost_cpf") || val("allow_boost_cnpj"));
+  const boostPriceReais = (val("boost_default_price_cents") || 0) / 100;
+  const boostDays = val("boost_default_days");
+
   async function save() {
     if (!hasChanges) return;
     if (!reason.trim()) {
@@ -469,11 +476,54 @@ function CommercialRulesTab() {
       )}
 
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-4">
-        <h2 className="text-sm font-bold text-cnc-text">Destaque avulso</h2>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-cnc-muted">
+          Produtos avulsos · Impulsionamentos
+        </p>
+
+        {/* Card de identidade do produto avulso "Destaque 7 dias".
+            Reflete os valores vivos de platform_settings (commercial.boost_*)
+            e atualiza conforme o admin edita os campos abaixo. NÃO é
+            assinatura: não toca user_subscriptions nem users.plan_id. */}
+        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-cnc-text">Destaque {boostDays} dias</h2>
+              <p className="mt-0.5 text-[11px] text-cnc-muted">
+                Tipo: Produto avulso / impulsionamento · Fonte:{" "}
+                <code>platform_settings</code> (commercial.boost_default_*)
+              </p>
+            </div>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                boostActive ? "bg-emerald-100 text-emerald-700" : "bg-cnc-bg text-cnc-muted"
+              }`}
+            >
+              {boostActive ? "Ativo" : "Inativo"}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <SummaryStat label="Preço atual" value={money(boostPriceReais)} />
+            <SummaryStat label="Duração" value={`${boostDays} dias`} />
+            <SummaryStat label="Cobrança" value="Avulsa (por anúncio)" />
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-cnc-muted-soft">
+            Não altera o limite de anúncios, não libera vídeo 360, não altera a quantidade de fotos
+            e não altera o plano do usuário. Pagamento avulso via Mercado Pago (rota{" "}
+            <code>/api/payments/boost-7d/checkout</code>); o benefício aprovado aplica em{" "}
+            <code>ads.highlight_until</code>. Não cria assinatura nem conta em{" "}
+            <code>user_subscriptions</code>.
+          </p>
+        </div>
+
+        <h3 className="text-xs font-bold uppercase tracking-wide text-cnc-muted">
+          Editar configuração
+        </h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field
             label="Preço padrão (centavos)"
-            hint={`Range: ${ranges.boost_default_price_cents.min}–${ranges.boost_default_price_cents.max}`}
+            hint={`Em R$ ${(ranges.boost_default_price_cents.min / 100).toFixed(2)}–${(ranges.boost_default_price_cents.max / 100).toFixed(2)} · gravado em centavos`}
           >
             <input
               type="number"
@@ -621,6 +671,17 @@ function Field({
       {children}
       {hint && <span className="mt-1 block text-[11px] text-cnc-muted-soft">{hint}</span>}
     </label>
+  );
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-amber-200/70 bg-white px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-cnc-muted-soft">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-bold text-cnc-text">{value}</p>
+    </div>
   );
 }
 

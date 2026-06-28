@@ -18,7 +18,7 @@ type ImpulsionarPageProps = {
 
 export const metadata: Metadata = {
   title: "Impulsionar anuncio",
-  description: "Ative destaque de 7 ou 30 dias para seu anuncio com pagamento Mercado Pago.",
+  description: "Ative o destaque de 7 dias para seu anuncio com pagamento Mercado Pago.",
 };
 
 export const dynamic = "force-dynamic";

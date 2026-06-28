@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-boost";
 
 /**
  * /planos — landing pública de conversão (Fase 3A do alinhamento de planos).
@@ -10,8 +11,11 @@ import Link from "next/link";
  *     Banner Regional ou Evento Premium.
  *   - Mercado Pago NÃO é acionado nesta fase. CTAs apontam para fluxos
  *     existentes (/anunciar, /cadastro, /ajuda) — Fase 3B liga checkout.
- *   - Estrutura totalmente estática: zero fetch, zero dependência do
- *     /api/account/plans. Cards são copy de marketing, não billing.
+ *   - Cards de assinatura/grátis são copy de marketing estática (não billing).
+ *   - O card "Destaque 7 dias" é a ÚNICA parte dinâmica: preço/duração vêm
+ *     de platform_settings via o endpoint público GET
+ *     /api/public/commercial/boost (mesma fonte do modal/checkout), com
+ *     fallback centralizado e ISR — sem login, sem dado sensível, SEO-safe.
  *
  * Travas de regressão em frontend/app/planos/page.test.tsx.
  */
@@ -52,42 +56,26 @@ type PlanCardData = {
    *   neutral:   demais
    */
   style: "highlight" | "accent" | "neutral";
+  /**
+   * Quando true, o card é renderizado desabilitado (CTA não-clicável) com
+   * uma mensagem. Usado pelo Destaque 7 dias quando o produto está inativo
+   * no admin (allow_boost_cpf e allow_boost_cnpj ambos false).
+   */
+  disabled?: boolean;
+  unavailableNote?: string;
 };
 
 /**
- * Ordem de exibição definida pelo produto:
- *   1. Destaque 7 dias (entry point de monetização rápida)
+ * Cards estáticos de assinatura/grátis (copy de marketing).
+ *
+ * Ordem de exibição final: o card dinâmico "Destaque 7 dias" é montado em
+ * runtime (buildDestaqueCard) e renderizado ANTES destes:
+ *   1. Destaque 7 dias (dinâmico — platform_settings)
  *   2. Lojista Pro (recomendado)
  *   3. Lojista Start
  *   4. Grátis (entry point de aquisição)
  */
 const PLANS: ReadonlyArray<PlanCardData> = [
-  {
-    id: "destaque-7-dias",
-    name: "Destaque 7 dias",
-    badge: "TOPO POR 7 DIAS",
-    priceLabel: "R$ 39,90",
-    periodLabel: "por anúncio",
-    intro: "Coloque um anúncio no topo das listagens da sua cidade por 7 dias.",
-    benefits: [
-      "Posição de destaque no catálogo por 7 dias",
-      "Disponível para CPF e CNPJ",
-      "Compras repetidas prorrogam o tempo no topo",
-    ],
-    cautions: [
-      "Não libera vídeo 360",
-      "Não altera o limite de fotos",
-      "Não altera o limite de anúncios",
-    ],
-    cta: {
-      label: "Destacar agora",
-      // Fase 4: CTA leva pra autenticação que retorna ao fluxo do anúncio.
-      // Mercado Pago só inicia DEPOIS que o user tem ad_id (tela interna
-      // pós-revisão renderiza BoostCheckoutButton, que aí sim chama MP).
-      href: "/login?next=/anunciar?acao=destaque",
-    },
-    style: "accent",
-  },
   {
     id: "lojista-pro",
     name: "Lojista Pro",
@@ -135,6 +123,40 @@ const PLANS: ReadonlyArray<PlanCardData> = [
     style: "neutral",
   },
 ];
+
+/**
+ * Monta o card "Destaque 7 dias" a partir da config pública viva
+ * (platform_settings). Preço/duração nunca divergem do que o checkout cobra.
+ */
+function buildDestaqueCard(boost: Awaited<ReturnType<typeof fetchPublicBoost>>): PlanCardData {
+  const days = boost.duration_days;
+  return {
+    id: "destaque-7-dias",
+    name: boost.name,
+    badge: `TOPO POR ${days} DIAS`,
+    priceLabel: formatBoostPriceBRL(boost.price_cents),
+    periodLabel: "por anúncio",
+    intro: `Coloque um anúncio no topo das listagens da sua cidade por ${days} dias.`,
+    benefits: [
+      `Posição de destaque no catálogo por ${days} dias`,
+      "Disponível para CPF e CNPJ",
+      "Compras repetidas prorrogam o tempo no topo",
+    ],
+    cautions: [
+      "Não libera vídeo 360",
+      "Não altera o limite de fotos",
+      "Não altera o limite de anúncios",
+    ],
+    // CTA leva à autenticação que retorna ao fluxo do anúncio. O Mercado Pago
+    // só inicia DEPOIS que o user tem ad_id (tela interna pós-revisão).
+    cta: { label: "Destacar agora", href: "/login?next=/anunciar?acao=destaque" },
+    style: "accent",
+    disabled: !boost.active,
+    unavailableNote: boost.active
+      ? undefined
+      : "Compra de destaque temporariamente indisponível. Tente novamente em breve.",
+  };
+}
 
 const HERO_CHIPS = ["Sem comissão", "Mais visibilidade", "Cadastro simples"] as const;
 
@@ -266,12 +288,26 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
         </ul>
       ) : null}
 
-      <Link
-        href={plan.cta.href}
-        className={`mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold transition ${s.cta}`}
-      >
-        {plan.cta.label}
-      </Link>
+      {plan.disabled ? (
+        <>
+          <span
+            aria-disabled="true"
+            className="mt-5 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-lg bg-cnc-line text-sm font-bold text-cnc-muted"
+          >
+            Indisponível no momento
+          </span>
+          {plan.unavailableNote ? (
+            <p className="mt-2 text-[11px] text-cnc-muted">{plan.unavailableNote}</p>
+          ) : null}
+        </>
+      ) : (
+        <Link
+          href={plan.cta.href}
+          className={`mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold transition ${s.cta}`}
+        >
+          {plan.cta.label}
+        </Link>
+      )}
     </article>
   );
 }
@@ -304,7 +340,12 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 // Página
 // ---------------------------------------------------------------------------
 
-export default function PlanosPage() {
+export default async function PlanosPage() {
+  // Única dependência dinâmica: o produto avulso "Destaque 7 dias".
+  // ISR (revalidate=900) + fallback centralizado mantêm SEO/robustez.
+  const boost = await fetchPublicBoost();
+  const plans: ReadonlyArray<PlanCardData> = [buildDestaqueCard(boost), ...PLANS];
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
       {/* Hero */}
@@ -331,7 +372,7 @@ export default function PlanosPage() {
         aria-label="Planos disponíveis"
         className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
       >
-        {PLANS.map((plan) => (
+        {plans.map((plan) => (
           <PlanCardView key={plan.id} plan={plan} />
         ))}
       </section>

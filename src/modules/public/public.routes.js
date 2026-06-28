@@ -22,6 +22,7 @@ import {
   getPublicBlogPostBySlug,
 } from "./public-blog.controller.js";
 import { collectAnalyticsEvent } from "./public-analytics.controller.js";
+import { getPublicBoostConfig } from "./public-commercial.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
 import {
   autocompleteRateLimit,
@@ -37,6 +38,18 @@ const router = express.Router();
 router.post("/analytics/events", analyticsRateLimit, collectAnalyticsEvent);
 
 router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
+
+/**
+ * Config pública do produto avulso "Destaque 7 dias" (boost-7d) — leitura,
+ * sem auth. Alimenta o card público de /planos com preço/duração vivos de
+ * platform_settings (mesma fonte do checkout). Cache 60s; edição no admin
+ * reflete em poucos segundos (TTL do getSetting) — sem dados sensíveis.
+ */
+router.get(
+  "/commercial/boost",
+  cacheGet({ prefix: "public:commercial:boost", ttlSeconds: 60, varyBy: [] }),
+  getPublicBoostConfig
+);
 
 /**
  * Carrossel do hero da Home — conteúdo editável pelo admin (Fase 4.1.1).

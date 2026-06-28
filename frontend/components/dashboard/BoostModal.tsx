@@ -41,15 +41,35 @@ export default function BoostModal({ open, ad, options, onClose }: BoostModalPro
         </div>
 
         <div className="mt-4 space-y-2">
-          {options.map((option) => (
-            <div key={option.id} className="rounded-xl border border-[#dce3f0] bg-[#f8fafe] p-3">
-              <p className="text-sm font-bold text-[#21304f]">{option.label}</p>
-              <p className="mt-0.5 text-xs text-[#5a6580]">{option.description}</p>
-              <p className="mt-1 text-base font-extrabold text-[#0e62d8]">
-                {formatPrice(option.price)}
-              </p>
-            </div>
-          ))}
+          {options.map((option, index) => {
+            // Há um único produto de destaque autorizado (boost-7d). O
+            // primeiro/único item vem marcado como selecionado para deixar
+            // claro o que será cobrado ao seguir para o pagamento.
+            const selected = index === 0;
+            return (
+              <div
+                key={option.id}
+                className={`rounded-xl border p-3 transition ${
+                  selected
+                    ? "border-[#0e62d8] bg-[#eef4ff] ring-1 ring-[#0e62d8]/30"
+                    : "border-[#dce3f0] bg-[#f8fafe]"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-[#21304f]">{option.label}</p>
+                  {selected ? (
+                    <span className="inline-flex items-center rounded-full bg-[#0e62d8] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                      Selecionado
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-xs text-[#5a6580]">{option.description}</p>
+                <p className="mt-1 text-base font-extrabold text-[#0e62d8]">
+                  {formatPrice(option.price)}
+                </p>
+              </div>
+            );
+          })}
         </div>
 
         <Link

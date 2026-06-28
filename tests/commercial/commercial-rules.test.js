@@ -143,21 +143,18 @@ describe("commercial-rules.service", () => {
       });
     });
 
-    it("mantém boost-30d como fallback estático", async () => {
+    it("NÃO expõe boost-30d (produto sem configuração administrativa real)", async () => {
       mockSettings({});
       const options = await getBoostOptions();
       const boost30d = options.find((o) => o.id === "boost-30d");
-      expect(boost30d).toMatchObject({
-        id: "boost-30d",
-        days: 30,
-        price: 129.9,
-      });
+      expect(boost30d).toBeUndefined();
+      expect(options.every((o) => o.id === "boost-7d")).toBe(true);
     });
 
     it("nunca retorna lista vazia", async () => {
       mockSettings({});
       const options = await getBoostOptions();
-      expect(options.length).toBeGreaterThanOrEqual(2);
+      expect(options.length).toBeGreaterThanOrEqual(1);
     });
   });
 

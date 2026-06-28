@@ -42,14 +42,17 @@ export default function BoostCheckout({ adId, options, defaultOptionId }: BoostC
 
     try {
       trackAdEvent(adId, "boost_start");
-      const response = await fetch("/api/payments/create", {
+      // Rota canônica do Destaque 7 dias: o backend FIXA boost_option_id
+      // ("boost-7d") e resolve preço/dias no servidor (platform_settings).
+      // O cliente envia SOMENTE ad_id — nunca preço, dias ou option_id
+      // (defesa anti-spoof; ver payments.routes.js#/boost-7d/checkout).
+      const response = await fetch("/api/payments/boost-7d/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ad_id: adId,
-          boost_option_id: selectedOption.id,
         }),
       });
 

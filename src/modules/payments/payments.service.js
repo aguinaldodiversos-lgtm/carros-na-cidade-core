@@ -498,8 +498,9 @@ export async function createBoostCheckout({
     getCommercialRules(),
   ]);
 
-  // Fase 2.1 — boost options canônicos vêm de platform_settings (boost-7d)
-  // + fallback estático (boost-30d). Não mais hardcode neste service.
+  // Fase 2.1 — boost options canônicos vêm de platform_settings (boost-7d),
+  // único produto autorizado. Validamos o id contra essa lista: ids não
+  // configurados (ex.: boost-30d removido) caem em "opção inválida" abaixo.
   const boostOption = boostOptions.find((option) => option.id === boostOptionId);
   if (!boostOption) {
     throw new AppError("Opcao de impulsionamento invalida.", 400);
@@ -605,7 +606,12 @@ export async function createBoostCheckout({
       items: [
         {
           id: `ad-boost-${ad.id}-${boostOption.id}`,
-          title: `Impulsionar anuncio: ${ad.title}`,
+          // Identificação do vendedor/produto no checkout do Mercado Pago.
+          // O nome da APLICAÇÃO MP (ex.: cabeçalho do checkout) vem das
+          // credenciais externas, não do código — ver runbook. Aqui
+          // garantimos que o item identifique Carros na Cidade.
+          title: `Carros na Cidade - Destaque ${boostOption.days} dias`,
+          description: `Impulsionar anuncio: ${ad.title}`,
           quantity: 1,
           currency_id: "BRL",
           unit_price: Number(Number(boostOption.price).toFixed(2)),
