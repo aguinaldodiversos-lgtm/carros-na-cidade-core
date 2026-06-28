@@ -89,24 +89,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function ArrowLeftIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 12H5" />
-      <path d="m12 19-7-7 7-7" />
-    </svg>
-  );
-}
-
 function ArrowRightIcon() {
   return (
     <svg
@@ -273,27 +255,14 @@ export function FinancingLandingPageClient({
 
   return (
     <>
-      <main className="bg-cnc-bg pb-24 text-cnc-text">
-        <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 sm:pt-6 lg:max-w-4xl lg:px-8">
-          {/* Page header: back button + title + sub */}
-          <div className="flex items-start gap-3">
-            <Link
-              href="/"
-              aria-label="Voltar para a Home"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cnc-line bg-white text-cnc-text-strong transition hover:border-primary hover:text-primary"
-            >
-              <ArrowLeftIcon />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[28px]">
-                Simulador de financiamento
-              </h1>
-              <p className="mt-1 text-[14px] leading-snug text-cnc-muted">
-                Simule parcelas e encontre carros dentro do seu orçamento.
-              </p>
-            </div>
-          </div>
-
+      {/*
+        `<div>` (não `<main>`): o `<main id="main-content">` é do root layout.
+        O cabeçalho (← + H1 + frase) foi movido para <SimuladorIntroSync>
+        SÍNCRONO na page (antes do <Suspense>), garantindo o H1 dentro do
+        `<main>` ANTES do footer (SEO). Aqui fica só o formulário + resultados.
+      */}
+      <div className="bg-cnc-bg pb-24 text-cnc-text">
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:max-w-4xl lg:px-8">
           {/* Form card */}
           <section
             aria-label="Parâmetros do financiamento"
@@ -459,7 +428,7 @@ export function FinancingLandingPageClient({
             </p>
           )}
         </div>
-      </main>
+      </div>
 
       <SiteBottomNav />
     </>

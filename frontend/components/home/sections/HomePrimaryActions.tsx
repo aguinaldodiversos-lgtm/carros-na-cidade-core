@@ -7,7 +7,9 @@ import { IconCalculator, IconPlus, IconTable } from "@/components/home/icons";
  * 3 cards quick-action lado a lado (1 col mobile, 3 col >= sm) abaixo do
  * banner herói da Home, conforme contrato visual `atualização-home.png`
  * (revisão 2026-05-19):
- *   - Anuncie seu carro grátis  → /anunciar/novo
+ *   - Anuncie seu carro grátis  → /anunciar  (landing comercial indexável;
+ *                                 antes apontava p/ /anunciar/novo, agora
+ *                                 `noindex` — SEO 2026-06-27)
  *   - Tabela FIPE               → /tabela-fipe
  *   - Simulador financiamento   → /simulador-financiamento
  *
@@ -20,7 +22,7 @@ import { IconCalculator, IconPlus, IconTable } from "@/components/home/icons";
 
 const ACTIONS = [
   {
-    href: "/anunciar/novo",
+    href: "/anunciar",
     title: "Anuncie seu carro grátis",
     subtitle: "Publique em poucos minutos",
     icon: <IconPlus className="h-full w-full" />,

@@ -1,8 +1,11 @@
 // frontend/app/simulador-financiamento/[cidade]/page.tsx
+import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
+
 import { FinancingLandingPageClient } from "@/components/financing/FinancingLandingPageClient";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
-import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
+import { normalizePublicAd } from "@/lib/public-contracts";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
 
 type PageProps = {
@@ -54,30 +57,22 @@ function prettifyCitySlug(slug: string) {
   };
 }
 
-// `fallbackHero` (T-Cross fake R$ 105.900, id 999001, slug
-// "volkswagen-t-cross-2022-2023") REMOVIDO no briefing P0 2026-05-24.
-// Quando os 3 fetches falham, `heroVehicle` agora é `null` e o cliente
-// renderiza hero institucional sem veículo/preço/modelo inventado.
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = prettifyCitySlug(params.cidade);
 
-  // Briefing P2-D 2026-05-25 — copy oficial vem do helper único.
-  // Preservamos fallback inline com o que tinha (drop-in compatível).
-  const baseCopy = publicCatalogPageCopy("simulator", { label: city.name, uf: city.state });
-
+  // Title/description canônicos do simulador (SEO 2026-06-27). O template do
+  // root layout acrescenta "| Carros na Cidade" ao title.
   return {
-    title: baseCopy.metaTitle ?? `Simule o financiamento do seu carro em ${city.name}`,
+    title: `Simulador de financiamento de veículos em ${city.label}`,
     description:
-      baseCopy.metaDescription ??
-      `Descubra parcelas, taxas e condições de financiamento em ${city.name}. Veja ofertas locais, oportunidades abaixo da FIPE e anuncie seu carro grátis no Carros na Cidade.`,
+      "Simule entrada, parcelas e prazo para financiar seu próximo veículo. Compare condições antes de negociar com vendedores da região.",
     alternates: {
       canonical: `/simulador-financiamento/${params.cidade}`,
     },
     openGraph: {
-      title: `Simule o financiamento do seu carro em ${city.name}`,
+      title: `Simulador de financiamento de veículos em ${city.label}`,
       description:
-        "Landing page automotiva com simulador de financiamento, ofertas locais e anúncio grátis.",
+        "Simule entrada, parcelas e prazo para financiar seu próximo veículo. Compare condições antes de negociar.",
       url: `/simulador-financiamento/${params.cidade}`,
       type: "website",
       locale: "pt_BR",
@@ -85,51 +80,93 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-/**
- * `force-dynamic` (correção de ordem semântica/SSR 2026-06-27).
- *
- * O root layout usa `cookies()`/`headers()` → toda rota já é dinâmica (ƒ).
- * Com `export const revalidate`, o Next emitia o shell estático (header +
- * FOOTER) e transmitia o `<main>` (incl. H1) DEPOIS do footer, num Suspense
- * vazio — crawler via rodapé antes do conteúdo. `force-dynamic` renderiza
- * inline (H1 antes do footer). Mesmo padrão de `/carros-em/[slug]`.
- */
 export const dynamic = "force-dynamic";
 
-export default async function SimuladorFinanciamentoCidadePage({
-  params,
-  searchParams = {},
-}: PageProps) {
-  const city = prettifyCitySlug(params.cidade);
-  const initialVehicleValue = parseValorFromSearch(searchParams);
+function BackArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
+}
+
+/**
+ * Intro SÍNCRONO do simulador — server 100% síncrono (SEM await/fetch/client/
+ * Suspense). Renderizado pela page SÍNCRONA ANTES do <Suspense>, então o H1 +
+ * a frase entram no `<main>` no primeiro flush do HTML, antes do footer.
+ *
+ * CRÍTICO: NÃO tornar async nem mover para dentro de componente async/Suspense.
+ */
+function SimuladorIntroSync({ cityLabel }: { cityLabel: string }) {
+  return (
+    <div className="bg-cnc-bg">
+      <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 sm:pt-6 lg:max-w-4xl lg:px-8">
+        <div className="flex items-start gap-3">
+          <Link
+            href="/"
+            aria-label="Voltar para a Home"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cnc-line bg-white text-cnc-text-strong transition hover:border-primary hover:text-primary"
+          >
+            <BackArrowIcon />
+          </Link>
+          <div className="min-w-0">
+            <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[28px]">
+              Simulador de financiamento em {cityLabel}
+            </h1>
+            <p className="mt-1 text-[14px] leading-snug text-cnc-muted">
+              Calcule parcelas, entrada e prazo antes de negociar seu próximo carro.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Skeleton do conteúdo pesado (fallback do <Suspense>). */
+function SimuladorSkeleton() {
+  return (
+    <div
+      className="mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:px-6 lg:max-w-4xl lg:px-8"
+      aria-hidden="true"
+    >
+      <div className="h-64 w-full rounded-2xl bg-black/5" />
+      <div className="mt-5 h-72 w-full rounded-2xl bg-black/5" />
+    </div>
+  );
+}
+
+/**
+ * Conteúdo assíncrono — fetches de anúncios + o client do simulador. Vive
+ * DENTRO do <Suspense>; pode suspender sem afetar a ordem do H1 síncrono.
+ */
+async function SimuladorAsyncContent({
+  cidade,
+  initialVehicleValue,
+}: {
+  cidade: string;
+  initialVehicleValue?: number;
+}) {
+  const city = prettifyCitySlug(cidade);
 
   const [opportunitiesResult, highlightResult, recentResult] = await Promise.allSettled([
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      below_fipe: true,
-      sort: "relevance",
-      limit: 6,
-      page: 1,
-    }),
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      highlight_only: true,
-      sort: "highlight",
-      limit: 4,
-      page: 1,
-    }),
-    fetchAdsSearch({
-      city_slug: params.cidade,
-      sort: "recent",
-      limit: 6,
-      page: 1,
-    }),
+    fetchAdsSearch({ city_slug: cidade, below_fipe: true, sort: "relevance", limit: 6, page: 1 }),
+    fetchAdsSearch({ city_slug: cidade, highlight_only: true, sort: "highlight", limit: 4, page: 1 }),
+    fetchAdsSearch({ city_slug: cidade, sort: "recent", limit: 6, page: 1 }),
   ]);
 
-  // Defesa em profundidade — briefing P0 2026-05-24 (hasRealPrice) +
-  // briefing P2-D 2026-05-25 (normalizePublicAd: drop slug inválido,
-  // dirty data residual, price ≤ 0). Filtros aplicados em sequência:
-  // backend já filtra DIRTY; este pipeline é safety net redundante.
+  // Defesa em profundidade (hasRealPrice + normalizePublicAd) — safety net
+  // redundante ao filtro do backend; nada de R$ 0, slug inválido ou dirty data.
   const filterPublic = <T,>(ad: T) =>
     hasRealPrice(ad as Parameters<typeof hasRealPrice>[0]) && normalizePublicAd(ad) !== null;
 
@@ -139,25 +176,19 @@ export default async function SimuladorFinanciamentoCidadePage({
 
   const opportunityAdsRaw =
     opportunitiesResult.status === "fulfilled" ? opportunitiesResult.value.data || [] : [];
-  const opportunityAds = opportunityAdsRaw.length > 0
-    ? opportunityAdsRaw.filter(filterPublic)
-    : recentAds.slice(0, 6);
+  const opportunityAds =
+    opportunityAdsRaw.length > 0 ? opportunityAdsRaw.filter(filterPublic) : recentAds.slice(0, 6);
 
   const highlightAdsRaw =
     highlightResult.status === "fulfilled" ? highlightResult.value.data || [] : [];
-  const highlightAds = highlightAdsRaw.length > 0
-    ? highlightAdsRaw.filter(filterPublic)
-    : recentAds.slice(0, 4);
+  const highlightAds =
+    highlightAdsRaw.length > 0 ? highlightAdsRaw.filter(filterPublic) : recentAds.slice(0, 4);
 
-  // heroVehicle = primeiro anúncio real com preço; `null` quando nenhum
-  // anúncio real está disponível. O `FinancingLandingPageClient`
-  // renderiza hero institucional (sem veículo/preço/modelo) nesse caso —
-  // briefing P0 2026-05-24 vetou o T-Cross fake R$ 105.900.
   const heroVehicle = highlightAds[0] ?? opportunityAds[0] ?? null;
 
   return (
     <FinancingLandingPageClient
-      citySlug={params.cidade}
+      citySlug={cidade}
       cityName={city.name}
       cityLabel={city.label}
       heroVehicle={heroVehicle}
@@ -165,5 +196,27 @@ export default async function SimuladorFinanciamentoCidadePage({
       opportunityAds={opportunityAds}
       initialVehicleValue={initialVehicleValue}
     />
+  );
+}
+
+/**
+ * SimuladorFinanciamentoCidadePage — SÍNCRONA de propósito (NÃO tornar async).
+ *
+ * O H1 vem do <SimuladorIntroSync> síncrono, ANTES do <Suspense> → entra no
+ * `<main>` antes do footer no HTML real. Os fetches estão isolados em
+ * <SimuladorAsyncContent> dentro do <Suspense>. H1 não fica em client
+ * component nem depende de fetch.
+ */
+export default function SimuladorFinanciamentoCidadePage({ params, searchParams = {} }: PageProps) {
+  const city = prettifyCitySlug(params.cidade);
+  const initialVehicleValue = parseValorFromSearch(searchParams);
+
+  return (
+    <>
+      <SimuladorIntroSync cityLabel={city.label} />
+      <Suspense fallback={<SimuladorSkeleton />}>
+        <SimuladorAsyncContent cidade={params.cidade} initialVehicleValue={initialVehicleValue} />
+      </Suspense>
+    </>
   );
 }

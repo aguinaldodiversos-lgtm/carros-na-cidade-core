@@ -90,9 +90,9 @@ export default function VehicleFinancePanel({
 
           <Link
             href={financeLink}
-            className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-[#138a63] px-4 text-[15px] font-bold text-white shadow-[0_14px_28px_rgba(19,138,99,0.26)] transition hover:bg-[#0f7755]"
+            className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-[#138a63] px-4 text-center text-[15px] font-bold text-white shadow-[0_14px_28px_rgba(19,138,99,0.26)] transition hover:bg-[#0f7755]"
           >
-            Simular financiamento
+            Simular financiamento deste veículo
           </Link>
         </div>
       </div>

@@ -87,7 +87,7 @@ function HeaderNavLink({
     <Link
       href={href}
       onClick={onClick}
-      className={`inline-flex h-10 max-w-full items-center rounded-lg px-2.5 text-[13px] font-semibold transition xl:px-3 xl:text-[14px] ${
+      className={`inline-flex h-10 max-w-full items-center whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition xl:px-3 xl:text-[14px] ${
         active
           ? "bg-slate-100/90 text-blue-800 shadow-sm"
           : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
@@ -171,14 +171,13 @@ export function PublicHeader() {
             <HeaderNavLink href={routes.comprar}>Comprar</HeaderNavLink>
             <HeaderNavLink href={routes.financing}>
               {/*
-                Single-label: o navegador desktop só aparece a partir de md
-                (pai já tem `hidden md:flex`), então o split entre "Simulador
-                de Financiamento" / "Simulador" gerava label duplicado em
-                AT/SR e em screenshots de cliente — ambos os spans existem
-                no DOM, e em alguns leitores ambos são lidos. Mantemos só
-                a forma curta no header e a forma longa no menu mobile.
+                Label descritivo (SEO interno 2026-06-27): "Simular
+                financiamento" em vez do genérico "Simulador" — eleva a
+                relevância do simulador como página principal/candidata a
+                sitelink. Single-label (sem split long/short) para não
+                duplicar leitura em AT/SR.
               */}
-              Simulador
+              Simular financiamento
             </HeaderNavLink>
             <HeaderNavLink href={routes.fipe}>FIPE</HeaderNavLink>
             <HeaderNavLink href={routes.blog}>Blog</HeaderNavLink>
@@ -294,7 +293,7 @@ export function PublicHeader() {
                 onClick={() => setMobileOpen(false)}
                 className="w-full justify-start px-4"
               >
-                Simulador de Financiamento
+                Simular financiamento
               </HeaderNavLink>
               <HeaderNavLink
                 href={routes.fipe}
