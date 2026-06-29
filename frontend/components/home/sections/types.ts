@@ -25,6 +25,10 @@ export type VehicleCardItem = {
   fipe_price?: number | string;
   below_fipe?: boolean;
   highlight_until?: string | null;
+  seller_kind?: string | null;
+  seller_type?: string | null;
+  account_type?: string | null;
+  dealership_id?: number | string | null;
   image_url?: string | null;
   image?: string | null;
   cover_image_url?: string | null;

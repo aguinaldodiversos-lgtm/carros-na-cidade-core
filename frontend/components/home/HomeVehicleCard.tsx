@@ -36,6 +36,11 @@ export type VehicleItem = {
   highlight_until?: string | null;
   /** Tier canônico do backend (commercialLayerExpr). */
   priority_tier?: 1 | 2 | 3 | 4 | null;
+  /** Tipo de vendedor (loja vs particular) — fonte do selo LOJA/PARTICULAR. */
+  seller_kind?: string | null;
+  seller_type?: string | null;
+  account_type?: string | null;
+  dealership_id?: number | string | null;
   image_url?: string | null;
   image?: string | null;
   cover_image_url?: string | null;
@@ -72,6 +77,10 @@ function toBaseAdData(item: VehicleItem): BaseAdData {
     opportunity: item.opportunity ?? null,
     highlight_until: item.highlight_until ?? null,
     priority_tier: item.priority_tier ?? null,
+    seller_kind: item.seller_kind ?? null,
+    seller_type: item.seller_type ?? null,
+    account_type: item.account_type ?? null,
+    dealership_id: item.dealership_id ?? null,
     image: item.image ?? null,
     image_url: item.image_url ?? null,
     cover_image_url: item.cover_image_url ?? null,
@@ -84,5 +93,14 @@ function toBaseAdData(item: VehicleItem): BaseAdData {
 
 export function HomeVehicleCard({ item, variant, priority = false }: HomeVehicleCardProps) {
   const adVariant = variant === "highlight" ? "featured" : "carousel";
-  return <AdCard item={toBaseAdData(item)} variant={adVariant} priority={priority} />;
+  // showDealerPill={false}: na home exibimos só o badge "LOJA" na fileira de
+  // selos, sem a pílula laranja sobre a imagem (decisão de produto).
+  return (
+    <AdCard
+      item={toBaseAdData(item)}
+      variant={adVariant}
+      priority={priority}
+      showDealerPill={false}
+    />
+  );
 }

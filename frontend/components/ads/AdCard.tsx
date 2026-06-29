@@ -104,6 +104,12 @@ export type AdCardProps = {
   variant?: AdCardVariant;
   /** Apenas para imagem acima da dobra. Default: false. */
   priority?: boolean;
+  /**
+   * Override do default da variante para a pílula de loja (nome sobre a
+   * imagem). A home passa `false` para exibir só o badge "LOJA" na fileira
+   * de selos. Quando undefined, usa `config.showDealerPill` da variante.
+   */
+  showDealerPill?: boolean;
   /** Override de href. Default: rota canônica /veiculo/[slug]. */
   href?: string;
   /** Status (dashboard/admin): "ativo", "pausado", "rejeitado", etc. */
@@ -547,6 +553,8 @@ type LayoutProps = {
   flags?: ReadonlyArray<string>;
   actions?: ReactNode;
   favKey: string;
+  /** Resolvido em AdCard: prop showDealerPill ?? config.showDealerPill. */
+  showDealerPill: boolean;
 };
 
 function VerticalLayout({
@@ -558,6 +566,7 @@ function VerticalLayout({
   status,
   actions,
   favKey,
+  showDealerPill,
 }: LayoutProps) {
   // Brand+modelo separados para hierarquia tipo Webmotors. Fallback no
   // title já normalizado quando brand/model não vieram do backend.
@@ -604,12 +613,16 @@ function VerticalLayout({
     ? "flex min-w-0 flex-1 flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-3.5"
     : "flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5";
 
-  // Linha de badges: no carrossel/grade desktop mantemos min-h reservado
-  // para alinhar cards do mesmo row. No grid mobile horizontal,
-  // single-column, sem necessidade de placeholder.
+  // Linha de badges: reservamos altura para ATÉ 2 linhas de selos no
+  // carrossel/grade desktop. Assim, com 1, 2 ou 3 selos (incluindo o pior
+  // caso DESTAQUE + ABAIXO DA FIPE + PARTICULAR, que quebra em 2 linhas no
+  // card de ~230px), título/spec/preço/CTA começam na mesma posição em
+  // todos os cards do row. Mantemos a fonte legível (text-[10px]) em vez de
+  // encolher para caber em 1 linha. No grid mobile horizontal (single-column)
+  // não há row para alinhar, então não reservamos placeholder no mobile.
   const badgeRowClass = compactMobile
-    ? "flex flex-wrap items-center gap-1.5 sm:min-h-[1.25rem]"
-    : "flex min-h-[1.25rem] flex-wrap items-center gap-1.5";
+    ? "flex flex-wrap items-center gap-1.5 sm:min-h-[2.875rem]"
+    : "flex min-h-[2.875rem] flex-wrap items-center gap-1.5";
 
   const titleClass = compactMobile
     ? "line-clamp-1 text-[13px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[15px]"
@@ -654,9 +667,7 @@ function VerticalLayout({
           className="h-full w-full object-contain p-1.5 transition duration-300 group-hover:scale-[1.02] sm:p-2"
         />
         {config.showFavorite && <FavoriteButton itemKey={favKey} />}
-        {config.showDealerPill && normalized.isDealer && (
-          <DealerPill name={normalized.dealerLabel} />
-        )}
+        {showDealerPill && normalized.isDealer && <DealerPill name={normalized.dealerLabel} />}
       </div>
 
       <div className={textWrapClass}>
@@ -716,7 +727,7 @@ function BadgeChipPill({ chip }: { chip: AdBadge }) {
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] ring-1 ring-inset ${palette[chip.variant]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] ring-1 ring-inset ${palette[chip.variant]}`}
       title={
         chip.variant === "reviewed"
           ? "Este anúncio passou por revisão antes de ser exibido."
@@ -882,11 +893,13 @@ export function AdCard({
   flags,
   actions,
   className = "",
+  showDealerPill,
 }: AdCardProps) {
   const source = ad || item || {};
   const normalized = normalizeAdData(source);
   const config = VARIANTS[variant];
   const favKey = resolveFavoriteKey(source);
+  const showDealerPillResolved = showDealerPill ?? config.showDealerPill;
 
   const computedHref =
     href ??
@@ -910,10 +923,14 @@ export function AdCard({
     flags,
     actions,
     favKey,
+    showDealerPill: showDealerPillResolved,
   };
 
   return (
-    <div className={className} data-variant={variant}>
+    // h-full: faz o card preencher a altura do item esticado no flex/grid,
+    // dando ao mt-auto do rodapé uma altura comum → preço e botão alinham
+    // entre cards com número diferente de selos.
+    <div className={`h-full ${className}`} data-variant={variant}>
       {config.layout === "horizontal" ? (
         <HorizontalLayout {...layoutProps} />
       ) : (
