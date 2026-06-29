@@ -292,7 +292,7 @@ export async function createPlanCheckout({
         failure: failureUrl,
         pending: pendingUrl,
       },
-      notification_url: `${getBackendPublicUrl()}/api/payments/webhook`,
+      notification_url: `${getBackendPublicUrl()}/webhook/mercadopago`,
       metadata,
     }),
   });
@@ -440,7 +440,7 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
       back_url: successUrl,
       status: "pending",
       payer_email: user.email || `${user.id}@carrosnacidade.local`,
-      notification_url: `${getBackendPublicUrl()}/api/payments/webhook`,
+      notification_url: `${getBackendPublicUrl()}/webhook/mercadopago`,
       metadata,
     }),
   });
@@ -626,7 +626,7 @@ export async function createBoostCheckout({
         failure: failureUrl,
         pending: pendingUrl,
       },
-      notification_url: `${getBackendPublicUrl()}/api/payments/webhook`,
+      notification_url: `${getBackendPublicUrl()}/webhook/mercadopago`,
       metadata,
     }),
   });
@@ -669,11 +669,50 @@ export async function createBoostCheckout({
   };
 }
 
-export function verifyWebhookSignature(rawBody, signatureHeader, requestIdHeader) {
+/**
+ * Comparação de hashes hex em tempo constante (anti timing-attack).
+ * Retorna false (sem lançar) quando os tamanhos diferem ou a entrada é
+ * inválida — `crypto.timingSafeEqual` exige buffers de mesmo tamanho.
+ */
+function timingSafeEqualHex(a, b) {
+  try {
+    const bufA = Buffer.from(String(a), "hex");
+    const bufB = Buffer.from(String(b), "hex");
+    if (bufA.length === 0 || bufA.length !== bufB.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extrai `data.id` do corpo cru do webhook. Usado APENAS como fallback quando
+ * a query string (?data.id=...) vem vazia — o Mercado Pago assina o `data.id`
+ * da query, então essa é a fonte preferencial (ver mercadoPagoWebhookController).
+ */
+function payloadDataIdFromRaw(rawBody) {
+  try {
+    const parsed = rawBody ? JSON.parse(rawBody) : {};
+    return parsed?.data?.id != null ? String(parsed.data.id) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifica a assinatura HMAC do webhook do Mercado Pago conforme a spec
+ * oficial: o manifesto é `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
+ * (data.id em lowercase), com HMAC-SHA256 sobre o manifesto SEM o corpo da
+ * requisição. O segredo vem exclusivamente de process.env.MP_WEBHOOK_SECRET
+ * (nunca hardcoded, nunca logado) e a comparação é tempo-constante.
+ */
+export function verifyWebhookSignature(signatureHeader, requestIdHeader, dataId) {
   if (!MP_WEBHOOK_SECRET) {
     return true;
   }
-  if (!signatureHeader || !requestIdHeader) {
+  if (!signatureHeader || !requestIdHeader || !dataId) {
     return false;
   }
 
@@ -689,13 +728,12 @@ export function verifyWebhookSignature(rawBody, signatureHeader, requestIdHeader
 
   const ts = tsPair.replace("ts=", "");
   const v1 = v1Pair.replace("v1=", "");
-  const manifest = `id:${requestIdHeader};request-id:${requestIdHeader};ts:${ts};`;
-  const expected = crypto
-    .createHmac("sha256", MP_WEBHOOK_SECRET)
-    .update(manifest + rawBody)
-    .digest("hex");
+  // Spec MP: id = data.id (lowercase se alfanumérico), request-id = header,
+  // ts = timestamp da própria assinatura. O corpo NÃO entra no HMAC.
+  const manifest = `id:${String(dataId).toLowerCase()};request-id:${requestIdHeader};ts:${ts};`;
+  const expected = crypto.createHmac("sha256", MP_WEBHOOK_SECRET).update(manifest).digest("hex");
 
-  return expected === v1;
+  return timingSafeEqualHex(expected, v1);
 }
 
 async function fetchPaymentStatus(resourceId, topic) {
@@ -1002,8 +1040,18 @@ export async function applyBoostApproval(client, intent) {
   return { applied: true };
 }
 
-export async function handleWebhookNotification({ rawBody, signature, requestId, traceRequestId }) {
-  const isValid = verifyWebhookSignature(rawBody, signature, requestId);
+export async function handleWebhookNotification({
+  rawBody,
+  signature,
+  requestId,
+  dataId,
+  traceRequestId,
+}) {
+  const isValid = verifyWebhookSignature(
+    signature,
+    requestId,
+    dataId || payloadDataIdFromRaw(rawBody)
+  );
   if (!isValid) {
     logger.warn(
       {

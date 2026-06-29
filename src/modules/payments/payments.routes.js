@@ -5,8 +5,8 @@ import {
   createBoostCheckout,
   createPlanCheckout,
   createPlanSubscription,
-  handleWebhookNotification,
 } from "./payments.service.js";
+import { mercadoPagoWebhookController } from "./payments.webhook.controller.js";
 import { cancelUserSubscription, createSubscriptionCheckout } from "./subscriptions.service.js";
 
 const router = express.Router();
@@ -176,19 +176,16 @@ router.post(
   })
 );
 
-router.post(
-  "/webhook",
-  asyncHandler(async (req, res) => {
-    const payload = await handleWebhookNotification({
-      rawBody: req.rawBody || JSON.stringify(req.body || {}),
-      signature: req.headers["x-signature"] || null,
-      requestId: req.headers["x-request-id"] || null,
-      traceRequestId: req.requestId,
-    });
-
-    res.json(payload);
-  })
-);
+// ALIAS LEGADO — NÃO REMOVER.
+// O caminho canônico do webhook é POST /webhook/mercadopago (montado na raiz
+// em src/app.js, cadastrado no painel do MP). Este alias /api/payments/webhook
+// precisa continuar existindo enquanto houver preferences ANTIGAS em
+// circulação: elas carregam a notification_url anterior
+// (`${backend}/api/payments/webhook`) embutida no recurso do Mercado Pago, e o
+// MP vai notificar nesse caminho até esses pagamentos expirarem. Remover este
+// alias faria essas notificações antigas baterem em 404. Mesmo handler do
+// caminho canônico (mercadoPagoWebhookController).
+router.post("/webhook", mercadoPagoWebhookController);
 
 router.get("/webhook", (_req, res) => {
   res.json({ ok: true });

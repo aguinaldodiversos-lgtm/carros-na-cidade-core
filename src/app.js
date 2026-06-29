@@ -39,6 +39,7 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import dealerAcquisitionInboundRoutes from "./modules/dealer-acquisition/dealer-inbound.routes.js";
 import leadsRoutes from "./modules/leads/leads.routes.js";
 import paymentsRoutes from "./modules/payments/payments.routes.js";
+import { mercadoPagoWebhookController } from "./modules/payments/payments.webhook.controller.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
@@ -240,6 +241,14 @@ app.get("/health/meta", (req, res) => {
     requestId: req.requestId || null,
   });
 });
+
+// Webhook Mercado Pago — caminho CANÔNICO cadastrado no painel do MP.
+// Montado na RAIZ (não sob /api) porque a URL registrada no painel é
+// https://<backend>/webhook/mercadopago. Usa o MESMO handler do alias legado
+// /api/payments/webhook (ver payments.routes.js). express.json já capturou
+// req.rawBody acima — exigido pela verificação HMAC da assinatura.
+app.post("/webhook/mercadopago", mercadoPagoWebhookController);
+app.get("/webhook/mercadopago", (_req, res) => res.json({ ok: true }));
 
 // Legado `/uploads/...`: servir somente quando habilitado EXPLICITAMENTE via
 // SERVE_UPLOADS_STATIC=true. Default OFF (refatorado em 2026-05-13 após
