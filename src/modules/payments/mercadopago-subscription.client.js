@@ -16,6 +16,7 @@ import {
   isMercadoPagoMockMode,
   getMercadoPagoBackendPublicUrl,
 } from "./payments.service.js";
+import { logger } from "../../shared/logger.js";
 
 const PREAPPROVAL_BASE = "/preapproval";
 
@@ -43,9 +44,9 @@ export async function createPreapproval({ planName, amount, payerEmail, backUrl,
     };
   }
 
-  const notificationUrl = `${getMercadoPagoBackendPublicUrl()}/api/payments/webhook`;
+  const notificationUrl = `${getMercadoPagoBackendPublicUrl()}/webhook/mercadopago`;
 
-  return mpRequest(PREAPPROVAL_BASE, {
+  const preapproval = await mpRequest(PREAPPROVAL_BASE, {
     method: "POST",
     body: JSON.stringify({
       reason: planName,
@@ -62,6 +63,17 @@ export async function createPreapproval({ planName, amount, payerEmail, backUrl,
       metadata,
     }),
   });
+
+  logger.info(
+    {
+      action: "payments.preapproval.create",
+      mercadoPagoId: preapproval?.id,
+      notificationUrl,
+    },
+    "[payments] preapproval criado"
+  );
+
+  return preapproval;
 }
 
 /**

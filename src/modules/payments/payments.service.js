@@ -63,8 +63,19 @@ function stripTrailingSlash(value) {
 }
 
 function getBackendPublicUrl() {
+  // IMPORTANTE: esta é a URL pública DO BACKEND (onde o Mercado Pago entrega o
+  // webhook), NÃO do frontend. Por isso NÃO usamos APP_BASE_URL — no .env.example
+  // ela pertence ao grupo do frontend (FRONTEND_URL/SITE_URL = :3000), enquanto o
+  // backend é API_URL/BACKEND_API_URL/NEXT_PUBLIC_API_URL (:4000). Usar APP_BASE_URL
+  // fazia a notification_url apontar para o domínio do frontend, que não serve
+  // /webhook/mercadopago — a notificação do pagamento real caía em 404.
+  //
+  // Precedência: override explícito → URL auto-injetada pelo Render (= domínio do
+  // próprio serviço de backend) → vars de backend.
   const value =
-    process.env.APP_BASE_URL?.trim() ||
+    process.env.MP_WEBHOOK_BASE_URL?.trim() ||
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    process.env.BACKEND_API_URL?.trim() ||
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
     "";
@@ -74,6 +85,15 @@ function getBackendPublicUrl() {
   }
 
   return stripTrailingSlash(value);
+}
+
+/**
+ * URL canônica do webhook do Mercado Pago (raiz do backend). Fonte única usada
+ * tanto no corpo da preference/preapproval quanto no log de criação — assim o
+ * log do Render reflete exatamente o que foi gravado no recurso do MP.
+ */
+function getWebhookNotificationUrl() {
+  return `${getBackendPublicUrl()}/webhook/mercadopago`;
 }
 
 /**
@@ -98,7 +118,11 @@ export async function mpRequest(path, init = {}) {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new AppError(`Mercado Pago error (${response.status}): ${body}`, 502);
+    const err = new AppError(`Mercado Pago error (${response.status}): ${body}`, 502);
+    // Expõe o status HTTP do MP para o caller distinguir casos esperados
+    // (ex.: 404 = recurso inexistente) de falhas reais. Ver handleWebhookNotification.
+    err.upstreamStatus = response.status;
+    throw err;
   }
 
   return response.json();
@@ -267,6 +291,7 @@ export async function createPlanCheckout({
     };
   }
 
+  const notificationUrl = getWebhookNotificationUrl();
   const preference = await mpRequest("/checkout/preferences", {
     method: "POST",
     headers: {
@@ -292,7 +317,7 @@ export async function createPlanCheckout({
         failure: failureUrl,
         pending: pendingUrl,
       },
-      notification_url: `${getBackendPublicUrl()}/webhook/mercadopago`,
+      notification_url: notificationUrl,
       metadata,
     }),
   });
@@ -320,6 +345,7 @@ export async function createPlanCheckout({
       planId: plan.id,
       intentId,
       mercadoPagoId: preference.id,
+      notificationUrl,
     },
     "[payments] checkout plan criado"
   );
@@ -427,6 +453,7 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
     requestId,
   });
 
+  const notificationUrl = getWebhookNotificationUrl();
   const preapproval = await mpRequest("/preapproval", {
     method: "POST",
     body: JSON.stringify({
@@ -440,7 +467,7 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
       back_url: successUrl,
       status: "pending",
       payer_email: user.email || `${user.id}@carrosnacidade.local`,
-      notification_url: `${getBackendPublicUrl()}/webhook/mercadopago`,
+      notification_url: notificationUrl,
       metadata,
     }),
   });
@@ -469,6 +496,7 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
       planId: plan.id,
       intentId,
       mercadoPagoId: preapproval.id,
+      notificationUrl,
     },
     "[payments] subscription checkout criado"
   );
@@ -596,6 +624,7 @@ export async function createBoostCheckout({
     };
   }
 
+  const notificationUrl = getWebhookNotificationUrl();
   const preference = await mpRequest("/checkout/preferences", {
     method: "POST",
     headers: {
@@ -626,7 +655,7 @@ export async function createBoostCheckout({
         failure: failureUrl,
         pending: pendingUrl,
       },
-      notification_url: `${getBackendPublicUrl()}/webhook/mercadopago`,
+      notification_url: notificationUrl,
       metadata,
     }),
   });
@@ -654,6 +683,7 @@ export async function createBoostCheckout({
       }),
       adId: ad.id,
       intentId,
+      notificationUrl,
       mercadoPagoId: preference.id,
     },
     "[payments] boost checkout criado"
@@ -1085,7 +1115,32 @@ export async function handleWebhookNotification({
   }
 
   const topic = payload.type === "preapproval" ? "preapproval" : "payment";
-  const paymentData = await fetchPaymentStatus(resourceId, topic);
+
+  let paymentData;
+  try {
+    paymentData = await fetchPaymentStatus(resourceId, topic);
+  } catch (err) {
+    // 404 do MP = recurso (pagamento/preapproval) não existe. Acontece com o
+    // simulador (data.id=123456) e com notificações órfãs. NÃO é erro fatal:
+    // loga e responde 200 para o MP não reenviar. Outros status sobem normal.
+    if (err?.upstreamStatus === 404) {
+      logger.info(
+        {
+          ...buildDomainFields({
+            action: "payments.webhook",
+            result: "success",
+            requestId: traceRequestId,
+          }),
+          resourceId,
+          ignored: true,
+        },
+        `[payments] pagamento não encontrado, ignorando id=${resourceId}`
+      );
+      return { ok: true, ignored: true, reason: "payment_not_found" };
+    }
+    throw err;
+  }
+
   const intent = await resolveIntentForWebhook(paymentData, resourceId);
 
   if (!intent) {
