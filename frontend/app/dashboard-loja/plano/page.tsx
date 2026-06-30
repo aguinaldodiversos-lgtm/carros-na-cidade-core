@@ -1,24 +1,191 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireLojistaDashboardSession } from "@/lib/account/dashboard-session";
+import { getPlansByType } from "@/lib/plans/plan-service";
+import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-boost";
+import SubscriptionCheckoutButton from "@/components/plans/SubscriptionCheckoutButton";
 
 export const metadata: Metadata = {
   title: "Plano e cobranças",
-  description: "Planos e pagamentos.",
+  description: "Planos e pagamentos da sua loja.",
 };
 
-export default function LojaPlanoPage() {
+// Lê sessão + planos vivos a cada acesso (preços vêm do banco, sem hardcode).
+export const dynamic = "force-dynamic";
+
+const PRIMARY = "#0e62d8";
+
+function formatBRL(value: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" })
+    .format(value)
+    .replace(new RegExp(String.fromCharCode(160), "g"), " ");
+}
+
+/**
+ * Card local desta tela (mesmo padrão visual da imagem de planos). Não exporta
+ * nem mexe no design system global — só compõe a grade do painel do lojista.
+ */
+function PlanCardView({
+  name,
+  badge,
+  price,
+  period,
+  intro,
+  benefits,
+  cta,
+  recommended,
+}: {
+  name: string;
+  badge?: string;
+  price: string;
+  period: string;
+  intro: string;
+  benefits: ReadonlyArray<string>;
+  cta: React.ReactNode;
+  recommended?: boolean;
+}) {
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-extrabold text-[#0f172a]">Plano e cobranças</h1>
-      <p className="text-sm text-[#64748b]">
-        Veja os planos disponíveis e escolha o melhor para a operação da sua loja.
+    <article
+      className={`relative flex flex-col rounded-2xl border bg-white p-5 shadow-[0_3px_18px_rgba(11,22,44,0.06)] ${
+        recommended ? "border-[#0e62d8] ring-2 ring-[#0e62d8]/20" : "border-[#dfe4ef]"
+      }`}
+    >
+      {badge ? (
+        <span
+          className="absolute -top-3 left-5 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+          style={{ backgroundColor: PRIMARY }}
+        >
+          {badge}
+        </span>
+      ) : null}
+
+      <h3 className="text-lg font-extrabold text-[#1d2538] sm:text-xl">{name}</h3>
+      <p className="mt-1 text-xs text-[#5a647d] sm:text-sm">{intro}</p>
+
+      <p className="mt-4 flex items-baseline gap-1">
+        <strong className="text-3xl font-extrabold tracking-tight text-[#0e62d8]">{price}</strong>
+        <span className="text-xs font-semibold text-[#5a647d]">{period}</span>
       </p>
-      <Link
-        href="/planos"
-        className="inline-flex h-11 items-center justify-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-6 text-sm font-bold text-white"
-      >
-        Ver planos
-      </Link>
+
+      <ul className="mt-4 flex-1 space-y-2 text-[13px] text-[#4f5972] sm:text-sm">
+        {benefits.map((b) => (
+          <li key={b} className="flex items-start gap-2">
+            <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[#0e62d8]" />
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-1">{cta}</div>
+    </article>
+  );
+}
+
+export default async function LojaPlanoPage() {
+  // Mesma proteção das demais páginas do painel do lojista.
+  await requireLojistaDashboardSession();
+
+  // Preços/limites de Start/Pro vêm do banco (subscription_plans); o Destaque
+  // 7 dias vem da config pública viva — mesma fonte do checkout, sem drift.
+  const [plans, boost] = await Promise.all([
+    getPlansByType("CNPJ").catch(() => []),
+    fetchPublicBoost(),
+  ]);
+
+  const start = plans.find((p) => p.id === "cnpj-store-start");
+  const pro = plans.find((p) => p.id === "cnpj-store-pro");
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6">
+      <header>
+        <h1 className="text-2xl font-extrabold text-[#0f172a]">Plano e cobranças</h1>
+        <p className="mt-1 text-sm text-[#64748b]">
+          Escolha o plano ideal para a operação da sua loja. O pagamento é processado pelo Mercado
+          Pago.
+        </p>
+      </header>
+
+      {/*
+        Ponto de ancoragem para a próxima entrega: bloco "Sua assinatura"
+        (status active/paused/cancelled + histórico de cobranças) entra AQUI,
+        acima da grade — sem reestruturar a página.
+      */}
+
+      <section aria-label="Planos disponíveis" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Destaque 7 dias é POR ANÚNCIO (boost). Leva à escolha do anúncio,
+            onde o checkout do destaque (já em produção) é disparado. */}
+        <PlanCardView
+          name={boost.name}
+          badge={`TOPO ${boost.duration_days} DIAS`}
+          price={formatBoostPriceBRL(boost.price_cents)}
+          period="por anúncio"
+          intro={`Coloque um anúncio no topo das listagens da sua cidade por ${boost.duration_days} dias.`}
+          benefits={[
+            `Posição de destaque por ${boost.duration_days} dias`,
+            "Compras repetidas prorrogam o tempo no topo",
+            "Não altera limite de anúncios ou fotos",
+          ]}
+          cta={
+            <Link
+              href="/dashboard-loja/meus-anuncios"
+              className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[linear-gradient(120deg,#f59e0b_0%,#f97316_100%)] px-4 text-sm font-bold text-white transition hover:brightness-110"
+            >
+              Escolher anúncio
+            </Link>
+          }
+        />
+
+        {pro ? (
+          <PlanCardView
+            name={pro.name}
+            badge="RECOMENDADO"
+            price={formatBRL(pro.price)}
+            period="/mês"
+            intro={pro.description || "Mais exposição e prioridade comercial para a loja."}
+            benefits={
+              pro.benefits?.length
+                ? pro.benefits
+                : [`Até ${pro.ad_limit} anúncios ativos`, "Prioridade superior na busca"]
+            }
+            recommended
+            cta={<SubscriptionCheckoutButton planId="cnpj-store-pro" label="Assinar Pro" />}
+          />
+        ) : null}
+
+        {start ? (
+          <PlanCardView
+            name={start.name}
+            price={formatBRL(start.price)}
+            period="/mês"
+            intro={start.description || "Plano de entrada para lojas começarem a operação digital."}
+            benefits={
+              start.benefits?.length
+                ? start.benefits
+                : [`Até ${start.ad_limit} anúncios ativos`, "Mais presença nas listagens"]
+            }
+            cta={
+              <SubscriptionCheckoutButton
+                planId="cnpj-store-start"
+                label="Assinar Start"
+                variant="outline"
+              />
+            }
+          />
+        ) : null}
+
+        <PlanCardView
+          name="Grátis"
+          price="R$ 0"
+          period="para sempre"
+          intro="Comece a anunciar sem mensalidade, respeitando o limite do plano gratuito da loja."
+          benefits={["Loja com CNPJ: até 10 anúncios", "Até 8 fotos por anúncio", "Sem comissão"]}
+          cta={
+            <span className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[#dfe4ef] bg-[#f8fafe] px-4 text-sm font-semibold text-[#64748b]">
+              Plano de entrada
+            </span>
+          }
+        />
+      </section>
     </div>
   );
 }
