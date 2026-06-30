@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fetchDashboardPayloadClient } from "@/lib/dashboard/fetch-dashboard-me-client";
 import type { DashboardPayload } from "@/lib/dashboard-types";
@@ -17,10 +17,16 @@ import {
 import {
   STEP_COUNT,
   STEP_LABELS,
-  WIZARD_STORAGE_KEY,
   type WizardFormState,
   type SellerType,
 } from "./new-ad-wizard/types";
+import {
+  readWizardDraft,
+  writeWizardDraft,
+  clearWizardDraft,
+  draftBelongsTo,
+  type StoredWizardDraft,
+} from "./new-ad-wizard/draft-storage";
 import { parseCurrency } from "./new-ad-wizard/currency";
 import { resolveInitialStep } from "./new-ad-wizard/resolve-initial-step";
 import CompleteProfileGate from "./CompleteProfileGate";
@@ -156,6 +162,11 @@ export default function NewAdWizardClient({ initialType }: Props) {
   const [hydrated, setHydrated] = useState(false);
   const [dashboardReload, setDashboardReload] = useState(0);
   const [dashboardFetchDone, setDashboardFetchDone] = useState(false);
+  // Rascunho lido do localStorage no mount. Os campos (incluindo PII de
+  // contato) só são aplicados ao form DEPOIS de confirmar a posse pelo
+  // usuário logado — ver o efeito de posse abaixo.
+  const pendingDraftRef = useRef<StoredWizardDraft | null>(null);
+  const [draftResolved, setDraftResolved] = useState(false);
 
   const step = form.step;
 
@@ -179,38 +190,63 @@ export default function NewAdWizardClient({ initialType }: Props) {
   }, [dashboard]);
 
   useEffect(() => {
+    // Lê o rascunho mas NÃO aplica os campos sensíveis ainda — guarda no ref
+    // para reidratar só depois de confirmar a posse pelo usuário logado. No
+    // mount aplicamos apenas bootstrap não-sensível: tipo de vendedor (da URL)
+    // e passo inicial (da URL). Isso garante que, se o dono não bater, nenhum
+    // dado de outra conta chega a ser exibido (form continua INITIAL).
+    pendingDraftRef.current = readWizardDraft();
     try {
-      const raw = window.localStorage.getItem(WIZARD_STORAGE_KEY);
-      const parsed = raw ? (JSON.parse(raw) as Partial<WizardFormState>) : {};
       const params = new URLSearchParams(window.location.search);
       const tipo = params.get("tipo");
-      // O passo inicial vem APENAS da URL (`?step=`); o rascunho persistido
-      // pré-preenche os campos, mas não reabre o wizard no meio do fluxo
-      // (corrige "anúncio começando no passo Preço"). Ver resolve-initial-step.
+      // O passo inicial vem APENAS da URL (`?step=`). Ver resolve-initial-step.
       const urlStep = resolveInitialStep(params.get("step"));
-
-      setForm({
-        ...INITIAL_FORM,
-        ...parsed,
-        cityId: typeof parsed.cityId === "number" ? parsed.cityId : null,
-        draftPhotoUrls: Array.isArray(parsed.draftPhotoUrls)
-          ? parsed.draftPhotoUrls.filter(
-              (u): u is string => typeof u === "string" && u.trim().length > 0
-            )
-          : [],
-        sellerType:
-          tipo === "lojista"
-            ? "lojista"
-            : parsed.sellerType === "lojista"
-              ? "lojista"
-              : initialType,
+      setForm((prev) => ({
+        ...prev,
+        sellerType: tipo === "lojista" ? "lojista" : initialType,
         step: urlStep,
-      });
+      }));
     } catch {
       setForm((prev) => ({ ...prev, sellerType: initialType }));
     }
     setHydrated(true);
   }, [initialType]);
+
+  // Posse do rascunho: só reidrata os campos persistidos quando o `ownerId`
+  // do rascunho bate com o usuário logado confirmado. Caso contrário (dono
+  // diferente, desconhecido, ou usuário não confirmado após o fetch), descarta
+  // o rascunho — defesa em profundidade contra vazamento de PII entre contas
+  // no mesmo navegador, mesmo que a limpeza no auth falhe.
+  useEffect(() => {
+    if (!hydrated || draftResolved) return;
+    const currentUserId = dashboard?.user?.id != null ? String(dashboard.user.id) : null;
+    // Aguarda a confirmação do usuário; se o fetch terminou sem usuário
+    // (timeout/anônimo), decidimos agora — descartando por segurança.
+    if (currentUserId == null && !dashboardFetchDone) return;
+
+    const draft = pendingDraftRef.current;
+    if (draftBelongsTo(draft, currentUserId)) {
+      const f = draft!.form;
+      setForm((prev) => ({
+        ...prev,
+        ...f,
+        // Preserva o bootstrap já resolvido no mount (passo/tipo).
+        step: prev.step,
+        sellerType: prev.sellerType,
+        cityId: typeof f.cityId === "number" ? f.cityId : null,
+        draftPhotoUrls: Array.isArray(f.draftPhotoUrls)
+          ? f.draftPhotoUrls.filter(
+              (u): u is string => typeof u === "string" && u.trim().length > 0
+            )
+          : [],
+      }));
+    } else if (draft != null) {
+      // Dono diferente / desconhecido → nunca reidrata; remove o rascunho.
+      clearWizardDraft();
+      pendingDraftRef.current = null;
+    }
+    setDraftResolved(true);
+  }, [hydrated, dashboard, dashboardFetchDone, draftResolved]);
 
   const syncUrl = useCallback(
     (nextStep: number) => {
@@ -229,13 +265,13 @@ export default function NewAdWizardClient({ initialType }: Props) {
   );
 
   useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(form));
-    } catch {
-      // ignore
-    }
-  }, [form, hydrated]);
+    // Só persiste depois de resolver a posse (evita sobrescrever o rascunho de
+    // outra conta antes da validação). Carimba o dono atual; null enquanto o
+    // usuário não é confirmado — rascunho com dono null não reidrata depois.
+    if (!hydrated || !draftResolved) return;
+    const ownerId = dashboard?.user?.id != null ? String(dashboard.user.id) : null;
+    writeWizardDraft(ownerId, form);
+  }, [form, hydrated, draftResolved, dashboard]);
 
   useEffect(() => {
     return () => {
@@ -502,11 +538,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
         return fail;
       }
 
-      try {
-        window.localStorage.removeItem(WIZARD_STORAGE_KEY);
-      } catch {
-        // ignore
-      }
+      clearWizardDraft();
 
       // Tarefa 8 — interpretar moderation_status retornado pelo backend.
       const moderationStatus =
