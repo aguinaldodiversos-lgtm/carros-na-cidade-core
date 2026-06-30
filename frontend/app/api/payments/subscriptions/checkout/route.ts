@@ -90,10 +90,20 @@ export async function POST(request: NextRequest) {
     const responseBody = await response.json().catch(() => ({}) as Record<string, unknown>);
 
     if (!response.ok) {
+      // O backend responde { success:false, error:true, message:"<causa>" } —
+      // `error` é BOOLEAN. Ler `error` primeiro descartava a causa (virava
+      // `true`). Preferimos `message` (string) e só caímos em `error` se ele
+      // for string. Logamos a causa real para parar de ter 502/500 mudo.
+      const be = responseBody as { error?: unknown; message?: unknown };
       const message =
-        (responseBody as { error?: string; message?: string }).error ||
-        (responseBody as { error?: string; message?: string }).message ||
+        (typeof be.message === "string" && be.message.trim() && be.message) ||
+        (typeof be.error === "string" && be.error.trim() && be.error) ||
         "Falha ao iniciar checkout da assinatura.";
+      console.error(
+        "[POST /api/payments/subscriptions/checkout] backend",
+        response.status,
+        message
+      );
       return applyBffCookies(
         NextResponse.json({ error: message }, { status: response.status }),
         auth.ctx

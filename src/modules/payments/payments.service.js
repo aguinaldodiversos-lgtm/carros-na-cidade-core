@@ -493,24 +493,69 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
   // pública absoluta). NÃO usamos `successUrl` (derivado do origin do request,
   // que pode ser http/localhost/origin interno) — montamos a partir da URL
   // pública do frontend. Boost (preference) permanece intocado.
-  const backUrl = `${getFrontendPublicUrl()}/pagamento/sucesso`;
-  const preapproval = await mpRequest("/preapproval", {
-    method: "POST",
-    body: JSON.stringify({
-      reason: plan.name,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: Number(Number(plan.price).toFixed(2)),
-        currency_id: "BRL",
+  //
+  // Observabilidade: qualquer falha aqui (FRONTEND_URL ausente ou erro do MP)
+  // é logada em level error com a causa real + requestId ANTES de propagar —
+  // evita 502/500 mudo no caminho da assinatura. Não altera status/lógica:
+  // o erro é re-lançado para o errorHandler/rota tratarem como antes.
+  let backUrl;
+  try {
+    backUrl = `${getFrontendPublicUrl()}/pagamento/sucesso`;
+  } catch (err) {
+    logger.error(
+      {
+        ...buildDomainFields({
+          action: "payments.checkout.subscription",
+          result: "error",
+          requestId,
+          userId: user.id,
+        }),
+        planId: plan.id,
+        reason: "back_url_unresolved",
+        err: err?.message,
       },
-      back_url: backUrl,
-      status: "pending",
-      payer_email: user.email || `${user.id}@carrosnacidade.local`,
-      notification_url: notificationUrl,
-      metadata,
-    }),
-  });
+      "[payments] back_url da assinatura falhou: FRONTEND_URL ausente/inválida"
+    );
+    throw err;
+  }
+
+  let preapproval;
+  try {
+    preapproval = await mpRequest("/preapproval", {
+      method: "POST",
+      body: JSON.stringify({
+        reason: plan.name,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: Number(Number(plan.price).toFixed(2)),
+          currency_id: "BRL",
+        },
+        back_url: backUrl,
+        status: "pending",
+        payer_email: user.email || `${user.id}@carrosnacidade.local`,
+        notification_url: notificationUrl,
+        metadata,
+      }),
+    });
+  } catch (err) {
+    logger.error(
+      {
+        ...buildDomainFields({
+          action: "payments.checkout.subscription",
+          result: "error",
+          requestId,
+          userId: user.id,
+        }),
+        planId: plan.id,
+        reason: "preapproval_create_failed",
+        upstreamStatus: err?.upstreamStatus ?? null,
+        err: err?.message,
+      },
+      "[payments] criação do preapproval falhou no Mercado Pago"
+    );
+    throw err;
+  }
 
   await insertPaymentIntent({
     id: intentId,

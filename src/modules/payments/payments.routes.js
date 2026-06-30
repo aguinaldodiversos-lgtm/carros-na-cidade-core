@@ -80,6 +80,7 @@ router.post(
     const payload = await createPlanSubscription({
       userId: req.user.id,
       planId,
+      requestId: req.requestId,
       ...resolvePublicUrls(req),
     });
 

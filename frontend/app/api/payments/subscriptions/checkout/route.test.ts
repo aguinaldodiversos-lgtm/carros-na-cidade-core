@@ -120,3 +120,68 @@ describe("BFF /api/payments/subscriptions/checkout — guard de produção", () 
     expect(res.status).toBe(400);
   });
 });
+
+describe("BFF /api/payments/subscriptions/checkout — observabilidade do erro", () => {
+  function mockAuthOk() {
+    vi.doMock("@/lib/http/bff-session", () => ({
+      authenticateBffRequest: async () => ({ ok: true, ctx: { session: { accessToken: "tok" } } }),
+      applyBffCookies: (res: unknown) => res,
+    }));
+    vi.doMock("@/lib/env/backend-api", () => ({
+      resolveInternalBackendApiUrl: () =>
+        "http://backend.internal/api/payments/subscriptions/checkout",
+    }));
+    vi.doMock("@/lib/http/client-ip", () => ({
+      buildBffBackendForwardHeaders: () => ({}),
+    }));
+  }
+
+  it("repassa a MESSAGE real do backend (não o boolean error) e mantém o status", async () => {
+    (process.env as Record<string, string>).NODE_ENV = "development";
+    mockAuthOk();
+
+    // Backend responde { success:false, error:true, message:"<causa>" } — `error`
+    // é BOOLEAN. A BFF deve devolver a `message`, não `true`.
+    const backendMsg =
+      "Mercado Pago error (400): Invalid value for back_url, must be a valid URL";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 502,
+        json: async () => ({ success: false, error: true, message: backendMsg, requestId: "r1" }),
+      }))
+    );
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toBe(backendMsg); // ← causa real, NÃO `true`
+    expect(consoleSpy).toHaveBeenCalled(); // logou a causa no caminho !ok
+  });
+
+  it("usa `error` do backend quando vier como STRING (compat) e não há message", async () => {
+    (process.env as Record<string, string>).NODE_ENV = "development";
+    mockAuthOk();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "plan_id nao suportado nesta rota dedicada" }),
+      }))
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("plan_id nao suportado nesta rota dedicada");
+  });
+});
