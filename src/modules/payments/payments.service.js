@@ -93,6 +93,36 @@ function getBackendPublicUrl() {
 }
 
 /**
+ * URL pública do FRONTEND (onde o usuário é redirecionado após o checkout),
+ * NÃO do backend. Usada como `back_url` do preapproval (assinatura). O
+ * Mercado Pago valida `back_url` de forma ESTRITA no endpoint /preapproval
+ * (diferente do /checkout/preferences do boost, que é leniente): precisa ser
+ * uma URL absoluta `https://`. Por isso aqui exigimos https público e
+ * falhamos com mensagem clara se não houver — em vez de deixar o MP devolver
+ * um 400 genérico ("Invalid value for back_url").
+ *
+ * Lê das mesmas envs de frontend já usadas no projeto (workers, SEO):
+ * FRONTEND_URL → SITE_URL → NEXT_PUBLIC_SITE_URL → PUBLIC_SITE_URL.
+ */
+export function getFrontendPublicUrl() {
+  const value =
+    process.env.FRONTEND_URL?.trim() ||
+    process.env.SITE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.PUBLIC_SITE_URL?.trim() ||
+    "";
+
+  const url = stripTrailingSlash(value);
+  if (!/^https:\/\/[^/\s]+/i.test(url)) {
+    throw new AppError(
+      "URL pública do frontend (https) não configurada para back_url da assinatura. Defina FRONTEND_URL (ex.: https://carrosnacidade.com).",
+      500
+    );
+  }
+  return url;
+}
+
+/**
  * URL canônica do webhook do Mercado Pago (raiz do backend). Fonte única usada
  * tanto no corpo da preference/preapproval quanto no log de criação — assim o
  * log do Render reflete exatamente o que foi gravado no recurso do MP.
@@ -459,6 +489,11 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
   });
 
   const notificationUrl = getWebhookNotificationUrl();
+  // back_url do preapproval: o MP valida estritamente (precisa ser https
+  // pública absoluta). NÃO usamos `successUrl` (derivado do origin do request,
+  // que pode ser http/localhost/origin interno) — montamos a partir da URL
+  // pública do frontend. Boost (preference) permanece intocado.
+  const backUrl = `${getFrontendPublicUrl()}/pagamento/sucesso`;
   const preapproval = await mpRequest("/preapproval", {
     method: "POST",
     body: JSON.stringify({
@@ -469,7 +504,7 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
         transaction_amount: Number(Number(plan.price).toFixed(2)),
         currency_id: "BRL",
       },
-      back_url: successUrl,
+      back_url: backUrl,
       status: "pending",
       payer_email: user.email || `${user.id}@carrosnacidade.local`,
       notification_url: notificationUrl,

@@ -43,6 +43,16 @@ const REJECTED_PLAN_IDS = Object.freeze(["cnpj-evento-premium", "cpf-premium-hig
 const LIVE_SUBSCRIPTION_STATUSES = Object.freeze(["active", "pending", "paused"]);
 
 /**
+ * Origem de uma concessão MANUAL de plano (cortesia/teste do admin). Espelha
+ * `GRANT_SOURCE` em src/modules/admin/advertisers/advertiser-plan-grant.constants.js
+ * — definida localmente para não acoplar o módulo de pagamentos ao de admin.
+ *
+ * Cortesia (admin_grant) NÃO conta como assinatura paga: o lojista de cortesia
+ * pode fazer upgrade para o plano pago sem bater no bloqueio de duplicata.
+ */
+const ADMIN_GRANT_SOURCE = "admin_grant";
+
+/**
  * Whitelist + blacklist explícita.
  *
  *   - planId em REJECTED_PLAN_IDS    → 410 (anti-revival)
@@ -90,15 +100,60 @@ export async function findLiveSubscriptionForUser(userId) {
 }
 
 /**
- * Bloqueio de duplicata: 409 quando user já tem sub viva. Lança
- * `AppError.statusCode=409` com mensagem detalhada (plano + status)
- * para o frontend orientar o user.
+ * Procura uma assinatura PAGA "viva" (active/pending/paused) do user — exclui
+ * concessão de cortesia (source='admin_grant'). "Paga" = source != admin_grant
+ * E (payment_id OU provider não-nulo). Mesmo critério de
+ * admin-advertisers.repository.findLivePaidSubscription.
+ *
+ * Usada SÓ pelo bloqueio de duplicata: uma cortesia (admin_grant) não impede o
+ * lojista de assinar o plano pago (upgrade cortesia → pago).
+ */
+export async function findLivePaidSubscriptionForUser(userId) {
+  const result = await query(
+    `
+    SELECT
+      user_id,
+      plan_id,
+      status,
+      source,
+      payment_id,
+      provider,
+      created_at
+    FROM user_subscriptions
+    WHERE user_id = $1
+      AND COALESCE(source, '') <> $2
+      AND (payment_id IS NOT NULL OR provider IS NOT NULL)
+      AND status = ANY($3::text[])
+      AND (expires_at IS NULL OR expires_at > NOW())
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [userId, ADMIN_GRANT_SOURCE, LIVE_SUBSCRIPTION_STATUSES]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Bloqueio de duplicata: 409 quando user já tem assinatura PAGA viva. Uma
+ * concessão de cortesia (admin_grant) NÃO bloqueia — o lojista de cortesia
+ * pode fazer upgrade para o plano pago.
+ *
+ * APOSENTADORIA DA CORTESIA (Fase 2): quando a assinatura paga ATIVAR (via
+ * webhook subscription_preapproval/authorized_payment), a ativação deve
+ * cancelar o admin_grant ainda ativo do usuário — paga substitui cortesia.
+ * Isso é responsabilidade da Fase 2 (ativação), NÃO deste guard. Motivo: se as
+ * duas convivessem ativas, o sweep de expiração da cortesia
+ * (expireDueGrantsForUser → revertEffectivePlanInTx) poderia, ao vencer o
+ * prazo da cortesia, REBAIXAR um cliente que está pagando. Ver
+ * src/modules/admin/advertisers/admin-advertisers.repository.js (createGrant já
+ * faz essa substituição entre concessões manuais — a Fase 2 fará o equivalente
+ * de pago sobre cortesia).
  */
 export async function assertNoLiveSubscriptionFor(userId) {
-  const live = await findLiveSubscriptionForUser(userId);
+  const live = await findLivePaidSubscriptionForUser(userId);
   if (live) {
     throw new AppError(
-      `Usuario ja possui assinatura ativa (plano: ${live.plan_id}, status: ${live.status}).`,
+      `Usuario ja possui assinatura paga ativa (plano: ${live.plan_id}, status: ${live.status}).`,
       409
     );
   }
