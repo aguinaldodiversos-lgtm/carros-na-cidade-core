@@ -16,6 +16,11 @@ import {
 } from "./subscriptions.guards.js";
 import { getBoostOptions, getCommercialRules } from "../commercial/commercial-rules.service.js";
 import { resolveCheckoutExecution, assertSubscriptionsRealAllowed } from "./payments.gate.js";
+import {
+  classifyWebhookTopic,
+  handleSubscriptionPreapprovalEvent,
+  handleSubscriptionAuthorizedPaymentEvent,
+} from "./subscriptions.webhook.js";
 
 /**
  * Guard: bloqueia checkout/subscription para planos do produto Evento
@@ -1076,7 +1081,30 @@ export async function handleWebhookNotification({
   requestId,
   dataId,
   traceRequestId,
+  topicHint = null,
 }) {
+  const payload = rawBody ? JSON.parse(rawBody) : {};
+  const topic = classifyWebhookTopic(topicHint || payload.type || payload.topic);
+
+  // Tópicos irrelevantes (merchant_order, feed v2.0, etc.): ACK 200 e ignora.
+  // Classificado ANTES da assinatura — não acionamos nada, então não há 401.
+  if (topic === "other") {
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "payments.webhook.ignore_topic",
+          result: "success",
+          requestId: traceRequestId,
+        }),
+        topic: String(topicHint || payload.type || payload.topic || "").toLowerCase() || null,
+        ignored: true,
+      },
+      "[payments] webhook tópico irrelevante — ACK 200 e ignorado"
+    );
+    return { ok: true, ignored: true, reason: "irrelevant_topic" };
+  }
+
+  // Tópicos acionáveis (payment avulso + assinatura) exigem assinatura válida.
   const isValid = verifyWebhookSignature(
     signature,
     requestId,
@@ -1097,8 +1125,7 @@ export async function handleWebhookNotification({
     throw new AppError("invalid signature", 401);
   }
 
-  const payload = rawBody ? JSON.parse(rawBody) : {};
-  const resourceId = String(payload?.data?.id ?? "");
+  const resourceId = String(payload?.data?.id ?? dataId ?? "");
   if (!resourceId) {
     logger.info(
       {
@@ -1114,11 +1141,21 @@ export async function handleWebhookNotification({
     return { ok: true, ignored: true };
   }
 
-  const topic = payload.type === "preapproval" ? "preapproval" : "payment";
+  // ── Assinatura (Fase 1: detectar + logar, SEM mutação) ──
+  if (topic === "subscription_preapproval") {
+    return handleSubscriptionPreapprovalEvent({ preapprovalId: resourceId, traceRequestId });
+  }
+  if (topic === "subscription_authorized_payment") {
+    return handleSubscriptionAuthorizedPaymentEvent({
+      authorizedPaymentId: resourceId,
+      traceRequestId,
+    });
+  }
 
+  // ── Pagamento avulso (destaque/boost) + plano one_time: PRODUÇÃO, INALTERADO ──
   let paymentData;
   try {
-    paymentData = await fetchPaymentStatus(resourceId, topic);
+    paymentData = await fetchPaymentStatus(resourceId, "payment");
   } catch (err) {
     // 404 do MP = recurso (pagamento/preapproval) não existe. Acontece com o
     // simulador (data.id=123456) e com notificações órfãs. NÃO é erro fatal:

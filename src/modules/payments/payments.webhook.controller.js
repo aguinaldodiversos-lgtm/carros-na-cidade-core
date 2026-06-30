@@ -14,11 +14,14 @@ import { handleWebhookNotification } from "./payments.service.js";
  */
 export async function mercadoPagoWebhookController(req, res, next) {
   try {
+    const topicHint =
+      req.query?.type || req.query?.topic || req.body?.type || req.body?.topic || null;
     const payload = await handleWebhookNotification({
       rawBody: req.rawBody || JSON.stringify(req.body || {}),
       signature: req.headers["x-signature"] || null,
       requestId: req.headers["x-request-id"] || null,
       dataId: req.query?.["data.id"] || req.query?.id || req.body?.data?.id || null,
+      topicHint,
       traceRequestId: req.requestId,
     });
     res.json(payload);

@@ -90,6 +90,27 @@ export async function getPreapproval(preapprovalId) {
 }
 
 /**
+ * Busca um authorized_payment (cobrança mensal de uma preapproval). Usado
+ * pelo webhook do tópico subscription_authorized_payment para obter o
+ * preapproval_id de origem e o status da cobrança.
+ * Doc: https://www.mercadopago.com.br/developers/pt/reference/subscriptions/_authorized_payments_id/get
+ */
+export async function getAuthorizedPayment(authorizedPaymentId) {
+  if (isMercadoPagoMockMode()) {
+    return {
+      id: authorizedPaymentId,
+      preapproval_id: `mock-preapproval-${authorizedPaymentId}`,
+      status: "processed",
+      payment: { status: "approved" },
+      mock: true,
+    };
+  }
+  return mpRequest(`/authorized_payments/${encodeURIComponent(authorizedPaymentId)}`, {
+    method: "GET",
+  });
+}
+
+/**
  * Cancela uma preapproval no Mercado Pago. Idempotente: chamar 2 vezes
  * não dá erro — segunda chamada simplesmente confirma cancellation.
  */
