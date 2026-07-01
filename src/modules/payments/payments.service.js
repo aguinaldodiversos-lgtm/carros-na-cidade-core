@@ -531,6 +531,10 @@ export async function createPlanSubscription({ userId, planId, successUrl, reque
         },
         back_url: backUrl,
         status: "pending",
+        // 2º caminho de resolução do webhook (além de payment_intents.
+        // checkout_resource_id): o MP ecoa external_reference no GET /preapproval
+        // e no authorized_payment, permitindo casar user+plano de forma robusta.
+        external_reference: intentId,
         payer_email: user.email || `${user.id}@carrosnacidade.local`,
         notification_url: notificationUrl,
         metadata,

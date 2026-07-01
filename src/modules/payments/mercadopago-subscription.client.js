@@ -101,6 +101,7 @@ export async function getAuthorizedPayment(authorizedPaymentId) {
       id: authorizedPaymentId,
       preapproval_id: `mock-preapproval-${authorizedPaymentId}`,
       status: "processed",
+      transaction_amount: 149.9,
       payment: { status: "approved" },
       mock: true,
     };

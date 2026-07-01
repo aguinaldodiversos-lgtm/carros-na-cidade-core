@@ -44,19 +44,12 @@ function stubFetchByUrl(routes) {
   return calls;
 }
 
-describe("webhook — roteamento por tópico (Fase 1)", () => {
-  it("subscription_preapproval → GET /preapproval/{id}, resolve por provider_preapproval_id, applied:false", async () => {
+describe("webhook — roteamento por tópico (Fase 2)", () => {
+  it("subscription_preapproval → GET /preapproval/{id}, resolve via payment_intents, NÃO ativa (applied:false)", async () => {
     const calls = stubFetchByUrl({ "/preapproval/PRE-1": { id: "PRE-1", status: "authorized" } });
+    // findPlanIntentByPreapprovalId → payment_intents (checkout_resource_id).
     dbMock.query.mockResolvedValueOnce({
-      rows: [
-        {
-          user_id: "u1",
-          plan_id: "cnpj-store-pro",
-          status: "active",
-          provider_preapproval_id: "PRE-1",
-          created_at: "2026-01-01",
-        },
-      ],
+      rows: [{ id: "intent-1", user_id: "u1", plan_id: "cnpj-store-pro" }],
     });
 
     const res = await handleWebhookNotification({
@@ -73,33 +66,31 @@ describe("webhook — roteamento por tópico (Fase 1)", () => {
       mp_status: "authorized",
       local_status: "active",
       resolved: true,
-      applied: false,
+      applied: false, // benefício só com pagamento aprovado
     });
     expect(calls.some((u) => u.includes("/preapproval/PRE-1"))).toBe(true);
-    expect(calls.some((u) => u.includes("/v1/payments"))).toBe(false); // não tocou pagamento
-    expect(dbMock.withTransaction).not.toHaveBeenCalled(); // não mutou
+    expect(calls.some((u) => u.includes("/v1/payments"))).toBe(false);
+    expect(dbMock.withTransaction).not.toHaveBeenCalled(); // NÃO ativa no preapproval
   });
 
-  it("subscription_authorized_payment → GET /authorized_payments/{id}, extrai preapproval_id, applied:false", async () => {
+  it("subscription_authorized_payment approved + valor + intent → ATIVA (applied:true)", async () => {
     const calls = stubFetchByUrl({
       "/authorized_payments/AP-1": {
         id: "AP-1",
         preapproval_id: "PRE-1",
         status: "processed",
+        transaction_amount: 149.9,
         payment: { status: "approved" },
       },
     });
-    dbMock.query.mockResolvedValueOnce({
-      rows: [
-        {
-          user_id: "u1",
-          plan_id: "cnpj-store-pro",
-          status: "active",
-          provider_preapproval_id: "PRE-1",
-          created_at: "2026-01-01",
-        },
-      ],
+    // findPlanIntentByPreapprovalId → intent (user+plano).
+    dbMock.query.mockResolvedValue({
+      rows: [{ id: "intent-1", user_id: "u1", plan_id: "cnpj-store-pro" }],
     });
+    // withTransaction executa a callback; ledger INSERT retorna 1 linha (pagamento novo).
+    dbMock.withTransaction.mockImplementation(async (fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rows: [{ id: 1 }] }) })
+    );
 
     const res = await handleWebhookNotification({
       rawBody: JSON.stringify({ type: "subscription_authorized_payment", data: { id: "AP-1" } }),
@@ -111,15 +102,13 @@ describe("webhook — roteamento por tópico (Fase 1)", () => {
 
     expect(res).toMatchObject({
       topic: "subscription_authorized_payment",
-      authorized_payment_id: "AP-1",
       preapproval_id: "PRE-1",
-      ap_status: "processed",
-      payment_status: "approved",
+      amount: 149.9,
       resolved: true,
-      applied: false,
+      applied: true,
     });
     expect(calls.some((u) => u.includes("/authorized_payments/AP-1"))).toBe(true);
-    expect(dbMock.withTransaction).not.toHaveBeenCalled();
+    expect(dbMock.withTransaction).toHaveBeenCalled(); // ativou
   });
 
   it("merchant_order → ACK 200 ignored, sem fetch e sem 401", async () => {
