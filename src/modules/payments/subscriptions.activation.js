@@ -53,8 +53,12 @@ export async function recordPaymentAndActivate({
   planId,
   authorizedPaymentId,
   amount,
+  client = null,
 }) {
-  return withTransaction(async (client) => {
+  // Quando `client` é passado (chamada de dentro do webhook, que já abriu uma
+  // transação), roda NA MESMA transação — evita transação aninhada e mantém
+  // atomicidade com o UPDATE do payment_intent. Senão, abre a própria.
+  const run = async (client) => {
     // 1) Ledger de idempotência — só um authorized_payment novo prossegue.
     const ins = await client.query(
       `
@@ -109,7 +113,9 @@ export async function recordPaymentAndActivate({
     );
 
     return { activated: true };
-  });
+  };
+
+  return client ? run(client) : withTransaction(run);
 }
 
 /**
@@ -123,8 +129,10 @@ export async function recordUnresolvedApprovedPayment({
   amount = null,
   reason,
   payload = {},
+  client = null,
 }) {
-  await query(
+  const exec = client ? (sql, params) => client.query(sql, params) : query;
+  await exec(
     `
     INSERT INTO subscription_reconciliation
       (authorized_payment_id, provider_preapproval_id, amount, status, reason, payload)

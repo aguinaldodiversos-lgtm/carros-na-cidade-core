@@ -129,6 +129,54 @@ describe("webhook — roteamento por tópico (Fase 2)", () => {
     expect(calls.length).toBe(0);
   });
 
+  it("type=payment que resolve intent RECORRENTE (preapproval) → ativa via Fase 2, NÃO usa o caminho legado", async () => {
+    const intentRow = {
+      id: "intent-rec",
+      user_id: "u1",
+      plan_id: "cnpj-store-pro",
+      context: "plan",
+      checkout_resource_type: "preapproval",
+      checkout_resource_id: "PRE-1",
+      status: "pending",
+      metadata: { payment_type: "recurring" },
+    };
+    stubFetchByUrl({
+      "/v1/payments/PAYREC-1": {
+        id: "PAYREC-1",
+        status: "approved",
+        transaction_amount: 79.9,
+        metadata: { intent_id: "intent-rec" },
+        external_reference: "intent-rec",
+      },
+    });
+    dbMock.query.mockResolvedValue({ rows: [intentRow] }); // getPaymentIntentById
+    const clientCalls = [];
+    const clientQuery = vi.fn(async (sql) => {
+      clientCalls.push(String(sql));
+      return { rows: [intentRow] };
+    });
+    dbMock.withTransaction.mockImplementation(async (fn) => fn({ query: clientQuery }));
+
+    const res = await handleWebhookNotification({
+      rawBody: JSON.stringify({ type: "payment", data: { id: "PAYREC-1" } }),
+      signature: null,
+      requestId: null,
+      dataId: "PAYREC-1",
+      traceRequestId: "t-rec",
+    });
+
+    expect(res).toMatchObject({ ok: true });
+    expect(dbMock.withTransaction).toHaveBeenCalled();
+    // Fase 2: gravou contracted_amount (só recordPaymentAndActivate faz)
+    expect(
+      clientCalls.some((s) => /INSERT INTO user_subscriptions/.test(s) && /contracted_amount/.test(s))
+    ).toBe(true);
+    // NÃO usou o upsertPlanPayment legado (que faz DO UPDATE SET status na payments)
+    expect(clientCalls.some((s) => /INSERT INTO payments/.test(s) && /DO UPDATE/.test(s))).toBe(
+      false
+    );
+  });
+
   it("payment avulso (boost) → segue caminho de produção: GET /v1/payments/{id}, NÃO toca /preapproval", async () => {
     const calls = stubFetchByUrl({
       "/v1/payments/PAY-1": {

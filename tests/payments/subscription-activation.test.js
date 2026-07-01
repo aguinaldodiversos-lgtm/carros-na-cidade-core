@@ -83,6 +83,21 @@ describe("recordPaymentAndActivate", () => {
     expect(grantCall.params).toContain("admin_grant");
   });
 
+  it("com `client` passado, roda na MESMA transação (não abre outra withTransaction)", async () => {
+    const { client: c, calls } = txClient([{ rows: [{ id: 1 }] }]);
+    const res = await activation.recordPaymentAndActivate({
+      preapprovalId: "PRE-1",
+      userId: "u1",
+      planId: "cnpj-store-pro",
+      authorizedPaymentId: "AP-1",
+      amount: 149.9,
+      client: c,
+    });
+    expect(res).toEqual({ activated: true });
+    expect(db.withTransaction).not.toHaveBeenCalled(); // usou o client do webhook
+    expect(calls.some((x) => x.sql.includes("INSERT INTO payments"))).toBe(true);
+  });
+
   it("idempotência: pagamento duplicado (ledger 0 linhas) NÃO reativa nem estende", async () => {
     const { client: c, calls } = txClient([{ rows: [] }]); // ledger: conflito (duplicado)
     db.withTransaction.mockImplementation(async (fn) => fn(c));

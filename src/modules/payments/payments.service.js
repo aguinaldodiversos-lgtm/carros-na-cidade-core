@@ -21,6 +21,10 @@ import {
   handleSubscriptionPreapprovalEvent,
   handleSubscriptionAuthorizedPaymentEvent,
 } from "./subscriptions.webhook.js";
+import {
+  recordPaymentAndActivate,
+  recordUnresolvedApprovedPayment,
+} from "./subscriptions.activation.js";
 
 /**
  * Guard: bloqueia checkout/subscription para planos do produto Evento
@@ -1317,75 +1321,110 @@ export async function handleWebhookNotification({
     );
 
     if (lockedIntent.context === "plan" && lockedIntent.plan_id) {
-      const plan = await getPlanById(lockedIntent.plan_id);
-      if (!plan) {
-        throw new AppError("Plano nao encontrado para confirmacao.", 404);
-      }
+      // Cobrança RECORRENTE (assinatura): o preapproval AVULSO entrega a cobrança
+      // como type=payment (não subscription_authorized_payment). Roteia para a
+      // ATIVAÇÃO da Fase 2 — EXCLUSIVO com o caminho legado (if/else): um mesmo
+      // evento nunca aciona os dois. Idempotência por payments.mercado_pago_id.
+      const isRecurring =
+        lockedIntent.checkout_resource_type === "preapproval" ||
+        mergedMetadata?.payment_type === "recurring";
 
-      await upsertPlanPayment(client, lockedIntent, paymentData);
+      if (isRecurring) {
+        if (paymentData.status === "approved" && Number(paymentData.amount) > 0) {
+          // amount = valor REAL da cobrança (fetchPaymentStatus → transaction_amount).
+          await recordPaymentAndActivate({
+            preapprovalId: lockedIntent.checkout_resource_id,
+            userId: lockedIntent.user_id,
+            planId: lockedIntent.plan_id,
+            authorizedPaymentId: paymentData.mercadoPagoId,
+            amount: Number(paymentData.amount),
+            client, // mesma transação do webhook — sem transação aninhada
+          });
+        } else if (paymentData.status === "approved") {
+          // Approved SEM valor confiável → reconciliação (não ativa com 0).
+          await recordUnresolvedApprovedPayment({
+            authorizedPaymentId: paymentData.mercadoPagoId,
+            preapprovalId: lockedIntent.checkout_resource_id,
+            amount: null,
+            reason: "amount_missing",
+            payload: { via: "payment_topic", intentId: lockedIntent.id },
+            client,
+          });
+        }
+        // status != approved (pending/rejected/canceled) é Fase 4 — nao ativa
+        // nem rebaixa aqui; o UPDATE do payment_intent acima ja basta.
+      } else {
+        // Pagamento ÚNICO de plano (one_time) — caminho legado INALTERADO.
+        const plan = await getPlanById(lockedIntent.plan_id);
+        if (!plan) {
+          throw new AppError("Plano nao encontrado para confirmacao.", 404);
+        }
 
-      const subscriptionStatus = resolveSubscriptionStatus(paymentData.status);
-      const expiresAt =
-        subscriptionStatus === "active" ? resolveExpiryDate(plan.validity_days) : null;
+        await upsertPlanPayment(client, lockedIntent, paymentData);
 
-      if (subscriptionStatus === "active") {
-        await client.query(
-          `
-          UPDATE user_subscriptions
-          SET status = 'canceled',
-              expires_at = NOW()
-          WHERE user_id = $1
-            AND payment_id IS DISTINCT FROM $2
-            AND status IN ('active', 'pending')
-          `,
-          [lockedIntent.user_id, paymentData.mercadoPagoId]
-        );
-      }
+        const subscriptionStatus = resolveSubscriptionStatus(paymentData.status);
+        const expiresAt =
+          subscriptionStatus === "active" ? resolveExpiryDate(plan.validity_days) : null;
 
-      await upsertUserSubscription(client, {
-        userId: lockedIntent.user_id,
-        planId: lockedIntent.plan_id,
-        paymentId: paymentData.mercadoPagoId,
-        status: subscriptionStatus,
-        expiresAt,
-      });
+        if (subscriptionStatus === "active") {
+          await client.query(
+            `
+            UPDATE user_subscriptions
+            SET status = 'canceled',
+                expires_at = NOW()
+            WHERE user_id = $1
+              AND payment_id IS DISTINCT FROM $2
+              AND status IN ('active', 'pending')
+            `,
+            [lockedIntent.user_id, paymentData.mercadoPagoId]
+          );
+        }
 
-      if (subscriptionStatus === "active") {
-        await client.query(
-          `
-          UPDATE users
-          SET plan_id = $2
-          WHERE id = $1
-          `,
-          [lockedIntent.user_id, lockedIntent.plan_id]
-        );
-      } else if (subscriptionStatus === "canceled") {
-        const activeSubscriptionResult = await client.query(
-          `
-          SELECT 1
-          FROM user_subscriptions
-          WHERE user_id = $1
-            AND status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
-          LIMIT 1
-          `,
-          [lockedIntent.user_id]
-        );
+        await upsertUserSubscription(client, {
+          userId: lockedIntent.user_id,
+          planId: lockedIntent.plan_id,
+          paymentId: paymentData.mercadoPagoId,
+          status: subscriptionStatus,
+          expiresAt,
+        });
 
-        if (!activeSubscriptionResult.rows[0]) {
-          // Sem assinatura ativa: rebaixa para o gratuito correspondente ao
-          // tipo de documento (CPF -> cpf-free-essential, CNPJ -> cnpj-free-store).
+        if (subscriptionStatus === "active") {
           await client.query(
             `
             UPDATE users
-            SET plan_id = CASE
-              WHEN UPPER(COALESCE(document_type, '')) = 'CNPJ' THEN 'cnpj-free-store'
-              ELSE 'cpf-free-essential'
-            END
+            SET plan_id = $2
             WHERE id = $1
+            `,
+            [lockedIntent.user_id, lockedIntent.plan_id]
+          );
+        } else if (subscriptionStatus === "canceled") {
+          const activeSubscriptionResult = await client.query(
+            `
+            SELECT 1
+            FROM user_subscriptions
+            WHERE user_id = $1
+              AND status = 'active'
+              AND (expires_at IS NULL OR expires_at > NOW())
+            LIMIT 1
             `,
             [lockedIntent.user_id]
           );
+
+          if (!activeSubscriptionResult.rows[0]) {
+            // Sem assinatura ativa: rebaixa para o gratuito correspondente ao
+            // tipo de documento (CPF -> cpf-free-essential, CNPJ -> cnpj-free-store).
+            await client.query(
+              `
+              UPDATE users
+              SET plan_id = CASE
+                WHEN UPPER(COALESCE(document_type, '')) = 'CNPJ' THEN 'cnpj-free-store'
+                ELSE 'cpf-free-essential'
+              END
+              WHERE id = $1
+              `,
+              [lockedIntent.user_id]
+            );
+          }
         }
       }
     }
