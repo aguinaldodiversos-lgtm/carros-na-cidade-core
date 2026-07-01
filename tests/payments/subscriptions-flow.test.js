@@ -42,8 +42,9 @@ vi.mock("../../src/shared/config/features.js", () => ({
 
 const account = await import("../../src/modules/account/account.service.js");
 const db = await import("../../src/infrastructure/database/db.js");
-const { createSubscriptionCheckout, cancelUserSubscription, ALLOWED_SUBSCRIPTION_PLAN_IDS } =
-  await import("../../src/modules/payments/subscriptions.service.js");
+const { createSubscriptionCheckout, cancelUserSubscription } = await import(
+  "../../src/modules/payments/subscriptions.service.js"
+);
 const { mapPreapprovalStatusToLocal } = await import(
   "../../src/modules/payments/mercadopago-subscription.client.js"
 );
@@ -55,6 +56,7 @@ const PLAN_START = {
   price: 79.9,
   is_active: true,
   billing_model: "monthly",
+  subscribable: true,
   validity_days: 30,
 };
 const PLAN_PRO = {
@@ -64,6 +66,7 @@ const PLAN_PRO = {
   price: 149.9,
   is_active: true,
   billing_model: "monthly",
+  subscribable: true,
   validity_days: 30,
 };
 
@@ -91,18 +94,11 @@ beforeEach(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
-// Whitelist de planos
+// Elegibilidade DATA-DRIVEN (subscribable && is_active && mensal) — sem whitelist fixa
 // ─────────────────────────────────────────────────────────────────────
 
-describe("createSubscriptionCheckout — whitelist de planos (anti-Evento)", () => {
-  it("ALLOWED_SUBSCRIPTION_PLAN_IDS contém EXATAMENTE Start e Pro", () => {
-    expect([...ALLOWED_SUBSCRIPTION_PLAN_IDS].sort()).toEqual([
-      "cnpj-store-pro",
-      "cnpj-store-start",
-    ]);
-  });
-
-  it("rejeita cnpj-evento-premium com 410 (produto desligado, anti-revival)", async () => {
+describe("createSubscriptionCheckout — elegibilidade data-driven", () => {
+  it("rejeita cnpj-evento-premium com 410 (Evento dormente, anti-revival — refuseEventPlanCheckout)", async () => {
     await expect(
       createSubscriptionCheckout({
         userId: "u1",
@@ -112,33 +108,54 @@ describe("createSubscriptionCheckout — whitelist de planos (anti-Evento)", () 
     ).rejects.toMatchObject({ statusCode: 410 });
   });
 
-  it("rejeita cpf-premium-highlight com 410 (descontinuado, substituído por boost)", async () => {
+  it("rejeita plano NÃO assinável (subscribable=false) com 400, mesmo sendo mensal e ativo", async () => {
+    account.getPlanById.mockResolvedValue({
+      id: "cpf-premium-highlight",
+      type: "CPF",
+      price: 79.9,
+      is_active: true,
+      billing_model: "monthly",
+      subscribable: false,
+    });
     await expect(
       createSubscriptionCheckout({
         userId: "u1",
         planId: "cpf-premium-highlight",
         successUrl: "http://x/ok",
       })
-    ).rejects.toMatchObject({ statusCode: 410 });
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it("rejeita plano inexistente com 400 (mensagem inclui whitelist)", async () => {
+  it("rejeita plano INATIVO (is_active=false) com 404 — some de novas assinaturas (grandfathering)", async () => {
+    account.getPlanById.mockResolvedValue({
+      id: "cnpj-store-legacy",
+      type: "CNPJ",
+      price: 99.9,
+      is_active: false,
+      billing_model: "monthly",
+      subscribable: true,
+    });
+    await expect(
+      createSubscriptionCheckout({
+        userId: "u1",
+        planId: "cnpj-store-legacy",
+        successUrl: "http://x/ok",
+      })
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("rejeita plano inexistente com 404 (plano não encontrado)", async () => {
+    account.getPlanById.mockResolvedValue(null);
     await expect(
       createSubscriptionCheckout({
         userId: "u1",
         planId: "plan-inventado",
         successUrl: "http://x/ok",
       })
-    ).rejects.toThrow(/cnpj-store-start.*cnpj-store-pro/);
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it("rejeita plan_id vazio com 400", async () => {
-    await expect(
-      createSubscriptionCheckout({ userId: "u1", planId: "", successUrl: "http://x/ok" })
-    ).rejects.toMatchObject({ statusCode: 400 });
-  });
-
-  it("aceita cnpj-store-start (Start é whitelistado)", async () => {
+  it("ACEITA qualquer plano subscribable=true + is_active + mensal (Start)", async () => {
     account.getPlanById.mockResolvedValue(PLAN_START);
 
     const r = await createSubscriptionCheckout({
@@ -149,7 +166,7 @@ describe("createSubscriptionCheckout — whitelist de planos (anti-Evento)", () 
     expect(r.plan_id).toBe("cnpj-store-start");
   });
 
-  it("aceita cnpj-store-pro (Pro é whitelistado)", async () => {
+  it("ACEITA Pro (subscribable=true)", async () => {
     account.getPlanById.mockResolvedValue(PLAN_PRO);
 
     const r = await createSubscriptionCheckout({
@@ -158,6 +175,25 @@ describe("createSubscriptionCheckout — whitelist de planos (anti-Evento)", () 
       successUrl: "http://x/ok",
     });
     expect(r.plan_id).toBe("cnpj-store-pro");
+  });
+
+  it("ACEITA um plano NOVO criado pelo admin (data-driven: não exige mexer em código)", async () => {
+    account.getPlanById.mockResolvedValue({
+      id: "cnpj-store-max",
+      name: "Plano Loja Max",
+      type: "CNPJ",
+      price: 249.9,
+      is_active: true,
+      billing_model: "monthly",
+      subscribable: true,
+      validity_days: 30,
+    });
+    const r = await createSubscriptionCheckout({
+      userId: "u1",
+      planId: "cnpj-store-max",
+      successUrl: "http://x/ok",
+    });
+    expect(r.plan_id).toBe("cnpj-store-max");
   });
 });
 

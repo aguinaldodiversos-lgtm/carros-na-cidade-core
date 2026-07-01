@@ -14,23 +14,6 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { query } from "../../infrastructure/database/db.js";
 
 /**
- * Único conjunto de planos comerciais permitidos no fluxo de
- * assinatura recorrente da Fase 3C. Hardcoded (whitelist) para evitar
- * que admin cadastre um plano novo no banco e ele escape acidentalmente
- * para esse fluxo sem revisão de produto.
- */
-export const ALLOWED_SUBSCRIPTION_PLAN_IDS = Object.freeze(["cnpj-store-start", "cnpj-store-pro"]);
-
-/**
- * Planos explicitamente REJEITADOS mesmo que retornem como
- * is_active=true no banco ou flag de Evento ligue inadvertidamente.
- *
- *   - cnpj-evento-premium: produto Evento dormente
- *   - cpf-premium-highlight: descontinuado, substituído por boost-7d
- */
-const REJECTED_PLAN_IDS = Object.freeze(["cnpj-evento-premium", "cpf-premium-highlight"]);
-
-/**
  * Estados locais que contam como "assinatura ainda viva". Bloqueiam
  * criar uma nova nesse momento (evita cobrar 2x por engano).
  *
@@ -53,23 +36,24 @@ const LIVE_SUBSCRIPTION_STATUSES = Object.freeze(["active", "pending", "paused"]
 const ADMIN_GRANT_SOURCE = "admin_grant";
 
 /**
- * Whitelist + blacklist explícita.
+ * Elegibilidade ao checkout de assinatura, DATA-DRIVEN (sem whitelist fixa).
+ * Um plano é assinável quando: existe + is_active + subscribable + mensal.
+ * Assim, criar/editar plano no admin não exige mexer em código — basta marcar
+ * `subscribable=true` num plano mensal ativo.
  *
- *   - planId em REJECTED_PLAN_IDS    → 410 (anti-revival)
- *   - planId NÃO em ALLOWED_*        → 400 (mensagem cita whitelist)
- *
- * Roda ANTES de qualquer chamada à API do MP. Não toca banco.
+ * Recebe a ROW do plano (já carregada via getPlanById), com mensagens claras
+ * por caso. NÃO cobre o bloqueio de Evento (410, anti-revival), que fica em
+ * `refuseEventPlanCheckout` no service base, ANTES desta checagem.
  */
-export function assertSubscriptionPlanAllowed(planId) {
-  const id = String(planId || "").trim();
-  if (REJECTED_PLAN_IDS.includes(id)) {
-    throw new AppError(`Plano ${id} indisponivel para assinatura recorrente.`, 410);
+export function assertSubscribablePlan(plan) {
+  if (!plan || !plan.is_active) {
+    throw new AppError("Plano nao encontrado ou inativo.", 404);
   }
-  if (!ALLOWED_SUBSCRIPTION_PLAN_IDS.includes(id)) {
-    throw new AppError(
-      `plan_id deve ser um dos: ${ALLOWED_SUBSCRIPTION_PLAN_IDS.join(", ")}.`,
-      400
-    );
+  if (plan.billing_model !== "monthly") {
+    throw new AppError("Este plano nao e de assinatura mensal.", 400);
+  }
+  if (!plan.subscribable) {
+    throw new AppError("Plano nao esta disponivel para assinatura.", 400);
   }
 }
 

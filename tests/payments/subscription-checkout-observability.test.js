@@ -42,6 +42,7 @@ const PLAN_PRO = {
   price: 149.9,
   is_active: true,
   billing_model: "monthly",
+  subscribable: true,
   validity_days: 30,
 };
 

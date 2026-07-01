@@ -54,6 +54,7 @@ const PLAN_START = {
   price: 79.9,
   is_active: true,
   billing_model: "monthly",
+  subscribable: true,
   validity_days: 30,
 };
 

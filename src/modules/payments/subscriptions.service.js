@@ -25,19 +25,13 @@ import {
 } from "./mercadopago-subscription.client.js";
 import { createPlanSubscription } from "./payments.service.js";
 import {
-  ALLOWED_SUBSCRIPTION_PLAN_IDS,
   assertNoLiveSubscriptionFor,
-  assertSubscriptionPlanAllowed,
+  assertSubscribablePlan,
   findLiveSubscriptionForUser,
 } from "./subscriptions.guards.js";
 
-// Re-exporta para compat retroativa (Fase 3C importava daqui).
-export {
-  ALLOWED_SUBSCRIPTION_PLAN_IDS,
-  assertNoLiveSubscriptionFor,
-  assertSubscriptionPlanAllowed,
-  findLiveSubscriptionForUser,
-};
+// Re-exporta para compat retroativa (consumidores importavam daqui).
+export { assertNoLiveSubscriptionFor, assertSubscribablePlan, findLiveSubscriptionForUser };
 
 /**
  * Cria checkout de assinatura mensal Start ou Pro.
@@ -65,21 +59,12 @@ export async function createSubscriptionCheckout({
 }) {
   const id = String(planId || "").trim();
 
-  // 1. Whitelist explícita (defesa em profundidade — também aplicada
-  //    em createPlanSubscription pra cobrir o endpoint legacy).
-  assertSubscriptionPlanAllowed(id);
-
-  // 2. Bloqueio de duplicata.
+  // Bloqueio de duplicata cedo (defesa em profundidade). A elegibilidade
+  // data-driven (existe + is_active + subscribable + mensal) + o bloqueio de
+  // Evento (410) são aplicados dentro de createPlanSubscription — choke point
+  // único. Delegar garante simetria entre esta rota e a legacy /subscription.
   await assertNoLiveSubscriptionFor(userId);
 
-  // 3. Delega para createPlanSubscription que faz:
-  //    - validação adicional (is_active, billing_model='monthly', preço > 0)
-  //    - validação de tipo (CPF vs CNPJ)
-  //    - criação de payment_intents (context='plan', resource='preapproval')
-  //    - chamada ao MP (preapproval)
-  //    - retorna { plan_id, init_point, mercado_pago_id, public_key }
-  //
-  //    Preço vem 100% do banco/DEFAULT_PLANS — anti-spoof já existente.
   const result = await createPlanSubscription({
     userId,
     planId: id,

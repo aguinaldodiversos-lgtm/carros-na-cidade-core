@@ -19,7 +19,8 @@
 import { useState } from "react";
 
 type SubscriptionCheckoutButtonProps = {
-  planId: "cnpj-store-start" | "cnpj-store-pro";
+  // Aceita qualquer plano assinável (data-driven) — não mais só Start/Pro.
+  planId: string;
   label: string;
   variant?: "primary" | "outline";
 };

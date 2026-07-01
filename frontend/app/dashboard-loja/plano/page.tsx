@@ -92,8 +92,12 @@ export default async function LojaPlanoPage() {
     fetchPublicBoost(),
   ]);
 
-  const start = plans.find((p) => p.id === "cnpj-store-start");
-  const pro = plans.find((p) => p.id === "cnpj-store-pro");
+  // Vitrine DATA-DRIVEN: renderiza todos os planos assináveis e ativos
+  // (subscribable && is_active), sem nomes hardcoded. Ordena por peso
+  // decrescente (maior camada comercial primeiro, ex.: Pro antes de Start).
+  const subscribablePlans = plans
+    .filter((p) => p.subscribable && p.is_active)
+    .sort((a, b) => Number(b.weight ?? 0) - Number(a.weight ?? 0));
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -135,43 +139,29 @@ export default async function LojaPlanoPage() {
           }
         />
 
-        {pro ? (
+        {subscribablePlans.map((plan, idx) => (
           <PlanCardView
-            name={pro.name}
-            badge="RECOMENDADO"
-            price={formatBRL(pro.price)}
+            key={plan.id}
+            name={plan.name}
+            badge={plan.recommended ? "RECOMENDADO" : undefined}
+            price={formatBRL(plan.price)}
             period="/mês"
-            intro={pro.description || "Mais exposição e prioridade comercial para a loja."}
+            intro={plan.description || "Plano de assinatura mensal para a loja."}
             benefits={
-              pro.benefits?.length
-                ? pro.benefits
-                : [`Até ${pro.ad_limit} anúncios ativos`, "Prioridade superior na busca"]
+              plan.benefits?.length
+                ? plan.benefits
+                : [`Até ${plan.ad_limit} anúncios ativos`, "Mais presença nas listagens"]
             }
-            recommended
-            cta={<SubscriptionCheckoutButton planId="cnpj-store-pro" label="Assinar Pro" />}
-          />
-        ) : null}
-
-        {start ? (
-          <PlanCardView
-            name={start.name}
-            price={formatBRL(start.price)}
-            period="/mês"
-            intro={start.description || "Plano de entrada para lojas começarem a operação digital."}
-            benefits={
-              start.benefits?.length
-                ? start.benefits
-                : [`Até ${start.ad_limit} anúncios ativos`, "Mais presença nas listagens"]
-            }
+            recommended={Boolean(plan.recommended)}
             cta={
               <SubscriptionCheckoutButton
-                planId="cnpj-store-start"
-                label="Assinar Start"
-                variant="outline"
+                planId={plan.id}
+                label={`Assinar ${plan.name}`}
+                variant={idx === 0 ? "primary" : "outline"}
               />
             }
           />
-        ) : null}
+        ))}
 
         <PlanCardView
           name="Grátis"

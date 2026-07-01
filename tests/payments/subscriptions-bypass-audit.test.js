@@ -55,6 +55,7 @@ const PLAN_START = {
   price: 79.9,
   is_active: true,
   billing_model: "monthly",
+  subscribable: true,
   validity_days: 30,
 };
 
@@ -65,6 +66,7 @@ const PLAN_PRO = {
   price: 149.9,
   is_active: true,
   billing_model: "monthly",
+  subscribable: true,
   validity_days: 30,
 };
 
@@ -118,15 +120,15 @@ describe("AUDIT — createPlanSubscription (legacy POST /subscription)", () => {
     ).rejects.toMatchObject({ statusCode: 410 });
   });
 
-  it("REJEITA cpf-premium-highlight com 410 mesmo se admin mudar billing_model=monthly", async () => {
+  it("REJEITA cpf-premium-highlight com 400 (subscribable=false) mesmo se admin mudar billing_model=monthly", async () => {
     account.getPlanById.mockResolvedValue(PLAN_CPF_PREMIUM_FAKE_MONTHLY);
 
     await expect(
       createPlanSubscription({ userId: "u1", planId: "cpf-premium-highlight" })
-    ).rejects.toMatchObject({ statusCode: 410 });
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it("REJEITA plano fora da whitelist com 400 (mensagem cita Start/Pro)", async () => {
+  it("REJEITA plano não-assinável (subscribable ausente) com 400", async () => {
     account.getPlanById.mockResolvedValue({
       id: "plan-fake",
       type: "CNPJ",
@@ -136,9 +138,9 @@ describe("AUDIT — createPlanSubscription (legacy POST /subscription)", () => {
       validity_days: 30,
     });
 
-    await expect(createPlanSubscription({ userId: "u1", planId: "plan-fake" })).rejects.toThrow(
-      /cnpj-store-start.*cnpj-store-pro/
-    );
+    await expect(
+      createPlanSubscription({ userId: "u1", planId: "plan-fake" })
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("REJEITA criar 2ª assinatura quando user tem sub active (409)", async () => {
@@ -221,16 +223,16 @@ describe("AUDIT — simetria entre /subscriptions/checkout (nova) e /subscriptio
     ).rejects.toMatchObject({ statusCode: 410 });
   });
 
-  it("ambas rejeitam CPF Premium Highlight com 410", async () => {
+  it("ambas rejeitam CPF Premium Highlight com 400 (subscribable=false)", async () => {
     account.getPlanById.mockResolvedValue(PLAN_CPF_PREMIUM_FAKE_MONTHLY);
 
     await expect(
       createSubscriptionCheckout({ userId: "u1", planId: "cpf-premium-highlight" })
-    ).rejects.toMatchObject({ statusCode: 410 });
+    ).rejects.toMatchObject({ statusCode: 400 });
 
     await expect(
       createPlanSubscription({ userId: "u1", planId: "cpf-premium-highlight" })
-    ).rejects.toMatchObject({ statusCode: 410 });
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("ambas rejeitam duplicata com 409", async () => {
@@ -255,7 +257,7 @@ describe("AUDIT — simetria entre /subscriptions/checkout (nova) e /subscriptio
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
-  it("ambas rejeitam plano fake com 400", async () => {
+  it("ambas rejeitam plano não-assinável (subscribable ausente) com 400", async () => {
     account.getPlanById.mockResolvedValue({
       id: "plan-fake",
       type: "CNPJ",
@@ -265,13 +267,13 @@ describe("AUDIT — simetria entre /subscriptions/checkout (nova) e /subscriptio
       validity_days: 30,
     });
 
-    await expect(createSubscriptionCheckout({ userId: "u1", planId: "plan-fake" })).rejects.toThrow(
-      /cnpj-store-start.*cnpj-store-pro/
-    );
+    await expect(
+      createSubscriptionCheckout({ userId: "u1", planId: "plan-fake" })
+    ).rejects.toMatchObject({ statusCode: 400 });
 
-    await expect(createPlanSubscription({ userId: "u1", planId: "plan-fake" })).rejects.toThrow(
-      /cnpj-store-start.*cnpj-store-pro/
-    );
+    await expect(
+      createPlanSubscription({ userId: "u1", planId: "plan-fake" })
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 });
 

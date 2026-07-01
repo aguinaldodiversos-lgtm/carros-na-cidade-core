@@ -78,6 +78,7 @@ const PRO_PLAN_AD_LIMIT_GUARD = 1000;
 const DEFAULT_PLANS = [
   {
     id: "cpf-free-essential",
+    subscribable: false,
     name: "Plano Gratuito (Essencial)",
     type: "CPF",
     price: 0,
@@ -103,6 +104,7 @@ const DEFAULT_PLANS = [
   },
   {
     id: "cpf-premium-highlight",
+    subscribable: false,
     name: "Plano Destaque Premium",
     type: "CPF",
     price: 79.9,
@@ -130,6 +132,7 @@ const DEFAULT_PLANS = [
   },
   {
     id: "cnpj-free-store",
+    subscribable: false,
     name: "Plano Gratuito Loja",
     type: "CNPJ",
     price: 0,
@@ -155,6 +158,7 @@ const DEFAULT_PLANS = [
   },
   {
     id: "cnpj-store-start",
+    subscribable: true,
     name: "Plano Loja Start",
     type: "CNPJ",
     price: 79.9,
@@ -180,6 +184,7 @@ const DEFAULT_PLANS = [
   },
   {
     id: "cnpj-store-pro",
+    subscribable: true,
     name: "Plano Loja Pro",
     type: "CNPJ",
     price: 149.9,
@@ -206,6 +211,7 @@ const DEFAULT_PLANS = [
   },
   {
     id: "cnpj-evento-premium",
+    subscribable: false,
     name: "Plano Evento Premium",
     type: "CNPJ",
     price: 999.9,
@@ -303,6 +309,8 @@ function mapPlanRow(row) {
     description: String(row.description || ""),
     benefits: safeJsonArray(row.benefits),
     recommended: Boolean(row.recommended),
+    // Elegibilidade data-driven ao checkout de assinatura (migration 040).
+    subscribable: Boolean(row.subscribable),
   };
 }
 
@@ -417,7 +425,8 @@ async function queryPlansFromDatabase() {
         billing_model,
         description,
         benefits,
-        recommended
+        recommended,
+        subscribable
       FROM subscription_plans
       ORDER BY priority_level ASC, price ASC, name ASC
       `

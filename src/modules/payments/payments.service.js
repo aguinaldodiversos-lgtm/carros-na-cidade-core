@@ -12,7 +12,7 @@ import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import {
   assertNoLiveSubscriptionFor,
-  assertSubscriptionPlanAllowed,
+  assertSubscribablePlan,
 } from "./subscriptions.guards.js";
 import { getBoostOptions, getCommercialRules } from "../commercial/commercial-rules.service.js";
 import { resolveCheckoutExecution, assertSubscriptionsRealAllowed } from "./payments.gate.js";
@@ -395,24 +395,22 @@ export async function createPlanCheckout({
 }
 
 export async function createPlanSubscription({ userId, planId, successUrl, requestId }) {
+  // Evento (dormente) é bloqueado primeiro, com 410 anti-revival.
   refuseEventPlanCheckout(planId, "createPlanSubscription");
 
-  // Fase 3C — defesa em profundidade no service base: bloqueia
-  // qualquer chamada (legacy POST /subscription, scripts admin,
-  // futuros consumidores) que tente assinar plano fora da whitelist
-  // Start/Pro ou criar 2ª assinatura para o mesmo user.
-  // Detalhes em src/modules/payments/subscriptions.guards.js e
-  // tests/payments/subscriptions-bypass-audit.test.js.
-  assertSubscriptionPlanAllowed(planId);
+  // Defesa em profundidade: bloqueia 2ª assinatura viva do mesmo user.
   await assertNoLiveSubscriptionFor(userId);
 
   const [user, plan] = await Promise.all([getAccountUser(userId), getPlanById(planId)]);
 
-  if (!plan || !plan.is_active) {
-    throw new AppError("Plano nao encontrado ou inativo.", 404);
-  }
-  if (plan.billing_model !== "monthly" || Number(plan.price) <= 0) {
-    throw new AppError("Este endpoint aceita apenas assinaturas recorrentes.", 400);
+  // Elegibilidade DATA-DRIVEN (sem whitelist fixa): plano existe + is_active +
+  // subscribable + mensal. Criar plano novo assinável não exige tocar código.
+  // Ver src/modules/payments/subscriptions.guards.js e
+  // tests/payments/subscriptions-bypass-audit.test.js.
+  assertSubscribablePlan(plan);
+
+  if (Number(plan.price) <= 0) {
+    throw new AppError("Plano de assinatura precisa de preco maior que zero.", 400);
   }
   if (plan.type !== user.type) {
     throw new AppError("Plano incompativel com o tipo da conta.", 400);

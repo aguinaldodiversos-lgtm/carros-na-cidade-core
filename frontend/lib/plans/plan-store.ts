@@ -20,6 +20,8 @@ export type SubscriptionPlan = {
   description: string;
   benefits: string[];
   recommended?: boolean;
+  /** Elegibilidade data-driven ao checkout de assinatura (migration 040). */
+  subscribable?: boolean;
   /**
    * Campos opcionais alinhados à oferta oficial de lançamento. Backend
    * ainda não tem colunas dedicadas; são preenchidos no fallback e
@@ -28,8 +30,11 @@ export type SubscriptionPlan = {
    * o frontend já consome — campo opcional não quebra payload legado.
    */
   max_photos?: number;
-  /** Camada comercial alvo (espelha commercial_layer do ranking SQL). */
-  weight?: 1 | 2 | 3 | 4;
+  /**
+   * Camada comercial (espelha commercial_layer do ranking SQL). Decimal desde a
+   * migration 039 (ex.: 3.5 encaixa entre Pro=3 e boost=4).
+   */
+  weight?: number;
   video_360_enabled?: boolean;
   monthly_highlight_credits?: number;
 };

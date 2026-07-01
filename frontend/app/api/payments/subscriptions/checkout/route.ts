@@ -20,8 +20,6 @@ import { buildBffBackendForwardHeaders } from "@/lib/http/client-ip";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_PLANS = new Set(["cnpj-store-start", "cnpj-store-pro"]);
-
 function subscriptionsLive(): boolean {
   if (process.env.NODE_ENV !== "production") return true;
   return process.env.SUBSCRIPTIONS_LIVE === "1";
@@ -55,12 +53,9 @@ export async function POST(request: NextRequest) {
     if (!planId) {
       return NextResponse.json({ error: "plan_id e obrigatorio" }, { status: 400 });
     }
-    if (!ALLOWED_PLANS.has(planId)) {
-      return NextResponse.json(
-        { error: "plan_id nao suportado nesta rota dedicada" },
-        { status: 400 }
-      );
-    }
+    // Sem whitelist fixa: a elegibilidade (existe + is_active + subscribable +
+    // mensal) é validada no backend de forma data-driven (assertSubscribablePlan).
+    // O backend devolve 400 com mensagem clara para plano não-assinável.
 
     const backendUrl = resolveInternalBackendApiUrl("/api/payments/subscriptions/checkout");
     if (!backendUrl) {
