@@ -1,6 +1,7 @@
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { recordAdminAction } from "../admin.audit.js";
 import * as repo from "./admin-plans.repository.js";
+import { BOOST_LAYER_WEIGHT } from "../../ads/filters/ads-ranking.sql.js";
 
 /**
  * Faixas e enums canônicos. Espelha os CHECK do schema 020 + a auditoria
@@ -16,7 +17,6 @@ const BILLING_MODELS = Object.freeze(["free", "one_time", "monthly"]);
 const MAX_PRIORITY_LEVEL = 200;
 const MAX_AD_LIMIT = 100000;
 const MAX_PRICE = 1000000;
-const MAX_WEIGHT = 10;
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
 /**
@@ -53,7 +53,7 @@ function validateBenefits(value) {
   return value.map((s) => s.trim()).filter(Boolean);
 }
 
-function validatePlanFields(patch, { isCreate }) {
+export function validatePlanFields(patch, { isCreate }) {
   const sanitized = {};
 
   if (isCreate || "id" in patch) {
@@ -109,11 +109,22 @@ function validatePlanFields(patch, { isCreate }) {
   }
 
   if (isCreate || "weight" in patch) {
-    const w = Number(patch.weight ?? 1);
-    if (!isNonNegativeInt(w) || w === 0 || w > MAX_WEIGHT) {
-      throw new AppError(`weight deve ser inteiro 1..${MAX_WEIGHT}`, 400);
+    // Peso DECIMAL (camada comercial). Aceita ponto ou vírgula na entrada
+    // (UI pt-BR pode mandar "3,5"); armazena sempre com ponto (3.5).
+    const raw = patch.weight ?? 1;
+    const normalized = typeof raw === "string" ? raw.trim().replace(",", ".") : raw;
+    const w = Number(normalized);
+    if (!Number.isFinite(w) || w <= 0) {
+      throw new AppError("Peso do plano deve ser um número maior que zero.", 400);
     }
-    sanitized.weight = w;
+    if (w >= BOOST_LAYER_WEIGHT) {
+      throw new AppError(
+        `Peso de plano deve ser menor que ${BOOST_LAYER_WEIGHT}; o valor ${BOOST_LAYER_WEIGHT} é reservado ao destaque pago.`,
+        400
+      );
+    }
+    // 2 casas decimais (NUMERIC(4,2) no banco).
+    sanitized.weight = Math.round(w * 100) / 100;
   }
 
   if (isCreate || "billing_model" in patch) {

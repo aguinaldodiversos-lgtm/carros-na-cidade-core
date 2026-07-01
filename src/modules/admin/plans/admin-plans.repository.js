@@ -1,6 +1,18 @@
 import { query } from "../../../infrastructure/database/db.js";
 
 /**
+ * `weight` é NUMERIC(4,2) (migration 039) e o driver pg devolve NUMERIC como
+ * STRING. Antes era INTEGER (devolvido como number). Coagimos de volta para
+ * number para preservar o contrato da API (consumidores comparam/exibem como
+ * número). weight nulo → 1 (piso do sistema, espelha COALESCE(sp.weight,1)).
+ */
+function coercePlanRow(row) {
+  if (!row) return row;
+  const w = row.weight == null ? 1 : Number(row.weight);
+  return { ...row, weight: Number.isFinite(w) ? w : 1 };
+}
+
+/**
  * Lista todos os planos (active + inactive). Ordena por sort_order ASC,
  * priority_level ASC, name ASC. Inclui contagem de assinaturas ativas
  * em subquery — barato porque temos índice
@@ -42,7 +54,7 @@ export async function list({ includeInactive = true } = {}) {
      ${where}
      ORDER BY p.sort_order ASC, p.priority_level ASC, p.name ASC`
   );
-  return rows;
+  return rows.map(coercePlanRow);
 }
 
 export async function findById(id) {
@@ -63,7 +75,7 @@ export async function findById(id) {
      LIMIT 1`,
     [id]
   );
-  return rows[0] || null;
+  return rows[0] ? coercePlanRow(rows[0]) : null;
 }
 
 /**
@@ -137,7 +149,7 @@ export async function insert(plan) {
       public_visible,
     ]
   );
-  return rows[0] || null;
+  return rows[0] ? coercePlanRow(rows[0]) : null;
 }
 
 /**
@@ -197,7 +209,7 @@ export async function updatePartial(id, patch) {
      RETURNING *`,
     params
   );
-  return rows[0] || null;
+  return rows[0] ? coercePlanRow(rows[0]) : null;
 }
 
 /**

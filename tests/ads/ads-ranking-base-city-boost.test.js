@@ -199,18 +199,17 @@ describe("buildAdsSearchQuery — priority_tier canônico exposto no SELECT", ()
     expect(normalize(dataQuery)).toContain("AS priority_tier");
   });
 
-  it("priority_tier é exposto a partir do commercialLayerExpr (CASE 4>3>2>1)", () => {
+  it("priority_tier é exposto a partir do commercialLayerExpr (GREATEST boost/weight, pós-039)", () => {
     const { dataQuery } = buildAdsSearchQuery({});
     const sql = normalize(dataQuery);
     const aliasIdx = sql.indexOf("AS priority_tier");
     expect(aliasIdx).toBeGreaterThan(-1);
-    const caseStart = sql.lastIndexOf("CASE", aliasIdx);
-    expect(caseStart).toBeGreaterThan(-1);
-    const caseBody = sql.slice(caseStart, aliasIdx);
-    expect(caseBody).toContain("a.highlight_until > NOW() THEN 4");
-    expect(caseBody).toContain("COALESCE(sp.priority_level, 0) >= 80 THEN 3");
-    expect(caseBody).toContain("COALESCE(sp.priority_level, 0) >= 50 THEN 2");
-    expect(caseBody).toContain("ELSE 1");
+    const exprStart = sql.lastIndexOf("GREATEST", aliasIdx);
+    expect(exprStart).toBeGreaterThan(-1);
+    const exprBody = sql.slice(exprStart, aliasIdx);
+    expect(exprBody).toContain("a.highlight_until > NOW() THEN 4"); // boost = topo fixo
+    expect(exprBody).toContain("COALESCE(sp.weight, 1)"); // camada = weight do plano
+    expect(exprBody).not.toContain("priority_level");
   });
 
   it("priority_tier presente independente do sort escolhido", () => {

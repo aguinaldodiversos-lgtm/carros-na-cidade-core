@@ -21,6 +21,11 @@
  *
  * Quando `sp.priority_level` é null (plano não cadastrado, banco legado, ou
  * usuário sem plan_id), aplicamos um default neutro de 12.
+ *
+ * PAPEL (pós-039): `priority_level` NÃO define mais a CAMADA comercial — isso
+ * agora é `subscription_plans.weight` (ver `commercialLayerExpr`). Aqui,
+ * `priority_level` é apenas DESEMPATE FINO dentro da mesma camada (compõe o
+ * `hybrid_score`). Resumo: weight = camada; priority_level = desempate intra-camada.
  */
 export const planRankExpr = `(COALESCE(sp.priority_level, 12) * 0.32)`;
 
@@ -30,41 +35,64 @@ export const planRankExpr = `(COALESCE(sp.priority_level, 12) * 0.32)`;
 export const cityDemandBoostExpr = `LEAST(48, COALESCE(cm.demand_score, 0) * 0.28)`;
 
 /**
- * Camada comercial discreta (1–4) para ordenação determinística da listagem
- * pública. Política comercial alvo:
+ * Peso reservado do DESTAQUE pago (boost). É o TOPO da camada comercial e é
+ * FIXO — âncora estável de produção. NUNCA muda para acomodar planos novos:
+ * planos vivem estritamente abaixo dele (0 < weight < 4).
+ */
+export const BOOST_LAYER_WEIGHT = 4;
+
+/**
+ * Camada comercial para ordenação determinística da listagem pública —
+ * DATA-DRIVEN via `subscription_plans.weight` (NUMERIC, pós-039).
  *
- *   4 = Destaque ativo (highlight_until > NOW()) — pode ser de qualquer plano,
- *       inclusive Grátis com boost avulso (R$ 39,90/7d ou R$ 129,90/30d).
- *   3 = Lojista Pro                  — sp.priority_level >= 80
- *       Inclui: cnpj-store-pro (80), cnpj-evento-premium (100).
- *   2 = Lojista Start                — sp.priority_level >= 50
- *       Inclui: cnpj-store-start (60), cpf-premium-highlight (50).
- *   1 = Tudo o mais                  — Grátis CPF (0), Grátis CNPJ (5),
- *       plan_id NULL, qualquer plano legado não migrado.
+ * Fórmula:
+ *   GREATEST( destaque_ativo ? BOOST_LAYER_WEIGHT : 0 , COALESCE(sp.weight, 1) )
  *
- * O ranking de relevância (relevance) usa esta camada como chave PRIMÁRIA do
- * ORDER BY (DESC) e empurra `hybrid_score` para tiebreaker — garantindo
- * Destaque > Pro > Start > Grátis em todas as bordas territoriais.
+ * Pesos canônicos:
+ *   Grátis = 1, Start = 2, Pro = 3  (subscription_plans.weight)
+ *   Boost/Destaque ativo = 4        (BOOST_LAYER_WEIGHT, reservado, topo pago)
  *
- * Em busca textual (q), `text_rank` vira chave primária e `commercial_layer`
- * desce para tiebreaker — preserva intenção do visitante (regra "filtros e
- * texto não são atropelados por plano").
+ * Planos ocupam a faixa 0 < weight < 4. Para encaixar um plano ENTRE dois
+ * existentes, use decimal (ex.: 3.5 fica ESTRITAMENTE entre Pro=3 e boost=4)
+ * SEM alterar nenhum outro peso. `COALESCE(sp.weight, 1)` é o PISO: plano nulo/
+ * legado cai em 1 (nunca 0 — o sistema assume piso 1).
  *
- * Os limiares 50 e 80 mapeiam diretamente os priority_level seedados na
- * migration 020. Mudar o priority_level do plano em subscription_plans move
- * o plano de camada automaticamente — sem hardcode de plan_id aqui.
+ * Como o peso vira camada: mudar `subscription_plans.weight` (pelo admin) move
+ * o plano na ordenação automaticamente — sem tocar código nem limiares. O
+ * campo `priority_level` NÃO define mais camada (só desempate intra-camada no
+ * hybrid_score — ver `planRankExpr`).
+ *
+ * Decisão de produto: no máx. 3 planos ativos; um 4º plano só se justificado
+ * por ferramenta nova, encaixado por peso decimal.
+ *
+ * Comportamento preservado: com os pesos atuais (1/2/3 + boost 4), a ordenação
+ * é IDÊNTICA à anterior (Destaque > Pro > Start > Grátis).
+ *
+ * O ranking de relevância usa esta camada como chave PRIMÁRIA do ORDER BY
+ * (DESC), com `hybrid_score` como tiebreaker. Em busca textual (q), `text_rank`
+ * vira chave primária e a camada desce para tiebreaker.
  *
  * Requer `LEFT JOIN subscription_plans sp ON sp.id = u.plan_id` na query
  * (mesmo JOIN que `planRankExpr` consome).
  */
 export const commercialLayerExpr = `
-  (CASE
-    WHEN a.highlight_until > NOW() THEN 4
-    WHEN COALESCE(sp.priority_level, 0) >= 80 THEN 3
-    WHEN COALESCE(sp.priority_level, 0) >= 50 THEN 2
-    ELSE 1
-  END)
+  GREATEST(
+    (CASE WHEN a.highlight_until > NOW() THEN ${BOOST_LAYER_WEIGHT} ELSE 0 END),
+    COALESCE(sp.weight, 1)
+  )
 `;
+
+/**
+ * Espelho em JS de `commercialLayerExpr` (mesma fórmula). Mantido em sincronia
+ * pelo teste estrutural. Útil para provar ordenação decimal sem tocar o banco
+ * e para eventual cálculo client-side. weight nulo/NaN → piso 1.
+ */
+export function commercialLayerFor({ highlightActive = false, weight = null } = {}) {
+  const n = Number(weight);
+  const planWeight = weight == null || Number.isNaN(n) ? 1 : n;
+  const boost = highlightActive ? BOOST_LAYER_WEIGHT : 0;
+  return Math.max(boost, planWeight);
+}
 
 /**
  * Pontos de boost para anúncios da cidade-base num filtro multi-cidade.

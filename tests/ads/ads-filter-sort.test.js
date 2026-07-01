@@ -3,6 +3,7 @@ import { buildSortClause } from "../../src/modules/ads/filters/ads-filter.sort.j
 import {
   cityDemandBoostExpr,
   commercialLayerExpr,
+  commercialLayerFor,
   planRankExpr,
 } from "../../src/modules/ads/filters/ads-ranking.sql.js";
 
@@ -12,35 +13,65 @@ function normalize(sql) {
     .trim();
 }
 
-describe("commercialLayerExpr", () => {
+describe("commercialLayerExpr (data-driven por weight, pós-039)", () => {
   const sql = normalize(commercialLayerExpr);
 
-  it("é uma expressão CASE com 4 ramos discretos", () => {
-    expect(sql).toMatch(/^\(CASE/);
-    expect(sql).toMatch(/END\)$/);
-    expect((sql.match(/WHEN /g) || []).length).toBe(3);
+  it("é GREATEST(boost_se_ativo, COALESCE(sp.weight,1)) — camada vem do weight do plano", () => {
+    expect(sql).toMatch(/^GREATEST\(/);
+    expect(sql).toContain("COALESCE(sp.weight, 1)");
   });
 
-  it("camada 4 = highlight ativo (highlight_until > NOW)", () => {
-    expect(sql).toContain("WHEN a.highlight_until > NOW() THEN 4");
+  it("boost/destaque ativo é o topo FIXO = BOOST_LAYER_WEIGHT (4)", () => {
+    expect(sql).toContain("WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END");
   });
 
-  it("camada 3 = Pro com priority_level >= 80", () => {
-    expect(sql).toContain("WHEN COALESCE(sp.priority_level, 0) >= 80 THEN 3");
+  it("NÃO usa mais priority_level para definir a camada", () => {
+    expect(sql).not.toContain("priority_level");
   });
 
-  it("camada 2 = Start com priority_level >= 50", () => {
-    expect(sql).toContain("WHEN COALESCE(sp.priority_level, 0) >= 50 THEN 2");
+  it("piso = 1 via COALESCE (plano nulo/legado nunca cai em 0)", () => {
+    expect((sql.match(/COALESCE\(sp\.weight, 1\)/g) || []).length).toBe(1);
+    expect(sql).not.toMatch(/COALESCE\(sp\.weight, 0\)/);
+  });
+});
+
+describe("commercialLayerFor (espelho JS) — ordenação decimal e regressão", () => {
+  it("REGRESSÃO: pesos atuais reproduzem exatamente a ordem de hoje", () => {
+    expect(commercialLayerFor({ weight: 1 })).toBe(1); // Grátis
+    expect(commercialLayerFor({ weight: 2 })).toBe(2); // Start
+    expect(commercialLayerFor({ weight: 3 })).toBe(3); // Pro
+    // Destaque ativo é o topo, sobre qualquer plano.
+    expect(commercialLayerFor({ highlightActive: true, weight: 1 })).toBe(4);
+    expect(commercialLayerFor({ highlightActive: true, weight: 3 })).toBe(4);
+    // Ordem estrita preservada.
+    const order = [1, 2, 3, 4];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  it("ELSE 1 cobre Grátis, plano nulo e plano legado", () => {
-    expect(sql).toContain("ELSE 1");
+  it("weight=3.5 fica ESTRITAMENTE entre Pro (3.0) e boost (4.0)", () => {
+    const layer = commercialLayerFor({ weight: 3.5 });
+    expect(layer).toBe(3.5);
+    expect(layer).toBeGreaterThan(3);
+    expect(layer).toBeLessThan(4);
   });
 
-  it("usa COALESCE para tratar plan_id NULL como camada 1", () => {
-    // sp.priority_level pode ser NULL via LEFT JOIN — COALESCE evita que
-    // anúncios sem plano caiam por NULL > number = unknown.
-    expect((sql.match(/COALESCE\(sp\.priority_level, 0\)/g) || []).length).toBe(2);
+  it("3.4 < 3.5 < 3.6 mantém ordem relativa entre planos decimais", () => {
+    const a = commercialLayerFor({ weight: 3.4 });
+    const b = commercialLayerFor({ weight: 3.5 });
+    const c = commercialLayerFor({ weight: 3.6 });
+    expect(a).toBeLessThan(b);
+    expect(b).toBeLessThan(c);
+  });
+
+  it("weight nulo/indefinido → piso 1 (COALESCE)", () => {
+    expect(commercialLayerFor({ weight: null })).toBe(1);
+    expect(commercialLayerFor({})).toBe(1);
+  });
+
+  it("sincronia: o espelho JS bate com a fórmula do SQL (boost 4 + COALESCE weight 1)", () => {
+    const sql = normalize(commercialLayerExpr);
+    expect(sql).toContain("THEN 4"); // BOOST_LAYER_WEIGHT
+    expect(sql).toContain("COALESCE(sp.weight, 1)");
   });
 });
 

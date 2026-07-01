@@ -34,8 +34,9 @@ function whereSection(sql) {
 }
 
 function commercialLayerInWhere(sql) {
-  // commercialLayerExpr termina com `ELSE 1 END`. Único nessa seção.
-  return /ELSE 1 END/.test(whereSection(sql));
+  // commercialLayerExpr (pós-039) é GREATEST(..., COALESCE(sp.weight, 1)).
+  // `COALESCE(sp.weight, 1)` é único do commercialLayerExpr nessa seção.
+  return /COALESCE\(sp\.weight, 1\)/.test(whereSection(sql));
 }
 
 function sellerKindInWhere(sql) {
