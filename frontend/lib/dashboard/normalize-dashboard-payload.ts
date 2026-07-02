@@ -161,7 +161,13 @@ function normalizeAd(raw: unknown): DashboardAd | null {
     featured_until: typeof raw.featured_until === "string" ? raw.featured_until : null,
     priority_level: pl,
     views: toNum(raw.views, 0),
+    leads: toNum(raw.leads, 0),
     expires_at: typeof raw.expires_at === "string" ? raw.expires_at : new Date().toISOString(),
+    year: raw.year != null ? toNum(raw.year, 0) || null : null,
+    fuel_type: typeof raw.fuel_type === "string" ? raw.fuel_type : null,
+    transmission: typeof raw.transmission === "string" ? raw.transmission : null,
+    city: typeof raw.city === "string" ? raw.city : null,
+    state: typeof raw.state === "string" ? raw.state : null,
   };
 }
 

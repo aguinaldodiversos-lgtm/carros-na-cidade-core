@@ -735,7 +735,16 @@ function normalizeDashboardAd(row) {
     featured_until: featuredUntil,
     priority_level: isFeatured ? "high" : "normal",
     views: toNumber(row.views, 0),
+    // Leads por anúncio: default 0 aqui; getDashboardPayload sobrescreve com a
+    // contagem real da tabela `leads` (escopada ao dono).
+    leads: toNumber(row.leads, 0),
     expires_at: fallbackExpiry.toISOString(),
+    // Ficha do veículo para a coluna "Anúncio" do painel (dado real do ads).
+    year: row.year != null ? toNumber(row.year, 0) || null : null,
+    fuel_type: row.fuel_type ?? null,
+    transmission: row.transmission ?? null,
+    city: row.city ?? null,
+    state: row.state ?? null,
     // Motivos exibíveis no card (quando aplicável). Frontend só mostra se vier.
     moderation: {
       rejection_reason: row.rejection_reason || null,
@@ -759,9 +768,16 @@ export async function listOwnedAds(userId) {
         a.updated_at,
         a.images,
         a.rejection_reason,
-        a.correction_requested_reason
+        a.correction_requested_reason,
+        a.year,
+        a.city,
+        a.state,
+        a.fuel_type,
+        a.transmission,
+        COALESCE(m.views, 0) AS views
       FROM ads a
       JOIN advertisers adv ON adv.id = a.advertiser_id
+      LEFT JOIN ad_metrics m ON m.ad_id = a.id
       WHERE a.status IN (
         '${AD_STATUS.ACTIVE}',
         '${AD_STATUS.PAUSED}',
@@ -786,6 +802,40 @@ export async function listOwnedAds(userId) {
     return result.rows.map(normalizeDashboardAd);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Contagem REAL de leads (contatos de compradores) do dono, a partir da tabela
+ * `leads` (escopada por seller_id = user_id do dono). Retorna total e mapa por
+ * anúncio. DEFENSIVO: se a tabela não existir no ambiente, degrada para zero
+ * sem quebrar o dashboard (mesmo padrão de tolerância do restante do módulo).
+ *
+ * NOTA DE SCHEMA: a tabela `leads` não é criada por nenhuma migration do repo
+ * (só `ad_metrics` e `dealer_leads`). Em produção ela existe (fluxo
+ * leads.service.createLead), mas convém adicionar uma migration para torná-la
+ * reproduzível — ver relatório da Fase C.
+ */
+async function getLeadCountsForOwner(userId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT ad_id, COUNT(*)::int AS c FROM leads WHERE seller_id = $1 GROUP BY ad_id`,
+      [userId]
+    );
+    const byAdId = {};
+    let total = 0;
+    for (const r of rows) {
+      const n = toNumber(r.c, 0);
+      byAdId[String(r.ad_id)] = n;
+      total += n;
+    }
+    return { total, byAdId };
+  } catch (err) {
+    logger.warn(
+      { domain: "account.dashboard.leads", userId, err: err?.message },
+      "[account.dashboard] leitura de leads falhou (tabela ausente?) — usando 0"
+    );
+    return { total: 0, byAdId: {} };
   }
 }
 
@@ -925,10 +975,16 @@ export async function getDashboardPayload(userId, options = {}) {
 
   try {
     const user = await getAccountUser(userId);
-    const [ads, publishEligibility] = await Promise.all([
+    const [ads, publishEligibility, leadCounts] = await Promise.all([
       listOwnedAds(userId),
       resolvePublishEligibility(userId, user),
+      getLeadCountsForOwner(userId),
     ]);
+
+    // Anexa a contagem real de leads por anúncio (default 0 quando não há).
+    for (const ad of ads) {
+      ad.leads = leadCounts.byAdId[ad.id] ?? 0;
+    }
 
     const activeAds = ads.filter((ad) => ad.status === "active");
     const pausedAds = ads.filter((ad) => ad.status === "paused");
@@ -981,7 +1037,8 @@ export async function getDashboardPayload(userId, options = {}) {
         activeAds: stats.active_ads,
         highlightedAds: stats.featured_ads,
         views: stats.total_views,
-        leads: 0,
+        // Total real de leads do dono (tabela leads). 0 = realmente sem leads.
+        leads: leadCounts.total,
       },
       publish_eligibility: {
         allowed: publishEligibility.allowed,

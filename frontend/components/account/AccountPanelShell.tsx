@@ -257,7 +257,7 @@ export default function AccountPanelShell({
                 width={400}
                 height={100}
                 priority
-                className="h-9 w-auto max-w-[180px] object-contain object-left"
+                className="h-11 w-auto max-w-[200px] object-contain object-left"
                 style={{ mixBlendMode: "multiply" }}
               />
             </Link>
@@ -305,7 +305,10 @@ export default function AccountPanelShell({
               >
                 ← Voltar ao site
               </Link>
-              <AccountLogoutButton className="mt-3 block w-full px-1 text-left text-xs font-bold text-[#6b7280] hover:text-[#0e62d8] disabled:opacity-60" />
+              <AccountLogoutButton
+                label="Sair da conta"
+                className="mt-3 block w-full px-1 text-left text-xs font-bold text-[#6b7280] hover:text-[#0e62d8] disabled:opacity-60"
+              />
             </div>
           </aside>
 

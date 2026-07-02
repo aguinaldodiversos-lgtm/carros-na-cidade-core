@@ -5,9 +5,11 @@ import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
 
 type AccountLogoutButtonProps = {
   className?: string;
+  /** Rótulo do botão (default "Sair"). Ex.: "Sair da conta" na sidebar. */
+  label?: string;
 };
 
-export function AccountLogoutButton({ className }: AccountLogoutButtonProps) {
+export function AccountLogoutButton({ className, label = "Sair" }: AccountLogoutButtonProps) {
   const [busy, setBusy] = useState(false);
 
   async function handleLogout() {
@@ -36,7 +38,7 @@ export function AccountLogoutButton({ className }: AccountLogoutButtonProps) {
       className={className}
       data-testid="logout-btn"
     >
-      {busy ? "Saindo..." : "Sair"}
+      {busy ? "Saindo..." : label}
     </button>
   );
 }

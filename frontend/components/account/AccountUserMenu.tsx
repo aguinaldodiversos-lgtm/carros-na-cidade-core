@@ -18,7 +18,14 @@ type AccountUserMenuProps = {
 export default function AccountUserMenu({ userName, accountLabel }: AccountUserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const initial = userName.trim().slice(0, 1).toUpperCase() || "U";
+  const initials =
+    userName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join("") || "U";
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +54,7 @@ export default function AccountUserMenu({ userName, accountLabel }: AccountUserM
         className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition hover:bg-[#f1f5fb]"
       >
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1d2538] text-sm font-extrabold text-white">
-          {initial}
+          {initials}
         </span>
         <span className="hidden min-w-0 text-left sm:block">
           <span className="block truncate text-sm font-bold leading-tight text-[#1d2538]">

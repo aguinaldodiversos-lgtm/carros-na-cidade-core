@@ -40,7 +40,19 @@ export type DashboardAd = {
   featured_until: string | null;
   priority_level: DashboardPriorityLevel;
   views: number;
+  /**
+   * Leads (contatos) reais deste anúncio — tabela leads, escopado ao dono.
+   * Opcional: payloads reais/normalizados sempre preenchem (0 quando não há);
+   * mocks estáticos podem omitir. Leitura sempre com fallback `?? 0`.
+   */
+  leads?: number;
   expires_at: string;
+  /** Ficha do veículo para a coluna "Anúncio" do painel (dado real). */
+  year?: number | null;
+  fuel_type?: string | null;
+  transmission?: string | null;
+  city?: string | null;
+  state?: string | null;
   /** Mensagens da moderação (visíveis para o dono no card). Apenas se aplicável. */
   moderation?: {
     rejection_reason: string | null;
