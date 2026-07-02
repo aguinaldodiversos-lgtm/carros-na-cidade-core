@@ -60,32 +60,53 @@ export default function AccountDashboardView({
 
   const firstName = data.user.name.trim().split(/\s+/)[0] || data.user.name;
   const planLabel = data.current_plan?.name ?? data.stats.plan_name;
-  const accountBadge =
-    variant === "pf"
-      ? data.user.type === "pending"
-        ? "Conta — complete seus dados ao criar o primeiro anúncio"
-        : "Pessoa física · CPF"
-      : "Lojista · CNPJ";
+  const isPaidPlan = Boolean(data.current_plan && data.current_plan.billing_model !== "free");
+  const planDetailsHref = variant === "lojista" ? "/dashboard-loja/plano" : "/planos";
+  const homeSubtitle =
+    variant === "lojista"
+      ? "Aqui está o resumo da sua loja hoje."
+      : "Aqui está o resumo da sua conta hoje.";
 
   return (
     <div className="space-y-8" data-testid="dashboard-content" data-user-id={data.user.id}>
       {mode === "home" && (
-        <header className="space-y-2">
-          <p className="text-sm font-semibold text-[#6b7280]">{accountBadge}</p>
-          <h1 className="text-2xl font-extrabold tracking-tight text-[#0f172a] sm:text-3xl">
-            Olá, {firstName}!
-          </h1>
-          <p className="max-w-2xl text-sm text-[#64748b]">
-            Plano atual: <span className="font-semibold text-[#334155]">{planLabel}</span>
-            {data.stats.plan_limit > 0 ? (
-              <>
-                {" "}
-                · Limite de anúncios ativos:{" "}
-                <span className="font-semibold text-[#334155]">{data.stats.plan_limit}</span>
-              </>
-            ) : null}
-          </p>
-          <div className="flex flex-wrap gap-3 pt-2">
+        <header className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold tracking-tight text-[#0f172a] sm:text-3xl">
+              Olá, {firstName}! <span aria-hidden>👋</span>
+            </h1>
+            <p className="mt-1 text-sm text-[#64748b]">{homeSubtitle}</p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+            {/* Card compacto de plano — dado real (plano + limite). Status
+                derivado do billing_model (pago → Ativo; gratuito → Grátis),
+                sem dado novo. "Ver detalhes" leva à gestão do plano. */}
+            <div className="rounded-2xl border border-[#e8ecf4] bg-white px-4 py-3 shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-[#1d2538]">{planLabel}</span>
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    isPaidPlan
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {isPaidPlan ? "Ativo" : "Grátis"}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-[#64748b]">
+                {data.stats.active_ads}
+                {data.stats.plan_limit > 0 ? ` / ${data.stats.plan_limit}` : ""} anúncios ativos
+              </p>
+              <Link
+                href={planDetailsHref}
+                className="mt-1 inline-block text-xs font-bold text-[#0e62d8] hover:underline"
+              >
+                Ver detalhes do plano →
+              </Link>
+            </div>
+
             <Link
               href="/anunciar/novo"
               className="inline-flex h-11 items-center justify-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.2)] transition hover:brightness-110"

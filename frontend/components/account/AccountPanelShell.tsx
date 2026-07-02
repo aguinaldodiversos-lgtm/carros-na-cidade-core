@@ -1,9 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountLogoutButton } from "@/components/account/AccountLogoutButton";
+import AccountPlanCard from "@/components/account/AccountPlanCard";
+import AccountUserMenu from "@/components/account/AccountUserMenu";
+import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 
 export type AccountPanelVariant = "pf" | "lojista";
 
@@ -129,6 +133,51 @@ function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   ];
 }
 
+/**
+ * Sino de notificações — ESTÁTICO e SEM badge de contagem.
+ *
+ * Não existe sistema de notificações de usuário no backend hoje (a área de
+ * Mensagens é stub). Renderizamos o ícone para compor o topo como no mockup,
+ * mas sem número falso: nada de "2" hardcoded que não significa nada. Quando
+ * houver fonte real, este vira interativo com contagem verdadeira.
+ */
+function NotificationBell() {
+  return (
+    <span
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#94a3b8]"
+      title="Notificações — em breve"
+      aria-label="Notificações (nenhuma novidade por enquanto)"
+      data-testid="account-notifications-bell"
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9Z" />
+        <path d="M10.5 21a1.5 1.5 0 0 0 3 0" />
+      </svg>
+    </span>
+  );
+}
+
+/** Card de suporte da sidebar. "Abrir atendimento" → /contato (canal oficial). */
+function SupportCard() {
+  return (
+    <div className="rounded-2xl border border-[#dbe7fb] bg-[#eff5ff] p-4 text-center">
+      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#0e62d8]">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <path d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-1v-6h3M4 13v4a2 2 0 0 0 2 2h1v-6H4" />
+        </svg>
+      </div>
+      <p className="mt-2 text-sm font-bold text-[#1d2538]">Precisa de ajuda?</p>
+      <p className="mt-0.5 text-xs text-[#5a647d]">Fale com nosso time sempre que precisar.</p>
+      <Link
+        href="/contato"
+        className="mt-3 block rounded-lg border border-[#cfe0fc] bg-white px-3 py-2 text-sm font-bold text-[#0e62d8] transition hover:bg-[#f0f6ff]"
+      >
+        Abrir atendimento
+      </Link>
+    </div>
+  );
+}
+
 type AccountPanelShellProps = {
   basePath: "/dashboard" | "/dashboard-loja";
   variant: AccountPanelVariant;
@@ -147,7 +196,6 @@ export default function AccountPanelShell({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const nav = buildNav(basePath, variant);
-  const initial = userName.trim().slice(0, 1).toUpperCase() || "U";
 
   const isActive = (href: string) => {
     if (href === basePath) return pathname === basePath;
@@ -168,12 +216,15 @@ export default function AccountPanelShell({
             >
               Menu
             </button>
-            <Link
-              href="/anunciar/novo"
-              className="inline-flex h-10 items-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white"
-            >
-              + Novo anúncio
-            </Link>
+            <div className="flex items-center gap-2">
+              <AccountUserMenu userName={userName} accountLabel={accountLabel} />
+              <Link
+                href="/anunciar/novo"
+                className="inline-flex h-10 items-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white"
+              >
+                + Novo anúncio
+              </Link>
+            </div>
           </div>
           {mobileOpen && (
             <nav className="border-t border-[#eef1f6] px-2 pb-3 pt-1">
@@ -198,18 +249,20 @@ export default function AccountPanelShell({
 
         <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
           {/* Sidebar desktop */}
-          <aside className="sticky top-0 hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 flex-col border-r border-[#e8ecf4] bg-white px-4 py-8 lg:flex">
-            <div className="mb-8 flex items-center gap-3 px-1">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1d2538] text-lg font-extrabold text-white">
-                {initial}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate font-extrabold text-[#1d2538]">{userName}</p>
-                <p className="text-xs font-semibold text-[#6b7280]">{accountLabel}</p>
-              </div>
-            </div>
+          <aside className="sticky top-0 hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[#e8ecf4] bg-white px-4 py-8 lg:flex">
+            <Link href="/" className="mb-8 inline-flex shrink-0 items-center px-1" aria-label="Carros na Cidade">
+              <Image
+                src={SITE_LOGO_SRC}
+                alt="Carros na Cidade"
+                width={400}
+                height={100}
+                priority
+                className="h-9 w-auto max-w-[180px] object-contain object-left"
+                style={{ mixBlendMode: "multiply" }}
+              />
+            </Link>
 
-            <nav className="flex flex-1 flex-col gap-1">
+            <nav className="flex flex-col gap-1">
               {nav.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -229,6 +282,15 @@ export default function AccountPanelShell({
               })}
             </nav>
 
+            {/* MEU PLANO + suporte (Fase B) — dado real via card client. */}
+            <div className="mt-6 space-y-4">
+              <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[#94a3b8]">
+                Meu plano
+              </p>
+              <AccountPlanCard variant={variant} basePath={basePath} />
+              <SupportCard />
+            </div>
+
             <div className="mt-auto pt-6">
               <Link
                 href="/anunciar/novo"
@@ -247,7 +309,14 @@ export default function AccountPanelShell({
             </div>
           </aside>
 
-          <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:py-10">{children}</div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            {/* Top bar desktop (Fase B): sino estático + menu de usuário. */}
+            <div className="hidden items-center justify-end gap-3 px-6 pt-6 lg:flex">
+              <NotificationBell />
+              <AccountUserMenu userName={userName} accountLabel={accountLabel} />
+            </div>
+            <div className="px-4 py-6 sm:px-6 lg:pb-10 lg:pt-6">{children}</div>
+          </div>
         </div>
       </div>
     </div>
