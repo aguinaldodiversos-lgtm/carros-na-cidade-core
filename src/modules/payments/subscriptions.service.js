@@ -18,7 +18,7 @@
 
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
-import { withTransaction } from "../../infrastructure/database/db.js";
+import { query, withTransaction } from "../../infrastructure/database/db.js";
 import {
   cancelPreapproval,
   mapPreapprovalStatusToLocal,
@@ -173,5 +173,81 @@ export async function cancelUserSubscription({ userId, requestId }) {
     plan_id: sub.plan_id,
     status: localStatus,
     cancel_at_period_end: true,
+    // Data "até quando o benefício continua". O cancel só marca
+    // cancel_at_period_end=true e NÃO altera expires_at, então o valor lido na
+    // sub viva ainda é o correto. Devolvido aqui para a tela mostrar
+    // "ativa até [data]" imediatamente, sem refazer o GET /subscriptions/me.
+    expires_at: sub.expires_at ? new Date(sub.expires_at).toISOString() : null,
   };
+}
+
+/**
+ * Estados locais que contam como assinatura "viva" para a tela do lojista.
+ * Espelha LIVE_SUBSCRIPTION_STATUSES dos guards (mantido local para não
+ * exportar um detalhe interno dos guards só por causa desta leitura).
+ */
+const RENDERABLE_LIVE_STATUSES = Object.freeze(["active", "pending", "paused"]);
+
+/**
+ * Estado da assinatura do PRÓPRIO usuário para a tela "Plano e cobranças".
+ *
+ * READ-ONLY: não toca em nada. Escopo SEMPRE pela sessão (`userId` vem do JWT
+ * na rota, nunca do corpo/query do cliente) — é impossível pedir a assinatura
+ * de outro usuário.
+ *
+ * Retorna a linha mais recente que seja:
+ *   - viva (status active/pending/paused), OU
+ *   - já cancelada mas ainda dentro do período pago
+ *     (cancel_at_period_end=true e expires_at no futuro),
+ * para que a tela consiga mostrar "cancelada — ativa até [data]".
+ *
+ * Sem assinatura relevante (ex.: plano gratuito) → `{ status: 'none' }`,
+ * nunca um erro. `expires_at` é a coluna canônica "até quando o benefício
+ * continua" neste schema.
+ */
+export async function getMySubscription({ userId }) {
+  try {
+    const { rows } = await query(
+      `
+      SELECT
+        us.plan_id,
+        us.status,
+        us.expires_at,
+        us.cancel_at_period_end,
+        p.name AS plan_name
+      FROM user_subscriptions us
+      LEFT JOIN subscription_plans p ON p.id = us.plan_id
+      WHERE us.user_id = $1
+        AND (
+          us.status = ANY($2::text[])
+          OR (
+            COALESCE(us.cancel_at_period_end, false) = true
+            AND us.expires_at IS NOT NULL
+            AND us.expires_at > NOW()
+          )
+        )
+      ORDER BY us.created_at DESC
+      LIMIT 1
+      `,
+      [String(userId), RENDERABLE_LIVE_STATUSES]
+    );
+
+    const row = rows[0];
+    if (!row) return { status: "none" };
+
+    return {
+      status: row.status,
+      plan_id: row.plan_id,
+      plan_name: row.plan_name || null,
+      expires_at: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+      cancel_at_period_end: Boolean(row.cancel_at_period_end),
+    };
+  } catch (err) {
+    logger.error(
+      { domain: "subscriptions.read", userId, err: err?.message },
+      "[subscriptions] getMySubscription falhou"
+    );
+    // Degrada para "sem assinatura" — a tela não deve quebrar por causa disso.
+    return { status: "none" };
+  }
 }

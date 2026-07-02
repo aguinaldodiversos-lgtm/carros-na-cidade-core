@@ -42,7 +42,7 @@ vi.mock("../../src/shared/config/features.js", () => ({
 
 const account = await import("../../src/modules/account/account.service.js");
 const db = await import("../../src/infrastructure/database/db.js");
-const { createSubscriptionCheckout, cancelUserSubscription } = await import(
+const { createSubscriptionCheckout, cancelUserSubscription, getMySubscription } = await import(
   "../../src/modules/payments/subscriptions.service.js"
 );
 const { mapPreapprovalStatusToLocal } = await import(
@@ -383,6 +383,76 @@ describe("cancelUserSubscription — ownership e cancellation", () => {
     await expect(cancelUserSubscription({ userId: "u1" })).rejects.toMatchObject({
       statusCode: 500,
     });
+  });
+
+  it("retorna expires_at (Fase A) para a tela mostrar 'ativa até [data]' sem refazer o GET", async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          user_id: "u1",
+          plan_id: "cnpj-store-start",
+          status: "active",
+          payment_id: "MP-PAYMENT-123",
+          expires_at: "2026-08-01T00:00:00.000Z",
+          created_at: "2026-04-01T00:00:00Z",
+        },
+      ],
+    });
+
+    const r = await cancelUserSubscription({ userId: "u1" });
+    expect(r.cancelled).toBe(true);
+    expect(r.cancel_at_period_end).toBe(true);
+    // O cancel NÃO altera expires_at — devolve a data da sub viva.
+    expect(r.expires_at).toBe("2026-08-01T00:00:00.000Z");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// getMySubscription — leitura escopada por sessão (Fase A)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("getMySubscription — read-only, escopo por sessão", () => {
+  it("retorna { status: 'none' } quando não há assinatura relevante (plano gratuito)", async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    const r = await getMySubscription({ userId: "u1" });
+    expect(r).toEqual({ status: "none" });
+  });
+
+  it("retorna plano, status, expires_at e cancel_at_period_end da sub ativa", async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          plan_id: "cnpj-store-start",
+          status: "active",
+          expires_at: "2026-08-01T00:00:00.000Z",
+          cancel_at_period_end: false,
+          plan_name: "Plano Loja Start",
+        },
+      ],
+    });
+    const r = await getMySubscription({ userId: "u1" });
+    expect(r).toMatchObject({
+      status: "active",
+      plan_id: "cnpj-store-start",
+      plan_name: "Plano Loja Start",
+      cancel_at_period_end: false,
+    });
+    expect(r.expires_at).toBe("2026-08-01T00:00:00.000Z");
+  });
+
+  it("escopa a query SEMPRE pelo userId da sessão (nunca por id do cliente)", async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    await getMySubscription({ userId: "u-session-42" });
+    const call = db.query.mock.calls.at(-1);
+    expect(String(call[0])).toMatch(/FROM user_subscriptions/i);
+    // Primeiro parâmetro da query é o userId da sessão.
+    expect(call[1][0]).toBe("u-session-42");
+  });
+
+  it("degrada para { status: 'none' } (sem lançar) se a query falhar", async () => {
+    db.query.mockRejectedValueOnce(new Error("db down"));
+    const r = await getMySubscription({ userId: "u1" });
+    expect(r).toEqual({ status: "none" });
   });
 });
 

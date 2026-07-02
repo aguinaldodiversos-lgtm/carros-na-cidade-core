@@ -7,7 +7,11 @@ import {
   createPlanSubscription,
 } from "./payments.service.js";
 import { mercadoPagoWebhookController } from "./payments.webhook.controller.js";
-import { cancelUserSubscription, createSubscriptionCheckout } from "./subscriptions.service.js";
+import {
+  cancelUserSubscription,
+  createSubscriptionCheckout,
+  getMySubscription,
+} from "./subscriptions.service.js";
 
 const router = express.Router();
 
@@ -122,6 +126,20 @@ router.post(
       ...resolvePublicUrls(req),
     });
 
+    res.json(payload);
+  })
+);
+
+/**
+ * Estado da assinatura do próprio usuário (READ-ONLY). Escopo pela sessão:
+ * usa SÓ req.user.id do JWT — não aceita id de assinatura/usuário do cliente.
+ * Retorna { status:'none' } quando não há assinatura (ex.: plano gratuito).
+ */
+router.get(
+  "/subscriptions/me",
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const payload = await getMySubscription({ userId: req.user.id });
     res.json(payload);
   })
 );

@@ -4,6 +4,7 @@ import { requireLojistaDashboardSession } from "@/lib/account/dashboard-session"
 import { getPlansByType } from "@/lib/plans/plan-service";
 import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-boost";
 import SubscriptionCheckoutButton from "@/components/plans/SubscriptionCheckoutButton";
+import SubscriptionPanel from "@/components/plans/SubscriptionPanel";
 
 export const metadata: Metadata = {
   title: "Plano e cobranças",
@@ -110,10 +111,12 @@ export default async function LojaPlanoPage() {
       </header>
 
       {/*
-        Ponto de ancoragem para a próxima entrega: bloco "Sua assinatura"
-        (status active/paused/cancelled + histórico de cobranças) entra AQUI,
-        acima da grade — sem reestruturar a página.
+        Bloco "Sua assinatura": estado real (plano, status, próxima cobrança /
+        ativa até) + cancelamento com confirmação. Client component que busca
+        GET /api/payments/subscriptions/me; não renderiza nada para quem está
+        no plano gratuito ({status:'none'}).
       */}
+      <SubscriptionPanel />
 
       <section aria-label="Planos disponíveis" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Destaque 7 dias é POR ANÚNCIO (boost). Leva à escolha do anúncio,
