@@ -77,7 +77,12 @@ describe("BFF /api/payments/subscriptions/checkout — guard de produção", () 
     expect(res.status).toBe(401);
   });
 
-  it("rejeita plan_id fora do whitelist mesmo com flag ligada (defesa em camada)", async () => {
+  it("encaminha plano não-assinável ao backend e repassa a rejeição data-driven (sem whitelist no cliente)", async () => {
+    // Contrato atual (DIFF 1): a assinabilidade é DATA-DRIVEN e decidida no
+    // BACKEND (coluna subscribable), não no cliente. A BFF NÃO mantém whitelist
+    // fixa — encaminha ao backend, que rejeita plano não-assinável com mensagem
+    // clara. Reintroduzir whitelist aqui dessincronizaria dos planos
+    // configuráveis (o problema que o DIFF 1 resolveu).
     (process.env as Record<string, string>).NODE_ENV = "production";
     process.env.SUBSCRIPTIONS_LIVE = "1";
 
@@ -91,14 +96,35 @@ describe("BFF /api/payments/subscriptions/checkout — guard de produção", () 
       }),
       applyBffCookies: (res: unknown) => res,
     }));
+    vi.doMock("@/lib/env/backend-api", () => ({
+      resolveInternalBackendApiUrl: () =>
+        "http://backend.internal/api/payments/subscriptions/checkout",
+    }));
+    vi.doMock("@/lib/http/client-ip", () => ({
+      buildBffBackendForwardHeaders: () => ({}),
+    }));
 
-    const fetchSpy = vi.fn();
+    // Backend responde 400 { success:false, error:true, message } para plano
+    // não-assinável (assertSubscribablePlan). A BFF deve repassar a MESSAGE
+    // (string), não o boolean `error` — mesmo fix de observabilidade.
+    const backendMsg = "Plano nao esta disponivel para assinatura.";
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ success: false, error: true, message: backendMsg }),
+    }));
     vi.stubGlobal("fetch", fetchSpy);
+    vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { POST } = await import("./route");
     const res = await POST(makeRequest({ plan_id: "cpf-premium-highlight" }));
+
+    // BFF NÃO bloqueia no cliente: encaminha ao backend...
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // ...e repassa status + a causa real (não `true`).
     expect(res.status).toBe(400);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.error).toBe(backendMsg);
   });
 
   it("400 quando plan_id ausente (mesmo em dev)", async () => {
