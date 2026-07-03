@@ -18,6 +18,7 @@ import { getAiHealth } from "./seo/admin-seo-ai.service.js";
 import * as homeService from "./home/admin-home.service.js";
 import * as blogService from "./blog/admin-blog.service.js";
 import * as analyticsService from "../analytics/analytics.service.js";
+import * as supportAdminService from "../support/support.admin.service.js";
 import {
   getRegionalSettings,
   updateRegionalSettings,
@@ -1008,6 +1009,60 @@ router.get(
   "/analytics/posts/:id",
   asyncHandler(async (req, res) => {
     const data = await analyticsService.getPostMetrics(req.params.id);
+    res.json({ ok: true, data });
+  })
+);
+
+// =========================================================================
+// SUPPORT (chamados de suporte usuário↔admin)
+// =========================================================================
+
+/** Resumo por status (KPIs da fila). */
+router.get(
+  "/support/summary",
+  asyncHandler(async (_req, res) => {
+    const data = await supportAdminService.getSummary();
+    res.json({ ok: true, data });
+  })
+);
+
+/** Lista TODOS os chamados. Filtros: status, q (assunto/nome/e-mail), paginação. */
+router.get(
+  "/support/tickets",
+  asyncHandler(async (req, res) => {
+    const { data, total, limit, offset } = await supportAdminService.listTickets({
+      status: req.query.status,
+      q: req.query.q,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+    res.json({ ok: true, data, total, limit, offset });
+  })
+);
+
+/** Chamado + thread completa + dados do autor. */
+router.get(
+  "/support/tickets/:id",
+  asyncHandler(async (req, res) => {
+    const data = await supportAdminService.getTicket(req.params.id);
+    res.json({ ok: true, data });
+  })
+);
+
+/** Resposta do admin (author_role=admin). Move para 'em_andamento' + e-mail ao usuário. */
+router.post(
+  "/support/tickets/:id/messages",
+  asyncHandler(async (req, res) => {
+    const data = await supportAdminService.replyToTicket(req.user.id, req.params.id, req.body || {});
+    res.status(201).json({ ok: true, data });
+  })
+);
+
+/** Mudança manual de status (aberto | em_andamento | resolvido). */
+router.patch(
+  "/support/tickets/:id",
+  asyncHandler(async (req, res) => {
+    const data = await supportAdminService.changeStatus(req.params.id, req.body || {});
     res.json({ ok: true, data });
   })
 );

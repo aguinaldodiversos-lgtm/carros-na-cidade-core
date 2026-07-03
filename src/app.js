@@ -13,6 +13,7 @@
 //   /api/account     → modules/account/account.routes.js
 //   /api/payments    → modules/payments/payments.routes.js
 //   /api/leads       → modules/leads/leads.routes.js
+//   /api/support     → modules/support/support.routes.js (auth required)
 //   /api/ads         → modules/ads/ads.routes.js + modules/ads/ads.events.routes.js (POST …/event)
 //   /api/events      → modules/ads/events.routes.js (POST / — mesmo handler que ingest de ad_events)
 //   /api/admin       → modules/admin/admin.routes.js (auth + role=admin required)
@@ -44,6 +45,7 @@ import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
+import supportRoutes from "./modules/support/support.routes.js";
 import vehicleImagesRoutes from "./modules/vehicle-images/vehicle-images.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 
@@ -282,6 +284,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/leads", leadsRoutes);
+app.use("/api/support", supportRoutes);
 
 // /api/ads/search é o mais pesado; aplicar limit mais restritivo PRIMEIRO,
 // senão `adsListRateLimit` em /api/ads casa /search também.

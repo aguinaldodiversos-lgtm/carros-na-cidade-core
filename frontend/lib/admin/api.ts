@@ -392,6 +392,79 @@ export const adminApi = {
         { method: "POST", body: { reason } }
       ),
   },
+  support: {
+    /** Contadores por status (KPIs da fila de chamados). */
+    summary: () => adminFetch<ApiOne<SupportSummary>>("support/summary"),
+    /** Lista paginada. Filtros: status, q (assunto/nome/e-mail). */
+    list: (p: Record<string, string | number> = {}) =>
+      adminFetch<ApiList<SupportTicketAdminRow>>("support/tickets", {
+        params: Object.fromEntries(
+          Object.entries({ limit: 30, ...p }).map(([k, v]) => [k, String(v)])
+        ),
+      }),
+    /** Chamado + thread + dados do autor. */
+    get: (id: string | number) =>
+      adminFetch<ApiOne<SupportTicketDetail>>(`support/tickets/${id}`),
+    /** Resposta do admin (move para em_andamento + e-mail ao usuário). */
+    reply: (id: string | number, body: string) =>
+      adminFetch<ApiOne<{ ticket: SupportTicketAdminRow; message: SupportMessageRow }>>(
+        `support/tickets/${id}/messages`,
+        { method: "POST", body: { body } }
+      ),
+    /** Mudança manual de status. */
+    changeStatus: (id: string | number, status: SupportTicketStatus) =>
+      adminFetch<ApiOne<SupportTicketAdminRow>>(`support/tickets/${id}`, {
+        method: "PATCH",
+        body: { status },
+      }),
+  },
+};
+
+// ── Suporte (chamados usuário↔admin) ──
+
+export type SupportTicketStatus = "aberto" | "em_andamento" | "resolvido";
+export type SupportAuthorRole = "user" | "admin";
+export type SupportAccountType = "CPF" | "CNPJ" | "pending";
+
+export const SUPPORT_STATUS_LABEL: Record<SupportTicketStatus, string> = {
+  aberto: "Aberto",
+  em_andamento: "Em andamento",
+  resolvido: "Resolvido",
+};
+
+export type SupportTicketAdminRow = {
+  id: number;
+  user_id: number | null;
+  subject: string;
+  category: string | null;
+  status: SupportTicketStatus;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  user_name: string | null;
+  user_email: string | null;
+  user_document_type: string | null;
+  user_account_type: SupportAccountType;
+  message_count?: number;
+};
+
+export type SupportMessageRow = {
+  id: number;
+  ticket_id: number;
+  author_id: number | null;
+  author_role: SupportAuthorRole;
+  body: string;
+  created_at: string;
+};
+
+export type SupportTicketDetail = {
+  ticket: SupportTicketAdminRow;
+  messages: SupportMessageRow[];
+};
+
+export type SupportSummary = {
+  counts: { aberto: number; em_andamento: number; resolvido: number };
+  total: number;
 };
 
 // ── SEO/IA health (Fase 4.3 §15) ──

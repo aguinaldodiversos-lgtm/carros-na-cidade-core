@@ -14,6 +14,10 @@ const MAP: Record<string, { bg: string; text: string; label: string }> = {
   in_review: { bg: "bg-amber-100", text: "text-amber-700", label: "Em análise" },
   resolved: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Resolvida" },
   dismissed: { bg: "bg-gray-200", text: "text-gray-600", label: "Rejeitada" },
+  // Status de chamado de suporte (support_tickets)
+  aberto: { bg: "bg-blue-100", text: "text-blue-700", label: "Aberto" },
+  em_andamento: { bg: "bg-amber-100", text: "text-amber-700", label: "Em andamento" },
+  resolvido: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Resolvido" },
 };
 
 export function AdminStatusBadge({ status }: { status: string }) {

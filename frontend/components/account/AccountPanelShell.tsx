@@ -157,8 +157,9 @@ function NotificationBell() {
   );
 }
 
-/** Card de suporte da sidebar. "Abrir atendimento" → /contato (canal oficial). */
-function SupportCard() {
+/** Card de suporte da sidebar. "Abrir atendimento" → centro de chamados do
+ * painel (basePath/suporte), particular ou lojista conforme o painel atual. */
+function SupportCard({ basePath }: { basePath: string }) {
   return (
     <div className="rounded-2xl border border-[#dbe7fb] bg-[#eff5ff] p-4 text-center">
       <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#0e62d8]">
@@ -169,7 +170,7 @@ function SupportCard() {
       <p className="mt-2 text-sm font-bold text-[#1d2538]">Precisa de ajuda?</p>
       <p className="mt-0.5 text-xs text-[#5a647d]">Fale com nosso time sempre que precisar.</p>
       <Link
-        href="/contato"
+        href={`${basePath}/suporte`}
         className="mt-3 block rounded-lg border border-[#cfe0fc] bg-white px-3 py-2 text-sm font-bold text-[#0e62d8] transition hover:bg-[#f0f6ff]"
       >
         Abrir atendimento
@@ -288,7 +289,7 @@ export default function AccountPanelShell({
                 Meu plano
               </p>
               <AccountPlanCard variant={variant} basePath={basePath} />
-              <SupportCard />
+              <SupportCard basePath={basePath} />
             </div>
 
             <div className="mt-auto pt-6">
