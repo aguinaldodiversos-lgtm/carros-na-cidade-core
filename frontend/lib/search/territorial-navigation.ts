@@ -22,6 +22,31 @@ function toTotalBadge(value?: number) {
   return value.toLocaleString("pt-BR");
 }
 
+/**
+ * Limiar mínimo de inventário para uma página marca+cidade competir na busca.
+ * Abaixo disso a página é `noindex,follow` (inventário insuficiente + risco de
+ * thin content — mesma política das cidades sem estoque). Auditoria SEO
+ * 2026-07-03: "MENOS de 3" → precisa de >= 3 anúncios da marca na cidade.
+ */
+export const BRAND_CITY_MIN_INVENTORY = 3;
+
+/**
+ * Nº de anúncios do recorte da página (marca+cidade = anúncios da marca na
+ * cidade). Usa `stats.totalAds` (o "universo da página", mesmo número exibido
+ * no hero), com fallback para o sinal do backend e para a contagem de cards.
+ */
+export function getTerritorialInventoryCount(data: TerritorialPagePayload): number {
+  const candidates = [
+    data.stats?.totalAds,
+    data.seo?.activeCount,
+    data.sections?.ads?.length,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "number" && c > 0) return c;
+  }
+  return 0;
+}
+
 function getCanonicalPath(data: TerritorialPagePayload) {
   return data.seo?.canonicalPath || "";
 }

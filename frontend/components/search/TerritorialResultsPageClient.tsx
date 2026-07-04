@@ -26,9 +26,34 @@ import { SmartVehicleSearch } from "./SmartVehicleSearch";
 import { TerritorialBreadcrumbs } from "./TerritorialBreadcrumbs";
 import { TerritorialHeroLinks } from "./TerritorialHeroLinks";
 import { TerritorialInternalLinksSection } from "./TerritorialInternalLinksSection";
+import { BrandCityStats } from "./BrandCityStats";
 import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
 
 type TerritorialMode = "city" | "brand" | "model" | "opportunities" | "below_fipe";
+
+/**
+ * Remove o sufixo " | Carros na Cidade" do H1 (pertence ao <title>, não ao
+ * <h1>). O backend devolve `seo.title` já com o sufixo; sem strip o H1 ficava
+ * "Fiat em Atibaia - SP | Carros na Cidade" (auditoria SEO 2026-07-03).
+ */
+function stripSiteSuffix(value: string): string {
+  return value.replace(/\s*\|\s*Carros na Cidade\s*$/i, "").trim();
+}
+
+/** H1 único, sem nome do site. Para brand/model, constrói a partir dos dados
+ *  (garante "{Marca} em {Cidade} - {UF}"); senão usa o seo.title sem sufixo. */
+function buildHeroH1(data: TerritorialPagePayload, mode: TerritorialMode): string {
+  const city = data.city?.name?.trim();
+  const uf = data.city?.state ? ` - ${data.city.state}` : "";
+  if (mode === "brand" && data.brand?.name && city) {
+    return `${data.brand.name} em ${city}${uf}`;
+  }
+  if (mode === "model" && data.brand?.name && data.model?.name && city) {
+    return `${data.brand.name} ${data.model.name} em ${city}${uf}`;
+  }
+  const stripped = stripSiteSuffix(data.seo?.title || "");
+  return stripped || (city ? `Carros em ${city}${uf}` : "Resultados da cidade");
+}
 
 interface TerritorialResultsPageClientProps {
   mode: TerritorialMode;
@@ -260,10 +285,17 @@ export function TerritorialResultsPageClient({
           </span>
 
           <h1 className="text-2xl font-extrabold tracking-tight text-[#0f172a] md:text-[32px] md:leading-tight">
-            {data.seo?.title || "Resultados da cidade"}
+            {buildHeroH1(data, mode)}
           </h1>
 
-          {data.seo?.description ? (
+          {/*
+            Modo brand: intro data-driven + estatísticas locais da marca
+            (BrandCityStats) — conteúdo único por marca+cidade. Demais modos:
+            descrição do backend (ou fallback genérico).
+          */}
+          {mode === "brand" ? (
+            <BrandCityStats data={data} />
+          ) : data.seo?.description ? (
             <p className="max-w-4xl text-sm leading-7 text-[#64748b] md:text-[15px]">
               {data.seo.description}
             </p>
