@@ -9,6 +9,36 @@
 
 import { pool } from "../../infrastructure/database/db.js";
 
+/**
+ * Uma linha por cidade com a contagem de anúncios ATIVOS. `HAVING >= 1` traz
+ * todas as cidades com estoque; o limiar final (>= SITEMAP_MIN_ADS) é aplicado
+ * na camada de serviço (`buildCityEntries`). O `loc` canônico `/carros-em/[slug]`
+ * é montado no serviço.
+ */
+export async function listActiveCityRows(limit = 50000) {
+  const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
+
+  const result = await pool.query(
+    `
+    SELECT
+      c.slug AS city_slug,
+      c.state AS state,
+      COUNT(*)::int AS total,
+      MAX(a.updated_at) AS last_updated
+    FROM ads a
+    JOIN cities c ON c.id = a.city_id
+    WHERE a.status = 'active'
+    GROUP BY c.slug, c.state
+    HAVING COUNT(*) >= 1
+    ORDER BY COUNT(*) DESC
+    LIMIT $1
+    `,
+    [safeLimit]
+  );
+
+  return result.rows;
+}
+
 export async function listActiveCityBrandRows(limit = 50000) {
   const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
 

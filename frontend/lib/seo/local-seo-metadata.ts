@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
 import { getSiteUrl, toAbsoluteUrl } from "@/lib/seo/site";
+import { getSitemapMinAds } from "@/lib/seo/sitemap-min-ads";
 
 function truncateTitle(raw: string, max = 70): string {
   const t = raw.trim();
@@ -41,21 +42,20 @@ function resolveCanonical(model: LocalSeoLandingModel): string {
 }
 
 /**
- * Regras de indexação da landing local:
+ * Regras de indexação da landing local (limiar unificado — auditoria SEO
+ * 2026-07-04):
  *
- *  - Cidade SEM inventário ativo (`isEmptyCity`) → noindex,follow. Sem
- *    anúncios reais a página é conteúdo fino (thin content) — não pode
- *    competir por indexação, mas os links seguem navegáveis. (Correção 6
- *    / auditoria 2026-07-03: antes empty city "em"/"baratos" saía index=true,
- *    contrariando a política; alinhado aqui ao enriquecimento de conteúdo, que
- *    só se aplica a cidades com inventário real.)
+ *  - Estoque < `SITEMAP_MIN_ADS` (default 3) → noindex,follow. Mesmo limiar
+ *    usado pelo sitemap e pelas páginas de marca/modelo: "index" e "presença no
+ *    sitemap" usam a MESMA contagem de estoque. Cobre também `isEmptyCity` (0).
+ *    Proteção anti-thin-content: cidade com 1-2 anúncios não compete.
  *
  *  - `/carros-automaticos-em/[slug]` cobre uma intenção específica com pouca
  *    demanda própria e grande sobreposição com `/comprar/cidade/[slug]`. Em
  *    transição, recebe noindex,follow para impedir indexação concorrente.
  */
 function shouldIndexLocalSeo(model: LocalSeoLandingModel): boolean {
-  if (model.isEmptyCity) return false;
+  if ((model.totalAds ?? 0) < getSitemapMinAds()) return false;
   return model.variant !== "automaticos";
 }
 

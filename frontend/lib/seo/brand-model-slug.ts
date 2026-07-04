@@ -24,3 +24,32 @@ export function brandModelSlug(value: string | null | undefined): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+/**
+ * ESPELHO de `src/shared/utils/slugify.js`. Normalização CANÔNICA de MARCA
+ * (NÃO usar em modelo): remove o prefixo de grupo FIPE "ABBR - Marca"
+ * ("GM - Chevrolet" → "chevrolet", "VW - VolksWagen" → "volkswagen"). Marcas
+ * com hífen interno sem espaços ("Mercedes-Benz") não são afetadas. Modelos
+ * como "HB 20" (slug "hb-20") NUNCA passam por aqui.
+ */
+const BRAND_GROUP_PREFIX_RE = /^\S+\s+-\s+/;
+const BRAND_DISPLAY_OVERRIDES: Record<string, string> = { volkswagen: "Volkswagen" };
+
+export function stripBrandGroupPrefix(value: string | null | undefined): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const stripped = raw.replace(BRAND_GROUP_PREFIX_RE, "").trim();
+  return stripped || raw;
+}
+
+export function canonicalBrandSlug(value: string | null | undefined): string {
+  if (value === undefined || value === null) return "";
+  return brandModelSlug(stripBrandGroupPrefix(value));
+}
+
+export function canonicalBrandLabel(value: string | null | undefined): string {
+  const stripped = stripBrandGroupPrefix(value);
+  if (!stripped) return "";
+  const key = canonicalBrandSlug(stripped);
+  return BRAND_DISPLAY_OVERRIDES[key] || stripped;
+}

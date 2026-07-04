@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { brandModelSlug } from "./brand-model-slug";
+import { brandModelSlug, canonicalBrandSlug, canonicalBrandLabel } from "./brand-model-slug";
 
 /**
  * Fixtures compartilhadas com o backend
@@ -43,5 +43,28 @@ describe("brandModelSlug — slug canônico de marca/modelo", () => {
   it("acentos são removidos (NFD strip), espaços viram hífen", () => {
     expect(brandModelSlug("Citroën")).toBe("citroen");
     expect(brandModelSlug("São José dos Campos")).toBe("sao-jose-dos-campos");
+  });
+});
+
+/** Fixtures ESPELHADAS no backend (`src/shared/utils/brand-model-slug.test.js`). */
+const BRAND_CANONICAL_FIXTURES: Array<[string, string, string]> = [
+  ["GM - Chevrolet", "chevrolet", "Chevrolet"],
+  ["VW - VolksWagen", "volkswagen", "Volkswagen"],
+  ["Chevrolet", "chevrolet", "Chevrolet"],
+  ["volkswagen", "volkswagen", "Volkswagen"],
+  ["Fiat", "fiat", "Fiat"],
+  ["Land Rover", "land-rover", "Land Rover"],
+  ["Mercedes-Benz", "mercedes-benz", "Mercedes-Benz"],
+  ["Caoa Chery/Chery", "caoa-chery-chery", "Caoa Chery/Chery"],
+];
+
+describe("canonicalBrandSlug/Label — strip do prefixo de grupo FIPE (só marca)", () => {
+  it.each(BRAND_CANONICAL_FIXTURES)("brand(%p) → slug %p / label %p", (input, slug, label) => {
+    expect(canonicalBrandSlug(input)).toBe(slug);
+    expect(canonicalBrandLabel(input)).toBe(label);
+  });
+
+  it("modelo 'HB 20' segue 'hb-20' (não sofre strip de marca)", () => {
+    expect(brandModelSlug("HB 20")).toBe("hb-20");
   });
 });

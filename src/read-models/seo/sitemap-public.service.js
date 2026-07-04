@@ -1,6 +1,7 @@
 import * as sitemapPublicRepository from "./sitemap-public.repository.js";
 import { CLUSTER_TYPES } from "../../modules/seo/constants/seo-status.js";
 import {
+  listActiveCityEntries,
   listActiveCityBrandEntries,
   listActiveCityBrandModelEntries,
 } from "./territorial-inventory-sitemap.service.js";
@@ -18,11 +19,16 @@ function mapSitemapEntry(entry) {
 }
 
 export async function getPublicSitemapByType(type, limit = 50000) {
-  // Marca/modelo passam a ser geradas a partir do ESTOQUE ATIVO real (tabela
-  // `ads`), não de `seo_cluster_plans`. Garante que só combinações com pelo
-  // menos 1 anúncio ativo entrem no sitemap (sem páginas vazias/noindex) e
-  // que o `lastmod` reflita MAX(ads.updated_at). Demais tipos seguem usando
-  // os cluster plans.
+  // Cidade/marca/modelo passam a ser geradas a partir do ESTOQUE ATIVO real
+  // (tabela `ads`), não de `seo_cluster_plans` (que não valida estoque e podia
+  // listar combinações vazias). Regra unificada (auditoria SEO 2026-07-04): só
+  // entram URLs com >= SITEMAP_MIN_ADS anúncios ativos — o MESMO limiar da
+  // indexação. A cidade usa a URL CANÔNICA `/carros-em/[slug]` (nunca `/cidade`
+  // nem `/comprar/cidade`). `lastmod` = MAX(ads.updated_at). Demais tipos
+  // (below_fipe, opportunities…) seguem via cluster plans.
+  if (type === CLUSTER_TYPES.CITY_HOME) {
+    return listActiveCityEntries(limit);
+  }
   if (type === CLUSTER_TYPES.CITY_BRAND) {
     return listActiveCityBrandEntries(limit);
   }

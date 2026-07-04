@@ -4,9 +4,10 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
-import { brandModelSlug } from "../../shared/utils/slugify.js";
+import { canonicalBrandSlug, canonicalBrandLabel } from "../../shared/utils/slugify.js";
 import { resolveCityBrand } from "./territorial-resolve.service.js";
 import { buildClusterSeo } from "./territorial-cluster.logic.js";
+import { getSitemapMinAds } from "../seo/sitemap-min-ads.js";
 
 /**
  * Página de cluster cidade + marca.
@@ -53,18 +54,20 @@ export async function getCityBrandPage(citySlug, brand, query = {}) {
     // para nunca exibir ("gol" não traz "Golf"). Anúncios sem brand não são
     // descartados (não há como reclassificar).
     ads = (adsResult.data || []).filter(
-      (ad) => !ad.brand || brandModelSlug(ad.brand) === brandSlug
+      (ad) => !ad.brand || canonicalBrandSlug(ad.brand) === brandSlug
     );
     adsFilters = adsResult.filters || {};
     adsPagination = adsResult.pagination;
 
     models = (facetsResult?.facets?.models || []).filter(
-      (item) => brandModelSlug(item.brand) === brandSlug
+      (item) => canonicalBrandSlug(item.brand) === brandSlug
     );
     relatedBrands = facetsResult?.facets?.brands || [];
   }
 
   const cityLabel = `${city.name}${city.state ? ` - ${city.state}` : ""}`;
+  // Exibição canônica: "GM - Chevrolet" → "Chevrolet"; "VW - VolksWagen" → "Volkswagen".
+  const brandDisplay = canonicalBrandLabel(brandAgg.label);
 
   return {
     city: {
@@ -75,7 +78,7 @@ export async function getCityBrandPage(citySlug, brand, query = {}) {
       stage: city.stage,
     },
     brand: {
-      name: brandAgg.label,
+      name: brandDisplay,
       slug: brandSlug,
     },
     stats: {
@@ -88,9 +91,10 @@ export async function getCityBrandPage(citySlug, brand, query = {}) {
     },
     seo: buildClusterSeo({
       canonicalPath: `/cidade/${city.slug}/marca/${brandSlug}`,
-      title: `${brandAgg.label} em ${cityLabel} | Carros na Cidade`,
-      description: `Veja ofertas de ${brandAgg.label} em ${city.name}. Compare anúncios, modelos disponíveis, destaques e oportunidades locais.`,
+      title: `${brandDisplay} em ${cityLabel} | Carros na Cidade`,
+      description: `Veja ofertas de ${brandDisplay} em ${city.name}. Compare anúncios, modelos disponíveis, destaques e oportunidades locais.`,
       activeCount: brandAgg.activeCount,
+      minInventory: getSitemapMinAds(),
     }),
     filters: adsFilters,
     sections: {

@@ -2,21 +2,19 @@
 import { NextResponse } from "next/server";
 import { buildSitemapXml } from "../../../lib/seo/sitemap-xml";
 import { fetchPublicSitemapByTypes } from "../../../lib/seo/sitemap-client";
-import { rewriteCityHomeEntries } from "../_lib/transition-helpers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
-// `rewriteCityHomeEntries` foi movido para `../_lib/transition-helpers.ts`
-// porque Next 14 App Router só aceita exports válidos de Route em route.ts
-// (handlers HTTP + dynamic/revalidate/runtime/etc). Manter o helper aqui
-// quebrava o build com "is not a valid Route export field".
+// SEO 2026-07-04: o backend agora emite o `city_home` já como a URL CANÔNICA
+// `/carros-em/[slug]` (fonte = estoque ativo, >= SITEMAP_MIN_ADS). Não há mais
+// rewrite `/cidade` → `/comprar/cidade`: o sitemap contém APENAS a canônica de
+// cada cidade (nunca `/cidade` nem `/comprar/cidade`).
 
 export async function GET() {
   try {
     const entries = await fetchPublicSitemapByTypes(["city_home"], 50000);
-    const rewritten = rewriteCityHomeEntries(entries);
-    const xml = buildSitemapXml(rewritten);
+    const xml = buildSitemapXml(entries);
 
     return new NextResponse(xml, {
       status: 200,

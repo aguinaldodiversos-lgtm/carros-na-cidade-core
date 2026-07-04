@@ -13,7 +13,7 @@
 //   2. Agregar contagem/estatística de forma EXATA por slug.
 //   3. Construir o objeto `seo` com robots dinâmico baseado em estoque ativo.
 
-import { brandModelSlug } from "../../shared/utils/slugify.js";
+import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
 
 /** Titulariza um slug (`"land-rover"` → `"Land Rover"`) para rótulo de fallback. */
 export function titleizeSlug(slug) {
@@ -39,11 +39,16 @@ function toNumber(value) {
  * @param {string} key nome do campo que carrega o texto real ("brand"|"model")
  */
 export function matchRowsBySlug(rows, slug, key) {
-  const target = brandModelSlug(slug);
+  // Marca usa o slug canônico (strip do prefixo de grupo FIPE "GM - Chevrolet"
+  // → "chevrolet"); modelo mantém o slug ingênuo (não pode sofrer strip, senão
+  // "HB 20"→"hb-20" quebraria). Ambos os lados (URL e valor real do banco)
+  // passam pela MESMA função, garantindo o casamento.
+  const slugFn = key === "brand" ? canonicalBrandSlug : brandModelSlug;
+  const target = slugFn(slug);
   if (!target) return [];
   return (Array.isArray(rows) ? rows : []).filter((row) => {
     const real = row && row[key];
-    return real != null && brandModelSlug(real) === target;
+    return real != null && slugFn(real) === target;
   });
 }
 
@@ -121,25 +126,37 @@ export function aggregateMatchedRows(matchedRows, { labelKey, slug }) {
  * em estoque ativo. Esta é a fonte de verdade de indexação do backend; o
  * frontend (`shouldIndexTerritorialPage`) apenas reforça defensivamente.
  *
- * Regra (Fase indexação dinâmica 2026-06-26):
- *   activeCount >= 1 → index,follow   (página tem valor real p/ o usuário)
- *   activeCount  = 0 → noindex,follow (cidade/marca válida, sem estoque)
+ * Regra unificada (auditoria SEO 2026-07-04): o MESMO limiar de estoque decide
+ * indexação e presença no sitemap (ver `sitemap-min-ads.js`).
+ *   activeCount >= minInventory → index,follow
+ *   activeCount  < minInventory → noindex,follow (estoque insuficiente p/
+ *     competir; proteção anti-thin-content)
+ *
+ * `minInventory` default 1 (mantém o comportamento histórico nos testes puros);
+ * os services passam `getSitemapMinAds()` (default 3 em prod). `hasActiveInventory`
+ * segue verdadeiro (count>0) — quem decide o robots é `indexable`.
  *
  * `canonicalPath` é SEMPRE o path self resolvido (slugs canônicos). Nunca
  * retorna "/" — o frontend depende disso para não auto-canonicalizar p/ home.
  */
-export function buildClusterSeo({ canonicalPath, title, description, activeCount }) {
+export function buildClusterSeo({ canonicalPath, title, description, activeCount, minInventory = 1 }) {
   const count = toNumber(activeCount) || 0;
+  const min = Math.max(1, toNumber(minInventory) || 1);
   const hasActiveInventory = count > 0;
+  const indexable = count >= min;
 
   return {
     title,
     description,
     canonicalPath,
-    robots: hasActiveInventory ? "index,follow" : "noindex,follow",
-    indexable: hasActiveInventory,
+    robots: indexable ? "index,follow" : "noindex,follow",
+    indexable,
     hasActiveInventory,
     activeCount: count,
-    noindexReason: hasActiveInventory ? null : "no_active_inventory",
+    noindexReason: indexable
+      ? null
+      : hasActiveInventory
+        ? "below_min_inventory"
+        : "no_active_inventory",
   };
 }

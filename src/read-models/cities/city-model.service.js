@@ -4,9 +4,10 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
-import { brandModelSlug } from "../../shared/utils/slugify.js";
+import { brandModelSlug, canonicalBrandSlug, canonicalBrandLabel } from "../../shared/utils/slugify.js";
 import { resolveCityModel } from "./territorial-resolve.service.js";
 import { buildClusterSeo } from "./territorial-cluster.logic.js";
+import { getSitemapMinAds } from "../seo/sitemap-min-ads.js";
 
 /**
  * Página de cluster cidade + marca + modelo.
@@ -50,18 +51,19 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
 
     ads = (adsResult.data || []).filter(
       (ad) =>
-        (!ad.brand || brandModelSlug(ad.brand) === brandSlug) &&
+        (!ad.brand || canonicalBrandSlug(ad.brand) === brandSlug) &&
         (!ad.model || brandModelSlug(ad.model) === modelSlug)
     );
     adsFilters = adsResult.filters || {};
     adsPagination = adsResult.pagination;
 
     relatedModels = (facetsResult?.facets?.models || []).filter(
-      (item) => brandModelSlug(item.brand) === brandSlug
+      (item) => canonicalBrandSlug(item.brand) === brandSlug
     );
   }
 
   const cityLabel = `${city.name}${city.state ? ` - ${city.state}` : ""}`;
+  const brandDisplay = canonicalBrandLabel(brandAgg.label);
 
   return {
     city: {
@@ -72,7 +74,7 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
       stage: city.stage,
     },
     brand: {
-      name: brandAgg.label,
+      name: brandDisplay,
       slug: brandSlug,
     },
     model: {
@@ -91,9 +93,10 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
     },
     seo: buildClusterSeo({
       canonicalPath: `/cidade/${city.slug}/marca/${brandSlug}/modelo/${modelSlug}`,
-      title: `${brandAgg.label} ${modelAgg.label} em ${cityLabel} | Carros na Cidade`,
-      description: `Encontre anúncios de ${brandAgg.label} ${modelAgg.label} em ${city.name}. Veja ofertas locais, preços, destaques e oportunidades.`,
+      title: `${brandDisplay} ${modelAgg.label} em ${cityLabel} | Carros na Cidade`,
+      description: `Encontre anúncios de ${brandDisplay} ${modelAgg.label} em ${city.name}. Veja ofertas locais, preços, destaques e oportunidades.`,
       activeCount: modelAgg.activeCount,
+      minInventory: getSitemapMinAds(),
     }),
     filters: adsFilters,
     sections: {

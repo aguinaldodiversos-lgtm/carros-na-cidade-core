@@ -33,3 +33,53 @@ export function brandModelSlug(value) {
   if (!raw) return "";
   return slugify(raw);
 }
+
+/**
+ * Normalização CANÔNICA de MARCA (não usar em modelo).
+ *
+ * O catálogo usa nomes da FIPE, que gravam alguns grupos como "ABBR - Marca"
+ * (ex.: "GM - Chevrolet", "VW - VolksWagen"). O slug ingênuo (`brandModelSlug`)
+ * produziria "gm-chevrolet" / "vw-volkswagen", que NÃO casam com a URL/slug
+ * humano esperado ("chevrolet" / "volkswagen") — bug do "0 anúncios" em
+ * `/cidade/[slug]/marca/[brand]` (auditoria SEO 2026-07-04).
+ *
+ * Regra GENÉRICA (não hardcode por marca): remove um prefixo de grupo no
+ * formato `TOKEN - ` (token + espaço-hífen-espaço). Só "GM - Chevrolet" e
+ * "VW - VolksWagen" têm esse padrão hoje; qualquer marca futura "XYZ - Foo"
+ * é normalizada automaticamente. Marcas com hífen interno SEM espaços
+ * ("Mercedes-Benz", "Rolls-Royce") NÃO são afetadas.
+ *
+ * NÃO aplicar a modelos: um modelo como "HB 20" (slug canônico "hb-20") seria
+ * corrompido por um strip genérico de prefixo — por isso a função é separada.
+ */
+const BRAND_GROUP_PREFIX_RE = /^\S+\s+-\s+/;
+
+/**
+ * Ajustes de caixa de exibição por slug canônico. A FIPE grafa "VolksWagen";
+ * a exibição correta é "Volkswagen". Mapa pequeno e extensível (keyed by slug).
+ */
+const BRAND_DISPLAY_OVERRIDES = Object.freeze({
+  volkswagen: "Volkswagen",
+});
+
+/** Remove o prefixo de grupo FIPE ("GM - Chevrolet" → "Chevrolet"). */
+export function stripBrandGroupPrefix(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const stripped = raw.replace(BRAND_GROUP_PREFIX_RE, "").trim();
+  return stripped || raw;
+}
+
+/** Slug canônico de MARCA: "GM - Chevrolet" → "chevrolet"; "chevrolet" → "chevrolet". */
+export function canonicalBrandSlug(value) {
+  if (value === undefined || value === null) return "";
+  return slugify(stripBrandGroupPrefix(value));
+}
+
+/** Nome de EXIBIÇÃO canônico da marca: "GM - Chevrolet" → "Chevrolet"; "VW - VolksWagen" → "Volkswagen". */
+export function canonicalBrandLabel(value) {
+  const stripped = stripBrandGroupPrefix(value);
+  if (!stripped) return "";
+  const key = canonicalBrandSlug(stripped);
+  return BRAND_DISPLAY_OVERRIDES[key] || stripped;
+}

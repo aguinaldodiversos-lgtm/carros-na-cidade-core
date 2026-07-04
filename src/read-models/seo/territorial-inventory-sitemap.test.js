@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBrandEntries, buildModelEntries } from "./territorial-inventory-sitemap.service.js";
+import {
+  buildCityEntries,
+  buildBrandEntries,
+  buildModelEntries,
+} from "./territorial-inventory-sitemap.service.js";
 
 describe("buildBrandEntries — sitemap brands a partir de estoque ativo", () => {
   it("slugifica marca e monta loc canônico com lastmod real", () => {
@@ -94,5 +98,39 @@ describe("buildModelEntries — sitemap models a partir de estoque ativo", () =>
       "/cidade/atibaia-sp/marca/volkswagen/modelo/gol",
       "/cidade/atibaia-sp/marca/volkswagen/modelo/golf",
     ]);
+  });
+});
+
+describe("slug canônico de marca + limiar unificado (auditoria 2026-07-04)", () => {
+  it("normaliza o prefixo FIPE: 'GM - Chevrolet' → /marca/chevrolet", () => {
+    const entries = buildBrandEntries([
+      { city_slug: "atibaia-sp", state: "SP", brand: "GM - Chevrolet", total: 5 },
+    ]);
+    expect(entries[0].loc).toBe("/cidade/atibaia-sp/marca/chevrolet");
+  });
+
+  it("limiar aplicado DEPOIS da dedup: 'GM - Chevrolet' (2) + 'Chevrolet' (2) = 4 ≥ 3 entra", () => {
+    const entries = buildBrandEntries(
+      [
+        { city_slug: "atibaia-sp", brand: "GM - Chevrolet", total: 2 },
+        { city_slug: "atibaia-sp", brand: "Chevrolet", total: 2 },
+      ],
+      3
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0].loc).toBe("/cidade/atibaia-sp/marca/chevrolet");
+  });
+
+  it("abaixo do limiar fica FORA do sitemap (1-2 anúncios com minAds=3)", () => {
+    const brands = buildBrandEntries([{ city_slug: "x-sp", brand: "Fiat", total: 2 }], 3);
+    const cities = buildCityEntries([{ city_slug: "x-sp", state: "SP", total: 2 }], 3);
+    expect(brands).toEqual([]);
+    expect(cities).toEqual([]);
+  });
+
+  it("cidade usa a URL canônica /carros-em/[slug]", () => {
+    const entries = buildCityEntries([{ city_slug: "atibaia-sp", state: "SP", total: 9 }], 3);
+    expect(entries[0].loc).toBe("/carros-em/atibaia-sp");
+    expect(entries[0].clusterType).toBe("city_home");
   });
 });

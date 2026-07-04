@@ -6,10 +6,10 @@ import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { BrandNeighborCities } from "@/components/search/BrandNeighborCities";
 import { fetchCityBrandTerritorialPage } from "@/lib/search/territorial-public";
 import {
-  BRAND_CITY_MIN_INVENTORY,
   buildTerritorialBreadcrumbs,
   getTerritorialInventoryCount,
 } from "@/lib/search/territorial-navigation";
+import { getSitemapMinAds } from "@/lib/seo/sitemap-min-ads";
 import { buildTerritorialMetadata } from "@/lib/seo/territorial-seo";
 
 interface CityBrandPageProps {
@@ -31,11 +31,13 @@ export async function generateMetadata({
 }: CityBrandPageProps): Promise<Metadata> {
   const data = await getCityBrandPageData(params.slug, params.brand, searchParams);
 
-  // PROTEÇÃO (auditoria SEO 2026-07-03): marca com < 3 anúncios na cidade →
-  // noindex,follow. Inventário insuficiente p/ competir + risco de thin
-  // content. >= 3 mantém a decisão de indexação do backend (estoque ativo).
+  // PROTEÇÃO (limiar unificado SITEMAP_MIN_ADS, default 3): marca com estoque
+  // insuficiente na cidade → noindex,follow. Defesa em profundidade — o backend
+  // (buildClusterSeo) já decide o mesmo pelo estoque ativo; aqui reforçamos com
+  // o MESMO limiar que governa o sitemap, para "index" e "sitemap" nunca
+  // divergirem.
   const inventoryCount = getTerritorialInventoryCount(data);
-  const forceNoindex = inventoryCount < BRAND_CITY_MIN_INVENTORY;
+  const forceNoindex = inventoryCount < getSitemapMinAds();
 
   return buildTerritorialMetadata(data, "brand", { searchParams, forceNoindex });
 }

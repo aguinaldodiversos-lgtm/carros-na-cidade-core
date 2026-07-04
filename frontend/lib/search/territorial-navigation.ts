@@ -23,10 +23,11 @@ function toTotalBadge(value?: number) {
 }
 
 /**
- * Limiar mínimo de inventário para uma página marca+cidade competir na busca.
- * Abaixo disso a página é `noindex,follow` (inventário insuficiente + risco de
- * thin content — mesma política das cidades sem estoque). Auditoria SEO
- * 2026-07-03: "MENOS de 3" → precisa de >= 3 anúncios da marca na cidade.
+ * DEFAULT do limiar mínimo de inventário para uma página marca+cidade competir
+ * na busca. A fonte de verdade em runtime é `getSitemapMinAds()` (env
+ * `SITEMAP_MIN_ADS`, default 3), o MESMO limiar que governa o sitemap — ver
+ * `frontend/lib/seo/sitemap-min-ads.ts`. Mantido como constante documentada
+ * (default) e usado em teste. Auditoria SEO 2026-07-04.
  */
 export const BRAND_CITY_MIN_INVENTORY = 3;
 

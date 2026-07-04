@@ -6,7 +6,7 @@
 // city-model.service.js.
 
 import * as repo from "./territorial-cluster.repository.js";
-import { brandModelSlug } from "../../shared/utils/slugify.js";
+import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
 import { matchRowsBySlug, aggregateMatchedRows } from "./territorial-cluster.logic.js";
 
 /**
@@ -25,7 +25,7 @@ export async function resolveCityBrand(citySlug, brandSlug) {
   const matched = matchRowsBySlug(rows, brandSlug, "brand");
   const brand = aggregateMatchedRows(matched, { labelKey: "brand", slug: brandSlug });
 
-  return { city, brandSlug: brandModelSlug(brandSlug), brand };
+  return { city, brandSlug: canonicalBrandSlug(brandSlug), brand };
 }
 
 /**
