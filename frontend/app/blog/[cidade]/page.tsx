@@ -19,6 +19,7 @@
 // posts adotados (sem o recorte antigo de 9).
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { BlogHubServer } from "@/components/blog/BlogHubServer";
@@ -55,6 +56,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (cmsPost) {
     return buildCmsPostMetadata(cmsPost, `/blog/${cmsPost.slug}`);
   }
+
+  // Não é post publicado E não tem forma de slug de cidade (`nome-uf`) → 404
+  // real (comitado no generateMetadata com force-dynamic). Antes o hub aceitava
+  // QUALQUER slug e respondia 200 indexável (soft-404). Hub de cidade real
+  // (mesmo sem posts) continua 200. Post tem precedência e nunca cai aqui.
+  if (!looksLikeCitySlug(params.cidade)) notFound();
 
   const city = prettifyCitySlug(params.cidade);
   const title = `Blog automotivo em ${city.name} — guias, dicas e notícias | Carros na Cidade`;
@@ -131,6 +138,10 @@ async function BlogCityAsyncContent({ cidade }: { cidade: string }) {
   }
 
   // ── 2) Hub editorial por cidade ─────────────────────────────────────────
+  // Guard espelhado do generateMetadata: slug que não é post nem cidade
+  // (`nome-uf`) → 404 (evita hub-fantasma indexável para slug de lixo).
+  if (!looksLikeCitySlug(cidade)) notFound();
+
   // Mesmo hub de /blog (componente compartilhado): CMS no HTML SSR, fallback
   // só quando o CMS está vazio.
   return <BlogHubServer citySlug={cidade} pagePath={`/blog/${cidade}`} />;

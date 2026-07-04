@@ -9,7 +9,7 @@ import AdCard from "@/components/ads/AdCard";
 import type { BaseAdData } from "@/components/ads/AdCard";
 import { trackAdEvent } from "@/lib/analytics/public-events";
 import { submitVehicleLead } from "@/lib/leads/public-leads";
-import { buildFinanceLink, buildVehicleWhatsappHref } from "@/lib/vehicle/detail-utils";
+import { buildFinanceLink, buildVehicleH1, buildVehicleWhatsappHref } from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
@@ -65,6 +65,19 @@ export default function VehicleDetailMobileShell({
     [vehicle.id, vehicle.citySlug, vehicle.priceNumeric]
   );
 
+  // H1 dinâmico da página (SEO): "Marca Modelo Versão Ano à venda em Cidade - UF".
+  // É o ÚNICO <h1> da rota — o rótulo do MobileTopBar virou <span>.
+  const vehicleH1 = useMemo(
+    () =>
+      buildVehicleH1({
+        fullName: vehicle.fullName,
+        model: vehicle.model,
+        year: vehicle.year,
+        city: vehicle.city,
+      }),
+    [vehicle.fullName, vehicle.model, vehicle.year, vehicle.city]
+  );
+
   // Texto compacto: "2020 · 41.000 km · Atibaia (SP)"
   const metaPieces = [primaryYear(vehicle.year), vehicle.km, vehicle.city].filter(
     (piece) => piece && piece !== "Não informado" && piece !== "Ano não informado"
@@ -111,9 +124,13 @@ export default function VehicleDetailMobileShell({
 
         {/* ---- Título + meta + preço ---- */}
         <section className="px-4 pt-5">
-          <h2 className="text-[20px] font-extrabold leading-tight text-slate-900">
-            {vehicle.fullName || vehicle.model}
-          </h2>
+          {/* H1 dinâmico (SEO) — único <h1> da rota. Antes o título visível era
+              um <h2> e o único <h1> era o rótulo genérico "Detalhes do veículo"
+              do MobileTopBar (agora <span>). A meta line abaixo mantém
+              ano · km · cidade como no mockup. */}
+          <h1 className="text-[20px] font-extrabold leading-tight text-slate-900">
+            {vehicleH1}
+          </h1>
 
           <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-slate-600">
             {metaPieces.map((piece, i) => (

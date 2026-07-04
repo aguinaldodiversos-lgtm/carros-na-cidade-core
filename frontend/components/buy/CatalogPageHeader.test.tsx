@@ -50,12 +50,13 @@ afterEach(() => {
 });
 
 describe("CatalogPageHeader — vitrine enxuta (briefing 2026-05-22)", () => {
-  it("renderiza H1 'Carros usados em [cidade]' com a cidade em azul", () => {
+  it("renderiza H1 'Carros usados em [cidade] - [UF]' com cidade+UF em azul", () => {
     renderHeader({});
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.textContent).toMatch(/Carros usados em Atibaia/i);
+    // UF no H1 alinha com o title "Carros ... em Atibaia - SP" (Correção 6).
+    expect(h1.textContent).toMatch(/Carros usados em Atibaia - SP/i);
     const span = h1.querySelector("span.text-primary");
-    expect(span?.textContent).toBe("Atibaia");
+    expect(span?.textContent).toBe("Atibaia - SP");
   });
 
   it("renderiza subtítulo curto 'Ofertas em [cidade] e região'", () => {

@@ -117,9 +117,14 @@ export default function MobileTopBar({ shareUrl, shareText }: MobileTopBarProps)
       >
         <ArrowLeftIcon />
       </button>
-      <h1 className="min-w-0 flex-1 truncate text-[16px] font-extrabold leading-tight text-slate-900">
+      {/*
+        Rótulo do topbar — NÃO é <h1> (era, e virava o único heading da rota,
+        genérico e igual em todo anúncio). O <h1> real é o título dinâmico do
+        veículo, dentro da shell. Aqui fica só chrome de navegação.
+      */}
+      <span className="min-w-0 flex-1 truncate text-[16px] font-extrabold leading-tight text-slate-900">
         Detalhes do veículo
-      </h1>
+      </span>
       <button
         type="button"
         onClick={handleShare}

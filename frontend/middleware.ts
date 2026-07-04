@@ -17,6 +17,17 @@ import {
   extractAdDetailMatch,
   validateAdIdentifier,
 } from "@/lib/middleware/ad-detail-gate";
+import {
+  decideDealerMiddlewareAction,
+  extractDealerSlug,
+  validateDealerSlug,
+} from "@/lib/middleware/dealer-gate";
+import {
+  decideBlogMiddlewareAction,
+  extractBlogSlug,
+  isCityHubSlug,
+  validateBlogPostSlug,
+} from "@/lib/middleware/blog-gate";
 import { decideTerritoryGate } from "@/lib/middleware/territory-gate";
 
 /**
@@ -168,8 +179,11 @@ export async function middleware(request: NextRequest) {
     return respond(request, startedAt, blocked);
   }
 
-  // ── 2b. Hard gate de UF inválida em `/carros-usados/[uf]` e
-  //        `/carros-em/[slug]` (auditoria 2026-05-21).
+  // ── 2b. Hard gate de UF inválida nas rotas territoriais por cidade:
+  //        `/carros-usados/[uf]`, `/carros-em/[slug]`, `/comprar/estado/[uf]`,
+  //        `/cidade/[slug]...` e (auditoria SEO 2026-07-03) as irmãs
+  //        `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]` e
+  //        `/tabela-fipe/[cidade]`.
   //
   // Bug Next 14.2: ISR + notFound() em server component retorna HTTP 200
   // com body not-found global. `force-dynamic` + notFound() em
@@ -231,6 +245,73 @@ export async function middleware(request: NextRequest) {
     // pass-valid: deixa o App Router renderizar normalmente.
     const passed = NextResponse.next(territorialContext);
     passed.headers.set("X-Middleware-Ad", "passed-valid");
+    return respond(request, startedAt, passed);
+  }
+
+  // ── 2d. Hard gate de existência para a vitrine de loja `/lojas/[slug]`
+  //        (auditoria SEO 2026-07-03).
+  //
+  // Mesmo soft-404 do Next 14.2: a page já chama `notFound()` quando
+  // `fetchPublicDealer` devolve null, mas sem gate de middleware o status
+  // comitava 200 (loja inexistente indexável). Política fail-open igual ao
+  // ad-detail-gate: `unavailable` passa (não 503) para não derrubar lojas
+  // reais em cold-start; a page mantém o `notFound()` como defesa.
+  const dealerSlug = extractDealerSlug(pathname);
+  if (dealerSlug !== null) {
+    const validation = await validateDealerSlug(dealerSlug);
+    const action = decideDealerMiddlewareAction(validation);
+
+    if (action.kind === "block-not-found") {
+      const blocked = new NextResponse(null, { status: 404 });
+      blocked.headers.set("X-Middleware-Dealer", "blocked-not-found");
+      return respond(request, startedAt, blocked);
+    }
+
+    if (action.kind === "pass-unavailable") {
+      const passed = NextResponse.next(territorialContext);
+      passed.headers.set("X-Middleware-Dealer", "passed-unavailable");
+      passed.headers.set("X-Middleware-Dealer-Reason", action.reason);
+      return respond(request, startedAt, passed);
+    }
+
+    const passed = NextResponse.next(territorialContext);
+    passed.headers.set("X-Middleware-Dealer", "passed-valid");
+    return respond(request, startedAt, passed);
+  }
+
+  // ── 2e. Hard gate de existência para `/blog/[cidade]` (rota dual post/hub;
+  //        auditoria SEO 2026-07-03).
+  //
+  // Slug com forma de cidade real (`nome-uf`) → hub legítimo, passa sem bater
+  // no backend. Qualquer outro slug → valida existência do post publicado
+  // (`/api/public/blog/posts/:slug`); 404 → 404 real (mata o hub-fantasma
+  // indexável). Fail-open em `unavailable` (a page mantém o `notFound()`).
+  const blogSlug = extractBlogSlug(pathname);
+  if (blogSlug !== null) {
+    if (isCityHubSlug(blogSlug)) {
+      const passed = NextResponse.next(territorialContext);
+      passed.headers.set("X-Middleware-Blog", "passed-city-hub");
+      return respond(request, startedAt, passed);
+    }
+
+    const validation = await validateBlogPostSlug(blogSlug);
+    const action = decideBlogMiddlewareAction(validation);
+
+    if (action.kind === "block-not-found") {
+      const blocked = new NextResponse(null, { status: 404 });
+      blocked.headers.set("X-Middleware-Blog", "blocked-not-found");
+      return respond(request, startedAt, blocked);
+    }
+
+    if (action.kind === "pass-unavailable") {
+      const passed = NextResponse.next(territorialContext);
+      passed.headers.set("X-Middleware-Blog", "passed-unavailable");
+      passed.headers.set("X-Middleware-Blog-Reason", action.reason);
+      return respond(request, startedAt, passed);
+    }
+
+    const passed = NextResponse.next(territorialContext);
+    passed.headers.set("X-Middleware-Blog", "passed-valid-post");
     return respond(request, startedAt, passed);
   }
 

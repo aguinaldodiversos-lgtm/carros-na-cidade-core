@@ -14,6 +14,9 @@ const modelBase: LocalSeoLandingModel = {
   totalAds: 12,
   catalogTotalAds: 12,
   avgPrice: 65000,
+  minPrice: 28000,
+  maxPrice: 189000,
+  belowFipeCount: 3,
   topBrands: [
     { brand: "Volkswagen", total: 5 },
     { brand: "Toyota", total: 4 },
@@ -42,13 +45,38 @@ describe("CompactCitySeoBlock", () => {
     expect(h2.textContent).toBe("Sobre carros usados em Atibaia");
   });
 
-  it("renderiza 1 parágrafo curto com palavras-chave SEO", () => {
+  it("cidade COM inventário: intro data-driven (nº, preço médio, marca líder) + stats + data", () => {
     render(<CompactCitySeoBlock model={modelBase} />);
-    const text = screen.getByText(/Encontre carros usados e seminovos/i);
-    expect(text).toBeTruthy();
-    expect(text.textContent).toMatch(/Atibaia/);
-    expect(text.textContent).toMatch(/lojas e particulares/i);
-    expect(text.textContent).toMatch(/abaixo da FIPE/i);
+    // Intro única por cidade — depende dos dados (não passa em find-replace).
+    const intro = screen.getByText(/Há 12 carros à venda em Atibaia - SP/i);
+    expect(intro.textContent).toMatch(/preço médio de/i);
+    expect(intro.textContent).toMatch(/Volkswagen é a marca mais anunciada/i);
+    // Tabela de estatísticas locais reais.
+    expect(screen.getByText(/Anúncios ativos/i)).toBeTruthy();
+    expect(screen.getByText(/Faixa de preço/i)).toBeTruthy();
+    expect(screen.getByText(/Abaixo da FIPE/i)).toBeTruthy();
+    // Sinal de frescor.
+    expect(screen.getByText(/Dados atualizados em/i)).toBeTruthy();
+    // NÃO usa o texto genérico quando há dados.
+    expect(screen.queryByText(/Encontre carros usados e seminovos/i)).toBeNull();
+  });
+
+  it("cidade SEM inventário: mantém parágrafo genérico e NÃO inventa estatística", () => {
+    const empty: LocalSeoLandingModel = {
+      ...modelBase,
+      totalAds: 0,
+      catalogTotalAds: 0,
+      isEmptyCity: true,
+      isEmptyVariant: true,
+      avgPrice: null,
+      minPrice: null,
+      maxPrice: null,
+      belowFipeCount: 0,
+    };
+    render(<CompactCitySeoBlock model={empty} />);
+    expect(screen.getByText(/Encontre carros usados e seminovos/i)).toBeTruthy();
+    expect(screen.queryByText(/Dados atualizados em/i)).toBeNull();
+    expect(screen.queryByText(/Anúncios ativos/i)).toBeNull();
   });
 
   it("renderiza até 6 marcas frequentes como links discretos", () => {

@@ -41,12 +41,21 @@ function resolveCanonical(model: LocalSeoLandingModel): string {
 }
 
 /**
- * /carros-automaticos-em/[slug] cobre uma intenção de busca específica
- * ("câmbio automático em X") com pouca demanda própria e grande sobreposição
- * com /comprar/cidade/[slug]. Em transição, recebe noindex,follow para
- * impedir indexação concorrente, mas links continuam navegáveis.
+ * Regras de indexação da landing local:
+ *
+ *  - Cidade SEM inventário ativo (`isEmptyCity`) → noindex,follow. Sem
+ *    anúncios reais a página é conteúdo fino (thin content) — não pode
+ *    competir por indexação, mas os links seguem navegáveis. (Correção 6
+ *    / auditoria 2026-07-03: antes empty city "em"/"baratos" saía index=true,
+ *    contrariando a política; alinhado aqui ao enriquecimento de conteúdo, que
+ *    só se aplica a cidades com inventário real.)
+ *
+ *  - `/carros-automaticos-em/[slug]` cobre uma intenção específica com pouca
+ *    demanda própria e grande sobreposição com `/comprar/cidade/[slug]`. Em
+ *    transição, recebe noindex,follow para impedir indexação concorrente.
  */
 function shouldIndexLocalSeo(model: LocalSeoLandingModel): boolean {
+  if (model.isEmptyCity) return false;
   return model.variant !== "automaticos";
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
+import { CityInventoryStats, hasCityInventoryData } from "@/components/seo/CityInventoryStats";
 
 /**
  * Bloco SEO mínimo renderizado APÓS a paginação na Página Cidade
@@ -40,6 +41,7 @@ export interface CompactCitySeoBlockProps {
 export function CompactCitySeoBlock({ model }: CompactCitySeoBlockProps) {
   const { cityName, topBrands, paths } = model;
   const brands = topBrands.slice(0, 6);
+  const hasData = hasCityInventoryData(model);
 
   return (
     <section
@@ -52,11 +54,22 @@ export function CompactCitySeoBlock({ model }: CompactCitySeoBlockProps) {
       >
         Sobre carros usados em {cityName}
       </h2>
-      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-cnc-muted sm:text-[15px]">
-        Encontre carros usados e seminovos em {cityName} e região, com ofertas de lojas e
-        particulares. Use os filtros para comparar preço, ano, quilometragem, câmbio e oportunidades
-        abaixo da FIPE.
-      </p>
+
+      {/*
+        Cidade COM inventário → estatísticas locais reais (intro data-driven +
+        tabela + "atualizado em"), conteúdo único por cidade. Cidade SEM
+        inventário → parágrafo genérico institucional (a página já é
+        noindex,follow nesse caso, então não há risco de "conteúdo em escala").
+      */}
+      {hasData ? (
+        <CityInventoryStats model={model} showIntro className="mt-2" />
+      ) : (
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-cnc-muted sm:text-[15px]">
+          Encontre carros usados e seminovos em {cityName} e região, com ofertas de lojas e
+          particulares. Use os filtros para comparar preço, ano, quilometragem, câmbio e
+          oportunidades abaixo da FIPE.
+        </p>
+      )}
 
       {brands.length > 0 ? (
         <div className="mt-4">
@@ -71,6 +84,7 @@ export function CompactCitySeoBlock({ model }: CompactCitySeoBlockProps) {
                   className="inline-flex items-center rounded-full border border-cnc-line bg-cnc-surface px-2.5 py-1 text-[12px] font-medium text-cnc-text transition hover:border-primary/50 hover:text-primary"
                 >
                   {b.brand}
+                  {b.total > 0 ? <span className="ml-1.5 text-cnc-muted">({b.total})</span> : null}
                 </Link>
               </li>
             ))}

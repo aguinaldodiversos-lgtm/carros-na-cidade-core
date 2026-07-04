@@ -143,9 +143,15 @@ export function CatalogPageHeader({
 
   const heading = useMemo(() => {
     if (variant === "cidade") {
+      // UF no H1 (alinha com o title "Carros ... em {Cidade} - {UF}"): sinal
+      // territorial consistente e único por cidade+UF.
       return (
         <>
-          Carros usados em <span className="text-primary">{city.name}</span>
+          Carros usados em{" "}
+          <span className="text-primary">
+            {city.name}
+            {city.state ? ` - ${city.state}` : ""}
+          </span>
         </>
       );
     }

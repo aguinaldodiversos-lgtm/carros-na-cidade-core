@@ -455,6 +455,33 @@ export function buildFinanceLink(
   return `/simulador-financiamento/${encodeURIComponent(citySlug)}?${params.toString()}`;
 }
 
+/**
+ * H1 dinâmico da página de veículo (SEO): "Marca Modelo Versão Ano à venda em
+ * Cidade - UF" (ex.: "Fiat Argo Drive 1.0 2024 à venda em Atibaia - SP").
+ * Substitui o antigo <h1> genérico "Detalhes do veículo", igual em todos os
+ * anúncios. `fullName` já é "marca modelo versão" sem ano, então o ano entra
+ * logo após. Cidade ausente ("Localização não informada") → omite o "em ...".
+ */
+export function buildVehicleH1(params: {
+  fullName: string;
+  model?: string;
+  year?: string;
+  city?: string;
+}): string {
+  const name = (params.fullName || params.model || "Veículo").trim();
+  const yearRaw = (params.year || "").split("/")[0]?.trim() ?? "";
+  const year = yearRaw && yearRaw !== "Ano não informado" ? yearRaw : "";
+  const cityRaw =
+    params.city && params.city.trim() && params.city !== "Localização não informada"
+      ? params.city.trim()
+      : "";
+  // "Atibaia (SP)" → "Atibaia - SP"
+  const cityLabel = cityRaw.replace(/\s*\(([A-Za-z]{2})\)\s*$/, " - $1");
+
+  const head = [name, year].filter(Boolean).join(" ");
+  return cityLabel ? `${head} à venda em ${cityLabel}` : `${head} à venda`;
+}
+
 export function estimateMonthlyPayment(
   vehicleValue: number,
   months = 60,

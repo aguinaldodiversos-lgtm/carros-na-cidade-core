@@ -73,6 +73,24 @@ export function isValidCitySlug(slug: string | null | undefined): boolean {
   return /^[a-z]{2}$/.test(uf);
 }
 
+/**
+ * Slug territorial de cidade VÁLIDO: além do formato `nome-uf`
+ * (`isValidCitySlug`), exige que a UF final seja uma UF brasileira REAL
+ * (`normalizeUf`). Sem o segundo teste, "cidade-falsa-xx" passaria o regex,
+ * cairia no fetch, voltaria vazia e produziria soft-404 (HTTP 200 indexável).
+ *
+ * É a fonte única de verdade usada por `/carros-em`, `/carros-baratos-em`,
+ * `/carros-automaticos-em` e `/tabela-fipe` para comitar 404 real em cidade
+ * inexistente (auditoria SEO 2026-05-21 / 2026-07-03). NÃO valida existência
+ * no catálogo: cidade real SEM anúncios continua válida (200 + fallback) —
+ * o 404 é só para entidade que NÃO EXISTE.
+ */
+export function isValidBrazilianCitySlug(slug: string | null | undefined): boolean {
+  if (!isValidCitySlug(slug)) return false;
+  const parts = String(slug).trim().toLowerCase().split("-").filter(Boolean);
+  return normalizeUf(parts[parts.length - 1]) !== null;
+}
+
 function normalizeWord(word: string) {
   const lower = word.toLowerCase();
   const dictionary: Record<string, string> = {

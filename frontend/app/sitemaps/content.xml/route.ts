@@ -8,6 +8,12 @@ export const revalidate = 3600;
 export async function GET() {
   const lastmod = new Date().toISOString();
   const citySlugs = getStaticCitySlugs(5000);
+  // ATENÇÃO (SEO 2026-07-03): NÃO reintroduzir `/simulador-financiamento/[cidade]`
+  // aqui. A rota é `noindex` (ferramenta interativa) e este bloco chegava a
+  // emitir ~5.000 URLs noindex no sitemap — o que fez o Google descobrir e
+  // rastrear em massa as páginas-fantasma `?veiculo=`. Sitemap só pode conter
+  // URLs 200 + canônicas + index. `/blog/[cidade]` e `/tabela-fipe/[cidade]`
+  // são indexáveis e permanecem.
   const entries = citySlugs.flatMap((cidade) => [
     {
       loc: `/blog/${cidade}`,
@@ -17,12 +23,6 @@ export async function GET() {
     },
     {
       loc: `/tabela-fipe/${cidade}`,
-      lastmod,
-      changefreq: "weekly",
-      priority: 0.7,
-    },
-    {
-      loc: `/simulador-financiamento/${cidade}`,
       lastmod,
       changefreq: "weekly",
       priority: 0.7,

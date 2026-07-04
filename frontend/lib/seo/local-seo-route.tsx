@@ -1,6 +1,8 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { LocalSeoLanding } from "@/components/seo/LocalSeoLanding";
+import { isValidBrazilianCitySlug } from "@/lib/buy/territory-variant";
 import { FaqBlock } from "@/components/seo/FaqBlock";
 import {
   loadLocalSeoLanding,
@@ -48,11 +50,17 @@ export function createLocalSeoPage(
   const load = cache((slug: string) => loadLocalSeoLanding(slug, variant));
 
   async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+    // Cidade inexistente → 404 real. Chamado no generateMetadata para comitar
+    // o status ANTES do Page (com force-dynamic; ver doc nas page.tsx). Sem
+    // isso, `/carros-baratos-em/cidade-falsa-xx` respondia 200 indexável
+    // (soft-404). Cidade real sem anúncios NÃO cai aqui (fallback 200).
+    if (!isValidBrazilianCitySlug(params.slug)) notFound();
     const model = await load(params.slug);
     return buildLocalSeoMetadata(model);
   }
 
   async function Page({ params }: PageParams) {
+    if (!isValidBrazilianCitySlug(params.slug)) notFound();
     const model = await load(params.slug);
     const jsonLd = buildLocalSeoJsonLd(model);
 

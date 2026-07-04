@@ -19,7 +19,6 @@ export default function robots(): MetadataRoute.Robots {
           "/veiculo/",
           "/blog/",
           "/tabela-fipe/",
-          "/simulador-financiamento/",
           "/sitemap.xml",
           "/sitemaps/",
         ],
@@ -30,6 +29,13 @@ export default function robots(): MetadataRoute.Robots {
           "/login",
           "/pagamento",
           "/impulsionar",
+          // NOTA (fase 1 de desindexação): o simulador é `noindex, follow` na própria
+          // página. NÃO bloqueamos por robots aqui de propósito — se bloqueássemos, o
+          // Google não rastrearia as ~30k URLs legadas `?veiculo=` e nunca veria o
+          // noindex, atrasando a remoção delas do índice. Deixamos rastrear para o
+          // noindex limpar o índice primeiro. Reintroduzir `Disallow:
+          // /simulador-financiamento` numa 2ª fase, quando o GSC mostrar essas URLs
+          // saindo do índice.
         ],
       },
     ],

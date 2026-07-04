@@ -1,6 +1,8 @@
 // frontend/app/tabela-fipe/[cidade]/page.tsx
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { FipePageClient } from "@/components/fipe/FipePageClient";
+import { isValidBrazilianCitySlug } from "@/lib/buy/territory-variant";
 import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
 import { fetchAdsSearch } from "@/lib/search/ads-search";
@@ -32,7 +34,31 @@ function prettifyCitySlug(slug: string) {
   };
 }
 
+/**
+ * `force-dynamic` (correção de ordem semântica/SSR 2026-06-27 + soft-404
+ * 2026-07-03).
+ *
+ * O root layout usa `cookies()`/`headers()` → toda rota já é dinâmica (ƒ).
+ * Com `export const revalidate`, o Next emitia o shell estático (header +
+ * FOOTER) e transmitia o `<main>` (incl. H1 "Consultar Tabela FIPE") DEPOIS
+ * do footer, num Suspense vazio — crawler via rodapé/e-mail antes do H1.
+ * `force-dynamic` renderiza inline (H1 antes do footer). Mesmo padrão de
+ * `/carros-em/[slug]`. `fetchAdsSearch` mantém cache próprio (revalidate 60).
+ *
+ * CRÍTICO: declarar `dynamic` ANTES de `generateMetadata`. Só assim o
+ * `notFound()` do gate de cidade inexistente comita HTTP 404 real; declarado
+ * depois, o Next renderiza o body de not-found mas responde 200 (soft-404) —
+ * exatamente o bug que esta rota tinha (auditoria 2026-07-03).
+ */
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  // Cidade inexistente → 404 real (comitado no generateMetadata com
+  // force-dynamic). Antes, `/tabela-fipe/cidade-falsa-xx` respondia 200
+  // indexável (soft-404). Cidade real sem anúncios continua 200 (a página é
+  // uma ferramenta FIPE + fallback), só a UF inválida cai no notFound().
+  if (!isValidBrazilianCitySlug(params.cidade)) notFound();
+
   const city = prettifyCitySlug(params.cidade);
 
   // Briefing P2-D 2026-05-25 — copy oficial via helper único.
@@ -58,19 +84,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-/**
- * `force-dynamic` (correção de ordem semântica/SSR 2026-06-27).
- *
- * O root layout usa `cookies()`/`headers()` → toda rota já é dinâmica (ƒ).
- * Com `export const revalidate`, o Next emitia o shell estático (header +
- * FOOTER) e transmitia o `<main>` (incl. H1 "Consultar Tabela FIPE") DEPOIS
- * do footer, num Suspense vazio — crawler via rodapé/e-mail antes do H1.
- * `force-dynamic` renderiza inline (H1 antes do footer). Mesmo padrão de
- * `/carros-em/[slug]`. `fetchAdsSearch` mantém cache próprio (revalidate 60).
- */
-export const dynamic = "force-dynamic";
-
 export default async function TabelaFipeCidadePage({ params }: PageProps) {
+  if (!isValidBrazilianCitySlug(params.cidade)) notFound();
+
   const city = prettifyCitySlug(params.cidade);
 
   const [highlightResult, belowFipeResult, fallbackRecentResult] = await Promise.allSettled([

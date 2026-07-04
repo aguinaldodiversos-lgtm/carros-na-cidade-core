@@ -66,6 +66,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `Simulador de financiamento de veículos em ${city.label}`,
     description:
       "Simule entrada, parcelas e prazo para financiar seu próximo veículo. Compare condições antes de negociar com vendedores da região.",
+    // O simulador é uma ferramenta interativa, não conteúdo de busca. NUNCA deve
+    // ser indexado: o parâmetro `?veiculo=` gera infinitas variações de URL e foi a
+    // origem de ~30k páginas-fantasma no Search Console (crawl budget). noindex,
+    // follow permite que o Google siga os links internos mas não indexe a página.
+    robots: { index: false, follow: true },
     alternates: {
       canonical: `/simulador-financiamento/${params.cidade}`,
     },

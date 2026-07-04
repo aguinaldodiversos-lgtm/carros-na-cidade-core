@@ -2,9 +2,11 @@ import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
 
 /**
  * Gate territorial executado no middleware (Edge runtime) ANTES do
- * Next router pegar as rotas dinâmicas `/carros-usados/[uf]` e
- * `/carros-em/[slug]`. Necessário porque o Next 14.2 retorna HTTP 200
- * com body "not-found global" quando `notFound()` é chamado em ISR
+ * Next router pegar as rotas dinâmicas por cidade/UF: `/carros-usados/[uf]`,
+ * `/carros-em/[slug]`, `/comprar/estado/[uf]`, `/cidade/[slug]...` e as
+ * landings irmãs `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]`
+ * e `/tabela-fipe/[cidade]`. Necessário porque o Next 14.2 retorna HTTP 200
+ * com body "not-found global" quando `notFound()` é chamado em ISR/página
  * (mesmo bug documentado em `regional-page-guard`).
  *
  * Sem este gate:
@@ -51,6 +53,21 @@ const LEGACY_STATE_ROUTE_RE = /^\/comprar\/estado\/([^/]+)\/?$/;
  * que devolve noindex,follow quando a cidade existe mas não há estoque).
  */
 const CITY_TERRITORIAL_PREFIX_RE = /^\/cidade\/([^/]+)(?:\/|$)/;
+
+/**
+ * Captura as landings irmãs de `/carros-em` e a ferramenta FIPE por cidade —
+ * todas com slug canônico `nome-uf`:
+ *   `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]`,
+ *   `/tabela-fipe/[cidade]`.
+ *
+ * Mesmo gate 404 real das demais: sem isso, o soft-404 do Next 14.2 servia
+ * HTTP 200 indexável para cidade inexistente — vetor de páginas-fantasma
+ * confirmado na auditoria SEO 2026-07-03. NÃO valida existência no banco
+ * (cidade real sem estoque continua 200 + fallback); só rejeita slug cuja UF
+ * final não é uma UF brasileira real.
+ */
+const CITY_LANDING_SIBLINGS_RE =
+  /^\/(?:carros-baratos-em|carros-automaticos-em|tabela-fipe)\/([^/]+)\/?$/;
 
 export function isValidBrUf(raw: string): boolean {
   if (!raw) return false;
@@ -110,6 +127,16 @@ export function decideTerritoryGate(pathname: string): TerritoryGateDecision {
   const cityTerritorialMatch = CITY_TERRITORIAL_PREFIX_RE.exec(pathname);
   if (cityTerritorialMatch) {
     const slug = cityTerritorialMatch[1];
+    const slugUf = extractSlugUf(slug);
+    if (!slugUf || !isValidBrUf(slugUf)) {
+      return { kind: "block-city-slug-invalid", slug };
+    }
+    return { kind: "pass" };
+  }
+
+  const cityLandingMatch = CITY_LANDING_SIBLINGS_RE.exec(pathname);
+  if (cityLandingMatch) {
+    const slug = cityLandingMatch[1];
     const slugUf = extractSlugUf(slug);
     if (!slugUf || !isValidBrUf(slugUf)) {
       return { kind: "block-city-slug-invalid", slug };

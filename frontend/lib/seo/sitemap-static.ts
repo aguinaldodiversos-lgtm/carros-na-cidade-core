@@ -36,12 +36,10 @@ export function getStaticSitemapEntries(): PublicSitemapEntry[] {
       changefreq: "monthly",
       priority: 0.6,
     },
-    {
-      loc: "/simulador-financiamento",
-      lastmod: now,
-      changefreq: "weekly",
-      priority: 0.6,
-    },
+    // `/simulador-financiamento` removido do sitemap (SEO 2026-07-03): a rota
+    // raiz só redireciona para `/simulador-financiamento/[cidade]`, que é
+    // `noindex` (ferramenta interativa). URL noindex/redirect não pode constar
+    // no sitemap.
     {
       loc: "/tabela-fipe",
       lastmod: now,

@@ -20,6 +20,12 @@ export interface LocalSeoLandingModel {
   /** Catálogo geral na cidade (para fallback e contexto). */
   catalogTotalAds: number;
   avgPrice: number | null;
+  /** Menor/maior preço do inventário local (fonte: stats do backend com
+   *  fallback para a amostra). `null` quando não há dado real. */
+  minPrice: number | null;
+  maxPrice: number | null;
+  /** Nº de anúncios abaixo da FIPE na cidade (para % de oportunidades). */
+  belowFipeCount: number;
   topBrands: Array<{ brand: string; total: number }>;
   sampleAds: AdItem[];
   /** Nenhum anúncio no recorte, mas pode haver estoque na cidade. */
@@ -43,6 +49,17 @@ function averagePriceFromAds(ads: Array<{ price?: number }>): number | null {
   const nums = ads.map((a) => a.price).filter((p): p is number => typeof p === "number" && p > 0);
   if (!nums.length) return null;
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+}
+
+function priceRangeFromAds(ads: Array<{ price?: number }>): { min: number; max: number } | null {
+  const nums = ads.map((a) => a.price).filter((p): p is number => typeof p === "number" && p > 0);
+  if (!nums.length) return null;
+  return { min: Math.min(...nums), max: Math.max(...nums) };
+}
+
+/** Preço positivo do backend, senão fallback (amostra). Nunca 0/negativo. */
+function positiveOr(value: number | null | undefined, fallback: number | null): number | null {
+  return typeof value === "number" && value > 0 ? value : fallback;
 }
 
 function maxTotal(...values: Array<number | undefined | null>): number {
@@ -200,6 +217,13 @@ export async function loadLocalSeoLanding(
       const avgPrice = await ensureAvgPrice(safeSlug, sampleAds, "general");
       const isEmptyCity = catalogTotalAds === 0;
 
+      // Faixa de preço: preferir stats do backend (catálogo inteiro), com
+      // fallback para a amostra. `belowFipeCount` habilita a % de oportunidades.
+      const sampleRange = priceRangeFromAds(sampleAds);
+      const minPrice = positiveOr(data.stats?.minPrice, sampleRange?.min ?? null);
+      const maxPrice = positiveOr(data.stats?.maxPrice, sampleRange?.max ?? null);
+      const belowFipeCount = maxTotal(data.stats?.totalBelowFipeAds);
+
       const comprarHref = buildComprarHref({
         city_slug: safeSlug,
         sort: "recent",
@@ -216,6 +240,9 @@ export async function loadLocalSeoLanding(
         totalAds,
         catalogTotalAds,
         avgPrice,
+        minPrice,
+        maxPrice,
+        belowFipeCount,
         topBrands,
         sampleAds,
         isEmptyVariant: totalAds === 0,
@@ -259,6 +286,14 @@ export async function loadLocalSeoLanding(
       const isEmptyCity = catalogTotalAds === 0;
       const isEmptyVariant = totalAds === 0 && !isEmptyCity;
 
+      // Faixa de preço do recorte abaixo-da-FIPE (stats do backend são gerais,
+      // então usamos a amostra do próprio recorte). `belowFipeCount` = o total
+      // do recorte (a variante inteira já é "abaixo da FIPE").
+      const sampleRange = priceRangeFromAds(sampleAds);
+      const minPrice = sampleRange?.min ?? null;
+      const maxPrice = sampleRange?.max ?? null;
+      const belowFipeCount = totalAds;
+
       const comprarHref = buildComprarHref({
         city_slug: safeSlug,
         below_fipe: true,
@@ -276,6 +311,9 @@ export async function loadLocalSeoLanding(
         totalAds,
         catalogTotalAds,
         avgPrice,
+        minPrice,
+        maxPrice,
+        belowFipeCount,
         topBrands,
         sampleAds,
         isEmptyVariant,
@@ -324,6 +362,12 @@ export async function loadLocalSeoLanding(
     const isEmptyCity = catalogTotalAds === 0;
     const isEmptyVariant = totalAds === 0 && !isEmptyCity;
 
+    // Faixa de preço do recorte de câmbio automático (amostra do recorte).
+    const sampleRange = priceRangeFromAds(sampleAds);
+    const minPrice = sampleRange?.min ?? null;
+    const maxPrice = sampleRange?.max ?? null;
+    const belowFipeCount = maxTotal(mainData.stats?.totalBelowFipeAds);
+
     const comprarHref = buildComprarHref({
       city_slug: safeSlug,
       transmission: TRANSMISSION_AUTO,
@@ -341,6 +385,9 @@ export async function loadLocalSeoLanding(
       totalAds,
       catalogTotalAds,
       avgPrice,
+      minPrice,
+      maxPrice,
+      belowFipeCount,
       topBrands,
       sampleAds,
       isEmptyVariant,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { buildAdHref } from "@/lib/ads/build-ad-href";
 import { formatPricePublic } from "@/lib/public-contracts";
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
+import { CityInventoryStats } from "@/components/seo/CityInventoryStats";
 
 /**
  * Wrapper sobre formatPricePublic para a landing SEO local. P3-B
@@ -77,26 +78,14 @@ export function LocalSeoLanding({ model, compactBelow = false }: LocalSeoLanding
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-4xl">
               {h1}
             </h1>
-            <dl className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-                <dt className="text-xs font-medium uppercase text-slate-500">Anúncios (recorte)</dt>
-                <dd className="text-lg font-semibold text-slate-900">{model.totalAds}</dd>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-                <dt className="text-xs font-medium uppercase text-slate-500">
-                  Na cidade (catálogo)
-                </dt>
-                <dd className="text-lg font-semibold text-slate-900">{model.catalogTotalAds}</dd>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-                <dt className="text-xs font-medium uppercase text-slate-500">
-                  Preço médio (amostra)
-                </dt>
-                <dd className="text-lg font-semibold text-slate-900">
-                  {model.avgPrice !== null ? formatMoney(model.avgPrice) : "—"}
-                </dd>
-              </div>
-            </dl>
+            {/*
+              Estatísticas locais reais do recorte (nº, preço médio, faixa de
+              preço) + "Dados atualizados em". Substitui o dl genérico anterior;
+              conteúdo único por cidade. Para cidade/recorte sem inventário,
+              `CityInventoryStats` renderiza null (não inventa dado — a página
+              já é noindex,follow nesse caso) e os parágrafos abaixo explicam.
+            */}
+            <CityInventoryStats model={model} />
           </div>
         </header>
       )}
