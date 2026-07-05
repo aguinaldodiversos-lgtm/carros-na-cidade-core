@@ -3,17 +3,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
+import { NearbyRadiusSection } from "@/components/buy/NearbyRadiusSection";
 import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
 import { FaqBlock } from "@/components/seo/FaqBlock";
-import { AlsoInRegionBlock } from "@/components/territorial/AlsoInRegionBlock";
 import { buildCityFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
-import {
-  isValidBrazilianCitySlug,
-  hasRestrictiveFilters,
-  type SearchParams,
-} from "@/lib/buy/territory-variant";
+import { loadNearbyRadiusAds } from "@/lib/buy/city-radius-catalog";
+import { isValidBrazilianCitySlug, type SearchParams } from "@/lib/buy/territory-variant";
 import { normalizePublicAd } from "@/lib/public-contracts";
 import {
   buildLocalSeoBreadcrumbJsonLd,
@@ -46,8 +43,6 @@ import { toAbsoluteUrl } from "@/lib/seo/site";
  * fase não recebem catálogo porque resolvem intenções específicas
  * (preço/câmbio) e a hierarquia territorial não se aplica.
  */
-
-const FEW_ADS_THRESHOLD = 5;
 
 interface PageProps {
   params: { slug: string };
@@ -94,13 +89,14 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   // notFound() internamente, então usamos try/catch no caller.
   const regionalEnabled = isRegionalPageEnabled();
 
-  const [model, catalog] = await Promise.all([
+  const [model, catalog, nearbyResult] = await Promise.all([
     loadSeoModel(slug),
-    // applyTerritoryFallback=false: a Página Cidade canônica é "prova
-    // local" — listagem principal nunca mistura anúncios de cidades
-    // vizinhas. Quando o estoque é baixo/zero, o <AlsoInRegionBlock>
-    // oferece a saída regional num bloco visualmente separado.
+    // applyTerritoryFallback=false: o catálogo PRINCIPAL é o bloco "Em [cidade]"
+    // — só anúncios da própria cidade (0 km). A vizinhança (raio) vem no bloco
+    // separado <NearbyRadiusSection>, com procedência+distância por card. Isso
+    // substitui o antigo <AlsoInRegionBlock> (âncora regional — Onda 2 Fase 2a).
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
+    loadNearbyRadiusAds(slug),
   ]);
 
   const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
@@ -115,15 +111,27 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   };
 
   const totalAds = initialResults.pagination.total || 0;
-  const noFilters = !hasRestrictiveFilters(filters);
-  const showAlsoInRegion = regionalEnabled && noFilters && totalAds < FEW_ADS_THRESHOLD;
 
-  // BreadcrumbList canônico — usa o builder existente do LocalSeoLanding
-  // (mesma estrutura usada na variant SEO stand-alone). ItemList só é
-  // emitido fora de modo fallback territorial: o schema descreveria
-  // anúncios de uma cidade vizinha sob a URL da cidade pedida e poluiria
-  // o sinal de conteúdo local.
-  const jsonLd = buildLocalSeoJsonLd(model);
+  // areaServed (âncora regional — Onda 2 Fase 2a): cidade da página + cidades
+  // de COBERTURA dentro do raio. Só NOMES de cidade — nunca bairro (respeita a
+  // trava PF). Sinaliza ao Google a geografia atendida sem criar entidade
+  // concorrente (a identidade segue na própria cidade, self-canonical).
+  const areaServed = [
+    { "@type": "City", name: ctx.name, ...(ctx.state ? { addressRegion: ctx.state } : {}) },
+    ...nearbyResult.coverageCities.map((c) => ({
+      "@type": "City",
+      name: c.name,
+      ...(c.state ? { addressRegion: c.state } : {}),
+    })),
+  ];
+
+  // BreadcrumbList canônico — usa o builder existente do LocalSeoLanding. O
+  // ItemList reflete a própria cidade. `areaServed` só entra quando há cobertura
+  // real de vizinhança (>1 = base + pelo menos uma cidade no raio).
+  const jsonLd = {
+    ...buildLocalSeoJsonLd(model),
+    ...(areaServed.length > 1 ? { areaServed } : {}),
+  };
   const breadcrumbJsonLd = buildLocalSeoBreadcrumbJsonLd(model);
 
   // Fase 4.3 (§7) — FAQ útil e específico da cidade. O FAQPage JSON-LD só é
@@ -186,12 +194,12 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
           mas tudo que renderiza DEPOIS do shell precisa replicar o
           mesmo padding para não ficar coberto pela bottom nav. */}
       <div className="bg-cnc-bg pb-20 md:pb-0">
-        {/* NearbyRegionButton vive no top-right do `CatalogPageHeader`
-            desktop, na seção Localização da `FilterSidebar`, e na
-            `CatalogActionBar` mobile. Sem duplicação entre páginas. */}
-        {showAlsoInRegion ? (
-          <AlsoInRegionBlock slug={slug} cityName={ctx.name} cityAdsTotal={totalAds} />
-        ) : null}
+        {/* Bloco "Próximos, até X km" — vizinhança por raio (âncora regional,
+            Onda 2 Fase 2a): anúncios de cidades vizinhas ordenados por
+            distância, cada card com procedência + "~X km". Marco 0 km = a
+            própria cidade (bloco principal acima). Renderiza null quando não há
+            vizinhas com estoque. Substitui o antigo AlsoInRegionBlock. */}
+        <NearbyRadiusSection result={nearbyResult} cityName={ctx.name} />
 
         {/* Bloco SEO mínimo pós-paginação. Sem stats grandes, sem
             "Continue explorando", sem CTAs grandes — o briefing

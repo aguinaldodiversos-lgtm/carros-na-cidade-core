@@ -3,11 +3,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
-import {
-  isRegionalPageCanonicalSelf,
-  isRegionalPageEnabled,
-  shouldIndexRegionalPage,
-} from "@/lib/env/feature-flags";
+import { isRegionalPageEnabled, shouldIndexRegionalPage } from "@/lib/env/feature-flags";
 import { loadRegionalCatalogData } from "@/lib/buy/region-catalog-loader";
 import type { SearchParams } from "@/lib/buy/territory-variant";
 import { normalizePublicAd, publicCatalogPageCopy } from "@/lib/public-contracts";
@@ -112,10 +108,14 @@ export async function generateMetadata({
   //   - false (default): aponta para /carros-em/[slug] (cidade-base).
   //     Proteção temporária do runbook §5.
   //   - true: aponta para a própria regional via TerritoryContext.
+  // APOSENTADA (Onda 2 Fase 2a, 2026-07-05): a página de cidade `/carros-em/[slug]`
+  // com raio cobre a intenção regional. A rota de região deixa de ser entidade
+  // indexável concorrente: canonical SEMPRE aponta para `/carros-em/[cidade-base]`
+  // (independente de REGIONAL_PAGE_CANONICAL_SELF) e a página é noindex. Mantemos
+  // `territory` calculado (usado no JSON-LD abaixo) mas ignorado no canonical.
   const territory = await getTerritoryContext(params.slug);
-  const canonical = isRegionalPageCanonicalSelf()
-    ? toAbsoluteUrl(territory.canonicalUrl)
-    : toAbsoluteUrl(`/carros-em/${encodeURIComponent(region.base.slug)}`);
+  void territory;
+  const canonical = toAbsoluteUrl(`/carros-em/${encodeURIComponent(region.base.slug)}`);
 
   // OG image: primeira imagem válida do primeiro anúncio da região.
   // Em qualquer falha cai para `undefined` (OG default do layout).
@@ -134,7 +134,10 @@ export async function generateMetadata({
   void radiusKm;
   void city;
 
-  const indexable = shouldIndexRegionalPage(totalAdsForIndex);
+  // APOSENTADA: nunca indexável (canonical → cidade). `totalAdsForIndex` segue
+  // referenciado só para o OG/diagnóstico, sem decidir indexação.
+  void totalAdsForIndex;
+  const indexable = false;
 
   return {
     title,

@@ -11,6 +11,7 @@ import {
 import {
   getCityById,
   getCatalogAdsTerritoryFallback,
+  getCityRadiusCoverage,
   resolveCity,
   searchCities,
 } from "./public-city-query.controller.js";
@@ -133,6 +134,15 @@ router.get(
   "/cities/:slug/catalog-ads-fallback",
   cacheGet({ prefix: "public:city:ads-fallback", ttlSeconds: 60, varyBy: ["params"] }),
   getCatalogAdsTerritoryFallback
+);
+
+// Cobertura por raio (âncora regional). Cache 300s — a vizinhança haversine só
+// muda quando lat/lng é re-seeded ou o raio muda; o estoque próprio muda mais,
+// mas o consumidor (seção "Próximos") tolera 5 min de atraso.
+router.get(
+  "/cities/:slug/radius",
+  cacheGet({ prefix: "public:city:radius", ttlSeconds: 300, varyBy: ["params", "query"] }),
+  getCityRadiusCoverage
 );
 
 router.get(

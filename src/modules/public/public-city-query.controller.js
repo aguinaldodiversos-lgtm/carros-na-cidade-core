@@ -1,5 +1,30 @@
 import * as citiesService from "../cities/cities.service.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
+import { resolveCityCoverage } from "../../read-models/cities/regional-radius.service.js";
+
+/**
+ * Cobertura "âncora regional" (Onda 2 Fase 2a): estoque próprio + cidades
+ * vizinhas dentro do raio (region_memberships, mesmo UF), ordenadas por
+ * distância. Funciona para QUALQUER cidade (não depende de is_ancora). Raio =
+ * env RAIO_PADRAO_KM (override opcional ?km= para debug). É a fonte da lista de
+ * "Próximos" da página de cidade — expansão de EXPERIÊNCIA, não de indexação.
+ */
+export async function getCityRadiusCoverage(req, res, next) {
+  try {
+    const slug = String(req.params.slug ?? "")
+      .trim()
+      .toLowerCase();
+    if (!slug) {
+      return res.status(400).json({ success: false, message: "Slug obrigatório." });
+    }
+    const kmParam = Number.parseInt(String(req.query.km ?? ""), 10);
+    const opts = Number.isFinite(kmParam) && kmParam > 0 ? { radiusKm: Math.min(kmParam, 150) } : {};
+    const coverage = await resolveCityCoverage(slug, opts);
+    res.json({ success: true, data: coverage });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function getCatalogAdsTerritoryFallback(req, res, next) {
   try {
