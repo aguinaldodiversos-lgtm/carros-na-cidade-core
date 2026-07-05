@@ -239,22 +239,32 @@ export async function getRegionByBaseSlugDynamic(slug) {
     logger.warn({ err: err?.message }, "[regions] falha ao ler radius_km — usando 80 km");
   }
 
+  // DECISÃO DE PRODUTO (2026-07-05): a fonte DESEJADA da vizinhança é
+  // `region_memberships` (pré-computado, mesma UF, ≤60km) — NÃO o haversine ao
+  // vivo. O haversine SQL abaixo tem um bug latente (bounding box `$3 - $5` com
+  // parâmetros sem tipo → "operator is not unique: unknown - unknown"), então
+  // hoje ele sempre falha e caímos no fallback. Como o fallback é EXATAMENTE o
+  // comportamento que queremos, mantemos assim e apenas rebaixamos o log para
+  // `debug` (era `warn`/`info` e poluía a produção a cada cidade). NÃO reativar o
+  // haversine ao vivo sem revalidar (mudaria o raio de ≤60km p/ ≤80km do admin).
+  // TODO(limpeza futura): remover o haversine morto e chamar
+  // findMembersFromMemberships direto (sem a query que sempre falha).
   let rows = null;
   try {
     rows = await findMembersFromHaversine(base, radius);
   } catch (err) {
-    logger.warn(
+    logger.debug(
       { err: err?.message, slug: base.slug, radius_km: radius },
-      "[regions] haversine falhou — caindo para region_memberships"
+      "[regions] haversine indisponível — usando region_memberships (caminho principal)"
     );
     rows = null;
   }
 
-  // Fallback: base sem lat/long, haversine vazio, ou erro.
+  // Caminho principal: region_memberships (também cobre base sem lat/long).
   if (rows === null || rows.length === 0) {
-    logger.info(
+    logger.debug(
       { slug: base.slug, radius_km: radius, hasCoords: base.latitude != null },
-      "[regions] usando fallback region_memberships"
+      "[regions] servindo via region_memberships"
     );
     rows = await findMembersFromMemberships(base.id);
   }

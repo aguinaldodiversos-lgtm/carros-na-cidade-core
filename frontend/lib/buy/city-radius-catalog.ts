@@ -135,7 +135,8 @@ export async function loadNearbyRadiusAds(
 
   const sorted = sortByDistanceThenHighlight(ads, {
     distanceMap,
-    getCitySlug: (ad) => cityKey(ad.city, ad.state),
+    // AdItem não tem city_slug → casamos pela chave normalizada nome|UF.
+    getCityKey: (ad) => cityKey(ad.city, ad.state),
     getHighlight: isHighlighted,
   });
 

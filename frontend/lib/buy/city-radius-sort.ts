@@ -57,7 +57,12 @@ export function buildDistanceMap(
 
 export interface SortOptions<T> {
   distanceMap: Map<string, CityDistanceInfo>;
-  getCitySlug: (ad: T) => string | null | undefined;
+  // Chave OPACA da cidade do anúncio, casada com as chaves de `distanceMap`. NÃO
+  // é necessariamente um slug: em produção `AdItem` não tem `city_slug`, então o
+  // loader usa a chave normalizada `nome|UF` (ver `cityKey` em
+  // city-radius-catalog.ts). O nome genérico evita sugerir uma coluna
+  // `ads.city_slug` — que não existe no schema.
+  getCityKey: (ad: T) => string | null | undefined;
   getHighlight: (ad: T) => boolean;
 }
 
@@ -67,10 +72,10 @@ export interface SortOptions<T> {
  * geografia": nunca fura a distância.
  */
 export function sortByDistanceThenHighlight<T>(ads: T[], opts: SortOptions<T>): T[] {
-  const { distanceMap, getCitySlug, getHighlight } = opts;
+  const { distanceMap, getCityKey, getHighlight } = opts;
   const distanceOf = (ad: T): number => {
-    const slug = getCitySlug(ad);
-    const info = slug ? distanceMap.get(String(slug)) : undefined;
+    const key = getCityKey(ad);
+    const info = key ? distanceMap.get(String(key)) : undefined;
     return info ? info.distanceKm : Number.POSITIVE_INFINITY;
   };
   return (Array.isArray(ads) ? ads : [])
@@ -82,14 +87,14 @@ export function sortByDistanceThenHighlight<T>(ads: T[], opts: SortOptions<T>): 
 /** Separa em "Em [cidade]" (base) e "Próximos" (vizinhas). Assume já ordenado. */
 export function partitionByOrigin<T>(
   ads: T[],
-  baseSlug: string,
-  getCitySlug: (ad: T) => string | null | undefined
+  baseKey: string,
+  getCityKey: (ad: T) => string | null | undefined
 ): { own: T[]; nearby: T[] } {
-  const base = String(baseSlug || "").trim();
+  const base = String(baseKey || "").trim();
   const own: T[] = [];
   const nearby: T[] = [];
   for (const ad of Array.isArray(ads) ? ads : []) {
-    if (String(getCitySlug(ad) || "").trim() === base) own.push(ad);
+    if (String(getCityKey(ad) || "").trim() === base) own.push(ad);
     else nearby.push(ad);
   }
   return { own, nearby };
