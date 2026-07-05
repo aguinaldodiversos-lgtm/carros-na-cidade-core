@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCityEntries,
+  buildBelowFipeCityEntries,
   buildBrandEntries,
   buildModelEntries,
 } from "./territorial-inventory-sitemap.service.js";
@@ -132,5 +133,18 @@ describe("slug canônico de marca + limiar unificado (auditoria 2026-07-04)", ()
     const entries = buildCityEntries([{ city_slug: "atibaia-sp", state: "SP", total: 9 }], 3);
     expect(entries[0].loc).toBe("/carros-em/atibaia-sp");
     expect(entries[0].clusterType).toBe("city_home");
+  });
+
+  it("below-fipe usa a canônica /carros-baratos-em/[slug] e filtra por >= minAds", () => {
+    const entries = buildBelowFipeCityEntries(
+      [
+        { city_slug: "atibaia-sp", state: "SP", total: 4 }, // entra
+        { city_slug: "braganca-paulista-sp", state: "SP", total: 0 }, // não vem do SQL, mas defesa
+        { city_slug: "jundiai-sp", state: "SP", total: 2 }, // abaixo do limiar → fora
+      ],
+      3
+    );
+    expect(entries.map((e) => e.loc)).toEqual(["/carros-baratos-em/atibaia-sp"]);
+    expect(entries[0].clusterType).toBe("city_below_fipe");
   });
 });

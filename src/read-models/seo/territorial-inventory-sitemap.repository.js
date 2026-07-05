@@ -39,6 +39,38 @@ export async function listActiveCityRows(limit = 50000) {
   return result.rows;
 }
 
+/**
+ * Uma linha por cidade com a contagem de anúncios ATIVOS e ABAIXO DA FIPE
+ * (`a.below_fipe = true` — mesma condição usada nas agregações de cluster). O
+ * limiar final (>= SITEMAP_MIN_ADS) é aplicado no serviço; o `loc` canônico
+ * `/carros-baratos-em/[slug]` é montado lá. Sem estoque abaixo-FIPE real, a
+ * cidade não aparece (corrige o below-fipe.xml servindo cidades sem estoque).
+ */
+export async function listActiveCityBelowFipeRows(limit = 50000) {
+  const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
+
+  const result = await pool.query(
+    `
+    SELECT
+      c.slug AS city_slug,
+      c.state AS state,
+      COUNT(*)::int AS total,
+      MAX(a.updated_at) AS last_updated
+    FROM ads a
+    JOIN cities c ON c.id = a.city_id
+    WHERE a.status = 'active'
+      AND a.below_fipe = true
+    GROUP BY c.slug, c.state
+    HAVING COUNT(*) >= 1
+    ORDER BY COUNT(*) DESC
+    LIMIT $1
+    `,
+    [safeLimit]
+  );
+
+  return result.rows;
+}
+
 export async function listActiveCityBrandRows(limit = 50000) {
   const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
 

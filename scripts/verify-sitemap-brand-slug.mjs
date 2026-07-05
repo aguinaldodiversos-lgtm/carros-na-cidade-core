@@ -163,10 +163,24 @@ async function main() {
   );
   const modelSitemapCount = [...modelSum.values()].filter((t) => t >= MIN).length;
 
+  // below-fipe (/carros-baratos-em/[slug]) — só cidades com >= MIN anúncios abaixo da FIPE
+  const belowFipeRows = (
+    await pool.query(
+      `SELECT c.slug AS city_slug, COUNT(*)::int AS total
+         FROM ads a JOIN cities c ON c.id = a.city_id
+        WHERE a.status='active' AND a.below_fipe = true
+        GROUP BY c.slug HAVING COUNT(*) >= $1
+        ORDER BY COUNT(*) DESC`,
+      [MIN]
+    )
+  ).rows;
+  const belowFipeCount = belowFipeRows.length;
+
   const report = [
-    ["cities.xml  (/carros-em/[slug])", cityCount],
-    ["brands.xml  (/cidade/[c]/marca/[b])", brandSitemapCount],
-    ["models.xml  (/cidade/[c]/marca/[b]/modelo/[m])", modelSitemapCount],
+    ["cities.xml      (/carros-em/[slug])", cityCount],
+    ["below-fipe.xml  (/carros-baratos-em/[slug])", belowFipeCount],
+    ["brands.xml      (/cidade/[c]/marca/[b])", brandSitemapCount],
+    ["models.xml      (/cidade/[c]/marca/[b]/modelo/[m])", modelSitemapCount],
   ];
   for (const [label, n] of report) {
     if (n > ALERT_THRESHOLD) {
@@ -175,6 +189,17 @@ async function main() {
     } else {
       ok(`${label}: ${n} URL(s)`);
     }
+  }
+  // Confirmação explícita do Bug 1: Bragança (0 abaixo-FIPE) NÃO pode aparecer.
+  const bragancaInBelowFipe = belowFipeRows.some((r) => r.city_slug === "braganca-paulista-sp");
+  if (bragancaInBelowFipe) {
+    hadAlert = true;
+    alert("braganca-paulista-sp AINDA está no below-fipe.xml — o filtro não pegou!");
+  } else {
+    ok("braganca-paulista-sp FORA do below-fipe.xml (correto).");
+  }
+  if (belowFipeRows.length > 0) {
+    info(`cidades no below-fipe.xml: ${belowFipeRows.map((r) => `${r.city_slug}(${r.total})`).join(", ")}`);
   }
 
   // ── 4. Recorte da região de Atibaia ───────────────────────────────────────

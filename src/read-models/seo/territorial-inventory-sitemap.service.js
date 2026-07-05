@@ -17,6 +17,7 @@ import * as repo from "./territorial-inventory-sitemap.repository.js";
 import { getSitemapMinAds } from "./sitemap-min-ads.js";
 
 const CLUSTER_TYPE_CITY = "city_home";
+const CLUSTER_TYPE_BELOW_FIPE = "city_below_fipe";
 const CLUSTER_TYPE_BRAND = "city_brand";
 const CLUSTER_TYPE_BRAND_MODEL = "city_brand_model";
 
@@ -87,6 +88,25 @@ export function buildCityEntries(rows, minAds = 1) {
   return finalize(dedupeByLoc(items), minAds);
 }
 
+/** PURA: linhas below-fipe → entradas `/carros-baratos-em/[slug]` (canônica, ≥ minAds). */
+export function buildBelowFipeCityEntries(rows, minAds = 1) {
+  const items = (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const citySlug = String(row.city_slug || "").trim();
+      if (!citySlug) return null;
+      return {
+        loc: `/carros-baratos-em/${citySlug}`,
+        total: Number(row.total) || 0,
+        lastmodTs: toLastmodTs(row.last_updated),
+        clusterType: CLUSTER_TYPE_BELOW_FIPE,
+        state: row.state || undefined,
+      };
+    })
+    .filter(Boolean);
+
+  return finalize(dedupeByLoc(items), minAds);
+}
+
 /** PURA: linhas de marca → entradas de sitemap (slug canônico, dedup, ≥ minAds). */
 export function buildBrandEntries(rows, minAds = 1) {
   const items = (Array.isArray(rows) ? rows : [])
@@ -131,6 +151,11 @@ export function buildModelEntries(rows, minAds = 1) {
 export async function listActiveCityEntries(limit = 50000) {
   const rows = await repo.listActiveCityRows(limit);
   return buildCityEntries(rows, getSitemapMinAds());
+}
+
+export async function listActiveCityBelowFipeEntries(limit = 50000) {
+  const rows = await repo.listActiveCityBelowFipeRows(limit);
+  return buildBelowFipeCityEntries(rows, getSitemapMinAds());
 }
 
 export async function listActiveCityBrandEntries(limit = 50000) {

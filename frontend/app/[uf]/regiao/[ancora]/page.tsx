@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { slugFromAncoraParts, slugToRegionHref } from "@/lib/regions/ancora-url";
+import { normalizeUf } from "@/lib/buy/territory-variant";
 
 /**
  * Rota legada `/:uf/regiao/:ancora` — agora só redireciona para a
@@ -34,6 +35,15 @@ interface RegionAncoraPageProps {
 }
 
 export default function LegacyAncoraRegionPage({ params }: RegionAncoraPageProps) {
+  // GUARD (correção 2026-07-05): esta rota `[uf]` é dinâmica no nível raiz e,
+  // sem validação, engolia QUALQUER `/{coisa}/regiao/{coisa}` — inclusive
+  // `/sitemaps/regiao/sp.xml`, que virava `uf="sitemaps"` (sliced p/ "si") +
+  // `ancora="sp.xml"` → redirect malformado `/carros-usados/regiao/sp.xml-si`
+  // → 404. Só redireciona se `uf` for uma UF brasileira REAL (2 letras). Caso
+  // contrário 404 limpo — deixa o gerador de sitemap real responder e mata o
+  // hijack de `/sitemaps/regiao/*` e de qualquer `/{não-UF}/regiao/{x}`.
+  if (!normalizeUf(params.uf)) notFound();
+
   const slug = slugFromAncoraParts(params.uf, params.ancora);
   if (!slug) notFound();
   permanentRedirect(slugToRegionHref(slug));

@@ -2,6 +2,7 @@ import * as sitemapPublicRepository from "./sitemap-public.repository.js";
 import { CLUSTER_TYPES } from "../../modules/seo/constants/seo-status.js";
 import {
   listActiveCityEntries,
+  listActiveCityBelowFipeEntries,
   listActiveCityBrandEntries,
   listActiveCityBrandModelEntries,
 } from "./territorial-inventory-sitemap.service.js";
@@ -28,6 +29,13 @@ export async function getPublicSitemapByType(type, limit = 50000) {
   // (below_fipe, opportunities…) seguem via cluster plans.
   if (type === CLUSTER_TYPES.CITY_HOME) {
     return listActiveCityEntries(limit);
+  }
+  if (type === CLUSTER_TYPES.CITY_BELOW_FIPE) {
+    // Correção 2026-07-05: below-fipe também por ESTOQUE ATIVO real (só cidades
+    // com >= SITEMAP_MIN_ADS anúncios abaixo da FIPE), URL canônica
+    // /carros-baratos-em/[slug]. Antes vinha de seo_cluster_plans sem filtro e
+    // listava cidades sem estoque (ex.: Bragança Paulista com 0).
+    return listActiveCityBelowFipeEntries(limit);
   }
   if (type === CLUSTER_TYPES.CITY_BRAND) {
     return listActiveCityBrandEntries(limit);
