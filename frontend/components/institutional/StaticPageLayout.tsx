@@ -1,9 +1,17 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+/**
+ * Bloco de corpo de uma seção. Retrocompatível: uma `string` continua sendo um
+ * parágrafo (`<p>`). `{ list }` renderiza uma lista semântica (`<ul><li>`) no
+ * mesmo estilo de texto da seção — sem alterar a aparência das páginas que já
+ * passam apenas strings.
+ */
+type StaticPageBlock = string | { list: string[] };
+
 type StaticPageSection = {
   title: string;
-  body: string[];
+  body: StaticPageBlock[];
 };
 
 interface StaticPageLayoutProps {
@@ -47,9 +55,17 @@ export function StaticPageLayout({
               <section key={section.title}>
                 <h2 className="text-[22px] font-extrabold text-[#1d2538]">{section.title}</h2>
                 <div className="mt-3 space-y-4 text-[16px] leading-7 text-[#5c6881]">
-                  {section.body.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
+                  {section.body.map((block) =>
+                    typeof block === "string" ? (
+                      <p key={block}>{block}</p>
+                    ) : (
+                      <ul key={block.list.join("|")} className="list-disc space-y-2 pl-5">
+                        {block.list.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    )
+                  )}
                 </div>
               </section>
             ))}
