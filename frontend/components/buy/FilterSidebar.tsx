@@ -6,7 +6,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 
 import { useNearbyRegionRedirect } from "@/hooks/useNearbyRegionRedirect";
 import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
-import { slugToRegionHref } from "@/lib/regions/ancora-url";
+import { DISTANCE_OPTIONS_KM } from "@/lib/buy/regional-radius-config";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { formatTotal, type BrandFacet, type BuyCityContext } from "@/lib/buy/catalog-helpers";
 
@@ -58,6 +58,14 @@ type FilterSidebarProps = {
    * false, o hook cai para `/carros-em/[slug]`.
    */
   regionalEnabled?: boolean;
+  /**
+   * Raio atual (km) do bloco "Próximos" — âncora regional. Alimenta o seletor
+   * "Distância (km)". Default RAIO_PADRAO_KM (40). Só faz efeito na página de
+   * cidade (onde há `currentCitySlug` + `onRadiusChange`).
+   */
+  radiusKm?: number;
+  /** Muda o raio de vizinhança (ação do usuário → `?raio=`). */
+  onRadiusChange?: (km: number) => void;
   className?: string;
 };
 
@@ -163,6 +171,8 @@ export function FilterSidebar({
   showApplyCta = false,
   onApply,
   regionalEnabled = false,
+  radiusKm,
+  onRadiusChange,
   className = "",
 }: FilterSidebarProps) {
   const router = useRouter();
@@ -352,26 +362,13 @@ export function FilterSidebar({
             </FieldGroup>
 
             {/*
-              Região e Cidade são atalhos contextuais quando há cidade
-              na rota atual. Sem fetch extra: usamos o slug que o SSR
-              já passou e geramos as URLs canônicas (regiao/* e
-              carros-em/*). Quando a página é estadual sem cidade
-              ativa, escondemos os atalhos para não exibir Selects
-              vazios.
+              Cidade e Distância são atalhos contextuais quando há cidade na
+              rota atual. Cidade = link canônico "Apenas [cidade]" (self, sem
+              fetch extra). Distância = raio do bloco "Próximos" (âncora
+              regional): substituiu o antigo atalho "Região" (a Região foi
+              trocada por distância). Em página estadual sem cidade ativa,
+              ambos ficam ocultos. NÃO reintroduzir "Região" aqui.
             */}
-            {currentCitySlug ? (
-              <FieldGroup label="Região">
-                <Link
-                  href={slugToRegionHref(currentCitySlug)}
-                  className="inline-flex w-full items-center justify-between rounded-xl border border-cnc-line bg-cnc-surface px-3 py-2.5 text-sm font-semibold text-primary transition hover:border-primary"
-                  data-testid="sidebar-region-link"
-                >
-                  Região de {currentCityName || currentCitySlug}
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </FieldGroup>
-            ) : null}
-
             {currentCitySlug ? (
               <FieldGroup label="Cidade">
                 <Link
@@ -382,6 +379,34 @@ export function FilterSidebar({
                   Apenas {currentCityName || currentCitySlug}
                   <span aria-hidden="true">→</span>
                 </Link>
+              </FieldGroup>
+            ) : null}
+
+            {/*
+              Distância (km) — controle do RAIO do bloco "Próximos". É AÇÃO DO
+              USUÁRIO (parâmetro `?raio=`), descartada pelo canonical → nunca
+              gera URL indexável. Só aparece na página de cidade (precisa de
+              `currentCitySlug` + `onRadiusChange`, injetados pelo client).
+            */}
+            {currentCitySlug && onRadiusChange ? (
+              <FieldGroup
+                label="Distância (km)"
+                htmlFor="fs-distance"
+                hint="Amplia o bloco “Próximos” com cidades vizinhas dentro do raio."
+              >
+                <select
+                  id="fs-distance"
+                  value={String(radiusKm ?? 40)}
+                  onChange={(event) => onRadiusChange(Number(event.target.value))}
+                  className={selectClasses}
+                  data-testid="sidebar-distance-select"
+                >
+                  {DISTANCE_OPTIONS_KM.map((km) => (
+                    <option key={`fs-distance-${km}`} value={km}>
+                      {km === 40 ? `${km} km (padrão)` : `${km} km`}
+                    </option>
+                  ))}
+                </select>
               </FieldGroup>
             ) : null}
           </section>

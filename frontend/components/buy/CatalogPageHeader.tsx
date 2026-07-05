@@ -1,7 +1,6 @@
 // frontend/components/buy/CatalogPageHeader.tsx
 "use client";
 
-import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -9,7 +8,6 @@ import { NearbyRegionButton } from "@/components/territorial/NearbyRegionButton"
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { buildPublicTerritoryLabel } from "@/lib/public-contracts";
-import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import { type BuyCityContext } from "@/lib/buy/catalog-helpers";
@@ -256,44 +254,28 @@ export function CatalogPageHeader({
                   visitante precisa do CTA visível para descobrir a região
                   dele. Mantém o card NearbyRegionButton.
 
-                ▸ Regional: SEM card geo no top-right. Os 2 botões
-                  ("Ver carros em minha região" + "Ver carros da cidade")
-                  ficavam visualmente pesados ali ("não está de forma
-                  profissional"). As mesmas intenções já estão expostas
-                  na sidebar `Localização`:
-                    - "Ver carros perto de mim" (geo → Regional)
-                    - "Região de X" (link direto)
-                    - "Apenas X" (link direto)
+                ▸ Regional: SEM card geo no top-right. As mesmas intenções já
+                  estão na sidebar `Localização` (geo + "Apenas X").
 
-                ▸ Cidade: link direto "Ver carros na Região" — pill
-                  outlined elegante, sem geo (slug já é conhecido).
+                ▸ Cidade: CTA geo "Ver carros perto de mim" (context="cidade").
+                  Substituiu o antigo link "Ver carros na Região" — a Região deu
+                  lugar ao filtro de Distância na sidebar (âncora regional).
             */}
-            {variant === "regional" ? null : variant === "cidade" ? (
-              <Link
-                href={slugToRegionHref(city.slug)}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong"
-                data-testid="catalog-city-to-region-link"
-                aria-label={`Ver carros na Região de ${city.name}`}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 22s7-7 7-13a7 7 0 1 0-14 0c0 6 7 13 7 13Z" />
-                  <circle cx="12" cy="9" r="2.2" />
-                </svg>
-                Ver carros na Região
-              </Link>
-            ) : (
+            {/* Cidade/Estadual/Catálogo: CTA geo "Ver carros perto de mim" (o
+                `context` define o copy). O antigo link direto "Ver carros na
+                Região" (variant cidade) foi REMOVIDO — a Região deu lugar ao
+                filtro de Distância na sidebar (âncora regional). Regional segue
+                sem card geo no top-right. */}
+            {variant === "regional" ? null : (
               <NearbyRegionButton
                 regionalEnabled={regionalEnabled}
-                context={variant === "estadual" ? "estadual" : "catalogo"}
+                context={
+                  variant === "estadual"
+                    ? "estadual"
+                    : variant === "cidade"
+                      ? "cidade"
+                      : "catalogo"
+                }
                 variant="compact"
                 stateUf={stateUf || city.state}
               />

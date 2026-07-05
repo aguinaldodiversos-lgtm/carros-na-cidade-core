@@ -156,11 +156,46 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
     expect(triggerGeo).toHaveBeenCalledTimes(1);
   });
 
-  it("seção Localização renderiza atalho 'Região de [cidade]' quando há cidade no contexto", () => {
+  it("seção Localização NÃO renderiza mais o atalho 'Região' (substituído por Distância)", () => {
+    // Âncora regional (2026-07-05): a Região saiu do painel; distância a
+    // substituiu. Nenhum link para a página de região aposentada.
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        radiusKm={40}
+        onRadiusChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId("sidebar-region-link")).toBeNull();
+    expect(screen.queryByText(/Região de/i)).toBeNull();
+  });
+
+  it("seção Localização renderiza o seletor 'Distância (km)' (10/25/40/100, padrão 40)", () => {
+    const onRadiusChange = vi.fn();
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        radiusKm={40}
+        onRadiusChange={onRadiusChange}
+      />
+    );
+    const select = screen.getByTestId("sidebar-distance-select") as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(select.value).toBe("40");
+    const optionValues = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(optionValues).toEqual(["10", "25", "40", "100"]);
+    // Mudar o raio dispara onRadiusChange com o novo valor.
+    fireEvent.change(select, { target: { value: "25" } });
+    expect(onRadiusChange).toHaveBeenCalledWith(25);
+  });
+
+  it("seletor 'Distância (km)' NÃO aparece sem onRadiusChange (fora da página de cidade)", () => {
     renderSidebar({}, vi.fn());
-    const regionLink = screen.getByTestId("sidebar-region-link");
-    expect(regionLink).toBeTruthy();
-    expect(regionLink.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
+    expect(screen.queryByTestId("sidebar-distance-select")).toBeNull();
   });
 
   it("seção Localização renderiza atalho 'Apenas [cidade]' quando há cidade no contexto", () => {

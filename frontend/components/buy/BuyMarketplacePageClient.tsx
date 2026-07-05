@@ -18,6 +18,7 @@ import type {
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
+import { DEFAULT_RADIUS_KM } from "@/lib/buy/regional-radius-config";
 import {
   DEFAULT_BRAND_OPTIONS,
   DEFAULT_MODEL_OPTIONS,
@@ -58,6 +59,13 @@ interface BuyMarketplacePageClientProps {
    * `NearbyRegionButton` no header + ações.
    */
   regionalEnabled?: boolean;
+  /**
+   * Raio (km) atual do bloco "Próximos", resolvido em SSR de `?raio=`
+   * (âncora regional — página de cidade). Alimenta o seletor "Distância (km)"
+   * da sidebar. Ao mudar, o client re-navega com o novo `?raio=` preservando os
+   * demais filtros. Default DEFAULT_RADIUS_KM (40) → URL sem o parâmetro.
+   */
+  radiusKm?: number;
 }
 
 export default function BuyMarketplacePageClient({
@@ -70,6 +78,7 @@ export default function BuyMarketplacePageClient({
   enableGeoRedirect = false,
   fallbackTerritory,
   regionalEnabled = false,
+  radiusKm,
 }: BuyMarketplacePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -120,6 +129,20 @@ export default function BuyMarketplacePageClient({
     return brandFacets.length > 0 ? brandFacets.slice(0, 8) : DEFAULT_POPULAR_BRANDS;
   }, [brandFacets]);
 
+  // `?raio=` (raio do bloco "Próximos") é ORTOGONAL aos filtros de veículo — não
+  // faz parte de AdsSearchFilters. Ao re-navegar por um filtro de veículo,
+  // reanexamos o raio atual para não perdê-lo (default 40 → omitido, URL limpa).
+  const buildUrl = useCallback(
+    (queryString: string): string => {
+      const parts: string[] = [];
+      if (queryString) parts.push(queryString);
+      if (radiusKm && radiusKm !== DEFAULT_RADIUS_KM) parts.push(`raio=${radiusKm}`);
+      const qs = parts.join("&");
+      return qs ? `${pathname}?${qs}` : pathname;
+    },
+    [pathname, radiusKm]
+  );
+
   const pushFilters = useCallback(
     (patch: Partial<AdsSearchFilters>, resetPage = true) => {
       const merged = mergeSearchFilters(initialFilters, {
@@ -127,26 +150,41 @@ export default function BuyMarketplacePageClient({
         ...(resetPage ? { page: 1 } : {}),
       });
 
-      const queryString = buildSearchQueryString(merged);
-      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+      router.push(buildUrl(buildSearchQueryString(merged)));
       setMobileFiltersOpen(false);
     },
-    [initialFilters, pathname, router]
+    [initialFilters, buildUrl, router]
   );
 
   const pushPage = useCallback(
     (patch: Partial<AdsSearchFilters>) => {
       const merged = mergeSearchFilters(initialFilters, patch);
-      const queryString = buildSearchQueryString(merged);
-      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+      router.push(buildUrl(buildSearchQueryString(merged)));
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
+    },
+    [initialFilters, buildUrl, router]
+  );
+
+  // Muda SÓ o raio de vizinhança: preserva os filtros de veículo atuais e seta o
+  // novo `?raio=` (padrão 40 → sem parâmetro). É ação do usuário descartada pelo
+  // canonical — não gera URL indexável (generateMetadata ignora searchParams).
+  const changeRadius = useCallback(
+    (km: number) => {
+      const queryString = buildSearchQueryString(initialFilters);
+      const parts: string[] = [];
+      if (queryString) parts.push(queryString);
+      if (km && km !== DEFAULT_RADIUS_KM) parts.push(`raio=${km}`);
+      const qs = parts.join("&");
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+      setMobileFiltersOpen(false);
     },
     [initialFilters, pathname, router]
   );
 
   const clearFilters = useCallback(() => {
+    // Limpar zera TUDO, inclusive o raio → cidade limpa (padrão 40).
     router.push(pathname);
     setMobileFiltersOpen(false);
   }, [pathname, router]);
@@ -193,6 +231,11 @@ export default function BuyMarketplacePageClient({
     onPatch: (patch: Partial<AdsSearchFilters>) => pushFilters(patch),
     onClear: clearFilters,
     regionalEnabled,
+    // Seletor "Distância (km)" só é útil na página de cidade (raio da
+    // vizinhança). Passamos o handler apenas nessa variante — nas outras a
+    // sidebar esconde o seletor (sem onRadiusChange).
+    radiusKm,
+    onRadiusChange: variant === "cidade" ? changeRadius : undefined,
   };
 
   return (
@@ -277,7 +320,6 @@ export default function BuyMarketplacePageClient({
                 regionalEnabled={regionalEnabled}
                 onOpenFilters={() => setMobileFiltersOpen(true)}
                 variant={variant}
-                citySlug={city.slug}
               />
 
               {/* Contagem + sort. No mobile o sort fica na action bar

@@ -10,6 +10,7 @@ import { buildCityFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
 import { loadNearbyRadiusAds } from "@/lib/buy/city-radius-catalog";
+import { parseRadiusParam } from "@/lib/buy/regional-radius-config";
 import { isValidBrazilianCitySlug, type SearchParams } from "@/lib/buy/territory-variant";
 import { normalizePublicAd } from "@/lib/public-contracts";
 import {
@@ -89,6 +90,12 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   // notFound() internamente, então usamos try/catch no caller.
   const regionalEnabled = isRegionalPageEnabled();
 
+  // Filtro "Distância (km)" = AÇÃO DO USUÁRIO via `?raio=` (10/25/40/100, padrão
+  // 40). Controla SÓ o raio do bloco "Próximos"; o catálogo próprio (0 km) não
+  // muda. Não afeta canonical/robots (generateMetadata ignora searchParams → a
+  // URL com `?raio=` é sempre deduplicada para a cidade limpa). Ver parseRadiusParam.
+  const radiusKm = parseRadiusParam(searchParams?.raio);
+
   const [model, catalog, nearbyResult] = await Promise.all([
     loadSeoModel(slug),
     // applyTerritoryFallback=false: o catálogo PRINCIPAL é o bloco "Em [cidade]"
@@ -96,7 +103,7 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     // separado <NearbyRadiusSection>, com procedência+distância por card. Isso
     // substitui o antigo <AlsoInRegionBlock> (âncora regional — Onda 2 Fase 2a).
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
-    loadNearbyRadiusAds(slug),
+    loadNearbyRadiusAds(slug, { radiusKm }),
   ]);
 
   const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
@@ -187,6 +194,7 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
         variant="cidade"
         stateUf={ctx.state}
         regionalEnabled={regionalEnabled}
+        radiusKm={radiusKm}
       />
 
       {/* Wrapper com pb-20 md:pb-0 — o `BuyPageShell` reserva esse

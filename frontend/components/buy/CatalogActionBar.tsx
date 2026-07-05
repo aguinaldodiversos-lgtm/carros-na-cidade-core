@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import { useNearbyRegionRedirect } from "@/hooks/useNearbyRegionRedirect";
-import { slugToRegionHref } from "@/lib/regions/ancora-url";
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { CATALOG_SORT_OPTIONS } from "@/components/buy/CatalogResultsHeader";
 import type { ComprarVariant } from "@/lib/buy/territory-variant";
@@ -29,9 +27,10 @@ import type { ComprarVariant } from "@/lib/buy/territory-variant";
  *   ▸ regional:  "Minha região"     — geo → Regional do visitante
  *                                     (re-localiza quando caiu numa
  *                                     região errada pelo Google)
- *   ▸ cidade:    "Ver na região"    — link direto para
- *                                     `slugToRegionHref(citySlug)`
- *                                     (sem geo: o slug já é conhecido)
+ *   ▸ cidade:    "Ver perto"        — geo → Regional do visitante. O antigo
+ *                                     link direto "Ver na região" foi removido
+ *                                     (a Região deu lugar ao filtro de
+ *                                     Distância na sidebar — âncora regional).
  *
  * Visualmente mobile-only (`lg:hidden`). Substitui o FAB flutuante
  * "Filtros" que existia no `BuyMarketplacePageClient` antes do refator.
@@ -43,7 +42,6 @@ type CatalogActionBarProps = {
   regionalEnabled: boolean;
   onOpenFilters: () => void;
   variant?: ComprarVariant;
-  citySlug?: string;
 };
 
 function PinIcon() {
@@ -106,57 +104,33 @@ export function CatalogActionBar({
   regionalEnabled,
   onOpenFilters,
   variant = "estadual",
-  citySlug,
 }: CatalogActionBarProps) {
   const { trigger, state } = useNearbyRegionRedirect({ regionalEnabled });
   const [sortOpen, setSortOpen] = useState(false);
 
   const locating = state.kind === "locating" || state.kind === "redirecting";
 
-  // Cidade: o botão é link direto para a região (sem geo). Demais
-  // variants: geo → Regional. Labels por variant — ver doc no topo.
-  const ctaLabel = locating
-    ? "Localizando…"
-    : variant === "cidade"
-      ? "Ver na região"
-      : variant === "regional"
-        ? "Minha região"
-        : "Ver perto";
+  // Todas as variants (inclusive cidade): geo → Regional do visitante. O antigo
+  // link direto de região (variant cidade) foi removido — a Região virou o
+  // filtro de Distância na sidebar. Labels por variant — ver doc no topo.
+  const ctaLabel = locating ? "Localizando…" : variant === "regional" ? "Minha região" : "Ver perto";
   const ctaAriaLabel =
-    variant === "cidade"
-      ? "Ver carros na Região"
-      : variant === "regional"
-        ? "Ver carros em minha região"
-        : "Ver carros perto de mim";
-
-  const cityRegionHref = variant === "cidade" && citySlug ? slugToRegionHref(citySlug) : null;
+    variant === "regional" ? "Ver carros em minha região" : "Ver carros perto de mim";
 
   return (
     <div data-testid="catalog-action-bar" className="lg:hidden">
       <div className="flex items-stretch gap-2">
-        {cityRegionHref ? (
-          <Link
-            href={cityRegionHref}
-            className={ACTION_BUTTON}
-            aria-label={ctaAriaLabel}
-            data-testid="catalog-action-bar-cta"
-          >
-            <PinIcon />
-            <span>{ctaLabel}</span>
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={trigger}
-            disabled={locating}
-            className={ACTION_BUTTON}
-            aria-label={ctaAriaLabel}
-            data-testid="catalog-action-bar-cta"
-          >
-            <PinIcon />
-            <span>{ctaLabel}</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={trigger}
+          disabled={locating}
+          className={ACTION_BUTTON}
+          aria-label={ctaAriaLabel}
+          data-testid="catalog-action-bar-cta"
+        >
+          <PinIcon />
+          <span>{ctaLabel}</span>
+        </button>
 
         <button
           type="button"

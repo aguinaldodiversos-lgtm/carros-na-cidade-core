@@ -127,17 +127,17 @@ describe("CatalogPageHeader — vitrine enxuta (briefing 2026-05-22)", () => {
     expect(pill.textContent).toMatch(/Atibaia, SP/i);
   });
 
-  it("variant 'cidade' renderiza link direto 'Ver carros na Região' (sem geo)", () => {
-    // Briefing 2026-05-23: na Cidade o CTA territorial é link direto
-    // para a Regional do slug atual — geo é redundante porque o slug
-    // já é conhecido.
+  it("variant 'cidade' renderiza CTA geo 'Ver carros perto de mim' (Região removida)", () => {
+    // Âncora regional (2026-07-05): a Região deu lugar ao filtro de Distância
+    // na sidebar. O CTA territorial do header vira o botão geo "Ver carros
+    // perto de mim" (context="cidade") — NÃO existe mais link direto de região.
     renderHeader({}, { regionalEnabled: true });
-    const link = screen.getByTestId("catalog-city-to-region-link");
-    expect(link).toBeTruthy();
-    expect(link.getAttribute("href")).toBe("/carros-usados/regiao/atibaia-sp");
-    expect(link.textContent).toMatch(/Ver carros na Região/i);
-    // Não deve renderizar botão geo na Cidade (substituído pelo link).
-    expect(screen.queryByTestId("nearby-region-button")).toBeNull();
+    expect(screen.getByTestId("nearby-region-button")).toBeTruthy();
+    expect(screen.getByTestId("nearby-region-trigger").textContent).toMatch(
+      /Ver carros perto de mim/i
+    );
+    // O link direto "Ver carros na Região" foi removido.
+    expect(screen.queryByTestId("catalog-city-to-region-link")).toBeNull();
   });
 });
 

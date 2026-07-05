@@ -70,9 +70,18 @@ function isHighlighted(ad: AdItem): boolean {
   return false;
 }
 
-async function fetchCityRadiusCoverage(citySlug: string): Promise<RadiusCoverage | null> {
+async function fetchCityRadiusCoverage(
+  citySlug: string,
+  radiusKm?: number
+): Promise<RadiusCoverage | null> {
+  // ?km= é override de EXPERIÊNCIA (controle do usuário = filtro de distância).
+  // O backend valida/limita (cap 150). Sem km, usa RAIO_PADRAO_KM do ambiente.
+  const kmQuery =
+    Number.isFinite(radiusKm) && (radiusKm as number) > 0
+      ? `?km=${Math.round(radiusKm as number)}`
+      : "";
   const url = resolveInternalBackendApiUrl(
-    `/api/public/cities/${encodeURIComponent(citySlug)}/radius`
+    `/api/public/cities/${encodeURIComponent(citySlug)}/radius${kmQuery}`
   );
   if (!url) return null;
   try {
@@ -97,12 +106,12 @@ async function fetchCityRadiusCoverage(citySlug: string): Promise<RadiusCoverage
  */
 export async function loadNearbyRadiusAds(
   citySlug: string,
-  options: { limit?: number } = {}
+  options: { limit?: number; radiusKm?: number } = {}
 ): Promise<NearbyRadiusResult> {
   const safeSlug = String(citySlug || "").trim();
   if (!safeSlug) return EMPTY;
 
-  const coverage = await fetchCityRadiusCoverage(safeSlug);
+  const coverage = await fetchCityRadiusCoverage(safeSlug, options.radiusKm);
   if (!coverage || !Array.isArray(coverage.members) || coverage.members.length === 0) {
     return { ...EMPTY, radiusKm: coverage?.radiusKm ?? getRegionalRadiusKm() };
   }
