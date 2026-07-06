@@ -482,6 +482,85 @@ export function buildVehicleH1(params: {
   return cityLabel ? `${head} à venda em ${cityLabel}` : `${head} à venda`;
 }
 
+// Prefixo de GRUPO econômico ("GM - ", "VW - ", "FIAT - ") que às vezes vem
+// grudado na marca. Exige espaços ao redor do traço para NÃO cortar marcas
+// compostas ("Mercedes-Benz", "Rolls-Royce", "Land Rover" não têm " - ").
+const BRAND_GROUP_PREFIX_RE = /^[A-Za-zÀ-ÿ]{2,6}\s+[-–]\s+/;
+
+/** Remove o prefixo de grupo da marca ("GM - Chevrolet" → "Chevrolet"). */
+export function stripBrandGroupPrefix(brand: string): string {
+  const raw = String(brand || "").trim();
+  const cleaned = raw.replace(BRAND_GROUP_PREFIX_RE, "").trim();
+  return cleaned || raw;
+}
+
+function normalizeTrimToken(token: string): string {
+  const alpha = token.replace(/[^A-Za-zÀ-ÿ]/g, "");
+  // Siglas curtas (LT, LTZ, GT, XEI, GLX) ficam em CAIXA ALTA; nomes maiores
+  // (Touring, Sport, Highline, Line) em Title Case.
+  if (alpha.length <= 3) return token.toUpperCase();
+  return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+}
+
+/**
+ * Divide a versão em "trim" (versão principal — ex.: "LT", "Touring", "GT Line")
+ * e "specs" (motor/detalhes — ex.: "1.0 12V Flex 5p Mec."). O trim são os tokens
+ * alfabéticos ANTES do primeiro token que contém dígito (cilindrada/portas).
+ * Se a versão já começa pelo motor (ex.: "1.0 12V Flex"), o trim fica vazio.
+ * Trim limitado a 2 tokens para não engolir specs.
+ */
+export function splitVersionTrim(version: string): { trim: string; specs: string } {
+  const tokens = String(version || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const trimTokens: string[] = [];
+  let i = 0;
+  for (; i < tokens.length; i++) {
+    if (/\d/.test(tokens[i])) break;
+    trimTokens.push(tokens[i]);
+    if (trimTokens.length >= 2) {
+      i++;
+      break;
+    }
+  }
+  return {
+    trim: trimTokens.map(normalizeTrimToken).join(" "),
+    specs: tokens.slice(i).join(" "),
+  };
+}
+
+/**
+ * H1 VISÍVEL curto (estilo Webmotors): "Marca Modelo Trim" — ex.:
+ * "Chevrolet Onix Hatch LT". Remove o prefixo de grupo ("GM - "), o motor,
+ * o ano e a cidade (que continuam no <title> de SEO, no JSON-LD e no conteúdo).
+ * Mantém marca + modelo para SEO on-page. Deduplica tokens repetidos (ex.:
+ * trim já presente no modelo).
+ */
+export function buildShortVehicleH1(params: {
+  brand?: string;
+  model?: string;
+  version?: string;
+}): string {
+  const brand = stripBrandGroupPrefix(String(params.brand || ""));
+  const model = String(params.model || "").trim();
+  const { trim } = splitVersionTrim(String(params.version || ""));
+
+  const seen = new Set<string>();
+  const deduped = [brand, model, trim]
+    .filter(Boolean)
+    .join(" ")
+    .split(/\s+/)
+    .filter((word) => {
+      const key = word.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return deduped.join(" ") || model || brand || "Veículo";
+}
+
 export function estimateMonthlyPayment(
   vehicleValue: number,
   months = 60,

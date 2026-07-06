@@ -12,8 +12,9 @@ import PhoneRevealSheet from "@/components/vehicle/mobile/PhoneRevealSheet";
 import { trackAdEvent } from "@/lib/analytics/public-events";
 import {
   buildFinanceLink,
-  buildVehicleH1,
+  buildShortVehicleH1,
   buildVehicleWhatsappHref,
+  splitVersionTrim,
 } from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
@@ -63,19 +64,20 @@ export default function VehicleDetailView({
 
   const year = primaryYear(vehicle.year);
 
-  // H1 (SEO) — MESMA string que hoje rankeia: "Marca Modelo Versão Ano à venda
-  // em Cidade - UF". Preservado verbatim (via buildVehicleH1), agora sem o
-  // combustível duplicado porque `fullName` já vem deduplicado. É o único <h1>.
-  const vehicleH1 = buildVehicleH1({
-    fullName: vehicle.fullName,
+  // H1 VISÍVEL curto (estilo Webmotors): "Marca Modelo Trim" (ex.: "Chevrolet
+  // Onix Hatch LT"). Contém marca+modelo p/ SEO on-page, sem o excesso (motor,
+  // ano, cidade). O <title>/canonical/JSON-LD/meta description NÃO mudam — eles
+  // continuam longos e com cidade (definidos em generateMetadata / page.tsx).
+  const vehicleH1 = buildShortVehicleH1({
+    brand: vehicle.brand,
     model: vehicle.model,
-    year: vehicle.year,
-    city: vehicle.city,
+    version: vehicle.version,
   });
 
-  // Subtítulo curto de specs (ex.: "1.0 12V Flex • Hatch • Manual"). `version`
-  // já vem com o combustível deduplicado em `adaptAdDetailToVehicle`.
-  const subtitle = [vehicle.version, chip(vehicle.bodyType), chip(vehicle.transmission)]
+  // Subtítulo secundário com o resto: motor/versão (sem o trim que subiu p/ o
+  // H1) • carroceria • câmbio • ano — ex.: "1.0 12V Flex • Hatch • Manual • 2025".
+  const versionSpecs = splitVersionTrim(vehicle.version).specs || vehicle.version;
+  const subtitle = [versionSpecs, chip(vehicle.bodyType), chip(vehicle.transmission), year]
     .filter(Boolean)
     .join(" • ");
 
@@ -99,15 +101,16 @@ export default function VehicleDetailView({
 
   return (
     <div className="bg-cnc-bg pb-24 lg:pb-12">
-      <div className="mx-auto w-full max-w-[1180px] px-4 pt-4 sm:px-5 sm:pt-5">
-        {/* ---- Galeria (dentro do container: respeita o max-width do layout) ---- */}
-        <VehicleGalleryCarousel
-          images={vehicle.images}
-          alt={vehicle.fullName}
-          isBelowFipe={vehicle.isBelowFipe}
-        />
+      {/* ---- Galeria FULL-WIDTH (edge-to-edge, fora do container) ---- */}
+      <VehicleGalleryCarousel
+        images={vehicle.images}
+        alt={vehicle.fullName}
+        isBelowFipe={vehicle.isBelowFipe}
+      />
 
-        <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* Conteúdo continua no container com max-width normal */}
+      <div className="mx-auto w-full max-w-[1180px] px-4 pt-5 sm:px-5">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* ================= COLUNA ESQUERDA ================= */}
           <div className="min-w-0 space-y-5">
             {/* Card principal: breadcrumb + título + preço + specs + descrição + selos */}
@@ -117,8 +120,9 @@ export default function VehicleDetailView({
                 <ShareButton shareUrl={shareUrl} title={vehicle.fullName} />
               </div>
 
-              {/* H1 único (SEO) — marca+modelo+versão+ano+cidade, preservado */}
-              <h1 className="mt-3 text-[22px] font-extrabold leading-tight text-cnc-text-strong sm:text-[26px]">
+              {/* H1 único e VISÍVEL curto (marca+modelo+trim). Excesso vai p/ o
+                  subtítulo; cidade/versão completa ficam no <title>/JSON-LD. */}
+              <h1 className="mt-3 text-[24px] font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-[30px]">
                 {vehicleH1}
               </h1>
               {subtitle ? (

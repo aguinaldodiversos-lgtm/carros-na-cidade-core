@@ -109,7 +109,7 @@ export default function VehicleGalleryCarousel({
 
   return (
     <section aria-label="Fotos do veículo" data-testid="vehicle-gallery">
-      <div className="relative overflow-hidden rounded-2xl border border-cnc-line bg-white">
+      <div className="relative w-full overflow-hidden border-b border-cnc-line bg-white">
         <div
           ref={scrollRef}
           onScroll={recomputePages}
@@ -127,13 +127,13 @@ export default function VehicleGalleryCarousel({
               aria-label={
                 isPlaceholderOnly ? "Sem fotos disponíveis" : `Ampliar foto ${i + 1} de ${total}`
               }
-              className="relative aspect-[4/3] shrink-0 grow snap-start basis-[88%] border-r border-cnc-line last:border-r-0 sm:basis-[47%] lg:basis-[32%] xl:basis-[24%]"
+              className="relative aspect-[4/3] shrink-0 grow snap-start basis-[90%] border-r border-cnc-line last:border-r-0 sm:basis-[60%] lg:basis-[42%] xl:basis-[32%]"
             >
               <Image
                 src={src}
                 alt={total > 1 ? `${alt} — foto ${i + 1} de ${total}` : alt}
                 fill
-                sizes="(max-width: 768px) 88vw, (max-width: 1024px) 47vw, (max-width: 1280px) 32vw, 290px"
+                sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, (max-width: 1280px) 42vw, 32vw"
                 className="object-contain p-1.5"
                 // 1ª foto = LCP (priority ⇒ fetchpriority=high, sem lazy). Demais lazy.
                 priority={i === 0}

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  buildShortVehicleH1,
   buildVehicleImageProxyUrlFromStorageKey,
   collectVehicleImageCandidates,
   LISTING_CARD_FALLBACK_IMAGE,
@@ -8,6 +9,8 @@ import {
   normalizeVehicleImageUrl,
   resolvePublicListingImageUrl,
   isSupportedVehicleImageUrl,
+  splitVersionTrim,
+  stripBrandGroupPrefix,
 } from "./detail-utils";
 
 const envKeys = [
@@ -228,5 +231,72 @@ describe("vehicle detail image utils", () => {
         storage_key: "ads/123/capa.jpg",
       })
     ).toBe("/api/vehicle-images?src=%2Fuploads%2Fads%2Fx.jpg");
+  });
+});
+
+describe("stripBrandGroupPrefix", () => {
+  it("remove prefixo de grupo com espaços ('GM - Chevrolet' → 'Chevrolet')", () => {
+    expect(stripBrandGroupPrefix("GM - Chevrolet")).toBe("Chevrolet");
+    expect(stripBrandGroupPrefix("VW - Volkswagen")).toBe("Volkswagen");
+    expect(stripBrandGroupPrefix("FIAT - Fiat")).toBe("Fiat");
+  });
+
+  it("NÃO corta marcas compostas sem ' - ' ao redor", () => {
+    expect(stripBrandGroupPrefix("Mercedes-Benz")).toBe("Mercedes-Benz");
+    expect(stripBrandGroupPrefix("Land Rover")).toBe("Land Rover");
+    expect(stripBrandGroupPrefix("Chevrolet")).toBe("Chevrolet");
+  });
+});
+
+describe("splitVersionTrim", () => {
+  it("separa trim (antes da cilindrada) das specs de motor", () => {
+    expect(splitVersionTrim("LT 1.0 12V Flex 5p Mec.")).toEqual({
+      trim: "LT",
+      specs: "1.0 12V Flex 5p Mec.",
+    });
+  });
+
+  it("versão começando pelo motor → trim vazio", () => {
+    expect(splitVersionTrim("1.5 DI I-VTEC Turbo Flex Touring CVT")).toEqual({
+      trim: "",
+      specs: "1.5 DI I-VTEC Turbo Flex Touring CVT",
+    });
+  });
+
+  it("normaliza caixa do trim (sigla curta em maiúsculas, nome em Title Case)", () => {
+    expect(splitVersionTrim("touring 1.5").trim).toBe("Touring");
+    expect(splitVersionTrim("lt 1.0").trim).toBe("LT");
+    expect(splitVersionTrim("GT Line 1.4 Turbo").trim).toBe("GT Line");
+  });
+});
+
+describe("buildShortVehicleH1", () => {
+  it("monta 'Marca Modelo Trim' curto, sem prefixo de grupo/motor/ano/cidade", () => {
+    expect(
+      buildShortVehicleH1({
+        brand: "GM - Chevrolet",
+        model: "Onix Hatch",
+        version: "LT 1.0 12V Flex 5p Mec.",
+      })
+    ).toBe("Chevrolet Onix Hatch LT");
+  });
+
+  it("sem trim quando a versão começa pelo motor (estilo Webmotors)", () => {
+    expect(
+      buildShortVehicleH1({
+        brand: "Honda",
+        model: "HR-V",
+        version: "1.5 DI I-VTEC Turbo Flex Touring CVT",
+      })
+    ).toBe("Honda HR-V");
+  });
+
+  it("preserva modelo numérico e não duplica tokens", () => {
+    expect(buildShortVehicleH1({ brand: "Peugeot", model: "208", version: "1.6 THP" })).toBe(
+      "Peugeot 208"
+    );
+    expect(
+      buildShortVehicleH1({ brand: "Chevrolet", model: "Onix", version: "Onix LT 1.0" })
+    ).toBe("Chevrolet Onix LT");
   });
 });

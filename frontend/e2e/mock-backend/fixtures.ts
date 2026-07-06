@@ -111,11 +111,13 @@ export const fixtures = {
   adDetail: {
     id: "ad-preview",
     slug: "chevrolet-onix-hatch-lt-2021-sao-paulo-sp",
-    // Título com "Flex Flex" de propósito — prova a correção do H1.
-    title: "Chevrolet Onix Hatch LT 1.0 12V Flex Flex",
-    brand: "Chevrolet",
+    // "GM -" no brand + "LT" na versão + "Flex Flex" no título: prova o H1
+    // curto ("Chevrolet Onix Hatch LT"), a remoção do prefixo de grupo e a
+    // correção do combustível duplicado, tudo de uma vez.
+    title: "GM - Chevrolet Onix Hatch LT 1.0 12V Flex Flex",
+    brand: "GM - Chevrolet",
     model: "Onix Hatch",
-    version: "1.0 12V Flex",
+    version: "LT 1.0 12V Flex 5p Mec.",
     year: 2021,
     mileage: 32000,
     price: 65000,
