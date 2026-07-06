@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSelectedOptionGroups,
+  buildTrustBadges,
   countSelectedOptions,
   extractSelectedKeys,
   getCatalogGroups,
+  TRUST_BADGE_KEYS,
   VEHICLE_OPTION_CATEGORIES,
 } from "./vehicle-options";
 
@@ -75,6 +77,54 @@ describe("vehicle-options — buildSelectedOptionGroups (exibição pública)", 
   it("usa o label canônico do catálogo (nunca texto vindo do cliente)", () => {
     const groups = buildSelectedOptionGroups({ comfort: ["ar_condicionado"] });
     expect(groups[0].items[0].label).toBe("Ar-condicionado");
+  });
+});
+
+describe("vehicle-options — buildSelectedOptionGroups (excludeKeys)", () => {
+  it("remove as chaves listadas em excludeKeys dos grupos", () => {
+    const groups = buildSelectedOptionGroups(
+      { drivability: ["unico_dono", "rodas_liga_leve"] },
+      { excludeKeys: ["unico_dono"] }
+    );
+    const keys = groups.flatMap((g) => g.items.map((i) => i.key));
+    expect(keys).toContain("rodas_liga_leve");
+    expect(keys).not.toContain("unico_dono");
+  });
+
+  it("omite a categoria inteira quando todas as chaves foram excluídas", () => {
+    const groups = buildSelectedOptionGroups(
+      { drivability: ["unico_dono"] },
+      { excludeKeys: ["unico_dono"] }
+    );
+    expect(groups).toEqual([]);
+  });
+});
+
+describe("vehicle-options — buildTrustBadges (selos de procedência)", () => {
+  it("retorna só as chaves de procedência selecionadas, em ordem canônica", () => {
+    const badges = buildTrustBadges({
+      drivability: ["rodas_liga_leve", "chave_reserva", "unico_dono"],
+      safety: ["laudo_cautelar_aprovado"],
+    });
+    // ordem canônica de TRUST_BADGE_KEYS: unico_dono antes de chave_reserva antes de laudo
+    expect(badges.map((b) => b.key)).toEqual([
+      "unico_dono",
+      "chave_reserva",
+      "laudo_cautelar_aprovado",
+    ]);
+    // usa o label canônico do catálogo
+    expect(badges[0].label).toBe("Único dono");
+  });
+
+  it("todas as TRUST_BADGE_KEYS existem no catálogo (label resolvível)", () => {
+    const badges = buildTrustBadges({ everything: TRUST_BADGE_KEYS });
+    expect(badges).toHaveLength(TRUST_BADGE_KEYS.length);
+    for (const b of badges) expect(b.label.length).toBeGreaterThan(0);
+  });
+
+  it("vazio quando nenhuma chave de procedência foi marcada", () => {
+    expect(buildTrustBadges({ comfort: ["ar_condicionado"] })).toEqual([]);
+    expect(buildTrustBadges(null)).toEqual([]);
   });
 });
 

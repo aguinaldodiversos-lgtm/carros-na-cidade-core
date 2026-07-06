@@ -19,6 +19,19 @@
         "REGIONAL_PAGE_CANONICAL_SELF": "true",
         "REGIONAL_BFF_USE_PUBLIC": "true"
       }
+    },
+    {
+      "name": "veiculo-preview-mock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "cwd": "./frontend",
+      "env": {
+        "BACKEND_API_URL": "http://127.0.0.1:4000",
+        "NEXT_PUBLIC_API_URL": "http://127.0.0.1:4000",
+        "INTERNAL_BACKEND_API_URL": "http://127.0.0.1:4000",
+        "NEXT_PUBLIC_R2_PUBLIC_BASE_URL": ""
+      }
     }
   ]
 }

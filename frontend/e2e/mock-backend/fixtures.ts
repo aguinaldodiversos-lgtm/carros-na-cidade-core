@@ -102,6 +102,56 @@ export const fixtures = {
     },
   ],
 
+  /**
+   * Detalhe rico de anúncio para preview local da rota /veiculo/[slug].
+   * Exercita: combustível duplicado no título (dedup), PF só primeiro nome
+   * (LGPD), selos de procedência extraídos, card de opcionais categorizado,
+   * galeria com múltiplas fotos. Servido por `GET /api/ads/:idOrSlug`.
+   */
+  adDetail: {
+    id: "ad-preview",
+    slug: "chevrolet-onix-hatch-lt-2021-sao-paulo-sp",
+    // Título com "Flex Flex" de propósito — prova a correção do H1.
+    title: "Chevrolet Onix Hatch LT 1.0 12V Flex Flex",
+    brand: "Chevrolet",
+    model: "Onix Hatch",
+    version: "1.0 12V Flex",
+    year: 2021,
+    mileage: 32000,
+    price: 65000,
+    fuel_type: "Flex",
+    transmission: "Manual",
+    body_type: "Hatch",
+    color: "Cinza",
+    city: "São Paulo",
+    state: "SP",
+    city_slug: "sao-paulo-sp",
+    below_fipe: true,
+    // PF com sobrenome — deve aparecer só "Rafael" em todo lugar.
+    seller_name: "Rafael Souza",
+    seller_kind: "private",
+    account_type: "CPF",
+    whatsapp_number: "11987654321",
+    description:
+      "Chevrolet Onix LT 1.0 12V Flex 2021 em excelente estado de conservação. Econômico, confiável e ideal para o dia a dia. Revisões em dia, pneus em ótimo estado, ar-condicionado, direção elétrica, vidros e travas elétricas.",
+    images: ["/images/gla.avif", "/images/dolphin.webp", "/images/home-hero-banner.jpg"],
+    vehicle_options: {
+      comfort: [
+        "ar_condicionado",
+        "direcao_eletrica",
+        "vidros_eletricos_dianteiros",
+        "travas_eletricas",
+        "central_multimidia",
+        "camera_re",
+        "bluetooth",
+      ],
+      drivability: ["rodas_liga_leve", "farois_led", "unico_dono", "todas_revisoes_feitas", "manual_proprietario", "chave_reserva"],
+      safety: ["airbag_duplo", "freios_abs", "isofix", "alarme", "laudo_cautelar_aprovado"],
+    },
+    created_at: "2026-06-20T10:00:00.000Z",
+    updated_at: "2026-06-28T10:00:00.000Z",
+  },
+
   facets: {
     brands: [
       { brand: "Fiat", total: 45 },

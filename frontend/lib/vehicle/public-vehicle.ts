@@ -1,7 +1,13 @@
 import type { ListingCar } from "@/lib/car-data";
 import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
-import { buildSelectedOptionGroups, type OptionGroup } from "@/lib/ads/vehicle-options";
+import {
+  buildSelectedOptionGroups,
+  buildTrustBadges,
+  TRUST_BADGE_KEYS,
+  type OptionGroup,
+  type TrustBadge,
+} from "@/lib/ads/vehicle-options";
 import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { normalizeVehicleGalleryImages } from "@/lib/vehicle/detail-utils";
@@ -78,6 +84,13 @@ export type VehicleDetail = {
    * derivado (`optionalItems`).
    */
   vehicleOptionGroups: OptionGroup[];
+  /**
+   * Selos de PROCEDÊNCIA marcados pelo anunciante (Único dono, Revisões,
+   * Manual/Chave reserva, Laudo cautelar...), extraídos de `vehicle_options`
+   * e REMOVIDOS de `vehicleOptionGroups` para não duplicar. Vazio quando o
+   * anúncio não marcou nenhuma chave de procedência. Nunca contém selo falso.
+   */
+  trustBadges: TrustBadge[];
   sellerNotes: string;
   seller: SellerInfo;
 };
@@ -119,7 +132,7 @@ const FALLBACK_IMAGES = ["/images/vehicle-placeholder.svg"];
 function slugify(value: string) {
   return value
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -254,6 +267,54 @@ function stripYearTokens(text: string): string {
     .trim();
 }
 
+/**
+ * Colapsa um token de COMBUSTÍVEL imediatamente repetido no título/nome, ex.:
+ * "Onix 1.0 6V Flex Flex" → "Onix 1.0 6V Flex". A duplicação nasce no backend,
+ * que monta o título concatenando a versão (que já termina em "Flex") + o
+ * `fuel_type` ("Flex"). Corrigimos só na renderização (o título histórico no
+ * banco não muda), preservando o combustível de quem tinha uma ocorrência só.
+ *
+ * Restrito a palavras de combustível conhecidas (case/acento-insensível) para
+ * nunca remover repetições legítimas de outros tokens. Cobre Flex, Gasolina,
+ * Etanol/Álcool, Diesel, Elétrico, Híbrido, GNV.
+ */
+const FUEL_WORDS = [
+  "flex",
+  "flexivel",
+  "gasolina",
+  "etanol",
+  "alcool",
+  "diesel",
+  "eletrico",
+  "hibrido",
+  "gnv",
+];
+
+function foldAccents(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function dedupeFuelToken(text: string): string {
+  const parts = String(text || "").split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const word of parts) {
+    const prev = out[out.length - 1];
+    const folded = foldAccents(word.replace(/[.,;]+$/, ""));
+    if (
+      prev &&
+      FUEL_WORDS.includes(folded) &&
+      foldAccents(prev.replace(/[.,;]+$/, "")) === folded
+    ) {
+      continue; // pula o combustível repetido em sequência
+    }
+    out.push(word);
+  }
+  return out.join(" ");
+}
+
 function deriveVehicleNames(ad: PublicAdDetail) {
   const title = sanitizeText(ad.title);
   const brand = sanitizeText(ad.brand);
@@ -262,17 +323,20 @@ function deriveVehicleNames(ad: PublicAdDetail) {
 
   const titleWithoutYear = stripYearTokens(title);
 
-  const fullName =
+  const fullNameRaw =
     titleWithoutYear ||
     stripYearTokens([brand, model, version].filter(Boolean).join(" ")) ||
     "Veículo";
+  // Corrige o combustível duplicado ("...6V Flex Flex") que vem do título
+  // montado no backend. Propaga para H1, subtítulo, JSON-LD name e meta title.
+  const fullName = dedupeFuelToken(fullNameRaw);
 
   const safeModel = model || title || [brand, model].filter(Boolean).join(" ").trim() || "Veículo";
 
   return {
     brand: toTitleCase(brand),
     model: toTitleCase(stripYearTokens(safeModel)),
-    version,
+    version: dedupeFuelToken(version),
     fullName,
   };
 }
@@ -422,11 +486,29 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
     };
   }
 
+  // Minimização de dados (LGPD + segurança): pessoa física é exibida SOMENTE
+  // pelo primeiro nome — nunca sobrenome. Como truncamos na fonte, o nome
+  // completo do PF não vaza em lugar nenhum: card, JSON-LD `Person.name`,
+  // meta ou alt (que não usam o nome do vendedor).
   return {
     type: "private",
-    name: sellerName,
+    name: firstNameOnly(sellerName),
     phone: sellerPhone,
   };
+}
+
+/**
+ * Extrai apenas o PRIMEIRO NOME de um nome de pessoa física ("Rafael Souza"
+ * → "Rafael"). Preserva o fallback genérico ("Anunciante no Carros na
+ * Cidade") intacto quando não há nome real. Nunca devolve string vazia.
+ */
+function firstNameOnly(fullName: string): string {
+  const cleaned = sanitizeText(fullName);
+  if (!cleaned) return "Anunciante";
+  // Fallbacks/rótulos genéricos (não são nome de pessoa) passam inteiros.
+  if (/carros na cidade|anunciante/i.test(cleaned)) return cleaned;
+  const first = cleaned.split(/\s+/)[0] ?? cleaned;
+  return first || cleaned;
 }
 
 function buildOptionalItems(ad: PublicAdDetail) {
@@ -525,7 +607,10 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     optionalItems: buildOptionalItems(ad),
     safetyItems: buildSafetyItems(),
     comfortItems: buildComfortItems(ad),
-    vehicleOptionGroups: buildSelectedOptionGroups(ad.vehicle_options),
+    vehicleOptionGroups: buildSelectedOptionGroups(ad.vehicle_options, {
+      excludeKeys: TRUST_BADGE_KEYS,
+    }),
+    trustBadges: buildTrustBadges(ad.vehicle_options),
     sellerNotes:
       "Confirme com o anunciante as condições do veículo, opcionais, documentação e disponibilidade antes de fechar negócio.",
     seller,

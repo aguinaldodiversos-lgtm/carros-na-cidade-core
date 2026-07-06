@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import AdEventTracker from "@/components/analytics/AdEventTracker";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
-import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
-import VehicleDetailMobileShell from "@/components/vehicle/mobile/VehicleDetailMobileShell";
+import VehicleDetailView from "@/components/vehicle/detail/VehicleDetailView";
 
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import { fetchAdDetail } from "@/lib/ads/ad-detail";
@@ -259,37 +258,20 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
   return (
     <>
       {/*
-        Mobile: esconde PublicHeader/PublicFooter globais para a shell
-        ocupar 100% da viewport (estilo app, igual ao mockup detalhes.png).
-        Desktop: mantém PublicHeader/PublicFooter, mas a mesma shell
-        renderiza com largura de coluna controlada — fidelidade ao
-        mockup também em desktop, sem sidebar e sem layout legado.
+        Redesign detalhes.png — o miolo é reconstruído em VehicleDetailView.
+        O PublicHeader/PublicFooter GLOBAIS (layout.tsx) permanecem visíveis
+        em todos os breakpoints (sem o hack antigo que os escondia no mobile).
+        Toda a camada de SEO abaixo (JSON-LD Product+Car+Offer+AutoDealer,
+        BreadcrumbList, WebPage, FAQ, canonical/metas em generateMetadata)
+        é preservada intacta.
       */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            @media (max-width: 1023px) {
-              body:has([data-vehicle-detail-mobile-shell]) [data-public-header],
-              body:has([data-vehicle-detail-mobile-shell]) [data-public-footer],
-              body:has([data-vehicle-detail-mobile-shell]) [data-vehicle-mobile-sticky] {
-                display: none !important;
-              }
-              body:has([data-vehicle-detail-mobile-shell]) #main-content { padding: 0 !important; }
-            }
-          `,
-        }}
+      <VehicleDetailView
+        vehicle={vehicle}
+        shareUrl={shareUrl}
+        breadcrumbItems={breadcrumbItems}
+        cityVehicles={cityVehicles}
+        sellerVehicles={sellerVehicles}
       />
-
-      <div className="mx-auto w-full max-w-[680px] lg:max-w-3xl">
-        <VehicleDetailMobileShell
-          vehicle={vehicle}
-          shareUrl={shareUrl}
-          cityVehicles={cityVehicles}
-          sellerVehicles={sellerVehicles}
-        />
-      </div>
-
-      <SiteBottomNav />
 
       <AdEventTracker adId={vehicle.id} eventType="view" />
       <AnalyticsPageView event="ad_view" adId={vehicle.id} entityId={canonicalSlug} />

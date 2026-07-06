@@ -166,6 +166,48 @@ export type OptionGroup = {
   items: { key: string; label: string }[];
 };
 
+/**
+ * Chaves de PROCEDÊNCIA/verificação — as que viram os "selos verdes" no topo
+ * do detalhe (item 6 do redesign detalhes.png), em vez de ficarem soltas na
+ * lista de opcionais. São um subconjunto curado do catálogo (todas existem em
+ * COMFORT/DRIVABILITY/SAFETY acima). Ordem = ordem de exibição dos selos.
+ *
+ * IMPORTANTE (LGPD/verdade): não existe coluna "IPVA pago" no modelo, então
+ * esse selo do mockup NUNCA é renderizado — só exibimos o que o anunciante
+ * realmente marcou em `vehicle_options`.
+ *
+ * Decisão 2026-07-05 (aprovada): estas chaves são EXTRAÍDAS dos grupos de
+ * opcionais (via `excludeKeys`) para não aparecerem duplicadas.
+ */
+export const TRUST_BADGE_KEYS: string[] = [
+  "unico_dono",
+  "todas_revisoes_feitas",
+  "revisoes_concessionaria",
+  "manual_proprietario",
+  "chave_reserva",
+  "laudo_cautelar_aprovado",
+  "blindado",
+  "preco_competitivo_fipe",
+];
+
+export type TrustBadge = { key: string; label: string };
+
+/**
+ * Entrada crua → selos de procedência selecionados, em ordem canônica do
+ * `TRUST_BADGE_KEYS`, com label canônico do catálogo. Vazio quando o anúncio
+ * não marcou nenhuma chave de procedência.
+ */
+export function buildTrustBadges(stored: unknown): TrustBadge[] {
+  const selected = new Set(extractSelectedKeys(stored));
+  const badges: TrustBadge[] = [];
+  for (const key of TRUST_BADGE_KEYS) {
+    if (!selected.has(key)) continue;
+    const item = OPTION_BY_KEY.get(key);
+    if (item) badges.push({ key, label: item.label });
+  }
+  return badges;
+}
+
 /** Catálogo agrupado por categoria — usado pelo seletor (checkboxes). */
 export function getCatalogGroups(): OptionGroup[] {
   return VEHICLE_OPTION_CATEGORIES.map((category) => ({
@@ -214,14 +256,22 @@ export function extractSelectedKeys(stored: unknown): string[] {
  * ordem do catálogo, categorias vazias OMITIDAS. Sempre usa o label canônico
  * (texto puro — nunca renderiza texto vindo do cliente).
  */
-export function buildSelectedOptionGroups(stored: unknown): OptionGroup[] {
+export function buildSelectedOptionGroups(
+  stored: unknown,
+  opts?: { excludeKeys?: Iterable<string> }
+): OptionGroup[] {
   const selected = new Set(extractSelectedKeys(stored));
   if (selected.size === 0) return [];
+
+  const excluded = opts?.excludeKeys ? new Set(opts.excludeKeys) : null;
 
   const groups: OptionGroup[] = [];
   for (const category of VEHICLE_OPTION_CATEGORIES) {
     const items = VEHICLE_OPTIONS_CATALOG.filter(
-      (item) => item.category === category && selected.has(item.key)
+      (item) =>
+        item.category === category &&
+        selected.has(item.key) &&
+        !(excluded && excluded.has(item.key))
     ).map((item) => ({ key: item.key, label: item.label }));
 
     if (items.length > 0) {

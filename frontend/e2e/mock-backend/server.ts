@@ -120,6 +120,22 @@ const routes: Record<string, Record<string, RouteHandler>> = {
     }),
   } as unknown as Record<string, RouteHandler>,
 
+  // Detalhe do anúncio (/api/ads/:idOrSlug). Fica APÓS search/facets: como
+  // `matchRoute` prioriza correspondência exata, aqueles continuam roteados
+  // certo; qualquer outro `/api/ads/<x>` cai aqui e devolve o detalhe rico.
+  "GET /api/ads/": {
+    handler: (_body: Record<string, unknown>, url: URL) => {
+      const idOrSlug = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "");
+      const detail = fixtures.adDetail;
+      // Echo do slug pedido para facilitar o preview local com qualquer slug.
+      const body =
+        idOrSlug && idOrSlug !== detail.id && idOrSlug !== detail.slug
+          ? { data: { ...detail, slug: idOrSlug } }
+          : { data: detail };
+      return { status: 200, body };
+    },
+  } as unknown as Record<string, RouteHandler>,
+
   "POST /api/ads": {
     handler: () => ({
       status: 201,

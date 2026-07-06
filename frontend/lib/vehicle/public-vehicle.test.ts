@@ -139,6 +139,97 @@ describe("adaptAdDetailToVehicle — reconciliação anti-incoerência", () => {
   });
 });
 
+describe("adaptAdDetailToVehicle — combustível duplicado no H1/fullName", () => {
+  it("colapsa 'Flex Flex' para um único 'Flex'", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({ title: "Chevrolet Onix Hatch LT 1.0 6V Flex Flex", fuel_type: "Flex" })
+    );
+    expect(v.fullName).toBe("Chevrolet Onix Hatch LT 1.0 6V Flex");
+    // não deve haver dois "Flex" seguidos em nenhuma parte visível
+    expect(/\bflex\s+flex\b/i.test(v.fullName)).toBe(false);
+  });
+
+  it("colapsa 'Diesel Diesel' e 'Gasolina Gasolina'", () => {
+    expect(
+      adaptAdDetailToVehicle(makeAd({ title: "Ford Ranger XLT 3.2 Diesel Diesel" })).fullName
+    ).toBe("Ford Ranger XLT 3.2 Diesel");
+    expect(
+      adaptAdDetailToVehicle(makeAd({ title: "VW Gol 1.6 Gasolina Gasolina" })).fullName
+    ).toBe("VW Gol 1.6 Gasolina");
+  });
+
+  it("NÃO remove o combustível quando ele aparece uma única vez", () => {
+    expect(adaptAdDetailToVehicle(makeAd({ title: "Chevrolet Onix 1.0 Flex" })).fullName).toBe(
+      "Chevrolet Onix 1.0 Flex"
+    );
+    expect(adaptAdDetailToVehicle(makeAd({ title: "Ford Ranger 3.2 Diesel" })).fullName).toBe(
+      "Ford Ranger 3.2 Diesel"
+    );
+  });
+
+  it("deduplica também na versão (subtítulo)", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({ title: "Fiat Argo", version: "1.0 Flex Flex", fuel_type: "Flex" })
+    );
+    expect(v.version).toBe("1.0 Flex");
+  });
+});
+
+describe("adaptAdDetailToVehicle — minimização de dados do vendedor (LGPD)", () => {
+  it("pessoa física expõe SOMENTE o primeiro nome", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        seller_type: "private",
+        seller_kind: "private",
+        dealership_id: null,
+        account_type: "CPF",
+        seller_name: "Rafael Souza",
+      })
+    );
+    expect(v.seller.type).toBe("private");
+    expect(v.seller.name).toBe("Rafael");
+    expect(v.seller.name).not.toContain("Souza");
+  });
+
+  it("loja mantém o nome comercial completo", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        seller_type: "dealer",
+        seller_kind: "dealer",
+        seller_name: "AutoCar Veículos Premium",
+      })
+    );
+    expect(v.seller.type).toBe("dealer");
+    expect(v.seller.name).toBe("AutoCar Veículos Premium");
+  });
+});
+
+describe("adaptAdDetailToVehicle — selos de procedência x opcionais", () => {
+  it("extrai selos de procedência e os remove dos grupos de opcionais", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        vehicle_options: {
+          drivability: ["unico_dono", "rodas_liga_leve"],
+          safety: ["freios_abs"],
+        },
+      })
+    );
+
+    // selo de procedência extraído
+    expect(v.trustBadges.map((b) => b.key)).toContain("unico_dono");
+    // e NÃO aparece mais entre os opcionais (Dirigibilidade)
+    const optionKeys = v.vehicleOptionGroups.flatMap((g) => g.items.map((i) => i.key));
+    expect(optionKeys).toContain("rodas_liga_leve");
+    expect(optionKeys).not.toContain("unico_dono");
+  });
+
+  it("sem opcionais → selos e grupos vazios", () => {
+    const v = adaptAdDetailToVehicle(makeAd({ vehicle_options: null }));
+    expect(v.trustBadges).toEqual([]);
+    expect(v.vehicleOptionGroups).toEqual([]);
+  });
+});
+
 /**
  * P2-E (Contract Lock) 2026-05-25 — garante que `adaptAdDetailToVehicle`
  * delega a formatação de preço/território ao contrato público
