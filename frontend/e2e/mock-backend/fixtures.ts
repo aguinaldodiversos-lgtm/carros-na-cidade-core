@@ -134,7 +134,16 @@ export const fixtures = {
     whatsapp_number: "11987654321",
     description:
       "Chevrolet Onix LT 1.0 12V Flex 2021 em excelente estado de conservação. Econômico, confiável e ideal para o dia a dia. Revisões em dia, pneus em ótimo estado, ar-condicionado, direção elétrica, vidros e travas elétricas.",
-    images: ["/images/gla.avif", "/images/dolphin.webp", "/images/home-hero-banner.jpg"],
+    // Fotos de carro repetidas via querystring distinta (só p/ preview local:
+    // gera 6 slides sem depender de assets reais de veículo no repo).
+    images: [
+      "/images/gla.avif?p=1",
+      "/images/dolphin.webp?p=2",
+      "/images/gla.avif?p=3",
+      "/images/dolphin.webp?p=4",
+      "/images/gla.avif?p=5",
+      "/images/dolphin.webp?p=6",
+    ],
     vehicle_options: {
       comfort: [
         "ar_condicionado",

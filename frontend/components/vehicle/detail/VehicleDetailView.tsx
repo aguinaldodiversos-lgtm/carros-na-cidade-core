@@ -99,17 +99,15 @@ export default function VehicleDetailView({
 
   return (
     <div className="bg-cnc-bg pb-24 lg:pb-12">
-      {/* ---- Galeria full-width ---- */}
-      <VehicleGalleryCarousel
-        images={vehicle.images}
-        alt={vehicle.fullName}
-        bodyTypeChip={vehicle.bodyType !== "Não informado" ? vehicle.bodyType : null}
-        isBelowFipe={vehicle.isBelowFipe}
-        reviewedAfterBelowFipe={vehicle.reviewedAfterBelowFipe}
-      />
+      <div className="mx-auto w-full max-w-[1180px] px-4 pt-4 sm:px-5 sm:pt-5">
+        {/* ---- Galeria (dentro do container: respeita o max-width do layout) ---- */}
+        <VehicleGalleryCarousel
+          images={vehicle.images}
+          alt={vehicle.fullName}
+          isBelowFipe={vehicle.isBelowFipe}
+        />
 
-      <div className="mx-auto w-full max-w-[1180px] px-4 pt-5 sm:px-5">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* ================= COLUNA ESQUERDA ================= */}
           <div className="min-w-0 space-y-5">
             {/* Card principal: breadcrumb + título + preço + specs + descrição + selos */}
