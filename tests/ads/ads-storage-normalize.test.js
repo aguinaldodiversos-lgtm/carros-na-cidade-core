@@ -17,8 +17,8 @@ describe("normalizeBodyTypeForStorage", () => {
     expect(normalizeBodyTypeForStorage("SUV")).toBe("suv");
   });
 
-  it("desconhecido usa fallback sedan", () => {
-    expect(normalizeBodyTypeForStorage("tipo-desconhecido-xyz")).toBe("sedan");
+  it("desconhecido vira null (não inventa 'sedan')", () => {
+    expect(normalizeBodyTypeForStorage("tipo-desconhecido-xyz")).toBe(null);
   });
 
   it("vazio vira null", () => {

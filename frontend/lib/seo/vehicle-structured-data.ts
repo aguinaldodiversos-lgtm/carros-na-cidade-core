@@ -14,6 +14,17 @@
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import { buildVehicleImageAlt, splitCityState } from "./vehicle-image-alt";
 
+/**
+ * Spec só entra no JSON-LD se for um valor REAL — descarta vazio e o sentinel
+ * "Não informado" (que câmbio/carroceria podem assumir após a Fase A). Evita
+ * poluir o dado estruturado que o Google lê com placeholders.
+ */
+function isRealSpec(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  return v.length > 0 && v.toLowerCase() !== "não informado" && v.toLowerCase() !== "nao informado";
+}
+
 function parsePriceNumber(vehicle: VehicleDetail): number | null {
   if (
     typeof vehicle.priceNumeric === "number" &&
@@ -140,10 +151,12 @@ export function buildVehicleJsonLd(
   if (vehicle.model) car.model = vehicle.model;
   if (vehicle.version) car.vehicleConfiguration = vehicle.version;
   if (year) car.vehicleModelDate = year;
-  if (vehicle.fuel) car.fuelType = vehicle.fuel;
-  if (vehicle.transmission) car.vehicleTransmission = vehicle.transmission;
-  if (vehicle.color) car.color = vehicle.color;
-  if (vehicle.bodyType) car.bodyType = vehicle.bodyType;
+  // Só emite specs REAIS: nunca coloca "Não informado"/vazio no dado estruturado
+  // que o Google lê (câmbio/carroceria podem vir "Não informado" pós-Fase A).
+  if (isRealSpec(vehicle.fuel)) car.fuelType = vehicle.fuel;
+  if (isRealSpec(vehicle.transmission)) car.vehicleTransmission = vehicle.transmission;
+  if (isRealSpec(vehicle.color)) car.color = vehicle.color;
+  if (isRealSpec(vehicle.bodyType)) car.bodyType = vehicle.bodyType;
   if (km != null) {
     car.mileageFromOdometer = { "@type": "QuantitativeValue", value: km, unitCode: "KMT" };
   }

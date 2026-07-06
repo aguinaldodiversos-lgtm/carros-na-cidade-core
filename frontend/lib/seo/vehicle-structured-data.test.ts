@@ -151,4 +151,15 @@ describe("buildVehicleJsonLd", () => {
       "https://schema.org/NewCondition"
     );
   });
+
+  it("NÃO emite câmbio/carroceria/combustível quando são 'Não informado'", () => {
+    const nodes = buildVehicleJsonLd(
+      vehicle({ transmission: "Não informado", bodyType: "Não informado", fuel: "Não informado" }),
+      { url: URL }
+    );
+    const car = findType(nodes, "Car")!;
+    expect(car.vehicleTransmission).toBeUndefined();
+    expect(car.bodyType).toBeUndefined();
+    expect(car.fuelType).toBeUndefined();
+  });
 });

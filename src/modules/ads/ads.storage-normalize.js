@@ -76,12 +76,18 @@ function tokenizeFuelParts(collapsed) {
 }
 
 /**
- * Carroceria: label → slug CHECK. Desconhecido → `sedan` (fallback seguro).
+ * Carroceria: label → slug canônico (`BODY_TYPE_SYNONYMS`) ou null.
+ *
+ * Não mapeado → `null` (mesma política de câmbio/combustível). ANTES caía em
+ * `"sedan"`, o que fabricava carroceria falsa: qualquer rótulo não reconhecido
+ * (ex.: "Utilitário esportivo") virava "sedan" silenciosamente. Preferimos
+ * `null` (→ "Não informado" na exibição) a inventar um dado errado.
+ * O CHECK do Postgres aceita NULL (coluna nullable, default NULL).
  */
 export function normalizeBodyTypeForStorage(value) {
   const resolved = resolveFromLookup(BODY_LOOKUP, value);
   if (resolved !== undefined) return resolved;
-  return "sedan";
+  return null;
 }
 
 /**

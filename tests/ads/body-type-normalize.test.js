@@ -15,7 +15,7 @@ describe("normalizeBodyTypeForStorage", () => {
     expect(normalizeBodyTypeForStorage("   ")).toBe(null);
   });
 
-  it("usa sedan como fallback seguro", () => {
-    expect(normalizeBodyTypeForStorage("valor-desconhecido-xyz")).toBe("sedan");
+  it("desconhecido vira null (não inventa 'sedan')", () => {
+    expect(normalizeBodyTypeForStorage("valor-desconhecido-xyz")).toBe(null);
   });
 });

@@ -82,9 +82,11 @@ export default function VehicleDetailView({
     .join(" • ");
 
   const specs = [
-    { icon: <CogIcon />, label: "Câmbio", value: chip(vehicle.transmission) },
+    // Câmbio e Carroceria sempre aparecem (com "Não informado" quando a fonte
+    // confiável não existe) — nunca escondemos para não mascarar o dado.
+    { icon: <CogIcon />, label: "Câmbio", value: vehicle.transmission || "Não informado" },
     { icon: <FuelIcon />, label: "Combustível", value: chip(vehicle.fuel) },
-    { icon: <CarIcon />, label: "Carroceria", value: chip(vehicle.bodyType) },
+    { icon: <CarIcon />, label: "Carroceria", value: vehicle.bodyType || "Não informado" },
     { icon: <PaletteIcon />, label: "Cor", value: chip(vehicle.color) },
     { icon: <PinIcon />, label: "Cidade", value: chip(vehicle.city, "Localização não informada") },
   ].filter((s) => s.value);

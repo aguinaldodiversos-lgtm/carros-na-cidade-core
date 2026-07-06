@@ -110,21 +110,22 @@ export const fixtures = {
    */
   adDetail: {
     id: "ad-preview",
-    slug: "chevrolet-onix-hatch-lt-2021-sao-paulo-sp",
-    // "GM -" no brand + "LT" na versão + "Flex Flex" no título: prova o H1
-    // curto ("Chevrolet Onix Hatch LT"), a remoção do prefixo de grupo e a
-    // correção do combustível duplicado, tudo de uma vez.
-    title: "GM - Chevrolet Onix Hatch LT 1.0 12V Flex Flex",
-    brand: "GM - Chevrolet",
-    model: "Onix Hatch",
-    version: "LT 1.0 12V Flex 5p Mec.",
-    year: 2021,
-    mileage: 32000,
-    price: 65000,
+    slug: "fiat-mobi-like-1-0-2024-sao-paulo-sp",
+    // BUG Fase A: transmission/body_type são os defaults HARDCODED do wizard
+    // ("automatico"/"sedan"), mas o anunciante marcou "Câmbio manual" no
+    // opcional. Mobi É hatch, não sedan. A exibição/JSON-LD devem mostrar
+    // câmbio "Manual" (do opcional) e carroceria "Não informado" (nunca "Sedã").
+    title: "Fiat Mobi Like 1.0 Fire Flex 5p",
+    brand: "Fiat",
+    model: "Mobi",
+    version: "Like 1.0 Fire Flex 5p",
+    year: 2024,
+    mileage: 52353,
+    price: 58500,
     fuel_type: "Flex",
-    transmission: "Manual",
-    body_type: "Hatch",
-    color: "Cinza",
+    transmission: "automatico", // ← default hardcoded errado
+    body_type: "sedan", // ← default hardcoded errado
+    color: "Branco",
     city: "São Paulo",
     state: "SP",
     city_slug: "sao-paulo-sp",
@@ -135,7 +136,7 @@ export const fixtures = {
     account_type: "CPF",
     whatsapp_number: "11987654321",
     description:
-      "Chevrolet Onix LT 1.0 12V Flex 2021 em excelente estado de conservação. Econômico, confiável e ideal para o dia a dia. Revisões em dia, pneus em ótimo estado, ar-condicionado, direção elétrica, vidros e travas elétricas.",
+      "Fiat Mobi Branco — 52.353 km. Procura um carro compacto, prático e ideal para o dia a dia? Esse Fiat Mobi na cor branca é uma excelente opção para quem busca economia e facilidade para estacionar na rotina.",
     // Fotos de carro repetidas via querystring distinta (só p/ preview local:
     // gera 6 slides sem depender de assets reais de veículo no repo).
     images: [
@@ -156,7 +157,7 @@ export const fixtures = {
         "camera_re",
         "bluetooth",
       ],
-      drivability: ["rodas_liga_leve", "farois_led", "unico_dono", "todas_revisoes_feitas", "manual_proprietario", "chave_reserva"],
+      drivability: ["cambio_manual", "rodas_liga_leve", "farois_led", "unico_dono", "todas_revisoes_feitas", "manual_proprietario", "chave_reserva"],
       safety: ["airbag_duplo", "freios_abs", "isofix", "alarme", "laudo_cautelar_aprovado"],
     },
     created_at: "2026-06-20T10:00:00.000Z",

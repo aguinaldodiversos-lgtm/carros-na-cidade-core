@@ -4,6 +4,7 @@ import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import {
   buildSelectedOptionGroups,
   buildTrustBadges,
+  extractSelectedKeys,
   TRUST_BADGE_KEYS,
   type OptionGroup,
   type TrustBadge,
@@ -406,6 +407,117 @@ function reconcileBodyType(ad: PublicAdDetail): string {
   return declared;
 }
 
+/**
+ * ── Fase A (paliativo do bug de câmbio/carroceria hardcoded) ─────────────────
+ *
+ * CAUSA RAIZ: o wizard de cadastro grava `transmission="Automático"` e
+ * `body_type="Sedã"` como DEFAULT hardcoded (não há campo para o anunciante
+ * informar). O único sinal REAL de câmbio é o opcional que ele marca
+ * (`cambio_*`). Carroceria não é capturada em lugar nenhum.
+ *
+ * Enquanto o cadastro não é corrigido (Fase B), estas funções derivam câmbio
+ * e carroceria de fontes confiáveis para a EXIBIÇÃO **e** o JSON-LD (mesma
+ * `VehicleDetail` alimenta os dois) — nunca chutando "Sedã"/"Automático".
+ */
+const UNKNOWN_SPEC = "Não informado";
+
+const CAMBIO_OPTION_LABELS: Record<string, string> = {
+  cambio_manual: "Manual",
+  cambio_automatico: "Automático",
+  cambio_cvt: "Automático (CVT)",
+  cambio_automatizado: "Automatizado",
+};
+
+/**
+ * Câmbio a partir do que o anunciante REALMENTE marcou nos opcionais.
+ * `null` quando não marcou câmbio ou marcou opções conflitantes (ex.: manual
+ * + automático) — aí o caller cai no sinal da versão.
+ */
+function transmissionFromOptions(vehicleOptions: unknown): string | null {
+  const cambioKeys = extractSelectedKeys(vehicleOptions).filter((k) => k.startsWith("cambio_"));
+  const labels = Array.from(
+    new Set(cambioKeys.map((k) => CAMBIO_OPTION_LABELS[k]).filter(Boolean))
+  );
+  return labels.length === 1 ? labels[0] : null;
+}
+
+/** Sinal de câmbio no texto da versão/título (FIPE traz "Mec."/"Aut."/"CVT"). */
+function transmissionFromVersionText(ad: PublicAdDetail): string | null {
+  const version = sanitizeText((ad as PublicAdDetail & { version?: string | null }).version);
+  const haystack = `${version} ${sanitizeText(ad.title)}`.toLowerCase();
+  if (/\bcvt\b/.test(haystack)) return "Automático (CVT)";
+  if (/\b(aut\.?|automátic|automatic|dct|dsg)\b/.test(haystack)) return "Automático";
+  if (/\b(mec\.?|manual)\b/.test(haystack)) return "Manual";
+  return null;
+}
+
+/**
+ * Câmbio para EXIBIÇÃO e JSON-LD (fonte única). Confiança:
+ *   1. opcional marcado (`cambio_*`) — o que o anunciante informou;
+ *   2. sinal no texto da versão/título ("Mec."/"Aut."/"CVT");
+ *   3. "Não informado" — NÃO confia na coluna `transmission` (default hardcoded).
+ */
+function deriveTransmissionForDisplay(ad: PublicAdDetail): string {
+  return (
+    transmissionFromOptions(ad.vehicle_options) ?? transmissionFromVersionText(ad) ?? UNKNOWN_SPEC
+  );
+}
+
+const BODY_LABEL: Record<string, string> = {
+  hatch: "Hatch",
+  sedan: "Sedã",
+  suv: "SUV",
+  picape: "Picape",
+  coupe: "Coupé",
+  minivan: "Minivan",
+  wagon: "Perua",
+};
+
+function bodyTypeSlugFromText(haystack: string): string | null {
+  if (/\bhatch\b/.test(haystack)) return "hatch";
+  if (/\bsed(?:an|ã|ane|\.)?\b/.test(haystack)) return "sedan";
+  if (/\bsuv\b/.test(haystack)) return "suv";
+  if (/\b(picape|pickup)\b/.test(haystack)) return "picape";
+  if (/\bcoup[eé]\b/.test(haystack)) return "coupe";
+  if (/\b(minivan|van)\b/.test(haystack)) return "minivan";
+  if (/\b(wagon|perua|sw)\b/.test(haystack)) return "wagon";
+  return null;
+}
+
+function bodyTypeSlugFromDeclared(value: string): string | null {
+  const v = value.trim().toLowerCase();
+  if (!v) return null;
+  if (/hatch/.test(v)) return "hatch";
+  if (/(sedan|sedã|seda)/.test(v)) return "sedan";
+  if (/(suv|utilit|crossover)/.test(v)) return "suv";
+  if (/(picape|pickup|camionete)/.test(v)) return "picape";
+  if (/coup/.test(v)) return "coupe";
+  if (/(minivan|van)/.test(v)) return "minivan";
+  if (/(wagon|perua)/.test(v)) return "wagon";
+  return null;
+}
+
+/**
+ * Carroceria para EXIBIÇÃO e JSON-LD (fonte única). Confiança:
+ *   1. sinal no texto (modelo/título/versão) — ex.: "Onix Hatch" → Hatch;
+ *   2. valor declarado NÃO-sedan reconhecido (SUV/Picape/...) — confiável por
+ *      NÃO ser o default;
+ *   3. "Não informado" — NÃO confia num "sedan" isolado (pode ser o default
+ *      hardcoded "Sedã" do wizard). Nunca chuta "Sedã".
+ */
+function deriveBodyTypeForDisplay(ad: PublicAdDetail): string {
+  const version = sanitizeText((ad as PublicAdDetail & { version?: string | null }).version);
+  const haystack = `${sanitizeText(ad.model)} ${sanitizeText(ad.title)} ${version}`.toLowerCase();
+
+  const fromText = bodyTypeSlugFromText(haystack);
+  if (fromText) return BODY_LABEL[fromText];
+
+  const declaredSlug = bodyTypeSlugFromDeclared(sanitizeText(ad.body_type));
+  if (declaredSlug && declaredSlug !== "sedan") return BODY_LABEL[declaredSlug];
+
+  return UNKNOWN_SPEC;
+}
+
 function buildFipeReferenceAmount(price: number | null, belowFipe: boolean): number | null {
   if (!price || price <= 0) return null;
 
@@ -586,8 +698,10 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
     year: formatYear(ad.year),
     km: formatMileage(ad.mileage),
     fuel: sanitizeText(ad.fuel_type, "Não informado"),
-    transmission: reconcileTransmission(ad),
-    bodyType: reconcileBodyType(ad),
+    // Fonte única (alimenta specs do topo + subtítulo + JSON-LD Car): câmbio do
+    // opcional/versão e carroceria do texto — nunca o default hardcoded.
+    transmission: deriveTransmissionForDisplay(ad),
+    bodyType: deriveBodyTypeForDisplay(ad),
     color: sanitizeText((ad as PublicAdDetail & { color?: string | null }).color, "Não informado"),
     city,
     citySlug,

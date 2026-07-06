@@ -139,6 +139,64 @@ describe("adaptAdDetailToVehicle — reconciliação anti-incoerência", () => {
   });
 });
 
+describe("adaptAdDetailToVehicle — Fase A: câmbio/carroceria (fonte confiável)", () => {
+  it("câmbio vem do opcional marcado pelo anunciante, não da coluna hardcoded", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        transmission: "automatico", // default hardcoded do wizard
+        version: "Like 1.0 Fire Flex 5p", // sem sinal Mec./Aut.
+        vehicle_options: { drivability: ["cambio_manual"] },
+      })
+    );
+    expect(v.transmission).toBe("Manual");
+  });
+
+  it("câmbio cai no sinal da versão quando não há opcional", () => {
+    expect(
+      adaptAdDetailToVehicle(makeAd({ transmission: "manual", version: "2.0 16V Aut." }))
+        .transmission
+    ).toBe("Automático");
+  });
+
+  it("câmbio = 'Não informado' quando não há opcional nem sinal na versão", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({ transmission: "automatico", version: "Like 1.0 Fire Flex 5p", title: "Fiat Mobi" })
+    );
+    expect(v.transmission).toBe("Não informado");
+  });
+
+  it("opcionais de câmbio conflitantes → cai no sinal da versão / Não informado", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        version: "Like 1.0 Fire Flex 5p",
+        title: "Fiat Mobi",
+        vehicle_options: { drivability: ["cambio_manual", "cambio_automatico"] },
+      })
+    );
+    expect(v.transmission).toBe("Não informado");
+  });
+
+  it("carroceria 'sedan' isolada (Mobi) vira 'Não informado' — nunca chuta Sedã", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({ brand: "Fiat", model: "Mobi", title: "Fiat Mobi Like 1.0 Fire Flex 5p", body_type: "sedan", version: "Like 1.0 Fire Flex 5p" })
+    );
+    expect(v.bodyType).toBe("Não informado");
+  });
+
+  it("carroceria confia em valor NÃO-sedan declarado (SUV)", () => {
+    const v = adaptAdDetailToVehicle(
+      makeAd({ model: "Creta", title: "Hyundai Creta", body_type: "suv", version: "1.0 Turbo" })
+    );
+    expect(v.bodyType).toBe("SUV");
+  });
+
+  it("carroceria vem do texto do modelo quando disponível (Onix Hatch → Hatch)", () => {
+    expect(
+      adaptAdDetailToVehicle(makeAd({ model: "ONIX HATCH", body_type: "sedan" })).bodyType
+    ).toBe("Hatch");
+  });
+});
+
 describe("adaptAdDetailToVehicle — combustível duplicado no H1/fullName", () => {
   it("colapsa 'Flex Flex' para um único 'Flex'", () => {
     const v = adaptAdDetailToVehicle(
