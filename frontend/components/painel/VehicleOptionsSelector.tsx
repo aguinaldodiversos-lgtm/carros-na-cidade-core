@@ -14,14 +14,29 @@ import { getCatalogGroups } from "@/lib/ads/vehicle-options";
 type VehicleOptionsSelectorProps = {
   selected: string[];
   onChange: (keys: string[]) => void;
+  /**
+   * Keys a ocultar do seletor manual (ex.: câmbio, controlado por um <select>
+   * dedicado — Fase B). Continuam preservadas em `selected` através dos toggles,
+   * só não aparecem para o usuário marcar/desmarcar aqui.
+   */
+  hiddenKeys?: Iterable<string>;
 };
 
 export default function VehicleOptionsSelector({
   selected,
   onChange,
+  hiddenKeys,
 }: VehicleOptionsSelectorProps) {
   const [query, setQuery] = useState("");
-  const groups = useMemo(() => getCatalogGroups(), []);
+  const hiddenSet = useMemo(() => new Set(hiddenKeys ?? []), [hiddenKeys]);
+  const groups = useMemo(
+    () =>
+      getCatalogGroups().map((g) => ({
+        ...g,
+        items: g.items.filter((item) => !hiddenSet.has(item.key)),
+      })),
+    [hiddenSet]
+  );
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const normalizedQuery = query.trim().toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");

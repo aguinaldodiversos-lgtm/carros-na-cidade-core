@@ -20,6 +20,12 @@ import {
   versionsForYear,
 } from "./fipe-years";
 import type { WizardFormState } from "./types";
+import {
+  BODY_TYPE_CHOICES,
+  CAMBIO_OPTION_KEYS,
+  syncCambioOptionKeys,
+  TRANSMISSION_CHOICES,
+} from "@/lib/ads/vehicle-options";
 import VehicleOptionsSelector from "../VehicleOptionsSelector";
 import { FinalizeLocationFields } from "./FinalizeLocationFields";
 import type { DashboardPayload } from "@/lib/dashboard-types";
@@ -413,6 +419,50 @@ export function StepVehicle({ state, patch }: { state: WizardFormState; patch: P
         </select>
       </label>
 
+      {/* Câmbio (Fase B): fonte ÚNICA — grava `transmission` E sincroniza o
+          opcional `cambio_*`. Antes era default hardcoded "Automático". */}
+      <label className="block">
+        <span className={labelClass}>
+          Câmbio <span className="text-red-500">*</span>
+        </span>
+        <select
+          className={selectClass}
+          value={state.transmission}
+          onChange={(e) =>
+            patch({
+              transmission: e.target.value,
+              vehicleOptionKeys: syncCambioOptionKeys(state.vehicleOptionKeys, e.target.value),
+            })
+          }
+        >
+          <option value="">Escolha uma...</option>
+          {TRANSMISSION_CHOICES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Carroceria (Fase B): antes era default hardcoded "Sedã". */}
+      <label className="block">
+        <span className={labelClass}>
+          Carroceria <span className="text-red-500">*</span>
+        </span>
+        <select
+          className={selectClass}
+          value={state.bodyStyle}
+          onChange={(e) => patch({ bodyStyle: e.target.value })}
+        >
+          <option value="">Escolha uma...</option>
+          {BODY_TYPE_CHOICES.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <label className="flex cursor-pointer items-center gap-3 rounded-[18px] border border-[#E5E9F2] bg-[#FBFCFF] px-4 py-3">
         <input
           type="checkbox"
@@ -664,9 +714,12 @@ export function StepOptionals({ state, patch }: { state: WizardFormState; patch:
         Marque os itens que o veículo possui. Eles aparecem agrupados por categoria (Conforto,
         Dirigibilidade, Segurança) no anúncio público.
       </p>
+      {/* Câmbio é controlado pelo <select> do passo Veículo (fonte única) —
+          escondido aqui para não criar um segundo campo divergente. */}
       <VehicleOptionsSelector
         selected={state.vehicleOptionKeys}
         onChange={(keys) => patch({ vehicleOptionKeys: keys })}
+        hiddenKeys={CAMBIO_OPTION_KEYS}
       />
     </div>
   );

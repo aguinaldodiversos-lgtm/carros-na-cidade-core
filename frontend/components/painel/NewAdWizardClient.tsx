@@ -56,8 +56,11 @@ const INITIAL_FORM: WizardFormState = {
   color: "",
   armored: false,
   fuel: "Flex",
-  transmission: "Automático",
-  bodyStyle: "Sedã",
+  // Fase B: câmbio/carroceria agora são ESCOLHIDOS pelo anunciante (antes eram
+  // default hardcoded "Automático"/"Sedã", que fabricava dado falso). Vazio →
+  // obrigatório no passo 0.
+  transmission: "",
+  bodyStyle: "",
   fipeValue: "",
   mileage: "",
   price: "",
@@ -91,6 +94,8 @@ function validateStep(step: number, form: WizardFormState): string | null {
       if (!form.yearManufacture) return "Selecione o ano de fabricação.";
       if (!form.fipeYearCode || !form.versionLabel) return "Selecione a versão.";
       if (!form.color) return "Selecione a cor.";
+      if (!form.transmission) return "Selecione o câmbio.";
+      if (!form.bodyStyle) return "Selecione a carroceria.";
       return null;
     case 1:
       if (!form.mileage.trim()) return "Informe a quilometragem.";

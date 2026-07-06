@@ -5,7 +5,14 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OwnedAdEditable } from "@/lib/account/backend-account";
-import { extractSelectedKeys } from "@/lib/ads/vehicle-options";
+import {
+  BODY_TYPE_CHOICES,
+  CAMBIO_OPTION_KEYS,
+  extractSelectedKeys,
+  syncCambioOptionKeys,
+  TRANSMISSION_CHOICES,
+  transmissionLabelFromKeys,
+} from "@/lib/ads/vehicle-options";
 import VehicleOptionsSelector from "./VehicleOptionsSelector";
 import {
   formatCurrencyInput,
@@ -27,6 +34,22 @@ const OWNER_EDITABLE_STATUSES = new Set([
   "paused",
   "rejected",
 ]);
+
+// Slugs persistidos → rótulos dos <select> (Fase B: câmbio/carroceria editáveis).
+const SLUG_TO_TRANSMISSION: Record<string, string> = {
+  manual: "Manual",
+  automatico: "Automático",
+  cvt: "CVT",
+};
+const SLUG_TO_BODY_TYPE: Record<string, string> = {
+  hatch: "Hatch",
+  sedan: "Sedã",
+  suv: "SUV",
+  picape: "Picape",
+  coupe: "Coupé",
+  minivan: "Minivan",
+  wagon: "Perua",
+};
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Rascunho",
@@ -70,6 +93,20 @@ export default function EditAdForm({
   const [optionKeys, setOptionKeys] = useState<string[]>(() =>
     extractSelectedKeys(editable?.vehicle_options)
   );
+  // Câmbio: preferir a chave de opcional (fonte única da Fase A); senão o slug
+  // da coluna transmission. Carroceria: slug da coluna body_type.
+  const [transmission, setTransmission] = useState<string>(() => {
+    const fromKey = transmissionLabelFromKeys(extractSelectedKeys(editable?.vehicle_options));
+    return fromKey || SLUG_TO_TRANSMISSION[(editable?.transmission ?? "").toLowerCase()] || "";
+  });
+  const [bodyStyle, setBodyStyle] = useState<string>(
+    () => SLUG_TO_BODY_TYPE[(editable?.body_type ?? "").toLowerCase()] || ""
+  );
+
+  function onTransmissionChange(value: string) {
+    setTransmission(value);
+    setOptionKeys((keys) => syncCambioOptionKeys(keys, value));
+  }
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +140,11 @@ export default function EditAdForm({
       title: title.trim(),
       description: description.trim() ? description.trim() : null,
       price: priceValue,
+      // Câmbio/carroceria (Fase B): rótulos; backend normaliza p/ slug. Vazio →
+      // null (não força "sedan"/"automatico"). `vehicle_options` já carrega a
+      // chave de câmbio sincronizada.
+      transmission: transmission || null,
+      body_type: bodyStyle || null,
       // Lista achatada de keys; backend reagrupa e valida. Array vazio limpa.
       vehicle_options: optionKeys,
     };
@@ -302,13 +344,59 @@ export default function EditAdForm({
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="ad-cambio" className="mb-1.5 block text-sm font-bold text-cnc-text">
+                  Câmbio
+                </label>
+                <select
+                  id="ad-cambio"
+                  value={transmission}
+                  onChange={(e) => onTransmissionChange(e.target.value)}
+                  className="w-full rounded-xl border border-cnc-line bg-white px-3.5 py-2.5 text-sm text-cnc-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-soft"
+                >
+                  <option value="">Não informado</option>
+                  {TRANSMISSION_CHOICES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="ad-carroceria"
+                  className="mb-1.5 block text-sm font-bold text-cnc-text"
+                >
+                  Carroceria
+                </label>
+                <select
+                  id="ad-carroceria"
+                  value={bodyStyle}
+                  onChange={(e) => setBodyStyle(e.target.value)}
+                  className="w-full rounded-xl border border-cnc-line bg-white px-3.5 py-2.5 text-sm text-cnc-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-soft"
+                >
+                  <option value="">Não informado</option>
+                  {BODY_TYPE_CHOICES.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div>
               <h3 className="text-sm font-bold text-cnc-text">Opcionais do veículo</h3>
               <p className="mb-3 mt-1 text-xs text-cnc-muted">
                 Marque os itens que o veículo possui. Aparecem agrupados por categoria no anúncio
-                público.
+                público. (O câmbio é definido no campo acima.)
               </p>
-              <VehicleOptionsSelector selected={optionKeys} onChange={setOptionKeys} />
+              <VehicleOptionsSelector
+                selected={optionKeys}
+                onChange={setOptionKeys}
+                hiddenKeys={CAMBIO_OPTION_KEYS}
+              />
             </div>
 
             <div className="rounded-xl border border-cnc-line bg-cnc-bg/60 px-4 py-3 text-xs text-cnc-muted">

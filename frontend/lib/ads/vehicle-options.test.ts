@@ -2,9 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   buildSelectedOptionGroups,
   buildTrustBadges,
+  CAMBIO_OPTION_KEYS,
   countSelectedOptions,
   extractSelectedKeys,
   getCatalogGroups,
+  syncCambioOptionKeys,
+  transmissionLabelFromKeys,
   TRUST_BADGE_KEYS,
   VEHICLE_OPTION_CATEGORIES,
 } from "./vehicle-options";
@@ -125,6 +128,31 @@ describe("vehicle-options — buildTrustBadges (selos de procedência)", () => {
   it("vazio quando nenhuma chave de procedência foi marcada", () => {
     expect(buildTrustBadges({ comfort: ["ar_condicionado"] })).toEqual([]);
     expect(buildTrustBadges(null)).toEqual([]);
+  });
+});
+
+describe("vehicle-options — câmbio como fonte única (Fase B)", () => {
+  it("syncCambioOptionKeys troca a chave de câmbio preservando os demais opcionais", () => {
+    const start = ["ar_condicionado", "cambio_automatico", "freios_abs"];
+    const next = syncCambioOptionKeys(start, "Manual");
+    expect(next).toContain("cambio_manual");
+    expect(next).not.toContain("cambio_automatico");
+    expect(next).toEqual(expect.arrayContaining(["ar_condicionado", "freios_abs"]));
+  });
+
+  it("syncCambioOptionKeys com câmbio vazio remove qualquer cambio_*", () => {
+    expect(syncCambioOptionKeys(["cambio_cvt", "bluetooth"], "")).toEqual(["bluetooth"]);
+  });
+
+  it("nunca deixa duas chaves de câmbio ao trocar", () => {
+    const next = syncCambioOptionKeys(["cambio_manual"], "CVT");
+    expect(next.filter((k) => CAMBIO_OPTION_KEYS.includes(k))).toEqual(["cambio_cvt"]);
+  });
+
+  it("transmissionLabelFromKeys devolve o rótulo do câmbio marcado", () => {
+    expect(transmissionLabelFromKeys(["freios_abs", "cambio_manual"])).toBe("Manual");
+    expect(transmissionLabelFromKeys(["cambio_automatico"])).toBe("Automático");
+    expect(transmissionLabelFromKeys(["freios_abs"])).toBe("");
   });
 });
 

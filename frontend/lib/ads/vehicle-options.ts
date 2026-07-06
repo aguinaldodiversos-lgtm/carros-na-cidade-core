@@ -193,6 +193,54 @@ export const TRUST_BADGE_KEYS: string[] = [
 export type TrustBadge = { key: string; label: string };
 
 /**
+ * ── Fase B (cura do cadastro) ────────────────────────────────────────────────
+ * Câmbio e carroceria passam a ser CAPTURADOS no wizard/edição. Para o câmbio
+ * ser FONTE ÚNICA (sem dois campos divergentes), o seletor de câmbio grava
+ * `transmission` E sincroniza a chave `cambio_*` correspondente nos opcionais —
+ * e as chaves de câmbio ficam ESCONDIDAS do seletor de opcionais manual.
+ */
+export const TRANSMISSION_CHOICES = ["Manual", "Automático", "Automatizado", "CVT"] as const;
+
+export const BODY_TYPE_CHOICES = [
+  "Hatch",
+  "Sedã",
+  "SUV",
+  "Picape",
+  "Coupé",
+  "Minivan",
+  "Perua",
+] as const;
+
+const TRANSMISSION_TO_CAMBIO_KEY: Record<string, string> = {
+  Manual: "cambio_manual",
+  Automático: "cambio_automatico",
+  Automatizado: "cambio_automatizado",
+  CVT: "cambio_cvt",
+};
+
+/** Todas as chaves de câmbio do catálogo (para esconder do seletor de opcionais). */
+export const CAMBIO_OPTION_KEYS: string[] = Object.values(TRANSMISSION_TO_CAMBIO_KEY);
+
+/**
+ * Sincroniza a chave de câmbio nos opcionais com o câmbio escolhido: remove
+ * qualquer `cambio_*` anterior e adiciona a do câmbio atual. Mantém o câmbio
+ * como fonte única (o mesmo dado alimenta a coluna `transmission` e o opcional).
+ */
+export function syncCambioOptionKeys(keys: string[], transmissionLabel: string): string[] {
+  const withoutCambio = keys.filter((k) => !CAMBIO_OPTION_KEYS.includes(k));
+  const key = TRANSMISSION_TO_CAMBIO_KEY[transmissionLabel];
+  return key ? [...withoutCambio, key] : withoutCambio;
+}
+
+/** Rótulo de câmbio ("Manual"...) a partir da chave `cambio_*` presente nas keys. */
+export function transmissionLabelFromKeys(keys: string[]): string {
+  const found = keys.find((k) => CAMBIO_OPTION_KEYS.includes(k));
+  if (!found) return "";
+  const entry = Object.entries(TRANSMISSION_TO_CAMBIO_KEY).find(([, v]) => v === found);
+  return entry ? entry[0] : "";
+}
+
+/**
  * Entrada crua → selos de procedência selecionados, em ordem canônica do
  * `TRUST_BADGE_KEYS`, com label canônico do catálogo. Vazio quando o anúncio
  * não marcou nenhuma chave de procedência.
