@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi, type AdRow } from "@/lib/admin/api";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
@@ -31,6 +31,7 @@ export default function AdminAnuncios() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [offset, setOffset] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   const buildParams = useCallback(
     () => ({ limit: LIMIT, offset, ...activeFilters }),
@@ -55,6 +56,33 @@ export default function AdminAnuncios() {
     setActiveFilters({});
     setOffset(0);
   }
+
+  // Soft-delete de limpeza: seta status='deleted' via o endpoint existente
+  // (PATCH /ads/:id/status). O anúncio some de TODAS as superfícies públicas
+  // (todas as queries públicas filtram status='active') e da lista admin padrão.
+  // Reversível pelo suporte (a linha é preservada). `stopPropagation` evita
+  // abrir o detalhe ao clicar no botão.
+  const handleDelete = useCallback(
+    async (ad: AdRow, event: MouseEvent) => {
+      event.stopPropagation();
+      const ok = window.confirm(
+        `Deletar o anúncio #${ad.id} "${ad.title}"?\n\n` +
+          `Ele sai de todas as superfícies públicas e da lista ativa do admin. ` +
+          `É um soft-delete (reversível pelo suporte via filtro status="deleted").`
+      );
+      if (!ok) return;
+      setDeletingId(ad.id);
+      try {
+        await adminApi.ads.changeStatus(ad.id, "deleted", "Limpeza de anúncio de teste (admin)");
+        reload();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Falha ao deletar o anúncio.");
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [reload]
+  );
 
   return (
     <div className="space-y-4">
@@ -125,6 +153,9 @@ export default function AdminAnuncios() {
                   <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
                     Data
                   </th>
+                  <th className="px-4 py-2.5 font-semibold text-cnc-muted uppercase tracking-wider">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -173,6 +204,21 @@ export default function AdminAnuncios() {
                     </td>
                     <td className="px-4 py-2.5 text-cnc-muted whitespace-nowrap">
                       {new Date(ad.created_at).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      {ad.status === "deleted" ? (
+                        <span className="text-cnc-muted">—</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDelete(ad, e)}
+                          disabled={deletingId === ad.id}
+                          className="rounded-lg border border-red-200 px-2.5 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                          title="Soft-delete: some de todas as superfícies públicas"
+                        >
+                          {deletingId === ad.id ? "Deletando…" : "Deletar"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

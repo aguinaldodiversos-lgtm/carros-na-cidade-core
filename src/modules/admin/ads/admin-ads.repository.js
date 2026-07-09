@@ -8,6 +8,11 @@ export async function listAds({ limit = 50, offset = 0, status, city_id, adverti
   if (status) {
     conditions.push(`a.status = $${idx++}`);
     params.push(status);
+  } else {
+    // Default: esconde anúncios DELETADOS da listagem (soft-delete "some" da
+    // visão). Continuam acessíveis/recuperáveis filtrando explicitamente por
+    // status='deleted'. Sem isso, o botão "Deletar" não limparia a lista.
+    conditions.push(`a.status != 'deleted'`);
   }
   if (city_id) {
     conditions.push(`a.city_id = $${idx++}`);
