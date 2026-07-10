@@ -172,30 +172,55 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
     expect(screen.queryByText(/Região de/i)).toBeNull();
   });
 
-  it("seção Localização renderiza o seletor 'Distância (km)' (10/25/40/100, padrão 40)", () => {
+  it("seção Localização renderiza o slider 'Distância (km)' (25/50/75/100, padrão 50)", () => {
     const onRadiusChange = vi.fn();
     render(
       <FilterSidebar
         filters={{}}
         onPatch={vi.fn()}
         {...baseProps}
-        radiusKm={40}
+        radiusKm={50}
         onRadiusChange={onRadiusChange}
       />
     );
-    const select = screen.getByTestId("sidebar-distance-select") as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    expect(select.value).toBe("40");
-    const optionValues = Array.from(select.querySelectorAll("option")).map((o) => o.value);
-    expect(optionValues).toEqual(["10", "25", "40", "100"]);
-    // Mudar o raio dispara onRadiusChange com o novo valor.
-    fireEvent.change(select, { target: { value: "25" } });
-    expect(onRadiusChange).toHaveBeenCalledWith(25);
+    const slider = screen.getByTestId("sidebar-distance-slider");
+    expect(slider).toBeTruthy();
+    expect(slider.getAttribute("role")).toBe("slider");
+    expect(slider.getAttribute("aria-valuenow")).toBe("50");
+    expect(slider.getAttribute("aria-valuemin")).toBe("25");
+    expect(slider.getAttribute("aria-valuemax")).toBe("100");
+    // Presets 25/50/75/100 presentes e sincronizados.
+    ["25 km", "50 km", "75 km", "100 km"].forEach((name) => {
+      expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe(
+        name === "50 km" ? "true" : "false"
+      );
+    });
+    // Clicar num preset dispara onRadiusChange com o novo valor.
+    fireEvent.click(screen.getByRole("button", { name: "75 km" }));
+    expect(onRadiusChange).toHaveBeenCalledWith(75);
   });
 
-  it("seletor 'Distância (km)' NÃO aparece sem onRadiusChange (fora da página de cidade)", () => {
+  it("slider de Distância navega por teclado (setas) e comita o novo raio", () => {
+    const onRadiusChange = vi.fn();
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        radiusKm={50}
+        onRadiusChange={onRadiusChange}
+      />
+    );
+    const slider = screen.getByTestId("sidebar-distance-slider");
+    fireEvent.keyDown(slider, { key: "ArrowLeft" });
+    expect(onRadiusChange).toHaveBeenLastCalledWith(25);
+    fireEvent.keyDown(slider, { key: "End" });
+    expect(onRadiusChange).toHaveBeenLastCalledWith(100);
+  });
+
+  it("slider 'Distância (km)' NÃO aparece sem onRadiusChange (fora da página de cidade)", () => {
     renderSidebar({}, vi.fn());
-    expect(screen.queryByTestId("sidebar-distance-select")).toBeNull();
+    expect(screen.queryByTestId("sidebar-distance-slider")).toBeNull();
   });
 
   it("seção Localização renderiza atalho 'Apenas [cidade]' quando há cidade no contexto", () => {

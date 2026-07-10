@@ -99,9 +99,10 @@ export default function BuyMarketplacePageClient({
     [initialFacets?.models]
   );
 
+  // Rótulo com contagem por opção ("Toyota (48)") quando o facet informa total.
   const brandOptions = useMemo(() => {
     const options = brandFacets.slice(0, 20).map((item) => ({
-      label: item.brand,
+      label: item.total > 0 ? `${item.brand} (${item.total})` : item.brand,
       value: item.brand,
     }));
 
@@ -116,7 +117,7 @@ export default function BuyMarketplacePageClient({
       : modelFacets;
 
     const options = filtered.slice(0, 20).map((item) => ({
-      label: item.model,
+      label: item.total > 0 ? `${item.model} (${item.total})` : item.model,
       value: item.model,
     }));
 
