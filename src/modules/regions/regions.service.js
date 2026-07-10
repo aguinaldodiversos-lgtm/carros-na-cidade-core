@@ -59,6 +59,19 @@ async function findBaseCity(slug) {
  * Busca vizinhos via region_memberships (fallback estático). Layer 1 ≤30 km,
  * layer 2 entre 30–60 km. Pré-computado offline. Sempre disponível mesmo
  * que cities.latitude/longitude esteja vazio.
+ *
+ * GUARD `rm.layer <= 2` (2026-07-09): a Página Regional (System B) define a
+ * vizinhança em ≤60 km. Hoje esta query NÃO tinha teto de distância nem de
+ * layer — só o cap de MAX_REGION_MEMBERS — e dependia de a TABELA só conter
+ * layers 1/2. Vamos introduzir uma banda LAYER 3 (60–100 km) em
+ * `region_memberships`, lida SÓ pelo filtro "Distância (km)" do /comprar
+ * (System A). Sem este guard, essas linhas vazariam para a Regional (onde há
+ * folga no LIMIT de 30). O guard mantém a Regional intocada em ≤60 km.
+ *
+ * NO-OP HOJE: enquanto a tabela não tiver linhas de layer 3, `rm.layer <= 2`
+ * não filtra nada (todas as linhas não-self já são layer 1 ou 2) — o resultado
+ * é byte-a-byte idêntico ao de antes. Por isso este fix é seguro de deployar
+ * ANTES do rebuild que popula o layer 3. Usa o índice (base_city_id, layer).
  */
 async function findMembersFromMemberships(baseCityId) {
   const result = await pool.query(
@@ -74,6 +87,7 @@ async function findMembersFromMemberships(baseCityId) {
     JOIN cities c ON c.id = rm.member_city_id
     WHERE rm.base_city_id = $1
       AND rm.member_city_id != $1
+      AND rm.layer <= 2
     ORDER BY rm.layer ASC, rm.distance_km ASC NULLS LAST, c.name ASC
     LIMIT $2
     `,
