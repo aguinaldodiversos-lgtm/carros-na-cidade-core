@@ -90,8 +90,8 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   // notFound() internamente, então usamos try/catch no caller.
   const regionalEnabled = isRegionalPageEnabled();
 
-  // Filtro "Distância (km)" = AÇÃO DO USUÁRIO via `?raio=` (10/25/40/100, padrão
-  // 40). Controla SÓ o raio do bloco "Próximos"; o catálogo próprio (0 km) não
+  // Filtro "Distância (km)" = AÇÃO DO USUÁRIO via `?raio=` (25/50/75/100, padrão
+  // 50). Controla SÓ o raio do bloco "Próximos"; o catálogo próprio (0 km) não
   // muda. Não afeta canonical/robots (generateMetadata ignora searchParams → a
   // URL com `?raio=` é sempre deduplicada para a cidade limpa). Ver parseRadiusParam.
   const radiusKm = parseRadiusParam(searchParams?.raio);

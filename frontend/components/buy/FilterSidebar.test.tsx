@@ -164,7 +164,7 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
         filters={{}}
         onPatch={vi.fn()}
         {...baseProps}
-        radiusKm={40}
+        radiusKm={50}
         onRadiusChange={vi.fn()}
       />
     );

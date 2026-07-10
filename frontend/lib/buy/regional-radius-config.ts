@@ -32,8 +32,8 @@ export const DISTANCE_OPTIONS_KM = [25, 50, 75, 100] as const;
 
 /**
  * Interpreta o parâmetro de URL `?raio=` (ação do usuário, descartada pelo
- * canonical). Retorna sempre um valor da lista permitida; default 40. String,
- * string[] ou lixo → 40.
+ * canonical). Retorna sempre um valor da lista permitida; default 50. String,
+ * string[] ou lixo → 50.
  */
 export function parseRadiusParam(raw: string | string[] | undefined): number {
   const value = Array.isArray(raw) ? raw[0] : raw;
