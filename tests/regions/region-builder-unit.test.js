@@ -97,7 +97,42 @@ describe("pickRegionMembers", () => {
 
     const layer2Ids = members.filter((m) => m.layer === 2).map((m) => m.member_city_id);
     expect(layer2Ids).toContain(SP_ATIBAIA.id);
-    expect(layer2Ids).not.toContain(SP_CAMPINAS.id); // ~90 km > 60
+    expect(layer2Ids).not.toContain(SP_CAMPINAS.id); // ~90 km > 60 → agora é layer 3
+  });
+
+  it("classifica vizinhos distantes como layer 3 (60-100 km) — banda aditiva p/ stops 75/100", () => {
+    const members = pickRegionMembers(SP_CAPITAL, [SP_CAPITAL, SP_ATIBAIA, SP_CAMPINAS]);
+
+    const layer3 = members.filter((m) => m.layer === 3).map((m) => m.member_city_id);
+    expect(layer3).toContain(SP_CAMPINAS.id); // ~90 km → layer 3
+    expect(layer3).not.toContain(SP_ATIBAIA.id); // ~49 km → layer 2, não 3
+  });
+
+  it("exclui vizinhos além de 100 km (fora do teto do layer 3)", () => {
+    const SP_FAR = {
+      id: 300,
+      state: "SP",
+      name: "Cidade Longe",
+      latitude: -23.5505 - 1.2, // ~133 km ao sul da capital
+      longitude: -46.6333,
+    };
+    const members = pickRegionMembers(SP_CAPITAL, [SP_CAPITAL, SP_FAR]);
+    expect(members.map((m) => m.member_city_id)).not.toContain(SP_FAR.id);
+  });
+
+  it("respeita o teto de membros em layer 3 (default 40)", () => {
+    // Cluster denso a ~66 km (banda 60-100 km): 60 cidades, todas em SP.
+    const dense = Array.from({ length: 60 }, (_, i) => ({
+      id: 2000 + i,
+      state: "SP",
+      name: `Distante ${i}`,
+      latitude: -23.5505 - 0.6 - i * 0.0005,
+      longitude: -46.6333,
+    }));
+    const members = pickRegionMembers(SP_CAPITAL, [SP_CAPITAL, ...dense]);
+    const layer3 = members.filter((m) => m.layer === 3);
+    expect(layer3.length).toBeGreaterThan(0);
+    expect(layer3.length).toBeLessThanOrEqual(40);
   });
 
   it("nunca inclui a própria cidade-base como membro", () => {

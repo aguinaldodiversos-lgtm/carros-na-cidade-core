@@ -59,6 +59,13 @@ async function findBaseCity(slug) {
  * Busca vizinhos via region_memberships (fallback estático). Layer 1 ≤30 km,
  * layer 2 entre 30–60 km. Pré-computado offline. Sempre disponível mesmo
  * que cities.latitude/longitude esteja vazio.
+ *
+ * ISOLAMENTO (2026-07-09): a tabela agora também guarda LAYER 3 (60–100 km),
+ * banda ADITIVA lida SÓ pelo filtro "Distância (km)" do /comprar
+ * (`getRadiusMembers`, System A). A Página Regional (System B) NÃO deve
+ * incorporar essa faixa — o produto define a vizinhança regional em ≤60 km. O
+ * `rm.layer <= 2` abaixo garante que o output do System B fica IDÊNTICO ao de
+ * antes do layer 3 existir (usa o índice `(base_city_id, layer)`).
  */
 async function findMembersFromMemberships(baseCityId) {
   const result = await pool.query(
@@ -74,6 +81,7 @@ async function findMembersFromMemberships(baseCityId) {
     JOIN cities c ON c.id = rm.member_city_id
     WHERE rm.base_city_id = $1
       AND rm.member_city_id != $1
+      AND rm.layer <= 2
     ORDER BY rm.layer ASC, rm.distance_km ASC NULLS LAST, c.name ASC
     LIMIT $2
     `,

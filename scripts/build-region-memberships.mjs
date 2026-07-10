@@ -9,6 +9,7 @@
  *   - Para cada cidade-base, calcula Haversine para todas as outras na mesma UF.
  *   - Layer 1: distance_km <= 30, top 12 por distância ASC.
  *   - Layer 2: 30 < distance_km <= 60, top 18 por distância ASC.
+ *   - Layer 3: 60 < distance_km <= 100, top 40 por distância ASC.
  *   - DELETE memberships antigos da base (preservando a self-row, layer 0).
  *   - INSERT ON CONFLICT DO UPDATE com a nova vizinhança.
  *   - Tudo em transação por base — rerun é idempotente e seguro.
@@ -31,6 +32,12 @@ import { pool, closeDatabasePool } from "../src/infrastructure/database/db.js";
 const EARTH_RADIUS_KM = 6371;
 const LAYER_1_MAX_KM = 30;
 const LAYER_2_MAX_KM = 60;
+// Layer 3 (60 < d <= 100 km) — banda ADITIVA introduzida p/ o filtro de
+// "Distância (km)" do /comprar honrar os stops 75 e 100 km (antes saturavam em
+// 60). É lida SÓ pela query System A (`getRadiusMembers`, `distance_km <= km`).
+// A Página Regional (System B) filtra `layer <= 2` e permanece intocada em
+// ≤60 km. Teto e cap configuráveis por env (não cravar no código).
+const LAYER_3_MAX_KM = Number.parseInt(String(process.env.REGIONAL_LAYER3_MAX_KM ?? "100"), 10) || 100;
 
 /**
  * Limites de cidades por região, configuráveis via env vars.
@@ -52,6 +59,11 @@ function parsePositiveInt(raw, fallback) {
 }
 const LAYER_1_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER1_MAX_MEMBERS, 12);
 const LAYER_2_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER2_MAX_MEMBERS, 18);
+// Cap do layer 3 (60-100 km). Default 40 calibrado com coordenadas reais IBGE:
+// garante contagem estritamente crescente 25<50<75<100 em metrópoles densas
+// (SP/Campinas) e cidades médias (Ribeirão/Bauru), sem inflar demais as linhas
+// (base fica com ≤ 12+18+40 = 70 membros; ~2× o volume anterior).
+const LAYER_3_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER3_MAX_MEMBERS, 40);
 
 function toRadians(degrees) {
   return (degrees * Math.PI) / 180;
@@ -74,6 +86,7 @@ export function haversineKm(lat1, lon1, lat2, lon2) {
 function classifyLayer(distanceKm) {
   if (distanceKm <= LAYER_1_MAX_KM) return 1;
   if (distanceKm <= LAYER_2_MAX_KM) return 2;
+  if (distanceKm <= LAYER_3_MAX_KM) return 3;
   return null;
 }
 
@@ -84,6 +97,7 @@ function classifyLayer(distanceKm) {
 export function pickRegionMembers(baseCity, candidates) {
   const layer1 = [];
   const layer2 = [];
+  const layer3 = [];
 
   for (const candidate of candidates) {
     if (candidate.id === baseCity.id) continue;
@@ -102,12 +116,18 @@ export function pickRegionMembers(baseCity, candidates) {
     const entry = { member_city_id: candidate.id, distance_km: distance, layer };
     if (layer === 1) layer1.push(entry);
     else if (layer === 2) layer2.push(entry);
+    else if (layer === 3) layer3.push(entry);
   }
 
   layer1.sort((a, b) => a.distance_km - b.distance_km);
   layer2.sort((a, b) => a.distance_km - b.distance_km);
+  layer3.sort((a, b) => a.distance_km - b.distance_km);
 
-  return [...layer1.slice(0, LAYER_1_MAX_MEMBERS), ...layer2.slice(0, LAYER_2_MAX_MEMBERS)];
+  return [
+    ...layer1.slice(0, LAYER_1_MAX_MEMBERS),
+    ...layer2.slice(0, LAYER_2_MAX_MEMBERS),
+    ...layer3.slice(0, LAYER_3_MAX_MEMBERS),
+  ];
 }
 
 async function rebuildMembershipsForBase(client, baseCity, candidatesInState) {
@@ -144,6 +164,7 @@ async function rebuildMembershipsForBase(client, baseCity, candidatesInState) {
   return {
     layer1: members.filter((m) => m.layer === 1).length,
     layer2: members.filter((m) => m.layer === 2).length,
+    layer3: members.filter((m) => m.layer === 3).length,
   };
 }
 
@@ -215,6 +236,7 @@ async function processStateWithRetry(state, citiesInState, { maxAttempts = 3 } =
 
     let stateLayer1 = 0;
     let stateLayer2 = 0;
+    let stateLayer3 = 0;
     let released = false;
 
     try {
@@ -222,10 +244,11 @@ async function processStateWithRetry(state, citiesInState, { maxAttempts = 3 } =
         const stats = await rebuildMembershipsForBase(client, baseCity, citiesInState);
         stateLayer1 += stats.layer1;
         stateLayer2 += stats.layer2;
+        stateLayer3 += stats.layer3;
       }
       client.release();
       released = true;
-      return { stateLayer1, stateLayer2, attempts: attempt };
+      return { stateLayer1, stateLayer2, stateLayer3, attempts: attempt };
     } catch (err) {
       lastErr = err;
       // Em connection drop, devolver o client com erro para o pool descartá-lo.
@@ -289,12 +312,13 @@ export async function buildRegionMemberships({ ufFilter } = {}) {
   let totalProcessed = 0;
   let totalLayer1 = 0;
   let totalLayer2 = 0;
+  let totalLayer3 = 0;
   const failedStates = [];
 
   for (const state of plannedStates) {
     const citiesInState = byState.get(state);
     try {
-      const { stateLayer1, stateLayer2, attempts } = await processStateWithRetry(
+      const { stateLayer1, stateLayer2, stateLayer3, attempts } = await processStateWithRetry(
         state,
         citiesInState
       );
@@ -302,14 +326,16 @@ export async function buildRegionMemberships({ ufFilter } = {}) {
         cities: citiesInState.length,
         layer1Total: stateLayer1,
         layer2Total: stateLayer2,
+        layer3Total: stateLayer3,
         attempts,
       };
       totalLayer1 += stateLayer1;
       totalLayer2 += stateLayer2;
+      totalLayer3 += stateLayer3;
       totalProcessed += citiesInState.length;
       const retryNote = attempts > 1 ? ` (recuperado em ${attempts} tentativas)` : "";
       console.log(
-        `[regions:build] ${state}: ${citiesInState.length} cidades, ${stateLayer1} memberships layer 1, ${stateLayer2} layer 2${retryNote}`
+        `[regions:build] ${state}: ${citiesInState.length} cidades, ${stateLayer1} layer 1, ${stateLayer2} layer 2, ${stateLayer3} layer 3${retryNote}`
       );
     } catch (err) {
       failedStates.push(state);
@@ -325,7 +351,7 @@ export async function buildRegionMemberships({ ufFilter } = {}) {
 
   const elapsedSec = ((Date.now() - start) / 1000).toFixed(1);
   console.log(
-    `[regions:build] OK — ${totalProcessed} cidades-base processadas, ${totalLayer1} memberships layer 1 + ${totalLayer2} layer 2 em ${elapsedSec}s.`
+    `[regions:build] OK — ${totalProcessed} cidades-base processadas, ${totalLayer1} layer 1 + ${totalLayer2} layer 2 + ${totalLayer3} layer 3 em ${elapsedSec}s.`
   );
   if (failedStates.length) {
     console.warn(
@@ -389,7 +415,7 @@ export async function buildRegionMemberships({ ufFilter } = {}) {
       `[regions:build] TOTAL: ${totalComViz}/${totalBase} cidades com vizinhança gravada (${pctNacional}%).`
     );
     console.log(
-      `[regions:build] Cidades sem vizinhança são, em geral, isoladas geograficamente (sem vizinhos no raio de ${LAYER_2_MAX_KM} km na mesma UF). Não é regressão.`
+      `[regions:build] Cidades sem vizinhança são, em geral, isoladas geograficamente (sem vizinhos no raio de ${LAYER_3_MAX_KM} km na mesma UF). Não é regressão.`
     );
   } catch (err) {
     console.warn(

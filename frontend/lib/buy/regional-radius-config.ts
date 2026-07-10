@@ -6,10 +6,11 @@
 //
 // ATENÇÃO — a distância é comparação CONTÍNUA (`region_memberships.distance_km
 // <= km`), não bucket: qualquer km funciona. Os valores abaixo são só a escala
-// de UI. CAVEAT de dados: o precompute (`scripts/build-region-memberships.mjs`,
-// LAYER_2_MAX_KM=60) só popula vizinhança até 60 km — então 75 e 100 hoje
-// retornam o mesmo conjunto de ≤60 km (como o antigo 100 já fazia). Para 75/100
-// alcançarem mais longe é preciso subir esse teto e re-rodar `regions:build`.
+// de UI. O precompute (`scripts/build-region-memberships.mjs`) popula LAYER 3
+// (60–100 km, cap REGIONAL_LAYER3_MAX_MEMBERS) além dos layers 1/2 (≤60 km),
+// então os stops 75 e 100 correspondem a raios reais e DISTINTOS. Requer que o
+// `regions:build` tenha rodado com o layer 3 (ver runbook). A Página Regional
+// (System B) filtra `layer <= 2` e permanece em ≤60 km.
 
 export const DEFAULT_RADIUS_KM = 50;
 const MAX_RADIUS_KM = 150;
