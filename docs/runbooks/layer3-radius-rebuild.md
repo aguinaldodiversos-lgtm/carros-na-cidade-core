@@ -18,11 +18,21 @@ git fetch origin && git checkout feature/painel-filtros-v2
 export DATABASE_URL='postgres://…PROD…'      # do painel do Render (seu lado)
 psql "$DATABASE_URL" -c "select 1;"          # confirma conexão
 ```
-**Ordem ideal de deploy:** publique o **backend desta branch (com o guard `layer<=2`)
-ANTES** de rodar o rebuild — assim a Página Regional já ignora o layer 3 no instante em
-que os dados aparecem. Se rodar o rebuild com o backend antigo (main) ainda no ar, há
-uma **janela** em que a Regional listaria vizinhas 60–100 km até você mergear/deployar.
+**Ordem OBRIGATÓRIA de deploy (há janela — a query da Regional NÃO tem teto por
+distância nem por layer; limita só pelo cap de 30 membros — ver §Como System B limita):**
+1. **Mergeie + deploye a branch isolada `fix/regional-layer-guard` PRIMEIRO.** Ela só
+   adiciona `AND rm.layer <= 2` em `findMembersFromMemberships`. **É NO-OP hoje** (sem
+   linhas de layer 3, não filtra nada → Regional idêntica), seguro de subir sozinha.
+2. **Só então** rode o rebuild (passo 3). No instante em que o layer 3 aparece, a
+   Regional já o ignora. Sem o guard no ar, a Regional listaria vizinhas 60–100 km.
 Para validar com blast radius mínimo, rode o rebuild só de **SP** (passo 3, opção B).
+
+### Como System B limita HOJE (confirmado no código)
+`src/modules/regions/regions.service.js` → `findMembersFromMemberships`:
+`WHERE base_city_id=$1 AND member_city_id<>$1 ORDER BY layer, distance_km LIMIT 30`.
+Ou seja: **cap de 30 membros, SEM `distance_km <= 60` e SEM filtro de layer** — depende
+de a tabela só ter layers 1/2. Por isso o guard é necessário (não é inerte). A rota é
+interna: `GET {BACKEND_URL}/api/internal/regions/:slug` com header `x-internal-token`.
 
 ---
 
@@ -138,6 +148,31 @@ GROUP BY rm.layer ORDER BY rm.layer;
 -- ✅ mostra layer 3 com min≈60 / max≈100 — a banda que a Regional deliberadamente ignora.
 ```
 
+### 6(c) SERVIDO — diff da Página Regional real ANTES × DEPOIS  [LEITURA] ⭐
+O SQL acima prova que os *dados* permitem o isolamento; este passo prova que o *código*
+servido aplica o guard. Requer o guard já deployado (passo 0) e o header interno.
+```bash
+export INTERNAL_TOKEN='…'   # = INTERNAL_API_TOKEN do backend de prod
+fetch_members () {  # $1 = slug da cidade-âncora
+  curl -s -H "x-internal-token: $INTERNAL_TOKEN" \
+    "{BACKEND_URL}/api/internal/regions/$1" \
+   | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);const m=j.data?.members||[];console.log(m.map(x=>x.slug).sort().join("\n"));process.stderr.write("max_km="+Math.max(0,...m.map(x=>Number(x.distance_km)||0))+"\n")})'
+}
+# 1) ANTES do rebuild (guard já no ar):
+for s in sao-paulo-sp campinas-sp atibaia-sp; do fetch_members "$s" > "regB.$s.antes"; done
+# 2) … rode o passo 3 (rebuild) …
+# 3) invalide o cache Redis (TTL 5 min) — senão a resposta vem cacheada:
+#    redis-cli --scan --pattern 'internal:regions*' | xargs -r redis-cli del   # (ou espere 5 min)
+# 4) DEPOIS do rebuild:
+for s in sao-paulo-sp campinas-sp atibaia-sp; do fetch_members "$s" > "regB.$s.depois"; done
+# 5) DIFF — critério: VAZIO (lista de vizinhas idêntica) em cada cidade:
+for s in sao-paulo-sp campinas-sp atibaia-sp; do
+  echo "== $s =="; diff "regB.$s.antes" "regB.$s.depois" && echo "IDÊNTICO ✅"
+done
+```
+✅ Critério: `diff` vazio (lista de slugs idêntica) nas 3 cidades, e o `max_km=` impresso
+no stderr ≤ 60 antes e depois. Isso comprova que a Regional SERVIDA aplica o `layer<=2`.
+
 ---
 
 ## 7. Captura HTTP viva — 4 stops distintos + default 50 km  [LEITURA]
@@ -169,11 +204,17 @@ REGIONAL_LAYER3_MAX_KM=60 node scripts/build-region-memberships.mjs   # +--uf=SP
 psql "$DATABASE_URL" -c "DELETE FROM region_memberships WHERE layer <> 0;"
 psql "$DATABASE_URL" -f region_memberships.backup.sql
 ```
+> **Env de rollback CONFIRMADA (lida pelo script):** `build-region-memberships.mjs` faz
+> `const LAYER_3_MAX_KM = parseInt(process.env.REGIONAL_LAYER3_MAX_KM ?? "100") || 100`, e
+> `classifyLayer` retorna 3 só p/ `60 < d <= LAYER_3_MAX_KM`. Verificado localmente: com
+> `REGIONAL_LAYER3_MAX_KM=60`, Campinas (~90 km) sai do resultado e **nenhuma linha de
+> layer 3 é gerada** (banda 60–60 = vazia) → o rebuild efetivamente remove o layer 3.
 
 ---
 
 ## Checklist p/ me devolver (eu interpreto e valido antes do merge)
 - [ ] Passo 4: km25<km50<km75<km100 em todas as cidades.
 - [ ] Passo 5: Execution Time (75 e 100 km) dentro do aceitável.
-- [ ] Passo 6(a): System B só layer 1/2, max ≤ 60 km.
+- [ ] Passo 6(a)+(b): System B só layer 1/2 (max ≤ 60 km); layer 3 existe nos dados (60–100).
+- [ ] **Passo 6(c) SERVIDO: `diff` da Regional ANTES×DEPOIS vazio nas 3 cidades (max_km ≤ 60).**
 - [ ] Passo 7: members crescente nos 4 stops + default radiusKm=50.
