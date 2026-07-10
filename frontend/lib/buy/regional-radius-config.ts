@@ -2,9 +2,16 @@
 //
 // Espelho de `src/read-models/cities/regional-radius.config.js`. Raio padrão
 // (km) da cobertura de vizinhança da página de cidade. Configurável por env
-// RAIO_PADRAO_KM, default 40 (Haversine ≈ ~50 km estrada). Lido em server-side.
+// RAIO_PADRAO_KM, default 50 (Haversine ≈ ~60 km estrada). Lido em server-side.
+//
+// ATENÇÃO — a distância é comparação CONTÍNUA (`region_memberships.distance_km
+// <= km`), não bucket: qualquer km funciona. Os valores abaixo são só a escala
+// de UI. CAVEAT de dados: o precompute (`scripts/build-region-memberships.mjs`,
+// LAYER_2_MAX_KM=60) só popula vizinhança até 60 km — então 75 e 100 hoje
+// retornam o mesmo conjunto de ≤60 km (como o antigo 100 já fazia). Para 75/100
+// alcançarem mais longe é preciso subir esse teto e re-rodar `regions:build`.
 
-export const DEFAULT_RADIUS_KM = 40;
+export const DEFAULT_RADIUS_KM = 50;
 const MAX_RADIUS_KM = 150;
 
 export function getRegionalRadiusKm(): number {
@@ -15,13 +22,13 @@ export function getRegionalRadiusKm(): number {
 
 /**
  * Opções do seletor "Distância (km)" do bloco "Próximos" (âncora regional).
- * 40 = RAIO_PADRAO_KM (padrão, URL limpa). São o único conjunto aceito — o
+ * 50 = RAIO_PADRAO_KM (padrão, URL limpa). São o único conjunto aceito — o
  * parser abaixo "encaixa" qualquer valor fora da lista de volta ao padrão, então
  * URLs adulteradas (`?raio=33`) não geram estados órfãos. NÃO inclui "estado":
  * ampliar para o estado é papel do seletor Estado (separado). Ver
  * FilterSidebar / carros-em/[slug].
  */
-export const DISTANCE_OPTIONS_KM = [10, 25, 40, 100] as const;
+export const DISTANCE_OPTIONS_KM = [25, 50, 75, 100] as const;
 
 /**
  * Interpreta o parâmetro de URL `?raio=` (ação do usuário, descartada pelo
