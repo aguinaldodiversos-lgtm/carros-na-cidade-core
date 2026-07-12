@@ -4,7 +4,7 @@ import { Suspense, type ReactNode } from "react";
 import { LocationRegionalPrompt } from "@/components/home/LocationRegionalPrompt";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { ContentCardsSection } from "@/components/home/sections/ContentCardsSection";
-import { ExploreByState } from "@/components/home/sections/ExploreByState";
+import { HomeAnnounceBanner } from "@/components/home/sections/HomeAnnounceBanner";
 import { HomeCarouselsSkeleton } from "@/components/home/sections/HomeCarouselsSkeleton";
 import {
   HomeHero,
@@ -12,28 +12,35 @@ import {
   type HomeHeroOverride,
 } from "@/components/home/sections/HomeHero";
 import { HomePrimaryActions } from "@/components/home/sections/HomePrimaryActions";
+import { HomeProfileSearch } from "@/components/home/sections/HomeProfileSearch";
 import { HomeSearchCard } from "@/components/home/sections/HomeSearchCard";
+import { HomeSeoLinks } from "@/components/home/sections/HomeSeoLinks";
 import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
-import { HomeTrustStrip } from "@/components/home/sections/HomeTrustStrip";
+import type {
+  HomeModelLink,
+  HomePriceBucketLink,
+  HomeProfileChip,
+  HomeSeoCity,
+} from "@/lib/home/home-discovery";
 
 /**
- * Orquestrador da Home — alinhado ao contrato visual oficial em
- * `frontend/public/images/pagina Home.png`.
+ * Orquestrador da Home — reestruturação 2026-07-11.
  *
- * Ordem das seções (mobile-first, fiel ao mockup):
- *   1. HomeSearchCard      — SearchBar + chips de filtro com ícones
- *   2. HomeShortcuts       — 7 atalhos circulares (Comprar, Vender, Blog,
- *                            Ofertas, Lojas, Favoritos, Planos). Centralizados
- *                            em desktop; carrossel scroll-snap em mobile.
- *   3. HomeHero            — banner regional com pílula do escopo (estado ou
- *                            cidade detectada), CTA "Ver ofertas →" e badge.
- *   4. HomePrimaryActions  — 3 cards quick-action coloridos: Anunciar grátis
- *                            (azul), Tabela FIPE (verde), Simulador (roxo)
- *   5. HomeCarousels       — Suspense com destaques + oportunidades (vitrine
- *                            ESTADUAL — substitui o antigo filtro por cidade
- *                            que zerava o inventário fora de SP capital).
- *   6. ExploreByState      — atalhos por estado
- *   7. ContentCardsSection — blog integrado (motor de aquisição)
+ * Ordem das seções (mobile-first):
+ *   1.  HomeHero            — carrossel de banners (subiu para o topo)
+ *   2.  HomeSearchCard      — busca por marca, modelo ou cidade + filtros
+ *   3.  HomeShortcuts       — atalhos (Comprar, Vender, FIPE, Ofertas, Planos)
+ *   4.  LocationRegionalPrompt — "ver carros próximos de você"
+ *   5.  HomeProfileSearch   — busca por perfil (NOVO; chips validados)
+ *   6.  HomeCarousels       — Suspense: veículos recentes + abaixo da FIPE
+ *   7.  HomeAnnounceBanner  — banner "Anuncie Grátis" (NOVO)
+ *   8.  HomePrimaryActions  — ações rápidas: Tabela FIPE + Simulador
+ *   9.  ContentCardsSection — blog integrado (motor de aquisição)
+ *   10. HomeSeoLinks        — bloco SEO "Continue sua busca" (NOVO)
+ *
+ * Removidos nesta reestruturação: o Hero textual (virou <h1> sr-only em
+ * app/page.tsx), HomeTrustStrip ("Por que escolher"), ExploreByState e o
+ * bloco "Explore por região" — os dois últimos substituídos por HomeSeoLinks.
  *
  * Padding-bottom no main = 20 (80px) para mobile não cobrir conteúdo com
  * BottomNav (regra documentada em frontend/components/ui/BottomNav.tsx).
@@ -73,12 +80,14 @@ interface HomePageClientProps {
   detectedCity?: { slug: string; name: string } | null;
   /** Slot de streaming: HomeCarousels embrulhado em <Suspense> na page.tsx. */
   carousels: ReactNode;
-  /**
-   * Slot opcional para o bloco "Explore por região" — renderizado entre
-   * ExploreByState e ContentCardsSection. `null` quando flag regional
-   * está off ou o endpoint não retornou regiões.
-   */
-  stateRegions?: ReactNode;
+  /** Chips de "Busca por perfil" já validados (não-vazios) por fetchHomeDiscovery. */
+  profiles: HomeProfileChip[];
+  /** Links "Por modelo" (facets, total > 0) do bloco SEO "Continue sua busca". */
+  models: HomeModelLink[];
+  /** Links "Por preço" já validados (não-vazios) do bloco SEO. */
+  priceBuckets: HomePriceBucketLink[];
+  /** Cidades "com mais anúncios" (slug real, não-vazias) do bloco SEO. */
+  cities: HomeSeoCity[];
   /**
    * Vem do server (lê REGIONAL_PAGE_ENABLED). Controla se o
    * `LocationRegionalPrompt` exibe o CTA primário "Ver ofertas da região"
@@ -113,7 +122,10 @@ export function HomePageClient({
   stateName,
   detectedCity = null,
   carousels,
-  stateRegions = null,
+  profiles,
+  models,
+  priceBuckets,
+  cities,
   regionalEnabled,
   heroOverride = null,
   heroBanners = null,
@@ -133,10 +145,24 @@ export function HomePageClient({
         layout. Evita `<main>` aninhado/duplicado (auditoria SSR 2026-06-27).
       */}
       <div className="bg-cnc-bg pb-20 md:pb-12">
+        {/* 1. Carrossel de banners — subiu para o topo (reestruturação 2026-07-11). */}
+        <HomeHero
+          defaultCitySlug={defaultCitySlug}
+          cityName={detectedCityName}
+          stateName={stateName}
+          totalAds={totalAds}
+          override={heroOverride}
+          banners={heroBanners}
+        />
+
+        {/* 2. Busca. */}
         <HomeSearchCard defaultCitySlug={defaultCitySlug} />
 
+        {/* 3. Atalhos rápidos. */}
+        <HomeShortcuts />
+
         {/*
-          LocationRegionalPrompt — PR 4 territorial.
+          4. Localização — LocationRegionalPrompt (PR 4 territorial).
           Server passa regionalEnabled (flag REGIONAL_PAGE_ENABLED). O
           componente NUNCA pede geolocalização automaticamente; só ao
           clicar no CTA. Coordenadas vivem só na memória do callback —
@@ -148,28 +174,23 @@ export function HomePageClient({
           stateCode={stateUf}
         />
 
-        <HomeShortcuts />
+        {/* 5. Busca por perfil (some se nenhum chip sobreviveu à validação). */}
+        <HomeProfileSearch profiles={profiles} />
 
-        <HomeHero
-          defaultCitySlug={defaultCitySlug}
-          cityName={detectedCityName}
-          stateName={stateName}
-          totalAds={totalAds}
-          override={heroOverride}
-          banners={heroBanners}
-        />
-
-        <HomePrimaryActions />
-
-        <HomeTrustStrip />
-
+        {/* 6. Veículos recentes + 7. Oportunidades abaixo da FIPE. */}
         <Suspense fallback={<HomeCarouselsSkeleton />}>{carousels}</Suspense>
 
-        <ExploreByState items={data.adsByState} />
+        {/* 8. Banner "Anuncie Grátis". */}
+        <HomeAnnounceBanner />
 
-        {stateRegions}
+        {/* 9. Ações rápidas — Tabela FIPE + Simulador. */}
+        <HomePrimaryActions />
 
+        {/* 10. Conteúdo / Blog. */}
         <ContentCardsSection />
+
+        {/* 11. Bloco SEO "Continue sua busca". */}
+        <HomeSeoLinks cities={cities} models={models} priceBuckets={priceBuckets} />
       </div>
 
       <SiteBottomNav />

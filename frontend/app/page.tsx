@@ -4,13 +4,12 @@ import { cookies } from "next/headers";
 
 import { HomePageClient } from "@/components/home/HomePageClient";
 import { HomeCarousels } from "@/components/home/sections/HomeCarousels";
-import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
+import { fetchHomeDiscovery } from "@/lib/home/home-discovery";
 import { fetchHomeAboveFold, fetchHomeHero } from "@/lib/home/public-home";
 import { buildHomeJsonLd } from "@/lib/seo/home-structured-data";
-import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
 export const dynamic = "force-dynamic";
@@ -23,29 +22,23 @@ function getFirstParam(value: string | string[] | undefined): string | undefined
 }
 
 /**
- * Intro SÍNCRONO da Home — componente server 100% síncrono: SEM await, SEM
+ * H1 SÍNCRONO da Home — componente server 100% síncrono: SEM await, SEM
  * fetch, SEM client component, SEM Suspense. É renderizado pela `HomePage`
  * (também síncrona) ANTES do <Suspense> do conteúdo pesado, então o H1 entra
  * no `<main>` no PRIMEIRO flush do HTML — antes do footer.
+ *
+ * Reestruturação 2026-07-11: o antigo "Hero" textual (título visível +
+ * subtítulo) foi REMOVIDO. A Home passa a abrir pelo carrossel de banners.
+ * Para não perder o H1 (sinal de SEO), mantemos aqui um H1 VISUALMENTE
+ * OCULTO (`sr-only`) — presente no HTML e lido por leitores de tela, sem
+ * ocupar espaço na tela.
  *
  * CRÍTICO: NÃO tornar async, NÃO mover para dentro de componente async/
  * Suspense e NÃO depender de dados remotos. Qualquer await acima/à volta deste
  * H1 joga ele de novo para depois do footer no stream (bug 2026-06-27).
  */
 function HomeIntroSync() {
-  return (
-    <section className="bg-cnc-bg">
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 md:pt-8">
-        <h1 className="text-[24px] font-extrabold leading-[1.12] tracking-[-0.02em] text-[#1D2440] sm:text-[30px] md:text-[36px]">
-          Compre e anuncie carros na sua região
-        </h1>
-        <p className="mt-2 max-w-2xl text-[14px] leading-7 text-[#5D667D] sm:text-[15px] md:text-[17px]">
-          Encontre veículos por cidade, marca e modelo, compare preços com a FIPE e fale direto com
-          vendedores próximos.
-        </p>
-      </div>
-    </section>
-  );
+  return <h1 className="sr-only">Compre e anuncie carros na sua região</h1>;
 }
 
 /** Skeleton do conteúdo pesado da Home (fallback do <Suspense>). */
@@ -90,25 +83,16 @@ async function HomeAsyncContent({ searchParams }: { searchParams: SearchParams }
   const detectedCity =
     fromCookie?.slug && fromCookie?.name ? { slug: fromCookie.slug, name: fromCookie.name } : null;
 
-  // Bloco "Explore por região" leve — só com flag on E regiões disponíveis.
+  // Flag regional — usada pelo LocationRegionalPrompt (seção Localização).
+  // O antigo bloco "Explore por região" foi removido na reestruturação
+  // 2026-07-11 (substituído pelo bloco SEO "Continue sua busca").
   const regionalEnabled = isRegionalPageEnabled();
 
-  const [aboveFold, stateRegionsPayload, heroBanners] = await Promise.all([
+  const [aboveFold, heroBanners, discovery] = await Promise.all([
     fetchHomeAboveFold(),
-    regionalEnabled ? fetchStateRegions(territory.state.code, { limit: 6 }) : Promise.resolve(null),
     fetchHomeHero(),
+    fetchHomeDiscovery(territory.state.code),
   ]);
-
-  const stateRegions = stateRegionsPayload?.regions ?? [];
-  const homeRegionsBlock =
-    regionalEnabled && stateRegions.length > 0 ? (
-      <StateRegionsBlock
-        stateName={territory.state.name}
-        regions={stateRegions}
-        maxCards={6}
-        variant="row"
-      />
-    ) : null;
 
   return (
     <HomePageClient
@@ -116,9 +100,12 @@ async function HomeAsyncContent({ searchParams }: { searchParams: SearchParams }
       stateUf={territory.state.code}
       stateName={territory.state.name}
       detectedCity={detectedCity}
-      stateRegions={homeRegionsBlock}
       regionalEnabled={regionalEnabled}
       heroBanners={heroBanners}
+      profiles={discovery.profiles}
+      models={discovery.models}
+      priceBuckets={discovery.priceBuckets}
+      cities={discovery.cities}
       carousels={
         <HomeCarousels
           stateUf={territory.state.code}

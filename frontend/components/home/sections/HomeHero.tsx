@@ -269,10 +269,7 @@ export function HomeHero({
       if (manualPauseTimerRef.current != null) {
         window.clearTimeout(manualPauseTimerRef.current);
       }
-      manualPauseTimerRef.current = window.setTimeout(
-        () => setPaused(false),
-        MANUAL_PAUSE_MS
-      );
+      manualPauseTimerRef.current = window.setTimeout(() => setPaused(false), MANUAL_PAUSE_MS);
     },
     [slides.length]
   );
@@ -331,9 +328,7 @@ export function HomeHero({
                   aria-current={isActive}
                   onClick={() => handleDotClick(idx)}
                   className={`rounded-full ring-1 ring-cnc-bg/30 transition-all hover:bg-primary/80 ${
-                    isActive
-                      ? "h-1.5 w-6 bg-primary"
-                      : "h-1.5 w-1.5 bg-cnc-text/30"
+                    isActive ? "h-1.5 w-6 bg-primary" : "h-1.5 w-1.5 bg-cnc-text/30"
                   }`}
                 />
               );
@@ -404,9 +399,7 @@ function HeroSlide({
   if (overrideImage) {
     const altText = overrideAlt ?? "";
     const isExternal = /^https?:\/\//i.test(offersHref);
-    const linkProps = isExternal
-      ? { rel: "noopener noreferrer", target: "_blank" as const }
-      : {};
+    const linkProps = isExternal ? { rel: "noopener noreferrer", target: "_blank" as const } : {};
 
     // Container usa BANNER_ASPECT_CLASS — mesmo aspect-ratio do fallback
     // textual. Garante que TROCAR de slide nunca muda a altura.
@@ -468,9 +461,7 @@ function HeroSlide({
   // a altura seja IDÊNTICA entre modos. Conteúdo textual posicionado
   // absoluto dentro do container; padding interno controla o offset.
   return (
-    <div
-      className={`relative w-full overflow-hidden bg-cnc-footer-a ${BANNER_ASPECT_CLASS}`}
-    >
+    <div className={`relative w-full overflow-hidden bg-cnc-footer-a ${BANNER_ASPECT_CLASS}`}>
       <div className="absolute inset-0">
         <Image
           src={HOME_HERO_BANNER}
@@ -490,7 +481,13 @@ function HeroSlide({
             {pillLabel}
           </span>
 
-          <h1 className="mt-3 text-[22px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[28px] md:text-[36px]">
+          {/*
+            Título visual do banner — NÃO é <h1>. O <h1> canônico da Home é o
+            sr-only em app/page.tsx (HomeIntroSync). Manter <h1> aqui criava
+            duplicidade quando o banner cai no fallback textual (reestruturação
+            2026-07-11).
+          */}
+          <p className="mt-3 text-[22px] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[28px] md:text-[36px]">
             {overrideTitle ? (
               overrideTitle
             ) : cityName ? (
@@ -508,14 +505,14 @@ function HeroSlide({
                 em {stateName}
               </>
             )}
-          </h1>
+          </p>
 
           <p className="mt-2 max-w-md text-[13px] leading-snug text-white/85 sm:mt-3 sm:text-[15px]">
             {overrideSubtitle
               ? overrideSubtitle
               : cityName
-              ? `Carros, lojas e ofertas reais em ${scopeLabel}.`
-              : `Ofertas selecionadas em todo o estado de ${stateName} — informe sua cidade para ver carros próximos.`}
+                ? `Carros, lojas e ofertas reais em ${scopeLabel}.`
+                : `Ofertas selecionadas em todo o estado de ${stateName} — informe sua cidade para ver carros próximos.`}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2.5 sm:mt-5 sm:gap-4">
