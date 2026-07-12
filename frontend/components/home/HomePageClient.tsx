@@ -14,14 +14,8 @@ import {
 import { HomePrimaryActions } from "@/components/home/sections/HomePrimaryActions";
 import { HomeProfileSearch } from "@/components/home/sections/HomeProfileSearch";
 import { HomeSearchCard } from "@/components/home/sections/HomeSearchCard";
-import { HomeSeoLinks } from "@/components/home/sections/HomeSeoLinks";
 import { HomeShortcuts } from "@/components/home/sections/HomeShortcuts";
-import type {
-  HomeModelLink,
-  HomePriceBucketLink,
-  HomeProfileChip,
-  HomeSeoCity,
-} from "@/lib/home/home-discovery";
+import type { HomeProfileChip } from "@/lib/home/home-discovery";
 
 /**
  * Orquestrador da Home — reestruturação 2026-07-11.
@@ -36,11 +30,12 @@ import type {
  *   7.  HomeAnnounceBanner  — banner "Anuncie Grátis" (NOVO)
  *   8.  HomePrimaryActions  — ações rápidas: Tabela FIPE + Simulador
  *   9.  ContentCardsSection — blog integrado (motor de aquisição)
- *   10. HomeSeoLinks        — bloco SEO "Continue sua busca" (NOVO)
  *
- * Removidos nesta reestruturação: o Hero textual (virou <h1> sr-only em
- * app/page.tsx), HomeTrustStrip ("Por que escolher"), ExploreByState e o
- * bloco "Explore por região" — os dois últimos substituídos por HomeSeoLinks.
+ * Removidos: o Hero textual (virou <h1> sr-only em app/page.tsx),
+ * HomeTrustStrip ("Por que escolher"), ExploreByState e o bloco "Explore por
+ * região". O bloco SEO "Continue sua busca" (HomeSeoLinks) também foi removido
+ * — duplicava o rodapé (Modelos mais buscados / Cidades com mais carros) e a
+ * faixa de preço já vive no filtro lateral.
  *
  * Padding-bottom no main = 20 (80px) para mobile não cobrir conteúdo com
  * BottomNav (regra documentada em frontend/components/ui/BottomNav.tsx).
@@ -82,12 +77,6 @@ interface HomePageClientProps {
   carousels: ReactNode;
   /** Chips de "Busca por perfil" já validados (não-vazios) por fetchHomeDiscovery. */
   profiles: HomeProfileChip[];
-  /** Links "Por modelo" (facets, total > 0) do bloco SEO "Continue sua busca". */
-  models: HomeModelLink[];
-  /** Links "Por preço" já validados (não-vazios) do bloco SEO. */
-  priceBuckets: HomePriceBucketLink[];
-  /** Cidades "com mais anúncios" (slug real, não-vazias) do bloco SEO. */
-  cities: HomeSeoCity[];
   /**
    * Vem do server (lê REGIONAL_PAGE_ENABLED). Controla se o
    * `LocationRegionalPrompt` exibe o CTA primário "Ver ofertas da região"
@@ -123,9 +112,6 @@ export function HomePageClient({
   detectedCity = null,
   carousels,
   profiles,
-  models,
-  priceBuckets,
-  cities,
   regionalEnabled,
   heroOverride = null,
   heroBanners = null,
@@ -188,9 +174,6 @@ export function HomePageClient({
 
         {/* 10. Conteúdo / Blog. */}
         <ContentCardsSection />
-
-        {/* 11. Bloco SEO "Continue sua busca". */}
-        <HomeSeoLinks cities={cities} models={models} priceBuckets={priceBuckets} />
       </div>
 
       <SiteBottomNav />

@@ -103,9 +103,6 @@ async function HomeAsyncContent({ searchParams }: { searchParams: SearchParams }
       regionalEnabled={regionalEnabled}
       heroBanners={heroBanners}
       profiles={discovery.profiles}
-      models={discovery.models}
-      priceBuckets={discovery.priceBuckets}
-      cities={discovery.cities}
       carousels={
         <HomeCarousels
           stateUf={territory.state.code}
