@@ -13,7 +13,7 @@
  *    sem opcional de câmbio NÃO são tocados (não há sinal confiável).
  *
  *  CARROCERIA: para `body_type='sedan'` (possível default falso):
- *    - se o texto (modelo/título/versão) indica uma carroceria → corrige p/ ela
+ *    - se o texto (modelo/título) indica uma carroceria → corrige p/ ela
  *      (ex.: "Onix Hatch" gravado como sedan → hatch; texto que diz "sedan"
  *      confirma e mantém);
  *    - senão (sedan "solto", sem sinal) → NULL (= "Não informado"), nunca chuta.
@@ -31,6 +31,12 @@
 import "dotenv/config";
 import pg from "pg";
 
+import {
+  BODY_TYPE_SYNONYMS,
+  TRANSMISSION_SYNONYMS,
+} from "../src/modules/ads/ads.canonical.constants.js";
+import { VEHICLE_OPTION_KEYS } from "../src/modules/ads/ad-options.catalog.js";
+
 const APPLY = process.argv.includes("--apply");
 
 const pool = new pg.Pool({
@@ -40,14 +46,44 @@ const pool = new pg.Pool({
   connectionTimeoutMillis: 20000,
 });
 
-/* ── Helpers de derivação (espelham lib/vehicle/public-vehicle.ts) ──────────── */
+/* ── Vocabulário canônico (fonte ÚNICA = backend) ────────────────────────────
+ * Raiz (Fase A/B: cadastro + normalização) e legado (este backfill) usam os
+ * MESMOS mapas — nada de tabela paralela aqui. Se o vocabulário mudar no
+ * backend, o backfill acompanha automaticamente.
+ *   BODY_TYPE_SYNONYMS + TRANSMISSION_SYNONYMS → ads.canonical.constants.js
+ *   chaves de câmbio (cambio_*)                → ad-options.catalog.js
+ */
 
-const CAMBIO_KEY_TO_SLUG = {
-  cambio_manual: "manual",
-  cambio_automatico: "automatico",
-  cambio_automatizado: "automatico",
-  cambio_cvt: "cvt",
-};
+// sinônimo/rótulo → slug de câmbio (ex.: "automatizado" → "automatico").
+const TRANSMISSION_BY_SYNONYM = new Map();
+for (const [slug, synonyms] of Object.entries(TRANSMISSION_SYNONYMS)) {
+  TRANSMISSION_BY_SYNONYM.set(slug, slug);
+  for (const s of synonyms) TRANSMISSION_BY_SYNONYM.set(String(s).toLowerCase(), slug);
+}
+
+// chaves de câmbio válidas (cambio_*), lidas do catálogo canônico de opcionais.
+const CAMBIO_OPTION_KEYS = new Set(VEHICLE_OPTION_KEYS.filter((k) => k.startsWith("cambio_")));
+
+/** cambio_* key → slug de câmbio, via sinônimos canônicos. null se desconhecida. */
+function cambioKeyToSlug(key) {
+  if (!CAMBIO_OPTION_KEYS.has(key)) return null;
+  const token = key.slice("cambio_".length).toLowerCase(); // manual|automatico|automatizado|cvt
+  return TRANSMISSION_BY_SYNONYM.get(token) || null;
+}
+
+// Matcher de carroceria a partir de TEXTO livre (model + title), construído dos
+// MESMOS sinônimos canônicos. Cada sinônimo é testado como palavra inteira
+// (fronteira tolerante a acento). NÃO há mapa modelo→carroceria: só reconhece a
+// carroceria quando o próprio texto a nomeia; caso contrário devolve null.
+function escapeRe(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+const BODY_MATCHERS = Object.entries(BODY_TYPE_SYNONYMS).map(([slug, synonyms]) => ({
+  slug,
+  res: synonyms.map(
+    (s) => new RegExp(`(?:^|[^0-9a-zà-ú])${escapeRe(String(s).toLowerCase())}(?:[^0-9a-zà-ú]|$)`, "i")
+  ),
+}));
 
 /** Extrai as keys de opcionais de um vehicle_options jsonb (objeto/array/string). */
 function extractOptionKeys(stored) {
@@ -70,20 +106,16 @@ function extractOptionKeys(stored) {
 /** Slug de câmbio a partir do opcional marcado; null se 0 ou conflitante. */
 function cambioSlugFromOptions(stored) {
   const cambio = extractOptionKeys(stored).filter((k) => k.startsWith("cambio_"));
-  const slugs = [...new Set(cambio.map((k) => CAMBIO_KEY_TO_SLUG[k]).filter(Boolean))];
+  const slugs = [...new Set(cambio.map(cambioKeyToSlug).filter(Boolean))];
   return slugs.length === 1 ? slugs[0] : null;
 }
 
-/** Slug de carroceria a partir do texto (modelo/título/versão); null se sem sinal. */
+/** Slug de carroceria a partir do texto (modelo/título), via sinônimos canônicos; null se sem sinal. */
 function bodySlugFromText(haystack) {
   const h = String(haystack || "").toLowerCase();
-  if (/\bhatch\b/.test(h)) return "hatch";
-  if (/\bsed(?:an|ã|ane|\.)?\b/.test(h)) return "sedan";
-  if (/\bsuv\b/.test(h)) return "suv";
-  if (/\b(picape|pickup)\b/.test(h)) return "picape";
-  if (/\bcoup[eé]\b/.test(h)) return "coupe";
-  if (/\b(minivan|van)\b/.test(h)) return "minivan";
-  if (/\b(wagon|perua|sw)\b/.test(h)) return "wagon";
+  for (const { slug, res } of BODY_MATCHERS) {
+    if (res.some((re) => re.test(h))) return slug;
+  }
   return null;
 }
 
@@ -110,13 +142,16 @@ async function run() {
 
   // 2) CARROCERIA: body_type='sedan' possivelmente default falso.
   const sedanRows = await q(
-    `SELECT id, brand, model, title, version, body_type
+    `SELECT id, brand, model, title, body_type
        FROM ads
       WHERE body_type = 'sedan'`
   );
   const bodyUpdates = [];
   for (const ad of sedanRows) {
-    const sig = bodySlugFromText(`${ad.model || ""} ${ad.title || ""} ${ad.version || ""}`);
+    // A tabela `ads` NÃO tem coluna de versão/trim: a versão do veículo vive
+    // embutida no `title` (ex.: "VW Gol 1.6 Comfortline"). Usamos model + title,
+    // as únicas fontes de texto disponíveis no schema real.
+    const sig = bodySlugFromText(`${ad.model || ""} ${ad.title || ""}`);
     const next = sig ?? null; // sem sinal → NULL; com sinal → o slug (pode ser 'sedan')
     if (next !== "sedan") {
       bodyUpdates.push({ id: ad.id, from: "sedan", to: next, label: `${ad.brand} ${ad.model}` });
