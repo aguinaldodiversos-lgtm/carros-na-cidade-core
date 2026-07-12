@@ -44,14 +44,6 @@ import type { HomeProfileChip } from "@/lib/home/home-discovery";
  * somente em ilhas (HomeSearchCard, HomeHero, SiteBottomNav).
  */
 
-type FeaturedCity = {
-  id: number;
-  name: string;
-  slug: string;
-  state?: string;
-  demand_score?: number;
-};
-
 type HomeStats = {
   total_ads?: number | string;
   total_cities?: number | string;
@@ -59,12 +51,10 @@ type HomeStats = {
   total_users?: number | string;
 };
 
-type StateAggregation = { uf: string; offers: number | string };
-
 interface HomePageClientProps {
+  /** Só `stats` é consumido (total_ads → badge do hero). featuredCities/adsByState
+   * foram removidos: não eram mais renderizados desde a reestruturação. */
   data: {
-    featuredCities: FeaturedCity[];
-    adsByState?: StateAggregation[];
     stats: HomeStats;
   };
   /** UF em foco — usado no banner e pelos carrosseis (vitrine estadual). */
