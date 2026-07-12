@@ -1,33 +1,25 @@
 // frontend/components/home/sections/HomePrimaryActions.tsx
 
 import { QuickActionTile } from "@/components/ui/QuickActionTile";
-import { IconCalculator, IconPlus, IconTable } from "@/components/home/icons";
+import { IconCalculator, IconTable } from "@/components/home/icons";
 
 /**
- * 3 cards quick-action lado a lado (1 col mobile, 3 col >= sm) abaixo do
- * banner herói da Home, conforme contrato visual `atualização-home.png`
- * (revisão 2026-05-19):
- *   - Anuncie seu carro grátis  → /anunciar  (landing comercial indexável;
- *                                 antes apontava p/ /anunciar/novo, agora
- *                                 `noindex` — SEO 2026-06-27)
+ * Cards quick-action "Ações rápidas" abaixo dos carrosséis (1 col mobile,
+ * 2 col >= sm):
  *   - Tabela FIPE               → /tabela-fipe
  *   - Simulador financiamento   → /simulador-financiamento
  *
- * Diferente do mockup anterior (azul/verde/roxo), nesta revisão TODOS os
- * cards usam o mesmo acento azul primário — proposta minimalista
- * solicitada pelo PO em 2026-05-19. Ver QuickActionTile["accent"].
+ * O card "Anuncie grátis" foi REMOVIDO na reestruturação 2026-07-11: virou
+ * banner dedicado (`HomeAnnounceBanner`, seção 8), e manter os dois criava
+ * dois CTAs idênticos competindo lado a lado.
+ *
+ * Todos os cards usam o mesmo acento azul primário (proposta minimalista
+ * do PO em 2026-05-19). Ver QuickActionTile["accent"].
  *
  * Server Component — apenas composição.
  */
 
 const ACTIONS = [
-  {
-    href: "/anunciar",
-    title: "Anuncie seu carro grátis",
-    subtitle: "Publique em poucos minutos",
-    icon: <IconPlus className="h-full w-full" />,
-    accent: "primary" as const,
-  },
   {
     href: "/tabela-fipe",
     title: "Tabela FIPE",
@@ -50,7 +42,7 @@ export function HomePrimaryActions() {
       aria-label="Ações rápidas"
       className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8"
     >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
         {ACTIONS.map((a) => (
           <QuickActionTile
             key={a.href}

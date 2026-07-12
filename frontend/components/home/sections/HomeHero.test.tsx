@@ -106,7 +106,7 @@ describe("HomeHero — regra dual de render (Fase 4.1.2)", () => {
     expect(screen.queryByText(/CTA que NÃO deve aparecer/i)).toBeNull();
   });
 
-  it("modo fallback textual: sem imagem, renderiza H1 e CTA pílula", () => {
+  it("modo fallback textual: sem imagem, renderiza título e CTA pílula", () => {
     render(
       <HomeHero
         stateName="São Paulo"
@@ -124,15 +124,18 @@ describe("HomeHero — regra dual de render (Fase 4.1.2)", () => {
         ]}
       />
     );
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Compre carros usados");
+    // O título do fallback textual NÃO é mais <h1> (o H1 canônico da Home é o
+    // sr-only em app/page.tsx, reestruturação 2026-07-11) — validamos o texto.
+    expect(screen.getByText("Compre carros usados")).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.getByText("Ver ofertas")).toBeTruthy();
   });
 
   it("sem banners do admin: cai no fallback hardcoded com microcopy regional", () => {
     render(<HomeHero stateName="São Paulo" />);
-    // Conteúdo do fallback hardcoded.
-    const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.textContent).toMatch(/Carros usados/i);
+    // Conteúdo do fallback hardcoded — título (não-<h1>) com microcopy regional.
+    expect(screen.getByText(/Carros usados/i)).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
   });
 
   it("carrossel 2 banners ambos com imagem: dois links, nenhum H1", () => {

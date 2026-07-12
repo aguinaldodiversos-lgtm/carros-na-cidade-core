@@ -5,11 +5,9 @@ import type { AdItem } from "@/lib/search/ads-search";
 export interface HomeDataResponse {
   success: boolean;
   data: {
-    featuredCities: Array<{ id: number; name: string; slug: string; demand_score?: number }>;
     highlightAds: AdItem[];
     opportunityAds: AdItem[];
     recentAds: AdItem[];
-    adsByState?: Array<{ uf: string; offers: number | string }>;
     stats: {
       total_ads?: number | string;
       total_cities?: number | string;
@@ -34,11 +32,9 @@ function getApiBaseUrl(): string {
 
 function fallbackHome(): HomeDataResponse["data"] {
   return {
-    featuredCities: [],
     highlightAds: [],
     opportunityAds: [],
     recentAds: [],
-    adsByState: [],
     stats: { total_ads: 0, total_cities: 0, total_advertisers: 0, total_users: 0 },
   };
 }
@@ -92,15 +88,16 @@ async function fetchAdsCollection(
   return Array.isArray(json?.data) ? json.data : [];
 }
 
-export type HomeAboveFoldData = Pick<
-  HomeDataResponse["data"],
-  "featuredCities" | "adsByState" | "stats"
->;
+export type HomeAboveFoldData = Pick<HomeDataResponse["data"], "stats">;
 
 /**
- * Fetch leve para conteudo acima da dobra (hero + promo + explore por estado).
- * Nao inclui os carrosseis de veiculos — esses sao carregados por Suspense
- * em HomeCarousels, permitindo streaming do HTML e TTFB menor.
+ * Fetch leve para conteudo acima da dobra. Hoje a Home só consome
+ * `stats.total_ads` (badge "+N mil ofertas ativas" do hero) — featuredCities
+ * e adsByState foram removidos por não terem mais consumidor na Home.
+ *
+ * `/api/public/home` continua sendo a origem porque ainda serve `stats`; o
+ * mesmo endpoint alimenta `featuredCities` para outros consumidores (ex.:
+ * `GET /api/cities`), então a fonte é preservada.
  */
 export async function fetchHomeAboveFold(): Promise<HomeAboveFoldData> {
   const apiBase = getApiBaseUrl();
@@ -111,8 +108,6 @@ export async function fetchHomeAboveFold(): Promise<HomeAboveFoldData> {
   const homeData = homeJson?.success && homeJson.data ? homeJson.data : empty;
 
   return {
-    featuredCities: homeData.featuredCities || empty.featuredCities,
-    adsByState: homeData.adsByState || empty.adsByState,
     stats: homeData.stats || empty.stats,
   };
 }
