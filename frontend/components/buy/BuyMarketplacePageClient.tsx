@@ -63,7 +63,7 @@ interface BuyMarketplacePageClientProps {
    * Raio (km) atual do bloco "Próximos", resolvido em SSR de `?raio=`
    * (âncora regional — página de cidade). Alimenta o seletor "Distância (km)"
    * da sidebar. Ao mudar, o client re-navega com o novo `?raio=` preservando os
-   * demais filtros. Default DEFAULT_RADIUS_KM (40) → URL sem o parâmetro.
+   * demais filtros. Default DEFAULT_RADIUS_KM (50) → URL sem o parâmetro.
    */
   radiusKm?: number;
 }
@@ -99,9 +99,10 @@ export default function BuyMarketplacePageClient({
     [initialFacets?.models]
   );
 
+  // Rótulo com contagem por opção ("Toyota (48)") quando o facet informa total.
   const brandOptions = useMemo(() => {
     const options = brandFacets.slice(0, 20).map((item) => ({
-      label: item.brand,
+      label: item.total > 0 ? `${item.brand} (${item.total})` : item.brand,
       value: item.brand,
     }));
 
@@ -116,7 +117,7 @@ export default function BuyMarketplacePageClient({
       : modelFacets;
 
     const options = filtered.slice(0, 20).map((item) => ({
-      label: item.model,
+      label: item.total > 0 ? `${item.model} (${item.total})` : item.model,
       value: item.model,
     }));
 
@@ -131,7 +132,7 @@ export default function BuyMarketplacePageClient({
 
   // `?raio=` (raio do bloco "Próximos") é ORTOGONAL aos filtros de veículo — não
   // faz parte de AdsSearchFilters. Ao re-navegar por um filtro de veículo,
-  // reanexamos o raio atual para não perdê-lo (default 40 → omitido, URL limpa).
+  // reanexamos o raio atual para não perdê-lo (default 50 → omitido, URL limpa).
   const buildUrl = useCallback(
     (queryString: string): string => {
       const parts: string[] = [];
@@ -168,7 +169,7 @@ export default function BuyMarketplacePageClient({
   );
 
   // Muda SÓ o raio de vizinhança: preserva os filtros de veículo atuais e seta o
-  // novo `?raio=` (padrão 40 → sem parâmetro). É ação do usuário descartada pelo
+  // novo `?raio=` (padrão 50 → sem parâmetro). É ação do usuário descartada pelo
   // canonical — não gera URL indexável (generateMetadata ignora searchParams).
   const changeRadius = useCallback(
     (km: number) => {
@@ -184,7 +185,7 @@ export default function BuyMarketplacePageClient({
   );
 
   const clearFilters = useCallback(() => {
-    // Limpar zera TUDO, inclusive o raio → cidade limpa (padrão 40).
+    // Limpar zera TUDO (chips, selects e o raio) → cidade limpa (padrão 50).
     router.push(pathname);
     setMobileFiltersOpen(false);
   }, [pathname, router]);

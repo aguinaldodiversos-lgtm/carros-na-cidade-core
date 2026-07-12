@@ -59,6 +59,10 @@ async function findBaseCity(slug) {
  * Busca vizinhos via region_memberships (fallback estático). Layer 1 ≤30 km,
  * layer 2 entre 30–60 km. Pré-computado offline. Sempre disponível mesmo
  * que cities.latitude/longitude esteja vazio.
+ *
+ * NB: o guard `rm.layer <= 2` (isolamento do futuro LAYER 3 60–100km) vive na
+ * branch `fix/regional-layer-guard`, deployada em prod ANTES do rebuild. Aqui
+ * NÃO duplicamos para evitar conflito de merge — esta branch (UI) entra depois.
  */
 async function findMembersFromMemberships(baseCityId) {
   const result = await pool.query(

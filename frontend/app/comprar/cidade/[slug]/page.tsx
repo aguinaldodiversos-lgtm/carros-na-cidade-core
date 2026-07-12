@@ -15,6 +15,7 @@ import {
   type AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
+import { parseRadiusParam } from "@/lib/buy/regional-radius-config";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-territory-fallback";
 import {
@@ -291,6 +292,7 @@ export default async function ComprarCidadePage({
         variant="cidade"
         stateUf={ctx.state}
         fallbackTerritory={fallbackTerritory}
+        radiusKm={parseRadiusParam(searchParams?.raio)}
       />
     </>
   );
