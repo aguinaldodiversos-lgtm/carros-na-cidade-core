@@ -18,3 +18,16 @@ scripts/data/*.json
 # Permissões/settings do Claude Code são por-máquina, não compartilhar.
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Scratch / referência local — NÃO versionar. Screenshots de referência e
+# scripts de diagnóstico one-off que acompanham o working tree entre branches;
+# ficam em disco, fora do git, p/ nunca serem varridos para dentro de um commit.
+/script.js
+/scripts/dump-payments-schema.mjs
+/frontend/public/images/1.png
+/frontend/public/images/favic1.png
+/frontend/public/images/area-lojista.png
+/frontend/public/images/pagina-anunciar.png
+/frontend/public/images/pagina-detalhe.png
+# nome acentuado (git mostra como revis\303\203o-...): glob evita mismatch de encoding
+/frontend/public/images/revis*-anuncio.png
