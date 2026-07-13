@@ -167,12 +167,12 @@ export function FipeCombobox({
                     setQuery(option.name);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-[14px] text-cnc-text-strong transition hover:bg-primary-soft"
+                  className="block w-full px-4 py-2.5 text-left text-[14px] leading-snug text-cnc-text-strong transition hover:bg-primary-soft"
                 >
-                  <span className="truncate">{option.name}</span>
-                  <span className="ml-3 shrink-0 text-[11px] font-semibold text-cnc-muted-soft">
-                    {option.code}
-                  </span>
+                  {/* Nome completo, com quebra em até N linhas: dois modelos que só
+                      diferem no fim (LT/LTZ/TB) nunca aparecem idênticos. O código
+                      FIPE (`option.code`) permanece só no valor/onChange, nunca na tela. */}
+                  <span className="block break-words">{option.name}</span>
                 </button>
               ))}
             </div>

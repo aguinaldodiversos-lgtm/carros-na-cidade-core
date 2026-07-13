@@ -140,10 +140,13 @@ export function PublicHeader() {
               className="inline-flex shrink-0 items-center"
             >
               {/*
-                Logo oficial PNG. `mix-blend-multiply` neutraliza o fundo
-                branco do arquivo contra o `bg-white/95` do header, dando
-                aparência de fundo transparente sem precisar re-exportar
-                a imagem com canal alpha.
+                Logo oficial PNG COM canal alpha (fundo transparente):
+                aparece correto sobre o claro do header e, no rodapé, o
+                `brightness-0 invert` o transforma em silhueta branca.
+                NÃO usa mix-blend: a transparência já resolve o fundo — o
+                hack de `multiply` era do PNG antigo achatado e podia
+                escurecer o logo sobre o backdrop-blur do header sticky
+                quando havia conteúdo escuro rolando atrás.
                 Sizing mobile-first: 32px mobile / 36px sm / 48px md+.
                 Larguras máximas evitam que o logo empurre a pílula da
                 cidade fora do viewport em telas pequenas (320–360px).
@@ -151,21 +154,22 @@ export function PublicHeader() {
               <Image
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade — Ofertas locais e confiança perto de você"
-                width={400}
-                height={100}
+                width={1000}
+                height={215}
                 priority
                 className="h-8 w-auto max-w-[140px] object-contain object-left sm:h-9 sm:max-w-[170px] md:h-12 md:max-w-[220px]"
-                style={{ mixBlendMode: "multiply" }}
               />
             </Link>
 
-            <div className="hidden min-w-0 md:block">
+            {/* Seletor de cidade DESKTOP — só a partir de lg. Abaixo de lg, a
+                cidade vem da pílula no bloco de controles mobile (sem duplicar). */}
+            <div className="hidden min-w-0 lg:block">
               <CityHeaderSelector />
             </div>
           </div>
 
           <nav
-            className="ml-2 hidden min-w-0 flex-1 items-center justify-center gap-0.5 md:ml-4 md:flex lg:gap-1"
+            className="ml-2 hidden min-w-0 flex-1 items-center justify-center gap-0.5 lg:ml-4 lg:flex lg:gap-1"
             aria-label="Navegação principal"
           >
             <HeaderNavLink href={routes.comprar}>Comprar</HeaderNavLink>
@@ -185,7 +189,7 @@ export function PublicHeader() {
 
           <div className="ml-auto flex shrink-0 items-center gap-0.5 md:gap-1">
             <nav
-              className="hidden items-center gap-0.5 md:flex lg:gap-1"
+              className="hidden items-center gap-0.5 lg:flex lg:gap-1"
               aria-label="Ações da conta"
             >
               <Link
@@ -223,7 +227,10 @@ export function PublicHeader() {
               )}
             </nav>
 
-            <div className="flex items-center gap-1 md:hidden">
+            {/* Controles MOBILE (pílula de cidade + conta + hambúrguer) — até lg.
+                Cobrem 768–1023px (tablet-retrato): sem nav central e sem ações
+                desktop, o hambúrguer é o único acesso a Comprar/FIPE/Blog/etc. */}
+            <div className="flex items-center gap-1 lg:hidden">
               <button
                 type="button"
                 onClick={() => openCityPicker()}
@@ -269,7 +276,7 @@ export function PublicHeader() {
         </div>
 
         {mobileOpen ? (
-          <div className="border-t border-slate-100 py-4 md:hidden">
+          <div className="border-t border-slate-100 py-4 lg:hidden">
             <nav className="grid gap-1" aria-label="Menu">
               <button
                 type="button"

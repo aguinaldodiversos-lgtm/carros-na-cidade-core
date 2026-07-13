@@ -144,6 +144,16 @@ async function providerFetch(path: string, revalidateSeconds = 86400) {
 }
 
 /**
+ * Ordena marcas por nome no locale pt-BR, case/acento-insensível — não a ordem
+ * ASCII do provider (que devolve "AM Gen, ASTON MARTIN, Acura, Agrale" porque
+ * maiúsculas vêm antes de minúsculas). Resultado: "Acura, Agrale, Alfa Romeo,
+ * AM Gen, Aston Martin". Aplicado tanto ao provider vivo quanto ao snapshot.
+ */
+function sortBrandsPtBr(brands: FipeOption[]): FipeOption[] {
+  return [...brands].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
+}
+
+/**
  * Lista de marcas via provider, com fallback estático.
  *
  * Caso real (produção, Render free tier): parallelum bloqueia/rate-limita
@@ -162,7 +172,7 @@ export async function getFipeBrands(vehicleType?: string): Promise<FipeOption[]>
     const data = await providerFetch(`/${type}/marcas`, 86400);
     const items = Array.isArray(data) ? data : [];
     const brands = items.map(toOption).filter(Boolean) as FipeOption[];
-    if (brands.length > 0) return brands;
+    if (brands.length > 0) return sortBrandsPtBr(brands);
     // Provider devolveu lista vazia → trata como falha pra cair no fallback.
     throw new Error("Provider devolveu lista de marcas vazia.");
   } catch (error) {
@@ -173,7 +183,7 @@ export async function getFipeBrands(vehicleType?: string): Promise<FipeOption[]>
         `[fipe-provider] usando snapshot estático para marcas (${type}) — provider falhou:`,
         error instanceof Error ? error.message : error
       );
-      return fallback.map((item) => ({ code: item.code, name: item.name }));
+      return sortBrandsPtBr(fallback.map((item) => ({ code: item.code, name: item.name })));
     }
     throw error;
   }

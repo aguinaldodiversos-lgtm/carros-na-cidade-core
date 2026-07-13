@@ -2,7 +2,10 @@
  * Assets de marca em `public/images`.
  * Ajuste apenas estes caminhos se os arquivos no disco tiverem outro nome/extensão.
  */
-export const SITE_LOGO_SRC = "/images/logo-carros-na-cidade.png";
+// `?v=2` = cache-busting: o arquivo foi re-exportado em alta resolução mantendo
+// o MESMO nome; sem versionar a URL, navegador/CDN/cache do next/image podiam
+// servir o logo antigo. Bump o número a cada troca de arte deste asset.
+export const SITE_LOGO_SRC = "/images/logo-carros-na-cidade.png?v=3";
 
 /** Ícone da aba / PWA — PNG oficial em `public/images`. */
 export const SITE_FAVICON_SRC = "/images/favicon.png";

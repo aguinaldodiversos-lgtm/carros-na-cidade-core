@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import AdCard from "@/components/ads/AdCard";
+import { BelowFipeBanner } from "@/components/fipe/BelowFipeBanner";
 import { FipeCombobox } from "@/components/fipe/FipeCombobox";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { VehicleImage } from "@/components/ui/VehicleImage";
@@ -460,7 +461,7 @@ export function FipePageClient({
 
               <FipeCombobox
                 label="Modelo"
-                placeholder={selectedBrand ? "Buscar modelo" : "Selecione a marca"}
+                placeholder={selectedBrand ? "Buscar modelo" : "Escolha a marca primeiro"}
                 options={models}
                 value={selectedModel}
                 onChange={handleModelChange}
@@ -472,7 +473,7 @@ export function FipePageClient({
 
               <FipeCombobox
                 label="Ano"
-                placeholder={selectedModel ? "Selecione o ano" : "Selecione o modelo"}
+                placeholder={selectedModel ? "Selecione o ano" : "Escolha o modelo primeiro"}
                 options={years}
                 value={selectedYear}
                 onChange={setSelectedYear}
@@ -549,30 +550,9 @@ export function FipePageClient({
             comercial em uma página de consulta FIPE.
           */}
 
-          {/* 6 — CTA secundário: ver carros abaixo da FIPE em [cidade] */}
-          <section className="mt-4">
-            <div className="rounded-2xl border border-primary/20 bg-primary-soft px-4 py-3.5 sm:px-5 sm:py-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-primary shadow-sm">
-                  <PriceTagPromoIcon />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-[14px] font-extrabold leading-tight text-cnc-text-strong sm:text-[15px]">
-                    Ver carros abaixo da FIPE em {cityName}
-                  </h3>
-                  <p className="mt-0.5 text-[12.5px] leading-snug text-cnc-muted sm:text-[13px]">
-                    Encontre ofertas imperdíveis perto de você.
-                  </p>
-                </div>
-                <Link
-                  href={offersHref}
-                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary bg-white px-3 text-[12.5px] font-bold text-primary transition hover:bg-primary hover:text-white sm:h-10 sm:px-4 sm:text-[13.5px]"
-                >
-                  Ver ofertas
-                  <ArrowRightIcon className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
+          {/* 6 — Banner: ver carros abaixo da FIPE em [cidade] (arte + texto real). */}
+          <section className="mt-6">
+            <BelowFipeBanner cityName={cityName} href={offersHref} />
           </section>
         </div>
       </main>
