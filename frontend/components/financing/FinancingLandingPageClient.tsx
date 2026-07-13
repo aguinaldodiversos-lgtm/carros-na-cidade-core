@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState, type ChangeEvent } from "react";
 import type { AdItem } from "@/lib/search/ads-search";
 import AdCard from "@/components/ads/AdCard";
+import { PromoBanner } from "@/components/common/PromoBanner";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 
 /**
@@ -427,6 +428,23 @@ export function FinancingLandingPageClient({
               Ainda não há ofertas carregadas para {cityName}. Volte em breve.
             </p>
           )}
+
+          {/*
+            Banner (último bloco antes do rodapé) — quem chega aqui buscou
+            "simular financiamento" e ainda não escolheu carro; o banner o leva
+            ao catálogo da cidade. Texto/CTA diferentes do "Ver todos" da seção
+            acima (que abre o /comprar por query) de propósito.
+          */}
+          <section aria-label={`Ver carros em ${cityName}`} className="mt-7">
+            <PromoBanner
+              desktopSrc="/images/banner-simulador-financiamento-desktop.png"
+              mobileSrc="/images/banner-simulador-financiamento-mobile.png"
+              title="Agora encontre o carro que cabe na sua parcela"
+              subtitle={`Veja os anúncios disponíveis em ${cityName} e região.`}
+              ctaLabel={`Ver carros em ${cityName}`}
+              href={`/comprar/cidade/${encodeURIComponent(citySlug)}`}
+            />
+          </section>
         </div>
       </div>
 

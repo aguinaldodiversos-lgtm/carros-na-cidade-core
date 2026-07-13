@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import AdCard from "@/components/ads/AdCard";
-import { BelowFipeBanner } from "@/components/fipe/BelowFipeBanner";
+import { PromoBanner } from "@/components/common/PromoBanner";
 import { FipeCombobox } from "@/components/fipe/FipeCombobox";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { VehicleImage } from "@/components/ui/VehicleImage";
@@ -552,7 +552,14 @@ export function FipePageClient({
 
           {/* 6 — Banner: ver carros abaixo da FIPE em [cidade] (arte + texto real). */}
           <section className="mt-6">
-            <BelowFipeBanner cityName={cityName} href={offersHref} />
+            <PromoBanner
+              desktopSrc="/images/banner-abaixo-da-fipe-desktop.png"
+              mobileSrc="/images/banner-abaixo-da-fipe-mobile.png"
+              title={`Ver carros abaixo da FIPE em ${cityName}`}
+              subtitle="Encontre ofertas imperdíveis perto de você."
+              ctaLabel="Ver ofertas"
+              href={offersHref}
+            />
           </section>
         </div>
       </main>
