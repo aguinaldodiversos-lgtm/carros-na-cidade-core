@@ -12,6 +12,7 @@ import {
   updateOwnedAdStatus,
 } from "./account.service.js";
 import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
+import { getStoreProfile, updateStoreProfile } from "./store-profile.service.js";
 
 const router = express.Router();
 
@@ -117,6 +118,23 @@ router.delete(
   asyncHandler(async (req, res) => {
     const result = await deleteOwnedAd(req.user.id, req.params.id);
     res.json(result);
+  })
+);
+
+// --- Dados da loja (cadastro do lojista) — sempre escopado a req.user.id ---
+router.get(
+  "/store",
+  asyncHandler(async (req, res) => {
+    const store = await getStoreProfile(req.user.id);
+    res.json({ success: true, store });
+  })
+);
+
+router.put(
+  "/store",
+  asyncHandler(async (req, res) => {
+    const store = await updateStoreProfile(req.user.id, req.body || {});
+    res.json({ success: true, store });
   })
 );
 

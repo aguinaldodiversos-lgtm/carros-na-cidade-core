@@ -404,6 +404,40 @@ export async function fetchOwnedAd(session: SessionData, adId: string) {
   });
 }
 
+/** Cadastro da loja (tabela `advertisers`) — "Dados da loja". */
+export type StoreProfile = {
+  name: string;
+  email: string;
+  whatsapp: string;
+  address: string;
+  /** Comprador consegue contato? (COALESCE whatsapp/mobile_phone/phone não vazio) */
+  has_contact_channel: boolean;
+  document: { type: "CPF" | "CNPJ" | null; number: string };
+};
+
+export type StoreProfileResponse = { success: boolean; store: StoreProfile };
+
+export type UpdateStoreProfilePayload = {
+  name: string;
+  email: string;
+  whatsapp: string;
+  address: string;
+};
+
+export async function fetchStoreProfile(session: SessionData) {
+  return fetchBackendJson<StoreProfileResponse>("/api/account/store", {
+    accessToken: assertAccessToken(session),
+  });
+}
+
+export async function updateStoreProfile(session: SessionData, payload: UpdateStoreProfilePayload) {
+  return fetchBackendJson<StoreProfileResponse>("/api/account/store", {
+    method: "PUT",
+    accessToken: assertAccessToken(session),
+    body: payload,
+  });
+}
+
 /**
  * Histórico de anúncios do dono: archived / sold / expired.
  * NÃO inclui ativos nem em moderação (esses ficam em /dashboard).
