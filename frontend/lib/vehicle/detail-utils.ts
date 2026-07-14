@@ -425,16 +425,19 @@ export function formatPhoneDisplay(value?: string | null): string | null {
 export function buildVehicleWhatsappHref({
   phone,
   vehicleName,
+  note,
 }: {
   phone?: string | null;
   vehicleName: string;
+  /** Frase extra opcional (ex.: a simulação de financiamento) anexada ao texto. */
+  note?: string | null;
 }): string | null {
   const normalizedPhone = normalizeBrazilPhone(phone);
   if (!normalizedPhone) return null;
 
-  const text = encodeURIComponent(
-    `Olá, vi seu anúncio no Carros na Cidade e tenho interesse no veículo ${vehicleName}.`
-  );
+  const base = `Olá, vi seu anúncio no Carros na Cidade e tenho interesse no veículo ${vehicleName}.`;
+  const full = note && note.trim() ? `${base} ${note.trim()}` : base;
+  const text = encodeURIComponent(full);
 
   return `https://wa.me/${normalizedPhone}?text=${text}`;
 }
@@ -560,25 +563,6 @@ export function buildShortVehicleH1(params: {
 
   return deduped.join(" ") || model || brand || "Veículo";
 }
-
-export function estimateMonthlyPayment(
-  vehicleValue: number,
-  months = 60,
-  entryRatio = 0.2
-): number {
-  const entry = vehicleValue * entryRatio;
-  const financed = Math.max(vehicleValue - entry, 0);
-  const monthlyRate = 1.99 / 100;
-
-  if (financed <= 0 || months <= 0) return 0;
-
-  return (financed * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
-}
-
-export function formatBrl(value: number, maximumFractionDigits = 0): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits,
-  }).format(value);
-}
+// estimateMonthlyPayment / formatBrl removidos: o cálculo de parcela agora tem
+// fonte única em components/financing/FinancingSimulator.tsx (unificação das 3
+// cópias com taxas divergentes). buildFinanceLink continua acima.
