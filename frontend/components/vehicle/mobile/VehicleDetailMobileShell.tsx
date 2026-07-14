@@ -8,8 +8,13 @@ import { useMemo, useState, type FormEvent } from "react";
 import AdCard from "@/components/ads/AdCard";
 import type { BaseAdData } from "@/components/ads/AdCard";
 import { trackAdEvent } from "@/lib/analytics/public-events";
+import { LEAD_CONTACT_FORM_ENABLED } from "@/lib/leads/lead-contact-form.flag";
 import { submitVehicleLead } from "@/lib/leads/public-leads";
-import { buildFinanceLink, buildVehicleH1, buildVehicleWhatsappHref } from "@/lib/vehicle/detail-utils";
+import {
+  buildFinanceLink,
+  buildVehicleH1,
+  buildVehicleWhatsappHref,
+} from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
@@ -128,9 +133,7 @@ export default function VehicleDetailMobileShell({
               um <h2> e o único <h1> era o rótulo genérico "Detalhes do veículo"
               do MobileTopBar (agora <span>). A meta line abaixo mantém
               ano · km · cidade como no mockup. */}
-          <h1 className="text-[20px] font-extrabold leading-tight text-slate-900">
-            {vehicleH1}
-          </h1>
+          <h1 className="text-[20px] font-extrabold leading-tight text-slate-900">{vehicleH1}</h1>
 
           <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-slate-600">
             {metaPieces.map((piece, i) => (
@@ -276,9 +279,14 @@ export default function VehicleDetailMobileShell({
         ) : null}
 
         {/* ---- Enviar mensagem ao vendedor ---- */}
-        <section aria-label="Enviar mensagem ao vendedor" className="px-4 pt-5">
-          <MessageForm vehicleId={vehicle.id} vehicleName={vehicle.fullName} />
-        </section>
+        {/* Escondido via flag (LEAD_CONTACT_FORM_ENABLED); WhatsApp e "Ver
+            telefone" seguem na linha de CTAs acima. Reativar em
+            lead-contact-form.flag.ts. */}
+        {LEAD_CONTACT_FORM_ENABLED ? (
+          <section aria-label="Enviar mensagem ao vendedor" className="px-4 pt-5">
+            <MessageForm vehicleId={vehicle.id} vehicleName={vehicle.fullName} />
+          </section>
+        ) : null}
 
         {/* ---- Denunciar anúncio ---- */}
         {/*

@@ -4,6 +4,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { trackAdEvent } from "@/lib/analytics/public-events";
+import { LEAD_CONTACT_FORM_ENABLED } from "@/lib/leads/lead-contact-form.flag";
 import { submitVehicleLead } from "@/lib/leads/public-leads";
 import { formatPhoneDisplay } from "@/lib/vehicle/detail-utils";
 
@@ -223,54 +224,59 @@ export default function PhoneRevealSheet({
             </a>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-2 rounded-2xl border border-slate-200 p-4"
-          >
-            <p className="text-[12.5px] font-semibold text-slate-700">
-              Ou peça para o anunciante entrar em contato:
-            </p>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome"
-              autoComplete="name"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20"
-            />
-            <input
-              type="tel"
-              inputMode="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Seu telefone"
-              autoComplete="tel"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20"
-            />
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Escreva sua mensagem (opcional)"
-              rows={2}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-[14px] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20"
-            />
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0e62d8] text-[14px] font-bold text-white transition hover:bg-[#0a52b8] disabled:cursor-not-allowed disabled:opacity-60"
+          {/* Mini-formulário de lead escondido via flag
+              (LEAD_CONTACT_FORM_ENABLED). O número, "Copiar" e "Ligar agora"
+              acima seguem funcionando. Reativar em lead-contact-form.flag.ts. */}
+          {LEAD_CONTACT_FORM_ENABLED ? (
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-2 rounded-2xl border border-slate-200 p-4"
             >
-              {submitting ? "Enviando..." : "Enviar mensagem"}
-            </button>
-            {feedback ? (
-              <p
-                className={`text-[12.5px] ${
-                  feedback.tone === "success" ? "text-emerald-600" : "text-rose-600"
-                }`}
-              >
-                {feedback.text}
+              <p className="text-[12.5px] font-semibold text-slate-700">
+                Ou peça para o anunciante entrar em contato:
               </p>
-            ) : null}
-          </form>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome"
+                autoComplete="name"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20"
+              />
+              <input
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Seu telefone"
+                autoComplete="tel"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[14px] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20"
+              />
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Escreva sua mensagem (opcional)"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-[14px] outline-none transition focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/20"
+              />
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0e62d8] text-[14px] font-bold text-white transition hover:bg-[#0a52b8] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Enviando..." : "Enviar mensagem"}
+              </button>
+              {feedback ? (
+                <p
+                  className={`text-[12.5px] ${
+                    feedback.tone === "success" ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {feedback.text}
+                </p>
+              ) : null}
+            </form>
+          ) : null}
         </div>
       </div>
     </div>

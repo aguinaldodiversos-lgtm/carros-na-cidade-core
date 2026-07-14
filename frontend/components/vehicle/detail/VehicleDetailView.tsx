@@ -10,6 +10,7 @@ import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
 import VehicleOptionsGroups from "@/components/vehicle/VehicleOptionsGroups";
 import PhoneRevealSheet from "@/components/vehicle/mobile/PhoneRevealSheet";
 import { trackAdEvent } from "@/lib/analytics/public-events";
+import { LEAD_CONTACT_FORM_ENABLED } from "@/lib/leads/lead-contact-form.flag";
 import {
   buildFinanceLink,
   buildShortVehicleH1,
@@ -241,8 +242,12 @@ export default function VehicleDetailView({
           <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             {/* Preço + contato */}
             <section className="rounded-2xl border border-cnc-line bg-white p-4 shadow-card">
-              <p className="text-[26px] font-extrabold leading-none text-primary">{vehicle.price}</p>
-              {year ? <p className="mt-1 text-[13px] font-semibold text-cnc-muted">{year}</p> : null}
+              <p className="text-[26px] font-extrabold leading-none text-primary">
+                {vehicle.price}
+              </p>
+              {year ? (
+                <p className="mt-1 text-[13px] font-semibold text-cnc-muted">{year}</p>
+              ) : null}
 
               <div className="mt-4 space-y-2">
                 <a
@@ -275,18 +280,23 @@ export default function VehicleDetailView({
                   <PhoneIcon />
                   Ver telefone
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMessageOpen((v) => !v)}
-                  aria-expanded={messageOpen}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-cnc-line bg-white text-[14px] font-bold text-cnc-text transition hover:bg-cnc-bg"
-                >
-                  <MailIcon />
-                  Enviar mensagem
-                </button>
+                {/* Formulário "Enviar mensagem" escondido via flag
+                    (LEAD_CONTACT_FORM_ENABLED). WhatsApp e "Ver telefone"
+                    seguem visíveis. Para reativar, ver lead-contact-form.flag.ts. */}
+                {LEAD_CONTACT_FORM_ENABLED ? (
+                  <button
+                    type="button"
+                    onClick={() => setMessageOpen((v) => !v)}
+                    aria-expanded={messageOpen}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-cnc-line bg-white text-[14px] font-bold text-cnc-text transition hover:bg-cnc-bg"
+                  >
+                    <MailIcon />
+                    Enviar mensagem
+                  </button>
+                ) : null}
               </div>
 
-              {messageOpen ? (
+              {LEAD_CONTACT_FORM_ENABLED && messageOpen ? (
                 <div className="mt-3 border-t border-cnc-line pt-3">
                   <VehicleMessageForm vehicleId={vehicle.id} vehicleName={vehicle.fullName} />
                 </div>
@@ -332,9 +342,9 @@ export default function VehicleDetailView({
             <section className="rounded-2xl border border-cnc-line bg-white p-4 shadow-card">
               <h2 className="text-[15px] font-extrabold text-cnc-text-strong">Aviso Legal</h2>
               <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
-                Carros na Cidade é um portal de anúncios classificados. Não intermedia
-                negociações, não recebe pagamentos e não se responsabiliza pelas ofertas ou
-                informações divulgadas pelos anunciantes.
+                Carros na Cidade é um portal de anúncios classificados. Não intermedia negociações,
+                não recebe pagamentos e não se responsabiliza pelas ofertas ou informações
+                divulgadas pelos anunciantes.
               </p>
             </section>
 
@@ -435,11 +445,27 @@ function ShareButton({ shareUrl, title }: { shareUrl: string; title: string }) {
       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cnc-line bg-white text-cnc-muted transition hover:border-primary hover:text-primary"
     >
       {copied ? (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="m5 12 5 5L20 7" />
         </svg>
       ) : (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <circle cx="18" cy="5" r="3" />
           <circle cx="6" cy="12" r="3" />
           <circle cx="18" cy="19" r="3" />
@@ -613,8 +639,19 @@ function PinIcon() {
 }
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-cnc-success" fill="none" aria-hidden="true">
-      <path d="M16.7 5.7 8.5 13.9l-3.2-3.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      viewBox="0 0 20 20"
+      className="h-4 w-4 shrink-0 text-cnc-success"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M16.7 5.7 8.5 13.9l-3.2-3.2"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -642,7 +679,16 @@ function MailIcon() {
 }
 function ShieldIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
     </svg>
   );
