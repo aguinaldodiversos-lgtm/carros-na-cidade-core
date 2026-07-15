@@ -2,33 +2,21 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ChangeEvent } from "react";
 import type { AdItem } from "@/lib/search/ads-search";
 import AdCard from "@/components/ads/AdCard";
 import { PromoBanner } from "@/components/common/PromoBanner";
+import FinancingSimulator from "@/components/financing/FinancingSimulator";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 
 /**
- * Simulador de financiamento — mobile-first, contrato visual oficial em
- * `frontend/public/images/simulador.png`.
+ * Página /simulador-financiamento/[cidade] — wrapper em torno do núcleo
+ * compartilhado `FinancingSimulator` (o mesmo usado embutido na página do
+ * anúncio). Aqui o valor do veículo é EDITÁVEL (o usuário chegou sem carro
+ * escolhido). O cálculo/inputs/tabela vivem no núcleo — este arquivo só
+ * compõe a página: simulador + "Carros compatíveis" + banner + bottom-nav.
  *
- * Estrutura (de cima para baixo):
- *  1. Header da página: ← back + h1 + sub
- *  2. Card de formulário: 2x2 grid (Valor / Entrada — Taxa / Prazo) + botão azul
- *  3. Card "Parcelas simuladas": 5 linhas radio (12/24/36/48/60x) + aviso azul
- *  4. Seção "Carros compatíveis com sua parcela": 3 AdCards
- *  5. SiteBottomNav (já fora do <main>)
- *
- * Antes era 3 colunas desktop com sliders, hero com imagem dolphin e
- * seção duplicada "Ofertas em [cidade]". Tudo isso saiu — o usuário
- * acessa ofertas pelo /comprar (atalho na home, FAB do BottomNav,
- * header desktop) então não precisa duplicar aqui.
- *
- * IMPORTANTE: a regra anti-duplicação do redesign (memory
- * project_visual_contract) — não renderizar dois CTAs de mesma função
- * — é respeitada: nada de "Anuncie seu carro grátis" aside, nada de
- * "Ver todas as ofertas em [cidade]" extra além do "Ver todos →" do
- * header da seção.
+ * O cabeçalho (← + H1 + frase) fica em <SimuladorIntroSync> SÍNCRONO na page
+ * (antes do <Suspense>), garantindo o H1 dentro do <main> antes do footer (SEO).
  */
 
 interface FinancingLandingPageClientProps {
@@ -36,58 +24,14 @@ interface FinancingLandingPageClientProps {
   cityName: string;
   cityLabel: string;
   /**
-   * Anúncio em destaque para o hero — `null` quando não há anúncio real
-   * disponível na cidade. Briefing P0 2026-05-24 vetou o fallback fake
-   * (T-Cross R$ 105.900 sintético). Hoje o componente já não usa o
-   * `heroVehicle` no JSX — o redesign manteve apenas formulário +
-   * parcelas + carrosséis "Carros compatíveis" — então `null` aqui é
-   * inofensivo. Quando o hero visual voltar, deve renderizar versão
-   * institucional (sem preço/modelo) quando `null`.
+   * Anúncio em destaque para o hero — hoje não usado no JSX (o redesign manteve
+   * apenas simulador + "Carros compatíveis"); mantido na prop porque a page
+   * ainda o resolve. `null` é inofensivo.
    */
   heroVehicle: AdItem | null;
   highlightAds: AdItem[];
   opportunityAds: AdItem[];
   initialVehicleValue?: number;
-}
-
-const TERMS = [12, 24, 36, 48, 60] as const;
-type TermOption = (typeof TERMS)[number];
-
-const VALUE_MIN = 5_000;
-const VALUE_MAX = 500_000;
-const DOWN_MIN = 0;
-const RATE_MIN = 0.5;
-const RATE_MAX = 3.5;
-
-function parseMoney(value: number | string | null | undefined) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
-  const cleaned = String(value)
-    .replace(/[^\d,.-]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatBRL(value: number, fractionDigits: number = 2) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(value);
-}
-
-function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
-  if (financedAmount <= 0 || months <= 0) return 0;
-  const monthlyRate = monthlyRatePct / 100;
-  if (monthlyRate === 0) return financedAmount / months;
-  return (financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }
 
 function ArrowRightIcon() {
@@ -104,96 +48,6 @@ function ArrowRightIcon() {
     >
       <path d="M5 12h14" />
       <path d="m13 6 6 6-6 6" />
-    </svg>
-  );
-}
-
-function CarPrefixIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 14V12l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-      <path d="M6 11h12" />
-      <circle cx="7.5" cy="14" r="1" />
-      <circle cx="16.5" cy="14" r="1" />
-    </svg>
-  );
-}
-
-function CalculatorIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="5" y="3" width="14" height="18" rx="2" />
-      <path d="M8 7h8M8 11h2M12 11h4M8 15h2M12 15h4M8 19h2M12 19h4" />
-    </svg>
-  );
-}
-
-function InfoIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v.01M12 11v5" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3 5 6v6c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6l-7-3Z" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }
@@ -225,32 +79,6 @@ export function FinancingLandingPageClient({
   opportunityAds,
   initialVehicleValue,
 }: FinancingLandingPageClientProps) {
-  const initialValue =
-    initialVehicleValue != null && initialVehicleValue > 0
-      ? clamp(Math.round(initialVehicleValue), VALUE_MIN, VALUE_MAX)
-      : 120_000;
-
-  const [vehicleValue, setVehicleValue] = useState(initialValue);
-  const [downPayment, setDownPayment] = useState(Math.round(initialValue * 0.2));
-  const [monthlyRate, setMonthlyRate] = useState(1.29);
-  const [selectedTerm, setSelectedTerm] = useState<TermOption>(12);
-
-  const effectiveFinanced = Math.max(vehicleValue - downPayment, 0);
-  const downPaymentPct = vehicleValue > 0 ? Math.round((downPayment / vehicleValue) * 100) : 0;
-
-  const installmentTable = useMemo(
-    () =>
-      TERMS.map((term) => {
-        const monthly = calculateMonthlyPayment(effectiveFinanced, monthlyRate, term);
-        return {
-          term,
-          monthly,
-          total: monthly * term + downPayment,
-        };
-      }),
-    [effectiveFinanced, monthlyRate, downPayment]
-  );
-
   const compatibleAds = (highlightAds?.length ? highlightAds : opportunityAds).slice(0, 3);
   const seeAllHref = `/comprar?city_slug=${citySlug}`;
 
@@ -258,143 +86,13 @@ export function FinancingLandingPageClient({
     <>
       {/*
         `<div>` (não `<main>`): o `<main id="main-content">` é do root layout.
-        O cabeçalho (← + H1 + frase) foi movido para <SimuladorIntroSync>
-        SÍNCRONO na page (antes do <Suspense>), garantindo o H1 dentro do
-        `<main>` ANTES do footer (SEO). Aqui fica só o formulário + resultados.
+        Aqui fica só o simulador + resultados + descoberta.
       */}
       <div className="bg-cnc-bg pb-24 text-cnc-text">
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:max-w-4xl lg:px-8">
-          {/* Form card */}
-          <section
-            aria-label="Parâmetros do financiamento"
-            className="mt-5 rounded-2xl border border-cnc-line bg-white p-4 shadow-card sm:p-5"
-          >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <CurrencyField
-                label="Valor do veículo"
-                value={vehicleValue}
-                onChange={(v) => {
-                  const next = clamp(v, VALUE_MIN, VALUE_MAX);
-                  setVehicleValue(next);
-                  if (downPayment > next) setDownPayment(next);
-                }}
-              />
-
-              <div>
-                <CurrencyField
-                  label="Entrada"
-                  value={downPayment}
-                  onChange={(v) => setDownPayment(clamp(v, DOWN_MIN, vehicleValue))}
-                />
-                <p className="mt-1 inline-flex rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold leading-tight text-primary">
-                  {downPaymentPct}% do valor do veículo
-                </p>
-              </div>
-
-              <RateField
-                label="Taxa de juros (a.m.)"
-                value={monthlyRate}
-                onChange={(v) => setMonthlyRate(clamp(Number(v.toFixed(2)), RATE_MIN, RATE_MAX))}
-              />
-
-              <SelectField
-                label="Prazo"
-                value={selectedTerm}
-                onChange={(v) => setSelectedTerm(v as TermOption)}
-                options={TERMS.map((t) => ({ value: t, label: `${t} meses` }))}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-bold text-white shadow-card transition hover:bg-primary-strong"
-            >
-              <CalculatorIcon />
-              Simular parcelas
-            </button>
-          </section>
-
-          {/* Parcelas simuladas card */}
-          <section
-            aria-label="Parcelas simuladas"
-            className="mt-5 rounded-2xl border border-cnc-line bg-white p-4 shadow-card sm:p-5"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-cnc-text-strong">
-                <CarSectionIcon />
-              </span>
-              <h2 className="text-[16px] font-extrabold leading-tight text-cnc-text-strong sm:text-[18px]">
-                Parcelas simuladas
-              </h2>
-              <button
-                type="button"
-                aria-label="Como o cálculo é feito"
-                className="text-cnc-muted-soft transition hover:text-cnc-text-strong"
-              >
-                <InfoIcon />
-              </button>
-            </div>
-
-            {/* Header row */}
-            <div className="mt-3 grid grid-cols-[2.25rem_minmax(0,0.7fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-x-2 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-cnc-muted-soft">
-              <span aria-hidden="true" />
-              <span>Prazo</span>
-              <span>Valor da parcela</span>
-              <span className="text-right">Total pago</span>
-            </div>
-
-            {/* Rows */}
-            <div className="space-y-1">
-              {installmentTable.map((row) => {
-                const isActive = row.term === selectedTerm;
-                return (
-                  <button
-                    key={row.term}
-                    type="button"
-                    onClick={() => setSelectedTerm(row.term)}
-                    aria-pressed={isActive}
-                    className={`grid w-full grid-cols-[2.25rem_minmax(0,0.7fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-x-2 rounded-xl px-1 py-3 text-left transition ${
-                      isActive ? "bg-primary-soft" : "hover:bg-cnc-bg"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full border-2 transition ${
-                        isActive ? "border-primary bg-white" : "border-cnc-muted-soft bg-white"
-                      }`}
-                    >
-                      {isActive ? <span className="h-2.5 w-2.5 rounded-full bg-primary" /> : null}
-                    </span>
-                    <span
-                      className={`text-[14px] font-semibold ${
-                        isActive ? "text-primary" : "text-cnc-text-strong"
-                      }`}
-                    >
-                      {row.term}x
-                    </span>
-                    <span
-                      className={`text-[15px] font-extrabold tabular-nums ${
-                        isActive ? "text-primary" : "text-cnc-text-strong"
-                      }`}
-                    >
-                      {formatBRL(row.monthly)}
-                    </span>
-                    <span className="text-right text-[13px] tabular-nums text-cnc-muted">
-                      {formatBRL(row.total)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Disclaimer */}
-            <p className="mt-3 flex items-center gap-2 rounded-xl bg-primary-soft px-3 py-2.5 text-[12.5px] leading-snug text-cnc-muted">
-              <span className="text-primary">
-                <ShieldIcon />
-              </span>
-              <span>Cálculo estimado. Valores sujeitos à análise de crédito.</span>
-            </p>
-          </section>
+          <div className="mt-5">
+            <FinancingSimulator initialVehicleValue={initialVehicleValue} valueEditable />
+          </div>
 
           {/* Carros compatíveis com sua parcela */}
           {compatibleAds.length > 0 ? (
@@ -432,8 +130,7 @@ export function FinancingLandingPageClient({
           {/*
             Banner (último bloco antes do rodapé) — quem chega aqui buscou
             "simular financiamento" e ainda não escolheu carro; o banner o leva
-            ao catálogo da cidade. Texto/CTA diferentes do "Ver todos" da seção
-            acima (que abre o /comprar por query) de propósito.
+            ao catálogo da cidade.
           */}
           <section aria-label={`Ver carros em ${cityName}`} className="mt-7">
             <PromoBanner
@@ -450,159 +147,6 @@ export function FinancingLandingPageClient({
 
       <SiteBottomNav />
     </>
-  );
-}
-
-/* ----------------------------------------------------------------------
- * Inputs
- * ---------------------------------------------------------------------- */
-
-/**
- * Hook auxiliar: mantém uma string-rascunho enquanto o input está focado
- * para que o cursor não pule a cada keystroke por causa de re-formatação.
- *
- * - Quando NÃO focado: o input mostra o valor formatado (canônico).
- * - Quando focado: o input mostra exatamente o que o usuário digita
- *   (sem reformatação a cada tecla).
- * - A cada keystroke, o draft é parseado e comitado em tempo real para
- *   o estado do pai — assim valores derivados (parcelas, totais) seguem
- *   atualizados, sem mexer no DOM do input em si (que segue mostrando o
- *   draft, não o formatado).
- * - No blur: o draft é descartado, e o input volta a mostrar o valor
- *   canônico formatado.
- */
-function useDraftValue<T>(
-  formatted: string,
-  parse: (raw: string) => T | null,
-  commit: (next: T) => void
-) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const display = draft !== null ? draft : formatted;
-
-  return {
-    value: display,
-    onChange: (e: ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value;
-      setDraft(raw);
-      const parsed = parse(raw);
-      if (parsed !== null) commit(parsed);
-    },
-    onFocus: () => setDraft(formatted),
-    onBlur: () => setDraft(null),
-  };
-}
-
-function CurrencyField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (next: number) => void;
-}) {
-  const draft = useDraftValue<number>(
-    formatBRL(value, 2),
-    (raw) => {
-      const parsed = parseMoney(raw);
-      return Number.isFinite(parsed) ? parsed : null;
-    },
-    onChange
-  );
-
-  return (
-    <label className="block">
-      <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
-      <span className="mt-1.5 flex items-center gap-2 rounded-xl border border-cnc-line bg-white px-3 py-2.5 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-        <span className="shrink-0 text-cnc-muted-soft">
-          <CarPrefixIcon />
-        </span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={draft.value}
-          onChange={draft.onChange}
-          onFocus={draft.onFocus}
-          onBlur={draft.onBlur}
-          className="w-full bg-transparent text-[15px] font-bold tabular-nums text-cnc-text-strong outline-none placeholder:text-cnc-muted-soft"
-        />
-      </span>
-    </label>
-  );
-}
-
-function RateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (next: number) => void;
-}) {
-  const draft = useDraftValue<number>(
-    value.toFixed(2).replace(".", ","),
-    (raw) => {
-      const cleaned = raw.replace(/[^\d,.-]/g, "").replace(",", ".");
-      const n = Number(cleaned);
-      return Number.isFinite(n) ? n : null;
-    },
-    onChange
-  );
-
-  return (
-    <label className="block">
-      <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
-      <span className="mt-1.5 flex items-center gap-2 rounded-xl border border-cnc-line bg-white px-3 py-2.5 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-        <input
-          type="text"
-          inputMode="decimal"
-          value={draft.value}
-          onChange={draft.onChange}
-          onFocus={draft.onFocus}
-          onBlur={draft.onBlur}
-          className="w-full bg-transparent text-[15px] font-bold tabular-nums text-cnc-text-strong outline-none placeholder:text-cnc-muted-soft"
-        />
-        <span className="shrink-0 text-[13px] font-semibold text-cnc-muted-soft">%</span>
-      </span>
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: number;
-  onChange: (next: number) => void;
-  options: ReadonlyArray<{ value: number; label: string }>;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-[12px] font-semibold leading-tight text-cnc-muted">{label}</span>
-      <span className="relative mt-1.5 flex items-center gap-2 rounded-xl border border-cnc-line bg-white px-3 py-2.5 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-        <select
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full appearance-none bg-transparent pr-6 text-[15px] font-bold text-cnc-text-strong outline-none"
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute right-3 text-cnc-muted-soft"
-        >
-          <ChevronDownIcon />
-        </span>
-      </span>
-    </label>
   );
 }
 

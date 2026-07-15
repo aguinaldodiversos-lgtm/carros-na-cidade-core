@@ -9,9 +9,9 @@ import AdCard, { type BaseAdData } from "@/components/ads/AdCard";
 import { ReportAdModal } from "@/components/vehicle/ReportAdModal";
 import VehicleOptionsGroups from "@/components/vehicle/VehicleOptionsGroups";
 import PhoneRevealSheet from "@/components/vehicle/mobile/PhoneRevealSheet";
+import VehicleFinancingSimulator from "@/components/vehicle/VehicleFinancingSimulator";
 import { trackAdEvent } from "@/lib/analytics/public-events";
 import {
-  buildFinanceLink,
   buildShortVehicleH1,
   buildVehicleWhatsappHref,
   splitVersionTrim,
@@ -57,11 +57,6 @@ export default function VehicleDetailView({
     () => buildVehicleWhatsappHref({ phone: sellerPhone, vehicleName: vehicle.fullName }),
     [sellerPhone, vehicle.fullName]
   );
-  const financeLink = useMemo(
-    () => buildFinanceLink(vehicle.id, vehicle.citySlug, vehicle.priceNumeric),
-    [vehicle.id, vehicle.citySlug, vehicle.priceNumeric]
-  );
-
   const year = primaryYear(vehicle.year);
 
   // H1 VISÍVEL curto (estilo Webmotors): "Marca Modelo Trim" (ex.: "Chevrolet
@@ -202,6 +197,15 @@ export default function VehicleDetailView({
               </section>
             ) : null}
 
+            {/* Simulador de financiamento embutido (antes dos recomendados) */}
+            <VehicleFinancingSimulator
+              vehicleId={vehicle.id}
+              citySlug={vehicle.citySlug}
+              vehicleName={vehicle.fullName}
+              vehiclePriceNumeric={vehicle.priceNumeric}
+              sellerPhone={sellerPhone}
+            />
+
             {/* Recomendados (Fase 2a) */}
             {recommended.length > 0 ? (
               <section
@@ -291,14 +295,8 @@ export default function VehicleDetailView({
                   <VehicleMessageForm vehicleId={vehicle.id} vehicleName={vehicle.fullName} />
                 </div>
               ) : null}
-
-              <Link
-                href={financeLink}
-                onClick={() => trackAdEvent(vehicle.id, "finance").catch(() => {})}
-                className="mt-3 inline-flex w-full items-center justify-center text-[13px] font-bold text-primary hover:underline"
-              >
-                Simular financiamento
-              </Link>
+              {/* CTA "Simular financiamento" removido: o simulador agora é
+                  embutido na coluna de conteúdo, com WhatsApp próprio. */}
             </section>
 
             {/* Vendedor */}
