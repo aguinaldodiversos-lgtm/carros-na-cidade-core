@@ -109,13 +109,18 @@ export async function createLead(input) {
   try {
     await client.query("BEGIN");
 
+    // O telefone do vendedor vem SEMPRE do advertiser — a tabela `ads` não tem
+    // coluna `whatsapp_number` (o `SELECT a.whatsapp_number` anterior quebrava a
+    // transação com "column a.whatsapp_number does not exist" → 500, e nenhum
+    // lead era gravado). Alinhado ao mesmo COALESCE usado no serializer público
+    // (ads.repository.js) e no botão de WhatsApp do front — fonte de verdade única.
     const adResult = await client.query(
       `
       SELECT
         a.id,
         a.city_id,
         a.title,
-        a.whatsapp_number,
+        COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,
         a.status,
         adv.user_id AS seller_user_id
       FROM ads a
