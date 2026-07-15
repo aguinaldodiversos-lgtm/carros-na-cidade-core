@@ -128,6 +128,7 @@ function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   return [
     { label: "Painel", href: basePath, icon: "home" },
     { label: "Meus anúncios", href: `${basePath}/meus-anuncios`, icon: "ads" },
+    { label: "Dados da loja", href: `${basePath}/dados`, icon: "user" },
     { label: "Mensagens", href: `${basePath}/mensagens`, icon: "msg" },
     { label: "Plano e cobranças", href: `${basePath}/plano`, icon: "billing" },
   ];
