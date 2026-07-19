@@ -101,6 +101,68 @@ async function enqueueLeadNotification({ ad, lead }) {
   }
 }
 
+/**
+ * Registra um "lead enviado" a partir de um clique em botão de WhatsApp na
+ * página do veículo (versão mínima, SEM captura de dado pessoal do visitante).
+ *
+ * Diferente de `createLead` (formulário de contato):
+ *   - Não recebe nem grava nome/telefone do comprador (`buyer_name`/`buyer_phone`
+ *     ficam NULL — o visitante está abrindo o WhatsApp por conta própria).
+ *   - `source = 'whatsapp'` para diferenciar do lead de formulário ('form').
+ *   - NÃO enfileira notificação WhatsApp ao lojista (o próprio visitante já
+ *     está iniciando a conversa via `wa.me`; notificar seria ruído/duplicidade).
+ *   - NÃO toca em `seller_scores`/`city_metrics` — o card "Leads recebidos" do
+ *     painel conta linhas de `leads` por `seller_id` (getLeadCountsForOwner),
+ *     então uma única linha já faz o número subir. Mantém a gravação leve.
+ *
+ * É um único INSERT ... SELECT: resolve anúncio ativo + vendedor e grava numa
+ * ida ao banco. Se o anúncio não existir, não estiver ativo ou não tiver
+ * vendedor vinculado, nada é inserido (retorna `{ registered: false }`) — o
+ * chamador é fire-and-forget e ignora o corpo da resposta de qualquer forma.
+ */
+export async function recordWhatsappLead(input) {
+  const adId = Number(input?.adId);
+
+  if (!adId || Number.isNaN(adId)) {
+    throw new AppError("ID do anúncio inválido", 400);
+  }
+
+  try {
+    const result = await pool.query(
+      `
+      INSERT INTO leads (ad_id, seller_id, city_id, source)
+      SELECT a.id, adv.user_id, a.city_id, 'whatsapp'
+      FROM ads a
+      JOIN advertisers adv ON adv.id = a.advertiser_id
+      WHERE a.id = $1
+        AND a.status = 'active'
+        AND adv.user_id IS NOT NULL
+      RETURNING id
+      `,
+      [adId]
+    );
+
+    const registered = result.rowCount > 0;
+
+    if (registered) {
+      logger.info(
+        { leadId: result.rows[0].id, adId, source: "whatsapp" },
+        "[leads.service] Lead de WhatsApp registrado"
+      );
+    } else {
+      logger.debug(
+        { adId },
+        "[leads.service] Clique de WhatsApp sem lead (anúncio inativo/sem vendedor)"
+      );
+    }
+
+    return { registered };
+  } catch (error) {
+    logger.error({ error, adId }, "[leads.service] Erro ao registrar lead de WhatsApp");
+    throw new AppError("Erro ao registrar contato", 500);
+  }
+}
+
 export async function createLead(input) {
   const { adId, buyerName, buyerPhone } = validateCreateLeadInput(input);
 

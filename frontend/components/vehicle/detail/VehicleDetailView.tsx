@@ -12,6 +12,7 @@ import PhoneRevealSheet from "@/components/vehicle/mobile/PhoneRevealSheet";
 import VehicleFinancingSimulator from "@/components/vehicle/VehicleFinancingSimulator";
 import { trackAdEvent } from "@/lib/analytics/public-events";
 import { LEAD_CONTACT_FORM_ENABLED } from "@/lib/leads/lead-contact-form.flag";
+import { registerWhatsappContact } from "@/lib/leads/public-leads";
 import {
   buildShortVehicleH1,
   buildVehicleWhatsappHref,
@@ -265,6 +266,7 @@ export default function VehicleDetailView({
                       return;
                     }
                     trackAdEvent(vehicle.id, "whatsapp").catch(() => {});
+                    registerWhatsappContact(vehicle.id);
                   }}
                   className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1ea860] text-[14px] font-bold text-white transition hover:bg-[#178a4f] ${
                     waLink ? "" : "pointer-events-none opacity-60"
@@ -377,6 +379,7 @@ export default function VehicleDetailView({
               return;
             }
             trackAdEvent(vehicle.id, "whatsapp").catch(() => {});
+            registerWhatsappContact(vehicle.id);
           }}
           className={`inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#1ea860] px-4 text-[13.5px] font-bold text-white ${
             waLink ? "" : "pointer-events-none opacity-60"

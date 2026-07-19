@@ -7,6 +7,7 @@ import FinancingSimulator, {
   type SimulationResult,
 } from "@/components/financing/FinancingSimulator";
 import { trackAdEvent } from "@/lib/analytics/public-events";
+import { registerWhatsappContact } from "@/lib/leads/public-leads";
 import { buildFinanceLink, buildVehicleWhatsappHref } from "@/lib/vehicle/detail-utils";
 
 /**
@@ -96,6 +97,7 @@ export default function VehicleFinancingSimulator({
             return;
           }
           trackAdEvent(vehicleId, "whatsapp").catch(() => {});
+          registerWhatsappContact(vehicleId);
         }}
         className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1ea860] text-[15px] font-bold text-white shadow-card transition hover:bg-[#178a4f] ${
           whatsappHref ? "" : "pointer-events-none opacity-60"
