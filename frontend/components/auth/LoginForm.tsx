@@ -16,6 +16,10 @@ type LoginFormProps = {
 
 export default function LoginForm({ next }: LoginFormProps) {
   const router = useRouter();
+  // Propaga o destino para o cadastro: anunciante novo que clica "Criar conta"
+  // deve, após registrar, cair no MESMO `next` (o formulário de anúncio), não
+  // no /dashboard genérico. O /api/auth/register já honra `next`.
+  const signupHref = next ? `/cadastro?next=${encodeURIComponent(next)}` : "/cadastro";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -132,7 +136,7 @@ export default function LoginForm({ next }: LoginFormProps) {
         <Link href="/recuperar-senha" className="font-semibold text-[#0e62d8] hover:text-[#0c4fb0]">
           Esqueci minha senha
         </Link>
-        <Link href="/cadastro" className="font-semibold text-[#0e62d8] hover:text-[#0c4fb0]">
+        <Link href={signupHref} className="font-semibold text-[#0e62d8] hover:text-[#0c4fb0]">
           Criar conta
         </Link>
       </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSellPageContent } from "./sell-page";
+import { getSellPageContent, buildAnunciarCtaHref } from "./sell-page";
 
 /**
  * Termos PROIBIDOS na copy pública de /anunciar.
@@ -84,6 +84,40 @@ describe("/anunciar copy — termos proibidos", () => {
     expect(flat).toMatch(/WhatsApp/);
     // Regional/local: alguma referência precisa permanecer
     expect(flat).toMatch(/regional|local|cidade/i);
+  });
+});
+
+describe("buildAnunciarCtaHref — destino dos CTAs (sem tela intermediária)", () => {
+  it("logado: vai DIRETO ao formulário, sem passar pelo login", () => {
+    expect(buildAnunciarCtaHref("particular", true)).toBe("/anunciar/novo?tipo=particular");
+    expect(buildAnunciarCtaHref("lojista", true)).toBe("/anunciar/novo?tipo=lojista");
+  });
+
+  it("anônimo: vai ao login com next apontando para o formulário", () => {
+    expect(buildAnunciarCtaHref("particular", false)).toBe(
+      `/login?next=${encodeURIComponent("/anunciar/novo?tipo=particular")}`
+    );
+    expect(buildAnunciarCtaHref("lojista", false)).toBe(
+      `/login?next=${encodeURIComponent("/anunciar/novo?tipo=lojista")}`
+    );
+  });
+
+  it("nunca aponta para a tela intermediária removida (/anunciar/publicar)", () => {
+    for (const authed of [true, false]) {
+      for (const tipo of ["particular", "lojista"] as const) {
+        expect(buildAnunciarCtaHref(tipo, authed)).not.toContain("/anunciar/publicar");
+      }
+    }
+  });
+
+  it("os CTAs do conteúdo refletem a sessão", async () => {
+    const anon = await getSellPageContent(false);
+    expect(anon.hero.primaryCtaHref).toContain("/login?next=");
+    expect(anon.hero.secondaryCtaHref).toContain("tipo%3Dlojista");
+
+    const authed = await getSellPageContent(true);
+    expect(authed.hero.primaryCtaHref).toBe("/anunciar/novo?tipo=particular");
+    expect(authed.bottomCta.secondaryCtaHref).toBe("/anunciar/novo?tipo=lojista");
   });
 });
 
