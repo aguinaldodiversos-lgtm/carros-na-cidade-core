@@ -18,6 +18,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function CadastroPage() {
-  return <RegisterPageClient />;
+type CadastroPageProps = {
+  searchParams?: {
+    next?: string;
+  };
+};
+
+export default function CadastroPage({ searchParams }: CadastroPageProps) {
+  // `next` propagado do login/CTA; o RegisterPageClient o reenvia ao
+  // /api/auth/register, que já resolve o redirect pós-cadastro para ele
+  // (formulário de anúncio, no fluxo do anunciante novo).
+  const next = typeof searchParams?.next === "string" ? searchParams.next : undefined;
+  return <RegisterPageClient next={next} />;
 }

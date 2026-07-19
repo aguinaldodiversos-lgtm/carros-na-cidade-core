@@ -79,7 +79,13 @@ function IconMegaphone() {
   );
 }
 
-export default function RegisterPageClient() {
+type RegisterPageClientProps = {
+  /** Destino pós-cadastro (propagado do login/CTA). Reenviado ao backend, que
+   *  resolve o `redirect_to` para ele — leva o anunciante novo ao formulário. */
+  next?: string;
+};
+
+export default function RegisterPageClient({ next }: RegisterPageClientProps = {}) {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -122,6 +128,7 @@ export default function RegisterPageClient() {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
+          ...(next ? { next } : {}),
         }),
       });
 

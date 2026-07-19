@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies, headers } from "next/headers";
 import SellPageClient from "@/components/sell/SellPageClient";
 import { getSellPageContent } from "@/lib/sell/sell-page";
 import { getSellHeroAd } from "@/lib/sell/sell-hero-ad";
+import { getSessionDataFromCookieStore } from "@/services/sessionService";
 
 /**
  * `force-dynamic` (NÃO trocar por `revalidate`) — correção de ordem
@@ -41,9 +43,15 @@ export const metadata: Metadata = {
 };
 
 export default async function AnunciarPage() {
+  // Sessão lida server-side (mesmo padrão de `/login`) para decidir o destino
+  // dos CTAs: logado → formulário direto; anônimo → login com `next`. A rota já
+  // é `force-dynamic` (lê cookies via layout), então o custo é marginal.
+  const session = getSessionDataFromCookieStore(cookies(), headers());
+  const authed = Boolean(session?.accessToken);
+
   // Conteúdo é estático; o anúncio real do hero é best-effort (cai em
   // prévia honesta se o backend não devolver nada). Buscados em paralelo.
-  const [content, heroAd] = await Promise.all([getSellPageContent(), getSellHeroAd()]);
+  const [content, heroAd] = await Promise.all([getSellPageContent(authed), getSellHeroAd()]);
 
   return <SellPageClient content={content} heroAd={heroAd} />;
 }

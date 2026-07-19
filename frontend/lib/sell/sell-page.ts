@@ -103,10 +103,28 @@ export type SellPageContent = {
   };
 };
 
-const PARTICULAR_HREF = "/anunciar/publicar?tipo=particular";
-const LOJISTA_HREF = "/anunciar/publicar?tipo=lojista";
+/**
+ * Href do CTA de anunciar, ciente da sessão (removemos a tela intermediária
+ * `/anunciar/publicar`):
+ *  - logado  → vai DIRETO ao formulário (`/anunciar/novo?tipo=…`), sem passar
+ *    pelo login.
+ *  - anônimo → vai ao `/login?next=…` apontando para o formulário; depois de
+ *    logar OU criar conta, o mecanismo `next` do projeto leva ao formulário.
+ *
+ * O `?tipo` é só o default COSMÉTICO inicial do wizard — o tipo real da conta
+ * (CPF/CNPJ) sobrescreve `sellerType` quando o dashboard carrega, e o gate de
+ * documento não depende dele. Preservá-lo mantém o rótulo certo por um instante
+ * e a intenção particular/lojista do clique.
+ */
+export function buildAnunciarCtaHref(tipo: "particular" | "lojista", authed: boolean): string {
+  const form = `/anunciar/novo?tipo=${tipo}`;
+  return authed ? form : `/login?next=${encodeURIComponent(form)}`;
+}
 
-function fallbackContent(): SellPageContent {
+function fallbackContent(authed: boolean): SellPageContent {
+  const particularHref = buildAnunciarCtaHref("particular", authed);
+  const lojistaHref = buildAnunciarCtaHref("lojista", authed);
+
   return {
     hero: {
       eyebrow: "Venda mais rápido e com segurança",
@@ -115,9 +133,9 @@ function fallbackContent(): SellPageContent {
       subtitle:
         "Publique em poucos minutos, mostre seu carro com aparência profissional e receba contatos diretamente pelo WhatsApp.",
       primaryCtaLabel: "Começar anúncio",
-      primaryCtaHref: PARTICULAR_HREF,
+      primaryCtaHref: particularHref,
       secondaryCtaLabel: "Sou lojista",
-      secondaryCtaHref: LOJISTA_HREF,
+      secondaryCtaHref: lojistaHref,
       microBenefits: ["É rápido", "Contato direto", "Sem compromisso"],
       mockup: {
         badges: ["Destaque", "Abaixo da FIPE"],
@@ -176,7 +194,7 @@ function fallbackContent(): SellPageContent {
           "Venda com mais segurança",
         ],
         ctaLabel: "Anunciar como particular",
-        ctaHref: PARTICULAR_HREF,
+        ctaHref: particularHref,
       },
       {
         audience: "lojista",
@@ -187,7 +205,7 @@ function fallbackContent(): SellPageContent {
           "Presença regional para sua loja",
         ],
         ctaLabel: "Anunciar como lojista",
-        ctaHref: LOJISTA_HREF,
+        ctaHref: lojistaHref,
       },
     ],
     assurance: [
@@ -235,7 +253,8 @@ function fallbackContent(): SellPageContent {
       },
       {
         title: "Mais confiança na apresentação",
-        description: "Seu veículo aparece em ambiente profissional, com cara de marketplace confiável.",
+        description:
+          "Seu veículo aparece em ambiente profissional, com cara de marketplace confiável.",
       },
       {
         title: "Maior chance de contato qualificado",
@@ -290,13 +309,18 @@ function fallbackContent(): SellPageContent {
       subtitle: "Comece agora e conecte seu veículo a compradores da sua região.",
       microcopy: "Rápido, simples e seguro.",
       primaryCtaLabel: "Começar agora",
-      primaryCtaHref: PARTICULAR_HREF,
+      primaryCtaHref: particularHref,
       secondaryCtaLabel: "Sou lojista",
-      secondaryCtaHref: LOJISTA_HREF,
+      secondaryCtaHref: lojistaHref,
     },
   };
 }
 
-export async function getSellPageContent(): Promise<SellPageContent> {
-  return fallbackContent();
+/**
+ * Conteúdo da landing `/anunciar`. `authed` decide o destino dos CTAs (form
+ * direto p/ logado; login com `next` p/ anônimo) — ver `buildAnunciarCtaHref`.
+ * Default `false` preserva a assinatura zero-arg usada nos testes de copy.
+ */
+export async function getSellPageContent(authed = false): Promise<SellPageContent> {
+  return fallbackContent(authed);
 }

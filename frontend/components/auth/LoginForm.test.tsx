@@ -45,6 +45,18 @@ describe("LoginForm", () => {
     expect(screen.getByText("Criar conta")).toBeDefined();
   });
 
+  it('link "Criar conta" é /cadastro puro quando não há next', () => {
+    render(<LoginForm />);
+    expect(screen.getByText("Criar conta").getAttribute("href")).toBe("/cadastro");
+  });
+
+  it('link "Criar conta" PROPAGA o next para o cadastro (anunciante novo cai no form)', () => {
+    render(<LoginForm next="/anunciar/novo?tipo=lojista" />);
+    expect(screen.getByText("Criar conta").getAttribute("href")).toBe(
+      `/cadastro?next=${encodeURIComponent("/anunciar/novo?tipo=lojista")}`
+    );
+  });
+
   it("shows error on failed login (401)", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,

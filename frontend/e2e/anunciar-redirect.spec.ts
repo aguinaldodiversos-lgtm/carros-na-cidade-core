@@ -18,3 +18,16 @@ test(
     expect(page.url()).toContain("step=3");
   }
 );
+
+test(
+  "tela intermediária /anunciar/publicar redireciona (301) para /anunciar",
+  { tag: "@smoke" },
+  async ({ request, baseURL }) => {
+    // Sem seguir o redirect: valida o status 301 literal e o destino.
+    const res = await request.get(`${baseURL}/anunciar/publicar?tipo=lojista`, {
+      maxRedirects: 0,
+    });
+    expect(res.status()).toBe(301);
+    expect(res.headers()["location"]).toMatch(/\/anunciar$/);
+  }
+);

@@ -67,6 +67,7 @@ import { decideTerritoryGate } from "@/lib/middleware/territory-gate";
  *    - /carros-{em,baratos-em,automaticos-em}-[slug] → versão com `/`
  *    - /painel/anuncios/novo → /anunciar/novo
  *    - /painel/anuncios/[id]/publicar → /upgrade
+ *    - /anunciar/publicar → /anunciar  (tela intermediária removida)
  *
  * 4. **Injeção de `x-cnc-pathname`** para RootLayout resolver cidade ativa SSR.
  *
@@ -350,6 +351,16 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/painel/anuncios/novo") {
     const url = request.nextUrl.clone();
     url.pathname = "/anunciar/novo";
+    return respond(request, startedAt, NextResponse.redirect(url, 301));
+  }
+
+  // Tela intermediária "Comece seu anúncio" removida (fricção): os CTAs da
+  // landing vão direto ao login/formulário. Mantém 301 (não 404) por causa de
+  // links externos / indexação antiga. Descarta `?tipo` (a landing não usa).
+  if (pathname === "/anunciar/publicar") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/anunciar";
+    url.search = "";
     return respond(request, startedAt, NextResponse.redirect(url, 301));
   }
 
