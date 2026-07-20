@@ -2,11 +2,7 @@ import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { logger } from "../../../shared/logger.js";
 import { uploadSiteImage } from "../../../infrastructure/storage/r2.service.js";
 import { recordAdminAction } from "../admin.audit.js";
-import {
-  listBySectionType,
-  findByPosition,
-  updateByPosition,
-} from "./admin-home.repository.js";
+import { listBySectionType, findByPosition, updateByPosition } from "./admin-home.repository.js";
 
 /**
  * Gestão do carrossel de hero da Home (Fase 4.1.1).
@@ -52,10 +48,7 @@ const ALLOWED_URL_PROTOCOLS = new Set(["http:", "https:"]);
 function assertValidPosition(position) {
   const n = Number(position);
   if (!Number.isInteger(n) || !VALID_POSITIONS.includes(n)) {
-    throw new AppError(
-      `position inválido. Aceitos: ${VALID_POSITIONS.join(", ")}.`,
-      400
-    );
+    throw new AppError(`position inválido. Aceitos: ${VALID_POSITIONS.join(", ")}.`, 400);
   }
   return n;
 }
@@ -69,8 +62,23 @@ function trimOrNull(value, max) {
 }
 
 /**
+ * Espaço (U+0020), control-chars (U+0000-U+001F), DEL (U+007F) e barra-invertida
+ * (U+005C) LITERAIS não têm lugar numa URL de CTA — viram link quebrado em
+ * produção (foi assim que "/abaixo da fipe", com espaço, passou e deu 404 na
+ * Home; mesma classe do bug do /entrar). URL legítima usa %20 para espaço.
+ */
+function hasUnsafeUrlChars(value) {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code <= 0x20 || code === 0x7f || code === 0x5c) return true;
+  }
+  return false;
+}
+
+/**
  * CTA URL: caminho interno '/...' OU http(s). Rejeita javascript:, data:,
- * file:, protocol-relative '//', etc.
+ * file:, protocol-relative '//', espaço/control-chars, e caminhos internos
+ * malformados (que escapem da origem, ex.: '/\\host', '/..//host').
  */
 function validateCtaUrl(raw) {
   if (raw === null) return { ok: true, value: null };
@@ -80,8 +88,29 @@ function validateCtaUrl(raw) {
   if (trimmed.length > LIMITS.cta_url) {
     return { ok: false, message: `cta_url excede ${LIMITS.cta_url} caracteres.` };
   }
+  if (hasUnsafeUrlChars(trimmed)) {
+    return {
+      ok: false,
+      message:
+        "cta_url não pode conter espaço ou caracteres de controle. Use um caminho válido (ex.: /comprar?below_fipe=true).",
+    };
+  }
+  // Caminho interno: começa com '/' e não com '//'. Valida que é uma rota
+  // PLAUSÍVEL resolvendo contra uma origem sentinela — rejeita truques que
+  // escapem da origem ('/\\host' já cai no hasUnsafeUrlChars; '/..//host'
+  // normaliza para '//host' e é pego aqui).
   if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
-    return { ok: true, value: trimmed };
+    try {
+      const SENTINEL = "https://internal.invalid";
+      const url = new URL(trimmed, SENTINEL);
+      const normalized = `${url.pathname}${url.search}${url.hash}`;
+      if (url.origin !== SENTINEL || !normalized.startsWith("/") || normalized.startsWith("//")) {
+        return { ok: false, message: "cta_url interna inválida (rota não plausível)." };
+      }
+      return { ok: true, value: trimmed };
+    } catch {
+      return { ok: false, message: "cta_url interna inválida (rota não plausível)." };
+    }
   }
   try {
     const url = new URL(trimmed);
@@ -178,9 +207,7 @@ export async function updateHeroBanner({ adminUserId, position, payload, reason 
   }
 
   const trimmedReason =
-    typeof reason === "string" && reason.trim()
-      ? reason.trim().slice(0, LIMITS.reason)
-      : null;
+    typeof reason === "string" && reason.trim() ? reason.trim().slice(0, LIMITS.reason) : null;
   if (!trimmedReason) {
     throw new AppError("Motivo (reason) é obrigatório para alterar o banner.", 400);
   }
@@ -243,9 +270,7 @@ export async function updateHeroBanner({ adminUserId, position, payload, reason 
   // Compõe estado final por campo (existente OU patch) para validar
   // regras pós-merge sem efetuar UPDATE prematuro.
   function effective(field) {
-    return Object.prototype.hasOwnProperty.call(updates, field)
-      ? updates[field]
-      : before[field];
+    return Object.prototype.hasOwnProperty.call(updates, field) ? updates[field] : before[field];
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -291,10 +316,7 @@ export async function updateHeroBanner({ adminUserId, position, payload, reason 
     if (hasImage) {
       // Modo A — só falta o link.
       if (!nonEmpty(finalCtaUrl)) {
-        throw new AppError(
-          "Para ativar um banner com imagem, defina o link de destino.",
-          400
-        );
+        throw new AppError("Para ativar um banner com imagem, defina o link de destino.", 400);
       }
     } else {
       // Modo B — fallback textual.
@@ -303,10 +325,7 @@ export async function updateHeroBanner({ adminUserId, position, payload, reason 
       if (!nonEmpty(finalCtaLabel)) missing.push("texto do botão");
       if (!nonEmpty(finalCtaUrl)) missing.push("link do botão");
       if (missing.length > 0) {
-        throw new AppError(
-          `Para ativar um banner sem imagem, defina: ${missing.join(", ")}.`,
-          400
-        );
+        throw new AppError(`Para ativar um banner sem imagem, defina: ${missing.join(", ")}.`, 400);
       }
     }
   }
