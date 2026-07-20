@@ -34,7 +34,9 @@ export async function POST(request: NextRequest) {
     const phone = normalizeString(body.phone);
     const city = normalizeString(body.city);
     const documentNumber = normalizeString(body.document_number);
-    const next = normalizeString(body.next);
+    // NÃO dar trim: o `sanitizeInternalRedirect` precisa ver o valor cru para
+    // rejeitar espaço/tab/control-char no início (ver login/route.ts).
+    const next = typeof body.next === "string" ? body.next : undefined;
 
     const documentType =
       body.document_type === "cpf" || body.document_type === "cnpj"

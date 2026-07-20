@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
+import { AUTH_ROUTES } from "@/lib/auth/routes";
 
 type SubmitState =
   | { tone: "idle"; message: string }
@@ -309,7 +310,7 @@ export default function RegisterPageClient({ next }: RegisterPageClientProps = {
 
               <p className="text-center text-[14px] text-[#6E748A]">
                 Já tem conta?{" "}
-                <Link href="/login" className="font-bold text-[#1F66E5] hover:underline">
+                <Link href={AUTH_ROUTES.login} className="font-bold text-[#1F66E5] hover:underline">
                   Entrar
                 </Link>
               </p>

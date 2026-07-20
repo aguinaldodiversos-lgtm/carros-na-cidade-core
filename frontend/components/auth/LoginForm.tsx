@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { clearClientAuthArtifacts } from "@/lib/auth/client-session-reset";
+import { AUTH_ROUTES } from "@/lib/auth/routes";
 
 type LoginResponse = {
   error?: string;
@@ -19,7 +20,9 @@ export default function LoginForm({ next }: LoginFormProps) {
   // Propaga o destino para o cadastro: anunciante novo que clica "Criar conta"
   // deve, após registrar, cair no MESMO `next` (o formulário de anúncio), não
   // no /dashboard genérico. O /api/auth/register já honra `next`.
-  const signupHref = next ? `/cadastro?next=${encodeURIComponent(next)}` : "/cadastro";
+  const signupHref = next
+    ? `${AUTH_ROUTES.register}?next=${encodeURIComponent(next)}`
+    : AUTH_ROUTES.register;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -133,7 +136,10 @@ export default function LoginForm({ next }: LoginFormProps) {
       </form>
 
       <div className="mt-5 grid gap-2 text-sm">
-        <Link href="/recuperar-senha" className="font-semibold text-[#0e62d8] hover:text-[#0c4fb0]">
+        <Link
+          href={AUTH_ROUTES.recoverPassword}
+          className="font-semibold text-[#0e62d8] hover:text-[#0c4fb0]"
+        >
           Esqueci minha senha
         </Link>
         <Link href={signupHref} className="font-semibold text-[#0e62d8] hover:text-[#0c4fb0]">

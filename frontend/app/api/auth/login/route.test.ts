@@ -159,6 +159,44 @@ describe("POST /api/auth/login", () => {
     expect(setCookie).toContain("cnc_rt=refresh-token");
   });
 
+  // Segurança: o route NÃO pode dar trim no `next` antes do sanitizador — senão
+  // " /evil" viraria "/evil". E qualquer destino não-interno cai no default.
+  it("rejeita next malicioso (open redirect) e cai no destino padrão", async () => {
+    const malicious = [
+      "https://evil.com",
+      "//evil.com",
+      "/\\evil.com",
+      "/%5Cevil.com",
+      " /evil.com",
+      "\t/evil.com",
+      "/..//evil.com",
+    ];
+
+    for (const next of malicious) {
+      mocks.authenticateUser.mockResolvedValueOnce(validAuthSession());
+      const response = await POST(
+        fakeRequest({ email: "valid@test.com", password: "correct-pass", next })
+      );
+      const body = await readJson(response);
+      expect(body.redirect_to, `next=${JSON.stringify(next)} deveria cair no default`).toBe(
+        "/dashboard"
+      );
+    }
+  });
+
+  it("preserva next interno válido", async () => {
+    mocks.authenticateUser.mockResolvedValueOnce(validAuthSession());
+    const response = await POST(
+      fakeRequest({
+        email: "valid@test.com",
+        password: "correct-pass",
+        next: "/anunciar/novo?tipo=lojista",
+      })
+    );
+    const body = await readJson(response);
+    expect(body.redirect_to).toBe("/anunciar/novo?tipo=lojista");
+  });
+
   it("cria sessao com segredo efemero quando AUTH_SESSION_SECRET esta ausente em producao", async () => {
     delete envRecord().AUTH_SESSION_SECRET;
     mocks.authenticateUser.mockResolvedValueOnce(validAuthSession());

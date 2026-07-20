@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import RegisterPageClient from "@/components/auth/RegisterPageClient";
+import { sanitizeInternalRedirect } from "@/lib/auth/redirects";
 
 export const metadata: Metadata = {
   title: "Criar conta",
@@ -26,8 +27,9 @@ type CadastroPageProps = {
 
 export default function CadastroPage({ searchParams }: CadastroPageProps) {
   // `next` propagado do login/CTA; o RegisterPageClient o reenvia ao
-  // /api/auth/register, que já resolve o redirect pós-cadastro para ele
-  // (formulário de anúncio, no fluxo do anunciante novo).
-  const next = typeof searchParams?.next === "string" ? searchParams.next : undefined;
+  // /api/auth/register, que resolve o redirect pós-cadastro para ele. Validado
+  // aqui pelo MESMO validador central (defesa em profundidade) — nunca passa
+  // um destino cru adiante.
+  const next = sanitizeInternalRedirect(searchParams?.next) ?? undefined;
   return <RegisterPageClient next={next} />;
 }

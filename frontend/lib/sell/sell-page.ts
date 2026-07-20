@@ -1,3 +1,5 @@
+import { loginWithNext } from "@/lib/auth/routes";
+
 export type SellBenefit = {
   title: string;
   description: string;
@@ -118,7 +120,7 @@ export type SellPageContent = {
  */
 export function buildAnunciarCtaHref(tipo: "particular" | "lojista", authed: boolean): string {
   const form = `/anunciar/novo?tipo=${tipo}`;
-  return authed ? form : `/login?next=${encodeURIComponent(form)}`;
+  return authed ? form : loginWithNext(form);
 }
 
 function fallbackContent(authed: boolean): SellPageContent {

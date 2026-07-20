@@ -86,7 +86,10 @@ export async function POST(request: NextRequest) {
 
     const email = normalizeString(body.email).toLowerCase();
     const password = typeof body.password === "string" ? body.password : "";
-    const next = normalizeString(body.next);
+    // NÃO dar trim: o `sanitizeInternalRedirect` precisa ver o valor cru para
+    // rejeitar espaço/tab/control-char no início (bypasses que o navegador
+    // remove). Trim aqui mascararia " /evil" como "/evil".
+    const next = typeof body.next === "string" ? body.next : undefined;
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 });
