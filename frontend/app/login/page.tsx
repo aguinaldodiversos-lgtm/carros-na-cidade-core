@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import LoginForm from "@/components/auth/LoginForm";
-import { resolvePostLoginRedirect } from "@/lib/auth/redirects";
+import { resolvePostLoginRedirect, sanitizeInternalRedirect } from "@/lib/auth/redirects";
 import { getSessionDataFromCookieStore } from "@/services/sessionService";
 
 export const metadata: Metadata = {
@@ -22,25 +22,11 @@ type LoginPageProps = {
   };
 };
 
+// Delega ao validador central (`sanitizeInternalRedirect`) — NÃO reimplementar
+// regras aqui. Havia um validador local mais fraco (aceitava `//host` e
+// barra-invertida) neste caminho alcançável, que era a origem do open redirect.
 function normalizeNextParam(value?: string) {
-  const normalized = typeof value === "string" ? value.trim() : "";
-
-  if (!normalized) return undefined;
-
-  if (
-    normalized === "/login" ||
-    normalized.startsWith("/login?") ||
-    normalized === "/cadastro" ||
-    normalized.startsWith("/cadastro?")
-  ) {
-    return undefined;
-  }
-
-  if (/^https?:\/\//i.test(normalized)) {
-    return undefined;
-  }
-
-  return normalized;
+  return sanitizeInternalRedirect(value) ?? undefined;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
