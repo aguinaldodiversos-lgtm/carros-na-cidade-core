@@ -143,4 +143,43 @@ describe("LoginForm", () => {
       expect(screen.getByText(/Falha na conexao/)).toBeDefined();
     });
   });
+
+  // PARTE 3: senha errada não pode fazer o usuário perder o destino.
+  it("preserva o next após login falho (2ª tentativa ainda envia o destino)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "Credenciais invalidas" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ redirect_to: "/anunciar/novo?tipo=lojista" }),
+      } as Response);
+
+    render(<LoginForm next="/anunciar/novo?tipo=lojista" />);
+
+    const email = screen.getByPlaceholderText("voce@exemplo.com");
+    const password = screen.getByPlaceholderText("******");
+    const submit = screen.getByRole("button", { name: "Entrar" });
+
+    // 1ª tentativa: senha errada → 401.
+    fireEvent.change(email, { target: { value: "user@test.com" } });
+    fireEvent.change(password, { target: { value: "errada" } });
+    fireEvent.submit(submit);
+    await waitFor(() => expect(screen.getByTestId("login-error")).toBeDefined());
+
+    // O link "Criar conta" continua carregando o destino.
+    expect(screen.getByText("Criar conta").getAttribute("href")).toBe(
+      `/cadastro?next=${encodeURIComponent("/anunciar/novo?tipo=lojista")}`
+    );
+
+    // 2ª tentativa: o next NÃO foi perdido.
+    fireEvent.change(password, { target: { value: "certa123" } });
+    fireEvent.submit(submit);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+
+    const [, secondInit] = fetchSpy.mock.calls[1];
+    expect(JSON.parse(secondInit?.body as string).next).toBe("/anunciar/novo?tipo=lojista");
+  });
 });
