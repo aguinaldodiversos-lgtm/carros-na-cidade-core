@@ -9,6 +9,7 @@ import FinancingSimulator, {
 import { trackAdEvent } from "@/lib/analytics/public-events";
 import { registerWhatsappContact } from "@/lib/leads/public-leads";
 import { buildFinanceLink, buildVehicleWhatsappHref } from "@/lib/vehicle/detail-utils";
+import { buildSimulationWhatsappNote } from "@/lib/vehicle/simulation-whatsapp-note";
 
 /**
  * Simulador embutido na página do anúncio. Reúne o núcleo compartilhado
@@ -27,14 +28,6 @@ function WhatsappIcon() {
   );
 }
 
-function formatBRL0(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 type VehicleFinancingSimulatorProps = {
   vehicleId: string;
   citySlug: string;
@@ -42,6 +35,9 @@ type VehicleFinancingSimulatorProps = {
   vehiclePriceNumeric?: number | null;
   /** Telefone/WhatsApp do lojista (mesma fonte dos botões de contato). */
   sellerPhone?: string | null;
+  /** URL canônica do anúncio — vai na mensagem do WhatsApp para o lojista
+   *  identificar o carro na hora. */
+  shareUrl?: string | null;
 };
 
 export default function VehicleFinancingSimulator({
@@ -50,18 +46,14 @@ export default function VehicleFinancingSimulator({
   vehicleName,
   vehiclePriceNumeric,
   sellerPhone,
+  shareUrl,
 }: VehicleFinancingSimulatorProps) {
   const [sim, setSim] = useState<SimulationResult | null>(null);
 
   const whatsappHref = useMemo(() => {
-    const note =
-      sim && sim.installment > 0
-        ? `Simulei ${sim.term}x de ${formatBRL0(sim.installment)} com ${formatBRL0(
-            sim.downPayment
-          )} de entrada.`
-        : null;
+    const note = buildSimulationWhatsappNote({ sim, vehiclePriceNumeric, shareUrl });
     return buildVehicleWhatsappHref({ phone: sellerPhone, vehicleName, note });
-  }, [sim, sellerPhone, vehicleName]);
+  }, [sim, sellerPhone, vehicleName, vehiclePriceNumeric, shareUrl]);
 
   // Sem preço real não há o que simular (o valor é o preço do anúncio, fixo).
   if (vehiclePriceNumeric == null || vehiclePriceNumeric <= 0) return null;

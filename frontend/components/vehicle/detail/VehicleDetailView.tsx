@@ -206,6 +206,7 @@ export default function VehicleDetailView({
               vehicleName={vehicle.fullName}
               vehiclePriceNumeric={vehicle.priceNumeric}
               sellerPhone={sellerPhone}
+              shareUrl={shareUrl}
             />
 
             {/* Recomendados (Fase 2a) */}

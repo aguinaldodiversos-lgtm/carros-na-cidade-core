@@ -128,6 +128,12 @@ describe("admin-home.service · updateHeroBanner — validações", () => {
     "data:text/html,",
     "file:///etc/passwd",
     "//example.com",
+    // Endurecimento: espaço/control-chars/barra-invertida e rotas malformadas
+    // (a origem real do 404 "/abaixo da fipe" na Home).
+    "/abaixo da fipe",
+    "/comprar\tofertas",
+    "/\\evil.com",
+    "/..//evil.com",
   ])("rejeita cta_url=%s", async (badUrl) => {
     findByPosition.mockResolvedValue(makeBanner(1));
     await expect(
@@ -158,6 +164,16 @@ describe("admin-home.service · updateHeroBanner — validações", () => {
       payload: { cta_url: "https://exemplo.com/campanha" },
       reason: "r",
     });
+
+    // Rota oficial de ofertas abaixo da FIPE (com querystring) — o destino
+    // correto do banner que hoje está quebrado.
+    updateByPosition.mockResolvedValueOnce(makeBanner(1, { cta_url: "/comprar?below_fipe=true" }));
+    await updateHeroBanner({
+      adminUserId: "admin-1",
+      position: 1,
+      payload: { cta_url: "/comprar?below_fipe=true" },
+      reason: "r",
+    });
   });
 
   it("rejeita image_*_url com scheme proibido", async () => {
@@ -173,7 +189,9 @@ describe("admin-home.service · updateHeroBanner — validações", () => {
   });
 
   it("exige alt quando há imagem (acessibilidade)", async () => {
-    findByPosition.mockResolvedValue(makeBanner(1, { image_alt: "ok", image_desktop_url: "https://x" }));
+    findByPosition.mockResolvedValue(
+      makeBanner(1, { image_alt: "ok", image_desktop_url: "https://x" })
+    );
     await expect(
       updateHeroBanner({
         adminUserId: "admin-1",
@@ -370,8 +388,7 @@ describe("admin-home.service · updateHeroBanner — isolamento + audit", () => 
     updateByPosition.mockResolvedValue(
       makeBanner(2, {
         title: "Anuncie seu veículo grátis",
-        subtitle:
-          "Publique em poucos minutos e alcance compradores da sua cidade e região.",
+        subtitle: "Publique em poucos minutos e alcance compradores da sua cidade e região.",
         cta_label: "Anunciar grátis",
         cta_url: "/anunciar",
         image_alt: "Banner para anunciar veículo grátis no Carros na Cidade",
@@ -384,8 +401,7 @@ describe("admin-home.service · updateHeroBanner — isolamento + audit", () => 
       position: 2,
       payload: {
         title: "Anuncie seu veículo grátis",
-        subtitle:
-          "Publique em poucos minutos e alcance compradores da sua cidade e região.",
+        subtitle: "Publique em poucos minutos e alcance compradores da sua cidade e região.",
         cta_label: "Anunciar grátis",
         cta_url: "/anunciar",
         image_alt: "Banner para anunciar veículo grátis no Carros na Cidade",
