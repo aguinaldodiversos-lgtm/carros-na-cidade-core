@@ -8,12 +8,6 @@ export type CityProfile = {
   displayName: string;
 };
 
-export type MarketStat = {
-  label: string;
-  value: string;
-  description: string;
-};
-
 export type FaqItem = {
   question: string;
   answer: string;
@@ -180,64 +174,6 @@ export function getVehiclesByCity(cidade: string, limit = 8): ListingCar[] {
     slug: `${toSlug(car.model)}-${car.yearModel.split("/")[0]}-${30000000 + index}`,
     city: city.displayName,
   }));
-}
-
-export function getFipeStatsByCity(cidade: string): MarketStat[] {
-  const city = getCityProfile(cidade);
-  const hash = hashString(city.slug);
-  const avgPrice = 62000 + (hash % 55) * 1000;
-  const belowFipe = 14 + (hash % 11);
-  const liquidity = 18 + (hash % 12);
-
-  return [
-    {
-      label: "Media FIPE local",
-      value: `R$ ${(avgPrice / 1000).toFixed(0)} mil`,
-      description: `Media de avaliacao dos carros mais buscados em ${city.name}.`,
-    },
-    {
-      label: "Anuncios abaixo da FIPE",
-      value: `${belowFipe}%`,
-      description: "Proporcao de ofertas competitivas detectadas pelo Cerebro IA.",
-    },
-    {
-      label: "Velocidade de venda",
-      value: `${liquidity} dias`,
-      description: "Tempo medio estimado para veiculos com preco aderente ao mercado.",
-    },
-    {
-      label: "Busca organica estimada",
-      value: `${90 + (hash % 80)}k`,
-      description: "Volume mensal potencial para termos de compra e avaliacao na cidade.",
-    },
-  ];
-}
-
-export function getFinancingStatsByCity(cidade: string): MarketStat[] {
-  const city = getCityProfile(cidade);
-  const hash = hashString(city.slug);
-  return [
-    {
-      label: "Taxa media aprovada",
-      value: `${(1.1 + (hash % 6) * 0.1).toFixed(2)}% a.m.`,
-      description: `Media das simulacoes aprovadas em ${city.name}.`,
-    },
-    {
-      label: "Prazo mais contratado",
-      value: `${36 + (hash % 4) * 12} meses`,
-      description: "Faixa de prazo com melhor equilibrio entre parcela e custo total.",
-    },
-    {
-      label: "Entrada recomendada",
-      value: `${18 + (hash % 9)}%`,
-      description: "Percentual sugerido para reduzir juros e melhorar score de credito.",
-    },
-    {
-      label: "Aprovacao estimada",
-      value: `${67 + (hash % 21)}%`,
-      description: "Probabilidade media com renda formal e historico positivo.",
-    },
-  ];
 }
 
 export function getFipeFaqByCity(cidade: string): FaqItem[] {

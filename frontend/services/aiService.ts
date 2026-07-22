@@ -1,9 +1,4 @@
-import {
-  getCityProfile,
-  getFinancingStatsByCity,
-  getFipeStatsByCity,
-  type MarketStat,
-} from "@/lib/market/market-data";
+import { getCityProfile } from "@/lib/market/market-data";
 import { type ListingCar } from "@/lib/car-data";
 import { buildSimilarVehicles, type VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
@@ -39,16 +34,6 @@ export async function getAIFipeInsights(cidade: string) {
   ];
 
   return requestAI(`/insights/fipe/${city.slug}`, fallback);
-}
-
-export async function getAIFipeStats(cidade: string): Promise<MarketStat[]> {
-  const fallback = getFipeStatsByCity(cidade);
-  return requestAI(`/stats/fipe/${cidade}`, fallback);
-}
-
-export async function getAIFinancingStats(cidade: string): Promise<MarketStat[]> {
-  const fallback = getFinancingStatsByCity(cidade);
-  return requestAI(`/stats/financing/${cidade}`, fallback);
 }
 
 export async function getAIFinancingInsights(cidade: string) {
