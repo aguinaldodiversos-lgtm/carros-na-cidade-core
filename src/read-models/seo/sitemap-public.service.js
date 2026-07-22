@@ -6,6 +6,7 @@ import {
   listActiveCityBrandEntries,
   listActiveCityBrandModelEntries,
 } from "./territorial-inventory-sitemap.service.js";
+import { listActiveAdRows } from "./sitemap-ads.repository.js";
 
 function mapSitemapEntry(entry) {
   return {
@@ -51,4 +52,19 @@ export async function getPublicSitemapByType(type, limit = 50000) {
 export async function getPublicSitemapByRegion(state, limit = 50000) {
   const entries = await sitemapPublicRepository.listSitemapByRegion(state, limit);
   return entries.map(mapSitemapEntry);
+}
+
+/**
+ * Sitemap de VEÍCULOS: uma URL `/veiculo/[slug]` por anúncio ATIVO. Emite o
+ * `ads.slug` armazenado (casa com o lookup de `/veiculo/[slug]`), `lastmod` =
+ * `ads.updated_at`. Não vem de `seo_cluster_plans` (que é só landings).
+ */
+export async function getPublicVehicleSitemap(limit = 50000) {
+  const rows = await listActiveAdRows(limit);
+  return rows.map((row) => ({
+    loc: `/veiculo/${row.slug}`,
+    lastmod: row.last_updated,
+    changefreq: "weekly",
+    priority: 0.6,
+  }));
 }

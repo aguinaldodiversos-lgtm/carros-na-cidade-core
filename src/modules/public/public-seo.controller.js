@@ -334,6 +334,24 @@ export async function getPublicSitemapByRegion(req, res, next) {
   }
 }
 
+export async function getPublicVehicleSitemap(req, res, next) {
+  if (!isSitemapPublicEnabled()) {
+    return respondSitemapDisabled(res, "json");
+  }
+  try {
+    const limit = toSafePositiveInt(req.query.limit, DEFAULT_SITEMAP_LIMIT, MAX_SITEMAP_LIMIT);
+    const data = await sitemapPublicService.getPublicVehicleSitemap(limit);
+
+    return res.status(200).set("Cache-Control", SITEMAP_CACHE_CONTROL).json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    logger.error({ error: err }, "[public-seo] falha ao gerar sitemap de veículos");
+    return next(err);
+  }
+}
+
 export async function getInternalLinks(req, res, next) {
   try {
     const limit = toSafePositiveInt(

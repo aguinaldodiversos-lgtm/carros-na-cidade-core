@@ -137,6 +137,14 @@ export async function fetchPublicSitemapByTypes(
   return dedupeEntries(results.flat());
 }
 
+/**
+ * Sitemap de veículos (`/veiculo/[slug]` por anúncio ativo). Endpoint dedicado
+ * — a fonte é a tabela `ads`, não os cluster plans dos demais tipos.
+ */
+export async function fetchPublicVehicleSitemap(limit = 50000): Promise<PublicSitemapEntry[]> {
+  return fetchSitemapEntries(`/api/public/seo/sitemap/vehicles?limit=${limit}`);
+}
+
 export async function detectAvailableStates(limit = 100000): Promise<string[]> {
   const entries = await fetchPublicSitemap(limit);
   const states = new Set<string>();

@@ -15,6 +15,7 @@ export async function GET() {
     "/sitemaps/opportunities.xml",
     "/sitemaps/below-fipe.xml",
     "/sitemaps/blog.xml",
+    "/sitemaps/vehicles.xml",
   ];
 
   let states: string[] = [];
