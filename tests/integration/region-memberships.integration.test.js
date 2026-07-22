@@ -454,4 +454,59 @@ describe.sequential("integração — region_memberships e cities.lat/long (migr
       }
     });
   }, 120000);
+
+  /**
+   * Sistema A (âncora regional da página de cidade). Replica a SQL de
+   * `getRadiusMembers` (src/read-models/cities/regional-radius.repository.js):
+   * membros dentro do raio, com o guard `distance_km > 0` que EXCLUI a self-row.
+   * Regressão: sem esse guard a self-row (distance 0) vazava e a própria cidade
+   * aparecia em "Próximos, até X km" a 0 km, duplicando o grid principal
+   * (34 links p/ 17 anúncios em /carros-em/atibaia-sp).
+   */
+  async function readRadiusMembersViaSql(db, slug, radiusKm) {
+    const result = await db.query(
+      `
+      SELECT m.slug, m.name, m.state, rm.distance_km
+      FROM cities base
+      JOIN region_memberships rm ON rm.base_city_id = base.id
+      JOIN cities m ON m.id = rm.member_city_id
+      WHERE base.slug = $1
+        AND rm.distance_km IS NOT NULL
+        AND rm.distance_km > 0
+        AND rm.distance_km <= $2
+      ORDER BY rm.distance_km ASC
+      `,
+      [slug, radiusKm]
+    );
+    return result.rows;
+  }
+
+  it("getRadiusMembers: exclui a self-row (distance 0) e retorna só vizinhas dentro do raio", async () => {
+    await withDatabase("radius-selfrow", async ({ dbUrl }) => {
+      await runNodeScript("scripts/run-migrations.mjs", buildBaseEnv(dbUrl));
+      const db = await openPool(dbUrl);
+
+      try {
+        await db.query(
+          `INSERT INTO cities (name, state, slug, latitude, longitude) VALUES
+           ('Hub Raio', 'TT', 'hub-raio-tt', -23.5505, -46.6333),
+           ('Perto', 'TT', 'perto-tt', -23.4538, -46.5333),
+           ('Media', 'TT', 'media-tt', -23.5329, -46.7918)`
+        );
+        await runNodeScript("scripts/build-region-memberships.mjs", buildBaseEnv(dbUrl));
+
+        const members = await readRadiusMembersViaSql(db, "hub-raio-tt", 100);
+
+        // A própria cidade (self-row, distance 0) NÃO pode aparecer.
+        expect(members.find((m) => m.slug === "hub-raio-tt")).toBeUndefined();
+        // Toda linha retornada tem distância estritamente positiva.
+        expect(members.every((m) => Number(m.distance_km) > 0)).toBe(true);
+        // As vizinhas com geo dentro do raio aparecem.
+        expect(members.length).toBeGreaterThanOrEqual(1);
+        expect(members.map((m) => m.slug)).toContain("perto-tt");
+      } finally {
+        await db.end();
+      }
+    });
+  }, 240000);
 });

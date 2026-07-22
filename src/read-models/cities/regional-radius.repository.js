@@ -7,7 +7,9 @@ import { pool } from "../../infrastructure/database/db.js";
 
 /**
  * Cidades-membro de `citySlug` dentro do raio (km), da mais próxima p/ a mais
- * distante. NÃO inclui a própria cidade (distância 0 é a base). Mesmo UF já é
+ * distante. NÃO inclui a própria cidade: a self-row (`distance_km = 0`, backfill
+ * da migration 021) é excluída pelo guard `distance_km > 0` — sem ele, a própria
+ * cidade vazava para "Próximos" a 0 km, duplicando o grid. Mesmo UF já é
  * garantido pelo build de `region_memberships`.
  *
  * @returns Array<{ slug, name, state, distance_km }>
@@ -21,6 +23,7 @@ export async function getRadiusMembers(citySlug, radiusKm) {
     JOIN cities m ON m.id = rm.member_city_id
     WHERE base.slug = $1
       AND rm.distance_km IS NOT NULL
+      AND rm.distance_km > 0
       AND rm.distance_km <= $2
     ORDER BY rm.distance_km ASC
     `,
@@ -42,4 +45,3 @@ export async function getOwnActiveCount(citySlug) {
   );
   return result.rows[0]?.total || 0;
 }
-
