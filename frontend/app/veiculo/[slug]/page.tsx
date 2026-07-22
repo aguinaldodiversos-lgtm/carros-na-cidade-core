@@ -253,7 +253,10 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
     about: vehicle.fullName,
   });
 
-  const shareUrl = `https://carrosnacidade.com/veiculo/${canonicalSlug}`;
+  // Usa getSiteUrl() (mesmo helper do JSON-LD/canonical) para seguir o host
+  // configurado — antes era apex hardcoded, que ignorava a env e emitia o
+  // domínio errado (sem www) mesmo com SITE_URL setada.
+  const shareUrl = `${getSiteUrl()}/veiculo/${canonicalSlug}`;
 
   return (
     <>
