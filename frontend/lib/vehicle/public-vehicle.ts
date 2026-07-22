@@ -1,5 +1,3 @@
-import type { ListingCar } from "@/lib/car-data";
-import { buyCars } from "@/lib/car-data";
 import type { PublicAdDetail } from "@/lib/ads/ad-detail";
 import {
   buildSelectedOptionGroups,
@@ -127,8 +125,6 @@ export function formatListingDateLabels(
 
   return { primary: "" };
 }
-
-const FALLBACK_IMAGES = ["/images/vehicle-placeholder.svg"];
 
 function slugify(value: string) {
   return value
@@ -299,7 +295,9 @@ function foldAccents(value: string): string {
 }
 
 export function dedupeFuelToken(text: string): string {
-  const parts = String(text || "").split(/\s+/).filter(Boolean);
+  const parts = String(text || "")
+    .split(/\s+/)
+    .filter(Boolean);
   const out: string[] = [];
   for (const word of parts) {
     const prev = out[out.length - 1];
@@ -729,36 +727,4 @@ export function adaptAdDetailToVehicle(ad: PublicAdDetail): VehicleDetail {
       "Confirme com o anunciante as condições do veículo, opcionais, documentação e disponibilidade antes de fechar negócio.",
     seller,
   };
-}
-
-function toListingCarFromSeed(seed: ListingCar, vehicle: VehicleDetail, index: number): ListingCar {
-  return {
-    ...seed,
-    id: `${seed.id}-${vehicle.id}-${index}`,
-    slug: seed.slug || `${slugify(seed.model)}-${vehicle.id}-${index}`,
-    city: vehicle.city,
-    image: vehicle.images[0] || FALLBACK_IMAGES[index % FALLBACK_IMAGES.length] || seed.image,
-  };
-}
-
-export function buildCityVehicles(vehicle: VehicleDetail, limit = 6): ListingCar[] {
-  return buyCars.slice(0, limit).map((seed, index) => toListingCarFromSeed(seed, vehicle, index));
-}
-
-export function buildSimilarVehicles(vehicle: VehicleDetail, limit = 8): ListingCar[] {
-  return buyCars
-    .filter((seed) => slugify(seed.model) !== slugify(vehicle.model))
-    .slice(0, limit)
-    .map((seed, index) => toListingCarFromSeed(seed, vehicle, index + 100));
-}
-
-export function buildSellerVehicles(vehicle: VehicleDetail, limit = 6): ListingCar[] {
-  if (vehicle.seller.type !== "dealer") {
-    return [];
-  }
-
-  return buyCars.slice(0, limit).map((seed, index) => ({
-    ...toListingCarFromSeed(seed, vehicle, index + 200),
-    city: vehicle.city,
-  }));
 }

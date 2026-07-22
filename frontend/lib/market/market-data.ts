@@ -1,5 +1,3 @@
-import { buyCars, type ListingCar } from "@/lib/car-data";
-
 export type CityProfile = {
   slug: string;
   name: string;
@@ -134,15 +132,6 @@ function hashString(input: string) {
   return input.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
 }
 
-function toSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export function getCityProfile(cidade: string): CityProfile {
   const slug = cidade.toLowerCase();
   const found = citySeeds.find((city) => city.slug === slug);
@@ -164,16 +153,6 @@ export function isSupportedCitySlug(slug: string) {
     .trim()
     .toLowerCase();
   return citySeeds.some((city) => city.slug === normalized);
-}
-
-export function getVehiclesByCity(cidade: string, limit = 8): ListingCar[] {
-  const city = getCityProfile(cidade);
-  return buyCars.slice(0, limit).map((car, index) => ({
-    ...car,
-    id: `${car.id}-${city.slug}-${index}`,
-    slug: `${toSlug(car.model)}-${car.yearModel.split("/")[0]}-${30000000 + index}`,
-    city: city.displayName,
-  }));
 }
 
 export function getFipeFaqByCity(cidade: string): FaqItem[] {

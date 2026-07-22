@@ -1,6 +1,5 @@
 import { getCityProfile } from "@/lib/market/market-data";
-import { type ListingCar } from "@/lib/car-data";
-import { buildSimilarVehicles, type VehicleDetail } from "@/lib/vehicle/public-vehicle";
+import { type VehicleDetail } from "@/lib/vehicle/public-vehicle";
 
 const AI_API_BASE = process.env.NEXT_PUBLIC_AI_API_URL;
 
@@ -86,11 +85,6 @@ export async function getAIVehicleInsights(vehicle: VehicleDetail): Promise<stri
   ];
 
   return requestAI(`/vehicle/${vehicle.id}/insights`, fallback);
-}
-
-export async function getAISimilarVehicles(vehicle: VehicleDetail): Promise<ListingCar[]> {
-  const fallback = buildSimilarVehicles(vehicle);
-  return requestAI(`/vehicle/${vehicle.id}/similar`, fallback);
 }
 
 export type AdBoostMetrics = {

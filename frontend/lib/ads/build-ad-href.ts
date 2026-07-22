@@ -12,6 +12,22 @@ function safeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
+/**
+ * Coage um campo de anúncio a texto ESCALAR. Blindagem contra a "armadilha de
+ * aranha" (incidente 2026-07): se `model`/`id`/`title`/etc. vierem como ARRAY,
+ * `String(["a","b"])` vira `"a,b"` e o slugify concatena tudo num slug-monstro
+ * (`/veiculo/modelo-a-modelo-b-...-100-101`). Array/objeto → "" (NUNCA
+ * concatena); escalares preservam o comportamento anterior (string trima,
+ * número finito vira dígitos). Nenhum caller passa array hoje, mas a porta
+ * ficava destrancada.
+ */
+export function coerceScalarField(value: unknown): string {
+  if (Array.isArray(value)) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -36,17 +52,16 @@ export function buildAdSlug(ad: AdCardLinkInput) {
   }
 
   const composed = [ad.title, ad.brand, ad.model, ad.version, ad.year, ad.id]
-    .filter((item) => item !== undefined && item !== null && String(item).trim())
-    .map((item) => String(item).trim())
+    .map(coerceScalarField)
+    .filter(Boolean)
     .join(" ");
 
-  return slugify(composed || `veiculo-${String(ad.id || "sem-id")}`);
+  return slugify(composed || `veiculo-${coerceScalarField(ad.id) || "sem-id"}`);
 }
 
 export function buildAdHref(ad: AdCardLinkInput) {
   const slug = buildAdSlug(ad);
-  const id =
-    ad.id !== undefined && ad.id !== null && String(ad.id).trim() ? String(ad.id).trim() : "";
+  const id = coerceScalarField(ad.id);
 
   const hasRealSlug = hasStableSlug(ad.slug);
 

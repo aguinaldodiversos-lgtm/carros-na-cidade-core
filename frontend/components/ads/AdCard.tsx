@@ -7,7 +7,7 @@ import { useCallback, type ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { VehicleImage } from "@/components/ui/VehicleImage";
 import { type AdBadge, inferAdTier, resolvePublicAdBadges } from "@/lib/ads/ad-badges";
-import { buildAdHref } from "@/lib/ads/build-ad-href";
+import { buildAdHref, coerceScalarField } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
 import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
@@ -394,9 +394,11 @@ type NormalizedAd = {
 
 function normalizeAdData(source?: BaseAdData): NormalizedAd {
   const item = source || {};
+  // coerceScalarField blinda contra campo array (armadilha de aranha): um
+  // `model` array concatenaria na composição do título → slug-monstro.
   const title =
-    item.title ||
-    [item.brand, item.model, item.version].filter(Boolean).join(" ").trim() ||
+    coerceScalarField(item.title) ||
+    [item.brand, item.model, item.version].map(coerceScalarField).filter(Boolean).join(" ") ||
     "Veículo";
   return {
     id: item.id,
