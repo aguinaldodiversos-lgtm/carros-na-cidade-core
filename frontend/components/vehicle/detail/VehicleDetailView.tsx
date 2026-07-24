@@ -133,9 +133,6 @@ export default function VehicleDetailView({
                 <p className="text-[28px] font-extrabold leading-none text-primary sm:text-[32px]">
                   {vehicle.price}
                 </p>
-                {year ? (
-                  <span className="text-[16px] font-semibold text-cnc-muted">{year}</span>
-                ) : null}
               </div>
 
               {/* Specs com ícone */}
@@ -251,9 +248,6 @@ export default function VehicleDetailView({
               <p className="text-[26px] font-extrabold leading-none text-primary">
                 {vehicle.price}
               </p>
-              {year ? (
-                <p className="mt-1 text-[13px] font-semibold text-cnc-muted">{year}</p>
-              ) : null}
 
               <div className="mt-4 space-y-2">
                 <a
