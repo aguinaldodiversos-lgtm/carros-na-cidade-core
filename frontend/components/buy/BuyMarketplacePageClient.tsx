@@ -207,7 +207,20 @@ export default function BuyMarketplacePageClient({
       initialFilters.transmission ||
       initialFilters.body_type ||
       initialFilters.below_fipe === true ||
-      initialFilters.highlight_only === true
+      initialFilters.highlight_only === true ||
+      // Chips da sidebar que ficavam de fora: sem eles, filtrar
+      // "Particulares" numa cidade com estoque só de loja caía no empty
+      // state "Sem ofertas em <cidade>" (culpando o território) em vez de
+      // "Nenhum anúncio combina com seus filtros" (culpando o filtro).
+      // `priority_tier` é o campo do chip Destaques — `highlight_only`
+      // acima é o filtro legado, não o mesmo controle.
+      initialFilters.seller_kind === "dealer" ||
+      initialFilters.seller_kind === "private" ||
+      initialFilters.opportunity === true ||
+      initialFilters.priority_tier === 1 ||
+      initialFilters.priority_tier === 2 ||
+      initialFilters.priority_tier === 3 ||
+      initialFilters.priority_tier === 4
   );
 
   const emptyContext = {
