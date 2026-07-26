@@ -368,11 +368,31 @@ export function buildAdsSearchQuery(filters = {}) {
   // total. Foi exatamente esse modo de falha que vitimou o catálogo
   // em 2026-05-24 (sem o JOIN, com `a.seller_name` no WHERE) e que
   // agora protegemos com o JOIN aqui.
+  //
+  // REINCIDÊNCIA 2026-07-26 — `users u` e `subscription_plans sp`:
+  // `whereClause` é COMPARTILHADO com o dataQuery, então os filtros
+  // canônicos da Fase 3 arrastam suas expressões para cá também —
+  // `sellerKindExpr` referencia `u.document_type` e
+  // `commercialLayerExpr` referencia `sp.weight`. Sem estes dois JOINs,
+  // `?seller_kind=private` e `?priority_tier=N` explodiam com
+  // "missing FROM-clause entry for table u/sp"; o safeMode engolia o
+  // erro e devolvia data:[] / total:0, indistinguível de "não há
+  // anúncios". Ambos ficaram assim EM PRODUÇÃO até 2026-07-26.
+  //
+  // Os dois JOINs são inertes para a contagem: casam pela PK da tabela
+  // juntada (`u.id`, `sp.id`), portanto no máximo 1 linha cada — não
+  // multiplicam o COUNT(*) de nenhuma query que já funcionava.
+  //
+  // Regra permanente: JOIN novo no dataQuery cujo alias possa aparecer
+  // no WHERE ⇒ mesmo JOIN aqui. Guardado por
+  // tests/ads/ads-filter-builder-canonical.test.js.
   const countQuery = `
     SELECT COUNT(*)::int AS total
     FROM ads a
     LEFT JOIN cities c ON c.id = a.city_id
     LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    LEFT JOIN users u ON u.id = adv.user_id
+    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id
     ${whereClause}
   `;
 

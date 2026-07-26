@@ -175,7 +175,11 @@ const citySlugsParam = () =>
    Base object (ZodObject) — serve para .pick() / .shape
 ========================================================= */
 
-const adsFilterQueryBase = z.object({
+// Exportado para que tests/ads/ads-cache-key-covers-filters.test.js possa
+// derivar a lista de filtros do schema e cruzá-la com a whitelist da cache
+// key (ADS_ALLOWED_QUERY_KEYS). Não usar como schema de validação — o
+// canônico é `adsFilterQuerySchema` (com os superRefine de faixas).
+export const adsFilterQueryBase = z.object({
   // paginação
   page: intParam(ADS_FILTER_LIMITS.PAGE_MIN, ADS_FILTER_LIMITS.PAGE_MAX).default(ADS_DEFAULTS.page),
   limit: intParam(ADS_FILTER_LIMITS.LIMIT_MIN, ADS_FILTER_LIMITS.LIMIT_MAX).default(
