@@ -73,8 +73,17 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: "inline",
     // remotePatterns ficam para o dia que sairmos do unoptimized global.
+    //
+    // `img.carrosnacidade.com` (domínio próprio na frente do bucket R2 desde
+    // 2026-07-26) está listado por PRECAUÇÃO, não por necessidade: hoje o
+    // `unoptimized: true` acima faz todo <Image> virar <img> cru e nada passa
+    // pelo /_next/image. Mas se alguém remover o kill switch sem lembrar
+    // disto, as fotos dos anúncios cairiam no otimizador com host não
+    // permitido → HTTP 400 → vitrine inteira sem foto. Uma linha barata
+    // contra um modo de falha caro.
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "img.carrosnacidade.com" },
       { protocol: "http", hostname: "localhost" },
     ],
   },

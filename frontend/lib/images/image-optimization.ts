@@ -14,6 +14,9 @@
  *   - Host R2 público        — definido por NEXT_PUBLIC_R2_PUBLIC_BASE_URL.
  *                              Já é CDN edge cacheada; otimizar adicionaria
  *                              salto Render no meio.
+ *   - Domínio próprio        — `*.carrosnacidade.com` (ex.: o
+ *                              `img.carrosnacidade.com` que serve o bucket R2
+ *                              desde 2026-07-26). Mesma razão.
  *   - *.onrender.com         — qualquer host do Render (backend Express,
  *                              outros serviços nossos): mesma razão.
  *
@@ -31,6 +34,18 @@ const ONRENDER_DOMAIN_SUFFIX = ".onrender.com";
 // primeiro fix em 2026-05-13.
 const R2_DOMAIN_SUFFIXES = [".r2.dev", ".r2.cloudflarestorage.com"];
 
+// Domínio próprio na frente do bucket R2 (`img.carrosnacidade.com`, migração
+// 2026-07-26 para sair do endpoint `r2.dev`, que é o *public development URL*
+// da Cloudflare e é limitado por taxa).
+//
+// Sem esta entrada o host novo não casaria NENHUMA regra de skip: não termina
+// em `.r2.dev` nem em `.onrender.com`, e o fallback por
+// NEXT_PUBLIC_R2_PUBLIC_BASE_URL só funciona se a env estiver presente no
+// BUILD — que foi exatamente o buraco de 2026-05-13. Sufixo do nosso domínio
+// cobre qualquer subdomínio futuro e é semanticamente certo: imagem em origem
+// nossa nunca deve dar a volta pelo otimizador do Render.
+const SELF_DOMAIN_SUFFIXES = [".carrosnacidade.com"];
+
 const SAME_ORIGIN_PREFIXES = ["/api/vehicle-images", "/uploads/", "/_next/image", "/images/"];
 
 function getPublicR2Host(): string | null {
@@ -45,6 +60,10 @@ function getPublicR2Host(): string | null {
 
 function isR2Host(host: string): boolean {
   return R2_DOMAIN_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
+function isSelfHost(host: string): boolean {
+  return SELF_DOMAIN_SUFFIXES.some((suffix) => host.endsWith(suffix));
 }
 
 export function shouldSkipNextImageOptimizer(url: string): boolean {
@@ -63,6 +82,7 @@ export function shouldSkipNextImageOptimizer(url: string): boolean {
     try {
       const host = new URL(url).host.toLowerCase();
       if (isR2Host(host)) return true;
+      if (isSelfHost(host)) return true;
       const r2Host = getPublicR2Host();
       if (r2Host && host === r2Host) return true;
       if (host.endsWith(ONRENDER_DOMAIN_SUFFIX)) return true;
