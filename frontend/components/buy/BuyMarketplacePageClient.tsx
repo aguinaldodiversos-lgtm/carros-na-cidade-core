@@ -131,6 +131,34 @@ export default function BuyMarketplacePageClient({
     return brandFacets.length > 0 ? brandFacets.slice(0, 8) : DEFAULT_POPULAR_BRANDS;
   }, [brandFacets]);
 
+  /**
+   * Contagem dos controles da sidebar (Ofertas, Vendedor, Câmbio). Escopo
+   * territorial — ver buildAdsFacetScopeWhere no backend.
+   *
+   * Cada bloco fica `undefined` quando a facet não veio, para a sidebar
+   * renderizar sem número em vez de "(0)": sem dado, "(0)" seria mentira.
+   * Necessário porque o BFF pode responder EMPTY_FACETS em erro/timeout, e
+   * porque outras páginas montam a sidebar sem passar esta prop.
+   */
+  const controlTotals = useMemo(() => {
+    const sellerKindRows = initialFacets?.sellerKinds;
+    const sellerKind =
+      Array.isArray(sellerKindRows) && sellerKindRows.length > 0
+        ? {
+            dealer: sellerKindRows.find((r) => r.seller_kind === "dealer")?.total ?? 0,
+            private: sellerKindRows.find((r) => r.seller_kind === "private")?.total ?? 0,
+          }
+        : undefined;
+
+    const transmissionRows = initialFacets?.transmissions;
+    const transmission =
+      Array.isArray(transmissionRows) && transmissionRows.length > 0
+        ? Object.fromEntries(transmissionRows.map((r) => [r.transmission, r.total]))
+        : undefined;
+
+    return { sellerKind, offers: initialFacets?.offers, transmission };
+  }, [initialFacets?.sellerKinds, initialFacets?.transmissions, initialFacets?.offers]);
+
   // `?raio=` (raio do bloco "Próximos") é ORTOGONAL aos filtros de veículo — não
   // faz parte de AdsSearchFilters. Ao re-navegar por um filtro de veículo,
   // reanexamos o raio atual para não perdê-lo (default 50 → omitido, URL limpa).
@@ -246,6 +274,7 @@ export default function BuyMarketplacePageClient({
     onPatch: (patch: Partial<AdsSearchFilters>) => pushFilters(patch),
     onClear: clearFilters,
     regionalEnabled,
+    controlTotals,
     // Seletor "Distância (km)" só é útil na página de cidade (raio da
     // vizinhança). Passamos o handler apenas nessa variante — nas outras a
     // sidebar esconde o seletor (sem onRadiusChange).

@@ -257,3 +257,71 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
     expect(screen.queryByRole("link", { name: /Anuncie agora/i })).toBeNull();
   });
 });
+
+describe("FilterSidebar — contagem por controle (controlTotals)", () => {
+  const totals = {
+    sellerKind: { dealer: 18, private: 0 },
+    offers: { opportunity: 0, below_fipe: 4, highlight: 0 },
+    transmission: { automatico: 18 },
+  };
+
+  function renderWithTotals(controlTotals?: typeof totals | undefined) {
+    return render(
+      <FilterSidebar filters={{}} onPatch={vi.fn()} {...baseProps} controlTotals={controlTotals} />
+    );
+  }
+
+  it('mostra "(0)" em Particulares e "(18)" em Lojas — o zero é o aviso', () => {
+    renderWithTotals(totals);
+    expect(screen.getByRole("button", { name: "Lojas (18)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Particulares (0)" })).toBeTruthy();
+  });
+
+  it("mostra contagem nos três chips de Ofertas", () => {
+    renderWithTotals(totals);
+    expect(screen.getByRole("button", { name: "Destaques (0)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Oportunidades (0)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Abaixo da FIPE (4)" })).toBeTruthy();
+  });
+
+  it("casa a opção de Câmbio com o valor cru do banco (case-insensitive)", () => {
+    renderWithTotals(totals);
+    const select = document.getElementById("fs-trans") as HTMLSelectElement;
+    const labels = [...select.options].map((o) => o.textContent);
+    // "Automatico" (opção) casa "automatico" (banco); "Manual" soma zero.
+    expect(labels).toContain("Automático (18)");
+    expect(labels).toContain("Manual (0)");
+    // "Automatizado" NÃO é casado por "Automatico" (substring não bate).
+    expect(labels).toContain("Automatizado (0)");
+  });
+
+  /**
+   * Regra dura: sem facet, renderizar SEM número. Um "(0)" fabricado por
+   * ausência de dado afastaria o visitante de um filtro que tem estoque —
+   * pior que não mostrar contagem nenhuma.
+   */
+  it("sem controlTotals NÃO inventa (0) em nenhum controle", () => {
+    renderWithTotals(undefined);
+    expect(screen.getByRole("button", { name: "Lojas" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Particulares" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Destaques" })).toBeTruthy();
+    expect(screen.queryByText(/\(0\)/)).toBeNull();
+
+    const select = document.getElementById("fs-trans") as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent)).toContain("Automático");
+  });
+
+  it("bloco ausente degrada sozinho (offers sem sellerKind)", () => {
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        controlTotals={{ offers: { opportunity: 2, below_fipe: 0, highlight: 0 } }}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Oportunidades (2)" })).toBeTruthy();
+    // sellerKind não veio → sem número, não "(0)"
+    expect(screen.getByRole("button", { name: "Lojas" })).toBeTruthy();
+  });
+});

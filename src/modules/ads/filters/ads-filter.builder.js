@@ -415,7 +415,13 @@ export function buildAdsSearchQuery(filters = {}) {
   };
 }
 
-export function buildAdsFacetWhere(filters = {}) {
+/**
+ * Base comum das facets: status ativo + guard de anúncio sujo + território.
+ * Extraída para que `buildAdsFacetWhere` (base + filtros de veículo) e
+ * `buildAdsFacetScopeWhere` (só a base) não divirjam na regra territorial —
+ * que é justamente a que já quebrou as facets regionais em 2026-05-24.
+ */
+function buildFacetBaseWhere(filters = {}) {
   const where = [`a.status = '${AD_STATUS.ACTIVE}'`];
   if (shouldApplyDirtyAdGuard()) {
     where.push(DIRTY_TEST_AD_GUARD_SQL);
@@ -449,6 +455,33 @@ export function buildAdsFacetWhere(filters = {}) {
       String(filters.state).toUpperCase()
     );
   }
+
+  return { where, params };
+}
+
+/**
+ * WHERE das facets de CONTROLE (chips de Ofertas, segmentado de Vendedor,
+ * Câmbio): só território + status. NÃO aplica os filtros de veículo nem os
+ * próprios filtros que a faceta conta.
+ *
+ * Por que ignorar os filtros aplicados: se a contagem de `seller_kind`
+ * respeitasse o próprio `seller_kind`, escolher "Lojas" faria
+ * "Particulares" virar (0) trivialmente e o chip ficaria inclicável para
+ * todo mundo — o oposto do objetivo, que é avisar ANTES do clique. O
+ * padrão "todos os filtros exceto o da própria dimensão" (Mercado Livre)
+ * exigiria um WHERE por dimensão; com o estoque atual não paga o custo.
+ */
+export function buildAdsFacetScopeWhere(filters = {}) {
+  const { where, params } = buildFacetBaseWhere(filters);
+  return {
+    whereClause: `WHERE ${where.join(" AND ")}`,
+    params,
+  };
+}
+
+export function buildAdsFacetWhere(filters = {}) {
+  const { where, params } = buildFacetBaseWhere(filters);
+
   if (filters.brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${filters.brand}%`);
   if (filters.model) pushFilter(where, params, `a.model ILIKE ?`, `%${filters.model}%`);
   if (filters.below_fipe !== undefined)

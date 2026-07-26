@@ -144,6 +144,19 @@ export interface AdsSearchResponse {
   error?: string | null;
 }
 
+/**
+ * Contagem dos chips de Ofertas. Sempre presente (zeros no lugar de campo
+ * ausente) para o caller não precisar de guarda em cada leitura.
+ */
+export interface AdsOfferFacets {
+  /** Selo "Oportunidade" canônico: >= 10% abaixo da FIPE. */
+  opportunity: number;
+  /** Qualquer margem abaixo da FIPE. */
+  below_fipe: number;
+  /** Chip "Destaques" — camada comercial 4 (boost ativo). */
+  highlight: number;
+}
+
 export interface AdsFacetsResponse {
   success: boolean;
   facets: {
@@ -151,6 +164,24 @@ export interface AdsFacetsResponse {
     models: Array<{ brand: string; model: string; total: number }>;
     fuelTypes: Array<{ fuel_type: string; total: number }>;
     bodyTypes: Array<{ body_type: string; total: number }>;
+    /**
+     * Contagem por tipo de vendedor. Escopo TERRITORIAL — não reflete os
+     * filtros de veículo aplicados nem o próprio seller_kind (senão
+     * escolher "Lojas" zeraria "Particulares" e o chip ficaria inclicável).
+     * O backend omite a categoria sem anúncios; o normalizador aqui
+     * completa as duas chaves com 0, porque é o zero que serve de aviso.
+     *
+     * OPCIONAL de propósito: `fetchAdsFacets` sempre popula, mas vários
+     * produtores legítimos não — literais de facets vazias nos loaders
+     * (city/state/region), páginas que montam a sidebar sem facets, e
+     * backend anterior a 2026-07-26. O consumidor DEVE tratar ausência
+     * renderizando sem número, nunca "(0)" — ver `controlTotals` em
+     * FilterSidebar.
+     */
+    sellerKinds?: Array<{ seller_kind: "dealer" | "private"; total: number }>;
+    /** Contagem por câmbio, mesmo escopo territorial. Valor cru do banco. */
+    transmissions?: Array<{ transmission: string; total: number }>;
+    offers?: AdsOfferFacets;
   };
 }
 
@@ -166,6 +197,13 @@ const EMPTY_FACETS: AdsFacetsResponse["facets"] = {
   models: [],
   fuelTypes: [],
   bodyTypes: [],
+  sellerKinds: [],
+  transmissions: [],
+  // `offers` fica AUSENTE de propósito, nunca {0,0,0}: este objeto é o que
+  // o BFF devolve quando o fetch de facets FALHA, e zeros aqui virariam
+  // "Destaques (0)" / "Oportunidades (0)" na sidebar — afastando o
+  // visitante de filtros que podem ter estoque. Ausente = sem número.
+  offers: undefined,
 };
 
 function getApiBaseUrl(): string {
@@ -389,7 +427,67 @@ function normalizeFacetsPayload(json: unknown): AdsFacetsResponse {
         rawFacets.bodyTypes ?? rawFacets.body_types,
         ["body_type"]
       ),
+      sellerKinds: normalizeSellerKindFacets(rawFacets.sellerKinds ?? rawFacets.seller_kinds),
+      transmissions: normalizeTransmissionFacets(rawFacets.transmissions),
+      offers: normalizeOfferFacets(rawFacets.offers),
     },
+  };
+}
+
+/**
+ * Completa as DUAS categorias de vendedor com 0 quando o backend as omite
+ * (GROUP BY não devolve linha para categoria sem anúncio). É justamente o
+ * zero que serve de aviso na sidebar — "Particulares (0)" evita o clique.
+ * Ordem fixa dealer→private para o render não oscilar entre requests.
+ */
+function normalizeSellerKindFacets(
+  raw: unknown
+): Array<{ seller_kind: "dealer" | "private"; total: number }> {
+  const parsed = normalizeFacetArray<{ seller_kind: string; total: number }>(raw, ["seller_kind"]);
+  const byKind = new Map(parsed.map((item) => [item.seller_kind, item.total]));
+
+  return (["dealer", "private"] as const).map((seller_kind) => ({
+    seller_kind,
+    total: Math.max(0, toNumber(byKind.get(seller_kind), 0)),
+  }));
+}
+
+/**
+ * Descarta linha sem valor de câmbio. `normalizeFacetArray` só OMITE a chave
+ * quando o valor é vazio (devolve `{ total: 5 }` mentindo no tipo), e o
+ * consumidor transforma isto em `Record<valor, total>` — uma chave
+ * `undefined` viraria a string "undefined" no mapa. O backend já exclui
+ * vazio com `TRIM(...) <> ''`; isto é a defesa do lado do cliente.
+ */
+function normalizeTransmissionFacets(raw: unknown): Array<{ transmission: string; total: number }> {
+  return normalizeFacetArray<{ transmission?: string; total: number }>(raw, ["transmission"])
+    .filter((item): item is { transmission: string; total: number } =>
+      Boolean(item.transmission?.trim())
+    )
+    .map((item) => ({ transmission: item.transmission, total: item.total }));
+}
+
+/**
+ * Devolve `undefined` — NÃO zeros — quando o payload não trouxe `offers`.
+ *
+ * A distinção é a regra do produto: "(0)" tem que significar "contei e não
+ * há", nunca "não recebi contagem". Backend anterior a 2026-07-26, resposta
+ * de erro ou timeout caem aqui, e nesses casos a sidebar renderiza o chip
+ * sem número em vez de afastar o visitante de um filtro que tem estoque.
+ */
+function normalizeOfferFacets(raw: unknown): AdsOfferFacets | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const source = raw as Record<string, unknown>;
+  const hasAnyKey = ["opportunity", "below_fipe", "belowFipe", "highlight"].some((key) =>
+    Object.prototype.hasOwnProperty.call(source, key)
+  );
+  if (!hasAnyKey) return undefined;
+
+  return {
+    opportunity: Math.max(0, toNumber(source.opportunity, 0)),
+    below_fipe: Math.max(0, toNumber(source.below_fipe ?? source.belowFipe, 0)),
+    highlight: Math.max(0, toNumber(source.highlight, 0)),
   };
 }
 
