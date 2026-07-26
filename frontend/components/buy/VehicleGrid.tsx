@@ -141,8 +141,11 @@ function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
           </Button>
         ) : null}
 
+        {/* Sem "Limpar filtros", ampliar o escopo passa a ser a ÚNICA saída
+            da tela — então vira a ação primária. Com filtro aplicado
+            continua secundária: ali o caminho mais curto é limpar. */}
         {broaderHref && broaderLabel ? (
-          <Button href={broaderHref} variant="secondary" size="md">
+          <Button href={broaderHref} variant={ctx.hasFilters ? "secondary" : "primary"} size="md">
             {broaderLabel}
           </Button>
         ) : null}
