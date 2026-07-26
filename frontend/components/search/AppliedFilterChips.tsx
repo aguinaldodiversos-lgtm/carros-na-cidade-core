@@ -8,6 +8,13 @@ interface AppliedFilterChipsProps {
   onRemove: (patch: Partial<AdsSearchFilters>) => void;
   onClearAll: () => void;
   lockedKeys?: Array<keyof AdsSearchFilters>;
+  /**
+   * Classes extras no container. Existe para o caller controlar espaçamento
+   * SEM envolver o componente numa div — ele retorna `null` quando não há
+   * filtro, e um wrapper com margem viraria espaço fantasma na vitrine
+   * limpa. Default "" preserva o layout dos callers existentes.
+   */
+  className?: string;
 }
 
 /**
@@ -28,6 +35,7 @@ export function AppliedFilterChips({
   onRemove,
   onClearAll,
   lockedKeys = [],
+  className = "",
 }: AppliedFilterChipsProps) {
   const locked = new Set<keyof AdsSearchFilters>(lockedKeys);
 
@@ -154,12 +162,57 @@ export function AppliedFilterChips({
     });
   }
 
+  // Filtros canônicos da Fase 3. Faltavam aqui pelo mesmo motivo que
+  // faltavam no hasFilters do catálogo, no countQuery e na whitelist da
+  // cache key: entraram numa fase e ninguém varreu os consumidores.
+  // Rótulos espelham o texto dos controles da sidebar (FilterSidebar) —
+  // o visitante tem que reconhecer o chip como "aquilo que eu cliquei".
+  if (filters.seller_kind === "dealer" || filters.seller_kind === "private") {
+    chips.push({
+      key: "seller_kind",
+      label: filters.seller_kind === "dealer" ? "Lojas" : "Particulares",
+      remove: () => onRemove({ seller_kind: undefined, page: 1 }),
+      locked: locked.has("seller_kind"),
+    });
+  }
+
+  if (filters.opportunity === true) {
+    chips.push({
+      key: "opportunity",
+      label: "Oportunidades",
+      remove: () => onRemove({ opportunity: undefined, page: 1 }),
+      locked: locked.has("opportunity"),
+    });
+  }
+
+  // priority_tier é a camada comercial (4=Destaque, 3=Pro, 2=Start,
+  // 1=Grátis). A sidebar só expõe o chip "Destaques" (tier 4), mas a URL
+  // aceita 1..4 — rotulamos os outros pelo nome da camada em vez de
+  // mostrar "priority_tier: 2", que não significa nada para o visitante.
+  if (filters.priority_tier !== undefined) {
+    const tierLabels: Record<number, string> = {
+      4: "Destaques",
+      3: "Lojista Pro",
+      2: "Lojista Start",
+      1: "Anúncios grátis",
+    };
+    const label = tierLabels[filters.priority_tier];
+    if (label) {
+      chips.push({
+        key: "priority_tier",
+        label,
+        remove: () => onRemove({ priority_tier: undefined, page: 1 }),
+        locked: locked.has("priority_tier"),
+      });
+    }
+  }
+
   const removableChips = chips.filter((chip) => !chip.locked);
 
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={`flex flex-wrap items-center gap-2 ${className}`.trimEnd()}>
       {chips.map((chip) =>
         chip.locked ? (
           <span

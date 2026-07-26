@@ -11,6 +11,7 @@ import { CatalogResultsHeader } from "@/components/buy/CatalogResultsHeader";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
+import { AppliedFilterChips } from "@/components/search/AppliedFilterChips";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import type {
   AdsFacetsResponse,
@@ -334,6 +335,28 @@ export default function BuyMarketplacePageClient({
                 regionalEnabled={regionalEnabled}
                 onOpenFilters={() => setMobileFiltersOpen(true)}
                 variant={variant}
+              />
+
+              {/* Chips de filtro ativo. No mobile a sidebar é uma gaveta
+                  fechada — sem esta linha o visitante não tem NENHUM sinal
+                  de que há filtro ligado, e a única saída é o "Limpar
+                  filtros" tudo-ou-nada. Aqui cada filtro sai sozinho.
+
+                  Componente compartilhado com /anuncios e /cidade/*; não
+                  renderiza nada quando não há filtro (retorna null), então
+                  a vitrine limpa continua limpa.
+
+                  lockedKeys territorial: cidade/UF vêm da ROTA, não de um
+                  filtro removível — remover não mudaria a URL. Hoje o
+                  loader já retira `city` dos filtros na página de cidade,
+                  então o chip nem aparece; o lock é defesa para não
+                  oferecer uma remoção que não funcionaria. */}
+              <AppliedFilterChips
+                filters={initialFilters}
+                onRemove={(patch) => pushFilters(patch)}
+                onClearAll={clearFilters}
+                lockedKeys={["city", "city_slug", "city_id", "state"]}
+                className="pb-1 pt-1"
               />
 
               {/* Contagem + sort. No mobile o sort fica na action bar
