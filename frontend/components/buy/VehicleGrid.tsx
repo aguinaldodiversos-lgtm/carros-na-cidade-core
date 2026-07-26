@@ -132,9 +132,14 @@ function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
       <h3 className="mt-4 text-lg font-bold text-cnc-text-strong sm:text-xl">{title}</h3>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-cnc-muted">{description}</p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        <Button href={clearFiltersHref} variant="primary" size="md">
-          Limpar filtros
-        </Button>
+        {/* Sem filtro aplicado (city-no-ads / state-no-ads), "Limpar filtros"
+            aponta para a própria rota — não faz nada e sugere ao visitante
+            que ele mesmo causou o vazio. Só aparece quando há o que limpar. */}
+        {ctx.hasFilters ? (
+          <Button href={clearFiltersHref} variant="primary" size="md">
+            Limpar filtros
+          </Button>
+        ) : null}
 
         {broaderHref && broaderLabel ? (
           <Button href={broaderHref} variant="secondary" size="md">
