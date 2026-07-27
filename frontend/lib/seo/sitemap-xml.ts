@@ -44,7 +44,35 @@ function normalizeChangefreq(value?: string): string | undefined {
   return allowed.has(normalized) ? normalized : undefined;
 }
 
+const IMAGE_NS = "http://www.google.com/schemas/sitemap-image/1.1";
+
+/**
+ * `<image:image>` aninhado no `<url>` da página que exibe a imagem.
+ *
+ * O Google descontinuou o sitemap de imagens dedicado; a prática atual é
+ * aninhar no sitemap de páginas. Emitimos SÓ `<image:loc>`: `<image:caption>`,
+ * `<image:title>`, `<image:license>` e `<image:geo_location>` foram
+ * descontinuadas e são ignoradas — incluí-las só engorda o XML.
+ *
+ * Ordem preservada do array: a primeira é a capa do anúncio, que o Google
+ * trata como a mais representativa da página.
+ */
+function buildImageNodes(images?: string[]): string {
+  if (!Array.isArray(images) || images.length === 0) return "";
+
+  return images
+    .filter((src) => typeof src === "string" && src.trim())
+    .map((src) => `<image:image><image:loc>${escapeXml(src.trim())}</image:loc></image:image>`)
+    .join("");
+}
+
 export function buildSitemapXml(entries: PublicSitemapEntry[]): string {
+  // Namespace de imagem só entra quando ALGUMA entrada tem imagem. Este
+  // gerador é compartilhado pelos 10 sitemaps (cities, models, brands, blog…);
+  // declarar `xmlns:image` incondicionalmente mudaria o XML de todos eles sem
+  // nenhum ganho.
+  const temImagem = entries.some((entry) => entry.loc && (entry.images?.length ?? 0) > 0);
+
   const body = entries
     .filter((entry) => entry.loc)
     .map((entry) => {
@@ -59,6 +87,9 @@ export function buildSitemapXml(entries: PublicSitemapEntry[]): string {
         lastmod ? `<lastmod>${escapeXml(lastmod)}</lastmod>` : "",
         changefreq ? `<changefreq>${escapeXml(changefreq)}</changefreq>` : "",
         priority ? `<priority>${escapeXml(priority)}</priority>` : "",
+        // Anúncio sem imagem elegível simplesmente não emite as tags — o
+        // `<url>` continua válido sozinho.
+        buildImageNodes(entry.images),
         "</url>",
       ]
         .filter(Boolean)
@@ -68,7 +99,9 @@ export function buildSitemapXml(entries: PublicSitemapEntry[]): string {
 
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"` +
+    (temImagem ? ` xmlns:image="${IMAGE_NS}"` : "") +
+    `>` +
     body +
     `</urlset>`
   );
