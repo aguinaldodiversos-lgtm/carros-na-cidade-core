@@ -7,6 +7,7 @@ import {
   updateOwnedAd,
   type UpdateOwnedAdPayload,
 } from "@/lib/account/backend-account";
+import { pickEditablePayload } from "@/lib/account/editable-ad-payload";
 import { authenticateBffRequest, applyBffCookies } from "@/lib/http/bff-session";
 
 export const dynamic = "force-dynamic";
@@ -20,39 +21,6 @@ type Params = {
 type PatchPayload = {
   action?: "pause" | "activate";
 };
-
-/**
- * Campos que a edição de conteúdo aceita. Campos estruturais
- * (brand/model/year/city/state) e `status`/`advertiser_id` NÃO são repassados —
- * o backend já os recusa, mas filtramos aqui para deixar o contrato explícito
- * e evitar payloads enganosos.
- */
-function pickEditablePayload(raw: unknown): UpdateOwnedAdPayload {
-  const body = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const payload: UpdateOwnedAdPayload = {};
-
-  if (typeof body.title === "string") payload.title = body.title;
-  if (typeof body.description === "string" || body.description === null) {
-    payload.description = body.description as string | null;
-  }
-  if (body.price !== undefined && body.price !== null && body.price !== "") {
-    payload.price = Number(body.price);
-  }
-  if (body.mileage !== undefined && body.mileage !== null && body.mileage !== "") {
-    payload.mileage = Number(body.mileage);
-  }
-  // Opcionais: aceita array de keys ou objeto agrupado; o backend valida as
-  // keys contra o catálogo. Presença (mesmo lista vazia) permite LIMPAR.
-  if (Array.isArray(body.vehicle_options) || isPlainObject(body.vehicle_options)) {
-    payload.vehicle_options = body.vehicle_options as UpdateOwnedAdPayload["vehicle_options"];
-  }
-
-  return payload;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 export async function GET(request: NextRequest, { params }: Params) {
   try {
