@@ -1,3 +1,4 @@
+import { adDetailTag } from "@/lib/ads/ad-cache-tags";
 import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
@@ -245,7 +246,9 @@ function buildCandidatePaths(identifier: string): string[] {
   ];
 }
 
-async function tryFetchJson(url: string): Promise<unknown | null> {
+async function tryFetchJson(url: string, identifier: string): Promise<unknown | null> {
+  const tag = adDetailTag(identifier);
+
   try {
     const response = await ssrResilientFetch(url, {
       method: "GET",
@@ -254,7 +257,14 @@ async function tryFetchJson(url: string): Promise<unknown | null> {
         "Content-Type": "application/json",
       },
       logTag: "ad-detail",
-      next: { revalidate: 300 },
+      // `revalidate` continua como teto de segurança (dado envelhece sozinho
+      // se a invalidação falhar), mas quem faz o trabalho é a TAG: o BFF
+      // chama `revalidateTag` no PUT/PATCH/DELETE, então a edição do lojista
+      // aparece na hora em vez de esperar até 5 minutos.
+      //
+      // O sintoma que isto resolve: o lojista editava o câmbio, conferia a
+      // página pública, via o valor antigo e concluía que não tinha salvado.
+      next: { revalidate: 300, ...(tag ? { tags: [tag] } : {}) },
     });
 
     if (!response.ok) return null;
@@ -279,7 +289,7 @@ export async function fetchAdDetail(identifier: string): Promise<PublicAdDetail 
   const candidatePaths = buildCandidatePaths(safeIdentifier);
 
   for (const path of candidatePaths) {
-    const json = await tryFetchJson(`${apiBase}${path}`);
+    const json = await tryFetchJson(`${apiBase}${path}`, safeIdentifier);
     if (!json) continue;
 
     const payload = extractPayload(json);
