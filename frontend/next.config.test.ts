@@ -25,7 +25,14 @@ describe("next.config.mjs — guardrails de outbound bandwidth", () => {
     const hosts = patterns.map((p) => p.hostname);
     // Lista white-list controlada. Adicionar host aqui exige justificar
     // outbound bandwidth (cada otimização puxa do origin pelo Render).
-    const ALLOWED = new Set(["images.unsplash.com", "localhost"]);
+    // `img.carrosnacidade.com` (2026-07-26): domínio próprio na frente do
+    // bucket R2. Justificativa de bandwidth — é o OPOSTO de um risco: está
+    // aqui só para que, no dia em que o `unoptimized: true` sair, o host não
+    // caia em 400 no /_next/image. Enquanto o kill switch estiver ligado,
+    // nenhuma imagem passa pelo otimizador. E `shouldSkipNextImageOptimizer`
+    // já pula `*.carrosnacidade.com`, então mesmo sem o kill switch o Render
+    // não puxaria esses bytes.
+    const ALLOWED = new Set(["images.unsplash.com", "img.carrosnacidade.com", "localhost"]);
     for (const host of hosts) {
       expect(ALLOWED.has(host), `host não revisado em remotePatterns: ${host}`).toBe(true);
     }

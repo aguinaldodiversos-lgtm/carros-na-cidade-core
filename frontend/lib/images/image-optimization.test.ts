@@ -57,10 +57,25 @@ describe("shouldSkipNextImageOptimizer", () => {
     expect(shouldSkipNextImageOptimizer("https://cdn.carrosnacidade.com/x.webp")).toBe(true);
   });
 
-  it("NÃO skip host R2 quando não configurado", () => {
+  /**
+   * CONTRATO INVERTIDO EM 2026-07-26 — de propósito.
+   *
+   * Este teste assertava `false`: sem `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`, uma
+   * imagem no NOSSO próprio subdomínio de CDN seria roteada pelo
+   * `/_next/image`. Isso não era um contrato a preservar, era o buraco
+   * documentado no cabeçalho do módulo — o Render baixando a imagem de uma
+   * origem nossa para servir variantes, o caminho duplo que estourou o
+   * outbound bandwidth em 2026-05-13, dependendo de uma env estar presente
+   * no build para não acontecer.
+   *
+   * Com `SELF_DOMAIN_SUFFIXES`, domínio nosso pula o otimizador sempre,
+   * setada ou não a env.
+   */
+  it("skip host de CDN próprio MESMO sem NEXT_PUBLIC_R2_PUBLIC_BASE_URL", () => {
+    delete process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
     expect(
       shouldSkipNextImageOptimizer("https://cdn.carrosnacidade.com/vehicles/abc/foto.webp")
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("skip qualquer *.onrender.com", () => {
@@ -94,6 +109,35 @@ describe("shouldSkipNextImageOptimizer", () => {
 
   it(".r2.dev case-insensitive", () => {
     expect(shouldSkipNextImageOptimizer("https://Pub-ABC.R2.DEV/x.webp")).toBe(true);
+  });
+
+  it("skip domínio próprio na frente do R2 (img.carrosnacidade.com) SEM env", () => {
+    // Migração 2026-07-26: as fotos saíram do `pub-*.r2.dev` (endpoint de
+    // desenvolvimento, limitado por taxa) para domínio próprio. O host novo
+    // não casa `.r2.dev` nem `.onrender.com`; sem a regra de domínio próprio
+    // ele voltaria a passar pelo otimizador do Render — o caminho duplo do
+    // incidente de banda de 2026-05-13 — e, como não estava em
+    // remotePatterns, daria 400.
+    delete process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+    expect(
+      shouldSkipNextImageOptimizer(
+        "https://img.carrosnacidade.com/vehicles/publish-122-abc/original/2026/07/foto.webp"
+      )
+    ).toBe(true);
+  });
+
+  it("skip qualquer subdomínio nosso, case-insensitive", () => {
+    delete process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+    expect(shouldSkipNextImageOptimizer("https://IMG.CarrosNaCidade.com/x.webp")).toBe(true);
+    expect(shouldSkipNextImageOptimizer("https://www.carrosnacidade.com/images/banner.png")).toBe(
+      true
+    );
+  });
+
+  it("domínio parecido NÃO é confundido com o nosso (defesa de sufixo)", () => {
+    delete process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
+    expect(shouldSkipNextImageOptimizer("https://carrosnacidade.com.br/x.webp")).toBe(false);
+    expect(shouldSkipNextImageOptimizer("https://fakecarrosnacidade.com/x.webp")).toBe(false);
   });
 
   it("URLs http inválidas tratadas como skip (não otimiza lixo)", () => {
