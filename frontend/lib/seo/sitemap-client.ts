@@ -28,6 +28,17 @@ export interface PublicSitemapEntry {
   stage?: string;
   moneyPage?: boolean;
   state?: string;
+  /**
+   * URLs de imagem para aninhar como `<image:image>` dentro do `<url>`
+   * (sitemap de imagens — o Google descontinuou o arquivo dedicado e a prática
+   * atual é aninhar no sitemap de páginas).
+   *
+   * Só o `vehicles.xml` popula hoje. Ordem significativa: a primeira é a capa
+   * do anúncio. O backend já filtra o que não é rastreável (relativa ou sob
+   * `/api/`, que é Disallow no robots); aqui filtramos de novo por
+   * type-safety, não por desconfiança.
+   */
+  images?: string[];
 }
 
 interface PublicSitemapResponse {
@@ -49,7 +60,38 @@ function normalizeEntry(entry: PublicSitemapEntry): PublicSitemapEntry {
     stage: entry.stage || undefined,
     state: entry.state || undefined,
     moneyPage: Boolean(entry.moneyPage),
+    images: normalizeImages(entry.images),
   };
+}
+
+/**
+ * Mantém só URL de imagem absoluta http(s) e fora de `/api/`.
+ *
+ * Espelha o guard do backend (`isCrawlableImageUrl` em
+ * sitemap-public.service.js) de propósito: este módulo consome JSON de rede e
+ * o tipo é só uma promessa. Se o backend estiver numa versão anterior, ou
+ * responder algo inesperado, o XML não pode sair com `<image:loc>` relativo
+ * (inválido) nem com URL sob `Disallow`.
+ *
+ * `undefined` quando não sobra nada — o gerador então nem abre as tags.
+ */
+function normalizeImages(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const url = item.trim();
+    if (!/^https?:\/\//i.test(url)) continue;
+    try {
+      if (new URL(url).pathname.startsWith("/api/")) continue;
+    } catch {
+      continue;
+    }
+    if (!out.includes(url)) out.push(url);
+  }
+
+  return out.length > 0 ? out : undefined;
 }
 
 function dedupeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {

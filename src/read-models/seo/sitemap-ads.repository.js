@@ -16,6 +16,12 @@ import { pool } from "../../infrastructure/database/db.js";
  * Anúncios ATIVOS com slug válido, do mais recente para o mais antigo. O limite
  * é saturado em 100k (o urlset de um sitemap suporta até 50k URLs; acima disso
  * seria necessário shardar — greenfield, não aplicável no volume atual).
+ *
+ * `images` (JSONB, 2026-07-26) alimenta o `<image:image>` aninhado no
+ * `vehicles.xml`. É a lista pública canônica, já na ordem certa — a coluna
+ * declara no COMMENT que "capa = primeiro elemento", e o Google usa a primeira
+ * imagem como a mais representativa. Uma coluna a mais na MESMA query, sem
+ * JOIN: o custo do sitemap de imagens no banco é zero.
  */
 export async function listActiveAdRows(limit = 50000) {
   const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
@@ -24,7 +30,8 @@ export async function listActiveAdRows(limit = 50000) {
     `
     SELECT
       slug,
-      updated_at AS last_updated
+      updated_at AS last_updated,
+      images
     FROM ads
     WHERE status = 'active'
       AND slug IS NOT NULL
