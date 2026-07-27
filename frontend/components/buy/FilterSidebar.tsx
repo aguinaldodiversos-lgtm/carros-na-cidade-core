@@ -46,6 +46,24 @@ type FilterSidebarProps = {
   showApplyCta?: boolean;
   onApply?: () => void;
   regionalEnabled?: boolean;
+  /**
+   * Contagem por controle (chips de Ofertas, segmentado de Vendedor,
+   * Câmbio) — escopo TERRITORIAL, vindo de /api/ads/facets.
+   *
+   * Objetivo: o visitante ver "Particulares (0)" e não clicar. Com estoque
+   * de uma única loja, "Particulares" e "Manual" retornam zero e o clique
+   * gasta um visitante pago num estado vazio.
+   *
+   * `undefined` = facet indisponível (backend velho, erro, ou página que não
+   * passa a prop) → renderiza sem número, exatamente como antes. NUNCA
+   * renderizar "(0)" por ausência de dado: seria mentir com confiança.
+   */
+  controlTotals?: {
+    sellerKind?: { dealer: number; private: number };
+    offers?: { opportunity: number; below_fipe: number; highlight: number };
+    /** Chave = valor cru do banco (ex.: "automatico"), valor = total. */
+    transmission?: Record<string, number>;
+  };
   /** Raio atual (km) do bloco "Próximos". Alimenta o slider de Distância. */
   radiusKm?: number;
   /** Muda o raio de vizinhança (ação do usuário → `?raio=`). */
@@ -327,6 +345,7 @@ export function FilterSidebar({
   showApplyCta = false,
   onApply,
   regionalEnabled = false,
+  controlTotals,
   radiusKm,
   onRadiusChange,
   className = "",
@@ -424,6 +443,42 @@ export function FilterSidebar({
     "inline-flex items-center justify-center gap-2.5 rounded-[11px] border px-3 py-3.5 text-[15px] font-semibold transition motion-reduce:transition-none [&>svg]:h-[18px] [&>svg]:w-[18px]";
   const segCls = (on: boolean) => `${segBase} ${on ? chipOn : chipOff}`;
 
+  /**
+   * Contagem ao lado do rótulo do controle. `undefined` (facet ausente) →
+   * não renderiza nada; 0 → renderiza "(0)", que é o caso útil. Mesmo peso
+   * visual das contagens de "Marcas populares".
+   */
+  const Count = ({ total }: { total?: number }) =>
+    total === undefined ? null : (
+      <span className="text-[11px] font-bold text-cnc-muted-soft">({formatTotal(total)})</span>
+    );
+
+  // Casa a opção da UI ("Automatico") com o valor cru do banco
+  // ("automatico"), espelhando o `ILIKE '%valor%'` que o backend aplica em
+  // buildAdsFacetWhere. Case-insensitive e SENSÍVEL a acento de propósito:
+  // o ILIKE do Postgres também é, e uma contagem acento-insensível
+  // divergiria do filtro que o clique dispara.
+  const transmissionTotal = (optionValue: string): number | undefined => {
+    const map = controlTotals?.transmission;
+    if (!map || !optionValue) return undefined;
+    const needle = optionValue.trim().toLowerCase();
+    let total = 0;
+    for (const [dbValue, count] of Object.entries(map)) {
+      if (dbValue.toLowerCase().includes(needle)) total += count;
+    }
+    return total;
+  };
+
+  const transmissionOptions = useMemo<SelectOption[]>(
+    () =>
+      TRANSMISSION_TYPES.map((opt) => {
+        const total = transmissionTotal(opt.value);
+        return total === undefined ? opt : { ...opt, label: `${opt.label} (${formatTotal(total)})` };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [controlTotals?.transmission]
+  );
+
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="overflow-hidden rounded-2xl border border-cnc-line bg-cnc-surface shadow-card">
@@ -458,7 +513,7 @@ export function FilterSidebar({
                 onClick={() => onPatch({ priority_tier: filters.priority_tier === 4 ? undefined : 4, page: 1 })}
                 className={chipCls(filters.priority_tier === 4)}
               >
-                <StarIcon /> Destaques
+                <StarIcon /> Destaques <Count total={controlTotals?.offers?.highlight} />
               </button>
               <button
                 type="button"
@@ -466,7 +521,7 @@ export function FilterSidebar({
                 onClick={() => onPatch({ opportunity: filters.opportunity === true ? undefined : true, page: 1 })}
                 className={chipCls(filters.opportunity === true)}
               >
-                <TagIcon /> Oportunidades
+                <TagIcon /> Oportunidades <Count total={controlTotals?.offers?.opportunity} />
               </button>
               <button
                 type="button"
@@ -474,7 +529,7 @@ export function FilterSidebar({
                 onClick={() => onPatch({ below_fipe: filters.below_fipe === true ? undefined : true, page: 1 })}
                 className={chipCls(filters.below_fipe === true)}
               >
-                <ShieldIcon /> Abaixo da FIPE
+                <ShieldIcon /> Abaixo da FIPE <Count total={controlTotals?.offers?.below_fipe} />
               </button>
             </div>
           </section>
@@ -491,7 +546,7 @@ export function FilterSidebar({
                 onClick={() => onPatch({ seller_kind: filters.seller_kind === "dealer" ? undefined : "dealer", page: 1 })}
                 className={segCls(filters.seller_kind === "dealer")}
               >
-                <StoreIcon /> Lojas
+                <StoreIcon /> Lojas <Count total={controlTotals?.sellerKind?.dealer} />
               </button>
               <button
                 type="button"
@@ -499,7 +554,7 @@ export function FilterSidebar({
                 onClick={() => onPatch({ seller_kind: filters.seller_kind === "private" ? undefined : "private", page: 1 })}
                 className={segCls(filters.seller_kind === "private")}
               >
-                <PersonIcon /> Particulares
+                <PersonIcon /> Particulares <Count total={controlTotals?.sellerKind?.private} />
               </button>
             </div>
           </section>
@@ -675,7 +730,7 @@ export function FilterSidebar({
             id="fs-trans"
             value={filters.transmission || ""}
             onChange={(v) => onPatch({ transmission: v || undefined, page: 1 })}
-            options={TRANSMISSION_TYPES}
+            options={transmissionOptions}
             lead={<GearIcon />}
           />
 

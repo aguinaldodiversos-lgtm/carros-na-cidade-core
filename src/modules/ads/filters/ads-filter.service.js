@@ -90,6 +90,12 @@ export async function getFacetsWithFilters(rawFilters = {}, options = {}) {
         models: [],
         fuelTypes: [],
         bodyTypes: [],
+        sellerKinds: [],
+        transmissions: [],
+        // `offers` OMITIDO de propósito: este é o fallback de erro, e
+        // {0,0,0} aqui viraria "Oportunidades (0)" na sidebar. O cliente
+        // trata ausência como "sem contagem" e renderiza sem número —
+        // "(0)" só pode significar "contei e não há".
       },
     };
   }

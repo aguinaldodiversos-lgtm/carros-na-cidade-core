@@ -17,7 +17,7 @@ import { cacheGet } from "../../shared/cache/cache.middleware.js";
  * ads-filter.parser.js — qualquer filtro novo no controller que altere o
  * resultado precisa entrar aqui senao o cache vira HIT incorreto.
  */
-const ADS_ALLOWED_QUERY_KEYS = Object.freeze([
+export const ADS_ALLOWED_QUERY_KEYS = Object.freeze([
   // Paginacao / ordenacao
   "page",
   "limit",
@@ -51,6 +51,24 @@ const ADS_ALLOWED_QUERY_KEYS = Object.freeze([
   "featured",
   "highlight_only",
   "below_fipe",
+  // Filtros canônicos da Fase 3. PRECISAM estar aqui: `filterQuery` no
+  // cache.middleware descarta da cache key toda chave fora desta lista,
+  // então sem eles `?city_slug=x` e `?city_slug=x&seller_kind=private`
+  // colidiriam na MESMA key do Redis (TTL 30s) — o filtro "não filtraria"
+  // de forma intermitente, dependendo de quem populou o cache primeiro.
+  // Até 2026-07-26 isso ficou latente porque os dois primeiros quebravam
+  // o countQuery e o cacheGet se recusa a cachear `ok:false`; corrigir os
+  // JOINs sem corrigir esta lista trocaria um bug por outro, pior.
+  "seller_kind",
+  "opportunity",
+  "priority_tier",
+  // Mesma classe de omissão, encontrada pelo teste derivado do schema
+  // (tests/ads/ads-cache-key-covers-filters.test.js): ambos restringem o
+  // WHERE de verdade — `highlight` é alias legado de `highlight_only`
+  // (normalizado no parser) e `advertiser_id` vira `a.advertiser_id = $N`.
+  // Sem eles na key, a página de uma loja podia servir o catálogo inteiro.
+  "highlight",
+  "advertiser_id",
   // Busca textual
   "q",
 ]);

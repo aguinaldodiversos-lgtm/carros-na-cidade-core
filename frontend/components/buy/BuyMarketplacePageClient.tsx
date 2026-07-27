@@ -11,6 +11,7 @@ import { CatalogResultsHeader } from "@/components/buy/CatalogResultsHeader";
 import { FilterSidebar } from "@/components/buy/FilterSidebar";
 import { GeoToCityRedirect } from "@/components/buy/GeoToCityRedirect";
 import { VehicleGrid } from "@/components/buy/VehicleGrid";
+import { AppliedFilterChips } from "@/components/search/AppliedFilterChips";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import type {
   AdsFacetsResponse,
@@ -130,6 +131,34 @@ export default function BuyMarketplacePageClient({
     return brandFacets.length > 0 ? brandFacets.slice(0, 8) : DEFAULT_POPULAR_BRANDS;
   }, [brandFacets]);
 
+  /**
+   * Contagem dos controles da sidebar (Ofertas, Vendedor, Câmbio). Escopo
+   * territorial — ver buildAdsFacetScopeWhere no backend.
+   *
+   * Cada bloco fica `undefined` quando a facet não veio, para a sidebar
+   * renderizar sem número em vez de "(0)": sem dado, "(0)" seria mentira.
+   * Necessário porque o BFF pode responder EMPTY_FACETS em erro/timeout, e
+   * porque outras páginas montam a sidebar sem passar esta prop.
+   */
+  const controlTotals = useMemo(() => {
+    const sellerKindRows = initialFacets?.sellerKinds;
+    const sellerKind =
+      Array.isArray(sellerKindRows) && sellerKindRows.length > 0
+        ? {
+            dealer: sellerKindRows.find((r) => r.seller_kind === "dealer")?.total ?? 0,
+            private: sellerKindRows.find((r) => r.seller_kind === "private")?.total ?? 0,
+          }
+        : undefined;
+
+    const transmissionRows = initialFacets?.transmissions;
+    const transmission =
+      Array.isArray(transmissionRows) && transmissionRows.length > 0
+        ? Object.fromEntries(transmissionRows.map((r) => [r.transmission, r.total]))
+        : undefined;
+
+    return { sellerKind, offers: initialFacets?.offers, transmission };
+  }, [initialFacets?.sellerKinds, initialFacets?.transmissions, initialFacets?.offers]);
+
   // `?raio=` (raio do bloco "Próximos") é ORTOGONAL aos filtros de veículo — não
   // faz parte de AdsSearchFilters. Ao re-navegar por um filtro de veículo,
   // reanexamos o raio atual para não perdê-lo (default 50 → omitido, URL limpa).
@@ -207,7 +236,20 @@ export default function BuyMarketplacePageClient({
       initialFilters.transmission ||
       initialFilters.body_type ||
       initialFilters.below_fipe === true ||
-      initialFilters.highlight_only === true
+      initialFilters.highlight_only === true ||
+      // Chips da sidebar que ficavam de fora: sem eles, filtrar
+      // "Particulares" numa cidade com estoque só de loja caía no empty
+      // state "Sem ofertas em <cidade>" (culpando o território) em vez de
+      // "Nenhum anúncio combina com seus filtros" (culpando o filtro).
+      // `priority_tier` é o campo do chip Destaques — `highlight_only`
+      // acima é o filtro legado, não o mesmo controle.
+      initialFilters.seller_kind === "dealer" ||
+      initialFilters.seller_kind === "private" ||
+      initialFilters.opportunity === true ||
+      initialFilters.priority_tier === 1 ||
+      initialFilters.priority_tier === 2 ||
+      initialFilters.priority_tier === 3 ||
+      initialFilters.priority_tier === 4
   );
 
   const emptyContext = {
@@ -232,6 +274,7 @@ export default function BuyMarketplacePageClient({
     onPatch: (patch: Partial<AdsSearchFilters>) => pushFilters(patch),
     onClear: clearFilters,
     regionalEnabled,
+    controlTotals,
     // Seletor "Distância (km)" só é útil na página de cidade (raio da
     // vizinhança). Passamos o handler apenas nessa variante — nas outras a
     // sidebar esconde o seletor (sem onRadiusChange).
@@ -321,6 +364,28 @@ export default function BuyMarketplacePageClient({
                 regionalEnabled={regionalEnabled}
                 onOpenFilters={() => setMobileFiltersOpen(true)}
                 variant={variant}
+              />
+
+              {/* Chips de filtro ativo. No mobile a sidebar é uma gaveta
+                  fechada — sem esta linha o visitante não tem NENHUM sinal
+                  de que há filtro ligado, e a única saída é o "Limpar
+                  filtros" tudo-ou-nada. Aqui cada filtro sai sozinho.
+
+                  Componente compartilhado com /anuncios e /cidade/*; não
+                  renderiza nada quando não há filtro (retorna null), então
+                  a vitrine limpa continua limpa.
+
+                  lockedKeys territorial: cidade/UF vêm da ROTA, não de um
+                  filtro removível — remover não mudaria a URL. Hoje o
+                  loader já retira `city` dos filtros na página de cidade,
+                  então o chip nem aparece; o lock é defesa para não
+                  oferecer uma remoção que não funcionaria. */}
+              <AppliedFilterChips
+                filters={initialFilters}
+                onRemove={(patch) => pushFilters(patch)}
+                onClearAll={clearFilters}
+                lockedKeys={["city", "city_slug", "city_id", "state"]}
+                className="pb-1 pt-1"
               />
 
               {/* Contagem + sort. No mobile o sort fica na action bar

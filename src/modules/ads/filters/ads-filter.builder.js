@@ -368,11 +368,31 @@ export function buildAdsSearchQuery(filters = {}) {
   // total. Foi exatamente esse modo de falha que vitimou o catálogo
   // em 2026-05-24 (sem o JOIN, com `a.seller_name` no WHERE) e que
   // agora protegemos com o JOIN aqui.
+  //
+  // REINCIDÊNCIA 2026-07-26 — `users u` e `subscription_plans sp`:
+  // `whereClause` é COMPARTILHADO com o dataQuery, então os filtros
+  // canônicos da Fase 3 arrastam suas expressões para cá também —
+  // `sellerKindExpr` referencia `u.document_type` e
+  // `commercialLayerExpr` referencia `sp.weight`. Sem estes dois JOINs,
+  // `?seller_kind=private` e `?priority_tier=N` explodiam com
+  // "missing FROM-clause entry for table u/sp"; o safeMode engolia o
+  // erro e devolvia data:[] / total:0, indistinguível de "não há
+  // anúncios". Ambos ficaram assim EM PRODUÇÃO até 2026-07-26.
+  //
+  // Os dois JOINs são inertes para a contagem: casam pela PK da tabela
+  // juntada (`u.id`, `sp.id`), portanto no máximo 1 linha cada — não
+  // multiplicam o COUNT(*) de nenhuma query que já funcionava.
+  //
+  // Regra permanente: JOIN novo no dataQuery cujo alias possa aparecer
+  // no WHERE ⇒ mesmo JOIN aqui. Guardado por
+  // tests/ads/ads-filter-builder-canonical.test.js.
   const countQuery = `
     SELECT COUNT(*)::int AS total
     FROM ads a
     LEFT JOIN cities c ON c.id = a.city_id
     LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    LEFT JOIN users u ON u.id = adv.user_id
+    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id
     ${whereClause}
   `;
 
@@ -395,7 +415,13 @@ export function buildAdsSearchQuery(filters = {}) {
   };
 }
 
-export function buildAdsFacetWhere(filters = {}) {
+/**
+ * Base comum das facets: status ativo + guard de anúncio sujo + território.
+ * Extraída para que `buildAdsFacetWhere` (base + filtros de veículo) e
+ * `buildAdsFacetScopeWhere` (só a base) não divirjam na regra territorial —
+ * que é justamente a que já quebrou as facets regionais em 2026-05-24.
+ */
+function buildFacetBaseWhere(filters = {}) {
   const where = [`a.status = '${AD_STATUS.ACTIVE}'`];
   if (shouldApplyDirtyAdGuard()) {
     where.push(DIRTY_TEST_AD_GUARD_SQL);
@@ -429,6 +455,33 @@ export function buildAdsFacetWhere(filters = {}) {
       String(filters.state).toUpperCase()
     );
   }
+
+  return { where, params };
+}
+
+/**
+ * WHERE das facets de CONTROLE (chips de Ofertas, segmentado de Vendedor,
+ * Câmbio): só território + status. NÃO aplica os filtros de veículo nem os
+ * próprios filtros que a faceta conta.
+ *
+ * Por que ignorar os filtros aplicados: se a contagem de `seller_kind`
+ * respeitasse o próprio `seller_kind`, escolher "Lojas" faria
+ * "Particulares" virar (0) trivialmente e o chip ficaria inclicável para
+ * todo mundo — o oposto do objetivo, que é avisar ANTES do clique. O
+ * padrão "todos os filtros exceto o da própria dimensão" (Mercado Livre)
+ * exigiria um WHERE por dimensão; com o estoque atual não paga o custo.
+ */
+export function buildAdsFacetScopeWhere(filters = {}) {
+  const { where, params } = buildFacetBaseWhere(filters);
+  return {
+    whereClause: `WHERE ${where.join(" AND ")}`,
+    params,
+  };
+}
+
+export function buildAdsFacetWhere(filters = {}) {
+  const { where, params } = buildFacetBaseWhere(filters);
+
   if (filters.brand) pushFilter(where, params, `a.brand ILIKE ?`, `%${filters.brand}%`);
   if (filters.model) pushFilter(where, params, `a.model ILIKE ?`, `%${filters.model}%`);
   if (filters.below_fipe !== undefined)
