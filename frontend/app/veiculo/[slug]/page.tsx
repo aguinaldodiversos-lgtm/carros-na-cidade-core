@@ -13,6 +13,7 @@ import { buildVehicleImageAlt, splitCityState } from "@/lib/seo/vehicle-image-al
 import { buildVehicleJsonLd } from "@/lib/seo/vehicle-structured-data";
 import { getSiteUrl } from "@/lib/seo/site";
 import { fetchRelatedListingsForAdPage } from "@/lib/vehicle/related-ads";
+import { buildVehicleBreadcrumbs } from "@/lib/vehicle/vehicle-breadcrumbs";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import { adaptAdDetailToVehicle, formatListingDateLabels } from "@/lib/vehicle/public-vehicle";
 
@@ -239,11 +240,11 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
     ],
   };
 
-  const breadcrumbItems = [
-    { name: "Home", href: "/" },
-    { name: "Comprar", href: "/comprar" },
-    { name: vehicle.model },
-  ];
+  // Inclui a cidade linkando /carros-em/[citySlug] — alimenta o breadcrumb
+  // VISÍVEL e o BreadcrumbList do JSON-LD com o mesmo array. Ver
+  // lib/vehicle/vehicle-breadcrumbs.ts para o porquê (link interno para a
+  // página de cidade, que o GSC reportava sem nenhuma página de referência).
+  const breadcrumbItems = buildVehicleBreadcrumbs(vehicle);
 
   const pageSchema = buildWebPageJsonLd({
     title: `${vehicle.model} ${year} à venda`,
