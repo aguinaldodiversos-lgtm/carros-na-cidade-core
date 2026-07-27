@@ -35,6 +35,26 @@
  * consultamos um mapa CURADO de modelos conhecidos; só cai para NULL quando o
  * modelo também é desconhecido.
  *
+ * ⚠️ OS DOIS CAMPOS TÊM GRAUS DE CONFIANÇA DIFERENTES — importa saber disso se
+ * alguém questionar um valor no futuro:
+ *
+ *   CÂMBIO      = DECLARAÇÃO do anunciante, sempre. Ou o opcional `cambio_*`
+ *                 que ele marcou (1ª ordem), ou o marcador da versão FIPE que
+ *                 ele SELECIONOU no wizard — "Mec."/"Aut."/"CVT" é designação
+ *                 do fabricante, parte da identidade da versão (2ª ordem).
+ *                 Sem nenhum dos dois, o script NÃO TOCA. Zero heurística
+ *                 nossa.
+ *
+ *   CARROCERIA  = declaração quando o texto a nomeia ("Onix HATCH"), mas
+ *                 CURADORIA NOSSA quando vem do mapa modelo→carroceria
+ *                 (Renegade → SUV). É fato público verificável, não opinião,
+ *                 mas não foi o anunciante que disse. Um valor de carroceria
+ *                 contestado provavelmente veio daqui — confira o mapa antes
+ *                 de culpar o cadastro.
+ *
+ * A saída do dry-run/apply informa a origem de cada correção (via opcional /
+ * versão FIPE / texto / modelo) justamente para essa rastreabilidade.
+ *
  * SEGURANÇA:
  *   - DRY-RUN por padrão: só mostra o que faria + amostras. Nada é gravado.
  *   - Grava apenas com `--apply` E `--confirm-target=<banco>` batendo com
@@ -140,6 +160,33 @@ function cambioSlugFromOptions(stored) {
   const cambio = extractOptionKeys(stored).filter((k) => k.startsWith("cambio_"));
   const slugs = [...new Set(cambio.map(cambioKeyToSlug).filter(Boolean))];
   return slugs.length === 1 ? slugs[0] : null;
+}
+
+/**
+ * Câmbio pelo MARCADOR DA VERSÃO FIPE embutido em `model`/`title`.
+ *
+ * Não usa `TRANSMISSION_SYNONYMS`: aquele mapa existe para normalizar INPUT DO
+ * USUÁRIO ("automatizado", "robotizado", "at") e não conhece as abreviações da
+ * FIPE. Aqui o alvo é outro — o sufixo que a própria FIPE põe no nome da
+ * versão: "Mec.", "Aut.", "CVT".
+ *
+ * POR QUE ISSO CONTA COMO DECLARAÇÃO, e não como chute: `ads.model` guarda a
+ * string de versão FIPE que o anunciante SELECIONOU no wizard
+ * ("ONIX HATCH LT 1.0 12V Flex 5p Mec."). O "Mec." é designação do fabricante,
+ * parte da identidade daquela versão — escolher a versão é declarar o câmbio,
+ * ainda que implicitamente. É declaração de segunda ordem, não inferência
+ * nossa.
+ *
+ * Ordem importa: "CVT" antes de "Aut." (uma versão CVT costuma trazer os dois).
+ */
+function cambioSlugFromFipeVersion(haystack) {
+  const h = String(haystack || "").toLowerCase();
+  if (/(?:^|[^0-9a-zà-ú])cvt(?:[^0-9a-zà-ú]|$)/.test(h)) return "cvt";
+  if (/(?:^|[^0-9a-zà-ú])(?:aut|automátic\w*|automatic\w*)\.?(?:[^0-9a-zà-ú]|$)/.test(h)) {
+    return "automatico";
+  }
+  if (/(?:^|[^0-9a-zà-ú])(?:mec|manual)\.?(?:[^0-9a-zà-ú]|$)/.test(h)) return "manual";
+  return null;
 }
 
 /** Slug de carroceria a partir do texto (modelo/título), via sinônimos canônicos; null se sem sinal. */
@@ -270,21 +317,28 @@ async function run() {
   }
   console.log("");
 
-  // 1) CÂMBIO: anúncios com opcional de câmbio cuja coluna transmission diverge.
+  // 1) CÂMBIO. Precedência: opcional marcado > marcador da versão FIPE.
+  // Os dois são DECLARAÇÃO do anunciante (ver `cambioSlugFromFipeVersion`);
+  // o script não tem heurística própria de câmbio. Sem nenhum dos dois, não
+  // toca — melhor default errado e visível que valor inventado.
   const cambioRows = await q(
-    `SELECT id, brand, model, transmission, vehicle_options
-       FROM ads
-      WHERE vehicle_options::text ILIKE '%cambio\\_%'`
+    `SELECT id, brand, model, title, transmission, vehicle_options
+       FROM ads`
   );
   const cambioUpdates = [];
   for (const ad of cambioRows) {
-    const slug = cambioSlugFromOptions(ad.vehicle_options);
+    const porOpcional = cambioSlugFromOptions(ad.vehicle_options);
+    const porFipe = porOpcional
+      ? null
+      : cambioSlugFromFipeVersion(`${ad.model || ""} ${ad.title || ""}`);
+    const slug = porOpcional ?? porFipe;
     if (slug && ad.transmission !== slug) {
       cambioUpdates.push({
         id: ad.id,
         from: ad.transmission,
         to: slug,
         label: `${ad.brand} ${ad.model}`,
+        via: porOpcional ? "opcional" : "versão FIPE",
       });
     }
   }
@@ -322,15 +376,22 @@ async function run() {
   const bodyToNull = bodyUpdates.filter((u) => u.to === null).length;
   const bodyToSlug = bodyUpdates.length - bodyToNull;
   console.log(
-    `CÂMBIO   — ${cambioRows.length} com opcional de câmbio; ${cambioUpdates.length} a corrigir (coluna ≠ opcional).`
+    `CÂMBIO   — ${cambioRows.length} anúncios varridos; ${cambioUpdates.length} a corrigir (coluna ≠ declaração).`
   );
   console.log(
     `CARROCERIA — ${sedanRows.length} com body_type='sedan'; ${bodyUpdates.length} a corrigir (${bodyToSlug} → slug real, ${bodyToNull} → NULL).\n`
   );
 
+  const viaCambio = cambioUpdates.reduce(
+    (acc, u) => ({ ...acc, [u.via]: (acc[u.via] || 0) + 1 }),
+    {}
+  );
+  console.log(
+    `           declaração via opcional: ${viaCambio.opcional || 0} · via versão FIPE: ${viaCambio["versão FIPE"] || 0}`
+  );
   const porVia = bodyUpdates.reduce((acc, u) => ({ ...acc, [u.via]: (acc[u.via] || 0) + 1 }), {});
   console.log(
-    `           via texto: ${porVia.texto || 0} · via mapa de modelo: ${porVia.modelo || 0} · sem sinal (NULL): ${porVia["sem sinal"] || 0}\n`
+    `           via texto: ${porVia.texto || 0} · via mapa de modelo (curadoria): ${porVia.modelo || 0} · sem sinal (NULL): ${porVia["sem sinal"] || 0}\n`
   );
 
   const sample = (arr) =>
