@@ -65,6 +65,18 @@ export type UpdateOwnedAdPayload = {
    * (ad-options.catalog) reagrupa, faz allowlist e descarta keys inválidas.
    */
   vehicle_options?: string[] | Record<string, string[]>;
+  /**
+   * Câmbio e carroceria (Fase B). Rótulo ("Automático", "Hatch") ou `null`
+   * para limpar; o backend normaliza para slug em
+   * `normalizeAdVehicleFieldsForPersistence`.
+   *
+   * O `EditAdForm` já enviava os dois desde a Fase B, mas eles NÃO estavam
+   * nesta type nem na whitelist do BFF — eram descartados em silêncio, e a
+   * coluna ficava congelada no valor da criação. Ver o comentário em
+   * `pickEditablePayload` (app/api/ads/[id]/route.ts).
+   */
+  transmission?: string | null;
+  body_type?: string | null;
 };
 
 type PaymentCheckoutResponse = {
