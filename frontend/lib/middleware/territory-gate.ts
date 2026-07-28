@@ -3,11 +3,16 @@ import { BRAZIL_UFS } from "@/lib/city/brazil-ufs";
 /**
  * Gate territorial executado no middleware (Edge runtime) ANTES do
  * Next router pegar as rotas dinâmicas por cidade/UF: `/carros-usados/[uf]`,
- * `/carros-em/[slug]`, `/comprar/estado/[uf]`, `/cidade/[slug]...` e as
- * landings irmãs `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]`
- * e `/tabela-fipe/[cidade]`. Necessário porque o Next 14.2 retorna HTTP 200
- * com body "not-found global" quando `notFound()` é chamado em ISR/página
- * (mesmo bug documentado em `regional-page-guard`).
+ * `/carros-em/[slug]`, `/comprar/estado/[uf]`, `/comprar/cidade/[slug]`,
+ * `/cidade/[slug]...` e as landings irmãs `/carros-baratos-em/[slug]`,
+ * `/carros-automaticos-em/[slug]` e `/tabela-fipe/[cidade]`. Necessário
+ * porque o Next 14.2 retorna HTTP 200 com body "not-found global" quando
+ * `notFound()` é chamado em ISR/página (mesmo bug documentado em
+ * `regional-page-guard`).
+ *
+ * A cobertura tem que ser EXAUSTIVA por família: `/comprar/cidade/` ficou de
+ * fora até 2026-07-28 e virou uma superfície indexável ilimitada sozinha.
+ * Ao criar rota territorial nova, adicione-a aqui no mesmo PR.
  *
  * Sem este gate:
  *   /carros-usados/zz       → 200 + soft-404 UI (Google indexa lixo)
@@ -53,6 +58,26 @@ const LEGACY_STATE_ROUTE_RE = /^\/comprar\/estado\/([^/]+)\/?$/;
  * que devolve noindex,follow quando a cidade existe mas não há estoque).
  */
 const CITY_TERRITORIAL_PREFIX_RE = /^\/cidade\/([^/]+)(?:\/|$)/;
+
+/**
+ * Captura o PREFIXO de `/comprar/cidade/[slug]` — o alias transacional que
+ * canonicaliza em `/carros-em/[slug]`.
+ *
+ * Auditoria 2026-07-28: esta era a ÚNICA rota territorial fora do gate. A
+ * página validava o slug só por FORMATO (`isValidCitySlug`), sem exigir UF
+ * brasileira real, então `/comprar/cidade/xpto-zz` respondia HTTP 200
+ * `index,follow` com o título fabricado "Carros usados em Xpto - ZZ" — uma
+ * superfície indexável ILIMITADA, não as 5.572 cidades do banco. A irmã
+ * `/carros-em/xpto-zz` já devolvia 404 real.
+ *
+ * Prefixo (e não `$`) por simetria com `/cidade/...`: se um dia surgir
+ * subrota sob `/comprar/cidade/[slug]/`, ela nasce coberta.
+ *
+ * Como nas demais: NÃO valida existência no banco — cidade real sem estoque
+ * segue 200 (quem decide indexação é o robots por inventário). O 404 aqui é
+ * só para slug que não pode corresponder a cidade nenhuma.
+ */
+const COMPRAR_CITY_PREFIX_RE = /^\/comprar\/cidade\/([^/]+)(?:\/|$)/;
 
 /**
  * Captura as landings irmãs de `/carros-em` e a ferramenta FIPE por cidade —
@@ -127,6 +152,16 @@ export function decideTerritoryGate(pathname: string): TerritoryGateDecision {
   const cityTerritorialMatch = CITY_TERRITORIAL_PREFIX_RE.exec(pathname);
   if (cityTerritorialMatch) {
     const slug = cityTerritorialMatch[1];
+    const slugUf = extractSlugUf(slug);
+    if (!slugUf || !isValidBrUf(slugUf)) {
+      return { kind: "block-city-slug-invalid", slug };
+    }
+    return { kind: "pass" };
+  }
+
+  const comprarCityMatch = COMPRAR_CITY_PREFIX_RE.exec(pathname);
+  if (comprarCityMatch) {
+    const slug = comprarCityMatch[1];
     const slugUf = extractSlugUf(slug);
     if (!slugUf || !isValidBrUf(slugUf)) {
       return { kind: "block-city-slug-invalid", slug };

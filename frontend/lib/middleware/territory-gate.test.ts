@@ -133,3 +133,48 @@ describe("decideTerritoryGate — bug Next 14.2 (briefing auditoria 2026-05-21)"
     });
   });
 });
+
+/**
+ * Regressão 2026-07-28 — a superfície ilimitada de `/comprar/cidade/[slug]`.
+ *
+ * Esta era a única rota territorial fora do gate: validava o slug só por
+ * FORMATO, então `/comprar/cidade/xpto-zz` respondia HTTP 200 `index,follow`
+ * com título fabricado "Carros usados em Xpto - ZZ". Não eram 5.572 páginas
+ * ruins — era um número ILIMITADO delas, já que qualquer `<algo>-<2 letras>`
+ * servia. A irmã `/carros-em/xpto-zz` sempre devolveu 404.
+ */
+describe("decideTerritoryGate — /comprar/cidade/[slug] (alias transacional)", () => {
+  it.each([
+    "/comprar/cidade/atibaia-sp",
+    "/comprar/cidade/braganca-paulista-sp",
+    "/comprar/cidade/belo-horizonte-mg",
+    "/comprar/cidade/altaneira-ce",
+    "/comprar/cidade/atibaia-sp/",
+  ])("%s (cidade válida) → pass", (pathname) => {
+    expect(decideTerritoryGate(pathname).kind).toBe("pass");
+  });
+
+  it.each([
+    "/comprar/cidade/xpto-zz",
+    "/comprar/cidade/cidade-falsa-xx",
+    "/comprar/cidade/atibaia",
+    "/comprar/cidade/foo",
+    "/comprar/cidade/qualquer-coisa-aa",
+  ])("%s (slug inválido) → block-city-slug-invalid (404 real)", (pathname) => {
+    expect(decideTerritoryGate(pathname).kind).toBe("block-city-slug-invalid");
+  });
+
+  it("paridade com a irmã canônica: mesmo veredito para o mesmo slug", () => {
+    for (const slug of ["atibaia-sp", "altaneira-ce", "xpto-zz", "cidade-falsa-xx", "foo"]) {
+      expect(decideTerritoryGate(`/comprar/cidade/${slug}`).kind).toBe(
+        decideTerritoryGate(`/carros-em/${slug}`).kind
+      );
+    }
+  });
+
+  it("não captura /comprar/estado nem /comprar puro", () => {
+    expect(decideTerritoryGate("/comprar").kind).toBe("pass");
+    expect(decideTerritoryGate("/comprar/estado/sp").kind).toBe("pass");
+    expect(decideTerritoryGate("/comprar/estado/zz").kind).toBe("block-legacy-state-uf-invalid");
+  });
+});
