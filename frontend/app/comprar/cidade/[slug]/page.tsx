@@ -7,6 +7,7 @@ import { hasRealPrice } from "@/lib/ads/has-real-price";
 import { toCityRef, type CityRef } from "@/lib/city/city-types";
 import { resolveBackendApiUrl } from "@/lib/env/backend-api";
 import { toAbsoluteUrl } from "@/lib/seo/site";
+import { getSitemapMinAds } from "@/lib/seo/sitemap-min-ads";
 import {
   fetchAdsFacets,
   fetchAdsSearch,
@@ -22,7 +23,7 @@ import {
   cityContextFromRef,
   cityContextFromSlug,
   hasRestrictiveFilters,
-  isValidCitySlug,
+  isValidBrazilianCitySlug,
   normalizeCityFilters,
   stateNameFromUf,
   type SearchParams,
@@ -82,6 +83,23 @@ function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
 }
 
 /**
+ * Estoque ATIVO da própria cidade — insumo do gate de indexação.
+ *
+ * `limit: 1` porque só o `pagination.total` importa. Em falha devolve 0, o que
+ * degrada para `noindex`: na dúvida NÃO indexar é o lado seguro do erro
+ * (indexar por engano uma página sem estoque é o problema que estamos
+ * consertando; deixar de indexar por um blip se corrige no próximo crawl).
+ */
+async function countOwnActiveAds(slug: string): Promise<number> {
+  try {
+    const res = await fetchAdsSearch({ city_slug: slug, page: 1, limit: 1 });
+    return Number(res?.pagination?.total ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Resolve metadados da cidade direto no backend público.
  * Fallback silencioso para parse do slug — página não pode quebrar em SSR
  * por indisponibilidade do catálogo territorial.
@@ -115,12 +133,12 @@ export async function generateMetadata({
   searchParams = {},
 }: ComprarCidadePageProps): Promise<Metadata> {
   const slug = String(params.slug || "").trim();
-  if (!isValidCitySlug(slug)) {
-    return {
-      title: "Comprar carros | Carros na Cidade",
-      robots: { index: false, follow: true },
-    };
-  }
+  // `isValidBrazilianCitySlug` = formato `nome-uf` E UF brasileira REAL. Antes
+  // era `isValidCitySlug` (só formato), então `xpto-zz` produzia metadata de
+  // cidade e a página respondia 200 indexável (auditoria 2026-07-28). O 404
+  // real vem do middleware (`territory-gate`); esta checagem é defesa em
+  // profundidade, igual às irmãs /carros-baratos-em e /carros-automaticos-em.
+  if (!isValidBrazilianCitySlug(slug)) notFound();
 
   const ref = await resolveCityMeta(slug);
   const ctx = cityContextFromRef(ref) || cityContextFromSlug(slug);
@@ -151,16 +169,27 @@ export async function generateMetadata({
   // antes vazavam via buildCityPath(slug, filters).
   const canonicalPath = `/carros-em/${encodeURIComponent(slug)}`;
 
-  // URLs filtradas (brand, model, q, etc.) não devem ser indexadas: o
-  // canonical já aponta para a URL limpa, mas robots:noindex é mais explícito
-  // e evita que o Googlebot gaste crawl budget em variações de filtro.
-  const noindex = hasRestrictiveFilters(filters);
+  // Indexabilidade = MESMA regra das irmãs (`shouldIndexLocalSeo` em
+  // lib/seo/local-seo-metadata.ts): estoque PRÓPRIO da cidade >= SITEMAP_MIN_ADS.
+  // Mesmo limiar usado pelo sitemap — "entra no índice" e "entra no sitemap"
+  // não podem divergir.
+  //
+  // Auditoria 2026-07-28: esta rota era a única sem o gate. Só emitia noindex
+  // quando havia filtro na URL; na URL limpa não emitia tag `robots` nenhuma
+  // ⇒ default `index,follow`. Com o fallback territorial servindo anúncios de
+  // outra cidade, isso produziu milhares de doorway pages indexáveis.
+  //
+  // CRÍTICO: conta o estoque da PRÓPRIA cidade, nunca o do fallback. Conteúdo
+  // emprestado não pode tornar a página indexável — é exatamente o que
+  // caracteriza doorway page.
+  const ownActiveAds = await countOwnActiveAds(slug);
+  const noindex = hasRestrictiveFilters(filters) || ownActiveAds < getSitemapMinAds();
 
   return {
     title,
     description,
     alternates: { canonical: canonicalPath },
-    ...(noindex && { robots: { index: false, follow: true } }),
+    robots: { index: !noindex, follow: true },
     openGraph: {
       title,
       description,
@@ -176,7 +205,7 @@ export default async function ComprarCidadePage({
   searchParams = {},
 }: ComprarCidadePageProps) {
   const slug = String(params.slug || "").trim();
-  if (!isValidCitySlug(slug)) notFound();
+  if (!isValidBrazilianCitySlug(slug)) notFound();
 
   const ref = await resolveCityMeta(slug);
   const ctx = cityContextFromRef(ref) || cityContextFromSlug(slug);
