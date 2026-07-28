@@ -17,3 +17,19 @@ services:
         value: https://carros-na-cidade-core.onrender.com
       - key: AUTH_SESSION_SECRET
         sync: false
+      # Par UA (`cnc-internal/1.0`) + token que autentica o SSR/BFF do portal no
+      # backend (`isAuthenticatedInternalCall` em bot-blocker.middleware.js).
+      # Quando bate, o SSR pula o bot-blocker, o limite global e os rate limits
+      # por minuto do backend.
+      #
+      # NÃO é o que resolveu os sitemaps vazios de 2026-07-27 — essa causa foi o
+      # 404 storm guard, a única camada que ignorava este token (ver
+      # 404-storm-guard.middleware.js). Registrado aqui porque a hipótese do
+      # token pareceu certa por dois dias e não deve ser reciclada.
+      #
+      # `sync: false` = o VALOR é setado à mão no dashboard do Render e não vive
+      # no git (é secret). O nome fica versionado aqui de propósito: env
+      # invisível no repo é ponto cego de revisão. PRECISA ser idêntica à
+      # INTERNAL_API_TOKEN do serviço de BACKEND.
+      - key: INTERNAL_API_TOKEN
+        sync: false

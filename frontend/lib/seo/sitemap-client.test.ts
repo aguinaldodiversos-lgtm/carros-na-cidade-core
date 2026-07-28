@@ -13,6 +13,7 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import {
+  __resetSitemapLastGoodCache,
   fetchPublicSitemap,
   fetchPublicSitemapByType,
   fetchPublicSitemapByTypes,
@@ -32,6 +33,9 @@ function jsonResponse(status: number, body: unknown): Response {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // O cache de último-bom é estado de módulo: sem limpar, um caso de sucesso
+  // faz o caso de falha seguinte devolver as entries do anterior.
+  __resetSitemapLastGoodCache();
   // Por padrão, resolve a URL "tal qual" prefixando o backend de produção.
   mockedResolve.mockImplementation(
     (path: string) => `https://carros-na-cidade-core.onrender.com${path}`
@@ -90,7 +94,8 @@ describe("sitemap-client — parse e normalização", () => {
       })
     );
 
-    const entries = await fetchPublicSitemapByType("city_home", 20);
+    const { entries, ok } = await fetchPublicSitemapByType("city_home", 20);
+    expect(ok).toBe(true);
     expect(entries).toHaveLength(2);
     expect(entries[0]).toMatchObject({
       loc: "/carros-em/atibaia-sp",
@@ -109,7 +114,7 @@ describe("sitemap-client — parse e normalização", () => {
         ],
       })
     );
-    const entries = await fetchPublicSitemapByType("city_home", 20);
+    const { entries } = await fetchPublicSitemapByType("city_home", 20);
     expect(entries).toHaveLength(1);
     expect(entries[0].priority).toBe(0.9);
   });
@@ -122,49 +127,101 @@ describe("sitemap-client — parse e normalização", () => {
       .mockResolvedValueOnce(
         jsonResponse(200, { success: true, data: [{ loc: "/carros-baratos-em/atibaia-sp" }] })
       );
-    const entries = await fetchPublicSitemapByTypes(["city_home", "city_below_fipe"], 20);
+    const { entries, ok } = await fetchPublicSitemapByTypes(["city_home", "city_below_fipe"], 20);
+    expect(ok).toBe(true);
     expect(entries.map((e) => e.loc).sort()).toEqual([
       "/carros-baratos-em/atibaia-sp",
       "/carros-em/atibaia-sp",
     ]);
   });
+
+  it("vazio LEGÍTIMO do backend é ok:true (não confundir com falha)", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: [] }));
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: true });
+  });
 });
 
-describe("sitemap-client — degrade gracioso (nunca lança)", () => {
-  it("URL não resolvida → []", async () => {
+/**
+ * Estes casos ANTES devolviam `[]` puro, indistinguível de "backend disse que
+ * não há URLs". Era exatamente essa ambiguidade que fazia o urlset vazio ser
+ * servido com TTL de sucesso (incidente 2026-07-27). Agora todo caminho de
+ * falha carrega `ok:false` — e é isso que estes testes travam.
+ */
+describe("sitemap-client — falha é observável (nunca lança, mas nunca finge sucesso)", () => {
+  it("URL não resolvida → ok:false", async () => {
     mockedResolve.mockReturnValue("");
-    const entries = await fetchPublicSitemapByType("city_home", 20);
-    expect(entries).toEqual([]);
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it("resposta não-ok (429/503) → []", async () => {
+  it("resposta não-ok (429 do rate limit) → ok:false", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
-    const entries = await fetchPublicSitemapByType("city_home", 20);
-    expect(entries).toEqual([]);
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
   });
 
-  it("payload success=false → []", async () => {
+  it("payload success=false → ok:false", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(200, { success: false, data: [] }));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual([]);
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
   });
 
-  it("data não-array → []", async () => {
+  it("data não-array → ok:false", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: null }));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual([]);
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
   });
 
-  it("ssrResilientFetch lança (rede/timeout) → [] sem propagar", async () => {
+  it("ssrResilientFetch lança (rede/timeout) → ok:false sem propagar", async () => {
     mockedFetch.mockRejectedValue(new Error("fetch failed"));
-    const entries = await fetchPublicSitemapByType("city_home", 20);
-    expect(entries).toEqual([]);
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
   });
 
-  it("JSON inválido → [] sem propagar", async () => {
+  it("JSON inválido → ok:false sem propagar", async () => {
     mockedFetch.mockResolvedValue(
       new Response("not-json", { status: 200, headers: { "Content-Type": "application/json" } })
     );
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual([]);
+    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+  });
+
+  it("TODO caminho de falha loga (nenhum degrade silencioso)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
+    await fetchPublicSitemapByType("city_home", 20);
+
+    expect(spy).toHaveBeenCalled();
+    expect(String(spy.mock.calls[0][0])).toContain("429");
+  });
+
+  it("um tipo falhando degrada o CONJUNTO (sitemap parcial = remoção silenciosa)", async () => {
+    mockedFetch
+      .mockResolvedValueOnce(
+        jsonResponse(200, { success: true, data: [{ loc: "/carros-em/atibaia-sp" }] })
+      )
+      .mockResolvedValueOnce(jsonResponse(429, { error: "rate_limited" }));
+
+    const result = await fetchPublicSitemapByTypes(["city_home", "city_below_fipe"], 20);
+    expect(result.ok).toBe(false);
+    expect(result.entries).toHaveLength(1);
+  });
+});
+
+describe("sitemap-client — último resultado bom", () => {
+  it("degradado reaproveita o último sitemap bom do mesmo path, ainda com ok:false", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // 1ª chamada: sucesso — memoriza.
+    mockedFetch.mockResolvedValueOnce(
+      jsonResponse(200, { success: true, data: [{ loc: "/carros-em/atibaia-sp" }] })
+    );
+    const good = await fetchPublicSitemapByType("city_brand", 20);
+    expect(good).toMatchObject({ ok: true });
+    expect(good.entries).toHaveLength(1);
+
+    // 2ª chamada: 429 — serve o último bom, mas segue marcado como degradado
+    // (para o TTL continuar curto e a próxima tentativa vir cedo).
+    mockedFetch.mockResolvedValueOnce(jsonResponse(429, { error: "rate_limited" }));
+    const degraded = await fetchPublicSitemapByType("city_brand", 20);
+    expect(degraded.ok).toBe(false);
+    expect(degraded.entries.map((e) => e.loc)).toEqual(["/carros-em/atibaia-sp"]);
   });
 });
 

@@ -163,7 +163,24 @@ function buildPerMinuteLimit(prefix, max) {
   });
 }
 
-export const sitemapRateLimit = buildPerMinuteLimit("sitemap", 5);
+// O portal serve ~10 sitemaps e cada um faz a sua própria chamada aqui
+// (`cities`, `content`, `brands`, `models`, `below-fipe`, `vehicles`,
+// `regiao/[uf]`…). Com cap 5/min, um único ciclo de revalidação já estourava o
+// limite: as chamadas perdedoras levavam 429, o cliente degradava para urlset
+// VAZIO e — até a correção de 2026-07-27 — esse vazio era cacheado por 1h com
+// TTL de sucesso. Resultado: sitemaps vazios em produção por semanas.
+//
+// A defesa primária continua sendo o `skip` interno autenticado: com
+// INTERNAL_API_TOKEN sincronizado entre frontend e backend, o SSR nem chega
+// aqui. Este cap é a rede de segurança para quando o par UA+token NÃO
+// autenticar — e nesse cenário ele precisa comportar o fanout inteiro com
+// folga, em vez de transformar uma falha de env numa desindexação silenciosa.
+// 60/min ≈ 1 req/s por IP real: folgado para o portal e para o Googlebot,
+// ainda restritivo para scraping sustentado de um payload de até 50k URLs.
+export const sitemapRateLimit = buildPerMinuteLimit(
+  "sitemap",
+  resolvePerMinuteMax(process.env.RATE_LIMIT_SITEMAP_MAX, 60)
+);
 export const vehicleImagesRateLimit = buildPerMinuteLimit("vehicle-images", 10);
 
 // Analytics (Fase 4.4): coletor público. Uma navegação dispara poucos eventos

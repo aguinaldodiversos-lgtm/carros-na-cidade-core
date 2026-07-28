@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { buildSitemapXml } from "../../../lib/seo/sitemap-xml";
 import { fetchPublicSitemapByTypes } from "../../../lib/seo/sitemap-client";
+import { sitemapResponseFrom } from "../_lib/sitemap-response";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -15,55 +14,39 @@ export const revalidate = 3600;
 // são listadas). ATENÇÃO: NÃO reintroduzir `/simulador-financiamento/[cidade]`
 // (rota noindex — listá-la em massa fez o Google rastrear as páginas-fantasma
 // `?veiculo=`). Sitemap só pode conter URLs 200 + canônicas + index.
+//
+// Esta rota é DERIVADA de `city_home`: usa `sitemapResponseFrom` para herdar o
+// `ok` da origem. Sem isso, uma derivação de fonte degradada (429) sairia como
+// sucesso e travaria TTL longo — o bug de 2026-07-27 numa nova roupagem.
 export async function GET() {
-  try {
-    const cityEntries = await fetchPublicSitemapByTypes(["city_home"], 50000);
-    const fallbackLastmod = new Date().toISOString();
+  const source = await fetchPublicSitemapByTypes(["city_home"], 50000);
+  const fallbackLastmod = new Date().toISOString();
 
-    const entries = cityEntries.flatMap((entry) => {
-      const slug = String(entry.loc || "")
-        .replace(/^\/carros-em\//, "")
-        .trim();
-      // Guard: só slugs de cidade (o city_home é sempre `/carros-em/{slug}`).
-      if (!slug || slug.includes("/")) return [];
+  const entries = source.entries.flatMap((entry) => {
+    const slug = String(entry.loc || "")
+      .replace(/^\/carros-em\//, "")
+      .trim();
+    // Guard: só slugs de cidade (o city_home é sempre `/carros-em/{slug}`).
+    if (!slug || slug.includes("/")) return [];
 
-      const lastmod =
-        typeof entry.lastmod === "string" && entry.lastmod ? entry.lastmod : fallbackLastmod;
+    const lastmod =
+      typeof entry.lastmod === "string" && entry.lastmod ? entry.lastmod : fallbackLastmod;
 
-      return [
-        {
-          loc: `/blog/${slug}`,
-          lastmod,
-          changefreq: "weekly",
-          priority: 0.6,
-        },
-        {
-          loc: `/tabela-fipe/${slug}`,
-          lastmod,
-          changefreq: "weekly",
-          priority: 0.7,
-        },
-      ];
-    });
-
-    const xml = buildSitemapXml(entries);
-
-    return new NextResponse(xml, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+    return [
+      {
+        loc: `/blog/${slug}`,
+        lastmod,
+        changefreq: "weekly",
+        priority: 0.6,
       },
-    });
-  } catch {
-    // fallback: não quebrar build/runtime se a API estiver fora
-    const xml = buildSitemapXml([]);
-    return new NextResponse(xml, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+      {
+        loc: `/tabela-fipe/${slug}`,
+        lastmod,
+        changefreq: "weekly",
+        priority: 0.7,
       },
-    });
-  }
+    ];
+  });
+
+  return sitemapResponseFrom(source, entries);
 }

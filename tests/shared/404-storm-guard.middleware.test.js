@@ -62,6 +62,7 @@ beforeEach(() => {
   envBackup.PUBLIC_404_STORM_GUARD_ENABLED = process.env.PUBLIC_404_STORM_GUARD_ENABLED;
   envBackup.PUBLIC_404_STORM_THRESHOLD = process.env.PUBLIC_404_STORM_THRESHOLD;
   envBackup.PUBLIC_404_STORM_BLOCK_SECONDS = process.env.PUBLIC_404_STORM_BLOCK_SECONDS;
+  envBackup.INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
   __resetForTests();
 });
 
@@ -193,5 +194,100 @@ describe("publicStormGuardMiddleware — flag ON", () => {
         resolve();
       }, 150);
     });
+  });
+});
+
+/**
+ * Regressão do incidente 2026-07-28: este guard era a ÚNICA camada sem skip
+ * para chamada interna autenticada. 404s do próprio SSR armaram o guard e o
+ * backend passou a responder 429 para TODA chamada do frontend por 1h — só
+ * `/health` escapava (allowlist). O portal seguiu de pé servindo cache stale,
+ * o que escondeu a queda por semanas.
+ *
+ * A correção não pode ser "deixar de contar": ficar cego para 404 gerado por
+ * bug nosso foi o que custou o tempo de diagnóstico. Interno é contado e
+ * REPORTADO, só nunca bloqueado.
+ */
+describe("publicStormGuardMiddleware — chamada interna autenticada", () => {
+  const TOKEN = "token-interno-de-teste";
+
+  function makeInternalReq({ path = "/api/qualquer-404" } = {}) {
+    return {
+      headers: {
+        "user-agent": "cnc-internal/1.0",
+        "x-internal-token": TOKEN,
+        "x-cnc-client-ip": "10.0.0.7",
+      },
+      path,
+      url: path,
+      originalUrl: path,
+    };
+  }
+
+  beforeEach(() => {
+    process.env.PUBLIC_404_STORM_GUARD_ENABLED = "true";
+    process.env.PUBLIC_404_STORM_THRESHOLD = "5";
+    process.env.INTERNAL_API_TOKEN = TOKEN;
+  });
+
+  it("NUNCA bloqueia: após 4x o threshold, segue passando", () => {
+    const req = makeInternalReq();
+    for (let i = 0; i < 20; i++) simulate404(req);
+
+    const res = makeRes();
+    const next = vi.fn();
+    publicStormGuardMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.statusCode).not.toBe(429);
+  });
+
+  it("mas REPORTA o burst — não fica cego para bug nosso", () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const req = makeInternalReq({ path: "/api/rota/que/nao/existe" });
+    for (let i = 0; i < 6; i++) simulate404(req);
+
+    const events = spy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0]);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    const burst = events.find((e) => e.event === "internal_404_burst");
+    expect(burst).toBeDefined();
+    expect(burst.blocked).toBe(false);
+    expect(burst.sample_path).toBe("/api/rota/que/nao/existe");
+    // Nunca deve emitir o evento de bloqueio para chamada interna.
+    expect(events.some((e) => e.event === "public_404_storm_blocked")).toBe(false);
+    spy.mockRestore();
+  });
+
+  it("token INVÁLIDO não ganha o skip — continua sendo bloqueado", () => {
+    const req = makeInternalReq();
+    req.headers["x-internal-token"] = "token-errado";
+    for (let i = 0; i < 5; i++) simulate404(req);
+
+    const res = makeRes();
+    const next = vi.fn();
+    publicStormGuardMiddleware(req, res, next);
+
+    expect(res.statusCode).toBe(429);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("bot externo continua bloqueado normalmente (guard preserva sua função)", () => {
+    const req = makeReq({ ua: "python-requests/2.31", ip: "45.9.1.2" });
+    for (let i = 0; i < 5; i++) simulate404(req);
+
+    const res = makeRes();
+    const next = vi.fn();
+    publicStormGuardMiddleware(req, res, next);
+
+    expect(res.statusCode).toBe(429);
+    expect(next).not.toHaveBeenCalled();
   });
 });

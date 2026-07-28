@@ -20,6 +20,7 @@
 
 import crypto from "node:crypto";
 
+import { isAuthenticatedInternalCall } from "./bot-blocker.middleware.js";
 import { clientRateLimitKey } from "./rateLimit.middleware.js";
 import { summarizeUserAgent } from "./bandwidth-diagnostics.middleware.js";
 
@@ -107,8 +108,25 @@ export function publicStormGuardMiddleware(req, res, next) {
   const now = Date.now();
   const key = getKey(req);
 
+  // Chamada interna AUTENTICADA (UA cnc-internal/1.0 + X-Internal-Token com
+  // timingSafeEqual) nunca é BLOQUEADA — mas continua CONTADA e logada abaixo.
+  //
+  // Incidente 2026-07-28: este guard era a única camada sem esse skip
+  // (bot-blocker, limite global e todos os buildPerMinuteLimit já tinham).
+  // Resultado: 404s do nosso próprio SSR armaram o guard e o backend passou a
+  // responder 429 para TODA chamada do frontend por 1h seguida — só `/health`
+  // escapava, por estar na allowlist. O portal seguiu de pé servindo cache
+  // stale, o que escondeu a queda.
+  //
+  // O guard existe contra bot que enumera rota falsa; bot não tem o token,
+  // então o skip não enfraquece a ameaça real. O que se perde é o teto de
+  // custo contra 404 gerado por bug NOSSO — e é por isso que a contagem e o
+  // log continuam valendo para interno: auto-DoS é pior que CPU desperdiçada,
+  // mas ficar cego para o bug é o que custou semanas nesta sessão.
+  const internal = isAuthenticatedInternalCall(req);
+
   // Se já bloqueado, devolver 429 leve direto sem tocar router.
-  if (isBlocked(key, now)) {
+  if (!internal && isBlocked(key, now)) {
     res.set("Retry-After", String(Math.ceil(getBlockDurationMs() / 1000)));
     res.set("Cache-Control", "no-store");
     res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -121,24 +139,48 @@ export function publicStormGuardMiddleware(req, res, next) {
     try {
       if (res.statusCode !== 404) return;
       gcOldEntries(now);
-      const entry = state.get(key) || { hits: [], blockedUntil: 0 };
+      const entry = state.get(key) || { hits: [], blockedUntil: 0, lastInternalWarnAt: 0 };
       entry.hits = pruneHits(entry.hits, now);
       entry.hits.push(now);
+
       if (entry.hits.length >= getThreshold()) {
-        entry.blockedUntil = now + getBlockDurationMs();
         const ip = clientRateLimitKey(req);
         const ua = req.headers["user-agent"] || "";
-        // eslint-disable-next-line no-console
-        console.log(
-          JSON.stringify({
-            event: "public_404_storm_blocked",
-            ua_summary: summarizeUserAgent(ua),
-            ip_hash: hashIp(ip),
-            count_404: entry.hits.length,
-            sample_path: (req.originalUrl || req.url || "").slice(0, 200),
-            block_seconds: Math.ceil(getBlockDurationMs() / 1000),
-          })
-        );
+        const sample_path = (req.originalUrl || req.url || "").slice(0, 200);
+
+        if (internal) {
+          // NÃO bloqueia: derrubaria o próprio portal. Mas avisa — este log é
+          // o que revela um caminho errado no SSR antes de virar incidente.
+          // Throttle de 1 por janela para não inundar stdout.
+          if (now - (entry.lastInternalWarnAt || 0) >= COUNT_WINDOW_MS) {
+            entry.lastInternalWarnAt = now;
+            // eslint-disable-next-line no-console
+            console.log(
+              JSON.stringify({
+                event: "internal_404_burst",
+                ua_summary: summarizeUserAgent(ua),
+                ip_hash: hashIp(ip),
+                count_404: entry.hits.length,
+                sample_path,
+                blocked: false,
+                note: "chamada interna autenticada: contada e reportada, nunca bloqueada",
+              })
+            );
+          }
+        } else {
+          entry.blockedUntil = now + getBlockDurationMs();
+          // eslint-disable-next-line no-console
+          console.log(
+            JSON.stringify({
+              event: "public_404_storm_blocked",
+              ua_summary: summarizeUserAgent(ua),
+              ip_hash: hashIp(ip),
+              count_404: entry.hits.length,
+              sample_path,
+              block_seconds: Math.ceil(getBlockDurationMs() / 1000),
+            })
+          );
+        }
       }
       state.set(key, entry);
     } catch {

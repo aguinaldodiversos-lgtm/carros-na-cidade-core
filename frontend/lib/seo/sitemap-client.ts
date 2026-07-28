@@ -46,7 +46,80 @@ interface PublicSitemapResponse {
   data: PublicSitemapEntry[];
 }
 
+/**
+ * Resultado de uma busca de sitemap.
+ *
+ * `ok: false` significa "não conseguimos falar com o backend" — NÃO "o backend
+ * disse que não há URLs". A distinção é o ponto central do incidente
+ * 2026-07-27: antes estas funções devolviam `[]` puro nos dois casos, o caller
+ * não tinha como diferenciar, e servia urlset vazio com o MESMO TTL de sucesso
+ * (3600s). Um 429 de um segundo congelava o sitemap vazio por uma hora.
+ *
+ * Quem consome DEVE olhar `ok` para escolher o TTL — ver
+ * `app/sitemaps/_lib/sitemap-response.ts`, que centraliza essa regra.
+ */
+export interface SitemapFetchResult {
+  entries: PublicSitemapEntry[];
+  ok: boolean;
+}
+
 const SITEMAP_REVALIDATE_SECONDS = 3600;
+
+const LOG_TAG = "sitemap-client";
+
+/**
+ * Falha de sitemap SEMPRE loga.
+ *
+ * Antes, três caminhos devolviam `[]` mudos (`!url`, `!res.ok`,
+ * `!json.success`) — só erro de rede aparecia, e ainda assim de dentro do
+ * `ssrResilientFetch`. Resultado: sitemap vazio em produção por semanas sem
+ * uma linha de log. `console.error` porque o Render captura stderr por padrão.
+ */
+function logSitemapFailure(path: string, reason: string): void {
+  if (typeof window !== "undefined") return;
+  // eslint-disable-next-line no-console
+  console.error(`[${LOG_TAG}] ${path} → urlset degradado: ${reason}`);
+}
+
+/**
+ * Último resultado BOM por path, em memória do processo.
+ *
+ * Best-effort deliberado: serve para atravessar um blip (um 429 isolado num
+ * fanout) sem despublicar URLs que o Google já conhece. NÃO é durável — morre
+ * em restart/deploy e não é compartilhado entre instâncias do Render. Por isso
+ * o `ok:false` continua acompanhando o resultado mesmo quando servimos o
+ * último bom: o caller ainda precisa aplicar TTL curto e tentar de novo cedo.
+ *
+ * Só guardamos resultado NÃO-VAZIO: cachear `[]` como "bom" reintroduziria o
+ * bug que estamos consertando.
+ */
+const lastGoodByPath = new Map<string, PublicSitemapEntry[]>();
+
+function rememberLastGood(path: string, entries: PublicSitemapEntry[]): void {
+  if (entries.length > 0) lastGoodByPath.set(path, entries);
+}
+
+/**
+ * Limpa o cache de último-bom. Uso EXCLUSIVO de teste: o cache é estado de
+ * módulo e, sem reset, um caso de sucesso contamina o caso de falha seguinte
+ * (o degradado passaria a devolver as entries do teste anterior).
+ */
+export function __resetSitemapLastGoodCache(): void {
+  lastGoodByPath.clear();
+}
+
+function degraded(path: string, reason: string): SitemapFetchResult {
+  logSitemapFailure(path, reason);
+  const lastGood = lastGoodByPath.get(path);
+  if (lastGood?.length) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[${LOG_TAG}] ${path} → servindo último sitemap bom (${lastGood.length} URLs) enquanto degradado`
+    );
+    return { entries: lastGood, ok: false };
+  }
+  return { entries: [], ok: false };
+}
 
 function normalizeEntry(entry: PublicSitemapEntry): PublicSitemapEntry {
   return {
@@ -118,45 +191,61 @@ function dedupeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {
 /**
  * Busca uma resposta de sitemap do backend e devolve as entries normalizadas.
  *
- * Degrade gracioso: retorna `[]` em qualquer falha (URL não resolvida, !ok,
- * parse, rede). NÃO lança — os `route.ts` de sitemap dependem disso para nunca
- * quebrar o build/runtime quando o backend está fora ou em cold-start.
+ * NÃO lança — os `route.ts` de sitemap dependem disso para nunca quebrar o
+ * build/runtime quando o backend está fora ou em cold-start. Mas, ao contrário
+ * da versão anterior, a falha é OBSERVÁVEL: loga e volta com `ok:false`, para
+ * o caller poder encurtar o TTL em vez de congelar um urlset vazio por 1h.
  *
  * `ssrResilientFetch` injeta os headers internos (UA cnc-internal/1.0 +
- * X-Internal-Token) automaticamente em server-side, então a chamada bypassa o
- * bot-blocker e o rate-limit de sitemap (5/min) do backend.
+ * X-Internal-Token) automaticamente em server-side. Quando o token bate, a
+ * chamada PULA o rate-limit de sitemap do backend (`skipIfAuthenticatedInternal`);
+ * quando não bate, cai no cap por minuto e é aqui que os 429 aparecem.
  */
-async function fetchSitemapEntries(path: string): Promise<PublicSitemapEntry[]> {
+async function fetchSitemapEntries(path: string): Promise<SitemapFetchResult> {
   const url = resolveInternalBackendApiUrl(path);
-  if (!url) return [];
+  if (!url) {
+    return degraded(path, "URL do backend não resolvida (env BACKEND_API_URL/API_URL ausente?)");
+  }
 
   try {
     const res = await ssrResilientFetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
-      logTag: "sitemap-client",
+      logTag: LOG_TAG,
       next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      // 429 aqui = rate limit do backend. Ver comentário no topo: sem
+      // INTERNAL_API_TOKEN sincronizado, o SSR não pula o cap por minuto.
+      return degraded(path, `HTTP ${res.status}`);
+    }
 
     const json = (await res.json()) as PublicSitemapResponse;
-    if (!json?.success || !Array.isArray(json.data)) return [];
+    if (!json?.success || !Array.isArray(json.data)) {
+      return degraded(
+        path,
+        `payload inválido (success=${json?.success}, data=${typeof json?.data})`
+      );
+    }
 
-    return dedupeEntries(json.data.map(normalizeEntry));
-  } catch {
-    return [];
+    const entries = dedupeEntries(json.data.map(normalizeEntry));
+    rememberLastGood(path, entries);
+    return { entries, ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return degraded(path, `exceção: ${message}`);
   }
 }
 
-export async function fetchPublicSitemap(limit = 50000): Promise<PublicSitemapEntry[]> {
+export async function fetchPublicSitemap(limit = 50000): Promise<SitemapFetchResult> {
   return fetchSitemapEntries(`/api/public/seo/sitemap.json?limit=${limit}`);
 }
 
 export async function fetchPublicSitemapByType(
   type: string,
   limit = 50000
-): Promise<PublicSitemapEntry[]> {
+): Promise<SitemapFetchResult> {
   return fetchSitemapEntries(
     `/api/public/seo/sitemap/type/${encodeURIComponent(type)}?limit=${limit}`
   );
@@ -165,30 +254,40 @@ export async function fetchPublicSitemapByType(
 export async function fetchPublicSitemapByRegion(
   state: string,
   limit = 50000
-): Promise<PublicSitemapEntry[]> {
+): Promise<SitemapFetchResult> {
   return fetchSitemapEntries(
     `/api/public/seo/sitemap/region/${encodeURIComponent(state)}?limit=${limit}`
   );
 }
 
+/**
+ * Junta múltiplos tipos num só urlset.
+ *
+ * `ok` é conjuntivo: basta UM tipo falhar para o conjunto ser degradado. Um
+ * sitemap montado com metade das fontes é uma remoção silenciosa de URLs do
+ * índice — trata-se como falha, não como "resultado menor".
+ */
 export async function fetchPublicSitemapByTypes(
   types: string[],
   limit = 50000
-): Promise<PublicSitemapEntry[]> {
+): Promise<SitemapFetchResult> {
   const results = await Promise.all(types.map((t) => fetchPublicSitemapByType(t, limit)));
-  return dedupeEntries(results.flat());
+  return {
+    entries: dedupeEntries(results.flatMap((r) => r.entries)),
+    ok: results.every((r) => r.ok),
+  };
 }
 
 /**
  * Sitemap de veículos (`/veiculo/[slug]` por anúncio ativo). Endpoint dedicado
  * — a fonte é a tabela `ads`, não os cluster plans dos demais tipos.
  */
-export async function fetchPublicVehicleSitemap(limit = 50000): Promise<PublicSitemapEntry[]> {
+export async function fetchPublicVehicleSitemap(limit = 50000): Promise<SitemapFetchResult> {
   return fetchSitemapEntries(`/api/public/seo/sitemap/vehicles?limit=${limit}`);
 }
 
 export async function detectAvailableStates(limit = 100000): Promise<string[]> {
-  const entries = await fetchPublicSitemap(limit);
+  const { entries } = await fetchPublicSitemap(limit);
   const states = new Set<string>();
 
   for (const entry of entries) {
