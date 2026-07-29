@@ -13,6 +13,7 @@ import type { CityRef } from "@/lib/city/city-types";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 
 import { SITE_FAVICON_SRC, SITE_OG_IMAGE_PATH } from "@/lib/site/brand-assets";
+import { fetchFooterInventory } from "@/lib/site/footer-inventory";
 
 import { PublicHeader } from "../components/shell/PublicHeader";
 import { PublicFooter } from "../components/shell/PublicFooter";
@@ -186,6 +187,11 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   const pathname = headerStore.get("x-cnc-pathname");
   const initialCity = resolveSsrInitialCity(pathname, rawCity);
 
+  // Inventário do rodapé resolvido no servidor: o footer é client component e
+  // não pode buscar sozinho sem virar fetch no browser em toda página. Cache de
+  // 1h no fetch; falha devolve inventário vazio (as colunas somem) e loga.
+  const footerInventory = await fetchFooterInventory();
+
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body className="min-h-screen bg-[var(--cnc-bg)] font-sans text-[var(--cnc-text)] antialiased">
@@ -221,7 +227,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
             <main id="main-content" className="flex-1 min-h-[calc(100vh-3.5rem)]">
               {children}
             </main>
-            <PublicFooter />
+            <PublicFooter inventory={footerInventory} />
           </div>
         </AppProviders>
       </body>

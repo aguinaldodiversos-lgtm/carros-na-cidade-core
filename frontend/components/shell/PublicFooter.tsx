@@ -9,7 +9,9 @@ import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/publi
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import {
   buildFooterNavSections,
+  EMPTY_FOOTER_INVENTORY_INPUT,
   SITE_ROUTES,
+  type FooterInventoryInput,
   type SiteNavSection,
   type TerritorialContext,
 } from "@/lib/site/site-navigation";
@@ -198,7 +200,20 @@ function deriveTerritorialContext(
   return {};
 }
 
-export function PublicFooter() {
+/**
+ * `inventory` é resolvido no SERVIDOR (RootLayout) e desce como prop.
+ *
+ * O footer é client component — precisa de `usePathname`/`useCityOptional` —
+ * então não pode buscar do backend por conta própria sem virar fetch no
+ * browser em toda página. O layout busca uma vez, com cache de 1h, e injeta.
+ * Sem a prop, o componente cai em inventário vazio e as colunas territoriais
+ * simplesmente não aparecem (nunca quebra).
+ */
+export function PublicFooter({
+  inventory = EMPTY_FOOTER_INVENTORY_INPUT,
+}: {
+  inventory?: FooterInventoryInput;
+}) {
   const currentYear = new Date().getFullYear();
   const socials = getPublicSocialLinks();
   const cityCtx = useCityOptional();
@@ -214,8 +229,13 @@ export function PublicFooter() {
   );
 
   const footerSections = useMemo(
-    () => buildFooterNavSections(cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG, territorial),
-    [cityCtx?.city.slug, territorial]
+    () =>
+      buildFooterNavSections(
+        cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG,
+        territorial,
+        inventory
+      ),
+    [cityCtx?.city.slug, territorial, inventory]
   );
 
   return (

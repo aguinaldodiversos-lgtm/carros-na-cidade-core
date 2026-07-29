@@ -97,41 +97,86 @@ export type SiteNavSection = {
 };
 
 /**
- * Modelos populares — lista fixa nacional, derivada da demanda agregada
- * (top 5 do termo de busca q= em /comprar). Não é por cidade porque o
- * footer renderiza em rotas sem contexto territorial (home, sobre, blog).
- * Ranking pode ser revisto trimestralmente com base nas métricas reais.
+ * Inventário que alimenta as colunas territoriais do rodapé.
+ *
+ * Shape espelha `lib/site/footer-inventory.ts` (server-only) sem importá-lo:
+ * este módulo é consumido por client components, e importar um módulo
+ * `server-only` quebraria o build.
  */
-const POPULAR_MODELS: ReadonlyArray<{ label: string; query: string }> = [
-  { label: "Volkswagen T-Cross", query: "T-Cross" },
-  { label: "Honda Civic", query: "Civic" },
-  { label: "Toyota Corolla", query: "Corolla" },
-  { label: "Hyundai HB20", query: "HB20" },
-  { label: "Jeep Compass", query: "Compass" },
-];
+export type FooterInventoryInput = {
+  cities: ReadonlyArray<{ slug: string; name: string; state?: string | null; total?: number }>;
+  models: ReadonlyArray<{
+    label: string;
+    brandSlug: string;
+    modelSlug: string;
+    total?: number;
+  }>;
+  modelsCity: { slug: string; name: string; state?: string | null } | null;
+};
+
+export const EMPTY_FOOTER_INVENTORY_INPUT: FooterInventoryInput = {
+  cities: [],
+  models: [],
+  modelsCity: null,
+};
+
+/** Teto por coluna — rodapé é chrome, não índice. */
+const FOOTER_COLUMN_LIMIT = 6;
 
 /**
- * Cidades com mais carros — fallback nacional (capitais + polos
- * regionais com maior liquidez histórica em SP). Footer declarativo:
- * sem fetch, sem pesquisa dinâmica. Re-curar manualmente quando rolar
- * expansão para outros estados.
+ * Cidades e modelos saem do INVENTÁRIO ATIVO (auditoria 2026-07-28).
+ *
+ * Antes eram duas listas hardcoded: 6 cidades com ZERO anúncios (São Paulo,
+ * Campinas, Santos…) e 5 modelos dos quais só o HB20 existia — os outros
+ * levavam a `/comprar?q=` sem resultado. Como o rodapé é global, o site
+ * inteiro não linkava Atibaia, a única cidade com estoque, e o Search Console
+ * reportava "Nenhuma página de referência detectada" para ela.
+ *
+ * Coluna sem item é OMITIDA (ver filtro no fim de `buildFooterNavSections`) —
+ * título sem link é pior que ausência.
  */
-const POPULAR_CITIES_FALLBACK: ReadonlyArray<{ name: string; slug: string }> = [
-  { name: "São Paulo", slug: "sao-paulo-sp" },
-  { name: "Campinas", slug: "campinas-sp" },
-  { name: "Santos", slug: "santos-sp" },
-  { name: "Ribeirão Preto", slug: "ribeirao-preto-sp" },
-  { name: "São José dos Campos", slug: "sao-jose-dos-campos-sp" },
-  { name: "Sorocaba", slug: "sorocaba-sp" },
-];
+function buildCityLinks(inventory: FooterInventoryInput): SiteNavLink[] {
+  return inventory.cities.slice(0, FOOTER_COLUMN_LIMIT).map((c) => ({
+    id: `city-${c.slug}`,
+    label: c.name,
+    href: `/carros-em/${encodeURIComponent(c.slug)}`,
+  }));
+}
 
-function buildModelSearchHref(query: string): string {
-  return `/comprar?q=${encodeURIComponent(query)}`;
+/**
+ * Modelos apontam para a página de cluster REAL
+ * (`/cidade/{cidade}/marca/{marca}/modelo/{modelo}`), não para `/comprar?q=`.
+ *
+ * Os slugs vêm prontos do backend, gerados pelas mesmas funções que o resolver
+ * usa para casar a URL com o valor real de `ads.brand`/`ads.model`. Remontá-los
+ * aqui reintroduziria o risco de link para página com "0 anúncios".
+ */
+function buildModelLinks(inventory: FooterInventoryInput): SiteNavLink[] {
+  const citySlug = inventory.modelsCity?.slug;
+  if (!citySlug) return [];
+
+  return inventory.models.slice(0, FOOTER_COLUMN_LIMIT).map((m) => ({
+    id: `model-${m.brandSlug}-${m.modelSlug}`,
+    label: m.label,
+    href: `/cidade/${encodeURIComponent(citySlug)}/marca/${encodeURIComponent(
+      m.brandSlug
+    )}/modelo/${encodeURIComponent(m.modelSlug)}`,
+  }));
+}
+
+/**
+ * Título honesto: os modelos são de UMA cidade, então o rótulo diz qual.
+ * "Modelos mais buscados" era uma afirmação que o dado não sustentava.
+ */
+function buildModelsTitle(inventory: FooterInventoryInput): string {
+  const city = inventory.modelsCity;
+  return city?.name ? `Modelos disponíveis em ${city.name}` : "Modelos disponíveis";
 }
 
 export function buildFooterNavSections(
   citySlug: string,
-  context: TerritorialContext = {}
+  context: TerritorialContext = {},
+  inventory: FooterInventoryInput = EMPTY_FOOTER_INVENTORY_INPUT
 ): SiteNavSection[] {
   const territorial = getTerritorialRoutesForCity(citySlug);
 
@@ -145,12 +190,25 @@ export function buildFooterNavSections(
       ? `/carros-usados/${context.stateUf.toLowerCase()}`
       : SITE_ROUTES.comprarOpen;
 
-  // "Carros por cidade" também respeita contexto.
-  const cityLinkHref = context.citySlug
-    ? `/carros-em/${encodeURIComponent(context.citySlug)}`
-    : territorial.cidade;
+  // "Carros por cidade" — o link só segue o contexto quando a cidade da página
+  // TEM estoque. Antes ele usava `context.citySlug` cru, que vem do cookie da
+  // última cidade visitada: quem passasse por Altaneira-CE (zero anúncios)
+  // passava a ver, em TODA página do site, um link do rodapé para
+  // `/carros-em/altaneira-ce` — página vazia. Sem cidade útil no contexto,
+  // aponta para a de maior estoque; sem inventário nenhum, para o catálogo.
+  const contextCityHasStock = Boolean(
+    context.citySlug && inventory.cities.some((c) => c.slug === context.citySlug)
+  );
+  const topInventoryCity = inventory.cities[0]?.slug ?? null;
+  const cityLinkHref = contextCityHasStock
+    ? `/carros-em/${encodeURIComponent(context.citySlug as string)}`
+    : topInventoryCity
+      ? `/carros-em/${encodeURIComponent(topInventoryCity)}`
+      : SITE_ROUTES.comprarOpen;
 
-  return [
+  // Anotação explícita: sem ela o `.filter()` no fim descarta a tipagem
+  // contextual do literal e `id: string` deixa de casar com `SiteNavSectionId`.
+  const sections: SiteNavSection[] = [
     {
       id: "comprar",
       title: "Comprar",
@@ -167,21 +225,13 @@ export function buildFooterNavSections(
     },
     {
       id: "modelos",
-      title: "Modelos mais buscados",
-      links: POPULAR_MODELS.map((m) => ({
-        id: `model-${m.query.toLowerCase()}`,
-        label: m.label,
-        href: buildModelSearchHref(m.query),
-      })),
+      title: buildModelsTitle(inventory),
+      links: buildModelLinks(inventory),
     },
     {
       id: "cidades",
       title: "Cidades com mais carros",
-      links: POPULAR_CITIES_FALLBACK.map((c) => ({
-        id: `city-${c.slug}`,
-        label: c.name,
-        href: `/carros-em/${encodeURIComponent(c.slug)}`,
-      })),
+      links: buildCityLinks(inventory),
     },
     {
       id: "ferramentas",
@@ -215,6 +265,13 @@ export function buildFooterNavSections(
       ],
     },
   ];
+
+  // Coluna sem link é OMITIDA. As colunas de inventário ficam vazias quando o
+  // backend falha ou quando não há estoque — e título sozinho é pior que
+  // ausência: promete navegação que não existe e ainda ocupa uma célula do
+  // grid. As colunas estáticas (Comprar, Ferramentas, Vender, Institucional)
+  // nunca são afetadas porque seus links são constantes.
+  return sections.filter((section) => section.links.length > 0);
 }
 
 /**

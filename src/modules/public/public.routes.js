@@ -12,16 +12,14 @@ import {
   getCityById,
   getCatalogAdsTerritoryFallback,
   getCityRadiusCoverage,
+  getFooterInventory,
   resolveCity,
   searchCities,
 } from "./public-city-query.controller.js";
 import { getFeaturedRegionsByState } from "./public-state.controller.js";
 import { getPublicRegionByCitySlug } from "./public-region.controller.js";
 import { getPublicDealerBySlug } from "./public-dealer.controller.js";
-import {
-  listPublicBlogPosts,
-  getPublicBlogPostBySlug,
-} from "./public-blog.controller.js";
+import { listPublicBlogPosts, getPublicBlogPostBySlug } from "./public-blog.controller.js";
 import { collectAnalyticsEvent } from "./public-analytics.controller.js";
 import { getPublicBoostConfig } from "./public-commercial.controller.js";
 import { cacheGet } from "../../shared/cache/cache.middleware.js";
@@ -39,6 +37,19 @@ const router = express.Router();
 router.post("/analytics/events", analyticsRateLimit, collectAnalyticsEvent);
 
 router.get("/home", cacheGet({ prefix: "home", ttlSeconds: 60, varyBy: ["query"] }), getHomeData);
+
+/**
+ * Facetas do rodapé (cidades com estoque + modelos da cidade mais forte).
+ *
+ * Cache 300s: o rodapé aparece em TODA página do site, mas a lista só muda
+ * quando um anúncio entra ou sai. 5 min é folgado para o conteúdo e evita que
+ * o chrome global vire uma query por pageview.
+ */
+router.get(
+  "/footer-inventory",
+  cacheGet({ prefix: "public:footer-inventory", ttlSeconds: 300, varyBy: ["query"] }),
+  getFooterInventory
+);
 
 /**
  * Config pública do produto avulso "Destaque 7 dias" (boost-7d) — leitura,

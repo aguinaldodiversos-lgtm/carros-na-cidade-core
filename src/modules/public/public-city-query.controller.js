@@ -1,6 +1,27 @@
 import * as citiesService from "../cities/cities.service.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
+import { getFooterInventoryFacets } from "../../read-models/cities/inventory-facets.service.js";
 import { resolveCityCoverage } from "../../read-models/cities/regional-radius.service.js";
+
+/**
+ * Facetas de inventário do rodapé público: cidades com estoque + modelos da
+ * cidade mais forte, com os slugs de cluster já resolvidos.
+ *
+ * Sempre 200, mesmo em falha parcial — o service degrada para lista vazia e
+ * loga. O rodapé é chrome global; um 5xx aqui derrubaria toda página do site.
+ * Coluna sem dado é ocultada no frontend.
+ */
+export async function getFooterInventory(req, res, next) {
+  try {
+    const data = await getFooterInventoryFacets({
+      cityLimit: req.query.cities,
+      modelLimit: req.query.models,
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Cobertura "âncora regional" (Onda 2 Fase 2a): estoque próprio + cidades
@@ -18,7 +39,8 @@ export async function getCityRadiusCoverage(req, res, next) {
       return res.status(400).json({ success: false, message: "Slug obrigatório." });
     }
     const kmParam = Number.parseInt(String(req.query.km ?? ""), 10);
-    const opts = Number.isFinite(kmParam) && kmParam > 0 ? { radiusKm: Math.min(kmParam, 150) } : {};
+    const opts =
+      Number.isFinite(kmParam) && kmParam > 0 ? { radiusKm: Math.min(kmParam, 150) } : {};
     const coverage = await resolveCityCoverage(slug, opts);
     res.json({ success: true, data: coverage });
   } catch (err) {
