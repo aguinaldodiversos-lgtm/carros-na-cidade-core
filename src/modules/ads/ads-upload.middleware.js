@@ -1,5 +1,8 @@
 import multer from "multer";
-import { ACCEPTED_INPUT_MIMES } from "../../infrastructure/storage/image-normalizer.js";
+import {
+  ACCEPTED_FORMATS_LABEL,
+  ACCEPTED_INPUT_MIMES,
+} from "../../infrastructure/storage/image-normalizer.js";
 import {
   VEHICLE_IMAGE_MAX_FILES,
   VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES,
@@ -35,7 +38,15 @@ function normalizeMime(mime) {
  * pelo pipeline de storage antes de chegar ao R2.
  *
  * Formatos aceitos: JPEG (incluindo aliases image/jpg, image/x-jpg,
- * image/pjpeg), PNG, WebP, HEIC/HEIF (fotos de iPhone).
+ * image/pjpeg), PNG e WebP. HEIC/HEIF saíram em 2026-07-29 — o sharp não
+ * decodifica (ver image-normalizer.js).
+ *
+ * LIMITE ESTRUTURAL: o `fileFilter` roda ANTES de o conteúdo do arquivo ser
+ * lido — só existe `file.mimetype`, não o buffer. Por isso a checagem aqui é
+ * necessariamente pelo tipo DECLARADO, e a verificação por conteúdo (magic
+ * bytes) só pode acontecer depois, no normalizador. Um HEIC rotulado como
+ * `image/jpeg` passa por aqui de propósito e é barrado lá, com mensagem
+ * específica.
  */
 export const adsPublishImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -49,11 +60,14 @@ export const adsPublishImageUpload = multer({
       cb(null, true);
       return;
     }
-    cb(
-      new Error(
-        `Formato de imagem não suportado: "${file.mimetype || "desconhecido"}". ` +
-          "Formatos aceitos: JPEG, PNG, WebP, HEIC/HEIF."
-      )
+    const error = new Error(
+      `Formato de imagem não suportado: "${file.mimetype || "desconhecido"}". ` +
+        `Envie em ${ACCEPTED_FORMATS_LABEL}.`
     );
+    // Mensagem escrita para o usuário final: pode ser exibida (ver o contrato
+    // de `expose` no errorHandler). Sem isso viraria "Requisição inválida."
+    error.statusCode = 415;
+    error.expose = true;
+    cb(error);
   },
 });

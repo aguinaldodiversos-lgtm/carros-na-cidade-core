@@ -23,13 +23,24 @@ const DEFAULT_CACHE_CONTROL =
   process.env.VEHICLE_IMAGE_CACHE_CONTROL ||
   "public, max-age=31536000, stale-while-revalidate=86400";
 
+/**
+ * Formatos aceitos no caminho `direct-r2`.
+ *
+ * ATENÇÃO — este caminho NÃO normaliza: o arquivo vai para o R2 exatamente
+ * como chegou, com a extensão mapeada aqui. Ele não usa sharp (compare com
+ * `src/infrastructure/storage/r2.service.js`, que converte tudo para WebP).
+ *
+ * Por isso `image/heic`, `image/heif` e `image/avif` foram REMOVIDOS em
+ * 2026-07-29: eram aceitos e subiam crus, e nenhum navegador além do Safari
+ * renderiza HEIC. O anúncio publicaria com foto quebrada e SEM erro nenhum —
+ * pior que o 500 visível que motivou esta correção.
+ *
+ * Só entram aqui formatos que qualquer navegador exibe nativamente.
+ */
 const ALLOWED_IMAGE_MIME_TYPES = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
   ["image/webp", "webp"],
-  ["image/avif", "avif"],
-  ["image/heic", "heic"],
-  ["image/heif", "heif"],
 ]);
 
 let cachedClient = null;

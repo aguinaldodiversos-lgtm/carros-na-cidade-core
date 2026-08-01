@@ -24,7 +24,10 @@ import sharp from "sharp";
 
 import {
   normalizeVehicleImage,
+  isHeifBuffer,
+  UnsupportedImageFormatError,
   ACCEPTED_INPUT_MIMES,
+  ACCEPTED_FORMATS_LABEL,
   OUTPUT_MIME,
   OUTPUT_EXT,
 } from "../../src/infrastructure/storage/image-normalizer.js";
@@ -79,10 +82,21 @@ describe("ACCEPTED_INPUT_MIMES — whitelist de entrada", () => {
     expect(ACCEPTED_INPUT_MIMES.has("image/pjpeg")).toBe(true));
   it("contém image/png", () => expect(ACCEPTED_INPUT_MIMES.has("image/png")).toBe(true));
   it("contém image/webp", () => expect(ACCEPTED_INPUT_MIMES.has("image/webp")).toBe(true));
-  it("contém image/heic (iPhone iOS 11+)", () =>
-    expect(ACCEPTED_INPUT_MIMES.has("image/heic")).toBe(true));
-  it("contém image/heif (MIME alternativo iPhone)", () =>
-    expect(ACCEPTED_INPUT_MIMES.has("image/heif")).toBe(true));
+  /**
+   * HEIC/HEIF saíram da whitelist em 2026-07-29.
+   *
+   * Estavam aqui porque o comentário do módulo afirmava que o sharp
+   * decodificava HEIC nos prebuilts. Não decodifica — os binários removeram o
+   * decoder HEVC por patente. Resultado em produção: foto de celular derrubava
+   * o wizard com HTTP 500 exibindo a string crua do libvips ao usuário.
+   *
+   * `sharp.format.heif.input.buffer` reporta `true` (suporte ao CONTÊINER),
+   * então nenhum teste de capacidade pega isso — só o arquivo real.
+   */
+  it("NÃO contém image/heic — sharp não decodifica HEVC", () =>
+    expect(ACCEPTED_INPUT_MIMES.has("image/heic")).toBe(false));
+  it("NÃO contém image/heif — mesma razão", () =>
+    expect(ACCEPTED_INPUT_MIMES.has("image/heif")).toBe(false));
   it("NÃO contém image/bmp", () => expect(ACCEPTED_INPUT_MIMES.has("image/bmp")).toBe(false));
   it("NÃO contém image/svg+xml", () =>
     expect(ACCEPTED_INPUT_MIMES.has("image/svg+xml")).toBe(false));
@@ -200,5 +214,101 @@ describe("normalizeVehicleImage — casos de erro", () => {
 
     expect(result.mimeType).toBe("image/webp");
     expect(result.buffer.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Incidente 2026-07-29 — foto de celular derrubava a etapa "Fotos" do wizard
+ * com HTTP 500 exibindo, na tela do usuário final:
+ *
+ *   "source: bad seek to 1495082 ... heif: Error while loading plugin:
+ *    Support for this compression format has not been built in"
+ *
+ * Duas causas somadas: HEIC estava na whitelist sem ser decodificável, e o
+ * errorHandler copiava a mensagem crua de qualquer erro não mapeado para o
+ * corpo da resposta.
+ */
+describe("HEIC — detecção por conteúdo e falha legível", () => {
+  /** Cabeçalho HEIC real: box `ftyp` + marca, nos offsets 4..12. */
+  function heifHeader(brand) {
+    const buf = Buffer.alloc(32);
+    buf.writeUInt32BE(32, 0); // box size
+    buf.write("ftyp", 4, "ascii");
+    buf.write(brand, 8, "ascii");
+    return buf;
+  }
+
+  it.each(["heic", "heix", "mif1", "msf1"])(
+    "reconhece a marca ftyp '%s' pelo conteúdo",
+    (brand) => {
+      expect(isHeifBuffer(heifHeader(brand))).toBe(true);
+    }
+  );
+
+  it("não confunde JPEG com HEIF", () => {
+    expect(isHeifBuffer(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(false);
+  });
+
+  it("buffer curto demais não quebra a detecção", () => {
+    expect(isHeifBuffer(Buffer.from([0xff, 0xd8]))).toBe(false);
+    expect(isHeifBuffer(null)).toBe(false);
+  });
+
+  /**
+   * O ponto central: detectar pelo CONTEÚDO, não pelo MIME declarado. O
+   * Android manda `.heic` como `application/octet-stream` ou até rotulado
+   * `image/jpeg` — nesse caso o arquivo passa pela whitelist e só o conteúdo
+   * denuncia.
+   */
+  it("rejeita HEIC com 415 mesmo quando o MIME declarado seria aceito", async () => {
+    await expect(normalizeVehicleImage(heifHeader("heic"))).rejects.toBeInstanceOf(
+      UnsupportedImageFormatError
+    );
+
+    const err = await normalizeVehicleImage(heifHeader("heic")).catch((e) => e);
+    expect(err.statusCode).toBe(415);
+    expect(err.expose).toBe(true);
+  });
+
+  it("a mensagem diz ao usuário o que fazer no celular", async () => {
+    const err = await normalizeVehicleImage(heifHeader("heic")).catch((e) => e);
+    expect(err.message).toMatch(/HEIC/i);
+    expect(err.message).toMatch(/alta efici[êe]ncia|HEIF/i);
+    expect(err.message).toContain(ACCEPTED_FORMATS_LABEL);
+  });
+
+  it("NENHUMA mensagem de erro contém jargão de libvips/sharp", async () => {
+    const casos = [heifHeader("heic"), Buffer.from("%PDF-1.4 conteudo qualquer aqui 12345678")];
+
+    for (const buf of casos) {
+      const err = await normalizeVehicleImage(buf).catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).not.toMatch(/libvips|bad seek|loading plugin|VipsOperation|heif:/i);
+    }
+  });
+
+  it("arquivo corrompido vira 415 legível, não 500 com stack de biblioteca", async () => {
+    const lixo = Buffer.from("nao sou uma imagem, sou texto puro com bytes suficientes");
+    const err = await normalizeVehicleImage(lixo).catch((e) => e);
+
+    expect(err).toBeInstanceOf(UnsupportedImageFormatError);
+    expect(err.statusCode).toBe(415);
+    expect(err.message).toContain(ACCEPTED_FORMATS_LABEL);
+  });
+
+  it("JPEG e PNG continuam passando — a correção não estreitou o que funcionava", async () => {
+    const jpeg = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: "#fff" },
+    })
+      .jpeg()
+      .toBuffer();
+    const png = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: "#fff" },
+    })
+      .png()
+      .toBuffer();
+
+    expect((await normalizeVehicleImage(jpeg)).mimeType).toBe(OUTPUT_MIME);
+    expect((await normalizeVehicleImage(png)).mimeType).toBe(OUTPUT_MIME);
   });
 });

@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           requestId,
-          message: "Nenhuma foto válida enviada. Use JPG, PNG, WebP, HEIC ou HEIF.",
+          message: "Nenhuma foto válida enviada. Use JPG, PNG ou WebP.",
         },
         { status: 400 }
       );

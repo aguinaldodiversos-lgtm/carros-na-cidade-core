@@ -1,4 +1,13 @@
 import { getLogger } from "../logger.js";
+// Import de `modules/` dentro de `shared/` é inversão de camada, aceita aqui
+// de propósito: `ads.upload.constants` é a FONTE ÚNICA dos limites (multer,
+// Zod, routes e r2.service leem dela) e o próprio arquivo documenta que
+// divergir desses números já causou bug. Duplicar os valores na mensagem de
+// erro seria pior que a inversão. Sem ciclo: o módulo não importa nada.
+import {
+  VEHICLE_IMAGE_MAX_FILES,
+  VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES,
+} from "../../modules/ads/ads.upload.constants.js";
 
 export class AppError extends Error {
   constructor(message, statusCode = 400, isOperational = true, details = null) {
@@ -92,6 +101,53 @@ function handlePostgresError(err) {
   return new AppError("Erro no banco de dados.", 500, false, details);
 }
 
+/**
+ * Mensagem neutra por faixa de status, para erro não mapeado.
+ *
+ * Em português porque é texto de usuário final — o público do portal é BR.
+ * Genérica de propósito: o detalhe fica no log, correlacionável por requestId.
+ */
+/**
+ * Erros do multer viram mensagem de usuário em português.
+ *
+ * `MulterError` não carrega `statusCode` e sua `.message` é em inglês
+ * ("File too large", "Too many files"). Antes da trava de exposição isso
+ * chegava cru ao cliente: feio, mas informativo. Sem este mapa, passaria a
+ * cair no genérico "Erro interno" — pior, porque quem mandou uma foto de 20 MB
+ * ficaria sem saber o que fazer.
+ *
+ * Retorna `null` quando não é erro de multer.
+ */
+function mapMulterError(err) {
+  if (err?.name !== "MulterError") return null;
+
+  const mb = Math.round(VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES / (1024 * 1024));
+  const byCode = {
+    LIMIT_FILE_SIZE: {
+      statusCode: 413,
+      message: `Imagem grande demais. O limite é ${mb} MB por foto.`,
+    },
+    LIMIT_FILE_COUNT: {
+      statusCode: 413,
+      message: `Muitas imagens de uma vez. Envie no máximo ${VEHICLE_IMAGE_MAX_FILES}.`,
+    },
+    LIMIT_UNEXPECTED_FILE: {
+      statusCode: 400,
+      message: "Campo de arquivo inesperado no envio.",
+    },
+  };
+
+  return byCode[err.code] || { statusCode: 400, message: "Falha ao receber o arquivo enviado." };
+}
+
+function genericMessageForStatus(statusCode) {
+  if (statusCode === 413) return "Arquivo grande demais.";
+  if (statusCode === 415) return "Formato de arquivo não suportado.";
+  if (statusCode === 429) return "Muitas requisições. Tente novamente em instantes.";
+  if (statusCode >= 400 && statusCode < 500) return "Requisição inválida.";
+  return "Erro interno. Tente novamente em instantes.";
+}
+
 export function errorHandler(err, req, res, _next) {
   let error = err;
 
@@ -157,7 +213,33 @@ export function errorHandler(err, req, res, _next) {
         },
         "[errorHandler] erro não mapeado antes do AppError"
       );
-      error = new AppError(raw?.message || "Internal Server Error", raw?.statusCode || 500, false);
+
+      // A mensagem de um erro NÃO MAPEADO não pode virar corpo de resposta.
+      //
+      // Antes: `new AppError(raw?.message || "Internal Server Error", ...)`.
+      // Isso copiava a string interna de qualquer biblioteca direto para o
+      // JSON devolvido ao cliente. Em 2026-07-29 o usuário final viu, na tela
+      // do wizard de anúncio, o texto do libvips:
+      //   "source: bad seek to 1495082 ... heif: Error while loading plugin"
+      // Não é só feio: expõe caminho de código, offsets e versão de
+      // dependência para qualquer visitante.
+      //
+      // Quem QUER expor mensagem marca o erro com `expose = true` (ver
+      // `UnsupportedImageFormatError` em image-normalizer.js) — decisão
+      // explícita de quem escreveu o erro, nunca vazamento por omissão.
+      // O texto completo continua no log acima, com requestId para correlação.
+      const multer = mapMulterError(raw);
+      if (multer) {
+        error = new AppError(multer.message, multer.statusCode, true);
+      } else {
+        const statusCode = raw?.statusCode || 500;
+        const canExpose = raw?.expose === true && typeof raw?.message === "string" && raw.message;
+        error = new AppError(
+          canExpose ? raw.message : genericMessageForStatus(statusCode),
+          statusCode,
+          false
+        );
+      }
     }
   }
 

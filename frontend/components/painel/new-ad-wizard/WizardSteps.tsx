@@ -612,14 +612,19 @@ export function StepPhotos({
           <span className="mt-2 max-w-md text-sm text-[#6E748A]">
             {uploadedUrls.length > 0
               ? `${uploadedUrls.length}/10 fotos adicionadas. Adicione mais ou continue.`
-              : "Até 10 imagens. Formatos JPG ou PNG."}
+              : "Até 10 imagens. Formatos JPG, PNG ou WebP."}
           </span>
           {uploading ? (
             <span className="mt-3 inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#2F67F6] border-t-transparent" />
           ) : null}
           <input
             type="file"
-            accept="image/*"
+            // Explícito, não `image/*`: no iOS o Safari CONVERTE HEIC→JPEG
+            // automaticamente quando o accept não inclui HEIC. No Android só
+            // filtra a exibição (não converte), mas alinha o seletor ao que o
+            // backend realmente aceita — antes o curinga deixava escolher HEIC
+            // e o upload morria com HTTP 500 no servidor.
+            accept="image/jpeg,image/png,image/webp"
             multiple
             className="hidden"
             disabled={uploading}

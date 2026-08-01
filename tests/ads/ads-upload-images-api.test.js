@@ -205,10 +205,12 @@ describe("POST /api/ads/upload-images — formatos aceitos e contrato", () => {
     expect(uploadVehicleImagesMock).toHaveBeenCalledTimes(1);
   });
 
-  // ── HEIC / HEIF (iPhone) ─────────────────────────────────────────────────
+  // ── HEIC / HEIF: rejeitados desde 2026-07-29 ─────────────────────────────
+  //
+  // Eram aceitos e quebravam no sharp, devolvendo 500 com a string do libvips
+  // na tela do usuário. Agora param no fileFilter, com 415 e texto acionável.
 
-  it("aceita HEIC (image/heic) — fotos de iPhone iOS 11+", async () => {
-    mockR2Upload();
+  it("rejeita HEIC (image/heic) com 415 — sharp não decodifica HEVC", async () => {
     const app = buildUploadApp();
 
     const res = await request(app)
@@ -216,12 +218,12 @@ describe("POST /api/ads/upload-images — formatos aceitos e contrato", () => {
       .set("Authorization", "Bearer token-teste")
       .attach("photos", MINIMAL_JPEG, { filename: "IMG_0001.heic", contentType: "image/heic" });
 
-    expect(res.status).toBe(200);
-    expect(uploadVehicleImagesMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(415);
+    expect(String(res.body?.message || "")).toMatch(/JPG, PNG ou WebP/i);
+    expect(uploadVehicleImagesMock).not.toHaveBeenCalled();
   });
 
-  it("aceita HEIF (image/heif) — MIME alternativo para fotos de iPhone", async () => {
-    mockR2Upload();
+  it("rejeita HEIF (image/heif) com 415", async () => {
     const app = buildUploadApp();
 
     const res = await request(app)
@@ -229,13 +231,30 @@ describe("POST /api/ads/upload-images — formatos aceitos e contrato", () => {
       .set("Authorization", "Bearer token-teste")
       .attach("photos", MINIMAL_JPEG, { filename: "IMG_0001.heif", contentType: "image/heif" });
 
-    expect(res.status).toBe(200);
-    expect(uploadVehicleImagesMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(415);
+    expect(uploadVehicleImagesMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * NENHUMA resposta pode conter texto interno de biblioteca. O incidente que
+   * originou esta correção expôs "bad seek to 1495082 ... heif: Error while
+   * loading plugin" na tela — caminho de código, offsets e dependência.
+   */
+  it("resposta de rejeição não vaza jargão de libvips/sharp/heif", async () => {
+    const app = buildUploadApp();
+
+    const res = await request(app)
+      .post("/api/ads/upload-images")
+      .set("Authorization", "Bearer token-teste")
+      .attach("photos", MINIMAL_JPEG, { filename: "IMG_0001.heic", contentType: "image/heic" });
+
+    const body = JSON.stringify(res.body);
+    expect(body).not.toMatch(/libvips|bad seek|loading plugin|VipsOperation|heif:/i);
   });
 
   // ── Rejeição ─────────────────────────────────────────────────────────────
 
-  it("rejeita formato não suportado (image/bmp) antes de chegar ao storage", async () => {
+  it("rejeita formato não suportado (image/bmp) com 415", async () => {
     const BMP_HEADER = Buffer.from("424d1e00000000000000", "hex");
     const app = buildUploadApp();
 
@@ -244,12 +263,14 @@ describe("POST /api/ads/upload-images — formatos aceitos e contrato", () => {
       .set("Authorization", "Bearer token-teste")
       .attach("photos", BMP_HEADER, { filename: "foto.bmp", contentType: "image/bmp" });
 
-    expect(res.status).toBe(500);
+    // Antes era 500: o erro do fileFilter não carregava statusCode e caía no
+    // default. 415 é o código correto para mídia não suportada.
+    expect(res.status).toBe(415);
     expect(String(res.body?.message || "")).toMatch(/não suportado/i);
     expect(uploadVehicleImagesMock).not.toHaveBeenCalled();
   });
 
-  it("rejeita PDF (application/pdf) — não é imagem", async () => {
+  it("rejeita PDF (application/pdf) com 415 — não é imagem", async () => {
     const PDF_HEADER = Buffer.from("%PDF-1.4");
     const app = buildUploadApp();
 
@@ -258,7 +279,7 @@ describe("POST /api/ads/upload-images — formatos aceitos e contrato", () => {
       .set("Authorization", "Bearer token-teste")
       .attach("photos", PDF_HEADER, { filename: "doc.pdf", contentType: "application/pdf" });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(415);
     expect(uploadVehicleImagesMock).not.toHaveBeenCalled();
   });
 

@@ -7,8 +7,6 @@
  *   • Universal browser support since 2020 (Chrome, Firefox, Safari, Edge)
  *   • ~35–40 % smaller than JPEG at equivalent perceived quality
  *   • Supports transparency (PNG source photos with alpha survive correctly)
- *   • sharp's HEIC/HEIF → WebP path (via bundled libheif ≥ 8.15) handles
- *     iPhone photos on Node 20 LTS without extra system packages or builds
  *   • Cloudflare R2 + CDN serves WebP with the correct Content-Type natively
  *
  * Why not JPEG?
@@ -25,18 +23,37 @@
  *   Metadata is stripped by default; sharp does not copy EXIF/IPTC/XMP
  *   unless you explicitly call .withMetadata().
  *
+ * ─── HEIC/HEIF NÃO É SUPORTADO AQUI (corrigido em 2026-07-29) ──────────────
+ *
+ * Este bloco AFIRMAVA que os binários pré-compilados do sharp decodificavam
+ * HEIC "sem pacotes de sistema extras". Era falso, e derrubou o upload de
+ * fotos de celular em produção com um HTTP 500 exibindo a string crua do
+ * libvips ao usuário final:
+ *
+ *   "heif: Error while loading plugin: Support for this compression format
+ *    has not been built in"
+ *
+ * Desde o sharp 0.33/0.34 os prebuilts REMOVERAM o decoder HEVC por patente.
+ * O que engana: `sharp.format.heif.input.buffer` reporta `true` — isso indica
+ * suporte ao CONTÊINER HEIF, não ao codec HEVC do conteúdo. Ou seja, nenhum
+ * teste de capacidade detecta o problema; só o arquivo real falha.
+ *
+ * Não reintroduza `image/heic`/`image/heif` em ACCEPTED_INPUT_MIMES sem antes
+ * plugar um decoder de verdade (libheif em WASM via `heic-convert`, que roda
+ * no Render sem pacote de sistema) ANTES do sharp no pipeline.
+ *
+ * AVIF também fica de fora: o codec não está presente em todas as variantes
+ * de binário (ausência confirmada em win32-x64, libvips 8.17.3).
+ *
  * Deploy requirements:
- *   sharp ≥ 0.33 prebuilt binaries for Node 20 LTS include all codecs used
- *   here (jpeg, png, webp, heif/heic) on linux-x64, linux-arm64,
- *   darwin-arm64, darwin-x64 and win32-x64.
- *   AVIF input is excluded from ACCEPTED_INPUT_MIMES because the avif codec
- *   is not available in all prebuilt binary variants (confirmed absence on
- *   win32-x64 in libvips 8.17.3); removing it avoids a runtime failure on
- *   platforms without avif support. Re-enable when the target deploy platform
- *   has been validated.
+ *   sharp ≥ 0.34 prebuilts cobrem jpeg, png e webp em linux-x64, linux-arm64,
+ *   darwin-arm64, darwin-x64 e win32-x64. Esses três são os únicos formatos
+ *   que este módulo aceita — a lista abaixo é a fonte única.
  */
 
 import sharp from "sharp";
+
+import { logger } from "../../shared/logger.js";
 
 /** Format written to R2 and served to all browsers. */
 export const OUTPUT_MIME = "image/webp";
@@ -83,9 +100,67 @@ export const ACCEPTED_INPUT_MIMES = new Set([
   "image/pjpeg", // progressive JPEG (legacy IE)
   "image/png",
   "image/webp",
-  "image/heic", // iPhone HEVC photo format (iOS 11+)
-  "image/heif", // iPhone HEVC, alternative MIME declaration
+  // image/heic e image/heif estavam AQUI e não eram decodificáveis — ver o
+  // bloco "HEIC/HEIF NÃO É SUPORTADO AQUI" no topo do arquivo antes de
+  // reintroduzir.
 ]);
+
+/**
+ * Formatos legíveis para mensagem de usuário. Fonte única do texto que
+ * aparece na UI, no fileFilter do multer e no erro 415 — sem essa fonte
+ * única, os três divergiram (a UI prometia "JPG ou PNG", o multer prometia
+ * "JPEG, PNG, WebP, HEIC/HEIF" e o `accept` do input era `image/*`).
+ */
+export const ACCEPTED_FORMATS_LABEL = "JPG, PNG ou WebP";
+
+/**
+ * Erro de formato de imagem não suportado.
+ *
+ * `statusCode: 415` e `expose: true` fazem o errorHandler devolver ESTA
+ * mensagem (em português, acionável) em vez da string interna da biblioteca.
+ * O erro original vai só para o log — ver `normalizeVehicleImage`.
+ */
+export class UnsupportedImageFormatError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "UnsupportedImageFormatError";
+    this.statusCode = 415;
+    this.expose = true;
+  }
+}
+
+/**
+ * Marcas HEIF/HEIC no box `ftyp` (bytes 4..12). O Android manda `.heic` com
+ * MIME `application/octet-stream` com frequência, então o TIPO DECLARADO não
+ * serve para identificar o arquivo — só o conteúdo serve.
+ *
+ * Hoje isso alimenta só o log de diagnóstico. É também o gancho para o decode
+ * HEIC via WASM (etapa 2): a detecção precisa acontecer DEPOIS do buffer
+ * existir, porque o `fileFilter` do multer roda antes de o stream ser lido e
+ * só enxerga `file.mimetype`.
+ */
+const HEIF_FTYP_BRANDS = ["heic", "heix", "hevc", "hevx", "mif1", "msf1", "heim", "heis"];
+
+/** `true` quando o buffer é da família HEIF/HEIC, pelo conteúdo. */
+export function isHeifBuffer(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return false;
+  if (buf.toString("ascii", 4, 8) !== "ftyp") return false;
+  return HEIF_FTYP_BRANDS.includes(buf.toString("ascii", 8, 12).toLowerCase());
+}
+
+/** Rótulo curto do formato real, só para log. Nunca vai para a resposta HTTP. */
+function describeMagicBytes(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return "curto-demais";
+  if (buf[0] === 0xff && buf[1] === 0xd8) return "jpeg";
+  if (buf.toString("ascii", 1, 4) === "PNG") return "png";
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") {
+    return "webp";
+  }
+  if (buf.toString("ascii", 4, 8) === "ftyp") {
+    return `ftyp:${buf.toString("ascii", 8, 12).toLowerCase()}`;
+  }
+  return `desconhecido:${buf.subarray(0, 4).toString("hex")}`;
+}
 
 /**
  * Normalise a vehicle photo buffer to WebP.
@@ -108,14 +183,51 @@ export async function normalizeVehicleImage(inputBuffer) {
     throw new Error("[normalizer] Buffer de entrada vazio.");
   }
 
-  const { data, info } = await sharp(buf)
-    .rotate() // step 1: EXIF auto-rotate + strip orientation
-    .resize(MAX_DIMENSION, MAX_DIMENSION, {
-      fit: "inside",
-      withoutEnlargement: true, // step 2: downscale only, preserve aspect ratio
-    })
-    .webp({ quality: WEBP_QUALITY, effort: 4 }) // step 3: encode to WebP
-    .toBuffer({ resolveWithObject: true });
+  // HEIC detectado pelo CONTEÚDO, antes de chamar o sharp. Cobre o caso em que
+  // o arquivo chega rotulado como image/jpeg (alguns seletores do Android
+  // rotulam errado) e passaria pela whitelist de MIME. Sem isto, o sharp
+  // falharia e o usuário receberia a mensagem genérica — esta é acionável,
+  // porque diz exatamente o que fazer no celular.
+  if (isHeifBuffer(buf)) {
+    logger.warn(
+      { bytes: buf.length, magic: describeMagicBytes(buf) },
+      "[normalizer] upload HEIC/HEIF recusado (decoder HEVC ausente no sharp)"
+    );
+    throw new UnsupportedImageFormatError(
+      "Esta foto está em HEIC, formato que ainda não processamos. " +
+        "Na câmera do celular, desative 'alta eficiência' (ou 'HEIF') e " +
+        `envie novamente, ou converta para ${ACCEPTED_FORMATS_LABEL}.`
+    );
+  }
+
+  let data;
+  let info;
+  try {
+    ({ data, info } = await sharp(buf)
+      .rotate() // step 1: EXIF auto-rotate + strip orientation
+      .resize(MAX_DIMENSION, MAX_DIMENSION, {
+        fit: "inside",
+        withoutEnlargement: true, // step 2: downscale only, preserve aspect ratio
+      })
+      .webp({ quality: WEBP_QUALITY, effort: 4 }) // step 3: encode to WebP
+      .toBuffer({ resolveWithObject: true }));
+  } catch (err) {
+    // O sharp/libvips descreve falha de decode em inglês técnico e às vezes
+    // vaza offsets internos ("bad seek to 1495082"). Isso NUNCA pode virar
+    // corpo de resposta HTTP — foi exatamente o que o usuário final viu na
+    // tela ao subir foto de celular. Log completo aqui, mensagem limpa acima.
+    logger.error(
+      {
+        err: err?.message || String(err),
+        bytes: buf.length,
+        magic: describeMagicBytes(buf),
+      },
+      "[normalizer] sharp falhou ao decodificar a imagem"
+    );
+    throw new UnsupportedImageFormatError(
+      `Não foi possível processar esta imagem. Envie em ${ACCEPTED_FORMATS_LABEL}.`
+    );
+  }
 
   return {
     buffer: data,
