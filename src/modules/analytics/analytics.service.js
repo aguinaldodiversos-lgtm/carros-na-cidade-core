@@ -1,6 +1,7 @@
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import {
   deriveDeviceType,
+  derivePlatform,
   hashUserAgent,
   isPayloadTooLarge,
   normalizeEventInput,
@@ -37,6 +38,10 @@ export async function recordEvent({ body, userAgent }) {
   const row = {
     ...norm.value,
     device_type: norm.value.device_type || deriveDeviceType(userAgent),
+    // Derivado SEMPRE no servidor, sem aceitar valor do cliente (ao contrário
+    // de device_type, que tem override legado): é dado de decisão técnica e
+    // não pode ser forjado pelo navegador.
+    platform: derivePlatform(userAgent),
     user_agent_hash: hashUserAgent(userAgent),
   };
 

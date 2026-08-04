@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   deriveDeviceType,
+  derivePlatform,
   hashUserAgent,
   isPayloadTooLarge,
   isValidEventType,
@@ -82,5 +83,64 @@ describe("analytics.constants · isPayloadTooLarge", () => {
   });
   it("aceita payload normal", () => {
     expect(isPayloadTooLarge({ event_type: "page_view", path: "/comprar" })).toBe(false);
+  });
+});
+
+/**
+ * `platform` foi adicionado em 2026-08-01 (migration 048) porque
+ * `deriveDeviceType` colapsa iPhone e Android em "mobile" — e a decisão sobre
+ * decodificar HEIC no servidor (dependência WASM, ~1-3s e centenas de MB por
+ * foto) depende exatamente dessa divisão. O `accept` explícito do seletor já
+ * resolve o iOS de graça; sem saber o peso do Android, não há critério.
+ *
+ * Balde GROSSO de propósito: sem versão de SO, sem modelo. Mesma granularidade
+ * de device_type, mesmo compromisso de privacidade (UA bruto nunca é gravado).
+ */
+describe("derivePlatform", () => {
+  const ANDROID_CHROME =
+    "Mozilla/5.0 (Linux; Android 13; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36";
+  const IPHONE_SAFARI =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+  const IPAD =
+    "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/604.1";
+  const DESKTOP =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+
+  it("Samsung Android → android", () => {
+    expect(derivePlatform(ANDROID_CHROME)).toBe("android");
+  });
+
+  it("iPhone → ios", () => {
+    expect(derivePlatform(IPHONE_SAFARI)).toBe("ios");
+  });
+
+  it("iPad → ios", () => {
+    expect(derivePlatform(IPAD)).toBe("ios");
+  });
+
+  it("desktop → other", () => {
+    expect(derivePlatform(DESKTOP)).toBe("other");
+  });
+
+  /**
+   * O caso que quebraria uma checagem ingênua: navegadores Android citam
+   * "like Mac OS X" na string de compatibilidade do WebKit. Testar iOS antes
+   * de Android classificaria Samsung como iPhone — e a decisão sobre a Etapa 2
+   * sairia invertida.
+   */
+  it("Android com 'like Mac OS X' NÃO é classificado como ios", () => {
+    const ua =
+      "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Mac OS X) Chrome/120 Mobile";
+    expect(derivePlatform(ua)).toBe("android");
+  });
+
+  it.each([null, undefined, "", "   "])("UA ausente (%s) → null, não 'other'", (ua) => {
+    expect(derivePlatform(ua)).toBeNull();
+  });
+
+  it("granularidade grossa: nunca devolve versão nem modelo", () => {
+    for (const ua of [ANDROID_CHROME, IPHONE_SAFARI, IPAD, DESKTOP]) {
+      expect(["ios", "android", "other"]).toContain(derivePlatform(ua));
+    }
   });
 });

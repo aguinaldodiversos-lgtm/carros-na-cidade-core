@@ -92,13 +92,40 @@ export function hashUserAgent(ua) {
 export function deriveDeviceType(ua) {
   if (typeof ua !== "string" || !ua.trim()) return "unknown";
   const lower = ua.toLowerCase();
-  if (/\b(ipad|tablet|playbook|silk)\b/.test(lower) || (/android/.test(lower) && !/mobile/.test(lower))) {
+  if (
+    /\b(ipad|tablet|playbook|silk)\b/.test(lower) ||
+    (/android/.test(lower) && !/mobile/.test(lower))
+  ) {
     return "tablet";
   }
   if (/\b(mobile|iphone|ipod|android|blackberry|iemobile|opera mini)\b/.test(lower)) {
     return "mobile";
   }
   return "desktop";
+}
+
+/**
+ * Plataforma do aparelho: `ios` | `android` | `other`.
+ *
+ * Existe porque `deriveDeviceType` colapsa iPhone e Android em "mobile", e a
+ * decisão sobre decodificar HEIC no servidor depende exatamente dessa divisão
+ * (o `accept` do seletor já resolve o iOS de graça).
+ *
+ * Balde GROSSO de propósito — mesma granularidade de `device_type`. Sem versão
+ * de SO, sem modelo: nada que identifique aparelho ou pessoa. O User-Agent
+ * bruto continua fora do banco (só `user_agent_hash`).
+ *
+ * Ordem importa: iPadOS moderno se anuncia como "Macintosh ... Mac OS X" com
+ * touch, mas iPad/iPhone/iPod cobrem os casos que interessam. Android é
+ * testado ANTES de iOS porque alguns navegadores Android citam "like Mac OS X"
+ * na string de compatibilidade do WebKit.
+ */
+export function derivePlatform(ua) {
+  if (typeof ua !== "string" || !ua.trim()) return null;
+  const lower = ua.toLowerCase();
+  if (/\bandroid\b/.test(lower)) return "android";
+  if (/\b(iphone|ipad|ipod)\b/.test(lower) || /\bios\b/.test(lower)) return "ios";
+  return "other";
 }
 
 function capString(value, max) {

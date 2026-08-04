@@ -28,6 +28,7 @@ const INSERT_COLS = [
   "utm_medium",
   "utm_campaign",
   "device_type",
+  "platform",
   "user_agent_hash",
   "session_id",
 ];
@@ -94,8 +95,15 @@ export async function getTotals() {
     };
   } catch {
     return {
-      visitorsToday: 0, viewsToday: 0, visitors7d: 0, views7d: 0,
-      visitors30d: 0, views30d: 0, whatsappClicks30d: 0, phoneClicks30d: 0, financeClicks30d: 0,
+      visitorsToday: 0,
+      viewsToday: 0,
+      visitors7d: 0,
+      views7d: 0,
+      visitors30d: 0,
+      views30d: 0,
+      whatsappClicks30d: 0,
+      phoneClicks30d: 0,
+      financeClicks30d: 0,
     };
   }
 }
@@ -340,8 +348,13 @@ export async function getAdMetrics(adId) {
     };
   } catch {
     return {
-      ad_id: adId, views_7d: 0, views_30d: 0, whatsapp_clicks_30d: 0,
-      phone_clicks_30d: 0, finance_clicks_30d: 0, contact_rate_30d: 0,
+      ad_id: adId,
+      views_7d: 0,
+      views_30d: 0,
+      whatsapp_clicks_30d: 0,
+      phone_clicks_30d: 0,
+      finance_clicks_30d: 0,
+      contact_rate_30d: 0,
     };
   }
 }
@@ -376,6 +389,12 @@ export async function getPostMetrics(postId) {
       traffic_sources: sources.rows.map((s) => ({ source: s.source, total: Number(s.total) || 0 })),
     };
   } catch {
-    return { blog_post_id: postId, views_7d: 0, views_30d: 0, unique_sessions_30d: 0, traffic_sources: [] };
+    return {
+      blog_post_id: postId,
+      views_7d: 0,
+      views_30d: 0,
+      unique_sessions_30d: 0,
+      traffic_sources: [],
+    };
   }
 }
