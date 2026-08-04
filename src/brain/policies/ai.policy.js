@@ -101,9 +101,21 @@ export class AiPolicy {
     }
   }
 
-  /** @param {string} [_task] — reservado para tarefas que não devem ir ao cache */
-  shouldCache(_task) {
-    return true;
+  /**
+   * Tarefas que NÃO vão ao cache.
+   *
+   * `ad_description_suggestion`: a chave de cache é o hash da ficha do
+   * veículo, então dois anúncios com a mesma ficha receberiam o MESMO texto —
+   * conteúdo duplicado dentro do próprio domínio, justamente o que a feature
+   * existe para evitar. Somado a isso, "Gerar sugestão" é um botão que o
+   * usuário clica de novo esperando outra redação; devolver o texto cacheado
+   * faria o botão parecer quebrado. O custo é contido pelo rate limit por
+   * usuário, não pelo cache.
+   *
+   * @param {string} [task]
+   */
+  shouldCache(task) {
+    return task !== "ad_description_suggestion";
   }
 
   cacheKey({ task, input, context }) {

@@ -2,6 +2,17 @@ import { z } from "zod";
 
 export const AiTaskSchema = z.enum([
   "ad_description_short",
+  /**
+   * Sugestão de descrição para o passo de Revisão do wizard (Fase 4.5).
+   *
+   * NÃO reusa `ad_description_short` de propósito: aquela task tem prompt
+   * persuasivo ("foco em conversão") e — pior — um fallback de template que
+   * afirma "excelente estado. Documentação em dia" e termina em CTA. Para um
+   * classificado isso é fato inventado assinado pelo domínio da plataforma, e
+   * idêntico em todo anúncio (conteúdo duplicado interno). Esta task tem
+   * prompt próprio, fallback `null` e um guard de saída (ad-description.guard).
+   */
+  "ad_description_suggestion",
   "lead_scoring",
   "seo_city_page",
   "seo_money_page",

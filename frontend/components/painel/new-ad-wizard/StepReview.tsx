@@ -14,6 +14,7 @@ import {
 } from "@/lib/painel/review-monetization";
 import { formatKm, parseCurrency } from "./currency";
 import { FinalizeLocationFields } from "./FinalizeLocationFields";
+import DescriptionSuggestion from "./DescriptionSuggestion";
 import type { WizardFormState } from "./types";
 
 type Patch = (partial: Partial<WizardFormState>) => void;
@@ -36,7 +37,6 @@ type Props = {
 };
 
 const DESCRIPTION_MAX = 1000;
-const cardLabel = "mb-2 block text-sm font-semibold text-cnc-text-strong";
 
 // ── Ícones inline (lucide-react não está instalado no projeto) ──────────────
 // Ilustração de megafone colorida (sobre o fundo claro, sem card azul) — fiel
@@ -612,14 +612,24 @@ export default function StepReview({
       {/* Descrição + UF + Cidade + Responsabilidade (bloco de dados editáveis) */}
       <section className="rounded-2xl border border-cnc-line bg-white p-5 shadow-card sm:p-6">
         <div className="space-y-5">
-          <label className="block">
-            <span className={cardLabel}>Descrição do anúncio (opcional)</span>
+          {/*
+            O rótulo saiu de dentro do <label> porque agora divide a linha com
+            o botão de gerar sugestão — um <button> dentro de <label> faz o
+            clique borbulhar para o textarea e roubar o foco.
+          */}
+          <div>
+            <DescriptionSuggestion
+              state={state}
+              onApply={(text) => patch({ description: text.slice(0, DESCRIPTION_MAX) })}
+            />
             <div className="relative">
               <textarea
+                id="ad-description"
                 value={state.description}
                 onChange={(e) => patch({ description: e.target.value.slice(0, DESCRIPTION_MAX) })}
                 rows={5}
                 maxLength={DESCRIPTION_MAX}
+                aria-label="Descrição do anúncio"
                 placeholder="Destaque diferenciais, estado de conservação e histórico de revisões."
                 className="w-full resize-y rounded-xl border border-primary/30 bg-primary-soft/30 px-4 py-3 pb-7 text-sm text-cnc-text outline-none transition focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/30"
               />
@@ -627,7 +637,7 @@ export default function StepReview({
                 {state.description.length}/{DESCRIPTION_MAX}
               </span>
             </div>
-          </label>
+          </div>
 
           <FinalizeLocationFields state={state} patch={patch} />
         </div>

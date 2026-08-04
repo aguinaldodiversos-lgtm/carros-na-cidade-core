@@ -2,6 +2,11 @@ import express from "express";
 import * as adsController from "./ads.controller.js";
 import * as adReportsController from "./reports/ad-reports.controller.js";
 import * as autocompleteController from "./autocomplete/ads-autocomplete.controller.js";
+import * as adDescriptionController from "./description-suggestion/ad-description.controller.js";
+import {
+  descriptionSuggestionUserRateLimit,
+  descriptionSuggestionDraftRateLimit,
+} from "./description-suggestion/ad-description.rate-limit.js";
 import { adsPublishImageUpload } from "./ads-upload.middleware.js";
 import { VEHICLE_IMAGE_MAX_FILES } from "./ads.upload.constants.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
@@ -82,6 +87,21 @@ router.post(
   authMiddleware,
   adsPublishImageUpload.array("photos", VEHICLE_IMAGE_MAX_FILES),
   adsController.uploadPublishImages
+);
+
+/**
+ * Sugestão de descrição do passo de Revisão (Fase 4.5).
+ *
+ * Caminho literal ANTES de `/:identifier` e `/:id/*` para não ser capturado
+ * por eles. Autenticado (anônimo leva 401 do authMiddleware) e com dois
+ * limiters por usuário — ver ad-description.rate-limit.js.
+ */
+router.post(
+  "/description-suggestion",
+  authMiddleware,
+  descriptionSuggestionUserRateLimit,
+  descriptionSuggestionDraftRateLimit,
+  adDescriptionController.suggest
 );
 
 router.get(
