@@ -3,13 +3,30 @@ import path from "node:path";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { sanitizeS3MetadataValue } from "@/lib/painel/s3-metadata-sanitize";
 
+/**
+ * Formatos aceitos neste caminho — que NÃO normaliza.
+ *
+ * `uploadDraftPhotosDirectR2` faz `PutObject` com o buffer EXATAMENTE como
+ * chegou, sem sharp: sem resize, sem recompressão, sem conversão para WebP.
+ * A extensão e o Content-Type saem daqui. Logo, só pode entrar formato que
+ * qualquer navegador exibe nativamente.
+ *
+ * `image/heic`, `image/heif` e `image/avif` foram REMOVIDOS em 2026-08-01.
+ * Se um deles subisse, o anúncio publicaria com foto que só o Safari
+ * renderiza — quebrada e SEM erro nenhum, pior que o HTTP 500 visível do
+ * incidente de HEIC.
+ *
+ * ATENÇÃO — o commit d463abee tentou fazer isso e MUDOU O ARQUIVO ERRADO:
+ * corrigiu `ALLOWED_IMAGE_MIME_TYPES` em
+ * `frontend/infrastructure/storage/r2.service.js`, que é cópia órfã, não
+ * importada por nada (só pelo próprio teste). Esta constante aqui é a que o
+ * upload realmente usa. Ao mexer em formato aceito, confira QUEM IMPORTA o
+ * módulo antes — não basta o nome do arquivo parecer certo.
+ */
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-  "image/avif": "avif",
-  "image/heic": "heic",
-  "image/heif": "heif",
 };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
