@@ -49,6 +49,14 @@ const CITY_PREFIX_PATTERNS: ReadonlyArray<{ family: string; re: RegExp }> = [
   { family: "cidade", re: /^\/cidade\/([^/]+)(?:\/|$)/ },
   // Dual: pode ser POST do CMS ou hub de cidade. Ver `isCityLikeSlug`.
   { family: "blog", re: /^\/blog\/([^/]+)(?:\/|$)/ },
+  // `/carros-usados/regiao/[slug]` recebe slug de CIDADE, não de UF: é a região
+  // ANCORADA naquela cidade (`resolveTerritory({ level: "region", regionSlug })`,
+  // H1 "Carros usados em {cidade} e região"). Chegou a ficar no gate de UF, sob
+  // o argumento de que a região pode ter vizinhas com estoque mesmo com a âncora
+  // vazia — mas isso produzia a contradição de uma página cujo H1 nomeia uma
+  // cidade que dá 404 em todas as outras 7 rotas. A rota aceita cidade, logo é
+  // do gate de cidade. Ver a ressalva sobre vizinhança no ADR.
+  { family: "carros-usados-regiao", re: /^\/carros-usados\/regiao\/([^/]+)(?:\/|$)/ },
 ];
 
 /**
@@ -78,18 +86,24 @@ const CITY_PREFIX_PATTERNS: ReadonlyArray<{ family: string; re: RegExp }> = [
  * região legítima. Pela UF é seguro: estado sem nenhum anúncio não pode ter
  * região com estoque.
  */
-const UF_PREFIX_PATTERNS: ReadonlyArray<{ family: string; re: RegExp; from: "uf" | "citySlug" }> = [
-  { family: "carros-usados-uf", re: /^\/carros-usados\/([^/]+)\/?$/, from: "uf" },
-  { family: "comprar-estado", re: /^\/comprar\/estado\/([^/]+)(?:\/|$)/, from: "uf" },
-  {
-    family: "carros-usados-regiao",
-    re: /^\/carros-usados\/regiao\/([^/]+)(?:\/|$)/,
-    from: "citySlug",
-  },
-  // `/[uf]/regiao/[ancora]` — segmento dinâmico na RAIZ. O literal "regiao" na
-  // segunda posição é o que impede este padrão de capturar o site inteiro.
-  { family: "uf-regiao", re: /^\/([^/]+)\/regiao\/([^/]+)(?:\/|$)/, from: "uf" },
+const UF_PREFIX_PATTERNS: ReadonlyArray<{ family: string; re: RegExp }> = [
+  // `/carros-usados/[uf]` — 2 segmentos. NÃO casa `/carros-usados/regiao/[slug]`
+  // (3 segmentos), que é rota de CIDADE e vive em CITY_PREFIX_PATTERNS.
+  { family: "carros-usados-uf", re: /^\/carros-usados\/([^/]+)\/?$/ },
+  { family: "comprar-estado", re: /^\/comprar\/estado\/([^/]+)(?:\/|$)/ },
 ];
+
+/**
+ * `/[uf]/regiao/[ancora]` NÃO está aqui de propósito.
+ *
+ * Medido em produção: é alias 301 para a canônica.
+ *   /ce/regiao/alguma-ancora → 301 → /carros-usados/regiao/alguma-ancora-ce → 404
+ *
+ * O destino é rota de cidade e já passa pelo gate de cidade, então gatear o
+ * alias seria uma segunda decisão sobre o mesmo recurso — e um fetch a mais
+ * por request. Um 301 que aterrissa em 404 é perfeitamente legível para
+ * crawler. O smoke SEGUE o redirect e afere o status final.
+ */
 
 /** `"sao-jose-dos-campos-sp"` → `"sp"`. Vazio quando não há sufixo de UF. */
 export function ufFromCitySlug(slug: string): string {
@@ -132,16 +146,13 @@ export interface UfScopedMatch {
  * `/lojas/regiao/x` com `/[uf]/regiao/x`.
  */
 export function extractUfScopedMatch(pathname: string): UfScopedMatch | null {
-  for (const { family, re, from } of UF_PREFIX_PATTERNS) {
+  for (const { family, re } of UF_PREFIX_PATTERNS) {
     const match = re.exec(pathname);
     if (!match) continue;
 
-    const raw = decodeURIComponent(match[1] || "")
+    const uf = decodeURIComponent(match[1] || "")
       .trim()
       .toLowerCase();
-    if (!raw) return null;
-
-    const uf = from === "uf" ? raw : ufFromCitySlug(raw);
     if (!/^[a-z]{2}$/.test(uf)) return null;
 
     return { family, uf };

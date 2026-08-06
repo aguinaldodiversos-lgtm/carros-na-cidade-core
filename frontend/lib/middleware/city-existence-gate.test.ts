@@ -92,6 +92,10 @@ describe("sub-rotas herdam a decisão da cidade", () => {
     "/blog/altaneira-ce/categoria/dicas",
     "/blog/altaneira-ce/algum-post",
     "/comprar/cidade/altaneira-ce/qualquer-coisa",
+    // Região ANCORADA numa cidade que não existe. Chegou a ficar no gate de
+    // UF; produzia um H1 "Carros usados em Altaneira e região" para uma cidade
+    // que dá 404 nas outras 7 rotas.
+    "/carros-usados/regiao/altaneira-ce",
   ];
 
   for (const path of subrotas) {
@@ -102,6 +106,25 @@ describe("sub-rotas herdam a decisão da cidade", () => {
 
   it("sub-rota de cidade que existe passa", () => {
     expect(act("/cidade/atibaia-sp/marca/fiat").kind).toBe("pass-exists");
+  });
+
+  it("região ancorada em cidade que EXISTE passa", () => {
+    expect(act("/carros-usados/regiao/atibaia-sp").kind).toBe("pass-exists");
+  });
+
+  it("/carros-usados/regiao/ é família de CIDADE, não de UF", () => {
+    expect(extractCityScopedMatch("/carros-usados/regiao/altaneira-ce")).toEqual({
+      family: "carros-usados-regiao",
+      citySlug: "altaneira-ce",
+    });
+  });
+
+  it("/carros-usados/[uf] NÃO é capturado pelo gate de cidade", () => {
+    // As duas rotas compartilham prefixo; se o padrão de cidade engolisse a de
+    // UF, `/carros-usados/sp` procuraria "sp" no conjunto de CIDADES e 404aria
+    // um estado que tem estoque.
+    expect(extractCityScopedMatch("/carros-usados/sp")).toBeNull();
+    expect(extractCityScopedMatch("/carros-usados/ce")).toBeNull();
   });
 });
 

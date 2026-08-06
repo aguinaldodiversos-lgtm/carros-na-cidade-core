@@ -29,7 +29,6 @@ const SET: CitySetResult = {
 const FAMILIAS = [
   ["carros-usados-uf", (uf: string) => `/carros-usados/${uf}`],
   ["comprar-estado", (uf: string) => `/comprar/estado/${uf}`],
-  ["uf-regiao", (uf: string) => `/${uf}/regiao/alguma-ancora`],
 ] as const;
 
 function act(pathname: string, set: CitySetResult = SET) {
@@ -45,11 +44,13 @@ describe("UF sem nenhum anúncio → 404", () => {
     });
   }
 
-  it("região ancorada em cidade de estado vazio é bloqueada", () => {
-    expect(act("/carros-usados/regiao/altaneira-ce")).toEqual({
-      kind: "block-not-found",
-      uf: "ce",
-    });
+  it("/carros-usados/regiao/ NAO e rota de UF — e do gate de cidade", () => {
+    expect(extractUfScopedMatch("/carros-usados/regiao/altaneira-ce")).toBeNull();
+  });
+
+  it("/[uf]/regiao/ NAO e gateado — e alias 301 para a canonica de cidade", () => {
+    expect(extractUfScopedMatch("/ce/regiao/alguma-ancora")).toBeNull();
+    expect(extractUfScopedMatch("/sp/regiao/campinas")).toBeNull();
   });
 });
 
@@ -59,16 +60,6 @@ describe("UF com anúncio → passa", () => {
       expect(act(build("sp"))).toEqual({ kind: "pass-exists", uf: "sp", activeAds: 4 });
     });
   }
-
-  it("região ancorada em cidade SEM estoque, mas de estado COM estoque, passa", () => {
-    // O ponto do gate ser por UF e não pela cidade âncora: a região pode
-    // conter vizinhas com estoque mesmo quando a âncora não tem.
-    expect(act("/carros-usados/regiao/ipua-sp")).toEqual({
-      kind: "pass-exists",
-      uf: "sp",
-      activeAds: 4,
-    });
-  });
 });
 
 describe("estado derivado", () => {
@@ -100,14 +91,12 @@ describe("estado derivado", () => {
 });
 
 describe("extração — não capturar o site inteiro", () => {
-  it("/[uf]/regiao/ só casa com UF de 2 letras", () => {
-    expect(extractUfScopedMatch("/sp/regiao/campinas")).toEqual({
-      family: "uf-regiao",
+  it("carros-usados/[uf] nao captura carros-usados/regiao/[slug]", () => {
+    expect(extractUfScopedMatch("/carros-usados/sp")).toEqual({
+      family: "carros-usados-uf",
       uf: "sp",
     });
-    // Sem isto, o padrão de segmento na RAIZ engoliria rotas comuns.
-    expect(extractUfScopedMatch("/lojas/regiao/x")).toBeNull();
-    expect(extractUfScopedMatch("/painel/regiao/x")).toBeNull();
+    expect(extractUfScopedMatch("/carros-usados/regiao/atibaia-sp")).toBeNull();
   });
 
   const fora = [
@@ -115,7 +104,9 @@ describe("extração — não capturar o site inteiro", () => {
     "/comprar",
     "/carros-em/atibaia-sp",
     "/veiculo/honda-civic-2020-42",
-    "/carros-usados", // sem UF
+    "/carros-usados",
+    "/carros-usados/regiao/atibaia-sp",
+    "/ce/regiao/alguma-ancora",
     "/lojas/minha-loja-1",
     "/blog/melhores-suvs-2026",
   ];

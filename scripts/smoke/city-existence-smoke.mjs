@@ -43,6 +43,9 @@ const CITY_ROUTES = [
   "/tabela-fipe",
   "/simulador-financiamento",
   "/blog",
+  // Recebe slug de CIDADE (região ancorada nela), não de UF — por isso está
+  // aqui e não no bloco de estado.
+  "/carros-usados/regiao",
 ];
 
 /** Municípios REAIS sem anúncio. Devem se comportar como inexistentes. */
@@ -58,27 +61,56 @@ const INVENTED = ["cidade-inventada-zz", "cidade-inventada-sp"];
 /** Cidade com estoque conhecido. */
 const WITH_STOCK = "atibaia-sp";
 
+/**
+ * Faz a requisição SEGUINDO redirects e devolve o status FINAL.
+ *
+ * Seguir importa: `/[uf]/regiao/[ancora]` é alias 301 para a canônica
+ * `/carros-usados/regiao/<ancora>-<uf>`. Aferir só o 301 marcaria divergência
+ * onde o efeito já está correto — foi o que aconteceu na primeira rodada.
+ * `redirects` guarda a cadeia para o relatório distinguir "404 direto" de
+ * "301 → 404".
+ */
 async function probe(path) {
-  const url = `${BASE}${path}`;
   const t0 = Date.now();
+  let url = `${BASE}${path}`;
+  const redirects = [];
+
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, Accept: "text/html" },
-      redirect: "manual",
-    });
-    const body = await res.text();
-    return {
-      path,
-      status: res.status,
-      ms: Date.now() - t0,
-      robots: (body.match(/<meta name="robots" content="([^"]*)"/i) || [])[1] || null,
-      bytes: body.length,
-      // Soft-404: status 200 servindo corpo de "não encontrado".
-      looksNotFound: /não encontrad|nao encontrad|not found|404/i.test(body.slice(0, 4000)),
-    };
+    for (let hop = 0; hop < 5; hop++) {
+      const res = await fetch(url, {
+        headers: { "User-Agent": UA, Accept: "text/html" },
+        redirect: "manual",
+      });
+
+      const location = res.headers.get("location");
+      if (res.status >= 300 && res.status < 400 && location) {
+        redirects.push({ from: url, status: res.status, to: location });
+        url = location.startsWith("http") ? location : `${BASE}${location}`;
+        continue;
+      }
+
+      const body = await res.text();
+      return {
+        path,
+        status: res.status,
+        finalUrl: url,
+        redirects,
+        ms: Date.now() - t0,
+        robots: (body.match(/<meta name="robots" content="([^"]*)"/i) || [])[1] || null,
+        bytes: body.length,
+        // Soft-404: status 200 servindo corpo de "não encontrado".
+        looksNotFound: /não encontrad|nao encontrad|not found|404/i.test(body.slice(0, 4000)),
+      };
+    }
+    return { path, status: 0, redirects, ms: Date.now() - t0, error: "loop de redirect" };
   } catch (err) {
-    return { path, status: 0, ms: Date.now() - t0, error: err.message };
+    return { path, status: 0, redirects, ms: Date.now() - t0, error: err.message };
   }
+}
+
+/** Sufixo para o relatório quando houve redirect no caminho. */
+function hopNote(r) {
+  return r.redirects?.length ? ` (via ${r.redirects.map((h) => h.status).join("→")})` : "";
 }
 
 const failures = [];
@@ -150,14 +182,17 @@ for (const route of CITY_ROUTES) {
 // ── 3b. UF: estado sem NENHUM anúncio não existe ───────────────────────────
 log("\n[3b] UF sem anúncio no estado inteiro → 404");
 
-/** Rotas com escopo de estado. `regiao` recebe slug de cidade (âncora). */
-const UF_ROUTES = [
-  (uf) => `/carros-usados/${uf}`,
-  (uf) => `/comprar/estado/${uf}`,
-  (uf) => `/${uf}/regiao/alguma-ancora`,
-];
+/**
+ * Rotas com escopo de ESTADO.
+ *
+ * `/carros-usados/regiao/[slug]` NÃO está aqui: recebe slug de CIDADE (é a
+ * região ancorada nela) e por isso é verificada no bloco [1], junto das demais
+ * variantes de cidade. `/[uf]/regiao/[ancora]` também não: é alias 301 para
+ * essa canônica, e `probe` segue o redirect.
+ */
+const UF_ROUTES = [(uf) => `/carros-usados/${uf}`, (uf) => `/comprar/estado/${uf}`];
 
-/** UFs sem estoque nenhum (derivado do fato de o estoque estar só em SP). */
+/** UFs sem estoque nenhum (o estoque está concentrado em SP). */
 const EMPTY_UFS = ["ce", "ba"];
 
 for (const uf of EMPTY_UFS) {
@@ -167,19 +202,23 @@ for (const uf of EMPTY_UFS) {
     results.push({ group: "empty-uf", uf, ...r });
     check(
       r.status === 404,
-      build(uf),
+      build(uf) + hopNote(r),
       r.status === 404 ? "" : `HTTP ${r.status}${r.robots ? ` robots="${r.robots}"` : ""}`
     );
   }
-  // Região ancorada em cidade de estado vazio também não existe.
-  const anchor = uf === "ce" ? "altaneira-ce" : "coribe-ba";
-  const r = await probe(`/carros-usados/regiao/${anchor}`);
-  results.push({ group: "empty-uf", uf, ...r });
-  check(r.status === 404, `/carros-usados/regiao/${anchor}`, `HTTP ${r.status}`);
+
+  // Alias 301 → canônica de cidade. Só exigimos que o DESTINO seja 404.
+  const alias = await probe(`/${uf}/regiao/alguma-ancora`);
+  results.push({ group: "empty-uf", uf, ...alias });
+  check(
+    alias.status === 404,
+    `/${uf}/regiao/alguma-ancora${hopNote(alias)}`,
+    alias.status === 404 ? "" : `status final ${alias.status}`
+  );
 }
 
 log("\n  UF COM estoque (sp) → 200");
-for (const build of UF_ROUTES.slice(0, 2)) {
+for (const build of UF_ROUTES) {
   const r = await probe(build("sp"));
   results.push({ group: "stock-uf", uf: "sp", ...r });
   check(r.status === 200, build("sp"), `HTTP ${r.status} robots="${r.robots}"`);
@@ -208,10 +247,34 @@ if (AS_JSON) {
     }
     if (failures.length > 25) console.log(`  … e mais ${failures.length - 25}`);
 
-    const all404 = results.filter((r) => r.group !== "with-stock").every((r) => r.status === 404);
-    if (!all404) {
+    // Diagnóstico: "gate ausente" e "família de rota não coberta" produzem
+    // sintomas parecidos (200 onde se esperava 404) mas exigem ações opostas.
+    // Distinguir pelo ESCOPO da falha, não pelo sintoma.
+    const cityChecks = results.filter((r) => r.group === "real-empty" || r.group === "invented");
+    const cityBad = cityChecks.filter((r) => r.status !== 404);
+    const ufBad = results.filter((r) => r.group === "empty-uf" && r.status !== 404);
+
+    console.log("\nComo ler:");
+    if (cityBad.length === cityChecks.length && cityChecks.length > 0) {
       console.log(
-        "\nSe TODAS as rotas de cidade vazia respondem 200, o gate provavelmente\nnão está deployado — confira se o commit do gate está na branch em produção."
+        "  TODAS as rotas de cidade vazia responderam 200 → o gate provavelmente\n" +
+          "  NÃO está deployado. Confira se o commit do gate está no branch que o\n" +
+          "  Render publica, e se INTERNAL_API_TOKEN bate entre frontend e backend\n" +
+          "  (token errado faz o gate cair em fail-open e passar tudo em silêncio)."
+      );
+    } else if (cityBad.length > 0) {
+      console.log(
+        "  ALGUMAS rotas de cidade falharam e outras passaram → o gate está no ar,\n" +
+          "  mas há FAMÍLIA DE ROTA fora da lista. Acrescente o prefixo a\n" +
+          "  CITY_PREFIX_PATTERNS em lib/middleware/city-existence-gate.ts:\n" +
+          `    ${[...new Set(cityBad.map((r) => r.path.split("/").slice(0, -1).join("/")))].join(", ")}`
+      );
+    }
+    if (ufBad.length > 0) {
+      console.log(
+        "  Rotas de ESTADO falharam → verifique UF_PREFIX_PATTERNS no mesmo arquivo.\n" +
+          "  Lembre que /carros-usados/regiao/[slug] recebe slug de CIDADE e pertence\n" +
+          "  ao conjunto de cidade, não ao de UF."
       );
     }
   }
