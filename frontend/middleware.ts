@@ -166,6 +166,30 @@ export async function middleware(request: NextRequest) {
     const action = decideRegionalMiddlewareAction(flagOn, validation);
 
     if (action.kind === "pass-valid") {
+      // O invariante territorial precisa ser aplicado AQUI, e não no gate de
+      // cidade lá embaixo: este bloco RETORNA CEDO para a família
+      // `/carros-usados/regiao/:slug`, então o gate de 2b-bis nunca é
+      // alcançado por ela.
+      //
+      // Foi um bug real (2026-08-06): `/carros-usados/regiao/altaneira-ce`
+      // seguia em 200 depois do deploy, mesmo com a família já listada em
+      // CITY_PREFIX_PATTERNS e com teste unitário verde — o teste exercitava
+      // a função pura, que estava certa, mas nada verificava que o middleware
+      // CHEGAVA a chamá-la. `validateRegionalSlug` responde "esta cidade
+      // existe no catálogo", pergunta diferente de "esta cidade tem anúncio".
+      const regionalCityMatch = extractCityScopedMatch(pathname);
+      if (regionalCityMatch) {
+        const citySet = await fetchPublicCitySet();
+        const cityAction = decideCityExistenceAction(regionalCityMatch, citySet);
+
+        if (cityAction.kind === "block-not-found") {
+          const blocked = new NextResponse(null, { status: 404 });
+          blocked.headers.set("X-Middleware-City-Gate", "blocked-no-active-ads");
+          blocked.headers.set("X-Middleware-City-Family", regionalCityMatch.family);
+          return respond(request, startedAt, blocked);
+        }
+      }
+
       const passed = NextResponse.next(territorialContext);
       passed.headers.set("X-Middleware-Regional", "passed-valid");
       return respond(request, startedAt, passed);
