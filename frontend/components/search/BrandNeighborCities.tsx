@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { fetchPublicCitySet, isPublicCity } from "@/lib/city/public-city-set";
 import { getCityProfile, getStaticCitySlugs } from "@/lib/market/market-data";
 
 /**
@@ -10,6 +11,12 @@ import { getCityProfile, getStaticCitySlugs } from "@/lib/market/market-data";
  * "Vizinhas" = outras cidades do MESMO UF (o seed estático não tem grafo de
  * proximidade; UF é a aproximação disponível e suficiente para o sinal de
  * cluster). Server component — resolve as cidades no SSR.
+ *
+ * 2026-08-05 — invariante territorial: a lista candidata vem de `citySeeds`,
+ * um seed HARDCODED de ~41 cidades que não sabe nada sobre estoque. Sem o
+ * filtro abaixo, este bloco linkava para cidades que agora respondem 404 —
+ * trocaria páginas duplicadas por links quebrados, que é pior. Ver
+ * `docs/architecture/invariante-cidade-existe-se-tem-anuncio.md`.
  */
 
 interface BrandNeighborCitiesProps {
@@ -20,7 +27,7 @@ interface BrandNeighborCitiesProps {
   limit?: number;
 }
 
-export function BrandNeighborCities({
+export async function BrandNeighborCities({
   citySlug,
   cityUf,
   brandName,
@@ -30,8 +37,15 @@ export function BrandNeighborCities({
   const uf = (cityUf || "").trim().toUpperCase();
   if (!uf || !brandName || !brandSlug) return null;
 
+  const citySet = await fetchPublicCitySet();
+
   const neighbors = getStaticCitySlugs(300)
     .filter((slug) => slug !== citySlug)
+    // Só cidade que EXISTE (tem anúncio ativo). Com o conjunto indisponível
+    // (`null`), `isPublicCity` devolve false e o bloco some — aqui o
+    // fail-CLOSED é o certo, ao contrário do gate: um bloco de links
+    // ausente é invisível para o usuário; um bloco cheio de 404 não é.
+    .filter((slug) => isPublicCity(citySet, slug))
     .map((slug) => getCityProfile(slug))
     .filter((c) => (c.uf || "").toUpperCase() === uf)
     .slice(0, limit);

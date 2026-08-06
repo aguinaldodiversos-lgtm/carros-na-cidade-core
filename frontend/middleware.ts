@@ -29,6 +29,11 @@ import {
   validateBlogPostSlug,
 } from "@/lib/middleware/blog-gate";
 import { decideTerritoryGate } from "@/lib/middleware/territory-gate";
+import {
+  decideCityExistenceAction,
+  extractCityScopedMatch,
+  fetchPublicCitySet,
+} from "@/lib/middleware/city-existence-gate";
 
 /**
  * Middleware do frontend. Responsabilidades:
@@ -207,6 +212,40 @@ export async function middleware(request: NextRequest) {
     const blocked = new NextResponse(null, { status: 404 });
     blocked.headers.set("X-Middleware-City", "blocked-slug-invalid");
     return respond(request, startedAt, blocked);
+  }
+
+  // ── 2b-bis. Hard gate de EXISTÊNCIA de cidade (invariante territorial).
+  //
+  //   "Uma cidade só existe a partir do momento em que um anunciante publica
+  //    um anúncio nela."
+  //
+  // O `territory-gate` acima é ESTRUTURAL: rejeita slug cuja UF final não é
+  // uma UF brasileira real. Ele nunca soube nada sobre estoque — e era por
+  // isso que `/carros-em/cidade-inventada-sp` e `/carros-em/altaneira-ce`
+  // (município real, zero anúncios) respondiam 200 idênticos. Este gate é o
+  // que faltava: consulta o conjunto derivado de anúncios ativos.
+  //
+  // Roda DEPOIS do estrutural de propósito: slug com UF falsa é barrado antes,
+  // de graça, sem custar o fetch do conjunto.
+  //
+  // Fail-open em `unavailable` — ver `lib/middleware/city-existence-gate.ts`.
+  const cityMatch = extractCityScopedMatch(pathname);
+  if (cityMatch) {
+    const citySet = await fetchPublicCitySet();
+    const cityAction = decideCityExistenceAction(cityMatch, citySet);
+
+    if (cityAction.kind === "block-not-found") {
+      const blocked = new NextResponse(null, { status: 404 });
+      blocked.headers.set("X-Middleware-City-Gate", "blocked-no-active-ads");
+      blocked.headers.set("X-Middleware-City-Family", cityMatch.family);
+      return respond(request, startedAt, blocked);
+    }
+
+    if (cityAction.kind === "pass-unavailable") {
+      // Não bloqueia, mas deixa rastro: se este header aparecer em volume, o
+      // invariante está desligado na prática e ninguém percebeu.
+      request.headers.set("x-cnc-city-gate-unavailable", cityAction.reason);
+    }
   }
 
   // ── 2c. Hard gate de existência para /veiculo/[slug] e

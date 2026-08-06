@@ -80,10 +80,16 @@ const CITY_TERRITORIAL_PREFIX_RE = /^\/cidade\/([^/]+)(?:\/|$)/;
 const COMPRAR_CITY_PREFIX_RE = /^\/comprar\/cidade\/([^/]+)(?:\/|$)/;
 
 /**
- * Captura as landings irmãs de `/carros-em` e a ferramenta FIPE por cidade —
+ * Captura as landings irmãs de `/carros-em` e as ferramentas por cidade —
  * todas com slug canônico `nome-uf`:
  *   `/carros-baratos-em/[slug]`, `/carros-automaticos-em/[slug]`,
- *   `/tabela-fipe/[cidade]`.
+ *   `/tabela-fipe/[cidade]`, `/simulador-financiamento/[cidade]`.
+ *
+ * `simulador-financiamento` entrou em 2026-08-05: era a última rota
+ * territorial fora do gate e respondia HTTP 200 até para UF inexistente
+ * (`/simulador-financiamento/cidade-inventada-zz`), enquanto as irmãs davam
+ * 404. Mesma classe de esquecimento que `/comprar/cidade/` teve até 07-28 —
+ * por isso a regra do topo: rota territorial nova entra aqui no mesmo PR.
  *
  * Mesmo gate 404 real das demais: sem isso, o soft-404 do Next 14.2 servia
  * HTTP 200 indexável para cidade inexistente — vetor de páginas-fantasma
@@ -92,7 +98,7 @@ const COMPRAR_CITY_PREFIX_RE = /^\/comprar\/cidade\/([^/]+)(?:\/|$)/;
  * final não é uma UF brasileira real.
  */
 const CITY_LANDING_SIBLINGS_RE =
-  /^\/(?:carros-baratos-em|carros-automaticos-em|tabela-fipe)\/([^/]+)\/?$/;
+  /^\/(?:carros-baratos-em|carros-automaticos-em|tabela-fipe|simulador-financiamento)\/([^/]+)\/?$/;
 
 export function isValidBrUf(raw: string): boolean {
   if (!raw) return false;

@@ -139,7 +139,13 @@ export function aggregateMatchedRows(matchedRows, { labelKey, slug }) {
  * `canonicalPath` é SEMPRE o path self resolvido (slugs canônicos). Nunca
  * retorna "/" — o frontend depende disso para não auto-canonicalizar p/ home.
  */
-export function buildClusterSeo({ canonicalPath, title, description, activeCount, minInventory = 1 }) {
+export function buildClusterSeo({
+  canonicalPath,
+  title,
+  description,
+  activeCount,
+  minInventory = 1,
+}) {
   const count = toNumber(activeCount) || 0;
   const min = Math.max(1, toNumber(minInventory) || 1);
   const hasActiveInventory = count > 0;

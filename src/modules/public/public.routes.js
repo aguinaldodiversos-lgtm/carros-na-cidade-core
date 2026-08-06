@@ -13,6 +13,7 @@ import {
   getCatalogAdsTerritoryFallback,
   getCityRadiusCoverage,
   getFooterInventory,
+  getPublicCitySetHandler,
   resolveCity,
   searchCities,
 } from "./public-city-query.controller.js";
@@ -134,6 +135,23 @@ router.get(
 );
 
 router.get("/cities/search", autocompleteRateLimit, searchCities);
+
+/**
+ * Conjunto de cidades públicas (invariante: cidade existe ⟺ tem anúncio ativo).
+ *
+ * ANTES de `/cities/:slug` de propósito — senão "public-set" seria capturado
+ * como slug de cidade.
+ *
+ * TTL 60s: é a janela entre "último anúncio da cidade sai do ar" e "a página
+ * passa a 404" (e vice-versa). Curto porque o conjunto é a base de uma decisão
+ * de 404; longo o bastante para um crawler varrendo milhares de slugs custar
+ * uma consulta só. Documentado no ADR do invariante.
+ */
+router.get(
+  "/cities/public-set",
+  cacheGet({ prefix: "public:city:set", ttlSeconds: 60 }),
+  getPublicCitySetHandler
+);
 
 router.get(
   "/cities/by-id/:id",

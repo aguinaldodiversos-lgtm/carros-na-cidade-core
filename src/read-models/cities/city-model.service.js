@@ -4,7 +4,11 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
-import { brandModelSlug, canonicalBrandSlug, canonicalBrandLabel } from "../../shared/utils/slugify.js";
+import {
+  brandModelSlug,
+  canonicalBrandSlug,
+  canonicalBrandLabel,
+} from "../../shared/utils/slugify.js";
 import { resolveCityModel } from "./territorial-resolve.service.js";
 import { buildClusterSeo } from "./territorial-cluster.logic.js";
 import { getSitemapMinAds } from "../seo/sitemap-min-ads.js";

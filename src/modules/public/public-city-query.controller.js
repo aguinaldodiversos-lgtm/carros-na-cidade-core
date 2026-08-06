@@ -2,6 +2,30 @@ import * as citiesService from "../cities/cities.service.js";
 import { inferUfFromSlug } from "../../shared/utils/inferUfFromSlug.js";
 import { getFooterInventoryFacets } from "../../read-models/cities/inventory-facets.service.js";
 import { resolveCityCoverage } from "../../read-models/cities/regional-radius.service.js";
+import { getPublicCitySet } from "../../read-models/cities/public-city-set.service.js";
+
+/**
+ * Conjunto de cidades públicas — o invariante territorial servido como dado.
+ *
+ * "Uma cidade só existe a partir do momento em que um anunciante publica um
+ *  anúncio nela." Ver `docs/architecture/invariante-cidade-existe-se-tem-anuncio.md`.
+ *
+ * Consumidores: o gate de existência no middleware (404 real para cidade fora
+ * do conjunto) e os geradores de link. NÃO confundir com `/cities/search`, que
+ * é o catálogo de municípios do IBGE e existe só para o wizard de anúncio.
+ *
+ * Falha NUNCA vira 5xx aqui: o middleware trata resposta ruim como
+ * "indisponível" e faz fail-open (deixa passar). Um 5xx transformado em 404
+ * derrubaria o site inteiro num cold-start do banco.
+ */
+export async function getPublicCitySetHandler(_req, res, next) {
+  try {
+    const data = await getPublicCitySet();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Facetas de inventário do rodapé público: cidades com estoque + modelos da
