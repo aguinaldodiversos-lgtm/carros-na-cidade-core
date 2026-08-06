@@ -41,6 +41,7 @@ export function buildPublicCitySet(rows, opts = {}) {
   const indexMin = Number(opts.indexMinAds ?? getCityIndexMinAds());
 
   const cities = {};
+  const ufs = {};
   let indexable = 0;
 
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -54,13 +55,36 @@ export function buildPublicCitySet(rows, opts = {}) {
 
     // Grafias distintas que slugificam igual somam (mesma defesa do sitemap).
     cities[slug] = (cities[slug] || 0) + total;
+
+    // UF agregada da MESMA passagem — o estado é consequência das cidades, não
+    // uma segunda fonte. Preferimos `row.state`; se vier vazio, derivamos do
+    // sufixo do slug canônico (`atibaia-sp` → `sp`), que é o mesmo formato que
+    // as rotas de UF recebem.
+    const uf = normalizeUf(row?.state) || ufFromCitySlug(slug);
+    if (uf) ufs[uf] = (ufs[uf] || 0) + total;
   }
 
   for (const total of Object.values(cities)) {
     if (total >= indexMin) indexable += 1;
   }
 
-  return { cities, total: Object.keys(cities).length, indexable };
+  return { cities, ufs, total: Object.keys(cities).length, indexable };
+}
+
+function normalizeUf(value) {
+  const uf = String(value || "")
+    .trim()
+    .toLowerCase();
+  return /^[a-z]{2}$/.test(uf) ? uf : "";
+}
+
+/** `"sao-jose-dos-campos-sp"` → `"sp"`. Vazio quando o slug não tem sufixo de UF. */
+function ufFromCitySlug(slug) {
+  const parts = String(slug || "")
+    .split("-")
+    .filter(Boolean);
+  if (parts.length < 2) return "";
+  return normalizeUf(parts[parts.length - 1]);
 }
 
 /**
@@ -101,4 +125,23 @@ export function citySetCount(set, slug) {
     .toLowerCase();
   if (!key) return 0;
   return Number(set?.cities?.[key]) || 0;
+}
+
+/**
+ * A UF existe? (tem ao menos um anúncio ativo em QUALQUER cidade do estado)
+ *
+ * Deriva do mesmo conjunto: nenhuma consulta nova, nenhuma segunda fonte de
+ * verdade. Foi a existência de fontes paralelas que causou o bug original.
+ */
+export function ufSetHas(set, uf) {
+  return ufSetCount(set, uf) > 0;
+}
+
+/** Anúncios ativos no estado inteiro (0 se a UF não tem nenhum). */
+export function ufSetCount(set, uf) {
+  const key = String(uf || "")
+    .trim()
+    .toLowerCase();
+  if (!/^[a-z]{2}$/.test(key)) return 0;
+  return Number(set?.ufs?.[key]) || 0;
 }

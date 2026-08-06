@@ -31,7 +31,9 @@ import {
 import { decideTerritoryGate } from "@/lib/middleware/territory-gate";
 import {
   decideCityExistenceAction,
+  decideUfExistenceAction,
   extractCityScopedMatch,
+  extractUfScopedMatch,
   fetchPublicCitySet,
 } from "@/lib/middleware/city-existence-gate";
 
@@ -245,6 +247,36 @@ export async function middleware(request: NextRequest) {
       // Não bloqueia, mas deixa rastro: se este header aparecer em volume, o
       // invariante está desligado na prática e ninguém percebeu.
       request.headers.set("x-cnc-city-gate-unavailable", cityAction.reason);
+    }
+  }
+
+  // ── 2b-ter. Mesmo invariante, um nível acima: UF sem NENHUM anúncio no
+  //        estado inteiro também não existe.
+  //
+  // Sem isto, trocaríamos 5.570 páginas de cidade por 27 de estado — melhor,
+  // mas ainda conteúdo vazio indexável. E pior: a página de UF linka de volta
+  // para cidades, reabrindo o ciclo de descoberta que o gate de cidade fecha.
+  //
+  // Reusa o MESMO conjunto (agregado por estado na origem), não uma segunda
+  // consulta — foi a existência de fontes paralelas que causou o bug original.
+  // `else if` porque cidade e UF são mutuamente exclusivas por pathname; evita
+  // o segundo fetch quando o primeiro gate já decidiu.
+  else {
+    const ufMatch = extractUfScopedMatch(pathname);
+    if (ufMatch) {
+      const citySet = await fetchPublicCitySet();
+      const ufAction = decideUfExistenceAction(ufMatch, citySet);
+
+      if (ufAction.kind === "block-not-found") {
+        const blocked = new NextResponse(null, { status: 404 });
+        blocked.headers.set("X-Middleware-City-Gate", "blocked-uf-no-active-ads");
+        blocked.headers.set("X-Middleware-City-Family", ufMatch.family);
+        return respond(request, startedAt, blocked);
+      }
+
+      if (ufAction.kind === "pass-unavailable") {
+        request.headers.set("x-cnc-city-gate-unavailable", ufAction.reason);
+      }
     }
   }
 

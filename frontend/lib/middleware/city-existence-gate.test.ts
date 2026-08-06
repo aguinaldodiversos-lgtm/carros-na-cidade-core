@@ -20,6 +20,7 @@ const SET: CitySetResult = {
   kind: "ok",
   set: {
     cities: { "atibaia-sp": 3, "braganca-paulista-sp": 1 },
+    ufs: { sp: 4 },
     total: 2,
     existsMinAds: 1,
     indexMinAds: 3,
@@ -274,7 +275,7 @@ describe("estado derivado — a cidade nasce e morre sozinha", () => {
   it("cidade perde o último anúncio → passa a 404", () => {
     const depois = act("/carros-em/atibaia-sp", {
       kind: "ok",
-      set: { cities: {}, total: 0, existsMinAds: 1, indexMinAds: 3 },
+      set: { cities: {}, ufs: {}, total: 0, existsMinAds: 1, indexMinAds: 3 },
     });
     expect(depois.kind).toBe("block-not-found");
   });

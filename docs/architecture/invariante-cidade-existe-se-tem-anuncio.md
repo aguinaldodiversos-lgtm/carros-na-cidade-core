@@ -122,6 +122,25 @@ Lista exaustiva. **Ao criar rota territorial nova, ela entra no gate no mesmo PR
 | `/cidade/[slug]` e sub-rotas (`/marca/…`, `/modelo/…`, `/abaixo-da-fipe`, `/oportunidades`) | `cidade`                  |
 | `/blog/[cidade]` e sub-rotas                                                                | `blog` (ver ressalva)     |
 
+### Rotas com escopo de UF
+
+Mesmo invariante, um nível acima: **UF sem nenhum anúncio no estado inteiro também não existe.**
+
+| Rota                           | Família no gate        | De onde vem a UF         |
+| ------------------------------ | ---------------------- | ------------------------ |
+| `/carros-usados/[uf]`          | `carros-usados-uf`     | segmento direto          |
+| `/comprar/estado/[uf]`         | `comprar-estado`       | segmento direto          |
+| `/[uf]/regiao/[ancora]`        | `uf-regiao`            | segmento direto (raiz)   |
+| `/carros-usados/regiao/[slug]` | `carros-usados-regiao` | sufixo do slug da âncora |
+
+Sem isso, trocaríamos 5.570 páginas de cidade por 27 de estado — melhor, mas ainda conteúdo vazio indexável. Pior: a página de UF **linka de volta para cidades**, reabrindo o ciclo de descoberta que o gate de cidade fecha.
+
+A UF é agregada na mesma passagem que monta as cidades (`buildPublicCitySet`), a partir de `row.state` com fallback no sufixo do slug. **Não é uma segunda fonte de verdade** — foi a existência de fontes paralelas que causou o bug original.
+
+**Por que `/carros-usados/regiao/[slug]` é gateado por UF e não pela cidade âncora:** a região pode conter vizinhas com estoque mesmo quando a âncora não tem. Gatear pela âncora mataria região legítima. Pela UF é seguro — estado sem nenhum anúncio não pode ter região com estoque.
+
+**Compatibilidade entre deploys:** se o frontend subir antes do backend, o payload não traz `ufs`. Nesse caso o gate **deriva** o agregado do sufixo dos slugs de cidade, em vez de tratar como vazio — derivar vazio 404aria todas as UFs durante a janela entre os dois deploys.
+
 ### Ressalva: `/blog/[cidade]` é DUAL
 
 A rota resolve **primeiro** um post publicado do CMS e só depois o hub de cidade. Um post chamado `melhores-suvs-2026` não pode levar 404 por não ser cidade.

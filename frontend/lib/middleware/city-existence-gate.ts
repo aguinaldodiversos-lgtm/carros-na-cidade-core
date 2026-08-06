@@ -62,6 +62,47 @@ const CITY_PREFIX_PATTERNS: ReadonlyArray<{ family: string; re: RegExp }> = [
  * post terminando em `-<uf>` seria colisão com cidade — caso que o admin do
  * blog já trata como conflito a evitar.
  */
+/**
+ * Famílias de rota com escopo de UF (estado inteiro).
+ *
+ *   "UF sem nenhum anúncio no estado inteiro também não existe."
+ *
+ * Hoje `/carros-usados/ce` e `/comprar/estado/ce` respondem 200 `index,follow`
+ * com o Ceará vazio — 27 estados de conteúdo vazio indexável. Pior: essas
+ * páginas linkam de volta para cidades, reabrindo o ciclo de descoberta que o
+ * gate de cidade fecha.
+ *
+ * `/carros-usados/regiao/[slug]` entra aqui, e não no gate de cidade, de
+ * propósito: o slug é a ÂNCORA de uma região que pode incluir vizinhas com
+ * estoque mesmo quando a âncora não tem. Gatear pela cidade âncora mataria
+ * região legítima. Pela UF é seguro: estado sem nenhum anúncio não pode ter
+ * região com estoque.
+ */
+const UF_PREFIX_PATTERNS: ReadonlyArray<{ family: string; re: RegExp; from: "uf" | "citySlug" }> = [
+  { family: "carros-usados-uf", re: /^\/carros-usados\/([^/]+)\/?$/, from: "uf" },
+  { family: "comprar-estado", re: /^\/comprar\/estado\/([^/]+)(?:\/|$)/, from: "uf" },
+  {
+    family: "carros-usados-regiao",
+    re: /^\/carros-usados\/regiao\/([^/]+)(?:\/|$)/,
+    from: "citySlug",
+  },
+  // `/[uf]/regiao/[ancora]` — segmento dinâmico na RAIZ. O literal "regiao" na
+  // segunda posição é o que impede este padrão de capturar o site inteiro.
+  { family: "uf-regiao", re: /^\/([^/]+)\/regiao\/([^/]+)(?:\/|$)/, from: "uf" },
+];
+
+/** `"sao-jose-dos-campos-sp"` → `"sp"`. Vazio quando não há sufixo de UF. */
+export function ufFromCitySlug(slug: string): string {
+  const parts = String(slug || "")
+    .trim()
+    .toLowerCase()
+    .split("-")
+    .filter(Boolean);
+  if (parts.length < 2) return "";
+  const last = parts[parts.length - 1];
+  return /^[a-z]{2}$/.test(last) ? last : "";
+}
+
 export function isCityLikeSlug(slug: string): boolean {
   const parts = String(slug || "")
     .trim()
@@ -75,6 +116,37 @@ export function isCityLikeSlug(slug: string): boolean {
 export interface CityScopedMatch {
   family: string;
   citySlug: string;
+}
+
+export interface UfScopedMatch {
+  family: string;
+  uf: string;
+}
+
+/**
+ * Extrai a UF do pathname quando for rota com escopo de estado.
+ * `null` → o caller sai cedo, sem custar fetch.
+ *
+ * Só devolve match quando a UF tem forma de UF (2 letras). A validação de UF
+ * REAL fica com o `territory-gate`, que roda antes — aqui basta não confundir
+ * `/lojas/regiao/x` com `/[uf]/regiao/x`.
+ */
+export function extractUfScopedMatch(pathname: string): UfScopedMatch | null {
+  for (const { family, re, from } of UF_PREFIX_PATTERNS) {
+    const match = re.exec(pathname);
+    if (!match) continue;
+
+    const raw = decodeURIComponent(match[1] || "")
+      .trim()
+      .toLowerCase();
+    if (!raw) return null;
+
+    const uf = from === "uf" ? raw : ufFromCitySlug(raw);
+    if (!/^[a-z]{2}$/.test(uf)) return null;
+
+    return { family, uf };
+  }
+  return null;
 }
 
 /**
@@ -111,6 +183,8 @@ export type CitySetUnavailableReason =
 
 export type PublicCitySet = {
   cities: Record<string, number>;
+  /** Agregado por estado, derivado das MESMAS cidades — não é segunda fonte. */
+  ufs: Record<string, number>;
   total: number;
   existsMinAds: number;
   indexMinAds: number;
@@ -179,10 +253,21 @@ export async function fetchPublicCitySet(config: CitySetFetchConfig = {}): Promi
       return { kind: "unavailable", reason: "bad-payload" };
     }
 
+    const rawUfs = json?.data?.ufs;
+    // `ufs` ausente NÃO invalida o payload: um backend anterior ao gate de UF
+    // devolve só `cities`. Derivamos do sufixo dos slugs — assim o deploy do
+    // frontend não depende da ordem em relação ao do backend. Se derivássemos
+    // "vazio", toda UF 404aria durante a janela entre os dois deploys.
+    const ufs =
+      rawUfs && typeof rawUfs === "object" && !Array.isArray(rawUfs)
+        ? (rawUfs as Record<string, number>)
+        : deriveUfsFromCities(cities as Record<string, number>);
+
     return {
       kind: "ok",
       set: {
         cities: cities as Record<string, number>,
+        ufs,
         total: Number(json?.data?.total) || Object.keys(cities).length,
         existsMinAds: Number(json?.data?.existsMinAds) || 1,
         indexMinAds: Number(json?.data?.indexMinAds) || 3,
@@ -198,6 +283,39 @@ export async function fetchPublicCitySet(config: CitySetFetchConfig = {}): Promi
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Fallback quando o backend ainda não expõe `ufs` (janela entre deploys). */
+export function deriveUfsFromCities(cities: Record<string, number>): Record<string, number> {
+  const ufs: Record<string, number> = {};
+  for (const [slug, total] of Object.entries(cities || {})) {
+    const uf = ufFromCitySlug(slug);
+    if (uf) ufs[uf] = (ufs[uf] || 0) + (Number(total) || 0);
+  }
+  return ufs;
+}
+
+export type UfExistenceAction =
+  | { kind: "pass-exists"; uf: string; activeAds: number }
+  | { kind: "block-not-found"; uf: string }
+  | { kind: "pass-unavailable"; reason: CitySetUnavailableReason };
+
+/**
+ * Decisão PURA para escopo de UF. Mesma regra da cidade, um nível acima:
+ * estado sem NENHUM anúncio não existe.
+ */
+export function decideUfExistenceAction(
+  match: UfScopedMatch,
+  result: CitySetResult
+): UfExistenceAction {
+  if (result.kind === "unavailable") {
+    return { kind: "pass-unavailable", reason: result.reason };
+  }
+
+  const activeAds = Number(result.set.ufs?.[match.uf]) || 0;
+  if (activeAds <= 0) return { kind: "block-not-found", uf: match.uf };
+
+  return { kind: "pass-exists", uf: match.uf, activeAds };
 }
 
 export type CityExistenceAction =

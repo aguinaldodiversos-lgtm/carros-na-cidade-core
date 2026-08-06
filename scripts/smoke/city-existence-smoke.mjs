@@ -147,6 +147,44 @@ for (const route of CITY_ROUTES) {
   check(r.status === 200, `${route}/${WITH_STOCK}`, `HTTP ${r.status} robots="${r.robots}"`);
 }
 
+// ── 3b. UF: estado sem NENHUM anúncio não existe ───────────────────────────
+log("\n[3b] UF sem anúncio no estado inteiro → 404");
+
+/** Rotas com escopo de estado. `regiao` recebe slug de cidade (âncora). */
+const UF_ROUTES = [
+  (uf) => `/carros-usados/${uf}`,
+  (uf) => `/comprar/estado/${uf}`,
+  (uf) => `/${uf}/regiao/alguma-ancora`,
+];
+
+/** UFs sem estoque nenhum (derivado do fato de o estoque estar só em SP). */
+const EMPTY_UFS = ["ce", "ba"];
+
+for (const uf of EMPTY_UFS) {
+  log(`\n  ${uf}`);
+  for (const build of UF_ROUTES) {
+    const r = await probe(build(uf));
+    results.push({ group: "empty-uf", uf, ...r });
+    check(
+      r.status === 404,
+      build(uf),
+      r.status === 404 ? "" : `HTTP ${r.status}${r.robots ? ` robots="${r.robots}"` : ""}`
+    );
+  }
+  // Região ancorada em cidade de estado vazio também não existe.
+  const anchor = uf === "ce" ? "altaneira-ce" : "coribe-ba";
+  const r = await probe(`/carros-usados/regiao/${anchor}`);
+  results.push({ group: "empty-uf", uf, ...r });
+  check(r.status === 404, `/carros-usados/regiao/${anchor}`, `HTTP ${r.status}`);
+}
+
+log("\n  UF COM estoque (sp) → 200");
+for (const build of UF_ROUTES.slice(0, 2)) {
+  const r = await probe(build("sp"));
+  results.push({ group: "stock-uf", uf: "sp", ...r });
+  check(r.status === 200, build("sp"), `HTTP ${r.status} robots="${r.robots}"`);
+}
+
 // ── 4. O 404 é REAL, não soft-404 ──────────────────────────────────────────
 log("\n[4] 404 é real (não 200 com página de erro)");
 const soft = results.filter((r) => r.status === 200 && r.looksNotFound);
