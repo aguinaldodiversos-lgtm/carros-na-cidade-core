@@ -16,12 +16,14 @@ import { extractCitySlugFromPathname } from "@/lib/city/city-from-pathname";
 import { DEFAULT_CITY } from "@/lib/city/city-default";
 import type { CityRef, CitySource } from "@/lib/city/city-types";
 import {
+  discardStoredCityIfAbsent,
   hasUserConfirmedCity,
   readCityFromCookie,
   readCityFromLocalStorage,
   writeCityCookie,
   writeCityToLocalStorage,
 } from "@/lib/city/city-storage";
+import { usePublicCitySet } from "@/lib/city/use-public-city-set";
 
 type CityContextValue = {
   city: CityRef;
@@ -29,6 +31,14 @@ type CityContextValue = {
   cityId: number | null;
   /** Origem do território ativo no cliente. */
   source: CitySource;
+  /**
+   * A cidade ativa pertence ao conjunto público (tem anúncio ativo)?
+   *
+   * `undefined` = ainda não se sabe (conjunto carregando ou indisponível).
+   * Consumidores devem tratar `undefined` como "siga o comportamento normal" —
+   * só `false` autoriza degradar links. Ver `usePublicCitySet`.
+   */
+  isCityPublic: boolean | undefined;
   setCity: (city: CityRef) => void;
   isReady: boolean;
   openCityPicker: () => void;
@@ -67,6 +77,7 @@ function CityProviderInner({
   const [pickerOpen, setPickerOpen] = useState(false);
   const hydrated = useRef(false);
   const searchKey = searchParams.toString();
+  const publicCitySet = usePublicCitySet();
 
   useEffect(() => {
     if (hydrated.current) return;
@@ -235,20 +246,52 @@ function CityProviderInner({
     });
   }, [ready, pathname, city.slug, citySource, searchParams]);
 
+  // ── Cidade guardada que saiu do conjunto público ────────────────────────
+  //
+  // Consequência direta do invariante territorial: cidade que perde o último
+  // anúncio deixa de existir e passa a responder 404. Sem isto, o visitante
+  // segue navegando para URLs mortas — medido em produção, três dos quatro
+  // links principais do cabeçalho quebravam com `altaneira-ce` guardado.
+  //
+  // Roda DEPOIS de `ready` e num efeito próprio, de propósito: a hidratação
+  // não espera pela rede, então a renderização nunca bloqueia por causa disto.
+  //
+  // Só descarta com `isPublic === false` (conjunto carregado E cidade ausente).
+  // `undefined` — carregando ou indisponível — MANTÉM a cidade. Uma falha de
+  // rede não pode apagar a preferência de todo mundo.
+  //
+  // `source === "path"` é pulado porque é display-only e nunca foi persistido.
+  useEffect(() => {
+    if (!ready) return;
+    if (citySource === "path") return;
+
+    const isPublic = publicCitySet.isPublicCity(city.slug);
+    if (isPublic !== false) return;
+
+    // `discardStoredCityIfAbsent` mexe SÓ nas duas chaves de cidade — o
+    // rascunho do wizard e o resto do localStorage ficam intactos.
+    discardStoredCityIfAbsent(() => false);
+    setCityState(DEFAULT_CITY);
+    setCitySource("fallback");
+  }, [ready, citySource, city.slug, publicCitySet]);
+
   const cityId = city.id ?? null;
+
+  const isCityPublic = publicCitySet.isPublicCity(city.slug);
 
   const value = useMemo<CityContextValue>(
     () => ({
       city,
       cityId,
       source: citySource,
+      isCityPublic,
       setCity,
       isReady: ready,
       openCityPicker: () => setPickerOpen(true),
       closeCityPicker: () => setPickerOpen(false),
       cityPickerOpen: pickerOpen,
     }),
-    [city, cityId, citySource, setCity, ready, pickerOpen]
+    [city, cityId, citySource, isCityPublic, setCity, ready, pickerOpen]
   );
 
   return <CityCtx.Provider value={value}>{children}</CityCtx.Provider>;

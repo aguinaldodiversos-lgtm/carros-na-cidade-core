@@ -100,7 +100,7 @@ function HeaderNavLink({
 
 export function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { city, openCityPicker } = useCity();
+  const { city, isCityPublic, openCityPicker } = useCity();
   const [sessionUser, setSessionUser] = useState<
     { name: string; type: AccountType } | null | undefined
   >(undefined);
@@ -124,7 +124,14 @@ export function PublicHeader() {
     };
   }, []);
 
-  const routes = useMemo(() => getTerritorialRoutesForCity(city.slug), [city.slug]);
+  // `isCityPublic === false` faz os links caírem nas rotas-índice. Sem isso,
+  // um visitante com cidade sem estoque guardada via FIPE, Simular e Blog
+  // levarem a 404 — medido em produção 2026-08-05. `undefined` (conjunto
+  // carregando ou indisponível) mantém o comportamento territorial.
+  const routes = useMemo(
+    () => getTerritorialRoutesForCity(city.slug, { isPublicCity: isCityPublic }),
+    [city.slug, isCityPublic]
+  );
 
   return (
     <header

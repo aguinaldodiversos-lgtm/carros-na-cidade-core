@@ -30,9 +30,54 @@ export type TerritorialContext = {
   stateUf?: string | null;
 };
 
-export function getTerritorialRoutesForCity(citySlug: string) {
+export type TerritorialRoutesOptions = {
+  /**
+   * A cidade pertence ao conjunto público (tem anúncio ativo)?
+   *
+   * `undefined` = "ainda não sei" e é tratado como TRUE — ver a nota de
+   * fail-open abaixo.
+   */
+  isPublicCity?: boolean;
+};
+
+/**
+ * Rotas territoriais do cabeçalho para uma cidade.
+ *
+ * ── Por que existe o `isPublicCity` ──────────────────────────────────────
+ * Com o invariante territorial no ar, cidade sem anúncio responde 404. Um
+ * visitante com `altaneira-ce` guardado no cliente via TRÊS dos quatro links
+ * principais levarem a 404 (medido em produção 2026-08-05):
+ *
+ *   Simular financiamento → /simulador-financiamento/altaneira-ce   404
+ *   FIPE                  → /tabela-fipe/altaneira-ce               404
+ *   Blog                  → /blog/altaneira-ce                      404
+ *
+ * Quando a cidade não é pública, caímos nas rotas-índice — que existem e
+ * respondem 200 — em vez de montar link para uma URL que não existe.
+ *
+ * ── Fail-open ────────────────────────────────────────────────────────────
+ * `isPublicCity: undefined` (conjunto ainda carregando, ou a chamada falhou)
+ * mantém o comportamento territorial de sempre. Um cabeçalho degradado é
+ * preferível a um cabeçalho vazio, e uma falha de rede não pode apagar a
+ * navegação do site. Mesma política do gate no servidor.
+ */
+export function getTerritorialRoutesForCity(citySlug: string, opts?: TerritorialRoutesOptions) {
   const slug = (citySlug || DEFAULT_PUBLIC_CITY_SLUG).trim() || DEFAULT_PUBLIC_CITY_SLUG;
   const enc = encodeURIComponent(slug);
+
+  if (opts?.isPublicCity === false) {
+    return {
+      // `/comprar` sem `city_slug`: listagem geral, sem filtro fantasma.
+      comprar: "/comprar",
+      comprarBelowFipe: "/comprar?below_fipe=true",
+      fipe: "/tabela-fipe",
+      financing: "/simulador-financiamento",
+      cidade: "/comprar",
+      regional: "/comprar",
+      blog: "/blog",
+    } as const;
+  }
+
   return {
     comprar: `/comprar?city_slug=${enc}`,
     comprarBelowFipe: `/comprar?below_fipe=true&city_slug=${enc}`,
