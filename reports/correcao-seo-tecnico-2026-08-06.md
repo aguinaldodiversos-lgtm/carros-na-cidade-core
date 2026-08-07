@@ -140,6 +140,9 @@ Medido contra build de produção local (§8).
 | `/carros-em/xpto-zz` | **404** | — | não |
 | `/anuncios` | 308 | `/comprar` | — |
 | `/anuncios/[identifier]` | 308 | `/veiculo/[slug]` | — |
+| `/anuncios/[inexistente]` | **404** | — | não |
+| `/carros-em/[cidade-sem-anúncio-ativo]` | **404** | — | não |
+| `/comprar/cidade/[cidade-sem-anúncio-ativo]` | **404** | — (404 vence o 308) | não |
 | `/sitemap.xml` | 200 | `application/xml` | — |
 | `/sitemaps/regiao/sp.xml` | 200 | `application/xml` | — |
 | `/sitemaps/regiao/zz.xml` | **404** | `text/plain` | — |
@@ -337,20 +340,61 @@ URL                                              status  destino                
 Links reais, `rel=prev`/`rel=next`, `aria-current` na atual, página 1 sem
 `page=1`. Funciona sem JavaScript.
 
-### O bug do meta refresh, capturado
+### O bug do meta refresh, capturado — e a correção medida ao lado
 
-Com o gate do anúncio desligado (ambiente local sem `INTERNAL_API_TOKEN`), a
-requisição chega ao `page.tsx` — e a resposta é:
+Duas execuções do mesmo binário, mudando só se o gate consegue validar o
+anúncio. **Com o gate desligado** (build sem `INTERNAL_API_TOKEN`), a requisição
+chega ao `page.tsx`:
 
 ```
+GET /anuncios/gm-chevrolet-onix-...
 HTTP/1.1 200 OK
+x-middleware-ad: passed-unavailable
+x-middleware-ad-reason: missing-internal-api-token
 <meta http-equiv="refresh" content="0;url=/veiculo/gm-chevrolet-onix-..."/>
 ```
 
-Isto é exatamente o que a auditoria descreveu e a razão de os redirects terem
-sido movidos para o middleware: `permanentRedirect()` em Server Component do
-Next 14.2 comita **200 com meta refresh**, que o Googlebot não trata como
-redirect. Com o gate ativo, o middleware emite 308 antes de qualquer HTML.
+200 com meta refresh — que o Googlebot não trata como redirect. É exatamente o
+que a auditoria descreveu, e a razão de os redirects terem ido para o middleware.
+
+**Com o gate ativo** (mesma URL, build com a variável presente):
+
+```
+GET /anuncios/gm-chevrolet-onix-...
+HTTP/1.1 308 Permanent Redirect
+location: /veiculo/gm-chevrolet-onix-...
+x-middleware-canonical: ad-alias
+                                       → 1 salto, destino 200
+
+GET /anuncios/inexistente-999999
+HTTP/1.1 404 Not Found
+x-middleware-ad: blocked-not-found
+```
+
+### Regra territorial, com o gate ativo
+
+```
+/carros-em/atibaia-sp                200                                       (tem estoque)
+/carros-em/braganca-paulista-sp      404  city-gate: blocked-no-active-ads
+/carros-em/altaneira-ce              404  city-gate: blocked-no-active-ads
+/carros-em/xpto-zz                   404                                       (cidade inexistente)
+/comprar/cidade/braganca-paulista-sp 404  city-gate: blocked-no-active-ads     (404 vence o 308)
+/tabela-fipe/braganca-paulista-sp    404  city-gate: blocked-no-active-ads
+/blog/braganca-paulista-sp           404  city-gate: blocked-no-active-ads
+/carros-usados/ce                    404  city-gate: blocked-uf-no-active-ads
+/carros-usados/sp                    200
+```
+
+A quinta linha é a ordem que o código impõe de propósito: cidade sem anúncio
+ativo responde **404**, não 308 para uma URL que também daria 404.
+
+E o redirect nunca inventa destino — preserva o slug e deixa o gate do destino
+decidir:
+
+```
+/comprar?city_slug=braganca-paulista-sp
+  → 1 salto → /carros-em/braganca-paulista-sp → 404
+```
 
 ---
 
@@ -376,8 +420,14 @@ redirect. Com o gate ativo, o middleware emite 308 antes de qualquer HTML.
 1. **`INTERNAL_API_TOKEN` precisa estar presente no BUILD, não só no runtime.**
    O Next inlina `process.env` no bundle do middleware em tempo de build. Sem a
    variável no ambiente de build, os gates territoriais e o alias de anúncio
-   ficam permanentemente em `pass-unavailable` — fail-open silencioso. Vale
-   conferir no Render antes do deploy. *(Descoberto durante esta validação.)*
+   ficam permanentemente em `pass-unavailable` — fail-open silencioso, com o
+   site inteiro voltando ao comportamento anterior sem nenhum erro visível.
+
+   Medido nesta validação: dois builds do mesmo código, diferindo só nisso,
+   produzem `/carros-em/braganca-paulista-sp` respondendo **200** (variável
+   ausente no build) ou **404** (variável presente). Vale conferir no Render
+   antes do deploy — e, como a config do Render não é versionada, isto se soma
+   à pendência já registrada de versionar as variáveis no `render.yaml`.
 
 2. **Fallback territorial ainda existe em `city-catalog-loader`.** Foi removido
    do caminho de `/comprar/cidade/[slug]` porque a rota virou redirect, mas a
