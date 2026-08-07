@@ -1,10 +1,19 @@
 import type { AdsSearchFilters } from "@/lib/search/ads-search";
 import { buildSearchQueryString } from "@/lib/search/ads-search-url";
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
 import type { SearchIntentParseResult, VehicleSearchKind } from "@/lib/search/search-intent-types";
 
 /**
- * Monta a URL de /comprar a partir do texto livre, chips e tipo de veículo.
- * Chips aplicados primeiro; filtros do parser sobrescrevem (texto mais específico).
+ * Monta a URL de destino da busca da home a partir do texto livre, chips e
+ * tipo de veículo. Chips aplicados primeiro; filtros do parser sobrescrevem
+ * (texto mais específico).
+ *
+ * O destino é a CANÔNICA da cidade (`/carros-em/[slug]?<filtros>`), não
+ * `/comprar?city_slug=…`. A busca da home é o caminho mais usado do site;
+ * mandá-la para uma URL que só redireciona custava um salto em toda busca.
+ *
+ * Sem cidade utilizável, cai na vitrine nacional — nunca numa cidade escolhida
+ * por nós.
  */
 export function buildComprarUrlFromHomeSearch(options: {
   defaultCitySlug: string;
@@ -40,6 +49,22 @@ export function buildComprarUrlFromHomeSearch(options: {
     merged.q = merged.q ? `${merged.q} ${q}`.trim() : q;
   }
 
-  const qs = buildSearchQueryString(merged);
-  return qs ? `/comprar?${qs}` : "/comprar";
+  const canonicalCity = getCanonicalCityPath(merged.city_slug);
+  if (!canonicalCity) {
+    // Sem cidade válida não há catálogo territorial a abrir. A vitrine
+    // nacional é a resposta honesta — escolher uma cidade aqui serviria o
+    // estoque dela para quem não pediu.
+    return "/comprar";
+  }
+
+  // Território sai da query: ele já está no path, e mantê-lo nos dois lugares
+  // recriaria duas grafias da mesma URL.
+  const territoryless: AdsSearchFilters = { ...merged };
+  delete territoryless.city_slug;
+  delete territoryless.city_id;
+  delete territoryless.city;
+  delete territoryless.state;
+
+  const qs = buildSearchQueryString(territoryless);
+  return qs ? `${canonicalCity}?${qs}` : canonicalCity;
 }

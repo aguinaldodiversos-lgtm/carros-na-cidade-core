@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
 
 /**
@@ -105,9 +106,9 @@ function hasContent(value: string | null | undefined): value is string {
 interface HomeHeroProps {
   /**
    * Slug da cidade detectada (cookie/query). Quando presente, o CTA "Ver
-   * ofertas" leva a `/comprar?city_slug=<slug>` que cai na cidade canônica.
-   * Quando vazio, o CTA vai para `/comprar` puro — que redireciona para o
-   * catálogo do estado padrão (vitrine estadual).
+   * ofertas" leva DIRETO a `/carros-em/<slug>`, a canônica da cidade. Quando
+   * vazio, vai para `/comprar` — a vitrine nacional, que lista os estados e
+   * cidades com anúncio ativo.
    */
   defaultCitySlug?: string;
   /** Nome da cidade detectada (cookie). Usado na pílula quando presente. */
@@ -385,15 +386,14 @@ function HeroSlide({
   const scopeLabel = cityName ? `${cityName} e região` : stateName;
   const pillLabel = cityName ? `${cityName} e região` : `${stateName} e região`;
 
-  const offersHref = useMemo(() => {
-    if (overrideCtaUrl) return overrideCtaUrl;
-    if (defaultCitySlug) {
-      const params = new URLSearchParams();
-      params.set("city_slug", defaultCitySlug);
-      return `/comprar?${params.toString()}`;
-    }
-    return "/comprar";
-  }, [defaultCitySlug, overrideCtaUrl]);
+  // CTA principal da home → a CANÔNICA da cidade detectada, direta. Era
+  // `/comprar?city_slug=<slug>`: o link de maior visibilidade do portal
+  // apontava para uma URL cuja única função é redirecionar. Sem cidade
+  // detectada (ou com slug inválido), vai para a vitrine nacional.
+  const offersHref = useMemo(
+    () => overrideCtaUrl ?? buildCanonicalCityHref(defaultCitySlug, "/comprar"),
+    [defaultCitySlug, overrideCtaUrl]
+  );
 
   // ─── Modo "arte pronta" ─────────────────────────────────────────────
   if (overrideImage) {

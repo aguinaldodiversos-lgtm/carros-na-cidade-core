@@ -4,6 +4,8 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
+
 /**
  * Barra de busca da Home — contrato visual `atualização-home.png`
  * (revisão 2026-05-19).
@@ -66,10 +68,22 @@ export function HomeSearchCard({ defaultCitySlug }: HomeSearchCardProps) {
 
   const submit = useCallback(
     (value: string) => {
+      // Destino DIRETO: a canônica da cidade ativa. Antes ia para
+      // `/comprar?city_slug=…&q=…`, que só existe para ser redirecionada —
+      // um salto extra em toda busca da home. Sem cidade utilizável, a
+      // vitrine nacional; nunca uma cidade escolhida por nós.
       const params = new URLSearchParams();
       if (value.trim()) params.set("q", value.trim());
-      if (defaultCitySlug) params.set("city_slug", defaultCitySlug);
-      router.push(`/comprar?${params.toString()}`);
+
+      const cityPath = getCanonicalCityPath(defaultCitySlug);
+      const qs = params.toString();
+
+      if (!cityPath) {
+        router.push("/comprar");
+        return;
+      }
+
+      router.push(qs ? `${cityPath}?${qs}` : cityPath);
     },
     [defaultCitySlug, router]
   );

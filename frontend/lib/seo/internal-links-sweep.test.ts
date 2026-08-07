@@ -97,6 +97,35 @@ describe("nenhum link interno monta a rota legada de cidade", () => {
   it("não existe `/comprar?state=` montado à mão (a vitrine estadual tem rota própria)", () => {
     expect(offenders(/["'`]\/comprar\?[^"'`]*state=/)).toEqual([]);
   });
+
+  /**
+   * A busca por literal não basta.
+   *
+   * O CTA principal da home escapou da primeira versão desta varredura porque
+   * montava a URL com `URLSearchParams`: `` `/comprar?${params.toString()}` ``
+   * não contém a string `city_slug`, mas produzia exatamente
+   * `/comprar?city_slug=<slug>` — o link de maior visibilidade do portal
+   * apontando para uma URL cuja única função é redirecionar.
+   */
+  it("não existe `/comprar?` montado por interpolação", () => {
+    expect(offenders(/[`]\/comprar\?\$\{/)).toEqual([]);
+    expect(offenders(/[`]\/anuncios\?\$\{/)).toEqual([]);
+  });
+
+  it("ninguém injeta city_slug numa query de NAVEGAÇÃO", () => {
+    // Os dois arquivos abaixo montam a query da API (fetch ao backend), onde
+    // `city_slug` é o parâmetro canônico de território e continua correto.
+    // Fora deles, escrever city_slug numa query é montar a URL legada à mão.
+    const CONSTRUTORES_DE_QUERY_DE_API = new Set([
+      "lib/search/ads-search-url.ts",
+      "lib/search/ads-search.ts",
+    ]);
+
+    const gravaCitySlug = offenders(/\.set\(\s*["']city_slug["']/).filter(
+      (file) => !CONSTRUTORES_DE_QUERY_DE_API.has(file)
+    );
+    expect(gravaCitySlug).toEqual([]);
+  });
 });
 
 describe("a allowlist é curta e justificada", () => {
