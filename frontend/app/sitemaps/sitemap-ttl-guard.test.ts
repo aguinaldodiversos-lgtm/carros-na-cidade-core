@@ -133,17 +133,22 @@ describe.each(BACKEND_ROUTES)("$name — TTL por estado do backend", ({ load }) 
   });
 });
 
-describe("regiao/[state].xml", () => {
-  it("UF ausente → vazio com TTL curto", async () => {
-    const { GET } = await import("./regiao/[state].xml/route");
+describe("regiao/[state]", () => {
+  // A pasta era `[state].xml` — segmento dinâmico malformado, que o Next trata
+  // como literal e nunca casa. Ver `regional-route.test.ts`.
+  it("UF ausente → 404 real (antes: 200 com HTML de not-found)", async () => {
+    const { GET } = await import("./regiao/[state]/route");
     const res: Response = await GET(new Request("https://x.test"), { params: {} });
-    expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+    expect(res.status).toBe(404);
   });
 
   it("backend 429 → TTL curto", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
-    const { GET } = await import("./regiao/[state].xml/route");
-    const res: Response = await GET(new Request("https://x.test"), { params: { state: "sp" } });
+    const { GET } = await import("./regiao/[state]/route");
+    const res: Response = await GET(new Request("https://x.test"), {
+      params: { state: "sp.xml" },
+    });
+    expect(res.status).toBe(200);
     expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
   });
 });
