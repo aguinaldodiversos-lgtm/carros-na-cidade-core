@@ -28,9 +28,21 @@ describe("deriveHomeDiscovery", () => {
     expect(keys).toContain("economicos"); // 30k <= 60k
     expect(keys).toContain("abaixo-fipe"); // um below_fipe
 
-    // hrefs sempre apontam para /comprar com state=SP.
+    // hrefs vão DIRETO para a vitrine estadual — nada de `/comprar?state=SP`,
+    // que só existia para o redirector reenviar o visitante ao mesmo destino.
     for (const p of out.profiles) {
-      expect(p.href.startsWith("/comprar?state=SP")).toBe(true);
+      expect(p.href.startsWith("/comprar/estado/sp")).toBe(true);
+      expect(p.href).not.toContain("state=SP");
+    }
+  });
+
+  // Segunda UF: um destino fixo passaria no caso acima e falha aqui.
+  it("o chip segue a UF pedida", () => {
+    const ads: SampleAd[] = [ad({ price: 30000, year: 2019, body_type: "hatch" })];
+    const out = deriveHomeDiscovery(ads, "MG");
+    expect(out.profiles.length).toBeGreaterThan(0);
+    for (const p of out.profiles) {
+      expect(p.href.startsWith("/comprar/estado/mg")).toBe(true);
     }
   });
 

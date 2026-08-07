@@ -9,6 +9,7 @@ import type {
   BlogPost,
   BlogTrendingItem,
 } from "@/lib/blog/blog-page";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogPageClientProps {
@@ -486,7 +487,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
   );
   const bottomBannerHref = normalizeHref(
     content.bottomBanner?.ctaHref,
-    `/comprar/cidade/${citySlug}`
+    buildCanonicalCityHref(citySlug, "/comprar")
   );
   const bottomBannerCta = toText(content.bottomBanner?.ctaLabel, `Ver carros em ${cityName}`);
 

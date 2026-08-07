@@ -60,7 +60,8 @@ export default async function ComprarEntryPage({ searchParams = {} }: ComprarPag
 
   const citySlugFromUrl = (getFirstValue(searchParams.city_slug) || "").trim();
   if (citySlugFromUrl && isValidCitySlug(citySlugFromUrl)) {
-    redirect(buildCityPath(citySlugFromUrl, rawFilters));
+    const cityTarget = buildCityPath(citySlugFromUrl, rawFilters);
+    if (cityTarget) redirect(cityTarget);
   }
 
   const ufFromUrl = normalizeUf(getFirstValue(searchParams.state));

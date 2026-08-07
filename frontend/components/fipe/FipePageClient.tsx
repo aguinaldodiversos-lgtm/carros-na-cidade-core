@@ -16,6 +16,7 @@ import {
   listFipeYears,
 } from "@/lib/fipe/fipe-client";
 import type { FipeOption, FipeQuote, FipeVehicleType } from "@/lib/fipe/fipe-provider";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 /**
  * Página de consulta da Tabela FIPE — mobile-first, contrato visual
@@ -424,10 +425,13 @@ export function FipePageClient({
     }
   }
 
-  const offersHref = `/comprar/cidade/${encodeURIComponent(citySlug)}?below_fipe=true`;
+  // "Ofertas abaixo da FIPE" tem rota própria e limpa (`/carros-baratos-em`),
+  // indexável e autocanônica — melhor destino que um filtro sobre um alias.
+  const offersHref = `/carros-baratos-em/${encodeURIComponent(citySlug)}`;
+  const cityCatalogHref = buildCanonicalCityHref(citySlug, "/comprar");
   const offersAllHref = selectedModel
-    ? `/comprar/cidade/${encodeURIComponent(citySlug)}?model=${encodeURIComponent(selectedModel.name)}`
-    : `/comprar/cidade/${encodeURIComponent(citySlug)}`;
+    ? `${cityCatalogHref}?model=${encodeURIComponent(selectedModel.name)}`
+    : cityCatalogHref;
 
   return (
     <>

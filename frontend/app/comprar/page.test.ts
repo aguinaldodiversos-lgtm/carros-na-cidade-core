@@ -101,7 +101,7 @@ describe("/comprar — sem território explícito", () => {
 });
 
 describe("/comprar — com território explícito (redirect canonical)", () => {
-  it("redireciona para /comprar/cidade/[slug] quando city_slug é válido", async () => {
+  it("redireciona para a canônica /carros-em/[slug] quando city_slug é válido", async () => {
     const ComprarEntryPage = await importPage();
 
     await expect(ComprarEntryPage({ searchParams: { city_slug: "atibaia-sp" } })).rejects.toThrow(
@@ -110,9 +110,25 @@ describe("/comprar — com território explícito (redirect canonical)", () => {
 
     expect(redirectMock).toHaveBeenCalledTimes(1);
     const target = redirectMock.mock.calls[0][0];
-    expect(target).toMatch(/^\/comprar\/cidade\/atibaia-sp(?:\?|$)/);
+    // Destino FINAL, não a rota legada: `/comprar/cidade/[slug]` hoje é 308,
+    // então mandar o visitante para lá seria uma cadeia de dois redirects.
+    expect(target).toMatch(/^\/carros-em\/atibaia-sp(?:\?|$)/);
+    expect(target).not.toContain("/comprar/cidade/");
     // city_slug NÃO pode aparecer na query string da rota canônica de cidade.
     expect(target).not.toMatch(/[?&]city_slug=/);
+  });
+
+  // Segunda cidade: um destino territorial fixo passaria acima e falha aqui.
+  it("preserva o slug pedido — nunca cai numa cidade padrão", async () => {
+    const ComprarEntryPage = await importPage();
+
+    await expect(
+      ComprarEntryPage({ searchParams: { city_slug: "braganca-paulista-sp" } })
+    ).rejects.toThrow(/NEXT_REDIRECT/);
+
+    const target = redirectMock.mock.calls[0][0];
+    expect(target).toMatch(/^\/carros-em\/braganca-paulista-sp(?:\?|$)/);
+    expect(target).not.toContain("atibaia");
   });
 
   it("redireciona para /comprar/estado/[uf] quando state é válido", async () => {
@@ -133,7 +149,7 @@ describe("/comprar — com território explícito (redirect canonical)", () => {
       })
     ).rejects.toThrow(/NEXT_REDIRECT/);
     const target = redirectMock.mock.calls[0][0];
-    expect(target).toContain("/comprar/cidade/atibaia-sp");
+    expect(target).toContain("/carros-em/atibaia-sp");
     expect(target).toContain("brand=Toyota");
     expect(target).toContain("sort=price_asc");
   });

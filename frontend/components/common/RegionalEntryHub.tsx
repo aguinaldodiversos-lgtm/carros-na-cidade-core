@@ -3,6 +3,7 @@ import PageBreadcrumbs from "@/components/common/PageBreadcrumbs";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { buildWebPageJsonLd } from "@/lib/seo/page-structured-data";
 import { getCityProfile, getStaticCitySlugs } from "@/lib/market/market-data";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 type RegionalEntryHubProps = {
   eyebrow: string;
@@ -93,7 +94,7 @@ export default function RegionalEntryHub({
               </p>
             </div>
             <Link
-              href="/anuncios"
+              href="/comprar"
               className="text-sm font-bold text-[#0e62d8] hover:text-[#0c4fb0]"
             >
               Ver catálogo nacional
@@ -121,7 +122,7 @@ export default function RegionalEntryHub({
                     Abrir página local
                   </Link>
                   <Link
-                    href={`/anuncios?city_slug=${city.slug}`}
+                    href={buildCanonicalCityHref(city.slug, "/comprar")}
                     className="inline-flex h-10 items-center justify-center rounded-xl border border-[#d9e2ef] px-4 text-sm font-bold text-[#31405d] transition hover:bg-[#f8fafc]"
                   >
                     Ver anúncios

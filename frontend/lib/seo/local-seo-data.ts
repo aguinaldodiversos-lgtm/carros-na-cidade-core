@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { AdItem, AdsSearchFilters } from "@/lib/search/ads-search";
 import { fetchAdsFacets, fetchAdsSearch } from "@/lib/search/ads-search";
 import { buildSearchQueryString } from "@/lib/search/ads-search-url";
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
 import {
   fetchCityBelowFipeTerritorialPage,
   fetchCityTerritorialPage,
@@ -71,9 +72,23 @@ function maxTotal(...values: Array<number | undefined | null>): number {
   return Math.max(0, Math.floor(m));
 }
 
-function buildComprarHref(filters: AdsSearchFilters): string {
-  const q = buildSearchQueryString(filters);
-  return q ? `/comprar?${q}` : "/comprar";
+/**
+ * CTA "ver o catálogo da cidade" das landings locais.
+ *
+ * Aponta para a CANÔNICA `/carros-em/[slug]`, direta. Antes montava
+ * `/comprar?city_slug=X&sort=recent&page=1&limit=20`: uma URL que só existia
+ * para ser redirecionada, carregando quatro parâmetros que o destino ignora.
+ * O link interno mais forte de cada landing gastava um salto e chegava sujo.
+ *
+ * Os filtros continuam sendo passados quando o recorte exige (abaixo da FIPE,
+ * câmbio automático) — só a ordenação/paginação default some, porque o destino
+ * já é ordenado assim.
+ */
+function buildComprarHref(citySlug: string, filters?: AdsSearchFilters): string {
+  const canonical = getCanonicalCityPath(citySlug);
+  if (!canonical) return "/comprar";
+  const q = filters ? buildSearchQueryString({ ...filters, city_slug: undefined }) : "";
+  return q ? `${canonical}?${q}` : canonical;
 }
 
 function topBrandsFromFacets(
@@ -224,12 +239,7 @@ export async function loadLocalSeoLanding(
       const maxPrice = positiveOr(data.stats?.maxPrice, sampleRange?.max ?? null);
       const belowFipeCount = maxTotal(data.stats?.totalBelowFipeAds);
 
-      const comprarHref = buildComprarHref({
-        city_slug: safeSlug,
-        sort: "recent",
-        page: 1,
-        limit: 20,
-      });
+      const comprarHref = buildComprarHref(safeSlug);
 
       const base: Omit<LocalSeoLandingModel, "paragraphs" | "h1"> = {
         variant: "em",
@@ -294,13 +304,7 @@ export async function loadLocalSeoLanding(
       const maxPrice = sampleRange?.max ?? null;
       const belowFipeCount = totalAds;
 
-      const comprarHref = buildComprarHref({
-        city_slug: safeSlug,
-        below_fipe: true,
-        sort: "recent",
-        page: 1,
-        limit: 20,
-      });
+      const comprarHref = buildComprarHref(safeSlug, { below_fipe: true });
 
       const base: Omit<LocalSeoLandingModel, "paragraphs" | "h1"> = {
         variant: "baratos",
@@ -368,13 +372,7 @@ export async function loadLocalSeoLanding(
     const maxPrice = sampleRange?.max ?? null;
     const belowFipeCount = maxTotal(mainData.stats?.totalBelowFipeAds);
 
-    const comprarHref = buildComprarHref({
-      city_slug: safeSlug,
-      transmission: TRANSMISSION_AUTO,
-      sort: "recent",
-      page: 1,
-      limit: 20,
-    });
+    const comprarHref = buildComprarHref(safeSlug, { transmission: TRANSMISSION_AUTO });
 
     const base: Omit<LocalSeoLandingModel, "paragraphs" | "h1"> = {
       variant: "automaticos",

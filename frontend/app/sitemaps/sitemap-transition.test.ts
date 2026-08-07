@@ -7,22 +7,34 @@ import {
 import type { PublicSitemapEntry } from "@/lib/seo/sitemap-client";
 
 describe("rewriteCityHomeEntries (cities.xml)", () => {
-  it("reescreve /cidade/[slug] (path relativo) para /comprar/cidade/[slug]", () => {
+  it("reescreve /cidade/[slug] (path relativo) para a canônica /carros-em/[slug]", () => {
     const input: PublicSitemapEntry[] = [
-      { loc: "/cidade/sao-paulo-sp" },
+      { loc: "/cidade/braganca-paulista-sp" },
       { loc: "/cidade/atibaia-sp" },
     ];
     const out = rewriteCityHomeEntries(input);
     expect(out.map((e) => e.loc)).toEqual([
-      "/comprar/cidade/sao-paulo-sp",
-      "/comprar/cidade/atibaia-sp",
+      "/carros-em/braganca-paulista-sp",
+      "/carros-em/atibaia-sp",
     ]);
+  });
+
+  // O sitemap não pode publicar URL que redireciona: `/comprar/cidade/[slug]`
+  // agora responde 308, então listá-la seria anunciar um salto ao Googlebot.
+  it("nunca emite a rota legada de cidade", () => {
+    const out = rewriteCityHomeEntries([{ loc: "/cidade/atibaia-sp" }]);
+    expect(out[0].loc).not.toContain("/comprar/cidade/");
+  });
+
+  it("descarta slug que não é cidade brasileira válida", () => {
+    const out = rewriteCityHomeEntries([{ loc: "/cidade/xpto-zz" }, { loc: "/cidade/atibaia-sp" }]);
+    expect(out.map((e) => e.loc)).toEqual(["/carros-em/atibaia-sp"]);
   });
 
   it("reescreve URL absoluta /cidade/[slug] preservando host", () => {
     const input: PublicSitemapEntry[] = [{ loc: "https://carrosnacidade.com/cidade/atibaia-sp" }];
     const out = rewriteCityHomeEntries(input);
-    expect(out[0].loc).toBe("https://carrosnacidade.com/comprar/cidade/atibaia-sp");
+    expect(out[0].loc).toBe("https://carrosnacidade.com/carros-em/atibaia-sp");
   });
 
   it("preserva entries que NÃO são home da cidade (ex.: subrotas /marca/, /modelo/)", () => {
@@ -62,7 +74,7 @@ describe("rewriteCityHomeEntries (cities.xml)", () => {
     ];
     const out = rewriteCityHomeEntries(input);
     expect(out[0]).toEqual({
-      loc: "/comprar/cidade/atibaia-sp",
+      loc: "/carros-em/atibaia-sp",
       lastmod: "2026-05-01T00:00:00.000Z",
       changefreq: "daily",
       priority: 0.8,

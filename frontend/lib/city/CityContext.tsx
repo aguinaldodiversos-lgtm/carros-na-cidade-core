@@ -24,6 +24,7 @@ import {
   writeCityToLocalStorage,
 } from "@/lib/city/city-storage";
 import { usePublicCitySet } from "@/lib/city/use-public-city-set";
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
 
 type CityContextValue = {
   city: CityRef;
@@ -170,13 +171,21 @@ function CityProviderInner({
       writeCityCookie(next);
       setPickerOpen(false);
 
+      // Trocar de cidade estando numa vitrine de catálogo navega para a
+      // CANÔNICA da cidade escolhida — antes ia para `/comprar/cidade/[slug]`,
+      // que agora é 308 e faria o usuário pagar um salto por clique.
+      // `/carros-em/[slug]` também entra na lista de origens: quem já está
+      // numa cidade e escolhe outra precisa trocar de página.
       const normalizedPath = pathname.replace(/\/+$/, "") || "/";
-      const onComprar =
+      const onCatalog =
         normalizedPath === "/comprar" ||
         normalizedPath.startsWith("/comprar/estado/") ||
-        normalizedPath.startsWith("/comprar/cidade/");
+        normalizedPath.startsWith("/comprar/cidade/") ||
+        normalizedPath.startsWith("/carros-em/");
 
-      if (onComprar) {
+      const canonicalTarget = getCanonicalCityPath(next.slug);
+
+      if (onCatalog && canonicalTarget) {
         const params = new URLSearchParams(searchParams.toString());
         params.delete("city_slug");
         params.delete("city_id");
@@ -184,8 +193,7 @@ function CityProviderInner({
         params.delete("state");
         params.delete("page");
         const qs = params.toString();
-        const target = `/comprar/cidade/${encodeURIComponent(next.slug)}`;
-        router.push(qs ? `${target}?${qs}` : target);
+        router.push(qs ? `${canonicalTarget}?${qs}` : canonicalTarget);
         return;
       }
 

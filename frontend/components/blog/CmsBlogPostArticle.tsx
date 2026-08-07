@@ -13,6 +13,7 @@ import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { MarkdownContent } from "@/lib/blog/markdown";
 import { cmsPostToBlogPost, type CmsBlogPost } from "@/lib/blog/blog-cms";
 import { findCategoryDefinition } from "@/lib/blog/blog-page";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 const PLACEHOLDER_IMAGE = "/images/vehicle-placeholder.svg";
 
@@ -36,7 +37,7 @@ export function CmsBlogPostArticle({
   cityName: string;
   cityLabel: string;
 }) {
-  const buyHref = `/comprar/cidade/${encodeURIComponent(citySlug)}`;
+  const buyHref = buildCanonicalCityHref(citySlug, "/comprar");
   const blogHref = `/blog/${encodeURIComponent(citySlug)}`;
   const coverImage = post.cover_image_url || PLACEHOLDER_IMAGE;
   const categoryLabel = post.category

@@ -4,6 +4,7 @@ import { isValidCitySlug } from "@/lib/buy/territory-variant";
 import { fetchCityMetaBySlug } from "@/lib/city/fetch-city-meta-server";
 import { fetchRegionByCitySlug } from "@/lib/regions/fetch-region";
 import { slugToRegionHref } from "@/lib/regions/ancora-url";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 import { getDefaultTerritoryState, stateFromUf, ufFromCitySlug } from "./territory-defaults";
 import type {
@@ -81,7 +82,7 @@ function buildCityBreadcrumbs(
   return [
     { label: "Início", href: "/" },
     { label: state.name, href: `/comprar/estado/${state.slug}` },
-    { label: city.name, href: `/comprar/cidade/${city.slug}` },
+    { label: city.name, href: buildCanonicalCityHref(city.slug, "/comprar") },
   ];
 }
 
@@ -173,7 +174,7 @@ async function resolveCityContext(citySlug: string): Promise<TerritoryContext> {
     level: "city",
     state,
     city: { slug: citySlug, name: cityName, state: state.code },
-    canonicalUrl: `/comprar/cidade/${citySlug}`,
+    canonicalUrl: buildCanonicalCityHref(citySlug, "/comprar"),
     title: `Carros usados em ${cityName} (${state.code})`,
     description: `Ofertas reais em ${cityName} — confira preço, ano e km direto no Carros na Cidade.`,
     breadcrumbs: buildCityBreadcrumbs(state, { slug: citySlug, name: cityName }),
