@@ -71,7 +71,10 @@ void LOCAL_SEO_REVALIDATE; // import preservado por compat (ver doc acima)
 
 const loadSeoModel = cache((slug: string) => loadLocalSeoLanding(slug, "em"));
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams = {},
+}: PageProps): Promise<Metadata> {
   const slug = String(params.slug || "").trim();
   // `isValidBrazilianCitySlug` = formato `nome-uf` E UF brasileira real (fonte
   // única em territory-variant). Chamamos notFound() no generateMetadata para
@@ -79,7 +82,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // HTTP 200 com body not-found (soft-404).
   if (!isValidBrazilianCitySlug(slug)) notFound();
   const model = await loadSeoModel(slug);
-  return buildLocalSeoMetadata(model);
+  // `searchParams` entra na metadata (auditoria 2026-08-06): antes era
+  // ignorado, e por isso TODA variante com filtro/ordenação desta rota
+  // respondia `index,follow` com canonical autorreferente. `?raio=25`,
+  // `?sort=price_asc` e `?seller_kind=dealer` eram três páginas indexáveis com
+  // o mesmo conteúdo. Ver `lib/seo/query-policy.ts`.
+  return buildLocalSeoMetadata(model, searchParams);
 }
 
 export default async function CarrosEmCidadePage({ params, searchParams = {} }: PageProps) {

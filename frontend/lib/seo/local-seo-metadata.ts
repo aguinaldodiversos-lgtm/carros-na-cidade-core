@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
 import { getSiteUrl, toAbsoluteUrl } from "@/lib/seo/site";
 import { getSitemapMinAds } from "@/lib/seo/sitemap-min-ads";
+import {
+  buildCanonicalUrlWithPolicy,
+  decideSeoQueryPolicy,
+  type SeoQueryInput,
+} from "@/lib/seo/query-policy";
 
 function truncateTitle(raw: string, max = 70): string {
   const t = raw.trim();
@@ -37,6 +42,12 @@ function transitionCanonicalPath(model: LocalSeoLandingModel): string {
   return `/carros-em/${slug}`;
 }
 
+/**
+ * Canonical LIMPA (sem query). É o que o JSON-LD deve declarar como `url`:
+ * o recurso é a cidade, não o recorte que o visitante pediu. A metadata usa a
+ * versão com política de parâmetros (`buildCanonicalUrlWithPolicy`), que só
+ * difere quando a URL é uma página 2+.
+ */
 function resolveCanonical(model: LocalSeoLandingModel): string {
   return toAbsoluteUrl(transitionCanonicalPath(model));
 }
@@ -314,13 +325,34 @@ export function buildLocalSeoJsonLd(model: LocalSeoLandingModel): Record<string,
   };
 }
 
-export function buildLocalSeoMetadata(model: LocalSeoLandingModel): Metadata {
+/**
+ * @param searchParams query string CRUA da requisição. Sem ela, a metadata
+ * ignora a query e `/carros-em/[slug]?sort=price_asc`, `?raio=25` e
+ * `?seller_kind=dealer` respondiam `index,follow` com canonical
+ * autorreferente — uma página indexável por combinação de filtro, todas com
+ * o mesmo conteúdo reordenado. A política vive em `lib/seo/query-policy.ts`.
+ */
+export function buildLocalSeoMetadata(
+  model: LocalSeoLandingModel,
+  searchParams?: SeoQueryInput
+): Metadata {
   const siteUrl = getSiteUrl();
   const title = buildTitle(model);
   const description = buildDescription(model);
-  const canonical = resolveCanonical(model);
   const ogImage = resolveOgImage(model);
-  const indexable = shouldIndexLocalSeo(model);
+
+  const policy = decideSeoQueryPolicy(searchParams ?? {});
+
+  // A canonical de uma página de filtro/ordenação é a URL territorial LIMPA.
+  // A da página 2+ é ela mesma, com `?page=N`: canonicalizar toda paginação
+  // para a página 1 esconderia do índice os anúncios do fim da lista.
+  const canonical = toAbsoluteUrl(
+    buildCanonicalUrlWithPolicy(transitionCanonicalPath(model), policy)
+  );
+
+  // As duas condições são independentes e ambas precisam valer: estoque
+  // suficiente (regra territorial) E query sem recorte (regra de parâmetros).
+  const indexable = shouldIndexLocalSeo(model) && policy.index;
 
   return {
     metadataBase: new URL(siteUrl),

@@ -21,6 +21,8 @@ export const LOCAL_SEO_REVALIDATE = 60;
 
 interface PageParams {
   params: { slug: string };
+  /** Query crua — alimenta a política de parâmetros em `generateMetadata`. */
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 /**
@@ -49,14 +51,14 @@ export function createLocalSeoPage(
 ) {
   const load = cache((slug: string) => loadLocalSeoLanding(slug, variant));
 
-  async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+  async function generateMetadata({ params, searchParams }: PageParams): Promise<Metadata> {
     // Cidade inexistente → 404 real. Chamado no generateMetadata para comitar
     // o status ANTES do Page (com force-dynamic; ver doc nas page.tsx). Sem
     // isso, `/carros-baratos-em/cidade-falsa-xx` respondia 200 indexável
     // (soft-404). Cidade real sem anúncios NÃO cai aqui (fallback 200).
     if (!isValidBrazilianCitySlug(params.slug)) notFound();
     const model = await load(params.slug);
-    return buildLocalSeoMetadata(model);
+    return buildLocalSeoMetadata(model, searchParams);
   }
 
   async function Page({ params }: PageParams) {

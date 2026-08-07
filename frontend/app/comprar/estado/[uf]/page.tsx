@@ -16,12 +16,12 @@ import {
 } from "@/lib/search/ads-search";
 import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
 import {
-  hasRestrictiveFilters,
   normalizeStateFilters,
   normalizeUf,
   stateNameFromUf,
   type SearchParams,
 } from "@/lib/buy/territory-variant";
+import { decideSeoQueryPolicy } from "@/lib/seo/query-policy";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
 
 type ComprarEstadualPageProps = {
@@ -123,10 +123,13 @@ export async function generateMetadata({
   // validar produção e SEO").
   const canonicalPath = `/carros-usados/${uf.toLowerCase()}`;
 
-  // URLs filtradas (brand, model, q, etc.) não devem ser indexadas.
-  // Canonical já aponta para URL limpa; noindex é mais explícito para
-  // que o Googlebot não desperdice crawl budget em variações de filtro.
-  const noindex = hasRestrictiveFilters(filters);
+  // Indexação por POLÍTICA CENTRAL (lib/seo/query-policy.ts), não por lista
+  // ad-hoc: `hasRestrictiveFilters` trabalha sobre filtros já parseados e não
+  // enxergava `sort`, `page` nem `raio`. Aqui a decisão é sobre a query CRUA,
+  // igual à das demais vitrines — "quais parâmetros desindexam" precisa ter
+  // uma resposta só no portal inteiro.
+  const policy = decideSeoQueryPolicy(searchParams);
+  const noindex = !policy.index;
 
   return {
     title,

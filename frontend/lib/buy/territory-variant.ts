@@ -142,11 +142,19 @@ export function cityContextFromRef(ref: CityRef | null | undefined): BuyCityCont
 }
 
 /**
- * Retorna true quando os searchParams contêm filtros de produto (brand, model,
- * q, faixa de preço etc.) — ou seja, a URL não é a vitrine canônica limpa.
- * Usado em generateMetadata para emitir robots:noindex nessas variantes,
- * evitando indexação de páginas de filtro com canonical apontando para a URL
- * limpa (o canonical só consolida; noindex é mais explícito para o crawl budget).
+ * True quando os filtros recortam o catálogo — ou seja, a URL NÃO é a vitrine
+ * canônica limpa. Usado em `generateMetadata` para emitir `robots: noindex`
+ * nessas variantes (a canonical consolida; o noindex é o sinal explícito).
+ *
+ * Auditoria 2026-08-06: faltavam `seller_kind`, `opportunity` e
+ * `priority_tier` — os três filtros da Fase 3. Cada valor deles produzia uma
+ * página `index,follow` com canonical autorreferente, exatamente a duplicata
+ * que esta função existe para impedir. Mesmo padrão de esquecimento já
+ * registrado em `hasFilters`, `countQuery`, chave de cache e chips.
+ *
+ * A lista de nomes de PARÂMETRO vive em `lib/seo/query-policy.ts`; aqui
+ * trabalhamos sobre `AdsSearchFilters` (já parseado), então a checagem é por
+ * campo. Ao acrescentar filtro novo, os dois lugares mudam no mesmo PR.
  */
 export function hasRestrictiveFilters(filters: AdsSearchFilters): boolean {
   return Boolean(
@@ -162,7 +170,10 @@ export function hasRestrictiveFilters(filters: AdsSearchFilters): boolean {
       filters.transmission ||
       filters.body_type ||
       filters.below_fipe === true ||
-      filters.highlight_only === true
+      filters.highlight_only === true ||
+      filters.opportunity === true ||
+      filters.seller_kind ||
+      filters.priority_tier
   );
 }
 
