@@ -72,6 +72,11 @@ export interface AdDetailValidationConfig {
   timeoutMs?: number;
   /** Fetch a usar — substituível em teste. */
   fetchImpl?: typeof fetch;
+  /**
+   * Lê o corpo da resposta para devolver o slug canônico do anúncio.
+   * Só o alias `/anuncios/[identifier]` precisa; `/veiculo/[slug]` não paga.
+   */
+  readCanonicalSlug?: boolean;
 }
 
 /**
@@ -89,9 +94,39 @@ export type AdDetailUnavailableReason =
   | "fetch-error";
 
 export type AdDetailValidation =
-  | { kind: "valid" }
+  /**
+   * `canonicalSlug` só vem quando o caller pede (`readCanonicalSlug`), porque
+   * exige ler o corpo da resposta. O gate roda em TODO request a `/veiculo/*`
+   * — parsear JSON à toa ali seria custo puro. Quem precisa é o alias
+   * `/anuncios/[identifier]`, que sem o slug não consegue emitir o 308 no
+   * middleware e teria de deixar o App Router renderizar antes de redirecionar.
+   */
+  | { kind: "valid"; canonicalSlug?: string }
   | { kind: "not_found" }
   | { kind: "unavailable"; reason: AdDetailUnavailableReason; detail?: string };
+
+/** Extrai `slug` (ou `id`) do payload público, tolerando os envelopes do BFF. */
+function readCanonicalSlugFromPayload(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+
+  const envelope = payload as Record<string, unknown>;
+  const candidates = [envelope.data, envelope.ad, envelope.item, envelope];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const ad = candidate as { slug?: unknown; id?: unknown };
+
+    const slug = typeof ad.slug === "string" ? ad.slug.trim() : "";
+    if (slug) return slug;
+
+    // Anúncio sem slug ainda tem destino canônico: `/veiculo/[id]`.
+    if (typeof ad.id === "number" || (typeof ad.id === "string" && ad.id.trim())) {
+      return String(ad.id).trim();
+    }
+  }
+
+  return undefined;
+}
 
 /**
  * Bate em `${BACKEND_API_URL}/api/ads/<identifier>` autenticado como
@@ -144,7 +179,16 @@ export async function validateAdIdentifier(
       next: { revalidate, tags: ["ad-detail-gate", `ad-detail-gate:${safeId}`] },
     });
 
-    if (response.status === 200) return { kind: "valid" };
+    if (response.status === 200) {
+      if (!config.readCanonicalSlug) return { kind: "valid" };
+      try {
+        return { kind: "valid", canonicalSlug: readCanonicalSlugFromPayload(await response.json()) };
+      } catch {
+        // Corpo ilegível não invalida a existência: o backend respondeu 200.
+        // Sem slug, o caller cai no fallback (deixa o App Router redirecionar).
+        return { kind: "valid" };
+      }
+    }
     if (response.status === 404) return { kind: "not_found" };
     // 410 Gone = "esse recurso existiu mas foi removido em definitivo".
     // Semanticamente equivalente a not_found para o usuário final. Sem
@@ -202,4 +246,41 @@ export function decideAdDetailMiddlewareAction(
   if (validation.kind === "valid") return { kind: "pass-valid" };
   if (validation.kind === "not_found") return { kind: "block-not-found" };
   return { kind: "pass-unavailable", reason: validation.reason };
+}
+
+/** Path canônico do detalhe de anúncio. Uma família, um literal. */
+export const VEHICLE_CANONICAL_PATH_PREFIX = "/veiculo";
+
+export type AdAliasAction =
+  /** 308 HTTP real, emitido antes de qualquer HTML sair. */
+  | { kind: "redirect-permanent"; pathname: string }
+  /** Sem slug utilizável: deixa a rota renderizar e redirecionar como antes. */
+  | { kind: "pass" };
+
+/**
+ * `/anuncios/[identifier]` → `/veiculo/[slug-canônico]`.
+ *
+ * O redirect já existia, mas no `page.tsx` (`permanentRedirect`), o que
+ * significa entrar no App Router e montar a rota antes de responder. No
+ * middleware o 308 sai antes de qualquer HTML, sem etapa intermediária —
+ * é o contrato que preserva backlinks antigos com o menor custo possível.
+ *
+ * Só age sobre a rota alias: `/veiculo/[slug]` é o destino e nunca redireciona
+ * para si mesmo (seria um loop). Identificador inexistente já foi barrado com
+ * 404 pelo gate; aqui só chega anúncio que existe.
+ */
+export function decideAdAliasRedirect(
+  match: AdDetailMatch,
+  validation: AdDetailValidation
+): AdAliasAction {
+  if (match.route !== "anuncios") return { kind: "pass" };
+  if (validation.kind !== "valid") return { kind: "pass" };
+
+  const slug = (validation.canonicalSlug || "").trim();
+  if (!slug) return { kind: "pass" };
+
+  return {
+    kind: "redirect-permanent",
+    pathname: `${VEHICLE_CANONICAL_PATH_PREFIX}/${encodeURIComponent(slug)}`,
+  };
 }

@@ -13,10 +13,17 @@ import {
   validateRegionalSlug,
 } from "@/lib/regional-page-guard";
 import {
+  decideAdAliasRedirect,
   decideAdDetailMiddlewareAction,
   extractAdDetailMatch,
   validateAdIdentifier,
 } from "@/lib/middleware/ad-detail-gate";
+import {
+  decideAnunciosListRedirect,
+  decideComprarLegacyQueryRedirect,
+  decideLegacyCityRedirect,
+  decideQueryNormalizationRedirect,
+} from "@/lib/middleware/canonical-redirects";
 import {
   decideDealerMiddlewareAction,
   extractDealerSlug,
@@ -69,6 +76,16 @@ import {
  *
  * 2. **Redirect 301 da rota legada** (`/:uf/regiao/:ancora`):
  *    Sempre redireciona para `/carros-usados/regiao/{ancora}-{uf}`.
+ *
+ * 2f. **Redirects 308 de canonicalização** (auditoria SEO 2026-08-06):
+ *    - /comprar/cidade/[slug] → /carros-em/[slug]   (rota legada concorrente)
+ *    - /anuncios/[identifier] → /veiculo/[slug]     (alias de anúncio)
+ *    - /anuncios              → /comprar            (alias de listagem)
+ *    - normalização de query nas vitrines (`sort=relevance`, `page=1`)
+ *
+ *    Todos AQUI e não em `page.tsx` pelo mesmo motivo dos 404 acima:
+ *    `redirect()` em Server Component pode virar 200 + meta refresh, que o
+ *    Googlebot não trata como redirect. Ver `lib/middleware/canonical-redirects.ts`.
  *
  * 3. **Redirects 301 de outras URLs legadas** (preservados):
  *    - /carros-{em,baratos-em,automaticos-em}-[slug] → versão com `/`
@@ -141,6 +158,23 @@ export async function middleware(request: NextRequest) {
     return respond(request, startedAt, blocked);
   }
 
+  // ── 0c. `/comprar?city_slug=` / `?state=` → 308 para o destino FINAL.
+  //
+  // Cedo de propósito: `/comprar` não tem gate territorial próprio (o
+  // território está na QUERY, não no path), então não há 404 a preservar. E
+  // quanto antes o salto sair, menos trabalho o Edge faz por uma URL que nem
+  // vai renderizar. O destino — `/carros-em/[slug]` ou `/comprar/estado/[uf]`
+  // — tem os gates dele e responde 404 sozinho quando a cidade não existe.
+  const comprarLegacy = decideComprarLegacyQueryRedirect(pathname, search);
+  if (comprarLegacy.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = comprarLegacy.pathname;
+    url.search = comprarLegacy.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "comprar-legacy-query");
+    return respond(request, startedAt, moved);
+  }
+
   // ── 1. Redirect 301 da rota legada `/:uf/regiao/:ancora` para canônica.
   const legacyAncoraMatch = LEGACY_ANCORA_RE.exec(pathname);
   if (legacyAncoraMatch) {
@@ -188,6 +222,22 @@ export async function middleware(request: NextRequest) {
           blocked.headers.set("X-Middleware-City-Family", regionalCityMatch.family);
           return respond(request, startedAt, blocked);
         }
+      }
+
+      // A normalização de query do fim do middleware é INALCANÇÁVEL para esta
+      // família — o bloco regional retorna aqui. Mesma armadilha que fez o
+      // gate de existência de cidade parecer aplicado e não estar (2026-08-06):
+      // a função pura estava certa, o teste unitário verde, e nada verificava
+      // que o middleware CHEGAVA a chamá-la. Por isso a chamada é repetida
+      // aqui, e há teste de alcance cobrindo justamente este ponto.
+      const regionalNormalization = decideQueryNormalizationRedirect(pathname, search);
+      if (regionalNormalization.kind === "redirect-permanent") {
+        const url = request.nextUrl.clone();
+        url.pathname = regionalNormalization.pathname;
+        url.search = regionalNormalization.search;
+        const moved = NextResponse.redirect(url, 308);
+        moved.headers.set("X-Middleware-Canonical", "query-normalization");
+        return respond(request, startedAt, moved);
       }
 
       const passed = NextResponse.next(territorialContext);
@@ -304,6 +354,22 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // ── 2b-quater. `/comprar/cidade/[slug]` → 308 `/carros-em/[slug]`.
+  //
+  // DEPOIS dos gates, e isso é essencial: cidade com slug estruturalmente
+  // inválido, ou sem nenhum anúncio ativo, precisa continuar respondendo 404
+  // real. Se o redirect viesse antes, o 404 territorial viraria um 308 para
+  // uma página que também dá 404 — cadeia inútil — ou, pior, um 200 emprestado.
+  const legacyCity = decideLegacyCityRedirect(pathname, search);
+  if (legacyCity.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = legacyCity.pathname;
+    url.search = legacyCity.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "legacy-city");
+    return respond(request, startedAt, moved);
+  }
+
   // ── 2c. Hard gate de existência para /veiculo/[slug] e
   //        /anuncios/[identifier] (auditoria 2026-05-24).
   //
@@ -321,7 +387,11 @@ export async function middleware(request: NextRequest) {
   // retorna null. Ver `lib/middleware/ad-detail-gate.ts`.
   const adDetailMatch = extractAdDetailMatch(pathname);
   if (adDetailMatch) {
-    const validation = await validateAdIdentifier(adDetailMatch.identifier);
+    // Só o alias paga a leitura do corpo — é ele que precisa do slug canônico
+    // para emitir o 308 aqui. `/veiculo/[slug]` continua checando só o status.
+    const validation = await validateAdIdentifier(adDetailMatch.identifier, {
+      readCanonicalSlug: adDetailMatch.route === "anuncios",
+    });
     const action = decideAdDetailMiddlewareAction(validation);
 
     if (action.kind === "block-not-found") {
@@ -329,6 +399,19 @@ export async function middleware(request: NextRequest) {
       blocked.headers.set("X-Middleware-Ad", "blocked-not-found");
       blocked.headers.set("X-Middleware-Ad-Route", adDetailMatch.route);
       return respond(request, startedAt, blocked);
+    }
+
+    // Alias legado → canônica do anúncio, 308 HTTP real, sem HTML intermediário.
+    // O `permanentRedirect()` do page.tsx segue no lugar como defesa: se o
+    // backend não devolver slug, caímos nele.
+    const alias = decideAdAliasRedirect(adDetailMatch, validation);
+    if (alias.kind === "redirect-permanent" && alias.pathname !== pathname) {
+      const url = request.nextUrl.clone();
+      url.pathname = alias.pathname;
+      url.search = "";
+      const moved = NextResponse.redirect(url, 308);
+      moved.headers.set("X-Middleware-Canonical", "ad-alias");
+      return respond(request, startedAt, moved);
     }
 
     if (action.kind === "pass-unavailable") {
@@ -464,6 +547,36 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = `/painel/anuncios/${upgradeMatch[1]}/upgrade`;
     return respond(request, startedAt, NextResponse.redirect(url, 301));
+  }
+
+  // ── 4. `/anuncios` → 308 `/comprar` (alias de listagem).
+  //
+  // A cadeia medida na auditoria: /anuncios respondia 200 canonicalizando para
+  // /comprar, que por sua vez não era destino final. Duas URLs gastando crawl
+  // budget para apontar para uma terceira. Agora é um salto só.
+  const anunciosList = decideAnunciosListRedirect(pathname);
+  if (anunciosList.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = anunciosList.pathname;
+    url.search = anunciosList.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "anuncios-list");
+    return respond(request, startedAt, moved);
+  }
+
+  // ── 5. Normalização de query das vitrines (`sort=relevance`, `page=1`, …).
+  //
+  // Por último de propósito: só normaliza URL que já passou por todos os gates
+  // e vai mesmo renderizar. Normalizar antes produziria 308 para uma página que
+  // responderia 404 logo em seguida.
+  const queryNormalization = decideQueryNormalizationRedirect(pathname, search);
+  if (queryNormalization.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = queryNormalization.pathname;
+    url.search = queryNormalization.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "query-normalization");
+    return respond(request, startedAt, moved);
   }
 
   // Fim: propaga o pathname para o RootLayout via header interno.

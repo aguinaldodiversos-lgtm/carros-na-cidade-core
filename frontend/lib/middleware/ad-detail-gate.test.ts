@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  decideAdAliasRedirect,
   decideAdDetailMiddlewareAction,
   extractAdDetailMatch,
   validateAdIdentifier,
@@ -161,5 +162,49 @@ describe("decideAdDetailMiddlewareAction — política fail-open em unavailable"
   ] as const)("unavailable(%s) → pass-unavailable (NÃO 503)", (reason) => {
     const action = decideAdDetailMiddlewareAction({ kind: "unavailable", reason });
     expect(action).toEqual({ kind: "pass-unavailable", reason });
+  });
+});
+
+/**
+ * `/anuncios/[identifier]` → 308 `/veiculo/[slug]`.
+ *
+ * O redirect existia, mas no `page.tsx` — ou seja, só depois de entrar no App
+ * Router e montar a rota. No middleware o status sai antes de qualquer HTML,
+ * que é o contrato pedido para preservar backlinks antigos sem etapa
+ * intermediária.
+ */
+describe("decideAdAliasRedirect", () => {
+  const alias = { route: "anuncios", identifier: "123" } as const;
+  const canonica = { route: "veiculo", identifier: "civic-2020" } as const;
+
+  it("alias com slug canônico → 308 para /veiculo/[slug]", () => {
+    expect(decideAdAliasRedirect(alias, { kind: "valid", canonicalSlug: "civic-2020-abc" })).toEqual(
+      { kind: "redirect-permanent", pathname: "/veiculo/civic-2020-abc" }
+    );
+  });
+
+  it("preserva o slug recebido — sem destino fixo", () => {
+    const a = decideAdAliasRedirect(alias, { kind: "valid", canonicalSlug: "onix-2019-xyz" });
+    const b = decideAdAliasRedirect(alias, { kind: "valid", canonicalSlug: "hb20-2021-def" });
+    expect(a.kind === "redirect-permanent" && a.pathname).toBe("/veiculo/onix-2019-xyz");
+    expect(b.kind === "redirect-permanent" && b.pathname).toBe("/veiculo/hb20-2021-def");
+  });
+
+  it("a rota canônica NUNCA redireciona para si mesma (seria loop)", () => {
+    expect(decideAdAliasRedirect(canonica, { kind: "valid", canonicalSlug: "civic-2020" })).toEqual({
+      kind: "pass",
+    });
+  });
+
+  it("sem slug no payload → pass (o page.tsx redireciona como antes)", () => {
+    expect(decideAdAliasRedirect(alias, { kind: "valid" }).kind).toBe("pass");
+    expect(decideAdAliasRedirect(alias, { kind: "valid", canonicalSlug: "  " }).kind).toBe("pass");
+  });
+
+  it("anúncio inexistente ou backend fora → pass (404/fail-open são de outro eixo)", () => {
+    expect(decideAdAliasRedirect(alias, { kind: "not_found" }).kind).toBe("pass");
+    expect(
+      decideAdAliasRedirect(alias, { kind: "unavailable", reason: "backend-timeout" }).kind
+    ).toBe("pass");
   });
 });

@@ -1,132 +1,125 @@
 /**
- * Gate de indexação de `/comprar/cidade/[slug]` — paridade com as irmãs.
+ * `/comprar/cidade/[slug]` — contrato de ALIAS.
  *
- * Esta rota era a ÚNICA da família territorial sem gate de estoque no robots
- * (auditoria 2026-07-28). Só emitia `noindex` quando havia filtro na URL; na
- * URL limpa não emitia tag `robots` nenhuma, e o default do Next é
- * `index,follow`. Somado ao fallback territorial, virou doorway page: milhares
- * de cidades servindo os anúncios de Atibaia, cada uma se declarando local.
+ * ── História desta suíte ─────────────────────────────────────────────────────
+ * Ela travava um gate de INDEXAÇÃO: a rota era a única da família territorial
+ * sem gate de estoque no robots (auditoria 2026-07-28) e, somada ao fallback
+ * territorial, virou doorway page — milhares de cidades servindo o estoque de
+ * outra, cada uma se declarando local.
  *
- * A regra travada aqui é a mesma de `shouldIndexLocalSeo`:
- *   indexável ⟺ estoque PRÓPRIO da cidade >= SITEMAP_MIN_ADS
+ * O gate consertou o sintoma. A causa era a rota existir como segunda página
+ * indexável do mesmo recurso. Agora ela só redireciona (308 → `/carros-em/
+ * [slug]`), então não há mais "quando indexar": a resposta é NUNCA. É isto que
+ * esta suíte trava — junto do invariante de que o slug pedido é o slug
+ * entregue, e de que cidade inexistente continua 404 em vez de virar redirect.
  *
- * "Próprio" é o ponto crítico: conteúdo emprestado pelo fallback nunca pode
- * tornar a página indexável.
+ * O 308 HTTP real é emitido pelo middleware; a decisão pura está coberta em
+ * `lib/middleware/canonical-redirects.test.ts`. Aqui é a defesa em profundidade
+ * da própria rota.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/components/buy/BuyMarketplacePageClient", () => ({ default: () => null }));
-vi.mock("@/components/seo/BreadcrumbJsonLd", () => ({ default: () => null }));
-
-vi.mock("@/lib/env/backend-api", () => ({
-  resolveBackendApiUrl: vi.fn(() => "https://backend.test/api/public/cities/x"),
-  resolveInternalBackendApiUrl: vi.fn(() => "https://backend.test/x"),
-  getBackendApiBaseUrl: vi.fn(() => "https://backend.test"),
-  getInternalBackendApiBaseUrl: vi.fn(() => ""),
+// `vi.hoisted` porque `vi.mock` sobe para o topo do arquivo: mocks declarados
+// como const normal ainda não existem quando a factory roda.
+const { notFoundMock, permanentRedirectMock } = vi.hoisted(() => ({
+  notFoundMock: vi.fn(() => {
+    const error = new Error("NEXT_NOT_FOUND");
+    (error as { digest?: string }).digest = "NEXT_NOT_FOUND";
+    throw error;
+  }),
+  permanentRedirectMock: vi.fn((path: string) => {
+    const error = new Error(`NEXT_REDIRECT:${path}`);
+    (error as { digest?: string }).digest = `NEXT_REDIRECT;replace;${path};308`;
+    throw error;
+  }),
 }));
 
-vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
-  ssrResilientFetch: vi.fn(async () => new Response("{}", { status: 500 })),
+vi.mock("next/navigation", () => ({
+  notFound: notFoundMock,
+  permanentRedirect: permanentRedirectMock,
 }));
 
-vi.mock("@/lib/search/ads-search", () => ({
-  fetchAdsSearch: vi.fn(),
-  fetchAdsFacets: vi.fn(),
-}));
+import ComprarCidadeLegacyRedirect, { generateMetadata } from "./page";
 
-import { fetchAdsSearch } from "@/lib/search/ads-search";
-import { generateMetadata } from "./page";
-
-const mockedSearch = vi.mocked(fetchAdsSearch);
-
-function withTotal(total: number) {
-  mockedSearch.mockResolvedValue({
-    success: true,
-    ok: true,
-    data: [],
-    pagination: { page: 1, limit: 1, total, totalPages: 1 },
-    error: null,
-  } as never);
-}
-
-const SLUG = "atibaia-sp";
+const CIDADE_A = "atibaia-sp";
+const CIDADE_B = "braganca-paulista-sp";
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  delete process.env.SITEMAP_MIN_ADS; // default 3
+  notFoundMock.mockClear();
+  permanentRedirectMock.mockClear();
 });
 
-afterEach(() => {
-  vi.restoreAllMocks();
+describe("metadata — a rota nunca é indexável", () => {
+  it("emite noindex mesmo com a URL limpa", async () => {
+    const meta = await generateMetadata({ params: { slug: CIDADE_A }, searchParams: {} });
+    expect(meta.robots).toMatchObject({ index: false, follow: true });
+  });
+
+  it("canonicaliza para a irmã canônica, preservando a cidade", async () => {
+    expect(
+      (await generateMetadata({ params: { slug: CIDADE_A }, searchParams: {} })).alternates
+        ?.canonical
+    ).toBe("/carros-em/atibaia-sp");
+
+    expect(
+      (await generateMetadata({ params: { slug: CIDADE_B }, searchParams: {} })).alternates
+        ?.canonical
+    ).toBe("/carros-em/braganca-paulista-sp");
+  });
+
+  it("cidade inexistente → 404, nunca metadata de cidade", async () => {
+    await expect(
+      generateMetadata({ params: { slug: "xpto-zz" }, searchParams: {} })
+    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    expect(notFoundMock).toHaveBeenCalled();
+  });
 });
 
-describe("gate de estoque no robots", () => {
-  it("cidade COM estoque suficiente (>= 3) → index", async () => {
-    withTotal(19);
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.robots).toMatchObject({ index: true, follow: true });
+describe("redirect — destino final, sem cadeia e sem cidade fixa", () => {
+  it.each([
+    [CIDADE_A, "/carros-em/atibaia-sp"],
+    [CIDADE_B, "/carros-em/braganca-paulista-sp"],
+    ["curitiba-pr", "/carros-em/curitiba-pr"],
+  ])("%s → %s", async (slug, esperado) => {
+    await expect(
+      ComprarCidadeLegacyRedirect({ params: { slug }, searchParams: {} })
+    ).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(permanentRedirectMock).toHaveBeenCalledWith(esperado);
   });
 
-  it("cidade no limiar exato (3) → index", async () => {
-    withTotal(3);
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.robots).toMatchObject({ index: true });
+  it("descarta sort=relevance e page=1 no destino", async () => {
+    await expect(
+      ComprarCidadeLegacyRedirect({
+        params: { slug: CIDADE_A },
+        searchParams: { sort: "relevance", page: "1" },
+      })
+    ).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(permanentRedirectMock).toHaveBeenCalledWith("/carros-em/atibaia-sp");
   });
 
-  it("cidade com 2 anúncios (abaixo do limiar) → noindex", async () => {
-    withTotal(2);
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.robots).toMatchObject({ index: false, follow: true });
-  });
-
-  it("cidade SEM estoque próprio → noindex, mesmo que o fallback vá preencher a página", async () => {
-    withTotal(0);
-    const meta = await generateMetadata({
-      params: { slug: "altaneira-ce" },
-      searchParams: {},
-    });
-    expect(meta.robots).toMatchObject({ index: false, follow: true });
-  });
-
-  it("URL LIMPA sempre emite tag robots explícita (antes era ausente ⇒ index por default)", async () => {
-    withTotal(0);
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.robots).toBeDefined();
-  });
-
-  it("filtro na URL → noindex mesmo com estoque de sobra", async () => {
-    withTotal(19);
-    const meta = await generateMetadata({
-      params: { slug: SLUG },
-      searchParams: { brand: "honda", model: "civic" },
-    });
-    expect(meta.robots).toMatchObject({ index: false, follow: true });
-  });
-
-  it("falha no backend → noindex (o lado seguro do erro)", async () => {
-    mockedSearch.mockRejectedValue(new Error("backend fora"));
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.robots).toMatchObject({ index: false });
-  });
-
-  it("conta o estoque da PRÓPRIA cidade pedida, nunca o do doador", async () => {
-    withTotal(0);
-    await generateMetadata({ params: { slug: "altaneira-ce" }, searchParams: {} });
-    expect(mockedSearch).toHaveBeenCalledWith(
-      expect.objectContaining({ city_slug: "altaneira-ce" })
+  it("preserva filtro real do usuário", async () => {
+    await expect(
+      ComprarCidadeLegacyRedirect({
+        params: { slug: CIDADE_B },
+        searchParams: { brand: "Honda" },
+      })
+    ).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(permanentRedirectMock).toHaveBeenCalledWith(
+      "/carros-em/braganca-paulista-sp?brand=Honda"
     );
   });
 
-  it("respeita SITEMAP_MIN_ADS configurável", async () => {
-    process.env.SITEMAP_MIN_ADS = "10";
-    withTotal(5);
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.robots).toMatchObject({ index: false });
+  it("o destino nunca passa por /comprar (sem cadeia de redirects)", async () => {
+    await expect(
+      ComprarCidadeLegacyRedirect({ params: { slug: CIDADE_A }, searchParams: {} })
+    ).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(String(permanentRedirectMock.mock.calls[0][0])).not.toContain("/comprar");
   });
 
-  it("canonical segue apontando para a irmã canônica", async () => {
-    withTotal(19);
-    const meta = await generateMetadata({ params: { slug: SLUG }, searchParams: {} });
-    expect(meta.alternates?.canonical).toBe(`/carros-em/${SLUG}`);
+  it("cidade inexistente → 404, jamais redirect para outra cidade", async () => {
+    await expect(
+      ComprarCidadeLegacyRedirect({ params: { slug: "cidade-falsa-xx" }, searchParams: {} })
+    ).rejects.toThrow(/NEXT_NOT_FOUND/);
+    expect(permanentRedirectMock).not.toHaveBeenCalled();
   });
 });
