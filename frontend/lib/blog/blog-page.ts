@@ -1,4 +1,6 @@
 // frontend/lib/blog/blog-page.ts
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
+
 export type BlogCategoryId =
   | "compra"
   | "venda"
@@ -163,7 +165,7 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
       title: `Encontre o carro ideal na sua região`,
       subtitle: `Veículos verificados, vendedores confiáveis e as melhores oportunidades em ${city.name} e região.`,
       ctaLabel: `Ver carros em ${city.name}`,
-      ctaHref: `/comprar/cidade/${cityNameEncoded}`,
+      ctaHref: buildCanonicalCityHref(citySlug, "/comprar"),
       image: "/images/imagem_banner_blog.png",
     },
     categories,
