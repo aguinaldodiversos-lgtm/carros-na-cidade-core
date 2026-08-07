@@ -240,7 +240,17 @@ export function normalizeCityFilters(
   return next;
 }
 
-/** Query string só com filtros não-territoriais, para cross-links entre rotas. */
+/**
+ * Query string só com filtros não-territoriais, para cross-links entre rotas
+ * e para os `href` da paginação.
+ *
+ * `limit` sai junto (auditoria 2026-08-07). `normalizeCityFilters` sempre
+ * preenche `filters.limit` com o default, então esta função vinha emitindo
+ * `limit=50` em TODO link de paginação — uma segunda grafia de cada página do
+ * catálogo, gerada pela própria navegação interna. E como não existe controle
+ * de tamanho de página na UI, `limit` nunca representa escolha do usuário que
+ * valha propagar. Ver `DEFAULT_CATALOG_LIMIT` em `lib/seo/query-policy.ts`.
+ */
 export function buildNonTerritoryQueryString(filters: AdsSearchFilters): string {
   const clone: AdsSearchFilters = { ...filters };
   delete clone.state;
@@ -248,6 +258,7 @@ export function buildNonTerritoryQueryString(filters: AdsSearchFilters): string 
   delete clone.city_id;
   delete clone.city_slug;
   delete clone.page;
+  delete clone.limit;
   return buildSearchQueryString(clone);
 }
 

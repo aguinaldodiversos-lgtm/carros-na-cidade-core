@@ -211,6 +211,19 @@ describe("buildNonTerritoryQueryString — separação rígida", () => {
     expect(qs).not.toContain("page=");
     expect(qs).toContain("brand=Toyota");
   });
+
+  /**
+   * `normalizeCityFilters` SEMPRE preenche `limit` com o default, então esta
+   * função vinha emitindo `limit=50` em todo href de paginação — uma segunda
+   * grafia de cada página do catálogo, gerada pela navegação interna.
+   * Não há controle de tamanho de página na UI: `limit` nunca é escolha do
+   * usuário que valha propagar.
+   */
+  it("remove limit — nunca é escolha de interface", () => {
+    expect(buildNonTerritoryQueryString({ limit: 50, brand: "Toyota" })).not.toContain("limit=");
+    expect(buildNonTerritoryQueryString({ limit: 10, brand: "Toyota" })).not.toContain("limit=");
+    expect(buildNonTerritoryQueryString({ limit: 50 })).toBe("");
+  });
 });
 
 describe("normalizeUf — só aceita UFs válidas", () => {

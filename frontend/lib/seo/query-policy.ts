@@ -45,6 +45,20 @@
 /** Ordenação default das vitrines territoriais (ver `normalizeCityFilters`). */
 export const DEFAULT_CATALOG_SORT = "relevance";
 
+/**
+ * Tamanho de página default do catálogo. Espelha `DEFAULT_COMPRAR_CATALOG_LIMIT`.
+ *
+ * NÃO existe controle de `limit` na interface — verificado em
+ * `components/buy/`. Ou seja, ele nunca é "uma escolha explícita do usuário":
+ * quando aparece na URL, ou é o default ecoado pela própria navegação, ou é
+ * URL montada à mão. Por isso `limit` não entra em canonical nem em link
+ * gerado, e o valor default é normalizado por redirect.
+ *
+ * Se um dia houver seletor de tamanho de página na UI, é AQUI que a política
+ * precisa ser revisitada — não em cada rota.
+ */
+export const DEFAULT_CATALOG_LIMIT = 50;
+
 export type SeoQueryCategory = "sorting" | "pagination" | "filter" | "tracking" | "territory";
 
 export const SEO_QUERY_POLICY: Readonly<Record<string, SeoQueryCategory>> = Object.freeze({
@@ -227,7 +241,11 @@ export function decideSeoQueryPolicy(input: SeoQueryInput): SeoQueryDecision {
     }
 
     if (category === "pagination") {
-      // `limit` — muda o tamanho da página, nunca é canônico e não desindexa.
+      // `limit`. Nunca é canônico e não desindexa — mas o valor DEFAULT é
+      // ruído puro: `?limit=50` e a URL limpa são a mesma página. A navegação
+      // interna vinha emitindo esse eco em todo link de paginação, criando uma
+      // segunda grafia de cada página do catálogo.
+      if (key === "limit" && Number.parseInt(value, 10) === DEFAULT_CATALOG_LIMIT) continue;
       normalized.append(key, value);
       continue;
     }
