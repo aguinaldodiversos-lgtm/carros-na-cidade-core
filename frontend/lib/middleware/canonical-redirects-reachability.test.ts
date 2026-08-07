@@ -113,6 +113,49 @@ describe("alcance: o guard Regional retorna cedo e precisa normalizar sozinho", 
   });
 });
 
+/**
+ * P0 (2026-08-07): o middleware precisa TRATAR `block-unavailable`.
+ *
+ * Antes ele tratava `pass-unavailable` — e por isso uma env ausente no build
+ * publicava página territorial. Se alguém remover estes ramos, o gate volta a
+ * ser desligável por acidente, e é isso que este bloco impede.
+ */
+describe("fail-safe: indisponibilidade do gate vira 503, nunca 200", () => {
+  it.each([
+    ["cidade (fluxo principal)", 'gateUnavailableResponse("city"'],
+    ["cidade (dentro do guard Regional)", 'gateUnavailableResponse("city-regional"'],
+    ["UF", 'gateUnavailableResponse("uf"'],
+    ["anúncio", 'gateUnavailableResponse("ad"'],
+  ])("o ramo de %s emite 503", (_nome, call) => {
+    expect(MIDDLEWARE).toContain(call);
+  });
+
+  it("todo `block-unavailable` é tratado — nenhum cai no fluxo de sucesso", () => {
+    const ramos = MIDDLEWARE.split('kind === "block-unavailable"').length - 1;
+    // 4 gates territoriais/anúncio + o guard Regional, que já tinha o seu.
+    expect(ramos).toBeGreaterThanOrEqual(4);
+  });
+
+  it("a resposta 503 carrega Retry-After e X-Robots-Tag noindex", () => {
+    const helper = MIDDLEWARE.slice(
+      MIDDLEWARE.indexOf("function gateUnavailableResponse"),
+      MIDDLEWARE.indexOf("export async function middleware")
+    );
+    expect(helper).toContain("status: 503");
+    expect(helper).toContain("Retry-After");
+    expect(helper).toContain("X-Robots-Tag");
+    expect(helper).toContain("no-store");
+  });
+
+  it("`pass-unavailable` não existe mais no middleware", () => {
+    // O identificador só pode aparecer em comentário explicando a correção.
+    const codeOnly = MIDDLEWARE.split("\n")
+      .filter((line) => !line.trim().startsWith("*") && !line.trim().startsWith("//"))
+      .join("\n");
+    expect(codeOnly).not.toContain("pass-unavailable");
+  });
+});
+
 describe("nenhum destino territorial fixo no middleware", () => {
   it("o arquivo não embute slug de cidade em redirect", () => {
     // O middleware pode citar cidades em comentário (e cita, em exemplos de

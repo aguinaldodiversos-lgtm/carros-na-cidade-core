@@ -137,6 +137,28 @@ function respond(request: NextRequest, startedAt: number, response: NextResponse
   return response;
 }
 
+/**
+ * 503 do gate — a resposta de "não consegui verificar".
+ *
+ * É a peça central da correção de 2026-08-07. Antes, indisponibilidade virava
+ * `pass-unavailable` → 200: uma falha de infraestrutura (ou uma env ausente no
+ * build) publicava página territorial que não deveria existir, sem erro
+ * visível. 503 é temporário, carrega `Retry-After`, e o Google não o trata como
+ * conteúdo — o crawler volta depois em vez de indexar o que não devíamos servir.
+ *
+ * `X-Robots-Tag: noindex` é cinto e suspensório: mesmo que algum intermediário
+ * transforme o status, o corpo não entra no índice.
+ */
+function gateUnavailableResponse(scope: string, reason: string): NextResponse {
+  const blocked = new NextResponse(null, { status: 503 });
+  blocked.headers.set("Retry-After", "60");
+  blocked.headers.set("Cache-Control", "no-store");
+  blocked.headers.set("X-Robots-Tag", "noindex, nofollow");
+  blocked.headers.set("X-Middleware-Gate-Unavailable", scope);
+  blocked.headers.set("X-Middleware-Gate-Reason", reason);
+  return blocked;
+}
+
 export async function middleware(request: NextRequest) {
   const startedAt = Date.now();
   const { pathname, search } = request.nextUrl;
@@ -220,7 +242,16 @@ export async function middleware(request: NextRequest) {
           const blocked = new NextResponse(null, { status: 404 });
           blocked.headers.set("X-Middleware-City-Gate", "blocked-no-active-ads");
           blocked.headers.set("X-Middleware-City-Family", regionalCityMatch.family);
+          blocked.headers.set("X-Middleware-City-Gate-Source", cityAction.source);
           return respond(request, startedAt, blocked);
+        }
+
+        if (cityAction.kind === "block-unavailable") {
+          return respond(
+            request,
+            startedAt,
+            gateUnavailableResponse("city-regional", cityAction.reason)
+          );
         }
       }
 
@@ -304,7 +335,11 @@ export async function middleware(request: NextRequest) {
   // Roda DEPOIS do estrutural de propósito: slug com UF falsa é barrado antes,
   // de graça, sem custar o fetch do conjunto.
   //
-  // Fail-open em `unavailable` — ver `lib/middleware/city-existence-gate.ts`.
+  // FAIL-SAFE em `unavailable` (2026-08-07): "não consegui verificar" vira 503,
+  // nunca 200. Antes era `pass-unavailable`, e por isso uma env ausente no
+  // BUILD desligava o invariante inteiro sem sintoma algum. O snapshot do
+  // último conjunto confirmado absorve blips; só cold-start com backend fora
+  // chega ao 503. Ver `lib/middleware/city-existence-gate.ts`.
   const cityMatch = extractCityScopedMatch(pathname);
   if (cityMatch) {
     const citySet = await fetchPublicCitySet();
@@ -314,14 +349,18 @@ export async function middleware(request: NextRequest) {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-City-Gate", "blocked-no-active-ads");
       blocked.headers.set("X-Middleware-City-Family", cityMatch.family);
+      blocked.headers.set("X-Middleware-City-Gate-Source", cityAction.source);
       return respond(request, startedAt, blocked);
     }
 
-    if (cityAction.kind === "pass-unavailable") {
-      // Não bloqueia, mas deixa rastro: se este header aparecer em volume, o
-      // invariante está desligado na prática e ninguém percebeu.
-      request.headers.set("x-cnc-city-gate-unavailable", cityAction.reason);
+    if (cityAction.kind === "block-unavailable") {
+      return respond(request, startedAt, gateUnavailableResponse("city", cityAction.reason));
     }
+
+    // Passou: registra se a decisão veio de snapshot. Header de diagnóstico,
+    // sem segredo — se `snapshot` aparecer em volume, o backend está fora e
+    // alguém precisa saber ANTES de o snapshot expirar e virar 503.
+    request.headers.set("x-cnc-city-gate-source", cityAction.source);
   }
 
   // ── 2b-ter. Mesmo invariante, um nível acima: UF sem NENHUM anúncio no
@@ -345,12 +384,15 @@ export async function middleware(request: NextRequest) {
         const blocked = new NextResponse(null, { status: 404 });
         blocked.headers.set("X-Middleware-City-Gate", "blocked-uf-no-active-ads");
         blocked.headers.set("X-Middleware-City-Family", ufMatch.family);
+        blocked.headers.set("X-Middleware-City-Gate-Source", ufAction.source);
         return respond(request, startedAt, blocked);
       }
 
-      if (ufAction.kind === "pass-unavailable") {
-        request.headers.set("x-cnc-city-gate-unavailable", ufAction.reason);
+      if (ufAction.kind === "block-unavailable") {
+        return respond(request, startedAt, gateUnavailableResponse("uf", ufAction.reason));
       }
+
+      request.headers.set("x-cnc-city-gate-source", ufAction.source);
     }
   }
 
@@ -379,12 +421,19 @@ export async function middleware(request: NextRequest) {
   // Comprovado empiricamente em produção 2026-05-24. Sem este gate o
   // Googlebot indexa páginas de anúncios inexistentes.
   //
-  // Política diferente do `regional-page-guard`: `unavailable` aqui
-  // resulta em `pass-unavailable` (não 503), porque este gate roda em
-  // TODO request a /veiculo/* — falhar 503 em cold-start do backend
-  // quebraria todo anúncio real. A defesa em profundidade vem do
-  // `page.tsx` que ainda chama `notFound()` quando `fetchAdDetail`
-  // retorna null. Ver `lib/middleware/ad-detail-gate.ts`.
+  // FAIL-SAFE (2026-08-07). A política anterior era `pass-unavailable` aqui,
+  // sob o argumento de que 503 em cold-start quebraria todo anúncio real. O
+  // argumento caiu por dois motivos:
+  //
+  //   1. Se o gate não consegue falar com o backend, o `page.tsx` também não
+  //      consegue — e o que ele produz nesse caso é soft-404 200 (ou, no
+  //      alias, 200 + meta refresh). "Não quebrar" era ilusão: já quebrava,
+  //      com o status errado.
+  //   2. O snapshot por identificador absorve o blip. Anúncio confirmado
+  //      recentemente continua respondendo normalmente; só identificador
+  //      nunca visto, durante backend fora, chega ao 503.
+  //
+  // Ver `lib/middleware/ad-detail-gate.ts`.
   const adDetailMatch = extractAdDetailMatch(pathname);
   if (adDetailMatch) {
     // Só o alias paga a leitura do corpo — é ele que precisa do slug canônico
@@ -414,16 +463,18 @@ export async function middleware(request: NextRequest) {
       return respond(request, startedAt, moved);
     }
 
-    if (action.kind === "pass-unavailable") {
-      const passed = NextResponse.next(territorialContext);
-      passed.headers.set("X-Middleware-Ad", "passed-unavailable");
-      passed.headers.set("X-Middleware-Ad-Reason", action.reason);
-      return respond(request, startedAt, passed);
+    if (action.kind === "block-unavailable") {
+      // Vale tanto para `/veiculo/[slug]` quanto para o alias sem slug em
+      // snapshot: sem saber se o anúncio existe, 503. O caminho antigo
+      // (`pass-unavailable`) levava a soft-404 200 na canônica e a
+      // 200 + meta refresh no alias — os dois indexáveis.
+      return respond(request, startedAt, gateUnavailableResponse("ad", action.reason));
     }
 
     // pass-valid: deixa o App Router renderizar normalmente.
     const passed = NextResponse.next(territorialContext);
     passed.headers.set("X-Middleware-Ad", "passed-valid");
+    passed.headers.set("X-Middleware-Ad-Source", action.source);
     return respond(request, startedAt, passed);
   }
 
@@ -446,11 +497,8 @@ export async function middleware(request: NextRequest) {
       return respond(request, startedAt, blocked);
     }
 
-    if (action.kind === "pass-unavailable") {
-      const passed = NextResponse.next(territorialContext);
-      passed.headers.set("X-Middleware-Dealer", "passed-unavailable");
-      passed.headers.set("X-Middleware-Dealer-Reason", action.reason);
-      return respond(request, startedAt, passed);
+    if (action.kind === "block-unavailable") {
+      return respond(request, startedAt, gateUnavailableResponse("dealer", action.reason));
     }
 
     const passed = NextResponse.next(territorialContext);
@@ -464,7 +512,8 @@ export async function middleware(request: NextRequest) {
   // Slug com forma de cidade real (`nome-uf`) → hub legítimo, passa sem bater
   // no backend. Qualquer outro slug → valida existência do post publicado
   // (`/api/public/blog/posts/:slug`); 404 → 404 real (mata o hub-fantasma
-  // indexável). Fail-open em `unavailable` (a page mantém o `notFound()`).
+  // indexável). FAIL-SAFE em `unavailable`: 503, nunca 200 — o `notFound()` da
+  // page produziria soft-404 com HTTP 200, que é o problema, não a defesa.
   const blogSlug = extractBlogSlug(pathname);
   if (blogSlug !== null) {
     if (isCityHubSlug(blogSlug)) {
@@ -482,11 +531,8 @@ export async function middleware(request: NextRequest) {
       return respond(request, startedAt, blocked);
     }
 
-    if (action.kind === "pass-unavailable") {
-      const passed = NextResponse.next(territorialContext);
-      passed.headers.set("X-Middleware-Blog", "passed-unavailable");
-      passed.headers.set("X-Middleware-Blog-Reason", action.reason);
-      return respond(request, startedAt, passed);
+    if (action.kind === "block-unavailable") {
+      return respond(request, startedAt, gateUnavailableResponse("blog", action.reason));
     }
 
     const passed = NextResponse.next(territorialContext);

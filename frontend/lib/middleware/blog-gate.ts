@@ -19,6 +19,8 @@ import { isValidBrUf } from "./territory-gate";
  */
 
 /** `/blog/<slug>` (um único segmento). NÃO casa `/blog`, `/blog/x/y`. */
+import { readBackendApiBaseUrl, readInternalApiToken } from "./gate-runtime-env";
+
 const BLOG_PATH_REGEX = /^\/blog\/([^/?#]+)\/?$/;
 
 /** Slug canônico de cidade: `nome-uf` (a UF real é validada à parte). */
@@ -49,7 +51,6 @@ export interface BlogValidationConfig {
 
 export type BlogUnavailableReason =
   | "missing-backend-api-url"
-  | "missing-internal-api-token"
   | "backend-401"
   | "backend-403"
   | "backend-5xx"
@@ -74,14 +75,13 @@ export async function validateBlogPostSlug(
   const safe = String(slug || "").trim();
   if (!safe) return { kind: "not_found" };
 
-  const apiBase = (config.apiBase ?? process.env.BACKEND_API_URL ?? "").replace(/\/+$/, "");
-  const token = (config.token ?? process.env.INTERNAL_API_TOKEN ?? "").trim();
+  const apiBase = (config.apiBase ?? readBackendApiBaseUrl()).replace(/\/+$/, "");
+  const token = (config.token ?? readInternalApiToken()).trim();
   const revalidate = config.revalidateSeconds ?? 60;
   const timeoutMs = config.timeoutMs ?? 6000;
   const fetchImpl = config.fetchImpl ?? fetch;
 
   if (!apiBase) return { kind: "unavailable", reason: "missing-backend-api-url" };
-  if (!token) return { kind: "unavailable", reason: "missing-internal-api-token" };
 
   const url = `${apiBase}/api/public/blog/posts/${encodeURIComponent(safe)}`;
   const controller = new AbortController();
@@ -121,14 +121,22 @@ export async function validateBlogPostSlug(
   }
 }
 
-/** Fail-open igual aos demais gates: `unavailable` passa (não bloqueia). */
+/**
+ * FAIL-SAFE igual aos demais gates (2026-08-07): `unavailable` NÃO passa.
+ *
+ * Era fail-open, sob o argumento de que a page mantinha o `notFound()` como
+ * defesa. Mas o que o `notFound()` produz no Next 14.2 é soft-404 com HTTP 200
+ * — ou seja, a "defesa" era exatamente o problema que o gate existe para
+ * evitar. 503 é temporário e não indexável.
+ */
 export type BlogMiddlewareAction =
   | { kind: "pass-valid" }
   | { kind: "block-not-found" }
-  | { kind: "pass-unavailable"; reason: BlogUnavailableReason };
+  /** Nem confirmado nem negado: 503 temporário. NUNCA 200. */
+  | { kind: "block-unavailable"; reason: BlogUnavailableReason };
 
 export function decideBlogMiddlewareAction(validation: BlogValidation): BlogMiddlewareAction {
   if (validation.kind === "valid") return { kind: "pass-valid" };
   if (validation.kind === "not_found") return { kind: "block-not-found" };
-  return { kind: "pass-unavailable", reason: validation.reason };
+  return { kind: "block-unavailable", reason: validation.reason };
 }

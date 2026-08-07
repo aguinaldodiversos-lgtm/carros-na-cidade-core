@@ -40,7 +40,7 @@ function act(pathname: string, set: CitySetResult = SET) {
 describe("UF sem nenhum anúncio → 404", () => {
   for (const [familia, build] of FAMILIAS) {
     it(`${familia}: CE (estado vazio) é bloqueado`, () => {
-      expect(act(build("ce"))).toEqual({ kind: "block-not-found", uf: "ce" });
+      expect(act(build("ce"))).toMatchObject({ kind: "block-not-found", uf: "ce" });
     });
   }
 
@@ -57,7 +57,7 @@ describe("UF sem nenhum anúncio → 404", () => {
 describe("UF com anúncio → passa", () => {
   for (const [familia, build] of FAMILIAS) {
     it(`${familia}: SP passa`, () => {
-      expect(act(build("sp"))).toEqual({ kind: "pass-exists", uf: "sp", activeAds: 4 });
+      expect(act(build("sp"))).toMatchObject({ kind: "pass-exists", uf: "sp", activeAds: 4 });
     });
   }
 });
@@ -82,7 +82,7 @@ describe("estado derivado", () => {
         indexMinAds: 3,
       },
     };
-    expect(act("/carros-usados/ce", comCe)).toEqual({
+    expect(act("/carros-usados/ce", comCe)).toMatchObject({
       kind: "pass-exists",
       uf: "ce",
       activeAds: 1,
@@ -122,16 +122,22 @@ describe("extração — não capturar o site inteiro", () => {
   });
 });
 
-describe("fail-open", () => {
+describe("fail-safe", () => {
   const motivos = ["backend-5xx", "backend-timeout", "bad-payload", "fetch-error"] as const;
   for (const reason of motivos) {
-    it(`${reason} → passa (não bloqueia)`, () => {
+    it(`${reason} → block-unavailable (503), nunca passa`, () => {
       expect(act("/carros-usados/ce", { kind: "unavailable", reason })).toEqual({
-        kind: "pass-unavailable",
+        kind: "block-unavailable",
         reason,
       });
     });
   }
+
+  it("nem a UF com estoque passa sem verificação", () => {
+    expect(act("/carros-usados/sp", { kind: "unavailable", reason: "fetch-error" }).kind).toBe(
+      "block-unavailable"
+    );
+  });
 });
 
 describe("compatibilidade entre deploys", () => {
