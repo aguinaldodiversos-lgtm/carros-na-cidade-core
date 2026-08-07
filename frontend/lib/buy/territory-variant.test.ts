@@ -169,8 +169,24 @@ describe("buildStatePath — canonical limpo da página estadual", () => {
 });
 
 describe("buildCityPath — canonical/navegação cidade", () => {
-  it("sem filters → URL limpa", () => {
-    expect(buildCityPath("atibaia-sp")).toBe("/comprar/cidade/atibaia-sp");
+  it("sem filters → URL canônica limpa", () => {
+    expect(buildCityPath("atibaia-sp")).toBe("/carros-em/atibaia-sp");
+  });
+
+  // Duas cidades: um retorno fixo passaria no caso de cima e falharia aqui.
+  it("preserva o slug recebido, sem destino territorial fixo", () => {
+    expect(buildCityPath("braganca-paulista-sp")).toBe("/carros-em/braganca-paulista-sp");
+    expect(buildCityPath("curitiba-pr")).toBe("/carros-em/curitiba-pr");
+  });
+
+  it("nunca emite a rota legada", () => {
+    expect(buildCityPath("atibaia-sp")).not.toContain("/comprar/cidade/");
+    expect(buildCityPath("atibaia-sp", { brand: "Honda" })).not.toContain("/comprar");
+  });
+
+  it("slug inválido → null (sem fallback para cidade padrão)", () => {
+    expect(buildCityPath("xpto-zz")).toBeNull();
+    expect(buildCityPath("atibaia")).toBeNull();
   });
 });
 

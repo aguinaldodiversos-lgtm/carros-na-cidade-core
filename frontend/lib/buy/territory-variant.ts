@@ -19,6 +19,7 @@ import {
   mergeSearchFilters,
   parseAdsSearchFiltersFromSearchParams,
 } from "@/lib/search/ads-search-url";
+import { getCanonicalCityPath, isValidCanonicalCitySlug } from "@/lib/seo/canonical-city-path";
 
 /**
  * Variantes da página /comprar.
@@ -75,20 +76,24 @@ export function isValidCitySlug(slug: string | null | undefined): boolean {
 
 /**
  * Slug territorial de cidade VÁLIDO: além do formato `nome-uf`
- * (`isValidCitySlug`), exige que a UF final seja uma UF brasileira REAL
- * (`normalizeUf`). Sem o segundo teste, "cidade-falsa-xx" passaria o regex,
- * cairia no fetch, voltaria vazia e produziria soft-404 (HTTP 200 indexável).
+ * (`isValidCitySlug`), exige que a UF final seja uma UF brasileira REAL.
+ * Sem o segundo teste, "cidade-falsa-xx" passaria o regex, cairia no fetch,
+ * voltaria vazia e produziria soft-404 (HTTP 200 indexável).
  *
  * É a fonte única de verdade usada por `/carros-em`, `/carros-baratos-em`,
  * `/carros-automaticos-em` e `/tabela-fipe` para comitar 404 real em cidade
  * inexistente (auditoria SEO 2026-05-21 / 2026-07-03). NÃO valida existência
  * no catálogo: cidade real SEM anúncios continua válida (200 + fallback) —
  * o 404 é só para entidade que NÃO EXISTE.
+ *
+ * A implementação foi movida para `lib/seo/canonical-city-path.ts`, junto da
+ * montagem da URL canônica, porque "este slug é uma cidade?" e "qual é a URL
+ * dessa cidade?" precisam responder sobre o MESMO conjunto. Enquanto eram duas
+ * implementações, uma rota podia aceitar um slug que a outra recusava. Este
+ * nome continua exportado: é o que o resto do portal importa.
  */
 export function isValidBrazilianCitySlug(slug: string | null | undefined): boolean {
-  if (!isValidCitySlug(slug)) return false;
-  const parts = String(slug).trim().toLowerCase().split("-").filter(Boolean);
-  return normalizeUf(parts[parts.length - 1]) !== null;
+  return isValidCanonicalCitySlug(slug);
 }
 
 function normalizeWord(word: string) {
@@ -242,8 +247,21 @@ export function buildStatePath(uf: string, filters?: AdsSearchFilters): string {
   return qs ? `${base}?${qs}` : base;
 }
 
-export function buildCityPath(citySlug: string, filters?: AdsSearchFilters): string {
-  const base = `/comprar/cidade/${citySlug}`;
+/**
+ * URL de destino de "ver os carros desta cidade".
+ *
+ * Passou a devolver a CANÔNICA `/carros-em/[slug]` (antes:
+ * `/comprar/cidade/[slug]`). Todo chamador — o redirector `/comprar`, o
+ * `GeoToCityRedirect`, o seletor de cidade — aterrissa direto no destino final,
+ * sem o salto intermediário que gastava crawl budget e dividia o sinal entre
+ * duas URLs do mesmo recurso.
+ *
+ * Slug inválido devolve `null`: sem cidade não há página de cidade, e escolher
+ * uma cidade "padrão" aqui seria fabricar doorway page. Quem chama trata.
+ */
+export function buildCityPath(citySlug: string, filters?: AdsSearchFilters): string | null {
+  const base = getCanonicalCityPath(citySlug);
+  if (!base) return null;
   if (!filters) return base;
   const qs = buildNonTerritoryQueryString(filters);
   return qs ? `${base}?${qs}` : base;
