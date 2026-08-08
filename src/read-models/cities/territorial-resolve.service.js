@@ -7,7 +7,11 @@
 
 import * as repo from "./territorial-cluster.repository.js";
 import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
-import { matchRowsBySlug, aggregateMatchedRows } from "./territorial-cluster.logic.js";
+import {
+  matchRowsBySlug,
+  matchModelRowsBySlug,
+  aggregateMatchedRows,
+} from "./territorial-cluster.logic.js";
 
 /**
  * Resolve `/cidade/{citySlug}/marca/{brandSlug}`.
@@ -31,17 +35,29 @@ export async function resolveCityBrand(citySlug, brandSlug) {
 /**
  * Resolve `/cidade/{citySlug}/marca/{brandSlug}/modelo/{modelSlug}`.
  * Resolve a marca primeiro; só então restringe os modelos às marcas reais.
+ *
+ * O slug de modelo é resolvido pelo MODELO COMERCIAL quando possível
+ * (`/modelo/onix` agrega as quatro descrições FIPE do Onix), com fallback para
+ * a descrição FIPE crua — ver `matchModelRowsBySlug`. `taxonomy` diz qual dos
+ * dois resolveu, para que o service consiga filtrar os anúncios pelo mesmo
+ * critério que contou o estoque.
  */
 export async function resolveCityModel(citySlug, brandSlug, modelSlug) {
   const base = await resolveCityBrand(citySlug, brandSlug);
   if (!base.city) return { city: null };
 
   let model = aggregateMatchedRows([], { labelKey: "model", slug: modelSlug });
+  let taxonomy = "none";
 
   if (base.brand.values.length > 0) {
     const rows = await repo.getActiveModelAggregates(base.city.id, base.brand.values);
-    const matched = matchRowsBySlug(rows, modelSlug, "model");
-    model = aggregateMatchedRows(matched, { labelKey: "model", slug: modelSlug });
+    const matched = matchModelRowsBySlug(rows, modelSlug);
+    taxonomy = matched.taxonomy;
+    model = aggregateMatchedRows(matched.rows, {
+      labelKey: "model",
+      slug: modelSlug,
+      labelOverride: matched.commercialLabel,
+    });
   }
 
   return {
@@ -50,5 +66,6 @@ export async function resolveCityModel(citySlug, brandSlug, modelSlug) {
     brand: base.brand,
     modelSlug: brandModelSlug(modelSlug),
     model,
+    taxonomy,
   };
 }

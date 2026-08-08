@@ -21,6 +21,8 @@
  */
 
 /** Pathname canônico `/lojas/<slug>`. NÃO casa com sub-rotas. */
+import { readBackendApiBaseUrl, readInternalApiToken } from "./gate-runtime-env";
+
 const LOJAS_PATH_REGEX = /^\/lojas\/([^/?#]+)\/?$/;
 
 /**
@@ -49,7 +51,6 @@ export interface DealerValidationConfig {
 /** Mesma taxonomia de `ad-detail-gate` para diagnóstico uniforme. */
 export type DealerUnavailableReason =
   | "missing-backend-api-url"
-  | "missing-internal-api-token"
   | "backend-401"
   | "backend-403"
   | "backend-5xx"
@@ -77,14 +78,13 @@ export async function validateDealerSlug(
   const safe = String(slug || "").trim();
   if (!safe) return { kind: "not_found" };
 
-  const apiBase = (config.apiBase ?? process.env.BACKEND_API_URL ?? "").replace(/\/+$/, "");
-  const token = (config.token ?? process.env.INTERNAL_API_TOKEN ?? "").trim();
+  const apiBase = (config.apiBase ?? readBackendApiBaseUrl()).replace(/\/+$/, "");
+  const token = (config.token ?? readInternalApiToken()).trim();
   const revalidate = config.revalidateSeconds ?? 60;
   const timeoutMs = config.timeoutMs ?? 6000;
   const fetchImpl = config.fetchImpl ?? fetch;
 
   if (!apiBase) return { kind: "unavailable", reason: "missing-backend-api-url" };
-  if (!token) return { kind: "unavailable", reason: "missing-internal-api-token" };
 
   const url = `${apiBase}/api/public/dealers/${encodeURIComponent(safe)}`;
   const controller = new AbortController();
@@ -135,10 +135,11 @@ export async function validateDealerSlug(
 export type DealerMiddlewareAction =
   | { kind: "pass-valid" }
   | { kind: "block-not-found" }
-  | { kind: "pass-unavailable"; reason: DealerUnavailableReason };
+  /** Nem confirmado nem negado: 503 temporário. NUNCA 200. */
+  | { kind: "block-unavailable"; reason: DealerUnavailableReason };
 
 export function decideDealerMiddlewareAction(validation: DealerValidation): DealerMiddlewareAction {
   if (validation.kind === "valid") return { kind: "pass-valid" };
   if (validation.kind === "not_found") return { kind: "block-not-found" };
-  return { kind: "pass-unavailable", reason: validation.reason };
+  return { kind: "block-unavailable", reason: validation.reason };
 }

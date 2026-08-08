@@ -49,3 +49,50 @@ export function getCityExistsMinAds(): number {
 export function getSitemapMinAds(): number {
   return getCityIndexMinAds();
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   POLÍTICA CENTRAL DE QUALIFICAÇÃO SEO (Fase 3)
+
+   Espelho de `src/read-models/cities/city-thresholds.js` — a justificativa
+   de cada valor está documentada LÁ (fonte única da política). Aqui fica só
+   a derivação, para que rotas e módulos do frontend não recomparem `>= 3`
+   espalhado.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export type SeoSurface =
+  | "city"
+  | "brand"
+  | "model"
+  | "bodyType"
+  | "transmission"
+  | "priceRange";
+
+/** Limiares por família, derivados do limiar de indexação de cidade. */
+export function getSeoInventoryThresholds(): Record<SeoSurface, number> {
+  const base = getCityIndexMinAds();
+  const transversal = base + 1;
+
+  return {
+    city: base,
+    brand: base,
+    model: base,
+    bodyType: transversal,
+    transmission: transversal,
+    priceRange: transversal,
+  };
+}
+
+export function getSeoThreshold(surface: SeoSurface): number {
+  const thresholds = getSeoInventoryThresholds();
+  return thresholds[surface] ?? thresholds.city;
+}
+
+/**
+ * Uma superfície qualifica para indexação + sitemap + link interno de malha?
+ * Pergunta ÚNICA — não recomparar o número no lugar de uso.
+ */
+export function qualifiesForSeoSurface(surface: SeoSurface, activeCount: unknown): boolean {
+  const count = Number(activeCount);
+  if (!Number.isFinite(count) || count < 0) return false;
+  return count >= getSeoThreshold(surface);
+}

@@ -56,4 +56,89 @@ export function getCityExistsMinAds() {
   return parsePositiveInt(process.env.CITY_EXISTS_MIN_ADS, DEFAULT_EXISTS_MIN_ADS);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   POLÍTICA CENTRAL DE QUALIFICAÇÃO SEO (Fase 3)
+   ─────────────────────────────────────────────────────────────────────────
+   Uma superfície territorial só vira landing indexável quando o estoque
+   ativo sustenta a intenção. Antes desta fase o número 3 vivia espalhado
+   (`getSitemapMinAds()` chamado direto em cada rota). Agora existe UMA
+   função que responde "esta família qualifica?" — e os motivos de cada
+   valor ficam escritos aqui, não descobertos por grep.
+
+   Todos os limiares derivam de `getCityIndexMinAds()` (env
+   CITY_INDEX_MIN_ADS / SITEMAP_MIN_ADS) para que o operador continue
+   ajustando UM número no Render e a hierarquia se mova junto.
+
+   POR QUE CADA VALOR:
+
+     city   = base (3)   Já era o limiar de indexação de cidade e está
+                         validado em produção. É a unidade de referência.
+
+     brand  = base (3)   Mesma intenção-raiz da cidade, só que recortada
+                         ("carros Chevrolet em Atibaia"). Manter igual à
+                         cidade evita o caso incoerente "cidade indexa com
+                         3, marca com 3 dos mesmos 3 anúncios não indexa".
+
+     model  = base (3)   O modelo é a intenção MAIS específica que ainda tem
+                         volume de busca real ("Onix usado em Atibaia").
+                         Com a taxonomia corrigida, 3 anúncios do mesmo
+                         modelo comercial já formam uma página comparável.
+
+     category = base+1   Carroceria/câmbio/faixa de preço são recortes
+                (4)      TRANSVERSAIS: o mesmo carro aparece em vários. Uma
+                         página "SUV em X" com 3 anúncios repete quase
+                         inteiramente a página da cidade. Exigir um a mais
+                         é o mínimo para a página ter conteúdo próprio.
+                         Não é um número mágico — é "estritamente mais
+                         exigente que a cidade", derivado, não copiado.
+
+   NENHUM limiar foi REDUZIDO nesta fase. `category` é novo e mais estrito.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Famílias de superfície com regra de qualificação própria. */
+export const SEO_SURFACE = Object.freeze({
+  CITY: "city",
+  BRAND: "brand",
+  MODEL: "model",
+  BODY_TYPE: "bodyType",
+  TRANSMISSION: "transmission",
+  PRICE_RANGE: "priceRange",
+});
+
+/**
+ * Limiares por família, derivados do limiar de indexação de cidade.
+ * @returns {Record<string, number>}
+ */
+export function getSeoInventoryThresholds() {
+  const base = getCityIndexMinAds();
+  const transversal = base + 1;
+
+  return {
+    [SEO_SURFACE.CITY]: base,
+    [SEO_SURFACE.BRAND]: base,
+    [SEO_SURFACE.MODEL]: base,
+    [SEO_SURFACE.BODY_TYPE]: transversal,
+    [SEO_SURFACE.TRANSMISSION]: transversal,
+    [SEO_SURFACE.PRICE_RANGE]: transversal,
+  };
+}
+
+/** Limiar de UMA família. Família desconhecida cai no limiar da cidade. */
+export function getSeoThreshold(surface) {
+  const thresholds = getSeoInventoryThresholds();
+  return thresholds[surface] ?? thresholds[SEO_SURFACE.CITY];
+}
+
+/**
+ * Uma superfície qualifica para indexação + sitemap + link interno de malha?
+ *
+ * Esta é a pergunta única. Quem precisa decidir "posso linkar/sitemapar/
+ * indexar isso?" chama aqui em vez de recomparar `>= 3` no lugar.
+ */
+export function qualifiesForSeoSurface(surface, activeCount) {
+  const count = Number(activeCount);
+  if (!Number.isFinite(count) || count < 0) return false;
+  return count >= getSeoThreshold(surface);
+}
+
 export const __testing = { DEFAULT_INDEX_MIN_ADS, DEFAULT_EXISTS_MIN_ADS };

@@ -19,27 +19,35 @@
  * `frontend/app/sitemaps/sitemap-transition.test.ts`.
  */
 
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
 import type { PublicSitemapEntry } from "@/lib/seo/sitemap-client";
 
 /**
  * Política de canonical de transição para sitemap de cidades:
  *
- * O backend (`seo_cluster_plans.path` para cluster_type='city_home') ainda
- * grava paths no formato /cidade/[slug]. A página /cidade/[slug] foi
- * deduplicada para canonicalizar em /comprar/cidade/[slug] (canônica
- * intermediária do catálogo). Sitemap deve refletir a canônica — caso
- * contrário Googlebot indexa a URL antiga e gasta crawl budget.
+ * Um backend em versão antiga pode gravar `seo_cluster_plans.path` no formato
+ * legado /cidade/[slug]. O sitemap não pode publicar esse path: ele não é a
+ * canônica, e URL que não é destino final gasta crawl budget e confunde o
+ * sinal — o problema que esta correção inteira existe para resolver.
  *
- * Esta função reescreve apenas paths que casam exatamente com /cidade/[slug]
- * (sem subrotas como /marca/, /modelo/, /oportunidades/, /abaixo-da-fipe/).
- * Subrotas têm sua própria política e ficam intactas.
+ * O destino é `/carros-em/[slug]`, a canônica única (antes esta função
+ * reescrevia para `/comprar/cidade/[slug]`, que agora é 308: o sitemap estaria
+ * publicando redirects). `getCanonicalCityPath` é a mesma função que monta os
+ * links internos, então sitemap e navegação não podem divergir.
  *
- * (Comentário original migrado de cities.xml/route.ts. A política em si NÃO
- * mudou nesta correção — apenas movemos o helper de arquivo.)
+ * Reescreve apenas paths que casam exatamente com /cidade/[slug] (sem subrotas
+ * como /marca/, /modelo/, /oportunidades/, /abaixo-da-fipe/). Subrotas têm
+ * política própria e ficam intactas. Slug que não é cidade válida é DESCARTADO
+ * — sitemap com URL inválida é pior que sitemap menor.
  */
 export function rewriteCityHomeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {
-  return entries.map((entry) => {
-    if (!entry.loc) return entry;
+  const out: PublicSitemapEntry[] = [];
+
+  for (const entry of entries) {
+    if (!entry.loc) {
+      out.push(entry);
+      continue;
+    }
 
     let path = entry.loc.trim();
     let prefix = "";
@@ -50,16 +58,24 @@ export function rewriteCityHomeEntries(entries: PublicSitemapEntry[]): PublicSit
         prefix = `${url.protocol}//${url.host}`;
         path = url.pathname;
       } catch {
-        return entry;
+        out.push(entry);
+        continue;
       }
     }
 
     const match = /^\/cidade\/([^/]+)\/?$/.exec(path);
-    if (!match) return entry;
+    if (!match) {
+      out.push(entry);
+      continue;
+    }
 
-    const rewrittenPath = `/comprar/cidade/${match[1]}`;
-    return { ...entry, loc: `${prefix}${rewrittenPath}` };
-  });
+    const canonical = getCanonicalCityPath(match[1]);
+    if (!canonical) continue;
+
+    out.push({ ...entry, loc: `${prefix}${canonical}` });
+  }
+
+  return out;
 }
 
 /**

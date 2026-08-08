@@ -19,6 +19,7 @@ import {
   splitVersionTrim,
 } from "@/lib/vehicle/detail-utils";
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 import VehicleGalleryCarousel from "./VehicleGalleryCarousel";
 import VehicleMessageForm from "./VehicleMessageForm";
@@ -92,9 +93,7 @@ export default function VehicleDetailView({
   // da cidade. Cada AdCard já mostra cidade/UF de origem e distância.
   const recommended = (sellerVehicles.length > 0 ? sellerVehicles : cityVehicles).slice(0, 8);
   const cityName = vehicle.city === "Localização não informada" ? "" : vehicle.city.split(" (")[0];
-  const moreCarsHref = vehicle.citySlug
-    ? `/comprar?city_slug=${encodeURIComponent(vehicle.citySlug)}`
-    : "/comprar";
+  const moreCarsHref = buildCanonicalCityHref(vehicle.citySlug, "/comprar");
 
   const isDealer = vehicle.seller.type === "dealer";
 

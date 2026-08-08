@@ -7,6 +7,7 @@ import {
   getCityModelClusterPage,
   getCityOpportunityClusterPage,
   getCityBelowFipeClusterPage,
+  getCitySeoOverviewPage,
 } from "./public-clusters.controller.js";
 import {
   getCityById,
@@ -172,6 +173,21 @@ router.get(
   "/cities/:slug/radius",
   cacheGet({ prefix: "public:city:radius", ttlSeconds: 300, varyBy: ["params", "query"] }),
   getCityRadiusCoverage
+);
+
+/**
+ * CitySeoOverview (Fase 3): estatística de mercado, marcas/modelos comerciais
+ * qualificados, lojas e cidades próximas — o payload único dos módulos de
+ * autoridade local.
+ *
+ * TTL 60s, igual ao da página de cidade. A informação é derivada do MESMO
+ * inventário; um TTL maior faria dois blocos da mesma página discordarem
+ * ("27 anúncios" no catálogo e "24 anúncios" no módulo de mercado).
+ */
+router.get(
+  "/cities/:slug/seo-overview",
+  cacheGet({ prefix: "public:city:seo-overview", ttlSeconds: 60, varyBy: ["params"] }),
+  getCitySeoOverviewPage
 );
 
 router.get(

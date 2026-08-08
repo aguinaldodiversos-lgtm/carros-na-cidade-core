@@ -2,7 +2,6 @@ import { fetchPublicSitemapByTypes } from "../../../lib/seo/sitemap-client";
 import { sitemapResponseFrom } from "../_lib/sitemap-response";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
 
 // SEO (2026-07-21): antes este bloco emitia `/blog/[cidade]` + `/tabela-fipe/[cidade]`
 // para uma lista HARDCODED de 41 cidades-seed, sem checar estoque — publicando

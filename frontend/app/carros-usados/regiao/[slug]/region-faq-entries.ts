@@ -59,7 +59,7 @@ export function buildRegionFaqEntries({
     {
       id: "so-cidade",
       question: `Posso ver somente anúncios de ${cityName}?`,
-      answer: `Pode. O catálogo da cidade (/comprar/cidade/${citySlug}) mostra apenas ofertas em ${cityName}, sem ampliar para as cidades próximas. Use a página regional quando quiser mais opções perto, e a página da cidade quando preferir restringir a busca à própria ${cityName}.`,
+      answer: `Pode. O catálogo da cidade (/carros-em/${citySlug}) mostra apenas ofertas em ${cityName}, sem ampliar para as cidades próximas. Use a página regional quando quiser mais opções perto, e a página da cidade quando preferir restringir a busca à própria ${cityName}.`,
     },
     {
       id: "anunciar",

@@ -21,6 +21,8 @@
  * verificação canônica. Header não foi tocado.
  */
 
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
+
 import { DEFAULT_PUBLIC_CITY_SLUG } from "./public-config";
 
 export type TerritorialContext = {
@@ -64,12 +66,15 @@ export type TerritorialRoutesOptions = {
 export function getTerritorialRoutesForCity(citySlug: string, opts?: TerritorialRoutesOptions) {
   const slug = (citySlug || DEFAULT_PUBLIC_CITY_SLUG).trim() || DEFAULT_PUBLIC_CITY_SLUG;
   const enc = encodeURIComponent(slug);
+  const canonicalCity = getCanonicalCityPath(slug);
 
-  if (opts?.isPublicCity === false) {
+  // Slug inválido cai no mesmo tratamento de cidade não-pública: rotas-índice.
+  // Montar `/carros-em/<lixo>` produziria link para 404 no chrome global.
+  if (opts?.isPublicCity === false || !canonicalCity) {
     return {
-      // `/comprar` sem `city_slug`: listagem geral, sem filtro fantasma.
+      // `/comprar` sem `city_slug`: a vitrine nacional, sem filtro fantasma.
       comprar: "/comprar",
-      comprarBelowFipe: "/comprar?below_fipe=true",
+      comprarBelowFipe: "/comprar",
       fipe: "/tabela-fipe",
       financing: "/simulador-financiamento",
       cidade: "/comprar",
@@ -79,11 +84,21 @@ export function getTerritorialRoutesForCity(citySlug: string, opts?: Territorial
   }
 
   return {
-    comprar: `/comprar?city_slug=${enc}`,
-    comprarBelowFipe: `/comprar?below_fipe=true&city_slug=${enc}`,
+    // "Buscar" na cidade ativa = a CANÔNICA da cidade, direta.
+    //
+    // Era `/comprar?city_slug=<slug>` — presente no header e no rodapé, ou
+    // seja, em TODA página do site. O link interno de maior volume do portal
+    // apontava para uma URL cuja única função era redirecionar, e que o
+    // Search Console reportava como "página com canônica diferente". A cidade
+    // canônica ficava sem link interno direto vindo do chrome.
+    comprar: canonicalCity,
+    // A indexável da intenção "abaixo da FIPE" é `/carros-baratos-em/[slug]`
+    // (rota limpa, canonical autorreferente). `/comprar?below_fipe=true&...`
+    // não era página nenhuma — era um filtro numa URL de redirect.
+    comprarBelowFipe: `/carros-baratos-em/${enc}`,
     fipe: `/tabela-fipe/${enc}`,
     financing: `/simulador-financiamento/${enc}`,
-    cidade: `/carros-em/${enc}`,
+    cidade: canonicalCity,
     regional: `/carros-usados/regiao/${enc}`,
     blog: `/blog/${enc}`,
   } as const;

@@ -9,7 +9,6 @@ import { fetchPublicVehicleSitemap } from "../../../lib/seo/sitemap-client";
 import { sitemapResponse } from "../_lib/sitemap-response";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
 
 export async function GET() {
   return sitemapResponse(await fetchPublicVehicleSitemap(50000));

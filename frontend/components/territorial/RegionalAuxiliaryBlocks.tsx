@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { RegionBase, RegionMember } from "@/lib/regions/fetch-region";
 import type { BrandCount, CityCount } from "@/lib/regions/regional-facets";
+import { canonicalBrandLabel, canonicalBrandSlug } from "@/lib/seo/brand-model-slug";
 
 /**
  * Blocos auxiliares da Página Regional — renderizados DEPOIS do
@@ -138,15 +139,20 @@ export function RegionalAuxiliaryBlocks({
           >
             Marcas frequentes em {base.name}
           </h2>
+          {/* Link para a CANÔNICA de marca, não para `?brand=<nome cru FIPE>`
+              (Fase 3). A URL com parâmetro é deduplicada pela política de
+              query para a cidade limpa — este bloco gastava seus links num
+              beco, e ainda vazava a grafia interna da FIPE ("GM - Chevrolet")
+              para o anchor. */}
           <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
             {topBrands.map((b) => (
               <Link
                 key={b.brand}
-                href={`/carros-em/${encodeURIComponent(base.slug)}?brand=${encodeURIComponent(b.brand)}`}
+                href={`/cidade/${encodeURIComponent(base.slug)}/marca/${canonicalBrandSlug(b.brand)}`}
                 className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-cnc-line bg-white px-3 text-xs font-medium text-cnc-text transition hover:border-primary hover:text-primary sm:shrink"
-                title={`${b.brand} — ${b.count} anúncio(s) nesta amostra`}
+                title={`${canonicalBrandLabel(b.brand)} — ${b.count} anúncio(s) nesta amostra`}
               >
-                <span className="font-semibold">{b.brand}</span>
+                <span className="font-semibold">{canonicalBrandLabel(b.brand)}</span>
                 <span className="rounded-full bg-cnc-bg px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
                   {b.count}
                 </span>

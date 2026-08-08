@@ -71,11 +71,18 @@ describe("validateBlogPostSlug — mapeamento de status", () => {
 });
 
 describe("decideBlogMiddlewareAction", () => {
-  it("valid → pass-valid; not_found → block-not-found; unavailable → pass-unavailable", () => {
+  it("valid → pass-valid; not_found → block-not-found", () => {
     expect(decideBlogMiddlewareAction({ kind: "valid" })).toEqual({ kind: "pass-valid" });
     expect(decideBlogMiddlewareAction({ kind: "not_found" })).toEqual({ kind: "block-not-found" });
-    expect(
-      decideBlogMiddlewareAction({ kind: "unavailable", reason: "backend-timeout" })
-    ).toEqual({ kind: "pass-unavailable", reason: "backend-timeout" });
+  });
+
+  // Era `pass-unavailable`. A "defesa em profundidade" citada na justificativa
+  // era o `notFound()` da page — que no Next 14.2 produz soft-404 com HTTP 200,
+  // isto é, exatamente o que o gate existe para evitar.
+  it("unavailable → block-unavailable (503), nunca passa", () => {
+    expect(decideBlogMiddlewareAction({ kind: "unavailable", reason: "backend-timeout" })).toEqual({
+      kind: "block-unavailable",
+      reason: "backend-timeout",
+    });
   });
 });

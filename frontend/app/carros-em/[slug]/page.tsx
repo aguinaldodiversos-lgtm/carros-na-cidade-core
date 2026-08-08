@@ -4,9 +4,15 @@ import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import { NearbyRadiusSection } from "@/components/buy/NearbyRadiusSection";
+import { CityAuthoritySection } from "@/components/seo/CityAuthoritySection";
 import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
 import { FaqBlock } from "@/components/seo/FaqBlock";
-import { buildCityFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
+import { loadCitySeoOverview } from "@/lib/seo/city-seo-overview";
+import {
+  buildCityFaqEntries,
+  buildCityInventoryFaqEntries,
+  buildFaqPageJsonLd,
+} from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
 import { loadNearbyRadiusAds } from "@/lib/buy/city-radius-catalog";
@@ -71,7 +77,10 @@ void LOCAL_SEO_REVALIDATE; // import preservado por compat (ver doc acima)
 
 const loadSeoModel = cache((slug: string) => loadLocalSeoLanding(slug, "em"));
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams = {},
+}: PageProps): Promise<Metadata> {
   const slug = String(params.slug || "").trim();
   // `isValidBrazilianCitySlug` = formato `nome-uf` E UF brasileira real (fonte
   // única em territory-variant). Chamamos notFound() no generateMetadata para
@@ -79,7 +88,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // HTTP 200 com body not-found (soft-404).
   if (!isValidBrazilianCitySlug(slug)) notFound();
   const model = await loadSeoModel(slug);
-  return buildLocalSeoMetadata(model);
+  // `searchParams` entra na metadata (auditoria 2026-08-06): antes era
+  // ignorado, e por isso TODA variante com filtro/ordenação desta rota
+  // respondia `index,follow` com canonical autorreferente. `?raio=25`,
+  // `?sort=price_asc` e `?seller_kind=dealer` eram três páginas indexáveis com
+  // o mesmo conteúdo. Ver `lib/seo/query-policy.ts`.
+  return buildLocalSeoMetadata(model, searchParams);
 }
 
 export default async function CarrosEmCidadePage({ params, searchParams = {} }: PageProps) {
@@ -96,7 +110,7 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   // URL com `?raio=` é sempre deduplicada para a cidade limpa). Ver parseRadiusParam.
   const radiusKm = parseRadiusParam(searchParams?.raio);
 
-  const [model, catalog, nearbyResult] = await Promise.all([
+  const [model, catalog, nearbyResult, overviewResult] = await Promise.all([
     loadSeoModel(slug),
     // applyTerritoryFallback=false: o catálogo PRINCIPAL é o bloco "Em [cidade]"
     // — só anúncios da própria cidade (0 km). A vizinhança (raio) vem no bloco
@@ -104,9 +118,14 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     // substitui o antigo <AlsoInRegionBlock> (âncora regional — Onda 2 Fase 2a).
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
     loadNearbyRadiusAds(slug, { radiusKm }),
+    // Camada de autoridade local (Fase 3). Falha do backend devolve
+    // `unavailable`, NÃO um overview vazio — os módulos somem em vez de
+    // afirmar "0 veículos" numa cidade que tem estoque.
+    loadCitySeoOverview(slug),
   ]);
 
   const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
+  const overview = overviewResult.status === "ok" ? overviewResult.overview : null;
 
   // Defesa em profundidade — briefing P2-B 2026-05-25:
   // backend já filtra DIRTY + price>0; `normalizePublicAd` é o último
@@ -116,8 +135,6 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     ...rawResults,
     data: (rawResults.data || []).filter((ad) => normalizePublicAd(ad) !== null),
   };
-
-  const totalAds = initialResults.pagination.total || 0;
 
   // areaServed (âncora regional — Onda 2 Fase 2a): cidade da página + cidades
   // de COBERTURA dentro do raio. Só NOMES de cidade — nunca bairro (respeita a
@@ -132,10 +149,10 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     })),
   ];
 
-  // BreadcrumbList canônico — usa o builder existente do LocalSeoLanding. O
-  // ItemList reflete a própria cidade. `areaServed` só entra quando há cobertura
-  // real de vizinhança (>1 = base + pelo menos uma cidade no raio).
-  const jsonLd = {
+  // CollectionPage canônico. O `mainEntity` (ItemList) é sobrescrito mais
+  // abaixo pelos anúncios realmente renderizados. `areaServed` só entra quando
+  // há cobertura real de vizinhança (>1 = base + pelo menos uma cidade no raio).
+  const jsonLd: Record<string, unknown> = {
     ...buildLocalSeoJsonLd(model),
     ...(areaServed.length > 1 ? { areaServed } : {}),
   };
@@ -143,25 +160,58 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
 
   // Fase 4.3 (§7) — FAQ útil e específico da cidade. O FAQPage JSON-LD só é
   // emitido porque o FaqBlock abaixo renderiza as MESMAS perguntas (visível).
-  const faqEntries = buildCityFaqEntries({ cityName: ctx.name, stateUf: ctx.state });
+  //
+  // Fase 3: as perguntas de INVENTÁRIO vêm primeiro (são as que só esta
+  // cidade responde) e são geradas do mesmo `overview` que alimenta os
+  // módulos acima — se o número muda na página, muda no FAQ e no schema
+  // junto. Sem overview (backend indisponível ou cidade vazia) restam as
+  // perguntas de processo, que continuam verdadeiras.
+  const faqEntries = [
+    ...(overview
+      ? buildCityInventoryFaqEntries({
+          cityName: overview.city.name,
+          activeAds: overview.inventory.activeAds,
+          activeDealers: overview.inventory.activeDealers,
+          automaticCount: overview.inventory.automaticCount,
+          belowFipeCount: overview.inventory.belowFipeCount,
+          brandLabels: overview.brands.map((b) => b.label),
+          medianPrice: overview.priceStats.publishable ? overview.priceStats.medianPrice : null,
+        })
+      : []),
+    ...buildCityFaqEntries({ cityName: ctx.name, stateUf: ctx.state }),
+  ];
   const faqJsonLd = buildFaqPageJsonLd(faqEntries);
 
-  // Sem fallback territorial nesta rota: ItemList sempre reflete a
-  // cidade pedida. Quando não há anúncios, emitimos ItemList vazio mas
-  // numberOfItems=0 é semântico para o Google ("essa cidade existe,
-  // está vazia agora").
-  const itemListJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: `Carros usados em ${ctx.name}`,
-    numberOfItems: totalAds,
-    itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
-      name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
-    })),
-  };
+  // ItemList ÚNICO (Fase 3, Etapa 44).
+  //
+  // A página emitia DOIS: o `CollectionPage.mainEntity` do
+  // `buildLocalSeoJsonLd` (10 itens da amostra) e um ItemList solto (que
+  // declarava `numberOfItems: 27` listando 20). Dois ItemList na mesma URL,
+  // com contagens diferentes, descrevendo a mesma coleção.
+  //
+  // Agora existe um só, dentro do CollectionPage — que é o container correto
+  // — construído dos anúncios REALMENTE renderizados nesta página. E
+  // `numberOfItems` conta os itens listados, não o total do catálogo: dizer
+  // 27 numa lista de 20 é declarar sete itens que o schema não contém.
+  //
+  // Sem fallback territorial: a lista sempre reflete a cidade pedida. Cidade
+  // vazia não emite ItemList (uma lista de zero itens não descreve nada).
+  const itemListElement = initialResults.data.slice(0, 20).map((ad, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
+    name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
+  }));
+
+  if (itemListElement.length > 0) {
+    jsonLd.mainEntity = {
+      "@type": "ItemList",
+      name: `Carros usados em ${ctx.name}`,
+      itemListOrder: "https://schema.org/ItemListOrderAscending",
+      numberOfItems: itemListElement.length,
+      itemListElement,
+    };
+  }
 
   return (
     <>
@@ -175,10 +225,6 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       ) : null}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
       {faqJsonLd ? (
         <script
           type="application/ld+json"
@@ -208,6 +254,13 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
             própria cidade (bloco principal acima). Renderiza null quando não há
             vizinhas com estoque. Substitui o antigo AlsoInRegionBlock. */}
         <NearbyRadiusSection result={nearbyResult} cityName={ctx.name} />
+
+        {/* Camada de autoridade local (Fase 3) — Server Component puro:
+            mercado, marcas, modelos comerciais, lojas e cidades próximas,
+            tudo derivado do inventário ativo DESTA cidade. Ausente quando o
+            backend está indisponível (nunca renderiza "0 veículos" por falha)
+            e quando a cidade não tem estoque (nada a dizer). */}
+        {overview ? <CityAuthoritySection overview={overview} /> : null}
 
         {/* Bloco SEO mínimo pós-paginação. Sem stats grandes, sem
             "Continue explorando", sem CTAs grandes — o briefing

@@ -101,14 +101,22 @@ async function fetchStateSample(uf: string): Promise<SampleAd[]> {
   }
 }
 
-/** Constrói `/comprar?state=UF&...` — o redirector preserva os filtros não-territoriais. */
+/**
+ * Chip de perfil → vitrine ESTADUAL já filtrada, direto.
+ *
+ * Era `/comprar?state=UF&<filtros>`, que só existia para o redirector reenviar
+ * o visitante a `/comprar/estado/[uf]?<filtros>`. Todo chip da home custava um
+ * salto extra e um redirect no meio do caminho para o mesmo destino final.
+ */
 function comprarHref(uf: string, params: Record<string, string | number | boolean>): string {
-  const qs = new URLSearchParams({ state: uf });
+  const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === "") continue;
     qs.set(key, String(value));
   }
-  return `/comprar?${qs.toString()}`;
+  const base = `/comprar/estado/${uf.toLowerCase()}`;
+  const query = qs.toString();
+  return query ? `${base}?${query}` : base;
 }
 
 /**

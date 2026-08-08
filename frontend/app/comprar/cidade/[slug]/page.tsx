@@ -1,328 +1,73 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
-import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
-import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
-import { hasRealPrice } from "@/lib/ads/has-real-price";
-import { toCityRef, type CityRef } from "@/lib/city/city-types";
-import { resolveBackendApiUrl } from "@/lib/env/backend-api";
-import { toAbsoluteUrl } from "@/lib/seo/site";
-import { getSitemapMinAds } from "@/lib/seo/sitemap-min-ads";
-import {
-  fetchAdsFacets,
-  fetchAdsSearch,
-  type AdsFacetsResponse,
-  type AdsSearchFilters,
-  type AdsSearchResponse,
-} from "@/lib/search/ads-search";
-import { DEFAULT_COMPRAR_CATALOG_LIMIT } from "@/lib/search/ads-search-url";
-import { parseRadiusParam } from "@/lib/buy/regional-radius-config";
-import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
-import { fetchCatalogAdsTerritoryFallback } from "@/lib/search/catalog-ads-territory-fallback";
-import {
-  cityContextFromRef,
-  cityContextFromSlug,
-  hasRestrictiveFilters,
-  isValidBrazilianCitySlug,
-  normalizeCityFilters,
-  stateNameFromUf,
-  type SearchParams,
-} from "@/lib/buy/territory-variant";
+import { isValidBrazilianCitySlug, type SearchParams } from "@/lib/buy/territory-variant";
+import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
+import { decideSeoQueryPolicy } from "@/lib/seo/query-policy";
+
+/**
+ * `/comprar/cidade/[slug]` — ALIAS LEGADO. Só redireciona.
+ *
+ * ── O que era ────────────────────────────────────────────────────────────────
+ * Uma segunda página de catálogo completa: mesmo H1, mesmo grid, mesma cidade,
+ * com canonical apontando para `/carros-em/[slug]`. Duas URLs indexáveis para o
+ * mesmo recurso — e a que tinha o canonical apontando para fora ainda respondia
+ * 200 com `index` sempre que o estoque batia o limiar. O Search Console
+ * reportava a família inteira como "página alternativa com canônica diferente".
+ *
+ * Pior: esta rota aplicava FALLBACK TERRITORIAL. Cidade sem estoque servia os
+ * anúncios da vizinha mais forte sob a URL da cidade pedida. É a definição de
+ * doorway page, e era a única rota do portal que fazia isso.
+ *
+ * ── O que é ──────────────────────────────────────────────────────────────────
+ * 308 para a canônica, preservando o slug pedido. O status real é emitido pelo
+ * `middleware.ts` (`decideLegacyCityRedirect`), antes de qualquer HTML sair —
+ * o `permanentRedirect()` daqui é defesa em profundidade, caso o matcher do
+ * middleware mude. Ver a nota sobre meta refresh em `canonical-redirects.ts`.
+ *
+ * Cidade inexistente continua 404 (nunca redirect para outra cidade), e cidade
+ * sem anúncio ativo segue barrada pelo gate de existência no middleware.
+ */
 
 type ComprarCidadePageProps = {
   params: { slug: string };
   searchParams?: SearchParams;
 };
 
-// `force-dynamic` (correção SSR 2026-06-27): evita o Suspense vazio que
-// transmitia o `<main>` (H1/catálogo) depois do footer. Padrão de /carros-em.
 export const dynamic = "force-dynamic";
 
-function buildEmptyResults(filters: AdsSearchFilters): AdsSearchResponse {
-  return {
-    success: false,
-    ok: false,
-    data: [],
-    pagination: {
-      page: filters.page || 1,
-      limit: filters.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
-      total: 0,
-      totalPages: 1,
-    },
-    error: null,
-  };
-}
+/** Destino do 308, com a query já normalizada pela política central. */
+function resolveTarget(slug: string, searchParams: SearchParams): string | null {
+  const canonical = getCanonicalCityPath(slug);
+  if (!canonical) return null;
 
-function buildEmptyFacets(): AdsFacetsResponse["facets"] {
-  return { brands: [], models: [], fuelTypes: [], bodyTypes: [] };
-}
-
-function isValidResultsResponse(value: unknown): value is AdsSearchResponse {
-  if (!value || typeof value !== "object") return false;
-  const response = value as AdsSearchResponse;
-  return (
-    Array.isArray(response.data) &&
-    Boolean(response.pagination) &&
-    typeof response.pagination.page === "number" &&
-    typeof response.pagination.limit === "number" &&
-    typeof response.pagination.total === "number" &&
-    typeof response.pagination.totalPages === "number"
-  );
-}
-
-function isValidFacetsResponse(value: unknown): value is AdsFacetsResponse {
-  if (!value || typeof value !== "object") return false;
-  const response = value as AdsFacetsResponse;
-  return (
-    Boolean(response.facets) &&
-    Array.isArray(response.facets.brands) &&
-    Array.isArray(response.facets.models) &&
-    Array.isArray(response.facets.fuelTypes) &&
-    Array.isArray(response.facets.bodyTypes)
-  );
+  const { normalizedQuery } = decideSeoQueryPolicy(searchParams);
+  return normalizedQuery ? `${canonical}?${normalizedQuery}` : canonical;
 }
 
 /**
- * Estoque ATIVO da própria cidade — insumo do gate de indexação.
- *
- * `limit: 1` porque só o `pagination.total` importa. Em falha devolve 0, o que
- * degrada para `noindex`: na dúvida NÃO indexar é o lado seguro do erro
- * (indexar por engano uma página sem estoque é o problema que estamos
- * consertando; deixar de indexar por um blip se corrige no próximo crawl).
+ * `robots: noindex` — a rota não deve ser indexada em hipótese alguma. Se o
+ * redirect falhar e o body vazar, o crawler ainda não indexa a duplicata.
  */
-async function countOwnActiveAds(slug: string): Promise<number> {
-  try {
-    const res = await fetchAdsSearch({ city_slug: slug, page: 1, limit: 1 });
-    return Number(res?.pagination?.total ?? 0);
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Resolve metadados da cidade direto no backend público.
- * Fallback silencioso para parse do slug — página não pode quebrar em SSR
- * por indisponibilidade do catálogo territorial.
- */
-async function resolveCityMeta(slug: string): Promise<CityRef | null> {
-  try {
-    const url = resolveBackendApiUrl(`/api/public/cities/${encodeURIComponent(slug)}`);
-    if (!url) return null;
-
-    const res = await ssrResilientFetch(url, {
-      headers: { Accept: "application/json" },
-      logTag: "city-meta-comprar",
-      next: { revalidate: 300 },
-    });
-
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      success?: boolean;
-      data?: { city?: { id?: number | string; name?: string; slug?: string; state?: string } };
-    };
-    const c = json?.data?.city;
-    if (!c) return null;
-    return toCityRef({ id: c.id, slug: c.slug, name: c.name, state: c.state });
-  } catch {
-    return null;
-  }
-}
-
-export async function generateMetadata({
-  params,
-  searchParams = {},
-}: ComprarCidadePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: ComprarCidadePageProps): Promise<Metadata> {
   const slug = String(params.slug || "").trim();
-  // `isValidBrazilianCitySlug` = formato `nome-uf` E UF brasileira REAL. Antes
-  // era `isValidCitySlug` (só formato), então `xpto-zz` produzia metadata de
-  // cidade e a página respondia 200 indexável (auditoria 2026-07-28). O 404
-  // real vem do middleware (`territory-gate`); esta checagem é defesa em
-  // profundidade, igual às irmãs /carros-baratos-em e /carros-automaticos-em.
   if (!isValidBrazilianCitySlug(slug)) notFound();
 
-  const ref = await resolveCityMeta(slug);
-  const ctx = cityContextFromRef(ref) || cityContextFromSlug(slug);
-  const stateName = stateNameFromUf(ctx.state);
-  const filters = normalizeCityFilters(slug, searchParams);
-
-  const brand = filters.brand?.trim();
-  const model = filters.model?.trim();
-
-  const title =
-    brand && model
-      ? `${brand} ${model} em ${ctx.name} - ${ctx.state} | Comprar`
-      : brand
-        ? `${brand} em ${ctx.name} - ${ctx.state} | Comprar`
-        : `Carros usados em ${ctx.name} - ${ctx.state} | Comprar`;
-
-  const description =
-    brand && model
-      ? `${brand} ${model} em ${ctx.name} (${ctx.state}): anúncios locais, filtros inteligentes e oportunidades atualizadas no Carros na Cidade.`
-      : brand
-        ? `Carros ${brand} em ${ctx.name} (${ctx.state}): catálogo focado na sua cidade com ofertas reais e contexto local — Carros na Cidade.`
-        : `Encontre carros usados à venda em ${ctx.name}, ${stateName}. Anúncios locais com filtros, preços e contexto da sua cidade no Carros na Cidade.`;
-
-  // Fase 1 da auditoria territorial (docs/runbooks/territorial-canonical-audit.md):
-  // /comprar/cidade/[slug] consolida sinal SEO em /carros-em/[slug], a
-  // canônica intermediária da intenção "comprar carros na cidade".
-  // Canonical é URL LIMPA — nunca carrega sort/limit/page/utm/filtros, que
-  // antes vazavam via buildCityPath(slug, filters).
-  const canonicalPath = `/carros-em/${encodeURIComponent(slug)}`;
-
-  // Indexabilidade = MESMA regra das irmãs (`shouldIndexLocalSeo` em
-  // lib/seo/local-seo-metadata.ts): estoque PRÓPRIO da cidade >= SITEMAP_MIN_ADS.
-  // Mesmo limiar usado pelo sitemap — "entra no índice" e "entra no sitemap"
-  // não podem divergir.
-  //
-  // Auditoria 2026-07-28: esta rota era a única sem o gate. Só emitia noindex
-  // quando havia filtro na URL; na URL limpa não emitia tag `robots` nenhuma
-  // ⇒ default `index,follow`. Com o fallback territorial servindo anúncios de
-  // outra cidade, isso produziu milhares de doorway pages indexáveis.
-  //
-  // CRÍTICO: conta o estoque da PRÓPRIA cidade, nunca o do fallback. Conteúdo
-  // emprestado não pode tornar a página indexável — é exatamente o que
-  // caracteriza doorway page.
-  const ownActiveAds = await countOwnActiveAds(slug);
-  const noindex = hasRestrictiveFilters(filters) || ownActiveAds < getSitemapMinAds();
-
   return {
-    title,
-    description,
-    alternates: { canonical: canonicalPath },
-    robots: { index: !noindex, follow: true },
-    openGraph: {
-      title,
-      description,
-      url: canonicalPath,
-      type: "website",
-      locale: "pt_BR",
-    },
+    alternates: { canonical: getCanonicalCityPath(slug) ?? undefined },
+    robots: { index: false, follow: true },
   };
 }
 
-export default async function ComprarCidadePage({
+export default async function ComprarCidadeLegacyRedirect({
   params,
   searchParams = {},
 }: ComprarCidadePageProps) {
   const slug = String(params.slug || "").trim();
   if (!isValidBrazilianCitySlug(slug)) notFound();
 
-  const ref = await resolveCityMeta(slug);
-  const ctx = cityContextFromRef(ref) || cityContextFromSlug(slug);
-  const filters = normalizeCityFilters(slug, searchParams);
+  const target = resolveTarget(slug, searchParams);
+  if (!target) notFound();
 
-  const [resultsResponse, facetsResponse] = await Promise.allSettled([
-    fetchAdsSearch(filters),
-    fetchAdsFacets(filters),
-  ]);
-
-  let initialResults =
-    resultsResponse.status === "fulfilled" && isValidResultsResponse(resultsResponse.value)
-      ? resultsResponse.value
-      : buildEmptyResults(filters);
-
-  let initialFacets =
-    facetsResponse.status === "fulfilled" && isValidFacetsResponse(facetsResponse.value)
-      ? facetsResponse.value.facets
-      : buildEmptyFacets();
-
-  /**
-   * Fallback territorial: se a cidade pedida não tem estoque ativo e o
-   * usuário não aplicou filtros específicos, consultamos o backend para
-   * descobrir a cidade-vizinha mais forte no mesmo UF e refazemos a
-   * busca. Mantemos os metadados da cidade original (ctx/SEO/canonical)
-   * e informamos o cliente via `fallbackTerritory`. O briefing
-   * 2026-05-22 SUBSTITUIU o aviso amarelo grande por uma frase discreta
-   * cinza abaixo do subtítulo — o cliente
-   * (`BuyMarketplacePageClient` → `CatalogPageHeader.softFallbackMessage`)
-   * converte o objeto numa linha curta "Mostrando ofertas próximas em
-   * [cidade] ([UF])." sem cor de alerta.
-   */
-  let fallbackTerritory:
-    | { requestedName: string; actualName: string; actualState: string; actualSlug: string }
-    | undefined;
-
-  if (initialResults.pagination.total === 0 && !hasRestrictiveFilters(filters)) {
-    const fallback = await fetchCatalogAdsTerritoryFallback(slug);
-    if (fallback && fallback.mode === "fallback" && fallback.slug && fallback.slug !== slug) {
-      const fallbackFilters: AdsSearchFilters = { ...filters, city_slug: fallback.slug };
-      const [fbResults, fbFacets] = await Promise.allSettled([
-        fetchAdsSearch(fallbackFilters),
-        fetchAdsFacets(fallbackFilters),
-      ]);
-
-      const fbResultsOk =
-        fbResults.status === "fulfilled" && isValidResultsResponse(fbResults.value)
-          ? fbResults.value
-          : null;
-      const fbFacetsOk =
-        fbFacets.status === "fulfilled" && isValidFacetsResponse(fbFacets.value)
-          ? fbFacets.value.facets
-          : null;
-
-      if (fbResultsOk && fbResultsOk.pagination.total > 0) {
-        initialResults = fbResultsOk;
-        initialFacets = fbFacetsOk ?? initialFacets;
-        fallbackTerritory = {
-          requestedName: ctx.name,
-          actualName: fallback.name,
-          actualState: fallback.state,
-          actualSlug: fallback.slug,
-        };
-      }
-    }
-  }
-
-  // Defesa em profundidade contra placeholder R$ 0 — vitrine pública
-  // nunca pode mostrar card sem preço real (rodada de credibilidade).
-  initialResults = {
-    ...initialResults,
-    data: (initialResults.data || []).filter(hasRealPrice),
-  };
-
-  const breadcrumbItems = [
-    { name: "Home", href: "/" },
-    { name: "Comprar", href: "/comprar" },
-    { name: `${ctx.name} (${ctx.state})` },
-  ];
-
-  // Em modo fallback (URL da cidade pedida, resultados de uma vizinha) nao
-  // emitimos ItemList JSON-LD: googlebot cruzaria o schema de "São Paulo"
-  // com URLs de anuncios de "Atibaia" — poluiria sinal de conteudo local.
-  const itemListJsonLd = fallbackTerritory
-    ? null
-    : {
-        "@context": "https://schema.org",
-        "@type": "ItemList",
-        name: `Carros usados em ${ctx.name}`,
-        numberOfItems: initialResults.pagination.total,
-        itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
-          "@type": "ListItem",
-          position: index + 1,
-          url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
-          name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
-        })),
-      };
-
-  return (
-    <>
-      <BreadcrumbJsonLd items={breadcrumbItems} />
-      {itemListJsonLd ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-        />
-      ) : null}
-      <BuyMarketplacePageClient
-        initialResults={initialResults}
-        initialFacets={initialFacets}
-        initialFilters={filters}
-        city={ctx}
-        variant="cidade"
-        stateUf={ctx.state}
-        fallbackTerritory={fallbackTerritory}
-        radiusKm={parseRadiusParam(searchParams?.raio)}
-      />
-    </>
-  );
+  permanentRedirect(target);
 }

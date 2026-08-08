@@ -4,7 +4,6 @@ import { buildSitemapXml } from "@/lib/seo/sitemap-xml";
 import { buildLocalSeoTransitionEntries } from "../_lib/transition-helpers";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
 
 // `buildLocalSeoTransitionEntries` foi movido para `../_lib/transition-helpers.ts`.
 // Em Next 14 App Router, route.ts só aceita exports válidos de Route

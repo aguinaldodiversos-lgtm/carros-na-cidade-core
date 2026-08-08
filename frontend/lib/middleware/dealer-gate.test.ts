@@ -51,13 +51,20 @@ describe("validateDealerSlug — mapeamento de status", () => {
     expect((await validateDealerSlug("   ", OK_CONFIG)).kind).toBe("not_found");
   });
 
-  it("sem apiBase/token → unavailable (nunca bloqueia por falta de config)", async () => {
+  it("sem apiBase → unavailable (não há o que chamar)", async () => {
     expect((await validateDealerSlug("x", { token: "t", fetchImpl: fakeFetch(200) })).kind).toBe(
       "unavailable"
     );
-    expect(
-      (await validateDealerSlug("x", { apiBase: "https://b.test", fetchImpl: fakeFetch(200) })).kind
-    ).toBe("unavailable");
+  });
+
+  // O token é bypass de rate-limit, não autorização. Exigi-lo fazia o gate se
+  // recusar a tentar uma chamada que funciona — e como o Next inlina
+  // `process.env` no bundle Edge em tempo de build, bastava a env faltar no
+  // BUILD para o gate se desligar sozinho.
+  it("sem token a chamada ACONTECE — o endpoint é público", async () => {
+    const fetchImpl = fakeFetch(200);
+    const res = await validateDealerSlug("x", { apiBase: "https://b.test", fetchImpl });
+    expect(res.kind).toBe("valid");
   });
 });
 
@@ -72,9 +79,9 @@ describe("decideDealerMiddlewareAction", () => {
     });
   });
 
-  it("unavailable → pass-unavailable (fail-open, não 503)", () => {
+  it("unavailable → block-unavailable (503), nunca passa", () => {
     expect(
       decideDealerMiddlewareAction({ kind: "unavailable", reason: "backend-timeout" })
-    ).toEqual({ kind: "pass-unavailable", reason: "backend-timeout" });
+    ).toEqual({ kind: "block-unavailable", reason: "backend-timeout" });
   });
 });

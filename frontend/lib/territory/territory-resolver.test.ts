@@ -99,7 +99,15 @@ describe("resolveTerritory — input explícito de cidade", () => {
     expect(ctx.level).toBe("city");
     expect(ctx.city).toEqual({ slug: "atibaia-sp", name: "Atibaia", state: "SP" });
     expect(ctx.state.code).toBe("SP");
-    expect(ctx.canonicalUrl).toBe("/comprar/cidade/atibaia-sp");
+    expect(ctx.canonicalUrl).toBe("/carros-em/atibaia-sp");
+  });
+
+  it("canonicalUrl segue a cidade pedida, sem destino fixo", async () => {
+    mockedCity.mockResolvedValue({ name: "Bragança Paulista", state: "SP" });
+    const ctx = await resolveTerritory({ query: { city_slug: "braganca-paulista-sp" } });
+    expect(ctx.canonicalUrl).toBe("/carros-em/braganca-paulista-sp");
+    expect(ctx.canonicalUrl).not.toContain("atibaia");
+    expect(ctx.canonicalUrl).not.toContain("/comprar/cidade/");
   });
 
   it("breadcrumbs da cidade incluem o estado intermediário", async () => {

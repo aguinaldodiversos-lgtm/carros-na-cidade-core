@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import type { BlogCategory, BlogCategoryId, BlogPageContent, BlogPost } from "@/lib/blog/blog-page";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogCategoryPageClientProps {
@@ -432,7 +433,7 @@ export function BlogCategoryPageClient({ content }: BlogCategoryPageClientProps)
             </div>
 
             <Link
-              href={`/comprar/cidade/${citySlug}`}
+              href={buildCanonicalCityHref(citySlug, "/comprar")}
               className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#2F67F6] px-6 text-[16px] font-extrabold text-white transition hover:bg-[#2457DC] md:w-auto md:text-[17px]"
             >
               Ver carros em {cityName}

@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
 import { CityInventoryStats, hasCityInventoryData } from "@/components/seo/CityInventoryStats";
 
@@ -19,9 +17,6 @@ import { CityInventoryStats, hasCityInventoryData } from "@/components/seo/CityI
  *   - h2 baixo destaque: "Sobre carros usados em [cidade]"
  *   - 1 parágrafo curto com palavras-chave (carros usados, seminovos,
  *     lojas, particulares, abaixo da FIPE).
- *   - "Marcas frequentes" (opcional, até 6) — chips de texto simples
- *     linkando para a Cidade com filtro por marca. Não é card, não é
- *     CTA forte; sinal SEO para entidades de veículo.
  *
  * NÃO renderiza:
  *   - Stats (dl com totalAds / catalogTotalAds / avgPrice).
@@ -29,6 +24,13 @@ import { CityInventoryStats, hasCityInventoryData } from "@/components/seo/CityI
  *   - "Continue explorando" (links para baratos/automáticos/hub).
  *   - CTA grande de ampliação Cidade → Regional/Estado (briefing
  *     reserva isso para o fluxo principal/PublicFooter).
+ *   - "Marcas frequentes" (REMOVIDO na Fase 3). Aqueles chips apontavam
+ *     para `/carros-em/[slug]?brand=<nome cru da FIPE>` — uma URL com
+ *     parâmetro, que a política de query deduplica para a cidade limpa
+ *     (noindex/canonical na cidade). Ou seja: o bloco de marcas da página
+ *     gastava seus links num beco. A mesma intenção agora é servida por
+ *     `CityAuthoritySection`, que linka para a canônica
+ *     `/cidade/[slug]/marca/[marca]` e SÓ quando a marca qualifica.
  *
  * Variantes Estado e Regional NÃO usam este bloco — não precisam de
  * SEO compacto extra por cima do catálogo.
@@ -39,8 +41,7 @@ export interface CompactCitySeoBlockProps {
 }
 
 export function CompactCitySeoBlock({ model }: CompactCitySeoBlockProps) {
-  const { cityName, topBrands, paths } = model;
-  const brands = topBrands.slice(0, 6);
+  const { cityName } = model;
   const hasData = hasCityInventoryData(model);
 
   return (
@@ -71,26 +72,6 @@ export function CompactCitySeoBlock({ model }: CompactCitySeoBlockProps) {
         </p>
       )}
 
-      {brands.length > 0 ? (
-        <div className="mt-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-cnc-muted">
-            Marcas frequentes
-          </h3>
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {brands.map((b) => (
-              <li key={b.brand}>
-                <Link
-                  href={`${paths.em}?brand=${encodeURIComponent(b.brand)}`}
-                  className="inline-flex items-center rounded-full border border-cnc-line bg-cnc-surface px-2.5 py-1 text-[12px] font-medium text-cnc-text transition hover:border-primary/50 hover:text-primary"
-                >
-                  {b.brand}
-                  {b.total > 0 ? <span className="ml-1.5 text-cnc-muted">({b.total})</span> : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }

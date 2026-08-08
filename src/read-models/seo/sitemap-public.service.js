@@ -49,9 +49,52 @@ export async function getPublicSitemapByType(type, limit = 50000) {
   return entries.map(mapSitemapEntry);
 }
 
+/**
+ * Sitemap REGIONAL: o recorte por UF das MESMAS entradas territoriais.
+ *
+ * ── O bug que isto corrige (auditoria 2026-08-07) ────────────────────────────
+ * Esta função era a última sobrevivente do caminho antigo: lia
+ * `seo_cluster_plans` via `listSitemapByRegion`, uma tabela de PLANEJAMENTO que
+ * não sabe nada sobre estoque. A correção de 2026-07-04/05 migrou `city_home`,
+ * `city_below_fipe`, `city_brand` e `city_brand_model` para o estoque ativo
+ * real — e deixou a regional para trás.
+ *
+ * O resultado medido: `/sitemaps/regiao/sp.xml` anunciava
+ * `/carros-em/braganca-paulista-sp` e `/carros-baratos-em/braganca-paulista-sp`
+ * com Bragança em ZERO anúncios ativos. As duas URLs respondem 404 — o gate
+ * territorial faz o certo, e o sitemap contradizia a própria aplicação.
+ *
+ * Note a ironia: o comentário de `CITY_BELOW_FIPE` acima já cita Bragança pelo
+ * nome como o caso que motivou aquela correção. O mesmo defeito continuou vivo
+ * a um `if` de distância.
+ *
+ * ── Por que compor, e não escrever uma query nova ────────────────────────────
+ * A regra territorial precisa ter UM dono. Uma query regional própria seria uma
+ * segunda implementação de "esta cidade existe?" — exatamente o que produziu a
+ * divergência. Aqui a regional é, por construção, um SUBCONJUNTO do que os
+ * outros sitemaps publicam: impossível ela publicar algo que eles recusariam.
+ *
+ * O custo é reusar quatro consultas já cacheadas em vez de uma sob medida.
+ * Aceitável: sitemap não é caminho quente, e correção vale mais que uma query.
+ */
 export async function getPublicSitemapByRegion(state, limit = 50000) {
-  const entries = await sitemapPublicRepository.listSitemapByRegion(state, limit);
-  return entries.map(mapSitemapEntry);
+  const uf = String(state || "")
+    .trim()
+    .toUpperCase();
+  if (!uf) return [];
+
+  const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
+
+  const [cities, belowFipe, brands, models] = await Promise.all([
+    listActiveCityEntries(safeLimit),
+    listActiveCityBelowFipeEntries(safeLimit),
+    listActiveCityBrandEntries(safeLimit),
+    listActiveCityBrandModelEntries(safeLimit),
+  ]);
+
+  return [...cities, ...belowFipe, ...brands, ...models]
+    .filter((entry) => String(entry.state || "").toUpperCase() === uf)
+    .slice(0, safeLimit);
 }
 
 /**

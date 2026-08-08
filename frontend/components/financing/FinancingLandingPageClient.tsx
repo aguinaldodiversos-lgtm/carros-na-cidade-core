@@ -7,6 +7,7 @@ import AdCard from "@/components/ads/AdCard";
 import { PromoBanner } from "@/components/common/PromoBanner";
 import FinancingSimulator from "@/components/financing/FinancingSimulator";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 /**
  * Página /simulador-financiamento/[cidade] — wrapper em torno do núcleo
@@ -80,7 +81,7 @@ export function FinancingLandingPageClient({
   initialVehicleValue,
 }: FinancingLandingPageClientProps) {
   const compatibleAds = (highlightAds?.length ? highlightAds : opportunityAds).slice(0, 3);
-  const seeAllHref = `/comprar?city_slug=${citySlug}`;
+  const seeAllHref = buildCanonicalCityHref(citySlug, "/comprar");
 
   return (
     <>
@@ -139,7 +140,7 @@ export function FinancingLandingPageClient({
               title="Agora encontre o carro que cabe na sua parcela"
               subtitle={`Veja os anúncios disponíveis em ${cityName} e região.`}
               ctaLabel={`Ver carros em ${cityName}`}
-              href={`/comprar/cidade/${encodeURIComponent(citySlug)}`}
+              href={seeAllHref}
             />
           </section>
         </div>

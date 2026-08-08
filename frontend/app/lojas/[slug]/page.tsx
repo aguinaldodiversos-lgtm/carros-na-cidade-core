@@ -58,7 +58,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!payload) notFound();
 
   const { dealer } = payload;
-  const title = `${buildTitle(dealer)} | Carros na Cidade`;
+  // SEM o sufixo " | Carros na Cidade": o `title.template` do RootLayout
+  // (`app/layout.tsx`: "%s | Carros na Cidade") já aplica. Com ele aqui, o
+  // HTML servido saía com "…| Carros na Cidade | Carros na Cidade" —
+  // reproduzido em runtime na auditoria da Fase 3 (2026-08-07). O `title`
+  // abaixo alimenta o template; `openGraph`/`twitter` NÃO passam pelo
+  // template, então esses recebem o título completo.
+  const title = buildTitle(dealer);
+  const socialTitle = `${title} | Carros na Cidade`;
   const description = buildDescription(dealer);
   const canonical = toAbsoluteUrl(`/lojas/${dealer.slug}`);
   const indexable = dealer.totalActiveAds > 0;
@@ -69,7 +76,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     alternates: { canonical },
     openGraph: {
       type: "website",
-      title,
+      title: socialTitle,
       description,
       url: canonical,
       siteName: "Carros na Cidade",
@@ -77,7 +84,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     twitter: {
       card: "summary",
-      title,
+      title: socialTitle,
       description,
     },
     robots: {

@@ -30,7 +30,8 @@ import {
   toSafeModelFacets,
   type BuyCityContext,
 } from "@/lib/buy/catalog-helpers";
-import type { ComprarVariant } from "@/lib/buy/territory-variant";
+import { buildNonTerritoryQueryString, type ComprarVariant } from "@/lib/buy/territory-variant";
+import { decideSeoQueryPolicy } from "@/lib/seo/query-policy";
 
 export type FallbackTerritoryInfo = {
   requestedName: string;
@@ -195,6 +196,31 @@ export default function BuyMarketplacePageClient({
       }
     },
     [initialFilters, buildUrl, router]
+  );
+
+  /**
+   * `href` de cada página da paginação — o MESMO builder que o clique usa,
+   * para `href` e destino não poderem divergir.
+   *
+   * URL limpa por construção:
+   *   - `buildNonTerritoryQueryString` tira território (já está no path) e
+   *     `page` (reinserido só quando >= 2 — `?page=1` seria duplicata da
+   *     vitrine);
+   *   - a política central tira `sort=relevance` e valores vazios.
+   *
+   * Sem isso o href sairia como `?sort=relevance&limit=50&city_slug=…&page=1`,
+   * que é a URL que a navegação interna vinha publicando a cada clique.
+   */
+  const buildPageHref = useCallback(
+    (target: number): string => {
+      const params = new URLSearchParams(buildNonTerritoryQueryString(initialFilters));
+      if (target >= 2) params.set("page", String(target));
+      if (radiusKm && radiusKm !== DEFAULT_RADIUS_KM) params.set("raio", String(radiusKm));
+
+      const { normalizedQuery } = decideSeoQueryPolicy(params);
+      return normalizedQuery ? `${pathname}?${normalizedQuery}` : pathname;
+    },
+    [initialFilters, pathname, radiusKm]
   );
 
   // Muda SÓ o raio de vizinhança: preserva os filtros de veículo atuais e seta o
@@ -402,6 +428,7 @@ export default function BuyMarketplacePageClient({
               <CatalogPagination
                 page={currentPage}
                 totalPages={totalPages}
+                buildHref={buildPageHref}
                 onPatch={(patch) => pushPage(patch)}
               />
             </div>

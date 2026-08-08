@@ -38,7 +38,7 @@ describe("cidade FORA do conjunto público", () => {
 
   it("comprar perde o filtro fantasma, mas segue funcional", () => {
     expect(routes.comprar).toBe("/comprar");
-    expect(routes.comprarBelowFipe).toBe("/comprar?below_fipe=true");
+    expect(routes.comprarBelowFipe).toBe("/comprar");
   });
 });
 
@@ -49,7 +49,37 @@ describe("cidade DENTRO do conjunto público", () => {
     expect(routes.fipe).toBe(`/tabela-fipe/${CIDADE_COM_ESTOQUE}`);
     expect(routes.financing).toBe(`/simulador-financiamento/${CIDADE_COM_ESTOQUE}`);
     expect(routes.blog).toBe(`/blog/${CIDADE_COM_ESTOQUE}`);
-    expect(routes.comprar).toBe(`/comprar?city_slug=${CIDADE_COM_ESTOQUE}`);
+  });
+
+  /**
+   * O chrome global é o link interno de maior volume do portal. Enquanto
+   * "Buscar" apontava para `/comprar?city_slug=<slug>`, TODA página do site
+   * linkava uma URL de redirect e nenhuma linkava a canônica da cidade.
+   */
+  it("comprar aponta para a canônica da cidade, sem redirect no caminho", () => {
+    expect(routes.comprar).toBe(`/carros-em/${CIDADE_COM_ESTOQUE}`);
+    expect(routes.cidade).toBe(`/carros-em/${CIDADE_COM_ESTOQUE}`);
+    expect(routes.comprar).not.toContain("city_slug=");
+    expect(routes.comprar).not.toContain("/comprar");
+  });
+
+  it("abaixo da FIPE aponta para a rota limpa indexável da intenção", () => {
+    expect(routes.comprarBelowFipe).toBe(`/carros-baratos-em/${CIDADE_COM_ESTOQUE}`);
+    expect(routes.comprarBelowFipe).not.toContain("?");
+  });
+
+  // Segunda cidade: qualquer destino fixo passaria nos casos acima e falha aqui.
+  it("preserva o slug de cada cidade", () => {
+    const outra = getTerritorialRoutesForCity("braganca-paulista-sp", { isPublicCity: true });
+    expect(outra.comprar).toBe("/carros-em/braganca-paulista-sp");
+    expect(outra.comprar).not.toContain(CIDADE_COM_ESTOQUE);
+  });
+
+  // Slug malformado nunca vira `/carros-em/<lixo>` no chrome global.
+  it("slug inválido cai nas rotas-índice", () => {
+    const invalida = getTerritorialRoutesForCity("xpto-zz", { isPublicCity: true });
+    expect(invalida.comprar).toBe("/comprar");
+    expect(invalida.cidade).toBe("/comprar");
   });
 });
 

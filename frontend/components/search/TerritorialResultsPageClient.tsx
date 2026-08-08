@@ -28,6 +28,7 @@ import { TerritorialHeroLinks } from "./TerritorialHeroLinks";
 import { TerritorialInternalLinksSection } from "./TerritorialInternalLinksSection";
 import { BrandCityStats } from "./BrandCityStats";
 import { REGIONAL_BRAND_TAGLINE } from "@/lib/site/public-config";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 type TerritorialMode = "city" | "brand" | "model" | "opportunities" | "below_fipe";
 
@@ -360,7 +361,7 @@ export function TerritorialResultsPageClient({
               {REGIONAL_BRAND_TAGLINE}
             </p>
             <Link
-              href={`/comprar?city_slug=${encodeURIComponent(slug)}`}
+              href={buildCanonicalCityHref(slug, "/comprar")}
               className="inline-flex h-11 shrink-0 items-center justify-center rounded-[12px] bg-[#1F66E5] px-5 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(31,102,229,0.22)] transition hover:bg-[#1758CC]"
             >
               Catálogo completo em {data.city?.name || "sua cidade"}

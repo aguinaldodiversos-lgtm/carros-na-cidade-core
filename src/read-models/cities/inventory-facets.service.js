@@ -15,11 +15,9 @@
 
 import { pool } from "../../infrastructure/database/db.js";
 import { logger } from "../../shared/logger.js";
-import {
-  brandModelSlug,
-  canonicalBrandLabel,
-  canonicalBrandSlug,
-} from "../../shared/utils/slugify.js";
+import { canonicalBrandLabel, canonicalBrandSlug } from "../../shared/utils/slugify.js";
+import { deriveCommercialModel } from "../../shared/vehicle/commercial-model.js";
+import { SEO_SURFACE, qualifiesForSeoSurface } from "./city-thresholds.js";
 
 const DEFAULT_LIMIT = 6;
 const MAX_LIMIT = 12;
@@ -75,12 +73,23 @@ export async function getTopCitiesByInventory(limit = DEFAULT_LIMIT) {
  * reintroduziria o risco de "0 anúncios" por divergência das duas
  * implementações.
  *
- * `label` é o rótulo curto de exibição; a URL usa sempre o modelo COMPLETO
- * ("HB20 Sense Plus 1.0 Flex 12V Mec."), que é o que existe em `ads.model`.
+ * MODELO COMERCIAL (Fase 3): a URL usa a entidade ("onix"), não a descrição
+ * FIPE ("onix-hatch-lt-1-0-12v-flex-5p-mec"). Antes o rodapé — que é chrome
+ * GLOBAL, presente em toda página do site — linkava para as descrições FIPE,
+ * e cada uma delas é um recorte de 1-2 anúncios, portanto `noindex`. O
+ * rodapé inteiro apontava para páginas que o próprio site pede para não
+ * indexar. Só entram modelos que QUALIFICAM (>= limiar de modelo): abaixo
+ * disso o link seria para um `noindex` de novo.
+ *
+ * A agregação por entidade acontece em JS porque a derivação do modelo
+ * comercial não cabe em SQL — por isso a query traz mais linhas do que o
+ * limite final e o corte é aplicado depois de somar.
  */
 export async function getTopModelsForCity(citySlug, limit = DEFAULT_LIMIT) {
   const slug = String(citySlug ?? "").trim();
   if (!slug) return [];
+
+  const safeLimit = clampLimit(limit);
 
   const result = await pool.query(
     `
@@ -93,58 +102,56 @@ export async function getTopModelsForCity(citySlug, limit = DEFAULT_LIMIT) {
       AND a.model IS NOT NULL AND TRIM(a.model) <> ''
     GROUP BY a.brand, a.model
     ORDER BY total DESC, a.brand ASC, a.model ASC
-    LIMIT $2
     `,
-    [slug, clampLimit(limit)]
+    [slug]
   );
 
-  return result.rows
-    .map((r) => {
-      const brandSlug = canonicalBrandSlug(r.brand);
-      const modelSlug = brandModelSlug(r.model);
-      // Slug vazio = link quebrado. Descarta em vez de publicar link morto.
-      if (!brandSlug || !modelSlug) return null;
-      return {
-        brand: canonicalBrandLabel(r.brand),
-        model: String(r.model).trim(),
-        label: buildShortModelLabel(r.brand, r.model),
-        brandSlug,
-        modelSlug,
-        total: Number(r.total || 0),
-      };
-    })
-    .filter(Boolean);
+  return aggregateCommercialModels(result.rows, safeLimit);
 }
 
 /**
- * Tokens que marcam o início da ficha técnica no padrão FIPE. A partir do
- * primeiro deles o rótulo é cortado: "HB20 Sense Plus 1.0 Flex 12V Mec." vira
- * "Hyundai HB20 Sense Plus".
- *
- * Só afeta EXIBIÇÃO — a URL continua usando o modelo completo.
+ * PURA: linhas (marca, descrição FIPE, total) → modelos comerciais
+ * qualificados, ordenados por volume. Testável sem DB.
  */
-const SPEC_TOKEN_RE =
-  /^(?:\d+[.,]\d+|\d+v|\d+p|flex|gas(?:olina)?|die(?:sel)?|alc(?:ool)?|mec\.?|aut\.?|automatico|manual|cvt|tb|turbo|4x4|4x2|16v|8v|12v)$/i;
+export function aggregateCommercialModels(rows, limit = DEFAULT_LIMIT) {
+  const byEntity = new Map();
 
-const MAX_LABEL_TOKENS = 3;
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const brandSlug = canonicalBrandSlug(r.brand);
+    const commercial = deriveCommercialModel(r.model, { brand: r.brand });
+    // Sem marca ou sem modelo comercial derivável = link que não resolve.
+    // Descarta em vez de publicar link morto.
+    if (!brandSlug || !commercial) continue;
 
-export function buildShortModelLabel(brand, model) {
-  const brandLabel = canonicalBrandLabel(brand);
-  const tokens = String(model ?? "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+    const key = `${brandSlug}::${commercial.slug}`;
+    const current = byEntity.get(key);
+    const total = Number(r.total || 0);
 
-  const kept = [];
-  for (const token of tokens) {
-    if (kept.length > 0 && SPEC_TOKEN_RE.test(token)) break;
-    kept.push(token);
-    if (kept.length >= MAX_LABEL_TOKENS) break;
+    if (!current) {
+      byEntity.set(key, {
+        brand: canonicalBrandLabel(r.brand),
+        model: commercial.label,
+        label: `${canonicalBrandLabel(r.brand)} ${commercial.label}`.trim(),
+        brandSlug,
+        modelSlug: commercial.slug,
+        total,
+      });
+      continue;
+    }
+    current.total += total;
   }
 
-  const shortModel = kept.join(" ") || String(model ?? "").trim();
-  return [brandLabel, shortModel].filter(Boolean).join(" ").trim();
+  return [...byEntity.values()]
+    .filter((m) => qualifiesForSeoSurface(SEO_SURFACE.MODEL, m.total))
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, "pt-BR"))
+    .slice(0, clampLimit(limit));
 }
+
+// `buildShortModelLabel` foi REMOVIDO na Fase 3. Ele encurtava a descrição
+// FIPE só para EXIBIÇÃO ("HB20 Sense Plus 1.0 Flex 12V Mec." → "Hyundai HB20
+// Sense Plus") enquanto a URL continuava usando a descrição inteira — rótulo
+// bonito, link para página noindex. `deriveCommercialModel` resolve os dois
+// lados de uma vez: a entidade "HB20" é o rótulo E o slug.
 
 /**
  * Payload do rodapé: cidades por estoque + modelos da cidade mais forte.

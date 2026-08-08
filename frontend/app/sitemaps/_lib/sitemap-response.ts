@@ -49,12 +49,48 @@ export function sitemapCacheControl(result: SitemapFetchResult): string {
 }
 
 /**
- * Monta a resposta XML aplicando a regra de TTL acima.
+ * 503 do sitemap — a resposta de "não consegui verificar".
  *
- * Sempre HTTP 200: um 5xx faria o Google marcar o sitemap como erro e parar de
- * lê-lo. Servimos urlset (possivelmente vazio) com TTL curto e seguimos.
+ * A versão anterior servia SEMPRE 200, com o argumento de que "um 5xx faria o
+ * Google marcar o sitemap como erro e parar de lê-lo". O argumento se voltou
+ * contra si: medido em 2026-08-07, processo novo + backend fora devolvia
+ *
+ *     HTTP 200  +  <urlset></urlset>
+ *
+ * para cities, vehicles, brands, models, blog e regional. Um sitemap vazio não
+ * é "erro que o Google ignora" — é a AFIRMAÇÃO de que aquelas URLs não existem
+ * mais. É estritamente pior que o 503, que o Google trata como transitório e
+ * reagenda.
+ *
+ * Só chega aqui quem esgotou as três camadas: resposta fresca, memória do
+ * processo e snapshot persistente.
+ */
+function sitemapUnavailableResponse(): NextResponse {
+  return new NextResponse("Sitemap temporariamente indisponível", {
+    status: 503,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Retry-After": "60",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
+/**
+ * Monta a resposta aplicando as regras de status e de TTL.
+ *
+ * Status:
+ *   `fresh` / `memory-stale` / `redis-stale` → 200 com o urlset
+ *   `unavailable`                            → 503
+ *
+ * Note que `fresh` com ZERO URLs continua 200: a consulta funcionou e a
+ * resposta é "não há URLs". `models.xml` vive nesse caso enquanto nenhum modelo
+ * atinge o limiar — vazio legítimo, não falha.
  */
 export function sitemapResponse(result: SitemapFetchResult): NextResponse {
+  if (result.source === "unavailable") return sitemapUnavailableResponse();
+
   return new NextResponse(buildSitemapXml(result.entries), {
     status: 200,
     headers: {
@@ -66,17 +102,32 @@ export function sitemapResponse(result: SitemapFetchResult): NextResponse {
 
 /**
  * Para rotas cujas entries são derivadas (ex.: `content.xml`, que transforma
- * `city_home` em `/blog/[slug]` + `/tabela-fipe/[slug]`): preserva o `ok` da
- * origem, senão uma derivação de fonte degradada seria servida como sucesso.
+ * `city_home` em `/blog/[slug]` + `/tabela-fipe/[slug]`): herda `ok` E `source`
+ * da origem.
+ *
+ * Herdar `source` é o que faz a derivação de uma fonte indisponível virar 503
+ * em vez de 200 vazio. Sem isso, `content.xml` transformaria "não sei" em
+ * "não há conteúdo" — a mesma troca que esta fase existe para eliminar.
  */
 export function sitemapResponseFrom(
   source: SitemapFetchResult,
   entries: PublicSitemapEntry[]
 ): NextResponse {
-  return sitemapResponse({ entries, ok: source.ok });
+  return sitemapResponse({
+    entries,
+    ok: source.ok,
+    source: source.source,
+    reason: source.reason,
+  });
 }
 
-/** Sitemaps estáticos (core, local-seo, opportunities): sempre TTL longo. */
+/**
+ * Sitemaps montados em memória, sem backend (core, local-seo, opportunities).
+ *
+ * `source: "fresh"` é literalmente verdade aqui: não há consulta que possa
+ * falhar, então o resultado é sempre uma afirmação — inclusive quando é uma
+ * lista vazia por design.
+ */
 export function staticSitemapResponse(entries: PublicSitemapEntry[]): NextResponse {
-  return sitemapResponse({ entries, ok: true });
+  return sitemapResponse({ entries, ok: true, source: "fresh" });
 }

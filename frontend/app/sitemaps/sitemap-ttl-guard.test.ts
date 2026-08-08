@@ -72,48 +72,93 @@ afterEach(() => {
 describe("invariante de TTL do sitemap", () => {
   it("TTL longo exige sucesso E conteúdo", () => {
     const entry = { loc: "/carros-em/atibaia-sp" };
-    expect(shouldUseLongTtl({ entries: [entry], ok: true })).toBe(true);
-    expect(shouldUseLongTtl({ entries: [], ok: true })).toBe(false);
-    expect(shouldUseLongTtl({ entries: [entry], ok: false })).toBe(false);
-    expect(shouldUseLongTtl({ entries: [], ok: false })).toBe(false);
+    expect(shouldUseLongTtl({ entries: [entry], ok: true, source: "fresh" })).toBe(true);
+    expect(shouldUseLongTtl({ entries: [], ok: true, source: "fresh" })).toBe(false);
+    expect(shouldUseLongTtl({ entries: [entry], ok: false, source: "memory-stale" })).toBe(false);
+    expect(shouldUseLongTtl({ entries: [], ok: false, source: "unavailable" })).toBe(false);
   });
 
   it("urlset VAZIO nunca sai com TTL longo — nem marcado como sucesso", () => {
-    expect(maxAge(sitemapResponse({ entries: [], ok: true }))).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+    expect(maxAge(sitemapResponse({ entries: [], ok: true, source: "fresh" }))).toBe(
+      SITEMAP_TTL_DEGRADED_SECONDS
+    );
   });
 
   it("degradado com conteúdo (último bom) também usa TTL curto", () => {
-    const res = sitemapResponse({ entries: [{ loc: "/carros-em/atibaia-sp" }], ok: false });
+    const res = sitemapResponse({
+      entries: [{ loc: "/carros-em/atibaia-sp" }],
+      ok: false,
+      source: "memory-stale",
+    });
+    expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+  });
+
+  /**
+   * A correção da Fase 2B.1: sem estado confiável a resposta deixa de ser um
+   * urlset vazio — que o Google lê como "estas URLs não existem mais" — e passa
+   * a ser 503, que ele trata como transitório.
+   */
+  it("`unavailable` → 503, não 200 vazio", () => {
+    const res = sitemapResponse({ entries: [], ok: false, source: "unavailable" });
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Content-Type")).not.toContain("xml");
+  });
+
+  it("`fresh` com zero URLs continua 200 — vazio legítimo é uma afirmação", () => {
+    const res = sitemapResponse({ entries: [], ok: true, source: "fresh" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("xml");
+  });
+
+  it.each(["memory-stale", "redis-stale"] as const)("`%s` serve 200 com o conteúdo", (source) => {
+    const res = sitemapResponse({
+      entries: [{ loc: "/carros-em/atibaia-sp" }],
+      ok: false,
+      source,
+    });
+    expect(res.status).toBe(200);
     expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
   });
 });
 
-describe.each(BACKEND_ROUTES)("$name — TTL por estado do backend", ({ load }) => {
-  it("backend 429 (rate limit) → urlset vazio com TTL CURTO", async () => {
+describe.each(BACKEND_ROUTES)("$name — status e TTL por estado do backend", ({ load }) => {
+  /**
+   * ATUALIZADO NA FASE 2B.1. Estes dois casos exigiam "200 com urlset vazio e
+   * TTL curto" — o TTL curto estava certo, o 200 vazio era o defeito. Um
+   * urlset vazio não é um erro que o Google ignora: é a afirmação de que
+   * aquelas URLs não existem mais. Sem estado confiável, a resposta é 503.
+   */
+  it("backend 429 (rate limit), sem estado confiável → 503", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
     const { GET } = await load();
 
     const res: Response = await GET(new Request("https://x.test"), { params: {} });
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Content-Type")).toContain("application/xml");
-    expect(await res.clone().text()).not.toContain("<url>");
-    expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(await res.clone().text()).not.toContain("<urlset");
   });
 
-  it("backend fora (exceção de rede) → TTL CURTO", async () => {
+  it("backend fora (exceção de rede), sem estado confiável → 503", async () => {
     mockedFetch.mockRejectedValue(new Error("fetch failed"));
     const { GET } = await load();
 
     const res: Response = await GET(new Request("https://x.test"), { params: {} });
-    expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+    expect(res.status).toBe(503);
   });
 
-  it("backend saudável mas SEM URLs → TTL CURTO (vazio nunca congela 1h)", async () => {
+  it("backend saudável mas SEM URLs → 200 com TTL CURTO (vazio legítimo)", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: [] }));
     const { GET } = await load();
 
     const res: Response = await GET(new Request("https://x.test"), { params: {} });
+    // 200: a consulta funcionou. O TTL é curto porque vazio é barato de
+    // reconsultar, não porque houve falha.
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/xml");
     expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
   });
 
@@ -133,17 +178,108 @@ describe.each(BACKEND_ROUTES)("$name — TTL por estado do backend", ({ load }) 
   });
 });
 
-describe("regiao/[state].xml", () => {
-  it("UF ausente → vazio com TTL curto", async () => {
-    const { GET } = await import("./regiao/[state].xml/route");
+describe("regiao/[state]", () => {
+  // A pasta era `[state].xml` — segmento dinâmico malformado, que o Next trata
+  // como literal e nunca casa. Ver `regional-route.test.ts`.
+  it("UF ausente → 404 real (antes: 200 com HTML de not-found)", async () => {
+    const { GET } = await import("./regiao/[state]/route");
     const res: Response = await GET(new Request("https://x.test"), { params: {} });
+    expect(res.status).toBe(404);
+  });
+
+  it("backend 429 sem estado confiável → 503 (antes: 200 vazio)", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
+    const { GET } = await import("./regiao/[state]/route");
+    const res: Response = await GET(new Request("https://x.test"), {
+      params: { state: "sp.xml" },
+    });
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("60");
+  });
+});
+
+/**
+ * `blog.xml` era o único sitemap fora da política central: tinha `catch {
+ * entries = [] }` próprio e devolvia 200 vazio com TTL de 1 HORA — congelando
+ * "não há posts" pelo tempo mais longo entre todos os sitemaps.
+ */
+describe("blog.xml — deixou de ser caso especial", () => {
+  const load = () => import("./blog.xml/route");
+
+  it("backend fora, sem estado confiável → 503 (antes: 200 vazio por 1 h)", async () => {
+    mockedFetch.mockRejectedValue(new Error("fetch failed"));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("backend 429 → 503, nunca urlset vazio com TTL longo", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+    expect(res.status).toBe(503);
+  });
+
+  it("payload success=false → 503, não lista vazia", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(200, { success: false }));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+    expect(res.status).toBe(503);
+  });
+
+  it("backend OK com posts → 200 com as URLs e TTL longo", async () => {
+    mockedFetch.mockResolvedValue(
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            slug: "melhores-suvs-2026",
+            is_indexable: true,
+            updated_at: "2026-08-01T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+    const { GET } = await load();
+
+    const res: Response = await GET();
+
+    expect(res.status).toBe(200);
+    expect(await res.clone().text()).toContain("/blog/melhores-suvs-2026");
+    expect(maxAge(res)).toBe(SITEMAP_TTL_OK_SECONDS);
+  });
+
+  it("blog sem post publicado → 200 vazio LEGÍTIMO (a consulta funcionou)", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: [] }));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/xml");
     expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
   });
 
-  it("backend 429 → TTL curto", async () => {
-    mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
-    const { GET } = await import("./regiao/[state].xml/route");
-    const res: Response = await GET(new Request("https://x.test"), { params: { state: "sp" } });
-    expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+  it("post marcado noindex não entra no sitemap", async () => {
+    mockedFetch.mockResolvedValue(
+      jsonResponse(200, {
+        success: true,
+        data: [
+          { slug: "post-publico", is_indexable: true },
+          { slug: "post-oculto", is_indexable: false },
+        ],
+      })
+    );
+    const { GET } = await load();
+
+    const body = await (await GET()).text();
+    expect(body).toContain("/blog/post-publico");
+    expect(body).not.toContain("/blog/post-oculto");
   });
 });

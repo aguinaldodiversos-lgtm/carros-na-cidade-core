@@ -117,7 +117,8 @@ describe("buildRegionFaqEntries — contrato das 4 perguntas-chave", () => {
     });
 
     const soCidade = entries.find((e) => e.id === "so-cidade")!;
-    expect(soCidade.answer).toContain("/comprar/cidade/atibaia-sp");
+    expect(soCidade.answer).toContain("/carros-em/atibaia-sp");
+    expect(soCidade.answer).not.toContain("/comprar/cidade/");
   });
 
   it("FAQ 'anunciar' menciona inclusão automática na região + catálogo estadual", () => {

@@ -13,10 +13,17 @@ import {
   validateRegionalSlug,
 } from "@/lib/regional-page-guard";
 import {
+  decideAdAliasRedirect,
   decideAdDetailMiddlewareAction,
   extractAdDetailMatch,
   validateAdIdentifier,
 } from "@/lib/middleware/ad-detail-gate";
+import {
+  decideAnunciosListRedirect,
+  decideComprarLegacyQueryRedirect,
+  decideLegacyCityRedirect,
+  decideQueryNormalizationRedirect,
+} from "@/lib/middleware/canonical-redirects";
 import {
   decideDealerMiddlewareAction,
   extractDealerSlug,
@@ -70,6 +77,16 @@ import {
  * 2. **Redirect 301 da rota legada** (`/:uf/regiao/:ancora`):
  *    Sempre redireciona para `/carros-usados/regiao/{ancora}-{uf}`.
  *
+ * 2f. **Redirects 308 de canonicalização** (auditoria SEO 2026-08-06):
+ *    - /comprar/cidade/[slug] → /carros-em/[slug]   (rota legada concorrente)
+ *    - /anuncios/[identifier] → /veiculo/[slug]     (alias de anúncio)
+ *    - /anuncios              → /comprar            (alias de listagem)
+ *    - normalização de query nas vitrines (`sort=relevance`, `page=1`)
+ *
+ *    Todos AQUI e não em `page.tsx` pelo mesmo motivo dos 404 acima:
+ *    `redirect()` em Server Component pode virar 200 + meta refresh, que o
+ *    Googlebot não trata como redirect. Ver `lib/middleware/canonical-redirects.ts`.
+ *
  * 3. **Redirects 301 de outras URLs legadas** (preservados):
  *    - /carros-{em,baratos-em,automaticos-em}-[slug] → versão com `/`
  *    - /painel/anuncios/novo → /anunciar/novo
@@ -120,6 +137,28 @@ function respond(request: NextRequest, startedAt: number, response: NextResponse
   return response;
 }
 
+/**
+ * 503 do gate — a resposta de "não consegui verificar".
+ *
+ * É a peça central da correção de 2026-08-07. Antes, indisponibilidade virava
+ * `pass-unavailable` → 200: uma falha de infraestrutura (ou uma env ausente no
+ * build) publicava página territorial que não deveria existir, sem erro
+ * visível. 503 é temporário, carrega `Retry-After`, e o Google não o trata como
+ * conteúdo — o crawler volta depois em vez de indexar o que não devíamos servir.
+ *
+ * `X-Robots-Tag: noindex` é cinto e suspensório: mesmo que algum intermediário
+ * transforme o status, o corpo não entra no índice.
+ */
+function gateUnavailableResponse(scope: string, reason: string): NextResponse {
+  const blocked = new NextResponse(null, { status: 503 });
+  blocked.headers.set("Retry-After", "60");
+  blocked.headers.set("Cache-Control", "no-store");
+  blocked.headers.set("X-Robots-Tag", "noindex, nofollow");
+  blocked.headers.set("X-Middleware-Gate-Unavailable", scope);
+  blocked.headers.set("X-Middleware-Gate-Reason", reason);
+  return blocked;
+}
+
 export async function middleware(request: NextRequest) {
   const startedAt = Date.now();
   const { pathname, search } = request.nextUrl;
@@ -139,6 +178,23 @@ export async function middleware(request: NextRequest) {
       headers: { "Retry-After": "60", "X-Middleware-Bot-Guard": "ua-empty" },
     });
     return respond(request, startedAt, blocked);
+  }
+
+  // ── 0c. `/comprar?city_slug=` / `?state=` → 308 para o destino FINAL.
+  //
+  // Cedo de propósito: `/comprar` não tem gate territorial próprio (o
+  // território está na QUERY, não no path), então não há 404 a preservar. E
+  // quanto antes o salto sair, menos trabalho o Edge faz por uma URL que nem
+  // vai renderizar. O destino — `/carros-em/[slug]` ou `/comprar/estado/[uf]`
+  // — tem os gates dele e responde 404 sozinho quando a cidade não existe.
+  const comprarLegacy = decideComprarLegacyQueryRedirect(pathname, search);
+  if (comprarLegacy.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = comprarLegacy.pathname;
+    url.search = comprarLegacy.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "comprar-legacy-query");
+    return respond(request, startedAt, moved);
   }
 
   // ── 1. Redirect 301 da rota legada `/:uf/regiao/:ancora` para canônica.
@@ -186,8 +242,33 @@ export async function middleware(request: NextRequest) {
           const blocked = new NextResponse(null, { status: 404 });
           blocked.headers.set("X-Middleware-City-Gate", "blocked-no-active-ads");
           blocked.headers.set("X-Middleware-City-Family", regionalCityMatch.family);
+          blocked.headers.set("X-Middleware-City-Gate-Source", cityAction.source);
           return respond(request, startedAt, blocked);
         }
+
+        if (cityAction.kind === "block-unavailable") {
+          return respond(
+            request,
+            startedAt,
+            gateUnavailableResponse("city-regional", cityAction.reason)
+          );
+        }
+      }
+
+      // A normalização de query do fim do middleware é INALCANÇÁVEL para esta
+      // família — o bloco regional retorna aqui. Mesma armadilha que fez o
+      // gate de existência de cidade parecer aplicado e não estar (2026-08-06):
+      // a função pura estava certa, o teste unitário verde, e nada verificava
+      // que o middleware CHEGAVA a chamá-la. Por isso a chamada é repetida
+      // aqui, e há teste de alcance cobrindo justamente este ponto.
+      const regionalNormalization = decideQueryNormalizationRedirect(pathname, search);
+      if (regionalNormalization.kind === "redirect-permanent") {
+        const url = request.nextUrl.clone();
+        url.pathname = regionalNormalization.pathname;
+        url.search = regionalNormalization.search;
+        const moved = NextResponse.redirect(url, 308);
+        moved.headers.set("X-Middleware-Canonical", "query-normalization");
+        return respond(request, startedAt, moved);
       }
 
       const passed = NextResponse.next(territorialContext);
@@ -254,7 +335,11 @@ export async function middleware(request: NextRequest) {
   // Roda DEPOIS do estrutural de propósito: slug com UF falsa é barrado antes,
   // de graça, sem custar o fetch do conjunto.
   //
-  // Fail-open em `unavailable` — ver `lib/middleware/city-existence-gate.ts`.
+  // FAIL-SAFE em `unavailable` (2026-08-07): "não consegui verificar" vira 503,
+  // nunca 200. Antes era `pass-unavailable`, e por isso uma env ausente no
+  // BUILD desligava o invariante inteiro sem sintoma algum. O snapshot do
+  // último conjunto confirmado absorve blips; só cold-start com backend fora
+  // chega ao 503. Ver `lib/middleware/city-existence-gate.ts`.
   const cityMatch = extractCityScopedMatch(pathname);
   if (cityMatch) {
     const citySet = await fetchPublicCitySet();
@@ -264,14 +349,18 @@ export async function middleware(request: NextRequest) {
       const blocked = new NextResponse(null, { status: 404 });
       blocked.headers.set("X-Middleware-City-Gate", "blocked-no-active-ads");
       blocked.headers.set("X-Middleware-City-Family", cityMatch.family);
+      blocked.headers.set("X-Middleware-City-Gate-Source", cityAction.source);
       return respond(request, startedAt, blocked);
     }
 
-    if (cityAction.kind === "pass-unavailable") {
-      // Não bloqueia, mas deixa rastro: se este header aparecer em volume, o
-      // invariante está desligado na prática e ninguém percebeu.
-      request.headers.set("x-cnc-city-gate-unavailable", cityAction.reason);
+    if (cityAction.kind === "block-unavailable") {
+      return respond(request, startedAt, gateUnavailableResponse("city", cityAction.reason));
     }
+
+    // Passou: registra se a decisão veio de snapshot. Header de diagnóstico,
+    // sem segredo — se `snapshot` aparecer em volume, o backend está fora e
+    // alguém precisa saber ANTES de o snapshot expirar e virar 503.
+    request.headers.set("x-cnc-city-gate-source", cityAction.source);
   }
 
   // ── 2b-ter. Mesmo invariante, um nível acima: UF sem NENHUM anúncio no
@@ -295,13 +384,32 @@ export async function middleware(request: NextRequest) {
         const blocked = new NextResponse(null, { status: 404 });
         blocked.headers.set("X-Middleware-City-Gate", "blocked-uf-no-active-ads");
         blocked.headers.set("X-Middleware-City-Family", ufMatch.family);
+        blocked.headers.set("X-Middleware-City-Gate-Source", ufAction.source);
         return respond(request, startedAt, blocked);
       }
 
-      if (ufAction.kind === "pass-unavailable") {
-        request.headers.set("x-cnc-city-gate-unavailable", ufAction.reason);
+      if (ufAction.kind === "block-unavailable") {
+        return respond(request, startedAt, gateUnavailableResponse("uf", ufAction.reason));
       }
+
+      request.headers.set("x-cnc-city-gate-source", ufAction.source);
     }
+  }
+
+  // ── 2b-quater. `/comprar/cidade/[slug]` → 308 `/carros-em/[slug]`.
+  //
+  // DEPOIS dos gates, e isso é essencial: cidade com slug estruturalmente
+  // inválido, ou sem nenhum anúncio ativo, precisa continuar respondendo 404
+  // real. Se o redirect viesse antes, o 404 territorial viraria um 308 para
+  // uma página que também dá 404 — cadeia inútil — ou, pior, um 200 emprestado.
+  const legacyCity = decideLegacyCityRedirect(pathname, search);
+  if (legacyCity.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = legacyCity.pathname;
+    url.search = legacyCity.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "legacy-city");
+    return respond(request, startedAt, moved);
   }
 
   // ── 2c. Hard gate de existência para /veiculo/[slug] e
@@ -313,15 +421,26 @@ export async function middleware(request: NextRequest) {
   // Comprovado empiricamente em produção 2026-05-24. Sem este gate o
   // Googlebot indexa páginas de anúncios inexistentes.
   //
-  // Política diferente do `regional-page-guard`: `unavailable` aqui
-  // resulta em `pass-unavailable` (não 503), porque este gate roda em
-  // TODO request a /veiculo/* — falhar 503 em cold-start do backend
-  // quebraria todo anúncio real. A defesa em profundidade vem do
-  // `page.tsx` que ainda chama `notFound()` quando `fetchAdDetail`
-  // retorna null. Ver `lib/middleware/ad-detail-gate.ts`.
+  // FAIL-SAFE (2026-08-07). A política anterior era `pass-unavailable` aqui,
+  // sob o argumento de que 503 em cold-start quebraria todo anúncio real. O
+  // argumento caiu por dois motivos:
+  //
+  //   1. Se o gate não consegue falar com o backend, o `page.tsx` também não
+  //      consegue — e o que ele produz nesse caso é soft-404 200 (ou, no
+  //      alias, 200 + meta refresh). "Não quebrar" era ilusão: já quebrava,
+  //      com o status errado.
+  //   2. O snapshot por identificador absorve o blip. Anúncio confirmado
+  //      recentemente continua respondendo normalmente; só identificador
+  //      nunca visto, durante backend fora, chega ao 503.
+  //
+  // Ver `lib/middleware/ad-detail-gate.ts`.
   const adDetailMatch = extractAdDetailMatch(pathname);
   if (adDetailMatch) {
-    const validation = await validateAdIdentifier(adDetailMatch.identifier);
+    // Só o alias paga a leitura do corpo — é ele que precisa do slug canônico
+    // para emitir o 308 aqui. `/veiculo/[slug]` continua checando só o status.
+    const validation = await validateAdIdentifier(adDetailMatch.identifier, {
+      readCanonicalSlug: adDetailMatch.route === "anuncios",
+    });
     const action = decideAdDetailMiddlewareAction(validation);
 
     if (action.kind === "block-not-found") {
@@ -331,16 +450,31 @@ export async function middleware(request: NextRequest) {
       return respond(request, startedAt, blocked);
     }
 
-    if (action.kind === "pass-unavailable") {
-      const passed = NextResponse.next(territorialContext);
-      passed.headers.set("X-Middleware-Ad", "passed-unavailable");
-      passed.headers.set("X-Middleware-Ad-Reason", action.reason);
-      return respond(request, startedAt, passed);
+    // Alias legado → canônica do anúncio, 308 HTTP real, sem HTML intermediário.
+    // O `permanentRedirect()` do page.tsx segue no lugar como defesa: se o
+    // backend não devolver slug, caímos nele.
+    const alias = decideAdAliasRedirect(adDetailMatch, validation);
+    if (alias.kind === "redirect-permanent" && alias.pathname !== pathname) {
+      const url = request.nextUrl.clone();
+      url.pathname = alias.pathname;
+      url.search = "";
+      const moved = NextResponse.redirect(url, 308);
+      moved.headers.set("X-Middleware-Canonical", "ad-alias");
+      return respond(request, startedAt, moved);
+    }
+
+    if (action.kind === "block-unavailable") {
+      // Vale tanto para `/veiculo/[slug]` quanto para o alias sem slug em
+      // snapshot: sem saber se o anúncio existe, 503. O caminho antigo
+      // (`pass-unavailable`) levava a soft-404 200 na canônica e a
+      // 200 + meta refresh no alias — os dois indexáveis.
+      return respond(request, startedAt, gateUnavailableResponse("ad", action.reason));
     }
 
     // pass-valid: deixa o App Router renderizar normalmente.
     const passed = NextResponse.next(territorialContext);
     passed.headers.set("X-Middleware-Ad", "passed-valid");
+    passed.headers.set("X-Middleware-Ad-Source", action.source);
     return respond(request, startedAt, passed);
   }
 
@@ -363,11 +497,8 @@ export async function middleware(request: NextRequest) {
       return respond(request, startedAt, blocked);
     }
 
-    if (action.kind === "pass-unavailable") {
-      const passed = NextResponse.next(territorialContext);
-      passed.headers.set("X-Middleware-Dealer", "passed-unavailable");
-      passed.headers.set("X-Middleware-Dealer-Reason", action.reason);
-      return respond(request, startedAt, passed);
+    if (action.kind === "block-unavailable") {
+      return respond(request, startedAt, gateUnavailableResponse("dealer", action.reason));
     }
 
     const passed = NextResponse.next(territorialContext);
@@ -381,7 +512,8 @@ export async function middleware(request: NextRequest) {
   // Slug com forma de cidade real (`nome-uf`) → hub legítimo, passa sem bater
   // no backend. Qualquer outro slug → valida existência do post publicado
   // (`/api/public/blog/posts/:slug`); 404 → 404 real (mata o hub-fantasma
-  // indexável). Fail-open em `unavailable` (a page mantém o `notFound()`).
+  // indexável). FAIL-SAFE em `unavailable`: 503, nunca 200 — o `notFound()` da
+  // page produziria soft-404 com HTTP 200, que é o problema, não a defesa.
   const blogSlug = extractBlogSlug(pathname);
   if (blogSlug !== null) {
     if (isCityHubSlug(blogSlug)) {
@@ -399,11 +531,8 @@ export async function middleware(request: NextRequest) {
       return respond(request, startedAt, blocked);
     }
 
-    if (action.kind === "pass-unavailable") {
-      const passed = NextResponse.next(territorialContext);
-      passed.headers.set("X-Middleware-Blog", "passed-unavailable");
-      passed.headers.set("X-Middleware-Blog-Reason", action.reason);
-      return respond(request, startedAt, passed);
+    if (action.kind === "block-unavailable") {
+      return respond(request, startedAt, gateUnavailableResponse("blog", action.reason));
     }
 
     const passed = NextResponse.next(territorialContext);
@@ -464,6 +593,36 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = `/painel/anuncios/${upgradeMatch[1]}/upgrade`;
     return respond(request, startedAt, NextResponse.redirect(url, 301));
+  }
+
+  // ── 4. `/anuncios` → 308 `/comprar` (alias de listagem).
+  //
+  // A cadeia medida na auditoria: /anuncios respondia 200 canonicalizando para
+  // /comprar, que por sua vez não era destino final. Duas URLs gastando crawl
+  // budget para apontar para uma terceira. Agora é um salto só.
+  const anunciosList = decideAnunciosListRedirect(pathname);
+  if (anunciosList.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = anunciosList.pathname;
+    url.search = anunciosList.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "anuncios-list");
+    return respond(request, startedAt, moved);
+  }
+
+  // ── 5. Normalização de query das vitrines (`sort=relevance`, `page=1`, …).
+  //
+  // Por último de propósito: só normaliza URL que já passou por todos os gates
+  // e vai mesmo renderizar. Normalizar antes produziria 308 para uma página que
+  // responderia 404 logo em seguida.
+  const queryNormalization = decideQueryNormalizationRedirect(pathname, search);
+  if (queryNormalization.kind === "redirect-permanent") {
+    const url = request.nextUrl.clone();
+    url.pathname = queryNormalization.pathname;
+    url.search = queryNormalization.search;
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "query-normalization");
+    return respond(request, startedAt, moved);
   }
 
   // Fim: propaga o pathname para o RootLayout via header interno.

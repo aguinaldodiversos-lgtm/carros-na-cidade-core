@@ -3,7 +3,6 @@ import { fetchPublicSitemapByTypes } from "../../../lib/seo/sitemap-client";
 import { sitemapResponse } from "../_lib/sitemap-response";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
 
 // SEO 2026-07-04: o backend agora emite o `city_home` já como a URL CANÔNICA
 // `/carros-em/[slug]` (fonte = estoque ativo, >= SITEMAP_MIN_ADS). Não há mais

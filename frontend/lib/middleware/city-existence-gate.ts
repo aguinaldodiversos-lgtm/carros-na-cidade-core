@@ -20,14 +20,43 @@
  * cidades COM estoque), cabe numa resposta e dá lookup O(1) para qualquer
  * slug, inclusive os inventados.
  *
- * ── Fail-open, deliberado ─────────────────────────────────────────────────
- * Backend fora do ar → `unavailable` → PASSA. Igual ao `ad-detail-gate` e
- * pelo mesmo motivo, aqui ainda mais grave: este gate roda em toda rota
- * territorial. Falhar fechado num cold-start transformaria uma indisponibilidade
- * de backend em 404 no site inteiro — trocaria um problema de SEO por uma
- * queda. O pior caso do fail-open é voltar ao comportamento de hoje durante a
- * janela.
+ * ── FAIL-SAFE (substituiu o fail-open em 2026-08-07) ──────────────────────
+ * A versão anterior tratava "não consegui verificar" como "pode passar":
+ * backend fora → `pass-unavailable` → 200. O raciocínio era evitar que um
+ * cold-start virasse 404 no site inteiro.
+ *
+ * O problema é que isso torna o gate desligável por acidente. Medido em
+ * produção local: dois builds do mesmo código, diferindo só na presença de
+ * `INTERNAL_API_TOKEN` no ambiente de BUILD, produziam
+ * `/carros-em/<cidade-sem-anúncio>` respondendo 404 ou 200. Uma variável
+ * esquecida desligava o invariante inteiro — sem erro, sem log, sem sintoma
+ * até o Google indexar.
+ *
+ * A política agora tem TRÊS respostas, não duas:
+ *
+ *   cidade comprovadamente sem anúncio  → 404
+ *   cidade comprovadamente ativa        → segue
+ *   não consegui verificar              → último snapshot válido, se houver;
+ *                                         senão 503 (temporário, não indexável)
+ *
+ * O snapshot (`gate-snapshot.ts`) é o que torna isso viável sem fragilizar o
+ * site: um blip de rede continua sendo decidido com o último estado real
+ * conhecido. Só cold-start COM backend fora chega ao 503 — e 503 é recuperável,
+ * enquanto uma página indevida indexada não é.
+ *
+ * ── O token NÃO é obrigatório ─────────────────────────────────────────────
+ * `INTERNAL_API_TOKEN` nunca foi autorização para este endpoint. Verificado no
+ * backend e por requisição real: `/api/public/cities/public-set` não tem
+ * middleware de auth, e `cnc-internal/1.0` não está na blocklist do
+ * bot-blocker. Sem token e com token inválido, o endpoint responde 200. O
+ * token só faz a chamada PULAR o rate-limit (`isAuthenticatedInternalCall`).
+ *
+ * Ou seja: o antigo `if (!token) return unavailable` recusava-se a tentar uma
+ * chamada que teria funcionado. Era o gate se auto-desligando.
  */
+
+import { readBackendApiBaseUrl, readInternalApiToken } from "./gate-runtime-env";
+import { GateSnapshotStore, getSnapshotMaxAgeMs } from "./gate-snapshot";
 
 /**
  * Famílias de rota com escopo de CIDADE. O slug da cidade é sempre o primeiro
@@ -184,7 +213,10 @@ export function extractCityScopedMatch(pathname: string): CityScopedMatch | null
 
 export type CitySetUnavailableReason =
   | "missing-backend-api-url"
-  | "missing-internal-api-token"
+  // `missing-internal-api-token` NÃO existe mais como motivo de
+  // indisponibilidade. O token é bypass de rate-limit, não autorização — ver a
+  // nota no topo. Manter o motivo faria o gate se recusar a tentar uma chamada
+  // que funciona.
   | "backend-401"
   | "backend-403"
   | "backend-5xx"
@@ -203,6 +235,11 @@ export type PublicCitySet = {
 
 export type CitySetResult =
   | { kind: "ok"; set: PublicCitySet }
+  /**
+   * Backend fora, mas temos o último conjunto confirmado. A decisão sai daqui
+   * com o MESMO rigor de um `ok` — o dado é real, só não é desta requisição.
+   */
+  | { kind: "stale"; set: PublicCitySet; reason: CitySetUnavailableReason; ageMs: number }
   | { kind: "unavailable"; reason: CitySetUnavailableReason; detail?: string };
 
 export interface CitySetFetchConfig {
@@ -213,6 +250,67 @@ export interface CitySetFetchConfig {
   /** Default 6s, mesmo orçamento do ad-detail-gate. */
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /** Relógio injetável — só teste passa. */
+  now?: number;
+  /** Idade máxima do snapshot. Default `getSnapshotMaxAgeMs()`. */
+  snapshotMaxAgeMs?: number;
+}
+
+/**
+ * Cofre do último conjunto CONFIRMADO. Uma entrada só: o conjunto inteiro é um
+ * documento pequeno e cabe numa chave.
+ */
+const CITY_SET_SNAPSHOT = new GateSnapshotStore<PublicCitySet>(1);
+const CITY_SET_SNAPSHOT_KEY = "public-city-set";
+
+/** Uso EXCLUSIVO de teste — estado de módulo contamina caso a caso. */
+export function __resetCitySetSnapshot(): void {
+  CITY_SET_SNAPSHOT.clear();
+}
+
+/**
+ * Falha de rede/backend: tenta o último snapshot antes de declarar
+ * indisponibilidade. É aqui que "não consegui verificar" deixa de virar 200.
+ */
+function degradedCitySet(
+  reason: CitySetUnavailableReason,
+  now: number,
+  detail?: string,
+  maxAgeMs?: number
+): CitySetResult {
+  const lookup = CITY_SET_SNAPSHOT.lookup(
+    CITY_SET_SNAPSHOT_KEY,
+    now,
+    maxAgeMs ?? getSnapshotMaxAgeMs()
+  );
+
+  if (lookup.kind === "hit") {
+    logGateDegraded(
+      `conjunto de cidades indisponível (${reason}) — decidindo com snapshot de ${Math.round(
+        lookup.ageMs / 1000
+      )}s atrás`
+    );
+    return { kind: "stale", set: lookup.value, reason, ageMs: lookup.ageMs };
+  }
+
+  logGateDegraded(
+    `conjunto de cidades indisponível (${reason}) e sem snapshot utilizável (${lookup.kind}) — respondendo 503`
+  );
+  return { kind: "unavailable", reason, detail };
+}
+
+/**
+ * Falha de gate SEMPRE loga.
+ *
+ * Um gate que se degrada em silêncio é indistinguível de um gate que funciona —
+ * foi exatamente assim que a dependência de build passou despercebida. O custo
+ * de uma linha de stderr é irrelevante perto de descobrir isso pelo Search
+ * Console semanas depois.
+ */
+function logGateDegraded(message: string): void {
+  if (typeof window !== "undefined") return;
+  // eslint-disable-next-line no-console
+  console.error(`[city-existence-gate] ${message}`);
 }
 
 /**
@@ -220,14 +318,18 @@ export interface CitySetFetchConfig {
  * Edge por `revalidateSeconds`. Uma entrada de cache para o site todo.
  */
 export async function fetchPublicCitySet(config: CitySetFetchConfig = {}): Promise<CitySetResult> {
-  const apiBase = (config.apiBase ?? process.env.BACKEND_API_URL ?? "").replace(/\/+$/, "");
-  const token = (config.token ?? process.env.INTERNAL_API_TOKEN ?? "").trim();
+  const apiBase = (config.apiBase ?? readBackendApiBaseUrl()).replace(/\/+$/, "");
+  const token = (config.token ?? readInternalApiToken()).trim();
   const revalidate = config.revalidateSeconds ?? 60;
   const timeoutMs = config.timeoutMs ?? 6000;
   const fetchImpl = config.fetchImpl ?? fetch;
+  const now = config.now ?? Date.now();
+  const maxAgeMs = config.snapshotMaxAgeMs;
 
-  if (!apiBase) return { kind: "unavailable", reason: "missing-backend-api-url" };
-  if (!token) return { kind: "unavailable", reason: "missing-internal-api-token" };
+  // Sem base de API não há o que chamar — é a única condição que impede a
+  // tentativa. Token ausente NÃO impede: o endpoint é público (ver nota no
+  // topo) e recusar-se a tentar era o gate se desligando sozinho.
+  if (!apiBase) return degradedCitySet("missing-backend-api-url", now);
 
   const controller = new AbortController();
   let timedOut = false;
@@ -248,10 +350,13 @@ export async function fetchPublicCitySet(config: CitySetFetchConfig = {}): Promi
       next: { revalidate, tags: ["public-city-set"] },
     });
 
-    if (response.status === 401) return { kind: "unavailable", reason: "backend-401" };
-    if (response.status === 403) return { kind: "unavailable", reason: "backend-403" };
+    // 401/403 continuam sendo indisponibilidade e não "cidade não existe": um
+    // erro de autenticação diz que NÃO SABEMOS, e não saber nunca pode virar
+    // 200 nem 404. Cai no snapshot; sem snapshot, 503.
+    if (response.status === 401) return degradedCitySet("backend-401", now, undefined, maxAgeMs);
+    if (response.status === 403) return degradedCitySet("backend-403", now, undefined, maxAgeMs);
     if (response.status !== 200) {
-      return { kind: "unavailable", reason: "backend-5xx", detail: `status ${response.status}` };
+      return degradedCitySet("backend-5xx", now, `status ${response.status}`, maxAgeMs);
     }
 
     const json = (await response.json()) as { data?: Partial<PublicCitySet> } | null;
@@ -261,7 +366,7 @@ export async function fetchPublicCitySet(config: CitySetFetchConfig = {}): Promi
     // "nenhuma cidade existe" e o gate 404aria o site inteiro. Mesma lição do
     // sitemap que cacheou `[]` como sucesso e desindexou por semanas.
     if (!cities || typeof cities !== "object" || Array.isArray(cities)) {
-      return { kind: "unavailable", reason: "bad-payload" };
+      return degradedCitySet("bad-payload", now, undefined, maxAgeMs);
     }
 
     const rawUfs = json?.data?.ufs;
@@ -274,23 +379,28 @@ export async function fetchPublicCitySet(config: CitySetFetchConfig = {}): Promi
         ? (rawUfs as Record<string, number>)
         : deriveUfsFromCities(cities as Record<string, number>);
 
-    return {
-      kind: "ok",
-      set: {
-        cities: cities as Record<string, number>,
-        ufs,
-        total: Number(json?.data?.total) || Object.keys(cities).length,
-        existsMinAds: Number(json?.data?.existsMinAds) || 1,
-        indexMinAds: Number(json?.data?.indexMinAds) || 3,
-      },
+    const set: PublicCitySet = {
+      cities: cities as Record<string, number>,
+      ufs,
+      total: Number(json?.data?.total) || Object.keys(cities).length,
+      existsMinAds: Number(json?.data?.existsMinAds) || 1,
+      indexMinAds: Number(json?.data?.indexMinAds) || 3,
     };
+
+    // Só resposta CONFIRMADA vira snapshot. Guardar o resultado de uma falha
+    // seria cachear "não sei" como estado bom — o defeito que congelou o
+    // sitemap vazio por semanas em 2026-07-27.
+    CITY_SET_SNAPSHOT.remember(CITY_SET_SNAPSHOT_KEY, set, now);
+
+    return { kind: "ok", set };
   } catch (err) {
-    if (timedOut) return { kind: "unavailable", reason: "backend-timeout" };
-    return {
-      kind: "unavailable",
-      reason: "fetch-error",
-      detail: err instanceof Error ? err.message : String(err),
-    };
+    if (timedOut) return degradedCitySet("backend-timeout", now, undefined, maxAgeMs);
+    return degradedCitySet(
+      "fetch-error",
+      now,
+      err instanceof Error ? err.message : String(err),
+      maxAgeMs
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -307,9 +417,13 @@ export function deriveUfsFromCities(cities: Record<string, number>): Record<stri
 }
 
 export type UfExistenceAction =
-  | { kind: "pass-exists"; uf: string; activeAds: number }
-  | { kind: "block-not-found"; uf: string }
-  | { kind: "pass-unavailable"; reason: CitySetUnavailableReason };
+  | { kind: "pass-exists"; uf: string; activeAds: number; source: GateDecisionSource }
+  | { kind: "block-not-found"; uf: string; source: GateDecisionSource }
+  /** Nem confirmado nem negado: 503 temporário. NUNCA 200. */
+  | { kind: "block-unavailable"; reason: CitySetUnavailableReason };
+
+/** De onde veio o dado que sustentou a decisão. Vira header de diagnóstico. */
+export type GateDecisionSource = "fresh" | "snapshot";
 
 /**
  * Decisão PURA para escopo de UF. Mesma regra da cidade, um nível acima:
@@ -320,22 +434,28 @@ export function decideUfExistenceAction(
   result: CitySetResult
 ): UfExistenceAction {
   if (result.kind === "unavailable") {
-    return { kind: "pass-unavailable", reason: result.reason };
+    return { kind: "block-unavailable", reason: result.reason };
   }
 
+  const source: GateDecisionSource = result.kind === "stale" ? "snapshot" : "fresh";
   const activeAds = Number(result.set.ufs?.[match.uf]) || 0;
-  if (activeAds <= 0) return { kind: "block-not-found", uf: match.uf };
+  if (activeAds <= 0) return { kind: "block-not-found", uf: match.uf, source };
 
-  return { kind: "pass-exists", uf: match.uf, activeAds };
+  return { kind: "pass-exists", uf: match.uf, activeAds, source };
 }
 
 export type CityExistenceAction =
-  | { kind: "pass-exists"; citySlug: string; activeAds: number }
-  | { kind: "block-not-found"; citySlug: string }
-  | { kind: "pass-unavailable"; reason: CitySetUnavailableReason };
+  | { kind: "pass-exists"; citySlug: string; activeAds: number; source: GateDecisionSource }
+  | { kind: "block-not-found"; citySlug: string; source: GateDecisionSource }
+  /** Nem confirmado nem negado: 503 temporário. NUNCA 200. */
+  | { kind: "block-unavailable"; reason: CitySetUnavailableReason };
 
 /**
  * Decisão PURA: a cidade está no conjunto?
+ *
+ * Três saídas, não duas. A terceira — `block-unavailable` — é a correção de
+ * 2026-08-07: antes, "não consegui verificar" devolvia `pass-unavailable` e a
+ * rota respondia 200 como se o gate não existisse.
  *
  * Note que não há caso "cidade existe mas está abaixo do limiar de indexação"
  * aqui — indexação é outro eixo, decidido no `generateMetadata` de cada rota
@@ -346,15 +466,18 @@ export function decideCityExistenceAction(
   result: CitySetResult
 ): CityExistenceAction {
   if (result.kind === "unavailable") {
-    return { kind: "pass-unavailable", reason: result.reason };
+    return { kind: "block-unavailable", reason: result.reason };
   }
 
+  // `stale` decide com o MESMO rigor de `ok`: o dado é real e confirmado, só
+  // não é desta requisição. O `source` deixa isso observável no header.
+  const source: GateDecisionSource = result.kind === "stale" ? "snapshot" : "fresh";
   const activeAds = Number(result.set.cities[match.citySlug]) || 0;
   if (activeAds <= 0) {
-    return { kind: "block-not-found", citySlug: match.citySlug };
+    return { kind: "block-not-found", citySlug: match.citySlug, source };
   }
 
-  return { kind: "pass-exists", citySlug: match.citySlug, activeAds };
+  return { kind: "pass-exists", citySlug: match.citySlug, activeAds, source };
 }
 
 export const __testing = { CITY_PREFIX_PATTERNS };

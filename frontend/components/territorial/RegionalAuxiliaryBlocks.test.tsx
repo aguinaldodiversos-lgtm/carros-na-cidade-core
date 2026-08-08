@@ -85,7 +85,10 @@ describe("RegionalAuxiliaryBlocks — cidades incluídas", () => {
 });
 
 describe("RegionalAuxiliaryBlocks — marcas frequentes", () => {
-  it("renderiza chips de top brands com link para /carros-em/[slug]?brand=...", () => {
+  it("linka a canônica de marca, não a URL com parâmetro (Fase 3)", () => {
+    // Antes: `/carros-em/atibaia-sp?brand=Toyota`. A política de query
+    // deduplica essa URL para a cidade limpa, então o bloco de marcas gastava
+    // seus links num beco. Agora aponta para a canônica da intenção.
     render(
       <RegionalAuxiliaryBlocks
         base={ATIBAIA_BASE}
@@ -99,7 +102,28 @@ describe("RegionalAuxiliaryBlocks — marcas frequentes", () => {
     expect(block.textContent).toContain("Honda");
 
     const toyotaLink = screen.getByRole("link", { name: /Toyota/i });
-    expect(toyotaLink.getAttribute("href")).toBe("/carros-em/atibaia-sp?brand=Toyota");
+    expect(toyotaLink.getAttribute("href")).toBe("/cidade/atibaia-sp/marca/toyota");
+
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toMatch(/[?&]brand=/);
+    }
+  });
+
+  it("exibe o rótulo canônico da marca, não a grafia crua da FIPE", () => {
+    render(
+      <RegionalAuxiliaryBlocks
+        base={ATIBAIA_BASE}
+        members={ATIBAIA_MEMBERS}
+        radiusKm={80}
+        topBrands={[{ brand: "GM - Chevrolet", count: 4 }]}
+      />
+    );
+    const block = screen.getByTestId("regional-top-brands");
+    expect(block.textContent).toContain("Chevrolet");
+    expect(block.textContent).not.toContain("GM - Chevrolet");
+    expect(screen.getByRole("link", { name: /Chevrolet/i }).getAttribute("href")).toBe(
+      "/cidade/atibaia-sp/marca/chevrolet"
+    );
   });
 
   it("suprime o bloco de marcas quando topBrands está vazio", () => {

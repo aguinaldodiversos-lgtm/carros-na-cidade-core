@@ -13,6 +13,7 @@ import Link from "next/link";
 import { BlogPostCard, ClockIcon, readingMinutesLabel } from "@/components/blog/BlogPageClient";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import type { BlogPost } from "@/lib/blog/blog-page";
+import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
 const PLACEHOLDER_IMAGE = "/images/vehicle-placeholder.svg";
 
@@ -29,7 +30,7 @@ export function BlogPostPageClient({
   citySlug,
   cityName,
 }: BlogPostPageClientProps) {
-  const buyHref = `/comprar/cidade/${citySlug}`;
+  const buyHref = buildCanonicalCityHref(citySlug, "/comprar");
   const blogHref = `/blog/${citySlug}`;
   const coverImage = post.coverImage || PLACEHOLDER_IMAGE;
 
