@@ -11,7 +11,8 @@ import {
 } from "../../shared/utils/slugify.js";
 import { resolveCityModel } from "./territorial-resolve.service.js";
 import { buildClusterSeo } from "./territorial-cluster.logic.js";
-import { getSitemapMinAds } from "../seo/sitemap-min-ads.js";
+import { commercialModelSlug } from "../../shared/vehicle/commercial-model.js";
+import { getSeoThreshold, SEO_SURFACE } from "./city-thresholds.js";
 
 /**
  * Página de cluster cidade + marca + modelo.
@@ -29,7 +30,7 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
     throw new AppError("Página de modelo da cidade não encontrada", 404);
   }
 
-  const { city, brandSlug, brand: brandAgg, modelSlug, model: modelAgg } = resolution;
+  const { city, brandSlug, brand: brandAgg, modelSlug, model: modelAgg, taxonomy } = resolution;
 
   let ads = [];
   let adsFilters = {};
@@ -41,6 +42,11 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
       ...query,
       city_slug: city.slug,
       brand: brandAgg.label,
+      // `modelAgg.label` é "Onix" quando o slug resolveu pelo modelo comercial,
+      // e a descrição FIPE completa quando resolveu pelo formato antigo. O
+      // filtro de busca é ILIKE '%valor%' — rede ampla de propósito; o filtro
+      // exato por slug logo abaixo é quem garante a precisão (é o mesmo
+      // motivo pelo qual "gol" não pode puxar "Golf").
       model: modelAgg.label,
     };
 
@@ -53,10 +59,18 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
       getFacetsWithFilters({ city_slug: city.slug, brand: brandAgg.label }, { safeMode: true }),
     ]);
 
+    // O anúncio precisa casar pelo MESMO critério que contou o estoque —
+    // senão a página diz "6 anúncios" e lista 2.
+    const modelMatches = (ad) => {
+      if (!ad.model) return true;
+      if (taxonomy === "commercial") {
+        return commercialModelSlug(ad.model, { brand: ad.brand }) === modelSlug;
+      }
+      return brandModelSlug(ad.model) === modelSlug;
+    };
+
     ads = (adsResult.data || []).filter(
-      (ad) =>
-        (!ad.brand || canonicalBrandSlug(ad.brand) === brandSlug) &&
-        (!ad.model || brandModelSlug(ad.model) === modelSlug)
+      (ad) => (!ad.brand || canonicalBrandSlug(ad.brand) === brandSlug) && modelMatches(ad)
     );
     adsFilters = adsResult.filters || {};
     adsPagination = adsResult.pagination;
@@ -97,10 +111,10 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
     },
     seo: buildClusterSeo({
       canonicalPath: `/cidade/${city.slug}/marca/${brandSlug}/modelo/${modelSlug}`,
-      title: `${brandDisplay} ${modelAgg.label} em ${cityLabel} | Carros na Cidade`,
-      description: `Encontre anúncios de ${brandDisplay} ${modelAgg.label} em ${city.name}. Veja ofertas locais, preços, destaques e oportunidades.`,
+      title: `${brandDisplay} ${modelAgg.label} usado em ${cityLabel} | Carros na Cidade`,
+      description: `Anúncios de ${brandDisplay} ${modelAgg.label} em ${city.name}: preços, ano, quilometragem e comparação com a tabela FIPE.`,
       activeCount: modelAgg.activeCount,
-      minInventory: getSitemapMinAds(),
+      minInventory: getSeoThreshold(SEO_SURFACE.MODEL),
     }),
     filters: adsFilters,
     sections: {

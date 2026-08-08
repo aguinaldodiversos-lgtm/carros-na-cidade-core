@@ -14,6 +14,7 @@
 //   3. Construir o objeto `seo` com robots dinâmico baseado em estoque ativo.
 
 import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
+import { deriveCommercialModel } from "../../shared/vehicle/commercial-model.js";
 
 /** Titulariza um slug (`"land-rover"` → `"Land Rover"`) para rótulo de fallback. */
 export function titleizeSlug(slug) {
@@ -53,12 +54,64 @@ export function matchRowsBySlug(rows, slug, key) {
 }
 
 /**
+ * Resolve o slug de MODELO da URL contra as linhas de agregação, aceitando as
+ * DUAS taxonomias — nesta ordem de precedência:
+ *
+ *   1. MODELO COMERCIAL (`/modelo/onix`) — a entidade que a pessoa busca.
+ *      Casa TODAS as descrições FIPE que colapsam nela ("ONIX HATCH LT 1.0
+ *      12V Flex 5p Mec.", "ONIX SEDAN Plus LTZ...", etc).
+ *   2. DESCRIÇÃO FIPE crua (`/modelo/onix-hatch-lt-1-0-12v-flex-5p-mec`) — o
+ *      formato que os links e sitemaps antigos geraram. Continua resolvendo
+ *      para não quebrar URL já rastreada, mas cai abaixo do limiar de
+ *      indexação (é um recorte de 1-2 anúncios), então responde noindex e
+ *      fica fora do sitemap. Sem duplicata no índice.
+ *
+ * A ordem importa: se um slug bater nos dois, o comercial vence, porque é o
+ * que agrega o inventário inteiro da entidade.
+ *
+ * @returns {{ rows: Array<object>, taxonomy: "commercial"|"fipe"|"none",
+ *             commercialLabel: string|null }}
+ */
+export function matchModelRowsBySlug(rows, slug) {
+  const target = brandModelSlug(slug);
+  const list = Array.isArray(rows) ? rows : [];
+  if (!target) return { rows: [], taxonomy: "none", commercialLabel: null };
+
+  const commercialMatches = [];
+  let commercialLabel = null;
+
+  for (const row of list) {
+    const commercial = deriveCommercialModel(row?.model, { brand: row?.brand });
+    if (commercial && commercial.slug === target) {
+      commercialMatches.push(row);
+      if (!commercialLabel) commercialLabel = commercial.label;
+    }
+  }
+
+  if (commercialMatches.length > 0) {
+    return { rows: commercialMatches, taxonomy: "commercial", commercialLabel };
+  }
+
+  const fipeMatches = matchRowsBySlug(list, slug, "model");
+  return {
+    rows: fipeMatches,
+    taxonomy: fipeMatches.length > 0 ? "fipe" : "none",
+    commercialLabel: null,
+  };
+}
+
+/**
  * Agrega múltiplas linhas (variações textuais que slugificam igual — ex.
  * "VW" e "Volkswagen" não, mas "Fiat" e "FIAT" sim) numa única estatística
  * exata. `avg_price` é recomputado a partir de `sum_price`/`total` (média
  * ponderada real, não média de médias).
+ *
+ * `labelOverride` existe para o modelo comercial: quando quatro descrições
+ * FIPE colapsam numa entidade, o rótulo exibido tem que ser "Onix" — não a
+ * descrição FIPE da variação com mais anúncios, que é o que o `labelKey`
+ * escolheria.
  */
-export function aggregateMatchedRows(matchedRows, { labelKey, slug }) {
+export function aggregateMatchedRows(matchedRows, { labelKey, slug, labelOverride = null }) {
   const rows = Array.isArray(matchedRows) ? matchedRows : [];
 
   let activeCount = 0;
@@ -100,7 +153,9 @@ export function aggregateMatchedRows(matchedRows, { labelKey, slug }) {
     if (!labelRow || total > (toNumber(labelRow.total) || 0)) labelRow = row;
   }
 
-  const label = labelRow && labelRow[labelKey] ? String(labelRow[labelKey]) : titleizeSlug(slug);
+  const label =
+    labelOverride ||
+    (labelRow && labelRow[labelKey] ? String(labelRow[labelKey]) : titleizeSlug(slug));
 
   return {
     activeCount,

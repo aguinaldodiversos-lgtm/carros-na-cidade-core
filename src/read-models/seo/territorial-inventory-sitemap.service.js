@@ -12,9 +12,11 @@
 // A URL de cidade é a CANÔNICA `/carros-em/[slug]` (não `/cidade` nem
 // `/comprar/cidade`) — auditoria SEO 2026-07-04.
 
-import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
+import { canonicalBrandSlug } from "../../shared/utils/slugify.js";
+import { commercialModelSlug } from "../../shared/vehicle/commercial-model.js";
 import * as repo from "./territorial-inventory-sitemap.repository.js";
 import { getSitemapMinAds } from "./sitemap-min-ads.js";
+import { getSeoThreshold, SEO_SURFACE } from "../cities/city-thresholds.js";
 
 const CLUSTER_TYPE_CITY = "city_home";
 const CLUSTER_TYPE_BELOW_FIPE = "city_below_fipe";
@@ -127,13 +129,25 @@ export function buildBrandEntries(rows, minAds = 1) {
   return finalize(dedupeByLoc(items), minAds);
 }
 
-/** PURA: linhas de modelo → entradas de sitemap (slugs canônicos, dedup, ≥ minAds). */
+/**
+ * PURA: linhas de modelo → entradas de sitemap.
+ *
+ * O slug é o do MODELO COMERCIAL, não o da descrição FIPE. Antes desta fase o
+ * agrupamento era por `ads.model` cru, e as quatro descrições FIPE do Onix em
+ * Atibaia (2+2+1+1) viravam quatro URLs de 1-2 anúncios — todas abaixo do
+ * limiar, logo o sitemap de modelos ficava VAZIO enquanto havia um Onix com 6
+ * anúncios na cidade. A dedup por `loc` já existia; o que faltava era que os
+ * quatro produzissem o MESMO `loc`.
+ *
+ * Linha cujo modelo comercial não é derivável com segurança é descartada — a
+ * entrada de sitemap tem que apontar para uma entidade que a página resolve.
+ */
 export function buildModelEntries(rows, minAds = 1) {
   const items = (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const citySlug = String(row.city_slug || "").trim();
       const brandSlug = canonicalBrandSlug(row.brand);
-      const modelSlug = brandModelSlug(row.model);
+      const modelSlug = commercialModelSlug(row.model, { brand: row.brand });
       if (!citySlug || !brandSlug || !modelSlug) return null;
       return {
         loc: `/cidade/${citySlug}/marca/${brandSlug}/modelo/${modelSlug}`,
@@ -160,10 +174,10 @@ export async function listActiveCityBelowFipeEntries(limit = 50000) {
 
 export async function listActiveCityBrandEntries(limit = 50000) {
   const rows = await repo.listActiveCityBrandRows(limit);
-  return buildBrandEntries(rows, getSitemapMinAds());
+  return buildBrandEntries(rows, getSeoThreshold(SEO_SURFACE.BRAND));
 }
 
 export async function listActiveCityBrandModelEntries(limit = 50000) {
   const rows = await repo.listActiveCityBrandModelRows(limit);
-  return buildModelEntries(rows, getSitemapMinAds());
+  return buildModelEntries(rows, getSeoThreshold(SEO_SURFACE.MODEL));
 }
