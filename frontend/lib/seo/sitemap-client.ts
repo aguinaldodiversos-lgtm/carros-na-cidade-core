@@ -244,7 +244,26 @@ function dedupeEntries(entries: PublicSitemapEntry[]): PublicSitemapEntry[] {
  * chamada PULA o rate-limit de sitemap do backend (`skipIfAuthenticatedInternal`);
  * quando não bate, cai no cap por minuto e é aqui que os 429 aparecem.
  */
-async function fetchSitemapEntries(path: string): Promise<SitemapFetchResult> {
+/**
+ * Converte o payload do backend em entradas de sitemap.
+ *
+ * `null` significa "payload inválido" e cai no caminho degradado — nunca em
+ * lista vazia. É a fronteira onde "não entendi a resposta" deixa de poder
+ * virar "não há URLs".
+ */
+type SitemapPayloadParser = (json: unknown) => PublicSitemapEntry[] | null;
+
+/** Parser padrão: `{ success: true, data: PublicSitemapEntry[] }`. */
+const defaultParser: SitemapPayloadParser = (json) => {
+  const body = json as PublicSitemapResponse | null;
+  if (!body?.success || !Array.isArray(body.data)) return null;
+  return body.data;
+};
+
+async function fetchSitemapEntries(
+  path: string,
+  parse: SitemapPayloadParser = defaultParser
+): Promise<SitemapFetchResult> {
   const url = resolveInternalBackendApiUrl(path);
   if (!url) {
     return degraded(path, "URL do backend não resolvida (env BACKEND_API_URL/API_URL ausente?)");
@@ -264,15 +283,13 @@ async function fetchSitemapEntries(path: string): Promise<SitemapFetchResult> {
       return degraded(path, `HTTP ${res.status}`);
     }
 
-    const json = (await res.json()) as PublicSitemapResponse;
-    if (!json?.success || !Array.isArray(json.data)) {
-      return degraded(
-        path,
-        `payload inválido (success=${json?.success}, data=${typeof json?.data})`
-      );
+    const json = (await res.json()) as unknown;
+    const parsed = parse(json);
+    if (!parsed) {
+      return degraded(path, "payload inválido (formato inesperado)");
     }
 
-    const entries = dedupeEntries(json.data.map(normalizeEntry));
+    const entries = dedupeEntries(parsed.map(normalizeEntry));
     rememberLastGood(path, entries);
     // Persiste fora do processo. Não bloqueia a resposta e nunca lança: Redis
     // fora custa a camada 3, não o sitemap.
@@ -344,6 +361,34 @@ export async function fetchPublicSitemapByTypes(
  */
 export async function fetchPublicVehicleSitemap(limit = 50000): Promise<SitemapFetchResult> {
   return fetchSitemapEntries(`/api/public/seo/sitemap/vehicles?limit=${limit}`);
+}
+
+/**
+ * Sitemap do blog do CMS, pela MESMA infraestrutura resiliente dos demais.
+ *
+ * ── Por que não reusar `fetchPublishedBlogPosts` ─────────────────────────────
+ * Aquela função devolve `{ posts: [], total: 0 }` em qualquer falha — o mesmo
+ * anti-padrão do `catch { entries = [] }`, só que um nível mais fundo. Ela é
+ * usada pelas PÁGINAS do blog, onde degradar em silêncio é aceitável (a página
+ * ainda renderiza). Num sitemap, não é: lista vazia vira "estes posts não
+ * existem mais".
+ *
+ * Aqui a resposta do backend é lida diretamente, e um payload que não bate com
+ * o contrato vira `unavailable` — não lista vazia. Isso dá ao blog snapshot em
+ * memória, snapshot no Redis e 503, exatamente como cities e vehicles.
+ *
+ * O mapeamento de post → entrada continua em `buildBlogSitemapEntries` (regras
+ * de `is_indexable`, slug e lastmod); aqui só entra a resiliência.
+ */
+export async function fetchPublicBlogSitemap(
+  limit = 50,
+  buildEntries: (posts: unknown[]) => PublicSitemapEntry[]
+): Promise<SitemapFetchResult> {
+  return fetchSitemapEntries(`/api/public/blog/posts?limit=${limit}`, (json) => {
+    const body = json as { success?: boolean; data?: unknown } | null;
+    if (!body || body.success === false || !Array.isArray(body.data)) return null;
+    return buildEntries(body.data);
+  });
 }
 
 /**

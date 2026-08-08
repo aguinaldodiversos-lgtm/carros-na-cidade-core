@@ -197,3 +197,89 @@ describe("regiao/[state]", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
   });
 });
+
+/**
+ * `blog.xml` era o único sitemap fora da política central: tinha `catch {
+ * entries = [] }` próprio e devolvia 200 vazio com TTL de 1 HORA — congelando
+ * "não há posts" pelo tempo mais longo entre todos os sitemaps.
+ */
+describe("blog.xml — deixou de ser caso especial", () => {
+  const load = () => import("./blog.xml/route");
+
+  it("backend fora, sem estado confiável → 503 (antes: 200 vazio por 1 h)", async () => {
+    mockedFetch.mockRejectedValue(new Error("fetch failed"));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("backend 429 → 503, nunca urlset vazio com TTL longo", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+    expect(res.status).toBe(503);
+  });
+
+  it("payload success=false → 503, não lista vazia", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(200, { success: false }));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+    expect(res.status).toBe(503);
+  });
+
+  it("backend OK com posts → 200 com as URLs e TTL longo", async () => {
+    mockedFetch.mockResolvedValue(
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            slug: "melhores-suvs-2026",
+            is_indexable: true,
+            updated_at: "2026-08-01T00:00:00.000Z",
+          },
+        ],
+      })
+    );
+    const { GET } = await load();
+
+    const res: Response = await GET();
+
+    expect(res.status).toBe(200);
+    expect(await res.clone().text()).toContain("/blog/melhores-suvs-2026");
+    expect(maxAge(res)).toBe(SITEMAP_TTL_OK_SECONDS);
+  });
+
+  it("blog sem post publicado → 200 vazio LEGÍTIMO (a consulta funcionou)", async () => {
+    mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: [] }));
+    const { GET } = await load();
+
+    const res: Response = await GET();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/xml");
+    expect(maxAge(res)).toBe(SITEMAP_TTL_DEGRADED_SECONDS);
+  });
+
+  it("post marcado noindex não entra no sitemap", async () => {
+    mockedFetch.mockResolvedValue(
+      jsonResponse(200, {
+        success: true,
+        data: [
+          { slug: "post-publico", is_indexable: true },
+          { slug: "post-oculto", is_indexable: false },
+        ],
+      })
+    );
+    const { GET } = await load();
+
+    const body = await (await GET()).text();
+    expect(body).toContain("/blog/post-publico");
+    expect(body).not.toContain("/blog/post-oculto");
+  });
+});
