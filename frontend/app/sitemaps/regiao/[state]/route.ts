@@ -33,7 +33,6 @@ import { sitemapResponse } from "../../_lib/sitemap-response";
  */
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
 
 /** `"sp.xml"` → `"SP"`. Sem sufixo também é aceito (`"sp"` → `"SP"`). */
 function normalizeStateParam(raw: string | undefined): string {

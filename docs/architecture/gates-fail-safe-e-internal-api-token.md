@@ -205,3 +205,66 @@ de build passou despercebida.
    Edge. O 503 é sintoma, não causa.
 4. **Não** "corrija" reintroduzindo fail-open. Foi a tentativa de nunca mostrar
    erro que produziu páginas indexáveis indevidas.
+
+---
+
+## 7. Sitemaps: a mesma disciplina, um andar acima (Fase 2B.1, 2026-08-07)
+
+O raciocínio deste ADR foi estendido aos sitemaps, com uma diferença de prazo
+que vale registrar.
+
+| | Gates | Sitemaps |
+| --- | --- | --- |
+| Estado guardado | conjunto de cidades / validação de anúncio | urlset por coleção |
+| Onde | memória do processo | memória **+ Redis** (`seo:sitemap:last-good:*`) |
+| Sobrevive a restart? | não | **sim** |
+| Idade máxima utilizável | 24 h | **6 h** |
+| Sem estado confiável | 503 | 503 |
+
+**Por que 6 h e não 24 h.** O erro de um gate velho é negar uma página que
+existe — o visitante vê 404, o Google recrawleia e resolve. O erro de um sitemap
+velho é *convidar* o Google a rastrear uma URL que morreu. Como a Fase 2B.1
+existiu justamente para tirar URLs 404 do sitemap, seria contraditório
+reintroduzi-las por um dia inteiro através do fallback.
+
+Seis horas cobre com folga qualquer janela realista de deploy ou de
+indisponibilidade de backend, que é o cenário para o qual o snapshot existe.
+
+**Por que o sitemap ganhou Redis e o gate não.** O gate roda no middleware
+(Edge), onde não há cliente Redis; e o custo do seu cold start é um 503
+temporário numa rota. O sitemap roda em Node, tem Redis à mão, e o custo do seu
+cold start é o Google concluir que o site perdeu todas as URLs. Prazos e
+consequências diferentes justificam camadas diferentes.
+
+**TTL de cache ≠ idade máxima do snapshot.** São perguntas distintas:
+
+- `revalidate: 3600` — "quando devo perguntar de novo?"
+- 6 h de snapshot — "até quando um dado velho ainda é melhor que admitir que não sei?"
+
+O primeiro governa o caminho feliz; o segundo, só o caminho de falha.
+
+---
+
+## 8. Dívida registrada: sharding de `vehicles.xml`
+
+O protocolo de sitemap limita **50.000 URLs** (ou 50 MB) por arquivo.
+`vehicles.xml` publica uma URL por anúncio ativo, num arquivo só.
+
+Hoje: **27 URLs** — três ordens de grandeza abaixo do limite. Implementar
+sharding agora seria complexidade sem problema.
+
+**Gatilho para agir:** quando `vehicles.xml` passar de **~25.000 URLs** (metade
+do limite). Nessa altura:
+
+```
+/sitemaps/vehicles.xml        → vira índice ou redireciona
+/sitemaps/vehicles-1.xml      ≤ 50.000
+/sitemaps/vehicles-2.xml      ≤ 50.000
+```
+
+Cada shard entra no `sitemap.xml` como filho próprio. O particionamento natural
+é por faixa de `ads.id` ou por UF — a segunda opção casa com o modelo
+territorial e torna a invalidação por região possível no futuro.
+
+**Como monitorar:** a contagem de `<loc>` em `vehicles.xml` é observável por
+requisição HTTP; vale um alerta quando cruzar 25 k.
