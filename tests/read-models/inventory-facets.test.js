@@ -24,78 +24,93 @@ vi.mock("../../src/shared/logger.js", () => ({
 }));
 
 const {
-  buildShortModelLabel,
+  aggregateCommercialModels,
   getFooterInventoryFacets,
   getTopCitiesByInventory,
   getTopModelsForCity,
 } = await import("../../src/read-models/cities/inventory-facets.service.js");
 
-const { canonicalBrandSlug, brandModelSlug } = await import("../../src/shared/utils/slugify.js");
+const { canonicalBrandSlug } = await import("../../src/shared/utils/slugify.js");
+const { SEO_SURFACE, getSeoThreshold } = await import(
+  "../../src/read-models/cities/city-thresholds.js"
+);
+
+const MODEL_MIN = getSeoThreshold(SEO_SURFACE.MODEL);
 
 beforeEach(() => {
   queryMock.mockReset();
 });
 
-describe("buildShortModelLabel — encurta sem corromper", () => {
-  it("corta a ficha técnica FIPE", () => {
-    expect(buildShortModelLabel("Hyundai", "HB20 Sense Plus 1.0 Flex 12V Mec.")).toBe(
-      "Hyundai HB20 Sense Plus"
-    );
+describe("aggregateCommercialModels — o rodapé linka a ENTIDADE, não a versão FIPE", () => {
+  it("colapsa descrições FIPE do mesmo modelo e soma o estoque", () => {
+    const models = aggregateCommercialModels([
+      { brand: "GM - Chevrolet", model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.", total: 2 },
+      { brand: "GM - Chevrolet", model: "ONIX SEDAN Plus LT 1.0 12V Flex 4p Mec.", total: 2 },
+      { brand: "GM - Chevrolet", model: "ONIX HATCH 1.0 12V Flex 5p Mec.", total: 2 },
+    ]);
+
+    expect(models).toHaveLength(1);
+    expect(models[0].modelSlug).toBe("onix");
+    expect(models[0].total).toBe(6);
+    expect(models[0].label).toBe("Chevrolet Onix");
+    // O caso que produzia "0 anúncios": prefixo de grupo some do slug.
+    expect(models[0].brandSlug).toBe(canonicalBrandSlug("GM - Chevrolet"));
   });
 
-  it("normaliza prefixo de grupo FIPE na marca", () => {
-    expect(buildShortModelLabel("GM - Chevrolet", "Onix Plus 1.0")).toBe("Chevrolet Onix Plus");
-    expect(buildShortModelLabel("VW - VolksWagen", "Polo Track 1.0")).toBe("Volkswagen Polo Track");
+  it("NENHUM slug do rodapé carrega ficha técnica FIPE", () => {
+    // O rodapé é chrome global: um link para descrição FIPE colocava TODA
+    // página do site apontando para um recorte de 1-2 anúncios (noindex).
+    const models = aggregateCommercialModels([
+      { brand: "Hyundai", model: "HB20 Sense Plus 1.0 Flex 12V Mec.", total: 5 },
+      { brand: "VW - VolksWagen", model: "T-Cross 200 TSI 1.0 Flex 12V 5p Aut.", total: 4 },
+    ]);
+
+    for (const m of models) {
+      expect(m.modelSlug).not.toMatch(/12v|flex|mec|aut|tsi|\d-\d/);
+    }
+    expect(models.map((m) => m.modelSlug).sort()).toEqual(["hb20", "t-cross"]);
   });
 
-  it("preserva modelo curto por inteiro", () => {
-    expect(buildShortModelLabel("Fiat", "Argo")).toBe("Fiat Argo");
+  it("só publica modelo QUALIFICADO — abaixo do limiar o link seria noindex", () => {
+    const models = aggregateCommercialModels([
+      { brand: "Fiat", model: "ARGO DRIVE 1.0 6V Flex", total: MODEL_MIN },
+      { brand: "Fiat", model: "MOBI LIKE 1.0 Fire Flex 5p.", total: MODEL_MIN - 1 },
+    ]);
+    expect(models.map((m) => m.modelSlug)).toEqual(["argo"]);
   });
 
-  it("nunca devolve rótulo só com a marca — o primeiro token sempre entra", () => {
-    // "1.0" é token de ficha técnica, mas se for o PRIMEIRO do modelo não pode
-    // zerar o rótulo (viraria "Fiat" sozinho, indistinguível de outro modelo).
-    expect(buildShortModelLabel("Fiat", "1.0 Flex")).toBe("Fiat 1.0");
+  it("descarta linha sem marca ou sem modelo derivável (link morto)", () => {
+    expect(
+      aggregateCommercialModels([
+        { brand: "  ", model: "  ", total: 9 },
+        { brand: "Fiat", model: "1.0 Flex 8V", total: 9 },
+      ])
+    ).toEqual([]);
   });
 
-  it("teto de 3 tokens de modelo", () => {
-    expect(buildShortModelLabel("Jeep", "Compass Longitude Serie S Plus")).toBe(
-      "Jeep Compass Longitude Serie"
-    );
+  it("respeita o limite pedido", () => {
+    const rows = ["Argo", "Mobi", "Pulse", "Strada", "Toro"].map((m) => ({
+      brand: "Fiat",
+      model: `${m} Drive 1.0`,
+      total: 10,
+    }));
+    expect(aggregateCommercialModels(rows, 2)).toHaveLength(2);
   });
 });
 
-describe("getTopModelsForCity — slugs que casam com o resolver", () => {
-  it("gera brandSlug/modelSlug pelas MESMAS funções do resolver", async () => {
+describe("getTopModelsForCity", () => {
+  it("agrega por entidade comercial a partir das linhas do banco", async () => {
     queryMock.mockResolvedValue({
       rows: [
-        { brand: "Hyundai", model: "HB20 Sense Plus 1.0 Flex 12V Mec.", total: 2 },
-        { brand: "GM - Chevrolet", model: "Onix Plus 1.0 Turbo", total: 1 },
+        { brand: "Hyundai", model: "HB20 Sense Plus 1.0 Flex 12V Mec.", total: 4 },
+        { brand: "GM - Chevrolet", model: "Onix Plus 1.0 Turbo", total: 3 },
       ],
       rowCount: 2,
     });
 
     const models = await getTopModelsForCity("atibaia-sp", 6);
-
-    expect(models[0].brandSlug).toBe(canonicalBrandSlug("Hyundai"));
-    expect(models[0].modelSlug).toBe(brandModelSlug("HB20 Sense Plus 1.0 Flex 12V Mec."));
-    // O caso que produzia "0 anúncios": prefixo de grupo tem de sumir do slug.
-    expect(models[1].brandSlug).toBe("chevrolet");
+    expect(models.map((m) => m.modelSlug)).toEqual(["hb20", "onix"]);
     expect(models[1].brand).toBe("Chevrolet");
-  });
-
-  it("descarta linha cujo slug sairia vazio (link quebrado)", async () => {
-    queryMock.mockResolvedValue({
-      rows: [
-        { brand: "  ", model: "  ", total: 3 },
-        { brand: "Fiat", model: "Argo", total: 1 },
-      ],
-      rowCount: 2,
-    });
-
-    const models = await getTopModelsForCity("atibaia-sp", 6);
-    expect(models).toHaveLength(1);
-    expect(models[0].brandSlug).toBe("fiat");
   });
 
   it("slug de cidade vazio → lista vazia sem tocar o banco", async () => {
