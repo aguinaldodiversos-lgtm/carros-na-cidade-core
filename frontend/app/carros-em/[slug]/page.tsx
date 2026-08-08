@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
 import { NearbyRadiusSection } from "@/components/buy/NearbyRadiusSection";
+import { CityAuthoritySection } from "@/components/seo/CityAuthoritySection";
 import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
 import { FaqBlock } from "@/components/seo/FaqBlock";
+import { loadCitySeoOverview } from "@/lib/seo/city-seo-overview";
 import { buildCityFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
@@ -104,7 +106,7 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   // URL com `?raio=` é sempre deduplicada para a cidade limpa). Ver parseRadiusParam.
   const radiusKm = parseRadiusParam(searchParams?.raio);
 
-  const [model, catalog, nearbyResult] = await Promise.all([
+  const [model, catalog, nearbyResult, overviewResult] = await Promise.all([
     loadSeoModel(slug),
     // applyTerritoryFallback=false: o catálogo PRINCIPAL é o bloco "Em [cidade]"
     // — só anúncios da própria cidade (0 km). A vizinhança (raio) vem no bloco
@@ -112,9 +114,14 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     // substitui o antigo <AlsoInRegionBlock> (âncora regional — Onda 2 Fase 2a).
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
     loadNearbyRadiusAds(slug, { radiusKm }),
+    // Camada de autoridade local (Fase 3). Falha do backend devolve
+    // `unavailable`, NÃO um overview vazio — os módulos somem em vez de
+    // afirmar "0 veículos" numa cidade que tem estoque.
+    loadCitySeoOverview(slug),
   ]);
 
   const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
+  const overview = overviewResult.status === "ok" ? overviewResult.overview : null;
 
   // Defesa em profundidade — briefing P2-B 2026-05-25:
   // backend já filtra DIRTY + price>0; `normalizePublicAd` é o último
@@ -216,6 +223,13 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
             própria cidade (bloco principal acima). Renderiza null quando não há
             vizinhas com estoque. Substitui o antigo AlsoInRegionBlock. */}
         <NearbyRadiusSection result={nearbyResult} cityName={ctx.name} />
+
+        {/* Camada de autoridade local (Fase 3) — Server Component puro:
+            mercado, marcas, modelos comerciais, lojas e cidades próximas,
+            tudo derivado do inventário ativo DESTA cidade. Ausente quando o
+            backend está indisponível (nunca renderiza "0 veículos" por falha)
+            e quando a cidade não tem estoque (nada a dizer). */}
+        {overview ? <CityAuthoritySection overview={overview} /> : null}
 
         {/* Bloco SEO mínimo pós-paginação. Sem stats grandes, sem
             "Continue explorando", sem CTAs grandes — o briefing

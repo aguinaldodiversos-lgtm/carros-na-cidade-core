@@ -79,10 +79,17 @@ describe("CompactCitySeoBlock", () => {
     expect(screen.queryByText(/Anúncios ativos/i)).toBeNull();
   });
 
-  it("renderiza até 6 marcas frequentes como links discretos", () => {
+  it("NÃO linka mais marcas por parâmetro de query (Fase 3)", () => {
+    // Regressão: os chips antigos apontavam para `?brand=<nome cru FIPE>`, uma
+    // URL que a política de query deduplica para a cidade limpa — link para um
+    // beco. A intenção "marca em [cidade]" agora é servida por
+    // `CityAuthoritySection`, que usa a canônica /cidade/[slug]/marca/[marca].
     render(<CompactCitySeoBlock model={modelBase} />);
-    const vw = screen.getByRole("link", { name: /Volkswagen/i });
-    expect(vw.getAttribute("href")).toBe("/carros-em/atibaia-sp?brand=Volkswagen");
+    const links = screen.queryAllByRole("link");
+    for (const link of links) {
+      expect(link.getAttribute("href")).not.toMatch(/[?&]brand=/);
+    }
+    expect(screen.queryByText(/Marcas frequentes/i)).toBeNull();
   });
 
   it("não renderiza CTAs grandes, cards, ou 'Continue explorando'", () => {
@@ -94,9 +101,4 @@ describe("CompactCitySeoBlock", () => {
     expect(screen.queryByText(/Ver carros na região/i)).toBeNull();
   });
 
-  it("não exibe marcas frequentes quando topBrands está vazio", () => {
-    const empty = { ...modelBase, topBrands: [] };
-    render(<CompactCitySeoBlock model={empty} />);
-    expect(screen.queryByText(/Marcas frequentes/i)).toBeNull();
-  });
 });
