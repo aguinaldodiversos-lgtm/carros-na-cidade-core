@@ -98,9 +98,63 @@ await q("city_advertisers", `
   WHERE a.status='active' AND c.slug=$1
   GROUP BY adv.id, adv.name, adv.slug ORDER BY ativos DESC`, [CITY]);
 
+/**
+ * COMPLETUDE DO ANÚNCIO (Fase 3, Etapas 48-49) — somente RELATÓRIO.
+ *
+ * Sete sinais que determinam se um anúncio consegue competir organicamente:
+ * foto de capa, galeria (≥5), descrição com texto real (≥120 caracteres),
+ * quilometragem informada, referência FIPE, carroceria e câmbio. Marca,
+ * modelo, ano e preço não entram porque são obrigatórios na publicação — não
+ * discriminam nada.
+ *
+ * NÃO bloqueia, NÃO ordena, NÃO altera ranking. É diagnóstico: mostra onde o
+ * inventário perde capacidade de rankear antes de qualquer decisão de produto.
+ */
+function scoreAdCompleteness(row) {
+  const signals = {
+    cover: row.n_images >= 1,
+    gallery: row.n_images >= 5,
+    description: row.desc_len >= 120,
+    mileage: Number(row.mileage) > 0,
+    fipe: row.fipe_value != null && row.fipe_value > 0,
+    bodyType: Boolean(row.body_type),
+    transmission: Boolean(row.transmission),
+  };
+  const hit = Object.values(signals).filter(Boolean).length;
+  return { signals, hit, total: Object.keys(signals).length };
+}
+
 await client.end();
 
-if (args.includes("--json")) {
+if (args.includes("--quality")) {
+  const rows = out.city_rows;
+  const totals = {};
+  let sum = 0;
+
+  console.log(`# Completude dos anúncios ativos — ${CITY} (${rows.length} anúncios)\n`);
+  for (const row of rows) {
+    const { signals, hit, total } = scoreAdCompleteness(row);
+    sum += hit / total;
+    for (const [key, ok] of Object.entries(signals)) {
+      totals[key] = (totals[key] || 0) + (ok ? 1 : 0);
+    }
+    const missing = Object.entries(signals)
+      .filter(([, ok]) => !ok)
+      .map(([k]) => k);
+    console.log(
+      `  #${row.id} ${row.brand} ${String(row.model).slice(0, 34)} → ${hit}/${total}${missing.length ? ` (falta: ${missing.join(", ")})` : ""}`
+    );
+  }
+
+  console.log(`\n## Cobertura por sinal`);
+  for (const [key, n] of Object.entries(totals)) {
+    const pct = rows.length ? Math.round((n / rows.length) * 100) : 0;
+    console.log(`  ${key.padEnd(14)} ${String(n).padStart(3)}/${rows.length}  ${pct}%`);
+  }
+  console.log(
+    `\n## Completude média: ${rows.length ? Math.round((sum / rows.length) * 100) : 0}%`
+  );
+} else if (args.includes("--json")) {
   console.log(JSON.stringify(out, null, 1));
 } else {
   const line = (s) => console.log(s);

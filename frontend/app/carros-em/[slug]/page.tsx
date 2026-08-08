@@ -8,7 +8,11 @@ import { CityAuthoritySection } from "@/components/seo/CityAuthoritySection";
 import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
 import { FaqBlock } from "@/components/seo/FaqBlock";
 import { loadCitySeoOverview } from "@/lib/seo/city-seo-overview";
-import { buildCityFaqEntries, buildFaqPageJsonLd } from "@/lib/seo/faq";
+import {
+  buildCityFaqEntries,
+  buildCityInventoryFaqEntries,
+  buildFaqPageJsonLd,
+} from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
 import { loadNearbyRadiusAds } from "@/lib/buy/city-radius-catalog";
@@ -158,7 +162,26 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
 
   // Fase 4.3 (§7) — FAQ útil e específico da cidade. O FAQPage JSON-LD só é
   // emitido porque o FaqBlock abaixo renderiza as MESMAS perguntas (visível).
-  const faqEntries = buildCityFaqEntries({ cityName: ctx.name, stateUf: ctx.state });
+  //
+  // Fase 3: as perguntas de INVENTÁRIO vêm primeiro (são as que só esta
+  // cidade responde) e são geradas do mesmo `overview` que alimenta os
+  // módulos acima — se o número muda na página, muda no FAQ e no schema
+  // junto. Sem overview (backend indisponível ou cidade vazia) restam as
+  // perguntas de processo, que continuam verdadeiras.
+  const faqEntries = [
+    ...(overview
+      ? buildCityInventoryFaqEntries({
+          cityName: overview.city.name,
+          activeAds: overview.inventory.activeAds,
+          activeDealers: overview.inventory.activeDealers,
+          automaticCount: overview.inventory.automaticCount,
+          belowFipeCount: overview.inventory.belowFipeCount,
+          brandLabels: overview.brands.map((b) => b.label),
+          medianPrice: overview.priceStats.publishable ? overview.priceStats.medianPrice : null,
+        })
+      : []),
+    ...buildCityFaqEntries({ cityName: ctx.name, stateUf: ctx.state }),
+  ];
   const faqJsonLd = buildFaqPageJsonLd(faqEntries);
 
   // Sem fallback territorial nesta rota: ItemList sempre reflete a

@@ -102,7 +102,16 @@ describe("buildLocalSeoMetadata — title NÃO duplica o sufixo do site", () => 
     expect(String(meta.title)).not.toMatch(/\|\s*Carros na Cidade\s*$/);
     // Conteúdo essencial preservado
     expect(String(meta.title)).toContain("Atibaia");
-    expect(String(meta.title)).toContain("anúncios");
+    expect(String(meta.title)).toContain("Carros usados");
+  });
+
+  it("o title NÃO carrega contagem de estoque (Fase 3, Etapa 39)", () => {
+    // A contagem muda a cada publicação e a cada venda; o Google guarda o
+    // title por ciclos de rastreio. Um número lá dentro nasce desatualizado, e
+    // não é o que a pessoa digita na busca. Ele vive no corpo da página.
+    for (const v of ["em", "baratos", "automaticos"] as const) {
+      expect(String(buildLocalSeoMetadata(buildModel(v)).title)).not.toMatch(/\d/);
+    }
   });
 
   it("variant 'baratos' não termina com '| Carros na Cidade'", () => {

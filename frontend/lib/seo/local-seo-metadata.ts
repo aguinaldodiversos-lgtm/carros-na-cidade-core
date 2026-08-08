@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
 import { getSiteUrl, toAbsoluteUrl } from "@/lib/seo/site";
 import { getSitemapMinAds } from "@/lib/seo/sitemap-min-ads";
+import { canonicalBrandLabel } from "@/lib/seo/brand-model-slug";
 import {
   buildCanonicalUrlWithPolicy,
   decideSeoQueryPolicy,
@@ -11,6 +12,15 @@ import {
 function truncateTitle(raw: string, max = 70): string {
   const t = raw.trim();
   return t.length <= max ? t : `${t.slice(0, max - 3)}...`;
+}
+
+/** "R$ 58.500" — sem centavos, cabe na description sem estourar 160. */
+function formatCompactBrl(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function truncateDesc(raw: string, max = 160): string {
@@ -79,20 +89,25 @@ function resolveOgImage(model: LocalSeoLandingModel): string | undefined {
 }
 
 function buildDescription(model: LocalSeoLandingModel): string {
-  const { cityName, state, variant, totalAds, catalogTotalAds, avgPrice, topBrands } = model;
+  const { cityName, state, variant, totalAds, catalogTotalAds, minPrice, maxPrice, topBrands } =
+    model;
   const uf = state ? `, ${state}` : "";
+  // Rótulo CANÔNICO da marca (Fase 3): `topBrands` vem das facetas com o nome
+  // cru da FIPE, então a description saía com "GM - Chevrolet, VW -
+  // VolksWagen" — a grafia interna da tabela vazando para o snippet do
+  // resultado de busca.
   const brands = topBrands
     .slice(0, 3)
-    .map((b) => b.brand)
+    .map((b) => canonicalBrandLabel(b.brand))
     .filter(Boolean)
     .join(", ");
+  // FAIXA em vez de média (Fase 3, Etapa 6): a média de uma amostra pequena é
+  // deslocada por um único outlier — com 26 hatches de ~R$ 70 mil e um carro
+  // de R$ 157 mil, "preço médio R$ 77.544" descreve um carro que não existe no
+  // estoque. A faixa é verificável olhando o catálogo.
   const price =
-    avgPrice !== null
-      ? ` Preço médio aproximado: ${new Intl.NumberFormat("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-          maximumFractionDigits: 0,
-        }).format(avgPrice)}.`
+    minPrice !== null && maxPrice !== null
+      ? ` Preços de ${formatCompactBrl(minPrice)} a ${formatCompactBrl(maxPrice)}.`
       : "";
 
   if (model.isEmptyCity) {
@@ -136,28 +151,24 @@ function buildDescription(model: LocalSeoLandingModel): string {
  * final (bug observado em prod, ver docs/runbooks/territorial-canonical-audit.md).
  */
 function buildTitle(model: LocalSeoLandingModel): string {
-  const { cityName, state, variant, totalAds } = model;
+  const { cityName, state, variant } = model;
   const uf = state ? ` - ${state}` : "";
 
-  if (model.isEmptyCity) {
-    if (variant === "baratos") {
-      return truncateTitle(`Carros baratos em ${cityName}${uf}`);
-    }
-    if (variant === "automaticos") {
-      return truncateTitle(`Carros automáticos em ${cityName}${uf}`);
-    }
-    return truncateTitle(`Carros em ${cityName}${uf}`);
-  }
-
-  if (variant === "em") {
-    return truncateTitle(`Carros em ${cityName}${uf} — ${totalAds} anúncios`);
-  }
-
+  // SEM CONTAGEM (Fase 3, Etapa 39). O title antes trazia "— 27 anúncios": um
+  // número que muda a cada publicação e a cada venda, num campo que o Google
+  // guarda por ciclos de rastreio. O resultado é um título desatualizado no
+  // SERP e um sinal de instabilidade sem contrapartida — a contagem não é o
+  // que a pessoa digita na busca. A contagem continua na página, no módulo de
+  // mercado, onde é sempre atual.
   if (variant === "baratos") {
-    return truncateTitle(`Carros baratos em ${cityName}${uf} — ${totalAds} abaixo da FIPE`);
+    return truncateTitle(`Carros baratos e abaixo da FIPE em ${cityName}${uf}`);
   }
 
-  return truncateTitle(`Carros automáticos em ${cityName}${uf} — ${totalAds} ofertas`);
+  if (variant === "automaticos") {
+    return truncateTitle(`Carros automáticos em ${cityName}${uf}`);
+  }
+
+  return truncateTitle(`Carros usados e seminovos em ${cityName}${uf}`);
 }
 
 function buildKeywords(model: LocalSeoLandingModel): string[] {
