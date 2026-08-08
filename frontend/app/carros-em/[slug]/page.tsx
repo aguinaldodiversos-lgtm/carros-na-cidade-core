@@ -136,8 +136,6 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     data: (rawResults.data || []).filter((ad) => normalizePublicAd(ad) !== null),
   };
 
-  const totalAds = initialResults.pagination.total || 0;
-
   // areaServed (âncora regional — Onda 2 Fase 2a): cidade da página + cidades
   // de COBERTURA dentro do raio. Só NOMES de cidade — nunca bairro (respeita a
   // trava PF). Sinaliza ao Google a geografia atendida sem criar entidade
@@ -151,10 +149,10 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     })),
   ];
 
-  // BreadcrumbList canônico — usa o builder existente do LocalSeoLanding. O
-  // ItemList reflete a própria cidade. `areaServed` só entra quando há cobertura
-  // real de vizinhança (>1 = base + pelo menos uma cidade no raio).
-  const jsonLd = {
+  // CollectionPage canônico. O `mainEntity` (ItemList) é sobrescrito mais
+  // abaixo pelos anúncios realmente renderizados. `areaServed` só entra quando
+  // há cobertura real de vizinhança (>1 = base + pelo menos uma cidade no raio).
+  const jsonLd: Record<string, unknown> = {
     ...buildLocalSeoJsonLd(model),
     ...(areaServed.length > 1 ? { areaServed } : {}),
   };
@@ -184,22 +182,36 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   ];
   const faqJsonLd = buildFaqPageJsonLd(faqEntries);
 
-  // Sem fallback territorial nesta rota: ItemList sempre reflete a
-  // cidade pedida. Quando não há anúncios, emitimos ItemList vazio mas
-  // numberOfItems=0 é semântico para o Google ("essa cidade existe,
-  // está vazia agora").
-  const itemListJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: `Carros usados em ${ctx.name}`,
-    numberOfItems: totalAds,
-    itemListElement: initialResults.data.slice(0, 20).map((ad, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
-      name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
-    })),
-  };
+  // ItemList ÚNICO (Fase 3, Etapa 44).
+  //
+  // A página emitia DOIS: o `CollectionPage.mainEntity` do
+  // `buildLocalSeoJsonLd` (10 itens da amostra) e um ItemList solto (que
+  // declarava `numberOfItems: 27` listando 20). Dois ItemList na mesma URL,
+  // com contagens diferentes, descrevendo a mesma coleção.
+  //
+  // Agora existe um só, dentro do CollectionPage — que é o container correto
+  // — construído dos anúncios REALMENTE renderizados nesta página. E
+  // `numberOfItems` conta os itens listados, não o total do catálogo: dizer
+  // 27 numa lista de 20 é declarar sete itens que o schema não contém.
+  //
+  // Sem fallback territorial: a lista sempre reflete a cidade pedida. Cidade
+  // vazia não emite ItemList (uma lista de zero itens não descreve nada).
+  const itemListElement = initialResults.data.slice(0, 20).map((ad, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    url: toAbsoluteUrl(`/veiculo/${ad.slug || ad.id}`),
+    name: ad.title || `${ad.brand ?? ""} ${ad.model ?? ""}`.trim() || "Veículo",
+  }));
+
+  if (itemListElement.length > 0) {
+    jsonLd.mainEntity = {
+      "@type": "ItemList",
+      name: `Carros usados em ${ctx.name}`,
+      itemListOrder: "https://schema.org/ItemListOrderAscending",
+      numberOfItems: itemListElement.length,
+      itemListElement,
+    };
+  }
 
   return (
     <>
@@ -213,10 +225,6 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       ) : null}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
       {faqJsonLd ? (
         <script
           type="application/ld+json"
