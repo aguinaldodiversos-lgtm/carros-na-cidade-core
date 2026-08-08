@@ -137,7 +137,7 @@ describe("sitemap-client — parse e normalização", () => {
 
   it("vazio LEGÍTIMO do backend é ok:true (não confundir com falha)", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: [] }));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: true });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: true, source: "fresh" });
   });
 });
 
@@ -150,35 +150,35 @@ describe("sitemap-client — parse e normalização", () => {
 describe("sitemap-client — falha é observável (nunca lança, mas nunca finge sucesso)", () => {
   it("URL não resolvida → ok:false", async () => {
     mockedResolve.mockReturnValue("");
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: false, source: "unavailable" });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it("resposta não-ok (429 do rate limit) → ok:false", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(429, { error: "rate_limited" }));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: false, source: "unavailable" });
   });
 
   it("payload success=false → ok:false", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(200, { success: false, data: [] }));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: false, source: "unavailable" });
   });
 
   it("data não-array → ok:false", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(200, { success: true, data: null }));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: false, source: "unavailable" });
   });
 
   it("ssrResilientFetch lança (rede/timeout) → ok:false sem propagar", async () => {
     mockedFetch.mockRejectedValue(new Error("fetch failed"));
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: false, source: "unavailable" });
   });
 
   it("JSON inválido → ok:false sem propagar", async () => {
     mockedFetch.mockResolvedValue(
       new Response("not-json", { status: 200, headers: { "Content-Type": "application/json" } })
     );
-    expect(await fetchPublicSitemapByType("city_home", 20)).toEqual({ entries: [], ok: false });
+    expect(await fetchPublicSitemapByType("city_home", 20)).toMatchObject({ entries: [], ok: false, source: "unavailable" });
   });
 
   it("TODO caminho de falha loga (nenhum degrade silencioso)", async () => {
@@ -191,7 +191,14 @@ describe("sitemap-client — falha é observável (nunca lança, mas nunca finge
     expect(String(spy.mock.calls[0][0])).toContain("429");
   });
 
-  it("um tipo falhando degrada o CONJUNTO (sitemap parcial = remoção silenciosa)", async () => {
+  /**
+   * ATUALIZADO NA FASE 2B.1. Antes, um tipo falhando devolvia o conjunto
+   * PARCIAL com `ok:false` — a melhor opção possível num mundo em que a
+   * resposta era sempre 200. Agora que existe 503, publicar metade das URLs
+   * deixou de ser o menos pior: a metade ausente seria lida pelo Google como
+   * removida. `unavailable` propaga e a rota devolve 503.
+   */
+  it("um tipo falhando torna o CONJUNTO indisponível (parcial = remoção silenciosa)", async () => {
     mockedFetch
       .mockResolvedValueOnce(
         jsonResponse(200, { success: true, data: [{ loc: "/carros-em/atibaia-sp" }] })
@@ -200,7 +207,19 @@ describe("sitemap-client — falha é observável (nunca lança, mas nunca finge
 
     const result = await fetchPublicSitemapByTypes(["city_home", "city_below_fipe"], 20);
     expect(result.ok).toBe(false);
-    expect(result.entries).toHaveLength(1);
+    expect(result.source).toBe("unavailable");
+    expect(result.entries).toHaveLength(0);
+  });
+
+  it("todos os tipos frescos → conjunto fresco", async () => {
+    // Uma Response por chamada: o corpo só pode ser lido uma vez, então
+    // reutilizar o mesmo objeto faz a segunda leitura falhar.
+    mockedFetch.mockImplementation(async () =>
+      jsonResponse(200, { success: true, data: [{ loc: "/carros-em/atibaia-sp" }] })
+    );
+    const result = await fetchPublicSitemapByTypes(["city_home", "city_below_fipe"], 20);
+    expect(result.source).toBe("fresh");
+    expect(result.ok).toBe(true);
   });
 });
 

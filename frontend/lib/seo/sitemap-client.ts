@@ -18,6 +18,7 @@
 
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
+import { readSitemapSnapshot, writeSitemapSnapshot } from "@/lib/seo/sitemap-snapshot";
 
 export interface PublicSitemapEntry {
   loc: string;
@@ -47,20 +48,34 @@ interface PublicSitemapResponse {
 }
 
 /**
- * Resultado de uma busca de sitemap.
+ * De onde veio o conjunto de URLs que estamos servindo.
  *
- * `ok: false` significa "não conseguimos falar com o backend" — NÃO "o backend
- * disse que não há URLs". A distinção é o ponto central do incidente
- * 2026-07-27: antes estas funções devolviam `[]` puro nos dois casos, o caller
- * não tinha como diferenciar, e servia urlset vazio com o MESMO TTL de sucesso
- * (3600s). Um 429 de um segundo congelava o sitemap vazio por uma hora.
+ * `ok: boolean` respondia "deu certo?" — suficiente para escolher TTL, e
+ * insuficiente para escolher STATUS. Com quatro estados explícitos, o caller
+ * consegue distinguir o que precisa distinguir:
  *
- * Quem consome DEVE olhar `ok` para escolher o TTL — ver
- * `app/sitemaps/_lib/sitemap-response.ts`, que centraliza essa regra.
+ *   fresh         backend respondeu agora. Inclui o VAZIO LEGÍTIMO: consulta
+ *                 bem-sucedida sem URLs (ex.: `models.xml`, enquanto nenhum
+ *                 modelo atinge o limiar) → 200 com urlset vazio, correto.
+ *   memory-stale  backend falhou; servindo o último bom deste processo.
+ *   redis-stale   backend falhou e a memória está vazia (processo novo);
+ *                 servindo o snapshot persistente.
+ *   unavailable   backend falhou e NÃO há estado confiável → 503.
+ *
+ * A distinção que importa: `fresh` com zero URLs é uma afirmação
+ * ("não há URLs"); `unavailable` é a ausência de afirmação ("não sei"). Servir
+ * as duas como 200 vazio foi o defeito medido em 2026-08-07 — para o Google,
+ * a segunda vira a primeira.
  */
+export type SitemapSource = "fresh" | "memory-stale" | "redis-stale" | "unavailable";
+
 export interface SitemapFetchResult {
   entries: PublicSitemapEntry[];
+  /** `true` apenas em `fresh`. Mantido para os consumidores existentes. */
   ok: boolean;
+  source: SitemapSource;
+  /** Motivo da degradação. Só para log — nunca vai para header de resposta. */
+  reason?: string;
 }
 
 const SITEMAP_REVALIDATE_SECONDS = 3600;
@@ -108,17 +123,45 @@ export function __resetSitemapLastGoodCache(): void {
   lastGoodByPath.clear();
 }
 
-function degraded(path: string, reason: string): SitemapFetchResult {
+/**
+ * Caminho de FALHA. Três camadas de recuperação, nesta ordem, e 503 no fim.
+ *
+ * A quarta possibilidade — devolver `[]` como se fosse resposta — foi removida
+ * em 2026-08-07. Ela transformava indisponibilidade em afirmação.
+ */
+async function degraded(path: string, reason: string): Promise<SitemapFetchResult> {
   logSitemapFailure(path, reason);
+
+  // Camada 2: memória do processo. Cobre o blip com processo já quente.
   const lastGood = lastGoodByPath.get(path);
   if (lastGood?.length) {
     // eslint-disable-next-line no-console
     console.error(
-      `[${LOG_TAG}] ${path} → servindo último sitemap bom (${lastGood.length} URLs) enquanto degradado`
+      `[${LOG_TAG}] ${path} → servindo último sitemap bom da MEMÓRIA (${lastGood.length} URLs)`
     );
-    return { entries: lastGood, ok: false };
+    return { entries: lastGood, ok: false, source: "memory-stale", reason };
   }
-  return { entries: [], ok: false };
+
+  // Camada 3: snapshot persistente. Cobre o cold start — processo novo, backend
+  // já fora. Sem isto, este caminho terminava em 200 com urlset vazio.
+  const snapshot = await readSitemapSnapshot(path);
+  if (snapshot.kind === "hit") {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[${LOG_TAG}] ${path} → servindo snapshot do REDIS (${snapshot.entries.length} URLs, ` +
+        `${Math.round(snapshot.ageMs / 60000)} min)`
+    );
+    // Reidrata a memória: as próximas requisições deste processo não pagam Redis.
+    rememberLastGood(path, snapshot.entries);
+    return { entries: snapshot.entries, ok: false, source: "redis-stale", reason };
+  }
+
+  // Camada 4: não sabemos. Dizer isso em voz alta (503) é melhor que fingir.
+  // eslint-disable-next-line no-console
+  console.error(
+    `[${LOG_TAG}] ${path} → SEM estado confiável (memória vazia, snapshot ${snapshot.kind}) — 503`
+  );
+  return { entries: [], ok: false, source: "unavailable", reason };
 }
 
 function normalizeEntry(entry: PublicSitemapEntry): PublicSitemapEntry {
@@ -231,7 +274,10 @@ async function fetchSitemapEntries(path: string): Promise<SitemapFetchResult> {
 
     const entries = dedupeEntries(json.data.map(normalizeEntry));
     rememberLastGood(path, entries);
-    return { entries, ok: true };
+    // Persiste fora do processo. Não bloqueia a resposta e nunca lança: Redis
+    // fora custa a camada 3, não o sitemap.
+    await writeSitemapSnapshot(path, entries);
+    return { entries, ok: true, source: "fresh" };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return degraded(path, `exceção: ${message}`);
@@ -272,9 +318,23 @@ export async function fetchPublicSitemapByTypes(
   limit = 50000
 ): Promise<SitemapFetchResult> {
   const results = await Promise.all(types.map((t) => fetchPublicSitemapByType(t, limit)));
+
+  // A pior origem manda. Se QUALQUER tipo ficou sem estado confiável, o
+  // conjunto inteiro é `unavailable`: publicar metade das URLs seria uma
+  // remoção silenciosa da outra metade, que é o dano que queremos evitar.
+  const source: SitemapSource = results.some((r) => r.source === "unavailable")
+    ? "unavailable"
+    : results.some((r) => r.source === "redis-stale")
+      ? "redis-stale"
+      : results.some((r) => r.source === "memory-stale")
+        ? "memory-stale"
+        : "fresh";
+
   return {
-    entries: dedupeEntries(results.flatMap((r) => r.entries)),
+    entries: source === "unavailable" ? [] : dedupeEntries(results.flatMap((r) => r.entries)),
     ok: results.every((r) => r.ok),
+    source,
+    reason: results.find((r) => r.reason)?.reason,
   };
 }
 
@@ -286,12 +346,36 @@ export async function fetchPublicVehicleSitemap(limit = 50000): Promise<SitemapF
   return fetchSitemapEntries(`/api/public/seo/sitemap/vehicles?limit=${limit}`);
 }
 
+/**
+ * UFs que têm conteúdo territorial público — as únicas que merecem um sitemap
+ * regional anunciado no index.
+ *
+ * ── Por que mudou de fonte (2026-08-07) ──────────────────────────────────────
+ * Lia `/api/public/seo/sitemap.json`, cujo payload NÃO traz o campo `state`.
+ * Resultado medido: sempre `[]` — e o index nunca listou um sitemap regional
+ * sequer. O arquivo que a Fase 1 consertou existia e ninguém apontava para ele.
+ *
+ * A fonte certa é `type/city_home`: as entradas de cidade vêm dos builders de
+ * estoque ativo, que já emitem `state` explicitamente (`c.state AS state` na
+ * query). Não há parsing de slug envolvido — o backend sabe a UF e a declara.
+ *
+ * Só entra UF que tem cidade publicável. UF sem estoque não gera sitemap
+ * regional e, portanto, não entra no index.
+ */
 export async function detectAvailableStates(limit = 100000): Promise<string[]> {
-  const { entries } = await fetchPublicSitemap(limit);
-  const states = new Set<string>();
+  const result = await fetchPublicSitemapByType("city_home", limit);
 
-  for (const entry of entries) {
-    if (entry.state) states.add(String(entry.state).trim().toUpperCase());
+  // Degradado não vira "nenhuma UF". Anunciar zero regionais porque o backend
+  // piscou seria remover do index sitemaps que existem — o mesmo erro do
+  // urlset vazio, num nível acima.
+  if (result.source === "unavailable") return [];
+
+  const states = new Set<string>();
+  for (const entry of result.entries) {
+    const uf = String(entry.state || "")
+      .trim()
+      .toUpperCase();
+    if (/^[A-Z]{2}$/.test(uf)) states.add(uf);
   }
 
   return [...states].sort((a, b) => a.localeCompare(b));
