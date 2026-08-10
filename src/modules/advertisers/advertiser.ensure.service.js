@@ -126,63 +126,108 @@ function buildAddressFieldsForAdvertiser(address, advertiserCols) {
 }
 
 /**
- * Resolve `city_id` para novo registro em `advertisers`:
- * 1) `explicitCityId` válido em `cities`
- * 2) texto em `users.city` (se existir coluna) → busca aproximada em `cities`
- * 3) primeira cidade cadastrada (fallback)
+ * Resolve `city_id` para novo registro em `advertisers`.
  *
- * @param {string} userId
+ * REGRA ÚNICA: a cidade tem que vir explícita e existir em `cities`.
+ * Não há segunda tentativa, não há aproximação, não há default.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE ISTO SUBSTITUIU, E POR QUÊ (Fase 0.1, 2026-08-10)
+ * ────────────────────────────────────────────────────────────────────────────
+ * A versão anterior tinha três degraus, e os dois últimos decidiam a cidade de
+ * um anunciante SEM ninguém ter dito qual era:
+ *
+ *   2) `users.city` (TEXT livre, opcional) → primeiro token → `name ILIKE
+ *      '%token%' ORDER BY id ASC LIMIT 1`. Busca parcial, SEM UF. "São Paulo -
+ *      SP" vira o token "São" e casa a primeira cidade cujo nome contenha
+ *      "São" por ordem de id — que quase nunca é São Paulo. O Brasil tem
+ *      dezenas de municípios homônimos entre estados; sem UF a consulta é um
+ *      sorteio.
+ *
+ *   3) `SELECT id FROM cities ORDER BY id ASC LIMIT 1` — a primeira cidade da
+ *      tabela. Em produção isso é uma cidade concreta e específica: todo
+ *      anunciante que caísse aqui nascia lá dentro, silenciosamente.
+ *
+ * Nenhum dos dois emitia log, erro ou qualquer sinal. O anunciante ficava com
+ * a cidade errada e ninguém sabia — e cidade errada num marketplace territorial
+ * contamina vitrine, busca por proximidade e, no futuro, o fan-out regional das
+ * oportunidades (um lojista recebendo demanda da região errada).
+ *
+ * A auditoria da Fase 0 comprovou que o caminho legítimo de publicação SEMPRE
+ * passa `city_id` (validado por Zod, vindo do próprio anúncio) via
+ * `ensureAdvertiserForPublishing`. O único caminho de produção que chegava aos
+ * degraus 2 e 3 era `POST /api/account/plans/eligibility`, que criava
+ * anunciante como efeito colateral sem precisar dele — efeito removido no mesmo
+ * commit.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * FALHAR ALTO, NÃO BAIXINHO
+ * ────────────────────────────────────────────────────────────────────────────
+ * Recusar é a resposta certa: um anunciante sem cidade conhecida é um dado que
+ * não deveria existir, e inventá-la troca um erro visível por uma corrupção
+ * invisível. O WARN abaixo existe porque falha silenciosa já custou caro neste
+ * projeto: se algum fluxo legítimo chegar aqui sem cidade, queremos descobrir
+ * pelo log no mesmo dia, não por um anúncio na cidade errada semanas depois.
+ *
+ * @param {string} userId — só para observabilidade da recusa; NÃO é fonte de cidade
  * @param {number|null|undefined} explicitCityId
+ * @returns {Promise<number>} id existente em `cities`
+ * @throws {AppError} 400 quando ausente, malformado ou inexistente
  */
 export async function resolveCityIdForNewAdvertiser(userId, explicitCityId) {
-  if (explicitCityId != null && !Number.isNaN(Number(explicitCityId))) {
-    const cid = Number(explicitCityId);
-    const { rows } = await pool.query(`SELECT id FROM cities WHERE id = $1 LIMIT 1`, [cid]);
-    if (rows[0]?.id != null) {
-      return Number(rows[0].id);
-    }
-  }
-
-  const usersCols = await getUsersColumnSet();
-  if (hasColumn(usersCols, "city")) {
-    const u = await pool.query(`SELECT city FROM users WHERE id = $1 LIMIT 1`, [userId]);
-    const cityText = String(u.rows[0]?.city || "").trim();
-    if (cityText.length >= 2) {
-      const token = cityText.split(/[-–—,\s]+/)[0]?.trim();
-      if (token && token.length >= 2) {
-        const { rows: match } = await pool.query(
-          `
-          SELECT id FROM cities
-          WHERE name ILIKE $1
-          ORDER BY id ASC
-          LIMIT 1
-          `,
-          [`%${token}%`]
-        );
-        if (match[0]?.id != null) {
-          return Number(match[0].id);
-        }
-      }
-    }
-  }
-
-  const { rows: fb } = await pool.query(`SELECT id FROM cities ORDER BY id ASC LIMIT 1`);
-  if (!fb[0]?.id) {
-    throw new AppError(
-      "Nenhuma cidade cadastrada no sistema. Importe cidades (ex.: seed IBGE) antes de usar anunciantes.",
-      503
+  const reject = (reason) => {
+    logger.warn(
+      {
+        ...buildDomainFields({
+          action: "advertiser.city.resolve",
+          result: "error",
+          userId,
+          reason,
+        }),
+        // Valor cru só no log (nunca na resposta) para diagnosticar quem chamou.
+        receivedCityId: explicitCityId ?? null,
+      },
+      "[advertiser] cidade explícita ausente ou inválida — criação recusada"
     );
+
+    return new AppError("Cidade válida é obrigatória.", 400, true, {
+      code: "ADVERTISER_CITY_REQUIRED",
+    });
+  };
+
+  if (explicitCityId == null || String(explicitCityId).trim() === "") {
+    throw reject("missing");
   }
-  return Number(fb[0].id);
+
+  const cityId = Number(explicitCityId);
+  // Number("12.5") e Number("1e3") passariam num teste frouxo de NaN; um id de
+  // cidade é inteiro positivo e nada mais.
+  if (!Number.isInteger(cityId) || cityId <= 0) {
+    throw reject("malformed");
+  }
+
+  const { rows } = await pool.query(`SELECT id FROM cities WHERE id = $1 LIMIT 1`, [cityId]);
+  if (rows[0]?.id == null) {
+    throw reject("not_found");
+  }
+
+  return Number(rows[0].id);
 }
 
 /**
  * Fonte única: garante uma linha em `advertisers` por usuário (idempotente).
- * Se já existir, devolve; se não, cria com `city_id` resolvido (explícito ou fallback).
+ * Se já existir, devolve; se não, cria com o `city_id` EXPLÍCITO informado.
+ *
+ * `options.cityId` é obrigatório **apenas no caminho de criação**. Quem só quer
+ * "me devolva o anunciante deste usuário" continua podendo chamar sem cidade:
+ * a resolução acontece depois da checagem de existência, dentro da transação
+ * (ver comentário no corpo). Sem isso, `ensure` deixaria de ser idempotente —
+ * a segunda chamada exigiria um dado que a primeira já consumiu.
  *
  * @param {string} userId
  * @param {{ cityId?: number|null, requestId?: string|null, source?: string }} [options]
  * @returns {Promise<{ id: string|number, user_id?: string }>}
+ * @throws {AppError} 400 quando precisa criar e não recebeu cidade válida
  */
 export async function ensureAdvertiserForUser(userId, options = {}) {
   const requestId = options.requestId ?? null;
@@ -191,11 +236,6 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
   if (!userId || String(userId).trim() === "") {
     throw new AppError("userId obrigatório para anunciante.", 400);
   }
-
-  const cityId = await resolveCityIdForNewAdvertiser(
-    userId,
-    options.cityId != null ? Number(options.cityId) : null
-  );
 
   const account = await getAccountUser(userId);
 
@@ -215,6 +255,16 @@ export async function ensureAdvertiserForUser(userId, options = {}) {
     if (existing.rows[0]?.id) {
       return existing.rows[0];
     }
+
+    // Cidade é exigida SÓ a partir daqui — depois de sabermos que vamos mesmo
+    // criar a linha. Resolver antes tornaria a função não-idempotente: quem
+    // chamasse `ensure` uma segunda vez, apenas para obter o anunciante já
+    // existente, seria recusado por não repetir um dado que não vai usar.
+    //
+    // A leitura sai pelo `pool` (não pelo `client`) de propósito: é um SELECT
+    // por PK numa tabela que a transação não toca, e mantê-lo fora evita
+    // acoplar o lookup ao ciclo de vida da transação.
+    const cityId = await resolveCityIdForNewAdvertiser(userId, options.cityId ?? null);
 
     const contactCols = [...USER_CONTACT_COLUMN_PRIORITY, ...USER_ADDRESS_COLUMN_PRIORITY].filter(
       (c, index, arr) => usersCols.has(c) && arr.indexOf(c) === index

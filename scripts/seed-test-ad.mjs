@@ -30,19 +30,11 @@ try {
   }
 
   const userId = String(users.rows[0].id);
-  const { ensureAdvertiserForUser } = await import(
-    "../src/modules/advertisers/advertiser.ensure.service.js"
-  );
-  await ensureAdvertiserForUser(userId, { source: "seed-test-ad" });
 
-  const adv = await pool.query("SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1", [userId]);
-  if (!adv.rows[0]) {
-    console.error(
-      "Falha ao garantir anunciante (ensureAdvertiserForUser). Verifique cities e logs."
-    );
-    process.exit(1);
-  }
-
+  // A cidade é escolhida ANTES do ensure (era depois) por duas razões: desde a
+  // Fase 0.1 o `ensure` exige `cityId` explícito para criar, e o anunciante do
+  // fixture passa a nascer na mesma cidade do anúncio que este script cria —
+  // antes podiam divergir.
   const city = await pool.query(
     `SELECT id, name, state FROM cities WHERE state = 'SP' ORDER BY id ASC LIMIT 1`
   );
@@ -52,6 +44,20 @@ try {
   }
 
   const c = city.rows[0];
+
+  const { ensureAdvertiserForUser } = await import(
+    "../src/modules/advertisers/advertiser.ensure.service.js"
+  );
+  await ensureAdvertiserForUser(userId, { cityId: Number(c.id), source: "seed-test-ad" });
+
+  const adv = await pool.query("SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1", [userId]);
+  if (!adv.rows[0]) {
+    console.error(
+      "Falha ao garantir anunciante (ensureAdvertiserForUser). Verifique cities e logs."
+    );
+    process.exit(1);
+  }
+
   const slug = `teste-seed-${Date.now()}`;
 
   const { rows } = await pool.query(
