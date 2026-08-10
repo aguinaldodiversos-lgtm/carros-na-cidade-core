@@ -42,9 +42,7 @@ test.describe("Login → painel PF e PJ", () => {
       await page.waitForTimeout(1000);
 
       await expect(page.locator("body")).not.toContainText(dashboardErrorRe, { timeout: 30_000 });
-      await expect(
-        page.getByText(/Olá,/i).or(page.getByRole("heading", { name: /Painel|Resumo|Meus/i }))
-      ).toBeVisible({
+      await expect(page.getByRole("heading", { level: 1, name: /Olá,/i })).toBeVisible({
         timeout: 30_000,
       });
     }
@@ -92,8 +90,8 @@ test.describe("Login → painel PF e PJ", () => {
     await page.waitForTimeout(1000);
 
     await expect(page.locator("body")).not.toContainText(dashboardErrorRe, { timeout: 30_000 });
-    await expect(
-      page.getByText(/Olá,/i).or(page.getByRole("heading", { name: /Painel|Resumo|Lojista|CNPJ/i }))
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { level: 1, name: /Olá,/i })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });

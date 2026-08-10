@@ -45,6 +45,41 @@ const nextConfig = {
           },
         ],
       },
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Áreas PRIVADAS (Fase 0.1): nunca cacheável, nunca indexável.
+      //
+      // Até aqui a única proteção dos painéis era `Disallow:` no robots.txt.
+      // Isso impede RASTREAR, não impede INDEXAR: uma URL só descoberta por
+      // link externo pode entrar no índice sem conteúdo, e o robots.txt não
+      // diz nada a proxies e caches intermediários sobre uma resposta que
+      // contém dados de UMA pessoa.
+      //
+      // As páginas já são `dynamic = "force-dynamic"`, o que impede o Next de
+      // gerá-las estaticamente — mas isso é sobre o build, não sobre quem
+      // guarda a resposta depois dela sair daqui.
+      //
+      // Duas entradas por prefixo de propósito: em path-to-regexp,
+      // `/dashboard/:path*` cobre `/dashboard/x`, e a entrada sem parâmetro
+      // garante a raiz `/dashboard` sem depender do comportamento de
+      // zero-ocorrências do `*`.
+      //
+      // Escopo restrito aos dois painéis: NENHUMA rota pública (`/`,
+      // `/comprar`, `/carros-em/*`, `/veiculo/*`, `/lojas/*`, `/blog/*`) casa
+      // com estes prefixos — se casasse, teríamos desindexado o site.
+      // Coberto por `next.config.headers.test.ts`.
+      //
+      // As novas áreas dos Produtos A e B nascem sob estes mesmos prefixos e
+      // herdam a política sem tocar nesta configuração de novo.
+      ...["/dashboard", "/dashboard/:path*", "/dashboard-loja", "/dashboard-loja/:path*"].map(
+        (source) => ({
+          source,
+          headers: [
+            { key: "Cache-Control", value: "private, no-store" },
+            { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          ],
+        })
+      ),
     ];
   },
   images: {

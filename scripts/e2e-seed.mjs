@@ -79,10 +79,22 @@ if (!userId) {
   throw new Error("[e2e-seed] Falha ao resolver id do utilizador E2E.");
 }
 
+// A cidade do fixture é resolvida pelo slug que este próprio script semeia
+// acima. Desde a Fase 0.1 o `ensure` exige `cityId` explícito para CRIAR — não
+// existe mais fallback para "a primeira cidade da tabela", e é bom que não
+// exista: um seed que dependia dessa adivinhação escondia o problema.
+const { rows: seedCityRows } = await pool.query("SELECT id FROM cities WHERE slug = $1 LIMIT 1", [
+  "atibaia-sp",
+]);
+const seedCityId = seedCityRows[0]?.id;
+if (seedCityId == null) {
+  throw new Error("[e2e-seed] Cidade do fixture (atibaia-sp) não encontrada em cities.");
+}
+
 const { ensureAdvertiserForUser } = await import(
   "../src/modules/advertisers/advertiser.ensure.service.js"
 );
-await ensureAdvertiserForUser(userId, { source: "e2e-seed" });
+await ensureAdvertiserForUser(userId, { cityId: Number(seedCityId), source: "e2e-seed" });
 
 await pool.query(
   `DELETE FROM ads WHERE advertiser_id IN (

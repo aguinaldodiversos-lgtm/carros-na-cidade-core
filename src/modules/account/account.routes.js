@@ -11,7 +11,6 @@ import {
   resolvePublishEligibility,
   updateOwnedAdStatus,
 } from "./account.service.js";
-import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
 import { getStoreProfile, updateStoreProfile } from "./store-profile.service.js";
 
 const router = express.Router();
@@ -46,12 +45,24 @@ router.get(
   })
 );
 
+// Consulta PURA de elegibilidade: documento + plano + limite. Não escreve nada.
+//
+// Até a Fase 0.1 esta rota chamava `ensureAdvertiserForUser` antes de responder,
+// sem `cityId`. Era o ÚNICO caminho de produção que alcançava o fallback
+// territorial do resolver — e criava o anunciante numa cidade adivinhada (ou na
+// primeira da tabela) só para responder "você pode publicar?".
+//
+// A criação nunca foi necessária para a resposta: `resolvePublishEligibility`
+// lê `users` (documento/plano) e conta anúncios por `adv.user_id`; sem linha em
+// `advertisers` o JOIN devolve 0, que é a resposta correta para quem ainda não
+// publicou. `docs/api/publish-eligibility.md` já dizia, desde antes, que
+// advertiser "não faz parte da elegibilidade de documento/plano".
+//
+// O anunciante continua sendo criado no momento certo — a publicação, via
+// `ensureAdvertiserForPublishing`, com a `city_id` real do anúncio.
 router.post(
   "/plans/eligibility",
   asyncHandler(async (req, res) => {
-    await ensureAdvertiserForUser(String(req.user.id), {
-      source: "plans_eligibility",
-    });
     const validation = await resolvePublishEligibility(req.user.id);
     const suggestedPlans = validation.suggested_plan_type
       ? await listPlans({

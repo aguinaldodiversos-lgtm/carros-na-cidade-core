@@ -6,7 +6,7 @@
 
 Mesma lógica para:
 
-- `POST /account/plans/eligibility` (com `ensureAdvertiserForUser` antes da resposta)
+- `POST /account/plans/eligibility` (consulta **pura**, sem efeito colateral)
 - `ensurePublishEligibility` → criação de anúncio (`ads.publish.eligibility.service.js`)
 - Campo `publish_eligibility` no payload de `GET /account/dashboard`
 
@@ -14,16 +14,48 @@ Mesma lógica para:
 
 ## Garantir anunciante (`ensureAdvertiserForUser`)
 
-Para evitar “anunciante não encontrado”, o backend garante uma linha em `advertisers` nestes pontos:
+Existe **um único** ponto que cria linha em `advertisers`:
 
-| Momento                | Onde                                                                                                |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| Registro               | `auth.service.js` após criar `users`                                                                |
-| Painel                 | início de `getDashboardPayload`                                                                     |
-| Elegibilidade de plano | `POST /account/plans/eligibility` (rota)                                                            |
-| Publicar anúncio       | `ensureAdvertiserForPublishing` com `city_id` do anúncio (após `resolvePublishEligibility` aprovar) |
+| Momento          | Onde                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| Publicar anúncio | `ensureAdvertiserForPublishing` com `city_id` do anúncio (após `resolvePublishEligibility` aprovar) |
 
 Leitura de conta sem dependência circular: `getAccountUser` em `account.user.read.js`.
+
+### Por que só um ponto (Fase 0.1, 2026-08-10)
+
+Esta tabela já teve quatro linhas. As de “Registro” (`auth.service.js`) e “Painel”
+(`getDashboardPayload`) foram removidas em refactors anteriores sem qualquer
+quebra — a documentação é que ficou para trás.
+
+A quarta, “Elegibilidade de plano”, saiu na Fase 0.1. Ela chamava
+`ensureAdvertiserForUser` **sem `city_id`**, e era o único caminho de produção que
+alcançava o fallback territorial do resolver: perguntar “posso publicar?” criava
+um anunciante numa cidade adivinhada a partir de `users.city` (busca parcial, sem
+UF) ou, na falta disso, na primeira cidade da tabela.
+
+A criação nunca foi necessária para a resposta — como esta própria página já
+dizia na seção “Advertiser”, o anunciante não faz parte da regra de
+documento/plano. Sem linha em `advertisers`, os `COUNT` por `adv.user_id`
+devolvem 0, que é a resposta correta para quem ainda não publicou.
+
+Efeito prático em quem só consulta elegibilidade: nada muda na resposta. O
+cadastro da loja passa a nascer somente na publicação — que é o que a tela
+“Dados da loja” já dizia ao usuário (“Publique um anúncio para criar o cadastro
+da loja”).
+
+Testes: `tests/account/plans-eligibility-no-side-effect.test.js` e
+`tests/ads/publish-supplies-explicit-city.test.js`.
+
+### Cidade é obrigatória e explícita
+
+`resolveCityIdForNewAdvertiser(userId, cityId)` é **fail closed**: aceita apenas
+um `cityId` inteiro positivo que exista em `cities`. Sem isso, lança
+`400 ADVERTISER_CITY_REQUIRED` e registra WARN — não há mais busca aproximada por
+texto nem “primeira cidade cadastrada”.
+
+A exigência vale só no caminho de **criação**: `ensureAdvertiserForUser` continua
+idempotente e devolve o anunciante já existente sem pedir cidade de novo.
 
 ## Regras (ordem)
 
