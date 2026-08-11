@@ -1,41 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  fetchNotifications,
-  fetchUnreadCount,
-  formatBadgeCount,
-  formatRelativeTime,
-  isSafeInternalPath,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
-  type UserNotification,
-} from "@/lib/notifications/api";
+import { useCallback, useRef } from "react";
+import { useAccountNotifications } from "@/components/account/AccountNotificationsProvider";
+import { formatBadgeCount, formatRelativeTime } from "@/lib/notifications/api";
 
 /**
- * Sino de notificações do painel — PF e lojista, o mesmo componente.
- *
- * Substitui o `NotificationBell` estático que existia no `AccountPanelShell`
- * (ícone decorativo, deliberadamente sem badge para não mostrar número falso).
- * Agora o número é real.
+ * Sino de notificações — PF e lojista, mesma implementação.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * REGRA QUE GOVERNA TODO ESTE ARQUIVO
+ * ESTE COMPONENTE NÃO TEM ESTADO PRÓPRIO (Fase 1.1)
  * ────────────────────────────────────────────────────────────────────────────
- * O sino NUNCA pode derrubar o painel. Ele é um adorno do topo; `/dashboard` e
- * `/dashboard-loja` precisam renderizar mesmo com a API de notificações fora.
- * Por isso toda chamada é `catch`-ada e o pior caso é o sino ficar sem badge ou
- * mostrar uma linha de erro dentro do próprio dropdown — nunca propagar.
+ * Contador, lista e ações vivem em `AccountNotificationsProvider`, montado uma
+ * vez por painel. O shell renderiza DOIS sinos — um na barra mobile, um na
+ * topbar desktop — e o CSS mostra só um. Se cada um tivesse estado próprio,
+ * seriam dois `fetchUnreadCount()` por carga e dois listeners de `focus`, já
+ * que as duas regiões ficam sempre montadas no DOM.
  *
- * Sem polling contínuo: contador ao montar e quando a aba volta ao foco; lista
- * só ao abrir. Um `setInterval` aqui multiplicaria requests por todas as abas
- * abertas do painel, o dia inteiro, para um dado que muda raramente.
+ * ────────────────────────────────────────────────────────────────────────────
+ * POSICIONAMENTO DO PAINEL
+ * ────────────────────────────────────────────────────────────────────────────
+ * No desktop o sino é o penúltimo item de uma topbar alinhada à direita, então
+ * `absolute right-0` cai dentro da tela naturalmente.
+ *
+ * No mobile não: o sino fica no MEIO da barra (à esquerda do menu de usuário e
+ * do CTA "Novo anúncio"). Ancorar o painel na borda direita do BOTÃO jogaria
+ * 340px para a esquerda a partir de ~200px — ou seja, para fora da tela. E
+ * como o `globals.css` tem `body { overflow-x: hidden }`, o vazamento seria
+ * CORTADO em silêncio, sem barra de rolagem para denunciar.
+ *
+ * (Não é hipótese: o `AccountUserMenu`, que já vive nessa barra com
+ * `absolute right-0 w-60`, hoje renderiza a `left: -43px` a 360px. Bug
+ * pré-existente, fora do escopo desta fase, mas foi o que confirmou o
+ * diagnóstico.)
+ *
+ * A correção é puramente CSS e sem número mágico: no mobile o wrapper é
+ * `static`, então o painel se ancora na LINHA da barra (que o shell marca como
+ * `relative`) e usa `inset-x-4` — a mesma margem do padding da barra. Em `lg`
+ * o wrapper volta a ser `relative` e tudo se comporta exatamente como antes.
+ * Nada de `position: fixed` nem de `top` calculado à mão.
  */
 
 type Props = {
-  /** Só para rotular o teste/aria em cada painel; o comportamento é idêntico. */
+  /** Rotula a instância (pf | lojista) e a região (mobile | desktop) nos testes. */
   variant?: "pf" | "lojista";
+  placement?: "mobile" | "desktop";
 };
 
 function BellIcon() {
@@ -54,133 +62,23 @@ function BellIcon() {
   );
 }
 
-export default function AccountNotificationsBell({ variant = "pf" }: Props) {
-  const router = useRouter();
+export default function AccountNotificationsBell({ variant = "pf", placement = "desktop" }: Props) {
+  const { unreadCount, items, loading, error, open, toggle, handleItemClick, markAll } =
+    useAccountNotifications();
 
-  const [open, setOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [items, setItems] = useState<UserNotification[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const refreshCount = useCallback(async () => {
-    try {
-      setUnreadCount(await fetchUnreadCount());
-    } catch {
-      // Silencioso de propósito: sem contador o sino continua utilizável, e um
-      // alarme no topo do painel por causa disto seria ruído.
-      setUnreadCount(0);
-    }
-  }, []);
-
-  // Contador ao montar + quando a aba recupera o foco. Barato e suficiente.
-  useEffect(() => {
-    let active = true;
-
-    const run = () => {
-      if (active) void refreshCount();
-    };
-
-    run();
-    window.addEventListener("focus", run);
-    return () => {
-      active = false;
-      window.removeEventListener("focus", run);
-    };
-  }, [refreshCount]);
-
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const page = await fetchNotifications();
-      setItems(page.notifications);
-    } catch {
-      setError(true);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const toggle = useCallback(() => {
-    setOpen((wasOpen) => {
-      const next = !wasOpen;
-      // Lista só quando abre — fechar não precisa buscar nada.
-      if (next) void loadList();
-      return next;
-    });
-  }, [loadList]);
-
-  // Fecha ao clicar fora e ao pressionar Escape.
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const handleItemClick = useCallback(
-    async (notification: UserNotification) => {
-      // Otimista na UI: o usuário vê a mudança na hora. Se o PATCH falhar,
-      // recarregamos o contador para voltar ao estado verdadeiro.
-      const wasUnread = notification.read_at == null;
-      if (wasUnread) {
-        setItems((current) =>
-          current.map((item) =>
-            item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
-          )
-        );
-        setUnreadCount((current) => Math.max(0, current - 1));
-      }
-
-      let marked = true;
-      try {
-        await markNotificationAsRead(notification.id);
-      } catch {
-        marked = false;
-        void refreshCount();
-      }
-
-      // Só navega se a marcação deu certo E o caminho é interno. Um destino
-      // não reconhecido simplesmente não navega — nunca mandamos o usuário
-      // logado para fora do portal a partir de um clique que ele confia.
-      if (marked && isSafeInternalPath(notification.action_path)) {
-        setOpen(false);
-        router.push(notification.action_path);
-      }
-    },
-    [refreshCount, router]
-  );
-
+  /**
+   * "Marcar todas" desmonta a si mesmo: ao zerar o contador, `hasUnread` vira
+   * false e o botão some — enquanto ele detém o foco. Sem isto o foco cai no
+   * `<body>`, e num leitor de tela o cursor virtual sai do dropdown e volta ao
+   * começo do documento. Devolvemos o foco ao painel para que a pessoa continue
+   * exatamente onde estava.
+   */
   const handleMarkAll = useCallback(async () => {
-    try {
-      await markAllNotificationsAsRead();
-      setUnreadCount(0);
-      setItems((current) =>
-        current.map((item) =>
-          item.read_at ? item : { ...item, read_at: new Date().toISOString() }
-        )
-      );
-    } catch {
-      void refreshCount();
-    }
-  }, [refreshCount]);
+    await markAll();
+    panelRef.current?.focus();
+  }, [markAll]);
 
   const hasUnread = unreadCount > 0;
   // O leitor de tela lê isto por extenso; "1 não lidas" soa errado e é o caso
@@ -190,7 +88,16 @@ export default function AccountNotificationsBell({ variant = "pf" }: Props) {
     : "Notificações";
 
   return (
-    <div className="relative" ref={containerRef} data-testid={`notifications-bell-${variant}`}>
+    <div
+      className="static lg:relative"
+      // Marca de PERTENCIMENTO ao domínio de notificações. O provider usa isto
+      // para decidir o que é "clique fora": com dois sinos montados, um clique
+      // no painel do sino visível é "fora" do sino oculto — sem esta marca, o
+      // oculto fechava o painel antes do clique registrar.
+      data-notifications-root
+      data-testid={`notifications-bell-${variant}`}
+      data-placement={placement}
+    >
       <button
         type="button"
         onClick={toggle}
@@ -198,12 +105,18 @@ export default function AccountNotificationsBell({ variant = "pf" }: Props) {
         aria-haspopup="dialog"
         aria-expanded={open}
         data-testid="account-notifications-bell"
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9] hover:text-[#0e62d8]"
+        // 36px no mobile (mesma altura do avatar do menu de usuário, que é o
+        // vizinho imediato na barra) e 40px no desktop — o tamanho que a
+        // topbar já usava. A barra mobile a 360px tem folga medida de 45px;
+        // 36 + gap 8 = 44 entra sem espremer o CTA.
+        className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9] hover:text-[#0e62d8] lg:h-10 lg:w-10"
       >
         <BellIcon />
         {hasUnread ? (
           <span
             data-testid="account-notifications-badge"
+            // `absolute` de propósito: o badge não entra no cálculo de largura
+            // da barra, então "99+" não empurra o CTA.
             className="absolute -right-0.5 -top-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[#dc2626] px-1 text-[10px] font-bold leading-[18px] text-white"
           >
             {formatBadgeCount(unreadCount)}
@@ -215,8 +128,21 @@ export default function AccountNotificationsBell({ variant = "pf" }: Props) {
         <div
           role="dialog"
           aria-label="Notificações"
+          ref={panelRef}
+          // Focável por código (não pela tecla Tab) para receber o foco quando
+          // o botão "Marcar todas" desaparece — ver `handleMarkAll`.
+          tabIndex={-1}
           data-testid="account-notifications-panel"
-          className="absolute right-0 z-50 mt-2 w-[340px] overflow-hidden rounded-2xl border border-[#e8ecf4] bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)]"
+          // Três faixas, e cada uma existe por um motivo medido:
+          //
+          //   < sm   `inset-x-4`: ocupa a largura útil da barra. A 360px um
+          //          painel de largura fixa não caberia sem vazar.
+          //   sm–lg  largura contida, colada à direita da barra. Sem isto, a
+          //          360px resolvido vira 721px num tablet de 768 — não vaza,
+          //          mas é um dropdown absurdo para duas linhas de texto.
+          //   lg+    exatamente o que a Fase 1 já fazia (o wrapper volta a ser
+          //          `relative`, então `right-0` é a borda do próprio botão).
+          className="absolute inset-x-4 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-[#e8ecf4] bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] sm:left-auto sm:right-4 sm:w-[360px] lg:inset-x-auto lg:right-0 lg:top-auto lg:w-[340px]"
         >
           <div className="flex items-center justify-between border-b border-[#eef1f6] px-4 py-3">
             <p className="text-sm font-bold text-[#1d2538]">Notificações</p>
@@ -225,14 +151,23 @@ export default function AccountNotificationsBell({ variant = "pf" }: Props) {
                 type="button"
                 onClick={handleMarkAll}
                 data-testid="account-notifications-mark-all"
-                className="text-xs font-bold text-[#0e62d8] hover:underline"
+                // `-mr-2 px-2 py-1.5` amplia a área de toque sem deslocar o
+                // texto: com `text-xs` puro o alvo ficava alto demais para o dedo.
+                className="-mr-2 rounded-lg px-2 py-1.5 text-xs font-bold text-[#0e62d8] transition hover:bg-[#f0f6ff] hover:underline"
               >
                 Marcar todas como lidas
               </button>
             ) : null}
           </div>
 
-          <div className="max-h-[360px] overflow-y-auto">
+          {/* Altura relativa à tela no mobile — um teto fixo de 360px estoura
+              em landscape, quando 360x640 vira 640x360.
+              `max-lg:landscape:` é o ajuste fino: o painel começa ~133px abaixo
+              do topo (cabeçalho do site + barra), então 55vh de 360 ainda
+              passaria da dobra. Medido: com 40vh o painel inteiro cabe.
+              Escopado a `max-lg` porque desktop também é "landscape" — lá vale
+              o teto fixo de sempre. */}
+          <div className="max-h-[55vh] overflow-y-auto max-lg:landscape:max-h-[40vh] lg:max-h-[360px]">
             {loading ? (
               <p className="px-4 py-6 text-center text-sm text-[#94a3b8]">Carregando…</p>
             ) : error ? (
@@ -260,10 +195,18 @@ export default function AccountNotificationsBell({ variant = "pf" }: Props) {
                       >
                         <span className="flex w-full items-center gap-2">
                           {unread ? (
-                            <span
-                              aria-hidden
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#0e62d8]"
-                            />
+                            <>
+                              <span
+                                aria-hidden
+                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#0e62d8]"
+                              />
+                              {/* O ponto azul é decorativo (`aria-hidden`), e o
+                                  resto da diferença entre lida e não lida é só
+                                  peso e cor. Sem este texto, os dois estados têm
+                                  o MESMO nome acessível — quem usa leitor de
+                                  tela não consegue distinguir. */}
+                              <span className="sr-only">Não lida.</span>
+                            </>
                           ) : null}
                           {/* Texto puro: React escapa por padrão. Nunca
                               dangerouslySetInnerHTML — title/body vêm do banco. */}
@@ -275,7 +218,9 @@ export default function AccountNotificationsBell({ variant = "pf" }: Props) {
                             {notification.title}
                           </span>
                         </span>
-                        <span className="line-clamp-2 text-xs text-[#64748b]">
+                        {/* `break-words` impede que uma palavra longa sem espaço
+                            (URL, id) estoure a largura em telas estreitas. */}
+                        <span className="line-clamp-2 break-words text-xs text-[#64748b]">
                           {notification.body}
                         </span>
                         <span className="text-[11px] text-[#94a3b8]">
