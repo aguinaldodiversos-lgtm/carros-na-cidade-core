@@ -16,7 +16,7 @@ export type AccountPanelVariant = "pf" | "lojista";
 type NavItem = {
   label: string;
   href: string;
-  icon: "home" | "ads" | "user" | "key" | "msg" | "billing" | "users";
+  icon: "home" | "ads" | "user" | "key" | "msg" | "billing" | "users" | "search";
 };
 
 function NavIcon({ name }: { name: NavItem["icon"] }) {
@@ -113,16 +113,43 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
           <path d="M16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3ZM8 13a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm8 6a5 5 0 0 0-10 0M3 19a6 6 0 0 1 11.3-2.2" />
         </svg>
       );
+    case "search":
+      return (
+        <svg
+          className={cls}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden
+        >
+          <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5-2 4 4" />
+        </svg>
+      );
     default:
       return null;
   }
 }
 
+/**
+ * Menu de cada painel.
+ *
+ * Lista PLANA, sem cabeçalho de seção. A Fase 2 pediu algo como um grupo
+ * "COMPRAR", mas `NavItem` não tem campo de seção e os dois laços de render
+ * (acordeão mobile e `<nav>` desktop) desenham `<Link>` direto — dar suporte a
+ * seções significaria mexer no tipo E nos dois laços, ou seja, redesenhar o
+ * shell para acomodar um item. Entrar como item plano é o que a especificação
+ * chama de "estrutura equivalente mais coerente com o shell atual".
+ *
+ * Também não existe entrada morta: "Vender para lojas" só aparece quando o
+ * produto existir. Botão que não leva a lugar nenhum é pior que ausência.
+ */
 function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   if (variant === "pf") {
     return [
       { label: "Painel", href: basePath, icon: "home" },
       { label: "Meus anúncios", href: `${basePath}/meus-anuncios`, icon: "ads" },
+      { label: "Minhas procuras", href: `${basePath}/minhas-procuras`, icon: "search" },
       { label: "Dados pessoais", href: `${basePath}/conta`, icon: "user" },
       { label: "Trocar senha", href: `${basePath}/senha`, icon: "key" },
     ];
@@ -130,6 +157,9 @@ function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   return [
     { label: "Painel", href: basePath, icon: "home" },
     { label: "Meus anúncios", href: `${basePath}/meus-anuncios`, icon: "ads" },
+    // Área guarda-chuva: hoje só "Compradores ativos"; a Fase 3 pendura
+    // "Veículos para comprar" no mesmo hub, sem mexer na navegação.
+    { label: "Oportunidades", href: `${basePath}/oportunidades`, icon: "users" },
     { label: "Dados da loja", href: `${basePath}/dados`, icon: "user" },
     { label: "Mensagens", href: `${basePath}/mensagens`, icon: "msg" },
     { label: "Plano e cobranças", href: `${basePath}/plano`, icon: "billing" },
