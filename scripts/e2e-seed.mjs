@@ -109,11 +109,32 @@ await pool.query(
 // que o lojista de Bragança NÃO vê a procura publicada em Atibaia. Com um único
 // lojista, um bug que ignorasse a cidade passaria despercebido.
 //
+// A Fase 2.1 acrescentou dois lojistas NA MESMA cidade do comprador, mas fora do
+// ar: suspenso e bloqueado. Eles existem para provar que moderação corta o
+// acesso — sem eles, "só loja ativa participa" seria uma regra sem testemunha.
+//
 // Aditivo e idempotente: não altera o utilizador CPF nem os anúncios dele, então
 // os specs que já existiam continuam a ver exatamente o mesmo estado.
 const DEALERS = [
-  { email: "cnpj@carrosnacidade.com", name: "Loja Atibaia", slug: "atibaia-sp" },
-  { email: "cnpj2@carrosnacidade.com", name: "Loja Braganca", slug: "braganca-paulista-sp" },
+  { email: "cnpj@carrosnacidade.com", name: "Loja Atibaia", slug: "atibaia-sp", status: "active" },
+  {
+    email: "cnpj2@carrosnacidade.com",
+    name: "Loja Braganca",
+    slug: "braganca-paulista-sp",
+    status: "active",
+  },
+  {
+    email: "cnpj3@carrosnacidade.com",
+    name: "Loja Atibaia Suspensa",
+    slug: "atibaia-sp",
+    status: "suspended",
+  },
+  {
+    email: "cnpj4@carrosnacidade.com",
+    name: "Loja Atibaia Bloqueada",
+    slug: "atibaia-sp",
+    status: "blocked",
+  },
 ];
 
 await pool.query(
@@ -161,9 +182,10 @@ for (const dealer of DEALERS) {
     cityId: Number(dealerCityId),
     source: "e2e-seed",
   });
-  await pool.query(`UPDATE advertisers SET city_id = $2 WHERE user_id = $1`, [
+  await pool.query(`UPDATE advertisers SET city_id = $2, status = $3 WHERE user_id = $1`, [
     dealerUserId,
     dealerCityId,
+    dealer.status,
   ]);
 }
 

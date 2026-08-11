@@ -7,19 +7,19 @@ Branch: `codex/opportunities-phase-2-purchase-intents`
 
 - branch de partida: `main`
 - HEAD inicial: `3c44a05a02fbc21e63c5b7ba0f884550c6391f34` (`merge: phase 1 internal notifications`)
-- working tree: limpo; `git pull --ff-only origin main` → *Already up to date*
+- working tree: limpo; `git pull --ff-only origin main` → _Already up to date_
 - migration mais alta antes desta fase: `049_user_notifications.sql` (verificado por listagem, não assumido)
 
 ### Baseline medido ANTES de qualquer alteração
 
-| Verificação | Resultado |
-|---|---|
-| backend `npm test` | 187 arquivos, 2591 passaram, 1 pulado — **verde** |
-| backend `npm run lint` | **BASELINE FAILURE** — 233 problemas (11 erros, 222 avisos), todos em `scripts/**` |
-| frontend `npm run test` | **BASELINE FAILURE** — 5 falhas / 2799 passaram |
-| frontend `npm run typecheck` | verde |
-| frontend `npm run lint` | verde |
-| frontend `npm run build` | verde |
+| Verificação                  | Resultado                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| backend `npm test`           | 187 arquivos, 2591 passaram, 1 pulado — **verde**                                  |
+| backend `npm run lint`       | **BASELINE FAILURE** — 233 problemas (11 erros, 222 avisos), todos em `scripts/**` |
+| frontend `npm run test`      | **BASELINE FAILURE** — 5 falhas / 2799 passaram                                    |
+| frontend `npm run typecheck` | verde                                                                              |
+| frontend `npm run lint`      | verde                                                                              |
+| frontend `npm run build`     | verde                                                                              |
 
 As falhas de baseline do frontend são de dois arquivos sem relação com esta fase:
 `app/carros-usados/regiao/[slug]/page.config.test.ts` (3) e `app/seguranca/page.copy.test.ts` (2).
@@ -51,27 +51,28 @@ Não existe `purchase_intents → ads` nesta fase. O teste de schema **prova a a
 
 Migration: `src/database/migrations/050_purchase_intents.sql` (nova; a 049 não foi tocada).
 
-| Campo | Tipo | Nota |
-|---|---|---|
-| `id` | `BIGSERIAL PK` | |
-| `buyer_user_id` | `BIGINT NOT NULL` | FK → `users(id)` **ON DELETE CASCADE** |
-| `city_id` | `BIGINT NOT NULL` | FK → `cities(id)`, sem `ON DELETE` (NO ACTION) |
-| `intent_type` | `TEXT NOT NULL` | CHECK `specific_model \| open_category` |
-| `brand`, `brand_slug` | `TEXT` | só em `specific_model` |
-| `model`, `model_slug` | `TEXT` | modelo **comercial**, nunca a descrição FIPE |
-| `body_type` | `TEXT` | só em `open_category` |
-| `transmission` | `TEXT NOT NULL` | slug canônico dos anúncios |
-| `max_price` | `NUMERIC(14,2) NOT NULL` | CHECK `> 0`; mesma convenção de `ads.price` |
-| `purchase_timeframe` | `TEXT NOT NULL` | CHECK com as 3 opções |
-| `status` | `TEXT NOT NULL DEFAULT 'active'` | CHECK `active \| closed` |
-| `expires_at` | `TIMESTAMPTZ NOT NULL` | `NOW() + 30 dias`, calculado pelo BANCO |
-| `created_at`, `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | |
+| Campo                      | Tipo                                 | Nota                                           |
+| -------------------------- | ------------------------------------ | ---------------------------------------------- |
+| `id`                       | `BIGSERIAL PK`                       |                                                |
+| `buyer_user_id`            | `BIGINT NOT NULL`                    | FK → `users(id)` **ON DELETE CASCADE**         |
+| `city_id`                  | `BIGINT NOT NULL`                    | FK → `cities(id)`, sem `ON DELETE` (NO ACTION) |
+| `intent_type`              | `TEXT NOT NULL`                      | CHECK `specific_model \| open_category`        |
+| `brand`, `brand_slug`      | `TEXT`                               | só em `specific_model`                         |
+| `model`, `model_slug`      | `TEXT`                               | modelo **comercial**, nunca a descrição FIPE   |
+| `body_type`                | `TEXT`                               | só em `open_category`                          |
+| `transmission`             | `TEXT NOT NULL`                      | slug canônico dos anúncios                     |
+| `max_price`                | `NUMERIC(14,2) NOT NULL`             | CHECK `> 0`; mesma convenção de `ads.price`    |
+| `purchase_timeframe`       | `TEXT NOT NULL`                      | CHECK com as 3 opções                          |
+| `status`                   | `TEXT NOT NULL DEFAULT 'active'`     | CHECK `active \| closed`                       |
+| `expires_at`               | `TIMESTAMPTZ NOT NULL`               | `NOW() + 30 dias`, calculado pelo BANCO        |
+| `created_at`, `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` |                                                |
 
 **CHECK de FORMA** (`purchase_intents_shape_check`): `specific_model` exige marca+modelo e proíbe
 carroceria; `open_category` exige carroceria e proíbe marca/modelo. É o invariante de que a Fase 3
 vai depender ao casar procura com estoque.
 
 Índices:
+
 - `purchase_intents_buyer_created_idx (buyer_user_id, created_at DESC, id DESC)`
 - `purchase_intents_city_active_idx (city_id, expires_at, created_at DESC, id DESC) WHERE status = 'active'` — **parcial**
 
@@ -135,11 +136,11 @@ contém `JOIN users`, `buyer_user_id` nem `SELECT *`.
 
 ## PF Frontend
 
-| Rota | Conteúdo |
-|---|---|
-| `/dashboard/minhas-procuras` | listagem + estados vazio/carregando/erro |
+| Rota                              | Conteúdo                                   |
+| --------------------------------- | ------------------------------------------ |
+| `/dashboard/minhas-procuras`      | listagem + estados vazio/carregando/erro   |
 | `/dashboard/minhas-procuras/nova` | formulário (os dois modos na mesma página) |
-| `/dashboard/minhas-procuras/[id]` | detalhe + encerrar (com confirmação) |
+| `/dashboard/minhas-procuras/[id]` | detalhe + encerrar (com confirmação)       |
 
 Menu: item **"Minhas procuras"** no `AccountPanelShell` existente (lista plana — o `NavItem` não tem
 campo de seção e dar suporte a cabeçalho exigiria mexer no tipo e nos dois laços de render, ou seja,
@@ -151,11 +152,11 @@ rótulo já reduzido, que quebraria "Omoda 5".
 
 ## PJ Frontend
 
-| Rota | Conteúdo |
-|---|---|
-| `/dashboard-loja/oportunidades` | hub (um card: Compradores ativos) |
-| `/dashboard-loja/oportunidades/compradores` | listagem |
-| `/dashboard-loja/oportunidades/compradores/[id]` | detalhe |
+| Rota                                             | Conteúdo                          |
+| ------------------------------------------------ | --------------------------------- |
+| `/dashboard-loja/oportunidades`                  | hub (um card: Compradores ativos) |
+| `/dashboard-loja/oportunidades/compradores`      | listagem                          |
+| `/dashboard-loja/oportunidades/compradores/[id]` | detalhe                           |
 
 Menu: item **"Oportunidades"** (ícone `users`, que já existia sem uso). O hub existe como página
 própria porque é onde a Fase 3 pendura "Veículos para comprar" — criá-lo depois custaria mudar
@@ -170,37 +171,37 @@ layout velho — foi o que aconteceu na primeira tentativa e produziu um falso p
 `body { overflow-x: hidden }` esconde vazamento, então a medição é por `getBoundingClientRect` de cada
 elemento, não por scrollbar.
 
-| Viewport | Resultado |
-|---|---|
-| 360×640 | 0 elementos fora da viewport em todas as 6 rotas; `scrollWidth` = 360 |
-| 768×1024 | 0 vazamentos; marca/modelo lado a lado (2 colunas a partir de `sm`) |
+| Viewport | Resultado                                                             |
+| -------- | --------------------------------------------------------------------- |
+| 360×640  | 0 elementos fora da viewport em todas as 6 rotas; `scrollWidth` = 360 |
+| 768×1024 | 0 vazamentos; marca/modelo lado a lado (2 colunas a partir de `sm`)   |
 
 Alturas de toque no formulário a 360px: selects/inputs **48px**, CTA **48px** e largura total
 (328px = 360 − 32 de padding). UF empilha acima de Cidade no mobile.
 
 ## Segurança — verificado contra backend real
 
-| Cenário | Resultado |
-|---|---|
-| PF A lê/encerra procura de PF B | **404** (`{success:false,error:"not_found"}`), nada muda |
-| id malformado (`abc`, `1.5`, `-1`, `0`) | **404**, nunca 400 |
-| CPF/`pending` na API do lojista | **403 `DEALER_ACCOUNT_REQUIRED`**, sem nenhuma query |
-| CNPJ publicando procura | **403 `PURCHASE_INTENT_BUYER_ONLY`** |
-| Lojista de Bragança lista Atibaia | lista vazia; id direto → **404**; 0 notificações |
-| Query string `?city_id=1` do lojista de Bragança | ignorada — a query usa a cidade do advertiser |
-| PII na resposta do lojista | ausente (allowlist exata; sem `JOIN users`) |
-| Fallback territorial | inexistente |
+| Cenário                                          | Resultado                                                |
+| ------------------------------------------------ | -------------------------------------------------------- |
+| PF A lê/encerra procura de PF B                  | **404** (`{success:false,error:"not_found"}`), nada muda |
+| id malformado (`abc`, `1.5`, `-1`, `0`)          | **404**, nunca 400                                       |
+| CPF/`pending` na API do lojista                  | **403 `DEALER_ACCOUNT_REQUIRED`**, sem nenhuma query     |
+| CNPJ publicando procura                          | **403 `PURCHASE_INTENT_BUYER_ONLY`**                     |
+| Lojista de Bragança lista Atibaia                | lista vazia; id direto → **404**; 0 notificações         |
+| Query string `?city_id=1` do lojista de Bragança | ignorada — a query usa a cidade do advertiser            |
+| PII na resposta do lojista                       | ausente (allowlist exata; sem `JOIN users`)              |
+| Fallback territorial                             | inexistente                                              |
 
 ## Testes
 
-| Suíte | Antes | Depois |
-|---|---|---|
-| backend `npm test` | 187 arq. / 2591 | **190 arq. / 2756** — verde |
-| backend lint | 11 erros (todos em `scripts/**`) | **11 erros — idêntico**, nenhum no código novo |
-| frontend `npm run test` | 5 falhas / 2799 | **5 falhas / 2875** — mesmas 2 rotas de baseline |
-| frontend typecheck | verde | **verde** |
-| frontend lint | verde | **verde** |
-| frontend build | verde | **verde** (6 rotas novas, todas dinâmicas) |
+| Suíte                   | Antes                            | Depois                                           |
+| ----------------------- | -------------------------------- | ------------------------------------------------ |
+| backend `npm test`      | 187 arq. / 2591                  | **190 arq. / 2756** — verde                      |
+| backend lint            | 11 erros (todos em `scripts/**`) | **11 erros — idêntico**, nenhum no código novo   |
+| frontend `npm run test` | 5 falhas / 2799                  | **5 falhas / 2875** — mesmas 2 rotas de baseline |
+| frontend typecheck      | verde                            | **verde**                                        |
+| frontend lint           | verde                            | **verde**                                        |
+| frontend build          | verde                            | **verde** (6 rotas novas, todas dinâmicas)       |
 
 Novos testes (241 no total):
 
@@ -245,6 +246,7 @@ histórico como "Encerrada".
 ## Arquivos alterados
 
 **Novos**
+
 - `src/database/migrations/050_purchase_intents.sql`
 - `src/modules/purchase-intents/` (constants, validation, repository, service, controller, routes,
   dealer.routes, rate-limit)
@@ -261,6 +263,7 @@ histórico como "Encerrada".
 - `frontend/e2e/purchase-intents.spec.ts`
 
 **Modificados (4)**
+
 - `src/app.js` — 2 imports + 2 montagens + mapa de prefixos do cabeçalho
 - `src/modules/notifications/notifications.constants.js` — +1 constante de evento
 - `frontend/components/account/AccountPanelShell.tsx` — +1 item por painel, +1 ícone
@@ -274,16 +277,17 @@ workers, Mercado Pago, planos, JWT/refresh, sitemaps, middleware SEO, gate terri
 
 ## Débitos conhecidos
 
-1. **Advertiser suspenso/bloqueado continua recebendo oportunidade.** Não há filtro por
-   `advertisers.status` — decisão consciente, alinhada ao §50 (não filtrar por plano/estoque), mas
-   `suspended`/`blocked` é caso diferente e provavelmente deve entrar na Fase 3.
+> **Atualização 2026-08-11 (Fase 2.1):** os débitos 1 e 4 foram fechados antes do merge. Ver
+> [`fase-2-1-compradores-ativos-hardening-2026-08-11.md`](./fase-2-1-compradores-ativos-hardening-2026-08-11.md).
+
+1. ~~**Advertiser suspenso/bloqueado continua recebendo oportunidade.**~~ **RESOLVIDO na Fase 2.1** —
+   filtro por `advertisers.status` no SQL das duas consultas (resolução de cidade e fan-out).
 2. **O E2E novo não roda no CI.** O job de e2e executa apenas `full-flow.spec.ts`. Rodar
    `purchase-intents.spec.ts` exige mudar o workflow — fora do escopo desta fase.
 3. **O teste de schema também não roda no CI** (`ci:integration-ads` tem caminho fixo para
    `ads-pipeline.integration.test.js`). Mesmo débito já existente da migration 049.
-4. **Sem paginação na UI.** A API pagina por cursor (default 20, teto 50) nas duas pontas, mas as
-   telas carregam só a primeira página. Com o volume atual não é visível; vira necessário quando uma
-   cidade passar de 20 procuras ativas.
+4. ~~**Sem paginação na UI.**~~ **RESOLVIDO na Fase 2.1** — botão "Carregar mais" nas duas listas,
+   com append, dedup por id e erro parcial que preserva a página já carregada.
 5. **`advertisers.user_id` continua sem UNIQUE.** O código falha fechado diante de cidades
    conflitantes, mas a constraint em si é dívida da Fase 0.1 e exige auditoria própria.
 6. **Cabeçalho público vaza a 360px** em rotas pré-existentes — não é regressão desta fase e não foi

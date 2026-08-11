@@ -22,6 +22,9 @@ import { expect, test } from "@playwright/test";
 const BUYER = { email: "cpf@carrosnacidade.com", password: "123456" };
 const DEALER_SAME_CITY = { email: "cnpj@carrosnacidade.com", password: "123456" };
 const DEALER_OTHER_CITY = { email: "cnpj2@carrosnacidade.com", password: "123456" };
+/** Mesma cidade do comprador, mas fora do ar por moderação (Fase 2.1). */
+const DEALER_SUSPENDED = { email: "cnpj3@carrosnacidade.com", password: "123456" };
+const DEALER_BLOCKED = { email: "cnpj4@carrosnacidade.com", password: "123456" };
 
 async function login(
   page: import("@playwright/test").Page,
@@ -120,6 +123,33 @@ test.describe("@e2e Fase 2 — compradores ativos", () => {
     );
     expect(otherDirect.status()).toBe(404);
     expect(await otherDirect.text()).not.toMatch(/cidade|Atibaia/i);
+
+    // --- lojistas fora do ar, na MESMA cidade (Fase 2.1) -------------------
+    // Passam pelo requireDealerAccount (são CNPJ) e ainda assim não veem nada:
+    // a guarda que os barra é o status da LOJA, não o tipo da conta.
+    for (const dealer of [DEALER_SUSPENDED, DEALER_BLOCKED]) {
+      expect((await login(page, dealer)).ok()).toBeTruthy();
+
+      const list = await page.request.get("/api/account/opportunities/purchase-intents");
+      expect(list.status()).toBe(200);
+      expect(
+        ((await list.json()) as { purchase_intents: unknown[] }).purchase_intents
+      ).toHaveLength(0);
+
+      const direct = await page.request.get(
+        `/api/account/opportunities/purchase-intents/${intentId}`
+      );
+      expect(direct.status()).toBe(404);
+
+      // E não foram avisados da procura.
+      const notifications = await page.request.get("/api/account/notifications");
+      const body = (await notifications.json()) as {
+        notifications: Array<{ event_type: string }>;
+      };
+      expect(
+        body.notifications.filter((row) => row.event_type === "purchase_intent.created")
+      ).toHaveLength(0);
+    }
 
     // --- PF encerra --------------------------------------------------------
     expect((await login(page, BUYER)).ok()).toBeTruthy();
