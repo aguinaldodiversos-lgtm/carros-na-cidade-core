@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountLogoutButton } from "@/components/account/AccountLogoutButton";
+import AccountNotificationsBell from "@/components/account/AccountNotificationsBell";
 import AccountPlanCard from "@/components/account/AccountPlanCard";
 import AccountUserMenu from "@/components/account/AccountUserMenu";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
@@ -134,37 +135,20 @@ function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   ];
 }
 
-/**
- * Sino de notificações — ESTÁTICO e SEM badge de contagem.
- *
- * Não existe sistema de notificações de usuário no backend hoje (a área de
- * Mensagens é stub). Renderizamos o ícone para compor o topo como no mockup,
- * mas sem número falso: nada de "2" hardcoded que não significa nada. Quando
- * houver fonte real, este vira interativo com contagem verdadeira.
- */
-function NotificationBell() {
-  return (
-    <span
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#94a3b8]"
-      title="Notificações — em breve"
-      aria-label="Notificações (nenhuma novidade por enquanto)"
-      data-testid="account-notifications-bell"
-    >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9Z" />
-        <path d="M10.5 21a1.5 1.5 0 0 0 3 0" />
-      </svg>
-    </span>
-  );
-}
-
 /** Card de suporte da sidebar. "Abrir atendimento" → centro de chamados do
  * painel (basePath/suporte), particular ou lojista conforme o painel atual. */
 function SupportCard({ basePath }: { basePath: string }) {
   return (
     <div className="rounded-2xl border border-[#dbe7fb] bg-[#eff5ff] p-4 text-center">
       <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#0e62d8]">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden
+        >
           <path d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-1v-6h3M4 13v4a2 2 0 0 0 2 2h1v-6H4" />
         </svg>
       </div>
@@ -252,7 +236,11 @@ export default function AccountPanelShell({
         <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
           {/* Sidebar desktop */}
           <aside className="sticky top-0 hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[#e8ecf4] bg-white px-4 py-8 lg:flex">
-            <Link href="/" className="mb-8 inline-flex shrink-0 items-center px-1" aria-label="Carros na Cidade">
+            <Link
+              href="/"
+              className="mb-8 inline-flex shrink-0 items-center px-1"
+              aria-label="Carros na Cidade"
+            >
               <Image
                 src={SITE_LOGO_SRC}
                 alt="Carros na Cidade"
@@ -315,9 +303,12 @@ export default function AccountPanelShell({
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            {/* Top bar desktop (Fase B): sino estático + menu de usuário. */}
+            {/* Top bar desktop: sino REAL (Fase 1) + menu de usuário. O sino
+                era estático e sem badge enquanto não havia fonte de dados; a
+                caixa postal interna passou a existir e o número agora é
+                verdadeiro. Mesmo componente nos dois painéis. */}
             <div className="hidden items-center justify-end gap-3 px-6 pt-6 lg:flex">
-              <NotificationBell />
+              <AccountNotificationsBell variant={variant} />
               <AccountUserMenu userName={userName} accountLabel={accountLabel} />
             </div>
             <div className="px-4 py-6 sm:px-6 lg:pb-10 lg:pt-6">{children}</div>
