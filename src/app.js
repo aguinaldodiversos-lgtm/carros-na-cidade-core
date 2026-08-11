@@ -11,6 +11,8 @@
 //   /api/public/seo  → modules/public/public-seo.routes.js
 //   /api/auth        → modules/auth/auth.routes.js
 //   /api/account/notifications → modules/notifications/notifications.routes.js (auth required)
+//   /api/account/opportunities/purchase-intents → modules/purchase-intents/purchase-intents.dealer.routes.js (auth + account_type=CNPJ)
+//   /api/account/purchase-intents → modules/purchase-intents/purchase-intents.routes.js (auth required)
 //   /api/account     → modules/account/account.routes.js
 //   /api/payments    → modules/payments/payments.routes.js
 //   /api/leads       → modules/leads/leads.routes.js
@@ -45,6 +47,8 @@ import paymentsRoutes from "./modules/payments/payments.routes.js";
 import { mercadoPagoWebhookController } from "./modules/payments/payments.webhook.controller.js";
 import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
+import purchaseIntentsDealerRoutes from "./modules/purchase-intents/purchase-intents.dealer.routes.js";
+import purchaseIntentsRoutes from "./modules/purchase-intents/purchase-intents.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
@@ -289,6 +293,20 @@ app.use("/api/auth", authRoutes);
 // ordem se inverter, toda request cai no router de conta, roda o authMiddleware
 // dele, não casa rota nenhuma e só então segue — auth em duplicidade por nada.
 app.use("/api/account/notifications", notificationsRoutes);
+
+// Fase 2 — Motor de Oportunidades. Os dois prefixos são mais específicos que
+// `/api/account` e precisam vir antes dele, pela mesma razão das notificações.
+//
+// E o de oportunidades vem antes do de procuras porque
+// `/api/account/opportunities/purchase-intents` NÃO é subcaminho de
+// `/api/account/purchase-intents` — são ramos distintos, mas manter o mais
+// longo primeiro evita que uma rota futura em `/api/account/purchase-intents/*`
+// passe a capturá-lo por engano.
+//
+// Guardas diferentes: procuras exigem só sessão (CPF/pending publicam);
+// oportunidades exigem sessão + conta CNPJ.
+app.use("/api/account/opportunities/purchase-intents", purchaseIntentsDealerRoutes);
+app.use("/api/account/purchase-intents", purchaseIntentsRoutes);
 
 app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
