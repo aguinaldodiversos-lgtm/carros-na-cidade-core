@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountLogoutButton } from "@/components/account/AccountLogoutButton";
+import AccountNotificationsBell from "@/components/account/AccountNotificationsBell";
+import { AccountNotificationsProvider } from "@/components/account/AccountNotificationsProvider";
 import AccountPlanCard from "@/components/account/AccountPlanCard";
 import AccountUserMenu from "@/components/account/AccountUserMenu";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
@@ -134,37 +136,20 @@ function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   ];
 }
 
-/**
- * Sino de notificações — ESTÁTICO e SEM badge de contagem.
- *
- * Não existe sistema de notificações de usuário no backend hoje (a área de
- * Mensagens é stub). Renderizamos o ícone para compor o topo como no mockup,
- * mas sem número falso: nada de "2" hardcoded que não significa nada. Quando
- * houver fonte real, este vira interativo com contagem verdadeira.
- */
-function NotificationBell() {
-  return (
-    <span
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#94a3b8]"
-      title="Notificações — em breve"
-      aria-label="Notificações (nenhuma novidade por enquanto)"
-      data-testid="account-notifications-bell"
-    >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9Z" />
-        <path d="M10.5 21a1.5 1.5 0 0 0 3 0" />
-      </svg>
-    </span>
-  );
-}
-
 /** Card de suporte da sidebar. "Abrir atendimento" → centro de chamados do
  * painel (basePath/suporte), particular ou lojista conforme o painel atual. */
 function SupportCard({ basePath }: { basePath: string }) {
   return (
     <div className="rounded-2xl border border-[#dbe7fb] bg-[#eff5ff] p-4 text-center">
       <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#0e62d8]">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden
+        >
           <path d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-1v-6h3M4 13v4a2 2 0 0 0 2 2h1v-6H4" />
         </svg>
       </div>
@@ -205,125 +190,145 @@ export default function AccountPanelShell({
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#f3f4f6]">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-0 lg:flex-row lg:gap-8">
-        {/* Mobile top bar */}
-        <div className="flex w-full flex-col border-b border-[#e5e7eb] bg-white lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ef] px-3 py-2 text-sm font-semibold text-[#1d2538]"
-              onClick={() => setMobileOpen((o) => !o)}
-              aria-expanded={mobileOpen}
-            >
-              Menu
-            </button>
-            <div className="flex items-center gap-2">
-              <AccountUserMenu userName={userName} accountLabel={accountLabel} />
-              <Link
-                href="/anunciar/novo"
-                className="inline-flex h-10 items-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white"
+    // O provider envolve o painel inteiro para que os DOIS sinos (barra mobile
+    // e topbar desktop) compartilhem um único contador, uma única busca e um
+    // único listener de foco. As duas regiões ficam sempre montadas — o CSS só
+    // esconde uma —, então sem isto haveria request duplicada em toda carga.
+    <AccountNotificationsProvider>
+      <div className="min-h-[calc(100vh-4rem)] bg-[#f3f4f6]">
+        <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-0 lg:flex-row lg:gap-8">
+          {/* Mobile top bar */}
+          <div className="flex w-full flex-col border-b border-[#e5e7eb] bg-white lg:hidden">
+            {/* `relative` (Fase 1.1): é o bloco de contenção do painel de
+              notificações no mobile. O sino fica no MEIO da barra, então
+              ancorar o painel no próprio botão o jogaria para fora da tela —
+              ancorado na linha, ele ocupa exatamente a largura útil. */}
+            <div className="relative flex items-center justify-between px-4 py-3">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#dfe4ef] px-3 py-2 text-sm font-semibold text-[#1d2538]"
+                onClick={() => setMobileOpen((o) => !o)}
+                aria-expanded={mobileOpen}
               >
-                + Novo anúncio
-              </Link>
-            </div>
-          </div>
-          {mobileOpen && (
-            <nav className="border-t border-[#eef1f6] px-2 pb-3 pt-1">
-              {nav.map((item) => (
+                Menu
+              </button>
+              <div className="flex items-center gap-2">
+                {/* Mesmo componente do desktop. O estado é compartilhado pelo
+                  provider, então este segundo sino NÃO duplica requests. */}
+                <AccountNotificationsBell variant={variant} placement="mobile" />
+                <AccountUserMenu userName={userName} accountLabel={accountLabel} />
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold ${
-                    isActive(item.href)
-                      ? "bg-[#eef4ff] text-[#0e62d8]"
-                      : "text-[#37425d] hover:bg-[#f8fafc]"
-                  }`}
+                  href="/anunciar/novo"
+                  className="inline-flex h-10 shrink-0 items-center rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white"
                 >
-                  <NavIcon name={item.icon} />
-                  {item.label}
+                  + Novo anúncio
                 </Link>
-              ))}
-            </nav>
-          )}
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
-          {/* Sidebar desktop */}
-          <aside className="sticky top-0 hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[#e8ecf4] bg-white px-4 py-8 lg:flex">
-            <Link href="/" className="mb-8 inline-flex shrink-0 items-center px-1" aria-label="Carros na Cidade">
-              <Image
-                src={SITE_LOGO_SRC}
-                alt="Carros na Cidade"
-                width={400}
-                height={100}
-                priority
-                className="h-11 w-auto max-w-[200px] object-contain object-left"
-                style={{ mixBlendMode: "multiply" }}
-              />
-            </Link>
-
-            <nav className="flex flex-col gap-1">
-              {nav.map((item) => {
-                const active = isActive(item.href);
-                return (
+              </div>
+            </div>
+            {mobileOpen && (
+              <nav className="border-t border-[#eef1f6] px-2 pb-3 pt-1">
+                {nav.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
-                      active
-                        ? "border-l-[3px] border-[#0e62d8] bg-[#eef4ff] text-[#0e62d8]"
-                        : "border-l-[3px] border-transparent text-[#37425d] hover:bg-[#f8fafc]"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold ${
+                      isActive(item.href)
+                        ? "bg-[#eef4ff] text-[#0e62d8]"
+                        : "text-[#37425d] hover:bg-[#f8fafc]"
                     }`}
                   >
                     <NavIcon name={item.icon} />
                     {item.label}
                   </Link>
-                );
-              })}
-            </nav>
+                ))}
+              </nav>
+            )}
+          </div>
 
-            {/* MEU PLANO + suporte (Fase B) — dado real via card client. */}
-            <div className="mt-6 space-y-4">
-              <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[#94a3b8]">
-                Meu plano
-              </p>
-              <AccountPlanCard variant={variant} basePath={basePath} />
-              <SupportCard basePath={basePath} />
-            </div>
-
-            <div className="mt-auto pt-6">
-              <Link
-                href="/anunciar/novo"
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.25)] transition hover:brightness-110"
-              >
-                <span className="text-lg leading-none">+</span>
-                Novo anúncio
-              </Link>
+          <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
+            {/* Sidebar desktop */}
+            <aside className="sticky top-0 hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[#e8ecf4] bg-white px-4 py-8 lg:flex">
               <Link
                 href="/"
-                className="mt-6 block px-1 text-xs font-bold text-[#6b7280] hover:text-[#0e62d8]"
+                className="mb-8 inline-flex shrink-0 items-center px-1"
+                aria-label="Carros na Cidade"
               >
-                ← Voltar ao site
+                <Image
+                  src={SITE_LOGO_SRC}
+                  alt="Carros na Cidade"
+                  width={400}
+                  height={100}
+                  priority
+                  className="h-11 w-auto max-w-[200px] object-contain object-left"
+                  style={{ mixBlendMode: "multiply" }}
+                />
               </Link>
-              <AccountLogoutButton
-                label="Sair da conta"
-                className="mt-3 block w-full px-1 text-left text-xs font-bold text-[#6b7280] hover:text-[#0e62d8] disabled:opacity-60"
-              />
-            </div>
-          </aside>
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            {/* Top bar desktop (Fase B): sino estático + menu de usuário. */}
-            <div className="hidden items-center justify-end gap-3 px-6 pt-6 lg:flex">
-              <NotificationBell />
-              <AccountUserMenu userName={userName} accountLabel={accountLabel} />
+              <nav className="flex flex-col gap-1">
+                {nav.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+                        active
+                          ? "border-l-[3px] border-[#0e62d8] bg-[#eef4ff] text-[#0e62d8]"
+                          : "border-l-[3px] border-transparent text-[#37425d] hover:bg-[#f8fafc]"
+                      }`}
+                    >
+                      <NavIcon name={item.icon} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* MEU PLANO + suporte (Fase B) — dado real via card client. */}
+              <div className="mt-6 space-y-4">
+                <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[#94a3b8]">
+                  Meu plano
+                </p>
+                <AccountPlanCard variant={variant} basePath={basePath} />
+                <SupportCard basePath={basePath} />
+              </div>
+
+              <div className="mt-auto pt-6">
+                <Link
+                  href="/anunciar/novo"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.25)] transition hover:brightness-110"
+                >
+                  <span className="text-lg leading-none">+</span>
+                  Novo anúncio
+                </Link>
+                <Link
+                  href="/"
+                  className="mt-6 block px-1 text-xs font-bold text-[#6b7280] hover:text-[#0e62d8]"
+                >
+                  ← Voltar ao site
+                </Link>
+                <AccountLogoutButton
+                  label="Sair da conta"
+                  className="mt-3 block w-full px-1 text-left text-xs font-bold text-[#6b7280] hover:text-[#0e62d8] disabled:opacity-60"
+                />
+              </div>
+            </aside>
+
+            <div className="flex min-w-0 flex-1 flex-col">
+              {/* Top bar desktop: sino REAL (Fase 1) + menu de usuário. O sino
+                era estático e sem badge enquanto não havia fonte de dados; a
+                caixa postal interna passou a existir e o número agora é
+                verdadeiro. Mesmo componente nos dois painéis. */}
+              <div className="hidden items-center justify-end gap-3 px-6 pt-6 lg:flex">
+                <AccountNotificationsBell variant={variant} placement="desktop" />
+                <AccountUserMenu userName={userName} accountLabel={accountLabel} />
+              </div>
+              <div className="px-4 py-6 sm:px-6 lg:pb-10 lg:pt-6">{children}</div>
             </div>
-            <div className="px-4 py-6 sm:px-6 lg:pb-10 lg:pt-6">{children}</div>
           </div>
         </div>
       </div>
-    </div>
+    </AccountNotificationsProvider>
   );
 }

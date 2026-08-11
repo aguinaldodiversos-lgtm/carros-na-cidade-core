@@ -10,6 +10,7 @@
 //   /api/public      → modules/public/public.routes.js
 //   /api/public/seo  → modules/public/public-seo.routes.js
 //   /api/auth        → modules/auth/auth.routes.js
+//   /api/account/notifications → modules/notifications/notifications.routes.js (auth required)
 //   /api/account     → modules/account/account.routes.js
 //   /api/payments    → modules/payments/payments.routes.js
 //   /api/leads       → modules/leads/leads.routes.js
@@ -39,6 +40,7 @@ import adEventsRoutes from "./modules/ads/events.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import dealerAcquisitionInboundRoutes from "./modules/dealer-acquisition/dealer-inbound.routes.js";
 import leadsRoutes from "./modules/leads/leads.routes.js";
+import notificationsRoutes from "./modules/notifications/notifications.routes.js";
 import paymentsRoutes from "./modules/payments/payments.routes.js";
 import { mercadoPagoWebhookController } from "./modules/payments/payments.webhook.controller.js";
 import publicRoutes from "./modules/public/public.routes.js";
@@ -281,6 +283,13 @@ app.use("/api/public/cities", publicCitiesRateLimit);
 app.use("/api/public", publicRoutes);
 
 app.use("/api/auth", authRoutes);
+
+// Notificações internas ANTES de `/api/account`: prefixo mais específico
+// primeiro, mesma razão de `/api/public/seo` vir antes de `/api/public`. Se a
+// ordem se inverter, toda request cai no router de conta, roda o authMiddleware
+// dele, não casa rota nenhuma e só então segue — auth em duplicidade por nada.
+app.use("/api/account/notifications", notificationsRoutes);
+
 app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/leads", leadsRoutes);

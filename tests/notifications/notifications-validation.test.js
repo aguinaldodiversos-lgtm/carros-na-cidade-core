@@ -1,0 +1,294 @@
+/**
+ * Validação do domínio de notificações — com foco no `action_path`.
+ *
+ * `action_path` é o campo perigoso: ele vira o destino de um clique dentro da
+ * área logada. Se aceitar host externo, a notificação vira open redirect com
+ * aparência de link legítimo do portal. O projeto já pagou por isso uma vez
+ * (o `next=` do login), e a lição registrada foi: um segundo validador mais
+ * fraco num caminho alcançável é o que abre o buraco.
+ *
+ * Por isso os testes abaixo não se contentam em provar que `/dashboard/x`
+ * passa: eles varrem as formas conhecidas de escapar de um validador de
+ * caminho — esquema, protocol-relative, barra-invertida (crua e
+ * percent-encoded), control-char, traversal — e o caso sutil do prefixo solto
+ * (`/dashboard` casando `/dashboard-qualquer-coisa`).
+ */
+import { describe, it, expect } from "vitest";
+import {
+  decodeCursor,
+  encodeCursor,
+  parseLimit,
+  parseNotificationId,
+  validateActionPath,
+  validateBody,
+  validateEntityId,
+  validateEventType,
+  validateIdempotencyKey,
+  validatePayload,
+  validateTitle,
+} from "../../src/modules/notifications/notifications.validation.js";
+import {
+  NOTIFICATION_LIMITS,
+  NOTIFICATION_PAGE,
+} from "../../src/modules/notifications/notifications.constants.js";
+
+describe("validateActionPath — caminhos internos aceitos", () => {
+  const accepted = [
+    "/dashboard",
+    "/dashboard/",
+    "/dashboard/minhas-procuras",
+    "/dashboard/minhas-procuras/123",
+    "/dashboard-loja",
+    "/dashboard-loja/oportunidades/456",
+    "/dashboard/meus-anuncios?tab=ativos",
+    "/dashboard-loja/oportunidades#lista",
+  ];
+
+  for (const path of accepted) {
+    it(`aceita ${path}`, () => {
+      expect(validateActionPath(path)).toBeTruthy();
+    });
+  }
+
+  it("preserva query e hash no valor normalizado", () => {
+    expect(validateActionPath("/dashboard/x?a=1#b")).toBe("/dashboard/x?a=1#b");
+  });
+
+  it("é opcional: ausente/vazio vira null", () => {
+    expect(validateActionPath(null)).toBe(null);
+    expect(validateActionPath(undefined)).toBe(null);
+    expect(validateActionPath("")).toBe(null);
+    expect(validateActionPath("   ")).toBe(null);
+  });
+});
+
+describe("validateActionPath — destinos externos são RECUSADOS", () => {
+  const rejected = [
+    // Esquema explícito
+    "https://evil.com",
+    "http://evil.com",
+    "https://evil.com/dashboard",
+    "javascript:alert(1)",
+    "JavaScript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "file:///etc/passwd",
+    // Protocol-relative
+    "//evil.com",
+    "//evil.com/dashboard",
+    "///evil.com",
+    // Barra-invertida (navegador normaliza para "/")
+    "\\\\evil.com",
+    "/\\evil.com",
+    "/dashboard\\..\\..\\evil",
+    // Percent-encoded
+    "/%5Cevil.com",
+    "/dashboard/%5c%5cevil.com",
+    // Prefixo de espaço/control-char
+    " /dashboard",
+    "\t/dashboard",
+    "\n/dashboard",
+    "/dash board",
+    // Control-chars embutidos, escritos como escape e NUNCA como byte literal:
+    // um NUL cru no fonte faz o git tratar o arquivo inteiro como binário, e o
+    // diff deixa de ser revisável.
+    "/dash\u0000board",
+    "/dashboard\u0007",
+    "/dashboard\u007f",
+    // Traversal saindo da área privada
+    "/dashboard/../admin",
+    "/dashboard/../../etc",
+    "/..//evil.com",
+    // Caminhos internos FORA da allowlist
+    "/admin",
+    "/admin/anuncios",
+    "/api/account/notifications",
+    "/",
+    "/login",
+    "/comprar",
+    // Prefixo solto: "/dashboard-loja" começa com "/dashboard", então um
+    // startsWith cru aceitaria qualquer "/dashboard*"
+    "/dashboardevil",
+    "/dashboard-evil",
+    "/dashboard-loja-evil",
+    "/dashboardX/oportunidades",
+  ];
+
+  for (const path of rejected) {
+    it(`recusa ${JSON.stringify(path)}`, () => {
+      expect(() => validateActionPath(path)).toThrowError();
+    });
+  }
+
+  it("recusa acima do tamanho máximo", () => {
+    const long = `/dashboard/${"a".repeat(NOTIFICATION_LIMITS.ACTION_PATH_MAX)}`;
+    expect(() => validateActionPath(long)).toThrowError();
+  });
+
+  it("o erro é 400 com code estável e não ecoa o valor recusado", () => {
+    try {
+      validateActionPath("https://evil.com");
+      throw new Error("deveria ter lançado");
+    } catch (err) {
+      expect(err.statusCode).toBe(400);
+      expect(err.details?.code).toBe("NOTIFICATION_INVALID_ACTION_PATH");
+      expect(err.message).not.toMatch(/evil\.com/);
+    }
+  });
+});
+
+describe("validatePayload", () => {
+  it("ausente vira objeto vazio", () => {
+    expect(validatePayload(null)).toEqual({});
+    expect(validatePayload(undefined)).toEqual({});
+  });
+
+  it("aceita objeto simples", () => {
+    expect(validatePayload({ amount: 1000, city: "atibaia-sp" })).toEqual({
+      amount: 1000,
+      city: "atibaia-sp",
+    });
+  });
+
+  it("recusa array e primitivos", () => {
+    expect(() => validatePayload([1, 2])).toThrowError();
+    expect(() => validatePayload("texto")).toThrowError();
+    expect(() => validatePayload(42)).toThrowError();
+    expect(() => validatePayload(true)).toThrowError();
+  });
+
+  it("recusa payload acima do teto de bytes", () => {
+    const big = { blob: "x".repeat(NOTIFICATION_LIMITS.PAYLOAD_MAX_BYTES + 1) };
+    expect(() => validatePayload(big)).toThrowError();
+  });
+
+  it("recusa objeto não serializável (referência circular)", () => {
+    const circular = {};
+    circular.self = circular;
+    expect(() => validatePayload(circular)).toThrowError();
+  });
+});
+
+describe("campos de texto", () => {
+  it("event_type é obrigatório e limitado", () => {
+    expect(validateEventType("  sale_request.outbid  ")).toBe("sale_request.outbid");
+    expect(() => validateEventType("")).toThrowError();
+    expect(() => validateEventType(null)).toThrowError();
+    expect(() =>
+      validateEventType("a".repeat(NOTIFICATION_LIMITS.EVENT_TYPE_MAX + 1))
+    ).toThrowError();
+  });
+
+  it("title é obrigatório e limitado", () => {
+    expect(validateTitle("  Nova oferta  ")).toBe("Nova oferta");
+    expect(() => validateTitle("   ")).toThrowError();
+    expect(() => validateTitle("a".repeat(NOTIFICATION_LIMITS.TITLE_MAX + 1))).toThrowError();
+  });
+
+  it("body é obrigatório e limitado", () => {
+    expect(validateBody("Você recebeu uma oferta")).toBe("Você recebeu uma oferta");
+    expect(() => validateBody("")).toThrowError();
+    expect(() => validateBody("a".repeat(NOTIFICATION_LIMITS.BODY_MAX + 1))).toThrowError();
+  });
+
+  it("idempotency_key é obrigatória e limitada", () => {
+    expect(validateIdempotencyKey("sale_request:1:bid:2")).toBe("sale_request:1:bid:2");
+    expect(() => validateIdempotencyKey("")).toThrowError();
+    expect(() =>
+      validateIdempotencyKey("a".repeat(NOTIFICATION_LIMITS.IDEMPOTENCY_KEY_MAX + 1))
+    ).toThrowError();
+  });
+
+  it("entity_id aceita number e string, e é opcional", () => {
+    expect(validateEntityId(123)).toBe("123");
+    expect(validateEntityId(" abc ")).toBe("abc");
+    expect(validateEntityId(null)).toBe(null);
+    expect(validateEntityId("")).toBe(null);
+  });
+});
+
+describe("parseNotificationId", () => {
+  it("aceita inteiro positivo", () => {
+    expect(parseNotificationId("42")).toBe(42);
+    expect(parseNotificationId(42)).toBe(42);
+  });
+
+  it("id malformado vira 404, não 400 (não confirma formato da chave)", () => {
+    // "1.5" e "12abc" estão aqui de propósito: `Number.parseInt` sozinho leria
+    // o prefixo (1 e 12) e a rota agiria sobre uma notificação que ninguém
+    // pediu. O parser exige a string inteira em dígitos.
+    const invalid = ["abc", "", "   ", null, undefined, "0", "-1", "1.5", "12abc", "1e3", "+1"];
+
+    for (const bad of invalid) {
+      expect(
+        () => parseNotificationId(bad),
+        `deveria recusar ${JSON.stringify(bad)}`
+      ).toThrowError();
+      expect(
+        (() => {
+          try {
+            parseNotificationId(bad);
+            return null;
+          } catch (err) {
+            return err.statusCode;
+          }
+        })(),
+        `status errado para ${JSON.stringify(bad)}`
+      ).toBe(404);
+    }
+  });
+});
+
+describe("parseLimit", () => {
+  it("ausente vira o default", () => {
+    expect(parseLimit(undefined)).toBe(NOTIFICATION_PAGE.DEFAULT_LIMIT);
+    expect(parseLimit(null)).toBe(NOTIFICATION_PAGE.DEFAULT_LIMIT);
+    expect(parseLimit("")).toBe(NOTIFICATION_PAGE.DEFAULT_LIMIT);
+  });
+
+  it("clampa acima do máximo — cliente não escolhe o custo da query", () => {
+    expect(parseLimit("999999")).toBe(NOTIFICATION_PAGE.MAX_LIMIT);
+    expect(parseLimit(1000)).toBe(NOTIFICATION_PAGE.MAX_LIMIT);
+  });
+
+  it("valor inválido/negativo cai no default", () => {
+    expect(parseLimit("abc")).toBe(NOTIFICATION_PAGE.DEFAULT_LIMIT);
+    expect(parseLimit("-5")).toBe(NOTIFICATION_PAGE.DEFAULT_LIMIT);
+    expect(parseLimit("0")).toBe(NOTIFICATION_PAGE.DEFAULT_LIMIT);
+  });
+
+  it("respeita valor válido dentro da faixa", () => {
+    expect(parseLimit("5")).toBe(5);
+  });
+});
+
+describe("cursor", () => {
+  it("round-trip preserva created_at e id", () => {
+    const createdAt = new Date("2026-08-10T12:00:00.000Z");
+    const encoded = encodeCursor({ created_at: createdAt, id: 77 });
+    expect(decodeCursor(encoded)).toEqual({ createdAt: createdAt.toISOString(), id: 77 });
+  });
+
+  it("é opaco (não é o valor cru legível na URL)", () => {
+    const encoded = encodeCursor({ created_at: new Date("2026-08-10T12:00:00.000Z"), id: 77 });
+    expect(encoded).not.toContain("2026-08-10");
+    expect(encoded).not.toContain("|");
+  });
+
+  it("cursor malformado é IGNORADO (volta à 1ª página), não vira erro", () => {
+    // Um link velho ou um cursor truncado não pode quebrar o sino.
+    expect(decodeCursor("lixo")).toBe(null);
+    expect(decodeCursor("")).toBe(null);
+    expect(decodeCursor(null)).toBe(null);
+    expect(decodeCursor(Buffer.from("sem-separador", "utf8").toString("base64url"))).toBe(null);
+    expect(
+      decodeCursor(Buffer.from("2026-08-10T12:00:00Z|abc", "utf8").toString("base64url"))
+    ).toBe(null);
+    expect(decodeCursor(Buffer.from("data-invalida|5", "utf8").toString("base64url"))).toBe(null);
+  });
+
+  it("encodeCursor devolve null sem linha válida", () => {
+    expect(encodeCursor(null)).toBe(null);
+    expect(encodeCursor({})).toBe(null);
+  });
+});
