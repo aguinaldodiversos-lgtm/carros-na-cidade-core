@@ -160,7 +160,10 @@ function extractMessage(payload: unknown, fallbackStatus: number): string {
 }
 
 async function bffFetch<T>(base: string, path: string, init?: RequestInit): Promise<T> {
-  const suffix = path ? `/${path.replace(/^\//, "")}` : "";
+  // Uma query string ("?cursor=…") é colada direto na base. Sem esta ramificação
+  // ela viraria `/?cursor=…` e a request iria para a rota com barra final —
+  // caminho diferente do endpoint de listagem.
+  const suffix = !path ? "" : path.startsWith("?") ? path : `/${path.replace(/^\//, "")}`;
   const res = await fetch(`${base}${suffix}`, {
     credentials: "include",
     cache: "no-store",
@@ -188,8 +191,18 @@ const DEALER_BASE = "/api/account/opportunities/purchase-intents";
 
 // --- Comprador --------------------------------------------------------------
 
-export async function fetchMyPurchaseIntents(): Promise<PurchaseIntentPage> {
-  const page = await bffFetch<PurchaseIntentPage>(BUYER_BASE, "");
+/**
+ * O cursor é OPACO: vem de `next_cursor` da página anterior e volta sem ser
+ * interpretado. O cliente nunca o constrói — se construísse, passaria a depender
+ * do formato interno (base64 de `"<createdAtISO>|<id>"`), que é justamente o que
+ * o backend esconde.
+ */
+function cursorQuery(cursor?: string | null): string {
+  return cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+}
+
+export async function fetchMyPurchaseIntents(cursor?: string | null): Promise<PurchaseIntentPage> {
+  const page = await bffFetch<PurchaseIntentPage>(BUYER_BASE, cursorQuery(cursor));
   return {
     // Coerção defensiva: a listagem não pode quebrar a página por causa de um
     // payload inesperado.
@@ -223,8 +236,10 @@ export async function closePurchaseIntent(id: number): Promise<PurchaseIntent> {
 
 // --- Lojista ----------------------------------------------------------------
 
-export async function fetchDealerOpportunities(): Promise<DealerOpportunityPage> {
-  const page = await bffFetch<DealerOpportunityPage>(DEALER_BASE, "");
+export async function fetchDealerOpportunities(
+  cursor?: string | null
+): Promise<DealerOpportunityPage> {
+  const page = await bffFetch<DealerOpportunityPage>(DEALER_BASE, cursorQuery(cursor));
   return {
     purchase_intents: Array.isArray(page?.purchase_intents) ? page.purchase_intents : [],
     next_cursor: page?.next_cursor ?? null,

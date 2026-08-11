@@ -136,8 +136,13 @@ describe("DealerOpportunitiesList — estados", () => {
   it("NÃO envia city_id — quem decide a cidade é o backend", async () => {
     render(<DealerOpportunitiesList />);
     await waitFor(() => expect(fetchDealerOpportunities).toHaveBeenCalled());
-    // A função de busca é chamada sem argumento nenhum.
-    expect(fetchDealerOpportunities).toHaveBeenCalledWith();
+
+    // O único argumento é o CURSOR de paginação (null na primeira página).
+    // Nenhuma cidade sai do cliente — se saísse, o lojista escolheria o que vê.
+    expect(fetchDealerOpportunities).toHaveBeenCalledWith(null);
+    for (const call of fetchDealerOpportunities.mock.calls) {
+      expect(JSON.stringify(call)).not.toMatch(/city|cidade/i);
+    }
   });
 
   it("mobile: card trunca o título e o CTA tem 44px", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import LoadMoreButton from "@/components/account/LoadMoreButton";
 import {
   DISPLAY_STATUS_CLASS,
   DISPLAY_STATUS_LABEL,
@@ -13,6 +13,7 @@ import {
   formatPublishedAt,
   type PurchaseIntent,
 } from "@/lib/purchase-intents/api";
+import { usePaginatedIntents } from "@/lib/purchase-intents/use-paginated-intents";
 
 /**
  * "Minhas procuras" — listagem do comprador.
@@ -103,29 +104,8 @@ export function PurchaseIntentCard({
 }
 
 export default function PurchaseIntentsList({ basePath = "/dashboard" }: { basePath?: string }) {
-  const [items, setItems] = useState<PurchaseIntent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await fetchMyPurchaseIntents();
-      setItems(page.purchase_intents);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error ? loadError.message : "Não foi possível carregar suas procuras."
-      );
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { items, loading, error, loadingMore, moreError, hasMore, loadMore, reload } =
+    usePaginatedIntents<PurchaseIntent>(fetchMyPurchaseIntents);
 
   return (
     <section data-testid="purchase-intents-list">
@@ -146,7 +126,7 @@ export default function PurchaseIntentsList({ basePath = "/dashboard" }: { baseP
 
       {loading ? <Spinner label="Carregando suas procuras…" /> : null}
 
-      {!loading && error ? <ErrorBox message={error} onRetry={() => void load()} /> : null}
+      {!loading && error ? <ErrorBox message={error} onRetry={reload} /> : null}
 
       {!loading && !error && items.length === 0 ? (
         <div
@@ -163,11 +143,19 @@ export default function PurchaseIntentsList({ basePath = "/dashboard" }: { baseP
       ) : null}
 
       {!loading && !error && items.length > 0 ? (
-        <ul className="grid gap-4">
-          {items.map((intent) => (
-            <PurchaseIntentCard key={intent.id} intent={intent} basePath={basePath} />
-          ))}
-        </ul>
+        <>
+          <ul className="grid gap-4">
+            {items.map((intent) => (
+              <PurchaseIntentCard key={intent.id} intent={intent} basePath={basePath} />
+            ))}
+          </ul>
+
+          {/* Some sozinho quando `next_cursor` volta null — nada de botão
+              desabilitado para sempre no fim da lista. */}
+          {hasMore ? (
+            <LoadMoreButton onClick={loadMore} loading={loadingMore} error={moreError} />
+          ) : null}
+        </>
       ) : null}
     </section>
   );

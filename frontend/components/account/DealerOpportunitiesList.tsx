@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import LoadMoreButton from "@/components/account/LoadMoreButton";
 import {
   TRANSMISSION_LABEL,
   describeVehicle,
@@ -11,6 +11,7 @@ import {
   formatPublishedAt,
   type DealerOpportunity,
 } from "@/lib/purchase-intents/api";
+import { usePaginatedIntents } from "@/lib/purchase-intents/use-paginated-intents";
 
 /**
  * "Compradores ativos" — oportunidades da cidade da loja.
@@ -66,31 +67,8 @@ export default function DealerOpportunitiesList({
 }: {
   basePath?: string;
 }) {
-  const [items, setItems] = useState<DealerOpportunity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await fetchDealerOpportunities();
-      setItems(page.purchase_intents);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Não foi possível carregar os compradores ativos."
-      );
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { items, loading, error, loadingMore, moreError, hasMore, loadMore, reload } =
+    usePaginatedIntents<DealerOpportunity>(fetchDealerOpportunities);
 
   return (
     <section data-testid="dealer-opportunities-list">
@@ -123,7 +101,7 @@ export default function DealerOpportunitiesList({
           <p className="text-sm text-[#b42318]">{error}</p>
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={reload}
             className="mt-4 h-11 rounded-xl border border-[#fecaca] bg-white px-5 text-sm font-bold text-[#b42318] transition hover:bg-[#fff5f5]"
           >
             Tentar novamente
@@ -149,15 +127,21 @@ export default function DealerOpportunitiesList({
       ) : null}
 
       {!loading && !error && items.length > 0 ? (
-        <ul className="grid gap-4">
-          {items.map((opportunity) => (
-            <DealerOpportunityCard
-              key={opportunity.id}
-              opportunity={opportunity}
-              basePath={basePath}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="grid gap-4">
+            {items.map((opportunity) => (
+              <DealerOpportunityCard
+                key={opportunity.id}
+                opportunity={opportunity}
+                basePath={basePath}
+              />
+            ))}
+          </ul>
+
+          {hasMore ? (
+            <LoadMoreButton onClick={loadMore} loading={loadingMore} error={moreError} />
+          ) : null}
+        </>
       ) : null}
     </section>
   );
