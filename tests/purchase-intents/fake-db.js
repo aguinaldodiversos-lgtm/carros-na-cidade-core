@@ -52,6 +52,12 @@ function cityOf(cityId) {
   return db.cities.find((city) => sameId(city.id, cityId)) ?? null;
 }
 
+/** `COALESCE(NULLIF(BTRIM(status), ''), 'active')` — NULL e '' são ativos. */
+function advertiserStatusOf(advertiser) {
+  const raw = String(advertiser.status ?? "").trim();
+  return raw === "" ? "active" : raw;
+}
+
 /** Projeção de BUYER_COLUMNS: colunas da procura + JOIN de cidade + is_expired. */
 function projectBuyer(row, now) {
   const city = cityOf(row.city_id);
@@ -240,20 +246,27 @@ function handle(text, params, now) {
   }
 
   // --- advertisers ----------------------------------------------------------
-  if (/^SELECT id, user_id, city_id FROM advertisers WHERE user_id = \$1/i.test(text)) {
-    const [userId] = params;
+  //
+  // Espelha `COALESCE(NULLIF(BTRIM(adv.status), ''), 'active') = $n`: NULL e ''
+  // contam como ativo, porque a coluna é nullable em bancos legados e a própria
+  // migration 012 faz esse backfill. Se o fake tratasse NULL como inativo, os
+  // testes divergiriam do Postgres exatamente no caso que mais importa.
+  if (/^SELECT adv\.id, adv\.user_id, adv\.city_id, adv\.status FROM advertisers adv/i.test(text)) {
+    const [userId, activeStatus] = params;
     const rows = db.advertisers
       .filter((item) => sameId(item.user_id, userId))
+      .filter((item) => advertiserStatusOf(item) === activeStatus)
       .sort((a, b) => Number(a.id) - Number(b.id));
     return { rows, rowCount: rows.length };
   }
 
   if (/^SELECT DISTINCT adv\.user_id AS user_id FROM advertisers adv JOIN users u/i.test(text)) {
-    const [cityId] = params;
+    const [cityId, activeStatus] = params;
     const userIds = new Set();
     for (const advertiser of db.advertisers) {
       if (!sameId(advertiser.city_id, cityId)) continue;
       if (advertiser.user_id == null) continue;
+      if (advertiserStatusOf(advertiser) !== activeStatus) continue;
       const user = db.users.find((item) => sameId(item.id, advertiser.user_id));
       if (!user) continue;
       if (

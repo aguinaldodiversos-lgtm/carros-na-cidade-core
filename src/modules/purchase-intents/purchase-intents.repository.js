@@ -16,6 +16,7 @@
 // é exatamente esse dia que a allowlist protege.
 
 import { query } from "../../infrastructure/database/db.js";
+import { ADVERTISER_STATUS } from "../../shared/constants/status.js";
 
 /** Colunas devolvidas ao DONO da procura. Sem `buyer_user_id`: ele já sabe quem é. */
 const BUYER_COLUMNS = `
@@ -265,7 +266,28 @@ export async function getActiveByIdForCity(purchaseIntentId, cityId) {
 }
 
 /**
- * Linhas de advertiser do usuário — TODAS, sem LIMIT.
+ * Predicado de advertiser OPERACIONAL.
+ *
+ * `advertisers.status` é NULLABLE na prática: a coluna nasce
+ * `NOT NULL DEFAULT 'active'` no CREATE, mas as migrations 003 e 012 também a
+ * re-adicionam como `ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'` para
+ * bancos legados — e o DEFAULT não preenche linha que já existia. A própria 012
+ * declara a interpretação do projeto ao fazer o backfill
+ * `status = COALESCE(NULLIF(status, ''), 'active')`.
+ *
+ * Por isso NULL e '' contam como ACTIVE. Tratá-los como "não ativo" seria
+ * fail-closed no papel e um defeito na prática: trancaria para fora lojistas
+ * legítimos cuja linha é anterior à coluna, um estrago maior que o problema que
+ * esta regra corrige. `suspended` e `blocked` são estados EXPLÍCITOS — sempre
+ * escritos por uma ação de moderação.
+ *
+ * Mesmo formato de `public-dealer.service.js:57`, que já usa
+ * `COALESCE(adv.status, 'active') = 'active'`.
+ */
+export const ADVERTISER_IS_OPERATIONAL = `COALESCE(NULLIF(BTRIM(adv.status), ''), 'active') = $2`;
+
+/**
+ * Linhas de advertiser OPERACIONAIS do usuário — TODAS, sem LIMIT.
  *
  * O LIMIT 1 é o erro clássico aqui. `advertisers.user_id` não tem UNIQUE (nem
  * nas migrations, nem em produção — verificado na Fase 0.1), então "a loja do
@@ -273,16 +295,22 @@ export async function getActiveByIdForCity(purchaseIntentId, cityId) {
  * devolve uma qualquer, e a autorização passaria a depender de qual linha
  * apareceu primeiro. Devolvemos o conjunto e deixamos o service FALHAR FECHADO
  * quando houver conflito.
+ *
+ * O filtro de status entra AQUI, no SQL, e não numa checagem do service: uma
+ * loja suspensa não deve nem chegar à camada que decide a cidade. Como
+ * consequência direta, um advertiser bloqueado em OUTRA cidade não gera
+ * conflito — ele simplesmente não faz parte do conjunto.
  */
-export async function listAdvertisersByUserId(userId) {
+export async function listActiveAdvertisersByUserId(userId) {
   const result = await query(
     `
-    SELECT id, user_id, city_id
-    FROM advertisers
-    WHERE user_id = $1
-    ORDER BY id ASC
+    SELECT adv.id, adv.user_id, adv.city_id, adv.status
+    FROM advertisers adv
+    WHERE adv.user_id = $1
+      AND ${ADVERTISER_IS_OPERATIONAL}
+    ORDER BY adv.id ASC
     `,
-    [userId]
+    [userId, ADVERTISER_STATUS.ACTIVE]
   );
   return result.rows;
 }
@@ -303,6 +331,14 @@ export async function listAdvertisersByUserId(userId) {
  *
  * `city_id` NULL nunca casa `= $1`, então lojista sem cidade fica de fora
  * naturalmente: fail closed sem cláusula extra.
+ *
+ * Loja suspensa/bloqueada NÃO é notificada — mesmo predicado de status da
+ * resolução de cidade, para que "ver a oportunidade" e "ser avisado dela"
+ * nunca discordem. Se divergissem, a loja suspensa receberia o aviso e bateria
+ * num 404 ao clicar.
+ *
+ * O JOIN em `users` existe SÓ para validar CNPJ. A consulta de oportunidades
+ * (a que responde ao lojista) continua sem tocar em `users`.
  */
 export async function listDealerRecipientsByCity(cityId) {
   const result = await query(
@@ -311,10 +347,11 @@ export async function listDealerRecipientsByCity(cityId) {
     FROM advertisers adv
     JOIN users u ON u.id = adv.user_id
     WHERE adv.city_id = $1
+      AND ${ADVERTISER_IS_OPERATIONAL}
       AND adv.user_id IS NOT NULL
       AND LOWER(BTRIM(COALESCE(u.document_type, ''))) = 'cnpj'
     `,
-    [cityId]
+    [cityId, ADVERTISER_STATUS.ACTIVE]
   );
   return result.rows.map((row) => row.user_id).filter((userId) => userId != null);
 }

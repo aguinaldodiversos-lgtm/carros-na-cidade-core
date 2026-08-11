@@ -414,25 +414,33 @@ export async function closeMyPurchaseIntent(userId, rawId) {
  * Cidade da loja do usuário autenticado — a única fonte da visibilidade do
  * lojista.
  *
- * FAIL CLOSED em três situações, todas devolvendo `null`:
+ * FAIL CLOSED em quatro situações, todas devolvendo `null`:
  *
  *   - nenhum advertiser: o usuário é CNPJ mas ainda não tem loja;
+ *   - nenhum advertiser ATIVO: todas as lojas dele estão suspensas ou
+ *     bloqueadas. Moderação não é sobre plano nem estoque — é sobre não
+ *     entregar demanda privada a quem foi tirado do ar;
  *   - advertiser sem `city_id`: a Fase 0.1 proíbe inferir cidade, e inferir
  *     aqui (de `users.city`, do primeiro anúncio, do cookie) entregaria
  *     oportunidades de gente real para a cidade errada;
- *   - MAIS DE UMA cidade distinta entre os advertisers do mesmo usuário:
+ *   - MAIS DE UMA cidade distinta entre os advertisers ATIVOS do mesmo usuário:
  *     `advertisers.user_id` não tem UNIQUE, então isso é possível hoje. Escolher
  *     "a primeira" seria decidir por sorteio de que cidade o lojista é.
  *
  * Linhas duplicadas apontando para a MESMA cidade não são conflito — a resposta
- * é a mesma seja qual for a linha lida.
+ * é a mesma seja qual for a linha lida. E uma loja bloqueada em outra cidade
+ * também não é conflito: ela não entra no conjunto.
  *
  * `null` não é erro: a listagem devolve vazio e o detalhe devolve 404. O lojista
  * sem localização válida simplesmente não participa desta fase, exatamente como
  * a especificação pede.
  */
 export async function resolveDealerCityId(userId) {
-  const rows = await repo.listAdvertisersByUserId(userId);
+  // Só lojas OPERACIONAIS entram no conjunto — suspensa/bloqueada é filtrada no
+  // SQL. Consequência que importa: um advertiser bloqueado em outra cidade não
+  // vira conflito, porque nem chega aqui. Quem foi suspenso perde o acesso, não
+  // ganha um empate que tranca a loja boa junto.
+  const rows = await repo.listActiveAdvertisersByUserId(userId);
 
   const cityIds = [
     ...new Set(

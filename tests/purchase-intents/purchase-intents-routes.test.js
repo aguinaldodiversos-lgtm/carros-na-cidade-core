@@ -317,6 +317,73 @@ describe("rotas do lojista — guarda de conta", () => {
   });
 });
 
+describe("status do advertiser na API do lojista", () => {
+  // A guarda de CONTA (requireDealerAccount) e a guarda de LOJA (status) são
+  // camadas diferentes: aqui o usuário É CNPJ e passa pela primeira — o que o
+  // barra é a loja estar fora do ar.
+  beforeEach(() => {
+    seedIntent({ city_id: ATIBAIA.id });
+  });
+
+  function setDealerStatus(status) {
+    db.advertisers = [{ id: 1, user_id: "20", city_id: ATIBAIA.id, status }];
+  }
+
+  it.each(["active", null, ""])(
+    "loja operacional (status=%p) vê a oportunidade",
+    async (status) => {
+      setDealerStatus(status);
+      const list = await request(buildApp())
+        .get("/api/account/opportunities/purchase-intents")
+        .set("x-test-user", "20")
+        .set("x-test-account", "CNPJ");
+      const detail = await request(buildApp())
+        .get("/api/account/opportunities/purchase-intents/1")
+        .set("x-test-user", "20")
+        .set("x-test-account", "CNPJ");
+
+      expect(list.body.purchase_intents.map((row) => row.id)).toEqual([1]);
+      expect(detail.status).toBe(200);
+    }
+  );
+
+  it.each(["suspended", "blocked"])("loja %s: lista vazia e detalhe 404", async (status) => {
+    setDealerStatus(status);
+
+    const list = await request(buildApp())
+      .get("/api/account/opportunities/purchase-intents")
+      .set("x-test-user", "20")
+      .set("x-test-account", "CNPJ");
+    expect(list.status).toBe(200);
+    expect(list.body.purchase_intents).toEqual([]);
+
+    const detail = await request(buildApp())
+      .get("/api/account/opportunities/purchase-intents/1")
+      .set("x-test-user", "20")
+      .set("x-test-account", "CNPJ");
+    expect(detail.status).toBe(404);
+    // Mesma resposta de "não existe": nada distingue loja suspensa de
+    // oportunidade inexistente, então o 404 não confirma a existência da linha.
+    expect(detail.body).toEqual({ success: false, error: "not_found" });
+  });
+
+  it("o filtro de status está no SQL, não num if depois da consulta", async () => {
+    setDealerStatus("suspended");
+    await request(buildApp())
+      .get("/api/account/opportunities/purchase-intents")
+      .set("x-test-user", "20")
+      .set("x-test-account", "CNPJ");
+
+    const advertiserCall = queryCalls.find((call) => /FROM advertisers adv/.test(call.sql));
+    expect(advertiserCall.sql).toMatch(
+      /COALESCE\(NULLIF\(BTRIM\(adv\.status\), ''\), 'active'\) = \$2/
+    );
+    expect(advertiserCall.params[1]).toBe("active");
+    // E a consulta de oportunidades nem chega a rodar.
+    expect(queryCalls.some((call) => /FROM purchase_intents pi/.test(call.sql))).toBe(false);
+  });
+});
+
 describe("isolamento por cidade na API do lojista", () => {
   beforeEach(() => {
     seedIntent({ city_id: ATIBAIA.id });

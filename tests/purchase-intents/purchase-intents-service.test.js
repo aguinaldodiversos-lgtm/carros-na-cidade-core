@@ -398,6 +398,185 @@ describe("cidade do lojista — fail closed", () => {
   });
 });
 
+describe("status do advertiser — só loja ATIVA participa", () => {
+  it("status ausente (NULL) conta como ativo", async () => {
+    // A coluna é nullable em bancos legados e a migration 012 faz o backfill
+    // COALESCE(NULLIF(status,''),'active'). Tratar NULL como inativo trancaria
+    // lojistas legítimos cuja linha é anterior à coluna.
+    seedWorld({ advertisers: [{ id: 1, user_id: "20", city_id: ATIBAIA.id, status: null }] });
+    await expect(service.resolveDealerCityId("20")).resolves.toBe(ATIBAIA.id);
+  });
+
+  it("status vazio conta como ativo", async () => {
+    seedWorld({ advertisers: [{ id: 1, user_id: "20", city_id: ATIBAIA.id, status: "  " }] });
+    await expect(service.resolveDealerCityId("20")).resolves.toBe(ATIBAIA.id);
+  });
+
+  it("status 'active' explícito resolve a cidade", async () => {
+    seedWorld({ advertisers: [{ id: 1, user_id: "20", city_id: ATIBAIA.id, status: "active" }] });
+    await expect(service.resolveDealerCityId("20")).resolves.toBe(ATIBAIA.id);
+  });
+
+  it.each(["suspended", "blocked"])("status '%s' → sem cidade (fail closed)", async (status) => {
+    seedWorld({ advertisers: [{ id: 1, user_id: "20", city_id: ATIBAIA.id, status }] });
+    await expect(service.resolveDealerCityId("20")).resolves.toBeNull();
+  });
+
+  it("loja BLOQUEADA em outra cidade NÃO cria conflito com a ativa", async () => {
+    // O caso que a Fase 2.1 existe para acertar: sem o filtro, estas duas linhas
+    // pareceriam "duas cidades" e trancariam o lojista para fora da própria
+    // cidade ativa.
+    seedWorld({
+      advertisers: [
+        { id: 1, user_id: "20", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "20", city_id: BRAGANCA.id, status: "blocked" },
+      ],
+    });
+    await expect(service.resolveDealerCityId("20")).resolves.toBe(ATIBAIA.id);
+  });
+
+  it("loja SUSPENSA em outra cidade também não cria conflito", async () => {
+    seedWorld({
+      advertisers: [
+        { id: 1, user_id: "20", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "20", city_id: BRAGANCA.id, status: "suspended" },
+      ],
+    });
+    await expect(service.resolveDealerCityId("20")).resolves.toBe(ATIBAIA.id);
+  });
+
+  it("duas cidades ATIVAS distintas continuam sendo conflito", async () => {
+    seedWorld({
+      advertisers: [
+        { id: 1, user_id: "20", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "20", city_id: BRAGANCA.id, status: "active" },
+      ],
+    });
+    await expect(service.resolveDealerCityId("20")).resolves.toBeNull();
+  });
+
+  it("duplicadas ATIVAS na mesma cidade continuam sem ser conflito", async () => {
+    seedWorld({
+      advertisers: [
+        { id: 1, user_id: "20", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "20", city_id: ATIBAIA.id, status: "active" },
+      ],
+    });
+    await expect(service.resolveDealerCityId("20")).resolves.toBe(ATIBAIA.id);
+  });
+
+  it("todas as lojas suspensas/bloqueadas → sem acesso, mesmo com CNPJ válido", async () => {
+    seedWorld({
+      advertisers: [
+        { id: 1, user_id: "20", city_id: ATIBAIA.id, status: "suspended" },
+        { id: 2, user_id: "20", city_id: BRAGANCA.id, status: "blocked" },
+      ],
+    });
+    await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);
+
+    const { purchase_intents: rows } = await service.listDealerOpportunities("20");
+    expect(rows).toEqual([]);
+    await expect(service.getDealerOpportunity("20", 1)).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+describe("fan-out — só lojas ATIVAS são notificadas", () => {
+  it("notifica apenas os ativos da cidade (A e D), não B nem C", async () => {
+    seedWorld({
+      users: [
+        { id: "10", document_type: "cpf" },
+        { id: "51", document_type: "cnpj" },
+        { id: "52", document_type: "cnpj" },
+        { id: "53", document_type: "cnpj" },
+        { id: "54", document_type: "cnpj" },
+      ],
+      advertisers: [
+        { id: 1, user_id: "51", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "52", city_id: ATIBAIA.id, status: "suspended" },
+        { id: 3, user_id: "53", city_id: ATIBAIA.id, status: "blocked" },
+        { id: 4, user_id: "54", city_id: ATIBAIA.id, status: "active" },
+      ],
+    });
+
+    await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);
+
+    const recipients = db.notifications.map((row) => row.recipient_user_id).sort();
+    expect(recipients).toEqual(["51", "54"]);
+    expect(recipients).not.toContain("52");
+    expect(recipients).not.toContain("53");
+  });
+
+  it("DISTINCT continua valendo entre linhas ATIVAS duplicadas", async () => {
+    seedWorld({
+      users: [
+        { id: "10", document_type: "cpf" },
+        { id: "51", document_type: "cnpj" },
+      ],
+      advertisers: [
+        { id: 1, user_id: "51", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "51", city_id: ATIBAIA.id, status: "active" },
+      ],
+    });
+
+    await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);
+    expect(db.notifications.map((row) => row.recipient_user_id)).toEqual(["51"]);
+  });
+
+  it("linha ativa + linha suspensa do MESMO usuário ainda gera um aviso", async () => {
+    seedWorld({
+      users: [
+        { id: "10", document_type: "cpf" },
+        { id: "51", document_type: "cnpj" },
+      ],
+      advertisers: [
+        { id: 1, user_id: "51", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "51", city_id: ATIBAIA.id, status: "suspended" },
+      ],
+    });
+
+    await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);
+    expect(db.notifications.map((row) => row.recipient_user_id)).toEqual(["51"]);
+  });
+
+  it("cidade só com lojas suspensas/bloqueadas → zero notificações, procura publicada", async () => {
+    seedWorld({
+      users: [
+        { id: "10", document_type: "cpf" },
+        { id: "52", document_type: "cnpj" },
+      ],
+      advertisers: [{ id: 1, user_id: "52", city_id: ATIBAIA.id, status: "blocked" }],
+    });
+
+    const { purchase_intent: intent } = await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);
+    expect(intent.status).toBe("active");
+    expect(db.notifications).toHaveLength(0);
+  });
+
+  it("quem é notificado consegue abrir o detalhe — aviso e acesso não divergem", async () => {
+    seedWorld({
+      users: [
+        { id: "10", document_type: "cpf" },
+        { id: "51", document_type: "cnpj" },
+        { id: "52", document_type: "cnpj" },
+      ],
+      advertisers: [
+        { id: 1, user_id: "51", city_id: ATIBAIA.id, status: "active" },
+        { id: 2, user_id: "52", city_id: ATIBAIA.id, status: "suspended" },
+      ],
+    });
+
+    await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);
+
+    // A foi avisado E consegue abrir.
+    expect(db.notifications.map((row) => row.recipient_user_id)).toEqual(["51"]);
+    await expect(service.getDealerOpportunity("51", 1)).resolves.toMatchObject({
+      purchase_intent: { id: 1 },
+    });
+    // B não foi avisado E não consegue abrir.
+    await expect(service.getDealerOpportunity("52", 1)).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
 describe("oportunidades do lojista — isolamento por cidade e privacidade", () => {
   beforeEach(async () => {
     await service.createPurchaseIntent(BUYER, SPECIFIC_INPUT);

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { INTEGRATION_TEST_DATABASE_URL_DEFAULT } from "./helpers/integration-test-constants.js";
 import { resolveSslConfig } from "../../src/infrastructure/database/ssl-config.js";
+import { ADVERTISER_IS_OPERATIONAL } from "../../src/modules/purchase-intents/purchase-intents.repository.js";
+import { ADVERTISER_STATUS } from "../../src/shared/constants/status.js";
 
 /**
  * Schema REAL de `purchase_intents`, contra um PostgreSQL de verdade.
@@ -419,6 +421,54 @@ describe.sequential("integração — schema de purchase_intents", () => {
         [cityA]
       );
       expect(rows).toHaveLength(1);
+    });
+  }, 180000);
+
+  it("o predicado de advertiser operacional trata NULL e '' como ativo no Postgres real", async () => {
+    // A semântica de COALESCE/NULLIF/BTRIM com NULL de verdade não pode ser
+    // provada pelo fake — ele concordaria consigo mesmo. E o predicado é
+    // IMPORTADO do repository, não copiado, então não há como divergir dele.
+    await withMigratedDatabase("advstatus", async (pool) => {
+      const cityId = await createCity(pool, "atibaia-advstatus");
+
+      // Num banco NOVO, `advertisers.status` nasce NOT NULL (o CREATE da 003
+      // vence e o `ADD COLUMN IF NOT EXISTS` posterior é no-op) — então o caso
+      // NULL é impossível de inserir aqui. Ele só existe em banco LEGADO, onde
+      // a tabela precedeu a coluna e o ALTER a adicionou nullable.
+      //
+      // Reproduzimos essa forma de propósito, como `migrations-compat` faz com
+      // `seedLegacyPartialSchema`. Sem isto, o ramo do COALESCE ficaria sem
+      // cobertura exatamente no banco em que ele importa.
+      await pool.query(`ALTER TABLE advertisers ALTER COLUMN status DROP NOT NULL`);
+
+      async function makeAdvertiser(label, status) {
+        const user = await createUser(pool, `${label}@advstatus.test`);
+        await pool.query(
+          `INSERT INTO advertisers (user_id, city_id, name, slug, status)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [user, cityId, label, `${label}-slug`, status]
+        );
+        return String(user);
+      }
+
+      const ativoNulo = await makeAdvertiser("ativonulo", null);
+      const ativoVazio = await makeAdvertiser("ativovazio", "   ");
+      const ativoExplicito = await makeAdvertiser("ativoexplicito", ADVERTISER_STATUS.ACTIVE);
+      const suspenso = await makeAdvertiser("suspenso", ADVERTISER_STATUS.SUSPENDED);
+      const bloqueado = await makeAdvertiser("bloqueado", ADVERTISER_STATUS.BLOCKED);
+
+      const { rows } = await pool.query(
+        `SELECT adv.user_id
+           FROM advertisers adv
+          WHERE adv.city_id = $1
+            AND ${ADVERTISER_IS_OPERATIONAL}`,
+        [cityId, ADVERTISER_STATUS.ACTIVE]
+      );
+      const operacionais = rows.map((row) => String(row.user_id)).sort();
+
+      expect(operacionais).toEqual([ativoNulo, ativoVazio, ativoExplicito].sort());
+      expect(operacionais).not.toContain(suspenso);
+      expect(operacionais).not.toContain(bloqueado);
     });
   }, 180000);
 });
