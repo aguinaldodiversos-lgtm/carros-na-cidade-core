@@ -7,6 +7,7 @@
 // ou qualquer outro identificador de dono vindo do corpo ou da query. O corpo
 // só carrega o QUE se procura; QUEM procura e de ONDE são do servidor.
 
+import * as offersService from "./purchase-intent-offers.service.js";
 import * as service from "./purchase-intents.service.js";
 
 /**
@@ -62,6 +63,35 @@ export async function listDealerOpportunities(req, res) {
 
 export async function getDealerOpportunity(req, res) {
   const result = await service.getDealerOpportunity(req.user.id, req.params.id);
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+// --- Envio de veículos (Fase 3) ---------------------------------------------
+
+export async function listMatchingAds(req, res) {
+  const result = await offersService.listMatchingAdsForDealer(req.user.id, req.params.id);
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * O corpo carrega SÓ `ad_id`.
+ *
+ * `dealer_user_id`, `advertiser_id`, `buyer_user_id`, `city_id`, `price` e
+ * qualquer mensagem que o cliente mandasse junto são ignorados — não existe
+ * `req.body.x` lido em lugar nenhum além de `ad_id`. QUEM envia sai de
+ * `req.user`, PARA QUEM sai da procura, e DE ONDE sai do advertiser. É por isso
+ * que não há como forjar um envio em nome de outra loja mudando o payload.
+ */
+export async function createOffer(req, res) {
+  const result = await offersService.sendVehicleToBuyer(req.user.id, req.params.id, req.body || {});
+  applyPrivateHeaders(res);
+  return res.status(result.created ? 201 : 200).json({ success: true, ...result });
+}
+
+export async function listReceivedOffers(req, res) {
+  const result = await offersService.listReceivedOffers(req.user.id, req.params.id);
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });
 }
