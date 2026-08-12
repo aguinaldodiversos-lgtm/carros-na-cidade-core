@@ -52,7 +52,7 @@ import {
   compareMatchingAds,
   evaluateAdForIntent,
 } from "./purchase-intent-offers.matching.js";
-import { resolveDealerCityId } from "./purchase-intents.service.js";
+import { requireUserId, resolveDealerCityId } from "./purchase-intents.service.js";
 import { parsePurchaseIntentId } from "./purchase-intents.validation.js";
 
 /**
@@ -229,7 +229,7 @@ function serializeReceivedOffer(row, { maxPrice, mainImage }) {
  * NÃO é autorização. Quem autoriza é o POST, que repete a avaliação.
  */
 export async function listMatchingAdsForDealer(userId, rawIntentId) {
-  const dealerUserId = String(userId);
+  const dealerUserId = requireUserId(userId);
   const purchaseIntentId = parsePurchaseIntentId(rawIntentId);
 
   const cityId = await resolveDealerCityId(dealerUserId);
@@ -401,7 +401,7 @@ async function notifyBuyerOfOffer({ intentId, buyerUserId, adId, vehicleName }) 
  * ele nunca usou.
  */
 export async function sendVehicleToBuyer(userId, rawIntentId, body) {
-  const dealerUserId = String(userId);
+  const dealerUserId = requireUserId(userId);
   const purchaseIntentId = parsePurchaseIntentId(rawIntentId);
   const adId = parseAdId(body?.ad_id);
 
@@ -554,7 +554,7 @@ export async function sendVehicleToBuyer(userId, rawIntentId, body) {
  * são veículos NOVOS, e essa regra vive no POST.
  */
 export async function listReceivedOffers(userId, rawIntentId) {
-  const buyerUserId = String(userId);
+  const buyerUserId = requireUserId(userId);
   const purchaseIntentId = parsePurchaseIntentId(rawIntentId);
 
   const { rows, intentFound, maxPrice } = await loadBuyerOffers({

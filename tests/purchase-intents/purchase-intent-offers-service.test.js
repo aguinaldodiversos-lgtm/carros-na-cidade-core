@@ -407,6 +407,23 @@ describe("sendVehicleToBuyer", () => {
     }
   });
 
+  it("sessão com id torto vira 401, não 500 de violação de tipo no banco", async () => {
+    // A guarda é a MESMA da Fase 2 (`requireUserId`, agora exportada). Sem ela,
+    // um id não numérico chegaria a uma coluna BIGINT e o sintoma seria um 500
+    // com erro de driver no log, em vez da causa real.
+    //
+    // Este caso existe para provar ALCANCE: a guarda está no caminho dos três
+    // pontos de entrada, não apenas definida em algum lugar.
+    for (const bad of [undefined, null, "", "abc", "0", "-1"]) {
+      await expectRejection(offers.sendVehicleToBuyer(bad, "1", { ad_id: 1 }), {
+        statusCode: 401,
+      });
+      await expectRejection(offers.listMatchingAdsForDealer(bad, "1"), { statusCode: 401 });
+      await expectRejection(offers.listReceivedOffers(bad, "1"), { statusCode: 401 });
+    }
+    expect(db.purchaseIntentOffers).toHaveLength(0);
+  });
+
   it("ignora dealer_user_id / buyer_user_id / price vindos do corpo", async () => {
     await offers.sendVehicleToBuyer(DEALER_A, "1", {
       ad_id: 1,
