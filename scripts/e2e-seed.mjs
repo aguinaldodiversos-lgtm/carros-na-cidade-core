@@ -103,6 +103,100 @@ await pool.query(
   [userId]
 );
 
+// --- Lojistas CNPJ para o Motor de Oportunidades (Fase 2) --------------------
+//
+// Dois, em cidades DIFERENTES, porque o teste que importa é o negativo: provar
+// que o lojista de Bragança NÃO vê a procura publicada em Atibaia. Com um único
+// lojista, um bug que ignorasse a cidade passaria despercebido.
+//
+// A Fase 2.1 acrescentou dois lojistas NA MESMA cidade do comprador, mas fora do
+// ar: suspenso e bloqueado. Eles existem para provar que moderação corta o
+// acesso — sem eles, "só loja ativa participa" seria uma regra sem testemunha.
+//
+// Aditivo e idempotente: não altera o utilizador CPF nem os anúncios dele, então
+// os specs que já existiam continuam a ver exatamente o mesmo estado.
+const DEALERS = [
+  { email: "cnpj@carrosnacidade.com", name: "Loja Atibaia", slug: "atibaia-sp", status: "active" },
+  {
+    email: "cnpj2@carrosnacidade.com",
+    name: "Loja Braganca",
+    slug: "braganca-paulista-sp",
+    status: "active",
+  },
+  {
+    email: "cnpj3@carrosnacidade.com",
+    name: "Loja Atibaia Suspensa",
+    slug: "atibaia-sp",
+    status: "suspended",
+  },
+  {
+    email: "cnpj4@carrosnacidade.com",
+    name: "Loja Atibaia Bloqueada",
+    slug: "atibaia-sp",
+    status: "blocked",
+  },
+];
+
+await pool.query(
+  `INSERT INTO cities (name, state, slug)
+   VALUES ('Bragança Paulista', 'SP', 'braganca-paulista-sp')
+   ON CONFLICT (slug) DO NOTHING`
+);
+
+for (const dealer of DEALERS) {
+  const { rows: cityRows } = await pool.query(`SELECT id FROM cities WHERE slug = $1 LIMIT 1`, [
+    dealer.slug,
+  ]);
+  const dealerCityId = cityRows[0]?.id;
+  if (dealerCityId == null) {
+    throw new Error(`[e2e-seed] Cidade ${dealer.slug} não encontrada em cities.`);
+  }
+
+  const touched = await pool.query(
+    `UPDATE users
+        SET password_hash = $2,
+            document_type = 'cnpj',
+            email_verified = true,
+            document_verified = true
+      WHERE LOWER(email) = LOWER($1)
+      RETURNING id`,
+    [dealer.email, hash]
+  );
+
+  let dealerUserId = touched.rows[0]?.id;
+  if (dealerUserId == null) {
+    const created = await pool.query(
+      `INSERT INTO users (email, password_hash, name, document_type, role, plan,
+                          email_verified, document_verified)
+       VALUES ($1, $2, $3, 'cnpj', 'user', 'free', true, true)
+       RETURNING id`,
+      [dealer.email, hash, dealer.name]
+    );
+    dealerUserId = created.rows[0].id;
+  }
+
+  // `ensureAdvertiserForUser` não ATUALIZA a cidade de um advertiser existente
+  // (não existe caminho que faça isso em lado nenhum do projeto), então o UPDATE
+  // abaixo garante que reexecutar o seed devolve o lojista à cidade esperada.
+  await ensureAdvertiserForUser(dealerUserId, {
+    cityId: Number(dealerCityId),
+    source: "e2e-seed",
+  });
+  await pool.query(`UPDATE advertisers SET city_id = $2, status = $3 WHERE user_id = $1`, [
+    dealerUserId,
+    dealerCityId,
+    dealer.status,
+  ]);
+}
+
+// Estado limpo entre execuções: as procuras são criadas pelos specs, não aqui.
+// Fica FORA do laço acima — é sobre o comprador, não sobre cada lojista.
+await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`, [userId]);
+
 await closeDatabasePool();
 
-console.log("[e2e-seed] OK —", E2E_EMAIL, "+ cidade Atibaia + advertiser");
+console.log(
+  "[e2e-seed] OK —",
+  E2E_EMAIL,
+  "+ cidade Atibaia + advertiser + lojistas CNPJ (Atibaia/Bragança)"
+);

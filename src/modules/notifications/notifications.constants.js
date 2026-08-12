@@ -54,6 +54,8 @@ export const NOTIFICATION_ALLOWED_ACTION_PREFIXES = Object.freeze([
  * — e para documentar o formato `dominio.fato_no_passado`.
  */
 export const NOTIFICATION_EVENT_TYPE = Object.freeze({
+  /** Fase 2 — procura publicada; avisa os lojistas CNPJ da mesma cidade. */
+  PURCHASE_INTENT_CREATED: "purchase_intent.created",
   PURCHASE_INTENT_OFFER_RECEIVED: "purchase_intent.offer_received",
   PURCHASE_INTENT_VEHICLE_SELECTED: "purchase_intent.vehicle_selected",
   SALE_REQUEST_BID_RECEIVED: "sale_request.bid_received",
