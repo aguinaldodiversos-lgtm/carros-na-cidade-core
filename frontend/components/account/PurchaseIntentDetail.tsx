@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/account/PurchaseIntentsList";
+import ReceivedVehicles from "@/components/account/ReceivedVehicles";
 import {
   PURCHASE_TIMEFRAME_LABEL,
   TRANSMISSION_LABEL,
@@ -22,9 +23,13 @@ import {
  * outra. Editar depois da notificação faria a oportunidade que a loja recebeu
  * deixar de ser a que ela vê ao clicar.
  *
- * Também não existe área de "veículos recebidos", nem vazia: `purchase_intent_offers`
- * é da Fase 3, e um espaço reservado com "nenhum veículo ainda" anunciaria um
- * fluxo que não existe.
+ * Abaixo dos detalhes fica "Veículos enviados para você" (Fase 3), com
+ * carregamento e erro PRÓPRIOS: a procura é o conteúdo principal e continua
+ * utilizável mesmo se a lista de veículos falhar.
+ *
+ * A área aparece também em procura encerrada ou expirada — o que o comprador já
+ * recebeu é histórico dele, e escondê-lo faria as opções sumirem no dia em que
+ * ele encerrasse a busca.
  */
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -211,6 +216,8 @@ export default function PurchaseIntentDetail({
             : "Esta procura expirou. Publique uma nova quando quiser."}
         </p>
       )}
+
+      <ReceivedVehicles intentId={id} />
     </section>
   );
 }
