@@ -12,14 +12,29 @@ import type { DealerOpportunity } from "@/lib/purchase-intents/api";
  * "Compradores ativos" — a superfície do lojista.
  *
  * Além dos estados de tela, este arquivo trava duas coisas que definem o
- * produto: a ausência TOTAL de identidade do comprador na tela, e a ausência
- * dos elementos da Fase 3 (enviar veículo, WhatsApp, agendar). Um botão desses
+ * produto: a ausência TOTAL de identidade do comprador na tela, e a ausência do
+ * que ainda não existe (WhatsApp, agendar, chat, leilão). Um botão desses
  * aparecendo aqui prometeria um fluxo inexistente.
+ *
+ * A seção de estoque da Fase 3 tem arquivo próprio
+ * (`DealerMatchingStock.test.tsx`). Aqui ela é apenas MOCKADA no nível do
+ * cliente HTTP: o detalhe da oportunidade precisa continuar sendo testável sem
+ * depender do estoque, que é justamente a separação que o produto exige.
  */
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+
+const fetchMatchingAds = vi.fn();
+
+vi.mock("@/lib/purchase-intents/offers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/purchase-intents/offers")>();
+  return {
+    ...actual,
+    fetchMatchingAds: (...args: unknown[]) => fetchMatchingAds(...args),
+  };
+});
 
 const fetchDealerOpportunities = vi.fn();
 const fetchDealerOpportunity = vi.fn();
@@ -58,6 +73,10 @@ beforeEach(() => {
     limit: 20,
   });
   fetchDealerOpportunity.mockResolvedValue(makeOpportunity());
+  fetchMatchingAds.mockResolvedValue({
+    matching_ads: [],
+    limit: { max_per_dealer: 3, used: 0, remaining: 3 },
+  });
 });
 
 afterEach(cleanup);
@@ -193,17 +212,20 @@ describe("DealerOpportunityDetail", () => {
     expect(screen.getByText("Em até 30 dias")).toBeVisible();
   });
 
-  it("NÃO traz nada da Fase 3 — sem enviar veículo, sem WhatsApp, sem agendar", async () => {
+  it("traz a seção de estoque da Fase 3, mas nada da Fase 4", async () => {
+    // A Fase 3 acrescentou "Veículos do seu estoque" + "Enviar ao comprador".
+    // O que continua NÃO existindo — e não pode aparecer nem como botão morto —
+    // é a etapa de contato: WhatsApp, agendamento, chat e leilão.
     render(<DealerOpportunityDetail id={1} />);
     await screen.findByTestId("dealer-opportunity-detail");
+    expect(await screen.findByTestId("dealer-matching-stock")).toBeVisible();
 
-    expect(screen.queryByText(/enviar ve[íi]culo/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/whatsapp/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/agendar/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/conversar|chat|mensagem/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/lance|leil[ãa]o/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/pr[óo]xima etapa/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/em breve/i)).not.toBeInTheDocument();
-    // Nem contagem de estoque compatível (matching é Fase 3).
-    expect(screen.queryByText(/compat[íi]ve/i)).not.toBeInTheDocument();
   });
 
   it("404 de outra cidade vira estado de erro sem revelar existência", async () => {
