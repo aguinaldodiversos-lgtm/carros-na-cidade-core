@@ -283,8 +283,19 @@ export async function getActiveByIdForCity(purchaseIntentId, cityId) {
  *
  * Mesmo formato de `public-dealer.service.js:57`, que já usa
  * `COALESCE(adv.status, 'active') = 'active'`.
+ *
+ * O predicado é MONTADO por função porque a Fase 3 precisa dele em consultas
+ * com outra numeração de parâmetro e outro alias de tabela. Copiar a expressão
+ * para lá criaria duas versões da mesma regra de moderação — e a que ficasse
+ * para trás numa correção seria justamente a que decide quem fica no ar.
+ *
+ * @param {{ alias?: string, param?: number }} [options]
  */
-export const ADVERTISER_IS_OPERATIONAL = `COALESCE(NULLIF(BTRIM(adv.status), ''), 'active') = $2`;
+export function advertiserIsOperational({ alias = "adv", param = 2 } = {}) {
+  return `COALESCE(NULLIF(BTRIM(${alias}.status), ''), 'active') = $${param}`;
+}
+
+export const ADVERTISER_IS_OPERATIONAL = advertiserIsOperational();
 
 /**
  * Linhas de advertiser OPERACIONAIS do usuário — TODAS, sem LIMIT.
