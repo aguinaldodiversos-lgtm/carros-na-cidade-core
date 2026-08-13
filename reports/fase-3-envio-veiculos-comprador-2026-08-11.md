@@ -11,9 +11,9 @@ Branch: `codex/opportunities-phase-3-vehicle-offers`
 |---|---|
 | branch de partida | `main`, working tree limpo |
 | HEAD inicial | `8aaf3e08ae8ca76b88a263c5c1911ffbada0836c` |
-| HEAD final | `03146aabefa2595b8968e07d0b8b7b8a045f6d0a` |
-| commits | 6 |
-| diff | 27 arquivos, +5.096 / −26 |
+| HEAD final | `7b3be49d` (ver git log) |
+| commits | 8 |
+| diff | 28 arquivos (ver `git diff main...HEAD --stat`) |
 
 Fase 2 / 2.1 confirmada na `main` **por conteúdo**, não por SHA:
 `src/modules/purchase-intents/**` (8 arquivos), `050_purchase_intents.sql`,
@@ -333,35 +333,87 @@ experiência; a página rolando para o lado quebra.
 
 | suíte | baseline | agora | resultado |
 |---|---|---|---|
-| backend | 190 arq. / 2.777 | **192 arq. / 2.840** | ✅ verde, +63 testes |
+| backend | 190 arq. / 2.777 | **192 arq. / 2.841** | ✅ verde, +64 testes |
 | frontend | 190 verdes + 2 falhando | **192 verdes + 2 falhando** | ✅ mesmas 5 falhas de baseline |
 | typecheck | verde | verde | ✅ |
 | frontend lint | verde | verde | ✅ |
 | frontend build | — | verde (standalone ok) | ✅ |
 | backend lint | 233 (11 erros) | **233 (11 erros)** | ✅ idêntico |
-| **integração PostgreSQL** | — | — | ⛔ **não executado** |
-| **concorrência** | — | — | ⛔ **não executado** |
-| **E2E** | — | — | ⛔ **não executado** |
+| **integração PostgreSQL — schema** | — | **8/8** | ✅ |
+| **integração PostgreSQL — concorrência** | — | **11/11** | ✅ |
+| **E2E (Playwright)** | — | **2/2, duas execuções** | ✅ |
 
 **Nenhuma regressão nova.** As 5 falhas do frontend são exatamente as mesmas do
 baseline, nos mesmos 2 arquivos, ambos sem relação com esta fase.
+
+### Evidência do §68 — concorrência real
+
+```
+✓ quatro envios SIMULTÂNEOS resultam em EXATAMENTE 3 relações
+✓ o resultado é ESTÁVEL: cinco rodadas, sempre exatamente 3
+✓ quatro envios simultâneos do MESMO anúncio criam UMA linha só
+✓ veículo indisponível libera a vaga, e o quarto envio passa
+✓ o comprador vê o preço ATUAL do anúncio, não o da hora do envio
+✓ anúncio fora do ar aparece INDISPONÍVEL para o comprador, sem sumir
+✓ loja bloqueada depois do envio torna o card indisponível
+
+Test Files  2 passed (2)
+     Tests  19 passed (19)
+```
+
+4 simultâneos → **3 criados, 1 rejeitado** com
+`PURCHASE_INTENT_OFFER_LIMIT_REACHED`. 4 simultâneos do mesmo anúncio → **1
+relação**, 3 respostas idempotentes, zero erro.
+
+### Evidência do E2E
+
+```
+✓ lojista envia carro do próprio estoque; rival não consegue; comprador recebe
+✓ o fluxo crítico funciona no mobile, sem overflow horizontal
+2 passed (1.3m)
+```
+
+Executado **duas vezes** em ambiente limpo (backend reiniciado + `e2e:prepare`),
+verde nas duas. Cobre: matching mostra só os 2 HR-V do próprio estoque (o Honda
+City da mesma loja e o HR-V do rival ficam de fora), envio pela TELA, retry
+idempotente (200 + `already_sent`), ataque cross-dealer (404), card recebido com
+preço/loja/badge/link, notificação com `action_path` correto, e mobile 390×844
+sem overflow.
 
 ### Testes escritos nesta fase
 
 | arquivo | testes | cobre |
 |---|---|---|
 | `purchase-intent-offers-matching.test.js` | 24 | §59 e §60 completos, com valores FIPE reais |
-| `purchase-intent-offers-service.test.js` | 40 | posse, status, limite, idempotência, notificação, privacidade |
+| `purchase-intent-offers-service.test.js` | 41 | posse, status, limite, idempotência, notificação, privacidade |
 | `purchase-intent-offers-schema.integration.test.js` | 8 | FKs, UNIQUE, índices, ausência de cópia, CASCADE |
-| `purchase-intent-offers-concurrency.integration.test.js` | 7 | **4 simultâneos → exatamente 3**, 5 rodadas |
+| `purchase-intent-offers-concurrency.integration.test.js` | 11 | **4 simultâneos → exatamente 3**, as 3 consultas contra Postgres real, CHECK de status |
 | `DealerMatchingStock.test.tsx` | 19 | estados, clique duplo, limite, ausências |
 | `ReceivedVehicles.test.tsx` | 17 | card vivo, indisponível, vazio, erro |
-| `purchase-intent-offers.spec.ts` (E2E) | 4 | fluxo completo + cross-dealer + idempotência + mobile |
+| `purchase-intent-offers.spec.ts` (E2E) | 2 | fluxo completo + cross-dealer + idempotência + mobile |
 
 O teste de concorrência importa `sendVehicleToBuyer` e o executa contra o banco
 temporário, **em vez de** reescrever BEGIN/SELECT/INSERT à mão. SQL escrito no
 teste provaria que o PostgreSQL sabe travar linha — que ninguém duvida — e
 continuaria passando no dia em que alguém removesse a transação do service.
+
+### §90 — falha intermitente observada e NÃO atribuída
+
+Em 2 de ~14 execuções da suíte completa do frontend o total foi **3 arquivos /
+6 testes** falhando em vez dos 2 / 5 do baseline. Não classifiquei como baseline
+automaticamente, e também não consegui identificá-la:
+
+- **8 execuções completas consecutivas** depois disso: sempre 2 / 5, e as duas
+  ocorrências não deixaram registro do terceiro arquivo;
+- os 4 arquivos de frontend criados/alterados nesta fase rodaram **6 vezes
+  isolados**: 59/59 verdes em todas;
+- as duas ocorrências foram enquanto o backend e o Next dev server do E2E
+  competiam por CPU — a assinatura de um teste sensível a tempo, não de
+  regressão.
+
+**Fica registrado como observação aberta**, não como "flake conhecido". Se
+reaparecer, o passo é capturar o nome do terceiro arquivo (`npm test 2>&1 | grep
+FAIL`) antes de qualquer conclusão.
 
 ---
 
@@ -429,6 +481,85 @@ e depois e exige igualdade. Nenhuma query do módulo escreve em `ads`.
 
 ---
 
+## Correções encontradas pelo banco real
+
+O PostgreSQL de verdade encontrou dois problemas que **toda** a suíte unitária
+tinha aprovado. Ambos corrigidos; nenhum exigiu migration.
+
+### 1. `SELECT a.image_url` — coluna que não existe
+
+```
+column a.image_url does not exist
+```
+
+`AD_CARD_COLUMNS` pedia `a.image_url`. A coluna **não existe em `ads`**: a
+baseline (004) nunca a criou, nenhuma migration posterior criou, e a única
+`image_url` do schema é a de `blog_posts` (035). Confirmado no banco real —
+`ads` tem apenas `images` (JSONB).
+
+Derrubava os **três** caminhos da fase (matching, envio, leitura do comprador)
+antes de qualquer lógica rodar, inclusive antes da concorrência ser exercitada.
+
+**De onde veio o engano:** o objeto que `normalizePublicAdRow` *devolve* tem
+`image_url` (a capa já resolvida), e a allowlist de DTO em
+`ads.public-listing.js` lista `image_url` entre os campos do card. Os dois são
+**saída do serializer**, não coluna de tabela.
+
+**Correção:** remover a coluna da projeção. `buildNormalizedPublicImages` lê
+`row.images` e trata `row.image_url` como opcional, então o resultado não muda.
+Criar uma migration para adicionar `ads.image_url` seria consertar o schema para
+caber no defeito.
+
+**Por que nenhum teste pegou** — e o que mudou:
+
+- o fake devolvia `image_url: ad.image_url ?? null`. Um fake que inventa coluna
+  concorda com qualquer query. `projectAd` agora espelha `AD_CARD_COLUMNS`
+  coluna a coluna;
+- `listActiveAdsByDealer` (a lista de compatíveis) tinha o mesmo defeito e
+  **nenhum teste de integração a exercitava**. Três casos novos garantem que
+  cada caminho de leitura roda contra Postgres real ao menos uma vez.
+
+### 2. `sold` não é gravável neste banco
+
+```
+new row for relation "ads" violates check constraint "ads_status_check"
+```
+
+Os testes que simulavam "carro vendido" com `status = 'sold'` morriam no CHECK.
+O `ads_status_check` (migration 032) aceita apenas `active | pending_review |
+paused | rejected | blocked | deleted | archived`, e o comentário da própria
+migration é explícito: *"draft/sold/expired ainda fora do CHECK até ter caminho
+de escrita real"*.
+
+`sold` existe em `AD_STATUS` (JS) mas **nenhum service o escreve**. Ou seja: o
+cenário que a especificação da fase descreve como "ad1 → sold" não é produzível
+hoje; o equivalente real é `paused` (o dono pausa) ou `archived`/`blocked`
+(moderação).
+
+**Não é bug de produto.** O código compara com `ACTIVE`, então qualquer status
+não-ativo cai no ramo certo. O que estava errado era o **teste**, que provava um
+cenário que o banco recusa.
+
+**Correção:** os cenários primários passam a usar `paused`. Um teste novo
+documenta o CHECK dentro da suíte, para que a próxima pessoa que escrever
+`status = 'sold'` veja o motivo em vez de um "violates check constraint" solto.
+`sold`/`expired` continuam nas varreduras de "qualquer estado não-active" como
+defesa — com o porquê escrito ao lado.
+
+### 3. Duas falhas do E2E que não eram do produto
+
+- **401 que era 429**: `loginRateLimit` permite 10 logins por IP a cada 15
+  minutos e o E2E inteiro sai de 127.0.0.1. A versão anterior do spec tinha 4
+  testes independentes = 15 logins; os dois últimos gastavam o balde e falhavam
+  com 401 no passo seguinte. Consolidado em 2 testes (7 logins), e `login()`
+  agora distingue 429 com mensagem própria.
+- **"element not found" que era compilação sob demanda**: no `npm run dev` a
+  primeira navegação à rota do lojista compila sob demanda; o cabeçalho da seção
+  aparece antes de a lista sair do esqueleto. `waitForStockSettled` espera a
+  **condição** (esqueleto sumir) e separa vazio de erro na mensagem.
+
+---
+
 ## Known debts
 
 1. **Sem paginação em `/offers` e `/matching-ads`.** Ambas devolvem a lista
@@ -458,32 +589,42 @@ e depois e exige igualdade. Nenhuma query do módulo escreve em `ads`.
 
 ## Verdict
 
-# NO-GO — pendente de execução dos testes de banco
+# GO
 
-**Não há defeito conhecido no código.** Todo o escopo da fase está implementado e
-todas as suítes executáveis nesta máquina estão verdes, sem regressão nova.
+Todo o escopo da fase está implementado e **todas** as suítes foram executadas,
+incluindo as que dependem de PostgreSQL real e do navegador.
 
-O bloqueio é **de ambiente**: o Docker Desktop está instalado e com processo
-ativo, mas a distro WSL `docker-desktop` permaneceu `Stopped` durante toda a
-sessão (~60 verificações) e o CLI `docker` trava sem responder. O Postgres local
-na porta 5432 recusou autenticação com a credencial documentada em `.env.test`.
+O NO-GO anterior era ambiental (Docker parado). Com o banco no ar, os testes de
+integração fizeram exatamente o trabalho que se espera deles: encontraram um
+defeito REAL que a suíte unitária inteira havia aprovado (`SELECT a.image_url`
+sobre coluna inexistente), mais um erro de premissa nos meus próprios testes
+(`sold` não é gravável). Os dois estão corrigidos e documentados acima.
 
-Sem banco não foi possível executar:
+| verificação | resultado |
+|---|---|
+| schema (PostgreSQL) | **8/8** |
+| concorrência (PostgreSQL) | **11/11** |
+| E2E (Playwright) | **2/2**, duas execuções limpas |
+| backend | 192 arq. / 2.841 — verde |
+| frontend | 192 verdes; 5 falhas idênticas ao baseline |
+| typecheck / lint FE / build | verdes |
+| lint BE | 233 (11 erros) — idêntico ao baseline |
 
-- `purchase-intent-offers-schema.integration.test.js`
-- **`purchase-intent-offers-concurrency.integration.test.js`** — o §68 marca este
-  teste como **obrigatório para GO**
-- `e2e/purchase-intent-offers.spec.ts`
+**Uma ressalva honesta**, para a revisão decidir: uma falha intermitente do
+frontend (1 arquivo / 1 teste a mais que o baseline) apareceu 2 vezes em ~14
+execuções e **não foi identificada** — 8 execuções completas seguidas voltaram
+ao baseline e os 4 arquivos desta fase ficaram 6/6 verdes isolados. Está
+registrada acima como observação aberta, não como flake conhecido.
 
-Os três estão **escritos e commitados**. Marcá-los como "passariam" seria
-exatamente o tipo de afirmação que a especificação proíbe.
-
-### Para fechar o GO
+### Reproduzir
 
 ```bash
 npm run e2e:prepare
 npx vitest run tests/integration/purchase-intent-offers-schema.integration.test.js tests/integration/purchase-intent-offers-concurrency.integration.test.js
-cd frontend && npx playwright test e2e/purchase-intent-offers.spec.ts
+```
+
+```bash
+cd frontend && PW_START_SERVER=1 npx playwright test e2e/purchase-intent-offers.spec.ts
 ```
 
 Com as três verdes, todos os demais critérios do §95 já estão satisfeitos e o
@@ -510,10 +651,10 @@ veredito vira **GO**.
 | dealer suspended/blocked não envia | ✅ |
 | cross-city protegido | ✅ |
 | intent closed/expired não recebe | ✅ |
-| limite 3 / quarto bloqueado | ✅ (unitário) |
-| indisponível libera vaga | ✅ (unitário) |
-| **4 simultâneos → exatamente 3** | ⛔ **não executado** |
-| duplicado gera 1 row / retry idempotente | ✅ (unitário) |
+| limite 3 / quarto bloqueado | ✅ (unitário + PostgreSQL real) |
+| indisponível libera vaga | ✅ (unitário + PostgreSQL real) |
+| **4 simultâneos → exatamente 3** | ✅ (11/11, estável em 5 rodadas) |
+| duplicado gera 1 row / retry idempotente | ✅ (unitário + 4 simultâneos no banco real) |
 | comprador recebe notificação / retry não duplica | ✅ |
 | falha da notificação não desfaz envio | ✅ |
 | PF só vê offers das próprias procuras | ✅ |
@@ -521,7 +662,7 @@ veredito vira **GO**.
 | card usa dados atuais / preço e foto vivos | ✅ |
 | vendido → indisponível; advertiser bloqueado → indisponível | ✅ |
 | "Ver anúncio" só quando disponível | ✅ |
-| PJ envia no mobile / PF vê no mobile / zero overflow | ⚠️ auditoria estática |
+| PJ envia no mobile / PF vê no mobile / zero overflow | ✅ E2E em 390×844 |
 | nenhum WhatsApp/chat/leilão | ✅ |
 | planos, payments, SEO intocados | ✅ |
 | testes sem regressão nova | ✅ |
