@@ -274,6 +274,183 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
     expect(result.offers[0].vehicle.vehicle_name).toBe("Honda HR-V");
     expect(result.offers[0].dealer.name).toBe("ittmotors");
   }, 180000);
+
+  /**
+   * Fase 3.1 — `getOfferContactForBuyer` contra o banco real.
+   *
+   * Mesma lição do `SELECT a.image_url`: o fake devolve o que a projeção dele
+   * inventar, então uma coluna inexistente em `advertisers` passaria por toda a
+   * suíte unitária e só quebraria em produção, no clique do comprador. Este
+   * caso existe para que a query com o COALESCE de três colunas execute de
+   * verdade pelo menos uma vez.
+   */
+  it("resolveOfferWhatsapp roda contra o banco e devolve wa.me com a mensagem", async () => {
+    const world = await seedWorld();
+    await pool.query(`UPDATE advertisers SET whatsapp = '(11) 99999-9999' WHERE id = $1`, [
+      world.advertiserId,
+    ]);
+
+    const sent = await offers.sendVehicleToBuyer(
+      String(world.dealerId),
+      String(world.intentId),
+      { ad_id: world.adIds[0] }
+    );
+
+    const result = await offers.resolveOfferWhatsapp(
+      String(world.buyerId),
+      String(world.intentId),
+      String(sent.offer.id)
+    );
+
+    const url = new URL(result.url);
+    expect(url.host).toBe("wa.me");
+    expect(url.pathname).toBe("/5511999999999");
+    expect(decodeURIComponent(url.searchParams.get("text"))).toBe(
+      "Olá! Recebi pelo Carros na Cidade a opção do Honda HR-V 2020 e gostaria de agendar uma visita para conhecer o veículo."
+    );
+  }, 180000);
+
+  it("a precedência COALESCE(whatsapp, mobile_phone, phone) vale no banco real", async () => {
+    const world = await seedWorld();
+    const sent = await offers.sendVehicleToBuyer(
+      String(world.dealerId),
+      String(world.intentId),
+      { ad_id: world.adIds[0] }
+    );
+
+    const whatsappOf = async () => {
+      const result = await offers.resolveOfferWhatsapp(
+        String(world.buyerId),
+        String(world.intentId),
+        String(sent.offer.id)
+      );
+      return new URL(result.url).pathname;
+    };
+
+    await pool.query(
+      `UPDATE advertisers SET whatsapp = $2, mobile_phone = $3, phone = $4 WHERE id = $1`,
+      [world.advertiserId, "(11) 91111-1111", "(11) 92222-2222", "(11) 93333-3333"]
+    );
+    expect(await whatsappOf()).toBe("/5511911111111");
+
+    await pool.query(`UPDATE advertisers SET whatsapp = NULL WHERE id = $1`, [
+      world.advertiserId,
+    ]);
+    expect(await whatsappOf()).toBe("/5511922222222");
+
+    await pool.query(`UPDATE advertisers SET mobile_phone = NULL WHERE id = $1`, [
+      world.advertiserId,
+    ]);
+    expect(await whatsappOf()).toBe("/5511933333333");
+
+    // Sem nenhum dos três: erro de DOMÍNIO, não 500.
+    await pool.query(`UPDATE advertisers SET phone = NULL WHERE id = $1`, [world.advertiserId]);
+    await expect(
+      offers.resolveOfferWhatsapp(
+        String(world.buyerId),
+        String(world.intentId),
+        String(sent.offer.id)
+      )
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      details: { code: "DEALER_WHATSAPP_UNAVAILABLE" },
+    });
+  }, 180000);
+
+  it("IDOR: outro comprador e oferta de outra procura recebem 404 no banco real", async () => {
+    const world = await seedWorld();
+    await pool.query(`UPDATE advertisers SET whatsapp = '(11) 99999-9999' WHERE id = $1`, [
+      world.advertiserId,
+    ]);
+
+    const sent = await offers.sendVehicleToBuyer(
+      String(world.dealerId),
+      String(world.intentId),
+      { ad_id: world.adIds[0] }
+    );
+
+    // Outro comprador, com procura própria.
+    const { rows: otherRows } = await pool.query(
+      `INSERT INTO users (email, password_hash, name, document_type)
+       VALUES ('outro@conc.test', 'x', 'Outro', 'cpf') RETURNING id`
+    );
+    const otherBuyerId = otherRows[0].id;
+
+    const { rows: otherIntentRows } = await pool.query(
+      `INSERT INTO purchase_intents (
+         buyer_user_id, city_id, intent_type, brand, brand_slug, model, model_slug,
+         transmission, max_price, purchase_timeframe, status, expires_at
+       )
+       VALUES ($1, $2, 'specific_model', 'Honda', 'honda', 'HR-V', 'hr-v',
+               'automatico', 100000, 'within_30_days', 'active', NOW() + INTERVAL '30 days')
+       RETURNING id`,
+      [otherBuyerId, world.cityId]
+    );
+    const otherIntentId = otherIntentRows[0].id;
+
+    // §39 — comprador B pedindo a oferta de A.
+    await expect(
+      offers.resolveOfferWhatsapp(
+        String(otherBuyerId),
+        String(world.intentId),
+        String(sent.offer.id)
+      )
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    // §40 — oferta de A pendurada na procura de B.
+    await expect(
+      offers.resolveOfferWhatsapp(
+        String(otherBuyerId),
+        String(otherIntentId),
+        String(sent.offer.id)
+      )
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    // E o dono legítimo continua conseguindo.
+    await expect(
+      offers.resolveOfferWhatsapp(
+        String(world.buyerId),
+        String(world.intentId),
+        String(sent.offer.id)
+      )
+    ).resolves.toHaveProperty("url");
+  }, 180000);
+
+  it("anúncio pausado e loja bloqueada cortam o contato no banco real", async () => {
+    for (const setup of [
+      { label: "anúncio pausado", sql: `UPDATE ads SET status = 'paused' WHERE id = $1`, ad: true },
+      {
+        label: "loja bloqueada",
+        sql: `UPDATE advertisers SET status = 'blocked' WHERE id = $1`,
+        ad: false,
+      },
+    ]) {
+      const world = await seedWorld();
+      await pool.query(`UPDATE advertisers SET whatsapp = '(11) 99999-9999' WHERE id = $1`, [
+        world.advertiserId,
+      ]);
+
+      const sent = await offers.sendVehicleToBuyer(
+        String(world.dealerId),
+        String(world.intentId),
+        { ad_id: world.adIds[0] }
+      );
+
+      await pool.query(setup.sql, [setup.ad ? world.adIds[0] : world.advertiserId]);
+
+      await expect(
+        offers.resolveOfferWhatsapp(
+          String(world.buyerId),
+          String(world.intentId),
+          String(sent.offer.id)
+        ),
+        setup.label
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        details: { code: "PURCHASE_INTENT_OFFER_UNAVAILABLE" },
+      });
+    }
+  }, 180000);
 });
 
 describe.sequential("integração — limite de 3 sob concorrência real", () => {

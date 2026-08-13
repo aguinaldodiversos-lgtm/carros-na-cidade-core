@@ -333,6 +333,56 @@ function handle(text, params, now) {
     return { rows, rowCount: rows.length };
   }
 
+  // --- contato de WhatsApp da oferta (Fase 3.1) ----------------------------
+  //
+  // Precisa vir ANTES da listagem do comprador: as duas partem de
+  // `purchase_intent_offers o JOIN purchase_intents pi`. O que distingue é o
+  // `WHERE o.id = $1` (uma oferta específica) e a coluna `whatsapp_number`.
+  if (/whatsapp_number/i.test(text) && /WHERE o\.id = \$1/i.test(text)) {
+    const [offerId, purchaseIntentId, buyerUserId, advStatus] = params;
+
+    // As TRÊS condições do WHERE real, reimplementadas. Apagar qualquer uma
+    // delas do repository faz os testes de IDOR falharem — que é o objetivo.
+    const offer = db.purchaseIntentOffers.find(
+      (item) =>
+        sameId(item.id, offerId) && sameId(item.purchase_intent_id, purchaseIntentId)
+    );
+    if (!offer) return { rows: [], rowCount: 0 };
+
+    const intent = db.purchaseIntents.find(
+      (item) =>
+        sameId(item.id, offer.purchase_intent_id) && sameId(item.buyer_user_id, buyerUserId)
+    );
+    if (!intent) return { rows: [], rowCount: 0 };
+
+    const ad = db.ads.find((item) => sameId(item.id, offer.ad_id));
+    if (!ad) return { rows: [], rowCount: 0 };
+
+    const advertiser = advertiserById(ad.advertiser_id);
+
+    return {
+      rows: [
+        {
+          offer_id: offer.id,
+          ad_id: ad.id,
+          brand: ad.brand ?? null,
+          model: ad.model ?? null,
+          year: ad.year ?? null,
+          title: ad.title ?? null,
+          ad_status: ad.status ?? null,
+          dealer_name: advertiser?.name ?? null,
+          dealer_operational: Boolean(advertiser) && advertiserStatusOf(advertiser) === advStatus,
+          // COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) — a precedência
+          // canônica do projeto. `telefone`/`telephone` ficam de fora aqui pelo
+          // mesmo motivo que ficam de fora do SQL: nenhum caminho os lê.
+          whatsapp_number:
+            advertiser?.whatsapp ?? advertiser?.mobile_phone ?? advertiser?.phone ?? null,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
   if (/FROM purchase_intent_offers o JOIN purchase_intents pi/i.test(text)) {
     const [purchaseIntentId, buyerUserId, adStatus] = params;
 
