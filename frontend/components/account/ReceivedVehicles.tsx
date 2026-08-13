@@ -6,9 +6,12 @@ import { VehicleImage } from "@/components/ui/VehicleImage";
 import {
   BUDGET_RELATION_CLASS,
   BUYER_BUDGET_RELATION_LABEL,
+  OFFER_ERROR_CODE,
+  OffersApiError,
   fetchReceivedOffers,
   formatOfferCount,
   formatVehiclePrice,
+  requestOfferWhatsapp,
   vehicleAttributes,
   vehicleHref,
   type ReceivedOffer,
@@ -34,13 +37,37 @@ import {
  * da história da procura dele, e sumir com ela deixaria a contagem de opções
  * mudando sozinha entre duas visitas.
  *
- * Não existe "Agendar visita" nem WhatsApp aqui: essa etapa é da próxima fase,
- * e um botão desligado só ensinaria o usuário a ignorar botões.
+ * ────────────────────────────────────────────────────────────────────────────
+ * O BOTÃO DE WHATSAPP ABRE UMA CONVERSA — NÃO AGENDA NADA
+ * ────────────────────────────────────────────────────────────────────────────
+ * "Agendar visita pelo WhatsApp" leva o comprador para a conversa com a loja,
+ * com uma mensagem já escrita. Nada foi agendado: não há dia, hora, nem
+ * compromisso registrado em lugar nenhum. Por isso a tela nunca diz "visita
+ * agendada" ou "horário reservado" — quem combina isso são as duas pessoas, no
+ * WhatsApp.
+ *
+ * A URL é pedida ao SERVIDOR a cada clique e nunca guardada no card: é assim
+ * que um veículo pausado há dez minutos deixa de abrir conversa. O telefone da
+ * loja não vem no payload da listagem — só existe dentro da URL que o backend
+ * devolve depois da ação explícita do comprador.
+ *
+ * Continua SEM chat interno, sem caixa de mensagem e sem agenda: o WhatsApp é o
+ * canal, e o portal não precisa virar um para concluir esta etapa do funil.
  */
 
 const SKELETON_KEYS = ["a", "b"];
 
-function ReceivedVehicleCard({ offer }: { offer: ReceivedOffer }) {
+function ReceivedVehicleCard({
+  offer,
+  onWhatsapp,
+  whatsappPending,
+  whatsappError,
+}: {
+  offer: ReceivedOffer;
+  onWhatsapp: (offer: ReceivedOffer) => void;
+  whatsappPending: boolean;
+  whatsappError: string | null;
+}) {
   const { vehicle, dealer, budget_relation: budgetRelation } = offer;
   const attributes = vehicleAttributes(vehicle);
   const href = vehicle.available ? vehicleHref(vehicle.slug) : null;
@@ -106,11 +133,30 @@ function ReceivedVehicleCard({ offer }: { offer: ReceivedOffer }) {
             </p>
           ) : null}
 
-          <div className="mt-3">
+          {/* CTAs. No mobile empilham (`flex-col`, `w-full`); a partir de `sm`
+              ficam lado a lado. O WhatsApp vem PRIMEIRO em ambos: o comprador
+              já passou da etapa de descobrir o carro e está na de falar com a
+              loja — "Ver anúncio" é a consulta, não a ação. */}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            {vehicle.available ? (
+              <button
+                type="button"
+                onClick={() => onWhatsapp(offer)}
+                // A trava de clique duplo é `whatsappPending`: o botão desabilita
+                // no primeiro clique e só volta quando a resposta chega. Sem ela,
+                // dois cliques abririam DUAS abas do WhatsApp.
+                disabled={whatsappPending}
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#1f9d55] px-4 text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[240px]"
+                data-testid="received-vehicle-whatsapp"
+              >
+                {whatsappPending ? "Abrindo WhatsApp…" : "Agendar visita pelo WhatsApp"}
+              </button>
+            ) : null}
+
             {href ? (
               <Link
                 href={href}
-                className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[#dbe7fb] bg-[#eff5ff] px-4 text-sm font-bold text-[#0e62d8] transition hover:bg-[#e2edff] sm:w-auto sm:min-w-[180px]"
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[#dbe7fb] bg-[#eff5ff] px-4 text-sm font-bold text-[#0e62d8] transition hover:bg-[#e2edff] sm:w-auto sm:min-w-[160px]"
                 data-testid="received-vehicle-link"
               >
                 Ver anúncio
@@ -121,6 +167,18 @@ function ReceivedVehicleCard({ offer }: { offer: ReceivedOffer }) {
               </p>
             )}
           </div>
+
+          {/* Erro POR CARD, e não da seção inteira: com uma mensagem global, o
+              comprador com três veículos não saberia qual deles falhou. */}
+          {whatsappError ? (
+            <p
+              className="mt-2 rounded-[14px] border border-[#F4C7C3] bg-[#FFF4F3] px-3 py-2 text-sm text-[#B42318]"
+              role="alert"
+              data-testid="received-vehicle-whatsapp-error"
+            >
+              {whatsappError}
+            </p>
+          ) : null}
         </div>
       </div>
     </li>
@@ -131,6 +189,9 @@ export default function ReceivedVehicles({ intentId }: { intentId: number }) {
   const [offers, setOffers] = useState<ReceivedOffer[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Oferta cujo WhatsApp está sendo resolvido agora. Só uma por vez. */
+  const [whatsappPendingId, setWhatsappPendingId] = useState<string | null>(null);
+  const [whatsappErrors, setWhatsappErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,6 +212,60 @@ export default function ReceivedVehicles({ intentId }: { intentId: number }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Resolve o WhatsApp e abre a conversa.
+   *
+   * A URL é pedida ao SERVIDOR a cada clique — nunca guardada no card. É o que
+   * garante que um veículo pausado há dez minutos não abra conversa: quem
+   * decide é o backend, no instante do clique, e não o estado que a tela
+   * carregou.
+   *
+   * `window.open` com `noopener,noreferrer`: sem isso a aba do WhatsApp
+   * receberia `window.opener` e poderia navegar a aba do painel.
+   *
+   * Sem detecção de user-agent. O link oficial do WhatsApp já resolve app no
+   * celular e Web no desktop; adivinhar aqui só criaria um caminho errado para
+   * algum dispositivo que ninguém testou.
+   */
+  const handleWhatsapp = useCallback(
+    async (offer: ReceivedOffer) => {
+      const key = String(offer.offer_id);
+      if (whatsappPendingId) return; // uma resolução ativa por vez
+
+      setWhatsappPendingId(key);
+      setWhatsappErrors((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+
+      try {
+        const { url } = await requestOfferWhatsapp(intentId, offer.offer_id);
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (whatsappError) {
+        // Cada motivo tem texto próprio. Um "tente novamente" genérico faria o
+        // comprador insistir num botão que nunca vai funcionar (loja sem
+        // WhatsApp) ou desistir de um que voltaria a funcionar (falha de rede).
+        const code = whatsappError instanceof OffersApiError ? whatsappError.code : null;
+
+        let message = "Não foi possível abrir o WhatsApp da loja. Tente novamente.";
+        if (code === OFFER_ERROR_CODE.UNAVAILABLE) {
+          message = "Este veículo não está mais disponível.";
+          // O backend acabou de dizer que saiu do ar: recarrega a lista para o
+          // card refletir isso e o botão sumir, em vez de ficar mentindo.
+          void load();
+        } else if (code === OFFER_ERROR_CODE.WHATSAPP_UNAVAILABLE) {
+          message = "Esta loja não possui WhatsApp disponível para contato no momento.";
+        }
+
+        setWhatsappErrors((current) => ({ ...current, [key]: message }));
+      } finally {
+        setWhatsappPendingId(null);
+      }
+    },
+    [intentId, load, whatsappPendingId]
+  );
 
   return (
     <section className="mt-8" data-testid="received-vehicles">
@@ -213,7 +328,13 @@ export default function ReceivedVehicles({ intentId }: { intentId: number }) {
           </p>
           <ul className="mt-4 grid gap-4">
             {offers.map((offer) => (
-              <ReceivedVehicleCard key={String(offer.offer_id)} offer={offer} />
+              <ReceivedVehicleCard
+                key={String(offer.offer_id)}
+                offer={offer}
+                onWhatsapp={(target) => void handleWhatsapp(target)}
+                whatsappPending={whatsappPendingId === String(offer.offer_id)}
+                whatsappError={whatsappErrors[String(offer.offer_id)] ?? null}
+              />
             ))}
           </ul>
         </>
