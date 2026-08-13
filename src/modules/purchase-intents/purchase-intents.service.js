@@ -43,8 +43,12 @@ import {
  * da aplicação. `0` é recusado explicitamente — `users.id` é serial e começa em
  * 1, então zero só chegaria aqui por engano e morreria lá embaixo como violação
  * de FK (um 500 no log de banco em vez da causa real).
+ *
+ * EXPORTADA para o módulo de ofertas (Fase 3) usar a MESMA guarda. Reescrevê-la
+ * lá daria duas definições de "id de sessão válido", e a que ficasse mais frouxa
+ * seria a que decide se um valor torto chega ao banco.
  */
-function requireUserId(raw) {
+export function requireUserId(raw) {
   const value = String(raw ?? "").trim();
   if (!/^\d+$/.test(value) || Number(value) <= 0) {
     throw new AppError("Sessão inválida.", 401, true, {

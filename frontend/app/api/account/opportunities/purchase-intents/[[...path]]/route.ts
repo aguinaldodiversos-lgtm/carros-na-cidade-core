@@ -2,16 +2,19 @@ import { NextRequest } from "next/server";
 import { createBackendProxy } from "@/lib/http/bff-proxy";
 
 /**
- * BFF das oportunidades do lojista (Compradores ativos).
+ * BFF das oportunidades do lojista (Compradores ativos + envio de veículos).
  *
- * Só GET: nesta fase o lojista lê. Não existe "enviar veículo", não existe
- * resposta à procura — isso é Fase 3, e um verbo de escrita aqui seria uma
- * porta aberta para um endpoint que ainda não foi desenhado.
+ * GET  — lista de oportunidades, detalhe e `/:id/matching-ads` (estoque
+ *        compatível do próprio lojista).
+ * POST — `/:id/offers`: envia um veículo do estoque ao comprador. É o primeiro
+ *        verbo de escrita desta área, adicionado na Fase 3.
  *
- * IMPORTANTE: este proxy NÃO decide o que o lojista pode ver. Ele não lê nem
- * repassa `city_id`. Quem resolve a cidade é o backend, a partir do advertiser
- * do usuário autenticado — se a cidade viesse daqui (ou da query string), um
- * lojista veria as procuras de qualquer cidade trocando um parâmetro.
+ * IMPORTANTE: este proxy NÃO decide o que o lojista pode ver nem o que pode
+ * enviar. Ele não lê nem repassa `city_id`, `ad_id` ou identidade — apenas
+ * encaminha o corpo com o Bearer do usuário. Quem resolve a cidade, prova a
+ * posse do anúncio, revalida a compatibilidade e aplica o limite de 3 é o
+ * backend. Se qualquer uma dessas decisões viesse daqui, bastaria um cliente
+ * fora do navegador para contorná-la.
  *
  * A guarda de conta CNPJ (`requireDealerAccount`) também é do backend. O
  * redirect de `/dashboard-loja` no frontend é conveniência de navegação, não
@@ -27,5 +30,9 @@ const proxy = createBackendProxy({
 });
 
 export async function GET(request: NextRequest, context: { params: { path?: string[] } }) {
+  return proxy(request, context);
+}
+
+export async function POST(request: NextRequest, context: { params: { path?: string[] } }) {
   return proxy(request, context);
 }

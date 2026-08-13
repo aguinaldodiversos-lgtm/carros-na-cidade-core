@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import DealerMatchingStock from "@/components/account/DealerMatchingStock";
 import {
   PURCHASE_TIMEFRAME_LABEL,
   TRANSMISSION_LABEL,
@@ -16,10 +17,13 @@ import {
 /**
  * Detalhe da oportunidade, para o lojista.
  *
- * Mostra os dados da procura e nada além. Sem "Enviar veículo" (Fase 3), sem
- * WhatsApp (não existe veículo escolhido para conversar a respeito) e sem
- * promessa do tipo "em breve você poderá…". A tela apresenta o que existe; o
- * que não existe não aparece.
+ * Duas seções: os dados da procura e, abaixo, o estoque compatível com botão de
+ * envio (Fase 3). Continua SEM WhatsApp e sem "agendar visita" — essa etapa é da
+ * próxima fase, e um botão desligado só ensinaria o lojista a ignorar botões.
+ *
+ * O estoque tem carregamento e erro PRÓPRIOS (`DealerMatchingStock`): a procura
+ * é o conteúdo principal e não pode sumir da tela porque a lista de anúncios
+ * falhou.
  */
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -116,6 +120,8 @@ export default function DealerOpportunityDetail({
         />
         <Row label="Publicada" value={formatPublishedAt(opportunity.created_at)} />
       </dl>
+
+      <DealerMatchingStock intentId={id} />
     </section>
   );
 }

@@ -37,4 +37,21 @@ router.use(requireDealerAccount());
 router.get("/", asyncHandler(controller.listDealerOpportunities));
 router.get("/:id", asyncHandler(controller.getDealerOpportunity));
 
+// --- Fase 3 — envio de veículos do estoque ----------------------------------
+//
+// As duas rotas herdam a cadeia declarada no topo (auth + CNPJ) e acrescentam,
+// no service, as guardas que decidem O QUE pode ser enviado: cidade da loja,
+// procura ativa, posse do anúncio, anúncio ACTIVE, compatibilidade e o limite
+// de 3 veículos disponíveis por lojista.
+//
+// `matching-ads` vem antes de nada que possa capturá-lo como parâmetro; como
+// `/:id` já está declarado acima e este caminho tem um segmento a mais, não há
+// ambiguidade de rota.
+router.get("/:id/matching-ads", asyncHandler(controller.listMatchingAds));
+
+// POST — o primeiro verbo de ESCRITA da área do lojista. Sem rate limit próprio:
+// o envio é idempotente por (procura, anúncio) no banco e teto de 3 por procura,
+// então o custo de um cliente insistente já é limitado pelo domínio.
+router.post("/:id/offers", asyncHandler(controller.createOffer));
+
 export default router;

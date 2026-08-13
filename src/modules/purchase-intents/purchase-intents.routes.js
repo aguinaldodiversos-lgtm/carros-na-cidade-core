@@ -28,6 +28,15 @@ router.post("/", purchaseIntentCreateRateLimit, asyncHandler(controller.createPu
 
 router.get("/:id", asyncHandler(controller.getMyPurchaseIntent));
 
+// Fase 3 — veículos que as lojas enviaram para ESTA procura. Somente leitura: o
+// comprador recebe, não envia. A posse vive na própria query (JOIN em
+// purchase_intents com buyer_user_id), então procura de outra pessoa é 404.
+//
+// Continua respondendo com procura encerrada ou vencida: o que o comprador já
+// recebeu é histórico dele. Quem para de aceitar veículo novo é o POST do
+// lojista, não esta leitura.
+router.get("/:id/offers", asyncHandler(controller.listReceivedOffers));
+
 // PATCH e não DELETE: encerrar é mudança de estado, não remoção. A procura
 // continua no histórico do comprador como "Encerrada".
 router.patch("/:id/close", asyncHandler(controller.closeMyPurchaseIntent));

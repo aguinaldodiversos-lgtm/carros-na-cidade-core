@@ -189,8 +189,126 @@ for (const dealer of DEALERS) {
   ]);
 }
 
+// --- Estoque dos lojistas para o envio de veículos (Fase 3) -----------------
+//
+// O fluxo da Fase 3 é "lojista escolhe um carro DO PRÓPRIO ESTOQUE", então sem
+// anúncio semeado não existe o que enviar e o spec inteiro vira um skip.
+//
+// Três anúncios em Atibaia, todos Honda HR-V automáticos, para exercitar as três
+// classificações que o produto tem:
+//
+//   • hr-v-atibaia-1  R$  98.900 → compatível, DENTRO do orçamento (95.000?
+//     não: o spec publica com teto de 100.000);
+//   • hr-v-atibaia-2  R$ 103.900 → compatível, ACIMA do orçamento (specific
+//     model não bloqueia por preço — é o caso que prova a regra);
+//   • city-atibaia-3  R$  89.900 → Honda City: MESMA marca, modelo diferente.
+//     É o negativo que importa: sem ele, "o matching funciona" poderia estar
+//     passando por não haver nada para recusar.
+//
+// E um HR-V idêntico na loja de BRAGANÇA, para o teste de posse: o lojista de
+// Atibaia não pode enviar o carro do concorrente, e provar isso exige que o
+// carro do concorrente EXISTA e seja compatível.
+const DEALER_ADS = [
+  {
+    dealerEmail: "cnpj@carrosnacidade.com",
+    slug: "honda-hr-v-ex-2020-atibaia-sp-e2e-1",
+    title: "Honda HR-V EX 2020",
+    model: "HR-V EX 1.8 Flex 16V 5p Aut.",
+    price: 98900,
+    year: 2020,
+    mileage: 72000,
+  },
+  {
+    dealerEmail: "cnpj@carrosnacidade.com",
+    slug: "honda-hr-v-exl-2022-atibaia-sp-e2e-2",
+    title: "Honda HR-V EXL 2022",
+    model: "HR-V EXL 1.8 Flex 16V 5p Aut.",
+    price: 103900,
+    year: 2022,
+    mileage: 41000,
+  },
+  {
+    dealerEmail: "cnpj@carrosnacidade.com",
+    slug: "honda-city-ex-2021-atibaia-sp-e2e-3",
+    title: "Honda City EX 2021",
+    model: "CITY EX 1.5 Flex 16V 4p Aut.",
+    price: 89900,
+    year: 2021,
+    mileage: 55000,
+  },
+  {
+    dealerEmail: "cnpj2@carrosnacidade.com",
+    slug: "honda-hr-v-ex-2020-braganca-sp-e2e-4",
+    title: "Honda HR-V EX 2020 (Bragança)",
+    model: "HR-V EX 1.8 Flex 16V 5p Aut.",
+    price: 97900,
+    year: 2020,
+    mileage: 68000,
+  },
+];
+
+for (const ad of DEALER_ADS) {
+  const { rows: ownerRows } = await pool.query(
+    `SELECT adv.id, adv.city_id
+       FROM advertisers adv
+       JOIN users u ON u.id = adv.user_id
+      WHERE LOWER(u.email) = LOWER($1)
+      ORDER BY adv.id ASC
+      LIMIT 1`,
+    [ad.dealerEmail]
+  );
+  const advertiser = ownerRows[0];
+  if (!advertiser) {
+    throw new Error(`[e2e-seed] Advertiser de ${ad.dealerEmail} não encontrado.`);
+  }
+
+  // Idempotente pelo slug: reexecutar o seed devolve o anúncio ao estado
+  // esperado em vez de acumular duplicatas a cada rodada.
+  const touched = await pool.query(
+    `UPDATE ads
+        SET advertiser_id = $2, city_id = $3, title = $4, price = $5,
+            brand = 'Honda', model = $6, year = $7, mileage = $8,
+            transmission = 'automatico', body_type = 'suv',
+            status = 'active', images = '[]'::jsonb, updated_at = NOW()
+      WHERE slug = $1
+      RETURNING id`,
+    [
+      ad.slug,
+      advertiser.id,
+      advertiser.city_id,
+      ad.title,
+      ad.price,
+      ad.model,
+      ad.year,
+      ad.mileage,
+    ]
+  );
+
+  if (touched.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO ads (advertiser_id, city_id, title, price, brand, model, year, mileage,
+                        transmission, body_type, status, slug, images)
+       VALUES ($1, $2, $3, $4, 'Honda', $5, $6, $7, 'automatico', 'suv', 'active', $8, '[]'::jsonb)`,
+      [
+        advertiser.id,
+        advertiser.city_id,
+        ad.title,
+        ad.price,
+        ad.model,
+        ad.year,
+        ad.mileage,
+        ad.slug,
+      ]
+    );
+  }
+}
+
 // Estado limpo entre execuções: as procuras são criadas pelos specs, não aqui.
 // Fica FORA do laço acima — é sobre o comprador, não sobre cada lojista.
+//
+// As ofertas (purchase_intent_offers) somem junto pelo ON DELETE CASCADE da
+// migration 051 — não é preciso apagá-las à mão, e apagar seria a chance de
+// esquecer uma tabela nova no futuro.
 await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`, [userId]);
 
 await closeDatabasePool();
@@ -198,5 +316,6 @@ await closeDatabasePool();
 console.log(
   "[e2e-seed] OK —",
   E2E_EMAIL,
-  "+ cidade Atibaia + advertiser + lojistas CNPJ (Atibaia/Bragança)"
+  "+ cidade Atibaia + advertiser + lojistas CNPJ (Atibaia/Bragança)",
+  `+ ${DEALER_ADS.length} anúncios de estoque (Fase 3)`
 );

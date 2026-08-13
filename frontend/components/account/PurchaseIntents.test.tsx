@@ -36,6 +36,23 @@ vi.mock("@/lib/purchase-intents/api", async (importOriginal) => {
   };
 });
 
+/**
+ * A área "Veículos enviados para você" (Fase 3) tem arquivo próprio
+ * (`ReceivedVehicles.test.tsx`). Aqui basta mockar o cliente HTTP dela: o
+ * detalhe da procura precisa continuar testável sem depender dos veículos
+ * recebidos — que é exatamente a separação que o produto exige, para que uma
+ * falha lá não derrube a procura.
+ */
+const fetchReceivedOffers = vi.fn();
+
+vi.mock("@/lib/purchase-intents/offers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/purchase-intents/offers")>();
+  return {
+    ...actual,
+    fetchReceivedOffers: (...args: unknown[]) => fetchReceivedOffers(...args),
+  };
+});
+
 function makeIntent(overrides: Partial<PurchaseIntent> = {}): PurchaseIntent {
   return {
     id: 1,
@@ -67,6 +84,7 @@ beforeEach(() => {
   });
   fetchMyPurchaseIntent.mockResolvedValue(makeIntent());
   closePurchaseIntent.mockResolvedValue(makeIntent({ status: "closed", display_status: "closed" }));
+  fetchReceivedOffers.mockResolvedValue({ offers: [] });
 });
 
 afterEach(cleanup);
@@ -192,12 +210,18 @@ describe("PurchaseIntentDetail", () => {
     );
   });
 
-  it("não cria área falsa de veículos recebidos nem botão de contato", async () => {
+  it("traz a área de veículos recebidos (Fase 3), sem botão de contato", async () => {
+    // A área existe desde a Fase 3 e mostra o estado vazio quando nenhuma loja
+    // enviou nada. O que NÃO existe — e não pode virar botão morto — é a etapa
+    // de contato: WhatsApp, agendamento e chat são da próxima fase.
     render(<PurchaseIntentDetail id={1} />);
     await screen.findByTestId("purchase-intent-detail");
-    expect(screen.queryByText(/veículos? recebidos?/i)).not.toBeInTheDocument();
+
+    expect(await screen.findByTestId("received-vehicles-empty")).toBeVisible();
     expect(screen.queryByText(/whatsapp/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/agendar/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/conversar|chat/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/em breve/i)).not.toBeInTheDocument();
   });
 
   it("encerrar pede confirmação antes de chamar a API", async () => {

@@ -23,8 +23,12 @@ export const db = {
   advertisers: [],
   purchaseIntents: [],
   notifications: [],
+  /** Fase 3 — estoque e relação procura ↔ anúncio. */
+  ads: [],
+  purchaseIntentOffers: [],
   nextIntentId: 1,
   nextNotificationId: 1,
+  nextOfferId: 1,
   /** Ligado por um teste para simular indisponibilidade do fan-out. */
   failNotificationInsert: false,
 };
@@ -34,9 +38,12 @@ export function resetDb(seed = {}) {
   db.users = seed.users ?? [];
   db.advertisers = seed.advertisers ?? [];
   db.purchaseIntents = seed.purchaseIntents ?? [];
+  db.ads = seed.ads ?? [];
+  db.purchaseIntentOffers = seed.purchaseIntentOffers ?? [];
   db.notifications = [];
   db.nextIntentId = seed.nextIntentId ?? 1;
   db.nextNotificationId = 1;
+  db.nextOfferId = seed.nextOfferId ?? 1;
   db.failNotificationInsert = false;
 }
 
@@ -126,11 +133,236 @@ function beforeCursor(row, createdAt, id) {
   return Number(row.id) < Number(id);
 }
 
+/**
+ * Anúncio do estoque, com os campos que o card e o casamento usam.
+ *
+ * A projeção espelha AD_CARD_COLUMNS coluna a coluna, e `image_url` NÃO está
+ * aqui porque não está em `ads` — a tabela só tem `images` (JSONB).
+ *
+ * Isso não é detalhe: a versão anterior deste helper devolvia
+ * `image_url: ad.image_url ?? null`, e foi exatamente por isso que o fake
+ * engoliu um `SELECT a.image_url` que o PostgreSQL real recusa com
+ * "column a.image_url does not exist". Um fake que inventa coluna concorda com
+ * qualquer query — inclusive com a que não roda em produção.
+ */
+function projectAd(ad) {
+  return {
+    id: ad.id,
+    slug: ad.slug ?? null,
+    title: ad.title ?? null,
+    brand: ad.brand ?? null,
+    model: ad.model ?? null,
+    year: ad.year ?? null,
+    mileage: ad.mileage ?? null,
+    transmission: ad.transmission ?? null,
+    body_type: ad.body_type ?? null,
+    price: ad.price ?? null,
+    images: ad.images ?? [],
+    status: ad.status ?? null,
+  };
+}
+
+function advertiserById(advertiserId) {
+  return db.advertisers.find((item) => sameId(item.id, advertiserId)) ?? null;
+}
+
+/** Loja do anúncio operacional? Mesma semântica do predicado SQL. */
+function adAdvertiserIsOperational(ad) {
+  const advertiser = advertiserById(ad.advertiser_id);
+  if (!advertiser) return false;
+  return advertiserStatusOf(advertiser) === "active";
+}
+
 function handle(text, params, now) {
   // --- cities ---------------------------------------------------------------
   if (/^SELECT id, name, state, slug FROM cities WHERE id = \$1/i.test(text)) {
     const city = cityOf(params[0]);
     return { rows: city ? [city] : [], rowCount: city ? 1 : 0 };
+  }
+
+  // --- vehicle_images: sondagem de esquema de ads.public-images -------------
+  //
+  // O fake não tem a tabela. Devolver 0 linhas faz o helper cair no fallback de
+  // `ads.images`, que é exatamente o caminho de produção hoje (a tabela existe,
+  // mas o acervo vive no JSON). Sem este ramo, a sondagem cairia no `unmatched`
+  // e o teste falharia por um detalhe de infraestrutura de imagem.
+  if (/FROM information_schema\.tables/i.test(text) && /vehicle_images/i.test(text)) {
+    return { rows: [], rowCount: 0 };
+  }
+
+  // --- purchase_intents: contexto de matching (Fase 3) ----------------------
+  //
+  // Precisa vir ANTES do handler de leitura do lojista da Fase 2: os dois
+  // filtram por (id, city_id, active). O que distingue é `brand_slug`, que só a
+  // consulta de matching projeta.
+  if (/pi\.brand_slug/i.test(text) && /pi\.city_id = \$2/i.test(text)) {
+    const [id, cityId] = params;
+    const locking = /FOR UPDATE/i.test(text);
+
+    const row = db.purchaseIntents.find(
+      (item) =>
+        sameId(item.id, id) &&
+        sameId(item.city_id, cityId) &&
+        item.status === "active" &&
+        new Date(item.expires_at).getTime() > now
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    const city = cityOf(row.city_id);
+    const base = {
+      id: row.id,
+      intent_type: row.intent_type,
+      brand: row.brand,
+      brand_slug: row.brand_slug,
+      model: row.model,
+      model_slug: row.model_slug,
+      body_type: row.body_type,
+      transmission: row.transmission,
+      max_price: row.max_price,
+    };
+
+    // Só a consulta TRAVADA devolve `buyer_user_id` — igual ao repository real.
+    // Se o fake o entregasse nas duas, um vazamento para o DTO do lojista
+    // passaria despercebido no teste de privacidade.
+    return locking
+      ? { rows: [{ ...base, buyer_user_id: row.buyer_user_id, city_id: row.city_id }], rowCount: 1 }
+      : {
+          rows: [
+            {
+              ...base,
+              purchase_timeframe: row.purchase_timeframe,
+              created_at: row.created_at,
+              expires_at: row.expires_at,
+              city_name: city?.name ?? null,
+              city_state: city?.state ?? null,
+              city_slug: city?.slug ?? null,
+            },
+          ],
+          rowCount: 1,
+        };
+  }
+
+  // --- ads: estoque do lojista ---------------------------------------------
+  if (/FROM ads a JOIN advertisers adv/i.test(text) && /WHERE adv\.user_id = \$1/i.test(text)) {
+    const [userId, adStatus, advStatus] = params;
+    const limit = Number(params[params.length - 1]);
+
+    const rows = db.ads
+      .filter((ad) => {
+        const advertiser = advertiserById(ad.advertiser_id);
+        if (!advertiser) return false;
+        if (!sameId(advertiser.user_id, userId)) return false;
+        if (advertiserStatusOf(advertiser) !== advStatus) return false;
+        return ad.status === adStatus;
+      })
+      .sort((a, b) => Number(b.id) - Number(a.id))
+      .slice(0, limit);
+
+    return { rows: rows.map(projectAd), rowCount: rows.length };
+  }
+
+  if (/WHERE a\.id = \$1 AND adv\.user_id = \$2/i.test(text)) {
+    const [adId, userId, advStatus] = params;
+    const ad = db.ads.find((item) => {
+      if (!sameId(item.id, adId)) return false;
+      const advertiser = advertiserById(item.advertiser_id);
+      if (!advertiser) return false;
+      if (!sameId(advertiser.user_id, userId)) return false;
+      return advertiserStatusOf(advertiser) === advStatus;
+    });
+    return { rows: ad ? [projectAd(ad)] : [], rowCount: ad ? 1 : 0 };
+  }
+
+  // --- purchase_intent_offers ----------------------------------------------
+  if (/^INSERT INTO purchase_intent_offers/i.test(text)) {
+    const [purchaseIntentId, dealerUserId, adId] = params;
+
+    // ON CONFLICT (purchase_intent_id, ad_id) DO NOTHING — o índice único.
+    const clash = db.purchaseIntentOffers.find(
+      (item) => sameId(item.purchase_intent_id, purchaseIntentId) && sameId(item.ad_id, adId)
+    );
+    if (clash) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextOfferId,
+      purchase_intent_id: purchaseIntentId,
+      dealer_user_id: String(dealerUserId),
+      ad_id: adId,
+      created_at: new Date(now).toISOString(),
+    };
+    db.nextOfferId += 1;
+    db.purchaseIntentOffers.push(row);
+    return { rows: [row], rowCount: 1 };
+  }
+
+  if (/FROM purchase_intent_offers WHERE purchase_intent_id = \$1 AND ad_id = \$2/i.test(text)) {
+    const [purchaseIntentId, adId] = params;
+    const row = db.purchaseIntentOffers.find(
+      (item) => sameId(item.purchase_intent_id, purchaseIntentId) && sameId(item.ad_id, adId)
+    );
+    return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+  }
+
+  if (/SELECT COUNT\(\*\)::int AS total FROM purchase_intent_offers o/i.test(text)) {
+    const [purchaseIntentId, dealerUserId, adStatus, advStatus] = params;
+
+    // Conta só as vagas OCUPADAS: anúncio ativo + loja operacional. Um carro
+    // vendido depois do envio libera vaga — a regra que o teste de §67 prova.
+    const total = db.purchaseIntentOffers.filter((offer) => {
+      if (!sameId(offer.purchase_intent_id, purchaseIntentId)) return false;
+      if (!sameId(offer.dealer_user_id, dealerUserId)) return false;
+      const ad = db.ads.find((item) => sameId(item.id, offer.ad_id));
+      if (!ad || ad.status !== adStatus) return false;
+      const advertiser = advertiserById(ad.advertiser_id);
+      if (!advertiser) return false;
+      return advertiserStatusOf(advertiser) === advStatus;
+    }).length;
+
+    return { rows: [{ total }], rowCount: 1 };
+  }
+
+  if (/SELECT ad_id FROM purchase_intent_offers WHERE purchase_intent_id = \$1/i.test(text)) {
+    const [purchaseIntentId, dealerUserId] = params;
+    const rows = db.purchaseIntentOffers
+      .filter(
+        (item) =>
+          sameId(item.purchase_intent_id, purchaseIntentId) &&
+          sameId(item.dealer_user_id, dealerUserId)
+      )
+      .map((item) => ({ ad_id: item.ad_id }));
+    return { rows, rowCount: rows.length };
+  }
+
+  if (/FROM purchase_intent_offers o JOIN purchase_intents pi/i.test(text)) {
+    const [purchaseIntentId, buyerUserId, adStatus] = params;
+
+    // A posse está no WHERE do SQL real; o fake a reimplementa para que apagar
+    // o `AND pi.buyer_user_id = $2` do repository faça o teste de IDOR falhar.
+    const intent = db.purchaseIntents.find(
+      (item) => sameId(item.id, purchaseIntentId) && sameId(item.buyer_user_id, buyerUserId)
+    );
+    if (!intent) return { rows: [], rowCount: 0 };
+
+    const rows = db.purchaseIntentOffers
+      .filter((offer) => sameId(offer.purchase_intent_id, purchaseIntentId))
+      .sort((a, b) => Number(b.id) - Number(a.id))
+      .map((offer) => {
+        const ad = db.ads.find((item) => sameId(item.id, offer.ad_id));
+        if (!ad) return null;
+        const city = cityOf(ad.city_id);
+        return {
+          offer_id: offer.id,
+          sent_at: offer.created_at,
+          ...projectAd(ad),
+          city_name: city?.name ?? null,
+          city_state: city?.state ?? null,
+          dealer_name: advertiserById(ad.advertiser_id)?.name ?? null,
+          available: ad.status === adStatus && adAdvertiserIsOperational(ad),
+        };
+      })
+      .filter(Boolean);
+
+    return { rows, rowCount: rows.length };
   }
 
   // --- purchase_intents: escrita -------------------------------------------
@@ -343,4 +575,21 @@ export async function fakeQuery(sql, params = []) {
     throw new Error(`fake-db: query sem padrão correspondente:\n${text}`);
   }
   return result;
+}
+
+/**
+ * `withTransaction` de mentira: executa o callback com o MESMO executor do pool.
+ *
+ * O que ele prova: que o service passa o cliente adiante em todos os passos
+ * (uma consulta que esquecesse o `tx` continuaria funcionando aqui, mas o teste
+ * de esquema/concorrência contra Postgres real pegaria a falta do lock).
+ *
+ * O que ele NÃO prova, e nem tenta: isolamento, `FOR UPDATE` e rollback. O
+ * estado é um array em memória, e não existe segunda conexão para disputar com
+ * ele. É por isso que o limite de 3 sob concorrência tem teste PRÓPRIO contra
+ * PostgreSQL de verdade (tests/integration/purchase-intent-offers-*.js) — um
+ * fake que "passasse" nesse cenário estaria só concordando consigo mesmo.
+ */
+export async function fakeWithTransaction(callback) {
+  return callback({ query: (sql, params) => fakeQuery(sql, params) });
 }
