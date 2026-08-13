@@ -362,3 +362,70 @@ export async function listOffersForBuyer({ purchaseIntentId, buyerUserId }, exec
   );
   return result.rows;
 }
+
+/**
+ * Contato da loja para UMA oferta — Fase 3.1.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * TODA A AUTORIZAÇÃO ESTÁ NO `WHERE`
+ * ────────────────────────────────────────────────────────────────────────────
+ * As três condições que a fase exige vivem na query, não num `if` do service:
+ *
+ *   o.id = $1                    — a oferta pedida;
+ *   o.purchase_intent_id = $2    — ela pertence ÀQUELA procura (§40: a oferta
+ *                                  de outra procura do mesmo comprador não casa);
+ *   pi.buyer_user_id = $3        — a procura é de QUEM está pedindo (§39).
+ *
+ * Qualquer combinação torta devolve zero linhas, e o service responde 404 sem
+ * distinguir os motivos — distinguir confirmaria a existência da oferta alheia
+ * para quem está sondando ids.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * DE ONDE SAI O NÚMERO
+ * ────────────────────────────────────────────────────────────────────────────
+ * `COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone)` — a MESMA precedência
+ * de `ads.repository.js`, `ads-filter.builder.js` e `leads.service.js`, e a que
+ * `store-profile.service.js` documenta como fonte de verdade única (a tela
+ * "Dados da loja" grava em `advertisers.whatsapp`, que vence o COALESCE).
+ *
+ * `advertisers` ainda tem `telefone` e `telephone`, colunas legadas que NENHUM
+ * caminho do produto lê. Incluí-las aqui inventaria uma quarta precedência e
+ * faria esta rota discordar do botão de WhatsApp do anúncio público.
+ *
+ * O advertiser vem do ANÚNCIO (`a.advertiser_id`), nunca de "algum advertiser
+ * do usuário": é o anúncio que determina qual loja enviou o veículo.
+ *
+ * `LEFT JOIN` + `adv.id IS NOT NULL` no predicado: anúncio órfão de loja é
+ * "não operacional", e não um NULL que o COALESCE de status transformaria em
+ * 'active' silenciosamente.
+ */
+export async function getOfferContactForBuyer({ offerId, purchaseIntentId, buyerUserId }, exec) {
+  const result = await runner(exec)(
+    `
+    SELECT
+      o.id AS offer_id,
+      a.id AS ad_id,
+      a.brand,
+      a.model,
+      a.year,
+      a.title,
+      a.status AS ad_status,
+      adv.name AS dealer_name,
+      (
+        adv.id IS NOT NULL
+        AND ${advertiserIsOperational({ param: 4 })}
+      ) AS dealer_operational,
+      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number
+    FROM purchase_intent_offers o
+    JOIN purchase_intents pi ON pi.id = o.purchase_intent_id
+    JOIN ads a ON a.id = o.ad_id
+    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id
+    WHERE o.id = $1
+      AND o.purchase_intent_id = $2
+      AND pi.buyer_user_id = $3
+    LIMIT 1
+    `,
+    [offerId, purchaseIntentId, buyerUserId, ADVERTISER_STATUS.ACTIVE]
+  );
+  return result.rows[0] ?? null;
+}

@@ -95,3 +95,26 @@ export async function listReceivedOffers(req, res) {
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });
 }
+
+/**
+ * Resolve o WhatsApp da loja para UM veículo recebido (Fase 3.1).
+ *
+ * `req.body` NÃO é lido — nem repassado. O service sequer aceita um parâmetro
+ * de corpo, então `{ url }`, `{ phone }` ou `{ redirect }` enviados pelo cliente
+ * não têm por onde influenciar o destino. É a defesa mais forte contra open
+ * redirect: não existe valor para validar.
+ *
+ * POST e não GET porque a operação REVELA um dado de contato mediante uma ação
+ * explícita do comprador. Um GET seria pré-carregável por prefetch do navegador
+ * e cacheável por engano — exatamente o que §7 quer evitar ao não pôr o telefone
+ * no DTO do card.
+ */
+export async function resolveOfferWhatsapp(req, res) {
+  const result = await offersService.resolveOfferWhatsapp(
+    req.user.id,
+    req.params.id,
+    req.params.offerId
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}

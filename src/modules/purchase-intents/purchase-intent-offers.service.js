@@ -31,6 +31,7 @@ import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import { withTransaction } from "../../infrastructure/database/db.js";
 import { canonicalBrandLabel } from "../../shared/utils/slugify.js";
+import { normalizeWhatsappDigits } from "../../shared/utils/brPhone.js";
 import { commercialModelLabel } from "../../shared/vehicle/commercial-model.js";
 import {
   buildNormalizedPublicImages,
@@ -46,6 +47,8 @@ import {
   PURCHASE_INTENT_OFFER_CODE,
   PURCHASE_INTENT_OFFER_MAX_PER_DEALER,
   PURCHASE_INTENT_OFFER_SCAN_LIMIT,
+  WHATSAPP_BASE_URL,
+  buildVisitMessage,
 } from "./purchase-intent-offers.constants.js";
 import {
   budgetRelationOf,
@@ -602,6 +605,163 @@ async function loadBuyerOffers({ purchaseIntentId, buyerUserId }) {
     intentFound: Boolean(intent),
     maxPrice: intent?.max_price ?? null,
   };
+}
+
+/**
+ * `:offerId` da rota → inteiro positivo, ou 404.
+ *
+ * 404 e não 400 pelo mesmo motivo de `parsePurchaseIntentId`: quem manda
+ * `/offers/abc/whatsapp` está sondando, e "id inválido" confirma o formato da
+ * chave. A string INTEIRA precisa ser dígitos — `Number.parseInt` sozinho leria
+ * o prefixo de "12abc" e agiria sobre a oferta 12.
+ */
+export function parseOfferId(raw) {
+  const asText = String(raw ?? "").trim();
+  if (!/^\d+$/.test(asText)) {
+    throw new AppError("Veículo não encontrado.", 404);
+  }
+
+  const id = Number.parseInt(asText, 10);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new AppError("Veículo não encontrado.", 404);
+  }
+  return id;
+}
+
+/**
+ * Nome do veículo para a MENSAGEM do WhatsApp.
+ *
+ * Reusa `vehicleNameOf` (marca canônica + modelo comercial — o mesmo nome que o
+ * comprador leu no card) e acrescenta o ano, que é coluna real de `ads`.
+ * Resultado: "Honda HR-V 2020".
+ *
+ * NÃO usa `ads.title`. O título é texto livre que o lojista escreve, e já
+ * apareceu em produção com preço, telefone e "ACEITO TROCA" dentro. Mandar isso
+ * numa mensagem que o comprador assina seria colocar palavra estranha na boca
+ * dele.
+ *
+ * NÃO usa a descrição FIPE inteira de `ads.model` ("HR-V EX 1.8 Flex 16V 5p
+ * Aut."): tecnicamente traz a versão, mas transformaria a frase num despejo de
+ * catálogo. O nome comercial é como as duas pessoas vão chamar o carro na
+ * conversa.
+ */
+function vehicleNameForMessage(ad) {
+  const name = vehicleNameOf(ad);
+  const year = Number(ad?.year);
+  return Number.isInteger(year) && year > 1900 ? `${name} ${year}` : name;
+}
+
+/**
+ * Resolve o link de WhatsApp da loja que enviou UM veículo — Fase 3.1.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE ESTA FUNÇÃO É E O QUE ELA NÃO É
+ * ────────────────────────────────────────────────────────────────────────────
+ * Ela abre uma CONVERSA. Não agenda visita, não reserva horário, não cria
+ * compromisso e não avisa o lojista pelo portal — a própria mensagem no
+ * WhatsApp é o aviso, e notificar em paralelo duplicaria o contato.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * NADA VEM DO NAVEGADOR
+ * ────────────────────────────────────────────────────────────────────────────
+ * A assinatura não tem `body`. É deliberado: não existe campo do cliente que
+ * possa influenciar o destino. Um `{ url }`, `{ phone }` ou `{ redirect }`
+ * enviado no corpo é ignorado porque nada aqui o lê — é a forma mais forte de
+ * fechar open redirect, mais forte que uma allowlist de domínio, porque não há
+ * o que validar.
+ *
+ * QUEM pede sai de `req.user`; QUAL veículo sai de (intentId, offerId); PARA
+ * QUEM sai do advertiser DO ANÚNCIO.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O ESTADO É RECONFERIDO AGORA
+ * ────────────────────────────────────────────────────────────────────────────
+ * A tela do comprador pode estar aberta há horas. Anúncio pausado/vendido e
+ * loja suspensa/bloqueada são checados NESTE instante, contra o banco — o card
+ * que ele está vendo não é fonte de verdade de nada.
+ */
+export async function resolveOfferWhatsapp(userId, rawIntentId, rawOfferId) {
+  const buyerUserId = requireUserId(userId);
+  const purchaseIntentId = parsePurchaseIntentId(rawIntentId);
+  const offerId = parseOfferId(rawOfferId);
+
+  const row = await offersRepo.getOfferContactForBuyer({
+    offerId,
+    purchaseIntentId,
+    buyerUserId,
+  });
+
+  // Oferta inexistente, de outra procura ou de outro comprador: tudo 404, sem
+  // distinguir. Ver o WHERE do repository.
+  if (!row) {
+    throw new AppError("Veículo não encontrado.", 404);
+  }
+
+  // Anúncio fora do ar OU loja fora do ar — mesmo código, de propósito.
+  if (row.ad_status !== AD_STATUS.ACTIVE || row.dealer_operational !== true) {
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "purchase_intent_offer.whatsapp",
+          result: "error",
+          userId: buyerUserId,
+          reason: row.ad_status !== AD_STATUS.ACTIVE ? "ad_inactive" : "dealer_inactive",
+        }),
+        purchaseIntentId,
+        offerId,
+      },
+      "[purchase-intent-offers] contato recusado — veículo indisponível"
+    );
+    throw new AppError("Este veículo não está mais disponível.", 409, true, {
+      code: PURCHASE_INTENT_OFFER_CODE.OFFER_UNAVAILABLE,
+    });
+  }
+
+  const digits = normalizeWhatsappDigits(row.whatsapp_number);
+  if (!digits) {
+    // Estado de DADO, não falha: a loja não preencheu um número utilizável.
+    // Log SEM o valor cru — mesmo inválido, é telefone de alguém.
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "purchase_intent_offer.whatsapp",
+          result: "error",
+          userId: buyerUserId,
+          reason: "whatsapp_unavailable",
+        }),
+        purchaseIntentId,
+        offerId,
+      },
+      "[purchase-intent-offers] loja sem WhatsApp utilizável"
+    );
+    throw new AppError(
+      "Esta loja não possui WhatsApp disponível para contato no momento.",
+      409,
+      true,
+      { code: PURCHASE_INTENT_OFFER_CODE.DEALER_WHATSAPP_UNAVAILABLE }
+    );
+  }
+
+  const message = buildVisitMessage(vehicleNameForMessage(row));
+  const url = `${WHATSAPP_BASE_URL}/${digits}?text=${encodeURIComponent(message)}`;
+
+  logger.info(
+    {
+      ...buildDomainFields({
+        action: "purchase_intent_offer.whatsapp",
+        result: "success",
+        userId: buyerUserId,
+      }),
+      purchaseIntentId,
+      offerId,
+      adId: row.ad_id,
+    },
+    "[purchase-intent-offers] contato de WhatsApp resolvido"
+  );
+
+  // Resposta MÍNIMA: só a URL. Sem telefone em campo separado, sem dados da
+  // loja além do que já está no card, sem eco de nada que o cliente mandou.
+  return { url };
 }
 
 export { BUDGET_RELATION, PURCHASE_INTENT_OFFER_MAX_PER_DEALER };

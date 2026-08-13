@@ -37,6 +37,17 @@ router.get("/:id", asyncHandler(controller.getMyPurchaseIntent));
 // lojista, não esta leitura.
 router.get("/:id/offers", asyncHandler(controller.listReceivedOffers));
 
+// Fase 3.1 — abre a conversa com a loja que enviou ESTE veículo.
+//
+// O caminho carrega os dois ids (procura e oferta) porque a autorização precisa
+// dos dois: a oferta tem de pertencer àquela procura, e a procura ao usuário
+// autenticado. Com `/offers/:offerId/whatsapp` sozinho, a posse dependeria de um
+// único id e a checagem de vínculo teria de ser lembrada no service.
+//
+// Não existe rota de LEITURA equivalente: o número da loja só sai do servidor
+// mediante esta ação explícita do comprador.
+router.post("/:id/offers/:offerId/whatsapp", asyncHandler(controller.resolveOfferWhatsapp));
+
 // PATCH e não DELETE: encerrar é mudança de estado, não remoção. A procura
 // continua no histórico do comprador como "Encerrada".
 router.patch("/:id/close", asyncHandler(controller.closeMyPurchaseIntent));
