@@ -133,7 +133,18 @@ function beforeCursor(row, createdAt, id) {
   return Number(row.id) < Number(id);
 }
 
-/** Anúncio do estoque, com os campos que o card e o casamento usam. */
+/**
+ * Anúncio do estoque, com os campos que o card e o casamento usam.
+ *
+ * A projeção espelha AD_CARD_COLUMNS coluna a coluna, e `image_url` NÃO está
+ * aqui porque não está em `ads` — a tabela só tem `images` (JSONB).
+ *
+ * Isso não é detalhe: a versão anterior deste helper devolvia
+ * `image_url: ad.image_url ?? null`, e foi exatamente por isso que o fake
+ * engoliu um `SELECT a.image_url` que o PostgreSQL real recusa com
+ * "column a.image_url does not exist". Um fake que inventa coluna concorda com
+ * qualquer query — inclusive com a que não roda em produção.
+ */
 function projectAd(ad) {
   return {
     id: ad.id,
@@ -147,7 +158,6 @@ function projectAd(ad) {
     body_type: ad.body_type ?? null,
     price: ad.price ?? null,
     images: ad.images ?? [],
-    image_url: ad.image_url ?? null,
     status: ad.status ?? null,
   };
 }

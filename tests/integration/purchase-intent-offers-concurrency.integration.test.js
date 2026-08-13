@@ -213,6 +213,69 @@ async function countOffers(intentId) {
   return rows[0].n;
 }
 
+describe.sequential("integração — as três consultas rodam no PostgreSQL real", () => {
+  /**
+   * Guarda contra a classe de bug que o fake NÃO pega: coluna inexistente.
+   *
+   * `SELECT a.image_url` passou por toda a suíte unitária porque o fake
+   * devolvia o campo — um fake concorda com qualquer query. O PostgreSQL real
+   * respondeu "column a.image_url does not exist" e derrubou o envio inteiro.
+   *
+   * Estes três casos existem para que CADA caminho de leitura da fase seja
+   * executado contra um banco de verdade pelo menos uma vez. O de matching é o
+   * que faltava: ele usa as mesmas AD_CARD_COLUMNS do envio, então tinha o
+   * mesmo defeito e nenhum teste de integração o exercitava.
+   */
+  it("listMatchingAdsForDealer roda contra o banco e devolve o estoque compatível", async () => {
+    const world = await seedWorld();
+
+    const result = await offers.listMatchingAdsForDealer(
+      String(world.dealerId),
+      String(world.intentId)
+    );
+
+    expect(result.matching_ads).toHaveLength(4);
+    expect(result.limit).toMatchObject({ max_per_dealer: 3, used: 0, remaining: 3 });
+
+    // O DTO é montado a partir de colunas REAIS — se `AD_CARD_COLUMNS` voltar a
+    // pedir algo que `ads` não tem, a query estoura antes desta asserção.
+    const [first] = result.matching_ads;
+    expect(first.vehicle_name).toBe("Honda HR-V");
+    expect(first.year).toBe(2020);
+    expect(first.mileage).toBe(72000);
+    expect(first.budget_relation).toBe("within_budget");
+    expect(first.already_sent).toBe(false);
+    // Sem foto no fixture (`images = '[]'`), a capa é null — não um erro.
+    expect(first.main_image).toBeNull();
+  }, 180000);
+
+  it("getAdForDealer roda contra o banco (é o caminho do envio)", async () => {
+    const world = await seedWorld();
+
+    const result = await offers.sendVehicleToBuyer(
+      String(world.dealerId),
+      String(world.intentId),
+      { ad_id: world.adIds[0] }
+    );
+    expect(result.created).toBe(true);
+  }, 180000);
+
+  it("listOffersForBuyer roda contra o banco", async () => {
+    const world = await seedWorld();
+    await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+      ad_id: world.adIds[0],
+    });
+
+    const result = await offers.listReceivedOffers(
+      String(world.buyerId),
+      String(world.intentId)
+    );
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0].vehicle.vehicle_name).toBe("Honda HR-V");
+    expect(result.offers[0].dealer.name).toBe("ittmotors");
+  }, 180000);
+});
+
 describe.sequential("integração — limite de 3 sob concorrência real", () => {
   it("quatro envios SIMULTÂNEOS resultam em EXATAMENTE 3 relações", async () => {
     const world = await seedWorld();
@@ -287,7 +350,24 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
     expect(await countOffers(world.intentId)).toBe(1);
   }, 180000);
 
-  it("veículo vendido libera a vaga, e o quarto envio passa", async () => {
+  /**
+   * ATENÇÃO AO STATUS USADO AQUI.
+   *
+   * A especificação da fase descreve este cenário como "ad1 → sold". Só que
+   * `sold` NÃO é gravável neste banco: o `ads_status_check` (migration 032)
+   * aceita apenas active | pending_review | paused | rejected | blocked |
+   * deleted | archived, e o comentário da própria migration é explícito —
+   * "draft/sold/expired ainda fora do CHECK até ter caminho de escrita real".
+   *
+   * `sold` existe em `AD_STATUS` (JS) mas nenhum service o escreve. Usá-lo aqui
+   * fazia o teste morrer com violação de CHECK, e o teste estaria provando um
+   * cenário que o produto não consegue produzir.
+   *
+   * `paused` é o equivalente REAL e alcançável: o dono pausa o anúncio pelo
+   * painel. O código não distingue os dois — ele compara com ACTIVE — então a
+   * regra provada é a mesma, agora com um estado que existe de verdade.
+   */
+  it("veículo indisponível libera a vaga, e o quarto envio passa", async () => {
     const world = await seedWorld();
 
     for (const adId of world.adIds.slice(0, 3)) {
@@ -305,7 +385,7 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
       })
     ).rejects.toMatchObject({ details: { code: "PURCHASE_INTENT_OFFER_LIMIT_REACHED" } });
 
-    await pool.query(`UPDATE ads SET status = 'sold' WHERE id = $1`, [world.adIds[0]]);
+    await pool.query(`UPDATE ads SET status = 'paused' WHERE id = $1`, [world.adIds[0]]);
 
     const fourth = await offers.sendVehicleToBuyer(
       String(world.dealerId),
@@ -314,8 +394,26 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
     );
     expect(fourth.created).toBe(true);
 
-    // A relação do carro vendido continua no histórico — 4 linhas, não 3.
+    // A relação do carro pausado continua no histórico — 4 linhas, não 3.
     expect(await countOffers(world.intentId)).toBe(4);
+  }, 180000);
+
+  it("o CHECK de ads.status é o que ele é — e o teste sabe disso", async () => {
+    // Documenta a descoberta acima DENTRO da suíte, para que a próxima pessoa
+    // que escrever `status = 'sold'` num teste veja o motivo em vez de um
+    // "violates check constraint" solto.
+    const { rows } = await pool.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'ads_status_check'`
+    );
+    const def = rows[0]?.def ?? "";
+
+    for (const writable of ["active", "paused", "blocked", "archived", "rejected", "deleted"]) {
+      expect(def, `${writable} deveria ser gravável`).toContain(writable);
+    }
+    // Ainda fora do CHECK, por decisão da migration 032 — não é esquecimento.
+    expect(def).not.toContain("sold");
+    expect(def).not.toContain("expired");
+    expect(def).not.toContain("draft");
   }, 180000);
 
   it("o comprador vê o preço ATUAL do anúncio, não o da hora do envio", async () => {
@@ -338,20 +436,23 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
     expect(result.offers[0].vehicle.available).toBe(true);
   }, 180000);
 
-  it("anúncio vendido aparece INDISPONÍVEL para o comprador, sem sumir", async () => {
-    const world = await seedWorld();
-    await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
-      ad_id: world.adIds[0],
-    });
+  it("anúncio fora do ar aparece INDISPONÍVEL para o comprador, sem sumir", async () => {
+    // Percorre os estados REALMENTE graváveis (ver o teste do CHECK acima).
+    for (const status of ["paused", "blocked", "archived", "rejected", "deleted"]) {
+      const world = await seedWorld();
+      await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+        ad_id: world.adIds[0],
+      });
 
-    await pool.query(`UPDATE ads SET status = 'sold' WHERE id = $1`, [world.adIds[0]]);
+      await pool.query(`UPDATE ads SET status = $2 WHERE id = $1`, [world.adIds[0], status]);
 
-    const result = await offers.listReceivedOffers(
-      String(world.buyerId),
-      String(world.intentId)
-    );
-    expect(result.offers).toHaveLength(1);
-    expect(result.offers[0].vehicle.available).toBe(false);
+      const result = await offers.listReceivedOffers(
+        String(world.buyerId),
+        String(world.intentId)
+      );
+      expect(result.offers, `status ${status}`).toHaveLength(1);
+      expect(result.offers[0].vehicle.available, `status ${status}`).toBe(false);
+    }
   }, 180000);
 
   it("loja bloqueada depois do envio torna o card indisponível", async () => {

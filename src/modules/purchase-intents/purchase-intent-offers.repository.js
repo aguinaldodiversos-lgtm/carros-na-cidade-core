@@ -38,9 +38,22 @@ function runner(exec) {
  * Colunas do anúncio necessárias para (a) decidir compatibilidade e (b) montar
  * o card. Allowlist explícita, nunca `a.*`.
  *
- * `images` entra crua porque a normalização de imagem pública é feita por
- * `ads.public-images.js` — a estratégia canônica do projeto, reaproveitada em
- * vez de reimplementada (ver o service).
+ * `images` (JSONB) é a ÚNICA coluna de imagem que `ads` tem. A normalização
+ * para URL pública é feita por `ads.public-images.js` — a estratégia canônica
+ * do projeto, reaproveitada em vez de reimplementada (ver o service).
+ *
+ * NÃO existe `ads.image_url`, e a tentação de selecioná-la é real: o objeto que
+ * `normalizePublicAdRow` DEVOLVE tem um campo `image_url` (a capa já resolvida),
+ * e a allowlist de DTO em `ads.public-listing.js` lista `image_url` entre os
+ * campos do card. Os dois são SAÍDA do serializer, não coluna de tabela — a
+ * migration 004 nunca criou `image_url` em `ads`, e nenhuma migration posterior
+ * criou (a única `image_url` do schema é a de `blog_posts`, na 035).
+ *
+ * Selecioná-la fazia o PostgreSQL responder
+ * `column a.image_url does not exist` e derrubar os três caminhos desta fase.
+ * `buildNormalizedPublicImages` lê `row.images` e trata `row.image_url` como
+ * OPCIONAL (`if (row?.image_url != null)`), então a ausência da coluna não muda
+ * nada no resultado.
  */
 const AD_CARD_COLUMNS = `
   a.id,
@@ -54,7 +67,6 @@ const AD_CARD_COLUMNS = `
   a.body_type,
   a.price,
   a.images,
-  a.image_url,
   a.status
 `;
 

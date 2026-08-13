@@ -6,10 +6,17 @@
 // impede o retry de duplicar o aviso e não que o `action_path` passa pela
 // allowlist da Fase 1.
 //
-// O QUE ESTE ARQUIVO NÃO CONSEGUE PROVAR: concorrência. O fake é um array em
-// memória com uma "conexão" só — quatro envios simultâneos nunca disputam nada
-// aqui. Esse cenário tem teste próprio contra PostgreSQL real, em
-// tests/integration/purchase-intent-offers-schema.integration.test.js.
+// O QUE ESTE ARQUIVO NÃO CONSEGUE PROVAR:
+//
+//   • CONCORRÊNCIA — o fake é um array em memória com uma "conexão" só, e
+//     quatro envios simultâneos nunca disputam nada aqui;
+//   • EXISTÊNCIA DE COLUNA — o fake devolve o que a projeção dele inventar. Foi
+//     assim que um `SELECT a.image_url` (coluna que `ads` não tem) passou por
+//     toda esta suíte e só caiu no PostgreSQL real;
+//   • CHECK constraints — `ads.status` aqui aceita qualquer string.
+//
+// Os três têm cobertura em
+// tests/integration/purchase-intent-offers-concurrency.integration.test.js.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -199,6 +206,10 @@ describe("listMatchingAdsForDealer", () => {
   });
 
   it("não lista anúncio fora de 'active'", async () => {
+    // A lista inclui `sold` e `draft`, que hoje o CHECK de `ads.status` recusa
+    // (migration 032: "ainda fora do CHECK até ter caminho de escrita real").
+    // Isso é DEFENSIVO e intencional: o código compara com ACTIVE, então
+    // qualquer valor que apareça na coluna amanhã já cai no ramo certo.
     for (const status of ["paused", "sold", "pending_review", "blocked", "archived", "draft"]) {
       db.ads = [makeAd({ id: 1, status })];
       const result = await offers.listMatchingAdsForDealer(DEALER_A, "1");
@@ -476,8 +487,11 @@ describe("limite de 3 veículos por lojista", () => {
       await offers.sendVehicleToBuyer(DEALER_A, "1", { ad_id: adId });
     }
 
-    // O primeiro foi vendido.
-    db.ads.find((ad) => ad.id === 1).status = "sold";
+    // O primeiro saiu do ar. `paused` e não `sold`: o CHECK real de
+    // `ads.status` (migration 032) NÃO aceita 'sold' — ver o teste de
+    // integração `o CHECK de ads.status é o que ele é`. Testar com um estado
+    // que o banco recusa ensinaria um cenário que o produto não produz.
+    db.ads.find((ad) => ad.id === 1).status = "paused";
 
     const fourth = await offers.sendVehicleToBuyer(DEALER_A, "1", { ad_id: 4 });
     expect(fourth.created).toBe(true);
@@ -514,7 +528,7 @@ describe("limite de 3 veículos por lojista", () => {
 
   it("retry de anúncio já enviado que depois ficou inativo continua idempotente", async () => {
     await offers.sendVehicleToBuyer(DEALER_A, "1", { ad_id: 1 });
-    db.ads.find((ad) => ad.id === 1).status = "sold";
+    db.ads.find((ad) => ad.id === 1).status = "paused";
 
     const retry = await offers.sendVehicleToBuyer(DEALER_A, "1", { ad_id: 1 });
     expect(retry.created).toBe(false);
@@ -567,7 +581,10 @@ describe("listReceivedOffers", () => {
     expect(offer.vehicle.available).toBe(true);
   });
 
-  it("anúncio vendido/pausado/bloqueado vira INDISPONÍVEL, sem apagar a relação", async () => {
+  it("anúncio fora do ar vira INDISPONÍVEL, sem apagar a relação", async () => {
+    // Idem: `sold` e `expired` estão fora do CHECK atual e entram como defesa.
+    // Os estados GRAVÁVEIS são cobertos contra Postgres real no arquivo de
+    // integração — aqui o que se prova é o ramo do código, não o do banco.
     for (const status of ["sold", "paused", "blocked", "expired", "archived", "deleted"]) {
       seedWorld();
       await offers.sendVehicleToBuyer(DEALER_A, "1", { ad_id: 1 });
