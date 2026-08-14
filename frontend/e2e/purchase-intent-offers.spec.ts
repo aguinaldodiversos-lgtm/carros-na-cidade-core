@@ -248,6 +248,41 @@ test.describe("@e2e Fase 3 — envio de veículos", () => {
       /^\/veiculo\//
     );
 
+    // --- Fase 3.1: agendar visita pelo WhatsApp ---------------------------
+    // O telefone NÃO viaja no payload da listagem: só a URL, e só depois do
+    // clique. Este é o teste de §7 no fluxo real.
+    const offersRaw = await (
+      await page.request.get(`/api/account/purchase-intents/${intentId}/offers`)
+    ).text();
+    expect(offersRaw).not.toMatch(/whatsapp|phone|telefone|telephone|mobile/i);
+
+    const openedUrls = await captureWhatsappOpen(page);
+
+    const whatsappCta = received.getByTestId("received-vehicle-whatsapp");
+    await expect(whatsappCta).toHaveText(/Agendar visita pelo WhatsApp/i);
+    await whatsappCta.click();
+
+    await expect.poll(async () => (await openedUrls()).length).toBe(1);
+    const waUrl = new URL((await openedUrls())[0]);
+
+    expect(waUrl.host).toBe("wa.me");
+    expect(waUrl.protocol).toBe("https:");
+    // O número EXATO da Loja Atibaia — não "algum número". O seed dá um
+    // WhatsApp diferente a cada lojista justamente para provar que o contato
+    // sai do advertiser DO ANÚNCIO enviado, e não de outra loja qualquer.
+    // "(11) 98888-1111" gravado com máscara vira "5511988881111": DDI na frente,
+    // sem duplicar, sem pontuação.
+    expect(waUrl.pathname).toBe("/5511988881111");
+    // E jamais o da loja de Bragança, que também tem número no seed.
+    expect(waUrl.pathname).not.toContain("98888222");
+    // Mensagem contextual, com o veículo que o comprador realmente recebeu.
+    const waText = waUrl.searchParams.get("text") ?? "";
+    expect(waText).toContain("Carros na Cidade");
+    expect(waText).toContain("Honda HR-V 2020");
+    expect(waText).toMatch(/gostaria de agendar uma visita/i);
+    // Nada de "visita agendada": nada foi agendado.
+    expect(waText).not.toMatch(/visita agendada|hor[áa]rio reservado/i);
+
     // E foi avisado, com a rota certa e sem PII no corpo.
     const notifications = await page.request.get("/api/account/notifications");
     const notifBody = (await notifications.json()) as {
@@ -293,8 +328,50 @@ test.describe("@e2e Fase 3 — envio de veículos", () => {
 
     await expect(page.getByTestId("received-vehicle-card").first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
+
+    // §52: o CTA precisa estar visível, clicável e gerar a URL certa no mobile,
+    // com os dois botões empilhados e sem estourar a largura da tela.
+    const openedUrls = await captureWhatsappOpen(page);
+    const cta = page.getByTestId("received-vehicle-whatsapp").first();
+    await expect(cta).toBeVisible();
+    await cta.click();
+
+    await expect.poll(async () => (await openedUrls()).length).toBe(1);
+
+    const mobileUrl = new URL((await openedUrls())[0]);
+    expect(mobileUrl.host).toBe("wa.me");
+    expect(mobileUrl.pathname).toBe("/5511988881111");
+    expect(mobileUrl.searchParams.get("text")).toContain("Honda HR-V 2020");
+
+    await expectNoHorizontalOverflow(page);
   });
 });
+
+/**
+ * Captura a URL do WhatsApp SEM abrir o WhatsApp.
+ *
+ * §53: o E2E automático não pode iniciar conversa externa de verdade. Em vez de
+ * interceptar navegação (que não acontece — o card usa `window.open` numa aba
+ * nova), o próprio `window.open` é substituído por uma função que guarda a URL
+ * e devolve `null`. O clique segue o caminho REAL do componente: pede a URL ao
+ * backend, recebe e chama `window.open` — só o último passo é observado em vez
+ * de executado.
+ */
+async function captureWhatsappOpen(page: Page) {
+  await page.evaluate(() => {
+    (window as unknown as { __waOpened: string[] }).__waOpened = [];
+    window.open = ((url?: string | URL) => {
+      (window as unknown as { __waOpened: string[] }).__waOpened.push(String(url ?? ""));
+      return null;
+    }) as typeof window.open;
+  });
+
+  return async function openedUrls(): Promise<string[]> {
+    return page.evaluate(
+      () => (window as unknown as { __waOpened?: string[] }).__waOpened ?? []
+    );
+  };
+}
 
 /**
  * Overflow horizontal é medido no DOCUMENTO, não em cada card.

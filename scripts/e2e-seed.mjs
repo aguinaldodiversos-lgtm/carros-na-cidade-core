@@ -115,25 +115,43 @@ await pool.query(
 //
 // Aditivo e idempotente: não altera o utilizador CPF nem os anúncios dele, então
 // os specs que já existiam continuam a ver exatamente o mesmo estado.
+//
+// A Fase 3.1 acrescentou `whatsapp`: sem número, o botão "Agendar visita pelo
+// WhatsApp" responderia DEALER_WHATSAPP_UNAVAILABLE e o E2E do CTA não teria o
+// que validar. Cada loja recebe um número DIFERENTE de propósito — é o que
+// permite provar que o contato sai do advertiser DO ANÚNCIO, e não de "alguma
+// loja" qualquer.
+//
+// Gravado no formato que o lojista digita, com máscara: a normalização para
+// `wa.me` é responsabilidade da leitura, não do dado.
 const DEALERS = [
-  { email: "cnpj@carrosnacidade.com", name: "Loja Atibaia", slug: "atibaia-sp", status: "active" },
+  {
+    email: "cnpj@carrosnacidade.com",
+    name: "Loja Atibaia",
+    slug: "atibaia-sp",
+    status: "active",
+    whatsapp: "(11) 98888-1111",
+  },
   {
     email: "cnpj2@carrosnacidade.com",
     name: "Loja Braganca",
     slug: "braganca-paulista-sp",
     status: "active",
+    whatsapp: "(11) 98888-2222",
   },
   {
     email: "cnpj3@carrosnacidade.com",
     name: "Loja Atibaia Suspensa",
     slug: "atibaia-sp",
     status: "suspended",
+    whatsapp: "(11) 98888-3333",
   },
   {
     email: "cnpj4@carrosnacidade.com",
     name: "Loja Atibaia Bloqueada",
     slug: "atibaia-sp",
     status: "blocked",
+    whatsapp: "(11) 98888-4444",
   },
 ];
 
@@ -182,11 +200,10 @@ for (const dealer of DEALERS) {
     cityId: Number(dealerCityId),
     source: "e2e-seed",
   });
-  await pool.query(`UPDATE advertisers SET city_id = $2, status = $3 WHERE user_id = $1`, [
-    dealerUserId,
-    dealerCityId,
-    dealer.status,
-  ]);
+  await pool.query(
+    `UPDATE advertisers SET city_id = $2, status = $3, whatsapp = $4 WHERE user_id = $1`,
+    [dealerUserId, dealerCityId, dealer.status, dealer.whatsapp]
+  );
 }
 
 // --- Estoque dos lojistas para o envio de veículos (Fase 3) -----------------

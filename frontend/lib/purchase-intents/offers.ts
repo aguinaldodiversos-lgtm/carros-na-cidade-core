@@ -117,6 +117,41 @@ function extractMessage(payload: unknown, fallbackStatus: number): string {
   return `Erro ${fallbackStatus}`;
 }
 
+/**
+ * Erro que preserva o CÓDIGO DE DOMÍNIO devolvido pelo backend.
+ *
+ * `new Error(mensagem)` sozinho obriga a tela a decidir por texto — e casar
+ * mensagem em pt-BR com regex é a receita para o dia em que alguém corrige uma
+ * vírgula no backend e a UI para de distinguir "veículo indisponível" de
+ * "falhou a rede".
+ *
+ * O `code` vem de `details.code` (ver `error.middleware.js`, que inclui
+ * `details` na resposta). Quando não houver, fica `null` e a tela cai no texto
+ * genérico — degradar é aceitável, adivinhar não.
+ */
+export class OffersApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.name = "OffersApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function extractCode(payload: unknown): string | null {
+  if (payload && typeof payload === "object") {
+    const details = (payload as Record<string, unknown>).details;
+    if (details && typeof details === "object") {
+      const code = (details as Record<string, unknown>).code;
+      if (typeof code === "string" && code) return code;
+    }
+  }
+  return null;
+}
+
 async function offersFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     credentials: "include",
@@ -136,7 +171,9 @@ async function offersFetch<T>(url: string, init?: RequestInit): Promise<T> {
     json = null;
   }
 
-  if (!res.ok) throw new Error(extractMessage(json, res.status));
+  if (!res.ok) {
+    throw new OffersApiError(extractMessage(json, res.status), res.status, extractCode(json));
+  }
   return json as T;
 }
 
@@ -176,6 +213,43 @@ export async function sendVehicleToBuyer(
 export async function fetchReceivedOffers(intentId: number): Promise<ReceivedOffersPage> {
   const page = await offersFetch<ReceivedOffersPage>(`${BUYER_BASE}/${intentId}/offers`);
   return { offers: Array.isArray(page?.offers) ? page.offers : [] };
+}
+
+/** Códigos de domínio que a tela de veículos recebidos trata por nome. */
+export const OFFER_ERROR_CODE = {
+  /** Anúncio saiu do ar OU loja deixou de estar operacional. */
+  UNAVAILABLE: "PURCHASE_INTENT_OFFER_UNAVAILABLE",
+  /** Tudo válido, mas a loja não tem número de WhatsApp utilizável. */
+  WHATSAPP_UNAVAILABLE: "DEALER_WHATSAPP_UNAVAILABLE",
+} as const;
+
+/**
+ * Pede ao servidor o link de WhatsApp da loja que enviou este veículo.
+ *
+ * O corpo vai VAZIO de propósito. Número, loja e mensagem são reconstruídos no
+ * servidor a partir de (sessão, intentId, offerId) — se a tela mandasse
+ * qualquer um deles, passaria a ser possível redirecionar o comprador para onde
+ * o cliente quisesse.
+ *
+ * A URL devolvida é sempre `https://wa.me/...`, montada pelo backend.
+ */
+export async function requestOfferWhatsapp(
+  intentId: number,
+  offerId: number | string
+): Promise<{ url: string }> {
+  const payload = await offersFetch<{ url?: string }>(
+    `${BUYER_BASE}/${intentId}/offers/${offerId}/whatsapp`,
+    { method: "POST" }
+  );
+
+  const url = String(payload?.url ?? "").trim();
+  // Cinto e suspensório: mesmo vindo do nosso backend, a tela só abre um host
+  // conhecido. Uma resposta inesperada vira erro tratado, não uma navegação
+  // para lugar nenhum.
+  if (!url.startsWith("https://wa.me/")) {
+    throw new OffersApiError("Não foi possível abrir o WhatsApp da loja.", 502, null);
+  }
+  return { url };
 }
 
 // --- Apresentação -----------------------------------------------------------

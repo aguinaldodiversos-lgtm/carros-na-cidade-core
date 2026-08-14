@@ -58,4 +58,51 @@ export const PURCHASE_INTENT_OFFER_CODE = Object.freeze({
   AD_NOT_ELIGIBLE: "PURCHASE_INTENT_OFFER_AD_NOT_ELIGIBLE",
   AD_NOT_ACTIVE: "PURCHASE_INTENT_OFFER_AD_NOT_ACTIVE",
   INVALID_AD: "PURCHASE_INTENT_OFFER_INVALID_AD",
+
+  // --- Fase 3.1 — contato por WhatsApp -------------------------------------
+
+  /**
+   * O veículo deixou de estar disponível entre o carregamento da tela e o
+   * clique: anúncio fora de `active` OU loja não operacional.
+   *
+   * Os DOIS casos compartilham este código de propósito. Distinguir "o anúncio
+   * foi pausado" de "a loja foi bloqueada" contaria ao comprador uma decisão de
+   * moderação que não é da conta dele — e para ele o efeito é idêntico: não dá
+   * para visitar este carro.
+   */
+  OFFER_UNAVAILABLE: "PURCHASE_INTENT_OFFER_UNAVAILABLE",
+
+  /**
+   * Tudo válido (procura, oferta, anúncio ativo, loja operacional), mas a loja
+   * não tem um número de WhatsApp utilizável.
+   *
+   * É estado de DADO, não erro de servidor: a loja simplesmente não preencheu o
+   * campo, ou preencheu algo que não é um celular brasileiro completo. Devolver
+   * 500 aqui faria parecer defeito do portal e mandaria alguém procurar bug.
+   */
+  DEALER_WHATSAPP_UNAVAILABLE: "DEALER_WHATSAPP_UNAVAILABLE",
 });
+
+/**
+ * Base do link de conversa. Domínio OFICIAL do WhatsApp.
+ *
+ * Mesma base que `buildVehicleWhatsappHref` usa no anúncio público — o produto
+ * já fala com o WhatsApp por aqui. Nada de encurtador, nada de domínio
+ * intermediário: um redirecionador no meio veria quem está conversando com quem.
+ */
+export const WHATSAPP_BASE_URL = "https://wa.me";
+
+/**
+ * Texto da mensagem pré-preenchida.
+ *
+ * Curta de propósito. O comprador vai REVISAR isso dentro do WhatsApp antes de
+ * enviar, e um parágrafo longo é apagado — aí ele manda "oi" e o lojista não
+ * sabe de qual carro se trata, que é justamente o que a mensagem existe para
+ * resolver.
+ *
+ * "gostaria de agendar uma visita" e não "agendei": nada foi agendado. O botão
+ * abre uma conversa; quem combina dia e hora são as duas pessoas.
+ */
+export function buildVisitMessage(vehicleName) {
+  return `Olá! Recebi pelo Carros na Cidade a opção do ${vehicleName} e gostaria de agendar uma visita para conhecer o veículo.`;
+}
