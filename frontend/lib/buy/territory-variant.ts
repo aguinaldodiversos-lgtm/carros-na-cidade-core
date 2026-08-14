@@ -24,18 +24,25 @@ import { getCanonicalCityPath, isValidCanonicalCitySlug } from "@/lib/seo/canoni
 /**
  * Variantes da página /comprar.
  *
- * - `estadual`: catálogo de um UF (`/comprar/estado/[uf]`). Vitrine padrão
- *   quando o usuário não traz cidade explícita — `/comprar` redireciona
- *   para `/comprar/estado/[uf]` resolvendo a UF via cookie/default.
+ * - `estadual`: catálogo de um UF (`/comprar/estado/[uf]`, alias da canônica
+ *   `/carros-usados/[uf]`).
  * - `cidade`: catálogo de uma cidade (`/carros-em/[slug]`, canônica).
  * - `regional`: catálogo da região de uma cidade-base
  *   (`/carros-usados/regiao/[slug]`). Inclui a cidade-base + cidades
  *   próximas dentro do raio configurável; cidade-base prioriza só
  *   dentro do mesmo tier comercial (briefing 2026-05-20).
- * - `nacional`: fallback técnico do `BuyMarketplacePageClient` para empty
- *   states e telas que não têm contexto territorial. Nenhuma rota pública
- *   entra por aqui — o ponto de entrada (`/comprar`) sempre redireciona
- *   para `estadual` ou `cidade`.
+ * - `nacional`: catálogo do Brasil inteiro — a rota `/comprar`. NÃO é mais
+ *   "fallback técnico sem rota pública": desde o hotfix de 2026-08-13,
+ *   `/comprar` é a vitrine nacional TRANSACIONAL (busca + filtros + cards +
+ *   paginação), servida por `normalizeNationalFilters` + `loadNationalCatalogData`.
+ *
+ * ── Correção documental (2026-08-13) ─────────────────────────────────────────
+ * Este comentário afirmava que `/comprar` "sempre redireciona para estadual ou
+ * cidade", resolvendo a UF por cookie/default. Isso deixou de ser verdade
+ * quando `/comprar` virou destino final (200 autocanônico) — e a descrição
+ * desatualizada é exatamente o tipo de sinal que faz alguém reintroduzir o
+ * redirect por território. Não existe fallback territorial em `/comprar`:
+ * sem UF, sem cidade, sem cookie. O território é o Brasil.
  */
 export type ComprarVariant = "estadual" | "cidade" | "regional" | "nacional";
 
@@ -204,6 +211,51 @@ export function normalizeStateFilters(uf: string, searchParams: SearchParams): A
   };
 
   delete next.city_slug;
+  delete next.city_id;
+  delete next.city;
+
+  return next;
+}
+
+/**
+ * Normaliza filtros para o catálogo NACIONAL (`/comprar`).
+ *
+ * O contrário dos dois normalizadores territoriais: em vez de FORÇAR um
+ * território, este REMOVE todos. O Brasil não é "um estado grande" — é a
+ * ausência de recorte territorial, e é isso que o backend precisa receber.
+ *
+ * ── Por que apagar em vez de só não preencher ────────────────────────────────
+ * `parseAdsSearchFiltersFromSearchParams` lê `state`, `city_slug`, `city_id`,
+ * `city` e `city_slugs` da query. Se um deles sobrevivesse, `/comprar?state=SP`
+ * renderizaria o catálogo de SP sob a URL nacional — a mesma doorway page que
+ * `/comprar/cidade` já custou para remover. As grafias legadas com território
+ * na query saem antes, com 308 real, no `decideComprarLegacyQueryRedirect`;
+ * este delete é a segunda linha, para o caso de a query chegar aqui de outro
+ * jeito (rewrite interno, chamada direta do loader em teste).
+ *
+ * Nenhum default entra no lugar: não há UF de cookie, não há "primeira cidade
+ * do banco", não há SP. Estoque concentrado numa cidade não redefine a
+ * identidade da rota.
+ *
+ * `sort`/`page`/`limit` seguem os MESMOS defaults das vitrines territoriais —
+ * é o mesmo catálogo, só sem recorte.
+ */
+export function normalizeNationalFilters(searchParams: SearchParams): AdsSearchFilters {
+  const parsed = parseAdsSearchFiltersFromSearchParams(toReader(searchParams));
+
+  const sortInQuery = getFirstValue(searchParams.sort);
+  const hasExplicitSort = sortInQuery != null && String(sortInQuery).trim() !== "";
+
+  const next: AdsSearchFilters = {
+    ...parsed,
+    sort: hasExplicitSort ? parsed.sort || "relevance" : "relevance",
+    page: parsed.page || 1,
+    limit: parsed.limit ?? DEFAULT_COMPRAR_CATALOG_LIMIT,
+  };
+
+  delete next.state;
+  delete next.city_slug;
+  delete next.city_slugs;
   delete next.city_id;
   delete next.city;
 

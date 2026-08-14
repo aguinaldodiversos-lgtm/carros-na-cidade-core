@@ -6,6 +6,7 @@ import {
   buildStatePath,
   isValidCitySlug,
   normalizeCityFilters,
+  normalizeNationalFilters,
   normalizeStateFilters,
   normalizeUf,
 } from "./territory-variant";
@@ -79,6 +80,86 @@ describe("normalizeStateFilters — contrato Página Estadual", () => {
   it("respeita sort explícito do usuário", () => {
     const out = normalizeStateFilters("SP", { sort: "price_asc" });
     expect(out.sort).toBe("price_asc");
+  });
+});
+
+/**
+ * Contrato da vitrine NACIONAL (`/comprar`), hotfix 2026-08-13.
+ *
+ * A regra é o espelho das duas de cima: em vez de forçar um território, apaga
+ * todos. O que este bloco trava não é a ausência trivial de `state` — é a
+ * impossibilidade de reintroduzir, por qualquer caminho, o fallback territorial
+ * que já existiu aqui (cookie → estado default → SP). Se alguém voltar a
+ * preencher UF ou cidade neste normalizador, estes testes caem.
+ */
+describe("normalizeNationalFilters — contrato Vitrine Nacional", () => {
+  it("não envia NENHUM campo territorial quando a query é limpa", () => {
+    const out = normalizeNationalFilters({});
+
+    expect(out.state).toBeUndefined();
+    expect(out.city_slug).toBeUndefined();
+    expect(out.city_slugs).toBeUndefined();
+    expect(out.city_id).toBeUndefined();
+    expect(out.city).toBeUndefined();
+  });
+
+  it("APAGA território vindo da query — /comprar?state=SP não vira catálogo de SP", () => {
+    const out = normalizeNationalFilters({
+      state: "SP",
+      city_slug: "atibaia-sp",
+      city_slugs: "atibaia-sp,campinas-sp",
+      city_id: "42",
+      city: "Atibaia",
+      brand: "Honda",
+    });
+
+    expect(out.state).toBeUndefined();
+    expect(out.city_slug).toBeUndefined();
+    expect(out.city_slugs).toBeUndefined();
+    expect(out.city_id).toBeUndefined();
+    expect(out.city).toBeUndefined();
+    // O filtro de veículo do usuário sobrevive: só o território sai.
+    expect(out.brand).toBe("Honda");
+  });
+
+  it("não injeta UF nem cidade default (sem SP, sem Atibaia, sem primeira cidade)", () => {
+    const serialized = JSON.stringify(normalizeNationalFilters({}));
+    expect(serialized).not.toMatch(/SP/);
+    expect(serialized).not.toMatch(/atibaia/i);
+  });
+
+  it("preserva filtros de veículo e paginação do usuário", () => {
+    const out = normalizeNationalFilters({
+      q: "onix",
+      brand: "Chevrolet",
+      model: "Onix",
+      min_price: "20000",
+      max_price: "80000",
+      transmission: "Automatico",
+      page: "3",
+    });
+
+    expect(out.q).toBe("onix");
+    expect(out.brand).toBe("Chevrolet");
+    expect(out.model).toBe("Onix");
+    expect(out.min_price).toBe(20000);
+    expect(out.max_price).toBe(80000);
+    expect(out.transmission).toBe("Automatico");
+    expect(out.page).toBe(3);
+  });
+
+  it("usa os MESMOS defaults de sort/page/limit das vitrines territoriais", () => {
+    const nacional = normalizeNationalFilters({});
+    const estadual = normalizeStateFilters("SP", {});
+
+    expect(nacional.sort).toBe("relevance");
+    expect(nacional.page).toBe(1);
+    expect(nacional.limit).toBe(estadual.limit);
+    expect(nacional.sort).toBe(estadual.sort);
+  });
+
+  it("respeita sort explícito do usuário", () => {
+    expect(normalizeNationalFilters({ sort: "price_asc" }).sort).toBe("price_asc");
   });
 });
 

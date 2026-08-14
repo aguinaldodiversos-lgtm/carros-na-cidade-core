@@ -73,6 +73,13 @@ export function decideLegacyCityRedirect(pathname: string, search: string): Redi
  * sem necessidade. Rota de catálogo nova entra aqui no mesmo PR.
  */
 const CATALOG_PATHS: ReadonlyArray<RegExp> = [
+  // Vitrine nacional. Entrou quando `/comprar` deixou de ser diretório e passou
+  // a montar o catálogo (hotfix 2026-08-13): a partir daí a navegação interna
+  // dela emite `?sort=relevance&limit=50` como qualquer outra vitrine, e sem
+  // esta linha cada clique de filtro publicaria uma grafia nova de `/comprar`.
+  // As grafias com TERRITÓRIO na query (`?state=`, `?city_slug=`) não chegam
+  // aqui: saem antes, no passo 0c, com 308 para a rota territorial canônica.
+  /^\/comprar\/?$/,
   /^\/carros-em\/[^/]+\/?$/,
   /^\/carros-baratos-em\/[^/]+\/?$/,
   /^\/carros-automaticos-em\/[^/]+\/?$/,

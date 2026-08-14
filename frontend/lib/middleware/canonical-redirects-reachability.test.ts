@@ -106,6 +106,32 @@ describe("alcance: o guard Regional retorna cedo e precisa normalizar sozinho", 
     expect(regionalPassBranch()).toContain("decideQueryNormalizationRedirect(pathname, search)");
   });
 
+  it("nenhum guard intercepta /comprar antes da normalização", () => {
+    // `/comprar` entrou em CATALOG_PATHS (2026-08-13). A função pura passar não
+    // basta — foi exatamente assim que o gate de cidade ficou verde e
+    // inalcançável. Aqui provamos que o ÚNICO ponto do middleware que decide
+    // sobre `/comprar` antes do fim é o bloco da query legada (que só retorna
+    // quando há território na query); tudo o mais é de outra família de rota,
+    // então o fluxo chega ao passo 5.
+    const codeOnly = MIDDLEWARE.split("\n")
+      .filter((line) => !line.trim().startsWith("*") && !line.trim().startsWith("//"))
+      .join("\n");
+
+    // O middleware não pode ter um teste de path próprio para `/comprar`: o
+    // único que existe mora em `decideComprarLegacyQueryRedirect`, e ele só
+    // retorna redirect quando há território na query.
+    expect(codeOnly).not.toMatch(/pathname\s*===\s*["'`]\/comprar["'`]/);
+    expect(codeOnly).not.toMatch(/pathname\.startsWith\(["'`]\/comprar/);
+
+    // E o bloco da query legada tem que continuar sendo um `if` sobre a
+    // decisão — não um `return` incondicional para a família.
+    const legacyBlock = MIDDLEWARE.slice(
+      MIDDLEWARE.indexOf("const comprarLegacy ="),
+      MIDDLEWARE.indexOf('"comprar-legacy-query"')
+    );
+    expect(legacyBlock).toContain('comprarLegacy.kind === "redirect-permanent"');
+  });
+
   it("a normalização aparece pelo menos duas vezes (fluxo principal + Regional)", () => {
     const ocorrencias = MIDDLEWARE.split("decideQueryNormalizationRedirect(pathname, search)")
       .length - 1;
