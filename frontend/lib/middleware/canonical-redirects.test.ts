@@ -155,6 +155,9 @@ describe("isCatalogPathname — escopo da normalização de query", () => {
     "/comprar/estado/sp",
     "/cidade/atibaia-sp",
     "/cidade/atibaia-sp/marca/fiat",
+    // Vitrine nacional — entrou quando `/comprar` virou catálogo (2026-08-13).
+    "/comprar",
+    "/comprar/",
   ])("%s é vitrine", (path) => {
     expect(isCatalogPathname(path)).toBe(true);
   });
@@ -165,6 +168,47 @@ describe("isCatalogPathname — escopo da normalização de query", () => {
       expect(isCatalogPathname(path)).toBe(false);
     }
   );
+});
+
+/**
+ * `/comprar` virou catálogo em 2026-08-13 e, com isso, passou a ter a mesma
+ * navegação interna das demais vitrines — que emite `?sort=relevance&limit=50`
+ * a cada clique de filtro. Sem normalização, cada clique publicaria uma grafia
+ * nova da porta de entrada do catálogo.
+ */
+describe("decideQueryNormalizationRedirect — vitrine nacional /comprar", () => {
+  it("normaliza sort=relevance / page=1 / limit default para a URL limpa", () => {
+    for (const query of ["?sort=relevance", "?page=1", "?limit=50", "?sort=relevance&limit=50"]) {
+      const d = decideQueryNormalizationRedirect("/comprar", query);
+      expect(d, `query ${query}`).toEqual({
+        kind: "redirect-permanent",
+        pathname: "/comprar",
+        search: "",
+      });
+    }
+  });
+
+  it("preserva filtro real do usuário ao limpar o eco da navegação", () => {
+    const d = decideQueryNormalizationRedirect("/comprar", "?sort=relevance&limit=50&brand=Honda");
+    expect(d).toEqual({
+      kind: "redirect-permanent",
+      pathname: "/comprar",
+      search: "?brand=Honda",
+    });
+  });
+
+  it("NÃO mexe em paginação, filtro ou ordenação reais", () => {
+    for (const query of ["?page=2", "?brand=Honda", "?sort=price_asc", "?q=onix"]) {
+      expect(decideQueryNormalizationRedirect("/comprar", query).kind, `query ${query}`).toBe(
+        "pass"
+      );
+    }
+  });
+
+  it("nunca reescreve o PATH — /comprar continua /comprar", () => {
+    const d = decideQueryNormalizationRedirect("/comprar", "?sort=relevance&brand=Honda");
+    expect(d.kind === "redirect-permanent" && d.pathname).toBe("/comprar");
+  });
 });
 
 describe("decideQueryNormalizationRedirect", () => {
