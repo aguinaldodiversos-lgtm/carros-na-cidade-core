@@ -38,8 +38,19 @@ export function maxModelYear(now: Date = new Date()): number {
   return now.getUTCFullYear() + 1;
 }
 
-export const PHOTO_PRIVACY_NOTICE =
-  "Evite fotos que mostrem a placa do veículo, documentos, pessoas ou a fachada da sua residência.";
+/**
+ * Orientação do bloco de fotos.
+ *
+ * COMERCIAL, e só. A tela não pede, não sugere e não chama atenção para
+ * documento, fachada, pessoa ou qualquer dado pessoal: mencionar esses itens —
+ * ainda que para desaconselhá-los — coloca dado sensível no centro da
+ * experiência, que é exatamente o oposto do que o produto quer.
+ *
+ * O foco é o veículo. Se uma foto acabar mostrando algo além dele, isto NÃO é
+ * bloqueado nesta etapa; simplesmente não é assunto da interface.
+ */
+export const PHOTO_GUIDANCE_NOTICE =
+  "Adicione fotos claras do veículo para ajudar os lojistas na avaliação inicial.";
 
 export const ISSUES_PRIVACY_NOTICE =
   "Informe problemas conhecidos do veículo, se houver. Não inclua telefone, endereço, placa ou dados pessoais.";

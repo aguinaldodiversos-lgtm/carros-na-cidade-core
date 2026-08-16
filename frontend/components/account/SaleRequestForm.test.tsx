@@ -13,7 +13,7 @@ import SaleRequestForm from "./SaleRequestForm";
  *   - a cadeia FIPE (marca → modelo → ano) encadeia e invalida corretamente;
  *   - o botão só habilita com o formulário COMPLETO, fotos incluídas;
  *   - o payload enviado carrega os CÓDIGOS FIPE e NENHUMA placa;
- *   - o aviso de privacidade das fotos aparece;
+ *   - o bloco de fotos traz orientação COMERCIAL e nenhum dado sensível;
  *   - o 409 de limite vira mensagem legível.
  */
 
@@ -74,9 +74,25 @@ function uploaded(count: number) {
   }));
 }
 
+/**
+ * `delay: null` remove a espera artificial que o `userEvent` insere ENTRE
+ * eventos.
+ *
+ * Não é micro-otimização: `fillEverything` encadeia ~10 interações, uma delas
+ * digitando 5 caracteres. Com o delay padrão, o custo somado se aproximava do
+ * `testTimeout` de 5 s — o arquivo passava isolado (9 s no total) e falhava de
+ * forma INTERMITENTE na suíte completa, onde as workers disputam CPU.
+ *
+ * Um teste que só falha sob carga é pior que um teste vermelho: ele treina quem
+ * lê a suíte a reexecutar até passar.
+ */
+function setupUser() {
+  return userEvent.setup({ delay: null });
+}
+
 /** Preenche todos os campos, deixando o formulário pronto para submeter. */
 async function fillEverything() {
-  const user = userEvent.setup();
+  const user = setupUser();
 
   await waitFor(() => expect(screen.getByTestId("sale-request-brand")).not.toBeDisabled());
   await user.selectOptions(screen.getByTestId("sale-request-brand"), "59");
@@ -122,7 +138,7 @@ describe("cadeia FIPE", () => {
     expect(screen.getByTestId("sale-request-model")).toBeDisabled();
     expect(screen.getByTestId("sale-request-year")).toBeDisabled();
 
-    const user = userEvent.setup();
+    const user = setupUser();
     await waitFor(() => expect(screen.getByTestId("sale-request-brand")).not.toBeDisabled());
     await user.selectOptions(screen.getByTestId("sale-request-brand"), "59");
 
@@ -137,7 +153,7 @@ describe("cadeia FIPE", () => {
     // Manter o ano de outro modelo enviaria um par de códigos que não descreve
     // carro nenhum — e a cotação FIPE sairia errada ou vazia.
     render(<SaleRequestForm />);
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await waitFor(() => expect(screen.getByTestId("sale-request-brand")).not.toBeDisabled());
     await user.selectOptions(screen.getByTestId("sale-request-brand"), "59");
@@ -160,7 +176,7 @@ describe("gate de submissão", () => {
 
   it("continua desabilitado com menos de 4 fotos", async () => {
     render(<SaleRequestForm />);
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await waitFor(() => expect(screen.getByTestId("sale-request-brand")).not.toBeDisabled());
     await user.selectOptions(screen.getByTestId("sale-request-brand"), "59");
@@ -227,7 +243,20 @@ describe("payload enviado", () => {
     }
   });
 
-  it("NÃO envia placa em nenhuma forma", async () => {
+  /**
+   * As duas AUSÊNCIAS críticas do payload, num único preenchimento.
+   *
+   * Estavam em testes separados, cada um repetindo `fillEverything` inteiro (~10
+   * interações + upload de 4 fotos). São asserções sobre o MESMO payload, com
+   * setup idêntico — separá-las custava dois ciclos completos de formulário e
+   * não comprava isolamento de falha nenhum, porque um payload errado quebraria
+   * os dois juntos de qualquer forma.
+   *
+   * O custo importava: este arquivo e o `PurchaseIntentForm.test.tsx` são os
+   * dois mais pesados da suíte, e a soma dos dois passou a estourar o
+   * `testTimeout` sob contenção de CPU na execução completa.
+   */
+  it("NÃO envia placa nem valor FIPE — o servidor é a autoridade", async () => {
     createSaleRequest.mockResolvedValue({ sale_request: { id: 12 } });
 
     render(<SaleRequestForm />);
@@ -240,17 +269,6 @@ describe("payload enviado", () => {
     expect(payload).not.toHaveProperty("plate");
     expect(payload).not.toHaveProperty("placa");
     expect(JSON.stringify(payload)).not.toMatch(/plac[ae]/i);
-  });
-
-  it("NÃO envia valor FIPE — o servidor é a autoridade", async () => {
-    createSaleRequest.mockResolvedValue({ sale_request: { id: 12 } });
-
-    render(<SaleRequestForm />);
-    const user = await fillEverything();
-    await user.click(screen.getByTestId("sale-request-submit"));
-
-    await waitFor(() => expect(createSaleRequest).toHaveBeenCalledTimes(1));
-    const payload = createSaleRequest.mock.calls[0][0];
 
     expect(payload).not.toHaveProperty("fipe_reference_value");
     expect(payload).not.toHaveProperty("fipe_value");
@@ -300,7 +318,7 @@ describe("erros", () => {
 
   it("erro de upload aparece sem quebrar o formulário", async () => {
     render(<SaleRequestForm />);
-    const user = userEvent.setup();
+    const user = setupUser();
 
     uploadSaleRequestPhotos.mockRejectedValue(new Error("Formato não suportado."));
     await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.heic")]);
@@ -313,11 +331,30 @@ describe("erros", () => {
 });
 
 describe("privacidade e limites na tela", () => {
-  it("mostra o aviso sobre placa, documentos e fachada", () => {
+  it("mostra orientação COMERCIAL no bloco de fotos", () => {
     render(<SaleRequestForm />);
-    expect(screen.getByTestId("sale-request-photo-privacy")).toHaveTextContent(
-      /Evite fotos que mostrem a placa do veículo, documentos, pessoas ou a fachada/i
+    expect(screen.getByTestId("sale-request-photo-guidance")).toHaveTextContent(
+      /Adicione fotos claras do veículo para ajudar os lojistas na avaliação inicial/i
     );
+  });
+
+  it("o bloco de fotos NÃO menciona dado sensível nenhum", () => {
+    // A regressão que este teste impede é o retorno do aviso antigo — ou de
+    // qualquer variante dele. Enumerar dados sensíveis, mesmo para
+    // desaconselhá-los, os traz para o centro da experiência.
+    render(<SaleRequestForm />);
+
+    const photoBlock = screen.getByTestId("sale-request-photos").textContent ?? "";
+    for (const term of [
+      /plac[ae]/i,
+      /documento/i,
+      /fachada/i,
+      /residência/i,
+      /dados pessoais/i,
+      /dados sensíveis/i,
+    ]) {
+      expect(photoBlock).not.toMatch(term);
+    }
   });
 
   it("mostra o aviso do campo de problemas conhecidos", () => {
@@ -334,7 +371,7 @@ describe("privacidade e limites na tela", () => {
 
   it("a primeira foto é marcada como capa", async () => {
     render(<SaleRequestForm />);
-    const user = userEvent.setup();
+    const user = setupUser();
 
     uploadSaleRequestPhotos.mockResolvedValue(uploaded(4));
     await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.jpg")]);
@@ -344,7 +381,7 @@ describe("privacidade e limites na tela", () => {
 
   it("permite remover uma foto escolhida", async () => {
     render(<SaleRequestForm />);
-    const user = userEvent.setup();
+    const user = setupUser();
 
     uploadSaleRequestPhotos.mockResolvedValue(uploaded(2));
     await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.jpg")]);

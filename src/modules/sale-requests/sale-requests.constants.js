@@ -118,17 +118,23 @@ export const SALE_REQUEST_CODE = Object.freeze({
   NOT_CANCELLABLE: "SALE_REQUEST_NOT_CANCELLABLE",
 });
 
-/**
- * Aviso de privacidade mostrado no formulário.
- *
- * Vive no backend porque é regra de produto derivada de uma limitação REAL da
- * infraestrutura: o bucket R2 é servido publicamente, então uma foto que mostra
- * a placa ou a fachada da casa fica acessível a quem tiver a URL, para sempre —
- * inclusive depois do cancelamento. A auditoria da Fase 4.0 registrou isso como
- * risco R-1.
- */
-export const SALE_REQUEST_PHOTO_PRIVACY_NOTICE =
-  "Evite fotos que mostrem a placa do veículo, documentos, pessoas ou a fachada da sua residência.";
-
-export const SALE_REQUEST_ISSUES_PRIVACY_NOTICE =
-  "Informe problemas conhecidos do veículo, se houver. Não inclua telefone, endereço, placa ou dados pessoais.";
+// ────────────────────────────────────────────────────────────────────────────
+// TEXTO DE FORMULÁRIO NÃO VIVE MAIS AQUI
+// ────────────────────────────────────────────────────────────────────────────
+// Este módulo já exportou `SALE_REQUEST_PHOTO_PRIVACY_NOTICE` e
+// `SALE_REQUEST_ISSUES_PRIVACY_NOTICE`. Nenhum dos dois era importado por
+// caminho nenhum do backend — a tela consome os literais espelhados em
+// `frontend/lib/sale-requests/api.ts`.
+//
+// O de FOTOS foi removido junto com o aviso que ele descrevia: enumerar dados
+// sensíveis (placa, documentos, pessoas, fachada), mesmo para desaconselhá-los,
+// traz esses dados para o centro da experiência. A orientação da tela passou a
+// ser puramente comercial.
+//
+// O de PROBLEMAS CONHECIDOS foi removido daqui apenas como export morto; o
+// texto continua sendo renderizado pelo formulário a partir do espelho do
+// frontend, sem alteração de comportamento.
+//
+// A limitação de infraestrutura que motivou o aviso original (bucket R2 público,
+// URL de foto válida para sempre) NÃO mudou e continua registrada como risco
+// R-1 no relatório da Fase 4.0 — documentação técnica é o lugar dela.

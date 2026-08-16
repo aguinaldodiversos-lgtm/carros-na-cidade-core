@@ -376,8 +376,69 @@ loja ou WhatsApp. Dois testes varrem o texto renderizado para garantir.
 
 **Sem placa:** nenhum campo, nenhum estado, nenhum envio. Testes na tela e no payload.
 
-**Avisos de privacidade** exibidos: o de fotos (placa, documentos, pessoas, fachada) e o de
-problemas conhecidos (telefone, endereço, placa, dados pessoais).
+**Orientação do bloco de fotos:** comercial, centrada no veículo. Ver §14.1.
+
+### 14.1 — Correção de privacidade e UX no bloco de fotos (pós-implementação)
+
+**Natureza: correção de apresentação/copy. NÃO é mudança funcional do produto.**
+
+O bloco de fotos exibia:
+
+> ❌ "Evite fotos que mostrem a placa do veículo, documentos, pessoas ou a fachada da sua
+> residência."
+
+Substituído por:
+
+> ✅ "Adicione fotos claras do veículo para ajudar os lojistas na avaliação inicial."
+
+**Motivo.** O problema não era o conteúdo em si, mas o fato de a interface trazer dados
+sensíveis para o **centro da experiência**. Enumerar placa, documentos, pessoas e fachada —
+ainda que para desaconselhá-los — sugere que a plataforma espera esse tipo de material. A
+proposta correta do produto é não incentivar essa exposição: o objetivo das fotos é mostrar
+**somente o veículo**.
+
+**Também alterado o tratamento visual.** O texto vivia numa caixa âmbar de alerta — o mesmo
+destaque de um erro. Orientação comercial não é advertência, e destacá-la em amarelo fazia
+a pessoa procurar um problema onde não há. Passou a hint neutro, igual às demais ajudas do
+formulário.
+
+**O que NÃO mudou** (verificado):
+
+| Item | Estado |
+|---|---|
+| Schema, migrations | inalterados |
+| Validação de fotos (mín. 4, máx. 12) | inalterada |
+| Validação de prefixo/posse da `storage_key` | inalterada |
+| Pipeline de upload e namespace R2 | inalterados |
+| Regras de backend, rotas, DTOs | inalterados |
+| Fluxo funcional da Fase 4.1 | inalterado |
+
+**Sem validação bloqueante nova.** Se o usuário postar uma foto em que a placa apareça,
+isso **não é bloqueado** — não era antes e não é agora. Nenhuma moderação automática foi
+criada.
+
+**Arquivos alterados:**
+
+- `frontend/lib/sale-requests/api.ts` — `PHOTO_PRIVACY_NOTICE` → `PHOTO_GUIDANCE_NOTICE`.
+- `frontend/components/account/SaleRequestPhotos.tsx` — texto, estilo neutro e `data-testid`
+  (`sale-request-photo-privacy` → `sale-request-photo-guidance`).
+- `src/modules/sale-requests/sale-requests.constants.js` — removidos
+  `SALE_REQUEST_PHOTO_PRIVACY_NOTICE` e `SALE_REQUEST_ISSUES_PRIVACY_NOTICE`, que eram
+  **exports mortos** (definidos e nunca importados por caminho nenhum do backend). Nenhuma
+  regra foi tocada; a tela sempre consumiu os literais espelhados no frontend.
+- `frontend/components/account/SaleRequestForm.test.tsx` — teste de copy atualizado, mais um
+  **novo teste de regressão** que varre o bloco de fotos por `placa`, `documento`,
+  `fachada`, `residência`, `dados pessoais` e `dados sensíveis`.
+
+**A limitação técnica que motivou o aviso original não desapareceu:** o bucket R2 é servido
+publicamente, então a URL de uma foto vale para sempre. Isso continua registrado como risco
+**R-1** no relatório da Fase 4.0 — documentação técnica é o lugar dela, não o formulário.
+
+> **Fora do escopo desta correção, registrado:** o campo "Problemas conhecidos" ainda exibe
+> "Não inclua telefone, endereço, placa ou dados pessoais." É a **mesma classe** de texto
+> que acabou de ser removida do bloco de fotos. O escopo pedido foi explicitamente "a área
+> de upload de fotos", então o campo não foi alterado. Recomenda-se aplicar o mesmo
+> tratamento — ver pendência **P-7**.
 
 ---
 
@@ -427,7 +488,7 @@ contra o banco real.
 |---|---|---|---|
 | Backend `npm test` | 199 arq. / 2978 | ✅ **203 arq. / 3090**, 1 pulado | +4 arq., +112 testes, **0 falhas** |
 | Backend `lint` | 233 (11 erros) | ⚠️ **233 (11 erros)** | **idêntico**; zero ocorrências nos arquivos novos |
-| Frontend `npm test` | 201 arq. / 5 falhas | ⚠️ **201 arq. / 5 falhas** | +35 testes, **mesmas 2 falhas preexistentes** |
+| Frontend `npm test` | 201 arq. / 5 falhas | ⚠️ **201 arq. / 5 falhas** (`--maxWorkers=2`) | +34 testes, **mesmas 2 falhas preexistentes** |
 | Frontend `typecheck` | ✅ | ✅ | — |
 | Frontend `lint` | ✅ | ✅ | — |
 | Frontend `build` | ✅ | ✅ | 7 rotas novas registradas |
@@ -559,6 +620,8 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 | **P-4** | `sale_requests` não tem `expires_at` (§34 — sem cronômetro). Solicitações abandonadas ficam abertas para sempre e vão poluir a lista do lojista na 4.2. | Média (vira alta na 4.2) |
 | **P-5** | A divergência de `deriveAccountType` (valor desconhecido → `pending`, não `CPF`) está documentada em dois lugares que discordam entre si. Não afeta a 4.1. | Baixa |
 | **P-6** | `src/shared/pagination/cursor.js` nasceu como codec canônico, mas `purchase-intents` e `notifications` mantêm as próprias cópias (domínios protegidos). | Baixa |
+| **P-7** | O hint de "Problemas conhecidos" ainda enumera dados sensíveis ("Não inclua telefone, endereço, placa ou dados pessoais") — mesma classe de texto removida do bloco de fotos em §14.1. Fora do escopo daquela correção. | Baixa |
+| **P-8** | A suíte de frontend tem fragilidade de TEMPO pré-existente nos testes de formulário em jsdom: sob contenção de CPU, `PurchaseIntentForm.test.tsx` (Produto 1, não tocado) e o novo `SaleRequestForm.test.tsx` estouram o `testTimeout` de forma intermitente. Com `--maxWorkers=2` a suíte fica verde exceto pelas 5 falhas pré-existentes. Mitigado no arquivo novo (`delay: null` e ciclos redundantes fundidos), não resolvido na configuração da suíte. | Média |
 
 ---
 

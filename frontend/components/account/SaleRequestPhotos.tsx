@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
-  PHOTO_PRIVACY_NOTICE,
+  PHOTO_GUIDANCE_NOTICE,
   SALE_REQUEST_PHOTOS,
   uploadSaleRequestPhotos,
   type UploadedPhoto,
@@ -16,9 +16,20 @@ import {
  * Isso evita que um erro de validação de campo (ano errado, por exemplo) obrigue
  * a pessoa a reenviar 12 imagens.
  *
- * O aviso de privacidade não é decorativo: o bucket é servido publicamente, e
- * uma foto que mostra a placa ou a fachada da casa fica acessível a quem tiver a
- * URL, inclusive depois do cancelamento.
+ * ────────────────────────────────────────────────────────────────────────────
+ * A ORIENTAÇÃO É COMERCIAL, NÃO DE PRIVACIDADE
+ * ────────────────────────────────────────────────────────────────────────────
+ * Esta área já exibiu um aviso pedindo para evitar placa, documentos, pessoas e
+ * a fachada da residência. Foi removido por decisão de produto: enumerar dados
+ * sensíveis — mesmo para desaconselhá-los — traz esses dados para o centro da
+ * experiência e sugere que a plataforma os espera. O texto agora fala só do
+ * veículo.
+ *
+ * Isso NÃO é um relaxamento de regra: nada era bloqueado antes e nada é
+ * bloqueado agora. A limitação de infraestrutura que motivou o aviso original
+ * (o bucket R2 é servido publicamente, então a URL de uma foto vale para sempre)
+ * continua existindo e continua registrada como risco R-1 no relatório da Fase
+ * 4.0 — o lugar certo para ela é a documentação técnica, não o formulário.
  */
 
 const ACCEPT = "image/jpeg,image/png,image/webp";
@@ -88,16 +99,22 @@ export default function SaleRequestPhotos({
         Fotos do veículo ({photos.length}/{SALE_REQUEST_PHOTOS.MAX})
       </span>
 
-      <p className="mb-3 text-xs leading-relaxed text-[#64748b]">
+      <p className="mb-2 text-xs leading-relaxed text-[#64748b]">
         Envie de {SALE_REQUEST_PHOTOS.MIN} a {SALE_REQUEST_PHOTOS.MAX} fotos: frente, traseira,
         lateral e interior ajudam as lojas a avaliar melhor.
       </p>
 
+      {/*
+        Estilo NEUTRO, de propósito. A versão anterior usava a caixa âmbar de
+        alerta — o mesmo tratamento visual de um erro. Orientação comercial não
+        é advertência, e destacá-la em amarelo faria a pessoa procurar um
+        problema onde não há.
+      */}
       <p
-        className="mb-4 rounded-[12px] border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2 text-xs leading-relaxed text-[#92400E]"
-        data-testid="sale-request-photo-privacy"
+        className="mb-4 text-xs leading-relaxed text-[#64748b]"
+        data-testid="sale-request-photo-guidance"
       >
-        {PHOTO_PRIVACY_NOTICE}
+        {PHOTO_GUIDANCE_NOTICE}
       </p>
 
       {photos.length > 0 ? (
