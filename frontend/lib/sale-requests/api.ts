@@ -52,8 +52,23 @@ export function maxModelYear(now: Date = new Date()): number {
 export const PHOTO_GUIDANCE_NOTICE =
   "Adicione fotos claras do veículo para ajudar os lojistas na avaliação inicial.";
 
-export const ISSUES_PRIVACY_NOTICE =
-  "Informe problemas conhecidos do veículo, se houver. Não inclua telefone, endereço, placa ou dados pessoais.";
+/**
+ * Orientação do campo "Problemas conhecidos".
+ *
+ * Mesma disciplina de `PHOTO_GUIDANCE_NOTICE`: fala do VEÍCULO e nada mais.
+ *
+ * A versão anterior pedia para não incluir telefone, endereço, placa ou dados
+ * pessoais. A intenção era protetiva, mas o efeito era o oposto do desejado —
+ * listar esses itens num campo de texto livre ensina a pessoa a pensar neles
+ * justamente onde ela vai escrever. Quem não tinha cogitado passar o telefone
+ * acabava de ser lembrado de que existe um telefone a passar.
+ *
+ * Se alguém escrever espontaneamente um dado desses, o envio NÃO é bloqueado.
+ * Não há filtro, regex, sanitização nem moderação: a plataforma apenas deixa de
+ * incentivar e de destacar.
+ */
+export const ISSUES_GUIDANCE_NOTICE =
+  "Descreva o estado do veículo e eventuais avarias, se houver.";
 
 export const STATUS_LABEL: Record<SaleRequestStatus, string> = {
   receiving_offers: "Recebendo ofertas",

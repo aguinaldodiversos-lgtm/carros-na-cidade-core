@@ -8,7 +8,7 @@ import PurchaseIntentCityField, {
 import SaleRequestPhotos from "@/components/account/SaleRequestPhotos";
 import {
   DECLARED_CONDITION_OPTIONS,
-  ISSUES_PRIVACY_NOTICE,
+  ISSUES_GUIDANCE_NOTICE,
   SALE_REQUEST_ACTIVE_LIMIT,
   SALE_REQUEST_LIMITS,
   SALE_REQUEST_PHOTOS,
@@ -388,7 +388,12 @@ export default function SaleRequestForm({ basePath = "/dashboard" }: { basePath?
         </div>
       </fieldset>
 
-      <label className="block">
+      {/*
+        Hint NEUTRO, no mesmo tom das demais ajudas do formulário — sem caixa de
+        alerta, sem âmbar, sem ícone de atenção. Orientação sobre o que escrever
+        não é advertência.
+      */}
+      <label className="block" data-testid="sale-request-issues-field">
         <span className={LABEL_CLASS}>Problemas conhecidos (opcional)</span>
         <textarea
           className="min-h-[120px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 py-3 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]"
@@ -398,8 +403,11 @@ export default function SaleRequestForm({ basePath = "/dashboard" }: { basePath?
           placeholder="Ex.: ar-condicionado precisa de reparo, pneus dianteiros gastos."
           data-testid="sale-request-issues"
         />
-        <span className="mt-1 block text-xs text-[#64748b]">
-          {ISSUES_PRIVACY_NOTICE} ({knownIssues.length}/{SALE_REQUEST_LIMITS.KNOWN_ISSUES_MAX})
+        <span
+          className="mt-1 block text-xs text-[#64748b]"
+          data-testid="sale-request-issues-guidance"
+        >
+          {ISSUES_GUIDANCE_NOTICE} ({knownIssues.length}/{SALE_REQUEST_LIMITS.KNOWN_ISSUES_MAX})
         </span>
       </label>
 

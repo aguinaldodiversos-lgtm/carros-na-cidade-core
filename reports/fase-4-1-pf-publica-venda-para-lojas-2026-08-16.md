@@ -434,11 +434,76 @@ criada.
 publicamente, então a URL de uma foto vale para sempre. Isso continua registrado como risco
 **R-1** no relatório da Fase 4.0 — documentação técnica é o lugar dela, não o formulário.
 
-> **Fora do escopo desta correção, registrado:** o campo "Problemas conhecidos" ainda exibe
-> "Não inclua telefone, endereço, placa ou dados pessoais." É a **mesma classe** de texto
-> que acabou de ser removida do bloco de fotos. O escopo pedido foi explicitamente "a área
-> de upload de fotos", então o campo não foi alterado. Recomenda-se aplicar o mesmo
-> tratamento — ver pendência **P-7**.
+> **Fora do escopo daquela correção:** o campo "Problemas conhecidos" exibia a mesma classe
+> de texto. Tratado em seguida — ver §14.2 (**P-7 resolvido**).
+
+### 14.2 — Correção de copy/UX no campo "Problemas conhecidos" (P-7)
+
+**Natureza: correção de apresentação/copy. NÃO é mudança funcional do produto.**
+
+O helper do campo exibia:
+
+> ❌ "Informe problemas conhecidos do veículo, se houver. Não inclua telefone, endereço,
+> placa ou dados pessoais."
+
+Substituído por:
+
+> ✅ "Descreva o estado do veículo e eventuais avarias, se houver."
+
+**Motivo.** A intenção do texto antigo era protetiva, mas o efeito era o oposto: listar
+telefone, endereço, placa e dados pessoais **dentro de um campo de texto livre** ensina a
+pessoa a pensar nesses dados justamente onde ela vai escrever. Quem não tinha cogitado
+passar o telefone acabava de ser lembrado de que existe um telefone a passar. É o mesmo
+raciocínio do §14.1, aplicado ao segundo — e último — ponto da tela onde isso ocorria.
+
+O objetivo do campo é exclusivamente descrever estado, defeitos, avarias e problemas
+conhecidos **do veículo**.
+
+**Tratamento visual:** já era hint neutro (`text-xs`, cinza `#64748b`), o mesmo padrão
+adotado no bloco de fotos. Nenhuma caixa de alerta, âmbar, ícone de atenção ou linguagem
+jurídica foi introduzida.
+
+**O que NÃO mudou** (verificado):
+
+| Item | Estado |
+|---|---|
+| `known_issues` opcional | inalterado (teste dedicado prova que o gate de submissão não depende dele) |
+| Limite de 1000 caracteres | inalterado (`maxLength` + validação de backend) |
+| Payload enviado | inalterado |
+| Schema, migrations 052/053 | inalterados |
+| DTO, service, repository, routes, persistência | inalterados |
+| Autorização e ownership | inalterados |
+| Bloco de fotos (§14.1) | intacto |
+
+**Nenhum bloqueio criado.** Não há filtro de telefone, endereço, placa, CPF ou e-mail;
+nenhum regex de PII, nenhuma IA de classificação, nenhuma moderação automática, nenhuma
+sanitização semântica e nenhum bloqueio de submit. Se a pessoa digitar espontaneamente um
+desses dados, o envio **continua permitido** — a plataforma apenas deixa de incentivar e de
+destacar.
+
+**Arquivos alterados (somente frontend):**
+
+- `frontend/lib/sale-requests/api.ts` — `ISSUES_PRIVACY_NOTICE` → `ISSUES_GUIDANCE_NOTICE`,
+  com a nova copy.
+- `frontend/components/account/SaleRequestForm.tsx` — import, uso e dois `data-testid`
+  (`sale-request-issues-field`, `sale-request-issues-guidance`) para permitir teste
+  **escopado** ao bloco.
+- `frontend/components/account/SaleRequestForm.test.tsx` — teste de copy atualizado, mais
+  dois novos: a varredura de termos proibidos no bloco e a guarda de que `known_issues`
+  segue opcional.
+
+**Backend: nada alterado.** Os constants mortos `SALE_REQUEST_PHOTO_PRIVACY_NOTICE` e
+`SALE_REQUEST_ISSUES_PRIVACY_NOTICE` já haviam sido removidos em `631c3667` (§14.1);
+busca confirmou que não restou nenhum literal da mensagem antiga no backend.
+
+**Escopo do teste de regressão.** A varredura é feita no elemento do campo
+(`sale-request-issues-field`), **não** no app inteiro: termos como "documento" e "dados
+pessoais" são legítimos em `/ajuda` e na política de privacidade, e uma varredura global
+daria falso positivo neles. O `placeholder` é conferido à parte, porque não entra em
+`textContent` — sem isso, a copy proibida poderia voltar por ali sem ninguém notar.
+
+**Detector validado por mutação:** restaurando o texto antigo na constante, os dois testes
+novos falham (o de presença e o de ausência). Com a copy correta, passam.
 
 ---
 
@@ -620,7 +685,7 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 | **P-4** | `sale_requests` não tem `expires_at` (§34 — sem cronômetro). Solicitações abandonadas ficam abertas para sempre e vão poluir a lista do lojista na 4.2. | Média (vira alta na 4.2) |
 | **P-5** | A divergência de `deriveAccountType` (valor desconhecido → `pending`, não `CPF`) está documentada em dois lugares que discordam entre si. Não afeta a 4.1. | Baixa |
 | **P-6** | `src/shared/pagination/cursor.js` nasceu como codec canônico, mas `purchase-intents` e `notifications` mantêm as próprias cópias (domínios protegidos). | Baixa |
-| **P-7** | O hint de "Problemas conhecidos" ainda enumera dados sensíveis ("Não inclua telefone, endereço, placa ou dados pessoais") — mesma classe de texto removida do bloco de fotos em §14.1. Fora do escopo daquela correção. | Baixa |
+| ~~**P-7**~~ | ~~O hint de "Problemas conhecidos" ainda enumera dados sensíveis.~~ **RESOLVIDO** em §14.2: copy trocada por "Descreva o estado do veículo e eventuais avarias, se houver.", com teste de regressão escopado ao bloco. Zero mudança funcional. | — |
 | **P-8** | A suíte de frontend tem fragilidade de TEMPO pré-existente nos testes de formulário em jsdom: sob contenção de CPU, `PurchaseIntentForm.test.tsx` (Produto 1, não tocado) e o novo `SaleRequestForm.test.tsx` estouram o `testTimeout` de forma intermitente. Com `--maxWorkers=2` a suíte fica verde exceto pelas 5 falhas pré-existentes. Mitigado no arquivo novo (`delay: null` e ciclos redundantes fundidos), não resolvido na configuração da suíte. | Média |
 
 ---

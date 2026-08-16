@@ -357,11 +357,56 @@ describe("privacidade e limites na tela", () => {
     }
   });
 
-  it("mostra o aviso do campo de problemas conhecidos", () => {
+  it("mostra orientação sobre o VEÍCULO no campo de problemas conhecidos", () => {
     render(<SaleRequestForm />);
-    expect(
-      screen.getByText(/Não inclua telefone, endereço, placa ou dados pessoais/i)
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("sale-request-issues-guidance")).toHaveTextContent(
+      "Descreva o estado do veículo e eventuais avarias, se houver."
+    );
+  });
+
+  it("o campo de problemas conhecidos NÃO menciona dado sensível nenhum", () => {
+    // A versão anterior pedia para não incluir telefone, endereço, placa ou
+    // dados pessoais. A intenção era protetiva, mas listar esses itens num campo
+    // de texto livre ensina a pessoa a pensar neles justamente onde ela vai
+    // escrever.
+    //
+    // O escopo é o BLOCO do campo (label + textarea + hint), e não o app
+    // inteiro: termos como "documento" e "dados pessoais" são legítimos em
+    // /ajuda e na política de privacidade, e uma varredura global daria falso
+    // positivo neles.
+    render(<SaleRequestForm />);
+
+    const issuesField = screen.getByTestId("sale-request-issues-field").textContent ?? "";
+    for (const term of [
+      /plac[ae]/i,
+      /telefone/i,
+      /endereço/i,
+      /documento/i,
+      /residência/i,
+      /fachada/i,
+      /dados pessoais/i,
+      /dados sensíveis/i,
+    ]) {
+      expect(issuesField).not.toMatch(term);
+    }
+
+    // O `placeholder` não entra em `textContent` — precisa ser conferido à
+    // parte, senão a copy proibida poderia voltar por ali sem ninguém notar.
+    expect(screen.getByTestId("sale-request-issues")).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/^(?!.*(plac|telefone|endereço|documento|dados pessoais)).*$/i)
+    );
+  });
+
+  it("known_issues continua OPCIONAL — o gate não depende dele", async () => {
+    // Guarda de comportamento: a correção é de copy. Se alguém transformasse a
+    // orientação numa exigência, o botão deixaria de habilitar com o campo
+    // vazio e este teste cairia.
+    render(<SaleRequestForm />);
+    await fillEverything();
+
+    expect(screen.getByTestId("sale-request-issues")).toHaveValue("");
+    expect(screen.getByTestId("sale-request-submit")).not.toBeDisabled();
   });
 
   it("limita problemas conhecidos a 1000 caracteres no próprio campo", () => {
