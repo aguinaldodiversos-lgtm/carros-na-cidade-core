@@ -625,6 +625,134 @@ export function toVehicleImageRecord(upload, extra = {}) {
 }
 
 /**
+ * Prefixo raiz das fotos de solicitação de venda (Produto 2, Fase 4.1).
+ *
+ * Exportado porque o backend PRECISA validar que uma `storage_key` recebida do
+ * cliente cai debaixo de `sale-requests/{ownerUserId}/`. Se o literal fosse
+ * escrito de novo lá, uma mudança de namespace aqui deixaria o validador
+ * apontando para o prefixo antigo — e um validador que valida o prefixo errado
+ * não valida nada.
+ */
+export const SALE_REQUEST_KEY_PREFIX = "sale-requests";
+
+/**
+ * Chave de objeto de UMA foto de solicitação de venda.
+ *
+ *     sale-requests/{ownerUserId}/{uploadSessionId}/{yyyy}/{mm}/{uuid}-{stem}.webp
+ *
+ * O `ownerUserId` fica NO PREFIXO de propósito: é o que torna a guarda
+ * anti-IDOR trivial e barata. Na criação da solicitação, o servidor exige que
+ * toda chave recebida comece com `sale-requests/{req.user.id}/` — uma chave
+ * apontando para a pasta de outra pessoa é recusada sem nenhuma consulta ao
+ * banco.
+ *
+ * Isto é uma MELHORIA sobre o caminho do wizard de anúncio, que embute o
+ * `userId` num `draftId` (`publish-{userId}-{uuid}`) mas não valida nada quando
+ * as URLs são adotadas pelo anúncio.
+ *
+ * `uploadSessionId` agrupa as fotos de um mesmo preenchimento de formulário, o
+ * que dá ao script de limpeza de órfãos uma unidade natural para varrer.
+ */
+export function generateSaleRequestImageKey({
+  ownerUserId,
+  uploadSessionId,
+  originalName,
+  mimeType,
+  now = new Date(),
+}) {
+  const safeOwnerId = sanitizePathSegment(ownerUserId, "");
+  if (!safeOwnerId) {
+    throw new Error("[r2] ownerUserId inválido.");
+  }
+
+  const safeSession = sanitizePathSegment(uploadSessionId, "");
+  if (!safeSession) {
+    throw new Error("[r2] uploadSessionId inválido.");
+  }
+
+  const safeStem = sanitizeFilenameStem(originalName);
+  const ext = getExtensionFromMimeType(mimeType, originalName);
+
+  const year = String(now.getUTCFullYear());
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const uuid = crypto.randomUUID();
+
+  return `${SALE_REQUEST_KEY_PREFIX}/${safeOwnerId}/${safeSession}/${year}/${month}/${uuid}-${safeStem}.${ext}`;
+}
+
+/**
+ * Upload de UMA foto de solicitação de venda (Produto 2).
+ *
+ * Mesma forma de `uploadSiteImage`, logo abaixo: reaproveita integralmente o
+ * pipeline canônico (`validateVehicleImageFile` → `normalizeVehicleImage` →
+ * `PutObject`) e muda SÓ o namespace da chave e os metadados.
+ *
+ * Reusar o pipeline — e não a tabela `vehicle_images`, que nenhuma migration
+ * cria — é a recomendação explícita da auditoria da Fase 4.0. Como consequência
+ * direta, estas fotos herdam de graça: whitelist de MIME por conteúdo,
+ * auto-rotate por EXIF, downscale para ≤2048 px, **strip de metadata** (que
+ * remove o GPS embutido pelo celular) e conversão para WebP.
+ *
+ * O strip de metadata importa especialmente aqui: a foto de um carro tirada na
+ * garagem de casa carrega a coordenada da casa no EXIF.
+ *
+ * NÃO grava `vehicle_id` nos metadados do objeto: a solicitação ainda não existe
+ * quando o upload acontece (o formulário só é submetido depois). O vínculo é
+ * feito no banco, por `sale_request_images.storage_key`.
+ */
+export async function uploadSaleRequestImage({
+  ownerUserId,
+  uploadSessionId,
+  file,
+  sortOrder = 0,
+  cacheControl = DEFAULT_CACHE_CONTROL,
+}) {
+  const client = getR2Client();
+  const { bucketName } = getR2Config();
+
+  const validated = await validateVehicleImageFile(file);
+  const normalized = await normalizeVehicleImage(validated.buffer);
+
+  const key = generateSaleRequestImageKey({
+    ownerUserId,
+    uploadSessionId,
+    originalName: validated.originalName,
+    mimeType: normalized.mimeType,
+  });
+
+  const metadata = {
+    owner_user_id: sanitizeS3MetadataValue(String(ownerUserId)),
+    upload_session_id: sanitizeS3MetadataValue(String(uploadSessionId), 64),
+    original_name: sanitizeS3MetadataValue(validated.originalName || ""),
+    sort_order: String(Number.isFinite(sortOrder) ? sortOrder : 0),
+  };
+
+  const result = await client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: normalized.buffer,
+      ContentType: normalized.mimeType, // sempre "image/webp"
+      ContentLength: normalized.normalizedSize,
+      CacheControl: cacheControl,
+      Metadata: metadata,
+    })
+  );
+
+  return {
+    provider: "cloudflare_r2",
+    bucket: bucketName,
+    key,
+    originalName: validated.originalName,
+    mimeType: normalized.mimeType,
+    sizeBytes: normalized.normalizedSize,
+    sortOrder: Number.isFinite(sortOrder) ? Number(sortOrder) : 0,
+    etag: result?.ETag ? String(result.ETag).replace(/"/g, "") : null,
+    publicUrl: buildR2PublicUrl(key),
+  };
+}
+
+/**
  * Upload de imagem institucional do site (hero da Home, banners promo, etc.).
  *
  * Diferenças vs. uploadVehicleImage:
