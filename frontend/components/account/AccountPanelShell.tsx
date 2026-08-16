@@ -16,7 +16,7 @@ export type AccountPanelVariant = "pf" | "lojista";
 type NavItem = {
   label: string;
   href: string;
-  icon: "home" | "ads" | "user" | "key" | "msg" | "billing" | "users" | "search";
+  icon: "home" | "ads" | "user" | "key" | "msg" | "billing" | "users" | "search" | "sell";
 };
 
 function NavIcon({ name }: { name: NavItem["icon"] }) {
@@ -126,6 +126,22 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
           <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5-2 4 4" />
         </svg>
       );
+    // "Vender para lojas" (Produto 2): etiqueta de preço. Distingue-se de `ads`
+    // (que é o anúncio ao consumidor) sem repetir o mesmo traço de documento.
+    case "sell":
+      return (
+        <svg
+          className={cls}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden
+        >
+          <path d="M4 12.5V5a1 1 0 0 1 1-1h7.5L21 12.5 12.5 21 4 12.5Z" />
+          <circle cx="8.5" cy="8.5" r="1.3" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -143,6 +159,14 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
  *
  * Também não existe entrada morta: "Vender para lojas" só aparece quando o
  * produto existir. Botão que não leva a lugar nenhum é pior que ausência.
+ *
+ * A Fase 4.1 cumpriu essa condição — o fluxo do dono existe de ponta a ponta
+ * (publicar, listar, ver, cancelar), então o item entrou. O que ele AINDA não
+ * faz é distribuir para lojista; isso é a Fase 4.2, e não muda a navegação.
+ *
+ * Posição: logo depois de "Minhas procuras". As duas são o par simétrico do
+ * Motor de Oportunidades — uma é "quero comprar", a outra "quero vender" — e
+ * separá-las com "Dados pessoais" no meio esconderia essa relação.
  */
 function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
   if (variant === "pf") {
@@ -150,6 +174,7 @@ function buildNav(basePath: string, variant: AccountPanelVariant): NavItem[] {
       { label: "Painel", href: basePath, icon: "home" },
       { label: "Meus anúncios", href: `${basePath}/meus-anuncios`, icon: "ads" },
       { label: "Minhas procuras", href: `${basePath}/minhas-procuras`, icon: "search" },
+      { label: "Vender para lojas", href: `${basePath}/vender-para-lojas`, icon: "sell" },
       { label: "Dados pessoais", href: `${basePath}/conta`, icon: "user" },
       { label: "Trocar senha", href: `${basePath}/senha`, icon: "key" },
     ];
