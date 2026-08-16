@@ -6,6 +6,7 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import * as dashboardService from "./dashboard/admin-dashboard.service.js";
 import * as adsService from "./ads/admin-ads.service.js";
 import * as advertisersService from "./advertisers/admin-advertisers.service.js";
+import * as adminUsersService from "./users/admin-users.service.js";
 import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";
 import * as moderationService from "./moderation/admin-moderation.service.js";
@@ -25,6 +26,7 @@ import {
 } from "./regional-settings/admin-regional-settings.service.js";
 import multer from "multer";
 import { ACCEPTED_INPUT_MIMES } from "../../infrastructure/storage/image-normalizer.js";
+import { parseAdminLimit, parseAdminOffset } from "./admin.pagination.js";
 
 const router = express.Router();
 
@@ -268,6 +270,45 @@ router.post(
       reason
     );
     res.json({ ok: true, data: revoked });
+  })
+);
+
+// =========================================================================
+// USERS (Admin U1) — TODAS as contas, incluindo quem nunca publicou anúncio.
+//
+// Estas rotas são SOMENTE LEITURA e endereçadas por `userId`. Elas NÃO
+// duplicam a operação comercial: status de loja, moderação, concessão de plano
+// e gestão de anúncios continuam exclusivamente em /advertisers/:advertiserId.
+//
+// Herdam `authMiddleware` + `requireAdmin()` aplicados ao router inteiro nas
+// linhas 41-42 — não há guard próprio a esquecer.
+// =========================================================================
+
+router.get(
+  "/users",
+  asyncHandler(async (req, res) => {
+    const result = await adminUsersService.listUsers({
+      limit: parseAdminLimit(req.query.limit),
+      offset: parseAdminOffset(req.query.offset),
+      search: req.query.search || undefined,
+      accountType: req.query.account_type || undefined,
+      role: req.query.role || undefined,
+    });
+    res.json({ ok: true, ...result });
+  })
+);
+
+router.get(
+  "/users/:id",
+  asyncHandler(async (req, res) => {
+    // Id inválido vira 400 ANTES de tocar o banco: `WHERE u.id = 'abc'` numa
+    // coluna BIGINT devolve erro 22P02 do Postgres, que o errorHandler traduz
+    // em 500 — um 500 por URL digitada errada é ruído no log de produção.
+    if (!/^[0-9]+$/.test(String(req.params.id))) {
+      throw new AppError("Identificador de usuário inválido", 400);
+    }
+    const user = await adminUsersService.getUserById(req.params.id);
+    res.json({ ok: true, data: user });
   })
 );
 
