@@ -192,9 +192,13 @@ router.get(
   "/advertisers",
   asyncHandler(async (req, res) => {
     const filters = {
-      limit: parseIntParam(req.query.limit, 50),
-      offset: parseIntParam(req.query.offset, 0),
+      limit: parseAdminLimit(req.query.limit),
+      offset: parseAdminOffset(req.query.offset),
       status: req.query.status || undefined,
+      // Até a Admin U1 este campo era montado pela UI, viajava na querystring e
+      // era DESCARTADO aqui — o operador digitava, clicava "Buscar" e recebia a
+      // lista inteira sem nenhum sinal de que o filtro não existia.
+      search: req.query.search || undefined,
     };
     const result = await advertisersService.listAdvertisers(filters);
     res.json({ ok: true, ...result });
