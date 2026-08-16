@@ -136,6 +136,14 @@ export const adminApi = {
         body: { reason },
       }),
   },
+  // Admin U1 — TODAS as contas (`users`), incluindo quem nunca publicou
+  // anúncio. Somente leitura: qualquer ação sobre a LOJA continua em
+  // `adminApi.advertisers`, endereçada por advertiserId.
+  users: {
+    list: (p: Record<string, string | number> = {}) =>
+      adminFetch<ApiList<AdminUserRow>>("users", { params: { limit: 30, ...p } }),
+    get: (id: string | number) => adminFetch<ApiOne<AdminUserDetail>>(`users/${id}`),
+  },
   payments: {
     list: (p: Record<string, string | number> = {}) =>
       adminFetch<ApiList<PaymentRow>>("payments", { params: { limit: 50, ...p } }),
@@ -971,6 +979,11 @@ export type AdvRow = {
   total_ads_count?: number;
   user_role?: string;
   document_type?: string;
+  // Plano EFETIVO (users.plan_id → subscription_plans). `plan` acima é o
+  // snapshot congelado em advertisers.plan, mantido no payload por compat mas
+  // NÃO deve ser exibido: é ele que fazia a lista discordar do detalhe.
+  effective_plan_id?: string | null;
+  effective_plan_name?: string | null;
 };
 
 export type AdvertiserPlanGrant = {
@@ -1285,6 +1298,71 @@ export type PostAnalytics = {
   views_30d: number;
   unique_sessions_30d: number;
   traffic_sources: Array<{ source: string; total: number }>;
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// Admin U1 — contas (`users`).
+//
+// Tipos PRÓPRIOS, deliberadamente não derivados de `AdvRow`/`AdvDetail`: uma
+// conta não é uma loja. Herdar o tipo do anunciante traria `company_name`,
+// `plan` (snapshot congelado) e `status` — campos que não existem em `users` e
+// que a tela acabaria exibindo como se existissem.
+//
+// Note o que NÃO está aqui, e não por esquecimento: `status` (users não tem
+// coluna de status), `last_login` (não existe no schema), `city` (users.city é
+// texto livre e não é fonte territorial confiável) e `document_number`.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** 'pending' | 'CPF' | 'CNPJ' — derivado no backend por `deriveAccountType`. */
+export type AdminAccountType = "pending" | "CPF" | "CNPJ";
+
+export type AdminUserRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: string;
+  account_type: AdminAccountType;
+  plan: { id: string; name: string | null } | null;
+  email_verified: boolean;
+  /** Só vem preenchido quando o bloqueio de segurança está VIGENTE. */
+  locked_until: string | null;
+  created_at: string | null;
+};
+
+export type AdminUserAdvertiser = {
+  id: string;
+  name: string | null;
+  company_name: string | null;
+  status: string;
+  city: { name: string; state: string | null } | null;
+  created_at: string | null;
+};
+
+export type AdminUserActivity = {
+  advertisers_count: number;
+  ads_active_count: number;
+  ads_total_count: number;
+  purchase_intents_count: number;
+  purchase_intents_live_count: number;
+  received_offers_count: number;
+};
+
+export type AdminUserPurchaseIntent = {
+  id: string;
+  intent_type: string | null;
+  brand: string | null;
+  model: string | null;
+  body_type: string | null;
+  status: string | null;
+  expires_at: string | null;
+  created_at: string | null;
+  city: { name: string; state: string | null } | null;
+};
+
+export type AdminUserDetail = AdminUserRow & {
+  advertisers: AdminUserAdvertiser[];
+  activity: AdminUserActivity;
+  recent_purchase_intents: AdminUserPurchaseIntent[];
 };
 
 export type RegionalSettings = {

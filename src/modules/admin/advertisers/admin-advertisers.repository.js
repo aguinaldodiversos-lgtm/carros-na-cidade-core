@@ -1,17 +1,75 @@
 import { query, withTransaction } from "../../../infrastructure/database/db.js";
 import { GRANT_SOURCE } from "./advertiser-plan-grant.constants.js";
 
-export async function listAdvertisers({ limit = 50, offset = 0, status } = {}) {
+/**
+ * Predicado de status OPERACIONAL do anunciante.
+ *
+ * `advertisers.status` é NULLABLE na prática: nasce `NOT NULL DEFAULT 'active'`
+ * no CREATE, mas as migrations 003 e 012 também a re-adicionam como
+ * `ADD COLUMN IF NOT EXISTS ... DEFAULT 'active'` para bancos legados — e
+ * DEFAULT não preenche linha que já existia.
+ *
+ * O resto do produto já decidiu que NULL/'' contam como 'active'
+ * (`purchase-intents.repository.js#advertiserIsOperational` e
+ * `public-dealer.service.js`). O admin comparava `adv.status = $1` cru, então
+ * filtrar "Ativo" ESCONDIA lojista legado que está no ar publicamente — o admin
+ * dizia uma coisa e o site fazia outra.
+ */
+const ADVERTISER_STATUS_EXPR = `COALESCE(NULLIF(BTRIM(adv.status), ''), 'active')`;
+
+/**
+ * Escapa curingas de LIKE — mesmo motivo de `admin-users.repository.js`:
+ * buscar "%" não pode devolver a base inteira.
+ */
+function escapeLikeTerm(term) {
+  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+/**
+ * WHERE construído UMA VEZ e usado pelas duas queries (dados e contagem).
+ *
+ * ATENÇÃO: as condições referenciam `adv` E `u` (a busca cobre o e-mail da
+ * conta). Por isso a query de contagem TAMBÉM precisa do
+ * `LEFT JOIN users` — sem ele o Postgres devolve "missing FROM-clause entry
+ * for table u" e a tela mostra erro genérico. É o mesmo defeito que apareceu
+ * nos filtros da Fase 3 no /comprar; aqui o join está no count de propósito.
+ *
+ * `users.id` é PK, então o LEFT JOIN é 1:1 e não infla a contagem.
+ */
+function buildAdvertiserFilters({ status, search } = {}) {
   const conditions = [];
   const params = [];
-  let idx = 1;
 
   if (status) {
-    conditions.push(`adv.status = $${idx++}`);
     params.push(status);
+    conditions.push(`${ADVERTISER_STATUS_EXPR} = $${params.length}`);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const term = typeof search === "string" ? search.trim() : "";
+  if (term) {
+    params.push(`%${escapeLikeTerm(term)}%`);
+    const idx = params.length;
+    conditions.push(
+      `(adv.name ILIKE $${idx} ESCAPE '\\'
+        OR adv.email ILIKE $${idx} ESCAPE '\\'
+        OR adv.company_name ILIKE $${idx} ESCAPE '\\'
+        OR u.email ILIKE $${idx} ESCAPE '\\')`
+    );
+  }
+
+  return {
+    where: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "",
+    params,
+  };
+}
+
+// Exportado só para teste (prova que dados e contagem partilham a cláusula).
+export { buildAdvertiserFilters as __buildAdvertiserFiltersForTest };
+
+export async function listAdvertisers({ limit = 50, offset = 0, status, search } = {}) {
+  const { where, params } = buildAdvertiserFilters({ status, search });
+  const limitIdx = params.length + 1;
+  const offsetIdx = params.length + 2;
 
   const result = await query(
     `SELECT
@@ -20,20 +78,33 @@ export async function listAdvertisers({ limit = 50, offset = 0, status } = {}) {
        adv.suspended_at, adv.blocked_at, adv.status_reason,
        adv.created_at, adv.updated_at,
        u.role AS user_role, u.document_type, u.email AS user_email,
+       -- Plano EFETIVO. A coluna adv.plan acima é um snapshot congelado no
+       -- momento em que a loja foi criada (ensureAdvertiserForUser) e nunca
+       -- mais atualizado: nem pagamento, nem concessão manual, nem expiração
+       -- escrevem nela. A verdade é users.plan_id, a mesma fonte que
+       -- account.service.resolveCurrentPlan entrega ao usuário e que o DETALHE
+       -- deste anunciante já resolvia — daí lista e detalhe discordarem antes
+       -- desta correção.
+       u.plan_id AS effective_plan_id,
+       sp.name   AS effective_plan_name,
        COUNT(a.id) FILTER (WHERE a.status = 'active') AS active_ads_count,
        COUNT(a.id) FILTER (WHERE a.status != 'deleted') AS total_ads_count
      FROM advertisers adv
      LEFT JOIN users u ON u.id = adv.user_id
+     LEFT JOIN subscription_plans sp ON sp.id = u.plan_id
      LEFT JOIN ads a ON a.advertiser_id = adv.id
      ${where}
-     GROUP BY adv.id, u.id
-     ORDER BY adv.created_at DESC NULLS LAST
-     LIMIT $${idx++} OFFSET $${idx++}`,
+     GROUP BY adv.id, u.id, sp.id
+     ORDER BY adv.created_at DESC NULLS LAST, adv.id DESC
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, limit, offset]
   );
 
   const countResult = await query(
-    `SELECT COUNT(*)::int AS total FROM advertisers adv ${where}`,
+    `SELECT COUNT(*)::int AS total
+     FROM advertisers adv
+     LEFT JOIN users u ON u.id = adv.user_id
+     ${where}`,
     params
   );
 

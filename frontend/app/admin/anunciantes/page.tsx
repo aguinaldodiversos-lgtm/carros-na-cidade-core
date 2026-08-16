@@ -55,7 +55,11 @@ export default function AdminAnunciantes() {
 
       <AdminFiltersBar
         filters={[
-          { key: "search", label: "Busca", type: "text", placeholder: "Nome, email ou documento…" },
+          // O placeholder anterior prometia "documento", que nunca foi
+          // implementado nem sequer selecionado pela query — e a busca inteira
+          // era descartada pelo backend. Agora ela funciona, e o texto descreve
+          // exatamente os campos cobertos.
+          { key: "search", label: "Busca", type: "text", placeholder: "Nome, e-mail ou empresa" },
           { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
         ]}
         values={filters}
@@ -115,7 +119,12 @@ export default function AdminAnunciantes() {
                     <td className="px-4 py-2.5 font-medium text-cnc-text">{adv.name}</td>
                     <td className="px-4 py-2.5 text-cnc-muted">{adv.email}</td>
                     <td className="px-4 py-2.5 text-cnc-muted">{adv.company_name || "—"}</td>
-                    <td className="px-4 py-2.5 capitalize text-cnc-muted">{adv.plan || "—"}</td>
+                    {/* Plano EFETIVO (users.plan_id). `adv.plan` é um snapshot
+                        congelado na criação da loja e fazia esta lista
+                        discordar do detalhe do mesmo anunciante. */}
+                    <td className="px-4 py-2.5 text-cnc-muted">
+                      {adv.effective_plan_name || adv.effective_plan_id || "Gratuito"}
+                    </td>
                     <td className="px-4 py-2.5 text-center font-semibold text-cnc-text">
                       {adv.active_ads_count ?? adv.total_ads_count ?? "—"}
                     </td>
