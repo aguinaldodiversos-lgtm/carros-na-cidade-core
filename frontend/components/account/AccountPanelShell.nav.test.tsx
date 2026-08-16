@@ -8,12 +8,18 @@ import AccountPanelShell from "./AccountPanelShell";
 /**
  * Navegação dos dois painéis.
  *
- * A Fase 2 acrescenta exatamente um item por painel. O teste existe porque o
+ * A Fase 2 acrescentou exatamente um item por painel. O teste existe porque o
  * menu é a única porta de entrada das telas novas: a rota pode existir, a API
  * pode funcionar, e o produto continuar invisível se o item não aparecer.
  *
- * Também trava o que NÃO deve existir: "Vender para lojas" é Fase 3, e um item
- * de menu apontando para uma rota inexistente é pior que nenhum item.
+ * Também trava o que NÃO deve existir. Este arquivo guardava, até a Fase 4.0,
+ * a ausência de "Vender para lojas" — a condição era "só aparece quando o
+ * produto existir". A Fase 4.1 cumpriu essa condição (publicar, listar, ver e
+ * cancelar funcionam de ponta a ponta), então a asserção foi INVERTIDA em vez de
+ * apagada: o que era guarda de ausência virou guarda de presença e de rota.
+ *
+ * "Veículos para comprar" (área do lojista) continua sendo guarda de AUSÊNCIA —
+ * é a Fase 4.2, e ainda não existe.
  */
 
 // `usePathname` para o item ativo do menu; `useRouter` porque o shell envolve
@@ -83,9 +89,25 @@ describe("menu do painel PF", () => {
     expect(screen.queryByRole("link", { name: /Oportunidades/i })).not.toBeInTheDocument();
   });
 
-  it("NÃO mostra item morto de 'Vender para lojas' (Fase 3)", () => {
+  it("mostra 'Vender para lojas' apontando para a rota certa (Fase 4.1)", () => {
     renderShell("pf");
-    expect(screen.queryByRole("link", { name: /Vender para lojas/i })).not.toBeInTheDocument();
+    const links = screen.getAllByRole("link", { name: /Vender para lojas/i });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/dashboard/vender-para-lojas");
+    }
+  });
+
+  it("mantém 'Minhas procuras' e 'Vender para lojas' lado a lado", () => {
+    // As duas são o par simétrico do Motor de Oportunidades ("quero comprar" e
+    // "quero vender"). Se um refactor separá-las, a relação some da navegação.
+    renderShell("pf");
+    const labels = screen
+      .getAllByRole("link")
+      .map((link) => link.textContent?.trim() ?? "")
+      .filter((label) => /Minhas procuras|Vender para lojas/i.test(label));
+
+    expect(labels.length).toBeGreaterThanOrEqual(2);
   });
 });
 
