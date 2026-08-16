@@ -13,6 +13,7 @@
 //   /api/account/notifications → modules/notifications/notifications.routes.js (auth required)
 //   /api/account/opportunities/purchase-intents → modules/purchase-intents/purchase-intents.dealer.routes.js (auth + account_type=CNPJ)
 //   /api/account/purchase-intents → modules/purchase-intents/purchase-intents.routes.js (auth required)
+//   /api/account/sale-requests → modules/sale-requests/sale-requests.routes.js (auth required; CNPJ recusado no service)
 //   /api/account     → modules/account/account.routes.js
 //   /api/payments    → modules/payments/payments.routes.js
 //   /api/leads       → modules/leads/leads.routes.js
@@ -49,6 +50,7 @@ import publicRoutes from "./modules/public/public.routes.js";
 import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import purchaseIntentsDealerRoutes from "./modules/purchase-intents/purchase-intents.dealer.routes.js";
 import purchaseIntentsRoutes from "./modules/purchase-intents/purchase-intents.routes.js";
+import saleRequestsRoutes from "./modules/sale-requests/sale-requests.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
@@ -307,6 +309,14 @@ app.use("/api/account/notifications", notificationsRoutes);
 // oportunidades exigem sessão + conta CNPJ.
 app.use("/api/account/opportunities/purchase-intents", purchaseIntentsDealerRoutes);
 app.use("/api/account/purchase-intents", purchaseIntentsRoutes);
+
+// Produto 2 — "Venda seu carro para lojas" (Fase 4.1). Só o dono (PF) por
+// enquanto: a área do lojista nasce num router separado na Fase 4.2, montado em
+// `/api/account/opportunities/sale-requests`, porque a cadeia de guardas é outra.
+//
+// Vem ANTES de `/api/account` pelo mesmo motivo das procuras: o ramo mais
+// específico primeiro, para que `accountRoutes` nunca capture este caminho.
+app.use("/api/account/sale-requests", saleRequestsRoutes);
 
 app.use("/api/account", accountRoutes);
 app.use("/api/payments", paymentsRoutes);
