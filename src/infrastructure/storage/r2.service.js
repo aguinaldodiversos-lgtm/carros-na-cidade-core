@@ -12,6 +12,7 @@ import {
 } from "@aws-sdk/client-s3";
 
 import { ACCEPTED_INPUT_MIMES, normalizeVehicleImage } from "./image-normalizer.js";
+import { ImageInputError, ObjectStorageError } from "./storage-errors.js";
 
 const DEFAULT_REGION = "auto";
 const DEFAULT_MAX_FILE_SIZE_BYTES = parsePositiveInt(
@@ -621,6 +622,198 @@ export function toVehicleImageRecord(upload, extra = {}) {
     is_cover: upload.isCover,
     original_name: upload.originalName,
     ...extra,
+  };
+}
+
+/**
+ * Prefixo raiz das fotos de solicitação de venda (Produto 2, Fase 4.1).
+ *
+ * Exportado porque o backend PRECISA validar que uma `storage_key` recebida do
+ * cliente cai debaixo de `sale-requests/{ownerUserId}/`. Se o literal fosse
+ * escrito de novo lá, uma mudança de namespace aqui deixaria o validador
+ * apontando para o prefixo antigo — e um validador que valida o prefixo errado
+ * não valida nada.
+ */
+export const SALE_REQUEST_KEY_PREFIX = "sale-requests";
+
+/**
+ * Chave de objeto de UMA foto de solicitação de venda.
+ *
+ *     sale-requests/{ownerUserId}/{uploadSessionId}/{yyyy}/{mm}/{uuid}-{stem}.webp
+ *
+ * O `ownerUserId` fica NO PREFIXO de propósito: é o que torna a guarda
+ * anti-IDOR trivial e barata. Na criação da solicitação, o servidor exige que
+ * toda chave recebida comece com `sale-requests/{req.user.id}/` — uma chave
+ * apontando para a pasta de outra pessoa é recusada sem nenhuma consulta ao
+ * banco.
+ *
+ * Isto é uma MELHORIA sobre o caminho do wizard de anúncio, que embute o
+ * `userId` num `draftId` (`publish-{userId}-{uuid}`) mas não valida nada quando
+ * as URLs são adotadas pelo anúncio.
+ *
+ * `uploadSessionId` agrupa as fotos de um mesmo preenchimento de formulário, o
+ * que dá ao script de limpeza de órfãos uma unidade natural para varrer.
+ */
+export function generateSaleRequestImageKey({
+  ownerUserId,
+  uploadSessionId,
+  originalName,
+  mimeType,
+  now = new Date(),
+}) {
+  const safeOwnerId = sanitizePathSegment(ownerUserId, "");
+  if (!safeOwnerId) {
+    throw new Error("[r2] ownerUserId inválido.");
+  }
+
+  const safeSession = sanitizePathSegment(uploadSessionId, "");
+  if (!safeSession) {
+    throw new Error("[r2] uploadSessionId inválido.");
+  }
+
+  const safeStem = sanitizeFilenameStem(originalName);
+  const ext = getExtensionFromMimeType(mimeType, originalName);
+
+  const year = String(now.getUTCFullYear());
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const uuid = crypto.randomUUID();
+
+  return `${SALE_REQUEST_KEY_PREFIX}/${safeOwnerId}/${safeSession}/${year}/${month}/${uuid}-${safeStem}.${ext}`;
+}
+
+/**
+ * Upload de UMA foto de solicitação de venda (Produto 2).
+ *
+ * Mesma forma de `uploadSiteImage`, logo abaixo: reaproveita integralmente o
+ * pipeline canônico (`validateVehicleImageFile` → `normalizeVehicleImage` →
+ * `PutObject`) e muda SÓ o namespace da chave e os metadados.
+ *
+ * Reusar o pipeline — e não a tabela `vehicle_images`, que nenhuma migration
+ * cria — é a recomendação explícita da auditoria da Fase 4.0. Como consequência
+ * direta, estas fotos herdam de graça: whitelist de MIME por conteúdo,
+ * auto-rotate por EXIF, downscale para ≤2048 px, **strip de metadata** (que
+ * remove o GPS embutido pelo celular) e conversão para WebP.
+ *
+ * O strip de metadata importa especialmente aqui: a foto de um carro tirada na
+ * garagem de casa carrega a coordenada da casa no EXIF.
+ *
+ * NÃO grava `vehicle_id` nos metadados do objeto: a solicitação ainda não existe
+ * quando o upload acontece (o formulário só é submetido depois). O vínculo é
+ * feito no banco, por `sale_request_images.storage_key`.
+ */
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * TRÊS FASES EXPLÍCITAS — a razão de esta função não ser um bloco só
+ * ────────────────────────────────────────────────────────────────────────────
+ * O smoke da Fase 4.1 subiu uma JPEG perfeita e recebeu "Use JPG, PNG ou WebP
+ * de até 10 MB" porque o bucket não existia. Um `try` único em volta de tudo não
+ * tem como saber se quem falhou foi o arquivo ou o storage.
+ *
+ * Aqui cada fase declara a NATUREZA da própria falha:
+ *
+ *   1. INPUT   — validação + normalização. Julga o ARQUIVO.
+ *   2. STORAGE — configuração e cliente. Fala com a INFRAESTRUTURA.
+ *   3. STORAGE — PutObject. Idem.
+ *
+ * A ordem mudou: input vem ANTES de tocar em configuração de storage. Dois
+ * ganhos concretos — um arquivo recusado nunca chega a exigir credencial válida,
+ * e quando as duas coisas estão erradas ao mesmo tempo o usuário recebe o erro
+ * que ele consegue resolver.
+ *
+ * Só `uploadSaleRequestImage` foi reestruturada. `uploadVehicleImage` (anúncios)
+ * e `uploadSiteImage` (institucional) seguem intactas: o contrato delas já é
+ * consumido por outros caminhos, e mudá-las para corrigir um bug do Produto 2
+ * seria arrastar risco para fora do escopo.
+ */
+export async function uploadSaleRequestImage({
+  ownerUserId,
+  uploadSessionId,
+  file,
+  sortOrder = 0,
+  cacheControl = DEFAULT_CACHE_CONTROL,
+}) {
+  // ── FASE 1 — INPUT ────────────────────────────────────────────────────────
+  // `validateVehicleImageFile` recusa MIME, tamanho e arquivo vazio;
+  // `normalizeVehicleImage` recusa conteúdo que o sharp não decodifica. Os dois
+  // julgam o ARQUIVO, então tudo que sai daqui é erro do usuário — inclusive a
+  // imagem corrompida com MIME correto.
+  let validated;
+  let normalized;
+  try {
+    validated = await validateVehicleImageFile(file);
+    normalized = await normalizeVehicleImage(validated.buffer);
+  } catch (error) {
+    throw new ImageInputError(error?.message || "Imagem inválida.", {
+      cause: error,
+      // Preserva a decisão de quem criou o erro original: `expose = true`
+      // significa "esta mensagem foi escrita para o usuário final ler".
+      expose: error?.expose === true,
+    });
+  }
+
+  // ── FASE 2 — STORAGE (configuração e cliente) ─────────────────────────────
+  // `getR2Config` lança quando falta variável de ambiente, com o NOME da
+  // variável na mensagem. Isso é diagnóstico interno e não pode virar corpo de
+  // resposta — daí a mensagem fixa aqui e o original preservado em `cause`.
+  let client;
+  let bucketName;
+  try {
+    client = getR2Client();
+    ({ bucketName } = getR2Config());
+  } catch (error) {
+    throw new ObjectStorageError("Falha ao inicializar o cliente de storage.", {
+      cause: error,
+      stage: "config",
+    });
+  }
+
+  const key = generateSaleRequestImageKey({
+    ownerUserId,
+    uploadSessionId,
+    originalName: validated.originalName,
+    mimeType: normalized.mimeType,
+  });
+
+  const metadata = {
+    owner_user_id: sanitizeS3MetadataValue(String(ownerUserId)),
+    upload_session_id: sanitizeS3MetadataValue(String(uploadSessionId), 64),
+    original_name: sanitizeS3MetadataValue(validated.originalName || ""),
+    sort_order: String(Number.isFinite(sortOrder) ? sortOrder : 0),
+  };
+
+  // ── FASE 3 — STORAGE (gravação) ───────────────────────────────────────────
+  // NoSuchBucket, AccessDenied, SignatureDoesNotMatch, ECONNREFUSED e timeout
+  // chegam todos aqui. Nenhum deles diz nada sobre a foto.
+  let result;
+  try {
+    result = await client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: normalized.buffer,
+        ContentType: normalized.mimeType, // sempre "image/webp"
+        ContentLength: normalized.normalizedSize,
+        CacheControl: cacheControl,
+        Metadata: metadata,
+      })
+    );
+  } catch (error) {
+    throw new ObjectStorageError("Falha ao gravar o objeto no storage.", {
+      cause: error,
+      stage: "put",
+    });
+  }
+
+  return {
+    provider: "cloudflare_r2",
+    bucket: bucketName,
+    key,
+    originalName: validated.originalName,
+    mimeType: normalized.mimeType,
+    sizeBytes: normalized.normalizedSize,
+    sortOrder: Number.isFinite(sortOrder) ? Number(sortOrder) : 0,
+    etag: result?.ETag ? String(result.ETag).replace(/"/g, "") : null,
+    publicUrl: buildR2PublicUrl(key),
   };
 }
 

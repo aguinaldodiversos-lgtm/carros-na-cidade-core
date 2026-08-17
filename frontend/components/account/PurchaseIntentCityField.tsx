@@ -55,14 +55,27 @@ function normalizeRows(raw: unknown): CityRow[] {
   return out;
 }
 
+/**
+ * `helpText` é o ÚNICO ponto configurável, adicionado na Fase 4.1 para que
+ * "Venda seu carro para lojas" reuse este campo sem duplicá-lo.
+ *
+ * O default preserva exatamente o texto do Produto 1 — nenhuma chamada
+ * existente muda de comportamento, e a suíte de Compradores Ativos continua
+ * válida sem alteração. Extrair um componente genérico e reescrever as duas
+ * pontas seria a refatoração "certa", mas `purchase_intents` é domínio protegido
+ * nesta fase, e trocar a UI de um produto em produção para entregar outro é
+ * risco sem contrapartida.
+ */
 export default function PurchaseIntentCityField({
   value,
   onChange,
   error,
+  helpText = "A cidade define quais lojas encontram a sua procura.",
 }: {
   value: SelectedCity | null;
   onChange: (city: SelectedCity | null) => void;
   error?: string | null;
+  helpText?: string;
 }) {
   const [uf, setUf] = useState("");
   const [term, setTerm] = useState("");
@@ -274,9 +287,7 @@ export default function PurchaseIntentCityField({
           {error}
         </p>
       ) : (
-        <p className="mt-2 text-xs leading-relaxed text-[#64748b]">
-          A cidade define quais lojas encontram a sua procura.
-        </p>
+        <p className="mt-2 text-xs leading-relaxed text-[#64748b]">{helpText}</p>
       )}
     </div>
   );
