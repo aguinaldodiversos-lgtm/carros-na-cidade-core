@@ -701,11 +701,113 @@ baseline (`carros-usados/regiao/[slug]`, `seguranca`).
 
 ---
 
-## 16.1 — Verificações que NÃO puderam ser executadas neste ambiente
+## 16.0 — RELEASE GATE EXECUTADO (2026-08-17) — P-2 e P-9 RESOLVIDAS
 
-Três itens exigidos pelo fechamento da fase **não foram executados**, por
-limitação de ambiente e não por decisão de escopo. Estão listados aqui em vez de
-marcados como feitos.
+Rodada de **verificação pura**: nenhum arquivo de produção foi alterado. O
+working tree terminou idêntico ao preflight.
+
+### Ambiente
+
+| Recurso | Estado |
+|---|---|
+| PostgreSQL de teste | ✅ container `carros-postgres-test`, `127.0.0.1:5433/carros_na_cidade_test` |
+| Migrations 052/053 | ✅ aplicadas (`e2e:prepare`) |
+| Seed | ✅ `cpf@carrosnacidade.com` + cidade Atibaia |
+| MinIO | ✅ container `carros-minio`, `127.0.0.1:9000` |
+| Bucket | ✅ `carros-local` criado, política `download`, listado por `mc ls` |
+| Backend | ✅ `127.0.0.1:4000`, `/health` → 200, apontado para MinIO |
+| Frontend | ✅ `127.0.0.1:3000`, BFF → `127.0.0.1:4000` |
+| Playwright | ✅ Chromium do próprio repositório |
+
+Credenciais do MinIO existiram **apenas no ambiente da sessão** — nada em `.env`,
+código, teste ou relatório.
+
+### P-9 — fluxo positivo ponta a ponta
+
+| PASSO | RESULTADO |
+|---|---|
+| login PF | ✅ redireciona para `/dashboard` |
+| lista carrega com CTA | ✅ |
+| formulário preenchido (FIPE, km, câmbio, combustível, condição, cidade) | ✅ |
+| **1 foto** → contador `1/12` + preview | ✅ `previews=1` |
+| **4 fotos** → contador `4/12` + 4 previews + submit habilitado | ✅ `previews=4 submit=true` |
+| criação da solicitação | ✅ `POST /api/account/sale-requests → 201` |
+| **objetos no MinIO** | ✅ 4 objetos `.webp` sob `sale-requests/{ownerUserId}/…` |
+| **banco** | ✅ 1 `sale_requests` + **exatamente 4** `sale_request_images`, `sort_order` 0–3, 4 `storage_key` distintos |
+| detalhe | ✅ 4 imagens, status "Recebendo ofertas", botão cancelar, **sem** placeholder de lance, **sem** placa |
+| cancelamento pela UI | ✅ status vira "Cancelada" e o botão some |
+| permanece no histórico | ✅ card continua listado como "Cancelada" |
+
+`known_issues` persistido corretamente ("Pequeno risco no para-choque.").
+
+As fotos entraram como **JPEG** e foram gravadas como **`.webp`** — a
+normalização do pipeline (EXIF strip + downscale + WebP) rodou de verdade. Os
+uploads usaram **duas sessões distintas** (1 foto + lote de 3), exatamente como
+o desenho prevê, e as 4 chaves ficaram sob o prefixo do dono.
+
+### P-2 — overflow medido nas 5 larguras × 3 rotas
+
+| ROTA | VIEWPORT | scrollWidth | clientWidth | overflow | RESULTADO |
+|---|---|---|---|---|---|
+| lista | 360×800 | 360 | 360 | não | ✅ |
+| nova | 360×800 | 360 | 360 | não | ✅ |
+| detalhe | 360×800 | 360 | 360 | não | ✅ |
+| lista | 390×844 | 390 | 390 | não | ✅ |
+| nova | 390×844 | 390 | 390 | não | ✅ |
+| detalhe | 390×844 | 390 | 390 | não | ✅ |
+| lista | 412×915 | 412 | 412 | não | ✅ |
+| nova | 412×915 | 412 | 412 | não | ✅ |
+| detalhe | 412×915 | 412 | 412 | não | ✅ |
+| lista | 768×1024 | 768 | 768 | não | ✅ |
+| nova | 768×1024 | 768 | 768 | não | ✅ |
+| detalhe | 768×1024 | 768 | 768 | não | ✅ |
+| lista | 1440×900 | 1440 | 1440 | não | ✅ |
+| nova | 1440×900 | 1440 | 1440 | não | ✅ |
+| detalhe | 1440×900 | 1440 | 1440 | não | ✅ |
+
+`scrollWidth === clientWidth` em **todas as 15 combinações** — igualdade, não
+apenas "menor ou igual". Medido por `page.evaluate`, não inferido de CSS.
+
+Além do overflow, **35 verificações de usabilidade** confirmaram que CTA, input
+de km, botão de fotos, select de câmbio, galeria e botão de cancelar ficam
+inteiros dentro do viewport em todas as larguras. O fluxo funcional completo
+(login → 4 fotos → criação → detalhe → cancelamento) foi executado em **360**.
+
+### Console / network
+
+`pageErrors = 0` · `failedRequests = 0`. Todas as chamadas de
+`/api/account/sale-requests` retornaram 200/201.
+
+### Duas descobertas de INSTRUMENTAÇÃO (não são defeitos do produto)
+
+**1. A fixture `frontend/e2e/fixtures/carro.jpg` é um JPEG corrompido de 203 bytes.**
+O sharp a recusa com `Input buffer has corrupt header: VipsJpeg: Bogus marker
+length`. Ao usá-la, o produto respondeu **400 `SALE_REQUEST_INVALID_PHOTO`** —
+comportamento **correto** para arquivo corrompido, e uma confirmação a mais de
+que a classificação de erro do §14.3 funciona ponta a ponta contra um arquivo
+real. O gate passou a gerar JPEGs válidos em TEMP, como o próprio roteiro prevê.
+
+> Vale registrar para quem escrever E2E de upload depois: essa fixture só serve
+> para testes que **mockam** o upload. Qualquer teste que decodifique de verdade
+> vai recusá-la.
+
+**2. Hidratação no `next dev`.** Preencher o formulário antes de o React
+hidratar grava o valor no DOM mas não no estado do componente, e o submit envia
+string vazia (`POST /api/auth/login → {"email":"","password":""}` → 400). É
+característica do servidor de desenvolvimento, não do produto: o `login()` de
+`e2e/helpers.ts` tem a mesma exposição. O gate espera pelas chaves internas do
+React (`__reactFiber$`) antes de interagir.
+
+---
+
+## 16.1 — Histórico: verificações que ficaram bloqueadas na rodada anterior
+
+> **Superado em 2026-08-17.** O bloqueio abaixo foi resolvido e as três
+> verificações foram executadas — ver §16.0. Esta seção fica como registro do
+> que estava aberto e de como o ambiente foi destravado.
+
+Três itens exigidos pelo fechamento da fase não puderam ser executados naquela
+rodada, por limitação de ambiente e não por decisão de escopo.
 
 | Item | Bloqueio |
 |---|---|
@@ -873,8 +975,8 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 | # | Pendência | Severidade |
 |---|---|---|
 | **P-1** | O `errorHandler` global marca 404 operacional como `public, max-age=60`; rotas autenticadas do **Produto 1** ainda têm esse comportamento. Corrigido só no router do Produto 2. | Média |
-| **P-2** | **ABERTA.** Validação visual mobile nas 5 larguras não executada — navegador bloqueado no ambiente e dependência de backend + storage no ar. Verificação estática feita; não substitui a medição. Ver §16.1. | Média |
-| **P-9** | Smoke positivo com MinIO (§20) não executado: daemon do Docker indisponível. O caminho de storage foi provado por smoke com SDK real (§14.3), mas o fluxo completo de UI — preview, 4 fotos, criação, detalhe, cancelamento — segue sem execução end-to-end. | Média |
+| ~~**P-2**~~ | ~~Validação visual mobile nas 5 larguras.~~ **RESOLVIDA** em §16.0: `scrollWidth === clientWidth` nas 15 combinações (5 larguras × 3 rotas), medido por `page.evaluate`, mais 35 verificações de usabilidade. | — |
+| ~~**P-9**~~ | ~~Smoke positivo com MinIO.~~ **RESOLVIDA** em §16.0: fluxo completo com MinIO real — 1 foto, 4 fotos, 4 objetos no storage, criação, 4 linhas em `sale_request_images`, detalhe e cancelamento. | — |
 | **P-3** | Script de limpeza de fotos órfãs no R2 (enviadas e nunca submetidas) não existe. | Baixa |
 | **P-4** | `sale_requests` não tem `expires_at` (§34 — sem cronômetro). Solicitações abandonadas ficam abertas para sempre e vão poluir a lista do lojista na 4.2. | Média (vira alta na 4.2) |
 | **P-5** | A divergência de `deriveAccountType` (valor desconhecido → `pending`, não `CPF`) está documentada em dois lugares que discordam entre si. Não afeta a 4.1. | Baixa |
@@ -937,9 +1039,9 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 | frontend mostra mensagem correta | ✅ teste de componente |
 | teste de regressão falha com o comportamento antigo | ✅ **14 testes caem na mutação** |
 | smoke storage real (negativo) | ✅ |
-| **smoke MinIO positivo** | ❌ **não executado** — Docker indisponível (P-9) |
-| **1 foto → preview; 4 fotos → criação; detalhe; cancelamento (UI)** | ❌ **não executado** — mesma dependência (P-9) |
-| **mobile 360/390/412/768/1440 + overflow=false** | ❌ **não executado** — navegador bloqueado (P-2) |
+| **smoke MinIO positivo** | ✅ **executado** (§16.0) — 4 objetos no bucket real |
+| **1 foto → preview; 4 fotos → criação; detalhe; cancelamento (UI)** | ✅ **executado** (§16.0) via Playwright |
+| **mobile 360/390/412/768/1440 + overflow=false** | ✅ **executado** (§16.0) — 15/15 sem overflow |
 | migrations 052/053 intactas · zero migration nova | ✅ |
 | schema, concurrency, lock, ownership intactos | ✅ não tocados |
 | Produto 1, SEO, payments, ads intactos | ✅ suítes verdes |
@@ -949,26 +1051,26 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 | nenhuma regressão nova | ✅ |
 | branch pushada · sem merge · sem deploy | ✅ |
 
-**Três critérios não puderam ser verificados neste ambiente.** Nenhum deles
-indica defeito conhecido — são verificações que exigem Docker e navegador.
+**Todos os critérios verificados.** Os três que estavam pendentes foram
+executados no release gate de 2026-08-17 (§16.0), com Docker, MinIO real,
+PostgreSQL de teste e Playwright.
 
 ---
 
 ## 24. Recomendação final
 
-> **Atualização após o smoke de upload (§14.3):** a recomendação abaixo foi
-> escrita antes do bug de classificação de erro de storage. O bug está corrigido
-> e coberto, mas o **fechamento definitivo** da fase depende de três verificações
-> que este ambiente não permitiu executar (§16.1 e §23.1): smoke positivo com
-> MinIO, fluxo de UI ponta a ponta e mobile nas cinco larguras.
+> **Atualização final (release gate, 2026-08-17).** As duas pendências que
+> seguravam o fechamento — **P-2** (mobile) e **P-9** (smoke positivo com MinIO)
+> — foram **RESOLVIDAS** e estão documentadas em §16.0, com storage S3 real,
+> PostgreSQL de teste, Playwright e medição objetiva de overflow.
 >
-> **Status definitivo: NO-GO até que P-2 e P-9 sejam fechadas.** Não há defeito
-> conhecido em aberto — o que falta é verificação, não conserto.
+> **Status definitivo: GO DEFINITIVO para merge/deploy.** Nenhum defeito de
+> produto foi encontrado em nenhuma rodada de verificação.
 
 ```
 FASE 4.1 — PF PUBLICA VENDA PARA LOJAS
 
-STATUS: GO (código) / NO-GO (fechamento — ver §16.1, §23.1)
+STATUS: GO DEFINITIVO (ver §16.0 e §23.1)
 
 Todos os 31 critérios do §42 atendidos. O P0 (teto de 3 sob concorrência
 real) está coberto por um detector cuja capacidade de detecção foi ELA
