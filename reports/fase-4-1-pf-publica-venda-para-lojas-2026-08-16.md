@@ -729,6 +729,32 @@ integration:db:up`, subir MinIO com o bucket `carros-local`, apontar o backend
 para os dois e rodar o fluxo via Playwright — que está instalado no repositório
 com Chromium disponível e é o caminho natural para medir overflow por script.
 
+### Diagnóstico exato do bloqueio (rodada de release gate, 2026-08-17)
+
+Uma segunda tentativa de fechar P-2 e P-9 isolou a causa do Docker indisponível:
+
+```
+Docker Desktop (processos de usuário)  → RODANDO
+com.docker.service (serviço Windows)   → STOPPED
+Start-Service com.docker.service       → acesso negado (exige elevação)
+```
+
+Sem esse serviço o named pipe `dockerDesktopLinuxEngine` não é criado, e nenhum
+comando `docker` funciona — daí não haver Postgres em 5433 nem MinIO.
+
+**Unblock:** iniciar o Docker Desktop (ou o serviço) com privilégio de
+administrador. Depois disso, o restante do ambiente já está no lugar:
+
+| Recurso | Estado |
+|---|---|
+| Playwright + Chromium | ✅ instalados no repositório |
+| PostgreSQL nativo 16 | ✅ rodando em `127.0.0.1:5432` (o gate pede o container em **5433**) |
+| Porta 5433 (Postgres de teste) | ❌ nada escutando |
+| Porta 9000 (MinIO) | ❌ nada escutando |
+
+Nenhuma verificação foi executada nesta rodada e **nenhum arquivo de produção
+foi tocado** — o working tree terminou idêntico ao preflight.
+
 ---
 
 ## 17. Mobile — verificação parcial, declarada
