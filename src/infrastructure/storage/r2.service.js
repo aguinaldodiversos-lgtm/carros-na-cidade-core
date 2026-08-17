@@ -12,6 +12,7 @@ import {
 } from "@aws-sdk/client-s3";
 
 import { ACCEPTED_INPUT_MIMES, normalizeVehicleImage } from "./image-normalizer.js";
+import { ImageInputError, ObjectStorageError } from "./storage-errors.js";
 
 const DEFAULT_REGION = "auto";
 const DEFAULT_MAX_FILE_SIZE_BYTES = parsePositiveInt(
@@ -700,6 +701,30 @@ export function generateSaleRequestImageKey({
  * quando o upload acontece (o formulário só é submetido depois). O vínculo é
  * feito no banco, por `sale_request_images.storage_key`.
  */
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * TRÊS FASES EXPLÍCITAS — a razão de esta função não ser um bloco só
+ * ────────────────────────────────────────────────────────────────────────────
+ * O smoke da Fase 4.1 subiu uma JPEG perfeita e recebeu "Use JPG, PNG ou WebP
+ * de até 10 MB" porque o bucket não existia. Um `try` único em volta de tudo não
+ * tem como saber se quem falhou foi o arquivo ou o storage.
+ *
+ * Aqui cada fase declara a NATUREZA da própria falha:
+ *
+ *   1. INPUT   — validação + normalização. Julga o ARQUIVO.
+ *   2. STORAGE — configuração e cliente. Fala com a INFRAESTRUTURA.
+ *   3. STORAGE — PutObject. Idem.
+ *
+ * A ordem mudou: input vem ANTES de tocar em configuração de storage. Dois
+ * ganhos concretos — um arquivo recusado nunca chega a exigir credencial válida,
+ * e quando as duas coisas estão erradas ao mesmo tempo o usuário recebe o erro
+ * que ele consegue resolver.
+ *
+ * Só `uploadSaleRequestImage` foi reestruturada. `uploadVehicleImage` (anúncios)
+ * e `uploadSiteImage` (institucional) seguem intactas: o contrato delas já é
+ * consumido por outros caminhos, e mudá-las para corrigir um bug do Produto 2
+ * seria arrastar risco para fora do escopo.
+ */
 export async function uploadSaleRequestImage({
   ownerUserId,
   uploadSessionId,
@@ -707,11 +732,40 @@ export async function uploadSaleRequestImage({
   sortOrder = 0,
   cacheControl = DEFAULT_CACHE_CONTROL,
 }) {
-  const client = getR2Client();
-  const { bucketName } = getR2Config();
+  // ── FASE 1 — INPUT ────────────────────────────────────────────────────────
+  // `validateVehicleImageFile` recusa MIME, tamanho e arquivo vazio;
+  // `normalizeVehicleImage` recusa conteúdo que o sharp não decodifica. Os dois
+  // julgam o ARQUIVO, então tudo que sai daqui é erro do usuário — inclusive a
+  // imagem corrompida com MIME correto.
+  let validated;
+  let normalized;
+  try {
+    validated = await validateVehicleImageFile(file);
+    normalized = await normalizeVehicleImage(validated.buffer);
+  } catch (error) {
+    throw new ImageInputError(error?.message || "Imagem inválida.", {
+      cause: error,
+      // Preserva a decisão de quem criou o erro original: `expose = true`
+      // significa "esta mensagem foi escrita para o usuário final ler".
+      expose: error?.expose === true,
+    });
+  }
 
-  const validated = await validateVehicleImageFile(file);
-  const normalized = await normalizeVehicleImage(validated.buffer);
+  // ── FASE 2 — STORAGE (configuração e cliente) ─────────────────────────────
+  // `getR2Config` lança quando falta variável de ambiente, com o NOME da
+  // variável na mensagem. Isso é diagnóstico interno e não pode virar corpo de
+  // resposta — daí a mensagem fixa aqui e o original preservado em `cause`.
+  let client;
+  let bucketName;
+  try {
+    client = getR2Client();
+    ({ bucketName } = getR2Config());
+  } catch (error) {
+    throw new ObjectStorageError("Falha ao inicializar o cliente de storage.", {
+      cause: error,
+      stage: "config",
+    });
+  }
 
   const key = generateSaleRequestImageKey({
     ownerUserId,
@@ -727,17 +781,28 @@ export async function uploadSaleRequestImage({
     sort_order: String(Number.isFinite(sortOrder) ? sortOrder : 0),
   };
 
-  const result = await client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: normalized.buffer,
-      ContentType: normalized.mimeType, // sempre "image/webp"
-      ContentLength: normalized.normalizedSize,
-      CacheControl: cacheControl,
-      Metadata: metadata,
-    })
-  );
+  // ── FASE 3 — STORAGE (gravação) ───────────────────────────────────────────
+  // NoSuchBucket, AccessDenied, SignatureDoesNotMatch, ECONNREFUSED e timeout
+  // chegam todos aqui. Nenhum deles diz nada sobre a foto.
+  let result;
+  try {
+    result = await client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: normalized.buffer,
+        ContentType: normalized.mimeType, // sempre "image/webp"
+        ContentLength: normalized.normalizedSize,
+        CacheControl: cacheControl,
+        Metadata: metadata,
+      })
+    );
+  } catch (error) {
+    throw new ObjectStorageError("Falha ao gravar o objeto no storage.", {
+      cause: error,
+      stage: "put",
+    });
+  }
 
   return {
     provider: "cloudflare_r2",

@@ -115,8 +115,31 @@ export const SALE_REQUEST_CODE = Object.freeze({
   ACTIVE_LIMIT_REACHED: "SALE_REQUEST_ACTIVE_LIMIT_REACHED",
   INVALID_PHOTO: "SALE_REQUEST_INVALID_PHOTO",
   PHOTO_COUNT: "SALE_REQUEST_PHOTO_COUNT",
+  /**
+   * O STORAGE falhou — a foto não tem defeito nenhum.
+   *
+   * Existe separado de `INVALID_PHOTO` porque as duas exigem reações opostas do
+   * usuário: `INVALID_PHOTO` pede outro arquivo; este pede a MESMA foto de novo,
+   * daqui a pouco. Colapsar os dois foi o bug do smoke da Fase 4.1 — o bucket não
+   * existia e a pessoa foi mandada converter uma JPEG que estava perfeita.
+   */
+  PHOTO_STORAGE_UNAVAILABLE: "SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE",
   NOT_CANCELLABLE: "SALE_REQUEST_NOT_CANCELLABLE",
 });
+
+/**
+ * Mensagem pública de indisponibilidade de storage.
+ *
+ * Diz o que aconteceu ("agora não deu"), o que fazer ("tente de novo") e NADA
+ * sobre a causa. Bucket, endpoint, account id, nome de variável de ambiente e
+ * erro do SDK ficam só no log — a resposta HTTP não carrega nenhum deles.
+ */
+export const SALE_REQUEST_PHOTO_STORAGE_MESSAGE =
+  "Não foi possível enviar a foto agora. Tente novamente em instantes.";
+
+/** Mensagem pública quando o ARQUIVO é o problema e não há texto acionável melhor. */
+export const SALE_REQUEST_PHOTO_INPUT_MESSAGE =
+  "Não foi possível enviar uma das fotos. Use JPG, PNG ou WebP de até 10 MB.";
 
 // ────────────────────────────────────────────────────────────────────────────
 // TEXTO DE FORMULÁRIO NÃO VIVE MAIS AQUI

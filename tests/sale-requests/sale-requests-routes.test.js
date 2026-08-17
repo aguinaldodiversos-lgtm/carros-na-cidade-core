@@ -12,6 +12,10 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, fakeClock, fakeQuery, resetDb } from "./fake-db.js";
+import {
+  ImageInputError,
+  ObjectStorageError,
+} from "../../src/infrastructure/storage/storage-errors.js";
 
 vi.mock("../../src/infrastructure/database/db.js", () => ({
   query: (sql, params) => fakeQuery(sql, params),
@@ -19,6 +23,22 @@ vi.mock("../../src/infrastructure/database/db.js", () => ({
   withTransaction: (callback) => callback({ query: (sql, params) => fakeQuery(sql, params) }),
   default: { query: (sql, params) => fakeQuery(sql, params) },
 }));
+
+/**
+ * O upload ao R2 é controlado pelo teste; TODO o resto de `r2.service` é o real
+ * (via `importOriginal`), porque `sale-requests.validation.js` importa
+ * `SALE_REQUEST_KEY_PREFIX` dali — mockar o módulo inteiro faria a validação de
+ * posse comparar contra `undefined` e passar a aceitar qualquer chave.
+ */
+const uploadSaleRequestImage = vi.fn();
+
+vi.mock("../../src/infrastructure/storage/r2.service.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    uploadSaleRequestImage: (...args) => uploadSaleRequestImage(...args),
+  };
+});
 
 // FIPE nunca é chamada de verdade num teste de rota: seria I/O externo e
 // tornaria o resultado dependente de rede.
@@ -333,6 +353,104 @@ describe("superfície — o que NÃO pode existir na Fase 4.1", () => {
     // de "solicitação não encontrada".
     expect(response.status).toBe(400);
     expect(String(response.body?.message || "")).not.toMatch(/não encontrada/i);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// O CONTRATO HTTP DO UPLOAD — 400 × 503 pelo caminho REAL
+// ────────────────────────────────────────────────────────────────────────────
+// Os testes de service provam a tradução; estes provam que ela SOBREVIVE ao
+// caminho completo (multer → controller → asyncHandler → error handler do router
+// → errorHandler global). É onde um 503 poderia virar 400 ou 500 sem ninguém
+// perceber — e o bug original só apareceu porque alguém rodou o fluxo de ponta a
+// ponta.
+describe("upload de fotos — classificação de falha na rota", () => {
+  function postPhoto(app) {
+    return request(app)
+      .post("/api/account/sale-requests/photos")
+      .set("x-test-user", OWNER_ID)
+      .attach("photos", Buffer.from([0xff, 0xd8, 0xff, 0xdb]), {
+        filename: "foto.jpg",
+        contentType: "image/jpeg",
+      });
+  }
+
+  it("sucesso devolve 201 com as chaves", async () => {
+    uploadSaleRequestImage.mockResolvedValue({
+      key: `sale-requests/${OWNER_ID}/sess/2026/08/uuid-0.webp`,
+      publicUrl: "",
+    });
+
+    const response = await postPhoto(buildApp()).expect(201);
+
+    expect(response.body.images).toHaveLength(1);
+    expect(response.body.images[0].storage_key).toContain(`sale-requests/${OWNER_ID}/`);
+  });
+
+  it("arquivo inválido → 400 INVALID_PHOTO", async () => {
+    uploadSaleRequestImage.mockRejectedValue(
+      new ImageInputError("[r2] Tipo de arquivo não permitido: image/heic.")
+    );
+
+    const response = await postPhoto(buildApp()).expect(400);
+
+    expect(response.body?.details?.code).toBe("SALE_REQUEST_INVALID_PHOTO");
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("storage indisponível → 503, e NÃO 400", async () => {
+    // A regressão exata do smoke: bucket inexistente devolvia 400 dizendo que a
+    // foto estava errada.
+    const cause = new Error("The specified bucket does not exist");
+    cause.name = "NoSuchBucket";
+    uploadSaleRequestImage.mockRejectedValue(
+      new ObjectStorageError("falha ao gravar", { cause, stage: "put" })
+    );
+
+    const response = await postPhoto(buildApp()).expect(503);
+
+    expect(response.body?.details?.code).toBe("SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE");
+    expect(response.body?.message).toBe(
+      "Não foi possível enviar a foto agora. Tente novamente em instantes."
+    );
+  });
+
+  it("configuração de storage ausente → 503 sem vazar o nome da variável", async () => {
+    uploadSaleRequestImage.mockRejectedValue(
+      new ObjectStorageError("Falha ao inicializar o cliente de storage.", {
+        cause: new Error("[r2] Variável obrigatória ausente: R2_BUCKET_NAME"),
+        stage: "config",
+      })
+    );
+
+    const response = await postPhoto(buildApp()).expect(503);
+
+    const body = JSON.stringify(response.body);
+    for (const leak of [/R2_/, /bucket/i, /endpoint/i, /secret/i, /access.?key/i]) {
+      expect(body).not.toMatch(leak);
+    }
+  });
+
+  it("a resposta 503 é privada e não cacheável", async () => {
+    // Um 503 cacheado por proxy manteria a tela quebrada depois de o storage
+    // voltar.
+    uploadSaleRequestImage.mockRejectedValue(
+      new ObjectStorageError("falha", { cause: new Error("x"), stage: "put" })
+    );
+
+    const response = await postPhoto(buildApp()).expect(503);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("erro não classificado NÃO vira 400 de foto inválida", async () => {
+    uploadSaleRequestImage.mockRejectedValue(new TypeError("client.send is not a function"));
+
+    const response = await postPhoto(buildApp());
+
+    expect(response.status).toBe(500);
+    expect(response.body?.details?.code).not.toBe("SALE_REQUEST_INVALID_PHOTO");
+    // O errorHandler global não expõe mensagem interna em 500.
+    expect(String(response.body?.message || "")).not.toMatch(/client\.send/);
   });
 });
 

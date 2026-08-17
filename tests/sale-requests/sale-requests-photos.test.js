@@ -13,6 +13,10 @@ import {
   SALE_REQUEST_KEY_PREFIX,
   generateSaleRequestImageKey,
 } from "../../src/infrastructure/storage/r2.service.js";
+import {
+  ImageInputError,
+  ObjectStorageError,
+} from "../../src/infrastructure/storage/storage-errors.js";
 
 const OWNER = { id: "7", account_type: "CPF" };
 
@@ -130,19 +134,59 @@ describe("sessão", () => {
   });
 });
 
-describe("erro do pipeline", () => {
-  it("vira 400 com a razão real, não 500", async () => {
-    // O pipeline recusa formato/tamanho com mensagem própria. Transformar em 500
-    // esconderia "seu arquivo é HEIC" atrás de "erro interno".
-    const upload = vi
-      .fn()
-      .mockRejectedValue(new Error("[r2] Tipo de arquivo não permitido: image/heic."));
+// ────────────────────────────────────────────────────────────────────────────
+// ERRO DO ARQUIVO × ERRO DO STORAGE
+// ────────────────────────────────────────────────────────────────────────────
+// O bug que estes testes travam: no smoke da Fase 4.1 o R2 respondeu
+// "The specified bucket does not exist" e o usuário recebeu 400 com "Use JPG,
+// PNG ou WebP de até 10 MB" — mandado converter uma foto que estava perfeita.
+//
+// Os mocks lançam os erros TIPADOS que `uploadSaleRequestImage` de fato lança.
+// Não usam `new Error("...bucket...")`, porque classificar por texto é
+// justamente o que a correção evita: o teste passaria a validar a string do SDK
+// da AWS em vez do contrato do produto.
+
+describe("erro de INPUT — o arquivo é o problema", () => {
+  it.each([
+    ["MIME não permitido", "[r2] Tipo de arquivo não permitido: image/heic."],
+    ["arquivo vazio", "[r2] Arquivo inválido ou vazio."],
+    ["arquivo acima do limite", "[r2] Arquivo excede o limite permitido (20000000 > 10485760)."],
+    ["imagem corrompida", "[normalizer] Buffer de entrada vazio."],
+  ])("%s → 400 INVALID_PHOTO", async (_label, message) => {
+    const upload = vi.fn().mockRejectedValue(new ImageInputError(message));
 
     await expect(
       uploadSaleRequestPhotos(OWNER, fakeFiles(1), { uploadSaleRequestImage: upload })
     ).rejects.toMatchObject({
       statusCode: 400,
-      details: { code: "SALE_REQUEST_INVALID_PHOTO" },
+      details: { code: "SALE_REQUEST_INVALID_PHOTO", field: "photos", index: 0 },
+    });
+  });
+
+  it("erro de input NÃO devolve a mensagem de storage", async () => {
+    const upload = vi.fn().mockRejectedValue(new ImageInputError("[r2] Arquivo vazio."));
+
+    await expect(
+      uploadSaleRequestPhotos(OWNER, fakeFiles(1), { uploadSaleRequestImage: upload })
+    ).rejects.toMatchObject({
+      message: expect.stringMatching(/Use JPG, PNG ou WebP/i),
+    });
+  });
+
+  it("mensagem marcada como `expose` chega ao usuário", async () => {
+    // É a mensagem que explica onde desligar o "alta eficiência" no iPhone.
+    // Trocá-la pelo texto genérico tornaria o erro menos acionável.
+    const upload = vi.fn().mockRejectedValue(
+      new ImageInputError("Esta foto está em HEIC, formato que ainda não processamos.", {
+        expose: true,
+      })
+    );
+
+    await expect(
+      uploadSaleRequestPhotos(OWNER, fakeFiles(1), { uploadSaleRequestImage: upload })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringMatching(/HEIC/),
     });
   });
 
@@ -152,15 +196,117 @@ describe("erro do pipeline", () => {
     let call = 0;
     const upload = vi.fn().mockImplementation(async () => {
       call += 1;
-      if (call === 2) throw new Error("[r2] Arquivo excede o limite permitido");
+      if (call === 2) throw new ImageInputError("[r2] Arquivo excede o limite permitido");
       return { key: `${SALE_REQUEST_KEY_PREFIX}/7/s/2026/08/a.webp`, publicUrl: "" };
     });
 
     await expect(
       uploadSaleRequestPhotos(OWNER, fakeFiles(3), { uploadSaleRequestImage: upload })
-    ).rejects.toMatchObject({ statusCode: 400 });
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      details: { index: 1 },
+    });
 
     expect(upload).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("erro de STORAGE — a foto não tem defeito", () => {
+  it.each([
+    ["configuração ausente", "config", "[r2] Variável obrigatória ausente: R2_BUCKET_NAME"],
+    ["bucket inexistente", "put", "The specified bucket does not exist"],
+    ["credencial recusada", "put", "AccessDenied"],
+    ["assinatura inválida", "put", "SignatureDoesNotMatch"],
+    ["conexão recusada", "put", "connect ECONNREFUSED 127.0.0.1:9000"],
+    ["timeout", "put", "Connection timed out"],
+  ])("%s → 503 STORAGE_UNAVAILABLE", async (_label, stage, causeMessage) => {
+    const cause = new Error(causeMessage);
+    const upload = vi
+      .fn()
+      .mockRejectedValue(new ObjectStorageError("falha de storage", { cause, stage }));
+
+    await expect(
+      uploadSaleRequestPhotos(OWNER, fakeFiles(1), { uploadSaleRequestImage: upload })
+    ).rejects.toMatchObject({
+      statusCode: 503,
+      details: { code: "SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE", field: "photos" },
+    });
+  });
+
+  it("a mensagem pública é segura e não culpa a foto", async () => {
+    const cause = new Error("The specified bucket does not exist");
+    cause.name = "NoSuchBucket";
+    const upload = vi
+      .fn()
+      .mockRejectedValue(new ObjectStorageError("falha ao gravar", { cause, stage: "put" }));
+
+    const failure = await uploadSaleRequestPhotos(OWNER, fakeFiles(1), {
+      uploadSaleRequestImage: upload,
+    }).catch((error) => error);
+
+    expect(failure.message).toBe(
+      "Não foi possível enviar a foto agora. Tente novamente em instantes."
+    );
+
+    // Nada da infraestrutura pode aparecer na resposta.
+    const serialized = JSON.stringify({
+      message: failure.message,
+      details: failure.details,
+    });
+    for (const leak of [
+      /bucket/i,
+      /R2_/,
+      /endpoint/i,
+      /account/i,
+      /access.?key/i,
+      /secret/i,
+      /NoSuchBucket/,
+      /amazonaws|cloudflarestorage/i,
+    ]) {
+      expect(serialized).not.toMatch(leak);
+    }
+
+    // E não pode sugerir que o arquivo estava errado.
+    expect(failure.message).not.toMatch(/JPG|PNG|WebP|10 MB|formato/i);
+    expect(failure.details.code).not.toBe("SALE_REQUEST_INVALID_PHOTO");
+  });
+
+  it("storage no meio do lote também para o lote", async () => {
+    let call = 0;
+    const upload = vi.fn().mockImplementation(async () => {
+      call += 1;
+      if (call === 2) {
+        throw new ObjectStorageError("falha ao gravar", {
+          cause: new Error("NoSuchBucket"),
+          stage: "put",
+        });
+      }
+      return { key: `${SALE_REQUEST_KEY_PREFIX}/7/s/2026/08/a.webp`, publicUrl: "" };
+    });
+
+    await expect(
+      uploadSaleRequestPhotos(OWNER, fakeFiles(3), { uploadSaleRequestImage: upload })
+    ).rejects.toMatchObject({ statusCode: 503 });
+
+    expect(upload).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("erro NÃO CLASSIFICADO — não inventar defeito na foto", () => {
+  it("erro cru é repassado, nunca convertido em INVALID_PHOTO", async () => {
+    // Um `TypeError` é bug nosso. Transformá-lo em "sua foto é inválida" manda o
+    // usuário caçar um problema que não existe — foi exatamente essa conversão
+    // genérica que produziu o bug do smoke.
+    const bug = new TypeError("client.send is not a function");
+    const upload = vi.fn().mockRejectedValue(bug);
+
+    const failure = await uploadSaleRequestPhotos(OWNER, fakeFiles(1), {
+      uploadSaleRequestImage: upload,
+    }).catch((error) => error);
+
+    expect(failure).toBe(bug);
+    expect(failure.details?.code).toBeUndefined();
+    expect(failure.statusCode).toBeUndefined();
   });
 });
 

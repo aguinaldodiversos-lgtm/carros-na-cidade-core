@@ -328,6 +328,37 @@ describe("erros", () => {
     );
     expect(screen.getByTestId("sale-request-form")).toBeInTheDocument();
   });
+
+  it("storage indisponível mostra a mensagem de TENTAR DE NOVO, não a de arquivo", async () => {
+    // A regressão do smoke vista pelo olho do usuário: o bucket não existia e a
+    // tela mandava converter uma foto perfeita. A pessoa precisa entender que o
+    // caminho é reenviar a MESMA foto daqui a pouco.
+    const { SaleRequestError } = await import("@/lib/sale-requests/api");
+
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    uploadSaleRequestPhotos.mockRejectedValue(
+      new SaleRequestError(
+        "Não foi possível enviar a foto agora. Tente novamente em instantes.",
+        503,
+        "SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE"
+      )
+    );
+
+    await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.jpg")]);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Não foi possível enviar a foto agora\. Tente novamente em instantes\./i)
+      ).toBeInTheDocument()
+    );
+
+    // O texto de formato NÃO pode aparecer: a foto não tem defeito.
+    const photoBlock = screen.getByTestId("sale-request-photos").textContent ?? "";
+    expect(photoBlock).not.toMatch(/Use JPG, PNG ou WebP/i);
+    expect(photoBlock).not.toMatch(/10 MB/i);
+  });
 });
 
 describe("privacidade e limites na tela", () => {

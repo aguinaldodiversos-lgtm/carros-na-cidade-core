@@ -30,9 +30,115 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import { uploadSaleRequestImage } from "../../infrastructure/storage/r2.service.js";
+import {
+  ImageInputError,
+  ObjectStorageError,
+  describeStorageFailure,
+} from "../../infrastructure/storage/storage-errors.js";
 import { buildCanonicalImageUrlFromStorageKey } from "../ads/ads.public-images.js";
 import { requireUserId } from "./sale-requests.service.js";
-import { SALE_REQUEST_CODE, SALE_REQUEST_PHOTOS } from "./sale-requests.constants.js";
+import {
+  SALE_REQUEST_CODE,
+  SALE_REQUEST_PHOTOS,
+  SALE_REQUEST_PHOTO_INPUT_MESSAGE,
+  SALE_REQUEST_PHOTO_STORAGE_MESSAGE,
+} from "./sale-requests.constants.js";
+
+/**
+ * Traduz a falha TIPADA do pipeline no contrato HTTP do produto.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * TRÊS CAMINHOS, TRÊS RESPOSTAS — e nenhum deles adivinha por string
+ * ────────────────────────────────────────────────────────────────────────────
+ *   ImageInputError    → 400. O ARQUIVO é o problema; o usuário resolve
+ *                        mandando outro.
+ *   ObjectStorageError → 503. O STORAGE é o problema; o usuário resolve
+ *                        tentando a MESMA foto de novo, daqui a pouco.
+ *   qualquer outro     → repassa. Erro não classificado é bug nosso, e culpar a
+ *                        foto do usuário por um bug nosso é o que causou este
+ *                        conserto. O errorHandler global transforma em 500 com
+ *                        mensagem genérica, sem stack e sem detalhe interno.
+ *
+ * A distinção NÃO usa `message.includes("bucket")` nem lista de códigos da AWS.
+ * Ela vem da ETAPA que falhou dentro de `uploadSaleRequestImage` — ver
+ * `storage-errors.js` para o porquê de classificar por estrutura e não por texto.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE VAI PARA O LOG E O QUE VAI PARA A RESPOSTA
+ * ────────────────────────────────────────────────────────────────────────────
+ * Log: `reason`, `stage` e o par nome/mensagem do erro de origem — o suficiente
+ * para saber que foi `NoSuchBucket` ou `R2_BUCKET_NAME` ausente. Nunca o objeto
+ * de erro inteiro, que no SDK da AWS carrega `$metadata` e configuração
+ * resolvida de credenciais.
+ *
+ * Resposta: mensagem fixa. Sem bucket, sem endpoint, sem account id, sem nome de
+ * variável de ambiente, sem texto do SDK.
+ */
+function translateUploadFailure(error, { ownerUserId, index }) {
+  if (error instanceof ObjectStorageError) {
+    logger.error(
+      {
+        ...buildDomainFields({
+          action: "sale_request.photo.upload",
+          result: "error",
+          userId: ownerUserId,
+          reason: "storage_unavailable",
+        }),
+        index,
+        stage: error.stage,
+        storage: describeStorageFailure(error.cause),
+      },
+      "[sale-requests] storage indisponível — a foto do usuário não tem defeito"
+    );
+
+    return new AppError(SALE_REQUEST_PHOTO_STORAGE_MESSAGE, 503, true, {
+      code: SALE_REQUEST_CODE.PHOTO_STORAGE_UNAVAILABLE,
+      field: "photos",
+    });
+  }
+
+  if (error instanceof ImageInputError) {
+    logger.warn(
+      {
+        ...buildDomainFields({
+          action: "sale_request.photo.upload",
+          result: "error",
+          userId: ownerUserId,
+          reason: "invalid_photo",
+        }),
+        index,
+        err: error.message,
+      },
+      "[sale-requests] arquivo recusado pelo pipeline de imagem"
+    );
+
+    // `expose` marca as mensagens escritas PARA o usuário final — como a que
+    // explica onde desligar o "alta eficiência" no iPhone. Descartá-las em favor
+    // do texto genérico tornaria o erro menos acionável do que já é hoje.
+    return new AppError(
+      error.expose && error.message ? error.message : SALE_REQUEST_PHOTO_INPUT_MESSAGE,
+      400,
+      true,
+      { code: SALE_REQUEST_CODE.INVALID_PHOTO, field: "photos", index }
+    );
+  }
+
+  logger.error(
+    {
+      ...buildDomainFields({
+        action: "sale_request.photo.upload",
+        result: "error",
+        userId: ownerUserId,
+        reason: "unclassified",
+      }),
+      index,
+      err: error?.message || String(error),
+    },
+    "[sale-requests] falha não classificada no envio de foto"
+  );
+
+  return error;
+}
 
 /**
  * Sobe um lote de fotos e devolve as chaves.
@@ -92,30 +198,7 @@ export async function uploadSaleRequestPhotos(user, files, deps = {}) {
         url: result.publicUrl || buildCanonicalImageUrlFromStorageKey(result.key),
       });
     } catch (error) {
-      // O pipeline recusa formato/tamanho com mensagem própria e legível
-      // (`[r2] Tipo de arquivo não permitido: ...`). Repassar como 400 dá ao
-      // usuário a razão real; transformar em 500 esconderia "seu arquivo é HEIC"
-      // atrás de "erro interno".
-      logger.warn(
-        {
-          ...buildDomainFields({
-            action: "sale_request.photo.upload",
-            result: "error",
-            userId: ownerUserId,
-            reason: "upload_failed",
-          }),
-          index,
-          err: error?.message || String(error),
-        },
-        "[sale-requests] falha ao enviar foto"
-      );
-
-      throw new AppError(
-        "Não foi possível enviar uma das fotos. Use JPG, PNG ou WebP de até 10 MB.",
-        400,
-        true,
-        { code: SALE_REQUEST_CODE.INVALID_PHOTO, field: "photos", index }
-      );
+      throw translateUploadFailure(error, { ownerUserId, index });
     }
   }
 
