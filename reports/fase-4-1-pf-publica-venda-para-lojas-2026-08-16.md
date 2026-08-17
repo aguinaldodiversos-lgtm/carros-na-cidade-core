@@ -507,6 +507,143 @@ novos falham (o de presença e o de ausência). Com a copy correta, passam.
 
 ---
 
+## 14.3 — Bug do smoke: erro de STORAGE classificado como foto inválida
+
+**Natureza: correção de contrato HTTP. Nenhum schema, migration, transação,
+ownership ou fluxo de upload foi alterado.**
+
+### Reprodução original
+
+No smoke manual, o backend recebeu uma **JPEG válida** e o R2 respondeu:
+
+```
+The specified bucket does not exist
+```
+
+A API respondeu ao usuário:
+
+```
+HTTP 400 · SALE_REQUEST_INVALID_PHOTO
+"Não foi possível enviar uma das fotos. Use JPG, PNG ou WebP de até 10 MB."
+```
+
+### Causa raiz
+
+`sale-requests.photos.service.js` envolvia a chamada inteira de
+`uploadSaleRequestImage()` num único `catch (error)` e convertia **qualquer**
+exceção em erro de foto. Um `catch` genérico não tem como distinguir "o arquivo
+está ruim" de "o storage está fora" — então a única classe de erro que ele sabia
+produzir era a errada para metade dos casos.
+
+O efeito prático é pior que um erro genérico: a pessoa foi instruída a converter,
+redimensionar e reenviar um arquivo que **nunca teve defeito**, e nenhuma dessas
+tentativas poderia funcionar.
+
+### Solução
+
+Classificação **estrutural**, por etapa — não por texto da mensagem do SDK.
+
+Novo módulo `src/infrastructure/storage/storage-errors.js`, genérico e sem
+nenhuma dependência de `sale_requests` (infraestrutura não importa constante de
+domínio):
+
+- `ImageInputError` — o ARQUIVO é o problema. Propaga o sinalizador `expose`, que
+  o projeto já usa para mensagens escritas ao usuário final.
+- `ObjectStorageError` — o STORAGE é o problema. Carrega `stage`
+  (`config` | `put`) e a causa original. A `message` é **interna**.
+- `describeStorageFailure()` — extrai `name`/`message`/`httpStatus` do erro de
+  origem para o LOG, nunca o objeto inteiro (o erro do SDK da AWS carrega
+  `$metadata` e configuração resolvida de credenciais).
+
+`uploadSaleRequestImage()` foi reestruturada em **três fases explícitas**:
+
+| Fase | O que roda | Erro produzido |
+|---|---|---|
+| 1 | `validateVehicleImageFile` + `normalizeVehicleImage` | `ImageInputError` |
+| 2 | `getR2Client` + `getR2Config` | `ObjectStorageError` (`stage: config`) |
+| 3 | `PutObjectCommand` | `ObjectStorageError` (`stage: put`) |
+
+A ordem mudou: **input vem antes** de tocar em configuração de storage. Um
+arquivo recusado nunca chega a exigir credencial válida, e quando as duas coisas
+estão erradas o usuário recebe o erro que ele consegue resolver.
+
+`uploadVehicleImage` (anúncios) e `uploadSiteImage` (institucional) ficaram
+**intactas** — mudá-las para corrigir um bug do Produto 2 arrastaria risco para
+fora do escopo.
+
+### Contrato final
+
+| Situação | HTTP | `code` | Mensagem pública |
+|---|---|---|---|
+| MIME recusado, vazio, >10 MB, corrompido | **400** | `SALE_REQUEST_INVALID_PHOTO` | "…Use JPG, PNG ou WebP de até 10 MB." (ou a mensagem `expose`, quando houver — ex.: a de HEIC) |
+| Quantidade inválida | **400** | `SALE_REQUEST_PHOTO_COUNT` | limite aplicável |
+| Config ausente, bucket inexistente, AccessDenied, SignatureDoesNotMatch, ECONNREFUSED, timeout, falha de PutObject | **503** | `SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE` | "Não foi possível enviar a foto agora. Tente novamente em instantes." |
+| Não classificado | **500** | — | genérica do `errorHandler`, **nunca** culpando a foto |
+
+A resposta de storage **não contém** bucket, endpoint, account id, nome de
+variável de ambiente, credencial ou texto do SDK — verificado por teste que varre
+o corpo serializado.
+
+### Teste por mutação (obrigatório — §14)
+
+Restaurando temporariamente o comportamento antigo (catch genérico → 400
+`INVALID_PHOTO`):
+
+```
+14 testes FALHAM
+  · 6 de storage (config, bucket, credencial, assinatura, conexão, timeout)
+  · 1 de mensagem pública segura
+  · 1 de storage no meio do lote
+  · 1 de erro não classificado
+  · 1 de mensagem `expose`
+  · 4 de rota (503, config, cache, não classificado)
+```
+
+Com a implementação correta: **todos verdes**. A mutação **não foi commitada**.
+
+### Smoke com storage REAL (sem mock)
+
+Executado contra o pipeline de produção inteiro — `sharp` de verdade, cliente
+S3 de verdade, `PutObjectCommand` de verdade:
+
+| Cenário | Resultado |
+|---|---|
+| JPEG válida (gerada por sharp) + storage inalcançável (`ECONNREFUSED` real) | ✅ **503**, mensagem segura, sem texto de formato |
+| Arquivo corrompido (MIME certo, conteúdo lixo) | ✅ **400** `INVALID_PHOTO` |
+| Arquivo de 11 MB | ✅ **400** `INVALID_PHOTO` |
+| Config R2 ausente (processo limpo) | ✅ **503**, sem vazar `R2_BUCKET_NAME` |
+
+O cenário 1 é a reprodução do bug: **antes** devolvia 400 culpando a foto.
+
+### Arquivos alterados
+
+- `src/infrastructure/storage/storage-errors.js` — **novo**.
+- `src/infrastructure/storage/r2.service.js` — só `uploadSaleRequestImage`,
+  reestruturada em fases.
+- `src/modules/sale-requests/sale-requests.constants.js` — código
+  `PHOTO_STORAGE_UNAVAILABLE` + as duas mensagens públicas.
+- `src/modules/sale-requests/sale-requests.photos.service.js` —
+  `translateUploadFailure()`.
+- `tests/sale-requests/sale-requests-photos.test.js` — matriz input × storage ×
+  não classificado.
+- `tests/sale-requests/sale-requests-routes.test.js` — contrato 400 × 503 pelo
+  caminho HTTP real, incluindo `Cache-Control: private, no-store` no 503.
+- `frontend/app/api/account/sale-requests/photos/route.test.ts` — **novo**: o BFF
+  preserva 503 e não achata em 400/500.
+- `frontend/components/account/SaleRequestForm.test.tsx` — a UI mostra a mensagem
+  de storage e **não** a de formato.
+
+### Bug secundário encontrado e corrigido no caminho
+
+O novo teste de BFF usava `vi.stubGlobal("fetch", …)` sem
+`vi.unstubAllGlobals()`. `restoreAllMocks` não desfaz `stubGlobal`, então o stub
+sobrevivia ao arquivo e vazava para o próximo teste da mesma worker — derrubando
+`lib/painel/upload-draft-photos-direct-r2.test.ts` (que usa o `S3Client` de
+verdade) **só na suíte completa**, enquanto passava isolado. Corrigido no
+`afterEach`.
+
+---
+
 ## 15. Testes
 
 ### Unitários — 112 novos
@@ -551,9 +688,9 @@ contra o banco real.
 
 | Verificação | Baseline | Depois | Delta |
 |---|---|---|---|
-| Backend `npm test` | 199 arq. / 2978 | ✅ **203 arq. / 3090**, 1 pulado | +4 arq., +112 testes, **0 falhas** |
+| Backend `npm test` | 199 arq. / 2978 | ✅ **203 arq. / 3110**, 1 pulado | +4 arq., +132 testes, **0 falhas** |
 | Backend `lint` | 233 (11 erros) | ⚠️ **233 (11 erros)** | **idêntico**; zero ocorrências nos arquivos novos |
-| Frontend `npm test` | 201 arq. / 5 falhas | ⚠️ **201 arq. / 5 falhas** (`--maxWorkers=2`) | +34 testes, **mesmas 2 falhas preexistentes** |
+| Frontend `npm test` | 201 arq. / 5 falhas | ⚠️ **202 arq. / 5 falhas** (`--maxWorkers=2`) | +45 testes, **mesmas 2 falhas preexistentes** |
 | Frontend `typecheck` | ✅ | ✅ | — |
 | Frontend `lint` | ✅ | ✅ | — |
 | Frontend `build` | ✅ | ✅ | 7 rotas novas registradas |
@@ -561,6 +698,36 @@ contra o banco real.
 
 **Nenhuma regressão nova.** As 5 falhas de frontend são exatamente as mesmas duas suítes do
 baseline (`carros-usados/regiao/[slug]`, `seguranca`).
+
+---
+
+## 16.1 — Verificações que NÃO puderam ser executadas neste ambiente
+
+Três itens exigidos pelo fechamento da fase **não foram executados**, por
+limitação de ambiente e não por decisão de escopo. Estão listados aqui em vez de
+marcados como feitos.
+
+| Item | Bloqueio |
+|---|---|
+| **Smoke positivo com MinIO** (§20: upload conclui, contador 0/12 → 1/12, preview, 4 fotos, criar, detalhe, cancelar) | O daemon do Docker ficou indisponível. Estava no ar no início da sessão (a bateria PostgreSQL de 30 testes rodou nele) e caiu depois; a tentativa de reiniciar o Docker Desktop não completou em ~10 min. Sem daemon não há MinIO nem bucket `carros-local`. |
+| **Smoke negativo pela UI** (§21) | Mesma dependência do backend + MinIO. **A regra foi provada por outro caminho** — ver o smoke com storage real em §14.3, que usa o SDK de verdade contra endpoint inalcançável. |
+| **Smoke mobile nas 5 larguras** (§22) | A navegação do navegador está bloqueada neste ambiente (`navigation ... was denied or failed` em `localhost` e em `127.0.0.1`). Sem navegador não há como medir `scrollWidth` × `clientWidth`. |
+
+**Consequência direta: P-2 permanece ABERTA.** Ela só pode ser marcada como
+resolvida depois de as cinco larguras serem realmente medidas — e afirmar o
+contrário com base em inspeção de CSS seria registrar como verificado algo que
+não foi.
+
+**O que existe hoje no lugar:** o build de produção passa com as três páginas, o
+dev server respondeu `GET /dashboard/vender-para-lojas 200` (sem crash de SSR), e
+a auditoria estática mostra que todo `min-w-[...]` dos componentes é
+`sm:`-prefixado — abaixo de 640 px os CTAs são `w-full`, sem largura fixa,
+`whitespace-nowrap` ou `overflow-x`. Isso reduz o risco; não o elimina.
+
+**Caminho para fechar** (fora deste ambiente): subir Docker, `npm run
+integration:db:up`, subir MinIO com o bucket `carros-local`, apontar o backend
+para os dois e rodar o fluxo via Playwright — que está instalado no repositório
+com Chromium disponível e é o caminho natural para medir overflow por script.
 
 ---
 
@@ -680,7 +847,8 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 | # | Pendência | Severidade |
 |---|---|---|
 | **P-1** | O `errorHandler` global marca 404 operacional como `public, max-age=60`; rotas autenticadas do **Produto 1** ainda têm esse comportamento. Corrigido só no router do Produto 2. | Média |
-| **P-2** | Validação visual mobile nas 5 larguras não executada (navegador bloqueado + necessidade de sessão autenticada). Verificação estática feita. | Média |
+| **P-2** | **ABERTA.** Validação visual mobile nas 5 larguras não executada — navegador bloqueado no ambiente e dependência de backend + storage no ar. Verificação estática feita; não substitui a medição. Ver §16.1. | Média |
+| **P-9** | Smoke positivo com MinIO (§20) não executado: daemon do Docker indisponível. O caminho de storage foi provado por smoke com SDK real (§14.3), mas o fluxo completo de UI — preview, 4 fotos, criação, detalhe, cancelamento — segue sem execução end-to-end. | Média |
 | **P-3** | Script de limpeza de fotos órfãs no R2 (enviadas e nunca submetidas) não existe. | Baixa |
 | **P-4** | `sale_requests` não tem `expires_at` (§34 — sem cronômetro). Solicitações abandonadas ficam abertas para sempre e vão poluir a lista do lojista na 4.2. | Média (vira alta na 4.2) |
 | **P-5** | A divergência de `deriveAccountType` (valor desconhecido → `pending`, não `CPF`) está documentada em dois lugares que discordam entre si. Não afeta a 4.1. | Baixa |
@@ -728,12 +896,53 @@ resolvido no servidor no instante do lance — mas **a regra de desempate ainda 
 
 ---
 
+## 23.1 — Checklist de GO definitivo (§28 do pedido de correção)
+
+| Critério | Status |
+|---|---|
+| arquivo inválido / grande / corrompido → 400 | ✅ unit + rota + smoke real |
+| storage sem config → 503 | ✅ unit + rota + smoke real |
+| bucket inexistente → 503 | ✅ unit + rota |
+| falha de PutObject → 503 | ✅ unit + rota + smoke real (ECONNREFUSED) |
+| mensagem pública de storage é segura | ✅ varredura de vazamento |
+| nenhuma credencial na resposta | ✅ |
+| backend não culpa a foto por erro de storage | ✅ |
+| BFF preserva 503 | ✅ teste de rota do BFF |
+| frontend mostra mensagem correta | ✅ teste de componente |
+| teste de regressão falha com o comportamento antigo | ✅ **14 testes caem na mutação** |
+| smoke storage real (negativo) | ✅ |
+| **smoke MinIO positivo** | ❌ **não executado** — Docker indisponível (P-9) |
+| **1 foto → preview; 4 fotos → criação; detalhe; cancelamento (UI)** | ❌ **não executado** — mesma dependência (P-9) |
+| **mobile 360/390/412/768/1440 + overflow=false** | ❌ **não executado** — navegador bloqueado (P-2) |
+| migrations 052/053 intactas · zero migration nova | ✅ |
+| schema, concurrency, lock, ownership intactos | ✅ não tocados |
+| Produto 1, SEO, payments, ads intactos | ✅ suítes verdes |
+| backend tests verdes | ✅ 203 arq. / 3110 |
+| frontend relevante verde | ✅ |
+| typecheck · lint · build verdes | ✅ |
+| nenhuma regressão nova | ✅ |
+| branch pushada · sem merge · sem deploy | ✅ |
+
+**Três critérios não puderam ser verificados neste ambiente.** Nenhum deles
+indica defeito conhecido — são verificações que exigem Docker e navegador.
+
+---
+
 ## 24. Recomendação final
+
+> **Atualização após o smoke de upload (§14.3):** a recomendação abaixo foi
+> escrita antes do bug de classificação de erro de storage. O bug está corrigido
+> e coberto, mas o **fechamento definitivo** da fase depende de três verificações
+> que este ambiente não permitiu executar (§16.1 e §23.1): smoke positivo com
+> MinIO, fluxo de UI ponta a ponta e mobile nas cinco larguras.
+>
+> **Status definitivo: NO-GO até que P-2 e P-9 sejam fechadas.** Não há defeito
+> conhecido em aberto — o que falta é verificação, não conserto.
 
 ```
 FASE 4.1 — PF PUBLICA VENDA PARA LOJAS
 
-STATUS: GO
+STATUS: GO (código) / NO-GO (fechamento — ver §16.1, §23.1)
 
 Todos os 31 critérios do §42 atendidos. O P0 (teto de 3 sob concorrência
 real) está coberto por um detector cuja capacidade de detecção foi ELA
