@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, fakeClock, fakeQuery, resetDb } from "./fake-db.js";
+import { EVALUATION_BODY, EVALUATION_ROW } from "./evaluation-fixture.js";
 
 /** SQL emitido, na ordem. Alimenta a prova de ALCANCE do lock. */
 const queryCalls = [];
@@ -61,6 +62,7 @@ function bodyFor(overrides = {}, owner = OWNER.id) {
     fuel_type: "Flex",
     declared_condition: "bom",
     known_issues: null,
+    ...EVALUATION_BODY,
     images: keysFor(4, owner),
     ...overrides,
   };
@@ -90,6 +92,7 @@ function seedRequest(overrides = {}) {
     fuel_type: "flex",
     declared_condition: "bom",
     known_issues: null,
+    ...EVALUATION_ROW,
     status: "receiving_offers",
     created_at: createdAt,
     updated_at: createdAt,
@@ -448,6 +451,32 @@ describe("DTO do dono — sem PII, sem coluna interna", () => {
         "transmission",
         "updated_at",
         "year",
+
+        // Ficha de avaliação. Esta lista é MANUAL de propósito: derivá-la de
+        // uma constante faria o teste concordar com qualquer coisa que o
+        // serializador passasse a devolver — inclusive uma coluna sensível
+        // adicionada sem revisão. O trabalho de editar esta lista à mão É a
+        // revisão.
+        "tire_condition",
+        "financing_status",
+        "financing_balance",
+        "fines_status",
+        "fines_amount",
+        "ipva_status",
+        "ipva_amount_due",
+        "licensing_status",
+        "caution_report_status",
+        "auction_history",
+        "collision_history",
+        "engine_condition",
+        "engine_notes",
+        "gearbox_condition",
+        "gearbox_notes",
+        "suspension_condition",
+        "suspension_notes",
+        "body_paint_status",
+        "body_paint_issues",
+        "body_paint_notes",
       ].sort()
     );
   });

@@ -56,6 +56,31 @@ const OWNER_COLUMNS = `
   sr.fuel_type,
   sr.declared_condition,
   sr.known_issues,
+
+  -- Ficha de avaliação. Listadas UMA a UMA, como o resto: a allowlist é o
+  -- contrato que a Fase 4.2 vai espelhar num DEALER_COLUMNS separado, e um
+  -- SELECT estrela entregaria de graça aos dois públicos qualquer coluna nova.
+  sr.tire_condition,
+  sr.financing_status,
+  sr.financing_balance,
+  sr.fines_status,
+  sr.fines_amount,
+  sr.ipva_status,
+  sr.ipva_amount_due,
+  sr.licensing_status,
+  sr.caution_report_status,
+  sr.auction_history,
+  sr.collision_history,
+  sr.engine_condition,
+  sr.engine_notes,
+  sr.gearbox_condition,
+  sr.gearbox_notes,
+  sr.suspension_condition,
+  sr.suspension_notes,
+  sr.body_paint_status,
+  sr.body_paint_issues,
+  sr.body_paint_notes,
+
   sr.status,
   sr.created_at,
   sr.updated_at,
@@ -139,6 +164,16 @@ export async function insertSaleRequest(input, exec) {
       fipe_code, fipe_reference_value, fipe_reference_at,
       year, mileage, transmission, fuel_type,
       declared_condition, known_issues,
+      tire_condition,
+      financing_status, financing_balance,
+      fines_status, fines_amount,
+      ipva_status, ipva_amount_due,
+      licensing_status,
+      caution_report_status, auction_history, collision_history,
+      engine_condition, engine_notes,
+      gearbox_condition, gearbox_notes,
+      suspension_condition, suspension_notes,
+      body_paint_status, body_paint_issues, body_paint_notes,
       status
     )
     VALUES (
@@ -147,6 +182,16 @@ export async function insertSaleRequest(input, exec) {
       $8, $9, $10,
       $11, $12, $13, $14,
       $15, $16,
+      $17,
+      $18, $19,
+      $20, $21,
+      $22, $23,
+      $24,
+      $25, $26, $27,
+      $28, $29,
+      $30, $31,
+      $32, $33,
+      $34, $35::jsonb, $36,
       'receiving_offers'
     )
     RETURNING id
@@ -168,6 +213,30 @@ export async function insertSaleRequest(input, exec) {
       input.fuelType,
       input.declaredCondition,
       input.knownIssues,
+      input.tireCondition,
+      input.financingStatus,
+      input.financingBalance,
+      input.finesStatus,
+      input.finesAmount,
+      input.ipvaStatus,
+      input.ipvaAmountDue,
+      input.licensingStatus,
+      input.cautionReportStatus,
+      input.auctionHistory,
+      input.collisionHistory,
+      input.engineCondition,
+      input.engineNotes,
+      input.gearboxCondition,
+      input.gearboxNotes,
+      input.suspensionCondition,
+      input.suspensionNotes,
+      input.bodyPaintStatus,
+      // JSONB viaja como TEXTO com cast explícito ($35::jsonb). O driver `pg`
+      // serializaria um array JS como ARRAY do Postgres (`{a,b}`), que não é
+      // JSON válido e violaria o CHECK de `jsonb_typeof` — falha tardia, no
+      // banco, longe de onde o valor foi montado.
+      JSON.stringify(input.bodyPaintIssues ?? []),
+      input.bodyPaintNotes,
     ]
   );
 

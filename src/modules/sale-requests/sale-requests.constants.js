@@ -142,6 +142,146 @@ export const SALE_REQUEST_PHOTO_INPUT_MESSAGE =
   "Não foi possível enviar uma das fotos. Use JPG, PNG ou WebP de até 10 MB.";
 
 // ────────────────────────────────────────────────────────────────────────────
+// FICHA DE AVALIAÇÃO PRELIMINAR (evolução da 4.1)
+// ────────────────────────────────────────────────────────────────────────────
+// Tudo abaixo descreve o que o PROPRIETÁRIO declara sobre o próprio carro, para
+// que o lojista decida se vale abrir conversa. NÃO é laudo, NÃO substitui
+// vistoria e NÃO é garantia — os rótulos dizem "conhecido/declarado" justamente
+// para que nenhum valor aqui possa ser lido como atestado técnico da plataforma.
+//
+// TRÊS ESTADOS, NUNCA BOOLEAN
+// ---------------------------
+// Onde a pergunta admite "Não sei informar", o vocabulário tem TRÊS valores.
+// Reduzir para boolean forçaria "não sei" a virar `false`, e `false` neste
+// domínio é uma afirmação com valor comercial: "este carro NÃO tem
+// financiamento" é diferente de "o dono não sabe". A diferença aparece no
+// primeiro lance que um lojista fizer.
+
+/** Sim / Não / Não sei. Financiamento, multas, leilão e sinistro. */
+export const YES_NO_UNKNOWN = Object.freeze({
+  YES: "yes",
+  NO: "no",
+  UNKNOWN: "unknown",
+});
+
+export const YES_NO_UNKNOWN_VALUES = Object.freeze(Object.values(YES_NO_UNKNOWN));
+
+/**
+ * Estado dos pneus.
+ *
+ * Escala fechada e ordenada por custo imediato para o comprador: `new` não gera
+ * despesa, `replace_now` gera despesa no ato. É a razão de o campo ser
+ * estruturado e não texto livre — "bons" digitado por mil pessoas não compara
+ * com nada, e a Fase 4.2 precisa comparar.
+ */
+export const TIRE_CONDITION = Object.freeze({
+  NEW: "new",
+  GOOD: "good",
+  HALF_LIFE: "half_life",
+  REPLACE_SOON: "replace_soon",
+  REPLACE_NOW: "replace_now",
+  UNKNOWN: "unknown",
+});
+
+export const TIRE_CONDITIONS = Object.freeze(Object.values(TIRE_CONDITION));
+
+/** Situação do IPVA. `installments` e `open` admitem valor pendente. */
+export const IPVA_STATUS = Object.freeze({
+  PAID: "paid",
+  INSTALLMENTS: "installments",
+  OPEN: "open",
+  UNKNOWN: "unknown",
+});
+
+export const IPVA_STATUSES = Object.freeze(Object.values(IPVA_STATUS));
+
+/** Situação do licenciamento. */
+export const LICENSING_STATUS = Object.freeze({
+  OK: "ok",
+  PENDING: "pending",
+  UNKNOWN: "unknown",
+});
+
+export const LICENSING_STATUSES = Object.freeze(Object.values(LICENSING_STATUS));
+
+/**
+ * Laudo cautelar — UM campo, não dois.
+ *
+ * A alternativa natural seria `has_caution_report` (sim/não/não sei) mais
+ * `caution_report_result` (aprovado/com apontamentos/reprovado). Duas colunas
+ * independentes permitem o estado IMPOSSÍVEL "não possui laudo + resultado
+ * aprovado", e nada no banco o impediria: seriam dois CHECKs que não se
+ * enxergam. Um único vocabulário torna esse estado inexprimível em vez de
+ * apenas proibido.
+ *
+ * `not_available` = não possui laudo. `unknown` = não sabe se possui.
+ */
+export const CAUTION_REPORT_STATUS = Object.freeze({
+  NOT_AVAILABLE: "not_available",
+  APPROVED: "approved",
+  APPROVED_WITH_NOTES: "approved_with_notes",
+  REJECTED: "rejected",
+  UNKNOWN: "unknown",
+});
+
+export const CAUTION_REPORT_STATUSES = Object.freeze(Object.values(CAUTION_REPORT_STATUS));
+
+/**
+ * Motor, câmbio e suspensão.
+ *
+ * `ok` significa SEM PROBLEMA CONHECIDO PELO PROPRIETÁRIO — não "mecanicamente
+ * perfeito". O rótulo da tela diz isso com todas as letras, e o vocabulário é
+ * nomeado assim para que nenhuma fase futura leia `ok` como aprovação técnica.
+ */
+export const MECHANICAL_CONDITION = Object.freeze({
+  OK: "ok",
+  ISSUE: "issue",
+  UNKNOWN: "unknown",
+});
+
+export const MECHANICAL_CONDITIONS = Object.freeze(Object.values(MECHANICAL_CONDITION));
+
+/** Os três conjuntos mecânicos, na ordem em que a ficha os apresenta. */
+export const MECHANICAL_PARTS = Object.freeze(["engine", "gearbox", "suspension"]);
+
+/** Lataria e pintura: o estado geral declarado. */
+export const BODY_PAINT_STATUS = Object.freeze({
+  ISSUES: "issues",
+  NONE: "none",
+  UNKNOWN: "unknown",
+});
+
+export const BODY_PAINT_STATUSES = Object.freeze(Object.values(BODY_PAINT_STATUS));
+
+/**
+ * Tipos de detalhe de lataria/pintura. Múltipla escolha, e só fazem sentido
+ * quando `body_paint_status = 'issues'` — a validação impõe isso nos dois
+ * sentidos (issues exige ao menos um; none/unknown exige nenhum).
+ */
+export const BODY_PAINT_ISSUE = Object.freeze({
+  SCRATCHES: "scratches",
+  DENTS: "dents",
+  WORN_PAINT: "worn_paint",
+  REPAINTED_PARTS: "repainted_parts",
+  COLLISION_REPAIR: "collision_repair",
+});
+
+export const BODY_PAINT_ISSUES = Object.freeze(Object.values(BODY_PAINT_ISSUE));
+
+/**
+ * Limites dos campos NOVOS.
+ *
+ * `MONEY_MAX` existe pelo mesmo motivo de `MILEAGE_MAX`: pegar o erro de
+ * digitação (centavos digitados como reais) sem virar regra de negócio. Cabe em
+ * `NUMERIC(14,2)` com folga.
+ */
+export const SALE_REQUEST_EVALUATION_LIMITS = Object.freeze({
+  MECHANICAL_NOTES_MAX: 500,
+  BODY_PAINT_NOTES_MAX: 500,
+  MONEY_MAX: 9_999_999.99,
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // TEXTO DE FORMULÁRIO NÃO VIVE MAIS AQUI
 // ────────────────────────────────────────────────────────────────────────────
 // Este módulo já exportou `SALE_REQUEST_PHOTO_PRIVACY_NOTICE` e

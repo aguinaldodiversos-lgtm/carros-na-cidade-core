@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { INTEGRATION_TEST_DATABASE_URL_DEFAULT } from "./helpers/integration-test-constants.js";
 import { resolveSslConfig } from "../../src/infrastructure/database/ssl-config.js";
+import { EVALUATION_BODY } from "../sale-requests/evaluation-fixture.js";
 
 /**
  * O teto de 3 solicitações abertas sob CONCORRÊNCIA REAL — o P0 da Fase 4.1.
@@ -171,7 +172,7 @@ async function seedWorld() {
  * mesmas chaves, a segunda falharia por violação de constraint e o teste
  * "provaria" o limite sem nunca tê-lo exercitado.
  */
-function bodyFor(ownerId, tag) {
+function bodyFor(ownerId, tag, overrides = {}) {
   return {
     city_id: world.cityId,
     brand: "VW - VolksWagen",
@@ -181,10 +182,15 @@ function bodyFor(ownerId, tag) {
     transmission: "Automático",
     fuel_type: "Flex",
     declared_condition: "bom",
+    // A ficha de avaliação é obrigatória para solicitação NOVA. Sem ela o
+    // service recusa antes de chegar à transação — e todo teste de concorrência
+    // deste arquivo "passaria" sem nunca ter exercitado o lock.
+    ...EVALUATION_BODY,
     images: Array.from(
       { length: 4 },
       (_, index) => `sale-requests/${ownerId}/${tag}/2026/08/uuid-${index}.webp`
     ),
+    ...overrides,
   };
 }
 
@@ -471,5 +477,222 @@ describe.sequential("posse contra o banco real", () => {
     // A linha continua existindo (soft) e o retry nem reescreve `updated_at`.
     expect(afterSecond[0].status).toBe("cancelled");
     expect(afterSecond[0].updated_at.toISOString()).toBe(afterFirst[0].updated_at.toISOString());
+  });
+});
+
+/**
+ * ROUND-TRIP da ficha de avaliação: POST → banco → GET do detalhe.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * POR QUE ISTO NÃO É REDUNDANTE COM O TESTE UNITÁRIO
+ * ────────────────────────────────────────────────────────────────────────────
+ * O teste unitário prova que os validadores normalizam e que o DTO monta as
+ * chaves certas. Nenhum dos dois toca no PostgreSQL, e é justamente entre a
+ * aplicação e o banco que moram os defeitos desta classe:
+ *
+ *   - um `$N` fora de ordem no INSERT grava o câmbio na coluna do motor, e todo
+ *     teste unitário continua verde porque nenhum deles vê a query;
+ *   - um array JS entregue ao driver sem `::jsonb` vira ARRAY do Postgres
+ *     (`{a,b}`), não JSON — o CHECK de `jsonb_typeof` derruba a escrita, mas só
+ *     em runtime;
+ *   - `NUMERIC` volta do driver como STRING, e um teste que compare com número
+ *     passaria com `==` e falharia com `toBe`.
+ *
+ * Aqui o dado faz o caminho inteiro e volta.
+ */
+describe("ficha de avaliação — round-trip com PostgreSQL", () => {
+  it("persiste e devolve TODOS os campos da ficha", async () => {
+    const created = await service.createSaleRequest(
+      ownerUser(world.ownerId),
+      bodyFor(world.ownerId, "ficha", {
+        tire_condition: "half_life",
+
+        financing_status: "yes",
+        financing_balance: "18500.00",
+        fines_status: "yes",
+        fines_amount: "320.55",
+        ipva_status: "installments",
+        ipva_amount_due: "450.50",
+        licensing_status: "pending",
+
+        caution_report_status: "approved_with_notes",
+        auction_history: "unknown",
+        collision_history: "no",
+
+        engine_condition: "issue",
+        engine_notes: "trepida ao frear",
+        gearbox_condition: "ok",
+        suspension_condition: "unknown",
+
+        body_paint_status: "issues",
+        body_paint_issues: ["scratches", "dents"],
+        body_paint_notes: "porta traseira direita",
+
+        known_issues: "Revisões sempre na concessionária.",
+      })
+    );
+
+    const id = created.sale_request.id;
+
+    // Leitura pelo MESMO caminho que a tela do dono usa.
+    const { sale_request: detail } = await service.getMySaleRequest(world.ownerId, String(id));
+
+    expect(detail).toMatchObject({
+      tire_condition: "half_life",
+      financing_status: "yes",
+      fines_status: "yes",
+      ipva_status: "installments",
+      licensing_status: "pending",
+      caution_report_status: "approved_with_notes",
+      auction_history: "unknown",
+      collision_history: "no",
+      engine_condition: "issue",
+      engine_notes: "trepida ao frear",
+      gearbox_condition: "ok",
+      gearbox_notes: null,
+      suspension_condition: "unknown",
+      suspension_notes: null,
+      body_paint_status: "issues",
+      body_paint_notes: "porta traseira direita",
+      known_issues: "Revisões sempre na concessionária.",
+    });
+
+    // NUMERIC volta como STRING com duas casas — o driver `pg` não converte
+    // para float de propósito, e a tela formata a partir do texto.
+    expect(detail.financing_balance).toBe("18500.00");
+    expect(detail.fines_amount).toBe("320.55");
+    expect(detail.ipva_amount_due).toBe("450.50");
+
+    // JSONB volta como ARRAY de verdade, não como string.
+    expect(Array.isArray(detail.body_paint_issues)).toBe(true);
+    expect(detail.body_paint_issues).toEqual(["scratches", "dents"]);
+  });
+
+  it("normaliza os condicionais NO BANCO, não só no DTO", async () => {
+    // O cliente manda valores que a resposta não justifica. O servidor grava
+    // NULL — e a prova tem de vir da COLUNA, não do objeto devolvido: um DTO
+    // que zerasse na serialização esconderia lixo persistido.
+    const created = await service.createSaleRequest(
+      ownerUser(world.ownerId),
+      bodyFor(world.ownerId, "normaliza", {
+        financing_status: "no",
+        financing_balance: "18500.00",
+        fines_status: "no",
+        fines_amount: "999.00",
+        ipva_status: "paid",
+        ipva_amount_due: "450.00",
+        engine_condition: "ok",
+        engine_notes: "texto que não deve sobreviver",
+        body_paint_status: "none",
+        body_paint_issues: ["scratches"],
+        body_paint_notes: "não deve sobreviver",
+      })
+    );
+
+    const { rows } = await pool.query(
+      `SELECT financing_balance, fines_amount, ipva_amount_due,
+              engine_notes, body_paint_issues, body_paint_notes
+       FROM sale_requests WHERE id = $1`,
+      [created.sale_request.id]
+    );
+
+    expect(rows[0].financing_balance).toBeNull();
+    expect(rows[0].fines_amount).toBeNull();
+    expect(rows[0].ipva_amount_due).toBeNull();
+    expect(rows[0].engine_notes).toBeNull();
+    expect(rows[0].body_paint_notes).toBeNull();
+    // Lista VAZIA (respondeu "nenhum detalhe"), não NULL (não perguntado).
+    expect(rows[0].body_paint_issues).toEqual([]);
+  });
+
+  it("uma ficha inteira de 'não sei' é aceita", async () => {
+    // O produto precisa aceitar quem não sabe responder: exigir certeza
+    // afastaria justamente o vendedor que mais precisa da avaliação da loja.
+    const unknownEverything = {
+      tire_condition: "unknown",
+      financing_status: "unknown",
+      fines_status: "unknown",
+      ipva_status: "unknown",
+      licensing_status: "unknown",
+      caution_report_status: "unknown",
+      auction_history: "unknown",
+      collision_history: "unknown",
+      engine_condition: "unknown",
+      gearbox_condition: "unknown",
+      suspension_condition: "unknown",
+      body_paint_status: "unknown",
+    };
+
+    const created = await service.createSaleRequest(
+      ownerUser(world.ownerId),
+      bodyFor(world.ownerId, "naosei", unknownEverything)
+    );
+
+    const { sale_request: detail } = await service.getMySaleRequest(
+      world.ownerId,
+      String(created.sale_request.id)
+    );
+
+    expect(detail.tire_condition).toBe("unknown");
+    expect(detail.body_paint_issues).toEqual([]);
+  });
+
+  it("RECUSA a solicitação nova sem a ficha", async () => {
+    // A obrigatoriedade vive na aplicação (a coluna é nullable por causa das
+    // linhas legadas). Este teste é o que impede a regra de sumir sem ninguém
+    // notar: sem ele, remover a validação faria linhas novas nascerem
+    // indistinguíveis das antigas.
+    const body = bodyFor(world.ownerId, "semficha");
+    delete body.tire_condition;
+
+    await expect(service.createSaleRequest(ownerUser(world.ownerId), body)).rejects.toThrow(
+      /pneus/i
+    );
+  });
+
+  it("linha LEGADA continua legível pelo detalhe, com a ficha em NULL", async () => {
+    // Solicitação escrita como a versão anterior escrevia: só as colunas da
+    // 052. É o cenário de todo registro que já existe em produção.
+    const { rows } = await pool.query(
+      `INSERT INTO sale_requests (
+         owner_user_id, city_id, brand, brand_slug, model, model_slug,
+         fipe_model_description, year, mileage, transmission, fuel_type,
+         declared_condition
+       )
+       VALUES ($1,$2,'Volkswagen','volkswagen','T-Cross','t-cross',
+               'T-Cross 200 TSI 1.0 Flex 12V 5p Aut.',2019,60000,'manual','flex','regular')
+       RETURNING id`,
+      [world.ownerId, world.cityId]
+    );
+
+    const { sale_request: detail } = await service.getMySaleRequest(
+      world.ownerId,
+      String(rows[0].id)
+    );
+
+    // Abre normalmente...
+    expect(detail.year).toBe(2019);
+    expect(detail.declared_condition).toBe("regular");
+
+    // ...e a ficha inteira é NULL — nunca "no", nunca "unknown". A diferença
+    // entre "não foi perguntado" e "a pessoa respondeu que não" precisa
+    // sobreviver à leitura.
+    for (const field of [
+      "tire_condition",
+      "financing_status",
+      "fines_status",
+      "ipva_status",
+      "licensing_status",
+      "caution_report_status",
+      "auction_history",
+      "collision_history",
+      "engine_condition",
+      "gearbox_condition",
+      "suspension_condition",
+      "body_paint_status",
+      "body_paint_issues",
+    ]) {
+      expect(detail[field], `${field} deveria ser null numa linha legada`).toBeNull();
+    }
   });
 });

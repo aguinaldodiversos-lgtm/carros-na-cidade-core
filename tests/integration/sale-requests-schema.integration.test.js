@@ -443,3 +443,319 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
     expect(names).toEqual(new Set(["sale_requests", "sale_request_images"]));
   });
 });
+
+/**
+ * MIGRATION 054 — ficha de avaliação, contra PostgreSQL de verdade.
+ *
+ * Os CHECKs desta migration são de duas classes, e as duas só podem ser
+ * exercitadas por um banco:
+ *
+ *   ALLOWLIST — recusa vocabulário inventado por qualquer caminho que não passe
+ *   pelos validadores (script de manutenção, SQL manual, módulo futuro).
+ *
+ *   COERÊNCIA CRUZADA — torna inexprimíveis os estados contraditórios. Um saldo
+ *   devedor numa linha que declara "não tem financiamento" é um dado que
+ *   ninguém sabe interpretar depois; é mais barato o banco recusá-lo do que uma
+ *   fase futura ter de adivinhar qual das duas informações era a verdadeira.
+ *
+ * O fake-db não imita CHECK constraint nenhum. Um CHECK escrito errado passa
+ * pela suíte unitária inteira e só aparece no primeiro INSERT que ele deveria
+ * ter recusado — em produção.
+ */
+describe("migration 054 — ficha de avaliação", () => {
+  /** INSERT com as colunas da ficha. Só as passadas em `fields` vão na query. */
+  async function insertWithEvaluation(fields = {}) {
+    const base = {
+      owner_user_id: world.ownerId,
+      city_id: world.cityId,
+      brand: "Volkswagen",
+      brand_slug: "volkswagen",
+      model: "T-Cross",
+      model_slug: "t-cross",
+      fipe_model_description: "T-Cross 200 TSI 1.0 Flex 12V 5p Aut.",
+      year: 2020,
+      mileage: 45000,
+      transmission: "automatico",
+      fuel_type: "flex",
+      declared_condition: "bom",
+      ...fields,
+    };
+
+    const columns = Object.keys(base);
+    const values = columns.map((column) => base[column]);
+    const placeholders = columns.map((_, index) => {
+      // `body_paint_issues` viaja como TEXTO com cast — igual ao repositório.
+      return columns[index] === "body_paint_issues" ? `$${index + 1}::jsonb` : `$${index + 1}`;
+    });
+
+    const { rows } = await pool.query(
+      `INSERT INTO sale_requests (${columns.join(", ")})
+       VALUES (${placeholders.join(", ")})
+       RETURNING id`,
+      values
+    );
+    return rows[0];
+  }
+
+  it("todas as colunas novas existem e são NULLABLE", async () => {
+    // Nullable NÃO é frouxidão: é o que preserva a diferença entre "a versão
+    // anterior do formulário não perguntou" (NULL) e "a pessoa respondeu que
+    // não sabe" ('unknown'). Um DEFAULT aqui fundiria as duas para sempre.
+    const expected = [
+      "tire_condition",
+      "financing_status",
+      "financing_balance",
+      "fines_status",
+      "fines_amount",
+      "ipva_status",
+      "ipva_amount_due",
+      "licensing_status",
+      "caution_report_status",
+      "auction_history",
+      "collision_history",
+      "engine_condition",
+      "engine_notes",
+      "gearbox_condition",
+      "gearbox_notes",
+      "suspension_condition",
+      "suspension_notes",
+      "body_paint_status",
+      "body_paint_issues",
+      "body_paint_notes",
+    ];
+
+    const { rows } = await pool.query(
+      `SELECT column_name, is_nullable, column_default, data_type
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'sale_requests'
+         AND column_name = ANY($1::text[])`,
+      [expected]
+    );
+
+    expect(rows).toHaveLength(expected.length);
+    for (const row of rows) {
+      expect(row.is_nullable, `${row.column_name} deveria ser nullable`).toBe("YES");
+      expect(row.column_default, `${row.column_name} não deveria ter default`).toBeNull();
+    }
+  });
+
+  it("os valores monetários são NUMERIC(14,2), a convenção do projeto", async () => {
+    // Nunca float: dinheiro em ponto flutuante binário acumula erro de
+    // arredondamento na primeira soma.
+    const { rows } = await pool.query(
+      `SELECT column_name, data_type, numeric_precision, numeric_scale
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'sale_requests'
+         AND column_name IN ('financing_balance', 'fines_amount', 'ipva_amount_due')`
+    );
+
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.data_type).toBe("numeric");
+      expect(row.numeric_precision).toBe(14);
+      expect(row.numeric_scale).toBe(2);
+    }
+  });
+
+  it("a linha LEGADA (sem nenhuma coluna da ficha) continua sendo aceita", async () => {
+    // É o cenário de todo registro que já existe em produção. Se esta inserção
+    // falhasse, a migration teria quebrado dados de gente real.
+    const row = await insertWithEvaluation();
+    const { rows } = await pool.query(
+      `SELECT tire_condition, financing_status, body_paint_issues FROM sale_requests WHERE id = $1`,
+      [row.id]
+    );
+
+    expect(rows[0].tire_condition).toBeNull();
+    expect(rows[0].financing_status).toBeNull();
+    // NULL, e não `[]`: a lista vazia significaria "respondeu que não há
+    // detalhe", que é uma declaração que ninguém fez nesta linha.
+    expect(rows[0].body_paint_issues).toBeNull();
+  });
+
+  it("allowlist de pneus", async () => {
+    for (const value of ["new", "good", "half_life", "replace_soon", "replace_now", "unknown"]) {
+      await expect(insertWithEvaluation({ tire_condition: value })).resolves.toBeTruthy();
+    }
+    await expect(insertWithEvaluation({ tire_condition: "otimo" })).rejects.toThrow(
+      /sale_requests_tire_condition_check/
+    );
+  });
+
+  it("allowlists de três estados recusam boolean e texto livre", async () => {
+    for (const column of ["financing_status", "fines_status", "auction_history", "collision_history"]) {
+      for (const value of ["yes", "no", "unknown"]) {
+        await expect(insertWithEvaluation({ [column]: value })).resolves.toBeTruthy();
+      }
+      await expect(insertWithEvaluation({ [column]: "true" })).rejects.toThrow(
+        new RegExp(`sale_requests_${column}_check`)
+      );
+    }
+  });
+
+  it("allowlist de IPVA e licenciamento", async () => {
+    for (const value of ["paid", "installments", "open", "unknown"]) {
+      await expect(insertWithEvaluation({ ipva_status: value })).resolves.toBeTruthy();
+    }
+    await expect(insertWithEvaluation({ ipva_status: "atrasado" })).rejects.toThrow(
+      /sale_requests_ipva_status_check/
+    );
+
+    for (const value of ["ok", "pending", "unknown"]) {
+      await expect(insertWithEvaluation({ licensing_status: value })).resolves.toBeTruthy();
+    }
+    await expect(insertWithEvaluation({ licensing_status: "vencido" })).rejects.toThrow(
+      /sale_requests_licensing_status_check/
+    );
+  });
+
+  it("laudo cautelar: UM campo, e o estado impossível não existe", async () => {
+    for (const value of [
+      "not_available",
+      "approved",
+      "approved_with_notes",
+      "rejected",
+      "unknown",
+    ]) {
+      await expect(insertWithEvaluation({ caution_report_status: value })).resolves.toBeTruthy();
+    }
+    await expect(insertWithEvaluation({ caution_report_status: "pendente" })).rejects.toThrow(
+      /sale_requests_caution_report_status_check/
+    );
+
+    // Não existe coluna separada de resultado — é o que torna
+    // "não possui laudo + aprovado" inexprimível em vez de apenas proibido.
+    const { rows } = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'sale_requests'
+         AND column_name LIKE 'caution%'`
+    );
+    expect(rows.map((row) => row.column_name)).toEqual(["caution_report_status"]);
+  });
+
+  it("COERÊNCIA: valor monetário exige a resposta que o justifica", async () => {
+    await expect(
+      insertWithEvaluation({ financing_status: "yes", financing_balance: "18500.00" })
+    ).resolves.toBeTruthy();
+
+    await expect(
+      insertWithEvaluation({ financing_status: "no", financing_balance: "18500.00" })
+    ).rejects.toThrow(/sale_requests_financing_balance_coherence/);
+
+    await expect(
+      insertWithEvaluation({ fines_status: "unknown", fines_amount: "10.00" })
+    ).rejects.toThrow(/sale_requests_fines_amount_coherence/);
+
+    for (const status of ["installments", "open"]) {
+      await expect(
+        insertWithEvaluation({ ipva_status: status, ipva_amount_due: "450.00" })
+      ).resolves.toBeTruthy();
+    }
+    await expect(
+      insertWithEvaluation({ ipva_status: "paid", ipva_amount_due: "450.00" })
+    ).rejects.toThrow(/sale_requests_ipva_amount_coherence/);
+  });
+
+  it("COERÊNCIA: descrição mecânica exige 'issue'", async () => {
+    for (const part of ["engine", "gearbox", "suspension"]) {
+      await expect(
+        insertWithEvaluation({ [`${part}_condition`]: "issue", [`${part}_notes`]: "barulho" })
+      ).resolves.toBeTruthy();
+
+      await expect(
+        insertWithEvaluation({ [`${part}_condition`]: "ok", [`${part}_notes`]: "barulho" })
+      ).rejects.toThrow(new RegExp(`sale_requests_${part}_notes_coherence`));
+    }
+  });
+
+  it("COERÊNCIA: lataria é bicondicional", async () => {
+    // "é issues" tem de ser EXATAMENTE "tem ao menos um detalhe". As duas
+    // contradições possíveis caem no mesmo CHECK.
+    await expect(
+      insertWithEvaluation({
+        body_paint_status: "issues",
+        body_paint_issues: JSON.stringify(["scratches"]),
+      })
+    ).resolves.toBeTruthy();
+
+    await expect(
+      insertWithEvaluation({ body_paint_status: "none", body_paint_issues: JSON.stringify([]) })
+    ).resolves.toBeTruthy();
+
+    await expect(
+      insertWithEvaluation({ body_paint_status: "issues", body_paint_issues: JSON.stringify([]) })
+    ).rejects.toThrow(/sale_requests_body_paint_coherence/);
+
+    await expect(
+      insertWithEvaluation({
+        body_paint_status: "none",
+        body_paint_issues: JSON.stringify(["scratches"]),
+      })
+    ).rejects.toThrow(/sale_requests_body_paint_coherence/);
+  });
+
+  it("body_paint_issues só aceita ARRAY", async () => {
+    // JSONB aceita objeto, número e string. Sem este CHECK,
+    // `'"riscos"'::jsonb` entraria e `jsonb_array_length` explodiria na LEITURA
+    // — longe de onde o dado errado entrou.
+    await expect(
+      insertWithEvaluation({ body_paint_status: "none", body_paint_issues: '"riscos"' })
+    ).rejects.toThrow(/sale_requests_body_paint_issues_array_check/);
+  });
+
+  it("o índice GIN de body_paint_issues existe", async () => {
+    const { rows } = await pool.query(
+      `SELECT indexdef FROM pg_indexes
+       WHERE tablename = 'sale_requests' AND indexname = 'sale_requests_body_paint_issues_gin'`
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].indexdef).toContain("gin");
+  });
+
+  it("as constraints das migrations 052/053 continuam intactas", async () => {
+    // A 054 é ADITIVA. Se ela tivesse recriado a tabela ou mexido num CHECK
+    // antigo, este teste seria o que perceberia.
+    const { rows } = await pool.query(
+      `SELECT conname FROM pg_constraint
+       WHERE conrelid = 'sale_requests'::regclass AND contype = 'c'`
+    );
+    const names = new Set(rows.map((row) => row.conname));
+
+    for (const original of [
+      "sale_requests_status_check",
+      "sale_requests_declared_condition_check",
+      "sale_requests_year_check",
+      "sale_requests_mileage_check",
+      "sale_requests_fipe_reference_value_check",
+    ]) {
+      expect(names.has(original), `${original} sumiu`).toBe(true);
+    }
+  });
+
+  it("continua sem placa e sem nenhuma coluna de dado pessoal", async () => {
+    // A ficha cresceu dezenove colunas e NENHUMA delas é sobre a pessoa. O
+    // produto avalia o CARRO.
+    const { rows } = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'sale_requests'`
+    );
+    const names = new Set(rows.map((row) => row.column_name));
+
+    for (const forbidden of [
+      "plate",
+      "placa",
+      "renavam",
+      "chassi",
+      "vin",
+      "document_number",
+      "cpf",
+      "phone",
+      "whatsapp",
+      "address",
+      "bank",
+      "bank_account",
+    ]) {
+      expect(names.has(forbidden), `${forbidden} não deveria existir`).toBe(false);
+    }
+  });
+});

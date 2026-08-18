@@ -76,6 +76,31 @@ function projectOwner(row) {
     fuel_type: row.fuel_type,
     declared_condition: row.declared_condition,
     known_issues: row.known_issues,
+
+    // Ficha de avaliação. `?? null` em cada uma: a linha semeada por um teste
+    // antigo não traz estas chaves, e `undefined` no DTO seria indistinguível de
+    // "campo removido" no `toMatchObject` de quem lê.
+    tire_condition: row.tire_condition ?? null,
+    financing_status: row.financing_status ?? null,
+    financing_balance: row.financing_balance ?? null,
+    fines_status: row.fines_status ?? null,
+    fines_amount: row.fines_amount ?? null,
+    ipva_status: row.ipva_status ?? null,
+    ipva_amount_due: row.ipva_amount_due ?? null,
+    licensing_status: row.licensing_status ?? null,
+    caution_report_status: row.caution_report_status ?? null,
+    auction_history: row.auction_history ?? null,
+    collision_history: row.collision_history ?? null,
+    engine_condition: row.engine_condition ?? null,
+    engine_notes: row.engine_notes ?? null,
+    gearbox_condition: row.gearbox_condition ?? null,
+    gearbox_notes: row.gearbox_notes ?? null,
+    suspension_condition: row.suspension_condition ?? null,
+    suspension_notes: row.suspension_notes ?? null,
+    body_paint_status: row.body_paint_status ?? null,
+    body_paint_issues: row.body_paint_issues ?? null,
+    body_paint_notes: row.body_paint_notes ?? null,
+
     status: row.status,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -83,6 +108,24 @@ function projectOwner(row) {
     city_state: city?.state ?? null,
     city_slug: city?.slug ?? null,
   };
+}
+
+/**
+ * Texto JSONB do INSERT → array, como o driver `pg` devolveria na leitura.
+ *
+ * `null` quando não é array: é o valor de uma linha legada, e colapsá-lo para
+ * `[]` apagaria a diferença entre "não foi perguntado" e "respondeu que não há
+ * detalhe nenhum".
+ */
+function parseJsonbArray(raw) {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Ordenação (created_at DESC, id DESC) — a mesma tupla do ORDER BY real. */
@@ -148,6 +191,26 @@ function handle(text, params, now) {
       fuelType,
       declaredCondition,
       knownIssues,
+      tireCondition,
+      financingStatus,
+      financingBalance,
+      finesStatus,
+      finesAmount,
+      ipvaStatus,
+      ipvaAmountDue,
+      licensingStatus,
+      cautionReportStatus,
+      auctionHistory,
+      collisionHistory,
+      engineCondition,
+      engineNotes,
+      gearboxCondition,
+      gearboxNotes,
+      suspensionCondition,
+      suspensionNotes,
+      bodyPaintStatus,
+      bodyPaintIssuesJson,
+      bodyPaintNotes,
     ] = params;
 
     const createdAt = new Date(now).toISOString();
@@ -169,6 +232,31 @@ function handle(text, params, now) {
       fuel_type: fuelType,
       declared_condition: declaredCondition,
       known_issues: knownIssues ?? null,
+
+      tire_condition: tireCondition ?? null,
+      financing_status: financingStatus ?? null,
+      financing_balance: financingBalance ?? null,
+      fines_status: finesStatus ?? null,
+      fines_amount: finesAmount ?? null,
+      ipva_status: ipvaStatus ?? null,
+      ipva_amount_due: ipvaAmountDue ?? null,
+      licensing_status: licensingStatus ?? null,
+      caution_report_status: cautionReportStatus ?? null,
+      auction_history: auctionHistory ?? null,
+      collision_history: collisionHistory ?? null,
+      engine_condition: engineCondition ?? null,
+      engine_notes: engineNotes ?? null,
+      gearbox_condition: gearboxCondition ?? null,
+      gearbox_notes: gearboxNotes ?? null,
+      suspension_condition: suspensionCondition ?? null,
+      suspension_notes: suspensionNotes ?? null,
+      body_paint_status: bodyPaintStatus ?? null,
+      // O repositório manda TEXTO com cast `::jsonb`. Desserializar aqui é o que
+      // faz o fake devolver o mesmo array que o Postgres devolveria — e é o que
+      // pegaria um dia em que alguém trocasse o cast por um array JS cru.
+      body_paint_issues: parseJsonbArray(bodyPaintIssuesJson),
+      body_paint_notes: bodyPaintNotes ?? null,
+
       // Espelha o literal 'receiving_offers' do INSERT real: o estado inicial é
       // do domínio, não da chamada.
       status: "receiving_offers",

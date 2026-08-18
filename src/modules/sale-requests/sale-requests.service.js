@@ -142,6 +142,46 @@ function serializeForOwner(row, { images = [] } = {}) {
     fuel_type: row.fuel_type,
     declared_condition: row.declared_condition,
     known_issues: row.known_issues,
+
+    // ────────────────────────────────────────────────────────────────────────
+    // FICHA DE AVALIAÇÃO — campo a campo, e NULL preservado
+    // ────────────────────────────────────────────────────────────────────────
+    // Nenhum `?? "unknown"` e nenhum `?? false` aqui. Uma solicitação publicada
+    // antes desta evolução tem NULL em todas estas colunas, e NULL significa
+    // "não foi perguntado" — que é diferente de "a pessoa respondeu que não
+    // sabe" e MUITO diferente de "não". Traduzir NULL para um valor do
+    // vocabulário aqui inventaria uma resposta que ninguém deu, e o lojista
+    // leria como declaração do proprietário.
+    //
+    // Quem decide como isso APARECE é a tela, que mostra "Não informado".
+    tire_condition: row.tire_condition,
+
+    financing_status: row.financing_status,
+    financing_balance: row.financing_balance,
+    fines_status: row.fines_status,
+    fines_amount: row.fines_amount,
+    ipva_status: row.ipva_status,
+    ipva_amount_due: row.ipva_amount_due,
+    licensing_status: row.licensing_status,
+
+    caution_report_status: row.caution_report_status,
+    auction_history: row.auction_history,
+    collision_history: row.collision_history,
+
+    engine_condition: row.engine_condition,
+    engine_notes: row.engine_notes,
+    gearbox_condition: row.gearbox_condition,
+    gearbox_notes: row.gearbox_notes,
+    suspension_condition: row.suspension_condition,
+    suspension_notes: row.suspension_notes,
+
+    body_paint_status: row.body_paint_status,
+    // JSONB chega já desserializado pelo driver. O guarda de tipo mantém a
+    // distinção que importa: array (inclusive vazio) = respondido; null =
+    // linha legada. Um `|| []` colapsaria as duas.
+    body_paint_issues: Array.isArray(row.body_paint_issues) ? row.body_paint_issues : null,
+    body_paint_notes: row.body_paint_notes,
+
     status: row.status,
     images,
     city: cityOf(row),
@@ -346,6 +386,31 @@ export async function createSaleRequest(user, input, deps = {}) {
         fuelType: normalized.fuelType,
         declaredCondition: normalized.declaredCondition,
         knownIssues: normalized.knownIssues,
+
+        // Ficha de avaliação, campo a campo. Um spread de `normalized` aqui
+        // funcionaria hoje e passaria a mandar para o INSERT qualquer chave que
+        // a validação viesse a devolver depois — `photos`, por exemplo, que já
+        // está lá e não é coluna de `sale_requests`.
+        tireCondition: normalized.tireCondition,
+        financingStatus: normalized.financingStatus,
+        financingBalance: normalized.financingBalance,
+        finesStatus: normalized.finesStatus,
+        finesAmount: normalized.finesAmount,
+        ipvaStatus: normalized.ipvaStatus,
+        ipvaAmountDue: normalized.ipvaAmountDue,
+        licensingStatus: normalized.licensingStatus,
+        cautionReportStatus: normalized.cautionReportStatus,
+        auctionHistory: normalized.auctionHistory,
+        collisionHistory: normalized.collisionHistory,
+        engineCondition: normalized.engineCondition,
+        engineNotes: normalized.engineNotes,
+        gearboxCondition: normalized.gearboxCondition,
+        gearboxNotes: normalized.gearboxNotes,
+        suspensionCondition: normalized.suspensionCondition,
+        suspensionNotes: normalized.suspensionNotes,
+        bodyPaintStatus: normalized.bodyPaintStatus,
+        bodyPaintIssues: normalized.bodyPaintIssues,
+        bodyPaintNotes: normalized.bodyPaintNotes,
       },
       tx
     );
