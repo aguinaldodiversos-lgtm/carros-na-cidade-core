@@ -105,8 +105,15 @@ export type DealerVehicleEvaluation = {
   body_paint_notes: string | null;
 };
 
-/** O card do feed. */
-export type DealerSaleOpportunitySummary = {
+/**
+ * O card do feed.
+ *
+ * Carrega o estado da DISPUTA (`DealerOfferState`) junto: o valor líder e a
+ * proposta desta loja chegam por card, em lote, na mesma resposta. A alternativa
+ * — uma request por card para descobrir "estou liderando?" — seria N+1 no lugar
+ * mais visitado da área.
+ */
+export type DealerSaleOpportunitySummary = DealerOfferState & {
   id: number | string;
 
   brand: string;
@@ -197,12 +204,26 @@ export type DealerSaleOpportunityPage = {
 export class DealerSaleOpportunityError extends Error {
   status: number;
   code: string | null;
+  /**
+   * O valor líder ATUALIZADO, quando o backend recusa por não superar.
+   *
+   * Viaja no erro (e não numa segunda request) porque a tela do lojista pode
+   * estar exibindo um número já vencido: mandá-lo corrigir sem dizer o novo
+   * valor o obrigaria a recarregar para descobrir quanto falta.
+   */
+  currentHighest: string | null;
 
-  constructor(message: string, status: number, code: string | null) {
+  constructor(
+    message: string,
+    status: number,
+    code: string | null,
+    currentHighest: string | null = null
+  ) {
     super(message);
     this.name = "DealerSaleOpportunityError";
     this.status = status;
     this.code = code;
+    this.currentHighest = currentHighest;
   }
 }
 
@@ -210,7 +231,7 @@ type ApiEnvelope = {
   success?: boolean;
   message?: string;
   code?: string;
-  details?: { code?: string; field?: string };
+  details?: { code?: string; field?: string; current_highest_offer?: string };
 };
 
 /**
@@ -232,7 +253,12 @@ async function readJson<T>(response: Response): Promise<T> {
       (response.status === 401
         ? "Sua sessão expirou. Entre novamente."
         : "Não foi possível carregar os veículos.");
-    throw new DealerSaleOpportunityError(message, response.status, code);
+    throw new DealerSaleOpportunityError(
+      message,
+      response.status,
+      code,
+      payload?.details?.current_highest_offer ?? null
+    );
   }
 
   return payload as T;
@@ -406,4 +432,116 @@ export function formatPublishedAt(iso: string, now: Date = new Date()): string {
 export function countActiveFilters(filters: DealerSaleOpportunityFilters): number {
   return Object.values(filters).filter((value) => value != null && String(value).trim() !== "")
     .length;
+}
+
+// ============================================================================
+// PROPOSTAS
+// ============================================================================
+
+/**
+ * O estado da disputa que acompanha toda oportunidade.
+ *
+ * `current_highest_offer` é um VALOR e nada mais. Não existe — e não deve passar
+ * a existir — nenhum campo de identidade ao lado dele: quem lidera é privado,
+ * quanto se lidera não é. Essa é a regra do produto, e o tipo é o lugar onde ela
+ * fica visível para quem for mexer aqui depois.
+ */
+export type DealerOfferState = {
+  current_highest_offer: string | null;
+  my_offer: string | null;
+  is_leading: boolean;
+  offers_count: number;
+};
+
+export type DealerSaleOffer = {
+  id: number | string;
+  amount: string;
+  note: string | null;
+  created_at: string;
+};
+
+export type DealerOfferResult = DealerOfferState & {
+  offer: DealerSaleOffer;
+};
+
+/**
+ * Envia uma proposta.
+ *
+ * `amount` viaja em REAIS com duas casas ("52000.00"), que é o que o banco
+ * guarda. A conversão de centavos (o que o campo digita) para reais acontece
+ * aqui, num lugar só.
+ *
+ * O corpo NÃO carrega loja nem usuário: os dois são resolvidos no servidor a
+ * partir da sessão. Mandá-los daqui não mudaria nada — não existe caminho de
+ * leitura para eles no backend — mas sugeriria que o cliente tem alguma
+ * autoridade sobre quem propõe.
+ */
+export async function submitSaleOffer(
+  saleRequestId: string | number,
+  input: { amount: string; note?: string | null }
+): Promise<DealerOfferResult> {
+  const response = await fetch(`${BASE}/${saleRequestId}/offers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: input.amount,
+      ...(input.note ? { note: input.note } : {}),
+    }),
+  });
+
+  return readJson<DealerOfferResult>(response);
+}
+
+/**
+ * Erro de proposta recusada por não superar a líder — carrega o valor
+ * atualizado.
+ *
+ * O backend devolve `details.current_highest_offer` junto do 409 exatamente para
+ * que a tela possa dizer quanto falta sem mandar o lojista recarregar. Este
+ * helper extrai o valor sem que a tela precise conhecer o formato do envelope.
+ */
+export function readRejectedHighest(error: unknown): string | null {
+  if (!(error instanceof DealerSaleOpportunityError)) return null;
+  return error.currentHighest;
+}
+
+/** Dígitos (centavos) → "52000.00" para o payload. `null` quando vazio. */
+export function offerDigitsToDecimal(digits: string): string | null {
+  const clean = String(digits ?? "").replace(/\D/g, "");
+  if (clean === "") return null;
+  return (Number(clean) / 100).toFixed(2);
+}
+
+/** "52000.00" → dígitos de centavos, para reabastecer o campo. */
+export function decimalToOfferDigits(value: string | null): string {
+  if (!value) return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "";
+  return String(Math.round(numeric * 100));
+}
+
+/**
+ * Distância para a FIPE — e NUNCA "margem" ou "lucro".
+ *
+ * O rótulo importa mais que a conta. Preparação, impostos, garantia, tempo de
+ * pátio e o preço real de revenda não estão calculados em lugar nenhum deste
+ * sistema; chamar esta diferença de margem daria ao lojista um número de
+ * rentabilidade que ninguém computou.
+ *
+ * `null` quando a FIPE não resolveu ou não há proposta — sem os dois lados não
+ * existe distância, e exibir a FIPE sozinha como se fosse a diferença seria pior
+ * do que não exibir nada.
+ */
+export function fipeDistance(
+  fipeValue: string | null,
+  offerValue: string | null
+): { amount: string; belowFipe: boolean } | null {
+  if (!fipeValue || !offerValue) return null;
+
+  const fipe = Number(fipeValue);
+  const offer = Number(offerValue);
+  if (!Number.isFinite(fipe) || !Number.isFinite(offer)) return null;
+
+  const diff = fipe - offer;
+  return { amount: Math.abs(diff).toFixed(2), belowFipe: diff >= 0 };
 }
