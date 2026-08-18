@@ -12,8 +12,9 @@ import {
   formatMaxPrice,
   formatPublishedAt,
   type PurchaseIntent,
+  type PurchaseIntentPage,
 } from "@/lib/purchase-intents/api";
-import { usePaginatedIntents } from "@/lib/purchase-intents/use-paginated-intents";
+import { useCursorPagination } from "@/lib/account/use-cursor-pagination";
 
 /**
  * "Minhas procuras" — listagem do comprador.
@@ -105,7 +106,7 @@ export function PurchaseIntentCard({
 
 export default function PurchaseIntentsList({ basePath = "/dashboard" }: { basePath?: string }) {
   const { items, loading, error, loadingMore, moreError, hasMore, loadMore, reload } =
-    usePaginatedIntents<PurchaseIntent>(fetchMyPurchaseIntents);
+    useCursorPagination<PurchaseIntent, PurchaseIntentPage>(fetchMyPurchaseIntents);
 
   return (
     <section data-testid="purchase-intents-list">

@@ -125,14 +125,22 @@ export type DealerOpportunity = {
   city: PurchaseIntentCity;
 };
 
+/**
+ * Página tipada para o hook de paginação.
+ *
+ * O campo é `items`; o payload do backend continua chamando a lista de
+ * `purchase_intents`. A tradução acontece nos fetchers abaixo — é o trabalho
+ * de fronteira que esta lib já faz, e é o que permite UMA máquina de paginação
+ * servir listas de produtos diferentes (ver `lib/account/use-cursor-pagination`).
+ */
 export type PurchaseIntentPage = {
-  purchase_intents: PurchaseIntent[];
+  items: PurchaseIntent[];
   next_cursor: string | null;
   limit: number;
 };
 
 export type DealerOpportunityPage = {
-  purchase_intents: DealerOpportunity[];
+  items: DealerOpportunity[];
   next_cursor: string | null;
   limit: number;
 };
@@ -202,11 +210,14 @@ function cursorQuery(cursor?: string | null): string {
 }
 
 export async function fetchMyPurchaseIntents(cursor?: string | null): Promise<PurchaseIntentPage> {
-  const page = await bffFetch<PurchaseIntentPage>(BUYER_BASE, cursorQuery(cursor));
+  const page = await bffFetch<{ purchase_intents?: PurchaseIntent[]; next_cursor?: string | null; limit?: number }>(
+    BUYER_BASE,
+    cursorQuery(cursor)
+  );
   return {
     // Coerção defensiva: a listagem não pode quebrar a página por causa de um
     // payload inesperado.
-    purchase_intents: Array.isArray(page?.purchase_intents) ? page.purchase_intents : [],
+    items: Array.isArray(page?.purchase_intents) ? page.purchase_intents : [],
     next_cursor: page?.next_cursor ?? null,
     limit: page?.limit ?? 20,
   };
@@ -239,9 +250,12 @@ export async function closePurchaseIntent(id: number): Promise<PurchaseIntent> {
 export async function fetchDealerOpportunities(
   cursor?: string | null
 ): Promise<DealerOpportunityPage> {
-  const page = await bffFetch<DealerOpportunityPage>(DEALER_BASE, cursorQuery(cursor));
+  const page = await bffFetch<{ purchase_intents?: DealerOpportunity[]; next_cursor?: string | null; limit?: number }>(
+    DEALER_BASE,
+    cursorQuery(cursor)
+  );
   return {
-    purchase_intents: Array.isArray(page?.purchase_intents) ? page.purchase_intents : [],
+    items: Array.isArray(page?.purchase_intents) ? page.purchase_intents : [],
     next_cursor: page?.next_cursor ?? null,
     limit: page?.limit ?? 20,
   };

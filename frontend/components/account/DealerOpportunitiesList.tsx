@@ -10,8 +10,9 @@ import {
   formatMaxPrice,
   formatPublishedAt,
   type DealerOpportunity,
+  type DealerOpportunityPage,
 } from "@/lib/purchase-intents/api";
-import { usePaginatedIntents } from "@/lib/purchase-intents/use-paginated-intents";
+import { useCursorPagination } from "@/lib/account/use-cursor-pagination";
 
 /**
  * "Compradores ativos" — oportunidades da cidade da loja.
@@ -68,7 +69,7 @@ export default function DealerOpportunitiesList({
   basePath?: string;
 }) {
   const { items, loading, error, loadingMore, moreError, hasMore, loadMore, reload } =
-    usePaginatedIntents<DealerOpportunity>(fetchDealerOpportunities);
+    useCursorPagination<DealerOpportunity, DealerOpportunityPage>(fetchDealerOpportunities);
 
   return (
     <section data-testid="dealer-opportunities-list">

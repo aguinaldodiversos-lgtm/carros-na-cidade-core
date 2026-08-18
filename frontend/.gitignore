@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright — artefatos de execução (screenshots, vídeos, traces).
+# Ficam fora do git de propósito: são saída de teste, regeneráveis a cada corrida,
+# e binários que crescem o histórico sem que ninguém consiga revisá-los num diff.
+test-results/
+playwright-report/
