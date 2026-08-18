@@ -512,13 +512,6 @@ export function offerDigitsToDecimal(digits: string): string | null {
   return (Number(clean) / 100).toFixed(2);
 }
 
-/** "52000.00" → dígitos de centavos, para reabastecer o campo. */
-export function decimalToOfferDigits(value: string | null): string {
-  if (!value) return "";
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return "";
-  return String(Math.round(numeric * 100));
-}
 
 /**
  * Distância para a FIPE — e NUNCA "margem" ou "lucro".

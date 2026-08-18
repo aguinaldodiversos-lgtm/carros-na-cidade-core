@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import {
-  decimalToOfferDigits,
   fipeDistance,
   formatMoneyValue,
   offerDigitsToDecimal,
+  readRejectedHighest,
   submitSaleOffer,
   type DealerOfferState,
 } from "@/lib/sale-requests/dealer-api";
@@ -134,13 +134,7 @@ export default function DealerOfferPanel({
       // A recusa por não superar carrega o líder ATUALIZADO. Refletir isso no
       // painel é o que evita o "tentei de novo com o mesmo valor e falhou de
       // novo" — o lojista passa a ver o número que precisa bater.
-      const highest =
-        caught &&
-        typeof caught === "object" &&
-        "currentHighest" in caught &&
-        typeof (caught as { currentHighest?: unknown }).currentHighest === "string"
-          ? ((caught as { currentHighest: string }).currentHighest)
-          : null;
+      const highest = readRejectedHighest(caught);
 
       if (highest) {
         onSubmitted({ ...state, current_highest_offer: highest, is_leading: false });
@@ -294,5 +288,3 @@ export default function DealerOfferPanel({
     </section>
   );
 }
-
-export { decimalToOfferDigits };

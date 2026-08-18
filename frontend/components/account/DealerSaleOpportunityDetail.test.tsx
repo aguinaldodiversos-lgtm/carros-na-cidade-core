@@ -5,7 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DealerSaleOpportunityDetail from "./DealerSaleOpportunityDetail";
-import type { DealerSaleOpportunityDetail as Detail } from "@/lib/sale-requests/dealer-api";
+import {
+  DealerSaleOpportunityError,
+  type DealerSaleOpportunityDetail as Detail,
+} from "@/lib/sale-requests/dealer-api";
 
 /**
  * Detalhe + painel de proposta.
@@ -277,13 +280,17 @@ describe("painel de proposta", () => {
   });
 
   it("a recusa por não superar atualiza o líder na tela", async () => {
-    class OfferError extends Error {
-      currentHighest = "61000.00";
-    }
+    // O erro REAL do módulo, e não um sósia com a mesma propriedade.
+    // `readRejectedHighest` só reconhece `DealerSaleOpportunityError` — e essa
+    // é a checagem certa: um objeto qualquer com um campo `currentHighest`
+    // poderia vir de qualquer lugar, inclusive de uma resposta malformada.
     submitSaleOffer.mockRejectedValue(
-      Object.assign(new OfferError("A sua proposta precisa ser maior que a maior proposta atual."), {
-        currentHighest: "61000.00",
-      })
+      new DealerSaleOpportunityError(
+        "A sua proposta precisa ser maior que a maior proposta atual.",
+        409,
+        "SALE_OPPORTUNITY_OFFER_NOT_LEADING",
+        "61000.00"
+      )
     );
 
     fetchSaleOpportunity.mockResolvedValue(
