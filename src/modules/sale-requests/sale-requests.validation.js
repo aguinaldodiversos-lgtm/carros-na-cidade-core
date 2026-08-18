@@ -35,11 +35,24 @@ import {
   parseLimit as sharedParseLimit,
 } from "../../shared/pagination/cursor.js";
 import {
+  BODY_PAINT_ISSUES,
+  BODY_PAINT_STATUS,
+  BODY_PAINT_STATUSES,
+  CAUTION_REPORT_STATUSES,
   DECLARED_CONDITIONS,
+  IPVA_STATUS,
+  IPVA_STATUSES,
+  LICENSING_STATUSES,
+  MECHANICAL_CONDITION,
+  MECHANICAL_CONDITIONS,
   SALE_REQUEST_CODE,
+  SALE_REQUEST_EVALUATION_LIMITS,
   SALE_REQUEST_LIMITS,
   SALE_REQUEST_PAGE,
   SALE_REQUEST_PHOTOS,
+  TIRE_CONDITIONS,
+  YES_NO_UNKNOWN,
+  YES_NO_UNKNOWN_VALUES,
   maxModelYear,
 } from "./sale-requests.constants.js";
 
@@ -366,6 +379,288 @@ export function parseLimit(raw) {
   });
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// FICHA DE AVALIAÇÃO — VALIDADORES
+// ────────────────────────────────────────────────────────────────────────────
+// Mesmo contrato dos validadores acima: NORMALIZAM e devolvem o valor pronto
+// para a coluna, ou lançam `AppError` com o `field` exato. O `field` é o nome da
+// COLUNA porque é assim que a tela sabe em qual seção destacar o erro — um nome
+// de conveniência aqui quebraria esse mapeamento sem quebrar nenhum teste.
+
+/** Fábrica de validador de allowlist fechada. Um por vocabulário. */
+function allowlistValidator(values, field, message) {
+  return function validate(raw) {
+    const value = asTrimmedString(raw);
+    if (!values.includes(value)) {
+      throw invalid(message, field);
+    }
+    return value;
+  };
+}
+
+/** `tire_condition` → allowlist fechada. Obrigatório. */
+export const validateTireCondition = allowlistValidator(
+  TIRE_CONDITIONS,
+  "tire_condition",
+  "Informe como estão os pneus."
+);
+
+/** `financing_status` → sim/não/não sei. Obrigatório. */
+export const validateFinancingStatus = allowlistValidator(
+  YES_NO_UNKNOWN_VALUES,
+  "financing_status",
+  "Informe se o veículo possui financiamento ativo."
+);
+
+/** `fines_status` → sim/não/não sei. Obrigatório. */
+export const validateFinesStatus = allowlistValidator(
+  YES_NO_UNKNOWN_VALUES,
+  "fines_status",
+  "Informe se há multas pendentes."
+);
+
+/** `ipva_status` → quitado/parcelado/em aberto/não sei. Obrigatório. */
+export const validateIpvaStatus = allowlistValidator(
+  IPVA_STATUSES,
+  "ipva_status",
+  "Informe a situação do IPVA."
+);
+
+/** `licensing_status` → em dia/pendente/não sei. Obrigatório. */
+export const validateLicensingStatus = allowlistValidator(
+  LICENSING_STATUSES,
+  "licensing_status",
+  "Informe a situação do licenciamento."
+);
+
+/** `caution_report_status` → vocabulário ÚNICO (ver constante). Obrigatório. */
+export const validateCautionReportStatus = allowlistValidator(
+  CAUTION_REPORT_STATUSES,
+  "caution_report_status",
+  "Informe a situação do laudo cautelar."
+);
+
+/** `auction_history` → sim/não/não sei. Obrigatório. */
+export const validateAuctionHistory = allowlistValidator(
+  YES_NO_UNKNOWN_VALUES,
+  "auction_history",
+  "Informe se o veículo passou por leilão."
+);
+
+/** `collision_history` → sim/não/não sei. Obrigatório. */
+export const validateCollisionHistory = allowlistValidator(
+  YES_NO_UNKNOWN_VALUES,
+  "collision_history",
+  "Informe se há colisão ou sinistro conhecido."
+);
+
+/**
+ * Valor monetário OPCIONAL → string com 2 casas, ou `null`.
+ *
+ * Aceita número ou string de dígitos com no máximo duas decimais e PONTO como
+ * separador. NÃO aceita "18.500,00": num formato em que o ponto é milhar em um
+ * lugar e decimal em outro, "1.500" é ambíguo entre mil e um e meio — e
+ * adivinhar errado num campo de saldo devedor é um erro caro. A conversão do
+ * texto brasileiro é trabalho da TELA, que sabe o que a pessoa digitou; o
+ * payload trafega o número já desambiguado.
+ *
+ * Vazio vira `null` pelo mesmo motivo de `validateKnownIssues`: um campo
+ * opcional tem UM jeito de estar ausente.
+ */
+export function validateMoney(raw, field, label) {
+  if (raw == null) return null;
+
+  const asText = typeof raw === "number" ? String(raw) : asTrimmedString(raw);
+  if (asText === "") return null;
+
+  if (!/^\d{1,9}(\.\d{1,2})?$/.test(asText)) {
+    throw invalid(`${label} inválido. Use apenas números.`, field);
+  }
+
+  const value = Number(asText);
+  if (!Number.isFinite(value) || value < 0) {
+    throw invalid(`${label} inválido.`, field);
+  }
+  if (value > SALE_REQUEST_EVALUATION_LIMITS.MONEY_MAX) {
+    throw invalid(`${label} acima do máximo permitido.`, field);
+  }
+
+  // Texto com 2 casas nas duas direções: o driver `pg` devolve NUMERIC como
+  // string, e manter o valor em texto na ida evita que um float de ida e um
+  // texto de volta pareçam valores diferentes. Mesma disciplina de
+  // `fipeReferenceValue`.
+  return value.toFixed(2);
+}
+
+/**
+ * Um conjunto mecânico → `{ condition, notes }`.
+ *
+ * A REGRA CRUZADA vive aqui, e não no chamador: "possui problema" sem descrição
+ * é uma solicitação que não ajuda ninguém a avaliar nada, e qualquer outro
+ * estado COM descrição preenchida é lixo de UI — o texto que ficou para trás
+ * quando a pessoa mudou de ideia. Normalizar para `null` é o que garante que a
+ * coluna não guarde a resposta de uma pergunta que deixou de ser feita.
+ */
+export function validateMechanicalPart(rawCondition, rawNotes, { field, label }) {
+  const condition = allowlistValidator(
+    MECHANICAL_CONDITIONS,
+    field,
+    `Informe a situação do ${label}.`
+  )(rawCondition);
+
+  const notesField = `${field.replace(/_condition$/, "")}_notes`;
+
+  if (condition !== MECHANICAL_CONDITION.ISSUE) {
+    // Descarta o texto: a pergunta deixou de existir quando a resposta mudou.
+    return { condition, notes: null };
+  }
+
+  const notes = asTrimmedString(rawNotes);
+  if (notes === "") {
+    throw invalid(`Descreva o problema do ${label}.`, notesField);
+  }
+  if (notes.length > SALE_REQUEST_EVALUATION_LIMITS.MECHANICAL_NOTES_MAX) {
+    throw invalid(
+      `A descrição pode ter no máximo ${SALE_REQUEST_EVALUATION_LIMITS.MECHANICAL_NOTES_MAX} caracteres.`,
+      notesField
+    );
+  }
+
+  return { condition, notes };
+}
+
+/**
+ * Lataria e pintura → `{ status, issues, notes }`.
+ *
+ * As duas regras cruzadas são simétricas e existem para tornar impossível o
+ * registro contraditório:
+ *
+ *   `issues`         → precisa de PELO MENOS UM detalhe marcado. "Possui
+ *                      detalhes" sem dizer quais não informa nada.
+ *   `none`/`unknown` → NENHUM detalhe, e nenhuma observação. Guardar "riscos"
+ *                      junto de "nenhum detalhe conhecido" gravaria uma
+ *                      contradição que nenhuma leitura futura saberia desfazer.
+ *
+ * Duplicatas são removidas em vez de recusadas: marcar a mesma caixa duas vezes
+ * é impossível na tela, e um payload repetido não é hostil — é ruído.
+ */
+export function validateBodyPaint(input = {}) {
+  const status = allowlistValidator(
+    BODY_PAINT_STATUSES,
+    "body_paint_status",
+    "Informe a situação da lataria e pintura."
+  )(input.body_paint_status);
+
+  const rawIssues = Array.isArray(input.body_paint_issues) ? input.body_paint_issues : [];
+  const issues = [];
+  for (const item of rawIssues) {
+    const value = asTrimmedString(item);
+    if (!BODY_PAINT_ISSUES.includes(value)) {
+      throw invalid("Detalhe de lataria inválido.", "body_paint_issues");
+    }
+    if (!issues.includes(value)) issues.push(value);
+  }
+
+  if (status !== BODY_PAINT_STATUS.ISSUES) {
+    if (issues.length > 0) {
+      throw invalid(
+        "Não é possível marcar detalhes junto com esta resposta.",
+        "body_paint_issues"
+      );
+    }
+    return { status, issues: [], notes: null };
+  }
+
+  if (issues.length === 0) {
+    throw invalid("Marque pelo menos um detalhe da lataria ou pintura.", "body_paint_issues");
+  }
+
+  const notes = asTrimmedString(input.body_paint_notes);
+  if (notes.length > SALE_REQUEST_EVALUATION_LIMITS.BODY_PAINT_NOTES_MAX) {
+    throw invalid(
+      `A descrição pode ter no máximo ${SALE_REQUEST_EVALUATION_LIMITS.BODY_PAINT_NOTES_MAX} caracteres.`,
+      "body_paint_notes"
+    );
+  }
+
+  return { status, issues, notes: notes === "" ? null : notes };
+}
+
+/**
+ * A ficha inteira → objeto normalizado, já no formato das colunas.
+ *
+ * Separado de `validateNewSaleRequest` para poder ser exercitado sozinho: são
+ * vinte colunas com cinco regras cruzadas, e testá-las através do corpo
+ * completo exigiria montar marca, modelo, cidade e quatro fotos só para provar
+ * que o saldo devedor vira NULL.
+ */
+export function validateEvaluation(input = {}) {
+  const financingStatus = validateFinancingStatus(input.financing_status);
+  const finesStatus = validateFinesStatus(input.fines_status);
+  const ipvaStatus = validateIpvaStatus(input.ipva_status);
+
+  const engine = validateMechanicalPart(input.engine_condition, input.engine_notes, {
+    field: "engine_condition",
+    label: "motor",
+  });
+  const gearbox = validateMechanicalPart(input.gearbox_condition, input.gearbox_notes, {
+    field: "gearbox_condition",
+    label: "câmbio",
+  });
+  const suspension = validateMechanicalPart(input.suspension_condition, input.suspension_notes, {
+    field: "suspension_condition",
+    label: "suspensão",
+  });
+
+  const bodyPaint = validateBodyPaint(input);
+
+  // O valor só sobrevive quando a resposta que o justifica foi dada. Fora disso
+  // é `null` — e não erro: quem responde "não tenho financiamento" enquanto o
+  // payload ainda carrega um saldo antigo da tela não cometeu falta nenhuma,
+  // apenas mudou de ideia.
+  const financingBalance =
+    financingStatus === YES_NO_UNKNOWN.YES
+      ? validateMoney(input.financing_balance, "financing_balance", "Saldo devedor")
+      : null;
+
+  const finesAmount =
+    finesStatus === YES_NO_UNKNOWN.YES
+      ? validateMoney(input.fines_amount, "fines_amount", "Valor das multas")
+      : null;
+
+  const ipvaAmountDue =
+    ipvaStatus === IPVA_STATUS.INSTALLMENTS || ipvaStatus === IPVA_STATUS.OPEN
+      ? validateMoney(input.ipva_amount_due, "ipva_amount_due", "Valor pendente do IPVA")
+      : null;
+
+  return {
+    tireCondition: validateTireCondition(input.tire_condition),
+
+    financingStatus,
+    financingBalance,
+    finesStatus,
+    finesAmount,
+    ipvaStatus,
+    ipvaAmountDue,
+    licensingStatus: validateLicensingStatus(input.licensing_status),
+
+    cautionReportStatus: validateCautionReportStatus(input.caution_report_status),
+    auctionHistory: validateAuctionHistory(input.auction_history),
+    collisionHistory: validateCollisionHistory(input.collision_history),
+
+    engineCondition: engine.condition,
+    engineNotes: engine.notes,
+    gearboxCondition: gearbox.condition,
+    gearboxNotes: gearbox.notes,
+    suspensionCondition: suspension.condition,
+    suspensionNotes: suspension.notes,
+
+    bodyPaintStatus: bodyPaint.status,
+    bodyPaintIssues: bodyPaint.issues,
+    bodyPaintNotes: bodyPaint.notes,
+  };
+}
+
 /**
  * Valida o corpo inteiro de uma nova solicitação e devolve o registro
  * NORMALIZADO, já no formato das colunas.
@@ -401,6 +696,7 @@ export function validateNewSaleRequest(input = {}, { ownerUserId, now = new Date
     fuelType: validateFuelType(input.fuel_type),
     declaredCondition: validateDeclaredCondition(input.declared_condition),
     knownIssues: validateKnownIssues(input.known_issues),
+    ...validateEvaluation(input),
     photos: validatePhotoKeys(input.images, { ownerUserId }),
   };
 }

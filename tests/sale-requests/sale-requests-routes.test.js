@@ -12,6 +12,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, fakeClock, fakeQuery, resetDb } from "./fake-db.js";
+import { EVALUATION_BODY, EVALUATION_ROW } from "./evaluation-fixture.js";
 import {
   ImageInputError,
   ObjectStorageError,
@@ -110,6 +111,7 @@ function validBody(overrides = {}) {
     transmission: "Automático",
     fuel_type: "Flex",
     declared_condition: "bom",
+    ...EVALUATION_BODY,
     images: keysFor(4),
     ...overrides,
   };
@@ -138,6 +140,7 @@ function seedRequest(overrides = {}) {
     fuel_type: "flex",
     declared_condition: "bom",
     known_issues: null,
+    ...EVALUATION_ROW,
     status: "receiving_offers",
     created_at: createdAt,
     updated_at: createdAt,

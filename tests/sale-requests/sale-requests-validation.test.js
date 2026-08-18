@@ -6,6 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { EVALUATION_BODY } from "./evaluation-fixture.js";
+
 import {
   decodeCursor,
   encodeCursor,
@@ -328,6 +330,7 @@ describe("corpo completo", () => {
     fuel_type: "Flex",
     declared_condition: "bom",
     known_issues: "Pequeno risco no para-choque.",
+    ...EVALUATION_BODY,
     images: keysFor(4),
   };
 

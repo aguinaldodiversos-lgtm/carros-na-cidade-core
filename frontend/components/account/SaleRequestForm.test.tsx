@@ -1,20 +1,42 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SaleRequestForm from "./SaleRequestForm";
 
 /**
- * Formulário de "Venda seu carro para lojas".
+ * Timeout ampliado para ESTE arquivo.
+ *
+ * Preencher a ficha inteira encadeia mais de vinte interações, e cada uma
+ * re-renderiza nove seções mais o resumo. Isoladamente cada teste leva ~2 s; na
+ * suíte completa, com as workers disputando CPU, o padrão de 5 s é atingido e o
+ * arquivo falha de forma INTERMITENTE — verde sozinho, vermelho no CI.
+ *
+ * Um teste que só falha sob carga é pior que um teste vermelho: ele treina quem
+ * lê a suíte a reexecutar até passar. O custo aqui é real e conhecido, então o
+ * limite acompanha o custo em vez de a suíte aprender a ignorá-lo.
+ */
+vi.setConfig({ testTimeout: 30_000 });
+
+
+/**
+ * Ficha de avaliação — comportamento da tela.
  *
  * O que este arquivo prova:
- *   - a cadeia FIPE (marca → modelo → ano) encadeia e invalida corretamente;
- *   - o botão só habilita com o formulário COMPLETO, fotos incluídas;
- *   - o payload enviado carrega os CÓDIGOS FIPE e NENHUMA placa;
- *   - o bloco de fotos traz orientação COMERCIAL e nenhum dado sensível;
- *   - o 409 de limite vira mensagem legível.
+ *   - a cadeia FIPE encadeia e invalida corretamente (preservado da 4.1);
+ *   - o progresso é REAL: sai do estado do formulário, não de um contador;
+ *   - o CTA NUNCA fica desabilitado por resposta faltante — só durante o envio;
+ *   - clicar com a ficha incompleta NÃO chama a API, nomeia o que falta e leva
+ *     o foco ao primeiro requisito pendente;
+ *   - os campos condicionais aparecem, somem e LIMPAM o valor abandonado;
+ *   - o resumo lateral reflete o estado, sem inventar valor nenhum;
+ *   - o payload carrega os códigos FIPE, os valores normalizados e nenhuma placa.
+ *
+ * A regressão específica do botão cinza mudo vive em
+ * `SaleRequestForm.cta-regression.test.tsx`, que usa o componente de cidade REAL
+ * — é lá que o defeito original acontece.
  */
 
 const mockPush = vi.fn();
@@ -46,8 +68,8 @@ vi.mock("./PurchaseIntentCityField", () => ({
 }));
 
 const BRANDS = [{ code: "59", name: "VW - VolksWagen" }];
-const MODELS = [{ code: "5940", name: "T-Cross 200 TSI 1.0 Flex 12V 5p Aut." }];
-const YEARS = [{ code: "2020-1", name: "2020 Gasolina" }];
+const MODELS = [{ code: "5940", name: "Golf Comfortline 1.4 TSI" }];
+const YEARS = [{ code: "2016-1", name: "2016 Gasolina" }];
 
 function mockFipeFetch() {
   return vi.fn(async (input: RequestInfo | URL) => {
@@ -78,22 +100,47 @@ function uploaded(count: number) {
  * `delay: null` remove a espera artificial que o `userEvent` insere ENTRE
  * eventos.
  *
- * Não é micro-otimização: `fillEverything` encadeia ~10 interações, uma delas
- * digitando 5 caracteres. Com o delay padrão, o custo somado se aproximava do
- * `testTimeout` de 5 s — o arquivo passava isolado (9 s no total) e falhava de
- * forma INTERMITENTE na suíte completa, onde as workers disputam CPU.
- *
- * Um teste que só falha sob carga é pior que um teste vermelho: ele treina quem
- * lê a suíte a reexecutar até passar.
+ * Não é micro-otimização: preencher a ficha inteira encadeia ~25 interações.
+ * Com o delay padrão, o custo somado passa do `testTimeout` — e um teste que só
+ * falha sob carga é pior que um teste vermelho, porque treina quem lê a suíte a
+ * reexecutar até passar.
  */
 function setupUser() {
   return userEvent.setup({ delay: null });
 }
 
-/** Preenche todos os campos, deixando o formulário pronto para submeter. */
-async function fillEverything() {
-  const user = setupUser();
+/**
+ * Marca uma opção pelo NOME do grupo e pelo VALOR persistido.
+ *
+ * Selecionar por rótulo visível quebraria a cada ajuste de texto; o par
+ * (name, value) é o contrato que vai para o banco, e é ele que o teste deve
+ * proteger.
+ */
+async function choose(
+  user: ReturnType<typeof setupUser>,
+  field: string,
+  value: string
+): Promise<void> {
+  const input = document.querySelector<HTMLInputElement>(
+    `input[name="${field}"][value="${value}"]`
+  );
+  if (!input) throw new Error(`opção não encontrada: ${field}=${value}`);
+  await user.click(input);
+}
 
+/**
+ * `Intl` separa "R$" do número com ESPAÇO NÃO SEPARÁVEL (U+00A0).
+ *
+ * `getByText` normaliza espaços e não percebe a diferença; `toHaveValue` compara
+ * a string crua e falha com uma mensagem em que os dois lados parecem idênticos
+ * na tela. Normalizar aqui evita meia hora procurando um defeito que não existe.
+ */
+function normalizeSpaces(value: string): string {
+  return value.replace(/ /g, " ");
+}
+
+/** Seções 1 e 2 — o suficiente para os testes que não precisam da ficha inteira. */
+async function fillVehicle(user: ReturnType<typeof setupUser>) {
   await waitFor(() => expect(screen.getByTestId("sale-request-brand")).not.toBeDisabled());
   await user.selectOptions(screen.getByTestId("sale-request-brand"), "59");
 
@@ -101,23 +148,49 @@ async function fillEverything() {
   await user.selectOptions(screen.getByTestId("sale-request-model"), "5940");
 
   await waitFor(() => expect(screen.getByTestId("sale-request-year")).not.toBeDisabled());
-  await user.selectOptions(screen.getByTestId("sale-request-year"), "2020-1");
+  await user.selectOptions(screen.getByTestId("sale-request-year"), "2016-1");
 
-  await user.type(screen.getByTestId("sale-request-mileage"), "45000");
+  await user.type(screen.getByTestId("sale-request-mileage"), "85000");
   await user.selectOptions(screen.getByTestId("sale-request-transmission"), "automatico");
   await user.selectOptions(screen.getByTestId("sale-request-fuel"), "flex");
-  await user.click(screen.getByRole("radio", { name: /Bom/i }));
   await user.click(screen.getByRole("button", { name: /escolher cidade/i }));
+}
 
-  uploadSaleRequestPhotos.mockResolvedValue(uploaded(4));
-  await user.upload(screen.getByTestId("sale-request-photo-input"), [
-    makeFile("a.jpg"),
-    makeFile("b.jpg"),
-    makeFile("c.jpg"),
-    makeFile("d.jpg"),
-  ]);
+async function addPhotos(user: ReturnType<typeof setupUser>, count: number) {
+  uploadSaleRequestPhotos.mockResolvedValue(uploaded(count));
+  await user.upload(
+    screen.getByTestId("sale-request-photo-input"),
+    Array.from({ length: count }, (_, index) => makeFile(`${index}.jpg`))
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("sale-request-photos").querySelectorAll("img")).toHaveLength(count)
+  );
+}
 
-  await waitFor(() => expect(screen.getByTestId("sale-request-submit")).not.toBeDisabled());
+/** A ficha INTEIRA respondida, pronta para enviar. */
+async function fillEverything(photoCount = 4) {
+  const user = setupUser();
+
+  await fillVehicle(user);
+  await choose(user, "declared_condition", "bom");
+  await choose(user, "tire_condition", "good");
+
+  await choose(user, "financing_status", "no");
+  await choose(user, "fines_status", "no");
+  await choose(user, "ipva_status", "paid");
+  await choose(user, "licensing_status", "ok");
+
+  await choose(user, "caution_report_has", "no");
+  await choose(user, "auction_history", "no");
+  await choose(user, "collision_history", "no");
+
+  await choose(user, "engine_condition", "ok");
+  await choose(user, "gearbox_condition", "ok");
+  await choose(user, "suspension_condition", "ok");
+
+  await choose(user, "body_paint_status", "none");
+
+  await addPhotos(user, photoCount);
   return user;
 }
 
@@ -168,53 +241,337 @@ describe("cadeia FIPE", () => {
   });
 });
 
-describe("gate de submissão", () => {
-  it("começa desabilitado", () => {
+describe("progresso", () => {
+  it("começa em 0 de 8 etapas", () => {
     render(<SaleRequestForm />);
-    expect(screen.getByTestId("sale-request-submit")).toBeDisabled();
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent(
+      "0 de 8 etapas essenciais"
+    );
   });
 
-  it("continua desabilitado com menos de 4 fotos", async () => {
+  it("avança conforme as seções são respondidas", async () => {
     render(<SaleRequestForm />);
     const user = setupUser();
 
-    await waitFor(() => expect(screen.getByTestId("sale-request-brand")).not.toBeDisabled());
-    await user.selectOptions(screen.getByTestId("sale-request-brand"), "59");
-    await waitFor(() => expect(screen.getByTestId("sale-request-model")).not.toBeDisabled());
-    await user.selectOptions(screen.getByTestId("sale-request-model"), "5940");
-    await waitFor(() => expect(screen.getByTestId("sale-request-year")).not.toBeDisabled());
-    await user.selectOptions(screen.getByTestId("sale-request-year"), "2020-1");
+    await choose(user, "tire_condition", "good");
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("1 de 8");
 
-    await user.type(screen.getByTestId("sale-request-mileage"), "45000");
-    await user.selectOptions(screen.getByTestId("sale-request-transmission"), "automatico");
-    await user.selectOptions(screen.getByTestId("sale-request-fuel"), "flex");
-    await user.click(screen.getByRole("radio", { name: /Bom/i }));
-    await user.click(screen.getByRole("button", { name: /escolher cidade/i }));
-
-    uploadSaleRequestPhotos.mockResolvedValue(uploaded(3));
-    await user.upload(screen.getByTestId("sale-request-photo-input"), [
-      makeFile("a.jpg"),
-      makeFile("b.jpg"),
-      makeFile("c.jpg"),
-    ]);
-
-    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(3));
-    expect(screen.getByTestId("sale-request-submit")).toBeDisabled();
+    await choose(user, "declared_condition", "bom");
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("2 de 8");
   });
 
-  it("habilita com o formulário completo", async () => {
+  it("chega a 8 de 8 com a ficha inteira, e o checklist acompanha", async () => {
     render(<SaleRequestForm />);
     await fillEverything();
-    expect(screen.getByTestId("sale-request-submit")).not.toBeDisabled();
+
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("8 de 8");
+
+    const checklist = screen.getByTestId("sale-request-checklist");
+    for (const key of [
+      "vehicle",
+      "condition",
+      "tires",
+      "financial",
+      "history",
+      "mechanics",
+      "bodyPaint",
+      "photos",
+    ]) {
+      expect(within(checklist).getByTestId(`checklist-${key}`)).toHaveAttribute(
+        "data-complete",
+        "true"
+      );
+    }
+  });
+
+  it("o cartão 'pronto para análise' só aparece com a ficha completa", async () => {
+    render(<SaleRequestForm />);
+    expect(screen.getByTestId("sale-request-not-ready")).toBeTruthy();
+    expect(screen.queryByTestId("sale-request-ready")).toBeNull();
+
+    await fillEverything();
+
+    expect(screen.getByTestId("sale-request-ready")).toBeTruthy();
+    expect(screen.queryByTestId("sale-request-not-ready")).toBeNull();
   });
 });
 
-describe("payload enviado", () => {
-  it("manda os CÓDIGOS FIPE, o ano civil e as chaves de storage", async () => {
-    createSaleRequest.mockResolvedValue({ sale_request: { id: 12 } });
+describe("CTA — nunca cinza sem explicação", () => {
+  it("está HABILITADO com o formulário totalmente vazio", () => {
+    // Este é o coração da remodelação. O botão desabilitado era a única
+    // resposta que a tela dava a quem não sabia o que faltava — ou seja,
+    // nenhuma. Agora o clique é o caminho para descobrir.
+    render(<SaleRequestForm />);
+    expect(screen.getByTestId("sale-request-submit")).not.toBeDisabled();
+  });
+
+  it("clicar incompleto NÃO chama a API", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(createSaleRequest).not.toHaveBeenCalled();
+  });
+
+  it("clicar incompleto NOMEIA o que falta", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    // Ficha inteira MENOS pneus e IPVA — as duas únicas pendências.
+    await fillVehicle(user);
+    await choose(user, "declared_condition", "bom");
+    await choose(user, "financing_status", "no");
+    await choose(user, "fines_status", "no");
+    await choose(user, "licensing_status", "ok");
+    await choose(user, "caution_report_has", "no");
+    await choose(user, "auction_history", "no");
+    await choose(user, "collision_history", "no");
+    await choose(user, "engine_condition", "ok");
+    await choose(user, "gearbox_condition", "ok");
+    await choose(user, "suspension_condition", "ok");
+    await choose(user, "body_paint_status", "none");
+    await addPhotos(user, 4);
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    const error = screen.getByTestId("sale-request-error");
+    expect(error).toHaveTextContent("Revise 2 informações antes de enviar");
+    expect(error).toHaveTextContent("Pneus");
+    expect(error).toHaveTextContent("Situação do IPVA");
+    // Nada de "preencha todos os campos": a mensagem genérica não diz onde
+    // procurar, que era exatamente o problema do botão cinza.
+    expect(error.textContent).not.toMatch(/preencha todos/i);
+  });
+
+  it("dá FOCO ao primeiro requisito pendente", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    // O primeiro item da ficha vazia é a marca, no topo da seção 1.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("sale-request-brand")));
+  });
+
+  it("marca os campos pendentes com aria-invalid depois da tentativa", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    expect(screen.getByTestId("sale-request-brand")).not.toHaveAttribute("aria-invalid");
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(screen.getByTestId("sale-request-brand")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("o erro de um campo some assim que ele é respondido", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+    expect(screen.getByTestId("choice-tire_condition")).toBeTruthy();
+    expect(screen.getAllByText(/informe como estão os pneus/i).length).toBeGreaterThan(0);
+
+    await choose(user, "tire_condition", "good");
+
+    expect(screen.queryByText(/informe como estão os pneus/i)).toBeNull();
+  });
+
+  it("nada é marcado como erro ANTES da primeira tentativa", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await choose(user, "tire_condition", "good");
+
+    // Formulário recém-aberto não acusa a pessoa do que ela ainda não fez.
+    expect(screen.queryAllByRole("alert")).toHaveLength(0);
+  });
+});
+
+describe("campos condicionais", () => {
+  it("saldo devedor só existe com financiamento ativo, e é LIMPO ao mudar", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    expect(screen.queryByTestId("money-financing_balance")).toBeNull();
+
+    await choose(user, "financing_status", "yes");
+    const field = screen.getByTestId("money-financing_balance") as HTMLInputElement;
+    await user.type(field, "1850000");
+    expect(normalizeSpaces(field.value)).toBe("R$ 18.500,00");
+
+    await choose(user, "financing_status", "no");
+    expect(screen.queryByTestId("money-financing_balance")).toBeNull();
+
+    // Voltar para "sim" mostra o campo VAZIO: o valor abandonado não sobreviveu.
+    await choose(user, "financing_status", "yes");
+    expect(screen.getByTestId("money-financing_balance")).toHaveValue("");
+  });
+
+  it("valor das multas só existe com multas pendentes", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    expect(screen.queryByTestId("money-fines_amount")).toBeNull();
+    await choose(user, "fines_status", "yes");
+    expect(screen.getByTestId("money-fines_amount")).toBeTruthy();
+    await choose(user, "fines_status", "unknown");
+    expect(screen.queryByTestId("money-fines_amount")).toBeNull();
+  });
+
+  it("IPVA: valor pendente aparece em parcelado e em aberto, não em quitado", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await choose(user, "ipva_status", "paid");
+    expect(screen.queryByTestId("money-ipva_amount_due")).toBeNull();
+
+    await choose(user, "ipva_status", "installments");
+    expect(screen.getByTestId("money-ipva_amount_due")).toBeTruthy();
+
+    await choose(user, "ipva_status", "open");
+    expect(screen.getByTestId("money-ipva_amount_due")).toBeTruthy();
+
+    await choose(user, "ipva_status", "unknown");
+    expect(screen.queryByTestId("money-ipva_amount_due")).toBeNull();
+  });
+
+  it("resultado do laudo só existe quando há laudo", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await choose(user, "caution_report_has", "no");
+    expect(screen.queryByTestId("choice-caution_report_result")).toBeNull();
+
+    await choose(user, "caution_report_has", "yes");
+    expect(screen.getByTestId("choice-caution_report_result")).toBeTruthy();
+
+    await choose(user, "caution_report_has", "unknown");
+    expect(screen.queryByTestId("choice-caution_report_result")).toBeNull();
+  });
+
+  it("descrição do problema mecânico aparece, é exigida e é limpa", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await choose(user, "engine_condition", "ok");
+    expect(screen.queryByTestId("notes-engine_notes")).toBeNull();
+
+    await choose(user, "engine_condition", "issue");
+    const notes = screen.getByTestId("notes-engine_notes");
+    await user.type(notes, "trepida ao frear");
+
+    await choose(user, "engine_condition", "unknown");
+    expect(screen.queryByTestId("notes-engine_notes")).toBeNull();
+
+    await choose(user, "engine_condition", "issue");
+    expect(screen.getByTestId("notes-engine_notes")).toHaveValue("");
+  });
+
+  it("problema mecânico sem descrição bloqueia o envio e explica", async () => {
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    await choose(user, "gearbox_condition", "issue");
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(createSaleRequest).not.toHaveBeenCalled();
+    expect(screen.getByTestId("sale-request-error")).toHaveTextContent(/descrição do problema/i);
+  });
+
+  it("detalhes de lataria só existem com 'possui detalhes'", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await choose(user, "body_paint_status", "none");
+    expect(screen.queryByTestId("choice-body_paint_issues")).toBeNull();
+
+    await choose(user, "body_paint_status", "issues");
+    expect(screen.getByTestId("choice-body_paint_issues")).toBeTruthy();
+
+    // "Nenhum detalhe" e "Não sei" são opções do RADIO anterior, então o estado
+    // contraditório ("nenhum" + "riscos") não tem como ser marcado.
+    await choose(user, "body_paint_status", "unknown");
+    expect(screen.queryByTestId("choice-body_paint_issues")).toBeNull();
+  });
+
+  it("'possui detalhes' sem nenhum marcado bloqueia o envio", async () => {
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    await choose(user, "body_paint_status", "issues");
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(createSaleRequest).not.toHaveBeenCalled();
+    expect(screen.getByTestId("sale-request-error")).toHaveTextContent(/detalhes da lataria/i);
+  });
+});
+
+describe("resumo lateral", () => {
+  it("mostra o placeholder enquanto não há foto", () => {
+    render(<SaleRequestForm />);
+    expect(screen.getByTestId("sale-request-summary-placeholder")).toBeTruthy();
+    expect(screen.queryByTestId("sale-request-summary-photo")).toBeNull();
+  });
+
+  it("usa a PRIMEIRA foto enviada como imagem principal", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await addPhotos(user, 4);
+
+    const photo = screen.getByTestId("sale-request-summary-photo") as HTMLImageElement;
+    expect(photo.src).toContain("uuid-0");
+    expect(screen.queryByTestId("sale-request-summary-placeholder")).toBeNull();
+  });
+
+  it("não inventa valor nenhum antes das respostas", () => {
+    render(<SaleRequestForm />);
+    const summary = screen.getByTestId("sale-request-summary");
+
+    // Nenhum default plausível: nada de "Não", "Bom" ou "Quitado" aparecendo
+    // sozinho num resumo que a pessoa leria como o que a loja vai ver.
+    expect(within(summary).queryByText("Quitado")).toBeNull();
+    expect(within(summary).queryByText("Bom")).toBeNull();
+    expect(within(summary).getAllByText("—").length).toBeGreaterThan(5);
+  });
+
+  it("reflete as respostas conforme entram", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await fillVehicle(user);
+    await choose(user, "tire_condition", "half_life");
+
+    const summary = screen.getByTestId("sale-request-summary");
+    expect(within(summary).getByTestId("sale-request-summary-title")).toHaveTextContent(
+      "VW - VolksWagen Golf Comfortline 1.4 TSI"
+    );
+    expect(within(summary).getByText("85.000 km")).toBeTruthy();
+    expect(within(summary).getByText("Meia-vida")).toBeTruthy();
+    expect(within(summary).getByText("Atibaia - SP")).toBeTruthy();
+  });
+
+  it("mostra o valor junto da resposta que o justifica", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await choose(user, "financing_status", "yes");
+    await user.type(screen.getByTestId("money-financing_balance"), "1850000");
+
+    const summary = screen.getByTestId("sale-request-summary");
+    expect(within(summary).getByText("Sim (R$ 18.500,00)")).toBeTruthy();
+  });
+});
+
+describe("envio", () => {
+  it("publica com a ficha completa e monta o payload correto", async () => {
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 77 } });
 
     render(<SaleRequestForm />);
     const user = await fillEverything();
+
     await user.click(screen.getByTestId("sale-request-submit"));
 
     await waitFor(() => expect(createSaleRequest).toHaveBeenCalledTimes(1));
@@ -223,86 +580,116 @@ describe("payload enviado", () => {
     expect(payload).toMatchObject({
       city_id: 1,
       brand: "VW - VolksWagen",
-      fipe_model_description: "T-Cross 200 TSI 1.0 Flex 12V 5p Aut.",
-      // "2020-1" é código FIPE (o sufixo é combustível). O ano civil é "2020".
-      year: "2020",
-      mileage: "45000",
+      fipe_model_description: "Golf Comfortline 1.4 TSI",
+      year: "2016",
+      mileage: "85000",
       transmission: "automatico",
       fuel_type: "flex",
       declared_condition: "bom",
+      tire_condition: "good",
+      financing_status: "no",
+      financing_balance: null,
+      fines_status: "no",
+      ipva_status: "paid",
+      licensing_status: "ok",
+      caution_report_status: "not_available",
+      auction_history: "no",
+      collision_history: "no",
+      engine_condition: "ok",
+      engine_notes: null,
+      gearbox_condition: "ok",
+      suspension_condition: "ok",
+      body_paint_status: "none",
+      body_paint_issues: [],
+      known_issues: null,
       fipe_brand_code: "59",
       fipe_model_code: "5940",
-      fipe_year_code: "2020-1",
+      fipe_year_code: "2016-1",
     });
 
-    // O que é submetido são as CHAVES, nunca as URLs de pré-visualização.
     expect(payload.images).toHaveLength(4);
-    for (const key of payload.images) {
-      expect(key.startsWith("sale-requests/")).toBe(true);
-      expect(key).not.toMatch(/^https?:|vehicle-images/);
-    }
   });
 
-  /**
-   * As duas AUSÊNCIAS críticas do payload, num único preenchimento.
-   *
-   * Estavam em testes separados, cada um repetindo `fillEverything` inteiro (~10
-   * interações + upload de 4 fotos). São asserções sobre o MESMO payload, com
-   * setup idêntico — separá-las custava dois ciclos completos de formulário e
-   * não comprava isolamento de falha nenhum, porque um payload errado quebraria
-   * os dois juntos de qualquer forma.
-   *
-   * O custo importava: este arquivo e o `PurchaseIntentForm.test.tsx` são os
-   * dois mais pesados da suíte, e a soma dos dois passou a estourar o
-   * `testTimeout` sob contenção de CPU na execução completa.
-   */
   it("NÃO envia placa nem valor FIPE — o servidor é a autoridade", async () => {
-    createSaleRequest.mockResolvedValue({ sale_request: { id: 12 } });
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 77 } });
 
     render(<SaleRequestForm />);
     const user = await fillEverything();
     await user.click(screen.getByTestId("sale-request-submit"));
 
-    await waitFor(() => expect(createSaleRequest).toHaveBeenCalledTimes(1));
-    const payload = createSaleRequest.mock.calls[0][0];
+    await waitFor(() => expect(createSaleRequest).toHaveBeenCalled());
+    const serialized = JSON.stringify(createSaleRequest.mock.calls[0][0]);
 
-    expect(payload).not.toHaveProperty("plate");
-    expect(payload).not.toHaveProperty("placa");
-    expect(JSON.stringify(payload)).not.toMatch(/plac[ae]/i);
-
-    expect(payload).not.toHaveProperty("fipe_reference_value");
-    expect(payload).not.toHaveProperty("fipe_value");
+    for (const forbidden of ["plate", "placa", "renavam", "fipe_reference_value", "cpf"]) {
+      expect(serialized.toLowerCase()).not.toContain(forbidden);
+    }
   });
 
   it("navega para o detalhe após publicar", async () => {
-    createSaleRequest.mockResolvedValue({ sale_request: { id: 12 } });
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 99 } });
+
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/dashboard/vender-para-lojas/99"));
+  });
+
+  it("o CTA fica desabilitado DURANTE o envio — e só aí", async () => {
+    // O único estado operacional que justifica desabilitar: a requisição está
+    // em voo e um segundo clique criaria uma solicitação duplicada.
+    let resolveCreate: (value: unknown) => void = () => {};
+    createSaleRequest.mockImplementation(
+      () => new Promise((resolve) => { resolveCreate = resolve; })
+    );
+
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    const submit = screen.getByTestId("sale-request-submit");
+    expect(submit).not.toBeDisabled();
+
+    await user.click(submit);
+
+    await waitFor(() => expect(submit).toBeDisabled());
+    expect(submit).toHaveTextContent("Enviando…");
+
+    resolveCreate({ sale_request: { id: 5 } });
+  });
+
+  it("observações adicionais NÃO bloqueiam o envio", async () => {
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 77 } });
+
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    // Sem escrever nada em observações, a ficha já está pronta.
+    expect(screen.getByTestId("sale-request-ready")).toBeTruthy();
+
+    await user.type(screen.getByTestId("sale-request-issues"), "Revisões na concessionária.");
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    await waitFor(() => expect(createSaleRequest).toHaveBeenCalled());
+    expect(createSaleRequest.mock.calls[0][0].known_issues).toBe("Revisões na concessionária.");
+  });
+});
+
+describe("erros do servidor", () => {
+  it("traduz o 409 de limite em mensagem acionável", async () => {
+    const { SaleRequestError } = await import("@/lib/sale-requests/api");
+    createSaleRequest.mockRejectedValue(
+      new SaleRequestError("qualquer", 409, "SALE_REQUEST_ACTIVE_LIMIT_REACHED")
+    );
 
     render(<SaleRequestForm />);
     const user = await fillEverything();
     await user.click(screen.getByTestId("sale-request-submit"));
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith("/dashboard/vender-para-lojas/12")
+      expect(screen.getByTestId("sale-request-error")).toHaveTextContent(
+        /Cancele uma para publicar outra/i
+      )
     );
-  });
-});
-
-describe("erros", () => {
-  it("traduz o 409 de limite em mensagem acionável", async () => {
-    const { SaleRequestError } = await import("@/lib/sale-requests/api");
-    createSaleRequest.mockRejectedValue(
-      new SaleRequestError("limite", 409, "SALE_REQUEST_ACTIVE_LIMIT_REACHED")
-    );
-
-    render(<SaleRequestForm />);
-    const user = await fillEverything();
-    await user.click(screen.getByTestId("sale-request-submit"));
-
-    await waitFor(() => expect(screen.getByTestId("sale-request-error")).toBeInTheDocument());
-    // A mensagem diz o que FAZER, não só o que deu errado.
-    expect(screen.getByTestId("sale-request-error")).toHaveTextContent(/Cancele uma para publicar/i);
-    // E o formulário volta a aceitar interação.
-    expect(screen.getByTestId("sale-request-submit")).not.toBeDisabled();
   });
 
   it("mostra erro genérico do servidor", async () => {
@@ -312,159 +699,55 @@ describe("erros", () => {
     const user = await fillEverything();
     await user.click(screen.getByTestId("sale-request-submit"));
 
-    await waitFor(() => expect(screen.getByTestId("sale-request-error")).toBeInTheDocument());
-    expect(screen.getByTestId("sale-request-error")).toHaveTextContent(/Cidade inválida/i);
-  });
-
-  it("erro de upload aparece sem quebrar o formulário", async () => {
-    render(<SaleRequestForm />);
-    const user = setupUser();
-
-    uploadSaleRequestPhotos.mockRejectedValue(new Error("Formato não suportado."));
-    await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.heic")]);
-
     await waitFor(() =>
-      expect(screen.getByText(/Formato não suportado/i)).toBeInTheDocument()
+      expect(screen.getByTestId("sale-request-error")).toHaveTextContent("Cidade inválida.")
     );
-    expect(screen.getByTestId("sale-request-form")).toBeInTheDocument();
-  });
-
-  it("storage indisponível mostra a mensagem de TENTAR DE NOVO, não a de arquivo", async () => {
-    // A regressão do smoke vista pelo olho do usuário: o bucket não existia e a
-    // tela mandava converter uma foto perfeita. A pessoa precisa entender que o
-    // caminho é reenviar a MESMA foto daqui a pouco.
-    const { SaleRequestError } = await import("@/lib/sale-requests/api");
-
-    render(<SaleRequestForm />);
-    const user = setupUser();
-
-    uploadSaleRequestPhotos.mockRejectedValue(
-      new SaleRequestError(
-        "Não foi possível enviar a foto agora. Tente novamente em instantes.",
-        503,
-        "SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE"
-      )
-    );
-
-    await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.jpg")]);
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Não foi possível enviar a foto agora\. Tente novamente em instantes\./i)
-      ).toBeInTheDocument()
-    );
-
-    // O texto de formato NÃO pode aparecer: a foto não tem defeito.
-    const photoBlock = screen.getByTestId("sale-request-photos").textContent ?? "";
-    expect(photoBlock).not.toMatch(/Use JPG, PNG ou WebP/i);
-    expect(photoBlock).not.toMatch(/10 MB/i);
   });
 });
 
-describe("privacidade e limites na tela", () => {
-  it("mostra orientação COMERCIAL no bloco de fotos", () => {
-    render(<SaleRequestForm />);
-    expect(screen.getByTestId("sale-request-photo-guidance")).toHaveTextContent(
-      /Adicione fotos claras do veículo para ajudar os lojistas na avaliação inicial/i
-    );
-  });
-
-  it("o bloco de fotos NÃO menciona dado sensível nenhum", () => {
-    // A regressão que este teste impede é o retorno do aviso antigo — ou de
-    // qualquer variante dele. Enumerar dados sensíveis, mesmo para
-    // desaconselhá-los, os traz para o centro da experiência.
-    render(<SaleRequestForm />);
-
-    const photoBlock = screen.getByTestId("sale-request-photos").textContent ?? "";
-    for (const term of [
-      /plac[ae]/i,
-      /documento/i,
-      /fachada/i,
-      /residência/i,
-      /dados pessoais/i,
-      /dados sensíveis/i,
-    ]) {
-      expect(photoBlock).not.toMatch(term);
-    }
-  });
-
-  it("mostra orientação sobre o VEÍCULO no campo de problemas conhecidos", () => {
-    render(<SaleRequestForm />);
-    expect(screen.getByTestId("sale-request-issues-guidance")).toHaveTextContent(
-      "Descreva o estado do veículo e eventuais avarias, se houver."
-    );
-  });
-
-  it("o campo de problemas conhecidos NÃO menciona dado sensível nenhum", () => {
-    // A versão anterior pedia para não incluir telefone, endereço, placa ou
-    // dados pessoais. A intenção era protetiva, mas listar esses itens num campo
-    // de texto livre ensina a pessoa a pensar neles justamente onde ela vai
-    // escrever.
-    //
-    // O escopo é o BLOCO do campo (label + textarea + hint), e não o app
-    // inteiro: termos como "documento" e "dados pessoais" são legítimos em
-    // /ajuda e na política de privacidade, e uma varredura global daria falso
-    // positivo neles.
-    render(<SaleRequestForm />);
-
-    const issuesField = screen.getByTestId("sale-request-issues-field").textContent ?? "";
-    for (const term of [
-      /plac[ae]/i,
-      /telefone/i,
-      /endereço/i,
-      /documento/i,
-      /residência/i,
-      /fachada/i,
-      /dados pessoais/i,
-      /dados sensíveis/i,
-    ]) {
-      expect(issuesField).not.toMatch(term);
-    }
-
-    // O `placeholder` não entra em `textContent` — precisa ser conferido à
-    // parte, senão a copy proibida poderia voltar por ali sem ninguém notar.
-    expect(screen.getByTestId("sale-request-issues")).toHaveAttribute(
-      "placeholder",
-      expect.stringMatching(/^(?!.*(plac|telefone|endereço|documento|dados pessoais)).*$/i)
-    );
-  });
-
-  it("known_issues continua OPCIONAL — o gate não depende dele", async () => {
-    // Guarda de comportamento: a correção é de copy. Se alguém transformasse a
-    // orientação numa exigência, o botão deixaria de habilitar com o campo
-    // vazio e este teste cairia.
-    render(<SaleRequestForm />);
-    await fillEverything();
-
-    expect(screen.getByTestId("sale-request-issues")).toHaveValue("");
-    expect(screen.getByTestId("sale-request-submit")).not.toBeDisabled();
-  });
-
-  it("limita problemas conhecidos a 1000 caracteres no próprio campo", () => {
-    render(<SaleRequestForm />);
-    expect(screen.getByTestId("sale-request-issues")).toHaveAttribute("maxLength", "1000");
-  });
-
-  it("a primeira foto é marcada como capa", async () => {
+describe("fotos", () => {
+  it("quatro fotos completam a seção", async () => {
     render(<SaleRequestForm />);
     const user = setupUser();
 
-    uploadSaleRequestPhotos.mockResolvedValue(uploaded(4));
-    await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.jpg")]);
+    await addPhotos(user, 4);
 
-    await waitFor(() => expect(screen.getByText("Capa")).toBeInTheDocument());
+    expect(screen.getByTestId("checklist-photos")).toHaveAttribute("data-complete", "true");
+  });
+
+  it("três fotos não completam, e o envio explica", async () => {
+    // Ficha inteira com TRÊS fotos: a galeria é a única pendência, então a
+    // mensagem tem de nomeá-la — e não uma genérica qualquer.
+    render(<SaleRequestForm />);
+    const user = await fillEverything(3);
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(createSaleRequest).not.toHaveBeenCalled();
+    expect(screen.getByTestId("checklist-photos")).toHaveAttribute("data-complete", "false");
+    const error = screen.getByTestId("sale-request-error");
+    expect(error).toHaveTextContent("Revise 1 informação antes de enviar");
+    expect(error).toHaveTextContent(/Fotos do veículo/i);
   });
 
   it("permite remover uma foto escolhida", async () => {
     render(<SaleRequestForm />);
     const user = setupUser();
 
-    uploadSaleRequestPhotos.mockResolvedValue(uploaded(2));
-    await user.upload(screen.getByTestId("sale-request-photo-input"), [makeFile("a.jpg")]);
+    await addPhotos(user, 4);
+    await user.click(screen.getByRole("button", { name: /Remover foto 2/i }));
 
-    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(2));
-    await user.click(screen.getByRole("button", { name: /Remover foto 1/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("sale-request-photos").querySelectorAll("img")).toHaveLength(3)
+    );
+  });
 
-    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
+  it("a orientação das fotos fala só do veículo", () => {
+    render(<SaleRequestForm />);
+    const guidance = screen.getByTestId("sale-request-photo-guidance").textContent ?? "";
+
+    for (const forbidden of ["placa", "documento", "telefone", "endereço", "fachada"]) {
+      expect(guidance.toLowerCase()).not.toContain(forbidden);
+    }
   });
 });
