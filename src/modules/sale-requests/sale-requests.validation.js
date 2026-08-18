@@ -590,7 +590,7 @@ export function validateBodyPaint(input = {}) {
  * A ficha inteira → objeto normalizado, já no formato das colunas.
  *
  * Separado de `validateNewSaleRequest` para poder ser exercitado sozinho: são
- * dezoito colunas com cinco regras cruzadas, e testá-las através do corpo
+ * vinte colunas com cinco regras cruzadas, e testá-las através do corpo
  * completo exigiria montar marca, modelo, cidade e quatro fotos só para provar
  * que o saldo devedor vira NULL.
  */

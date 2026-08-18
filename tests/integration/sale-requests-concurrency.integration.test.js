@@ -572,6 +572,14 @@ describe("ficha de avaliação — round-trip com PostgreSQL", () => {
     // O cliente manda valores que a resposta não justifica. O servidor grava
     // NULL — e a prova tem de vir da COLUNA, não do objeto devolvido: um DTO
     // que zerasse na serialização esconderia lixo persistido.
+    //
+    // NOTA sobre a assimetria deliberada: valor abandonado é LIMPADO em
+    // silêncio (dinheiro, descrição mecânica, observação de lataria), porque é
+    // resíduo de quem mudou de ideia com o campo já preenchido. Já
+    // `body_paint_issues` marcado junto de "nenhum detalhe" é RECUSADO — essa
+    // combinação a tela não consegue produzir (as caixas somem e são zeradas),
+    // então ela só chega de um cliente malformado. Ver o teste dedicado a essa
+    // recusa em `sale-requests-evaluation.test.js`.
     const created = await service.createSaleRequest(
       ownerUser(world.ownerId),
       bodyFor(world.ownerId, "normaliza", {
@@ -584,7 +592,6 @@ describe("ficha de avaliação — round-trip com PostgreSQL", () => {
         engine_condition: "ok",
         engine_notes: "texto que não deve sobreviver",
         body_paint_status: "none",
-        body_paint_issues: ["scratches"],
         body_paint_notes: "não deve sobreviver",
       })
     );

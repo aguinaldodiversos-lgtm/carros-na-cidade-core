@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { INTEGRATION_TEST_DATABASE_URL_DEFAULT } from "./helpers/integration-test-constants.js";
 import { resolveSslConfig } from "../../src/infrastructure/database/ssl-config.js";
+// A allowlist da APLICAÇÃO, importada para ser confrontada com a do BANCO.
+// Reescrever a lista aqui faria o teste concordar consigo mesmo em vez de
+// provar que as duas pontas dizem a mesma coisa.
+import { BODY_PAINT_ISSUES } from "../../src/modules/sale-requests/sale-requests.constants.js";
 
 /**
  * O ESQUEMA das migrations 052/053 contra PostgreSQL de verdade.
@@ -698,9 +702,145 @@ describe("migration 054 — ficha de avaliação", () => {
     // JSONB aceita objeto, número e string. Sem este CHECK,
     // `'"riscos"'::jsonb` entraria e `jsonb_array_length` explodiria na LEITURA
     // — longe de onde o dado errado entrou.
+    //
+    // Estado 'issues' de propósito: com ele a bicondicional PASSA (o escalar
+    // conta como "tem detalhe"), então quem recusa é um dos dois CHECKs de
+    // `body_paint_issues`. Com 'none' quem falharia primeiro seria a coerência,
+    // e o teste não estaria exercitando o que diz exercitar.
+    //
+    // `'"riscos"'` viola OS DOIS (não é array E não está na allowlist), e o
+    // PostgreSQL reporta o que avaliar primeiro. O teste aceita qualquer um dos
+    // dois nomes em vez de fixar uma ordem que a documentação não promete — a
+    // garantia que importa (ser violação, e não erro de tipo) é provada pelo
+    // teste de SQLSTATE logo abaixo.
     await expect(
-      insertWithEvaluation({ body_paint_status: "none", body_paint_issues: '"riscos"' })
-    ).rejects.toThrow(/sale_requests_body_paint_issues_array_check/);
+      insertWithEvaluation({ body_paint_status: "issues", body_paint_issues: '"riscos"' })
+    ).rejects.toThrow(/sale_requests_body_paint_issues_(array|allowed)_check/);
+  });
+
+  it("valor não-array vira VIOLAÇÃO DE CONSTRAINT, nunca erro de tipo", async () => {
+    // Regressão do defeito encontrado no release gate: a coerência usava
+    // `jsonb_array_length`, que LANÇA em não-array. Como o PostgreSQL não
+    // promete ordem entre CHECKs, um escalar podia morrer como erro de tipo
+    // (22023) em vez de violação (23514) — e quem trata 23514 para virar
+    // mensagem de campo devolveria 500 no lugar de 400.
+    for (const [status, value] of [
+      ["none", '"riscos"'],
+      ["unknown", '{"a":1}'],
+      ["issues", '"riscos"'],
+      ["issues", '{"a":1}'],
+    ]) {
+      let code = null;
+      try {
+        await insertWithEvaluation({ body_paint_status: status, body_paint_issues: value });
+      } catch (error) {
+        code = error.code;
+      }
+      expect(code, `${status} + ${value} deveria violar constraint`).toBe("23514");
+    }
+  });
+
+  /**
+   * ALLOWLIST DOS ELEMENTOS — o banco, não só o validador.
+   *
+   * `validateBodyPaint` já recusa elemento inventado, mas ele só protege o
+   * caminho HTTP. Antes deste CHECK, `body_paint_issues` era a única coluna de
+   * vocabulário fechado da tabela cuja allowlist vivia apenas na aplicação:
+   * um script de manutenção, uma correção manual em psql ou um módulo futuro
+   * gravavam `["banana"]` sem nenhum obstáculo.
+   *
+   * Todas as outras colunas da ficha têm o CHECK escalar equivalente. Esta era
+   * a exceção, e exceção em allowlist é por onde o dado ruim entra.
+   */
+  describe("allowlist dos ELEMENTOS de body_paint_issues", () => {
+    /** Insere com estado coerente, para isolar a allowlist da bicondicional. */
+    const withIssues = (issues) =>
+      insertWithEvaluation({
+        body_paint_status: "issues",
+        body_paint_issues: typeof issues === "string" ? issues : JSON.stringify(issues),
+      });
+
+    it("aceita um elemento do catálogo", async () => {
+      await expect(withIssues(["scratches"])).resolves.toBeTruthy();
+    });
+
+    it("aceita vários elementos do catálogo", async () => {
+      await expect(withIssues(["scratches", "dents"])).resolves.toBeTruthy();
+    });
+
+    it("aceita o catálogo INTEIRO", async () => {
+      await expect(
+        withIssues(["scratches", "dents", "worn_paint", "repainted_parts", "collision_repair"])
+      ).resolves.toBeTruthy();
+    });
+
+    it("RECUSA elemento inventado", async () => {
+      await expect(withIssues(["banana"])).rejects.toThrow(
+        /sale_requests_body_paint_issues_allowed_check/
+      );
+    });
+
+    it("RECUSA elemento inventado MISTURADO com válidos", async () => {
+      // Um elemento fora já basta: `<@` exige que TODOS estejam contidos.
+      // É o caso que um filtro ingênuo (ex.: "o primeiro elemento é válido")
+      // deixaria passar.
+      await expect(withIssues(["scratches", "banana"])).rejects.toThrow(
+        /sale_requests_body_paint_issues_allowed_check/
+      );
+    });
+
+    it("RECUSA número no lugar do rótulo", async () => {
+      await expect(withIssues([1, 2])).rejects.toThrow(
+        /sale_requests_body_paint_issues_allowed_check/
+      );
+    });
+
+    it("RECUSA objeto JSON", async () => {
+      // Também viola os dois CHECKs — ver a nota do teste de ARRAY acima.
+      await expect(withIssues('{"scratches": true}')).rejects.toThrow(
+        /sale_requests_body_paint_issues_(array|allowed)_check/
+      );
+    });
+
+    it("RECUSA string JSON", async () => {
+      // Cuidado com a regra de contenção do `<@`: um ESCALAR é considerado
+      // contido num array quando aparece como elemento, então
+      // `'"scratches"'::jsonb <@ '[...]'::jsonb` é VERDADEIRO e a allowlist
+      // sozinha deixaria passar. Quem recusa é o CHECK de `jsonb_typeof`.
+      // Este teste existe para provar que a dupla cobre o caso — remover
+      // qualquer um dos dois CHECKs o faria falhar.
+      await expect(withIssues('"scratches"')).rejects.toThrow(
+        /sale_requests_body_paint_issues_array_check/
+      );
+    });
+
+    it("preserva a lista VAZIA de none/unknown", async () => {
+      for (const status of ["none", "unknown"]) {
+        await expect(
+          insertWithEvaluation({ body_paint_status: status, body_paint_issues: "[]" })
+        ).resolves.toBeTruthy();
+      }
+    });
+
+    it("preserva NULL da linha legada", async () => {
+      await expect(insertWithEvaluation()).resolves.toBeTruthy();
+    });
+
+    it("a allowlist do banco casa EXATAMENTE com a da aplicação", async () => {
+      // Uma allowlist mais larga no banco deixaria passar o que a aplicação
+      // recusa (dado inalcançável pela tela, mas gravável por script); mais
+      // estreita derrubaria uma publicação legítima com erro de constraint em
+      // vez de mensagem de campo. As duas pontas têm de ser a MESMA lista.
+      const { rows } = await pool.query(
+        `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+         WHERE conname = 'sale_requests_body_paint_issues_allowed_check'`
+      );
+      expect(rows).toHaveLength(1);
+
+      for (const value of BODY_PAINT_ISSUES) {
+        expect(rows[0].def, `${value} ausente no CHECK`).toContain(value);
+      }
+    });
   });
 
   it("o índice GIN de body_paint_issues existe", async () => {
@@ -733,7 +873,7 @@ describe("migration 054 — ficha de avaliação", () => {
   });
 
   it("continua sem placa e sem nenhuma coluna de dado pessoal", async () => {
-    // A ficha cresceu dezenove colunas e NENHUMA delas é sobre a pessoa. O
+    // A ficha cresceu vinte colunas e NENHUMA delas é sobre a pessoa. O
     // produto avalia o CARRO.
     const { rows } = await pool.query(
       `SELECT column_name FROM information_schema.columns

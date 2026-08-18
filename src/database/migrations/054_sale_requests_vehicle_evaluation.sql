@@ -7,7 +7,7 @@
 -- a pergunta que o lojista realmente faz antes de gastar tempo com uma visita:
 -- "que RISCO e que CUSTO vêm junto?".
 --
--- Esta migration acrescenta as dezenove colunas que respondem a isso.
+-- Esta migration acrescenta as vinte colunas que respondem a isso.
 --
 -- ============================================================================
 -- ADITIVA — E POR QUÊ ISSO IMPORTA AQUI
@@ -200,6 +200,57 @@ BEGIN
       ADD CONSTRAINT sale_requests_body_paint_issues_array_check
       CHECK (body_paint_issues IS NULL OR jsonb_typeof(body_paint_issues) = 'array');
   END IF;
+
+  -- ==========================================================================
+  -- ALLOWLIST DOS ELEMENTOS DO ARRAY
+  -- ==========================================================================
+  -- O CHECK acima garante que é um ARRAY; este garante o que tem DENTRO dele.
+  --
+  -- Sem ele, as outras constraints deste grupo protegem apenas colunas
+  -- escalares, e `body_paint_issues` fica sendo a única coluna de vocabulário
+  -- fechado cuja allowlist existe só na aplicação. Qualquer caminho que não
+  -- passe por `validateBodyPaint` — script de manutenção, correção manual em
+  -- psql, módulo futuro — grava `["banana"]` sem nenhum obstáculo. A tela que
+  -- lesse essa linha depois não teria rótulo para o valor, e a agregação da
+  -- Fase 4.2 contaria uma avaria que não existe no catálogo.
+  --
+  -- POR QUE O OPERADOR DE CONTENÇÃO, E NÃO UM EXISTS
+  -- ------------------------------------------------
+  -- A forma natural de escrever "todo elemento pertence ao conjunto" seria
+  -- percorrer `jsonb_array_elements_text` num `NOT EXISTS`. PostgreSQL PROÍBE
+  -- subconsulta dentro de CHECK ("cannot use subquery in check constraint"), e
+  -- envolver isso numa função IMMUTABLE criaria uma dependência que todo dump/
+  -- restore precisaria recriar na ordem certa.
+  --
+  -- `<@` resolve em um operador puro: para dois arrays JSONB, `a <@ b` é
+  -- verdadeiro quando TODO elemento de `a` aparece em `b`. Sem subconsulta, sem
+  -- função nova, e indexável pelo mesmo GIN que já existe na coluna.
+  --
+  -- O QUE CADA ESTADO PRODUZ
+  -- ------------------------
+  --   NULL                        → passa pelo primeiro ramo (linha legada).
+  --   '[]'                        → contido em qualquer conjunto: passa. É o
+  --                                 valor de none/unknown.
+  --   '["scratches"]'             → passa.
+  --   '["scratches","dents"]'     → passa.
+  --   '["banana"]'                → RECUSA.
+  --   '["scratches","banana"]'    → RECUSA (um elemento fora já basta).
+  --   '{"a":1}'                   → RECUSA aqui e no CHECK de tipo acima.
+  --   '[1,2]'                     → RECUSA (número não está no conjunto).
+  --
+  -- ATENÇÃO a uma regra do `<@` que este CHECK NÃO cobre sozinho: um ESCALAR
+  -- JSON é considerado contido num array quando aparece como elemento, então
+  -- `'"scratches"'::jsonb <@ '["scratches",...]'::jsonb` é VERDADEIRO. Quem
+  -- recusa esse caso é o `..._array_check` acima, que exige `jsonb_typeof =
+  -- 'array'`. Os dois são necessários; nenhum dos dois substitui o outro.
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_requests_body_paint_issues_allowed_check') THEN
+    ALTER TABLE sale_requests
+      ADD CONSTRAINT sale_requests_body_paint_issues_allowed_check
+      CHECK (
+        body_paint_issues IS NULL
+        OR body_paint_issues <@ '["scratches", "dents", "worn_paint", "repainted_parts", "collision_repair"]'::jsonb
+      );
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -263,14 +314,41 @@ BEGIN
   -- contradições de uma vez — 'issues' com lista vazia, e 'none'/'unknown' com
   -- detalhes marcados.
   --
-  -- `COALESCE(..., 0)` cobre o caso em que a lista é NULL: zero detalhes.
+  -- ==========================================================================
+  -- POR QUE `<> '[]'` E NÃO `jsonb_array_length(...) > 0`
+  -- ==========================================================================
+  -- A forma óbvia — `COALESCE(jsonb_array_length(body_paint_issues), 0) > 0` —
+  -- tem um defeito que só aparece com dado inválido: `jsonb_array_length`
+  -- LANÇA em qualquer valor que não seja array ("cannot get array length of a
+  -- scalar"), em vez de devolver NULL.
+  --
+  -- O PostgreSQL NÃO promete ordem de avaliação entre CHECKs da mesma tabela.
+  -- Então um `body_paint_issues = '"riscos"'` podia bater primeiro AQUI e
+  -- morrer como ERRO DE TIPO (SQLSTATE 22023) em vez de violação de constraint
+  -- (23514) — apesar de existir, logo ao lado, um CHECK feito exatamente para
+  -- recusá-lo com nome legível.
+  --
+  -- A diferença não é cosmética: quem trata `23514` para transformar violação
+  -- em mensagem de campo não reconhece `22023`, e a mesma linha inválida vira
+  -- 500 em vez de 400. E o log não nomeia constraint nenhuma, então a causa
+  -- fica invisível justamente no caso em que alguém escreveu direto no banco.
+  --
+  -- `<> '[]'::jsonb` é comparação, não função: nunca lança, para QUALQUER
+  -- jsonb. Para array o resultado é idêntico ao da versão anterior
+  -- (`[]` → sem detalhes; `["x"]` → com detalhes); para não-array devolve
+  -- `true`, que faz a bicondicional recusar com o nome desta constraint quando
+  -- o estado é 'none'/'unknown', e deixa o CHECK de `jsonb_typeof` recusar
+  -- quando o estado é 'issues'. Em nenhum caminho sobra um erro de tipo cru.
+  --
+  -- NULL continua significando zero detalhes (o `IS NOT NULL` cobre a linha
+  -- legada), exatamente como o COALESCE cobria.
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_requests_body_paint_coherence') THEN
     ALTER TABLE sale_requests
       ADD CONSTRAINT sale_requests_body_paint_coherence
       CHECK (
         body_paint_status IS NULL
         OR (body_paint_status = 'issues')
-           = (COALESCE(jsonb_array_length(body_paint_issues), 0) > 0)
+           = (body_paint_issues IS NOT NULL AND body_paint_issues <> '[]'::jsonb)
       );
   END IF;
 
@@ -307,4 +385,4 @@ COMMENT ON COLUMN sale_requests.engine_condition IS
   'ok | issue | unknown. "ok" = sem problema CONHECIDO PELO PROPRIETARIO; nao e atestado mecanico.';
 
 COMMENT ON COLUMN sale_requests.body_paint_issues IS
-  'Array JSONB da allowlist (scratches, dents, worn_paint, repainted_parts, collision_repair). Vazio quando o estado e none/unknown; NULL apenas em linha legada.';
+  'Array JSONB da allowlist (scratches, dents, worn_paint, repainted_parts, collision_repair), imposta no banco por sale_requests_body_paint_issues_allowed_check. Vazio quando o estado e none/unknown; NULL apenas em linha legada.';

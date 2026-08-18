@@ -3,8 +3,8 @@
 **Data:** 2026-08-17
 **Branch:** `claude/sale-request-professional-evaluation`
 **Base:** `main` @ `d222e8c0` (merge da Fase 4.1)
-**Commits:** 3 · **ahead 3 / behind 0**
-**Veredito:** **GO** para revisão e merge, com duas pendências de verificação registradas em §16.
+**Commits:** 4 · **ahead 4 / behind 0**
+**Veredito:** **GO DEFINITIVO** — release gate PostgreSQL executado e 100% verde (§16).
 
 ---
 
@@ -139,8 +139,14 @@ Valor abandonado vira **NULL, não erro**: quem responde "não tenho
 financiamento" com um saldo antigo ainda no estado não cometeu falta — mudou de
 ideia. Punir isso seria punir uma correção legítima.
 
-No banco, a lataria é uma **bicondicional**: `(status = 'issues') = (nº de
-detalhes > 0)`, que barra as duas contradições possíveis num CHECK só.
+No banco, a lataria é uma **bicondicional**:
+`(status = 'issues') = (issues IS NOT NULL AND issues <> '[]')`, que barra as
+duas contradições possíveis num CHECK só. A forma usa comparação, e não
+`jsonb_array_length` — ver §16.1(b) para o defeito que a versão anterior
+escondia.
+
+E os ELEMENTOS do array têm allowlist no próprio banco
+(`sale_requests_body_paint_issues_allowed_check`), não só no validador — §16.1(a).
 
 ## 8–9. Arquivos e componentes
 
@@ -243,30 +249,174 @@ Detalhe renderizando a ficha inteira, incluindo `Financiamento ativo: Sim
 (R$ 18.500,00)`, `IPVA: Parcelado (R$ 450,50)`, `Câmbio: Possui problema` com a
 descrição, e `Detalhes: Riscos, Amassados`.
 
-## 16. PostgreSQL — **NÃO EXECUTADO**
+## 16. PostgreSQL — **RELEASE GATE EXECUTADO, 100% VERDE**
 
-**Docker não está rodando** nesta máquina e não há Postgres em
-`127.0.0.1:5433` (`ECONNREFUSED`). Os testes de integração foram **escritos e
-verificados sintaticamente**, mas **não executados**.
+Docker Desktop 29.7.2 + `carros-postgres-test` (PostgreSQL em `127.0.0.1:5433`).
+As duas pendências da revisão anterior estão **fechadas**.
 
-Escritos (prontos para rodar com `npm run integration:db:up`):
+### 16.1 Hardening da 054 aplicado ANTES do gate
 
-- **`sale-requests-schema`** (+13 testes): colunas existem e são nullable sem
-  default; monetários são NUMERIC(14,2); linha legada continua sendo aceita;
-  allowlists recusam valor inventado; coerência cruzada nas cinco regras;
-  bicondicional de lataria; `body_paint_issues` só aceita array; índice GIN
-  existe; constraints de 052/053 intactas; nenhuma coluna de dado pessoal.
-- **`sale-requests-concurrency`** (+5 testes): round-trip POST → banco → GET com
-  todos os campos; normalização condicional provada **na coluna** (não no DTO);
-  ficha inteira de "não sei"; recusa sem ficha; **linha legada continua legível
-  com a ficha em NULL**.
+**(a) Allowlist dos ELEMENTOS de `body_paint_issues`.** Antes, a migration
+garantia apenas que a coluna fosse um array JSONB e que a cardinalidade batesse
+com `body_paint_status`. Os elementos em si só eram validados pela aplicação —
+`body_paint_issues` era a **única coluna de vocabulário fechado da tabela sem
+allowlist no banco**, e qualquer caminho fora do HTTP (script, psql, módulo
+futuro) gravava `["banana"]` sem obstáculo.
 
-Também corrigi o `bodyFor` desse arquivo para incluir a ficha — sem isso, todos
-os testes de concorrência existentes passariam sem nunca exercitar o lock.
+Novo CHECK, na **própria 054** (ainda não aplicada em produção, então sem 055):
 
-> **Pendência 1:** rodar a suíte de integração com Docker.
-> **Pendência 2:** teste de migration em banco limpo (1..054) e em banco com
-> 052/053 aplicadas — depende do mesmo Docker.
+```sql
+CONSTRAINT sale_requests_body_paint_issues_allowed_check
+CHECK (
+  body_paint_issues IS NULL
+  OR body_paint_issues <@ '["scratches","dents","worn_paint","repainted_parts","collision_repair"]'::jsonb
+)
+```
+
+Usa o operador de **contenção** e não um `NOT EXISTS` sobre
+`jsonb_array_elements_text` porque **PostgreSQL proíbe subconsulta dentro de
+CHECK**. `a <@ b` é verdadeiro quando todo elemento de `a` está em `b` — sem
+subconsulta, sem função nova, e indexável pelo GIN que já existe.
+
+Preserva os três estados exigidos: `NULL` (legado) passa pelo primeiro ramo,
+`[]` está contido em qualquer conjunto, e array não vazio precisa estar todo
+dentro do catálogo.
+
+**(b) DEFEITO ENCONTRADO PELO PRÓPRIO GATE — e corrigido dentro da 054.**
+
+Ao rodar os testes novos, três falharam com **`cannot get array length of a
+scalar`** em vez de violação de constraint. Diagnóstico: a bicondicional de
+lataria usava `jsonb_array_length(body_paint_issues)`, e essa função **lança**
+em qualquer valor não-array em vez de devolver NULL:
+
+```
+'["a"]'   -> len 1        '"riscos"' -> ERRO: cannot get array length of a scalar
+'[]'      -> len 0        '{"a":1}'  -> ERRO: cannot get array length of a non-array
+```
+
+O PostgreSQL **não promete ordem de avaliação entre CHECKs da mesma tabela**.
+Então um valor não-array podia bater primeiro na coerência e morrer como **erro
+de tipo (SQLSTATE 22023)** em vez de **violação de constraint (23514)** — apesar
+de existir, ao lado, um CHECK feito exatamente para recusá-lo com nome legível.
+
+Não é cosmético: quem trata `23514` para virar mensagem de campo não reconhece
+`22023`, e a mesma linha inválida vira **500 em vez de 400**; e o log não nomeia
+constraint nenhuma, justamente no caso em que alguém escreveu direto no banco.
+
+Correção: trocar a função que lança por uma **comparação**, que nunca lança:
+
+```sql
+(body_paint_status = 'issues')
+  = (body_paint_issues IS NOT NULL AND body_paint_issues <> '[]'::jsonb)
+```
+
+Semântica idêntica para arrays (`[]` → sem detalhes; `["x"]` → com detalhes) e
+NULL continua valendo zero detalhes. `jsonb_array_length` não aparece mais em
+CHECK nenhum da migration. Teste de regressão dedicado assegura **SQLSTATE
+23514** para as quatro combinações de valor não-array.
+
+### 16.2 (A) Banco LIMPO — migrations 001..054
+
+```
+A) migrations aplicadas: 54 | ultima: 054_sale_requests_vehicle_evaluation
+A) colunas da ficha presentes: 20/20
+```
+
+### 16.3 (B) Banco em 053 → aplicar 054
+
+Cenário construído de verdade: a 054 foi **retirada do diretório**, o banco
+migrado até a 053, uma **solicitação legada gravada nesse estado** (o dado que
+existe em produção hoje), e só então a 054 foi restaurada e aplicada.
+
+```
+B) apos esconder a 054: 53 migrations | ultima: 053_sale_request_images
+B) coluna tire_condition ANTES da 054: 0 (esperado 0)
+B) linha legada gravada em 053: 1
+B) migration 054 restaurada no working tree
+B) apos aplicar a 054: 54 migrations | ultima: 054_sale_requests_vehicle_evaluation
+B) linha legada apos upgrade: 1 linha(s), ficha NULL: 1, body_paint_issues NULL: 1
+   gate_clean: CHECK de allowlist de elementos presente = 1
+   gate_053:   CHECK de allowlist de elementos presente = 1
+RELEASE GATE: OK nos dois cenarios.
+```
+
+**Zero perda de dado.** A linha escrita em 053 sobreviveu com a ficha inteira em
+NULL — inclusive `body_paint_issues` em **NULL**, e não `[]`, preservando a
+distinção entre "não foi perguntado" e "respondeu que não há detalhe".
+
+### 16.4 (C) Migration 054 — 44 testes de schema
+
+`sale-requests-schema.integration.test.js`: **44 passaram, 0 falharam.**
+
+20 colunas existem · todas nullable · sem defaults · monetários NUMERIC(14,2) ·
+allowlists escalares (pneus, três estados, IPVA, licenciamento, laudo, mecânica,
+lataria) · **allowlist de cada elemento de `body_paint_issues`** · coerência de
+financiamento · de multas · de IPVA · de motor/câmbio/suspensão · bicondicional
+de lataria · não-array vira 23514 (nunca erro de tipo) · linha legada aceita ·
+índice GIN existe · constraints de 052/053 intactas · nenhuma coluna de dado
+pessoal.
+
+**Teste contra elemento inventado** (exigido pela revisão):
+
+| Entrada | Resultado |
+|---|---|
+| `["scratches"]` | ✅ aceita |
+| `["scratches","dents"]` | ✅ aceita |
+| catálogo inteiro (5 elementos) | ✅ aceita |
+| `["banana"]` | ✅ **recusa** (`..._allowed_check`) |
+| `["scratches","banana"]` | ✅ **recusa** — um elemento fora já basta |
+| `[1,2]` | ✅ **recusa** |
+| `{"scratches": true}` (objeto) | ✅ **recusa** |
+| `"scratches"` (string JSON) | ✅ **recusa** (`..._array_check`) |
+| `[]` com none/unknown | ✅ aceita |
+| `NULL` (legado) | ✅ aceita |
+
+Nota sobre o par de CHECKs: o `<@` tem uma regra própria — um **escalar** JSON é
+considerado contido num array quando aparece como elemento, então
+`'"scratches"'::jsonb <@ '[...]'::jsonb` é **verdadeiro**. Quem recusa esse caso
+é o CHECK de `jsonb_typeof`. Os dois são necessários, e há um teste dedicado a
+essa combinação exata — remover qualquer um dos dois o quebra.
+
+Onde um valor viola os **dois** CHECKs (`"riscos"`, objeto), o teste aceita
+qualquer um dos dois nomes: a ordem de avaliação não é promessa da
+documentação, e a garantia que importa (ser violação, não erro de tipo) é
+provada pelo teste de SQLSTATE.
+
+Um teste confronta a allowlist do **banco** com `BODY_PAINT_ISSUES` do
+**código**, importado — não reescrito. Uma lista mais larga no banco deixaria
+passar o que a aplicação recusa; mais estreita derrubaria publicação legítima
+com erro de constraint em vez de mensagem de campo.
+
+### 16.5 (D) Round-trip e (E) concorrência
+
+`sale-requests-concurrency.integration.test.js`: **17 passaram, 0 falharam.**
+
+- **Round-trip** POST → PostgreSQL → GET detail com a ficha completa. NUMERIC
+  volta como **string** de duas casas (`"18500.00"`), JSONB volta como **array**
+  de verdade.
+- Normalização condicional provada **na coluna**, não no DTO.
+- Ficha inteira de "não sei" aceita; solicitação nova **sem** ficha recusada.
+- **Linha legada continua legível** pelo detalhe, com a ficha em NULL.
+- **Concorrência:** todos os testes antigos de teto/lock passaram **exercitando
+  uma ficha válida** — o `bodyFor` foi corrigido para incluí-la. Sem essa
+  correção eles passariam sem nunca chegar à transação, porque o service
+  recusaria antes.
+
+Rodados **juntos** também: **61 testes, 2 arquivos, 0 falhas**.
+
+### 16.6 Correção de teste feita durante o gate
+
+Um teste de round-trip que eu havia escrito esperava que
+`body_paint_status: "none"` + `body_paint_issues: ["scratches"]` fosse
+silenciosamente normalizado. **O teste estava errado, não o código:**
+`validateBodyPaint` **recusa** essa combinação, e há teste unitário que o
+comprova.
+
+A assimetria é deliberada e ficou documentada no teste: dinheiro e descrições
+abandonados são **limpos em silêncio** (resíduo de quem mudou de ideia com o
+campo preenchido); detalhe de lataria marcado junto de "nenhum detalhe" é
+**recusado**, porque a tela não consegue produzir essa combinação — ela só chega
+de cliente malformado.
 
 ## 17–21. Suítes
 
@@ -274,6 +424,11 @@ os testes de concorrência existentes passariam sem nunca exercitar o lock.
 |---|---|
 | Backend (`npx vitest run --exclude tests/integration`) | ✅ **204 arquivos, 3194 testes, 1 skip** |
 | Backend — só sale-requests | ✅ **216 testes** (5 arquivos) |
+| **Integração PG — sale-requests-schema** | ✅ **44 testes** |
+| **Integração PG — sale-requests-concurrency** | ✅ **17 testes** |
+| **Integração PG — os dois juntos** | ✅ **61 testes** |
+| **Migration em banco limpo (001..054)** | ✅ 54 aplicadas, 20/20 colunas |
+| **Migration 053 → 054** | ✅ 53 → 54, linha legada preservada |
 | Frontend (`npx vitest run`) | ⚠️ **3135 passam, 5 falham (baseline)** |
 | Frontend — sale-requests | ✅ **97 testes** (evaluation 35, form 37, regressão 3, listagem/detalhe 22) |
 | Typecheck (`tsc --noEmit`) | ✅ limpo |
@@ -293,6 +448,17 @@ em `git stash` e elas falham igual em `main` limpa.
 
 Nenhuma toca sale-requests. Os 11 erros de lint do backend estão todos em
 `scripts/` (variáveis não usadas, blocos vazios) — arquivos que não encostei.
+
+**`migrations-compat.integration.test.js` — 3 falhas, também baseline.** Só
+apareceram agora porque a suíte de integração nunca tinha rodado (Docker
+indisponível na fase anterior). São sobre a migration **020** e a recuperação de
+banco legado (`null value in column "plan" of relation "users"`), sem nenhuma
+relação com sale_requests.
+
+Provado em dois passos: falham (a) com as mudanças desta fase em `git stash`, e
+(b) com `054_sale_requests_vehicle_evaluation.sql` **removida do diretório**.
+Registrado como tarefa separada — vale investigar se é teste desatualizado ou
+defeito real no caminho que roda num banco de produção antigo.
 
 **Uma flakiness introduzida e corrigida:** meus dois arquivos de teste do
 formulário encadeiam 25+ interações e estouravam o `testTimeout` padrão de 5 s
@@ -318,11 +484,14 @@ armadilha de "replace que não casou" que já mordeu neste repositório.
 ## 23–25. Commits, branch, ahead/behind
 
 Branch **`claude/sale-request-professional-evaluation`**, criada de `main` @
-`d222e8c0`. **ahead 3, behind 0.** Sem merge, sem deploy.
+`d222e8c0`. **ahead 4, behind 0.** Sem merge, sem deploy.
 
 1. `feat(sale-requests): add structured vehicle evaluation` — 13 arquivos
 2. `feat(sale-requests): redesign owner evaluation form` — 17 arquivos
-3. `docs(sale-requests): record evaluation sheet rollout` — este relatório
+3. `docs(sale-requests): record evaluation sheet rollout` — relatório
+4. `fix(sale-requests): enforce body paint allowlist in database` — hardening da
+   054 (allowlist de elementos + correção do erro de tipo na bicondicional),
+   testes PostgreSQL e este relatório atualizado
 
 **Não commitados de propósito** (já untracked antes do trabalho): a imagem de
 referência `frontend/public/images/vender-para-loja.png` — commitá-la em
@@ -344,6 +513,17 @@ workers e Redis: **intocados**. Nenhuma dependência nova.
 
 ## 27. Veredito
 
-**GO** para revisão e merge, condicionado a rodar a suíte de integração
-PostgreSQL (§16) antes do deploy — é a única camada que os CHECKs da migration
-054 e o round-trip realmente exercitam, e ela não pôde ser executada aqui.
+**GO DEFINITIVO** para revisão e merge.
+
+O release gate PostgreSQL foi executado e está **100% verde**: banco limpo
+001..054, upgrade 053→054 com linha legada preservada, 61 testes de integração,
+3194 testes de backend, typecheck, lint e build. As duas pendências da revisão
+anterior estão fechadas.
+
+O gate **pagou por si mesmo**: encontrou um defeito real na 054 —
+`jsonb_array_length` lançando erro de tipo onde deveria haver violação de
+constraint — que nenhuma suíte unitária teria pego, porque nenhuma delas fala
+com o PostgreSQL. Corrigido dentro da própria 054, com teste de regressão por
+SQLSTATE.
+
+Continua valendo: **sem merge e sem deploy** por decisão do escopo.
