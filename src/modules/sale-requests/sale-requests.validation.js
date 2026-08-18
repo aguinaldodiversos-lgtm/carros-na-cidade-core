@@ -71,6 +71,41 @@ function invalid(message, field) {
  * "VW - VolksWagen"). `canonicalBrandLabel`/`canonicalBrandSlug` tiram o prefixo
  * e produzem o mesmo par que o resto do projeto usa em rota e agregação.
  */
+/**
+ * Normaliza o id do usuário autenticado.
+ *
+ * Vive AQUI, e não no service, porque é validação de entrada pura — e porque a
+ * Fase 4.3 acrescentou um segundo service ao domínio (a área do lojista) que
+ * precisa exatamente da mesma guarda. Deixá-la no service do dono obrigaria o
+ * service do lojista a importar o do dono só por causa dela, arrastando junto a
+ * FIPE, o storage e o módulo de notificações.
+ *
+ * `sale-requests.service.js` REEXPORTA o símbolo, então
+ * `sale-requests.photos.service.js` e os testes que já a importavam de lá
+ * continuam valendo sem alteração.
+ *
+ * Mesma guarda de `requireUserId` no Produto 1, reescrita neste domínio em vez
+ * de importada: `purchase-intents.service.js` é domínio do Produto 1 e está na
+ * lista de arquivos protegidos desta fase. Importar dali criaria uma dependência
+ * Produto 2 → Produto 1 que a §17 da auditoria proíbe — infraestrutura se
+ * compartilha, domínio não.
+ *
+ * `pg` devolve BIGINT como string, então o id alterna entre number e string ao
+ * longo da aplicação; aqui ele vira sempre string de dígitos. `0` é recusado
+ * explicitamente — `users.id` é serial e começa em 1, então zero só chegaria por
+ * engano e morreria lá embaixo como violação de FK (um 500 no log de banco em
+ * vez da causa real).
+ */
+export function requireUserId(raw) {
+  const value = String(raw ?? "").trim();
+  if (!/^\d+$/.test(value) || Number(value) <= 0) {
+    throw new AppError("Sessão inválida.", 401, true, {
+      code: SALE_REQUEST_CODE.INVALID_USER,
+    });
+  }
+  return value;
+}
+
 export function validateBrand(raw) {
   const value = asTrimmedString(raw);
   if (value === "") {

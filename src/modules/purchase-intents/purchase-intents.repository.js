@@ -17,6 +17,10 @@
 
 import { query } from "../../infrastructure/database/db.js";
 import { ADVERTISER_STATUS } from "../../shared/constants/status.js";
+import {
+  advertiserIsOperational,
+  ADVERTISER_IS_OPERATIONAL,
+} from "../../shared/account/advertiser-status.js";
 
 /** Colunas devolvidas ao DONO da procura. Sem `buyer_user_id`: ele já sabe quem é. */
 const BUYER_COLUMNS = `
@@ -266,65 +270,35 @@ export async function getActiveByIdForCity(purchaseIntentId, cityId) {
 }
 
 /**
- * Predicado de advertiser OPERACIONAL.
+ * O predicado de loja operacional MUDOU DE CASA na Fase 4.3.
  *
- * `advertisers.status` é NULLABLE na prática: a coluna nasce
- * `NOT NULL DEFAULT 'active'` no CREATE, mas as migrations 003 e 012 também a
- * re-adicionam como `ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'` para
- * bancos legados — e o DEFAULT não preenche linha que já existia. A própria 012
- * declara a interpretação do projeto ao fazer o backfill
- * `status = COALESCE(NULLIF(status, ''), 'active')`.
+ * A regra — `COALESCE(NULLIF(BTRIM(status), ''), 'active') = 'active'`, com
+ * toda a justificativa das migrations 003/012 — passou a viver em
+ * `src/shared/account/advertiser-status.js`, porque o Produto 2 ("Venda seu
+ * carro para lojas") faz exatamente a mesma pergunta e não deve importar o
+ * repositório de PROCURAS para respondê-la.
  *
- * Por isso NULL e '' contam como ACTIVE. Tratá-los como "não ativo" seria
- * fail-closed no papel e um defeito na prática: trancaria para fora lojistas
- * legítimos cuja linha é anterior à coluna, um estrago maior que o problema que
- * esta regra corrige. `suspended` e `blocked` são estados EXPLÍCITOS — sempre
- * escritos por uma ação de moderação.
- *
- * Mesmo formato de `public-dealer.service.js:57`, que já usa
- * `COALESCE(adv.status, 'active') = 'active'`.
- *
- * O predicado é MONTADO por função porque a Fase 3 precisa dele em consultas
- * com outra numeração de parâmetro e outro alias de tabela. Copiar a expressão
- * para lá criaria duas versões da mesma regra de moderação — e a que ficasse
- * para trás numa correção seria justamente a que decide quem fica no ar.
- *
- * @param {{ alias?: string, param?: number }} [options]
+ * Os dois símbolos continuam sendo exportados DAQUI de propósito: os call sites
+ * do Produto 1 em `purchase-intent-offers.repository.js` e o teste de
+ * integração que importa `ADVERTISER_IS_OPERATIONAL` deste caminho seguem
+ * valendo sem alteração. É REEXPORTAÇÃO, não cópia — existe uma definição só.
  */
-export function advertiserIsOperational({ alias = "adv", param = 2 } = {}) {
-  return `COALESCE(NULLIF(BTRIM(${alias}.status), ''), 'active') = $${param}`;
-}
-
-export const ADVERTISER_IS_OPERATIONAL = advertiserIsOperational();
+export { advertiserIsOperational, ADVERTISER_IS_OPERATIONAL };
 
 /**
- * Linhas de advertiser OPERACIONAIS do usuário — TODAS, sem LIMIT.
+ * `listActiveAdvertisersByUserId` SAIU daqui na Fase 4.3.
  *
- * O LIMIT 1 é o erro clássico aqui. `advertisers.user_id` não tem UNIQUE (nem
- * nas migrations, nem em produção — verificado na Fase 0.1), então "a loja do
- * usuário" pode ser mais de uma linha. Com `LIMIT 1` sem `ORDER BY`, o Postgres
- * devolve uma qualquer, e a autorização passaria a depender de qual linha
- * apareceu primeiro. Devolvemos o conjunto e deixamos o service FALHAR FECHADO
- * quando houver conflito.
+ * A consulta era usada por um único call site — `resolveDealerCityId` — e a
+ * decisão que ela alimenta virou compartilhada entre os dois produtos. Ela
+ * agora vive junto da regra que a consome, em
+ * `src/shared/account/dealer-store.js`, com o mesmo SQL e o mesmo
+ * `ORDER BY adv.id ASC`.
  *
- * O filtro de status entra AQUI, no SQL, e não numa checagem do service: uma
- * loja suspensa não deve nem chegar à camada que decide a cidade. Como
- * consequência direta, um advertiser bloqueado em OUTRA cidade não gera
- * conflito — ele simplesmente não faz parte do conjunto.
+ * Deixá-la aqui como cópia órfã criaria a segunda versão da consulta que decide
+ * quem enxerga demanda privada — exatamente o que a promoção do predicado logo
+ * acima foi feita para evitar.
  */
-export async function listActiveAdvertisersByUserId(userId) {
-  const result = await query(
-    `
-    SELECT adv.id, adv.user_id, adv.city_id, adv.status
-    FROM advertisers adv
-    WHERE adv.user_id = $1
-      AND ${ADVERTISER_IS_OPERATIONAL}
-    ORDER BY adv.id ASC
-    `,
-    [userId, ADVERTISER_STATUS.ACTIVE]
-  );
-  return result.rows;
-}
+
 
 /**
  * Destinatários do fan-out: usuários CNPJ com loja NA CIDADE da procura.

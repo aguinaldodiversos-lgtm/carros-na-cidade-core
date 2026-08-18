@@ -16,6 +16,7 @@
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
+import { resolveDealerCityId as resolveSharedDealerCityId } from "../../shared/account/dealer-store.js";
 import { createUserNotification } from "../notifications/notifications.service.js";
 import { NOTIFICATION_EVENT_TYPE } from "../notifications/notifications.constants.js";
 import * as repo from "./purchase-intents.repository.js";
@@ -416,64 +417,28 @@ export async function closeMyPurchaseIntent(userId, rawId) {
 
 /**
  * Cidade da loja do usuário autenticado — a única fonte da visibilidade do
- * lojista.
+ * lojista neste produto.
  *
- * FAIL CLOSED em quatro situações, todas devolvendo `null`:
+ * A REGRA não mora mais aqui. Ela foi promovida na Fase 4.3 para
+ * `src/shared/account/dealer-store.js`, porque o Produto 2 precisa da MESMA
+ * decisão (e de um dado a mais, o `advertiser_id`). Duas implementações da
+ * pergunta "de que cidade é este lojista" apareceriam como um lojista que
+ * enxerga a oportunidade numa tela e é recusado na outra.
  *
- *   - nenhum advertiser: o usuário é CNPJ mas ainda não tem loja;
- *   - nenhum advertiser ATIVO: todas as lojas dele estão suspensas ou
- *     bloqueadas. Moderação não é sobre plano nem estoque — é sobre não
- *     entregar demanda privada a quem foi tirado do ar;
- *   - advertiser sem `city_id`: a Fase 0.1 proíbe inferir cidade, e inferir
- *     aqui (de `users.city`, do primeiro anúncio, do cookie) entregaria
- *     oportunidades de gente real para a cidade errada;
- *   - MAIS DE UMA cidade distinta entre os advertisers ATIVOS do mesmo usuário:
- *     `advertisers.user_id` não tem UNIQUE, então isso é possível hoje. Escolher
- *     "a primeira" seria decidir por sorteio de que cidade o lojista é.
+ * O comportamento é idêntico ao da Fase 2, incluindo o FAIL CLOSED em quatro
+ * situações (sem loja / sem loja ativa / loja sem cidade / mais de uma cidade
+ * entre as lojas ativas) e o `null` que faz a listagem devolver vazio e o
+ * detalhe devolver 404.
  *
- * Linhas duplicadas apontando para a MESMA cidade não são conflito — a resposta
- * é a mesma seja qual for a linha lida. E uma loja bloqueada em outra cidade
- * também não é conflito: ela não entra no conjunto.
- *
- * `null` não é erro: a listagem devolve vazio e o detalhe devolve 404. O lojista
- * sem localização válida simplesmente não participa desta fase, exatamente como
- * a especificação pede.
+ * A função continua exportada com este nome porque é o contrato que os call
+ * sites do Produto 1 e a suíte de procuras usam. O `action` do log de domínio
+ * também é preservado — `purchase_intent.dealer_city.resolve` — para que a
+ * observabilidade desta fase não mude de nome por causa de uma refatoração.
  */
 export async function resolveDealerCityId(userId) {
-  // Só lojas OPERACIONAIS entram no conjunto — suspensa/bloqueada é filtrada no
-  // SQL. Consequência que importa: um advertiser bloqueado em outra cidade não
-  // vira conflito, porque nem chega aqui. Quem foi suspenso perde o acesso, não
-  // ganha um empate que tranca a loja boa junto.
-  const rows = await repo.listActiveAdvertisersByUserId(userId);
-
-  const cityIds = [
-    ...new Set(
-      rows
-        .map((row) => row.city_id)
-        .filter((cityId) => cityId != null && String(cityId).trim() !== "")
-        .map((cityId) => String(cityId))
-    ),
-  ];
-
-  if (cityIds.length === 1) {
-    return Number(cityIds[0]);
-  }
-
-  logger.warn(
-    {
-      ...buildDomainFields({
-        action: "purchase_intent.dealer_city.resolve",
-        result: "error",
-        userId,
-        reason: cityIds.length === 0 ? "missing" : "ambiguous",
-      }),
-      advertiserRows: rows.length,
-      distinctCities: cityIds.length,
-    },
-    "[purchase-intents] cidade da loja indefinida — oportunidades ocultas"
-  );
-
-  return null;
+  return resolveSharedDealerCityId(userId, {
+    action: "purchase_intent.dealer_city.resolve",
+  });
 }
 
 /**
