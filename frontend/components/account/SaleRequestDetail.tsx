@@ -5,11 +5,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   DECLARED_CONDITION_OPTIONS,
+  NOT_INFORMED,
   STATUS_LABEL,
   cancelSaleRequest,
   formatFipe,
   formatMileage,
+  formatMoneyValue,
   getSaleRequest,
+  readBodyPaintIssue,
+  readBodyPaintStatus,
+  readCautionReport,
+  readIpvaStatus,
+  readLicensingStatus,
+  readMechanicalCondition,
+  readTireCondition,
+  readYesNoUnknown,
   type SaleRequest,
 } from "@/lib/sale-requests/api";
 
@@ -17,20 +27,35 @@ import {
  * Detalhe de UMA solicitação, para o dono.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * SEM PLACEHOLDER DE FUTURO
+ * A FICHA INTEIRA FICA VISÍVEL DEPOIS DE PUBLICADA
  * ────────────────────────────────────────────────────────────────────────────
- * Nada de "0 ofertas", "maior lance" ou "aguardando avaliação". Essas entidades
+ * Tudo o que a pessoa respondeu aparece aqui, agrupado nas mesmas seções do
+ * formulário. Coletar dezoito respostas e depois só mostrar marca, ano e km
+ * seria pedir trabalho sem devolver nada — e o dono não teria como conferir o
+ * que as lojas vão ver.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * "NÃO INFORMADO" NUNCA VIRA "NÃO"
+ * ────────────────────────────────────────────────────────────────────────────
+ * Solicitações publicadas antes desta ficha existir têm NULL em todas as
+ * colunas novas. NULL significa "a versão anterior do formulário não
+ * perguntou", e é exibido como "Não informado" — nunca como "Não", que seria
+ * uma declaração que o proprietário jamais fez.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * SEM EDIÇÃO, SEM PLACEHOLDER DE FUTURO
+ * ────────────────────────────────────────────────────────────────────────────
+ * Nada de "0 ofertas", "maior lance" ou "aguardando avaliação": essas entidades
  * chegam nas fases 4.3–4.5, e anunciá-las agora faria a pessoa esperar por algo
  * que o produto não entrega.
  *
- * O cancelamento é a ÚNICA ação: publicou, não edita campo economicamente
- * relevante — quando os lances existirem, mudar a quilometragem debaixo de uma
- * oferta já feita seria alterar o objeto do negócio depois da proposta.
+ * O cancelamento continua sendo a ÚNICA ação. Publicou, não edita campo
+ * economicamente relevante — quando os lances existirem, mudar a quilometragem
+ * debaixo de uma oferta já feita seria alterar o objeto do negócio depois da
+ * proposta.
  */
 
-const CONDITION_LABEL = new Map(
-  DECLARED_CONDITION_OPTIONS.map((item) => [item.value, item.label])
-);
+const CONDITION_LABEL = new Map(DECLARED_CONDITION_OPTIONS.map((item) => [item.value, item.label]));
 
 const TRANSMISSION_LABEL: Record<string, string> = {
   automatico: "Automático",
@@ -47,13 +72,64 @@ const FUEL_LABEL: Record<string, string> = {
   eletrico: "Elétrico",
 };
 
-function DataRow({ label, value }: { label: string; value: string }) {
+/**
+ * Uma linha de dado.
+ *
+ * `value` nulo vira "Não informado" em cinza claro — visualmente distinto de um
+ * valor real, para que a ausência não se pareça com resposta.
+ */
+function DataRow({ label, value }: { label: string; value: string | null }) {
+  const filled = Boolean(value);
   return (
-    <div className="flex flex-col gap-0.5 border-b border-[#F2F4F7] py-3 last:border-b-0 sm:flex-row sm:justify-between">
-      <dt className="text-sm text-[#64748b]">{label}</dt>
-      <dd className="text-sm font-semibold text-[#1D2440]">{value}</dd>
+    <div className="flex flex-col gap-0.5 border-b border-[#F2F4F7] py-2.5 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+      <dt className="text-[13px] text-[#64748b]">{label}</dt>
+      <dd
+        className={`text-[13px] sm:text-right ${
+          filled ? "font-semibold text-[#1D2440]" : "text-[#98A2B3]"
+        }`}
+      >
+        {value || NOT_INFORMED}
+      </dd>
     </div>
   );
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-[#E5E9F2] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      <h2 className="mb-1 text-[13px] font-bold text-[#161f34]">{title}</h2>
+      <dl>{children}</dl>
+    </section>
+  );
+}
+
+/** Condição mecânica + a descrição do problema, quando existe. */
+function MechanicalRow({
+  label,
+  condition,
+  notes,
+}: {
+  label: string;
+  condition: Parameters<typeof readMechanicalCondition>[0];
+  notes: string | null;
+}) {
+  return (
+    <>
+      <DataRow label={label} value={readMechanicalCondition(condition)} />
+      {notes ? (
+        <p className="-mt-1 mb-2 whitespace-pre-line rounded-xl bg-[#F9FBFF] px-3 py-2 text-[12px] leading-relaxed text-[#475467]">
+          {notes}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** Valor com um complemento monetário entre parênteses, quando houver. */
+function withAmount(base: string | null, amount: string | null): string | null {
+  if (!base) return null;
+  const money = formatMoneyValue(amount);
+  return money ? `${base} (${money})` : base;
 }
 
 export default function SaleRequestDetail({ id }: { id: string }) {
@@ -132,6 +208,12 @@ export default function SaleRequestDetail({ id }: { id: string }) {
   const open = request.status === "receiving_offers";
   const fipe = formatFipe(request.fipe_reference_value);
 
+  const bodyPaintIssues = request.body_paint_issues;
+  const bodyPaintIssuesLabel =
+    bodyPaintIssues && bodyPaintIssues.length > 0
+      ? bodyPaintIssues.map((issue) => readBodyPaintIssue(issue)).filter(Boolean).join(", ")
+      : null;
+
   return (
     <div data-testid="sale-request-detail">
       <div className="flex flex-wrap items-center gap-3">
@@ -172,36 +254,108 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         </ul>
       ) : null}
 
-      <dl className="mt-6 rounded-[16px] border border-[#E5E9F2] bg-white px-4">
-        <DataRow label="Ano" value={String(request.year)} />
-        <DataRow label="Quilometragem" value={formatMileage(request.mileage)} />
-        <DataRow
-          label="Câmbio"
-          value={TRANSMISSION_LABEL[request.transmission] || request.transmission}
-        />
-        <DataRow
-          label="Combustível"
-          value={FUEL_LABEL[request.fuel_type] || request.fuel_type}
-        />
-        <DataRow
-          label="Estado de conservação"
-          value={CONDITION_LABEL.get(request.declared_condition) || request.declared_condition}
-        />
-        <DataRow
-          label="Cidade"
-          value={`${request.city.name}${request.city.state ? ` - ${request.city.state}` : ""}`}
-        />
-        {fipe ? <DataRow label="Referência FIPE" value={fipe} /> : null}
-        <DataRow
-          label="Publicada em"
-          value={new Date(request.created_at).toLocaleDateString("pt-BR")}
-        />
-      </dl>
+      {/*
+        Duas colunas a partir de `md`, uma no mobile. Os cartões são
+        independentes, então a grade pode reorganizá-los sem quebrar leitura
+        nenhuma — e o detalhe não vira um painel único ilegível.
+      */}
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <Card title="Dados do veículo">
+          <DataRow label="Ano" value={String(request.year)} />
+          <DataRow label="Quilometragem" value={formatMileage(request.mileage)} />
+          <DataRow
+            label="Câmbio"
+            value={TRANSMISSION_LABEL[request.transmission] || request.transmission}
+          />
+          <DataRow label="Combustível" value={FUEL_LABEL[request.fuel_type] || request.fuel_type} />
+          <DataRow
+            label="Cidade"
+            value={`${request.city.name}${request.city.state ? ` - ${request.city.state}` : ""}`}
+          />
+          {fipe ? <DataRow label="Referência FIPE" value={fipe} /> : null}
+          <DataRow
+            label="Publicada em"
+            value={new Date(request.created_at).toLocaleDateString("pt-BR")}
+          />
+        </Card>
+
+        <Card title="Estado geral e pneus">
+          <DataRow
+            label="Estado geral"
+            value={CONDITION_LABEL.get(request.declared_condition) || request.declared_condition}
+          />
+          <DataRow label="Pneus" value={readTireCondition(request.tire_condition)} />
+        </Card>
+
+        <Card title="Pendências e documentação">
+          <DataRow
+            label="Financiamento ativo"
+            value={withAmount(
+              readYesNoUnknown(request.financing_status),
+              request.financing_balance
+            )}
+          />
+          <DataRow
+            label="Multas pendentes"
+            value={withAmount(readYesNoUnknown(request.fines_status), request.fines_amount)}
+          />
+          <DataRow
+            label="IPVA"
+            value={withAmount(readIpvaStatus(request.ipva_status), request.ipva_amount_due)}
+          />
+          <DataRow label="Licenciamento" value={readLicensingStatus(request.licensing_status)} />
+        </Card>
+
+        <Card title="Histórico do veículo">
+          <DataRow label="Laudo cautelar" value={readCautionReport(request.caution_report_status)} />
+          <DataRow
+            label="Passagem por leilão"
+            value={readYesNoUnknown(request.auction_history)}
+          />
+          <DataRow
+            label="Colisão ou sinistro conhecido"
+            value={readYesNoUnknown(request.collision_history)}
+          />
+        </Card>
+
+        <Card title="Mecânica">
+          <MechanicalRow
+            label="Motor"
+            condition={request.engine_condition}
+            notes={request.engine_notes}
+          />
+          <MechanicalRow
+            label="Câmbio"
+            condition={request.gearbox_condition}
+            notes={request.gearbox_notes}
+          />
+          <MechanicalRow
+            label="Suspensão"
+            condition={request.suspension_condition}
+            notes={request.suspension_notes}
+          />
+        </Card>
+
+        <Card title="Lataria e pintura">
+          <DataRow label="Situação" value={readBodyPaintStatus(request.body_paint_status)} />
+          {/*
+            A linha de detalhes só existe quando o estado declarado é "possui
+            detalhes". Mostrá-la vazia para quem respondeu "nenhum detalhe"
+            sugeriria uma pergunta sem resposta onde a resposta foi dada.
+          */}
+          {request.body_paint_status === "issues" ? (
+            <DataRow label="Detalhes" value={bodyPaintIssuesLabel} />
+          ) : null}
+          {request.body_paint_notes ? (
+            <DataRow label="Onde" value={request.body_paint_notes} />
+          ) : null}
+        </Card>
+      </div>
 
       {request.known_issues ? (
-        <section className="mt-5 rounded-[16px] border border-[#E5E9F2] bg-white p-4">
-          <h2 className="text-sm font-bold text-[#161f34]">Problemas conhecidos</h2>
-          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[#475467]">
+        <section className="mt-4 rounded-2xl border border-[#E5E9F2] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+          <h2 className="text-[13px] font-bold text-[#161f34]">Observações adicionais</h2>
+          <p className="mt-2 whitespace-pre-line text-[13px] leading-relaxed text-[#475467]">
             {request.known_issues}
           </p>
         </section>
@@ -224,9 +378,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
               className="rounded-[16px] border border-[#E5E9F2] bg-[#F9FBFF] p-4"
               data-testid="sale-request-cancel-confirm"
             >
-              <p className="text-sm font-semibold text-[#1D2440]">
-                Cancelar esta solicitação?
-              </p>
+              <p className="text-sm font-semibold text-[#1D2440]">Cancelar esta solicitação?</p>
               <p className="mt-1 text-sm text-[#64748b]">
                 Ela sai da lista das lojas e continua no seu histórico. Não é possível reativá-la.
               </p>

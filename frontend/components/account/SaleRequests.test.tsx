@@ -36,6 +36,62 @@ vi.mock("@/lib/sale-requests/api", async (importOriginal) => {
   };
 });
 
+/**
+ * Ficha RESPONDIDA. É o estado de qualquer solicitação criada depois desta
+ * evolução — o backend exige resposta explícita em todos estes campos.
+ */
+export const ANSWERED_EVALUATION = {
+  tire_condition: "good",
+  financing_status: "no",
+  financing_balance: null,
+  fines_status: "no",
+  fines_amount: null,
+  ipva_status: "paid",
+  ipva_amount_due: null,
+  licensing_status: "ok",
+  caution_report_status: "not_available",
+  auction_history: "no",
+  collision_history: "no",
+  engine_condition: "ok",
+  engine_notes: null,
+  gearbox_condition: "ok",
+  gearbox_notes: null,
+  suspension_condition: "ok",
+  suspension_notes: null,
+  body_paint_status: "none",
+  body_paint_issues: [],
+  body_paint_notes: null,
+} satisfies Partial<SaleRequest>;
+
+/**
+ * Ficha NÃO COLETADA: a solicitação foi publicada antes desta evolução.
+ *
+ * Tudo `null` — inclusive `body_paint_issues`, que numa linha nova seria `[]`.
+ * A tela precisa mostrar "Não informado" para todos eles, e nunca "Não".
+ */
+export const LEGACY_EVALUATION = {
+  tire_condition: null,
+  financing_status: null,
+  financing_balance: null,
+  fines_status: null,
+  fines_amount: null,
+  ipva_status: null,
+  ipva_amount_due: null,
+  licensing_status: null,
+  caution_report_status: null,
+  auction_history: null,
+  collision_history: null,
+  engine_condition: null,
+  engine_notes: null,
+  gearbox_condition: null,
+  gearbox_notes: null,
+  suspension_condition: null,
+  suspension_notes: null,
+  body_paint_status: null,
+  body_paint_issues: null,
+  body_paint_notes: null,
+} satisfies Partial<SaleRequest>;
+
 function makeRequest(overrides: Partial<SaleRequest> = {}): SaleRequest {
   return {
     id: 1,
@@ -53,6 +109,7 @@ function makeRequest(overrides: Partial<SaleRequest> = {}): SaleRequest {
     fuel_type: "flex",
     declared_condition: "bom",
     known_issues: null,
+    ...ANSWERED_EVALUATION,
     status: "receiving_offers",
     images: ["/api/vehicle-images?key=sale-requests%2F7%2Fs%2Fa.webp"],
     city: { name: "Atibaia", state: "SP", slug: "atibaia-sp" },
@@ -305,5 +362,125 @@ describe("cancelamento", () => {
 
     expect(screen.queryByTestId("sale-request-cancel-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("sale-request-cancelled-note")).toBeInTheDocument();
+  });
+});
+
+describe("detalhe — ficha de avaliação", () => {
+  it("exibe TODAS as seções da ficha depois de publicada", async () => {
+    // Coletar dezoito respostas e depois mostrar só marca, ano e km seria pedir
+    // trabalho sem devolver nada — e o dono não teria como conferir o que as
+    // lojas vão ver.
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest({
+        tire_condition: "half_life",
+        financing_status: "yes",
+        financing_balance: "18500.00",
+        fines_status: "no",
+        ipva_status: "installments",
+        ipva_amount_due: "450.50",
+        licensing_status: "ok",
+        caution_report_status: "approved_with_notes",
+        auction_history: "no",
+        collision_history: "no",
+        engine_condition: "ok",
+        gearbox_condition: "issue",
+        gearbox_notes: "Trepida ao trocar da segunda para a terceira.",
+        suspension_condition: "unknown",
+        body_paint_status: "issues",
+        body_paint_issues: ["scratches", "dents"],
+        body_paint_notes: "Pequeno amassado na porta traseira direita.",
+      }),
+    });
+
+    render(<SaleRequestDetail id="1" />);
+    await screen.findByTestId("sale-request-detail");
+
+    for (const title of [
+      "Dados do veículo",
+      "Estado geral e pneus",
+      "Pendências e documentação",
+      "Histórico do veículo",
+      "Mecânica",
+      "Lataria e pintura",
+    ]) {
+      expect(screen.getByText(title)).toBeTruthy();
+    }
+
+    expect(screen.getByText("Meia-vida")).toBeTruthy();
+    expect(screen.getByText("Aprovado com apontamentos")).toBeTruthy();
+    expect(screen.getByText("Possui problema")).toBeTruthy();
+    expect(screen.getByText("Trepida ao trocar da segunda para a terceira.")).toBeTruthy();
+    expect(screen.getByText("Não sei avaliar")).toBeTruthy();
+    expect(screen.getByText("Riscos, Amassados")).toBeTruthy();
+    expect(screen.getByText("Pequeno amassado na porta traseira direita.")).toBeTruthy();
+  });
+
+  it("mostra o valor junto da resposta que o justifica", async () => {
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest({
+        financing_status: "yes",
+        financing_balance: "18500.00",
+        ipva_status: "installments",
+        ipva_amount_due: "450.50",
+      }),
+    });
+
+    render(<SaleRequestDetail id="1" />);
+    await screen.findByTestId("sale-request-detail");
+
+    expect(screen.getByText("Sim (R$ 18.500,00)")).toBeTruthy();
+    expect(screen.getByText("Parcelado (R$ 450,50)")).toBeTruthy();
+  });
+
+  it("solicitação LEGADA mostra 'Não informado' — nunca 'Não'", async () => {
+    // Este é o teste que protege a distinção mais importante da migration 054:
+    // NULL significa "a versão anterior do formulário não perguntou", e traduzir
+    // isso para "Não" transformaria silêncio numa declaração do proprietário —
+    // uma declaração sobre a qual um lojista faria uma oferta.
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest(LEGACY_EVALUATION),
+    });
+
+    render(<SaleRequestDetail id="1" />);
+    await screen.findByTestId("sale-request-detail");
+
+    // A tela abre normalmente...
+    expect(screen.getByText("45.000 km")).toBeTruthy();
+
+    // ...e toda a ficha aparece como não informada.
+    const naoInformado = screen.getAllByText("Não informado");
+    expect(naoInformado.length).toBeGreaterThanOrEqual(12);
+
+    // NENHUM "Não" isolado: seria uma resposta que ninguém deu.
+    expect(screen.queryByText("Não")).toBeNull();
+    expect(screen.queryByText("Quitado")).toBeNull();
+    expect(screen.queryByText("Sem problemas conhecidos")).toBeNull();
+  });
+
+  it("a linha de detalhes de lataria não aparece quando não há detalhes", async () => {
+    // Mostrá-la vazia para quem respondeu "nenhum detalhe" sugeriria uma
+    // pergunta sem resposta onde a resposta foi dada.
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest({ body_paint_status: "none", body_paint_issues: [] }),
+    });
+
+    render(<SaleRequestDetail id="1" />);
+    await screen.findByTestId("sale-request-detail");
+
+    expect(screen.getByText("Nenhum detalhe conhecido")).toBeTruthy();
+    expect(screen.queryByText("Detalhes")).toBeNull();
+  });
+
+  it("continua sem botão de edição", async () => {
+    // Publicou, não edita campo economicamente relevante: quando os lances
+    // existirem, mudar a quilometragem debaixo de uma oferta já feita seria
+    // alterar o objeto do negócio depois da proposta.
+    getSaleRequest.mockResolvedValue({ sale_request: makeRequest() });
+
+    render(<SaleRequestDetail id="1" />);
+    await screen.findByTestId("sale-request-detail");
+
+    expect(screen.queryByRole("button", { name: /editar/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /editar/i })).toBeNull();
   });
 });

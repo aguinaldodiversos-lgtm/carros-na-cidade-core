@@ -5,7 +5,7 @@ import { requirePfDashboardSession } from "@/lib/account/dashboard-session";
 
 export const metadata: Metadata = {
   title: "Enviar meu carro para as lojas",
-  description: "Cadastre o seu veículo para as lojas da sua cidade avaliarem.",
+  description: "Preencha a ficha do seu veículo para as lojas da sua cidade avaliarem.",
   alternates: { canonical: "/dashboard/vender-para-lojas/nova" },
 };
 
@@ -15,6 +15,18 @@ export const dynamic = "force-dynamic";
  * Segmento estático `nova` convive com o dinâmico `[id]` porque o App Router
  * resolve o literal primeiro — `/vender-para-lojas/nova` nunca cai no detalhe.
  * Mesmo arranjo já usado por `minhas-procuras/nova`.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O TÍTULO VIVE NO FORMULÁRIO, NÃO AQUI
+ * ────────────────────────────────────────────────────────────────────────────
+ * O `h1` e o subtítulo saíram desta página e passaram para `SaleRequestForm`
+ * porque o cabeçalho da ficha carrega o INDICADOR DE PROGRESSO, e o progresso é
+ * derivado do estado do formulário. Mantê-lo aqui exigiria elevar o estado da
+ * ficha inteira para um componente cliente acima desta página — ou duplicar o
+ * cálculo em dois lugares, que é o defeito que esta evolução existe para
+ * eliminar.
+ *
+ * A página continua sendo o Server Component que exige a sessão PF.
  */
 export default async function NovaSolicitacaoPage() {
   await requirePfDashboardSession();
@@ -28,23 +40,9 @@ export default async function NovaSolicitacaoPage() {
         ← Vender para lojas
       </Link>
 
-      <header className="mb-6 mt-3">
-        <h1 className="text-xl font-bold text-[#161f34] sm:text-2xl">
-          Enviar meu carro para as lojas
-        </h1>
-        {/*
-          O texto descreve o que ACONTECE agora e o que virá depois, sem
-          prometer oferta para hoje: a distribuição para lojistas é a Fase 4.2 e
-          os lances são a 4.3. Afirmar "receba propostas" antes disso faria a
-          pessoa esperar por algo que o produto ainda não entrega.
-        */}
-        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#64748b]">
-          Seu veículo será mostrado a lojas da sua cidade para que elas possam avaliar e, nas
-          próximas etapas do serviço, enviar propostas de compra.
-        </p>
-      </header>
-
-      <SaleRequestForm basePath="/dashboard" />
+      <div className="mt-3">
+        <SaleRequestForm basePath="/dashboard" />
+      </div>
     </section>
   );
 }
