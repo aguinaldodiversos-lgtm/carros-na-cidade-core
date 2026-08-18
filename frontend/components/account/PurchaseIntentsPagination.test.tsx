@@ -106,7 +106,7 @@ const SCENARIOS = [
 describe.each(SCENARIOS)("$name — paginação", (scenario) => {
   function page(ids: number[], nextCursor: string | null) {
     return {
-      purchase_intents: ids.map(scenario.makeItem),
+      items: ids.map(scenario.makeItem),
       next_cursor: nextCursor,
       limit: 20,
     };
