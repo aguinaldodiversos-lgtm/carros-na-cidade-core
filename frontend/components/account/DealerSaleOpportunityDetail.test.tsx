@@ -19,6 +19,24 @@ import {
  * suíte que só verificasse o que a tela mostra.
  */
 
+
+/**
+ * `next/navigation` mockado com um leitor de query REAL.
+ *
+ * `useSearchParams` não é decoração aqui: é por onde a loja escolhida chega à
+ * tela. Um mock que devolvesse sempre vazio esconderia a regra que este arquivo
+ * precisa exercitar — por isso o valor é controlável por teste.
+ */
+let currentSearch = "";
+const routerReplace = vi.fn((url: string) => {
+  currentSearch = String(url).replace(/^\?/, "");
+});
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: routerReplace, push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(currentSearch),
+}));
+
 const fetchSaleOpportunity = vi.fn();
 const submitSaleOffer = vi.fn();
 
@@ -84,6 +102,7 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  currentSearch = "";
   fetchSaleOpportunity.mockResolvedValue(makeDetail());
 });
 

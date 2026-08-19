@@ -39,7 +39,10 @@ import { expect, test } from "@playwright/test";
 
 const OWNER = { email: "cpf@carrosnacidade.com", password: "123456" };
 const DEALER_A = { email: "cnpj@carrosnacidade.com", password: "123456" };
-const DEALER_B = { email: "cnpj3@carrosnacidade.com", password: "123456" };
+// cnpj5@ e não cnpj3@: a terceira loja do seed é SUSPENSA de propósito (ela prova
+// o corte da moderação no Produto 1). A disputa precisa de duas lojas ATIVAS na
+// MESMA cidade, e cnpj5@ foi acrescentada ao seed exatamente para isso.
+const DEALER_B = { email: "cnpj5@carrosnacidade.com", password: "123456" };
 const DEALER_OTHER_CITY = { email: "cnpj2@carrosnacidade.com", password: "123456" };
 
 const FEED = "/dashboard-loja/oportunidades/veiculos";
@@ -70,95 +73,53 @@ async function login(page: Page, user: { email: string; password: string }) {
   expect(res.ok(), `login de ${user.email} falhou com ${res.status()}`).toBeTruthy();
 }
 
-/** A PF publica a solicitação do spec e devolve o id. */
-async function publishSaleRequest(page: Page): Promise<string> {
-  const cityRes = await page.request.get("/api/painel/cidades/search?q=Atibaia&uf=SP");
-  expect(cityRes.ok()).toBeTruthy();
-  const cityBody = (await cityRes.json()) as { data?: Array<{ id: number; name: string }> };
-  const atibaia = (cityBody.data || []).find((row) => /^Atibaia$/i.test(row.name));
-  expect(atibaia, "Atibaia precisa existir no catálogo (npm run e2e:prepare)").toBeTruthy();
+/**
+ * A solicitação de venda usada pela disputa — SEMEADA, não publicada aqui.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * POR QUE SEMEADA
+ * ────────────────────────────────────────────────────────────────────────────
+ * Publicar exige no mínimo quatro fotos, e o upload passa pelo R2. Sem
+ * credenciais, o endpoint responde 503 com `SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE`
+ * — que é o comportamento CORRETO, não um defeito: a Fase 4.1 criou esse código
+ * exatamente para não mandar a pessoa trocar uma foto que está perfeita quando o
+ * problema é o bucket.
+ *
+ * Deixar o gate inteiro parado por falta de credencial de storage seria trocar a
+ * prova da DISPUTA — que é o assunto desta fase — por uma prova de
+ * infraestrutura. `scripts/e2e-seed.mjs` cria a linha, do mesmo jeito que já
+ * cria os anúncios do Produto 1.
+ *
+ * O caminho de publicação da PF NÃO fica sem prova: ele tem cobertura própria em
+ * tests/sale-requests/ (validação, service e rotas, contra o router real).
+ *
+ * A função LÊ o feed do lojista para descobrir o id — não recebe um número
+ * fixo. Assim o spec continua válido quando o seed rodar de novo e a linha
+ * mudar de id.
+ */
+async function findSeededSaleRequest(page: Page): Promise<string> {
+  const res = await page.request.get("/api/account/opportunities/sale-requests");
 
-  // As fotos são obrigatórias na publicação (mínimo 4). O upload real exige R2;
-  // aqui o spec usa o endpoint de fotos do próprio produto, que devolve as
-  // chaves — se ele não estiver disponível, o skip diz exatamente isso em vez de
-  // falhar num passo adiante.
-  const photos = await page.request.post("/api/account/sale-requests/photos", {
-    multipart: {
-      photos: {
-        name: "carro.webp",
-        mimeType: "image/webp",
-        buffer: Buffer.from(
-          "UklGRhIAAABXRUJQVlA4TAYAAAAvAAAAAAfQ//73v/+BiOh/AAA=",
-          "base64"
-        ),
-      },
-    },
-  });
-
-  if (!photos.ok()) {
+  if (res.status() === 403) {
     test.skip(
       true,
-      `upload de foto indisponível (${photos.status()}). O R2 está configurado? Sem foto não há publicação.`
+      "lojista sem loja elegível — o seed rodou? (npm run e2e:prepare)"
     );
   }
+  expect(res.ok(), `o feed do lojista respondeu ${res.status()}`).toBeTruthy();
 
-  const uploaded = (await photos.json()) as { photos?: Array<{ storage_key: string }> };
-  const keys = (uploaded.photos || []).map((photo) => photo.storage_key);
-  expect(keys.length, "o upload precisa devolver ao menos uma chave").toBeGreaterThan(0);
+  const body = (await res.json()) as {
+    items?: Array<{ id: number | string; fipe_model_description: string }>;
+  };
+  const items = body.items || [];
 
-  // O mínimo de fotos é 4; reenviamos até completar, reusando o mesmo arquivo.
-  while (keys.length < 4) {
-    const extra = await page.request.post("/api/account/sale-requests/photos", {
-      multipart: {
-        photos: {
-          name: `carro-${keys.length}.webp`,
-          mimeType: "image/webp",
-          buffer: Buffer.from(
-            "UklGRhIAAABXRUJQVlA4TAYAAAAvAAAAAAfQ//73v/+BiOh/AAA=",
-            "base64"
-          ),
-        },
-      },
-    });
-    expect(extra.ok()).toBeTruthy();
-    const body = (await extra.json()) as { photos?: Array<{ storage_key: string }> };
-    keys.push(...(body.photos || []).map((photo) => photo.storage_key));
-  }
+  const target = items.find((item) => /T-Cross/i.test(item.fipe_model_description));
+  expect(
+    target,
+    "a solicitação semeada não apareceu no feed — rode: node scripts/e2e-seed.mjs"
+  ).toBeTruthy();
 
-  const created = await page.request.post("/api/account/sale-requests", {
-    headers: { "Content-Type": "application/json" },
-    data: {
-      city_id: atibaia!.id,
-      brand: "VW - VolksWagen",
-      fipe_model_description: "T-Cross 200 TSI 1.0 Flex 12V 5p Aut.",
-      year: "2020",
-      mileage: "45000",
-      transmission: "Automático",
-      fuel_type: "Flex",
-      declared_condition: "bom",
-      tire_condition: "good",
-      financing_status: "no",
-      fines_status: "no",
-      ipva_status: "paid",
-      licensing_status: "ok",
-      caution_report_status: "not_available",
-      auction_history: "no",
-      collision_history: "no",
-      engine_condition: "ok",
-      gearbox_condition: "ok",
-      suspension_condition: "ok",
-      body_paint_status: "none",
-      images: keys.slice(0, 4),
-    },
-  });
-
-  if (created.status() === 429) {
-    test.skip(true, "rate limit de criação esgotado. Aguarde um minuto.");
-  }
-  expect(created.status(), "a publicação da solicitação precisa devolver 201").toBe(201);
-
-  const body = (await created.json()) as { sale_request: { id: number | string } };
-  return String(body.sale_request.id);
+  return String(target!.id);
 }
 
 async function openDetail(page: Page, saleRequestId: string) {
@@ -181,12 +142,9 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
   test("o ciclo completo: publicar, propor, ser coberto, e nunca ver o concorrente", async ({
     page,
   }) => {
-    // ── 1. A PF publica ──────────────────────────────────────────────────────
-    await login(page, OWNER);
-    const saleRequestId = await publishSaleRequest(page);
-
-    // ── 2. Lojista A vê o carro no feed ──────────────────────────────────────
+    // ── 1. Lojista A vê o carro publicado pela PF ────────────────────────────
     await login(page, DEALER_A);
+    const saleRequestId = await findSeededSaleRequest(page);
     await page.goto(FEED);
 
     await expect(page.getByTestId("dealer-sale-opportunities-list")).toBeVisible({

@@ -65,8 +65,14 @@ const PF_ID = "8";
 const STORE_A = 100;
 const STORE_B = 200;
 
-function seedDealer({ userId, cityId = ATIBAIA.id, id, status = "active" }) {
-  db.advertisers.push({ id, user_id: userId, city_id: cityId, status });
+function seedDealer({ userId, cityId = ATIBAIA.id, id, status = "active", name = null }) {
+  db.advertisers.push({
+    id,
+    user_id: userId,
+    city_id: cityId,
+    status,
+    name: name ?? `Loja ${id}`,
+  });
   return id;
 }
 
@@ -106,9 +112,10 @@ function seedRequest(overrides = {}) {
   return row;
 }
 
-function offer(app, { user = DEALER_A, id, body }) {
+function offer(app, { user = DEALER_A, id, body, advertiserId = null }) {
+  const query = advertiserId == null ? "" : `?advertiser_id=${advertiserId}`;
   return request(app)
-    .post(`${BASE}/${id}/offers`)
+    .post(`${BASE}/${id}/offers${query}`)
     .set("x-test-user", user)
     .set("x-test-account", "CNPJ")
     .send(body);
@@ -640,5 +647,133 @@ describe("ausência de prazo e de estados futuros", () => {
     for (const term of ["whatsapp", "wa.me", "telefone", "tel:", "mailto", "chat"]) {
       expect(raw).not.toContain(term);
     }
+  });
+});
+
+// ============================================================================
+describe("a LOJA que fez a proposta", () => {
+  it("com uma loja só, o advertiser_id gravado é o dela", async () => {
+    const row = seedRequest();
+    await offer(buildApp(), { id: row.id, body: { amount: "50000" } });
+
+    expect(String(db.saleRequestOffers[0].advertiser_id)).toBe(String(STORE_A));
+  });
+
+  it("com DUAS lojas e nenhuma escolhida, a proposta é BLOQUEADA — não atribuída à toa", async () => {
+    seedDealer({ userId: DEALER_A, id: 300, cityId: ATIBAIA.id });
+    const row = seedRequest();
+
+    const response = await offer(buildApp(), { id: row.id, body: { amount: "50000" } });
+
+    expect(response.status).toBe(409);
+    expect(response.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED");
+    // O ponto do gate: NADA foi gravado em nome de nenhuma das duas.
+    expect(db.saleRequestOffers).toHaveLength(0);
+  });
+
+  it("escolhendo a Loja A, a proposta fica registrada em nome da Loja A", async () => {
+    seedDealer({ userId: DEALER_A, id: 300, cityId: ATIBAIA.id });
+    const row = seedRequest();
+
+    const response = await offer(buildApp(), {
+      id: row.id,
+      body: { amount: "50000" },
+      advertiserId: STORE_A,
+    });
+
+    expect(response.status).toBe(201);
+    expect(String(db.saleRequestOffers[0].advertiser_id)).toBe(String(STORE_A));
+  });
+
+  it("escolhendo a Loja 300, a MESMA conta registra em nome da Loja 300", async () => {
+    seedDealer({ userId: DEALER_A, id: 300, cityId: ATIBAIA.id });
+    const row = seedRequest();
+
+    const response = await offer(buildApp(), {
+      id: row.id,
+      body: { amount: "50000" },
+      advertiserId: 300,
+    });
+
+    expect(response.status).toBe(201);
+    expect(String(db.saleRequestOffers[0].advertiser_id)).toBe("300");
+    // A conta continua sendo a mesma pessoa: os dois atores são independentes.
+    expect(db.saleRequestOffers[0].dealer_user_id).toBe(DEALER_A);
+  });
+
+  it("loja de OUTRO usuário é recusada, mesmo que exista e esteja ativa", async () => {
+    const row = seedRequest();
+
+    const response = await offer(buildApp(), {
+      user: DEALER_A,
+      id: row.id,
+      body: { amount: "50000" },
+      advertiserId: STORE_B,
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_INVALID");
+    expect(db.saleRequestOffers).toHaveLength(0);
+  });
+
+  it("loja inexistente é recusada", async () => {
+    const row = seedRequest();
+
+    const response = await offer(buildApp(), {
+      id: row.id,
+      body: { amount: "50000" },
+      advertiserId: 999999,
+    });
+
+    expect(response.status).toBe(403);
+    expect(db.saleRequestOffers).toHaveLength(0);
+  });
+
+  it("loja da CIDADE ERRADA não alcança a solicitação — 404, e nada é gravado", async () => {
+    // O lojista A ganha uma segunda loja, em Bragança. Ela é legítima e dele,
+    // mas não atende Atibaia.
+    seedDealer({ userId: DEALER_A, id: 400, cityId: BRAGANCA.id });
+    const row = seedRequest({ city_id: ATIBAIA.id });
+
+    const response = await offer(buildApp(), {
+      id: row.id,
+      body: { amount: "50000" },
+      advertiserId: 400,
+    });
+
+    // 404 e não 403: para quem age pela loja de Bragança, um carro de Atibaia
+    // não existe. Dizer "cidade errada" confirmaria a existência da solicitação.
+    expect(response.status).toBe(404);
+    expect(db.saleRequestOffers).toHaveLength(0);
+  });
+
+  it("advertiser_id no CORPO é ignorado — o contexto vem da query verificada", async () => {
+    seedDealer({ userId: DEALER_A, id: 300, cityId: ATIBAIA.id });
+    const row = seedRequest();
+
+    const response = await offer(buildApp(), {
+      id: row.id,
+      // O corpo tenta uma loja; a query pede outra. Só a query é lida, e ela
+      // ainda assim é confrontada com o conjunto do servidor.
+      body: { amount: "50000", advertiser_id: STORE_B },
+      advertiserId: 300,
+    });
+
+    expect(response.status).toBe(201);
+    expect(String(db.saleRequestOffers[0].advertiser_id)).toBe("300");
+  });
+
+  it("duas lojas do MESMO usuário disputam de verdade: cada lance guarda a sua", async () => {
+    seedDealer({ userId: DEALER_A, id: 300, cityId: ATIBAIA.id });
+    const app = buildApp();
+    const row = seedRequest();
+
+    await offer(app, { id: row.id, body: { amount: "50000" }, advertiserId: STORE_A });
+    await offer(app, { id: row.id, body: { amount: "52000" }, advertiserId: 300 });
+
+    expect(db.saleRequestOffers.map((item) => String(item.advertiser_id))).toEqual([
+      String(STORE_A),
+      "300",
+    ]);
   });
 });

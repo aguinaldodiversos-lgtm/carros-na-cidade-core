@@ -436,6 +436,36 @@ function handle(text, params, now) {
     };
   }
 
+  // --- advertisers: as lojas ELEGÍVEIS, com nome e cidade -------------------
+  //
+  // Query separada da do Produto 1 (logo abaixo) de propósito: aquela é o SQL
+  // que a suíte de procuras casa por regex, e acrescentar um JOIN nela quebraria
+  // o outro domínio. Esta é a do seletor de loja.
+  if (/^SELECT adv.id AS advertiser_id/i.test(text)) {
+    const [userId, activeStatus] = params;
+    const rows = db.advertisers
+      .filter((advertiser) => {
+        if (!sameId(advertiser.user_id, userId)) return false;
+        const status = String(advertiser.status ?? "").trim();
+        if ((status === "" ? "active" : status) !== activeStatus) return false;
+        // JOIN INNER com cities: loja cuja city_id não casa o catálogo não é
+        // elegível — ela não veria feed nenhum.
+        return cityOf(advertiser.city_id) != null;
+      })
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .map((advertiser) => {
+        const city = cityOf(advertiser.city_id);
+        return {
+          advertiser_id: advertiser.id,
+          advertiser_name: advertiser.name ?? null,
+          city_id: advertiser.city_id,
+          city_name: city?.name ?? null,
+          city_state: city?.state ?? null,
+        };
+      });
+    return { rows, rowCount: rows.length };
+  }
+
   // --- advertisers: a loja que resolve a cidade do lojista ------------------
   if (/^SELECT adv\.id, adv\.user_id, adv\.city_id, adv\.status FROM advertisers adv/i.test(text)) {
     const [userId, activeStatus] = params;

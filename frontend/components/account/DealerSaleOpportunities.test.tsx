@@ -5,9 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DealerSaleOpportunitiesList from "./DealerSaleOpportunitiesList";
-import type {
-  DealerSaleOpportunityPage,
-  DealerSaleOpportunitySummary,
+import {
+  DealerSaleOpportunityError,
+  type DealerSaleOpportunityPage,
+  type DealerSaleOpportunitySummary,
 } from "@/lib/sale-requests/dealer-api";
 
 /**
@@ -23,6 +24,24 @@ import type {
  * Um botão de WhatsApp ou uma etiqueta "Margem: Boa" aparecendo aqui prometeria
  * um fluxo e um cálculo que o sistema não tem.
  */
+
+
+/**
+ * `next/navigation` mockado com um leitor de query REAL.
+ *
+ * `useSearchParams` não é decoração aqui: é por onde a loja escolhida chega à
+ * tela. Um mock que devolvesse sempre vazio esconderia a regra que este arquivo
+ * precisa exercitar — por isso o valor é controlável por teste.
+ */
+let currentSearch = "";
+const routerReplace = vi.fn((url: string) => {
+  currentSearch = String(url).replace(/^\?/, "");
+});
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: routerReplace, push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(currentSearch),
+}));
 
 const fetchSaleOpportunities = vi.fn();
 
@@ -102,6 +121,7 @@ function makePage(overrides: Partial<DealerSaleOpportunityPage> = {}): DealerSal
 
 beforeEach(() => {
   vi.clearAllMocks();
+  currentSearch = "";
   fetchSaleOpportunities.mockResolvedValue(makePage());
 });
 
@@ -452,5 +472,98 @@ describe("paginação", () => {
 
     await waitFor(() => expect(fetchSaleOpportunities).toHaveBeenCalled());
     expect(fetchSaleOpportunities.mock.calls[0][0].cursor).toBe("cursor-abc");
+  });
+});
+
+// ============================================================================
+describe("seletor de loja — quando a conta tem mais de uma", () => {
+  const STORES = [
+    { advertiser_id: 100, name: "Auto Atibaia", city: { name: "Atibaia", state: "SP" } },
+    { advertiser_id: 101, name: "Auto Bragança", city: { name: "Bragança Paulista", state: "SP" } },
+  ];
+
+  function rejectWithSelection() {
+    fetchSaleOpportunities.mockRejectedValue(
+      new DealerSaleOpportunityError(
+        "Escolha a loja que vai comprar.",
+        409,
+        "SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED",
+        null,
+        STORES
+      )
+    );
+  }
+
+  it("o 409 vira PERGUNTA, não tela de erro", async () => {
+    rejectWithSelection();
+    render(<DealerSaleOpportunitiesList />);
+
+    expect(await screen.findByTestId("dealer-store-picker")).toBeTruthy();
+    // A distinção que importa: escolher loja não é falha.
+    expect(screen.queryByTestId("dealer-sale-opportunities-error")).toBeNull();
+    expect(screen.queryByTestId("dealer-sale-opportunities-empty")).toBeNull();
+  });
+
+  it("mostra as duas lojas, com nome e cidade", async () => {
+    rejectWithSelection();
+    render(<DealerSaleOpportunitiesList />);
+
+    const picker = await screen.findByTestId("dealer-store-picker");
+    expect(within(picker).getByText("Auto Atibaia")).toBeTruthy();
+    expect(within(picker).getByText("Auto Bragança")).toBeTruthy();
+    expect(within(picker).getByText("Bragança Paulista - SP")).toBeTruthy();
+  });
+
+  it("escolher uma loja põe a escolha na URL", async () => {
+    rejectWithSelection();
+    render(<DealerSaleOpportunitiesList />);
+
+    const options = await screen.findAllByTestId("dealer-store-option");
+    await userEvent.click(options[1]);
+
+    // O contrato do componente termina aqui: ele escreve a escolha na URL.
+    // Quem re-renderiza com o novo `searchParams` é o roteador do Next, e o
+    // efeito disso — a busca sair com `advertiserId` — é o que o teste seguinte
+    // prova, entrando na tela já com `?loja=` na URL.
+    //
+    // Afirmar as duas coisas neste mesmo teste exigiria simular a navegação do
+    // Next dentro do mock, e o teste passaria a provar o roteador em vez do
+    // componente.
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("?loja=101"));
+  });
+
+  it("entrando com a loja na URL, a busca sai com ela", async () => {
+    currentSearch = "loja=101";
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    await screen.findByText("Volkswagen T-Cross 2020");
+    expect(fetchSaleOpportunities.mock.calls[0][0].advertiserId).toBe("101");
+  });
+
+  it("com a loja escolhida na URL, o seletor não aparece", async () => {
+    currentSearch = "loja=100";
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    await screen.findByText("Volkswagen T-Cross 2020");
+    expect(screen.queryByTestId("dealer-store-picker")).toBeNull();
+  });
+
+  it("a loja escolhida acompanha o link do card para o detalhe", async () => {
+    currentSearch = "loja=100";
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    const link = await screen.findByTestId("dealer-sale-opportunity-link");
+    expect(link.getAttribute("href")).toContain("?loja=100");
+  });
+
+  it("com UMA loja só, ninguém é perguntado", async () => {
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    await screen.findByText("Volkswagen T-Cross 2020");
+    expect(screen.queryByTestId("dealer-store-picker")).toBeNull();
   });
 });

@@ -175,9 +175,9 @@ async function seedWorld() {
   const advertiserIds = [];
   for (const [index, dealer] of dealerRows.entries()) {
     const { rows } = await pool.query(
-      `INSERT INTO advertisers (user_id, name, city_id, status)
-       VALUES ($1, $2, $3, 'active') RETURNING id`,
-      [dealer.id, `Loja ${index}`, cityId]
+      `INSERT INTO advertisers (user_id, name, slug, city_id, status)
+       VALUES ($1, $2, $3, $4, 'active') RETURNING id`,
+      [dealer.id, `Loja ${index}`, `loja-${index}-${dealer.id}`, cityId]
     );
     advertiserIds.push(rows[0].id);
   }
@@ -218,8 +218,19 @@ async function readOffers(saleRequestId) {
   return rows;
 }
 
-/** Executa uma proposta e devolve `{ ok }` ou `{ ok:false, status, code }`. */
-async function propose(dealerIndex, saleRequestId, amount) {
+/**
+ * Executa uma proposta e devolve `{ ok }` ou `{ ok:false, status, code }`.
+ *
+ * `delayMs` existe para VARIAR quem chega primeiro ao lock. Sem ele, duas
+ * chamadas disparadas no mesmo `Promise.all` tendem a entrar sempre na mesma
+ * ordem, e o teste passaria a provar um único escalonamento — o mais favorável.
+ * Com jitter, rodadas diferentes têm vencedores de LOCK diferentes, e o
+ * invariante precisa valer em todas.
+ */
+async function propose(dealerIndex, saleRequestId, amount, { delayMs = 0 } = {}) {
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
   try {
     const result = await offersService.createSaleOffer(
       world.dealerIds[dealerIndex],
@@ -329,20 +340,56 @@ describe.sequential("integração — concorrência real", () => {
     expect(rows[1].amount).toBe("51000.00");
   });
 
-  it("o resultado é ESTÁVEL: cinco rodadas, sempre a maior vence", async () => {
-    for (let round = 0; round < 5; round += 1) {
+  it("VINTE E QUATRO rodadas com jitter: o invariante vale em todo escalonamento", async () => {
+    // O jitter alterna qual conexão chega primeiro ao lock. A tabela cobre os
+    // dois lados (A antes de B, B antes de A) e o empate aproximado, para que o
+    // teste não fique provando um único escalonamento — o mais favorável.
+    const jitters = [
+      [0, 0],
+      [0, 3],
+      [3, 0],
+      [0, 8],
+      [8, 0],
+      [2, 2],
+    ];
+
+    let bWon = 0;
+
+    for (let round = 0; round < 24; round += 1) {
+      const [delayA, delayB] = jitters[round % jitters.length];
       const saleRequestId = await insertSaleRequest();
       await propose(0, saleRequestId, "50000");
 
       const [a, b] = await Promise.all([
-        propose(1, saleRequestId, "51000"),
-        propose(2, saleRequestId, "50500"),
+        propose(1, saleRequestId, "51000", { delayMs: delayA }),
+        propose(2, saleRequestId, "50500", { delayMs: delayB }),
       ]);
 
-      expect([a, b].filter((item) => item.ok)).toHaveLength(1);
-      const rows = await readOffers(saleRequestId);
-      expect(rows.map((row) => row.amount)).toEqual(["50000.00", "51000.00"]);
+      // Exatamente uma das duas entra, SEMPRE — e é a de 51.000, porque 50.500
+      // não supera 51.000 em ordem nenhuma de execução. Quando B pega o lock
+      // primeiro, ela entra (supera 50.000) e A entra depois superando B; nesse
+      // caso as DUAS passam, e o histórico continua estritamente crescente.
+      const amounts = (await readOffers(saleRequestId)).map((row) => Number(row.amount));
+
+      const violates = amounts.some(
+        (amount, index) => index > 0 && amount <= Math.max(...amounts.slice(0, index))
+      );
+      expect(
+        violates,
+        `rodada ${round}: histórico ${JSON.stringify(amounts)} viola a regra do líder`
+      ).toBe(false);
+
+      // O maior valor SEMPRE vence a disputa final.
+      expect(Math.max(...amounts)).toBe(51000);
+
+      if (b.ok) bWon += 1;
+      expect(a.ok || b.ok).toBe(true);
     }
+
+    // Diagnóstico, não asserção de produto: se B nunca vencesse o lock em 24
+    // rodadas, o jitter não estaria variando nada e as rodadas seriam a mesma
+    // rodada repetida. O log torna isso visível em vez de silencioso.
+    console.log(`[concorrência] B obteve o lock primeiro em ${bWon}/24 rodadas`);
   });
 
   it("QUATRO lojas simultâneas com valores crescentes: o histórico nunca viola a regra", async () => {

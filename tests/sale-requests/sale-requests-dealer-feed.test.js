@@ -72,9 +72,21 @@ const OTHER_DEALER_ID = "21";
 const PF_ID = "8";
 
 /** Lojista com UMA loja ativa em Atibaia — o caso feliz. */
-function seedDealer({ userId = DEALER_ID, cityId = ATIBAIA.id, id = null, status = "active" } = {}) {
+function seedDealer({
+  userId = DEALER_ID,
+  cityId = ATIBAIA.id,
+  id = null,
+  status = "active",
+  name = null,
+} = {}) {
   const advertiserId = id ?? db.advertisers.length + 100;
-  db.advertisers.push({ id: advertiserId, user_id: userId, city_id: cityId, status });
+  db.advertisers.push({
+    id: advertiserId,
+    user_id: userId,
+    city_id: cityId,
+    status,
+    name: name ?? `Loja ${advertiserId}`,
+  });
   return advertiserId;
 }
 
@@ -207,24 +219,129 @@ describe("resolução da loja — multi-advertiser determinístico", () => {
     expect(response.status).toBe(200);
   });
 
-  it("DUAS lojas em cidades DIFERENTES falham fechado: 403, nunca 'a primeira'", async () => {
+  // ==========================================================================
+  // MAIS DE UMA LOJA: O SERVIDOR NÃO DESEMPATA
+  // ==========================================================================
+  // Uma versão anterior desta fase escolhia a loja de MENOR id. Era
+  // determinístico — e atribuía a proposta a uma empresa que talvez não a
+  // tivesse feito. Os testes abaixo travam a regra que substituiu aquela.
+
+  it("DUAS lojas em cidades DIFERENTES: 409 pedindo escolha, não um 403 mudo", async () => {
     seedDealer({ id: 100, cityId: ATIBAIA.id });
     seedDealer({ id: 101, cityId: BRAGANCA.id });
     seedRequest();
 
     const response = await asDealer(buildApp());
-    expect(response.status).toBe(403);
-    expect(response.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_UNRESOLVED");
+
+    expect(response.status).toBe(409);
+    expect(response.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED");
   });
 
-  it("duas lojas na MESMA cidade resolvem — e o resultado não depende da ordem de inserção", async () => {
+  it("DUAS lojas na MESMA cidade também exigem escolha — a cidade não desambigua a LOJA", async () => {
     seedDealer({ id: 205, cityId: ATIBAIA.id });
     seedDealer({ id: 101, cityId: ATIBAIA.id });
     seedRequest();
 
     const response = await asDealer(buildApp());
+
+    expect(response.status).toBe(409);
+    expect(response.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED");
+  });
+
+  it("o 409 carrega as lojas do PRÓPRIO usuário, para a tela oferecer a escolha", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id, name: "Auto Atibaia" });
+    seedDealer({ id: 101, cityId: BRAGANCA.id, name: "Auto Bragança" });
+
+    const response = await asDealer(buildApp());
+    const stores = response.body?.details?.stores ?? [];
+
+    expect(stores).toHaveLength(2);
+    expect(stores.map((store) => store.name).sort()).toEqual(["Auto Atibaia", "Auto Bragança"]);
+    expect(stores[0].city).toEqual({ name: ATIBAIA.name, state: ATIBAIA.state });
+  });
+
+  it("escolhendo a loja de Atibaia, o feed é de ATIBAIA", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedDealer({ id: 101, cityId: BRAGANCA.id });
+    const here = seedRequest({ city_id: ATIBAIA.id });
+    seedRequest({ city_id: BRAGANCA.id });
+
+    const response = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=100");
+
     expect(response.status).toBe(200);
-    expect(response.body.items).toHaveLength(1);
+    expect(response.body.items.map((item) => item.id)).toEqual([here.id]);
+  });
+
+  it("escolhendo a loja de Bragança, o MESMO usuário vê o feed de BRAGANÇA", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedDealer({ id: 101, cityId: BRAGANCA.id });
+    seedRequest({ city_id: ATIBAIA.id });
+    const there = seedRequest({ city_id: BRAGANCA.id });
+
+    const response = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=101");
+
+    expect(response.status).toBe(200);
+    expect(response.body.items.map((item) => item.id)).toEqual([there.id]);
+  });
+
+  it("loja de OUTRO usuário é recusada — o id pedido nunca vira autorização", async () => {
+    seedDealer({ id: 100, userId: DEALER_ID, cityId: ATIBAIA.id });
+    seedDealer({ id: 900, userId: OTHER_DEALER_ID, cityId: ATIBAIA.id });
+    seedRequest();
+
+    const response = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=900");
+
+    expect(response.status).toBe(403);
+    expect(response.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_INVALID");
+  });
+
+  it("loja INEXISTENTE recebe a MESMA resposta de loja alheia", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedRequest();
+
+    const alheia = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=999999");
+
+    expect(alheia.status).toBe(403);
+    expect(alheia.body?.details?.code).toBe("SALE_OPPORTUNITY_STORE_INVALID");
+  });
+
+  it("loja SUSPENSA do próprio usuário é recusada", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedDealer({ id: 101, cityId: ATIBAIA.id, status: "suspended" });
+    seedRequest();
+
+    const response = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=101");
+    expect(response.status).toBe(403);
+  });
+
+  it("com UMA loja só, o advertiser_id é dispensável — e o correto é aceito", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedRequest();
+
+    const semParam = await asDealer(buildApp());
+    const comParam = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=100");
+
+    expect(semParam.status).toBe(200);
+    expect(comParam.status).toBe(200);
+  });
+
+  it("com UMA loja só, pedir OUTRA continua sendo recusado", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedRequest();
+
+    const response = await asDealer(buildApp(), DEALER_ID, "?advertiser_id=101");
+    expect(response.status).toBe(403);
+  });
+
+  it("loja sem cidade no catálogo não entra no conjunto elegível", async () => {
+    seedDealer({ id: 100, cityId: ATIBAIA.id });
+    seedDealer({ id: 101, cityId: 987654 });
+    seedRequest();
+
+    // Duas linhas em advertisers, mas só UMA elegível → resolve sozinha, sem
+    // pedir escolha.
+    const response = await asDealer(buildApp());
+    expect(response.status).toBe(200);
   });
 
   it("loja bloqueada em OUTRA cidade não cria conflito com a loja boa", async () => {
