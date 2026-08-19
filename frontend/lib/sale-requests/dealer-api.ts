@@ -161,6 +161,18 @@ export type DealerSaleOpportunityDetail = DealerSaleOpportunitySummary & {
 export type DealerSaleOpportunitySummaryStats = {
   total: number;
   new_today: number;
+  /**
+   * Solicitações abertas da cidade em que ESTA loja já propôs, e em que não.
+   *
+   * O backend devolve as duas desde a Fase 4.3 (`countCityOffersForAdvertiser`);
+   * o tipo é que não as declarava, então a tela não tinha como usá-las sem erro
+   * de compilação. Nenhuma mudança de contrato: os campos já vinham na resposta.
+   *
+   * As duas descrevem a CIDADE inteira, não a página filtrada — juntas formam
+   * uma partição, e `with + without` fecha com o total sem filtros.
+   */
+  with_my_offer: number;
+  without_my_offer: number;
 };
 
 export type DealerSaleOpportunitySort = "recent" | "oldest" | "year_desc" | "mileage_asc";
@@ -343,7 +355,7 @@ export async function fetchSaleOpportunities(options: {
     next_cursor: page?.next_cursor ?? null,
     limit: page?.limit ?? 12,
     sort: page?.sort ?? options.sort,
-    summary: page?.summary ?? { total: 0, new_today: 0 },
+    summary: page?.summary ?? { total: 0, new_today: 0, with_my_offer: 0, without_my_offer: 0 },
   };
 }
 

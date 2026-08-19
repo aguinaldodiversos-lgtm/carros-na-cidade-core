@@ -395,16 +395,27 @@ describe("detalhe — ficha de avaliação", () => {
     render(<SaleRequestDetail id="1" />);
     await screen.findByTestId("sale-request-detail");
 
+    // A ficha deixou de ser cinco cartões com borda e virou UM cartão com
+    // grupos, e dois títulos internos foram reagrupados. O que NÃO mudou para o
+    // dono é o primeiro: "Estado geral e pneus" é o texto que ele conhece desde
+    // a Fase 4.2, e continua sendo o default do componente compartilhado.
+    //
+    // A tela do LOJISTA passa "Conservação" explicitamente, porque lá existe um
+    // resumo logo acima com um dado rotulado "Estado geral". Esta asserção é o
+    // que garante que aquela decisão não vaze para cá.
     for (const title of [
       "Dados do veículo",
       "Estado geral e pneus",
-      "Pendências e documentação",
-      "Histórico do veículo",
+      "Financeiro e documentação",
+      "Histórico",
       "Mecânica",
       "Lataria e pintura",
     ]) {
       expect(screen.getByText(title)).toBeTruthy();
     }
+
+    // E o inverso: o título do lojista não pode aparecer na tela do dono.
+    expect(screen.queryByText("Conservação")).toBeNull();
 
     expect(screen.getByText("Meia-vida")).toBeTruthy();
     expect(screen.getByText("Aprovado com apontamentos")).toBeTruthy();

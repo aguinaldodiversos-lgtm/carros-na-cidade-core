@@ -146,7 +146,7 @@ function buildFixture() {
     };
   });
 
-  return { success: true, items, next_cursor: null, limit: 12, sort: "recent", summary: { total: 12, new_today: 4 } };
+  return { success: true, items, next_cursor: null, limit: 12, sort: "recent", summary: { total: 12, new_today: 4, with_my_offer: 3, without_my_offer: 9 } };
 }
 
 /** O detalhe: o primeiro item do feed, com galeria e uma disputa em andamento. */
@@ -224,13 +224,20 @@ async function expectNoHorizontalOverflow(page: Page) {
   ).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
+/**
+ * As colunas esperadas por largura.
+ *
+ * Mudaram na Fase 4.3.1: 1024 passou de 2 para 3 e 1440 de 3 para 4. O card
+ * antigo tinha ~360px em 1440 — foto enorme e texto perdido no meio dela. Em
+ * quatro colunas ele fica em ~270px, que é a densidade da referência.
+ */
 const VIEWPORTS = [
   { name: "360", width: 360, height: 800, columns: 1 },
   { name: "390", width: 390, height: 844, columns: 1 },
   { name: "412", width: 412, height: 915, columns: 1 },
   { name: "768", width: 768, height: 1024, columns: 2 },
-  { name: "1024", width: 1024, height: 800, columns: 2 },
-  { name: "1440", width: 1440, height: 900, columns: 3 },
+  { name: "1024", width: 1024, height: 800, columns: 3 },
+  { name: "1440", width: 1440, height: 900, columns: 4 },
 ];
 
 test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () => {
@@ -289,13 +296,24 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
     await page.screenshot({ path: "test-results/dealer-sale-feed-390-filtros.png" });
   });
 
-  test("desktop: os filtros ficam visíveis sem clique", async ({ page }) => {
+  test("desktop: os filtros PRIMÁRIOS ficam visíveis sem clique", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await prepare(page);
     await page.goto(PAGE_PATH);
 
-    await expect(page.locator("#dealer-sale-filters-panel")).toBeVisible();
-    await expect(page.getByTestId("dealer-sale-opportunity-filters-toggle")).toBeHidden();
+    // Os cinco que respondem "que carro eu quero olhar" estão inline.
+    for (const label of ["Marca", "Ano de", "Ano até", "Km até", "Estado geral"]) {
+      await expect(page.getByLabel(label)).toBeVisible();
+    }
+
+    // Os de RISCO ficam atrás de "Mais filtros" — o botão existe no desktop
+    // também, e o painel começa fechado.
+    await expect(page.getByTestId("dealer-sale-opportunity-filters-toggle")).toBeVisible();
+    await expect(page.locator("#dealer-sale-filters-panel")).toBeHidden();
+    await expect(page.getByLabel("Passagem por leilão")).toBeHidden();
+
+    await page.getByTestId("dealer-sale-opportunity-filters-toggle").click();
+    await expect(page.getByLabel("Passagem por leilão")).toBeVisible();
   });
 
   test("o shell atual é preservado: o menu não foi pintado nem duplicado", async ({ page }) => {
@@ -379,7 +397,10 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
 
     const panel = page.getByTestId("dealer-offer-panel");
     await expect(panel).toContainText("61.000,00");
-    await expect(page.getByTestId("dealer-offer-standing")).toHaveText(
+    // `toContainText` e não `toHaveText`: o badge passou a carregar um glifo de
+    // estado (✓/⚠) ao lado da frase, justamente para a posição não depender só
+    // de cor. A asserção é sobre a MENSAGEM.
+    await expect(page.getByTestId("dealer-offer-standing")).toContainText(
       "Existe uma proposta maior"
     );
 

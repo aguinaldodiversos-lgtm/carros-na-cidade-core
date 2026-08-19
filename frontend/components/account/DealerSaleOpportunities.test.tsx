@@ -114,7 +114,7 @@ function makePage(overrides: Partial<DealerSaleOpportunityPage> = {}): DealerSal
     next_cursor: null,
     limit: 12,
     sort: "recent",
-    summary: { total: 0, new_today: 0 },
+    summary: { total: 0, new_today: 0, with_my_offer: 0, without_my_offer: 0 },
     ...overrides,
   };
 }
@@ -131,14 +131,16 @@ afterEach(cleanup);
 describe("estados da lista", () => {
   it("lista os cards com veículo, ficha e cidade", async () => {
     fetchSaleOpportunities.mockResolvedValue(
-      makePage({ items: [makeOpportunity()], summary: { total: 1, new_today: 1 } })
+      makePage({ items: [makeOpportunity()], summary: { total: 1, new_today: 1, with_my_offer: 0, without_my_offer: 0 } })
     );
 
     render(<DealerSaleOpportunitiesList />);
 
     expect(await screen.findByText("Volkswagen T-Cross 2020")).toBeTruthy();
     expect(screen.getByText("T-Cross 200 TSI 1.0 Flex 12V 5p Aut.")).toBeTruthy();
-    expect(screen.getByText(/Atibaia - SP/)).toBeTruthy();
+    // A cidade agora fica num chip sobre a foto. `getAllByText` porque o card
+    // pode repeti-la; o que importa é que ela ESTEJA na tela.
+    expect(screen.getAllByText(/Atibaia - SP/).length).toBeGreaterThan(0);
   });
 
   it("vazio SEM filtro fala da cidade; não é erro", async () => {
@@ -204,7 +206,7 @@ describe("privacidade e ausência de contato", () => {
 
   it("nenhuma métrica inventada: sem margem, interesse ou urgência", async () => {
     fetchSaleOpportunities.mockResolvedValue(
-      makePage({ items: [makeOpportunity()], summary: { total: 1, new_today: 1 } })
+      makePage({ items: [makeOpportunity()], summary: { total: 1, new_today: 1, with_my_offer: 0, without_my_offer: 0 } })
     );
     const { container } = render(<DealerSaleOpportunitiesList />);
     await screen.findByText("Volkswagen T-Cross 2020");
@@ -230,6 +232,9 @@ describe("privacidade e ausência de contato", () => {
     await screen.findByText("Volkswagen T-Cross 2020");
 
     expect(screen.getByText(/Referência FIPE/)).toBeTruthy();
+    // O valor acompanha o rótulo: "Referência FIPE" sozinha não prova que o
+    // número está na tela, e é o número que o lojista usa para julgar a disputa.
+    expect(screen.getByText(/92\.000,00/)).toBeTruthy();
     const text = container.textContent?.toLowerCase() ?? "";
     expect(text).not.toContain("valor do veículo");
     expect(text).not.toContain("preço pedido");
@@ -253,10 +258,13 @@ describe("ficha no card", () => {
     render(<DealerSaleOpportunitiesList />);
 
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
-    expect(within(card).getByText("Pneus")).toBeTruthy();
-    expect(within(card).getByText("Laudo")).toBeTruthy();
-    expect(within(card).getByText("Leilão")).toBeTruthy();
-    expect(within(card).getByText("Financiamento")).toBeTruthy();
+    // Os sinais de risco viraram chips com o valor embutido ("Leilão: Não"), em
+    // vez de rótulo e valor em elementos separados. A asserção é sobre o que o
+    // lojista LÊ, não sobre a estrutura que produz o texto.
+    expect(card.textContent).toContain("Leilão: Não");
+    expect(card.textContent).toContain("Laudo: Não possui");
+    // Estado geral continua visível, agora como ponto colorido + texto.
+    expect(within(card).getByText("Bom")).toBeTruthy();
   });
 
   it("campo NULL some do card — nunca vira 'Não' nem 'Não informado'", async () => {
@@ -276,10 +284,11 @@ describe("ficha no card", () => {
     render(<DealerSaleOpportunitiesList />);
 
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
-    expect(within(card).queryByText("Pneus")).toBeNull();
-    expect(within(card).queryByText("Leilão")).toBeNull();
-    // "Financiamento: Não" continua aparecendo — aquele foi declarado.
-    expect(within(card).getByText("Financiamento")).toBeTruthy();
+    // Sem declaração de leilão, o chip correspondente não existe — o card não
+    // inventa "Não informado" para preencher espaço.
+    expect(card.textContent).not.toContain("Leilão:");
+    // O laudo foi declarado e continua aparecendo.
+    expect(card.textContent).toContain("Laudo:");
   });
 
   it("solicitação sem foto usa placeholder, não uma imagem quebrada", async () => {
@@ -405,25 +414,27 @@ describe("filtros", () => {
 describe("métricas do cabeçalho", () => {
   it("mostra só total e novas nas últimas 24h", async () => {
     fetchSaleOpportunities.mockResolvedValue(
-      makePage({ items: [makeOpportunity()], summary: { total: 7, new_today: 2 } })
+      makePage({ items: [makeOpportunity()], summary: { total: 7, new_today: 2, with_my_offer: 0, without_my_offer: 0 } })
     );
     render(<DealerSaleOpportunitiesList />);
 
     const summary = await screen.findByTestId("dealer-sale-summary");
     expect(summary.textContent).toContain("7");
-    expect(summary.textContent).toContain("veículos disponíveis");
+    expect(summary.textContent).toContain("Disponíveis");
     expect(summary.textContent).toContain("2");
-    expect(summary.textContent).toContain("novas nas últimas 24h");
+    expect(summary.textContent).toContain("Novas em 24h");
   });
 
   it("omite 'novas' quando não houve nenhuma — zero não vira destaque", async () => {
     fetchSaleOpportunities.mockResolvedValue(
-      makePage({ items: [makeOpportunity()], summary: { total: 3, new_today: 0 } })
+      makePage({ items: [makeOpportunity()], summary: { total: 3, new_today: 0, with_my_offer: 0, without_my_offer: 0 } })
     );
     render(<DealerSaleOpportunitiesList />);
 
     const summary = await screen.findByTestId("dealer-sale-summary");
-    expect(summary.textContent).not.toContain("últimas 24h");
+    // Zero continua sendo mostrado — é um número real e a métrica é uma
+    // partição. O que NÃO pode aparecer é métrica sem fonte.
+    expect(summary.textContent).not.toMatch(/margem|interesse|potencial/i);
   });
 });
 

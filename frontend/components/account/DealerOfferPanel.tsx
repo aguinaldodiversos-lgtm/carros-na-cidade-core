@@ -42,20 +42,22 @@ function Figure({
 }: {
   label: string;
   value: string | null;
-  tone?: "default" | "highlight" | "muted";
+  tone?: "default" | "highlight" | "leading";
 }) {
   const formatted = formatMoneyValue(value);
   const toneClass =
     tone === "highlight"
       ? "text-[#0e62d8]"
-      : tone === "muted"
-        ? "text-[#98A2B3]"
+      : tone === "leading"
+        ? "text-[#067647]"
         : "text-[#1D2440]";
 
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#98A2B3]">{label}</p>
-      <p className={`mt-0.5 text-[18px] font-bold leading-tight ${toneClass}`}>
+      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#98A2B3]">
+        {label}
+      </p>
+      <p className={`mt-0.5 text-[19px] font-bold leading-tight tabular-nums ${toneClass}`}>
         {/* Ausência é travessão, nunca "R$ 0,00": zero seria uma proposta de
             nada, e ainda não existe proposta nenhuma. */}
         {formatted || "—"}
@@ -153,33 +155,56 @@ export default function DealerOfferPanel({
 
   return (
     <section
-      className="rounded-2xl border border-[#E5E9F2] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+      className="rounded-2xl border-2 border-[#DBE7FB] bg-white p-4 shadow-[0_4px_16px_-6px_rgba(14,98,216,0.15)]"
       data-testid="dealer-offer-panel"
     >
-      <h2 className="text-[13px] font-bold text-[#161f34]">Sua proposta</h2>
+      <h2 className="text-[15px] font-bold text-[#0e62d8]">Sua proposta</h2>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <Figure label="Sua proposta" value={state.my_offer} />
-        <Figure
-          label="Maior proposta atual"
-          value={state.current_highest_offer}
-          tone={state.is_leading ? "default" : "highlight"}
-        />
-      </div>
+      {/*
+        O ESTADO DA DISPUTA, num bloco só.
+        A versão anterior espalhava valores, badge, distância FIPE e contagem em
+        quatro alturas soltas antes do campo — o lojista lia um relatório para
+        depois encontrar o formulário. Aqui os dois números dividem uma faixa
+        cinza, com a posição logo abaixo, e o formulário começa em seguida.
 
-      {/* Badge de liderança — sem nomes, dos dois lados. */}
-      {state.my_offer ? (
-        <p
-          className={`mt-3 inline-flex items-center rounded-lg px-2.5 py-1.5 text-[12px] font-bold ${
-            state.is_leading
-              ? "bg-[#ECFDF3] text-[#067647]"
-              : "bg-[#FFF4ED] text-[#B93815]"
-          }`}
-          data-testid="dealer-offer-standing"
-        >
-          {state.is_leading ? "Você está liderando" : "Existe uma proposta maior"}
+        A ordem "maior primeiro" também mudou: é o número que decide quanto ele
+        precisa oferecer, e vinha em segundo.
+      */}
+      <div className="mt-3 rounded-xl bg-[#F7F9FC] p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <Figure
+            label="Maior proposta"
+            value={state.current_highest_offer}
+            tone={state.is_leading ? "default" : "highlight"}
+          />
+          <Figure
+            label="Sua proposta"
+            value={state.my_offer}
+            tone={state.is_leading ? "leading" : "default"}
+          />
+        </div>
+
+        {/* Badge de posição — sem nomes, dos dois lados. */}
+        {state.my_offer ? (
+          <p
+            className={`mt-2.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] font-bold leading-none ${
+              state.is_leading
+                ? "bg-[#ECFDF3] text-[#067647]"
+                : "bg-[#FFF4ED] text-[#B93815]"
+            }`}
+            data-testid="dealer-offer-standing"
+          >
+            <span aria-hidden="true">{state.is_leading ? "✓" : "⚠"}</span>
+            {state.is_leading ? "Você está liderando" : "Existe uma proposta maior"}
+          </p>
+        ) : null}
+
+        <p className="mt-2 text-[11.5px] text-[#98A2B3]" data-testid="dealer-offer-count">
+          {state.offers_count === 0
+            ? "Nenhuma proposta recebida ainda."
+            : `${state.offers_count} ${state.offers_count === 1 ? "proposta recebida" : "propostas recebidas"}.`}
         </p>
-      ) : null}
+      </div>
 
       {/*
         Distância para a FIPE — rotulada como distância, e nunca como margem ou
@@ -187,7 +212,7 @@ export default function DealerOfferPanel({
         enviada); sem um deles não há diferença a mostrar.
       */}
       {distance ? (
-        <p className="mt-3 text-[12px] text-[#64748b]" data-testid="dealer-offer-fipe-distance">
+        <p className="mt-2.5 text-[12px] text-[#667085]" data-testid="dealer-offer-fipe-distance">
           Distância para a referência FIPE:{" "}
           <span className="font-semibold text-[#1D2440]">
             {formatMoneyValue(distance.amount)}
@@ -196,16 +221,10 @@ export default function DealerOfferPanel({
         </p>
       ) : null}
 
-      <p className="mt-3 text-[12px] text-[#98A2B3]" data-testid="dealer-offer-count">
-        {state.offers_count === 0
-          ? "Nenhuma proposta recebida ainda."
-          : `${state.offers_count} ${state.offers_count === 1 ? "proposta recebida" : "propostas recebidas"}.`}
-      </p>
-
-      <form onSubmit={handleSubmit} className="mt-4 border-t border-[#F2F4F7] pt-4">
+      <form onSubmit={handleSubmit} className="mt-4">
         <label
           htmlFor="dealer-offer-amount"
-          className="text-[11px] font-semibold text-[#64748b]"
+          className="text-[11.5px] font-semibold text-[#475467]"
         >
           Nova proposta
         </label>
@@ -219,18 +238,18 @@ export default function DealerOfferPanel({
             setSuccess(null);
           }}
           placeholder="R$ 0,00"
-          className="mt-1 h-12 w-full rounded-xl border border-[#E5E9F2] bg-white px-3.5 text-[15px] font-semibold text-[#1D2440] outline-none placeholder:font-normal placeholder:text-[#B6C0D4] focus:border-[#0e62d8]"
+          className="mt-1.5 h-14 w-full rounded-xl border border-[#E5E9F2] bg-white px-3.5 text-[22px] font-bold tabular-nums text-[#1D2440] outline-none transition placeholder:text-[19px] placeholder:font-normal placeholder:text-[#C3CDDE] focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/15"
           data-testid="dealer-offer-amount"
         />
 
         {bumpFrom ? (
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 grid grid-cols-3 gap-2">
             {[500, 1000, 2000].map((increment) => (
               <button
                 key={increment}
                 type="button"
                 onClick={() => applyBump(increment)}
-                className="h-9 rounded-lg border border-[#dbe7fb] bg-[#eff5ff] px-3 text-[12px] font-bold text-[#0e62d8] transition hover:bg-[#e2edff]"
+                className="h-9 rounded-lg border border-[#DBE7FB] bg-white text-[12px] font-bold text-[#0e62d8] transition hover:bg-[#F0F6FF]"
                 data-testid={`dealer-offer-bump-${increment}`}
               >
                 + R$ {increment.toLocaleString("pt-BR")}

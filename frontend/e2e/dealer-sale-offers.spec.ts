@@ -169,10 +169,15 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     await openDetail(page, saleRequestId);
 
     await expect(page.getByText("Avaliação de veículo para compra")).toBeVisible();
+    // Os títulos mudaram na Fase 4.3.1, quando a ficha virou UM cartão com
+    // grupos. O que a asserção protege é que todo grupo de dados declarados
+    // chega ao lojista — não o nome que cada um tinha antes.
     for (const section of [
-      "Estado geral e pneus",
-      "Pendências e documentação",
-      "Histórico do veículo",
+      "Resumo do veículo",
+      "Situação declarada pelo proprietário",
+      "Conservação",
+      "Financeiro e documentação",
+      "Histórico",
       "Mecânica",
       "Lataria e pintura",
     ]) {
@@ -183,7 +188,11 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     // ── 4. A propõe 50.000 e lidera ─────────────────────────────────────────
     await submitOffer(page, 50000);
     await expect(page.getByTestId("dealer-offer-success")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("dealer-offer-standing")).toHaveText("Você está liderando");
+    // `toContainText`: o badge carrega um glifo de estado (✓/⚠) ao lado da
+    // frase, para a posição não depender só de cor.
+    await expect(page.getByTestId("dealer-offer-standing")).toContainText(
+      "Você está liderando"
+    );
     await expect(page.getByTestId("dealer-offer-panel")).toContainText("50.000,00");
 
     // ── 5. Lojista B vê a maior proposta, sem saber de quem é ───────────────
@@ -204,14 +213,18 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     // ── 7. B propõe 51.000 e assume a liderança ─────────────────────────────
     await submitOffer(page, 51000);
     await expect(page.getByTestId("dealer-offer-success")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("dealer-offer-standing")).toHaveText("Você está liderando");
+    // `toContainText`: o badge carrega um glifo de estado (✓/⚠) ao lado da
+    // frase, para a posição não depender só de cor.
+    await expect(page.getByTestId("dealer-offer-standing")).toContainText(
+      "Você está liderando"
+    );
     await expect(panel).toContainText("51.000,00");
 
     // ── 8. A recarrega: perdeu a liderança, e o rival continua invisível ────
     await login(page, DEALER_A);
     await openDetail(page, saleRequestId);
 
-    await expect(page.getByTestId("dealer-offer-standing")).toHaveText(
+    await expect(page.getByTestId("dealer-offer-standing")).toContainText(
       "Existe uma proposta maior"
     );
     // A dele continua 50.000; a maior é 51.000.
