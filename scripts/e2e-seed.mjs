@@ -153,6 +153,23 @@ const DEALERS = [
     status: "blocked",
     whatsapp: "(11) 98888-4444",
   },
+  // SEGUNDA loja ATIVA em Atibaia — acrescentada na Fase 4.3.
+  //
+  // Existe por um motivo que nenhuma das quatro acima atende: o Produto 2 é uma
+  // DISPUTA, e provar disputa exige duas lojas ELEGÍVEIS na MESMA cidade
+  // competindo pelo mesmo veículo. `cnpj@` é a única ativa de Atibaia; `cnpj3` e
+  // `cnpj4` são de propósito suspensa e bloqueada (elas provam o corte da
+  // moderação no Produto 1), e `cnpj2` é de outra cidade.
+  //
+  // ACRESCENTA, não altera: as quatro anteriores mantêm e-mail, cidade e status
+  // intactos, porque os specs do Produto 1 dependem exatamente desses papéis.
+  {
+    email: "cnpj5@carrosnacidade.com",
+    name: "Loja Atibaia Dois",
+    slug: "atibaia-sp",
+    status: "active",
+    whatsapp: "(11) 98888-5555",
+  },
 ];
 
 await pool.query(
@@ -328,11 +345,97 @@ for (const ad of DEALER_ADS) {
 // esquecer uma tabela nova no futuro.
 await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`, [userId]);
 
+// ============================================================================
+// PRODUTO 2 — solicitação de venda para o E2E de disputa (Fase 4.3)
+// ============================================================================
+//
+// POR QUE ISTO É SEMEADO E NÃO PUBLICADO PELO PRÓPRIO PRODUTO
+//
+// A publicação exige no MÍNIMO quatro fotos, e o upload passa pelo R2. Num
+// ambiente local sem credenciais o endpoint responde 503 com
+// `SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE` — que é o comportamento CORRETO
+// (a Fase 4.1 criou esse código exatamente para não mandar a pessoa trocar uma
+// foto que está perfeita quando o problema é o bucket).
+//
+// Ou seja: o caminho da PF não está quebrado; ele depende de infraestrutura que
+// a máquina de teste não tem. Semear a linha aqui é a mesma escolha que este
+// arquivo já faz para os anúncios do Produto 1, e mantém o E2E focado no que a
+// Fase 4.3 precisa provar — a DISPUTA entre dois lojistas.
+//
+// O caminho de publicação da PF tem cobertura própria em
+// tests/sale-requests/ (validação, service e rotas) e não fica sem prova.
+//
+// As fotos entram como `storage_key`: a URL pública é DERIVADA na leitura
+// (`buildCanonicalImageUrlFromStorageKey`), e sem R2 configurado ela cai no
+// proxy `/api/vehicle-images?key=` — a galeria monta e as imagens não carregam,
+// que é exatamente o esperado num ambiente sem storage.
+
+// Idempotência: as propostas somem junto pelo ON DELETE CASCADE da 055.
+await pool.query(`DELETE FROM sale_requests WHERE owner_user_id = $1::bigint`, [userId]);
+
+const { rows: atibaiaRows } = await pool.query(
+  `SELECT id FROM cities WHERE slug = 'atibaia-sp' LIMIT 1`
+);
+const saleCityId = atibaiaRows[0]?.id;
+if (saleCityId == null) {
+  throw new Error("[e2e-seed] Atibaia não encontrada para a solicitação de venda.");
+}
+
+const { rows: saleRows } = await pool.query(
+  `
+  INSERT INTO sale_requests (
+    owner_user_id, city_id,
+    brand, brand_slug, model, model_slug, fipe_model_description,
+    fipe_code, fipe_reference_value, fipe_reference_at,
+    year, mileage, transmission, fuel_type,
+    declared_condition, known_issues,
+    tire_condition,
+    financing_status, fines_status, ipva_status, licensing_status,
+    caution_report_status, auction_history, collision_history,
+    engine_condition, gearbox_condition, suspension_condition,
+    body_paint_status, body_paint_issues,
+    status
+  )
+  VALUES (
+    $1, $2,
+    'Volkswagen', 'volkswagen', 'T-Cross', 't-cross',
+    'T-Cross 200 TSI 1.0 Flex 12V 5p Aut.',
+    '005340-0', 92000.00, NOW(),
+    2020, 45000, 'automatico', 'flex',
+    'bom', 'Ar-condicionado gelando pouco; revisão feita em junho.',
+    'good',
+    'no', 'no', 'paid', 'ok',
+    'not_available', 'no', 'no',
+    'ok', 'ok', 'ok',
+    'none', '[]'::jsonb,
+    'receiving_offers'
+  )
+  RETURNING id
+  `,
+  [userId, saleCityId]
+);
+
+const saleRequestId = saleRows[0].id;
+
+await pool.query(
+  `
+  INSERT INTO sale_request_images (sale_request_id, storage_key, sort_order)
+  SELECT $1, key, ord
+  FROM UNNEST($2::text[], $3::int[]) AS t(key, ord)
+  `,
+  [
+    saleRequestId,
+    [0, 1, 2, 3].map((i) => `sale-requests/${userId}/e2e/2026/08/foto-${i}.webp`),
+    [0, 1, 2, 3],
+  ]
+);
+
 await closeDatabasePool();
 
 console.log(
   "[e2e-seed] OK —",
   E2E_EMAIL,
-  "+ cidade Atibaia + advertiser + lojistas CNPJ (Atibaia/Bragança)",
-  `+ ${DEALER_ADS.length} anúncios de estoque (Fase 3)`
+  "+ cidade Atibaia + advertiser + lojistas CNPJ (Atibaia x2/Bragança)",
+  `+ ${DEALER_ADS.length} anúncios de estoque (Fase 3)`,
+  `+ solicitação de venda #${saleRequestId} com 4 fotos (Fase 4.3)`
 );

@@ -51,6 +51,7 @@ import publicSeoRoutes from "./modules/public/public-seo.routes.js";
 import purchaseIntentsDealerRoutes from "./modules/purchase-intents/purchase-intents.dealer.routes.js";
 import purchaseIntentsRoutes from "./modules/purchase-intents/purchase-intents.routes.js";
 import saleRequestsRoutes from "./modules/sale-requests/sale-requests.routes.js";
+import saleRequestsDealerRoutes from "./modules/sale-requests/sale-requests.dealer.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
@@ -310,12 +311,17 @@ app.use("/api/account/notifications", notificationsRoutes);
 app.use("/api/account/opportunities/purchase-intents", purchaseIntentsDealerRoutes);
 app.use("/api/account/purchase-intents", purchaseIntentsRoutes);
 
-// Produto 2 — "Venda seu carro para lojas" (Fase 4.1). Só o dono (PF) por
-// enquanto: a área do lojista nasce num router separado na Fase 4.2, montado em
-// `/api/account/opportunities/sale-requests`, porque a cadeia de guardas é outra.
+// Produto 2 — "Venda seu carro para lojas". Os DOIS lados, em routers separados
+// porque a cadeia de guardas é outra em cada um:
 //
-// Vem ANTES de `/api/account` pelo mesmo motivo das procuras: o ramo mais
-// específico primeiro, para que `accountRoutes` nunca capture este caminho.
+//   /api/account/opportunities/sale-requests → LOJISTA (auth + account_type=CNPJ)
+//   /api/account/sale-requests               → DONO PF (auth; CNPJ recusado no service)
+//
+// O do lojista vem primeiro pela mesma razão das procuras: o ramo mais
+// específico antes do mais curto, para que nenhum dos dois capture o caminho do
+// outro. Os dois vêm antes de `/api/account`, para que `accountRoutes` nunca
+// capture nenhum deles.
+app.use("/api/account/opportunities/sale-requests", saleRequestsDealerRoutes);
 app.use("/api/account/sale-requests", saleRequestsRoutes);
 
 app.use("/api/account", accountRoutes);

@@ -31,6 +31,7 @@ import {
   SALE_REQUEST_STATUS,
 } from "./sale-requests.constants.js";
 import {
+  requireUserId,
   decodeCursor,
   encodeCursor,
   parseLimit,
@@ -39,29 +40,20 @@ import {
 } from "./sale-requests.validation.js";
 
 /**
- * Normaliza o id do usuário autenticado.
+ * `requireUserId` MUDOU DE CASA na Fase 4.3.
  *
- * Mesma guarda de `requireUserId` no Produto 1, reescrita aqui em vez de
- * importada: `purchase-intents.service.js` é domínio do Produto 1 e está na
- * lista de arquivos protegidos desta fase. Importar dali criaria uma dependência
- * Produto 2 → Produto 1 que a §17 da auditoria proíbe — infraestrutura se
- * compartilha, domínio não.
+ * A guarda passou para `sale-requests.validation.js`, junto do resto da
+ * validação de entrada, porque o domínio ganhou um SEGUNDO service (a área do
+ * lojista) que precisa dela. Mantê-la aqui obrigaria aquele service a importar
+ * este — arrastando FIPE, storage e notificações para um caminho que só lista
+ * veículos.
  *
- * `pg` devolve BIGINT como string, então o id alterna entre number e string ao
- * longo da aplicação; aqui ele vira sempre string de dígitos. `0` é recusado
- * explicitamente — `users.id` é serial e começa em 1, então zero só chegaria por
- * engano e morreria lá embaixo como violação de FK (um 500 no log de banco em
- * vez da causa real).
+ * A reexportação preserva os call sites existentes
+ * (`sale-requests.photos.service.js` e a suíte do dono): é UMA definição, com
+ * dois caminhos de import.
  */
-export function requireUserId(raw) {
-  const value = String(raw ?? "").trim();
-  if (!/^\d+$/.test(value) || Number(value) <= 0) {
-    throw new AppError("Sessão inválida.", 401, true, {
-      code: SALE_REQUEST_CODE.INVALID_USER,
-    });
-  }
-  return value;
-}
+export { requireUserId };
+
 
 /**
  * Quem pode PUBLICAR uma solicitação de venda.

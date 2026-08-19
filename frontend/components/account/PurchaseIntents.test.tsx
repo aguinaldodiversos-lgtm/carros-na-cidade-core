@@ -78,7 +78,7 @@ function makeIntent(overrides: Partial<PurchaseIntent> = {}): PurchaseIntent {
 beforeEach(() => {
   vi.clearAllMocks();
   fetchMyPurchaseIntents.mockResolvedValue({
-    purchase_intents: [],
+    items: [],
     next_cursor: null,
     limit: 20,
   });
@@ -113,7 +113,7 @@ describe("PurchaseIntentsList — estados", () => {
 
   it("lista os cards com critérios, cidade e status", async () => {
     fetchMyPurchaseIntents.mockResolvedValue({
-      purchase_intents: [makeIntent()],
+      items: [makeIntent()],
       next_cursor: null,
       limit: 20,
     });
@@ -133,7 +133,7 @@ describe("PurchaseIntentsList — estados", () => {
 
   it("NÃO promete veículos recebidos — purchase_intent_offers não existe", async () => {
     fetchMyPurchaseIntents.mockResolvedValue({
-      purchase_intents: [makeIntent()],
+      items: [makeIntent()],
       next_cursor: null,
       limit: 20,
     });
@@ -152,7 +152,7 @@ describe("PurchaseIntentsList — estados", () => {
     expect(box).toHaveTextContent("backend fora");
 
     fetchMyPurchaseIntents.mockResolvedValue({
-      purchase_intents: [makeIntent()],
+      items: [makeIntent()],
       next_cursor: null,
       limit: 20,
     });
@@ -165,7 +165,7 @@ describe("PurchaseIntentsList — estados", () => {
     ["expired", "Expirada"],
   ] as const)("card com display_status=%s mostra '%s'", async (status, label) => {
     fetchMyPurchaseIntents.mockResolvedValue({
-      purchase_intents: [makeIntent({ display_status: status })],
+      items: [makeIntent({ display_status: status })],
       next_cursor: null,
       limit: 20,
     });
@@ -184,7 +184,7 @@ describe("PurchaseIntentsList — estados", () => {
 
   it("mobile: o card trunca o título em vez de vazar a largura", async () => {
     fetchMyPurchaseIntents.mockResolvedValue({
-      purchase_intents: [makeIntent({ model: "Modelo Absurdamente Longo Para Testar Overflow" })],
+      items: [makeIntent({ model: "Modelo Absurdamente Longo Para Testar Overflow" })],
       next_cursor: null,
       limit: 20,
     });

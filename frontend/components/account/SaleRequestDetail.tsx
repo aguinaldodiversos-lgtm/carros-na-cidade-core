@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import VehicleEvaluationSheet, {
+  Card,
+  DataRow,
+} from "@/components/account/VehicleEvaluationSheet";
 import {
   DECLARED_CONDITION_OPTIONS,
   NOT_INFORMED,
@@ -72,65 +76,9 @@ const FUEL_LABEL: Record<string, string> = {
   eletrico: "Elétrico",
 };
 
-/**
- * Uma linha de dado.
- *
- * `value` nulo vira "Não informado" em cinza claro — visualmente distinto de um
- * valor real, para que a ausência não se pareça com resposta.
- */
-function DataRow({ label, value }: { label: string; value: string | null }) {
-  const filled = Boolean(value);
-  return (
-    <div className="flex flex-col gap-0.5 border-b border-[#F2F4F7] py-2.5 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-      <dt className="text-[13px] text-[#64748b]">{label}</dt>
-      <dd
-        className={`text-[13px] sm:text-right ${
-          filled ? "font-semibold text-[#1D2440]" : "text-[#98A2B3]"
-        }`}
-      >
-        {value || NOT_INFORMED}
-      </dd>
-    </div>
-  );
-}
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-[#E5E9F2] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-      <h2 className="mb-1 text-[13px] font-bold text-[#161f34]">{title}</h2>
-      <dl>{children}</dl>
-    </section>
-  );
-}
 
-/** Condição mecânica + a descrição do problema, quando existe. */
-function MechanicalRow({
-  label,
-  condition,
-  notes,
-}: {
-  label: string;
-  condition: Parameters<typeof readMechanicalCondition>[0];
-  notes: string | null;
-}) {
-  return (
-    <>
-      <DataRow label={label} value={readMechanicalCondition(condition)} />
-      {notes ? (
-        <p className="-mt-1 mb-2 whitespace-pre-line rounded-xl bg-[#F9FBFF] px-3 py-2 text-[12px] leading-relaxed text-[#475467]">
-          {notes}
-        </p>
-      ) : null}
-    </>
-  );
-}
 
-/** Valor com um complemento monetário entre parênteses, quando houver. */
-function withAmount(base: string | null, amount: string | null): string | null {
-  if (!base) return null;
-  const money = formatMoneyValue(amount);
-  return money ? `${base} (${money})` : base;
-}
 
 export default function SaleRequestDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -259,97 +207,45 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         independentes, então a grade pode reorganizá-los sem quebrar leitura
         nenhuma — e o detalhe não vira um painel único ilegível.
       */}
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <Card title="Dados do veículo">
-          <DataRow label="Ano" value={String(request.year)} />
-          <DataRow label="Quilometragem" value={formatMileage(request.mileage)} />
-          <DataRow
-            label="Câmbio"
-            value={TRANSMISSION_LABEL[request.transmission] || request.transmission}
-          />
-          <DataRow label="Combustível" value={FUEL_LABEL[request.fuel_type] || request.fuel_type} />
-          <DataRow
-            label="Cidade"
-            value={`${request.city.name}${request.city.state ? ` - ${request.city.state}` : ""}`}
-          />
-          {fipe ? <DataRow label="Referência FIPE" value={fipe} /> : null}
-          <DataRow
-            label="Publicada em"
-            value={new Date(request.created_at).toLocaleDateString("pt-BR")}
-          />
-        </Card>
+      {/*
+        A ficha é renderizada pelo componente COMPARTILHADO com a área do
+        lojista. As duas telas mostram a mesma declaração porque leem o mesmo
+        código — e não porque duas cópias foram mantidas alinhadas à mão.
 
-        <Card title="Estado geral e pneus">
-          <DataRow
-            label="Estado geral"
-            value={CONDITION_LABEL.get(request.declared_condition) || request.declared_condition}
-          />
-          <DataRow label="Pneus" value={readTireCondition(request.tire_condition)} />
-        </Card>
-
-        <Card title="Pendências e documentação">
-          <DataRow
-            label="Financiamento ativo"
-            value={withAmount(
-              readYesNoUnknown(request.financing_status),
-              request.financing_balance
-            )}
-          />
-          <DataRow
-            label="Multas pendentes"
-            value={withAmount(readYesNoUnknown(request.fines_status), request.fines_amount)}
-          />
-          <DataRow
-            label="IPVA"
-            value={withAmount(readIpvaStatus(request.ipva_status), request.ipva_amount_due)}
-          />
-          <DataRow label="Licenciamento" value={readLicensingStatus(request.licensing_status)} />
-        </Card>
-
-        <Card title="Histórico do veículo">
-          <DataRow label="Laudo cautelar" value={readCautionReport(request.caution_report_status)} />
-          <DataRow
-            label="Passagem por leilão"
-            value={readYesNoUnknown(request.auction_history)}
-          />
-          <DataRow
-            label="Colisão ou sinistro conhecido"
-            value={readYesNoUnknown(request.collision_history)}
-          />
-        </Card>
-
-        <Card title="Mecânica">
-          <MechanicalRow
-            label="Motor"
-            condition={request.engine_condition}
-            notes={request.engine_notes}
-          />
-          <MechanicalRow
-            label="Câmbio"
-            condition={request.gearbox_condition}
-            notes={request.gearbox_notes}
-          />
-          <MechanicalRow
-            label="Suspensão"
-            condition={request.suspension_condition}
-            notes={request.suspension_notes}
-          />
-        </Card>
-
-        <Card title="Lataria e pintura">
-          <DataRow label="Situação" value={readBodyPaintStatus(request.body_paint_status)} />
-          {/*
-            A linha de detalhes só existe quando o estado declarado é "possui
-            detalhes". Mostrá-la vazia para quem respondeu "nenhum detalhe"
-            sugeriria uma pergunta sem resposta onde a resposta foi dada.
-          */}
-          {request.body_paint_status === "issues" ? (
-            <DataRow label="Detalhes" value={bodyPaintIssuesLabel} />
-          ) : null}
-          {request.body_paint_notes ? (
-            <DataRow label="Onde" value={request.body_paint_notes} />
-          ) : null}
-        </Card>
+        O card "Dados do veículo" entra como `leading` por ser específico desta
+        tela: ele traz a data de publicação, que é informação do DONO sobre a
+        própria solicitação.
+      */}
+      <div className="mt-5">
+        <VehicleEvaluationSheet
+          evaluation={request}
+          declaredConditionLabel={
+            CONDITION_LABEL.get(request.declared_condition) || request.declared_condition
+          }
+          leading={
+            <Card title="Dados do veículo">
+              <DataRow label="Ano" value={String(request.year)} />
+              <DataRow label="Quilometragem" value={formatMileage(request.mileage)} />
+              <DataRow
+                label="Câmbio"
+                value={TRANSMISSION_LABEL[request.transmission] || request.transmission}
+              />
+              <DataRow
+                label="Combustível"
+                value={FUEL_LABEL[request.fuel_type] || request.fuel_type}
+              />
+              <DataRow
+                label="Cidade"
+                value={`${request.city.name}${request.city.state ? ` - ${request.city.state}` : ""}`}
+              />
+              {fipe ? <DataRow label="Referência FIPE" value={fipe} /> : null}
+              <DataRow
+                label="Publicada em"
+                value={new Date(request.created_at).toLocaleDateString("pt-BR")}
+              />
+            </Card>
+          }
+        />
       </div>
 
       {request.known_issues ? (

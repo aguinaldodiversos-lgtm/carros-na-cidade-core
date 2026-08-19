@@ -19,10 +19,15 @@ const NOT_MATCHED = Symbol("unmatched");
 export const db = {
   cities: [],
   users: [],
+  /** Lojas — o que `resolveDealerStore` lê para decidir a cidade do lojista. */
+  advertisers: [],
   saleRequests: [],
   saleRequestImages: [],
+  /** Propostas (migration 055). APPEND-ONLY: nada aqui é reescrito. */
+  saleRequestOffers: [],
   nextRequestId: 1,
   nextImageId: 1,
+  nextOfferId: 1,
   /** Todas as chaves já usadas — espelha o UNIQUE GLOBAL da migration 053. */
   usedStorageKeys: new Set(),
 };
@@ -30,10 +35,13 @@ export const db = {
 export function resetDb(seed = {}) {
   db.cities = seed.cities ?? [];
   db.users = seed.users ?? [];
+  db.advertisers = seed.advertisers ?? [];
   db.saleRequests = seed.saleRequests ?? [];
   db.saleRequestImages = seed.saleRequestImages ?? [];
+  db.saleRequestOffers = seed.saleRequestOffers ?? [];
   db.nextRequestId = seed.nextRequestId ?? 1;
   db.nextImageId = seed.nextImageId ?? 1;
+  db.nextOfferId = seed.nextOfferId ?? 1;
   db.usedStorageKeys = new Set(
     (seed.saleRequestImages ?? []).map((image) => image.storage_key)
   );
@@ -145,7 +153,436 @@ function beforeCursor(row, createdAt, id) {
   return Number(row.id) < Number(id);
 }
 
+/**
+ * Projeção de DEALER_COLUMNS — campo a campo, IGUAL ao repository do lojista.
+ *
+ * Espalhar `...row` aqui faria o teste de privacidade ver `owner_user_id` vindo
+ * do FAKE e não do código sob teste — provaria o oposto do que se quer provar.
+ * A ausência de `owner_user_id` nesta lista é o que dá sentido à asserção.
+ */
+function projectDealer(row) {
+  const city = cityOf(row.city_id);
+  return {
+    id: row.id,
+    brand: row.brand,
+    brand_slug: row.brand_slug,
+    model: row.model,
+    model_slug: row.model_slug,
+    fipe_model_description: row.fipe_model_description,
+    fipe_code: row.fipe_code,
+    fipe_reference_value: row.fipe_reference_value ?? null,
+    fipe_reference_at: row.fipe_reference_at ?? null,
+    year: row.year,
+    mileage: row.mileage,
+    transmission: row.transmission,
+    fuel_type: row.fuel_type,
+    declared_condition: row.declared_condition,
+    known_issues: row.known_issues ?? null,
+    tire_condition: row.tire_condition ?? null,
+    financing_status: row.financing_status ?? null,
+    financing_balance: row.financing_balance ?? null,
+    fines_status: row.fines_status ?? null,
+    fines_amount: row.fines_amount ?? null,
+    ipva_status: row.ipva_status ?? null,
+    ipva_amount_due: row.ipva_amount_due ?? null,
+    licensing_status: row.licensing_status ?? null,
+    caution_report_status: row.caution_report_status ?? null,
+    auction_history: row.auction_history ?? null,
+    collision_history: row.collision_history ?? null,
+    engine_condition: row.engine_condition ?? null,
+    engine_notes: row.engine_notes ?? null,
+    gearbox_condition: row.gearbox_condition ?? null,
+    gearbox_notes: row.gearbox_notes ?? null,
+    suspension_condition: row.suspension_condition ?? null,
+    suspension_notes: row.suspension_notes ?? null,
+    body_paint_status: row.body_paint_status ?? null,
+    body_paint_issues: parseJsonbArray(row.body_paint_issues),
+    body_paint_notes: row.body_paint_notes ?? null,
+    status: row.status,
+    created_at: row.created_at,
+    city_name: city?.name ?? null,
+    city_state: city?.state ?? null,
+    city_slug: city?.slug ?? null,
+  };
+}
+
+/**
+ * Os predicados do feed são LIDOS DO SQL, não reescritos aqui.
+ *
+ * É o que dá poder de detecção ao fake. Se alguém apagar `sr.city_id = $1` do
+ * repository, este extrator simplesmente não encontra a condição, o fake não
+ * filtra por cidade e o teste "outra cidade não aparece" FALHA — que é o
+ * comportamento desejado. Uma lista de filtros codificada aqui à mão continuaria
+ * filtrando por conta própria e o teste passaria com o furo aberto.
+ *
+ * A cláusula de cursor `(sr.created_at, sr.id) < ($4::timestamptz, $5)` NÃO casa
+ * este padrão (o nome da coluna vem seguido de vírgula, não de operador) e é
+ * tratada à parte.
+ */
+function extractScalarConditions(text, params) {
+  const conditions = [];
+  const pattern = /sr\.([a-z_]+)\s*(>=|<=|=|<|>)\s*\$(\d+)/gi;
+  let match = pattern.exec(text);
+  while (match) {
+    conditions.push({
+      column: match[1],
+      operator: match[2],
+      value: params[Number(match[3]) - 1],
+    });
+    match = pattern.exec(text);
+  }
+  return conditions;
+}
+
+function matchesCondition(row, { column, operator, value }) {
+  const actual = row[column] ?? null;
+  if (actual == null) return false;
+
+  if (operator === "=") return String(actual) === String(value);
+
+  const left = Number(actual);
+  const right = Number(value);
+  if (Number.isNaN(left) || Number.isNaN(right)) return false;
+
+  if (operator === ">=") return left >= right;
+  if (operator === "<=") return left <= right;
+  if (operator === ">") return left > right;
+  return left < right;
+}
+
+/** `ORDER BY sr.<col> <dir>, sr.id <dir>` — lido do SQL, pelo mesmo motivo. */
+function extractOrder(text) {
+  const match = /ORDER BY sr\.([a-z_]+) (ASC|DESC)/i.exec(text);
+  if (!match) return { column: "created_at", direction: "DESC" };
+  return { column: match[1], direction: match[2].toUpperCase() };
+}
+
+function compareByOrder(a, b, { column, direction }) {
+  const rawA = a[column];
+  const rawB = b[column];
+  const isTime = column.endsWith("_at");
+  const left = isTime ? new Date(rawA).getTime() : Number(rawA);
+  const right = isTime ? new Date(rawB).getTime() : Number(rawB);
+
+  let result = 0;
+  if (left !== right) result = left < right ? -1 : 1;
+  else if (Number(a.id) !== Number(b.id)) result = Number(a.id) < Number(b.id) ? -1 : 1;
+
+  return direction === "DESC" ? -result : result;
+}
+
+/** Comparação de TUPLA do cursor, na direção da ordenação. */
+function passesFeedCursor(row, { column, direction }, key, id) {
+  const isTime = column.endsWith("_at");
+  const rowKey = isTime ? new Date(row[column]).getTime() : Number(row[column]);
+  const cursorKey = isTime ? new Date(key).getTime() : Number(key);
+
+  if (rowKey !== cursorKey) {
+    return direction === "ASC" ? rowKey > cursorKey : rowKey < cursorKey;
+  }
+  return direction === "ASC" ? Number(row.id) > Number(id) : Number(row.id) < Number(id);
+}
+
 function handle(text, params, now) {
+  // ==========================================================================
+  // ÁREA DO LOJISTA (Fase 4.3)
+  // ==========================================================================
+  // Estes ramos vêm PRIMEIRO por uma razão concreta, não por estilo: a consulta
+  // de capas (`SELECT DISTINCT ON (sale_request_id) ... WHERE sale_request_id =
+  // ANY(...)`) também casa o padrão da galeria em lote do dono, mais abaixo.
+  // Invertida a ordem, o ramo do dono responderia primeiro e devolveria TODAS as
+  // fotos onde o repository pediu uma capa por solicitação — o card mostraria a
+  // foto certa por acidente e o teste de "capa é sort_order 0" passaria sem
+  // provar nada.
+
+  // --- sale_request_offers: LOCK da solicitação -----------------------------
+  //
+  // O fake não tem isolamento (é um array e uma "conexão" só), então o
+  // `FOR UPDATE` aqui não serializa nada. O que este ramo prova é ALCANCE: que o
+  // service pediu o lock da solicitação certa, JÁ ESCOPADO À CIDADE, antes de
+  // ler a maior proposta. A serialização de verdade tem teste próprio contra
+  // PostgreSQL real, com teste por mutação do lock.
+  if (/^SELECT id, status FROM sale_requests WHERE id = \$1 AND city_id = \$2 FOR UPDATE/i.test(text)) {
+    const [id, cityId] = params;
+    const row = db.saleRequests.find(
+      (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
+    );
+    return {
+      rows: row ? [{ id: row.id, status: row.status }] : [],
+      rowCount: row ? 1 : 0,
+    };
+  }
+
+  // --- sale_request_offers: a MAIOR proposta --------------------------------
+  if (/^SELECT amount FROM sale_request_offers WHERE sale_request_id = \$1 ORDER BY amount DESC/i.test(text)) {
+    const rows = db.saleRequestOffers
+      .filter((offer) => sameId(offer.sale_request_id, params[0]))
+      .sort((a, b) => {
+        const byAmount = Number(b.amount) - Number(a.amount);
+        if (byAmount !== 0) return byAmount;
+        return Number(b.id) - Number(a.id);
+      });
+    return rows.length
+      ? { rows: [{ amount: rows[0].amount }], rowCount: 1 }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- sale_request_offers: a proposta VIGENTE de uma loja ------------------
+  //
+  // A mais RECENTE, não a maior — é a diferença que o repository documenta.
+  if (/FROM sale_request_offers WHERE sale_request_id = \$1 AND advertiser_id = \$2 ORDER BY created_at DESC/i.test(text)) {
+    const [saleRequestId, advertiserId] = params;
+    const rows = db.saleRequestOffers
+      .filter(
+        (offer) =>
+          sameId(offer.sale_request_id, saleRequestId) &&
+          sameId(offer.advertiser_id, advertiserId)
+      )
+      .sort((a, b) => {
+        const byDate = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        if (byDate !== 0) return byDate;
+        return Number(b.id) - Number(a.id);
+      });
+    return rows.length
+      ? {
+          rows: [
+            {
+              id: rows[0].id,
+              amount: rows[0].amount,
+              note: rows[0].note ?? null,
+              created_at: rows[0].created_at,
+            },
+          ],
+          rowCount: 1,
+        }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- sale_request_offers: INSERT (append-only) ----------------------------
+  if (/^INSERT INTO sale_request_offers/i.test(text)) {
+    const [saleRequestId, dealerUserId, advertiserId, amount, note] = params;
+    const row = {
+      id: db.nextOfferId++,
+      sale_request_id: saleRequestId,
+      dealer_user_id: dealerUserId,
+      advertiser_id: advertiserId,
+      amount,
+      note: note ?? null,
+      created_at: new Date(now).toISOString(),
+    };
+    db.saleRequestOffers.push(row);
+    return {
+      rows: [{ id: row.id, amount: row.amount, note: row.note, created_at: row.created_at }],
+      rowCount: 1,
+    };
+  }
+
+  // --- sale_request_offers: contagem de uma solicitação ---------------------
+  if (/^SELECT COUNT\(\*\)::int AS total FROM sale_request_offers WHERE sale_request_id = \$1/i.test(text)) {
+    const total = db.saleRequestOffers.filter((offer) =>
+      sameId(offer.sale_request_id, params[0])
+    ).length;
+    return { rows: [{ total }], rowCount: 1 };
+  }
+
+  // --- sale_request_offers: estado de disputa EM LOTE -----------------------
+  if (/MAX\(amount\) FILTER \(WHERE advertiser_id = \$2\)/i.test(text)) {
+    const ids = Array.isArray(params[0]) ? params[0] : [];
+    const advertiserId = params[1];
+
+    const grouped = new Map();
+    for (const offer of db.saleRequestOffers) {
+      if (!ids.some((id) => sameId(id, offer.sale_request_id))) continue;
+      const key = String(offer.sale_request_id);
+      const current = grouped.get(key) || { highest: null, mine: null, total: 0 };
+      current.total += 1;
+      if (current.highest == null || Number(offer.amount) > Number(current.highest)) {
+        current.highest = offer.amount;
+      }
+      if (sameId(offer.advertiser_id, advertiserId)) {
+        if (current.mine == null || Number(offer.amount) > Number(current.mine)) {
+          current.mine = offer.amount;
+        }
+      }
+      grouped.set(key, current);
+    }
+
+    return {
+      rows: [...grouped.entries()].map(([saleRequestId, value]) => ({
+        sale_request_id: saleRequestId,
+        highest_amount: value.highest,
+        my_amount: value.mine,
+        total: value.total,
+      })),
+      rowCount: grouped.size,
+    };
+  }
+
+  // --- sale_requests × ofertas da loja: as duas métricas do cabeçalho -------
+  if (/LEFT JOIN LATERAL/i.test(text) && /FROM sale_requests sr/i.test(text)) {
+    const [cityId, advertiserId, status] = params;
+    const open = db.saleRequests.filter(
+      (row) => sameId(row.city_id, cityId) && row.status === status
+    );
+    const withMine = open.filter((row) =>
+      db.saleRequestOffers.some(
+        (offer) =>
+          sameId(offer.sale_request_id, row.id) && sameId(offer.advertiser_id, advertiserId)
+      )
+    ).length;
+    return {
+      rows: [{ with_mine: withMine, without_mine: open.length - withMine }],
+      rowCount: 1,
+    };
+  }
+
+  // --- advertisers: as lojas ELEGÍVEIS, com nome e cidade -------------------
+  //
+  // Query separada da do Produto 1 (logo abaixo) de propósito: aquela é o SQL
+  // que a suíte de procuras casa por regex, e acrescentar um JOIN nela quebraria
+  // o outro domínio. Esta é a do seletor de loja.
+  if (/^SELECT adv.id AS advertiser_id/i.test(text)) {
+    const [userId, activeStatus] = params;
+    const rows = db.advertisers
+      .filter((advertiser) => {
+        if (!sameId(advertiser.user_id, userId)) return false;
+        const status = String(advertiser.status ?? "").trim();
+        if ((status === "" ? "active" : status) !== activeStatus) return false;
+        // JOIN INNER com cities: loja cuja city_id não casa o catálogo não é
+        // elegível — ela não veria feed nenhum.
+        return cityOf(advertiser.city_id) != null;
+      })
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .map((advertiser) => {
+        const city = cityOf(advertiser.city_id);
+        return {
+          advertiser_id: advertiser.id,
+          advertiser_name: advertiser.name ?? null,
+          city_id: advertiser.city_id,
+          city_name: city?.name ?? null,
+          city_state: city?.state ?? null,
+        };
+      });
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- advertisers: a loja que resolve a cidade do lojista ------------------
+  if (/^SELECT adv\.id, adv\.user_id, adv\.city_id, adv\.status FROM advertisers adv/i.test(text)) {
+    const [userId, activeStatus] = params;
+    const rows = db.advertisers
+      .filter((advertiser) => {
+        if (!sameId(advertiser.user_id, userId)) return false;
+        // Espelha COALESCE(NULLIF(BTRIM(status), ''), 'active') = $2:
+        // NULL e string vazia contam como ATIVO.
+        const status = String(advertiser.status ?? "").trim();
+        return (status === "" ? "active" : status) === activeStatus;
+      })
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .map((advertiser) => ({
+        id: advertiser.id,
+        user_id: advertiser.user_id,
+        city_id: advertiser.city_id ?? null,
+        status: advertiser.status ?? null,
+      }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- sale_request_images: CAPA de várias solicitações --------------------
+  if (/^SELECT DISTINCT ON \(sale_request_id\)/i.test(text)) {
+    const ids = Array.isArray(params[0]) ? params[0] : [];
+    const seen = new Set();
+    const rows = db.saleRequestImages
+      .filter((image) => ids.some((id) => sameId(id, image.sale_request_id)))
+      .sort((a, b) => {
+        if (!sameId(a.sale_request_id, b.sale_request_id)) {
+          return Number(a.sale_request_id) - Number(b.sale_request_id);
+        }
+        if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+        return Number(a.id) - Number(b.id);
+      })
+      .filter((image) => {
+        const key = String(image.sale_request_id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((image) => ({
+        sale_request_id: image.sale_request_id,
+        storage_key: image.storage_key,
+      }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- sale_request_images: galeria de UMA solicitação ---------------------
+  if (/FROM sale_request_images WHERE sale_request_id = \$1/i.test(text)) {
+    const rows = db.saleRequestImages
+      .filter((image) => sameId(image.sale_request_id, params[0]))
+      .sort((a, b) => {
+        if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+        return Number(a.id) - Number(b.id);
+      })
+      .map((image) => ({ storage_key: image.storage_key, sort_order: image.sort_order }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- sale_requests: métricas do feed -------------------------------------
+  if (/COUNT\(\*\)::int AS total, COUNT\(\*\) FILTER/i.test(text)) {
+    const conditions = extractScalarConditions(text, params);
+    const rows = db.saleRequests.filter((row) =>
+      conditions.every((condition) => matchesCondition(row, condition))
+    );
+    const dayAgo = now - 24 * 60 * 60 * 1000;
+    return {
+      rows: [
+        {
+          total: rows.length,
+          new_today: rows.filter((row) => new Date(row.created_at).getTime() >= dayAgo).length,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- sale_requests: DETALHE do lojista ------------------------------------
+  if (/WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND sr\.status = \$3/i.test(text)) {
+    const [id, cityId, status] = params;
+    const row = db.saleRequests.find(
+      (item) => sameId(item.id, id) && sameId(item.city_id, cityId) && item.status === status
+    );
+    return { rows: row ? [projectDealer(row)] : [], rowCount: row ? 1 : 0 };
+  }
+
+  // --- sale_requests: FEED do lojista ---------------------------------------
+  //
+  // Cidade, estado e filtros saem todos de `extractScalarConditions`, que LÊ o
+  // SQL do repository. Nenhum deles é reimplementado aqui — ver o comentário
+  // daquela função.
+  if (/FROM sale_requests sr JOIN cities c/i.test(text) && /WHERE sr\.city_id = \$1/i.test(text)) {
+    const conditions = extractScalarConditions(text, params);
+    const order = extractOrder(text);
+    const limit = Number(params[params.length - 1]);
+
+    let rows = db.saleRequests.filter((row) =>
+      conditions.every((condition) => matchesCondition(row, condition))
+    );
+
+    const cursorMatch = /\(sr\.[a-z_]+, sr\.id\) [<>] \(\$(\d+)(?:::timestamptz)?, \$(\d+)\)/i.exec(
+      text
+    );
+    if (cursorMatch) {
+      const key = params[Number(cursorMatch[1]) - 1];
+      const id = params[Number(cursorMatch[2]) - 1];
+      rows = rows.filter((row) => passesFeedCursor(row, order, key, id));
+    }
+
+    rows.sort((a, b) => compareByOrder(a, b, order));
+
+    return {
+      rows: rows.slice(0, limit).map(projectDealer),
+      rowCount: rows.length,
+    };
+  }
+
   // --- cities ---------------------------------------------------------------
   if (/^SELECT id, name, state, slug FROM cities WHERE id = \$1/i.test(text)) {
     const city = cityOf(params[0]);

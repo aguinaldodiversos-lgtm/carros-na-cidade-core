@@ -68,7 +68,7 @@ function makeOpportunity(overrides: Partial<DealerOpportunity> = {}): DealerOppo
 beforeEach(() => {
   vi.clearAllMocks();
   fetchDealerOpportunities.mockResolvedValue({
-    purchase_intents: [],
+    items: [],
     next_cursor: null,
     limit: 20,
   });
@@ -100,7 +100,7 @@ describe("DealerOpportunitiesList — estados", () => {
 
   it("lista os cards com o veículo procurado e a cidade", async () => {
     fetchDealerOpportunities.mockResolvedValue({
-      purchase_intents: [makeOpportunity()],
+      items: [makeOpportunity()],
       next_cursor: null,
       limit: 20,
     });
@@ -119,7 +119,7 @@ describe("DealerOpportunitiesList — estados", () => {
 
   it("modo aberto mostra a carroceria", async () => {
     fetchDealerOpportunities.mockResolvedValue({
-      purchase_intents: [
+      items: [
         makeOpportunity({
           intent_type: "open_category",
           brand: null,
@@ -144,7 +144,7 @@ describe("DealerOpportunitiesList — estados", () => {
     );
 
     fetchDealerOpportunities.mockResolvedValue({
-      purchase_intents: [makeOpportunity()],
+      items: [makeOpportunity()],
       next_cursor: null,
       limit: 20,
     });
@@ -166,7 +166,7 @@ describe("DealerOpportunitiesList — estados", () => {
 
   it("mobile: card trunca o título e o CTA tem 44px", async () => {
     fetchDealerOpportunities.mockResolvedValue({
-      purchase_intents: [makeOpportunity({ model: "Modelo Muito Longo Para Estourar A Largura" })],
+      items: [makeOpportunity({ model: "Modelo Muito Longo Para Estourar A Largura" })],
       next_cursor: null,
       limit: 20,
     });
@@ -183,7 +183,7 @@ describe("privacidade do comprador na TELA do lojista", () => {
 
   it("o card não exibe nada que identifique o comprador", async () => {
     fetchDealerOpportunities.mockResolvedValue({
-      purchase_intents: [makeOpportunity()],
+      items: [makeOpportunity()],
       next_cursor: null,
       limit: 20,
     });
