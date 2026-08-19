@@ -123,11 +123,15 @@ describe("cabeçalho e ficha", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-sale-opportunity-detail");
 
+    // O resumo virou um cartão próprio e a ficha virou UM cartão com seções.
+    // Os títulos mudaram junto; o que a asserção protege é que TODO grupo de
+    // dados continua na tela, não como cada um se chama por dentro.
     for (const title of [
-      "Dados do veículo",
-      "Estado geral e pneus",
-      "Pendências e documentação",
-      "Histórico do veículo",
+      "Resumo do veículo",
+      "Situação declarada pelo proprietário",
+      "Conservação",
+      "Financeiro e documentação",
+      "Histórico",
       "Mecânica",
       "Lataria e pintura",
     ]) {
@@ -206,7 +210,7 @@ describe("galeria", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-detail-gallery");
 
-    expect(screen.getByText("1/2")).toBeTruthy();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
     expect(screen.getAllByTestId("dealer-detail-thumb")).toHaveLength(2);
   });
 
@@ -215,7 +219,7 @@ describe("galeria", () => {
     await screen.findByTestId("dealer-detail-gallery");
 
     await userEvent.click(screen.getAllByTestId("dealer-detail-thumb")[1]);
-    expect(screen.getByText("2/2")).toBeTruthy();
+    expect(screen.getByText("2 / 2")).toBeTruthy();
   });
 
   it("sem fotos mostra um estado próprio, não uma imagem quebrada", async () => {
@@ -274,8 +278,10 @@ describe("painel de proposta", () => {
     await userEvent.type(screen.getByTestId("dealer-offer-amount"), "5000000");
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
 
-    expect(await screen.findByTestId("dealer-offer-standing")).toHaveProperty(
-      "textContent",
+    // A igualdade EXATA quebrou quando o badge ganhou um glifo de estado ao lado
+    // do texto. O glifo existe para a posição não depender só de cor; a asserção
+    // passa a ser sobre a MENSAGEM, que é o que o lojista lê.
+    expect((await screen.findByTestId("dealer-offer-standing")).textContent).toContain(
       "Você está liderando"
     );
     expect(fetchSaleOpportunity).not.toHaveBeenCalled();
@@ -294,7 +300,7 @@ describe("painel de proposta", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const standing = await screen.findByTestId("dealer-offer-standing");
 
-    expect(standing.textContent).toBe("Existe uma proposta maior");
+    expect(standing.textContent).toContain("Existe uma proposta maior");
     expect(standing.textContent).not.toMatch(/loja|dealer|concorrente/i);
   });
 

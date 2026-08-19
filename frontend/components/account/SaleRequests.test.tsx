@@ -395,11 +395,15 @@ describe("detalhe — ficha de avaliação", () => {
     render(<SaleRequestDetail id="1" />);
     await screen.findByTestId("sale-request-detail");
 
+    // Os títulos das seções mudaram na Fase 4.3.1, quando a ficha deixou de ser
+    // cinco cartões com borda e virou UM cartão com grupos. O dono continua
+    // vendo TODOS os grupos — é isso que a asserção protege, e não o nome que
+    // cada um tinha antes.
     for (const title of [
       "Dados do veículo",
-      "Estado geral e pneus",
-      "Pendências e documentação",
-      "Histórico do veículo",
+      "Conservação",
+      "Financeiro e documentação",
+      "Histórico",
       "Mecânica",
       "Lataria e pintura",
     ]) {
