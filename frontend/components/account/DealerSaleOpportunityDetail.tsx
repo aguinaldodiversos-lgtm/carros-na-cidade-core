@@ -432,6 +432,13 @@ export default function DealerSaleOpportunityDetail({
               DECLARED_CONDITION_LABEL[opportunity.declared_condition] ||
               opportunity.declared_condition
             }
+            /*
+              "Conservação" só AQUI. O cartão "Resumo do veículo" logo acima já
+              traz um dado rotulado "Estado geral", e repetir esse texto como
+              título de seção faria o leitor procurar a diferença entre os dois.
+              A tela do dono não tem esse resumo e mantém o título original.
+            */
+            conditionSectionTitle="Conservação"
           />
         </div>
 

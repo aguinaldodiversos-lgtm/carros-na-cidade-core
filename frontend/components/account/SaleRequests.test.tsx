@@ -395,13 +395,17 @@ describe("detalhe — ficha de avaliação", () => {
     render(<SaleRequestDetail id="1" />);
     await screen.findByTestId("sale-request-detail");
 
-    // Os títulos das seções mudaram na Fase 4.3.1, quando a ficha deixou de ser
-    // cinco cartões com borda e virou UM cartão com grupos. O dono continua
-    // vendo TODOS os grupos — é isso que a asserção protege, e não o nome que
-    // cada um tinha antes.
+    // A ficha deixou de ser cinco cartões com borda e virou UM cartão com
+    // grupos, e dois títulos internos foram reagrupados. O que NÃO mudou para o
+    // dono é o primeiro: "Estado geral e pneus" é o texto que ele conhece desde
+    // a Fase 4.2, e continua sendo o default do componente compartilhado.
+    //
+    // A tela do LOJISTA passa "Conservação" explicitamente, porque lá existe um
+    // resumo logo acima com um dado rotulado "Estado geral". Esta asserção é o
+    // que garante que aquela decisão não vaze para cá.
     for (const title of [
       "Dados do veículo",
-      "Conservação",
+      "Estado geral e pneus",
       "Financeiro e documentação",
       "Histórico",
       "Mecânica",
@@ -409,6 +413,9 @@ describe("detalhe — ficha de avaliação", () => {
     ]) {
       expect(screen.getByText(title)).toBeTruthy();
     }
+
+    // E o inverso: o título do lojista não pode aparecer na tela do dono.
+    expect(screen.queryByText("Conservação")).toBeNull();
 
     expect(screen.getByText("Meia-vida")).toBeTruthy();
     expect(screen.getByText("Aprovado com apontamentos")).toBeTruthy();

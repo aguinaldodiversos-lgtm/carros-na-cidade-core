@@ -246,10 +246,38 @@ export default function VehicleEvaluationSheet({
   declaredConditionLabel,
   /** Cartão extra da tela chamadora (ex.: "Dados do veículo"), acima da ficha. */
   leading,
+  /**
+   * Título do PRIMEIRO grupo (conservação declarada + pneus).
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * POR QUE ISTO É UMA PROP, E NÃO UM VALOR FIXO
+   * ────────────────────────────────────────────────────────────────────────
+   * As duas telas que compartilham esta ficha têm VIZINHANÇAS diferentes, e o
+   * título certo depende da vizinhança:
+   *
+   *   • no detalhe do LOJISTA existe, logo acima, um cartão "Resumo do veículo"
+   *     com um dado rotulado "Estado geral". Um título de seção com o mesmo
+   *     texto faz o leitor procurar a diferença entre os dois — por isso ali o
+   *     grupo se chama "Conservação";
+   *
+   *   • na tela do DONO não existe esse resumo, e "Estado geral e pneus" é o
+   *     texto que ele já conhece desde a Fase 4.2. Mudá-lo seria alterar a tela
+   *     de quem publica por causa de uma decisão tomada na tela de quem compra.
+   *
+   * O default é o texto do DONO, de propósito: quem não passa nada continua
+   * vendo exatamente o que via antes desta fase. Só o chamador que tem um bom
+   * motivo — o lojista — precisa dizer o contrário.
+   *
+   * A alternativa seria duplicar o componente, e aí as duas cópias divergiriam
+   * na primeira correção de rótulo de VALOR — que é justamente o que este
+   * componente compartilhado existe para impedir.
+   */
+  conditionSectionTitle = "Estado geral e pneus",
 }: {
   evaluation: VehicleEvaluationFields;
   declaredConditionLabel: string | null;
   leading?: React.ReactNode;
+  conditionSectionTitle?: string;
 }) {
   const bodyPaintIssuesLabel =
     Array.isArray(evaluation.body_paint_issues) && evaluation.body_paint_issues.length > 0
@@ -267,13 +295,7 @@ export default function VehicleEvaluationSheet({
       {leading}
 
       <div className="rounded-2xl border border-[#E5E9F2] bg-white p-4">
-        {/*
-          "Conservação", e não "Estado geral": na tela do lojista o resumo logo
-          acima já traz um dado ROTULADO "Estado geral", e um título de seção com
-          o mesmo texto fazia o leitor procurar a diferença entre os dois. O
-          grupo cobre conservação declarada + pneus, e é assim que se chama.
-        */}
-        <Group title="Conservação" first>
+        <Group title={conditionSectionTitle} first>
           <StatusItem
             label="Estado declarado"
             value={declaredConditionLabel}
