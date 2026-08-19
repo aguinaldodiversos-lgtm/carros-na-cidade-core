@@ -3,8 +3,13 @@
 **Data:** 2026-08-18
 **Branch:** `codex/sale-requests-dealer-marketplace`
 **Base:** `main` @ `930e10e7`
-**Veredito:** **NO-GO** — um critério obrigatório não pôde ser executado neste
-ambiente. Ver §24.
+**Veredito:** **GO DEFINITIVO** — release gate executado em 2026-08-19 contra
+PostgreSQL real. Ver §24.
+
+> **Atualização do release gate (2026-08-19).** A versão anterior deste relatório
+> marcava NO-GO por três provas não executadas (Docker indisponível) e por uma
+> regra de advertiser que era estável mas errada. Os quatro pontos foram
+> fechados; as seções 3, 16, 17, 18, 19 e 24 foram reescritas.
 
 ---
 
@@ -54,30 +59,74 @@ menu já fica ativo por `startsWith` — **zero alteração de navegação**.
 
 ## 3. Regra de advertiser e cidade
 
-Promovida para `src/shared/account/dealer-store.js`. **Uma** implementação serve
-aos dois produtos.
+### A correção do gate final
 
-**Fail closed** (devolve `null` → 403 na área do lojista):
+A versão anterior resolvia duas lojas na mesma cidade pegando a de **menor id**.
+Determinístico — e **errado**. A proposta grava `advertiser_id`: ela afirma que
+ESTA EMPRESA ofereceu ESTE valor. Escolher por conveniência registra a oferta em
+nome de uma empresa que talvez não a tenha feito, e o lojista nunca é perguntado.
 
-- nenhum advertiser;
-- nenhum advertiser ATIVO (`COALESCE(NULLIF(BTRIM(status),''),'active')`);
-- advertiser sem `city_id`;
-- **mais de uma cidade distinta** entre os advertisers ativos.
+**Estabilidade não é correção.** A regra passou a ser por CARDINALIDADE:
 
-**Multi-advertiser — a regra explícita que faltava:**
-
-| Situação | Decisão | Por quê |
+| Lojas elegíveis | Decisão | HTTP |
 |---|---|---|
-| Cidades **diferentes** | `null` → 403 | Escolher "a primeira" seria sortear de que cidade o lojista é, e o sorteio mudaria entre deploys |
-| **Mesma** cidade, N linhas | a de **menor `id`** | A cidade — que governa a visibilidade — é inequívoca; resta escolher qual linha REPRESENTA a loja. `MIN(id)` é a mais antiga: estável entre requests, deploys e réplicas |
-| Loja bloqueada em outra cidade | ignorada | Filtrada no SQL, não entra no conjunto — não vira conflito |
+| 0 | acesso recusado | 403 `STORE_UNRESOLVED` |
+| 1 | resolve sozinha | — |
+| 2+ sem escolha | o lojista escolhe; o servidor **não desempata** | 409 `STORE_SELECTION_REQUIRED` + `stores[]` |
+| 2+ com escolha válida | usa a escolhida | — |
+| escolha inválida | recusa | 403 `STORE_INVALID` |
 
-A ordenação vem do SQL (`ORDER BY adv.id ASC`), não de um `sort` em JS.
+"Elegível" = advertiser OPERACIONAL com cidade real (JOIN INNER com `cities`).
 
-`resolveDealerCityId` continua exportado do Produto 1, delegando, com o mesmo
-nome de ação no log. **281 testes do Produto 1 verdes antes e depois.**
+O 409 é deliberado: não é erro de quem pediu (400) nem proibição (403) — é uma
+decisão que só o lojista pode tomar, e a resposta carrega as lojas dele para a
+tela poder oferecê-la sem uma segunda ida ao servidor.
 
----
+### Auditoria: existe seletor canônico?
+
+**Não.** O caminho de publicação de anúncio (`ensureAdvertiserForUser`) usa
+`SELECT id FROM advertisers WHERE user_id = $1 LIMIT 1` — sem `ORDER BY`. É
+arbitrário, e só não causa dano porque em produção há uma loja por usuário. Não
+havia o que reutilizar, então a seleção foi implementada no escopo do módulo,
+sem redesenhar o dashboard.
+
+### Segurança: o id pedido nunca é autorização
+
+O `advertiser_id` viaja na **query string** (não no corpo — o corpo carrega o
+QUANTO; o EM NOME DE QUEM é contexto de atuação). O servidor o confronta com o
+conjunto que ELE montou a partir de `req.user.id`:
+
+- loja de outro usuário → 403
+- loja inexistente → 403 (mesma resposta, para não revelar quais ids existem)
+- loja suspensa/bloqueada → 403
+- loja sem cidade → não entra no conjunto elegível
+
+Não existe caminho em que o valor recebido seja usado sem antes aparecer em
+`listEligibleDealerStores`. Não é um `if` que alguém possa esquecer — é a
+ausência de qualquer outra origem para o valor.
+
+### Cidade: por construção, não por checagem
+
+O objeto resolvido carrega o `cityId` **da loja escolhida**, e é esse valor que
+entra no `WHERE` de toda query seguinte — listagem, detalhe e o
+`SELECT ... FOR UPDATE` da proposta. Um lojista que escolhe a loja de Bragança e
+abre um carro de Atibaia recebe **404**: a linha não casa. Uma validação separada
+seria redundante, e foi removida em vez de mantida como código morto.
+
+### Contexto da loja no frontend
+
+A escolha vive na **URL** (`?loja=`). Sem `localStorage`: some ao sair, é
+compartilhável entre feed e detalhe, e — o que importa — **não é autorização**,
+porque o servidor reconfere a cada request. Um `?loja=` adulterado recebe 403.
+
+### O que o Produto 1 NÃO sofreu
+
+"Uma cidade" e "uma loja" são perguntas diferentes. Um lojista com duas lojas na
+mesma cidade tem cidade inequívoca (Produto 1 funciona) e loja ambígua (Produto 2
+pergunta). São duas funções — `resolveDealerCityId` manteve o SQL, o
+comportamento e o nome de ação no log da Fase 2.
+
+**281 testes do Produto 1 verdes antes e depois.**
 
 ## 4. Arquitetura do feed
 
@@ -308,96 +357,179 @@ automática de que o menu **não foi pintado**.
 
 ## 16. PostgreSQL
 
-**Não executado.** Ver §24.
+**Executado.** `carros-postgres-test` (postgres:15.17) na porta 5433, via
+`docker-compose.test.yml`.
 
-- `docker compose -f docker-compose.test.yml` indisponível: o Docker Desktop
-  falha ao iniciar neste ambiente (`initializing Inference manager ... The file
-  cannot be accessed by the system`).
-- Existe um PostgreSQL local na porta 5432, mas a credencial do `.env`
-  (`TEST_DATABASE_URL`, porta 5433) não autentica nele.
-
-O arquivo de integração está escrito e sintaticamente válido:
-`tests/integration/sale-request-offers-concurrency.integration.test.js`.
+- `npm run integration:db:prepare` → **55 migrations, 1 aplicada, 54 puladas** — a
+  aplicada é a **055**.
+- Presença confirmada: `SELECT to_regclass('public.sale_request_offers')` →
+  `sale_request_offers`.
+- Os testes de concorrência criam o PRÓPRIO banco temporário e rodam as migrations
+  nele, então a 055 é exercitada por dois caminhos diferentes.
 
 ---
 
-## 17. E2E dois lojistas
+## 17. Concorrência real
 
-`frontend/e2e/dealer-sale-offers.spec.ts` — escrito, tipado e listado pelo
-Playwright (2 testes). **Não executado** (exige `npm run e2e:prepare`, que exige
-Docker).
+`tests/integration/sale-request-offers-concurrency.integration.test.js` — o service
+REAL contra o banco real. **13/13 verdes.**
 
-Cobre o §61 literalmente: PF publica → A vê e propõe 50.000 → B vê 50.000, tenta
-49.000 (recusa), propõe 51.000 (aceita) → A recarrega, vê 51.000 como maior e
-50.000 como a sua, e a identidade de B não aparece.
+O cenário obrigatório do §7 (líder 50.000; A propõe 51.000 e B propõe 50.500,
+simultâneos) roda em **24 rodadas com jitter**, alternando qual conexão chega
+primeiro ao lock:
 
-Segundo teste: lojista de outra cidade não vê o veículo.
+```
+[concorrência] B obteve o lock primeiro em 11/24 rodadas
+```
+
+Esse número é o que dá valor às rodadas. Sem jitter, as duas chamadas do mesmo
+`Promise.all` entram sempre na mesma ordem e o teste provaria **um** escalonamento
+— o mais favorável. Com 11/24, os dois lados foram exercitados.
+
+O invariante assertado em cada rodada não é "A sempre vence" (isso dependeria do
+escalonamento), e sim: **nenhum lance aceito viola o líder que existia no momento
+protegido pelo lock** — o histórico é estritamente crescente — e `MAX = 51.000`.
+
+Outros casos verdes no mesmo arquivo: quatro lojas simultâneas, dois lances de
+mesmo valor, clique duplo da mesma loja, solicitações diferentes não se bloqueiam,
+cancelada → 409, outra cidade → 404.
 
 ---
 
 ## 18. Teste por mutação do lock
 
-Última seção do arquivo de integração. Executa **à mão** a mesma sequência **sem**
-`FOR UPDATE`, com uma janela de 60 ms entre ler e escrever, e **exige que a
-violação apareça**:
+Executado sobre o **código de produção**, não sobre uma réplica.
 
-```js
-expect(
-  violates,
-  "a versão SEM lock respeitou a regra — o cenário não é discriminante, e os
-   testes de concorrência acima estão dando confiança falsa"
-).toBe(true);
+| Passo | Resultado |
+|---|---|
+| 1. `FOR UPDATE` removido de `lockSaleRequestForOffer` | mutação aplicada e verificada (a única ocorrência restante no arquivo é um comentário) |
+| 2. Detector executado | **5 de 13 testes FALHARAM** |
+| 3. Lock restaurado | — |
+| 4. Detector reexecutado | **13/13 verdes** |
+| 5. `git diff` do arquivo | **vazio** — a mutação não foi commitada |
+
+A falha da rodada 0 é literalmente o defeito que o lock existe para impedir:
+
+```
+rodada 0: histórico [50000,51000,50500] viola a regra do líder
 ```
 
-Não testa o produto: testa o **teste**. Nada é commitado como mutação — a versão
-sem lock existe só dentro daquela função.
-
-**Não executado** pelo mesmo motivo do §16.
+B gravou 50.500 **depois** de A gravar 51.000, sem nunca ter enxergado os 51.000.
+As duas propostas ficam válidas no banco, sem erro em lugar nenhum — a corrida
+silenciosa. O cenário é discriminante.
 
 ---
 
-## 19. Suítes
+## 19. E2E dois lojistas
+
+`frontend/e2e/dealer-sale-offers.spec.ts` — **2/2 verdes** contra a stack real
+(backend :4000 + Next :3000 + PostgreSQL).
+
+| Passo | Verificado |
+|---|---|
+| A abre o feed | vê o T-Cross; sem erro, sem vazio |
+| A abre o detalhe | ficha completa (5 seções); "Nenhuma proposta recebida" |
+| A propõe 50.000 | sucesso; badge **"Você está liderando"**; painel mostra 50.000 |
+| B abre o mesmo veículo | vê **50.000** como maior; **sem badge** (ainda não propôs) |
+| B tenta 49.000 | **recusado**, com mensagem; nenhum sucesso na tela |
+| B propõe 51.000 | aceito; badge "Você está liderando"; painel 51.000 |
+| A recarrega | **"Existe uma proposta maior"**; a dele 50.000, a maior 51.000 |
+| A varre a tela | sem `cnpj5`, sem `carrosnacidade.com`, sem "confidencial", sem WhatsApp/telefone/contato, sem "margem", sem "expira"; zero `a[href^=wa.me\|tel:\|mailto:]` |
+| Lojista de Bragança | não vê o veículo de Atibaia no feed |
+
+### A PF publica — semeada, e por quê
+
+A publicação exige 4 fotos e o upload passa pelo R2. Sem credenciais o endpoint
+responde **503 `SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE`** — o comportamento
+CORRETO, não um defeito: a Fase 4.1 criou esse código exatamente para não mandar a
+pessoa trocar uma foto que está perfeita quando o problema é o bucket.
+
+Parar o gate por falta de credencial de storage trocaria a prova da DISPUTA (o
+assunto desta fase) por uma prova de infraestrutura. A linha é criada por
+`scripts/e2e-seed.mjs`, do mesmo jeito que ele já cria os anúncios do Produto 1. O
+caminho de publicação da PF **não fica sem prova**: tem cobertura própria em
+`tests/sale-requests/`, contra o router real.
+
+O spec DESCOBRE o id lendo o feed — não usa número fixo —, então continua válido
+quando o seed rodar de novo.
+
+### Seed: uma linha acrescentada
+
+`cnpj5@carrosnacidade.com` ("Loja Atibaia Dois", ativa, Atibaia). Era necessária:
+`cnpj@` é a única ativa de Atibaia, `cnpj3`/`cnpj4` são de propósito suspensa e
+bloqueada, e `cnpj2` é de outra cidade. **Acrescenta, não altera** — as quatro
+anteriores mantêm e-mail, cidade e status, porque os specs do Produto 1 dependem
+desses papéis.
+
+### O defeito que o E2E encontrou
+
+O BFF `app/api/account/opportunities/sale-requests/[[...path]]/route.ts` exportava
+apenas **GET**. Sem o `POST`, o Next respondia 405 e o cliente traduzia a resposta
+sem `message` na mensagem genérica "Não foi possível carregar os veículos" — com o
+backend devolvendo **201** o tempo todo.
+
+Nenhuma outra suíte podia pegar isso: os testes de componente mockam a lib de API
+(não passam pelo proxy) e a suíte visual só fazia GET. **Só um fluxo ponta a ponta
+de ESCRITA atravessa aquele arquivo** — que é exatamente o que este E2E existe
+para fazer.
+
+---
+
+## 20. Cancelamento com propostas existentes
+
+| Verificação | Resultado |
+|---|---|
+| Feed antes | 1 item |
+| PF cancela | 200 |
+| Feed depois | **0 itens** |
+| Detalhe depois | **404** |
+| Nova proposta | **409 `SALE_OPPORTUNITY_OFFER_CLOSED`** |
+| Propostas no banco | **2, preservadas** |
+| Status da solicitação | `cancelled` |
+
+Cancelar é mudança de estado, não remoção. O histórico permanece.
+
+---
+
+## 21. Estado final do banco
+
+```
+  valor   |          conta           |       loja        | solicitacao
+----------+--------------------------+-------------------+-------------
+ 50000.00 | cnpj@carrosnacidade.com  | Loja Atibaia      |           3
+ 51000.00 | cnpj5@carrosnacidade.com | Loja Atibaia Dois |           3
+
+MAX=51000.00 | lances_49k=0 | empates_50k=1 | total=2
+```
+
+Os dois atores gravados em cada linha. `lances_49k=0`: o lance abaixo do líder não
+entrou. `empates_50k=1`: só o de A — o empate de B foi recusado.
+
+---
+
+## 22. Suítes
 
 | Suíte | Resultado |
 |---|---|
-| Backend afetado (`tests/sale-requests/`) | **330 / 330** |
-| Backend afetado (`tests/purchase-intents/`) | **281 / 281** |
-| Backend completo (`npm test`) | **3308 passed, 1 skipped, 206 arquivos** |
-| Backend lint | 11 erros — **todos em `scripts/`**, nenhum arquivo desta fase; `src/` limpo |
+| Backend completo (`npm test`) | **3326 passed, 1 skipped, 206 arquivos** |
+| `tests/sale-requests/` | **342 / 342** |
+| `tests/purchase-intents/` (Produto 1) | **281 / 281** |
+| Integração — concorrência PostgreSQL | **13 / 13** |
+| Backend lint | 11 erros, **todos em `scripts/`** — baseline; `src/` limpo |
 | Frontend typecheck | **0 erros** |
 | Frontend lint | **0 erros, 0 warnings** |
-| Frontend afetado | Feed 23/23 · Detalhe 29/29 · Produto 1 49/49 |
-| Frontend completo | 3186–3192 passed; ver a nota abaixo |
+| Frontend afetado | **108 / 108** (5 arquivos) |
 | Frontend build | **verde**, standalone verificado |
-| Playwright visual/responsivo | **24 / 24** (feed + detalhe, 6 larguras cada) |
-| Integração PostgreSQL | **não executado** (§16) |
-| E2E dois lojistas | **não executado** (§17) |
+| Playwright visual/responsivo | **24 / 24** (feed + detalhe, 6 larguras) |
+| E2E dois lojistas | **2 / 2** |
 
-**Armadilha de ambiente encontrada no caminho.** A primeira execução da matriz
-visual do DETALHE falhou em 9 dos 24 casos com página em branco. Causa: `npm run
-build` foi executado com o `next dev` ligado, e o build sobrescreveu `.next/` —
-o dev server perdeu os chunks e passou a devolver 500 em toda rota **nova**
-(`Cannot find module './vendor-chunks/next.js'`). O feed, já compilado antes,
-continuou respondendo 200, o que fazia o sintoma parecer um defeito só do
-detalhe. Depois de `rm -rf .next` e reinício do dev server: **24/24**.
-
-Fica registrado porque o modo de falha é enganoso — a rota antiga funciona, a
-nova não, e nada no código mudou.
-
-**Nota sobre o frontend completo.** Duas classes de falha, nenhuma delas
-regressão desta fase:
-
-1. **Pré-existentes na main** — `app/seguranca/page.copy.test.ts` (2) e
-   `app/carros-usados/regiao/[slug]/page.config.test.ts` (3). Verificado:
-   falham igual em `main`, com o mesmo número de casos.
-2. **Instabilidade por carga** — `PurchaseIntentForm`, `SaleRequestForm` e dois
-   dos meus (`DealerSaleOpportunities`, `DealerSaleOpportunityDetail`) falham de
-   forma **não determinística** na corrida completa (timeouts de 5–6 s) e passam
-   **todos** isoladamente. O conjunto de arquivos que falha muda entre execuções.
+**Baseline não corrigido (§19 da spec):** `app/seguranca/page.copy.test.ts` (2) e
+`app/carros-usados/regiao/[slug]/page.config.test.ts` (3) falham igualmente na
+`main` — verificado. Os 11 erros de lint em `scripts/` também são anteriores.
 
 ---
 
-## 20. Commits
+## 23. Commits
 
 ```
 f92dd534  refactor(dealer): promote dealer store resolution to shared
@@ -405,95 +537,80 @@ f99d5ce0  feat(sale-requests): add dealer opportunity feed
 df7a1356  feat(sale-requests): add dealer preliminary offers
 5a5451f8  test(sale-requests): verify dealer marketplace flow
 87ae1782  refactor(sale-requests): drop dead offer helpers
-<este>    docs(sale-requests): record phase 4.3 release gate
+72adf950  docs(sale-requests): record phase 4.3 release gate
+<gate>    feat(sale-requests): require explicit dealer store selection
+<gate>    fix(sale-requests): forward dealer offer POST through the BFF
+<gate>    test(sale-requests): prove offer serialization on postgres
+<gate>    docs(sale-requests): record phase 4.3 final release gate
 ```
 
-## 21. Branch
-
-`codex/sale-requests-dealer-marketplace`
-
-## 22. Ahead / behind
-
-Ahead de `origin/main`. **Não mergeada. Não deployada.**
+**Branch:** `codex/sale-requests-dealer-marketplace` — ahead de `origin/main`,
+behind 0. **Não mergeada. Não deployada.**
 
 ---
 
-## 23. Pendências
+## 24. Pendências
 
 | # | Pendência | Gravidade |
 |---|---|---|
-| P1 | **Teste de concorrência real não executado.** Bloqueia o GO. | Alta |
-| P2 | **Teste por mutação do lock não executado.** Sem ele, não se sabe se o cenário de concorrência é discriminante. | Alta |
-| P3 | **E2E dois lojistas não executado.** | Alta |
-| P4 | Instabilidade da suíte de frontend sob carga (§19, item 2). Não é desta fase, mas piorou com mais dois arquivos jsdom. Vale investigar `poolOptions`/`maxConcurrency` do Vitest. | Média |
-| P5 | Duas suítes de frontend já vermelhas na `main` (§19, item 1). | Média — pré-existente |
-| P6 | 11 erros de lint em `scripts/` na `main`. | Baixa — pré-existente |
-| P7 | A migration 055 **não foi aplicada** em banco nenhum. Precisa de release gate PostgreSQL antes de qualquer deploy. | Alta |
+| P1 | A publicação da PF depende de R2; sem credenciais o E2E usa linha semeada. Não é defeito — é ambiente. | Baixa |
+| P2 | Instabilidade da suíte de frontend COMPLETA sob carga (timeouts de 5–6 s; passam isoladas). Anterior a esta fase, piorou com mais arquivos jsdom. Vale olhar `poolOptions`/`maxConcurrency` do Vitest. | Média |
+| P3 | Duas suítes de frontend já vermelhas na `main`. | Média — pré-existente |
+| P4 | 11 erros de lint em `scripts/` na `main`. | Baixa — pré-existente |
+| P5 | `ensureAdvertiserForUser` (publicação de anúncio) ainda usa `LIMIT 1` sem `ORDER BY`. Não afeta esta fase, mas é a mesma classe de escolha arbitrária que o gate corrigiu no Produto 2. | Média — fora do escopo |
+| P6 | O `loginRateLimit` do backend limita por IP encaminhado; duas rodadas seguidas do E2E esgotam a janela. Reiniciar o backend zera. | Baixa — operacional |
 
 ---
 
-## 24. Veredito
+## 25. Armadilhas operacionais registradas
 
-# NO-GO
+**`next build` com `next dev` no mesmo `.next`.** O build sobrescreve o diretório,
+o dev server perde os chunks e passa a devolver 500 **só nas rotas novas**
+(`Cannot find module './vendor-chunks/next.js'`). As rotas já compiladas seguem em
+200, então o sintoma aponta para o código errado. Antes de buildar: parar o dev
+server e `rm -rf .next`. **Não é bug da Fase 4.3.**
 
-O código está completo e as suítes que **podem** rodar neste ambiente estão
-verdes. O que impede o GO não é defeito conhecido — é **ausência de prova** em
-três critérios que a própria especificação marcou como P0:
+**Rate limit de login no E2E.** Ver P6.
 
-- §57 teste concorrente real (P1);
-- §57 teste por mutação do lock (P2);
-- §61 E2E com dois lojistas (P3);
+---
 
-e mais o release gate da migration (P7).
+## 26. Veredito
 
-Declarar GO com esses quatro em aberto seria afirmar sobre serialização de
-dinheiro exatamente o que não foi verificado. A regra da maior oferta está
-implementada com `SELECT ... FOR UPDATE` e testada contra um fake que **não
-serializa nada** — e o próprio comentário do arquivo de teste diz que um service
-sem transação passaria naqueles casos.
+# GO DEFINITIVO
 
-**Para virar GO**, com PostgreSQL disponível:
+Os quatro bloqueadores P0 do gate foram fechados com prova executada:
 
-```bash
-npm run integration:db:up && npm run integration:db:wait
-npx vitest run tests/integration/sale-request-offers-concurrency.integration.test.js
-npm run e2e:prepare
-npx playwright test e2e/dealer-sale-offers.spec.ts
-```
+- **advertiser** não é mais escolhido por conveniência — 2+ lojas exigem escolha
+  explícita, verificada contra o conjunto do servidor;
+- **concorrência** provada em PostgreSQL real, 24 rodadas, com o lock alternando de
+  vencedor em 11/24;
+- **mutação do lock** derruba 5 testes com a violação exata, e o lock restaurado
+  volta a 13/13 — sem mutação commitada;
+- **E2E de dois lojistas** verde ponta a ponta, e foi ele que encontrou o `POST`
+  ausente no BFF.
 
-Se os três passarem — incluindo a asserção de mutação, que **precisa** ver a
-violação aparecer sem o lock —, os critérios restantes já estão satisfeitos e o
-veredito muda.
+Nada do que restou em §24 bloqueia: P1 é ambiente, P2–P4 são baseline anterior à
+fase, P5 está fora do escopo e P6 é operacional.
 
 ---
 
 ## Checklist de GO
 
-- [x] feed só mostra same-city eligible requests
-- [x] multi-advertiser determinístico
-- [x] nenhuma PII PF
-- [x] sem WhatsApp
-- [x] sem contato
-- [x] cancelled fora do feed
-- [x] filtros funcionam
-- [x] cursor funciona
-- [x] detalhe completo
-- [x] NULL ≠ unknown
-- [x] fotos ordenadas
-- [x] FIPE correta (bug de fuso corrigido)
-- [x] primeira proposta funciona
-- [x] líder atual visível
-- [x] identidade concorrente invisível
-- [x] abaixo/igual líder recusado
-- [x] aumento aceito
-- [ ] **lock concorrente comprovado** ← P1
-- [ ] **teste por mutação do lock funciona** ← P2
-- [x] sem timer
-- [x] sem estados futuros
-- [x] mobile sem overflow
-- [x] desktop segue shell atual
-- [x] menu lateral NÃO foi pintado
-- [x] testes verdes (os executáveis)
+- [x] advertiser não é arbitrariamente escolhido
+- [x] multi-store same-city resolvido semanticamente
+- [x] advertiser spoofing recusado
+- [x] Postgres concurrency verde
+- [x] múltiplas rodadas verdes (24, jitter 11/24)
+- [x] lock mutation derruba o teste (5 falhas)
+- [x] lock restaurado volta a verde (13/13)
+- [x] E2E dois dealers verde
+- [x] below leader recusado
+- [x] tie recusado
+- [x] higher bid aceito
+- [x] maior valor visível
+- [x] concorrente anônimo
+- [x] PF PII ausente
+- [x] cancelamento bloqueia novos bids
+- [x] bids existentes preservados
 - [x] build verde
-- [ ] **E2E dois dealers verde** ← P3
 - [x] zero regressão nova
