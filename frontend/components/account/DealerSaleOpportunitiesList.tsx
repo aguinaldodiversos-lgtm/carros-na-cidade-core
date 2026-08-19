@@ -47,6 +47,44 @@ function isPristine(filters: Filters): boolean {
   return countActiveFilters(filters) === 0;
 }
 
+/**
+ * Um número do cabeçalho.
+ *
+ * A cor é do ÍCONE, não do número: o valor fica sempre em tinta escura, legível
+ * em qualquer um dos quatro cards. Pintar o número faria a métrica de menor
+ * relevância competir com a de maior só por ser verde.
+ */
+const METRIC_TONE = {
+  blue: "bg-[#EFF5FF] text-[#0e62d8]",
+  green: "bg-[#ECFDF3] text-[#067647]",
+  violet: "bg-[#F4F3FF] text-[#5925DC]",
+  amber: "bg-[#FFF8F0] text-[#B54708]",
+} as const;
+
+function MetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: keyof typeof METRIC_TONE;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-[#E5E9F2] bg-white px-2.5 py-2">
+      <span
+        className={`flex h-7 min-w-[28px] shrink-0 items-center justify-center rounded-md px-1 text-[12.5px] font-bold tabular-nums ${METRIC_TONE[tone]}`}
+        aria-hidden="true"
+      >
+        {value}
+      </span>
+      <span className="min-w-0 text-[11px] font-medium leading-[1.25] text-[#667085]">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export default function DealerSaleOpportunitiesList({
   basePath = "/dashboard-loja",
 }: {
@@ -93,7 +131,7 @@ export default function DealerSaleOpportunitiesList({
           // NÃO é erro de tela: é uma pergunta que só o lojista responde. O
           // componente troca a lista pelo seletor em vez de mostrar "falhou".
           setStoreOptions(caught.stores);
-          return { items: [], next_cursor: null, limit: 12, sort, summary: { total: 0, new_today: 0 } };
+          return { items: [], next_cursor: null, limit: 12, sort, summary: { total: 0, new_today: 0, with_my_offer: 0, without_my_offer: 0 } };
         }
         throw caught;
       }
@@ -150,38 +188,50 @@ export default function DealerSaleOpportunitiesList({
     <section data-testid="dealer-sale-opportunities-list">
       <Link
         href={`${basePath}/oportunidades`}
-        className="text-sm font-semibold text-[#0e62d8] hover:underline"
+        className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#0e62d8] transition hover:underline"
       >
-        ← Oportunidades
+        <span aria-hidden="true">←</span> Oportunidades
       </Link>
 
-      <header className="mb-5 mt-3">
-        <h1 className="text-xl font-bold text-[#161f34] sm:text-2xl">
-          Veículos disponíveis para avaliação
-        </h1>
-        {/*
-          A copy descreve o que É, e não promete o que o sistema não sustenta.
-          Nada de "melhores oportunidades", "margem garantida" ou "carros
-          verificados": não há curadoria, não há cálculo de margem e não há
-          vistoria — a ficha é uma DECLARAÇÃO do proprietário.
-        */}
-        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#64748b]">
-          Veículos enviados por proprietários particulares para avaliação de compra.
-        </p>
-
-        {/* Métricas com fonte real, e só elas. */}
-        {summary && !loading && !error ? (
-          <p className="mt-3 text-[13px] text-[#475467]" data-testid="dealer-sale-summary">
-            <span className="font-bold text-[#1D2440]">{summary.total}</span>{" "}
-            {summary.total === 1 ? "veículo disponível" : "veículos disponíveis"}
-            {summary.new_today > 0 ? (
-              <>
-                <span className="mx-1.5 text-[#C3CDDE]">·</span>
-                <span className="font-bold text-[#1D2440]">{summary.new_today}</span>{" "}
-                {summary.new_today === 1 ? "nova nas últimas 24h" : "novas nas últimas 24h"}
-              </>
-            ) : null}
+      {/*
+        CABEÇALHO COMPACTO, com as métricas ao LADO do título.
+        A versão anterior empilhava título, subtítulo e uma frase de métricas em
+        três alturas, e junto com os filtros comia o primeiro viewport inteiro —
+        o lojista abria um catálogo e via texto. Aqui título e números dividem a
+        mesma faixa a partir de `lg`, como na referência.
+      */}
+      <header className="mb-4 mt-2.5 flex flex-col gap-4 lg:mb-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-bold leading-tight tracking-[-0.01em] text-[#161f34] sm:text-[25px] lg:whitespace-nowrap">
+            Veículos disponíveis para avaliação
+          </h1>
+          {/*
+            A copy descreve o que É, e não promete o que o sistema não sustenta.
+            Nada de "melhores oportunidades", "margem garantida" ou "carros
+            verificados": não há curadoria, não há cálculo de margem e não há
+            vistoria — a ficha é uma DECLARAÇÃO do proprietário.
+          */}
+          <p className="mt-1 max-w-xl text-[13.5px] leading-relaxed text-[#667085]">
+            Veículos enviados por proprietários particulares para receber propostas de lojas.
           </p>
+        </div>
+
+        {/*
+          MÉTRICAS — quatro números, todos com fonte real no `summary` do
+          servidor. A referência traz um quarto card "Com potencial alto /
+          margem atrativa": ele não existe aqui, porque não existe cálculo de
+          margem em lugar nenhum deste sistema.
+        */}
+        {summary && !loading && !error ? (
+          <div
+            className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:w-auto"
+            data-testid="dealer-sale-summary"
+          >
+            <MetricCard label="Disponíveis" value={summary.total} tone="blue" />
+            <MetricCard label="Novas em 24h" value={summary.new_today} tone="green" />
+            <MetricCard label="Com sua proposta" value={summary.with_my_offer} tone="violet" />
+            <MetricCard label="Sem proposta sua" value={summary.without_my_offer} tone="amber" />
+          </div>
         ) : null}
       </header>
 
@@ -263,12 +313,17 @@ export default function DealerSaleOpportunitiesList({
       {items.length > 0 ? (
         <>
           {/*
-            Um card por linha no celular; dois a partir de `sm`; três em `xl`;
-            quatro em `2xl`. A escada é conservadora de propósito — a ficha do
-            card tem cinco etiquetas, e espremer cinco colunas tornaria todas
-            ilegíveis.
+            1 / 2 / 3 / 4 colunas. O salto para quatro acontece em `xl`
+            (1280px) e não mais em `2xl`: dentro do shell do painel, a coluna de
+            conteúdo em 1440 tem ~1130px úteis, e com o breakpoint antigo os
+            cards ficavam com 360px de largura — foto enorme e texto perdido no
+            meio dela. Em quatro colunas cada card fica em ~270px, que é a
+            proporção da referência.
+
+            Não vai a cinco: o card carrega marca+modelo em uma linha, e abaixo
+            de ~250px o título passa a truncar em quase todo veículo.
           */}
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {items.map((opportunity) => (
               <DealerSaleOpportunityCard
                 key={String(opportunity.id)}
