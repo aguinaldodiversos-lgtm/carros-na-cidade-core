@@ -96,7 +96,7 @@ function serializeOfferState({ highest = null, mine = null, total = 0 } = {}) {
  * (tests/integration/sale-request-offers-concurrency.integration.test.js),
  * incluindo teste POR MUTAÇÃO: removido o lock, o teste precisa falhar.
  */
-export async function createSaleOffer(userId, rawId, body = {}) {
+export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 
@@ -105,7 +105,13 @@ export async function createSaleOffer(userId, rawId, body = {}) {
   // enquanto se descobre isso.
   const { amount, amountCents, note } = validateOfferInput(body);
 
-  const { advertiserId, cityId } = await requireDealerStore(dealerUserId);
+  // A loja é resolvida a partir da sessão; `context.advertiserId` é só a
+  // PREFERÊNCIA de qual loja do próprio usuário está comprando, e ela é
+  // confrontada com o conjunto que o servidor montou.
+  const store = await requireDealerStore(dealerUserId, {
+    advertiserId: context.advertiserId,
+  });
+  const { advertiserId, cityId } = store;
 
   const result = await withTransaction(async (exec) => {
     const saleRequest = await offersRepo.lockSaleRequestForOffer(saleRequestId, cityId, exec);

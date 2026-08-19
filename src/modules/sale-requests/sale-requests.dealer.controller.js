@@ -40,7 +40,7 @@ export async function listSaleOpportunities(req, res) {
 }
 
 export async function getSaleOpportunity(req, res) {
-  const result = await service.getDealerSaleOpportunity(req.user.id, req.params.id);
+  const result = await service.getDealerSaleOpportunity(req.user.id, req.params.id, req.query || {});
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });
 }
@@ -60,7 +60,16 @@ export async function getSaleOpportunity(req, res) {
  * a atualização de uma proposta existente.
  */
 export async function createSaleOffer(req, res) {
-  const result = await offersService.createSaleOffer(req.user.id, req.params.id, req.body || {});
+  // A loja escolhida viaja na QUERY, não no corpo. O corpo carrega o QUANTO
+  // (amount, note); o EM NOME DE QUEM é contexto de atuação, e mantê-lo fora do
+  // payload preserva literalmente a regra da fase anterior: nenhum ator é lido
+  // do corpo. Em ambos os casos o servidor reconfirma a posse.
+  const result = await offersService.createSaleOffer(
+    req.user.id,
+    req.params.id,
+    req.body || {},
+    { advertiserId: (req.query || {}).advertiser_id }
+  );
   applyPrivateHeaders(res);
   return res.status(201).json({ success: true, ...result });
 }

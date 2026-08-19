@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import DealerOfferPanel from "@/components/account/DealerOfferPanel";
 import VehicleEvaluationSheet, {
   Card,
@@ -113,11 +114,18 @@ export default function DealerSaleOpportunityDetail({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // A loja escolhida no feed chega pela URL e acompanha o detalhe inteiro —
+  // leitura e proposta. Sem ela, um lojista com duas lojas veria o 409 de novo
+  // ao abrir um card que já tinha escolhido de qual loja estava olhando.
+  const searchParams = useSearchParams();
+  const advertiserId = searchParams.get("loja");
+  const backQuery = advertiserId ? `?loja=${encodeURIComponent(advertiserId)}` : "";
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setOpportunity(await fetchSaleOpportunity(id));
+      setOpportunity(await fetchSaleOpportunity(id, advertiserId));
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Não foi possível carregar o veículo."
@@ -126,7 +134,7 @@ export default function DealerSaleOpportunityDetail({
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, advertiserId]);
 
   useEffect(() => {
     void load();
@@ -155,7 +163,7 @@ export default function DealerSaleOpportunityDetail({
     return (
       <section data-testid="dealer-detail-error">
         <Link
-          href={`${basePath}/oportunidades/veiculos`}
+          href={`${basePath}/oportunidades/veiculos${backQuery}`}
           className="text-sm font-semibold text-[#0e62d8] hover:underline"
         >
           ← Veículos para avaliação
@@ -184,7 +192,7 @@ export default function DealerSaleOpportunityDetail({
   return (
     <section data-testid="dealer-sale-opportunity-detail">
       <Link
-        href={`${basePath}/oportunidades/veiculos`}
+        href={`${basePath}/oportunidades/veiculos${backQuery}`}
         className="text-sm font-semibold text-[#0e62d8] hover:underline"
       >
         ← Veículos para avaliação
@@ -277,6 +285,7 @@ export default function DealerSaleOpportunityDetail({
         <div className="min-w-0">
           <DealerOfferPanel
             saleRequestId={opportunity.id}
+            advertiserId={advertiserId}
             state={{
               current_highest_offer: opportunity.current_highest_offer,
               my_offer: opportunity.my_offer,

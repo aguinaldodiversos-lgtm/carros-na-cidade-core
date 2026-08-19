@@ -119,12 +119,32 @@ export const SALE_OPPORTUNITY_CODE = Object.freeze({
   /** A solicitação foi cancelada pelo proprietário e não recebe mais propostas. */
   OFFER_CLOSED: "SALE_OPPORTUNITY_OFFER_CLOSED",
   /**
-   * A conta é CNPJ, mas não tem loja ATIVA com uma cidade única.
+   * A conta é CNPJ, mas não tem NENHUMA loja operacional com cidade.
    *
    * Separado de "não encontrado" porque a reação do usuário é outra: aqui não
    * há o que procurar, há uma loja para regularizar.
    */
   STORE_UNRESOLVED: "SALE_OPPORTUNITY_STORE_UNRESOLVED",
+
+  /**
+   * MAIS DE UMA loja elegível e nenhuma escolhida.
+   *
+   * Não é erro de quem pediu nem falha do servidor: é uma decisão que só o
+   * lojista pode tomar, porque a proposta grava `advertiser_id` e o servidor
+   * escolher por ele atribuiria uma oferta comercial à empresa errada.
+   *
+   * A resposta carrega `stores` — as lojas do PRÓPRIO usuário — para que a tela
+   * possa oferecer a escolha sem uma segunda ida ao servidor.
+   */
+  STORE_SELECTION_REQUIRED: "SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED",
+
+  /**
+   * A loja pedida não é do usuário, não existe, está suspensa ou não tem cidade.
+   *
+   * UM código para os quatro casos, de propósito: distinguir as respostas
+   * contaria a quem sonda `advertiser_id` qual deles existe.
+   */
+  STORE_INVALID: "SALE_OPPORTUNITY_STORE_INVALID",
 });
 
 /**

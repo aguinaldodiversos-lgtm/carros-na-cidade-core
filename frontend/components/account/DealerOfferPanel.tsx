@@ -69,11 +69,14 @@ export default function DealerOfferPanel({
   state,
   fipeReferenceValue,
   onSubmitted,
+  /** A loja em nome da qual a proposta é feita, quando a conta tem mais de uma. */
+  advertiserId = null,
 }: {
   saleRequestId: string | number;
   state: DealerOfferState;
   fipeReferenceValue: string | null;
   onSubmitted: (next: DealerOfferState) => void;
+  advertiserId?: string | number | null;
 }) {
   const [digits, setDigits] = useState("");
   const [note, setNote] = useState("");
@@ -116,7 +119,11 @@ export default function DealerOfferPanel({
     setSuccess(null);
 
     try {
-      const result = await submitSaleOffer(saleRequestId, { amount, note: note.trim() || null });
+      const result = await submitSaleOffer(
+        saleRequestId,
+        { amount, note: note.trim() || null },
+        advertiserId
+      );
       setDigits("");
       setNote("");
       setSuccess("Proposta enviada.");

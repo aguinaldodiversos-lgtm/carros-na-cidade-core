@@ -79,9 +79,12 @@ function PhotoPlaceholder() {
 export default function DealerSaleOpportunityCard({
   opportunity,
   basePath,
+  /** Query preservada no link (a loja escolhida, quando há mais de uma). */
+  query = "",
 }: {
   opportunity: DealerSaleOpportunitySummary;
   basePath: string;
+  query?: string;
 }) {
   const { evaluation } = opportunity;
   const fipe = formatFipeReference(
@@ -157,7 +160,7 @@ export default function DealerSaleOpportunityCard({
           </span>
 
           <Link
-            href={`${basePath}/oportunidades/veiculos/${opportunity.id}`}
+            href={`${basePath}/oportunidades/veiculos/${opportunity.id}${query}`}
             className="text-[13px] font-bold text-[#0e62d8] after:absolute after:inset-0 after:content-[''] hover:underline"
             data-testid="dealer-sale-opportunity-link"
           >

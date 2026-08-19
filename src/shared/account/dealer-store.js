@@ -100,13 +100,24 @@ async function listOperationalAdvertisers(userId) {
 }
 
 /**
- * Identidade comercial do lojista autenticado.
+ * A CIDADE do lojista — a pergunta do Produto 1, e só ela.
+ *
+ * "Uma cidade" e "uma loja" são perguntas DIFERENTES, e é a diferença que esta
+ * fase precisou tornar explícita. Um lojista com duas lojas na MESMA cidade tem
+ * uma cidade inequívoca (o Produto 1 funciona) e uma loja ambígua (o Produto 2
+ * não pode escolher por ele — a proposta grava `advertiser_id`, e gravar a loja
+ * errada é atribuir uma oferta comercial a uma empresa que não a fez).
+ *
+ * Por isso são duas funções, e não uma com um parâmetro. Esta continua
+ * respondendo exatamente o que respondia na Fase 2, com o mesmo SQL e o mesmo
+ * resultado em todos os casos — inclusive o de duas lojas na mesma cidade, que
+ * aqui resolve e no Produto 2 passou a exigir escolha.
  *
  * @param {string|number} userId — `req.user.id`, NUNCA um valor do corpo/query
  * @param {{ action?: string }} [options] — nome da ação no log de domínio
- * @returns {Promise<{ advertiserId: number, cityId: number }|null>}
+ * @returns {Promise<number|null>}
  */
-export async function resolveDealerStore(userId, { action = "account.dealer_store.resolve" } = {}) {
+async function resolveUniqueCityId(userId, { action } = {}) {
   const rows = await listOperationalAdvertisers(userId);
 
   // Só linhas com cidade REAL entram na decisão. `''` e `'  '` são tratados
@@ -119,10 +130,7 @@ export async function resolveDealerStore(userId, { action = "account.dealer_stor
   const distinctCities = [...new Set(located.map((row) => String(row.city_id)))];
 
   if (distinctCities.length === 1) {
-    // `located` já vem ordenado por `adv.id ASC` do SQL, e todas as linhas
-    // apontam para a mesma cidade — então a primeira É a de menor id.
-    const chosen = located[0];
-    return { advertiserId: Number(chosen.id), cityId: Number(chosen.city_id) };
+    return Number(located[0].city_id);
   }
 
   logger.warn(
@@ -137,7 +145,7 @@ export async function resolveDealerStore(userId, { action = "account.dealer_stor
       locatedRows: located.length,
       distinctCities: distinctCities.length,
     },
-    "[dealer-store] loja do lojista indefinida — acesso comercial suspenso"
+    "[dealer-store] cidade do lojista indefinida — acesso comercial suspenso"
   );
 
   return null;
@@ -153,6 +161,166 @@ export async function resolveDealerStore(userId, { action = "account.dealer_stor
  * @returns {Promise<number|null>}
  */
 export async function resolveDealerCityId(userId, options) {
-  const store = await resolveDealerStore(userId, options);
-  return store ? store.cityId : null;
+  return resolveUniqueCityId(userId, options);
+}
+
+// ============================================================================
+// A LOJA — a pergunta do Produto 2
+// ============================================================================
+//
+// Uma proposta grava `advertiser_id`: ela diz que ESTA EMPRESA ofereceu ESTE
+// valor. Escolher a loja por um critério de conveniência — "a primeira",
+// "a de menor id" — é estável, mas atribui uma oferta comercial a uma empresa
+// que talvez não a tenha feito. Estável não é o mesmo que correto.
+//
+// Por isso a regra abaixo é por CARDINALIDADE, e não por ordenação:
+//
+//   0 lojas elegíveis  → acesso recusado (não há em nome de quem agir)
+//   1 loja elegível    → resolve sozinha (não há o que escolher)
+//   2+ lojas elegíveis → o lojista ESCOLHE. O servidor não adivinha.
+//
+// "Elegível" é uma loja OPERACIONAL com cidade real. A cidade importa porque a
+// visibilidade do feed é territorial; sem ela a loja não sabe onde está e não
+// participa.
+
+/**
+ * Todas as lojas elegíveis do usuário, com o nome da cidade para o seletor.
+ *
+ * Query SEPARADA de `listOperationalAdvertisers` de propósito. Aquela é o SQL
+ * que o Produto 1 usa há duas fases, e o fake de testes daquele domínio o casa
+ * por REGEX sobre o texto — acrescentar um JOIN ali quebraria a suíte de
+ * procuras por um motivo que não tem nada a ver com procuras.
+ *
+ * O JOIN com `cities` é INNER, não LEFT: uma loja cuja `city_id` não casa o
+ * catálogo é uma loja sem lugar, e ela não pode aparecer num seletor como opção
+ * — o lojista escolheria uma loja que não veria feed nenhum.
+ */
+export async function listEligibleDealerStores(userId) {
+  const result = await query(
+    `
+    SELECT
+      adv.id        AS advertiser_id,
+      adv.name      AS advertiser_name,
+      adv.city_id   AS city_id,
+      c.name        AS city_name,
+      c.state       AS city_state
+    FROM advertisers adv
+    JOIN cities c ON c.id = adv.city_id
+    WHERE adv.user_id = $1
+      AND ${ADVERTISER_IS_OPERATIONAL}
+    ORDER BY adv.id ASC
+    `,
+    [userId, ADVERTISER_STATUS.ACTIVE]
+  );
+
+  return result.rows.map((row) => ({
+    advertiserId: Number(row.advertiser_id),
+    cityId: Number(row.city_id),
+    name: row.advertiser_name || null,
+    city: { name: row.city_name, state: row.city_state },
+  }));
+}
+
+/**
+ * Resultados possíveis de `resolveDealerStoreSelection`.
+ *
+ * Um objeto discriminado, e não `null` + exceção, porque os três casos de falha
+ * pedem respostas HTTP e mensagens DIFERENTES — e um `null` genérico obrigaria
+ * cada chamador a redescobrir qual deles aconteceu.
+ */
+export const DEALER_STORE_RESOLUTION = Object.freeze({
+  OK: "ok",
+  /** Nenhuma loja operacional com cidade. Não há em nome de quem agir. */
+  NONE: "none",
+  /** Duas ou mais lojas e nenhuma escolhida. O servidor NÃO desempata. */
+  SELECTION_REQUIRED: "selection_required",
+  /** A loja pedida não é do usuário, não existe, ou não está operacional. */
+  INVALID_SELECTION: "invalid_selection",
+});
+
+/**
+ * A loja em nome da qual o lojista está agindo.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O `advertiserId` PEDIDO É UMA PREFERÊNCIA, NUNCA UMA AUTORIZAÇÃO
+ * ────────────────────────────────────────────────────────────────────────────
+ * Ele pode vir do cliente — é o único jeito de o lojista dizer qual das lojas
+ * dele está comprando. O que NÃO vem do cliente é a permissão: o valor pedido é
+ * confrontado com o conjunto que o SERVIDOR montou a partir de `req.user.id`.
+ *
+ * Uma loja de outro usuário, uma loja suspensa, uma loja sem cidade e um id
+ * inventado caem todos no MESMO ramo (`INVALID_SELECTION`) — não porque sejam a
+ * mesma coisa, mas porque distinguir as respostas contaria a quem sonda ids
+ * qual deles existe.
+ *
+ * Note o que este desenho torna impossível: não há caminho em que o
+ * `advertiserId` recebido seja usado sem antes aparecer em `listEligibleDealerStores`.
+ * A verificação não é um `if` que alguém possa esquecer — é a ausência de
+ * qualquer outra origem para o valor devolvido.
+ *
+ * @param {string|number} userId — `req.user.id`
+ * @param {{ advertiserId?: unknown, action?: string }} [options]
+ */
+export async function resolveDealerStoreSelection(
+  userId,
+  { advertiserId = null, action = "account.dealer_store.select" } = {}
+) {
+  const stores = await listEligibleDealerStores(userId);
+
+  if (stores.length === 0) {
+    logger.warn(
+      {
+        ...buildDomainFields({ action, result: "error", userId, reason: "none" }),
+      },
+      "[dealer-store] usuário sem loja operacional com cidade"
+    );
+    return { status: DEALER_STORE_RESOLUTION.NONE, stores };
+  }
+
+  const requested = String(advertiserId ?? "").trim();
+
+  if (requested !== "") {
+    // Comparação por STRING contra o conjunto do servidor. `pg` devolve BIGINT
+    // como string e a query string sempre é texto; normalizar os dois lados
+    // evita que `20` e `"20"` deixem de casar por diferença de tipo.
+    const chosen = stores.find((store) => String(store.advertiserId) === requested);
+
+    if (!chosen) {
+      logger.warn(
+        {
+          ...buildDomainFields({
+            action,
+            result: "error",
+            userId,
+            reason: "invalid_selection",
+          }),
+          eligibleStores: stores.length,
+        },
+        "[dealer-store] loja pedida não pertence ao usuário ou não está operacional"
+      );
+      return { status: DEALER_STORE_RESOLUTION.INVALID_SELECTION, stores };
+    }
+
+    return { status: DEALER_STORE_RESOLUTION.OK, store: chosen, stores };
+  }
+
+  if (stores.length === 1) {
+    // Uma loja só: não existe escolha a fazer, e pedir uma seria atrito puro.
+    return { status: DEALER_STORE_RESOLUTION.OK, store: stores[0], stores };
+  }
+
+  logger.info(
+    {
+      ...buildDomainFields({
+        action,
+        result: "error",
+        userId,
+        reason: "selection_required",
+      }),
+      eligibleStores: stores.length,
+    },
+    "[dealer-store] mais de uma loja elegível — escolha explícita necessária"
+  );
+
+  return { status: DEALER_STORE_RESOLUTION.SELECTION_REQUIRED, stores };
 }

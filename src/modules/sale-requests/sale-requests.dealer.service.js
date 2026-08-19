@@ -198,7 +198,11 @@ export async function listDealerSaleOpportunities(userId, rawQuery = {}, { now =
   const limit = parseLimit(rawQuery.limit);
   const cursor = decodeCursor(rawQuery.cursor, sort);
 
-  const { advertiserId, cityId } = await requireDealerStore(dealerUserId);
+  // `advertiser_id` é a PREFERÊNCIA do lojista, não uma autorização: o valor é
+  // confrontado com as lojas que o servidor montou a partir de `req.user.id`.
+  const { advertiserId, cityId } = await requireDealerStore(dealerUserId, {
+    advertiserId: rawQuery.advertiser_id,
+  });
 
   const [{ rows, hasMore }, counts, offerCounts] = await Promise.all([
     repo.listOpenByCity({ cityId, filters, sort, limit, cursor }),
@@ -276,11 +280,13 @@ export async function listDealerSaleOpportunities(userId, rawQuery = {}, { now =
  * e a existência já é informação: diz que alguém naquela cidade está vendendo um
  * carro.
  */
-export async function getDealerSaleOpportunity(userId, rawId) {
+export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 
-  const { advertiserId, cityId } = await requireDealerStore(dealerUserId);
+  const { advertiserId, cityId } = await requireDealerStore(dealerUserId, {
+    advertiserId: rawQuery.advertiser_id,
+  });
 
   const row = await repo.getOpenByIdForCity(saleRequestId, cityId);
   if (!row) {

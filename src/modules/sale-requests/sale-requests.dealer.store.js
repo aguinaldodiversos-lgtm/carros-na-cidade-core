@@ -1,6 +1,6 @@
 /**
- * "Qual é a loja deste lojista?" — a pergunta que TODA rota desta área faz
- * antes de qualquer outra coisa.
+ * "Em nome de qual loja este lojista está agindo?" — a pergunta que TODA rota
+ * desta área faz antes de qualquer outra coisa.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * POR QUE ISTO É UM ARQUIVO, E NÃO UMA FUNÇÃO NO SERVICE DO FEED
@@ -10,48 +10,114 @@
  * primeiro precisa importar o segundo para montar o estado de disputa de cada
  * card. Isso é um ciclo de imports.
  *
- * ESM tolera ciclos, mas o modo de falha quando ele quebra é péssimo: uma das
+ * ESM tolera ciclos, mas o modo de falha quando um quebra é péssimo: uma das
  * pontas recebe `undefined` no lugar da função, e o erro que chega ao log é
  * "X is not a function" numa linha que não tem nada de errado. Este projeto já
  * pagou por esse diagnóstico uma vez nesta mesma fase.
  *
- * Um terceiro arquivo que nenhum dos dois services conhece como "o outro"
- * elimina o ciclo por construção, em vez de administrá-lo.
+ * ────────────────────────────────────────────────────────────────────────────
+ * A LOJA NÃO É ESCOLHIDA POR CONVENIÊNCIA
+ * ────────────────────────────────────────────────────────────────────────────
+ * Uma versão anterior desta fase resolvia duas lojas na mesma cidade pegando a
+ * de MENOR id. Era determinístico — e errado: a proposta grava `advertiser_id`,
+ * então essa escolha atribui uma oferta comercial a uma empresa que talvez não a
+ * tenha feito. O lojista com duas lojas veria a proposta dele registrada em nome
+ * da outra, sem nunca ser perguntado.
+ *
+ * Estabilidade não é correção. Quando há mais de uma loja elegível, quem escolhe
+ * é o lojista.
  */
 import { AppError } from "../../shared/middlewares/error.middleware.js";
-import { resolveDealerStore } from "../../shared/account/dealer-store.js";
+import {
+  DEALER_STORE_RESOLUTION,
+  resolveDealerStoreSelection,
+} from "../../shared/account/dealer-store.js";
 import { SALE_OPPORTUNITY_CODE } from "./sale-requests.dealer.constants.js";
 
 /**
- * A loja do lojista autenticado, ou 403 com código estável.
+ * As lojas do próprio usuário, no formato que o seletor consome.
  *
- * Chegar aqui já significa conta CNPJ (o router garante). O que falta provar é
- * que existe UMA loja ativa com UMA cidade — sem isso não há como decidir o que
- * mostrar, e mostrar "alguma coisa" seria entregar demanda privada da cidade
- * errada.
- *
- * 403 e não 200-vazio: a diferença importa para o usuário. Lista vazia diz "não
- * há veículos"; este caso diz "há uma loja para regularizar". Uma tela que
- * mostra "nenhum veículo na sua cidade" para quem tem duas lojas em cidades
- * diferentes esconde o problema real e não dá o que fazer.
- *
- * @returns {Promise<{ advertiserId: number, cityId: number }>}
+ * Isto NÃO é vazamento: são as lojas de quem perguntou, montadas a partir de
+ * `req.user.id`. O `advertiser_id` aparece porque é o valor que o cliente
+ * devolve na escolha — e devolvê-lo não autoriza nada, já que toda resolução
+ * seguinte confronta o valor com o conjunto do servidor de novo.
  */
-export async function requireDealerStore(dealerUserId) {
-  const store = await resolveDealerStore(dealerUserId, {
+function serializeStores(stores) {
+  return stores.map((store) => ({
+    advertiser_id: store.advertiserId,
+    name: store.name,
+    city: store.city,
+  }));
+}
+
+/**
+ * A loja do lojista autenticado, ou o erro HTTP correspondente.
+ *
+ * Chegar aqui já significa conta CNPJ (o router garante). O que falta decidir é
+ * em nome de QUAL loja a request acontece:
+ *
+ *   NONE               → 403. Não há em nome de quem agir. A ação do usuário não
+ *                        é "procurar veículo", é regularizar a loja — e uma
+ *                        lista vazia dizendo "nenhum veículo na sua cidade"
+ *                        esconderia isso.
+ *
+ *   SELECTION_REQUIRED → 409, com a lista das lojas. Não é erro do usuário nem
+ *                        falha do servidor: é uma decisão que só ele pode tomar,
+ *                        e o 409 carrega exatamente o que a tela precisa para
+ *                        oferecê-la. 400 diria "você mandou algo errado"; 403
+ *                        diria "você não pode" — nenhum dos dois é verdade.
+ *
+ *   INVALID_SELECTION  → 403. Loja de outro usuário, suspensa, sem cidade ou
+ *                        inexistente. Mesma resposta para os quatro, para não
+ *                        contar a quem sonda ids qual deles existe.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * A CIDADE VEM JUNTO, E É O QUE TORNA "COMPRAR FORA DA CIDADE" IMPOSSÍVEL
+ * ────────────────────────────────────────────────────────────────────────────
+ * O objeto devolvido carrega o `cityId` DA LOJA RESOLVIDA, e é esse valor que
+ * entra no `WHERE` de toda query seguinte — a listagem, o detalhe e o
+ * `SELECT ... FOR UPDATE` da proposta.
+ *
+ * Por isso não existe (nem faria falta) uma checagem separada de "esta loja
+ * atende esta cidade?": um lojista que escolhe a loja de Bragança e abre um
+ * carro de Atibaia não recebe um 403 de uma validação — a linha simplesmente não
+ * casa o `WHERE`, e a resposta é 404. A regra não é um `if` que alguém possa
+ * esquecer de escrever; é a ausência de qualquer outra origem para o `cityId`.
+ *
+ * @param {string|number} dealerUserId — `req.user.id`
+ * @param {{ advertiserId?: unknown }} [options] — a PREFERÊNCIA do cliente
+ * @returns {Promise<{ advertiserId: number, cityId: number, name: string|null }>}
+ */
+export async function requireDealerStore(dealerUserId, { advertiserId = null } = {}) {
+  const resolution = await resolveDealerStoreSelection(dealerUserId, {
+    advertiserId,
     action: "sale_request.dealer_store.resolve",
   });
 
-  if (!store) {
-    throw new AppError(
-      "Não foi possível identificar a cidade da sua loja. Confira os dados da loja.",
-      403,
-      true,
-      { code: SALE_OPPORTUNITY_CODE.STORE_UNRESOLVED }
-    );
+  if (resolution.status === DEALER_STORE_RESOLUTION.OK) {
+    return resolution.store;
   }
 
-  return store;
+  if (resolution.status === DEALER_STORE_RESOLUTION.SELECTION_REQUIRED) {
+    throw new AppError("Escolha a loja que vai comprar.", 409, true, {
+      code: SALE_OPPORTUNITY_CODE.STORE_SELECTION_REQUIRED,
+      stores: serializeStores(resolution.stores),
+    });
+  }
+
+  if (resolution.status === DEALER_STORE_RESOLUTION.INVALID_SELECTION) {
+    throw new AppError("Loja inválida para esta conta.", 403, true, {
+      code: SALE_OPPORTUNITY_CODE.STORE_INVALID,
+    });
+  }
+
+  throw new AppError(
+    "Não foi possível identificar a cidade da sua loja. Confira os dados da loja.",
+    403,
+    true,
+    { code: SALE_OPPORTUNITY_CODE.STORE_UNRESOLVED }
+  );
 }
+
 
 export default requireDealerStore;

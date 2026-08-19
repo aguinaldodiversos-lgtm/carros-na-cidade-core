@@ -212,26 +212,51 @@ export class DealerSaleOpportunityError extends Error {
    * valor o obrigaria a recarregar para descobrir quanto falta.
    */
   currentHighest: string | null;
+  /**
+   * As lojas do PRÓPRIO usuário, quando o servidor pede uma escolha.
+   *
+   * Vem no erro, e não numa segunda request, porque o 409 já sabe a resposta:
+   * pedir a lista depois seria uma ida ao servidor para descobrir algo que ele
+   * acabou de dizer.
+   */
+  stores: DealerStoreOption[];
 
   constructor(
     message: string,
     status: number,
     code: string | null,
-    currentHighest: string | null = null
+    currentHighest: string | null = null,
+    stores: DealerStoreOption[] = []
   ) {
     super(message);
     this.name = "DealerSaleOpportunityError";
     this.status = status;
     this.code = code;
     this.currentHighest = currentHighest;
+    this.stores = stores;
   }
 }
+
+/** Uma loja do usuário, no seletor. */
+export type DealerStoreOption = {
+  advertiser_id: number;
+  name: string | null;
+  city: { name: string; state: string };
+};
+
+/** O código que o servidor devolve quando há mais de uma loja elegível. */
+export const STORE_SELECTION_REQUIRED = "SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED";
 
 type ApiEnvelope = {
   success?: boolean;
   message?: string;
   code?: string;
-  details?: { code?: string; field?: string; current_highest_offer?: string };
+  details?: {
+    code?: string;
+    field?: string;
+    current_highest_offer?: string;
+    stores?: DealerStoreOption[];
+  };
 };
 
 /**
@@ -257,7 +282,8 @@ async function readJson<T>(response: Response): Promise<T> {
       message,
       response.status,
       code,
-      payload?.details?.current_highest_offer ?? null
+      payload?.details?.current_highest_offer ?? null,
+      Array.isArray(payload?.details?.stores) ? payload.details.stores : []
     );
   }
 
@@ -276,10 +302,12 @@ export function buildFeedQuery({
   filters,
   sort,
   cursor,
+  advertiserId,
 }: {
   filters: DealerSaleOpportunityFilters;
   sort: DealerSaleOpportunitySort;
   cursor?: string | null;
+  advertiserId?: number | string | null;
 }): string {
   const query = new URLSearchParams();
 
@@ -289,6 +317,11 @@ export function buildFeedQuery({
 
   if (sort && sort !== "recent") query.set("sort", sort);
   if (cursor) query.set("cursor", cursor);
+  // A loja escolhida acompanha TODA request desta área. Não é autorização — o
+  // servidor confronta o valor com as lojas do usuário a cada chamada.
+  if (advertiserId != null && String(advertiserId) !== "") {
+    query.set("advertiser_id", String(advertiserId));
+  }
 
   const text = query.toString();
   return text ? `?${text}` : "";
@@ -298,6 +331,7 @@ export async function fetchSaleOpportunities(options: {
   filters: DealerSaleOpportunityFilters;
   sort: DealerSaleOpportunitySort;
   cursor?: string | null;
+  advertiserId?: number | string | null;
 }): Promise<DealerSaleOpportunityPage> {
   const response = await fetch(`${BASE}${buildFeedQuery(options)}`, { cache: "no-store" });
   const page = await readJson<Partial<DealerSaleOpportunityPage>>(response);
@@ -314,9 +348,14 @@ export async function fetchSaleOpportunities(options: {
 }
 
 export async function fetchSaleOpportunity(
-  id: string | number
+  id: string | number,
+  advertiserId?: number | string | null
 ): Promise<DealerSaleOpportunityDetail> {
-  const response = await fetch(`${BASE}/${id}`, { cache: "no-store" });
+  const suffix =
+    advertiserId != null && String(advertiserId) !== ""
+      ? `?advertiser_id=${encodeURIComponent(String(advertiserId))}`
+      : "";
+  const response = await fetch(`${BASE}/${id}${suffix}`, { cache: "no-store" });
   const payload = await readJson<{ sale_opportunity: DealerSaleOpportunityDetail }>(response);
   return payload.sale_opportunity;
 }
@@ -478,9 +517,14 @@ export type DealerOfferResult = DealerOfferState & {
  */
 export async function submitSaleOffer(
   saleRequestId: string | number,
-  input: { amount: string; note?: string | null }
+  input: { amount: string; note?: string | null },
+  advertiserId?: number | string | null
 ): Promise<DealerOfferResult> {
-  const response = await fetch(`${BASE}/${saleRequestId}/offers`, {
+  const suffix =
+    advertiserId != null && String(advertiserId) !== ""
+      ? `?advertiser_id=${encodeURIComponent(String(advertiserId))}`
+      : "";
+  const response = await fetch(`${BASE}/${saleRequestId}/offers${suffix}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

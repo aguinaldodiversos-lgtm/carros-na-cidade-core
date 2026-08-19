@@ -2,18 +2,23 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import LoadMoreButton from "@/components/account/LoadMoreButton";
 import DealerSaleOpportunityCard from "@/components/account/DealerSaleOpportunityCard";
 import DealerSaleOpportunityFilters from "@/components/account/DealerSaleOpportunityFilters";
+import DealerStorePicker from "@/components/account/DealerStorePicker";
 import { useCursorPagination } from "@/lib/account/use-cursor-pagination";
 import {
+  DealerSaleOpportunityError,
   EMPTY_FILTERS,
+  STORE_SELECTION_REQUIRED,
   countActiveFilters,
   fetchSaleOpportunities,
   type DealerSaleOpportunityFilters as Filters,
   type DealerSaleOpportunityPage,
   type DealerSaleOpportunitySort,
   type DealerSaleOpportunitySummary,
+  type DealerStoreOption,
 } from "@/lib/sale-requests/dealer-api";
 
 /**
@@ -51,6 +56,20 @@ export default function DealerSaleOpportunitiesList({
   const [sort, setSort] = useState<DealerSaleOpportunitySort>("recent");
 
   /**
+   * A loja escolhida vive na URL, e não em estado local nem em `localStorage`.
+   *
+   * Três consequências, todas desejadas: ela sobrevive à navegação para o
+   * detalhe e de volta; é compartilhável; e some quando o lojista sai. E não é
+   * autorização — o servidor reconfere o valor contra as lojas do usuário a cada
+   * request, então um `?loja=` adulterado recebe 403 em vez de acesso.
+   */
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const advertiserId = searchParams.get("loja");
+
+  const [storeOptions, setStoreOptions] = useState<DealerStoreOption[]>([]);
+
+  /**
    * `fetchPage` PRECISA ser estável entre renders quando nada muda — o hook a
    * usa como dependência do efeito. Recriá-la a cada render faria a lista
    * recarregar em loop.
@@ -59,8 +78,27 @@ export default function DealerSaleOpportunitiesList({
    * lojista troca um filtro: página 1, cursor limpo, sem API de reset.
    */
   const fetchPage = useCallback(
-    (cursor?: string | null) => fetchSaleOpportunities({ filters, sort, cursor }),
-    [filters, sort]
+    async (cursor?: string | null) => {
+      try {
+        const page = await fetchSaleOpportunities({ filters, sort, cursor, advertiserId });
+        // Uma carga bem-sucedida encerra a pergunta: se o seletor estava na
+        // tela por um 409 anterior, ele sai agora.
+        setStoreOptions([]);
+        return page;
+      } catch (caught) {
+        if (
+          caught instanceof DealerSaleOpportunityError &&
+          caught.code === STORE_SELECTION_REQUIRED
+        ) {
+          // NÃO é erro de tela: é uma pergunta que só o lojista responde. O
+          // componente troca a lista pelo seletor em vez de mostrar "falhou".
+          setStoreOptions(caught.stores);
+          return { items: [], next_cursor: null, limit: 12, sort, summary: { total: 0, new_today: 0 } };
+        }
+        throw caught;
+      }
+    },
+    [filters, sort, advertiserId]
   );
 
   const { items, loading, error, loadingMore, moreError, hasMore, loadMore, reload, page } =
@@ -96,6 +134,17 @@ export default function DealerSaleOpportunitiesList({
   );
 
   const summary = page?.summary ?? null;
+
+  const chooseStore = (chosen: number) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("loja", String(chosen));
+    // `replace` e não `push`: a escolha de loja não é um passo de navegação que
+    // o "voltar" do navegador deva desfazer para uma tela que não carrega.
+    router.replace(`?${next.toString()}`);
+  };
+
+  /** Preserva a loja escolhida ao navegar para o detalhe. */
+  const detailQuery = advertiserId ? `?loja=${encodeURIComponent(advertiserId)}` : "";
 
   return (
     <section data-testid="dealer-sale-opportunities-list">
@@ -136,15 +185,21 @@ export default function DealerSaleOpportunitiesList({
         ) : null}
       </header>
 
-      <DealerSaleOpportunityFilters
-        filters={filters}
-        sort={sort}
-        onChange={setFilters}
-        onSortChange={setSort}
-        brandOptions={brandOptions}
-      />
+      {storeOptions.length > 0 ? (
+        <DealerStorePicker stores={storeOptions} onSelect={chooseStore} />
+      ) : null}
 
-      {loading ? (
+      {storeOptions.length === 0 ? (
+        <DealerSaleOpportunityFilters
+          filters={filters}
+          sort={sort}
+          onChange={setFilters}
+          onSortChange={setSort}
+          brandOptions={brandOptions}
+        />
+      ) : null}
+
+      {loading && storeOptions.length === 0 ? (
         <div className="flex items-center justify-center gap-3 py-16">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#0e62d8] border-t-transparent" />
           <span className="text-sm text-[#64748b]">Carregando veículos…</span>
@@ -173,7 +228,7 @@ export default function DealerSaleOpportunitiesList({
         de propósito — "nenhum veículo na sua cidade" e "nenhum resultado para
         estes filtros" pedem ações opostas do lojista.
       */}
-      {!loading && !error && items.length === 0 ? (
+      {!loading && !error && storeOptions.length === 0 && items.length === 0 ? (
         <div
           className="rounded-2xl border border-dashed border-[#cfd8e8] bg-white p-8 text-center sm:p-10"
           data-testid="dealer-sale-opportunities-empty"
@@ -219,6 +274,7 @@ export default function DealerSaleOpportunitiesList({
                 key={String(opportunity.id)}
                 opportunity={opportunity}
                 basePath={basePath}
+                query={detailQuery}
               />
             ))}
           </ul>
