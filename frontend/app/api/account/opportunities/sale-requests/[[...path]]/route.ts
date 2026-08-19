@@ -4,7 +4,8 @@ import { createBackendProxy } from "@/lib/http/bff-proxy";
 /**
  * BFF da área do LOJISTA no Produto 2 — "Veículos para avaliação".
  *
- * GET — feed de veículos disponíveis na cidade da loja, e o detalhe de um deles.
+ * GET  — feed de veículos disponíveis na cidade da loja, e o detalhe de um deles.
+ * POST — `/:id/offers`: a proposta preliminar. É o único verbo de escrita da área.
  *
  * Catch-all (e não rotas explícitas como o BFF do dono) porque aqui TODAS as
  * rotas são JSON: o motivo que obrigou o outro arquivo a declarar caminho por
@@ -34,5 +35,22 @@ const proxy = createBackendProxy({
 });
 
 export async function GET(request: NextRequest, context: { params: { path?: string[] } }) {
+  return proxy(request, context);
+}
+
+/**
+ * O POST das propostas.
+ *
+ * Faltou aqui até o E2E de dois lojistas encostar nele — e o modo de falha
+ * explica por que nenhuma outra suíte pegou: sem este export, o Next responde
+ * 405 ao POST, e o handler de erro do cliente traduz uma resposta sem `message`
+ * na mensagem genérica ("Não foi possível carregar os veículos"). O backend
+ * respondia 201 o tempo todo; quem não encaminhava era o proxy.
+ *
+ * Os testes de componente mockam a lib de API (não passam por aqui) e a suíte
+ * visual só fazia GET. Só um fluxo ponta a ponta de ESCRITA atravessa este
+ * arquivo — que é exatamente o que o E2E da fase existe para fazer.
+ */
+export async function POST(request: NextRequest, context: { params: { path?: string[] } }) {
   return proxy(request, context);
 }
