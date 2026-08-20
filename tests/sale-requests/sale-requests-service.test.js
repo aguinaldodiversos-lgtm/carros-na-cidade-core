@@ -62,6 +62,10 @@ function bodyFor(overrides = {}, owner = OWNER.id) {
     fuel_type: "Flex",
     declared_condition: "bom",
     known_issues: null,
+    // O PISO do proprietario (4.3.3) e OBRIGATORIO em toda publicacao nova:
+    // sem ele o corpo nem passa da validacao. Os testes que exercitam a REGRA do
+    // piso sobrescrevem este valor.
+    minimum_accepted_price: "62500.00",
     ...EVALUATION_BODY,
     images: keysFor(4, owner),
     ...overrides,
@@ -444,6 +448,7 @@ describe("DTO do dono — sem PII, sem coluna interna", () => {
         "id",
         "images",
         "known_issues",
+        "minimum_accepted_price",
         "mileage",
         "model",
         "model_slug",

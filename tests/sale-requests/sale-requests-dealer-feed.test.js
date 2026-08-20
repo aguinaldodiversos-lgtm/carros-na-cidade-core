@@ -467,6 +467,11 @@ describe("privacidade — nenhum dado da pessoa física", () => {
         "declared_condition",
         "evaluation",
         "fipe_model_description",
+
+        // O PISO do proprietario (4.3.3): dado COMERCIAL, o unico valor que o
+        // card mostra. Entra na lista porque a lista e o contrato — campo novo
+        // so chega ao lojista se alguem escreve-lo aqui, a mao.
+        "minimum_accepted_price",
         "fipe_reference_at",
         "fipe_reference_value",
         "fuel_type",
