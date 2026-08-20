@@ -135,6 +135,11 @@ function serializeForOwner(row, { images = [] } = {}) {
     declared_condition: row.declared_condition,
     known_issues: row.known_issues,
 
+    // O PISO declarado na publicação (4.3.3). NULL preservado: solicitação
+    // anterior à regra não tem piso, e escrever 0 aqui diria que o dono aceita
+    // qualquer valor — coisa que ele nunca declarou.
+    minimum_accepted_price: row.minimum_accepted_price,
+
     // ────────────────────────────────────────────────────────────────────────
     // FICHA DE AVALIAÇÃO — campo a campo, e NULL preservado
     // ────────────────────────────────────────────────────────────────────────
@@ -378,6 +383,7 @@ export async function createSaleRequest(user, input, deps = {}) {
         fuelType: normalized.fuelType,
         declaredCondition: normalized.declaredCondition,
         knownIssues: normalized.knownIssues,
+        minimumAcceptedPrice: normalized.minimumAcceptedPrice,
 
         // Ficha de avaliação, campo a campo. Um spread de `normalized` aqui
         // funcionaria hoje e passaria a mandar para o INSERT qualquer chave que
