@@ -137,10 +137,19 @@ function buildFixture() {
             body_paint_issues: [],
             body_paint_notes: null,
           },
-      // A linha legada também não tem referência: o snapshot só é gravado com
-      // confiança alta, então uma solicitação publicada com o provedor FIPE fora
-      // do ar chega ao card com NULL. É o caso que precisa dizer "não
-      // disponível" em vez de sumir — e nunca "R$ 0,00".
+      // A LINHA LEGADA não tem piso NEM referência FIPE.
+      //
+      // As duas ausências têm a mesma origem: a solicitação foi publicada antes
+      // da regra existir (piso), ou com o provedor FIPE fora do ar (referência).
+      // É o caso em que a região de preço do card fica NEUTRA — sem valor
+      // inventado, sem R$ 0,00 e sem converter outro campo em preço.
+      //
+      // O piso é o ÚNICO valor que o card mostra; FIPE e disputa vão junto na
+      // fixture para que a ausência delas na tela seja provada com dado presente.
+      // Base distinta das outras séries (FIPE 72.000+, disputa 61.000+/58.000+)
+      // de propósito: se o piso compartilhasse número com qualquer uma delas, a
+      // asserção de ausência ficaria ambígua e passaria por coincidência.
+      minimum_accepted_price: legacy ? null : `${44000 + index * 2600}.00`,
       fipe_reference_value: legacy ? null : `${72000 + index * 3100}.00`,
       fipe_reference_at: legacy ? null : "2026-08-01T00:00:00.000Z",
       image: null,
@@ -305,7 +314,7 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
     se quer impedir é visual: alguém reintroduzir um bloco de dinheiro "só para
     dar contexto" e a grade voltar a competir consigo mesma.
   */
-  test("nenhum valor monetário no feed — dinheiro só no detalhe", async ({ page }) => {
+  test("o único dinheiro do feed é o piso do proprietário", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await prepare(page);
     await page.goto(PAGE_PATH);
@@ -314,9 +323,33 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
     const cards = page.getByTestId("dealer-sale-opportunity-card");
     const texto = (await cards.allTextContents()).join(" | ");
 
-    for (const proibido of ["R$", "Referência FIPE", "Maior proposta", "Sua proposta"]) {
+    // O piso do primeiro card da fixture: 44.000.
+    await expect(page.getByTestId("dealer-card-price").first()).toHaveText(/44\.000/);
+
+    // Nenhum rótulo de valor comparativo, e nenhum dos números da FIPE nem da
+    // disputa (72.000+ e 61.000+ na fixture).
+    for (const proibido of ["Referência FIPE", "Maior proposta", "Sua proposta", "FIPE"]) {
       expect(texto, `card não pode carregar "${proibido}"`).not.toContain(proibido);
     }
+    for (const numero of ["72.000", "75.100", "61.000", "62.000"]) {
+      expect(texto, `card não pode mostrar ${numero}`).not.toContain(numero);
+    }
+
+    // E a ficha declarada não voltou junto: o card é triagem.
+    for (const chip of ["Leilão", "Laudo", "Particular"]) {
+      expect(texto).not.toContain(chip);
+    }
+  });
+
+  test("linha legada sem piso: região de preço neutra, nunca R$ 0,00", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await prepare(page);
+    await page.goto(PAGE_PATH);
+
+    // O índice 3 da fixture é a linha legada (sem piso e sem FIPE).
+    const legado = page.getByTestId("dealer-sale-opportunity-card").nth(3);
+    await expect(legado.getByTestId("dealer-card-price")).toHaveText("—");
+    expect(await legado.textContent()).not.toContain("R$ 0");
   });
 
   /*
@@ -360,7 +393,7 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
       expect(photo!.x + photo!.width).toBeLessThanOrEqual(titulo!.x + 1);
 
       // O CTA principal cabe inteiro dentro do card — nada de botão escapando.
-      const cta = await card.getByTestId("dealer-sale-opportunity-evaluate").boundingBox();
+      const cta = await card.getByTestId("dealer-sale-opportunity-offer").boundingBox();
       expect(cta!.x).toBeGreaterThanOrEqual(box!.x - 1);
       expect(cta!.x + cta!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
 
@@ -397,21 +430,26 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
     expect(Math.max(...alturas) - Math.min(...alturas)).toBeLessThanOrEqual(2);
   });
 
-  test("os dois CTAs do card: 'Avaliar agora' abre o detalhe no formulário", async ({ page }) => {
+  test("o CTA do card: 'Fazer oferta' abre o detalhe no formulário", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await prepare(page);
     await page.goto(PAGE_PATH);
 
     const card = page.getByTestId("dealer-sale-opportunity-card").first();
-    await expect(card.getByTestId("dealer-sale-opportunity-evaluate")).toHaveAttribute(
+    await expect(card.getByTestId("dealer-sale-opportunity-offer")).toHaveAttribute(
       "href",
       /\/oportunidades\/veiculos\/1(\?[^#]*)?#proposta$/
     );
 
+    expect(await card.getByTestId("dealer-sale-opportunity-offer").textContent()).toContain(
+      "Fazer oferta"
+    );
+
     // O clique precisa chegar ao CTA: a camada que torna o cartão inteiro
-    // clicável (`after:inset-0` do "Ver detalhes") cobre o botão inteiro, e sem
-    // o `z-10` o lojista cairia no topo da página em vez do formulário.
-    await card.getByTestId("dealer-sale-opportunity-evaluate").click();
+    // clicável (`after:inset-0`, agora no link do TÍTULO) cobre o botão
+    // inteiro, e sem o `z-10` o lojista cairia no topo da página em vez do
+    // formulário. Este é o teste que a §15 manda preservar.
+    await card.getByTestId("dealer-sale-opportunity-offer").click();
     await expect(page).toHaveURL(/\/oportunidades\/veiculos\/1.*#proposta$/);
     await expect(page.locator("#proposta")).toBeVisible();
   });

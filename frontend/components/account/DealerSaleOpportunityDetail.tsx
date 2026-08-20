@@ -13,6 +13,7 @@ import {
   fetchSaleOpportunity,
   formatCity,
   formatFipeReference,
+  formatMoneyValue,
   formatMileage,
   formatPublishedAt,
   readTireCondition,
@@ -399,10 +400,28 @@ export default function DealerSaleOpportunityDetail({
             solicitação não tem preço pedido, e confundir os dois faria o lojista
             propor contra um número que ninguém pediu.
           */}
-          <p className="mt-3.5 border-t border-[#F2F4F7] pt-3 text-[12.5px] text-[#667085]">
-            Referência FIPE{" "}
-            <span className="font-semibold text-[#1D2440]">{fipe || NOT_INFORMED}</span>
-          </p>
+          <div className="mt-3.5 flex flex-wrap items-baseline gap-x-5 gap-y-1 border-t border-[#F2F4F7] pt-3 text-[12.5px] text-[#667085]">
+            <p>
+              Referência FIPE{" "}
+              <span className="font-semibold text-[#1D2440]">{fipe || NOT_INFORMED}</span>
+            </p>
+
+            {/*
+              O PISO ao lado da referência, e não em outro canto da página: são
+              os dois números que emolduram a proposta — um diz quanto o mercado
+              acha que o carro vale, o outro quanto o dono aceita receber. Lidos
+              juntos, dizem imediatamente se há espaço para negócio.
+
+              `null` (solicitação anterior à 4.3.3) mostra "Não informado", nunca
+              R$ 0,00.
+            */}
+            <p data-testid="dealer-detail-minimum">
+              Valor mínimo do proprietário{" "}
+              <span className="font-semibold text-[#1D2440]">
+                {formatMoneyValue(opportunity.minimum_accepted_price) || NOT_INFORMED}
+              </span>
+            </p>
+          </div>
         </section>
 
         {/*
@@ -427,6 +446,7 @@ export default function DealerSaleOpportunityDetail({
               offers_count: opportunity.offers_count,
             }}
             fipeReferenceValue={opportunity.fipe_reference_value}
+            minimumAcceptedPrice={opportunity.minimum_accepted_price}
             onSubmitted={applyOfferState}
           />
         </div>

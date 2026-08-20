@@ -84,6 +84,7 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
       body_paint_issues: ["scratches", "dents"],
       body_paint_notes: "Porta dianteira direita.",
     },
+    minimum_accepted_price: "62500.00",
     fipe_reference_value: "92000.00",
     fipe_reference_at: "2026-08-01T00:00:00.000Z",
     image: "https://cdn.example.com/1.webp",
@@ -255,11 +256,11 @@ describe("painel de proposta", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
 
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "5000000");
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6500000");
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
 
     await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
-    expect(submitSaleOffer.mock.calls[0][1].amount).toBe("50000.00");
+    expect(submitSaleOffer.mock.calls[0][1].amount).toBe("65000.00");
   });
 
   it("depois de enviar, o painel mostra a liderança sem nova request", async () => {
@@ -275,7 +276,7 @@ describe("painel de proposta", () => {
     await screen.findByTestId("dealer-offer-panel");
 
     fetchSaleOpportunity.mockClear();
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "5000000");
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6500000");
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
 
     // A igualdade EXATA quebrou quando o badge ganhou um glifo de estado ao lado
@@ -325,7 +326,11 @@ describe("painel de proposta", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
 
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "5500000");
+    // 62.000 SUPERA o líder que a tela conhece (60.000) — a checagem local
+    // deixa passar, e é o servidor que recusa, porque enquanto isso outra loja
+    // subiu para 61.000. É o cenário real de tela defasada, e é o que este teste
+    // existe para provar.
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6200000");
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
 
     expect(await screen.findByTestId("dealer-offer-error")).toBeTruthy();
@@ -342,6 +347,104 @@ describe("painel de proposta", () => {
 
     expect(submitSaleOffer).not.toHaveBeenCalled();
     expect(screen.getByTestId("dealer-offer-error").textContent).toContain("Informe o valor");
+  });
+
+  /*
+    ────────────────────────────────────────────────────────────────────────
+    AS DUAS BARREIRAS NA TELA (§24 da Fase 4.3.3)
+    ────────────────────────────────────────────────────────────────────────
+    A checagem local NÃO substitui o servidor — lá ela acontece dentro da
+    transação que trava a solicitação, e é a única confiável. Aqui ela existe
+    para transformar um 409 previsível em resposta imediata, com o alvo na tela.
+
+    O que estes testes prendem é a ORDEM das barreiras: sem proposta, o piso e
+    `>=`; com proposta, a maior atual e `>`. Invertê-las faria a tela recusar um
+    valor que a API aceita — o pior tipo de divergência, porque o lojista não
+    tem como saber quem está certo.
+  */
+  it("abaixo do piso: não chama a API e diz qual é o piso", async () => {
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+
+    // Piso da fixture: 62.500. Um centavo abaixo.
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6249999");
+    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
+
+    expect(submitSaleOffer).not.toHaveBeenCalled();
+    const error = screen.getByTestId("dealer-offer-error").textContent ?? "";
+    expect(error).toContain("valor mínimo");
+    expect(error).toMatch(/62\.500,00/);
+  });
+
+  it("EXATAMENTE o piso é aceito enquanto não existe proposta", async () => {
+    submitSaleOffer.mockResolvedValue({
+      offer: { id: 1, amount: "62500.00", note: null, created_at: new Date().toISOString() },
+      current_highest_offer: "62500.00",
+      my_offer: "62500.00",
+      is_leading: true,
+      offers_count: 1,
+    });
+
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6250000");
+    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
+
+    await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
+    expect(submitSaleOffer.mock.calls[0][1].amount).toBe("62500.00");
+  });
+
+  it("com proposta na mesa, alcançar o piso já não basta: precisa superar o líder", async () => {
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({ current_highest_offer: "64000.00", my_offer: null, offers_count: 1 })
+    );
+
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+
+    // Acima do piso (62.500) e abaixo do líder (64.000).
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6300000");
+    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
+
+    expect(submitSaleOffer).not.toHaveBeenCalled();
+    expect(screen.getByTestId("dealer-offer-error").textContent).toContain(
+      "superar a maior proposta atual"
+    );
+  });
+
+  it("o detalhe mostra os QUATRO valores — é o card que mostra só o piso", async () => {
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({
+        minimum_accepted_price: "62500.00",
+        fipe_reference_value: "72000.00",
+        current_highest_offer: "65000.00",
+        my_offer: "64000.00",
+        offers_count: 2,
+      })
+    );
+
+    render(<DealerSaleOpportunityDetail id="1" />);
+    const panel = await screen.findByTestId("dealer-offer-panel");
+
+    // A tela de decisão tem largura para os quatro, e é onde eles servem: o
+    // formulário de proposta está logo abaixo.
+    expect(screen.getByTestId("dealer-offer-minimum").textContent).toMatch(/62\.500,00/);
+    expect(screen.getByTestId("dealer-detail-minimum").textContent).toMatch(/62\.500,00/);
+    expect(panel.textContent).toMatch(/65\.000,00/);
+    expect(panel.textContent).toMatch(/64\.000,00/);
+    expect(document.body.textContent).toMatch(/72\.000,00/);
+  });
+
+  it("legado sem piso: o painel não mostra linha de valor mínimo, e nada de R$ 0,00", async () => {
+    fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
+
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+
+    expect(screen.queryByTestId("dealer-offer-minimum")).toBeNull();
+    // No resumo a linha existe, mas diz "não informado" — nunca zero.
+    expect(screen.getByTestId("dealer-detail-minimum").textContent).not.toContain("R$ 0");
   });
 
   it("os atalhos partem da maior proposta atual e apenas PREENCHEM o campo", async () => {
