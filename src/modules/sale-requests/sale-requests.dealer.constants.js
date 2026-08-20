@@ -116,6 +116,22 @@ export const SALE_OPPORTUNITY_CODE = Object.freeze({
    */
   OFFER_NOT_LEADING: "SALE_OPPORTUNITY_OFFER_NOT_LEADING",
 
+  /**
+   * A proposta não alcança o PISO declarado pelo proprietário (Fase 4.3.3).
+   *
+   * Separado de `OFFER_NOT_LEADING` porque as duas recusas descrevem barreiras
+   * diferentes e o lojista precisa saber contra qual delas esbarrou: o piso é
+   * imóvel e conhecido de antemão (está no card), enquanto a maior proposta
+   * sobe a cada lance de concorrente. Colapsar os dois códigos faria a tela
+   * dizer "supere a maior proposta atual" numa solicitação que ainda não tem
+   * proposta nenhuma.
+   *
+   * A resposta carrega `minimum_accepted_price` junto, pelo mesmo motivo que a
+   * outra carrega o líder: mandar corrigir sem dizer o alvo obrigaria a
+   * recarregar a página para descobrir quanto falta.
+   */
+  OFFER_BELOW_MINIMUM: "SALE_OPPORTUNITY_OFFER_BELOW_MINIMUM",
+
   /** A solicitação foi cancelada pelo proprietário e não recebe mais propostas. */
   OFFER_CLOSED: "SALE_OPPORTUNITY_OFFER_CLOSED",
   /**
