@@ -8,10 +8,7 @@ import {
   describeVehicle,
   formatCity,
   formatMileage,
-  formatMoneyValue,
   formatPublishedAt,
-  readCautionReport,
-  readYesNoUnknown,
   type DealerSaleOpportunitySummary,
 } from "@/lib/sale-requests/dealer-api";
 
@@ -19,66 +16,80 @@ import {
  * Card de um veículo disponível para avaliação.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * A FOTO É A PROTAGONISTA
+ * O CARD É TRIAGEM; O DETALHE É DECISÃO
  * ────────────────────────────────────────────────────────────────────────────
- * A versão anterior deste card dava à foto a mesma importância que a seis
- * etiquetas de texto, e o resultado parecia uma linha de tabela administrativa
- * com uma imagem em cima. Num catálogo de veículos, a foto é o primeiro filtro
- * que o comprador aplica — antes de ler qualquer especificação, ele decide se
- * vale olhar.
+ * A pergunta que este card responde é "vale abrir?", e não "quanto eu ofereço?".
+ * Tudo que serve para decidir VALOR — referência FIPE, maior proposta, a
+ * proposta desta loja, distância para a FIPE — saiu daqui e vive apenas na
+ * página de detalhe, onde há largura para os números e onde o formulário de
+ * proposta está a um palmo deles.
  *
- * Por isso a imagem ocupa o topo inteiro em 4:3, sem margem, e o bloco de texto
- * abaixo foi comprimido para o que se lê em três segundos: o veículo, a linha de
- * especificação, a condição, dois sinais de risco e a disputa.
+ * A versão anterior mostrava os três valores no card. Numa grade de quatro
+ * colunas isso produzia três blocos monetários competindo entre si em ~270px, e
+ * o lojista precisava ler dinheiro para decidir se queria olhar o carro.
+ *
+ * O dado continua no CONTRATO da API: `fipe_reference_value`,
+ * `current_highest_offer` e `my_offer` seguem chegando na mesma resposta, e o
+ * detalhe os consome. O card é que deixou de renderizá-los — nenhum campo foi
+ * removido de nenhuma rota, nenhum DTO mudou.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * O QUE SAIU, E POR QUÊ
+ * UMA ESTRUTURA, DOIS LAYOUTS
  * ────────────────────────────────────────────────────────────────────────────
- * A referência visual traz coração de favoritar, selos "Urgente"/"Bom potencial"
- * e dois CTAs ("Avaliar agora" + "Ver detalhes"). Nenhum dos três entrou:
+ * No celular o card é um ITEM DE LISTA horizontal: miniatura à esquerda,
+ * conteúdo à direita, altura curta — dá para varrer muitos veículos numa
+ * rolagem. A partir de `sm` ele vira o cartão vertical com a foto em 4:3 no
+ * topo.
  *
- *   • favoritar não tem entidade de persistência — o coração seria um botão que
- *     esquece o clique ao recarregar;
- *   • "Urgente" e "Bom potencial" não têm algoritmo por trás. Um selo desses faz
- *     o lojista priorizar por um sinal que o sistema não possui;
- *   • dois CTAs para a mesma página custam um momento de decisão por card e não
- *     mudam nada no destino.
+ * É o MESMO DOM nos dois casos, com classes responsivas: `flex-row` →
+ * `sm:flex-col`, miniatura de largura fixa → `sm:w-full` com `aspect-[4/3]`.
+ * Duplicar em `CardMobile`/`CardDesktop` faria toda correção de privacidade ou
+ * de copy precisar ser aplicada duas vezes — e a segunda seria esquecida.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE NÃO ENTROU
+ * ────────────────────────────────────────────────────────────────────────────
+ * A referência visual traz coração de favoritar, selos "Urgente"/"Bom
+ * potencial", cronômetro e nota de reputação da loja. Nenhum dos quatro entrou:
+ *
+ *   • favoritar não tem entidade de persistência — seria um botão que esquece o
+ *     clique ao recarregar;
+ *   • "Urgente"/"Bom potencial" e nota de reputação não têm algoritmo por trás.
+ *     Um selo desses faz o lojista priorizar por um sinal que o sistema não tem;
+ *   • cronômetro exigiria prazo, e este produto não expira solicitação.
  *
  * O único sinal temporal é "há N dias", derivado de `created_at`.
  */
 
 /**
- * Ponto colorido + texto — a leitura de estado do card.
+ * Etiqueta compacta de triagem.
  *
- * A cor acompanha, mas nunca carrega sozinha: quem não distingue verde de âmbar
- * lê o mesmo texto que todo mundo.
+ * A cor acompanha, mas nunca carrega sozinha: o texto diz "Sem leilão" ou
+ * "Laudo com apontamentos" por extenso, então quem não distingue verde de âmbar
+ * lê exatamente a mesma informação.
  */
-function ConditionDot({ label, tone }: { label: string; tone: "good" | "warn" | "bad" }) {
-  const dot =
-    tone === "good" ? "bg-[#12B76A]" : tone === "warn" ? "bg-[#F79009]" : "bg-[#F04438]";
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#344054]">
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
-      {label}
-    </span>
-  );
-}
+const CHIP_TONE = {
+  good: "bg-[#ECFDF3] text-[#067647]",
+  warn: "bg-[#FFF8F0] text-[#B54708]",
+  bad: "bg-[#FEF3F2] text-[#B42318]",
+  muted: "bg-[#F2F4F7] text-[#475467]",
+} as const;
 
-/**
- * Sinal de risco compacto: ✓ quando não há apontamento, ⚠ quando há.
- *
- * `null` some do card — nunca vira "Não informado". Um card não é lugar de
- * declarar ausência: quem precisa da ficha completa abre o detalhe.
- */
-function RiskChip({ label, ok }: { label: string | null; ok: boolean }) {
-  if (!label) return null;
+type ChipTone = keyof typeof CHIP_TONE;
+
+function Chip({
+  label,
+  tone,
+  className = "",
+}: {
+  label: string;
+  tone: ChipTone;
+  className?: string;
+}) {
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium leading-none ${
-        ok ? "bg-[#F2F8F5] text-[#067647]" : "bg-[#FFF8F0] text-[#B54708]"
-      }`}
+      className={`inline-flex max-w-full items-center rounded-md px-1.5 py-1 text-[10.5px] font-semibold leading-none sm:text-[11px] ${CHIP_TONE[tone]} ${className}`}
     >
-      <span aria-hidden="true">{ok ? "✓" : "⚠"}</span>
       <span className="truncate">{label}</span>
     </span>
   );
@@ -93,7 +104,7 @@ function PhotoPlaceholder() {
     >
       <svg
         viewBox="0 0 40 40"
-        className="h-10 w-10"
+        className="h-7 w-7 sm:h-10 sm:w-10"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
@@ -108,7 +119,29 @@ function PhotoPlaceholder() {
   );
 }
 
-/** "45.000 km · Flex · Automático" — os três números que o lojista compara. */
+function PinIcon({ className = "h-3 w-3 shrink-0" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      aria-hidden="true"
+    >
+      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+      <circle cx="12" cy="10" r="2.4" />
+    </svg>
+  );
+}
+
+/**
+ * "45.000 km · Flex · Automático" — a linha que o lojista compara entre cards.
+ *
+ * O ANO não entra aqui porque já está no título (`describeVehicle` devolve
+ * "Volkswagen T-Cross 2020"). Repeti-lo custaria a largura de um dado novo para
+ * dizer o que a linha de cima já disse.
+ */
 function specLine(opportunity: DealerSaleOpportunitySummary): string {
   return [
     formatMileage(opportunity.mileage),
@@ -119,12 +152,36 @@ function specLine(opportunity: DealerSaleOpportunitySummary): string {
     .join(" · ");
 }
 
-const CONDITION_TONE: Record<string, "good" | "warn" | "bad"> = {
+const CONDITION_TONE: Record<string, ChipTone> = {
   excelente: "good",
   bom: "good",
   regular: "warn",
   precisa_reparos: "bad",
 };
+
+/** Leilão em UMA etiqueta curta. `null` (não declarado) não vira etiqueta. */
+function auctionChip(value: string | null): { label: string; tone: ChipTone } | null {
+  if (value === "no") return { label: "Sem leilão", tone: "good" };
+  if (value === "yes") return { label: "Leilão: sim", tone: "bad" };
+  if (value === "unknown") return { label: "Leilão: não sei", tone: "muted" };
+  return null;
+}
+
+/**
+ * Laudo cautelar em UMA etiqueta curta.
+ *
+ * "Sem laudo" é `not_available` — o proprietário declarou que NÃO possui laudo,
+ * o que é diferente de `null` (não respondeu) e de `unknown` (não sabe se
+ * possui). As três situações produzem etiquetas diferentes, ou nenhuma.
+ */
+function cautionChip(value: string | null): { label: string; tone: ChipTone } | null {
+  if (value === "approved") return { label: "Laudo aprovado", tone: "good" };
+  if (value === "approved_with_notes") return { label: "Laudo com apontamentos", tone: "warn" };
+  if (value === "rejected") return { label: "Laudo reprovado", tone: "bad" };
+  if (value === "not_available") return { label: "Sem laudo", tone: "muted" };
+  if (value === "unknown") return { label: "Laudo: não sei", tone: "muted" };
+  return null;
+}
 
 export default function DealerSaleOpportunityCard({
   opportunity,
@@ -137,203 +194,150 @@ export default function DealerSaleOpportunityCard({
   query?: string;
 }) {
   const { evaluation } = opportunity;
+  const title = describeVehicle(opportunity);
 
-  const auction = readYesNoUnknown(evaluation.auction_history);
-  const caution = readCautionReport(evaluation.caution_report_status);
-  const financing = readYesNoUnknown(evaluation.financing_status);
+  const detailHref = `${basePath}/oportunidades/veiculos/${opportunity.id}${query}`;
 
-  // Só o VALOR no card: `formatFipeReference` acrescenta o mês do snapshot
-  // ("R$ 72.000,00 (ago de 2026)"), e isso quebra em duas linhas num card de
-  // 270px, empurrando a disputa para fora do cartão. A data continua no
-  // detalhe, onde há largura para ela e onde a decisão de fato acontece.
-  const fipe = formatMoneyValue(opportunity.fipe_reference_value);
+  /**
+   * "Avaliar agora" leva ao MESMO destino de "Ver detalhes", com âncora no
+   * painel de proposta.
+   *
+   * Dois botões para a mesma URL crua seriam custo de decisão sem ganho — o que
+   * separa os dois é ONDE a página abre: quem já decidiu cai no formulário, quem
+   * quer conferir a ficha entra pelo topo. Não existe fluxo de avaliação fora do
+   * detalhe, e inventar um destino próprio para o CTA principal prometeria uma
+   * tela que não existe.
+   */
+  const evaluateHref = `${detailHref}#proposta`;
 
-  const highest = formatMoneyValue(opportunity.current_highest_offer);
-  const mine = formatMoneyValue(opportunity.my_offer);
+  const condition = DECLARED_CONDITION_LABEL[opportunity.declared_condition];
+  const auction = auctionChip(evaluation.auction_history);
+  const caution = cautionChip(evaluation.caution_report_status);
 
   return (
     <li
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#E5E9F2] bg-white transition duration-150 hover:border-[#CFE0FB] hover:shadow-[0_10px_28px_-12px_rgba(16,24,40,0.18)] focus-within:border-[#0e62d8] focus-within:ring-1 focus-within:ring-[#0e62d8]"
+      className="group relative flex flex-row overflow-hidden rounded-2xl border border-[#E5E9F2] bg-white transition duration-150 hover:border-[#CFE0FB] hover:shadow-[0_10px_28px_-12px_rgba(16,24,40,0.18)] focus-within:border-[#0e62d8] focus-within:ring-1 focus-within:ring-[#0e62d8] sm:flex-col"
       data-testid="dealer-sale-opportunity-card"
     >
-      {/* FOTO — proporção fixa 4:3, sangrando até as bordas do card. */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#F1F4F9]">
+      {/*
+        FOTO — miniatura à esquerda no celular, topo em 4:3 no desktop.
+
+        `self-stretch` faz a miniatura acompanhar a altura da linha sem que o
+        componente precise saber quanto texto o conteúdo tem; a imagem é absoluta
+        porque no modo linha o contêiner não tem altura intrínseca.
+      */}
+      <div className="relative w-[112px] shrink-0 self-stretch overflow-hidden bg-[#F1F4F9] sm:aspect-[4/3] sm:w-full sm:self-auto">
         {opportunity.image ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={opportunity.image}
-            alt={`Foto de ${describeVehicle(opportunity)}`}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            alt={`Foto de ${title}`}
+            className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
             loading="lazy"
           />
         ) : (
           <PhotoPlaceholder />
         )}
 
-        {/* Cidade sobre a foto: é o dado que o lojista confere primeiro, e sobre
-            a imagem ele não gasta uma linha do bloco de texto. */}
-        <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium leading-none text-white backdrop-blur-sm">
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-            <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
-            <circle cx="12" cy="10" r="2.4" />
-          </svg>
+        {/* No desktop a cidade fica sobre a foto e não gasta linha de texto. Na
+            miniatura de 112px não caberia, então ali ela volta ao conteúdo. */}
+        <span className="absolute left-2.5 top-2.5 hidden items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium leading-none text-white backdrop-blur-sm sm:inline-flex">
+          <PinIcon />
           {formatCity(opportunity.city)}
         </span>
       </div>
 
       {/* CONTEÚDO */}
-      <div className="flex min-w-0 flex-1 flex-col p-4">
-        <h3 className="truncate text-[15px] font-bold leading-snug text-[#161f34]">
-          {describeVehicle(opportunity)}
+      <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-4">
+        <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-[#161f34] sm:truncate sm:text-[15px]">
+          {title}
         </h3>
 
         {/*
-          A VERSÃO FIPE completa, e não uma linha de specs inventada.
-          É ela que separa um EX de um LX — quinze mil reais de diferença no
-          mesmo modelo e ano. O título traz marca, modelo comercial e ano; esta
-          linha traz o que o título não consegue carregar sem estourar.
+          A VERSÃO FIPE completa, e não uma linha de specs inventada. É ela que
+          separa um EX de um LX — quinze mil reais de diferença no mesmo modelo e
+          ano. O título traz marca, modelo comercial e ano; esta linha traz o que
+          o título não consegue carregar sem estourar.
         */}
-        <p className="mt-0.5 truncate text-[12px] text-[#667085]">
+        <p className="mt-0.5 truncate text-[12px] leading-snug text-[#667085]">
           {opportunity.fipe_model_description}
         </p>
 
-        <p className="mt-2 text-[13px] font-semibold text-[#1D2440]">
+        <p className="mt-1.5 text-[12.5px] font-semibold leading-snug text-[#1D2440] sm:text-[13px]">
           {specLine(opportunity)}
         </p>
 
-        <div className="mt-2">
-          <ConditionDot
-            label={
-              DECLARED_CONDITION_LABEL[opportunity.declared_condition] ||
-              opportunity.declared_condition
-            }
-            tone={CONDITION_TONE[opportunity.declared_condition] ?? "warn"}
-          />
-        </div>
+        {/*
+          UMA LINHA PARA TRÊS METADADOS.
+
+          "Particular" é um FATO deste produto, não rótulo decorativo: todo
+          veículo aqui vem de pessoa física, e é o que diferencia este feed do
+          estoque entre lojas.
+
+          A CIDADE entra aqui só no celular — no desktop ela fica sobre a foto,
+          onde não custa linha nenhuma. Ao lado da miniatura de 112px o chip não
+          caberia, e uma linha só para ela levava o item de lista a 208px de
+          altura: quatro veículos por tela em vez de cinco.
+        */}
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-[#98A2B3]">
+          <span className="inline-flex max-w-full items-center gap-1 font-medium text-[#667085] sm:hidden">
+            <PinIcon />
+            <span className="truncate">{formatCity(opportunity.city)}</span>
+          </span>
+          <span className="sm:hidden" aria-hidden="true">
+            ·
+          </span>
+          <span className="font-medium text-[#667085]">Particular</span>
+          <span aria-hidden="true">·</span>
+          <span>{formatPublishedAt(opportunity.created_at)}</span>
+        </p>
 
         {/*
-          Dois sinais de risco, no máximo — os que mudam uma decisão de compra:
-          passagem por leilão e laudo. Financiamento entra no lugar do laudo
-          quando o laudo não foi informado, porque um card com uma etiqueta só
-          fica visualmente torto e a informação seguinte em relevância é essa.
+          NO MÁXIMO TRÊS ETIQUETAS, E TRÊS DE VERDADE.
+
+          Estado declarado, leilão e laudo — as três que mudam a decisão de
+          abrir. Financiamento, pneus, IPVA, multas, mecânica e pintura ficam na
+          ficha do detalhe: no card viravam uma parede de chips em que nenhuma se
+          lia.
+
+          No celular a terceira (laudo) fica oculta: ao lado de uma miniatura de
+          112px, três etiquetas quebram em duas linhas e alongam o item de lista
+          justamente onde a compactação é o ponto.
         */}
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          <RiskChip
-            label={auction ? `Leilão: ${auction}` : null}
-            ok={evaluation.auction_history === "no"}
-          />
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2">
+          {condition ? (
+            <Chip
+              label={condition}
+              tone={CONDITION_TONE[opportunity.declared_condition] ?? "muted"}
+            />
+          ) : null}
+          {auction ? <Chip label={auction.label} tone={auction.tone} /> : null}
           {caution ? (
-            <RiskChip
-              // "Laudo:" na frente porque o valor sozinho não se explica: "Não
-              // possui" e "Aprovado" poderiam ser resposta de qualquer campo da
-              // ficha, e no card não há rótulo de seção para dar contexto.
-              label={`Laudo: ${caution}`}
-              ok={
-                evaluation.caution_report_status === "approved" ||
-                evaluation.caution_report_status === "not_available"
-              }
-            />
-          ) : (
-            <RiskChip
-              label={financing ? `Financiado: ${financing}` : null}
-              ok={evaluation.financing_status === "no"}
-            />
-          )}
-        </div>
-
-        {/*
-          BLOCO COMERCIAL — a âncora de mercado e, quando existe, a disputa.
-
-          ────────────────────────────────────────────────────────────────────
-          POR QUE A REFERÊNCIA DEIXOU DE SER UMA NOTA DE RODAPÉ
-          ────────────────────────────────────────────────────────────────────
-          Até a Fase 4.3.1 a referência era uma linha de 11,5px em cinza claro,
-          logo abaixo das etiquetas de risco. O dado CHEGAVA à tela — banco, API
-          e DTO sempre entregaram o valor —, mas num card de ~270px ele era o
-          texto de MENOR contraste do cartão: ficava abaixo da quilometragem, do
-          estado e dos chips, e ao lado de "Maior proposta" em 15px azul-negrito
-          sumia por completo. Em uso real o efeito é indistinguível de campo
-          ausente, e foi assim que ele foi relatado.
-
-          Agora ela tem o MESMO posto tipográfico dos valores de proposta, no
-          mesmo bloco separado por linha: é o primeiro número que o lojista
-          encontra, e é contra ele que os outros dois são lidos.
-
-          "Referência FIPE", nunca "valor do veículo", "preço" ou "preço
-          pedido": a solicitação NÃO tem preço pedido — o produto inteiro existe
-          para descobri-lo. Confundir os dois faria o lojista propor contra um
-          número que ninguém pediu.
-        */}
-        <div className="mt-2.5 border-t border-[#F2F4F7] pt-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
-            Referência FIPE
-          </p>
-          {fipe ? (
-            <p
-              className="text-[15px] font-bold leading-tight text-[#1D2440]"
-              data-testid="dealer-card-fipe-value"
-            >
-              {fipe}
-            </p>
-          ) : (
-            /*
-              LEGADO E FALHA DE PROVEDOR — o único texto honesto é "não
-              disponível".
-
-              Uma solicitação anterior à resolução server-side, ou publicada
-              enquanto o provedor FIPE estava fora, grava NULL de propósito
-              (`resolveFipeSnapshot` só aceita `confidence: "high"`). Sumir com a
-              linha faria o card parecer inconsistente com os vizinhos; um "R$ 0"
-              ou um valor derivado de marca/modelo aproximado seria pior ainda —
-              o lojista tomaria decisão de compra contra um número inventado.
-            */
-            <p
-              className="text-[13px] font-medium leading-tight text-[#98A2B3]"
-              data-testid="dealer-card-fipe-value"
-            >
-              Não disponível
-            </p>
-          )}
-
-          {/*
-            DISPUTA — só aparece quando existe: uma solicitação sem proposta
-            nenhuma não ganha um bloco vazio dizendo "—".
-          */}
-          {highest ? (
-            <div className="mt-2 flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
-                  Maior proposta
-                </p>
-                <p className="text-[15px] font-bold leading-tight text-[#0e62d8]">{highest}</p>
-              </div>
-              {mine ? (
-                <div className="min-w-0 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
-                    Sua proposta
-                  </p>
-                  <p
-                    className={`text-[15px] font-bold leading-tight ${
-                      opportunity.is_leading ? "text-[#067647]" : "text-[#1D2440]"
-                    }`}
-                  >
-                    {mine}
-                  </p>
-                </div>
-              ) : null}
-            </div>
+            <Chip label={caution.label} tone={caution.tone} className="hidden sm:inline-flex" />
           ) : null}
         </div>
 
-        {/* RODAPÉ — tempo + a única ação. */}
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3.5">
-          <span className="truncate text-[11px] text-[#98A2B3]">
-            {formatPublishedAt(opportunity.created_at)}
-          </span>
+        {/*
+          AÇÕES — lado a lado no celular, empilhadas no desktop.
+
+          "Ver detalhes" carrega o `after:absolute after:inset-0`: é ele que faz
+          o CARTÃO INTEIRO ser clicável, padrão que esta base já usa. "Avaliar
+          agora" precisa de `relative z-10` para ficar ACIMA dessa camada — sem
+          isso o botão principal seria engolido pelo link do cartão e todo clique
+          cairia no topo da página em vez do formulário de proposta.
+        */}
+        <div className="mt-auto flex items-center gap-2 pt-2.5 sm:flex-col sm:items-stretch sm:gap-1.5 sm:pt-3.5">
+          <Link
+            href={evaluateHref}
+            className="relative z-10 inline-flex h-9 flex-1 items-center justify-center rounded-lg bg-[#0e62d8] px-3 text-[12.5px] font-bold text-white transition hover:bg-[#0b52b5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8] sm:h-10 sm:w-full sm:text-[13px]"
+            data-testid="dealer-sale-opportunity-evaluate"
+          >
+            Avaliar agora
+          </Link>
 
           <Link
-            href={`${basePath}/oportunidades/veiculos/${opportunity.id}${query}`}
-            className="inline-flex h-9 shrink-0 items-center rounded-lg border border-[#DBE7FB] bg-[#F5F9FF] px-3.5 text-[12.5px] font-bold text-[#0e62d8] transition group-hover:bg-[#0e62d8] group-hover:text-white after:absolute after:inset-0 after:content-['']"
+            href={detailHref}
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-[#DBE7FB] bg-white px-3 text-[12.5px] font-semibold text-[#0e62d8] transition hover:bg-[#F5F9FF] after:absolute after:inset-0 after:content-[''] sm:w-full"
             data-testid="dealer-sale-opportunity-link"
           >
             Ver detalhes

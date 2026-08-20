@@ -226,81 +226,30 @@ describe("privacidade e ausência de contato", () => {
     }
   });
 
-  it("a FIPE é rotulada como REFERÊNCIA, nunca como valor do veículo", async () => {
-    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
-    const { container } = render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
-
-    expect(screen.getByText(/Referência FIPE/)).toBeTruthy();
-    // O valor acompanha o rótulo: "Referência FIPE" sozinha não prova que o
-    // número está na tela, e é o número que o lojista usa para julgar a disputa.
-    expect(screen.getByText(/92\.000,00/)).toBeTruthy();
-    const text = container.textContent?.toLowerCase() ?? "";
-    expect(text).not.toContain("valor do veículo");
-    expect(text).not.toContain("preço pedido");
-  });
-
   /*
     ────────────────────────────────────────────────────────────────────────
-    FASE 4.3.2 — A REFERÊNCIA PRECISA SER ENCONTRÁVEL, NÃO SÓ ESTAR PRESENTE
+    O CARD NÃO CARREGA DINHEIRO
     ────────────────────────────────────────────────────────────────────────
-    O teste acima já passava quando o defeito foi relatado: o número ESTAVA no
-    DOM. Ele era a menor e mais apagada linha do card (11,5px, #98A2B3), abaixo
-    das etiquetas de risco — e ao lado de "Maior proposta" em 15px negrito
-    sumia. Em uso real, indistinguível de campo ausente.
+    A pergunta do feed é "vale abrir?", não "quanto eu ofereço?". Referência
+    FIPE, maior proposta e a proposta desta loja saíram do card e vivem no
+    DETALHE, ao lado do formulário que os usa.
 
-    Um teste de unidade não mede legibilidade. O que ele PODE travar é o posto
-    do valor: um elemento próprio, com o valor sozinho, no mesmo bloco
-    comercial das propostas. É o que as asserções abaixo prendem; a prova
-    visual mora em `e2e/dealer-sale-opportunities-visual.spec.ts`.
+    As asserções abaixo são de AUSÊNCIA, e a ausência precisa ser provada com
+    dado presente: a oportunidade do teste TEM os três valores no objeto. Se
+    algum voltasse a ser renderizado, o número apareceria no texto do card e o
+    teste falharia. Um teste sobre um objeto sem valores passaria de graça.
+
+    O contrato da API é intocado — `fipe_reference_value`,
+    `current_highest_offer` e `my_offer` continuam chegando; quem os consome
+    agora é só o detalhe (`DealerSaleOpportunityDetail.test.tsx`).
   */
-  it("o valor da referência tem elemento próprio, com o número sozinho", async () => {
-    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
-    render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
-
-    const value = screen.getByTestId("dealer-card-fipe-value");
-    // O texto do elemento é o VALOR, e nada mais: se o número voltasse a ser um
-    // `<span>` dentro da frase do rótulo, este elemento carregaria "Referência
-    // FIPE R$ 92.000,00" — e a asserção falharia.
-    //
-    // ` ` → espaço: `Intl.NumberFormat` pt-BR separa "R$" do número com
-    // ESPAÇO INSEPARÁVEL. Comparar com um espaço comum falha com as duas
-    // strings idênticas na tela e no diff — armadilha que já custou tempo nesta
-    // base.
-    expect(value.textContent?.replace(/ /g, " ").trim()).toBe("R$ 92.000,00");
-  });
-
-  it("sem referência: mostra 'Não disponível' — nunca R$ 0,00 nem um valor derivado", async () => {
-    fetchSaleOpportunities.mockResolvedValue(
-      makePage({
-        items: [
-          makeOpportunity({ fipe_reference_value: null, fipe_reference_at: null }),
-        ],
-      })
-    );
-    render(<DealerSaleOpportunitiesList />);
-
-    const card = await screen.findByTestId("dealer-sale-opportunity-card");
-
-    // O rótulo CONTINUA na tela: sumir com a linha faria o card parecer
-    // inconsistente com os vizinhos, sem dizer por quê.
-    expect(card.textContent).toContain("Referência FIPE");
-    expect(screen.getByTestId("dealer-card-fipe-value").textContent?.trim()).toBe(
-      "Não disponível"
-    );
-
-    // E, acima de tudo: nada de número inventado. Um "R$ 0,00" aqui teria
-    // aparência de referência oficial e alguém proporia contra ele.
-    expect(card.textContent).not.toContain("R$ 0");
-    expect(card.textContent).not.toMatch(/R\$\s*0,00/);
-  });
-
-  it("a referência fica no mesmo bloco das propostas, e vem ANTES delas", async () => {
+  it("nenhum valor monetário no card: sem FIPE, sem maior proposta, sem a sua", async () => {
     fetchSaleOpportunities.mockResolvedValue(
       makePage({
         items: [
           makeOpportunity({
+            fipe_reference_value: "92000.00",
+            fipe_reference_at: "2026-08-01T00:00:00.000Z",
             current_highest_offer: "81000.00",
             my_offer: "79000.00",
             offers_count: 2,
@@ -313,20 +262,55 @@ describe("privacidade e ausência de contato", () => {
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
     const text = card.textContent ?? "";
 
-    // A ordem importa para a leitura: "maior proposta R$ 81.000" não diz nada
-    // sozinho — dito DEPOIS de uma referência de R$ 92.000, diz tudo.
-    expect(text.indexOf("Referência FIPE")).toBeGreaterThan(-1);
-    expect(text.indexOf("Referência FIPE")).toBeLessThan(text.indexOf("Maior proposta"));
+    for (const label of ["Referência FIPE", "Maior proposta", "Sua proposta"]) {
+      expect(text).not.toContain(label);
+    }
+
+    // Nenhum dos três NÚMEROS na tela — nem formatado, nem cru.
+    for (const value of ["92.000", "81.000", "79.000", "92000", "81000", "79000"]) {
+      expect(text).not.toContain(value);
+    }
+
+    // E nada de moeda no card, de forma nenhuma: um "R$" aqui significaria que
+    // algum valor voltou por outro caminho.
+    expect(text).not.toContain("R$");
   });
 
-  it("uma ação primária por card, e uma só", async () => {
+  it("o card continua sem valor do veículo ou preço pedido — eles não existem", async () => {
+    // Não há preço nesta fase: a solicitação da pessoa física NÃO tem valor
+    // pedido, e a disputa existe justamente para descobri-lo. Um "preço" no card
+    // seria um número que ninguém pediu.
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    const { container } = render(<DealerSaleOpportunitiesList />);
+    await screen.findByText("Volkswagen T-Cross 2020");
+
+    const text = container.textContent?.toLowerCase() ?? "";
+    expect(text).not.toContain("valor do veículo");
+    expect(text).not.toContain("preço pedido");
+    expect(text).not.toContain("preço");
+  });
+
+  it("duas ações, dois destinos: 'Avaliar agora' abre no formulário de proposta", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
     await screen.findByText("Volkswagen T-Cross 2020");
 
     const card = screen.getByTestId("dealer-sale-opportunity-card");
-    expect(within(card).getAllByRole("link")).toHaveLength(1);
-    expect(within(card).getByText("Ver detalhes")).toBeTruthy();
+
+    // Os dois CTAs vão para a MESMA página; o que muda é onde ela abre. Sem a
+    // âncora, "Avaliar agora" seria um segundo botão idêntico ao primeiro — o
+    // custo de decisão sem o ganho.
+    const evaluate = within(card).getByTestId("dealer-sale-opportunity-evaluate");
+    const details = within(card).getByTestId("dealer-sale-opportunity-link");
+
+    expect(evaluate.getAttribute("href")).toBe("/dashboard-loja/oportunidades/veiculos/1#proposta");
+    expect(details.getAttribute("href")).toBe("/dashboard-loja/oportunidades/veiculos/1");
+    expect(evaluate.textContent).toContain("Avaliar agora");
+    expect(details.textContent).toContain("Ver detalhes");
+
+    // Nenhum terceiro link: o cartão inteiro é clicável pela camada do
+    // "Ver detalhes", não por um link extra escondido.
+    expect(within(card).getAllByRole("link")).toHaveLength(2);
   });
 });
 
@@ -337,13 +321,19 @@ describe("ficha no card", () => {
     render(<DealerSaleOpportunitiesList />);
 
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
-    // Os sinais de risco viraram chips com o valor embutido ("Leilão: Não"), em
-    // vez de rótulo e valor em elementos separados. A asserção é sobre o que o
-    // lojista LÊ, não sobre a estrutura que produz o texto.
-    expect(card.textContent).toContain("Leilão: Não");
-    expect(card.textContent).toContain("Laudo: Não possui");
-    // Estado geral continua visível, agora como ponto colorido + texto.
+
+    // TRÊS etiquetas, e três só: estado declarado, leilão e laudo. O texto é
+    // AFIRMATIVO ("Sem leilão"), e não rótulo + valor ("Leilão: Não") — num chip
+    // de 10,5px metade da largura ia para a palavra que se repete em todos.
     expect(within(card).getByText("Bom")).toBeTruthy();
+    expect(within(card).getByText("Sem leilão")).toBeTruthy();
+    expect(within(card).getByText("Sem laudo")).toBeTruthy();
+
+    // A ficha completa (pneus, IPVA, multas, mecânica, pintura) fica no
+    // detalhe: no card ela virava uma parede de chips ilegível.
+    for (const absent of ["Pneus", "IPVA", "Multas", "Motor", "Câmbio", "Financiado"]) {
+      expect(card.textContent).not.toContain(absent);
+    }
   });
 
   it("campo NULL some do card — nunca vira 'Não' nem 'Não informado'", async () => {
@@ -364,10 +354,13 @@ describe("ficha no card", () => {
 
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
     // Sem declaração de leilão, o chip correspondente não existe — o card não
-    // inventa "Não informado" para preencher espaço.
-    expect(card.textContent).not.toContain("Leilão:");
+    // inventa "Não informado" nem "Sem leilão" para preencher espaço. A segunda
+    // invenção seria a pior das duas: transformaria "não perguntado" em uma
+    // declaração de que o carro nunca passou por leilão.
+    expect(card.textContent).not.toContain("leilão");
+    expect(card.textContent).not.toContain("Leilão");
     // O laudo foi declarado e continua aparecendo.
-    expect(card.textContent).toContain("Laudo:");
+    expect(card.textContent).toContain("Sem laudo");
   });
 
   it("solicitação sem foto usa placeholder, não uma imagem quebrada", async () => {

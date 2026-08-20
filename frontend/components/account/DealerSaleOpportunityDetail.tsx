@@ -405,8 +405,18 @@ export default function DealerSaleOpportunityDetail({
           </p>
         </section>
 
-        {/* 3 — PROPOSTA (no mobile vem AQUI, antes da ficha) */}
-        <div className="order-3 min-w-0 lg:col-start-2 lg:row-start-1">
+        {/*
+          3 — PROPOSTA (no mobile vem AQUI, antes da ficha)
+
+          `id="proposta"` é o destino de "Avaliar agora" no card do feed: quem já
+          decidiu abrir a página para propor cai no formulário, e não no topo.
+          `scroll-mt` compensa o cabeçalho fixo — sem ele a âncora encosta o
+          painel embaixo da barra e o campo de valor fica meio escondido.
+        */}
+        <div
+          id="proposta"
+          className="order-3 min-w-0 scroll-mt-20 lg:col-start-2 lg:row-start-1"
+        >
           <DealerOfferPanel
             saleRequestId={opportunity.id}
             advertiserId={advertiserId}
