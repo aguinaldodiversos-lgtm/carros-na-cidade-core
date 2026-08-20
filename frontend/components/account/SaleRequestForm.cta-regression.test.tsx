@@ -174,6 +174,10 @@ async function fillEverythingExceptCity(user: ReturnType<typeof setupUser>, phot
       photoCount
     )
   );
+
+  // O PISO (4.3.3) entra aqui: sem ele a única pendência deixaria de ser a
+  // CIDADE, e o teste passaria a exercitar outra coisa.
+  await user.type(screen.getByTestId("sale-request-minimum-price"), "6000000");
 }
 
 /** Digita a cidade e clica FORA, sem escolher a sugestão. */
@@ -239,7 +243,7 @@ describe("o cenário exato do relato", () => {
     await fillEverythingExceptCity(user, 9);
     await pickCityFromList(user);
 
-    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("8 de 8 etapas");
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("9 de 9 etapas");
     expect(screen.getByTestId("sale-request-ready")).toBeTruthy();
 
     await user.click(screen.getByTestId("sale-request-submit"));

@@ -155,6 +155,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
 
   const open = request.status === "receiving_offers";
   const fipe = formatFipe(request.fipe_reference_value);
+  const minimumPrice = formatMoneyValue(request.minimum_accepted_price);
 
   const bodyPaintIssues = request.body_paint_issues;
   const bodyPaintIssuesLabel =
@@ -239,6 +240,21 @@ export default function SaleRequestDetail({ id }: { id: string }) {
                 value={`${request.city.name}${request.city.state ? ` - ${request.city.state}` : ""}`}
               />
               {fipe ? <DataRow label="Referência FIPE" value={fipe} /> : null}
+
+              {/*
+                O PISO que ESTA pessoa declarou (4.3.3).
+                Fica aqui, e não só na tela do lojista, porque é a declaração
+                econômica dela: precisa poder conferir contra o que decidiu. Não
+                é editável nesta fase — mudar o piso depois que as lojas já
+                viram a oportunidade alteraria a regra da disputa no meio dela.
+
+                `null` (solicitação anterior à regra) simplesmente não rende
+                linha: escrever "R$ 0,00" afirmaria que ela aceita qualquer
+                valor.
+              */}
+              {minimumPrice ? (
+                <DataRow label="Valor mínimo informado" value={minimumPrice} />
+              ) : null}
               <DataRow
                 label="Publicada em"
                 value={new Date(request.created_at).toLocaleDateString("pt-BR")}

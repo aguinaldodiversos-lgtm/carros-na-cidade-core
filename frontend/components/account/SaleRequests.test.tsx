@@ -101,6 +101,7 @@ function makeRequest(overrides: Partial<SaleRequest> = {}): SaleRequest {
     model_slug: "t-cross",
     fipe_model_description: "T-Cross 200 TSI 1.0 Flex 12V 5p Aut.",
     fipe_code: "005340-6",
+    minimum_accepted_price: "62500.00",
     fipe_reference_value: "92450.00",
     fipe_reference_at: "2026-08-16T12:00:00.000Z",
     year: 2020,

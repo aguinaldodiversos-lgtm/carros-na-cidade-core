@@ -74,6 +74,16 @@ const YEARS = [{ code: "2016-1", name: "2016 Gasolina" }];
 function mockFipeFetch() {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    // A COTAÇÃO (4.3.3) alimenta a faixa recomendada da seção de valor. Vem
+    // FORMATADA, como o provedor real devolve — é assim que 
+    // é exercitado pelo caminho de verdade.
+    if (url.includes("/api/fipe/quote")) {
+      return {
+        ok: true,
+        json: async () => ({ data: { price: "R$ 75.000,00" } }),
+      } as unknown as Response;
+    }
+
     const data = url.includes("/api/fipe/brands")
       ? BRANDS
       : url.includes("/api/fipe/models")
@@ -191,6 +201,12 @@ async function fillEverything(photoCount = 4) {
   await choose(user, "body_paint_status", "none");
 
   await addPhotos(user, photoCount);
+
+  // O PISO (4.3.3): nona seção essencial. 60.000 fica ABAIXO da faixa
+  // recomendada da cotação mockada (85% de 75.000 = 63.750), então o caminho
+  // feliz não dispara o aviso comercial.
+  await user.type(screen.getByTestId("sale-request-minimum-price"), "6000000");
+
   return user;
 }
 
@@ -242,10 +258,10 @@ describe("cadeia FIPE", () => {
 });
 
 describe("progresso", () => {
-  it("começa em 0 de 8 etapas", () => {
+  it("começa em 0 de 9 etapas", () => {
     render(<SaleRequestForm />);
     expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent(
-      "0 de 8 etapas essenciais"
+      "0 de 9 etapas essenciais"
     );
   });
 
@@ -254,17 +270,17 @@ describe("progresso", () => {
     const user = setupUser();
 
     await choose(user, "tire_condition", "good");
-    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("1 de 8");
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("1 de 9");
 
     await choose(user, "declared_condition", "bom");
-    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("2 de 8");
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("2 de 9");
   });
 
-  it("chega a 8 de 8 com a ficha inteira, e o checklist acompanha", async () => {
+  it("chega a 9 de 9 com a ficha inteira, e o checklist acompanha", async () => {
     render(<SaleRequestForm />);
     await fillEverything();
 
-    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("8 de 8");
+    expect(screen.getByTestId("sale-request-progress-label")).toHaveTextContent("9 de 9");
 
     const checklist = screen.getByTestId("sale-request-checklist");
     for (const key of [
@@ -318,7 +334,9 @@ describe("CTA — nunca cinza sem explicação", () => {
     render(<SaleRequestForm />);
     const user = setupUser();
 
-    // Ficha inteira MENOS pneus e IPVA — as duas únicas pendências.
+    // Ficha inteira MENOS pneus e IPVA — as duas únicas pendências. O valor
+    // mínimo (4.3.3) É preenchido: sem ele seriam três, e o teste deixaria de
+    // exercitar a mensagem de DUAS.
     await fillVehicle(user);
     await choose(user, "declared_condition", "bom");
     await choose(user, "financing_status", "no");
@@ -332,6 +350,7 @@ describe("CTA — nunca cinza sem explicação", () => {
     await choose(user, "suspension_condition", "ok");
     await choose(user, "body_paint_status", "none");
     await addPhotos(user, 4);
+    await user.type(screen.getByTestId("sale-request-minimum-price"), "6000000");
 
     await user.click(screen.getByTestId("sale-request-submit"));
 
@@ -749,5 +768,145 @@ describe("fotos", () => {
     for (const forbidden of ["placa", "documento", "telefone", "endereço", "fachada"]) {
       expect(guidance.toLowerCase()).not.toContain(forbidden);
     }
+  });
+});
+
+// ============================================================================
+describe("valor mínimo — a orientação dos 15% (Fase 4.3.3)", () => {
+  it("mostra a referência FIPE e a faixa recomendada assim que o veículo é escolhido", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await fillVehicle(user);
+
+    // A cotação mockada é R$ 75.000,00 → faixa recomendada até R$ 63.750.
+    await waitFor(() =>
+      expect(screen.getByTestId("sale-request-fipe-reference").textContent).toMatch(/75\.000/)
+    );
+    expect(screen.getByTestId("sale-request-recommended-max").textContent).toMatch(/63\.750/);
+  });
+
+  it("NÃO preenche o campo sozinho — o piso é declarado por quem o assume", async () => {
+    render(<SaleRequestForm />);
+    const user = setupUser();
+
+    await fillVehicle(user);
+    await waitFor(() =>
+      expect(screen.getByTestId("sale-request-fipe-reference").textContent).toMatch(/75\.000/)
+    );
+
+    // Preencher com 85% da FIPE pareceria conveniência e seria outra coisa: a
+    // pessoa publicaria um piso que nunca decidiu.
+    expect(screen.getByTestId("sale-request-minimum-price")).toHaveValue("");
+  });
+
+  it("acima da faixa: AVISA, oferece o anúncio convencional e NÃO bloqueia o envio", async () => {
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 99 } });
+
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    // 74.000 passa de 63.750 (85% de 75.000).
+    await user.clear(screen.getByTestId("sale-request-minimum-price"));
+    await user.type(screen.getByTestId("sale-request-minimum-price"), "7400000");
+
+    const warning = await screen.findByTestId("sale-request-price-warning");
+    expect(warning.textContent).toContain("próximo da referência FIPE");
+    expect(screen.getByTestId("sale-request-conventional-ad-link")).toHaveAttribute(
+      "href",
+      "/anunciar/novo"
+    );
+
+    // E publica assim mesmo: o aviso é orientação, não trava.
+    await user.click(screen.getByTestId("sale-request-submit"));
+    await waitFor(() => expect(createSaleRequest).toHaveBeenCalled());
+    expect(createSaleRequest.mock.calls[0][0].minimum_accepted_price).toBe("74000.00");
+  });
+
+  it("abaixo da faixa não gera aviso nenhum", async () => {
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    expect(screen.queryByTestId("sale-request-price-warning")).toBeNull();
+  });
+
+  it("sem valor mínimo, o envio para e a mensagem nomeia o campo", async () => {
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    await user.clear(screen.getByTestId("sale-request-minimum-price"));
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(createSaleRequest).not.toHaveBeenCalled();
+    expect(screen.getByTestId("sale-request-error").textContent).toContain("Valor mínimo");
+  });
+
+  it("zero não completa a ficha — piso zero seria 'aceito qualquer proposta'", async () => {
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    await user.clear(screen.getByTestId("sale-request-minimum-price"));
+    await user.type(screen.getByTestId("sale-request-minimum-price"), "0");
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    expect(createSaleRequest).not.toHaveBeenCalled();
+  });
+
+  it("FIPE indisponível: sem faixa, sem número inventado — e a publicação continua", async () => {
+    // O provedor cai só na COTAÇÃO; marcas, modelos e anos continuam
+    // respondendo, que é o modo de falha real (um endpoint fora, não o serviço
+    // inteiro).
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/fipe/quote")) {
+          return { ok: false, json: async () => ({ success: false }) } as unknown as Response;
+        }
+        const data = url.includes("/api/fipe/brands")
+          ? BRANDS
+          : url.includes("/api/fipe/models")
+            ? MODELS
+            : url.includes("/api/fipe/years")
+              ? YEARS
+              : [];
+        return { ok: true, json: async () => ({ data }) } as unknown as Response;
+      })
+    );
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 100 } });
+
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sale-request-fipe-reference").textContent).toContain(
+        "indisponível"
+      )
+    );
+    // Sem faixa: nada de "Até R$ 0,00".
+    expect(screen.queryByTestId("sale-request-recommended-max")).toBeNull();
+    expect(screen.getByTestId("sale-request-price-reference").textContent).not.toContain("R$ 0");
+
+    await user.click(screen.getByTestId("sale-request-submit"));
+    await waitFor(() => expect(createSaleRequest).toHaveBeenCalled());
+    expect(createSaleRequest.mock.calls[0][0].minimum_accepted_price).toBe("60000.00");
+  });
+
+  it("o payload leva o piso e NENHUM valor de FIPE", async () => {
+    createSaleRequest.mockResolvedValue({ sale_request: { id: 101 } });
+
+    render(<SaleRequestForm />);
+    const user = await fillEverything();
+    await user.click(screen.getByTestId("sale-request-submit"));
+
+    await waitFor(() => expect(createSaleRequest).toHaveBeenCalled());
+    const payload = createSaleRequest.mock.calls[0][0];
+
+    expect(payload.minimum_accepted_price).toBe("60000.00");
+    // A cotação da tela é ORIENTAÇÃO: o servidor resolve o próprio snapshot a
+    // partir dos códigos, e um valor de FIPE no corpo seria ignorado — mas nem
+    // sai daqui.
+    expect(JSON.stringify(payload)).not.toContain("75000");
+    expect(payload).not.toHaveProperty("fipe_reference_value");
   });
 });
