@@ -240,6 +240,85 @@ describe("privacidade e ausência de contato", () => {
     expect(text).not.toContain("preço pedido");
   });
 
+  /*
+    ────────────────────────────────────────────────────────────────────────
+    FASE 4.3.2 — A REFERÊNCIA PRECISA SER ENCONTRÁVEL, NÃO SÓ ESTAR PRESENTE
+    ────────────────────────────────────────────────────────────────────────
+    O teste acima já passava quando o defeito foi relatado: o número ESTAVA no
+    DOM. Ele era a menor e mais apagada linha do card (11,5px, #98A2B3), abaixo
+    das etiquetas de risco — e ao lado de "Maior proposta" em 15px negrito
+    sumia. Em uso real, indistinguível de campo ausente.
+
+    Um teste de unidade não mede legibilidade. O que ele PODE travar é o posto
+    do valor: um elemento próprio, com o valor sozinho, no mesmo bloco
+    comercial das propostas. É o que as asserções abaixo prendem; a prova
+    visual mora em `e2e/dealer-sale-opportunities-visual.spec.ts`.
+  */
+  it("o valor da referência tem elemento próprio, com o número sozinho", async () => {
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+    await screen.findByText("Volkswagen T-Cross 2020");
+
+    const value = screen.getByTestId("dealer-card-fipe-value");
+    // O texto do elemento é o VALOR, e nada mais: se o número voltasse a ser um
+    // `<span>` dentro da frase do rótulo, este elemento carregaria "Referência
+    // FIPE R$ 92.000,00" — e a asserção falharia.
+    //
+    // ` ` → espaço: `Intl.NumberFormat` pt-BR separa "R$" do número com
+    // ESPAÇO INSEPARÁVEL. Comparar com um espaço comum falha com as duas
+    // strings idênticas na tela e no diff — armadilha que já custou tempo nesta
+    // base.
+    expect(value.textContent?.replace(/ /g, " ").trim()).toBe("R$ 92.000,00");
+  });
+
+  it("sem referência: mostra 'Não disponível' — nunca R$ 0,00 nem um valor derivado", async () => {
+    fetchSaleOpportunities.mockResolvedValue(
+      makePage({
+        items: [
+          makeOpportunity({ fipe_reference_value: null, fipe_reference_at: null }),
+        ],
+      })
+    );
+    render(<DealerSaleOpportunitiesList />);
+
+    const card = await screen.findByTestId("dealer-sale-opportunity-card");
+
+    // O rótulo CONTINUA na tela: sumir com a linha faria o card parecer
+    // inconsistente com os vizinhos, sem dizer por quê.
+    expect(card.textContent).toContain("Referência FIPE");
+    expect(screen.getByTestId("dealer-card-fipe-value").textContent?.trim()).toBe(
+      "Não disponível"
+    );
+
+    // E, acima de tudo: nada de número inventado. Um "R$ 0,00" aqui teria
+    // aparência de referência oficial e alguém proporia contra ele.
+    expect(card.textContent).not.toContain("R$ 0");
+    expect(card.textContent).not.toMatch(/R\$\s*0,00/);
+  });
+
+  it("a referência fica no mesmo bloco das propostas, e vem ANTES delas", async () => {
+    fetchSaleOpportunities.mockResolvedValue(
+      makePage({
+        items: [
+          makeOpportunity({
+            current_highest_offer: "81000.00",
+            my_offer: "79000.00",
+            offers_count: 2,
+          }),
+        ],
+      })
+    );
+    render(<DealerSaleOpportunitiesList />);
+
+    const card = await screen.findByTestId("dealer-sale-opportunity-card");
+    const text = card.textContent ?? "";
+
+    // A ordem importa para a leitura: "maior proposta R$ 81.000" não diz nada
+    // sozinho — dito DEPOIS de uma referência de R$ 92.000, diz tudo.
+    expect(text.indexOf("Referência FIPE")).toBeGreaterThan(-1);
+    expect(text.indexOf("Referência FIPE")).toBeLessThan(text.indexOf("Maior proposta"));
+  });
+
   it("uma ação primária por card, e uma só", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);

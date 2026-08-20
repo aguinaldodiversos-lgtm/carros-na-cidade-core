@@ -242,51 +242,88 @@ export default function DealerSaleOpportunityCard({
         </div>
 
         {/*
-          A ÂNCORA DE MERCADO.
-          Fica no card, e não só no detalhe, porque é ela que dá sentido ao
-          número seguinte: "maior proposta R$ 51.000" não diz nada sozinho — dito
-          ao lado de uma referência de R$ 92.000, diz tudo.
+          BLOCO COMERCIAL — a âncora de mercado e, quando existe, a disputa.
 
-          "Referência FIPE", nunca "valor do veículo": a solicitação não tem
-          preço pedido, e confundir os dois faria o lojista propor contra um
+          ────────────────────────────────────────────────────────────────────
+          POR QUE A REFERÊNCIA DEIXOU DE SER UMA NOTA DE RODAPÉ
+          ────────────────────────────────────────────────────────────────────
+          Até a Fase 4.3.1 a referência era uma linha de 11,5px em cinza claro,
+          logo abaixo das etiquetas de risco. O dado CHEGAVA à tela — banco, API
+          e DTO sempre entregaram o valor —, mas num card de ~270px ele era o
+          texto de MENOR contraste do cartão: ficava abaixo da quilometragem, do
+          estado e dos chips, e ao lado de "Maior proposta" em 15px azul-negrito
+          sumia por completo. Em uso real o efeito é indistinguível de campo
+          ausente, e foi assim que ele foi relatado.
+
+          Agora ela tem o MESMO posto tipográfico dos valores de proposta, no
+          mesmo bloco separado por linha: é o primeiro número que o lojista
+          encontra, e é contra ele que os outros dois são lidos.
+
+          "Referência FIPE", nunca "valor do veículo", "preço" ou "preço
+          pedido": a solicitação NÃO tem preço pedido — o produto inteiro existe
+          para descobri-lo. Confundir os dois faria o lojista propor contra um
           número que ninguém pediu.
         */}
-        {fipe ? (
-          <p className="mt-2.5 text-[11.5px] text-[#98A2B3]">
-            Referência FIPE{" "}
-            <span className="font-semibold text-[#475467]">{fipe}</span>
+        <div className="mt-2.5 border-t border-[#F2F4F7] pt-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
+            Referência FIPE
           </p>
-        ) : null}
+          {fipe ? (
+            <p
+              className="text-[15px] font-bold leading-tight text-[#1D2440]"
+              data-testid="dealer-card-fipe-value"
+            >
+              {fipe}
+            </p>
+          ) : (
+            /*
+              LEGADO E FALHA DE PROVEDOR — o único texto honesto é "não
+              disponível".
 
-        {/*
-          DISPUTA — a informação comercial, separada por uma linha do resto.
-          Só aparece quando existe: uma solicitação sem proposta nenhuma não
-          ganha um bloco vazio dizendo "—".
-        */}
-        {highest ? (
-          <div className="mt-2.5 flex items-end justify-between gap-3 border-t border-[#F2F4F7] pt-2.5">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
-                Maior proposta
-              </p>
-              <p className="text-[15px] font-bold leading-tight text-[#0e62d8]">{highest}</p>
-            </div>
-            {mine ? (
-              <div className="min-w-0 text-right">
+              Uma solicitação anterior à resolução server-side, ou publicada
+              enquanto o provedor FIPE estava fora, grava NULL de propósito
+              (`resolveFipeSnapshot` só aceita `confidence: "high"`). Sumir com a
+              linha faria o card parecer inconsistente com os vizinhos; um "R$ 0"
+              ou um valor derivado de marca/modelo aproximado seria pior ainda —
+              o lojista tomaria decisão de compra contra um número inventado.
+            */
+            <p
+              className="text-[13px] font-medium leading-tight text-[#98A2B3]"
+              data-testid="dealer-card-fipe-value"
+            >
+              Não disponível
+            </p>
+          )}
+
+          {/*
+            DISPUTA — só aparece quando existe: uma solicitação sem proposta
+            nenhuma não ganha um bloco vazio dizendo "—".
+          */}
+          {highest ? (
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
-                  Sua proposta
+                  Maior proposta
                 </p>
-                <p
-                  className={`text-[15px] font-bold leading-tight ${
-                    opportunity.is_leading ? "text-[#067647]" : "text-[#1D2440]"
-                  }`}
-                >
-                  {mine}
-                </p>
+                <p className="text-[15px] font-bold leading-tight text-[#0e62d8]">{highest}</p>
               </div>
-            ) : null}
-          </div>
-        ) : null}
+              {mine ? (
+                <div className="min-w-0 text-right">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[#98A2B3]">
+                    Sua proposta
+                  </p>
+                  <p
+                    className={`text-[15px] font-bold leading-tight ${
+                      opportunity.is_leading ? "text-[#067647]" : "text-[#1D2440]"
+                    }`}
+                  >
+                    {mine}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         {/* RODAPÉ — tempo + a única ação. */}
         <div className="mt-auto flex items-center justify-between gap-2 pt-3.5">
