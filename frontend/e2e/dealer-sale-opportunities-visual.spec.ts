@@ -137,8 +137,12 @@ function buildFixture() {
             body_paint_issues: [],
             body_paint_notes: null,
           },
-      fipe_reference_value: `${72000 + index * 3100}.00`,
-      fipe_reference_at: "2026-08-01T00:00:00.000Z",
+      // A linha legada também não tem referência: o snapshot só é gravado com
+      // confiança alta, então uma solicitação publicada com o provedor FIPE fora
+      // do ar chega ao card com NULL. É o caso que precisa dizer "não
+      // disponível" em vez de sumir — e nunca "R$ 0,00".
+      fipe_reference_value: legacy ? null : `${72000 + index * 3100}.00`,
+      fipe_reference_at: legacy ? null : "2026-08-01T00:00:00.000Z",
       image: null,
       city: { name: "Atibaia", state: "SP", slug: "atibaia-sp" },
       status: "receiving_offers",
@@ -275,6 +279,69 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
       });
 
       expect(perRow).toBe(viewport.columns);
+    });
+  }
+
+  /*
+    ──────────────────────────────────────────────────────────────────────────
+    FASE 4.3.2 — A REFERÊNCIA FIPE PRECISA SER ENCONTRÁVEL NO CARD
+    ──────────────────────────────────────────────────────────────────────────
+    O defeito relatado não era ausência de dado: banco, API e DTO sempre
+    entregaram `fipe_reference_value`. Era HIERARQUIA — o número era a menor e
+    mais apagada linha do cartão (11,5px em #98A2B3), abaixo dos chips de risco,
+    e ao lado de "Maior proposta" em 15px negrito desaparecia. Em uso real isso
+    é indistinguível de campo vazio.
+
+    Esta prova é da RENDERIZAÇÃO real, não do DOM: lê o tamanho e a cor
+    computados. Um retorno ao rodapé apagado reprovaria aqui mesmo que o texto
+    continuasse presente — que é o único jeito de travar a correção, já que
+    "está no DOM" era verdade o tempo todo.
+  */
+  for (const width of [390, 1440]) {
+    test(`${width}px: a referência FIPE é um valor legível, não uma nota de rodapé`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await prepare(page);
+      await page.goto(PAGE_PATH);
+
+      const cards = page.getByTestId("dealer-sale-opportunity-card");
+      await expect(cards.first()).toBeVisible();
+
+      // TODO card tem a linha — inclusive o legado sem snapshot.
+      const total = await cards.count();
+      const values = page.getByTestId("dealer-card-fipe-value");
+      expect(await values.count()).toBe(total);
+
+      const first = values.first();
+      await expect(first).toBeVisible();
+      await expect(first).toHaveText(/R\$\s?72\.000,00/);
+
+      const style = await first.evaluate((node) => {
+        const computed = getComputedStyle(node);
+        return { fontSize: parseFloat(computed.fontSize), color: computed.color };
+      });
+
+      // 15px negrito é o posto dos valores de proposta; qualquer coisa abaixo de
+      // 14 recoloca a âncora no rodapé.
+      expect(style.fontSize).toBeGreaterThanOrEqual(14);
+
+      // E em tom de TEXTO, não de legenda: #1D2440 tem luminância baixa; o
+      // #98A2B3 anterior não passaria deste corte.
+      const [r, g, b] = style.color.match(/\d+/g)!.map(Number);
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      expect(luminance).toBeLessThan(110);
+
+      // O card LEGADO (índice 3, sem snapshot) diz o que houve, em vez de sumir
+      // com a linha — e não inventa zero.
+      const legacy = cards.nth(3);
+      await expect(legacy.getByTestId("dealer-card-fipe-value")).toHaveText("Não disponível");
+      expect(await legacy.textContent()).not.toContain("R$ 0");
+
+      await page.screenshot({
+        path: `test-results/dealer-sale-feed-fipe-${width}.png`,
+        fullPage: false,
+      });
     });
   }
 
