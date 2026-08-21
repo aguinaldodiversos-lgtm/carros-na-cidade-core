@@ -565,6 +565,55 @@ describe.sequential("integração — o PISO do proprietário sob concorrência 
     expect(empate.ok).toBe(false);
     expect(empate.code).toBe("SALE_OPPORTUNITY_OFFER_NOT_LEADING");
   });
+
+  /*
+    A TROCA DE BARREIRA, com os valores exatos do gate, em SEQUÊNCIA e contra o
+    banco real.
+
+    Os mesmos casos existem no teste unitário (fake-db). Aqui eles valem por
+    outra coisa: o fake compara strings num array, enquanto isto compara NUMERIC
+    do PostgreSQL lido de dentro da transação travada. Um erro de tipo, de
+    arredondamento ou de conversão centavo↔decimal só aparece deste lado.
+  */
+  it("depois da primeira, empatar com o PISO é recusado; um centavo acima entra", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    expect((await propose(0, saleRequestId, "62500.00")).ok).toBe(true);
+
+    // Alcançar o piso já não basta: existe líder, e ele precisa ser superado.
+    const empate = await propose(1, saleRequestId, "62500.00");
+    expect(empate.ok).toBe(false);
+    expect(empate.code).toBe("SALE_OPPORTUNITY_OFFER_NOT_LEADING");
+
+    expect((await propose(1, saleRequestId, "62500.01")).ok).toBe(true);
+
+    expect((await readOffers(saleRequestId)).map((row) => row.amount)).toEqual([
+      "62500.00",
+      "62500.01",
+    ]);
+  });
+
+  it("com líder em 64.000: 63.000 e 64.000 recusados; 64.000,01 entra", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    expect((await propose(0, saleRequestId, "64000.00")).ok).toBe(true);
+
+    // Acima do piso, mas abaixo do líder.
+    const abaixoDoLider = await propose(1, saleRequestId, "63000.00");
+    expect(abaixoDoLider.ok).toBe(false);
+    expect(abaixoDoLider.code).toBe("SALE_OPPORTUNITY_OFFER_NOT_LEADING");
+
+    // Empate com o líder.
+    expect((await propose(1, saleRequestId, "64000.00")).ok).toBe(false);
+
+    // Um centavo acima.
+    expect((await propose(1, saleRequestId, "64000.01")).ok).toBe(true);
+
+    expect((await readOffers(saleRequestId)).map((row) => row.amount)).toEqual([
+      "64000.00",
+      "64000.01",
+    ]);
+  });
 });
 
 // ============================================================================

@@ -1,10 +1,11 @@
 # Fase 4.3.3 — Valor mínimo do proprietário + card limpo do lojista
 
-Data: 2026-08-20
+Data: 2026-08-20 (gate PostgreSQL executado em 2026-08-21)
 Branch: `codex/dealer-feed-ui-refinement`
 Base: `origin/main` @ `ed2b0358` (merge do PR #39 — Fase 4.3.2)
 Status: **não mergeada, não deployada**
-Veredito: **NO-GO técnico** — um único item do gate ficou aberto (§17 abaixo)
+Veredito: **GO técnico** — o item que faltava (§17) foi executado contra
+PostgreSQL real e passou.
 
 ---
 
@@ -229,33 +230,177 @@ Nova linha `Valor mínimo informado` no card "Dados do veículo". Sem edição
 | typecheck / lint frontend / build | ✅ / ✅ 0 warnings / ✅ |
 | lint backend | 11 erros — **idênticos ao baseline**, todos em `scripts/`, zero em `src/` |
 
-## 17. Testes PostgreSQL reais — **ESCRITOS, NÃO EXECUTADOS**
+## 17. Testes PostgreSQL reais — **EXECUTADOS E VERDES** (rodada de 21/08/2026)
 
-É o item que segura o GO.
+O item que segurava o GO foi executado. O Docker Desktop, que na rodada anterior
+não respondia, subiu — o engine estava apenas demorando a inicializar.
 
-**Escritos:**
+**Ambiente** (provado antes de qualquer migration, e comparado com
+`DATABASE_URL1` para garantir que não é produção):
 
-- `tests/integration/sale-request-minimum-price.integration.test.js` (novo, 10
-  casos): coluna/tipo/nullable, CHECK, NULL e positivo aceitos, zero e negativo
-  recusados (23514), centavos preservados; e o **upgrade com dados** — linha
-  inserida antes da migration, migration aplicada por cima, piso continua NULL e
-  a FIPE de 75.000 **não** vira piso de 63.750; idempotência da reaplicação;
-- `sale-request-offers-concurrency.integration.test.js` (+5 casos): primeira
-  proposta abaixo do piso recusada, duas lojas na primeira proposta, disputa
-  simultânea acima do piso com histórico crescente, **10 rodadas com jitter** e
-  o caso legado.
-
-**Não executados:** o Docker Desktop desta máquina não subiu o engine (o CLI fica
-sem resposta indefinidamente; `docker version` estourou 45s). Há um PostgreSQL 16
-local na 5432, mas as credenciais não estão no `.env` — e adivinhar senha não é
-caminho. Para rodar:
-
-```bash
-npm run integration:db:up && npm run integration:db:wait && npx vitest run tests/integration/sale-request-minimum-price.integration.test.js tests/integration/sale-request-offers-concurrency.integration.test.js
+```
+host      localhost
+porta     5433            (container carros-postgres-test, docker-compose.test.yml)
+database  carros_na_cidade_test
+usuário   postgres
+versão    PostgreSQL 15.17 (Debian 15.17-1.pgdg13+1) on x86_64-pc-linux-gnu
+docker    engine 29.7.2
 ```
 
-O teste POR MUTAÇÃO do lock (que já existia) continua no arquivo e passa a cobrir
-também o piso — mas, pelo mesmo motivo, não foi executado nesta rodada.
+Cada suíte cria o PRÓPRIO banco temporário (`CREATE DATABASE saleminprice_<tag>`
+/ `saleofferconc_<tag>`), roda as migrations do zero e o derruba no `afterAll` —
+nada é escrito no banco compartilhado, e nada toca produção.
+
+SHA testado: `af0f811dd3eb06dd7ce4b6a40f4f089b8639500c`, mais dois arquivos de
+FIXTURE de teste descritos em 17.8.
+
+### 17.1 Migration 056 — 10/10 ✅
+
+```
+npx vitest run tests/integration/sale-request-minimum-price.integration.test.js --reporter=verbose
+→ Test Files 1 passed | Tests 10 passed | 3.37s
+```
+
+| Prova | Resultado |
+|---|---|
+| coluna existe, `numeric`, precisão 14, escala 2, `is_nullable = YES` | ✅ |
+| CHECK existe com `minimum_accepted_price IS NULL` e `> 0` | ✅ |
+| NULL aceito (linha legada) e positivo aceito | ✅ |
+| **zero rejeitado pelo PostgreSQL** (`23514`) | ✅ |
+| **negativo rejeitado pelo PostgreSQL** (`23514`) | ✅ |
+| centavos preservados (`62499.99`) | ✅ |
+| um centavo (`0.01`) é válido | ✅ |
+| **upgrade com dados**: linha inserida ANTES da 056 atravessa com NULL | ✅ |
+| **FIPE 75.000 NÃO virou piso 63.750** | ✅ |
+| reaplicar a migration é idempotente (1 coluna, 1 CHECK) | ✅ |
+| depois do upgrade o CHECK vale para linhas novas | ✅ |
+
+### 17.2 Concorrência real — 20/20 ✅
+
+```
+npx vitest run tests/integration/sale-request-offers-concurrency.integration.test.js --reporter=verbose
+→ Test Files 1 passed | Tests 20 passed
+```
+
+Os 7 casos do piso (4.3.3):
+
+| Cenário | Resultado |
+|---|---|
+| piso 62.500 · primeira proposta 62.499,99 | recusada, `OFFER_BELOW_MINIMUM`, zero linhas gravadas ✅ |
+| piso 62.500 · primeira proposta 62.500 | aceita ✅ |
+| depois da primeira: empate com o piso recusado; 62.500,01 entra | ✅ |
+| líder 64.000: 63.000 recusada, 64.000 recusada, 64.000,01 entra | ✅ |
+| duas lojas na PRIMEIRA proposta (62.500 vs 62.400) | só a que alcança o piso entra, em qualquer ordem de lock ✅ |
+| disputa simultânea acima do piso (62.500 vs 62.600) | serializada, histórico estritamente crescente ✅ |
+| LEGADO (piso NULL) | regra histórica preservada; nada derivado ✅ |
+
+Os 13 casos herdados da 4.3 continuam verdes — inclusive escopo de cidade, os
+dois atores gravados, clique duplo e "solicitações diferentes não se bloqueiam".
+
+### 17.3 Jitter rounds — executados na íntegra
+
+| Suíte | Rodadas | Resultado |
+|---|---|---|
+| disputa da 4.3 (`VINTE E QUATRO rodadas com jitter`) | **24** | ✅ invariante em todo escalonamento |
+| piso da 4.3.3 (`jitter: dez rodadas`) | **10** | ✅ nenhuma linha abaixo de 62.500, histórico sempre crescente |
+
+Nenhuma rodada foi reduzida. Nenhum histórico do tipo `50.000 → 51.000 → 50.500`
+apareceu em qualquer execução.
+
+### 17.4 Prova do lock e teste POR MUTAÇÃO — executados ✅
+
+O mutex é o mesmo da 4.3, agora lendo o piso na própria query:
+
+```sql
+SELECT id, status, minimum_accepted_price
+FROM sale_requests
+WHERE id = $1 AND city_id = $2
+FOR UPDATE
+```
+
+O teste por mutação **já é automatizado dentro do arquivo** e não exige alterar
+código de produção: ele reexecuta a MESMA sequência à mão, sem `FOR UPDATE`, e
+exige que a violação apareça.
+
+```
+✓ teste POR MUTAÇÃO > SEM o lock, a corrida acontece: duas propostas passam e o histórico viola a regra
+✓ teste POR MUTAÇÃO > COM o lock, exatamente o mesmo cenário respeita a regra
+```
+
+Os dois passaram: o cenário é discriminante, e o lock é o que o faz passar.
+Nenhum arquivo rastreado foi mutado para produzir esta prova.
+
+### 17.5 Execução combinada — 30/30 ✅
+
+```
+npx vitest run tests/integration/sale-request-minimum-price.integration.test.js \
+                tests/integration/sale-request-offers-concurrency.integration.test.js --reporter=verbose
+→ Test Files 2 passed | Tests 30 passed | 4.58s
+```
+
+Sem dependência de ordem nem sujeira de estado entre as suítes.
+
+### 17.6 Suítes de integração relacionadas
+
+```
+npx vitest run tests/integration/sale-request-minimum-price.integration.test.js \
+                tests/integration/sale-request-offers-concurrency.integration.test.js \
+                tests/integration/sale-requests-concurrency.integration.test.js
+→ Test Files 3 passed | Tests 47 passed
+```
+
+Duas falhas apareceram na varredura mais ampla e **as duas são BASELINE**,
+provadas por execução do MESMO arquivo num worktree em `origin/main`
+(`ed2b0358`):
+
+| Suíte | Falha | Veredito |
+|---|---|---|
+| `migrations-compat` | 3 testes — `null value in column "plan" of relation "users"` | **BASELINE**: 3 falhas idênticas em `origin/main` |
+| `sale-requests-schema` | `não existe tabela de lances nem de oferta final nesta fase` | **BASELINE**: 1 falha idêntica em `origin/main` (1 de 44). A asserção é da Fase 4.1/4.2 e não foi atualizada quando a migration **055** criou `sale_request_offers` na 4.3 — nada a ver com a 4.3.3 |
+
+Nenhuma regressão nova. As duas ficam registradas como dívida de teste herdada, e
+não foram corrigidas nesta rodada por estarem fora do escopo da 4.3.3.
+
+### 17.7 Smoke de persistência real (§15)
+
+Publicação pelo SERVICE real, contra banco descartável, com FIPE resolvida em
+75.000 e piso declarado de 62.500. Lido de volta do PostgreSQL:
+
+```
+fipe_reference_value  : 75000.00
+minimum_accepted_price: 62500.00
+status                : receiving_offers
+```
+
+O piso é o número que o proprietário digitou — **não** os 63.750 da faixa
+recomendada.
+
+### 17.8 Alterações de FIXTURE necessárias nesta rodada
+
+Duas, ambas de infraestrutura de teste, nenhuma de comportamento de produção:
+
+1. `tests/integration/sale-requests-concurrency.integration.test.js` — o corpo de
+   publicação passou a incluir `minimum_accepted_price`. Sem isso o service
+   recusa antes da transação (a regra nova está correta) e **todo** teste de
+   concorrência daquele arquivo "passaria" sem nunca ter exercitado o lock. É o
+   mesmo motivo pelo qual a ficha de avaliação já estava lá.
+2. `tests/integration/sale-request-offers-concurrency.integration.test.js` — dois
+   casos novos com os valores EXATOS do gate (empate com o piso após a primeira
+   proposta; líder 64.000 com 63.000/64.000/64.000,01), agora contra NUMERIC do
+   PostgreSQL lido de dentro da transação travada.
+
+### 17.9 Incidente de ambiente (registrado por honestidade)
+
+Ao remover o worktree temporário usado para provar o baseline, o
+`git worktree remove --force` seguiu uma junção de `node_modules` que eu havia
+criado dentro dele e **apagou o `node_modules` do repositório principal**.
+Restaurado com `npm ci` (511 pacotes; `package-lock.json` intocado) e revalidado:
+`npm test` voltou a **3.358 testes verdes**, e as suítes de integração foram
+reexecutadas DEPOIS da restauração. Nenhum arquivo versionado e nenhum dos quatro
+untracked do usuário foi afetado.
+
+Lição para as próximas rodadas: não criar junção de `node_modules` dentro de
+worktree que será removida com `--force`.
 
 ## 18. Screenshots / matriz de viewport
 
@@ -291,7 +436,12 @@ tests/integration/sale-request-minimum-price.integration.test.js
 
 ## 20. Dívidas e riscos
 
-1. **PostgreSQL real não executado** (§17). É o único item aberto do gate.
+1. ~~PostgreSQL real não executado~~ — **resolvido em 21/08**: migration, upgrade
+   com dado legado, concorrência, jitter e mutação do lock executados e verdes
+   (§17). Restam DUAS falhas BASELINE de integração, herdadas e provadas em
+   `origin/main`: 3 em `migrations-compat` e 1 em `sale-requests-schema` (esta
+   última é uma asserção da Fase 4.1/4.2 que a migration 055 tornou obsoleta na
+   4.3). Não são desta fase e não foram corrigidas aqui.
 2. **`SET NOT NULL` futuro**: quando não houver mais linha anterior à 4.3.3 em
    produção (hoje existe 1 solicitação, criada em 18/08, que será NULL), a coluna
    pode virar `NOT NULL` em migration própria — decisão sobre DADOS existentes,
@@ -329,10 +479,16 @@ tests/integration/sale-request-minimum-price.integration.test.js
 | Detalhe mantém os quatro valores | ✅ |
 | PF vê o piso que declarou | ✅ |
 | Privacidade preservada | ✅ (contrato de campos do feed testado) |
-| **Concorrência provada em PostgreSQL real** | ❌ **pendente de execução** |
-| Migration provada em PostgreSQL real | ❌ **pendente de execução** |
+| **Concorrência provada em PostgreSQL real** | ✅ 20/20 (PG 15.17) |
+| Migration provada em PostgreSQL real | ✅ 10/10 (PG 15.17) |
+| Jitter rounds (24 + 10) | ✅ |
+| Teste por mutação do lock | ✅ executado |
+| Execução combinada | ✅ 30/30 |
+| Smoke de persistência (75.000 / 62.500) | ✅ |
 | typecheck / lint / build | ✅ |
 | Zero regressão nova | ✅ |
 
-**NO-GO** até os dois itens em vermelho rodarem. Todo o resto está verde, e os
-testes que faltam já estão escritos — falta o banco.
+**GO técnico.** Todos os itens do gate estão verdes. As duas falhas de
+integração que aparecem numa varredura mais ampla são BASELINE, provadas por
+execução do mesmo arquivo em `origin/main` — nenhuma regressão nova foi
+introduzida pela 4.3.3.
