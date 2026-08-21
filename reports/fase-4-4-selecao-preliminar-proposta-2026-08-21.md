@@ -296,8 +296,13 @@ tabela) não falha no primeiro banco com dados — que é o de produção.
 - **Pós-seleção**: painel com loja, cidade, valor, selo **"Aguardando próxima
   etapa"**, e o texto explicativo. As perdedoras **somem**. O botão de cancelar
   **desaparece** (não fica desabilitado — a reversão não existe, e um botão inerte
-  prometeria que existe). O badge de status ganhou tratamento próprio (azul), para
-  não usar o mesmo cinza apagado de "Cancelada".
+  prometeria que existe).
+- **Badge de status**: ganhou um terceiro tratamento, para não usar o mesmo cinza
+  apagado de "Cancelada". O tom foi **medido, não escolhido no olho**: o primeiro
+  candidato (`#EFF4FF`) computava `rgb(239,244,255)` contra um fundo de
+  `rgb(242,243,247)` — três pontos de diferença em dois canais, e a pílula sumia,
+  sobrando só o texto azul solto. `#D1E0FF` / `#1849a9` resolve as duas coisas
+  (forma visível + ~6:1 de contraste no texto, sobre o mínimo de 4,5:1).
 
 ### Lojista (§19, §20)
 
@@ -320,13 +325,17 @@ tabela) não falha no primeiro banco com dados — que é o de produção.
 | `04-owner-dialogo-mobile-390.png` | diálogo em 390px |
 | `05-owner-proposta-selecionada.png` | estado pós-seleção do proprietário |
 | `06-lojista-selecionado.png` | tela read-only da loja escolhida |
+| `08-owner-badge-selecionada.png` | recorte do badge de status, depois da correção de contraste |
+
+Todas refletem o estado **final** do código, inclusive os dois ajustes de UI
+feitos ao revisar as primeiras capturas (subtítulo do lojista escolhido e
+contraste do badge).
 
 > A sétima captura planejada (loja perdedora sem acesso) **não foi gerada**: o
 > `loginRateLimit` (10 logins/IP a cada 15 min) esgotou durante a sessão de
 > capturas. O cenário está coberto por teste de service, teste de integração
-> PostgreSQL e pelo E2E. As capturas `05` e `06` foram tiradas **antes** dos dois
-> ajustes finais de UI (subtítulo do lojista selecionado e cor do badge de
-> status) — o conteúdo é o mesmo; só esses dois detalhes visuais mudaram depois.
+> PostgreSQL e pelo E2E — que verifica os dois lados: a tela de erro e o 404 da
+> API.
 
 ---
 
@@ -451,9 +460,12 @@ solicitações abertas.
 
 1. **Sétima captura não gerada** — `loginRateLimit`. Cenário coberto por três
    camadas de teste. Baixo impacto.
-2. **`05` e `06` são anteriores aos dois ajustes finais de UI** (subtítulo do
-   lojista selecionado; cor do badge de status). Regerar quando a janela de login
-   reabrir.
+2. **O badge de status não tem teste de contraste.** A correção foi verificada
+   com estilo **computado** no navegador (`rgb(209,224,255)` sobre
+   `rgb(242,243,247)`), mas nada impede uma regressão futura: um teste de
+   presença no DOM passaria com a pílula invisível, exatamente como passaria
+   antes da correção. Um teste que trave o par fundo/texto computado resolveria —
+   fora do escopo desta fase.
 3. **`migrations-compat.integration.test.js` vermelho** (pré-existente,
    `users.plan` NOT NULL). Merece uma correção própria, fora desta fase.
 4. **11 erros de lint em `scripts/`** (pré-existentes).

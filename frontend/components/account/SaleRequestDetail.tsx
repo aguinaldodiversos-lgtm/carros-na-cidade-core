@@ -215,13 +215,24 @@ export default function SaleRequestDetail({ id }: { id: string }) {
 
           O azul não é decoração. Ele diz que algo aconteceu e que o estado é
           ativo — verde é "recebendo", cinza é "encerrada sem desfecho".
+
+          O TOM foi medido, não escolhido no olho. O primeiro candidato foi
+          `#EFF4FF`, o azul mais claro da paleta: contra o fundo desta área
+          (`rgb(242,243,247)`) ele computa `rgb(239,244,255)` — três pontos de
+          diferença em dois canais. A pílula sumia e sobrava só o texto azul
+          solto, sem a forma que distingue um selo de estado de uma palavra
+          qualquer ao lado do título.
+
+          `#D1E0FF` com `#1849a9` resolve as duas coisas: a pílula aparece
+          contra o fundo, e o texto tem ~6:1 sobre ela — folga sobre o mínimo de
+          4,5:1 para este tamanho em negrito.
         */}
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
             open
               ? "bg-[#ECFDF3] text-[#027A48]"
               : request.status === "offer_selected"
-                ? "bg-[#EFF4FF] text-[#0e62d8]"
+                ? "bg-[#D1E0FF] text-[#1849a9]"
                 : "bg-[#F2F4F7] text-[#475467]"
           }`}
           data-testid="sale-request-detail-status"
