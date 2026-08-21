@@ -381,7 +381,7 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
 
   it("cria a trilha append-only com as FKs e o UNIQUE por solicitação", async () => {
     const { rows: fks } = await pool.query(
-      `SELECT conname, confrelid::regclass::text AS references_table
+      `SELECT conname, confrelid::regclass::text AS references_table, confdeltype
        FROM pg_constraint
        WHERE conrelid = 'sale_request_offer_selections'::regclass
          AND contype = 'f'
@@ -392,6 +392,11 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
       ["advertisers", "sale_request_offers", "sale_requests", "users"].sort()
     );
 
+    // FASE 4.4.1 — NENHUMA delas apaga a trilha em cascata. 'a' = NO ACTION.
+    for (const fk of fks) {
+      expect(fk.confdeltype, `${fk.conname} não é NO ACTION`).toBe("a");
+    }
+
     const { rows: unique } = await pool.query(
       `SELECT indexdef FROM pg_indexes
        WHERE tablename = 'sale_request_offer_selections'
@@ -399,6 +404,76 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
     );
     expect(unique).toHaveLength(1);
     expect(unique[0].indexdef).toMatch(/UNIQUE/i);
+  });
+
+  /**
+   * FASE 4.4.1 — as chaves candidatas compostas.
+   *
+   * Elas são o ALVO das FKs que provam pertencimento. Sem elas o PostgreSQL
+   * recusa a própria criação da FK ("there is no unique constraint matching
+   * given keys"), então este teste é, na prática, um teste de que a ORDEM da
+   * migration está certa — as UNIQUE precisam nascer antes das FKs.
+   */
+  it("cria as chaves candidatas compostas de sale_request_offers", async () => {
+    const { rows } = await pool.query(
+      `SELECT conname, pg_get_constraintdef(oid) AS def
+         FROM pg_constraint
+        WHERE conrelid = 'sale_request_offers'::regclass
+          AND contype = 'u'
+        ORDER BY conname`
+    );
+
+    const byName = Object.fromEntries(rows.map((row) => [row.conname, row.def]));
+
+    expect(byName.sale_request_offers_id_request_unique).toBe(
+      "UNIQUE (id, sale_request_id)"
+    );
+    expect(byName.sale_request_offers_id_request_advertiser_unique).toBe(
+      "UNIQUE (id, sale_request_id, advertiser_id)"
+    );
+
+    // Exatamente DUAS — nem uma a menos (invariante sem alvo), nem uma a mais
+    // (índice único sem FK que o use é custo de escrita sem contrapartida).
+    expect(rows).toHaveLength(2);
+  });
+
+  it("a FK de sale_requests é COMPOSTA, e sem MATCH FULL", async () => {
+    const { rows } = await pool.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname = 'sale_requests_selected_offer_fk'`
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].def).toContain("FOREIGN KEY (selected_offer_id, id)");
+    expect(rows[0].def).toContain("sale_request_offers(id, sale_request_id)");
+
+    // `MATCH FULL` exigiria que TODAS as colunas fossem nulas ou nenhuma. Como
+    // `id` nunca é nulo, toda solicitação sem seleção seria rejeitada — e a
+    // migration morreria no primeiro banco com dados.
+    expect(rows[0].def).not.toMatch(/MATCH FULL/i);
+
+    // Sem ON DELETE: apagar a oferta selecionada tem de FALHAR.
+    expect(rows[0].def).not.toMatch(/ON DELETE/i);
+  });
+
+  /**
+   * A FK simples de `offer_id` foi REMOVIDA na 4.4.1.
+   *
+   * Ela seria estritamente mais fraca que a tripla e verificaria de novo o que a
+   * tripla já verifica — custo de escrita sem invariante nova. Este teste impede
+   * que ela volte "por segurança".
+   */
+  it("a trilha NÃO tem FK simples de offer_id além da tripla", async () => {
+    const { rows } = await pool.query(
+      `SELECT conname, pg_get_constraintdef(oid) AS def
+         FROM pg_constraint
+        WHERE conrelid = 'sale_request_offer_selections'::regclass
+          AND contype = 'f'
+          AND confrelid = 'sale_request_offers'::regclass`
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].def).toContain("(offer_id, sale_request_id, advertiser_id)");
   });
 
   it("o CHECK de status aceita offer_selected e recusa vocabulário inventado", async () => {
@@ -556,6 +631,61 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
          WHERE conname = 'sale_requests_status_check'`
       );
       expect(check[0].def).toContain("offer_selected");
+
+      // 6. FASE 4.4.1 — as constraints ENDURECIDAS entraram no banco povoado.
+      //
+      //    Este é o passo que mais podia falhar: as duas UNIQUE compostas são
+      //    criadas sobre uma `sale_request_offers` que JÁ TEM LINHAS, e a FK
+      //    composta de `sale_requests` é validada contra linhas legadas cujo
+      //    `selected_offer_id` é NULL. Se a FK tivesse sido escrita com
+      //    `MATCH FULL`, é exatamente aqui que a migration morreria — e só aqui,
+      //    porque um banco vazio não tem linha para violar nada.
+      const { rows: hardened } = await upgradePool.query(
+        `SELECT conname, pg_get_constraintdef(oid) AS def
+           FROM pg_constraint
+          WHERE conname IN (
+            'sale_request_offers_id_request_unique',
+            'sale_request_offers_id_request_advertiser_unique',
+            'sale_requests_selected_offer_fk',
+            'sale_request_offer_selections_offer_request_advertiser_fk'
+          )
+          ORDER BY conname`
+      );
+
+      expect(hardened.map((row) => row.conname)).toEqual([
+        "sale_request_offer_selections_offer_request_advertiser_fk",
+        "sale_request_offers_id_request_advertiser_unique",
+        "sale_request_offers_id_request_unique",
+        "sale_requests_selected_offer_fk",
+      ]);
+
+      const byName = Object.fromEntries(hardened.map((row) => [row.conname, row.def]));
+
+      // A FK de `sale_requests` é COMPOSTA — e a asserção casa o par inteiro,
+      // não só o nome: renomear é inofensivo, voltar para a forma simples não é.
+      expect(byName.sale_requests_selected_offer_fk).toContain("(selected_offer_id, id)");
+      expect(byName.sale_requests_selected_offer_fk).toContain(
+        "sale_request_offers(id, sale_request_id)"
+      );
+      // E NÃO tem MATCH FULL: com ele, toda linha sem seleção seria rejeitada.
+      expect(byName.sale_requests_selected_offer_fk).not.toMatch(/MATCH FULL/i);
+
+      expect(
+        byName.sale_request_offer_selections_offer_request_advertiser_fk
+      ).toContain("(offer_id, sale_request_id, advertiser_id)");
+
+      // 7. NENHUMA FK da trilha usa CASCADE — a razão de ser da 4.4.1.
+      const { rows: trailFks } = await upgradePool.query(
+        `SELECT conname, confdeltype
+           FROM pg_constraint
+          WHERE conrelid = 'sale_request_offer_selections'::regclass
+            AND contype = 'f'`
+      );
+      expect(trailFks.length).toBeGreaterThan(0);
+      for (const fk of trailFks) {
+        // 'a' = NO ACTION. 'c' seria CASCADE, 'n' SET NULL, 'r' RESTRICT.
+        expect(fk.confdeltype, `${fk.conname} não é NO ACTION`).toBe("a");
+      }
     } finally {
       await upgradePool.end().catch(() => {});
     }
@@ -1109,6 +1239,354 @@ describe.sequential("integração — §19/§20: quem vê o quê depois da decis
     for (const email of ["a@selection.test", "b@selection.test"]) {
       expect(serialized).not.toContain(email);
     }
+  });
+});
+
+// ============================================================================
+// FASE 4.4.1 — A INTEGRIDADE VEM DO BANCO, NÃO DO SERVICE
+// ============================================================================
+/**
+ * Todos os testes desta seção falam SQL direto. Nenhum passa pelo service — e é
+ * esse o ponto.
+ *
+ * A 4.4 provou que o service recusa os estados inválidos. Isso é necessário e
+ * não é suficiente: um script de manutenção, um `UPDATE` manual num console de
+ * produção ou um endpoint futuro que esqueça a checagem passam por baixo de
+ * qualquer validação em JavaScript. Este repositório já registrou esse modo de
+ * falha — filtros de fase anterior sem varredura dos consumidores, `countQuery`
+ * sem os JOINs do `whereClause` — e as duas vezes o sintoma foi silencioso.
+ *
+ * O que se prova aqui é diferente do que a suíte da 4.4 prova: não que o sistema
+ * recusa, mas que o estado inválido é INEXPRIMÍVEL. A diferença aparece no
+ * código de erro — `23503`, foreign key violation, vindo do PostgreSQL.
+ *
+ * As duas camadas continuam existindo, e de propósito (§12 da 4.4.1): o service
+ * devolve erro semântico legível (`SALE_REQUEST_OFFER_NOT_FOUND`, 404), o banco
+ * torna o estado impossível. Nenhuma substitui a outra.
+ */
+
+/** Executa SQL cru e devolve o código de erro do PostgreSQL, ou `null` se passou. */
+async function pgErrorCode(sql, params = []) {
+  try {
+    await pool.query(sql, params);
+    return null;
+  } catch (error) {
+    return error?.code ?? "unknown";
+  }
+}
+
+/** Uma solicitação com uma proposta, pelos caminhos reais. Devolve os dois ids. */
+async function seedRequestWithOffer(dealerIndex = 0, amount = "62000") {
+  const saleRequestId = await insertSaleRequest();
+  await propose(dealerIndex, saleRequestId, amount);
+  const offerId = await currentOfferId(saleRequestId, dealerIndex);
+  return { saleRequestId, offerId };
+}
+
+describe.sequential("integração — 4.4.1: a oferta selecionada PERTENCE à solicitação", () => {
+  /**
+   * §13 CASO A — o estado corrente.
+   *
+   * Com a FK SIMPLES da primeira versão da 057, este `UPDATE` era aceito: a
+   * oferta existe, e era só isso que a constraint sabia perguntar. A solicitação
+   * A ficaria `offer_selected` apontando para um lance feito na solicitação B —
+   * um negócio que nunca houve, gravado como se tivesse havido.
+   */
+  it("CASO A: sale_requests não aceita selected_offer_id de OUTRA solicitação", async () => {
+    const a = await seedRequestWithOffer(0, "62000");
+    const b = await seedRequestWithOffer(1, "70000");
+
+    const code = await pgErrorCode(
+      `UPDATE sale_requests
+          SET status = 'offer_selected',
+              selected_offer_id = $2,
+              selected_offer_at = NOW()
+        WHERE id = $1`,
+      [a.saleRequestId, b.offerId]
+    );
+
+    expect(code).toBe("23503");
+
+    // E o estado não mudou: a transação inteira do UPDATE foi abortada.
+    const row = await readRequest(a.saleRequestId);
+    expect(row.status).toBe("receiving_offers");
+    expect(row.selected_offer_id).toBeNull();
+  });
+
+  /**
+   * §13 CASO B — a trilha.
+   *
+   * Com FKs por coluna, cada peça desta linha era válida (a solicitação A
+   * existe, a oferta existe, a loja existe) e o conjunto era ficção. É o modo de
+   * falha clássico de chave estrangeira por coluna.
+   */
+  it("CASO B: a trilha não aceita offer_id de OUTRA solicitação", async () => {
+    const a = await seedRequestWithOffer(0, "62000");
+    const b = await seedRequestWithOffer(1, "70000");
+
+    const code = await pgErrorCode(
+      `INSERT INTO sale_request_offer_selections
+         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, 70000.00)`,
+      [a.saleRequestId, b.offerId, world.advertiserIds[1], world.ownerId]
+    );
+
+    expect(code).toBe("23503");
+    expect(await readSelections(a.saleRequestId)).toHaveLength(0);
+  });
+
+  /** §13 CASO C — a combinação correta continua passando. */
+  it("CASO C: a combinação COERENTE é aceita nas duas tabelas", async () => {
+    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+
+    const insertCode = await pgErrorCode(
+      `INSERT INTO sale_request_offer_selections
+         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, 62000.00)`,
+      [saleRequestId, offerId, world.advertiserIds[0], world.ownerId]
+    );
+    expect(insertCode).toBeNull();
+
+    const updateCode = await pgErrorCode(
+      `UPDATE sale_requests
+          SET status = 'offer_selected', selected_offer_id = $2, selected_offer_at = NOW()
+        WHERE id = $1`,
+      [saleRequestId, offerId]
+    );
+    expect(updateCode).toBeNull();
+
+    const row = await readRequest(saleRequestId);
+    expect(row.status).toBe("offer_selected");
+    expect(row.selected_offer_id).toBe(offerId);
+  });
+
+  /**
+   * A nuance de MATCH SIMPLE, explicitada.
+   *
+   * A FK de `sale_requests` é composta e uma das colunas é nullable. Se alguém
+   * "endurecer" isso para `MATCH FULL` no futuro, TODA linha sem seleção passa a
+   * ser rejeitada — `id` nunca é NULL, então o par nunca seria "todo nulo" — e a
+   * migration falha no primeiro banco com dados. Este teste trava o
+   * comportamento certo.
+   */
+  it("MATCH SIMPLE: linha SEM seleção é aceita, apesar da FK composta", async () => {
+    const code = await pgErrorCode(
+      `INSERT INTO sale_requests (
+         owner_user_id, city_id, brand, brand_slug, model, model_slug,
+         fipe_model_description, year, mileage, transmission, fuel_type,
+         declared_condition, status
+       )
+       VALUES ($1, $2, 'Fiat', 'fiat', 'Argo', 'argo', 'Argo 1.0', 2019, 60000,
+               'manual', 'flex', 'bom', 'receiving_offers')`,
+      [world.ownerId, world.cityId]
+    );
+
+    expect(code).toBeNull();
+  });
+});
+
+// ============================================================================
+describe.sequential("integração — 4.4.1: o advertiser da trilha bate com a oferta", () => {
+  /**
+   * §14 — `advertiser_id` na trilha é DESNORMALIZADO, e desnormalização diverge.
+   *
+   * Uma trilha dizendo "a loja X ganhou" sobre um lance da loja Y é um erro de
+   * auditoria que ninguém detectaria — a auditoria é justamente quem olharia
+   * aqui. A FK tripla é o que torna a divergência impossível em vez de
+   * improvável.
+   */
+  it("advertiser DIFERENTE do da oferta é recusado", async () => {
+    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+
+    const code = await pgErrorCode(
+      `INSERT INTO sale_request_offer_selections
+         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, 62000.00)`,
+      // A oferta é da loja 0; a trilha tentaria registrar a loja 1.
+      [saleRequestId, offerId, world.advertiserIds[1], world.ownerId]
+    );
+
+    expect(code).toBe("23503");
+    expect(await readSelections(saleRequestId)).toHaveLength(0);
+  });
+
+  it("advertiser CORRETO é aceito", async () => {
+    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+
+    const code = await pgErrorCode(
+      `INSERT INTO sale_request_offer_selections
+         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, 62000.00)`,
+      [saleRequestId, offerId, world.advertiserIds[0], world.ownerId]
+    );
+
+    expect(code).toBeNull();
+    expect(await readSelections(saleRequestId)).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+describe.sequential("integração — 4.4.1: a trilha NÃO some por cascade", () => {
+  /**
+   * §8/§15 — a razão de ser desta fase.
+   *
+   * A primeira versão da 057 usava `ON DELETE CASCADE` nas quatro FKs da trilha.
+   * O argumento era sobre RENDERIZAÇÃO ("um evento sobre uma solicitação apagada
+   * não pode ser descrito por tela nenhuma") — e esta tabela não existe para ser
+   * renderizada. Ela existe para responder "o que aconteceu?" quando alguém
+   * contesta um negócio.
+   *
+   * CASCADE numa trilha auditável é uma contradição: o registro desapareceria em
+   * silêncio, sem log e sem erro, exatamente no momento em que seria consultado.
+   *
+   * Os quatro testes abaixo não exigem NOME de constraint. O que importa é o
+   * efeito: o DELETE falha, e a linha continua lá. Qual FK legítima bloqueou
+   * primeiro é detalhe de implementação do PostgreSQL.
+   */
+  let scenario;
+
+  beforeEach(async () => {
+    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+    await select(saleRequestId, offerId);
+    scenario = { saleRequestId, offerId };
+
+    // Pré-condição: a trilha existe antes de cada tentativa de destruição.
+    expect(await readSelections(saleRequestId)).toHaveLength(1);
+  });
+
+  it("DELETE da OFERTA selecionada é rejeitado, e a trilha sobrevive", async () => {
+    const code = await pgErrorCode(`DELETE FROM sale_request_offers WHERE id = $1`, [
+      scenario.offerId,
+    ]);
+
+    expect(code).toBe("23503");
+    expect(await readSelections(scenario.saleRequestId)).toHaveLength(1);
+  });
+
+  it("DELETE da SOLICITAÇÃO é rejeitado, e a trilha sobrevive", async () => {
+    const code = await pgErrorCode(`DELETE FROM sale_requests WHERE id = $1`, [
+      scenario.saleRequestId,
+    ]);
+
+    expect(code).toBe("23503");
+    expect(await readSelections(scenario.saleRequestId)).toHaveLength(1);
+  });
+
+  it("DELETE do ADVERTISER é rejeitado, e a trilha sobrevive", async () => {
+    const code = await pgErrorCode(`DELETE FROM advertisers WHERE id = $1`, [
+      world.advertiserIds[0],
+    ]);
+
+    expect(code).toBe("23503");
+    expect(await readSelections(scenario.saleRequestId)).toHaveLength(1);
+  });
+
+  /**
+   * O usuário que DECIDIU.
+   *
+   * `users` é referenciado por muita coisa com CASCADE (`sale_requests.owner_user_id`,
+   * `sale_request_offers.dealer_user_id`). A cascata tenta propagar e esbarra na
+   * trilha — que é exatamente o que se quer: apagar a conta de quem decidiu não
+   * pode apagar o registro da decisão em silêncio.
+   */
+  it("DELETE do USUÁRIO que selecionou é rejeitado, e a trilha sobrevive", async () => {
+    const code = await pgErrorCode(`DELETE FROM users WHERE id = $1`, [world.ownerId]);
+
+    expect(code).toBe("23503");
+    expect(await readSelections(scenario.saleRequestId)).toHaveLength(1);
+  });
+
+  it("DELETE do usuário LOJISTA é rejeitado, e a trilha sobrevive", async () => {
+    const code = await pgErrorCode(`DELETE FROM users WHERE id = $1`, [world.dealerIds[0]]);
+
+    expect(code).toBe("23503");
+    expect(await readSelections(scenario.saleRequestId)).toHaveLength(1);
+  });
+
+  /**
+   * O contraste que dá sentido aos cinco testes acima: sem seleção, o CASCADE
+   * histórico continua funcionando normalmente. O endurecimento não travou o
+   * banco inteiro — ele travou exatamente o que precisa ser preservado.
+   */
+  it("sem seleção, apagar a solicitação continua funcionando (o CASCADE de offers vale)", async () => {
+    // Acima do piso de R$ 60.000 que `insertSaleRequest` semeia — a regra da
+    // 4.3.3 continua valendo, e o fixture tem de respeitá-la.
+    const { saleRequestId } = await seedRequestWithOffer(1, "63000");
+
+    const code = await pgErrorCode(`DELETE FROM sale_requests WHERE id = $1`, [saleRequestId]);
+
+    expect(code).toBeNull();
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM sale_request_offers WHERE sale_request_id = $1`,
+      [saleRequestId]
+    );
+    expect(rows[0].total).toBe(0);
+  });
+});
+
+// ============================================================================
+describe.sequential("integração — 4.4.1: o caminho feliz e as igualdades", () => {
+  /**
+   * §17 — depois de endurecer, o fluxo real continua funcionando ponta a ponta,
+   * e as quatro igualdades que a integridade referencial agora garante são
+   * verificadas explicitamente.
+   *
+   * Este teste seria redundante com os da 4.4 se olhasse só o resultado. Ele
+   * olha para as JUNÇÕES: é o que prova que as constraints novas descrevem o
+   * mesmo mundo que o service produz — e não um mundo mais estreito que
+   * recusaria o caminho legítimo.
+   */
+  it("duas lojas, seleção da MENOR, e as quatro igualdades fecham", async () => {
+    const saleRequestId = await insertSaleRequest();
+    await propose(0, saleRequestId, "65000");
+    await propose(1, saleRequestId, "67000");
+
+    const smaller = await currentOfferId(saleRequestId, 0);
+    const outcome = await select(saleRequestId, smaller);
+    expect(outcome.ok).toBe(true);
+
+    const { rows } = await pool.query(
+      `SELECT
+         sr.id::text                     AS request_id,
+         sr.selected_offer_id::text      AS request_selected_offer,
+         sel.offer_id::text              AS trail_offer,
+         sel.sale_request_id::text       AS trail_request,
+         sel.advertiser_id::text         AS trail_advertiser,
+         o.sale_request_id::text         AS offer_request,
+         o.advertiser_id::text           AS offer_advertiser,
+         o.amount::text                  AS offer_amount,
+         sel.amount_snapshot::text       AS trail_amount
+       FROM sale_requests sr
+       JOIN sale_request_offer_selections sel ON sel.sale_request_id = sr.id
+       JOIN sale_request_offers o ON o.id = sr.selected_offer_id
+       WHERE sr.id = $1`,
+      [saleRequestId]
+    );
+
+    expect(rows).toHaveLength(1);
+    const r = rows[0];
+
+    // 1. o estado aponta para a mesma oferta que a trilha registrou
+    expect(r.request_selected_offer).toBe(r.trail_offer);
+    // 2. a trilha é da mesma solicitação
+    expect(r.trail_request).toBe(r.request_id);
+    // 3. a oferta é da mesma solicitação
+    expect(r.offer_request).toBe(r.request_id);
+    // 4. o advertiser da trilha é o da oferta
+    expect(r.trail_advertiser).toBe(r.offer_advertiser);
+
+    // E a MENOR venceu — o hardening não transformou a maior em regra.
+    expect(r.offer_amount).toBe("65000.00");
+    expect(r.trail_amount).toBe("65000.00");
+  });
+
+  it("a notificação continua sendo criada na mesma transação", async () => {
+    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+    await select(saleRequestId, offerId);
+
+    const notifications = await readNotifications(saleRequestId);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].recipient_user_id).toBe(world.dealerIds[0]);
   });
 });
 

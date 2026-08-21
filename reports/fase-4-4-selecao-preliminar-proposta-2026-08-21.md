@@ -1,12 +1,18 @@
 # Fase 4.4 — Propostas recebidas + seleção preliminar da loja
+## + Fase 4.4.1 — Hardening de integridade referencial
 
 **Data:** 2026-08-21
-**Branch:** `codex/sale-request-owner-offer-selection`
+**Branch:** `codex/sale-request-owner-offer-selection` *(confirmada por
+`git branch --show-current`; nenhuma outra branch com nome parecido existe,
+local ou remota)*
 **Base SHA:** `9f3ffd92ddf41b027ac8515787f35f8061f82751` (main, Fase 4.3.3 mergeada)
-**HEAD:** trabalho local, ainda **não commitado** — nada mergeado, nada deployado.
 
-> **Veredito: GO técnico**, com as ressalvas de ambiente da §Regressões (todas
-> pré-existentes e comprovadamente alheias a esta fase).
+> **Veredito: GO técnico** para 4.4 **e** 4.4.1, com as ressalvas de ambiente da
+> §Regressões (todas pré-existentes e comprovadamente alheias a estas fases).
+>
+> A seção **[Hardening 4.4.1](#hardening-441--a-integridade-passou-a-ser-do-banco)**
+> está no fim deste documento. As seções 1–17 descrevem a 4.4 e continuam
+> válidas — a 4.4.1 não redesenhou nada delas.
 
 ---
 
@@ -45,28 +51,43 @@ cada achado decidiu:
 
 ## 2. Migration `057_sale_request_offer_selection.sql`
 
-Cinco blocos, nesta ordem:
+> **Atualizado pela 4.4.1.** Os itens 2 e 6 abaixo descrevem a forma FINAL, já
+> endurecida. Os itens marcados *(4.4.1)* mudaram depois desta seção ter sido
+> escrita — o raciocínio completo está na seção
+> [Hardening 4.4.1](#hardening-441--a-integridade-passou-a-ser-do-banco).
+
+Seis blocos, nesta ordem:
 
 1. **Colunas** `selected_offer_id BIGINT` e `selected_offer_at TIMESTAMPTZ` em
    `sale_requests`. Ambas nullable, **sem DEFAULT** — um `DEFAULT NOW()` faria a
    data ser sobre a criação da linha, não sobre a decisão.
-2. **FK** `sale_requests_selected_offer_fk → sale_request_offers(id)`, **sem
-   `ON DELETE`** (NO ACTION). Decisão documentada: `CASCADE` apagaria a
-   solicitação por causa de um satélite; `SET NULL` produziria um estado que o
-   CHECK de coerência proíbe (o `DELETE` falharia mesmo assim, com diagnóstico
-   pior). Consequência **aceita**: o banco recusa apagar `users`/`advertisers` de
-   um lojista com proposta selecionada. Verificado que **não existe
+2. *(4.4.1)* **Chaves candidatas compostas** em `sale_request_offers`:
+   `UNIQUE (id, sale_request_id)` e `UNIQUE (id, sale_request_id, advertiser_id)`.
+   Não existem pela unicidade (a PK já a garante) — existem porque o PostgreSQL
+   exige que o alvo de uma FK seja coberto **exatamente** por PK ou UNIQUE.
+3. *(4.4.1)* **FK COMPOSTA** `sale_requests_selected_offer_fk`:
+   `(selected_offer_id, id) → sale_request_offers (id, sale_request_id)`, **sem
+   `ON DELETE`** (NO ACTION). Prova PERTENCIMENTO, não só existência: a FK
+   simples aceitava selecionar a oferta de outra solicitação. `MATCH SIMPLE`
+   (padrão) é obrigatório aqui — com `MATCH FULL`, toda linha sem seleção seria
+   rejeitada.
+   Consequência **aceita**: o banco recusa apagar `users`/`advertisers` de um
+   lojista com proposta selecionada. Verificado que **não existe
    `DELETE FROM users` nem `DELETE FROM advertisers` em `src/`**.
-3. **CHECK de status** — DROP/ADD, pelo padrão que a migration 030 descreve:
+4. **CHECK de status** — DROP/ADD, pelo padrão que a migration 030 descreve:
    `receiving_offers | offer_selected | cancelled`.
-4. **CHECK de coerência** — bi-implicação:
+5. **CHECK de coerência** — bi-implicação:
    `offer_selected` ⟺ (`selected_offer_id` **e** `selected_offer_at` preenchidos).
    Torna **inexprimíveis** os três estados contraditórios. Entra sem `NOT VALID`
-   porque toda linha legada satisfaz a segunda metade.
-5. **Tabela `sale_request_offer_selections`** — append-only, com
-   `UNIQUE (sale_request_id)`, `CHECK (amount_snapshot > 0)`, quatro FKs
-   (`sale_requests`, `sale_request_offers`, `advertisers`, `users`), todas
-   `ON DELETE CASCADE`, e índice `(advertiser_id, selected_at DESC, id DESC)`.
+   porque toda linha legada satisfaz a segunda metade. **Inalterado pela 4.4.1.**
+6. **Tabela `sale_request_offer_selections`** — append-only, com
+   `UNIQUE (sale_request_id)`, `CHECK (amount_snapshot > 0)` e índice
+   `(advertiser_id, selected_at DESC, id DESC)`.
+   *(4.4.1)* Quatro FKs, **nenhuma com `ON DELETE`** — CASCADE numa trilha
+   auditável a faria sumir em silêncio exatamente quando fosse consultada. Uma
+   delas é **tripla**: `(offer_id, sale_request_id, advertiser_id) →
+   sale_request_offers (id, sale_request_id, advertiser_id)`, e substitui a FK
+   simples de `offer_id`.
 
 **Sem `updated_at`, sem `status`, sem `cancelled_at`** — a tabela nunca sofre
 UPDATE nem DELETE, e uma coluna dessas só poderia mentir.
@@ -513,8 +534,14 @@ solicitações abertas.
 são pré-existentes (documentadas com data e causa) ou flakiness de execução
 paralela — nenhuma introduzida por esta fase.
 
-**NÃO MERGEADO. NÃO DEPLOYADO.** Branch `codex/sale-request-offer-selection`,
+**NÃO MERGEADO. NÃO DEPLOYADO.** Branch `codex/sale-request-owner-offer-selection`,
 aguardando revisão.
+
+> Correção documental (4.4.1): esta linha dizia
+> `codex/sale-request-offer-selection`, sem o `owner-`. Era erro de digitação do
+> relatório, não uma segunda branch — `git branch --show-current` sempre
+> respondeu `codex/sale-request-owner-offer-selection`, e nenhuma outra branch
+> local ou remota com nome parecido existe.
 
 ### Antes do deploy
 
@@ -523,3 +550,351 @@ aguardando revisão.
 - ciente de que a FK sem `ON DELETE` passa a **bloquear** a remoção manual de
   `users`/`advertisers` de um lojista com proposta selecionada (nenhum caminho da
   aplicação faz isso hoje).
+
+---
+---
+
+# Hardening 4.4.1 — a integridade passou a ser do banco
+
+**Escopo:** nenhuma funcionalidade nova. Duas invariantes que a 4.4 garantia
+**principalmente pelo service** passaram a ser garantidas **também pelo
+PostgreSQL**.
+
+**Branch (real, verificada):** `codex/sale-request-owner-offer-selection`
+**HEAD ao iniciar a 4.4.1:** `5f984a51833dff46736c62948263b87afaa00603`
+**Working tree ao iniciar:** limpo, exceto os 4 arquivos untracked do usuário —
+intocados do começo ao fim.
+
+---
+
+## 1. Pré-condição: a 057 ainda não é contrato (§1)
+
+| Verificação | Resultado |
+|---|---|
+| `057` está em `origin/main`? | **Não** — `git log origin/main -- …057….sql` vazio |
+| Branch existe no remoto? | **Não** — `git ls-remote --heads origin …` vazio |
+| `origin/main…HEAD` | `0 2` — dois commits à frente, zero atrás |
+| Produção (Render) tem a 057? | **Impossível**: o deploy roda migrations da main, e a branch nunca foi pushada |
+| Ambientes com a 057 aplicada | apenas `carros_na_cidade_test` local, descartável (recriado por `npm run e2e:prepare`) |
+
+**Conclusão:** a migration não saiu da branch e não é contrato publicado. Editada
+**in-place**; nenhuma 058 criada. Uma 058 que consertasse a 057 deixaria as duas
+no histórico para sempre, obrigando todo leitor futuro a ler a versão errada
+antes de encontrar a certa. O cabeçalho da migration documenta essa janela e
+declara que ela fecha no merge.
+
+---
+
+## 2. Auditoria do schema real (§2)
+
+Inspecionado com `\d` e `pg_constraint` no banco de teste, **sem inferir tipos**.
+
+**`sale_request_offers`** — `id BIGSERIAL PK`, `sale_request_id BIGINT`,
+`dealer_user_id BIGINT`, `advertiser_id BIGINT`, `amount NUMERIC(14,2)`,
+`note TEXT`, `created_at TIMESTAMPTZ`. Três índices (055). **Única chave:
+`sale_request_offers_pkey (id)` — nenhuma UNIQUE composta existia.**
+
+**`sale_requests`** — `selected_offer_fk` era **simples**
+(`selected_offer_id → sale_request_offers(id)`), sem `ON DELETE`. CHECK de
+coerência presente.
+
+**`sale_request_offer_selections`** — `UNIQUE (sale_request_id)` e **quatro FKs,
+todas `ON DELETE CASCADE`**.
+
+Todos os ids envolvidos são `bigint` nas duas pontas — as FKs compostas casam sem
+conversão.
+
+---
+
+## 3. Problema 1: "a oferta existe" não é "a oferta é desta solicitação"
+
+A FK simples aceitava isto sem reclamar:
+
+```sql
+-- sale_requests id = 100 ; offer id = 900, sale_request_id = 200
+UPDATE sale_requests
+   SET selected_offer_id = 900, selected_offer_at = NOW(), status = 'offer_selected'
+ WHERE id = 100;                                    -- aceito pela FK simples
+```
+
+### A solução: chaves candidatas compostas + FK composta
+
+```sql
+ALTER TABLE sale_request_offers
+  ADD CONSTRAINT sale_request_offers_id_request_unique
+  UNIQUE (id, sale_request_id);
+
+ALTER TABLE sale_request_offers
+  ADD CONSTRAINT sale_request_offers_id_request_advertiser_unique
+  UNIQUE (id, sale_request_id, advertiser_id);
+
+ALTER TABLE sale_requests
+  ADD CONSTRAINT sale_requests_selected_offer_fk
+  FOREIGN KEY (selected_offer_id, id)
+  REFERENCES sale_request_offers (id, sale_request_id);
+```
+
+A FK carrega a **própria `sale_requests.id`** no lado esquerdo. Ler em voz alta:
+*"a oferta que eu selecionei tem, como solicitação, EU MESMA"*. O estado inválido
+deixou de ser proibido e passou a ser **inexprimível**.
+
+Verificado no banco real:
+
+```
+ERROR:  insert or update on table "sale_requests" violates foreign key
+        constraint "sale_requests_selected_offer_fk"
+DETAIL: Key (selected_offer_id, id)=(2, 1) is not present in table
+        "sale_request_offers".
+```
+
+### `MATCH SIMPLE` — a armadilha que quase entrou
+
+O padrão do PostgreSQL dispensa a verificação quando **qualquer** coluna da FK é
+NULL. Aqui isso é exatamente o desejado:
+
+- `selected_offer_id` NULL → linha sem seleção, passa sem consultar o alvo;
+- `selected_offer_id` cheio → as duas colunas são NOT NULL, par verificado inteiro.
+
+**`MATCH FULL` faria o oposto do que se quer.** Ele exige todas nulas ou todas
+não-nulas, e `sale_requests.id` **nunca** é nulo — toda solicitação sem seleção
+seria rejeitada, e a migration morreria no primeiro banco com dados. Há **dois**
+testes travando isso: um assertando `not.toMatch(/MATCH FULL/i)` na definição da
+constraint, e outro inserindo uma solicitação sem seleção e exigindo sucesso.
+
+---
+
+## 4. Problema 2: FK por coluna aceita conjuntos que são ficção (§6, §7)
+
+Com FKs separadas, esta linha de auditoria era aceita:
+
+```
+selection.sale_request_id = A
+selection.offer_id        = <oferta da solicitação B>
+selection.advertiser_id   = <uma loja qualquer>
+```
+
+Cada peça válida; o conjunto, ficção.
+
+```sql
+CONSTRAINT sale_request_offer_selections_offer_request_advertiser_fk
+  FOREIGN KEY (offer_id, sale_request_id, advertiser_id)
+  REFERENCES sale_request_offers (id, sale_request_id, advertiser_id)
+```
+
+### Por que a alternativa tripla foi escolhida (§7)
+
+`advertiser_id` na trilha é **desnormalizado**, e desnormalização sem constraint é
+o campo que diverge em silêncio. Uma trilha dizendo *"a loja X ganhou"* sobre um
+lance da loja Y é um erro de auditoria indetectável — a auditoria é justamente
+quem olharia ali. As três colunas são NOT NULL, então não há nuance de MATCH.
+
+### Por que **duas** UNIQUE, e não uma (§4, §7)
+
+O PostgreSQL exige que o alvo de uma FK seja coberto **exatamente** por PK ou
+UNIQUE — não vale prefixo de índice nem subconjunto. São dois referenciadores com
+formas diferentes:
+
+| Referenciador | Colunas | Alvo necessário |
+|---|---|---|
+| `sale_requests` | `(selected_offer_id, id)` — **2** | `(id, sale_request_id)` |
+| trilha | `(offer_id, sale_request_id, advertiser_id)` — **3** | `(id, sale_request_id, advertiser_id)` |
+
+Uma UNIQUE tripla não serve de alvo para a FK de duas colunas; uma dupla não prova
+o advertiser. `sale_requests` **não tem** advertiser, e criar
+`selected_advertiser_id` só para casar uma chave seria inventar coluna para
+satisfazer constraint.
+
+**Duas é o menor modelo que expressa as duas invariantes** — não é "mais segurança
+por precaução", que o §7 proíbe. Um teste assere `toHaveLength(2)`: nem uma a
+menos (invariante sem alvo), nem uma a mais (índice único sem FK que o use é custo
+de escrita sem contrapartida).
+
+**Custo medido:** dois índices únicos a mais por INSERT numa tabela append-only que
+cresce por lance — dezenas de linhas por solicitação, não milhões.
+
+### FK simples de `offer_id`: **removida**
+
+Seria estritamente mais fraca que a tripla e verificaria de novo o mesmo. Um teste
+impede que ela volte "por segurança".
+
+### FK direta de `advertiser_id`: **mantida**
+
+Não é redundante com a tripla: a tripla garante **coerência** (bate com a oferta),
+esta garante **existência** e é o que bloqueia diretamente o DELETE da loja, com o
+nome certo no erro.
+
+---
+
+## 5. A trilha deixou de sumir por cascade (§8, §9)
+
+**Antes:** as quatro FKs com `ON DELETE CASCADE`.
+**Depois:** as quatro sem `ON DELETE` (NO ACTION).
+
+O argumento original era sobre **renderização** — *"um evento sobre uma
+solicitação apagada não pode ser descrito por tela nenhuma"*. Está errado de
+premissa: esta tabela não existe para ser renderizada. Ela existe para responder
+*"o que aconteceu?"* quando alguém contesta um negócio.
+
+CASCADE numa trilha auditável é contradição em si: o registro desaparece **em
+silêncio, sem log e sem erro**, exatamente no momento em que seria consultado.
+
+`NO ACTION` e não `RESTRICT`: sem `DEFERRABLE` em jogo os dois se comportam igual,
+e NO ACTION é o padrão — escrever RESTRICT sugeriria uma diferença de semântica
+sendo explorada, e não há.
+
+**LGPD/anonimização não foi implementada** (§9). Quando existir, será fluxo próprio
+que decide o que preservar — não um `ON DELETE` herdado de FK.
+
+---
+
+## 6. Consequência real: o seed de E2E quebrou — e foi corrigido explicitamente
+
+`scripts/e2e-seed.mjs` fazia `DELETE FROM sale_requests WHERE owner_user_id = …`
+para ser idempotente. Com a trilha em NO ACTION, o DELETE passou a falhar:
+
+```
+error: update or delete on table "sale_requests" violates foreign key constraint
+       "sale_request_offer_selections_sale_request_id_fkey"
+```
+
+**Isto não é um defeito do endurecimento — é o endurecimento funcionando.** E é
+exatamente o "fluxo próprio" que o §9 descreve: a destruição de histórico passou a
+exigir uma declaração explícita no código.
+
+O seed ganhou um DELETE próprio da trilha, **escopado ao mesmo `owner_user_id`**
+(nunca a tabela inteira), com o comentário explicando que um script de reset de
+ambiente de teste está descartando a trilha que ele mesmo semeou.
+
+Foi encontrado **rodando o E2E**, não por inspeção — a suíte pegou.
+
+---
+
+## 7. Testes novos (§13–§17)
+
+Todos falam **SQL direto**; nenhum passa pelo service. É esse o ponto: prova-se
+que o estado inválido é **inexprimível**, não que o sistema o recusa. A diferença
+aparece no código de erro — `23503`, do PostgreSQL.
+
+| § | Teste | Esperado | OK |
+|---|---|---|---|
+| 13-A | `UPDATE sale_requests` com offer de outra request | `23503` + estado intacto | ✅ |
+| 13-B | `INSERT` na trilha com offer de outra request | `23503` + trilha vazia | ✅ |
+| 13-C | combinação coerente nas duas tabelas | aceita | ✅ |
+| — | MATCH SIMPLE: solicitação **sem** seleção | aceita | ✅ |
+| 14 | trilha com advertiser diferente do da oferta | `23503` | ✅ |
+| 14 | trilha com advertiser correto | aceita | ✅ |
+| 15 | `DELETE` da oferta selecionada | `23503` + **trilha sobrevive** | ✅ |
+| 15 | `DELETE` da solicitação | `23503` + trilha sobrevive | ✅ |
+| 15 | `DELETE` do advertiser | `23503` + trilha sobrevive | ✅ |
+| 15 | `DELETE` do usuário que **selecionou** | `23503` + trilha sobrevive | ✅ |
+| 15 | `DELETE` do usuário **lojista** | `23503` + trilha sobrevive | ✅ |
+| 15 | **contraste**: sem seleção, apagar a solicitação funciona | sucesso + offers em cascata | ✅ |
+| 16 | upgrade povoado + constraints endurecidas presentes | as 4, sem MATCH FULL, `confdeltype='a'` | ✅ |
+| 17 | caminho feliz e as **quatro igualdades** | fecham | ✅ |
+
+Os testes de DELETE **não exigem nome de constraint** (§15): o que importa é o
+efeito — o DELETE falha e a linha continua lá.
+
+O teste de contraste importa tanto quanto os outros: prova que o endurecimento
+travou **exatamente o que precisa ser preservado**, e não o banco inteiro.
+
+### As quatro igualdades (§17)
+
+Verificadas por JOIN, depois de uma seleção real da **menor** proposta:
+
+1. `sale_requests.selected_offer_id` = `selections.offer_id`
+2. `selections.sale_request_id` = `sale_requests.id`
+3. `offer.sale_request_id` = `sale_requests.id`
+4. `selections.advertiser_id` = `offer.advertiser_id`
+
+E `amount = 65000.00` nas duas pontas — **o hardening não transformou a maior
+proposta em regra** (§19).
+
+---
+
+## 8. O que NÃO mudou (§10, §11, §12)
+
+`sale_request_offers` continua append-only — sem `status`, `updated_at`,
+`deleted_at`, soft delete, UPDATE ou DELETE funcional. A definição de "proposta
+atual" (a mais recente da loja) está intacta.
+
+A regra funcional e a transação de onze passos estão **byte a byte iguais**: o
+diff da 4.4.1 não toca **nenhum** arquivo de `src/modules/`.
+
+**As duas camadas continuam (§12):** o service devolve erro semântico legível
+(`SALE_REQUEST_OFFER_NOT_FOUND`, 404) e o banco torna o estado impossível. Nenhuma
+validação foi removida do service porque "o banco agora garante" — um `23503` que
+chegasse ao usuário seria um 500 sem mensagem útil.
+
+---
+
+## 9. Regressões da 4.4.1 (§21)
+
+| Suíte | Antes (4.4) | Depois (4.4.1) |
+|---|---|---|
+| Integração da seleção | 33 ✅ | **50 ✅** (estável em 2 execuções) |
+| Integração vizinha (4 suítes) | 91 ✅ | **91 ✅** |
+| Backend `npm test` | 3395 ✅ | **3395 ✅** |
+| Frontend afetado (17 arquivos) | ✅ | **✅** |
+| `frontend typecheck` | ✅ | **✅** |
+| `frontend lint` | ✅ | **✅** |
+| `frontend build` | — | **✅** |
+| `backend lint` | 11 erros em `scripts/` | **11 erros em `scripts/`** (baseline) |
+| **E2E 4.4** (seleção) | 1 ✅ | **1 ✅** (9,5s, schema endurecido) |
+| **E2E 4.3** (disputa) | não reexecutado | **2 ✅** |
+
+O **E2E da 4.3 foi incluído de propósito**: a 4.4.1 adicionou duas UNIQUE em
+`sale_request_offers`, que é justamente a tabela em que aquela fase escreve. Uma
+regressão de escrita de proposta apareceria ali antes de qualquer outro lugar.
+Ele também é o teste que confirma o `scripts/e2e-seed.mjs` corrigido — foi ele
+que expôs a quebra do seed.
+
+Concorrência **preservada e sem redução de jitter** (§18): seleção × seleção (6
+rodadas), seleção × novo lance (8), seleção × cancelamento (8), retry simultâneo,
+rollback da notificação, stale, e o teste por mutação do lock.
+
+**§22 respeitado:** a asserção de schema da 4.4 não foi reaberta. As asserções que
+ganharam linhas são as da própria suíte de seleção, por exigência legítima das
+constraints novas.
+
+---
+
+## 10. Gate 4.4.1 (§24)
+
+| # | Critério | Status |
+|---|---|---|
+| 1 | 057 não publicada e endurecida in-place | ✅ `git log origin/main` + `ls-remote` |
+| 2 | banco impede `selected_offer` de outra request | ✅ `23503` |
+| 3 | banco impede trilha apontando offer de outra request | ✅ `23503` |
+| 4 | advertiser da trilha coerente com a offer | ✅ FK tripla |
+| 5 | trilha não usa `ON DELETE CASCADE` | ✅ `confdeltype='a'` nas 4 |
+| 6 | delete não apaga trilha | ✅ 5 cenários |
+| 7 | CHECK `offer_selected` continua válido | ✅ inalterado |
+| 8 | upgrade 056 → 057 com dados passa | ✅ + constraints verificadas |
+| 9 | caminho feliz passa | ✅ 4 igualdades |
+| 10 | proposta menor continua selecionável | ✅ service + PG + componente + E2E |
+| 11 | stale detection funciona | ✅ |
+| 12 | idempotência funciona | ✅ sequencial e concorrente |
+| 13 | selection × selection | ✅ 6 rodadas |
+| 14 | selection × bid | ✅ 8 rodadas |
+| 15 | selection × cancel | ✅ 8 rodadas |
+| 16 | rollback notification | ✅ gatilho no PG |
+| 17 | mutation proof | ✅ |
+| 18 | E2E verde | ✅ |
+| 19 | nenhuma regressão nova | ✅ |
+| 20 | UI inalterada funcionalmente | ✅ zero arquivo de UI no diff da 4.4.1 |
+
+### Veredito 4.4.1: **GO técnico**
+
+**NÃO MERGEADO. NÃO DEPLOYADO.**
+
+### Antes do deploy — atualizado
+
+- rodar a **migration 057 endurecida** (`npm run db:migrate`);
+- ciente de que a remoção manual de `users`, `advertisers`, `sale_requests` ou
+  `sale_request_offers` passa a ser **bloqueada** quando houver seleção. Nenhum
+  caminho da aplicação faz isso; o único fluxo que precisava foi corrigido para
+  declarar a destruição explicitamente (`scripts/e2e-seed.mjs`);
+- quando existir política de LGPD/anonimização, ela precisará de um fluxo próprio
+  — e a ausência de CASCADE é o que garante que ela seja escrita, em vez de
+  acontecer por acidente.
