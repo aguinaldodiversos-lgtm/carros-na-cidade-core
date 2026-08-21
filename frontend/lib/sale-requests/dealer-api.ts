@@ -152,15 +152,45 @@ export type DealerSaleOpportunitySummary = DealerOfferState & {
   /** Capa (`sort_order = 0`). `null` quando a solicitação não tem foto. */
   image: string | null;
   city: SaleRequestCity;
+  /**
+   * O FEED só devolve `receiving_offers` — a query filtra por igualdade, então
+   * cancelada e decidida nunca aparecem como card.
+   *
+   * O DETALHE amplia (ver `DealerSaleOpportunityDetail`): a loja escolhida
+   * continua abrindo a oportunidade dela depois da decisão, em leitura.
+   */
   status: "receiving_offers";
   created_at: string;
 };
 
-/** O detalhe: o mesmo objeto do feed, mais a galeria e as observações. */
-export type DealerSaleOpportunityDetail = DealerSaleOpportunitySummary & {
-  images: string[];
-  known_issues: string | null;
+/**
+ * O estado de SELEÇÃO na visão do lojista (Fase 4.4).
+ *
+ * `is_selected: true` só chega para a loja que GANHOU — a API devolve 404 para
+ * as demais depois da decisão. Não existe, e não deve passar a existir, um campo
+ * dizendo QUEM ganhou: a única resposta possível para quem recebe este bloco é
+ * "você".
+ *
+ * `selected_amount` é o valor da própria proposta desta loja, devolvido para que
+ * a tela não precise ir buscá-lo.
+ */
+export type DealerSelectionState = {
+  is_selected: boolean;
+  selected_amount: string | null;
+  selected_at: string | null;
 };
+
+/** O detalhe: o mesmo objeto do feed, mais a galeria, as observações e a seleção. */
+export type DealerSaleOpportunityDetail = Omit<DealerSaleOpportunitySummary, "status"> &
+  DealerSelectionState & {
+    /**
+     * `offer_selected` só é alcançável pela loja escolhida — a query de
+     * visibilidade não casa a linha para nenhuma outra.
+     */
+    status: "receiving_offers" | "offer_selected";
+    images: string[];
+    known_issues: string | null;
+  };
 
 /**
  * Métricas do cabeçalho — só o que tem fonte real.

@@ -7,6 +7,7 @@ import VehicleEvaluationSheet, {
   Card,
   DataRow,
 } from "@/components/account/VehicleEvaluationSheet";
+import SaleRequestProposals from "@/components/account/SaleRequestProposals";
 import {
   DECLARED_CONDITION_OPTIONS,
   NOT_INFORMED,
@@ -25,10 +26,21 @@ import {
   readTireCondition,
   readYesNoUnknown,
   type SaleRequest,
+  type SaleRequestProposal,
+  type SaleRequestSelectedOffer,
 } from "@/lib/sale-requests/api";
 
 /**
  * Detalhe de UMA solicitação, para o dono.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * AS PROPOSTAS VÊM PRIMEIRO (Fase 4.4)
+ * ────────────────────────────────────────────────────────────────────────────
+ * A seção "Propostas recebidas" fica ACIMA da ficha, logo depois das fotos. A
+ * ficha é o que a pessoa já preencheu e já sabe; as propostas são a novidade e a
+ * única decisão que ela tem para tomar aqui. Enterrá-las abaixo de vinte linhas
+ * de declaração faria o proprietário rolar uma tela inteira do próprio
+ * formulário para descobrir que alguém ofereceu dinheiro.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * A FICHA INTEIRA FICA VISÍVEL DEPOIS DE PUBLICADA
@@ -49,14 +61,19 @@ import {
  * ────────────────────────────────────────────────────────────────────────────
  * SEM EDIÇÃO, SEM PLACEHOLDER DE FUTURO
  * ────────────────────────────────────────────────────────────────────────────
- * Nada de "0 ofertas", "maior lance" ou "aguardando avaliação": essas entidades
- * chegam nas fases 4.3–4.5, e anunciá-las agora faria a pessoa esperar por algo
- * que o produto não entrega.
+ * Continua não havendo "aguardando avaliação", "prazo" ou "próxima etapa em X
+ * dias": a 4.5 não existe, e anunciá-la faria a pessoa esperar por algo que o
+ * produto não entrega. O que a tela mostra depois da seleção é o estado real —
+ * "Aguardando próxima etapa" — sem data e sem promessa.
  *
- * O cancelamento continua sendo a ÚNICA ação. Publicou, não edita campo
- * economicamente relevante — quando os lances existirem, mudar a quilometragem
- * debaixo de uma oferta já feita seria alterar o objeto do negócio depois da
- * proposta.
+ * Publicou, não edita campo economicamente relevante: mudar a quilometragem
+ * debaixo de uma proposta já feita seria alterar o objeto do negócio depois da
+ * oferta.
+ *
+ * O cancelamento deixou de ser a única ação (agora há a seleção) e passou a ter
+ * um limite: depois de escolher uma proposta, cancelar não é mais possível — a
+ * decisão é irreversível nesta fase, e o botão desaparece em vez de devolver um
+ * erro a quem clicasse.
  */
 
 const CONDITION_LABEL = new Map(DECLARED_CONDITION_OPTIONS.map((item) => [item.value, item.label]));
@@ -84,16 +101,34 @@ export default function SaleRequestDetail({ id }: { id: string }) {
   const router = useRouter();
 
   const [request, setRequest] = useState<SaleRequest | null>(null);
+  const [proposals, setProposals] = useState<SaleRequestProposal[]>([]);
+  const [selectedOffer, setSelectedOffer] = useState<SaleRequestSelectedOffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
+  /**
+   * Contador de recargas. Incrementá-lo re-dispara o efeito de carga.
+   *
+   * É o que a seção de propostas usa quando o servidor recusa uma seleção
+   * obsoleta (a loja aumentou entre a renderização e o clique): a tela precisa
+   * do estado novo, e um `router.refresh()` não serve — este componente busca os
+   * dados no cliente, e o refresh do App Router só revalidaria o servidor, sem
+   * tocar neste estado.
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+
   useEffect(() => {
     let alive = true;
     void getSaleRequest(id)
       .then((response) => {
-        if (alive) setRequest(response.sale_request);
+        if (!alive) return;
+        setRequest(response.sale_request);
+        // Coerção defensiva: uma resposta inesperada não pode quebrar a tela
+        // inteira do detalhe por causa da seção de propostas.
+        setProposals(Array.isArray(response.proposals) ? response.proposals : []);
+        setSelectedOffer(response.selected_offer ?? null);
       })
       .catch((failure) => {
         if (alive) {
@@ -109,7 +144,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, reloadToken]);
 
   async function handleCancel() {
     setCancelling(true);
@@ -117,6 +152,8 @@ export default function SaleRequestDetail({ id }: { id: string }) {
     try {
       const response = await cancelSaleRequest(id);
       setRequest(response.sale_request);
+      // A disputa acabou: as propostas somem da tela junto com o cancelamento.
+      setProposals([]);
       setConfirming(false);
       router.refresh();
     } catch (failure) {
@@ -169,9 +206,23 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         <h1 className="text-xl font-bold text-[#161f34] sm:text-2xl">
           {request.brand} {request.model}
         </h1>
+        {/*
+          TRÊS estados, três tratamentos — e não "aberta vs. resto".
+          Antes da Fase 4.4 o ternário bastava, porque o "resto" era só
+          `cancelled`. Com `offer_selected` no mesmo ramo, uma solicitação que
+          acabou de receber uma escolha apareceria com o MESMO cinza apagado de
+          uma cancelada: dois desfechos opostos com a mesma cara.
+
+          O azul não é decoração. Ele diz que algo aconteceu e que o estado é
+          ativo — verde é "recebendo", cinza é "encerrada sem desfecho".
+        */}
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
-            open ? "bg-[#ECFDF3] text-[#027A48]" : "bg-[#F2F4F7] text-[#475467]"
+            open
+              ? "bg-[#ECFDF3] text-[#027A48]"
+              : request.status === "offer_selected"
+                ? "bg-[#EFF4FF] text-[#0e62d8]"
+                : "bg-[#F2F4F7] text-[#475467]"
           }`}
           data-testid="sale-request-detail-status"
         >
@@ -202,6 +253,37 @@ export default function SaleRequestDetail({ id }: { id: string }) {
           ))}
         </ul>
       ) : null}
+
+      {/*
+        PROPOSTAS RECEBIDAS (Fase 4.4) — acima da ficha, de propósito.
+
+        O componente decide sozinho o que mostrar: a lista enquanto a disputa
+        está aberta, o painel da escolhida depois da seleção, e nada quando a
+        solicitação foi cancelada. Concentrar essa decisão nele mantém esta tela
+        sem uma cadeia de ternários sobre `status` que teria de ser mantida em
+        sincronia com a de lá.
+      */}
+      <div className="mt-5">
+        <SaleRequestProposals
+          saleRequestId={request.id}
+          proposals={proposals}
+          selected={selectedOffer}
+          status={request.status}
+          onSelected={(selected) => {
+            // A resposta do POST veio de dentro da transação que travou a
+            // solicitação — é autoritativa. Aplicá-la aqui evita um GET extra e,
+            // mais importante, evita a janela em que a tela mostraria a lista
+            // antiga de propostas ao lado de uma escolha já feita.
+            setSelectedOffer(selected);
+            setProposals([]);
+            setRequest((current) =>
+              current ? { ...current, status: "offer_selected" } : current
+            );
+            router.refresh();
+          }}
+          onStale={() => setReloadToken((value) => value + 1)}
+        />
+      </div>
 
       {/*
         Duas colunas a partir de `md`, uma no mobile. Os cartões são
@@ -325,6 +407,20 @@ export default function SaleRequestDetail({ id }: { id: string }) {
             </button>
           )}
         </div>
+      ) : request.status === "offer_selected" ? (
+        /*
+          Depois da seleção NÃO há botão de cancelar, e a ausência é a mensagem.
+          Renderizá-lo desabilitado, ou renderizá-lo para receber um 409, diria
+          que a reversão existe e está indisponível — quando ela simplesmente não
+          existe nesta fase.
+
+          O painel verde acima já diz o que está acontecendo; esta linha só
+          fecha o assunto do cancelamento para quem procurava o botão.
+        */
+        <p className="mt-6 text-sm text-[#64748b]" data-testid="sale-request-selected-note">
+          Você já selecionou uma proposta. Esta solicitação não recebe mais propostas e não
+          pode ser cancelada.
+        </p>
       ) : (
         <p className="mt-6 text-sm text-[#64748b]" data-testid="sale-request-cancelled-note">
           Esta solicitação foi cancelada e permanece no seu histórico.

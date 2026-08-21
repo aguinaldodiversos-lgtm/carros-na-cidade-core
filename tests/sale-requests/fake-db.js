@@ -25,9 +25,24 @@ export const db = {
   saleRequestImages: [],
   /** Propostas (migration 055). APPEND-ONLY: nada aqui é reescrito. */
   saleRequestOffers: [],
+  /**
+   * Trilha de seleções (migration 057). APPEND-ONLY, e com o UNIQUE por
+   * solicitação re-implementado no INSERT — não é decoração: é o que faz o teste
+   * do §12 falhar se alguém remover o `ON CONFLICT`.
+   */
+  saleRequestOfferSelections: [],
+  /**
+   * Caixa postal interna. Existe aqui porque a notificação da seleção é gravada
+   * DENTRO da transação (§22), então ela passa pelo mesmo executor — e um teste
+   * que não a registrasse não teria como provar "uma notificação, exatamente
+   * uma".
+   */
+  userNotifications: [],
   nextRequestId: 1,
   nextImageId: 1,
   nextOfferId: 1,
+  nextSelectionId: 1,
+  nextNotificationId: 1,
   /** Todas as chaves já usadas — espelha o UNIQUE GLOBAL da migration 053. */
   usedStorageKeys: new Set(),
 };
@@ -39,9 +54,13 @@ export function resetDb(seed = {}) {
   db.saleRequests = seed.saleRequests ?? [];
   db.saleRequestImages = seed.saleRequestImages ?? [];
   db.saleRequestOffers = seed.saleRequestOffers ?? [];
+  db.saleRequestOfferSelections = seed.saleRequestOfferSelections ?? [];
+  db.userNotifications = seed.userNotifications ?? [];
   db.nextRequestId = seed.nextRequestId ?? 1;
   db.nextImageId = seed.nextImageId ?? 1;
   db.nextOfferId = seed.nextOfferId ?? 1;
+  db.nextSelectionId = seed.nextSelectionId ?? 1;
+  db.nextNotificationId = seed.nextNotificationId ?? 1;
   db.usedStorageKeys = new Set(
     (seed.saleRequestImages ?? []).map((image) => image.storage_key)
   );
@@ -288,7 +307,290 @@ function passesFeedCursor(row, { column, direction }, key, id) {
   return direction === "ASC" ? Number(row.id) > Number(id) : Number(row.id) < Number(id);
 }
 
+/**
+ * A loja de uma proposta, no formato que as queries de seleção projetam.
+ *
+ * O `LEFT JOIN cities` do repositório é reproduzido como `?? null`: uma loja sem
+ * cidade resolvida aparece com nome e sem cidade — nunca some da lista. Um
+ * `INNER JOIN` aqui esconderia a proposta dela do proprietário, que é uma
+ * decisão de produto que ninguém tomou.
+ */
+function storeColumnsOf(advertiserId) {
+  const advertiser = db.advertisers.find((item) => sameId(item.id, advertiserId));
+  const city = advertiser ? cityOf(advertiser.city_id) : null;
+  return {
+    store_name: advertiser?.name ?? null,
+    store_city_name: city?.name ?? null,
+    store_city_state: city?.state ?? null,
+  };
+}
+
+/**
+ * A proposta ATUAL de cada loja — o `DISTINCT ON (advertiser_id)` do repositório.
+ *
+ * Re-implementado de verdade (a mais RECENTE por loja, e não a maior), e não
+ * simulado devolvendo tudo: um fake que devolvesse o histórico inteiro faria o
+ * teste de "uma linha por loja" passar mesmo se alguém apagasse o `DISTINCT ON`.
+ */
+function currentOffersOf(saleRequestId) {
+  const byAdvertiser = new Map();
+
+  for (const offer of db.saleRequestOffers) {
+    if (!sameId(offer.sale_request_id, saleRequestId)) continue;
+
+    const key = String(offer.advertiser_id);
+    const current = byAdvertiser.get(key);
+    const isNewer =
+      !current ||
+      new Date(offer.created_at).getTime() > new Date(current.created_at).getTime() ||
+      (new Date(offer.created_at).getTime() === new Date(current.created_at).getTime() &&
+        Number(offer.id) > Number(current.id));
+
+    if (isNewer) byAdvertiser.set(key, offer);
+  }
+
+  return [...byAdvertiser.values()];
+}
+
 function handle(text, params, now) {
+  // ==========================================================================
+  // SELEÇÃO DE PROPOSTA (Fase 4.4)
+  // ==========================================================================
+  // Estes ramos vêm ANTES de tudo pelo mesmo motivo que os do lojista vêm antes
+  // dos do dono: o SQL da seleção contém trechos que padrões mais genéricos
+  // abaixo também casariam (`FROM sale_requests sr JOIN cities c`, por exemplo),
+  // e o primeiro ramo a casar responde.
+
+  // --- sale_requests: o LOCK da SELEÇÃO, escopado ao DONO -------------------
+  //
+  // A projeção é casada LITERALMENTE, incluindo `selected_offer_id`: ele é o
+  // critério que distingue o retry idempotente do conflito, e precisa ser lido
+  // na MESMA query do lock. Se alguém o mover para uma segunda leitura (fora do
+  // mutex), este ramo deixa de casar e os testes de seleção caem — que é o
+  // alarme certo.
+  if (
+    /^SELECT id, status, selected_offer_id FROM sale_requests WHERE id = \$1 AND owner_user_id = \$2 FOR UPDATE/i.test(
+      text
+    )
+  ) {
+    const [id, ownerUserId] = params;
+    const row = db.saleRequests.find(
+      (item) => sameId(item.id, id) && sameId(item.owner_user_id, ownerUserId)
+    );
+    return {
+      rows: row
+        ? [
+            {
+              id: row.id,
+              status: row.status,
+              // `?? null` e não `|| null`: a linha semeada sem a chave nunca
+              // pode chegar ao service como `undefined`, que passaria
+              // despercebido numa comparação de string.
+              selected_offer_id: row.selected_offer_id ?? null,
+            },
+          ]
+        : [],
+      rowCount: row ? 1 : 0,
+    };
+  }
+
+  // --- sale_request_offers: a oferta apontada, PROVADA como desta solicitação
+  //
+  // O `sale_request_id` entra no filtro de verdade. Apagá-lo do repository faz
+  // o teste "oferta de outra solicitação é recusada" falhar — que é o ponto
+  // deste fake existir.
+  if (
+    /^SELECT id, advertiser_id, dealer_user_id, amount FROM sale_request_offers WHERE id = \$1 AND sale_request_id = \$2/i.test(
+      text
+    )
+  ) {
+    const [offerId, saleRequestId] = params;
+    const offer = db.saleRequestOffers.find(
+      (item) => sameId(item.id, offerId) && sameId(item.sale_request_id, saleRequestId)
+    );
+    return {
+      rows: offer
+        ? [
+            {
+              id: offer.id,
+              advertiser_id: offer.advertiser_id,
+              dealer_user_id: offer.dealer_user_id,
+              amount: offer.amount,
+            },
+          ]
+        : [],
+      rowCount: offer ? 1 : 0,
+    };
+  }
+
+  // --- sale_request_offers: as propostas ATUAIS do proprietário -------------
+  if (/FROM sale_request_offers o JOIN sale_requests sr ON sr\.id = o\.sale_request_id/i.test(text)) {
+    const [saleRequestId, ownerUserId] = params;
+
+    const saleRequest = db.saleRequests.find(
+      (item) => sameId(item.id, saleRequestId) && sameId(item.owner_user_id, ownerUserId)
+    );
+    // O escopo por dono está no `WHERE` do repository. Apagá-lo de lá faz este
+    // ramo devolver linhas para qualquer um — e o teste de IDOR falhar.
+    if (!saleRequest) return { rows: [], rowCount: 0 };
+
+    const rows = currentOffersOf(saleRequestId)
+      .sort((a, b) => {
+        const byAmount = Number(b.amount) - Number(a.amount);
+        if (byAmount !== 0) return byAmount;
+        return Number(b.id) - Number(a.id);
+      })
+      .map((offer) => ({
+        id: offer.id,
+        advertiser_id: offer.advertiser_id,
+        amount: offer.amount,
+        created_at: offer.created_at,
+        ...storeColumnsOf(offer.advertiser_id),
+      }));
+
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- sale_request_offer_selections: o INSERT da trilha --------------------
+  //
+  // O `ON CONFLICT (sale_request_id) DO NOTHING` é re-implementado: já existindo
+  // seleção para a solicitação, devolve zero linhas. É o que prova que a rede
+  // de segurança do §12 está no SQL, e não numa checagem em JS que o fake
+  // pudesse estar simulando por conta própria.
+  if (/^INSERT INTO sale_request_offer_selections/i.test(text)) {
+    const [saleRequestId, offerId, advertiserId, selectedByUserId, amountSnapshot] = params;
+
+    const exists = db.saleRequestOfferSelections.some((item) =>
+      sameId(item.sale_request_id, saleRequestId)
+    );
+    if (exists) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextSelectionId,
+      sale_request_id: saleRequestId,
+      offer_id: offerId,
+      advertiser_id: advertiserId,
+      selected_by_user_id: selectedByUserId,
+      amount_snapshot: amountSnapshot,
+      selected_at: new Date(now).toISOString(),
+    };
+    db.nextSelectionId += 1;
+    db.saleRequestOfferSelections.push(row);
+
+    return { rows: [row], rowCount: 1 };
+  }
+
+  // --- sale_requests: aplica o ESTADO da seleção ----------------------------
+  //
+  // As TRÊS cláusulas do `WHERE` são reproduzidas — id, dono e status. Apagar
+  // qualquer uma delas do repository faz um teste diferente falhar: a posse, a
+  // transição única, ou as duas.
+  if (/^UPDATE sale_requests SET status = \$4, selected_offer_id = \$3/i.test(text)) {
+    const [id, ownerUserId, offerId, selectedStatus, receivingStatus] = params;
+
+    const row = db.saleRequests.find(
+      (item) =>
+        sameId(item.id, id) &&
+        sameId(item.owner_user_id, ownerUserId) &&
+        item.status === receivingStatus
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    row.status = selectedStatus;
+    row.selected_offer_id = offerId;
+    row.selected_offer_at = new Date(now).toISOString();
+    row.updated_at = new Date(now).toISOString();
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- sale_requests: a proposta SELECIONADA, para exibição -----------------
+  if (/FROM sale_requests sr JOIN sale_request_offers o ON o\.id = sr\.selected_offer_id/i.test(text)) {
+    const [saleRequestId, ownerUserId] = params;
+
+    const saleRequest = db.saleRequests.find(
+      (item) => sameId(item.id, saleRequestId) && sameId(item.owner_user_id, ownerUserId)
+    );
+    if (!saleRequest?.selected_offer_id) return { rows: [], rowCount: 0 };
+
+    // INNER JOIN: sem a oferta não há linha. O CHECK de coerência da migration
+    // 057 torna esse estado inexprimível no banco real; aqui a ausência de
+    // fallback é o que faria um fake inconsistente aparecer como teste vermelho.
+    const offer = db.saleRequestOffers.find((item) =>
+      sameId(item.id, saleRequest.selected_offer_id)
+    );
+    if (!offer) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          id: offer.id,
+          advertiser_id: offer.advertiser_id,
+          amount: offer.amount,
+          selected_offer_at: saleRequest.selected_offer_at ?? null,
+          ...storeColumnsOf(offer.advertiser_id),
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- user_notifications: o INSERT idempotente ----------------------------
+  //
+  // O índice único `(recipient_user_id, idempotency_key)` é re-implementado:
+  // a segunda chamada com a mesma chave não insere. É o que prova "uma
+  // notificação, exatamente uma" no retry — em vez de o teste concordar consigo
+  // mesmo contando um array que nunca recusa nada.
+  if (/^INSERT INTO user_notifications/i.test(text)) {
+    const [
+      recipientUserId,
+      eventType,
+      title,
+      body,
+      entityType,
+      entityId,
+      actionPath,
+      payload,
+      idempotencyKey,
+    ] = params;
+
+    const exists = db.userNotifications.some(
+      (item) =>
+        sameId(item.recipient_user_id, recipientUserId) &&
+        item.idempotency_key === idempotencyKey
+    );
+    if (exists) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextNotificationId,
+      recipient_user_id: recipientUserId,
+      event_type: eventType,
+      title,
+      body,
+      entity_type: entityType,
+      entity_id: entityId,
+      action_path: actionPath,
+      payload: typeof payload === "string" ? JSON.parse(payload) : (payload ?? {}),
+      idempotency_key: idempotencyKey,
+      read_at: null,
+      created_at: new Date(now).toISOString(),
+    };
+    db.nextNotificationId += 1;
+    db.userNotifications.push(row);
+
+    return { rows: [row], rowCount: 1 };
+  }
+
+  // --- user_notifications: a leitura do conflito idempotente ----------------
+  if (/FROM user_notifications WHERE recipient_user_id = \$1 AND idempotency_key = \$2/i.test(text)) {
+    const [recipientUserId, idempotencyKey] = params;
+    const row = db.userNotifications.find(
+      (item) =>
+        sameId(item.recipient_user_id, recipientUserId) &&
+        item.idempotency_key === idempotencyKey
+    );
+    return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+  }
+
   // ==========================================================================
   // ÁREA DO LOJISTA (Fase 4.3)
   // ==========================================================================
@@ -569,12 +871,52 @@ function handle(text, params, now) {
   }
 
   // --- sale_requests: DETALHE do lojista ------------------------------------
-  if (/WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND sr\.status = \$3/i.test(text)) {
-    const [id, cityId, status] = params;
+  //
+  // As DUAS condições de visibilidade da Fase 4.4, re-implementadas de verdade:
+  //
+  //   `receiving_offers` → qualquer loja da cidade;
+  //   `offer_selected`   → SÓ a loja cuja proposta foi a escolhida.
+  //
+  // A segunda comparação (`sel.advertiser_id = $5`) é o que faz o teste de
+  // "lojista perdedor recebe 404" falhar se alguém a apagar do repository. Um
+  // fake que ignorasse o advertiser devolveria a ficha para todo mundo e o teste
+  // passaria enquanto a privacidade estivesse quebrada.
+  if (
+    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( sr\.status = \$3 OR \(sr\.status = \$4 AND sel\.advertiser_id = \$5\) \)/i.test(
+      text
+    )
+  ) {
+    const [id, cityId, openStatus, selectedStatus, advertiserId] = params;
+
     const row = db.saleRequests.find(
-      (item) => sameId(item.id, id) && sameId(item.city_id, cityId) && item.status === status
+      (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
     );
-    return { rows: row ? [projectDealer(row)] : [], rowCount: row ? 1 : 0 };
+    if (!row) return { rows: [], rowCount: 0 };
+
+    // LEFT JOIN pelo `selected_offer_id` — a proposta ESCOLHIDA, não "uma
+    // proposta desta loja".
+    const selectedOffer = row.selected_offer_id
+      ? db.saleRequestOffers.find((offer) => sameId(offer.id, row.selected_offer_id))
+      : null;
+
+    const visible =
+      row.status === openStatus ||
+      (row.status === selectedStatus &&
+        selectedOffer != null &&
+        sameId(selectedOffer.advertiser_id, advertiserId));
+
+    if (!visible) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          ...projectDealer(row),
+          selected_offer_at: row.selected_offer_at ?? null,
+          selected_offer_amount: selectedOffer?.amount ?? null,
+        },
+      ],
+      rowCount: 1,
+    };
   }
 
   // --- sale_requests: FEED do lojista ---------------------------------------

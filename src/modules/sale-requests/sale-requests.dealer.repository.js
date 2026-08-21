@@ -264,25 +264,74 @@ export async function countOpenByCity({ cityId, filters }) {
 }
 
 /**
- * UMA solicitação, escopada à cidade e ao estado aberto.
+ * UMA solicitação VISÍVEL para esta loja — escopada à cidade e ao estado.
  *
  * A cidade está no `WHERE`, então a linha de outra cidade simplesmente NÃO CASA
  * — quem chama transforma isso em 404, nunca em "esta oportunidade é de outra
  * cidade". Distinguir os motivos confirmaria a existência da solicitação para
  * quem estivesse sondando ids de fora.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * DOIS ESTADOS VISÍVEIS, E O SEGUNDO É VISÍVEL PARA UMA LOJA SÓ (Fase 4.4)
+ * ────────────────────────────────────────────────────────────────────────────
+ *   `receiving_offers` → visível para QUALQUER loja da cidade. A disputa está
+ *                        aberta e é isso que o feed distribui.
+ *
+ *   `offer_selected`   → visível SÓ para a loja cuja proposta foi escolhida
+ *                        (§19), e em modo leitura. Ela precisa saber que ganhou,
+ *                        e a única tela onde isso cabe é a da oportunidade.
+ *
+ * A segunda condição é `sr.selected_offer_id = mine.id`, e a comparação
+ * acontece DENTRO do `WHERE`: uma loja não selecionada não casa a linha e recebe
+ * o mesmo 404 de sempre (§20). Não existe "carrega e depois esconde no DTO" —
+ * a ficha da pessoa física não sai do banco para quem perdeu.
+ *
+ * O `LEFT JOIN` de `sel` é a proposta SELECIONADA (não "uma proposta desta
+ * loja"): ele parte de `sr.selected_offer_id`, o estado corrente. Traz o valor
+ * escolhido, que é o número que a tela da loja vencedora mostra.
+ *
+ * `sel.advertiser_id` NÃO é projetado — só comparado. A loja vencedora vê que
+ * ganhou; a loja perdedora não recebe resposta nenhuma; e em nenhum caminho a
+ * identidade de um concorrente entra na projeção. É a mesma disciplina de
+ * `findHighestAmount`, que nem seleciona a coluna do líder.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * A LISTA DE ESTADOS VISÍVEIS CONTINUA SENDO UMA IGUALDADE, NUNCA UMA NEGAÇÃO
+ * ────────────────────────────────────────────────────────────────────────────
+ * `status = A OR (status = B AND ...)`, e jamais `status <> 'cancelled'`. A
+ * forma negativa passaria a mostrar automaticamente todo estado novo que uma
+ * fase seguinte criasse — inclusive um que ainda não tivesse tela.
+ *
+ * `advertiserId` é obrigatório e vem SEMPRE de `resolveDealerStore`, nunca do
+ * cliente. Um `null` aqui faria a segunda condição nunca casar (comparação com
+ * NULL não é verdadeira), então o pior caso de um call site distraído é a loja
+ * vencedora receber 404 — falha fechada, e não vazamento.
  */
-export async function getOpenByIdForCity(saleRequestId, cityId) {
+export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId) {
   const result = await query(
     `
-    SELECT ${DEALER_COLUMNS}
+    SELECT
+      ${DEALER_COLUMNS},
+      sr.selected_offer_at,
+      sel.amount AS selected_offer_amount
     FROM sale_requests sr
     JOIN cities c ON c.id = sr.city_id
+    LEFT JOIN sale_request_offers sel ON sel.id = sr.selected_offer_id
     WHERE sr.id = $1
       AND sr.city_id = $2
-      AND sr.status = $3
+      AND (
+        sr.status = $3
+        OR (sr.status = $4 AND sel.advertiser_id = $5)
+      )
     LIMIT 1
     `,
-    [saleRequestId, cityId, SALE_REQUEST_STATUS.RECEIVING_OFFERS]
+    [
+      saleRequestId,
+      cityId,
+      SALE_REQUEST_STATUS.RECEIVING_OFFERS,
+      SALE_REQUEST_STATUS.OFFER_SELECTED,
+      advertiserId,
+    ]
   );
   return result.rows[0] ?? null;
 }

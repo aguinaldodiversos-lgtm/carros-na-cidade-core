@@ -97,6 +97,12 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
     my_offer: null,
     is_leading: false,
     offers_count: 0,
+    // O bloco de seleção (Fase 4.4). O padrão é a disputa ABERTA — a API devolve
+    // `is_selected: false` em todo detalhe, e não só quando verdadeiro, para que
+    // a tela não precise distinguir "não selecionada" de "campo ausente".
+    is_selected: false,
+    selected_amount: null,
+    selected_at: null,
     ...overrides,
   };
 }

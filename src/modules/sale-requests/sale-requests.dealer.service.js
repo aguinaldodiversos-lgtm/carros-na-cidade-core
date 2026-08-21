@@ -40,6 +40,7 @@ import * as offersRepo from "./sale-requests.offers.repository.js";
 import { buildCanonicalImageUrlFromStorageKey } from "../ads/ads.public-images.js";
 import * as repo from "./sale-requests.dealer.repository.js";
 import { parseSaleRequestId, requireUserId } from "./sale-requests.validation.js";
+import { SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import { SALE_OPPORTUNITY_PAGE } from "./sale-requests.dealer.constants.js";
 import {
   decodeCursor,
@@ -187,6 +188,35 @@ function serializeDetail(row, { images = [] } = {}) {
   };
 }
 
+/**
+ * O bloco de SELEÇÃO na visão do lojista (Fase 4.4, §24).
+ *
+ * Chegar aqui com `status = 'offer_selected'` já significa, por construção da
+ * query, que ESTA loja é a escolhida: a linha não casa o `WHERE` para nenhuma
+ * outra (§20). O DTO não precisa — e não deve — carregar um "quem ganhou",
+ * porque a única resposta possível é "você".
+ *
+ * `selected_amount` é o valor da PRÓPRIA proposta desta loja. Não é vazamento de
+ * concorrente: é o número que ela mesma ofereceu, devolvido para que a tela não
+ * precise ir buscá-lo.
+ *
+ * O que este bloco NÃO carrega, e não pode passar a carregar: nome, telefone,
+ * e-mail, WhatsApp, endereço ou documento do proprietário. A garantia continua
+ * sendo estrutural — `DEALER_COLUMNS` não os seleciona e nenhuma query deste
+ * módulo faz JOIN com `users` —, e a seleção não afrouxa nada: quem foi
+ * escolhido ganha o direito de saber que foi escolhido, não o contato de quem
+ * escolheu. O contato não existe nesta fase para ninguém.
+ */
+function serializeSelection(row) {
+  const isSelected = row.status === SALE_REQUEST_STATUS.OFFER_SELECTED;
+
+  return {
+    is_selected: isSelected,
+    selected_amount: isSelected ? (row.selected_offer_amount ?? null) : null,
+    selected_at: isSelected ? (row.selected_offer_at ?? null) : null,
+  };
+}
+
 
 /**
  * Feed de veículos disponíveis para avaliação na cidade da loja.
@@ -284,11 +314,17 @@ export async function listDealerSaleOpportunities(userId, rawQuery = {}, { now =
 /**
  * UMA oportunidade, com a ficha completa e a galeria.
  *
- * Sempre 404 quando não casa — nunca "esta oportunidade é de outra cidade" e
- * nunca "esta solicitação foi cancelada". Distinguir os motivos confirmaria a
- * existência da solicitação para quem estivesse sondando ids de fora da cidade,
- * e a existência já é informação: diz que alguém naquela cidade está vendendo um
- * carro.
+ * Sempre 404 quando não casa — nunca "esta oportunidade é de outra cidade",
+ * nunca "esta solicitação foi cancelada" e nunca "outra loja foi escolhida".
+ * Distinguir os motivos confirmaria a existência da solicitação para quem
+ * estivesse sondando ids de fora da cidade, e a existência já é informação: diz
+ * que alguém naquela cidade está vendendo um carro.
+ *
+ * O 404 é o MESMO para a loja que perdeu a disputa (§20). A tentação de dar a
+ * ela um 403 com "outra loja foi selecionada" é grande e está errada: seria
+ * contar o desfecho de um negócio alheio a alguém que já não participa dele — e
+ * a mesma resposta viraria um oráculo para qualquer CNPJ da cidade sondar ids e
+ * descobrir quais solicitações foram fechadas.
  */
 export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
   const dealerUserId = requireUserId(userId);
@@ -298,7 +334,9 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
     advertiserId: rawQuery.advertiser_id,
   });
 
-  const row = await repo.getOpenByIdForCity(saleRequestId, cityId);
+  // A loja entra na PRÓPRIA query de visibilidade: é ela que decide se uma
+  // solicitação já decidida ainda pode ser aberta, e por quem.
+  const row = await repo.getVisibleByIdForCity(saleRequestId, cityId, advertiserId);
   if (!row) {
     logger.info(
       {
@@ -330,6 +368,12 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
       // quantas propostas existem. Nenhum identificador de concorrente — a
       // query que lê o líder nem seleciona `advertiser_id`.
       ...offerState,
+      // O bloco de seleção (4.4). `is_selected: false` enquanto a disputa está
+      // aberta — presente em todo detalhe, e não só quando verdadeiro, para que
+      // a tela não precise distinguir "não selecionada" de "campo ausente". É a
+      // mesma escolha que `serializeOfferState` faz com a solicitação sem
+      // proposta nenhuma.
+      ...serializeSelection(row),
     },
   };
 }

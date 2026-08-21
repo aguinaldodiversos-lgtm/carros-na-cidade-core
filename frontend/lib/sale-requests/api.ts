@@ -8,7 +8,15 @@
 // formulário: o botão habilita, a pessoa envia, e o servidor recusa com uma
 // mensagem que a tela não sabia prever.
 
-export type SaleRequestStatus = "receiving_offers" | "cancelled";
+/**
+ * Estados da solicitação. Espelha `SALE_REQUEST_STATUS` do backend e o CHECK da
+ * migration 057.
+ *
+ * `offer_selected` é a Fase 4.4: o proprietário escolheu uma proposta e a
+ * disputa encerrou. NÃO significa venda concluída, e nenhum texto desta tela
+ * pode dizer que significa.
+ */
+export type SaleRequestStatus = "receiving_offers" | "offer_selected" | "cancelled";
 
 export type DeclaredCondition = "excelente" | "bom" | "regular" | "precisa_reparos";
 
@@ -270,8 +278,17 @@ export function formatMoneyValue(value: string | null): string | null {
   return numeric.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/**
+ * Rótulos de estado.
+ *
+ * "Proposta selecionada" — e nunca "Vendido", "Negócio fechado" ou "Concluída".
+ * A seleção é preliminar: o valor ainda será revisto na avaliação presencial, e
+ * um rótulo que sugira conclusão faria a pessoa parar de considerar outras
+ * saídas para um carro que ela ainda tem.
+ */
 export const STATUS_LABEL: Record<SaleRequestStatus, string> = {
   receiving_offers: "Recebendo ofertas",
+  offer_selected: "Proposta selecionada",
   cancelled: "Cancelada",
 };
 
@@ -342,6 +359,64 @@ export type SaleRequestListResponse = {
   sale_requests: SaleRequest[];
   next_cursor: string | null;
   limit: number;
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// PROPOSTAS RECEBIDAS (Fase 4.4)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * UMA proposta atual, na visão do proprietário.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE ESTE TIPO NÃO TEM
+ * ────────────────────────────────────────────────────────────────────────────
+ * Nenhum `advertiser_id`, `dealer_user_id`, e-mail, telefone, WhatsApp, CNPJ ou
+ * `note` — porque a API não devolve nenhum deles. Não há campo escondido para a
+ * tela esconder, e o tipo é o lugar onde essa regra fica visível para quem for
+ * mexer aqui depois.
+ *
+ * `id` é da PROPOSTA, e é o único identificador que trafega: ele volta no POST
+ * de seleção para apontar a oferta exata, e o servidor o reconfronta com o
+ * estado travado antes de aceitar. Enviá-lo não autoriza nada.
+ *
+ * É UMA linha por loja — a proposta atual dela. O histórico de lances existe no
+ * banco e não chega aqui: quem propôs cinco vezes aparece uma vez, com o último
+ * valor.
+ */
+export type SaleRequestProposal = {
+  id: number | string;
+  store_name: string;
+  /** "Atibaia - SP". `null` quando a loja não tem cidade resolvida. */
+  store_city: string | null;
+  amount: string;
+  created_at: string;
+  /**
+   * Indicador VISUAL de que esta é a maior proposta atual.
+   *
+   * Não é permissão nem recomendação: qualquer proposta da lista pode ser
+   * selecionada, e o servidor não compara valores em momento nenhum. Vem
+   * derivado da ordenação do backend para que a marcação e a ordem nunca
+   * discordem — inclusive no desempate entre valores iguais.
+   */
+  is_highest: boolean;
+};
+
+/** A proposta escolhida. Sem `is_highest`: depois da decisão, a comparação só serviria para questioná-la. */
+export type SaleRequestSelectedOffer = {
+  id: number | string;
+  store_name: string;
+  store_city: string | null;
+  amount: string;
+  selected_at: string;
+};
+
+export type SaleRequestDetailResponse = {
+  sale_request: SaleRequest;
+  /** As propostas ATUAIS. Vazio depois da seleção — e vazio quando ninguém propôs. */
+  proposals: SaleRequestProposal[];
+  /** A escolha, quando já houve uma. `null` enquanto a disputa está aberta. */
+  selected_offer: SaleRequestSelectedOffer | null;
 };
 
 export type UploadedPhoto = { storage_key: string; url: string };
@@ -464,7 +539,47 @@ export async function listSaleRequests(params: { cursor?: string | null } = {}) 
 
 export async function getSaleRequest(id: string | number) {
   const response = await fetch(`/api/account/sale-requests/${id}`, { cache: "no-store" });
-  return readJson<{ sale_request: SaleRequest }>(response);
+  return readJson<SaleRequestDetailResponse>(response);
+}
+
+/**
+ * Códigos de recusa da seleção. O frontend discrimina por `code`, nunca por
+ * texto da mensagem — que muda na primeira melhoria de redação.
+ */
+export const SELECTION_CODE = {
+  /** A loja aumentou a proposta e a tela ficou para trás. Recarregar resolve. */
+  OFFER_STALE: "SALE_REQUEST_OFFER_STALE",
+  /** Já existe uma seleção, e é outra. Não há segunda escolha a fazer. */
+  ALREADY_SELECTED: "SALE_REQUEST_ALREADY_SELECTED",
+  /** A solicitação foi cancelada e não recebe mais propostas. */
+  SELECTION_CLOSED: "SALE_REQUEST_SELECTION_CLOSED",
+  /** A proposta apontada não é desta solicitação. */
+  OFFER_NOT_FOUND: "SALE_REQUEST_OFFER_NOT_FOUND",
+} as const;
+
+/**
+ * Seleciona uma proposta.
+ *
+ * O corpo carrega SÓ o `offer_id`. O valor NÃO é enviado, e a omissão é
+ * deliberada: mandá-lo daqui sugeriria que o cliente tem alguma autoridade sobre
+ * quanto foi escolhido, e um cliente forjado poderia congelar na trilha um
+ * número que loja nenhuma ofereceu. O servidor lê o valor da própria oferta,
+ * dentro da transação que trava a solicitação.
+ *
+ * Retry da MESMA seleção é seguro e devolve 200 com `changed: false`.
+ * Selecionar OUTRA proposta depois de já ter escolhido é 409 — aí a diferença
+ * não é de repetição, é de intenção.
+ */
+export async function selectSaleRequestOffer(
+  id: string | number,
+  offerId: string | number
+) {
+  const response = await fetch(`/api/account/sale-requests/${id}/select-offer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ offer_id: String(offerId) }),
+  });
+  return readJson<{ selected: SaleRequestSelectedOffer; changed: boolean }>(response);
 }
 
 export async function createSaleRequest(input: CreateSaleRequestInput) {
