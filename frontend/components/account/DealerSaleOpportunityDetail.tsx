@@ -127,6 +127,62 @@ function Gallery({ images, alt }: { images: string[]; alt: string }) {
   );
 }
 
+/**
+ * O painel que substitui o formulário de proposta quando ESTA loja foi a
+ * escolhida (Fase 4.4, §19).
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * READ-ONLY, E O FORMULÁRIO NÃO EXISTE — NÃO ESTÁ DESABILITADO
+ * ────────────────────────────────────────────────────────────────────────────
+ * A disputa acabou. Um campo de valor desabilitado sugeriria que aumentar
+ * continua sendo uma jogada possível, só que temporariamente bloqueada — e o
+ * lojista tentaria de novo mais tarde. Não há mais lance a dar: nem desta loja,
+ * nem de nenhuma outra (§15).
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE ELE NÃO DIZ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Não diz "venda fechada", "negócio concluído" nem "compra confirmada": a
+ * seleção é preliminar e o valor ainda será revisto na avaliação presencial. Uma
+ * loja que leia "fechado" aqui vai reservar o dinheiro e a vaga no pátio.
+ *
+ * E não mostra contato do proprietário — sem nome, telefone, e-mail ou WhatsApp.
+ * Ser escolhida dá a esta loja o direito de saber que foi escolhida, não os
+ * dados de quem escolheu. A API não devolve nenhum deles; não há o que esconder.
+ */
+function SelectedPanel({ amount }: { amount: string | null }) {
+  const value = formatMoneyValue(amount);
+
+  return (
+    <section
+      className="rounded-2xl border border-[#ABEFC6] bg-[#F6FEF9] p-4 sm:p-5"
+      data-testid="dealer-detail-selected"
+    >
+      <h2 className="text-[16px] font-bold leading-tight text-[#161f34]">
+        Sua proposta foi selecionada
+      </h2>
+
+      {value ? (
+        <>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-[#667085]">
+            Valor selecionado
+          </p>
+          <p
+            className="mt-1 text-[26px] font-bold leading-none tracking-[-0.01em] text-[#161f34]"
+            data-testid="dealer-detail-selected-amount"
+          >
+            {value}
+          </p>
+        </>
+      ) : null}
+
+      <p className="mt-4 text-[13px] leading-relaxed text-[#475467]">
+        Aguarde as próximas etapas pela plataforma.
+      </p>
+    </section>
+  );
+}
+
 /** Um dado do resumo: ícone + rótulo + valor, na grade do card único. */
 function SummaryItem({
   label,
@@ -295,8 +351,16 @@ export default function DealerSaleOpportunityDetail({
         <h1 className="text-[21px] font-bold leading-tight tracking-[-0.01em] text-[#161f34] sm:text-[25px]">
           Avaliação de veículo para compra
         </h1>
+        {/*
+          O subtítulo acompanha o estado. Para a loja escolhida, "envie sua
+          proposta preliminar" é uma instrução impossível: não há mais proposta a
+          enviar, e o formulário nem está na tela. Manter a frase fixa faria a
+          página pedir uma ação que ela mesma removeu.
+        */}
         <p className="mt-1 max-w-2xl text-[13.5px] leading-relaxed text-[#667085]">
-          Analise as informações declaradas e envie sua proposta preliminar.
+          {opportunity.is_selected
+            ? "O proprietário selecionou a proposta da sua loja. As próximas etapas serão informadas por aqui."
+            : "Analise as informações declaradas e envie sua proposta preliminar."}
         </p>
       </header>
 
@@ -346,7 +410,13 @@ export default function DealerSaleOpportunityDetail({
               {formatCity(opportunity.city)}
             </span>
             <span aria-hidden="true">·</span>
-            <span>Recebendo propostas</span>
+            {/*
+              O estado real, e não um rótulo fixo. Chegar aqui com
+              `is_selected` significa que ESTA loja venceu — a API devolve 404
+              para as demais depois da decisão —, então a linha nunca diz
+              "selecionada" para quem perdeu.
+            */}
+            <span>{opportunity.is_selected ? "Proposta selecionada" : "Recebendo propostas"}</span>
             <span aria-hidden="true">·</span>
             <span>publicado {formatPublishedAt(opportunity.created_at)}</span>
           </p>
@@ -436,19 +506,23 @@ export default function DealerSaleOpportunityDetail({
           id="proposta"
           className="order-3 min-w-0 scroll-mt-20 lg:col-start-2 lg:row-start-1"
         >
-          <DealerOfferPanel
-            saleRequestId={opportunity.id}
-            advertiserId={advertiserId}
-            state={{
-              current_highest_offer: opportunity.current_highest_offer,
-              my_offer: opportunity.my_offer,
-              is_leading: opportunity.is_leading,
-              offers_count: opportunity.offers_count,
-            }}
-            fipeReferenceValue={opportunity.fipe_reference_value}
-            minimumAcceptedPrice={opportunity.minimum_accepted_price}
-            onSubmitted={applyOfferState}
-          />
+          {opportunity.is_selected ? (
+            <SelectedPanel amount={opportunity.selected_amount} />
+          ) : (
+            <DealerOfferPanel
+              saleRequestId={opportunity.id}
+              advertiserId={advertiserId}
+              state={{
+                current_highest_offer: opportunity.current_highest_offer,
+                my_offer: opportunity.my_offer,
+                is_leading: opportunity.is_leading,
+                offers_count: opportunity.offers_count,
+              }}
+              fipeReferenceValue={opportunity.fipe_reference_value}
+              minimumAcceptedPrice={opportunity.minimum_accepted_price}
+              onSubmitted={applyOfferState}
+            />
+          )}
         </div>
 
         {/* 4 — FICHA DECLARADA */}

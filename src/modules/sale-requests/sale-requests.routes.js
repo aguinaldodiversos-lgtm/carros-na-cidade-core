@@ -63,6 +63,23 @@ router.get("/:id", asyncHandler(controller.getMySaleRequest));
 router.post("/:id/cancel", asyncHandler(controller.cancelMySaleRequest));
 
 /**
+ * Seleção de proposta (Fase 4.4). O segundo — e último — verbo de escrita de
+ * estado desta área.
+ *
+ * Sem rate limit próprio, pela mesma razão do POST de propostas do lojista: o
+ * DOMÍNIO já limita o custo de um cliente insistente. A transição é única e
+ * irreversível (§8), então a partir do segundo request a resposta é 200
+ * idempotente (mesma oferta) ou 409 (outra) — sem escrita, sem notificação e sem
+ * trabalho além de um `SELECT ... FOR UPDATE` numa linha que o próprio usuário
+ * possui. Um limitador aqui protegeria contra uma pressão que não existe e
+ * poderia recusar o retry legítimo de quem perdeu a resposta na rede.
+ *
+ * Declarada DEPOIS de `/photos` como todas as rotas com `:id` deste router — ver
+ * o comentário lá em cima sobre o Express casar `/photos` como `/:id`.
+ */
+router.post("/:id/select-offer", asyncHandler(controller.selectSaleRequestOffer));
+
+/**
  * Cache-Control nos caminhos de ERRO deste router.
  *
  * ────────────────────────────────────────────────────────────────────────────
@@ -94,7 +111,31 @@ router.use((error, _req, res, next) => {
   res.set("Cache-Control", "private, no-store");
 
   if (error?.statusCode === 404 && error?.isOperational) {
-    return res.status(404).json({ success: false, error: "not_found" });
+    /**
+     * O corpo continua enxuto — sem mensagem, sem campo, sem id.
+     *
+     * O `code`, quando existe, viaja junto. Ele NÃO afrouxa nada: os 404 que
+     * este router produz sobre a SOLICITAÇÃO ("não é sua", "não existe") não
+     * carregam código nenhum e continuam indistinguíveis entre si, que é a
+     * propriedade que protege quem sonda ids.
+     *
+     * Quem carrega código é o 404 de dentro de um recurso que o usuário JÁ
+     * provou possuir — hoje só `OFFER_NOT_FOUND`, a proposta que não pertence a
+     * esta solicitação (Fase 4.4). A tela precisa distinguir esse caso do outro,
+     * porque as reações são opostas: uma manda recarregar a lista de propostas,
+     * a outra manda sair da página. Discriminar por status HTTP é impossível (os
+     * dois são 404), e por texto de mensagem quebraria na primeira melhoria de
+     * redação — que é justamente o motivo de os códigos existirem.
+     *
+     * Sem esta linha, `SALE_REQUEST_OFFER_NOT_FOUND` seria uma constante que
+     * nenhum cliente jamais veria: código morto nascendo já morto.
+     */
+    const code = error?.details?.code ?? null;
+    return res.status(404).json({
+      success: false,
+      error: "not_found",
+      ...(code ? { details: { code } } : {}),
+    });
   }
 
   return next(error);

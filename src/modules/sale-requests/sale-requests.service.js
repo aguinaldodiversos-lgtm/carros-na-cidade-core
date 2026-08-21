@@ -25,6 +25,10 @@ import { ACCOUNT_TYPE } from "../../shared/middlewares/dealer.middleware.js";
 import { resolveFipeReference } from "../fipe/fipe.service.js";
 import * as repo from "./sale-requests.repository.js";
 import {
+  getOwnerSelectedOffer,
+  listOwnerProposals,
+} from "./sale-requests.selection.service.js";
+import {
   SALE_REQUEST_ACTIVE_LIMIT,
   SALE_REQUEST_CODE,
   SALE_REQUEST_PAGE,
@@ -479,10 +483,28 @@ export async function listMySaleRequests(userId, { limit: rawLimit, cursor: rawC
 }
 
 /**
- * UMA solicitação do próprio dono.
+ * UMA solicitação do próprio dono, com as propostas recebidas (Fase 4.4).
  *
  * 404 (e não 403) quando é de outra pessoa: responder "pertence a outro usuário"
  * confirmaria a existência da linha para quem está sondando ids.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * AS PROPOSTAS VÊM NA MESMA RESPOSTA, E SÓ NO DETALHE
+ * ────────────────────────────────────────────────────────────────────────────
+ * Na MESMA resposta porque a tela precisa das duas coisas para renderizar uma
+ * linha sequer da seção: sem o veículo não há contexto, sem as propostas não há
+ * seção. Duas requisições produziriam um estado intermediário em que o
+ * proprietário vê "Propostas recebidas" com um esqueleto embaixo — e, num
+ * carregamento lento, a impressão de que ninguém propôs.
+ *
+ * SÓ no detalhe porque a listagem é uma página inteira de solicitações, e
+ * carregar as propostas de todas exigiria uma segunda leitura por linha (o N+1)
+ * ou uma agregação em lote que ninguém pediu: o card da lista não mostra
+ * proposta nenhuma.
+ *
+ * As duas leituras são independentes entre si e vão em paralelo. Nenhuma delas é
+ * critério de nada — a decisão acontece em `selectSaleRequestOffer`, com a
+ * solicitação travada. Aqui é apresentação.
  */
 export async function getMySaleRequest(userId, rawId) {
   const ownerUserId = requireUserId(userId);
@@ -493,23 +515,67 @@ export async function getMySaleRequest(userId, rawId) {
     throw new AppError("Solicitação não encontrada.", 404);
   }
 
-  const imagesByRequest = await repo.listImagesByRequestIds([saleRequestId]);
+  const [imagesByRequest, proposals, selectedOffer] = await Promise.all([
+    repo.listImagesByRequestIds([saleRequestId]),
+    // Enquanto a disputa está aberta, as propostas ATUAIS — uma por loja.
+    // Depois da escolha a lista deixa de ser oferecida: mostrar as perdedoras ao
+    // lado da vencedora convidaria a uma comparação sobre uma decisão que já não
+    // pode ser mudada (§8), e o §18 pede a tela do estado escolhido, não um
+    // placar.
+    row.status === SALE_REQUEST_STATUS.RECEIVING_OFFERS
+      ? listOwnerProposals(saleRequestId, ownerUserId)
+      : Promise.resolve([]),
+    row.status === SALE_REQUEST_STATUS.OFFER_SELECTED
+      ? getOwnerSelectedOffer(saleRequestId, ownerUserId)
+      : Promise.resolve(null),
+  ]);
 
   return {
     sale_request: serializeForOwner(row, {
       images: imagesOf(imagesByRequest.get(String(saleRequestId)) || []),
     }),
+    proposals,
+    selected_offer: selectedOffer,
   };
 }
 
 /**
  * Cancela a solicitação do próprio dono.
  *
- * IDEMPOTENTE: cancelar de novo devolve 200 com a mesma linha, sem erro. Um 409
- * aqui só serviria para quem clicou duas vezes ver uma falha para uma ação que,
- * do ponto de vista dele, deu certo.
+ * IDEMPOTENTE quando já está cancelada: devolve 200 com a mesma linha, sem erro.
+ * Um 409 aí só serviria para quem clicou duas vezes ver uma falha para uma ação
+ * que, do ponto de vista dele, deu certo.
  *
  * Soft: `status = 'cancelled'`, nunca DELETE. A linha permanece no histórico.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * DEPOIS DA SELEÇÃO, CANCELAR DEIXA DE SER POSSÍVEL (§14 da Fase 4.4)
+ * ────────────────────────────────────────────────────────────────────────────
+ * O `UPDATE` de `cancelForOwner` sempre teve `AND status = 'receiving_offers'`,
+ * então uma solicitação `offer_selected` JAMAIS mudou de estado por aqui — o
+ * banco já estava correto. O que estava errado era a RESPOSTA: o `UPDATE` não
+ * casava linha, e o caminho caía no ramo idempotente, devolvendo 200.
+ *
+ * Para o segundo clique em "cancelar" isso é o comportamento certo. Para o
+ * PRIMEIRO clique depois de uma seleção, é uma mentira: a tela mostraria
+ * "cancelada" sobre uma solicitação que continua `offer_selected`, com uma loja
+ * escolhida do outro lado vendo a oportunidade dela. O proprietário acharia ter
+ * desfeito uma escolha que o §8 define como irreversível.
+ *
+ * A distinção é feita pelo ESTADO LIDO, e não por `changed`: `changed === false`
+ * significa "o UPDATE não casou" e cobre os dois casos (já cancelada, já
+ * selecionada) — que precisam de respostas opostas.
+ *
+ * Isto NÃO é "cancelar seleção" nem o começo de uma reversão: é a recusa
+ * explícita de uma transição que não existe. Cancelar de uma solicitação
+ * selecionada continua sem writer, e o 409 é o que diz isso em voz alta.
+ *
+ * A corrida cancelamento × seleção (§14) é resolvida no OUTRO lado, pelo mesmo
+ * mecanismo do §12: a seleção trava a solicitação e só transiciona a partir de
+ * `receiving_offers`. Se o cancelamento commitar primeiro, a seleção acorda,
+ * lê `cancelled` e é recusada com `SELECTION_CLOSED`; se a seleção commitar
+ * primeiro, o `UPDATE` daqui não casa e cai neste 409. Exatamente uma das duas
+ * transições vence, nas duas ordens.
  */
 export async function cancelMySaleRequest(userId, rawId) {
   const ownerUserId = requireUserId(userId);
@@ -518,6 +584,28 @@ export async function cancelMySaleRequest(userId, rawId) {
   const { row, changed } = await repo.cancelForOwner(saleRequestId, ownerUserId);
   if (!row) {
     throw new AppError("Solicitação não encontrada.", 404);
+  }
+
+  if (row.status === SALE_REQUEST_STATUS.OFFER_SELECTED) {
+    logger.info(
+      {
+        ...buildDomainFields({
+          action: "sale_request.cancel",
+          result: "error",
+          userId: ownerUserId,
+          reason: SALE_REQUEST_CODE.NOT_CANCELLABLE,
+        }),
+        saleRequestId,
+      },
+      "[sale-requests] cancelamento recusado — proposta já selecionada"
+    );
+
+    throw new AppError(
+      "Você já selecionou uma proposta para esta solicitação.",
+      409,
+      true,
+      { code: SALE_REQUEST_CODE.NOT_CANCELLABLE }
+    );
   }
 
   const imagesByRequest = await repo.listImagesByRequestIds([saleRequestId]);

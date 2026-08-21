@@ -9,6 +9,7 @@
 // QUE se vende; QUEM vende é do servidor.
 
 import * as photosService from "./sale-requests.photos.service.js";
+import * as selectionService from "./sale-requests.selection.service.js";
 import * as service from "./sale-requests.service.js";
 
 /**
@@ -60,6 +61,39 @@ export async function getMySaleRequest(req, res) {
  */
 export async function cancelMySaleRequest(req, res) {
   const result = await service.cancelMySaleRequest(req.user.id, req.params.id);
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * Seleciona uma proposta recebida (Fase 4.4).
+ *
+ * O corpo carrega `offer_id` e NADA MAIS é lido dele. `owner_user_id`,
+ * `advertiser_id`, `amount` e `status` enviados pelo cliente são ignorados: o
+ * dono sai do Bearer, a loja e o valor são derivados da OFERTA dentro da
+ * transação, e o status é literal no `UPDATE`. Não é uma checagem que alguém
+ * possa esquecer de fazer — é a ausência do código que os leria.
+ *
+ * Em especial, o VALOR nunca vem do cliente. Mandá-lo faria a resposta parecer
+ * confirmar um número que o proprietário escolheu na tela, e um cliente
+ * malicioso poderia congelar na trilha um valor que loja nenhuma ofereceu.
+ *
+ * POST e não PATCH: a seleção é um FATO novo (uma linha em
+ * `sale_request_offer_selections`), não a edição de um campo. 200 e não 201
+ * porque o recurso que o cliente conhece — a solicitação — continua sendo o
+ * mesmo, e a resposta descreve o estado NOVO dele.
+ *
+ * Sempre 200, inclusive no retry da mesma seleção. `changed: false` distingue os
+ * dois casos para quem quiser mostrar um aviso, sem transformar um retry em
+ * erro. Selecionar OUTRA proposta é 409 — aí a diferença não é de repetição, é
+ * de intenção.
+ */
+export async function selectSaleRequestOffer(req, res) {
+  const result = await selectionService.selectSaleRequestOffer(
+    req.user.id,
+    req.params.id,
+    req.body || {}
+  );
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });
 }

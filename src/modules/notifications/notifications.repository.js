@@ -17,6 +17,40 @@ const NOTIFICATION_COLUMNS = `
 `;
 
 /**
+ * Pool por omissão; cliente da TRANSAÇÃO quando fornecido.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * POR QUE ISTO PRECISOU EXISTIR (Fase 4.4)
+ * ────────────────────────────────────────────────────────────────────────────
+ * Até a Fase 2 todo produtor de notificação chamava esta camada DEPOIS de a
+ * escrita dele já estar commitada, e a notificação era honestamente best-effort:
+ * `purchase_intent_offers` é a fonte de verdade, o card aparece de qualquer
+ * jeito, e o pior caso é o sino não piscar.
+ *
+ * A seleção de proposta não tem esse formato. Ela é a transição terminal da
+ * disputa (§8: irreversível), e a loja escolhida precisa ser avisada — não
+ * existe outra tela onde ela descubra sozinha que ganhou. Uma notificação
+ * gravada FORA da transação teria dois modos de falha, e os dois são ruins:
+ *
+ *   notificar depois do commit → a notificação pode falhar e a loja nunca fica
+ *                                sabendo, com a disputa encerrada;
+ *   notificar antes do commit  → o rollback da seleção deixaria uma notificação
+ *                                ÓRFÃ, dizendo "sua proposta foi selecionada"
+ *                                sobre uma solicitação que continua em disputa.
+ *
+ * O segundo é o pior: é uma mentira persistida para um terceiro. Por isso o
+ * executor é injetável — a notificação entra na MESMA transação, e ou as duas
+ * existem, ou nenhuma existe.
+ *
+ * O parâmetro é OPCIONAL e vem por último: nenhum call site existente muda, e
+ * `insertNotification(input)` continua significando exatamente o que significava
+ * (uma escrita autônoma no pool).
+ */
+function runner(exec) {
+  return exec?.query ? exec.query : query;
+}
+
+/**
  * Insere uma notificação de forma idempotente.
  *
  * `ON CONFLICT DO NOTHING` sobre o índice único (recipient_user_id,
@@ -24,9 +58,18 @@ const NOTIFICATION_COLUMNS = `
  * buscamos a existente. Duas requisições simultâneas com a mesma chave chegam
  * ao mesmo resultado — o banco arbitra, não a aplicação.
  *
+ * Dentro de uma transação, o segundo SELECT usa o MESMO cliente: sem isso ele
+ * consultaria pelo pool e não enxergaria a linha que a própria transação acabou
+ * de inserir (nem a de uma transação concorrente ainda não commitada),
+ * devolvendo `{ notification: null, created: false }` — um retorno que o
+ * chamador leria como "já existia" quando ninguém existe.
+ *
+ * @param {object} input
+ * @param {{ query: Function }} [exec] cliente da transação; pool quando ausente
  * @returns {Promise<{ notification: object, created: boolean }>}
  */
-export async function insertNotification(input) {
+export async function insertNotification(input, exec) {
+  const run = runner(exec);
   const params = [
     input.recipientUserId,
     input.eventType,
@@ -39,7 +82,7 @@ export async function insertNotification(input) {
     input.idempotencyKey,
   ];
 
-  const inserted = await query(
+  const inserted = await run(
     `
     INSERT INTO user_notifications (
       recipient_user_id, event_type, title, body,
@@ -58,7 +101,7 @@ export async function insertNotification(input) {
 
   // Conflito: a notificação já existia. Devolvemos a linha vigente para que o
   // chamador tenha sempre um objeto, independente de ter criado ou não.
-  const existing = await query(
+  const existing = await run(
     `
     SELECT ${NOTIFICATION_COLUMNS}
     FROM user_notifications

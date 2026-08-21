@@ -370,7 +370,38 @@ await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`
 // proxy `/api/vehicle-images?key=` — a galeria monta e as imagens não carregam,
 // que é exatamente o esperado num ambiente sem storage.
 
-// Idempotência: as propostas somem junto pelo ON DELETE CASCADE da 055.
+// ────────────────────────────────────────────────────────────────────────────
+// IDEMPOTÊNCIA: a TRILHA DE SELEÇÃO É APAGADA À MÃO, E DE PROPÓSITO
+// ────────────────────────────────────────────────────────────────────────────
+// As propostas (055) somem junto com a solicitação pelo `ON DELETE CASCADE`
+// delas. A trilha de seleção (057) NÃO — nenhuma FK dela tem cascade, e o banco
+// RECUSA apagar `sale_requests` enquanto existir um evento de seleção.
+//
+// Isso não é um obstáculo a contornar: é a Fase 4.4.1 funcionando. Uma trilha
+// auditável que sumisse junto com o objeto sumiria exatamente quando fosse
+// consultada — e sem log, sem erro e sem ninguém saber que existiu.
+//
+// O que o endurecimento exige é que a destruição de histórico seja EXPLÍCITA.
+// Este DELETE é essa declaração: um script de RESET DE AMBIENTE DE TESTE
+// dizendo, por escrito, que está descartando a trilha das solicitações que ele
+// mesmo semeou.
+//
+// O escopo é o mesmo do DELETE seguinte (`owner_user_id`), e não a tabela
+// inteira: um `DELETE FROM sale_request_offer_selections` sem WHERE apagaria a
+// trilha de qualquer outro dado que estivesse no banco de teste.
+//
+// Fora daqui, nenhum caminho da aplicação apaga esta tabela. Quando existir
+// política de LGPD/anonimização, ela será um fluxo próprio com as mesmas
+// características: explícita, escopada e legível — nunca um `ON DELETE`
+// herdado de uma FK.
+await pool.query(
+  `DELETE FROM sale_request_offer_selections
+    WHERE sale_request_id IN (
+      SELECT id FROM sale_requests WHERE owner_user_id = $1::bigint
+    )`,
+  [userId]
+);
+
 await pool.query(`DELETE FROM sale_requests WHERE owner_user_id = $1::bigint`, [userId]);
 
 const { rows: atibaiaRows } = await pool.query(

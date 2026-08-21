@@ -437,14 +437,44 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
     expect(rows[0].def).not.toContain("sale_request");
   });
 
-  it("não existe tabela de lances nem de oferta final nesta fase", async () => {
+  /**
+   * O domínio tem EXATAMENTE as tabelas que as fases entregues criaram.
+   *
+   * A asserção é de igualdade de conjunto, e não uma lista de proibições, porque
+   * a pergunta que ela responde é "alguém criou tabela de fase futura sem
+   * caminho de escrita?" — o erro que as migrations 030 e 052 documentam. Uma
+   * `sale_request_appointments`, `sale_request_payments` ou
+   * `sale_request_final_offers` aparecendo aqui é exatamente o que este teste
+   * existe para pegar.
+   *
+   * A lista cresceu com as fases que de fato entregaram writer:
+   *
+   *   4.1  `sale_requests`, `sale_request_images`;
+   *   4.3  `sale_request_offers` — o histórico append-only de lances
+   *        (migration 055). A asserção não foi atualizada naquela fase e este
+   *        teste ficou vermelho desde então;
+   *   4.4  `sale_request_offer_selections` — a trilha da escolha preliminar
+   *        (migration 057).
+   *
+   * Continua NÃO existindo — e a igualdade acima é o que garante: agendamento,
+   * inspeção, laudo, proposta final, aceite, venda concluída, pagamento,
+   * comissão, escrow e prazo. Nenhum deles tem endpoint que os escreva.
+   */
+  it("o domínio tem exatamente as tabelas das fases entregues — nenhuma de fase futura", async () => {
     const { rows } = await pool.query(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name LIKE 'sale_request%'`
     );
     const names = new Set(rows.map((row) => row.table_name));
 
-    expect(names).toEqual(new Set(["sale_requests", "sale_request_images"]));
+    expect(names).toEqual(
+      new Set([
+        "sale_requests",
+        "sale_request_images",
+        "sale_request_offers",
+        "sale_request_offer_selections",
+      ])
+    );
   });
 });
 

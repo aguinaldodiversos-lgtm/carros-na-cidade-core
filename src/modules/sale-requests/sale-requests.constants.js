@@ -9,16 +9,25 @@
 // pontas precisam falar o mesmo vocabulário.
 
 /**
- * Estados da solicitação NESTA FASE. Somente dois.
+ * Estados da solicitação. TRÊS, e cada um com um writer real.
  *
- * `selected` e `completed` pertencem às fases 4.4/4.5 e não existem aqui — nem
- * na constante, nem no CHECK da migration 052. Criar o valor antes do endpoint
- * que o escreve é o erro que a migration 030 documenta em `ads.status`:
- * `draft`, `sold` e `expired` estão em `AD_STATUS` há fases, sem nenhum caminho
- * de escrita, e viraram lista morta que todo filtro precisa considerar.
+ * `receiving_offers` — o INSERT da publicação (migration 052);
+ * `offer_selected`   — a transação de seleção da Fase 4.4;
+ * `cancelled`        — `cancelForOwner`.
+ *
+ * `completed`, `sold`, `expired`, `reopened` e afins continuam NÃO existindo:
+ * nenhum endpoint os escreve. Criar o valor antes do caminho que o grava é o
+ * erro que a migration 030 documenta em `ads.status` — `draft`, `sold` e
+ * `expired` estão em `AD_STATUS` há fases, sem nenhum caminho de escrita, e
+ * viraram lista morta que todo filtro precisa considerar.
+ *
+ * `offer_selected` (e não `selected`, que a 052 previu em comentário) porque
+ * "selecionado" sozinho não diz O QUE foi selecionado — e este produto vai
+ * selecionar outra coisa na 4.5, a avaliação presencial.
  */
 export const SALE_REQUEST_STATUS = Object.freeze({
   RECEIVING_OFFERS: "receiving_offers",
+  OFFER_SELECTED: "offer_selected",
   CANCELLED: "cancelled",
 });
 
@@ -155,7 +164,68 @@ export const SALE_REQUEST_CODE = Object.freeze({
    * existia e a pessoa foi mandada converter uma JPEG que estava perfeita.
    */
   PHOTO_STORAGE_UNAVAILABLE: "SALE_REQUEST_PHOTO_STORAGE_UNAVAILABLE",
+
+  /**
+   * A solicitação não está num estado que aceite cancelamento.
+   *
+   * O código existia desde a 4.1 sem consumidor. Ele ganhou um na Fase 4.4:
+   * depois que uma proposta é selecionada, cancelar deixa de ser possível.
+   *
+   * Até esta fase o `UPDATE` de cancelamento simplesmente não casava linha
+   * nenhuma nesse caso (o `AND status = 'receiving_offers'` já estava lá) e o
+   * service respondia 200 com `changed: false` — a resposta idempotente, correta
+   * para o SEGUNDO clique em "cancelar" e enganosa para o PRIMEIRO clique depois
+   * de uma seleção: a tela diria "cancelada" sobre uma solicitação que continua
+   * `offer_selected`, e a loja escolhida continuaria vendo a oportunidade dela.
+   */
   NOT_CANCELLABLE: "SALE_REQUEST_NOT_CANCELLABLE",
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SELEÇÃO DE PROPOSTA (Fase 4.4)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * O `offer_id` enviado não é uma proposta desta solicitação.
+   *
+   * Cobre os dois casos — id inexistente e proposta de OUTRA solicitação — com
+   * a mesma resposta, de propósito: distinguir contaria a quem sonda ids qual
+   * deles existe. Não é 404 da solicitação (essa o dono possui e acabou de
+   * abrir), é 404 da PROPOSTA dentro dela.
+   */
+  OFFER_NOT_FOUND: "SALE_REQUEST_OFFER_NOT_FOUND",
+
+  /**
+   * A proposta apontada JÁ NÃO É a proposta atual daquela loja (§9).
+   *
+   * O caso real: o proprietário está com a tela aberta desde antes de a loja
+   * aumentar. Ele veria R$ 62.500 e selecionaria a oferta #10, enquanto a loja
+   * já está em R$ 65.000 na oferta #18. Aceitar seria congelar um valor que a
+   * loja já superou — e o proprietário escolheria menos dinheiro sem saber.
+   *
+   * Código próprio porque é o único erro desta tela que se resolve sem sair
+   * dela: basta recarregar as propostas. A resposta carrega o valor atual junto,
+   * pelo mesmo motivo que a recusa de proposta carrega o líder.
+   */
+  OFFER_STALE: "SALE_REQUEST_OFFER_STALE",
+
+  /**
+   * Já existe uma seleção nesta solicitação, e é OUTRA (§11).
+   *
+   * Separado de `OFFER_STALE` porque a causa e a reação são diferentes: ali a
+   * disputa continua e a tela se corrige recarregando; aqui a disputa ACABOU, e
+   * não há segunda escolha a fazer (§8). Repetir a MESMA seleção não passa por
+   * este código — é idempotente e devolve 200.
+   */
+  ALREADY_SELECTED: "SALE_REQUEST_ALREADY_SELECTED",
+
+  /**
+   * A solicitação não está mais recebendo propostas e não pode ser selecionada.
+   *
+   * Hoje significa `cancelled` — a própria pessoa encerrou. Distinto de
+   * `ALREADY_SELECTED` porque lá existe uma escolha para mostrar, e aqui não
+   * existe nada: a tela precisa dizer coisas diferentes.
+   */
+  SELECTION_CLOSED: "SALE_REQUEST_SELECTION_CLOSED",
 });
 
 /**

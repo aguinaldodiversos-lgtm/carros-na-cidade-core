@@ -312,6 +312,57 @@ export function parseSaleRequestId(raw) {
 }
 
 /**
+ * `offer_id` do corpo da seleção → inteiro positivo (Fase 4.4).
+ *
+ * 400 e NÃO 404, ao contrário de `parseSaleRequestId`, e a diferença é sobre o
+ * que cada um está afirmando:
+ *
+ *   `parseSaleRequestId` decide se um RECURSO DE URL existe para quem perguntou.
+ *   Responder "id inválido" ali confirmaria o formato da chave a quem sonda
+ *   `/sale-requests/abc` sem ter nenhuma solicitação.
+ *
+ *   Aqui quem chama JÁ PROVOU ser dono da solicitação (a rota é escopada ao dono
+ *   e o lock confere a posse). Um `offer_id` malformado é um campo errado num
+ *   formulário que a pessoa tem direito de usar — e 404 mandaria a tela mostrar
+ *   "solicitação não encontrada" para quem está olhando para ela.
+ *
+ * A string INTEIRA precisa ser dígitos: `Number.parseInt` sozinho leria o
+ * prefixo de "10abc" e o servidor selecionaria a proposta 10 — uma proposta
+ * REAL, de uma loja real, por um valor que ninguém escolheu.
+ *
+ * A existência da proposta e o pertencimento dela à solicitação NÃO são
+ * decididos aqui: são provados dentro da transação, com a solicitação travada.
+ * Uma checagem de existência antes do lock seria uma leitura de critério fora do
+ * mutex que decide.
+ */
+export function parseSaleOfferId(raw) {
+  const asText = String(raw ?? "").trim();
+
+  if (asText === "") {
+    throw new AppError("Selecione uma proposta.", 400, true, {
+      code: SALE_REQUEST_CODE.INVALID_FIELD,
+      field: "offer_id",
+    });
+  }
+
+  if (!/^\d+$/.test(asText)) {
+    throw new AppError("Proposta inválida.", 400, true, {
+      code: SALE_REQUEST_CODE.INVALID_FIELD,
+      field: "offer_id",
+    });
+  }
+
+  const id = Number.parseInt(asText, 10);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new AppError("Proposta inválida.", 400, true, {
+      code: SALE_REQUEST_CODE.INVALID_FIELD,
+      field: "offer_id",
+    });
+  }
+  return id;
+}
+
+/**
  * Chaves de foto recebidas do cliente → lista ordenada e PROVADA como do dono.
  *
  * ────────────────────────────────────────────────────────────────────────────

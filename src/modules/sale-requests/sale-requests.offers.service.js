@@ -125,10 +125,23 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
       return { ok: false, status: 404, message: "Oportunidade não encontrada." };
     }
 
-    // Existe e é da cidade, mas foi CANCELADA. Aqui o motivo pode (e deve) ser
-    // dito: o lojista tem acesso legítimo a esta solicitação, provavelmente tem
-    // a tela aberta desde antes do cancelamento, e precisa saber por que a
-    // proposta dele não entrou.
+    // Existe e é da cidade, mas a disputa ACABOU — cancelada pelo proprietário
+    // ou encerrada por uma seleção (Fase 4.4, §15). Aqui o motivo pode (e deve)
+    // ser dito: o lojista tem acesso legítimo a esta solicitação, provavelmente
+    // tem a tela aberta desde antes, e precisa saber por que a proposta dele não
+    // entrou.
+    //
+    // A condição é `!== RECEIVING_OFFERS`, e não uma lista dos estados que
+    // fecham. É a mesma disciplina de igualdade do feed, com o sinal invertido
+    // porque aqui a lista curta é a dos estados que ABREM: só um estado aceita
+    // proposta, e todo estado novo que uma fase futura criar já nasce recusando
+    // — em vez de aceitar até alguém lembrar de acrescentá-lo aqui.
+    //
+    // Um mesmo 409 para os dois casos, de propósito: distinguir "cancelada" de
+    // "outra loja foi escolhida" contaria a um concorrente o desfecho de um
+    // negócio alheio. E a loja SELECIONADA também esbarra aqui — ela não pode
+    // aumentar a própria proposta pela rota de disputa (§15), porque não há mais
+    // disputa.
     if (saleRequest.status !== SALE_REQUEST_STATUS.RECEIVING_OFFERS) {
       return {
         ok: false,

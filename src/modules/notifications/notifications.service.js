@@ -75,9 +75,22 @@ function requireRecipientUserId(raw) {
  *   payload?: object|null,
  *   idempotencyKey: string,
  * }} input
+ * @param {{ exec?: { query: Function } }} [options]
+ *   `exec` é o cliente de uma TRANSAÇÃO em curso. Quando presente, a notificação
+ *   é inserida DENTRO dela: o rollback do produtor leva a notificação junto e
+ *   nunca sobra um aviso órfão sobre um fato que não aconteceu.
+ *
+ *   Opcional e retrocompatível — sem ele, o comportamento é exatamente o de
+ *   antes (escrita autônoma no pool), que continua sendo o certo para os
+ *   produtores best-effort da Fase 2.
+ *
+ *   ATENÇÃO ao usar: dentro de uma transação, este método passa a poder LANÇAR
+ *   de um jeito que derruba a operação inteira do produtor — que é o ponto. Um
+ *   produtor que quer notificação best-effort NÃO deve passar `exec`; deve
+ *   chamar depois do commit e engolir o erro, como `notifyBuyerOfOffer` faz.
  * @returns {Promise<{ notification: object|null, created: boolean }>}
  */
-export async function createUserNotification(input) {
+export async function createUserNotification(input, { exec } = {}) {
   const recipientUserId = requireRecipientUserId(input?.recipientUserId);
   const eventType = validateEventType(input?.eventType);
   const title = validateTitle(input?.title);
@@ -89,17 +102,20 @@ export async function createUserNotification(input) {
   const idempotencyKey = validateIdempotencyKey(input?.idempotencyKey);
 
   try {
-    const result = await repo.insertNotification({
-      recipientUserId,
-      eventType,
-      title,
-      body,
-      entityType,
-      entityId,
-      actionPath,
-      payload,
-      idempotencyKey,
-    });
+    const result = await repo.insertNotification(
+      {
+        recipientUserId,
+        eventType,
+        title,
+        body,
+        entityType,
+        entityId,
+        actionPath,
+        payload,
+        idempotencyKey,
+      },
+      exec
+    );
 
     logger.info(
       {
