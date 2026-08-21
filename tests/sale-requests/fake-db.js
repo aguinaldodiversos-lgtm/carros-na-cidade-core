@@ -85,6 +85,10 @@ function projectOwner(row) {
     declared_condition: row.declared_condition,
     known_issues: row.known_issues,
 
+    // Piso do proprietario (4.3.3). Linha semeada por teste antigo nao traz a
+    // chave: vira null, que e o caso LEGADO, e nunca undefined.
+    minimum_accepted_price: row.minimum_accepted_price ?? null,
+
     // Ficha de avaliação. `?? null` em cada uma: a linha semeada por um teste
     // antigo não traz estas chaves, e `undefined` no DTO seria indistinguível de
     // "campo removido" no `toMatchObject` de quem lê.
@@ -178,6 +182,7 @@ function projectDealer(row) {
     fuel_type: row.fuel_type,
     declared_condition: row.declared_condition,
     known_issues: row.known_issues ?? null,
+    minimum_accepted_price: row.minimum_accepted_price ?? null,
     tire_condition: row.tire_condition ?? null,
     financing_status: row.financing_status ?? null,
     financing_balance: row.financing_balance ?? null,
@@ -302,13 +307,33 @@ function handle(text, params, now) {
   // service pediu o lock da solicitação certa, JÁ ESCOPADO À CIDADE, antes de
   // ler a maior proposta. A serialização de verdade tem teste próprio contra
   // PostgreSQL real, com teste por mutação do lock.
-  if (/^SELECT id, status FROM sale_requests WHERE id = \$1 AND city_id = \$2 FOR UPDATE/i.test(text)) {
+  // A projeção é casada LITERALMENTE, incluindo `minimum_accepted_price`: o piso
+  // é critério de aceitação da primeira proposta, e precisa ser lido na MESMA
+  // query do lock. Se alguém movê-lo para uma segunda leitura (fora do mutex),
+  // este ramo deixa de casar e os testes de oferta caem — que é o alarme certo.
+  if (
+    /^SELECT id, status, minimum_accepted_price FROM sale_requests WHERE id = \$1 AND city_id = \$2 FOR UPDATE/i.test(
+      text
+    )
+  ) {
     const [id, cityId] = params;
     const row = db.saleRequests.find(
       (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
     );
     return {
-      rows: row ? [{ id: row.id, status: row.status }] : [],
+      rows: row
+        ? [
+            {
+              id: row.id,
+              status: row.status,
+              // `?? null` e não `|| null`: a linha semeada sem a chave é o caso
+              // LEGADO (anterior à 4.3.3), e ele precisa chegar ao service como
+              // `null` — nunca como `undefined`, que passaria despercebido numa
+              // comparação e nunca como 0, que seria um piso inventado.
+              minimum_accepted_price: row.minimum_accepted_price ?? null,
+            },
+          ]
+        : [],
       rowCount: row ? 1 : 0,
     };
   }
@@ -648,6 +673,7 @@ function handle(text, params, now) {
       bodyPaintStatus,
       bodyPaintIssuesJson,
       bodyPaintNotes,
+      minimumAcceptedPrice,
     ] = params;
 
     const createdAt = new Date(now).toISOString();
@@ -693,6 +719,11 @@ function handle(text, params, now) {
       // pegaria um dia em que alguém trocasse o cast por um array JS cru.
       body_paint_issues: parseJsonbArray(bodyPaintIssuesJson),
       body_paint_notes: bodyPaintNotes ?? null,
+
+      // O PISO do proprietario (4.3.3). Posicional, como todo o resto: se alguem
+      // acrescentar coluna ao INSERT sem acrescentar aqui, o valor entra na
+      // chave errada e o teste que le o piso falha.
+      minimum_accepted_price: minimumAcceptedPrice ?? null,
 
       // Espelha o literal 'receiving_offers' do INSERT real: o estado inicial é
       // do domínio, não da chamada.

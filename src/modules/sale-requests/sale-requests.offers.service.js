@@ -70,10 +70,12 @@ function serializeOfferState({ highest = null, mine = null, total = 0 } = {}) {
  * ────────────────────────────────────────────────────────────────────────────
  * Os cinco passos abaixo acontecem numa ÚNICA transação, e a ordem importa:
  *
- *   1. TRAVA a solicitação (`SELECT ... FOR UPDATE`), já escopada à cidade;
+ *   1. TRAVA a solicitação (`SELECT ... FOR UPDATE`), já escopada à cidade, e lê
+ *      na mesma query o PISO declarado pelo proprietário;
  *   2. confere que ela ainda está `receiving_offers`;
  *   3. lê a maior proposta atual — leitura que só é confiável DEPOIS do lock;
- *   4. valida `amount > maior atual`;
+ *   4. valida: sem proposta ainda → `amount >= piso`; com proposta →
+ *      `amount > maior atual`;
  *   5. insere.
  *
  * Sem o lock, duas lojas propondo no mesmo instante leem as duas o mesmo "maior
@@ -139,9 +141,47 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
     const highest = await offersRepo.findHighestAmount(saleRequestId, exec);
     const highestCents = toCents(highest);
 
+    // ────────────────────────────────────────────────────────────────────────
+    // DUAS BARREIRAS, NESTA ORDEM (Fase 4.3.3)
+    // ────────────────────────────────────────────────────────────────────────
+    // Enquanto NÃO há proposta, a barreira é o PISO do proprietário: a primeira
+    // oferta precisa ALCANÇÁ-LO (`>=`), não superá-lo. O piso é o valor que a
+    // pessoa disse que aceita — exigir um centavo a mais recusaria exatamente a
+    // proposta que ela pediu.
+    //
+    // Assim que existe proposta, a barreira passa a ser a MAIOR ATUAL, e aí o
+    // operador é `>`: empatar não desempata nada, e duas lojas com o mesmo valor
+    // deixariam a disputa sem líder definido.
+    //
+    // A ordem entre as duas não é escolha de estilo. O piso só governa a
+    // ABERTURA; depois dela, a maior proposta já é necessariamente >= piso (foi
+    // validada quando entrou), então revalidar o piso seria uma condição que
+    // nunca reprova. Um `amount >= minimum && amount > highest` funcionaria
+    // igual, mas diria ao leitor que existem dois filtros vivos quando existe um
+    // só em cada estado.
+    //
+    // LEGADO: `minimum_accepted_price` é `null` nas solicitações anteriores à
+    // regra. Elas mantêm o comportamento histórico — a primeira proposta só
+    // precisa ser positiva, o que `validateOfferInput` já garantiu. Inventar um
+    // piso para elas (85% da FIPE, a maior proposta, qualquer coisa) faria o
+    // sistema recusar propostas em nome de alguém que nunca declarou piso algum.
+    const minimumCents = toCents(saleRequest.minimum_accepted_price);
+
+    if (highestCents == null && minimumCents != null && amountCents < minimumCents) {
+      return {
+        ok: false,
+        status: 409,
+        message: "A sua proposta precisa alcançar o valor mínimo do proprietário.",
+        code: SALE_OPPORTUNITY_CODE.OFFER_BELOW_MINIMUM,
+        // O piso viaja junto pelo mesmo motivo do líder: mandar corrigir sem
+        // dizer o alvo obriga a recarregar a página para descobrir quanto falta.
+        minimumAcceptedPrice: saleRequest.minimum_accepted_price,
+      };
+    }
+
     // `null` é "ainda não há proposta" — e não zero. A primeira proposta da
-    // solicitação não precisa superar nada; só precisa ser positiva, o que a
-    // validação de forma já garantiu.
+    // solicitação não precisa superar nada; só precisa ser positiva e alcançar o
+    // piso, quando ele existe.
     if (highestCents != null && amountCents <= highestCents) {
       return {
         ok: false,
@@ -185,6 +225,9 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
       ...(result.code ? { code: result.code } : {}),
       ...(result.currentHighest != null
         ? { current_highest_offer: result.currentHighest }
+        : {}),
+      ...(result.minimumAcceptedPrice != null
+        ? { minimum_accepted_price: result.minimumAcceptedPrice }
         : {}),
     });
   }

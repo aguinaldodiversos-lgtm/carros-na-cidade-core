@@ -103,6 +103,37 @@ export function maxModelYear(now = new Date()) {
   return now.getUTCFullYear() + 1;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// O PISO DO PROPRIETÁRIO (Fase 4.3.3)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Desconto RECOMENDADO sobre a referência FIPE para venda a lojistas.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * RECOMENDAÇÃO, NUNCA REGRA
+ * ────────────────────────────────────────────────────────────────────────────
+ * A loja compra para revender: sobre o valor pago ainda entram preparação,
+ * garantia, impostos e margem. Um piso colado na FIPE não recebe proposta
+ * nenhuma — e o proprietário descobre isso depois de uma semana de silêncio,
+ * sem entender por quê.
+ *
+ * Por isso o número existe: para ser DITO na tela antes da publicação. Ele NÃO
+ * é validado no servidor, e publicar acima do recomendado é um caminho normal
+ * do produto — quem quer valor de mercado tem o anúncio convencional, e a tela
+ * oferece esse caminho em vez de recusar a publicação.
+ *
+ * Transformar isto num `if` do backend seria trocar orientação por proibição, e
+ * a pessoa nem saberia que existe outro produto para o caso dela.
+ *
+ * Espelhado no frontend em `frontend/lib/sale-requests/pricing.ts` — os dois
+ * lados precisam do mesmo número, e há teste de sincronia.
+ */
+export const SALE_REQUEST_DEALER_DISCOUNT = 0.15;
+
+/** FIPE × este fator = teto da faixa recomendada. Derivado, para não repetir 0,85 solto. */
+export const SALE_REQUEST_RECOMMENDED_RATIO = 1 - SALE_REQUEST_DEALER_DISCOUNT;
+
 /**
  * Códigos de erro estáveis. O frontend discrimina por `code`, nunca por parsing
  * de mensagem — mesmo contrato de `ad-ownership.js` e do módulo de ofertas.

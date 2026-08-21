@@ -90,7 +90,12 @@ function makeOpportunity(
       body_paint_issues: [],
       body_paint_notes: null,
     },
-    fipe_reference_value: "92000.00",
+    // §23 da 4.3.3: a fixture carrega os QUATRO valores ao mesmo tempo, com
+    // números distintos entre si. So assim a asserção de "o card mostra apenas o
+    // piso" tem o que vazar — uma fixture sem FIPE e sem disputa passaria de
+    // graça.
+    minimum_accepted_price: "62500.00",
+    fipe_reference_value: "72000.00",
     fipe_reference_at: "2026-08-01T00:00:00.000Z",
     image: "https://cdn.example.com/capa.webp",
     city: { name: "Atibaia", state: "SP", slug: "atibaia-sp" },
@@ -136,7 +141,7 @@ describe("estados da lista", () => {
 
     render(<DealerSaleOpportunitiesList />);
 
-    expect(await screen.findByText("Volkswagen T-Cross 2020")).toBeTruthy();
+    expect(await screen.findByText("Volkswagen T-Cross")).toBeTruthy();
     expect(screen.getByText("T-Cross 200 TSI 1.0 Flex 12V 5p Aut.")).toBeTruthy();
     // A cidade agora fica num chip sobre a foto. `getAllByText` porque o card
     // pode repeti-la; o que importa é que ela ESTEJA na tela.
@@ -161,7 +166,7 @@ describe("estados da lista", () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     await userEvent.click(within(box).getByRole("button", { name: /Tentar novamente/i }));
 
-    expect(await screen.findByText("Volkswagen T-Cross 2020")).toBeTruthy();
+    expect(await screen.findByText("Volkswagen T-Cross")).toBeTruthy();
   });
 
   it("a tela NÃO envia city_id — quem resolve a cidade é o servidor", async () => {
@@ -178,7 +183,7 @@ describe("privacidade e ausência de contato", () => {
   it("nenhum canal de contato direto aparece na tela", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     const { container } = render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     const text = container.textContent?.toLowerCase() ?? "";
     for (const term of [
@@ -209,7 +214,7 @@ describe("privacidade e ausência de contato", () => {
       makePage({ items: [makeOpportunity()], summary: { total: 1, new_today: 1, with_my_offer: 0, without_my_offer: 0 } })
     );
     const { container } = render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     const text = container.textContent?.toLowerCase() ?? "";
     for (const term of [
@@ -226,83 +231,30 @@ describe("privacidade e ausência de contato", () => {
     }
   });
 
-  it("a FIPE é rotulada como REFERÊNCIA, nunca como valor do veículo", async () => {
-    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
-    const { container } = render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
-
-    expect(screen.getByText(/Referência FIPE/)).toBeTruthy();
-    // O valor acompanha o rótulo: "Referência FIPE" sozinha não prova que o
-    // número está na tela, e é o número que o lojista usa para julgar a disputa.
-    expect(screen.getByText(/92\.000,00/)).toBeTruthy();
-    const text = container.textContent?.toLowerCase() ?? "";
-    expect(text).not.toContain("valor do veículo");
-    expect(text).not.toContain("preço pedido");
-  });
-
   /*
     ────────────────────────────────────────────────────────────────────────
-    FASE 4.3.2 — A REFERÊNCIA PRECISA SER ENCONTRÁVEL, NÃO SÓ ESTAR PRESENTE
+    UM ÚNICO NÚMERO NO CARD: O PISO DO PROPRIETÁRIO (§23 da Fase 4.3.3)
     ────────────────────────────────────────────────────────────────────────
-    O teste acima já passava quando o defeito foi relatado: o número ESTAVA no
-    DOM. Ele era a menor e mais apagada linha do card (11,5px, #98A2B3), abaixo
-    das etiquetas de risco — e ao lado de "Maior proposta" em 15px negrito
-    sumia. Em uso real, indistinguível de campo ausente.
+    A fixture carrega os QUATRO valores ao mesmo tempo, com números distintos:
 
-    Um teste de unidade não mede legibilidade. O que ele PODE travar é o posto
-    do valor: um elemento próprio, com o valor sozinho, no mesmo bloco
-    comercial das propostas. É o que as asserções abaixo prendem; a prova
-    visual mora em `e2e/dealer-sale-opportunities-visual.spec.ts`.
+        minimum_accepted_price  62.500   ← o único que pode aparecer
+        fipe_reference_value    72.000
+        current_highest_offer   65.000
+        my_offer                64.000
+
+    A ausência dos três últimos só significa alguma coisa porque eles ESTÃO no
+    objeto. Um teste que os omitisse da fixture passaria de graça — e passaria
+    também no dia em que alguém os renderizasse de volta.
   */
-  it("o valor da referência tem elemento próprio, com o número sozinho", async () => {
-    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
-    render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
-
-    const value = screen.getByTestId("dealer-card-fipe-value");
-    // O texto do elemento é o VALOR, e nada mais: se o número voltasse a ser um
-    // `<span>` dentro da frase do rótulo, este elemento carregaria "Referência
-    // FIPE R$ 92.000,00" — e a asserção falharia.
-    //
-    // ` ` → espaço: `Intl.NumberFormat` pt-BR separa "R$" do número com
-    // ESPAÇO INSEPARÁVEL. Comparar com um espaço comum falha com as duas
-    // strings idênticas na tela e no diff — armadilha que já custou tempo nesta
-    // base.
-    expect(value.textContent?.replace(/ /g, " ").trim()).toBe("R$ 92.000,00");
-  });
-
-  it("sem referência: mostra 'Não disponível' — nunca R$ 0,00 nem um valor derivado", async () => {
-    fetchSaleOpportunities.mockResolvedValue(
-      makePage({
-        items: [
-          makeOpportunity({ fipe_reference_value: null, fipe_reference_at: null }),
-        ],
-      })
-    );
-    render(<DealerSaleOpportunitiesList />);
-
-    const card = await screen.findByTestId("dealer-sale-opportunity-card");
-
-    // O rótulo CONTINUA na tela: sumir com a linha faria o card parecer
-    // inconsistente com os vizinhos, sem dizer por quê.
-    expect(card.textContent).toContain("Referência FIPE");
-    expect(screen.getByTestId("dealer-card-fipe-value").textContent?.trim()).toBe(
-      "Não disponível"
-    );
-
-    // E, acima de tudo: nada de número inventado. Um "R$ 0,00" aqui teria
-    // aparência de referência oficial e alguém proporia contra ele.
-    expect(card.textContent).not.toContain("R$ 0");
-    expect(card.textContent).not.toMatch(/R\$\s*0,00/);
-  });
-
-  it("a referência fica no mesmo bloco das propostas, e vem ANTES delas", async () => {
+  it("mostra o valor mínimo do proprietário — e SÓ ele", async () => {
     fetchSaleOpportunities.mockResolvedValue(
       makePage({
         items: [
           makeOpportunity({
-            current_highest_offer: "81000.00",
-            my_offer: "79000.00",
+            minimum_accepted_price: "62500.00",
+            fipe_reference_value: "72000.00",
+            current_highest_offer: "65000.00",
+            my_offer: "64000.00",
             offers_count: 2,
           }),
         ],
@@ -313,49 +265,30 @@ describe("privacidade e ausência de contato", () => {
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
     const text = card.textContent ?? "";
 
-    // A ordem importa para a leitura: "maior proposta R$ 81.000" não diz nada
-    // sozinho — dito DEPOIS de uma referência de R$ 92.000, diz tudo.
-    expect(text.indexOf("Referência FIPE")).toBeGreaterThan(-1);
-    expect(text.indexOf("Referência FIPE")).toBeLessThan(text.indexOf("Maior proposta"));
+    // O piso aparece, no elemento próprio do preço.
+    // Normaliza o ESPAÇO INSEPARÁVEL que Intl.NumberFormat pt-BR insere entre
+    // "R$" e o número: comparar com espaço comum falha exibindo duas strings
+    // idênticas no diff — armadilha que já custou tempo nesta base.
+    const preco = screen.getByTestId("dealer-card-price").textContent ?? "";
+    expect(preco.replace(/\u00a0/g, " ")).toBe("R$ 62.500,00");
+
+    // Os outros três NÃO aparecem — nem número, nem rótulo.
+    for (const value of ["72.000", "65.000", "64.000", "72000", "65000", "64000"]) {
+      expect(text).not.toContain(value);
+    }
+    for (const label of ["Referência FIPE", "Maior proposta", "Sua proposta", "FIPE"]) {
+      expect(text).not.toContain(label);
+    }
   });
 
-  it("uma ação primária por card, e uma só", async () => {
-    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
-    render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
-
-    const card = screen.getByTestId("dealer-sale-opportunity-card");
-    expect(within(card).getAllByRole("link")).toHaveLength(1);
-    expect(within(card).getByText("Ver detalhes")).toBeTruthy();
-  });
-});
-
-// ============================================================================
-describe("ficha no card", () => {
-  it("mostra as etiquetas declaradas", async () => {
-    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
-    render(<DealerSaleOpportunitiesList />);
-
-    const card = await screen.findByTestId("dealer-sale-opportunity-card");
-    // Os sinais de risco viraram chips com o valor embutido ("Leilão: Não"), em
-    // vez de rótulo e valor em elementos separados. A asserção é sobre o que o
-    // lojista LÊ, não sobre a estrutura que produz o texto.
-    expect(card.textContent).toContain("Leilão: Não");
-    expect(card.textContent).toContain("Laudo: Não possui");
-    // Estado geral continua visível, agora como ponto colorido + texto.
-    expect(within(card).getByText("Bom")).toBeTruthy();
-  });
-
-  it("campo NULL some do card — nunca vira 'Não' nem 'Não informado'", async () => {
+  it("legado sem piso: região de preço neutra — nunca R$ 0,00 nem outro campo no lugar", async () => {
     fetchSaleOpportunities.mockResolvedValue(
       makePage({
         items: [
           makeOpportunity({
-            evaluation: {
-              ...makeOpportunity().evaluation,
-              tire_condition: null,
-              auction_history: null,
-            },
+            minimum_accepted_price: null,
+            fipe_reference_value: "72000.00",
+            current_highest_offer: "65000.00",
           }),
         ],
       })
@@ -363,13 +296,78 @@ describe("ficha no card", () => {
     render(<DealerSaleOpportunitiesList />);
 
     const card = await screen.findByTestId("dealer-sale-opportunity-card");
-    // Sem declaração de leilão, o chip correspondente não existe — o card não
-    // inventa "Não informado" para preencher espaço.
-    expect(card.textContent).not.toContain("Leilão:");
-    // O laudo foi declarado e continua aparecendo.
-    expect(card.textContent).toContain("Laudo:");
+
+    // Traço neutro. Zero seria uma declaração que ninguém fez, e converter a
+    // FIPE ou a maior proposta em preço seria inventar o número que falta.
+    expect(screen.getByTestId("dealer-card-price").textContent?.trim()).toBe("—");
+    expect(card.textContent).not.toContain("R$ 0");
+    expect(card.textContent).not.toContain("72.000");
+    expect(card.textContent).not.toContain("65.000");
   });
 
+  it("o card não vira ficha: sem etiquetas, sem 'Particular', sem tempo de publicação", async () => {
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    const card = await screen.findByTestId("dealer-sale-opportunity-card");
+    const text = card.textContent ?? "";
+
+    // A ficha declarada inteira mora no DETALHE. No card ela virava uma parede
+    // de chips que ninguém lia — e empurrava o preço para fora do primeiro olhar.
+    for (const absent of [
+      "Leilão",
+      "leilão",
+      "Laudo",
+      "laudo",
+      "Bom",
+      "Particular",
+      "Pneus",
+      "IPVA",
+      "Multas",
+      "Financiado",
+      "há ",
+    ]) {
+      expect(text, `o card não deve conter "${absent}"`).not.toContain(absent);
+    }
+  });
+
+  it("mostra os metadados permitidos: km, combustível, câmbio e cidade", async () => {
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    const card = await screen.findByTestId("dealer-sale-opportunity-card");
+    const text = card.textContent ?? "";
+
+    expect(text).toContain("45.000 km");
+    expect(text).toContain("Flex");
+    expect(text).toContain("Automático");
+    expect(text).toContain("Atibaia - SP");
+    // A versão FIPE continua: é ela que separa um EX de um LX.
+    expect(text).toContain("T-Cross 200 TSI 1.0 Flex 12V 5p Aut.");
+  });
+
+  it("um CTA: 'Fazer oferta', que abre o detalhe no formulário de proposta", async () => {
+    fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
+    render(<DealerSaleOpportunitiesList />);
+
+    const card = await screen.findByTestId("dealer-sale-opportunity-card");
+
+    const cta = within(card).getByTestId("dealer-sale-opportunity-offer");
+    expect(cta.textContent).toContain("Fazer oferta");
+    expect(cta.getAttribute("href")).toBe("/dashboard-loja/oportunidades/veiculos/1#proposta");
+
+    // O título continua sendo o link que torna o cartão inteiro clicável para o
+    // detalhe — sem CTA secundário competindo com o principal.
+    const titleLink = within(card).getByTestId("dealer-sale-opportunity-link");
+    expect(titleLink.getAttribute("href")).toBe("/dashboard-loja/oportunidades/veiculos/1");
+    expect(within(card).getAllByRole("link")).toHaveLength(2);
+    expect(card.textContent).not.toContain("Ver detalhes");
+    expect(card.textContent).not.toContain("Avaliar agora");
+  });
+});
+
+// ============================================================================
+describe("foto do card", () => {
   it("solicitação sem foto usa placeholder, não uma imagem quebrada", async () => {
     fetchSaleOpportunities.mockResolvedValue(
       makePage({ items: [makeOpportunity({ image: null })] })
@@ -385,7 +383,7 @@ describe("filtros", () => {
   it("trocar um filtro refaz a busca desde a primeira página", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     fetchSaleOpportunities.mockClear();
     await userEvent.selectOptions(screen.getByLabelText("Passagem por leilão"), "no");
@@ -400,7 +398,7 @@ describe("filtros", () => {
   it("filtro ativo vira chip removível, e o chip limpa o filtro", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     await userEvent.selectOptions(screen.getByLabelText("Passagem por leilão"), "no");
     const chip = await screen.findByTestId("dealer-sale-opportunity-chip");
@@ -417,7 +415,7 @@ describe("filtros", () => {
   it("'Limpar filtros' zera tudo de uma vez", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     await userEvent.selectOptions(screen.getByLabelText("Passagem por leilão"), "no");
     await userEvent.selectOptions(screen.getByLabelText("Pneus"), "new");
@@ -434,7 +432,7 @@ describe("filtros", () => {
   it("vazio COM filtro fala dos filtros, não da cidade", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [] }));
     await userEvent.selectOptions(screen.getByLabelText("Passagem por leilão"), "no");
@@ -453,7 +451,7 @@ describe("filtros", () => {
       })
     );
     render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     fetchSaleOpportunities.mockResolvedValue(
       makePage({ items: [makeOpportunity({ id: 2, brand: "Fiat", brand_slug: "fiat" })] })
@@ -471,7 +469,7 @@ describe("filtros", () => {
   it("ordenar refaz a busca com o novo sort", async () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
 
     fetchSaleOpportunities.mockClear();
     await userEvent.selectOptions(screen.getByTestId("dealer-sale-opportunity-sort"), "mileage_asc");
@@ -535,8 +533,8 @@ describe("paginação", () => {
       expect(screen.getAllByTestId("dealer-sale-opportunity-card")).toHaveLength(2)
     );
     // O primeiro continua na tela: append, não substituição.
-    expect(screen.getByText("Volkswagen T-Cross 2020")).toBeTruthy();
-    expect(screen.getByText("Fiat Argo 2020")).toBeTruthy();
+    expect(screen.getByText("Volkswagen T-Cross")).toBeTruthy();
+    expect(screen.getByText("Fiat Argo")).toBeTruthy();
   });
 
   it("sem next_cursor não há botão", async () => {
@@ -627,7 +625,7 @@ describe("seletor de loja — quando a conta tem mais de uma", () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
 
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
     expect(fetchSaleOpportunities.mock.calls[0][0].advertiserId).toBe("101");
   });
 
@@ -636,7 +634,7 @@ describe("seletor de loja — quando a conta tem mais de uma", () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
 
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
     expect(screen.queryByTestId("dealer-store-picker")).toBeNull();
   });
 
@@ -653,7 +651,7 @@ describe("seletor de loja — quando a conta tem mais de uma", () => {
     fetchSaleOpportunities.mockResolvedValue(makePage({ items: [makeOpportunity()] }));
     render(<DealerSaleOpportunitiesList />);
 
-    await screen.findByText("Volkswagen T-Cross 2020");
+    await screen.findByText("Volkswagen T-Cross");
     expect(screen.queryByTestId("dealer-store-picker")).toBeNull();
   });
 });

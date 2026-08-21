@@ -191,18 +191,24 @@ async function seedWorld() {
   };
 }
 
-async function insertSaleRequest({ cityId, status = "receiving_offers" } = {}) {
+async function insertSaleRequest({
+  cityId,
+  status = "receiving_offers",
+  // O PISO (4.3.3). `null` é o caso LEGADO — solicitação anterior à regra, que
+  // NÃO ganha piso derivado de nada.
+  minimumAcceptedPrice = null,
+} = {}) {
   const { rows } = await pool.query(
     `INSERT INTO sale_requests (
        owner_user_id, city_id, brand, brand_slug, model, model_slug,
        fipe_model_description, year, mileage, transmission, fuel_type,
-       declared_condition, status
+       declared_condition, minimum_accepted_price, status
      )
      VALUES ($1, $2, 'Volkswagen', 'volkswagen', 'T-Cross', 't-cross',
              'T-Cross 200 TSI 1.0 Flex 12V 5p Aut.', 2020, 45000, 'automatico', 'flex',
-             'bom', $3)
+             'bom', $3, $4)
      RETURNING id`,
-    [world.ownerId, cityId ?? world.cityId, status]
+    [world.ownerId, cityId ?? world.cityId, minimumAcceptedPrice, status]
   );
   return String(rows[0].id);
 }
@@ -450,6 +456,163 @@ describe.sequential("integração — concorrência real", () => {
 
     expect(a.ok).toBe(true);
     expect(b.ok).toBe(true);
+  });
+});
+
+
+// ============================================================================
+describe.sequential("integração — o PISO do proprietário sob concorrência (4.3.3)", () => {
+  /*
+    A barreira do piso vive DENTRO da mesma transação que trava a solicitação, e
+    a leitura do piso vem na MESMA query do `FOR UPDATE`. Estes testes provam
+    isso onde o fake não alcança: com conexões reais disputando a linha.
+  */
+
+  it("a primeira proposta precisa ALCANÇAR o piso — um centavo abaixo é recusada", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    const abaixo = await propose(0, saleRequestId, "62499.99");
+    expect(abaixo.ok).toBe(false);
+    expect(abaixo.status).toBe(409);
+    expect(abaixo.code).toBe("SALE_OPPORTUNITY_OFFER_BELOW_MINIMUM");
+
+    // Nada foi gravado: a recusa acontece antes do INSERT, dentro da transação.
+    expect(await readOffers(saleRequestId)).toHaveLength(0);
+
+    const exato = await propose(0, saleRequestId, "62500.00");
+    expect(exato.ok).toBe(true);
+    expect((await readOffers(saleRequestId)).map((row) => row.amount)).toEqual(["62500.00"]);
+  });
+
+  it("duas lojas na PRIMEIRA proposta: a que fica abaixo do piso é recusada, seja qual for a ordem", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    // A alcança o piso; B fica abaixo. As duas disparam juntas.
+    const [a, b] = await Promise.all([
+      propose(0, saleRequestId, "62500.00"),
+      propose(1, saleRequestId, "62400.00"),
+    ]);
+
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(false);
+    // B pode cair em qualquer uma das duas barreiras dependendo de quem pegou o
+    // lock primeiro — abaixo do piso, ou abaixo do líder que A acabou de criar.
+    // O que NÃO pode é entrar.
+    expect(["SALE_OPPORTUNITY_OFFER_BELOW_MINIMUM", "SALE_OPPORTUNITY_OFFER_NOT_LEADING"]).toContain(
+      b.code
+    );
+
+    const gravadas = await readOffers(saleRequestId);
+    expect(gravadas).toHaveLength(1);
+    expect(gravadas[0].amount).toBe("62500.00");
+  });
+
+  it("disputa simultânea acima do piso: as duas entram, e o histórico fica CRESCENTE", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    const [a, b] = await Promise.all([
+      propose(0, saleRequestId, "62500.00"),
+      propose(1, saleRequestId, "62600.00"),
+    ]);
+
+    // Quem chegou depois só entra se superou quem chegou antes. Uma das duas
+    // pode ser recusada (se B pegou o lock primeiro, A com 62.500 não supera
+    // 62.600) — o que o teste exige é que o resultado seja SERIALIZADO.
+    const gravadas = await readOffers(saleRequestId);
+    const valores = gravadas.map((row) => Number(row.amount));
+
+    for (let i = 1; i < valores.length; i += 1) {
+      expect(valores[i]).toBeGreaterThan(valores[i - 1]);
+    }
+    expect(valores.every((valor) => valor >= 62500)).toBe(true);
+    expect([a.ok, b.ok].filter(Boolean).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("jitter: dez rodadas de disputa simultânea nunca gravam abaixo do piso", async () => {
+    for (let rodada = 0; rodada < 10; rodada += 1) {
+      const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+      // Atrasos assimétricos e variáveis embaralham quem chega primeiro ao lock;
+      // sem eles as dez rodadas exercitariam sempre o mesmo escalonamento.
+      await Promise.all([
+        propose(0, saleRequestId, "62500.00", { delayMs: rodada % 3 }),
+        propose(1, saleRequestId, "62000.00", { delayMs: (rodada + 1) % 3 }),
+        propose(2, saleRequestId, "63000.00", { delayMs: (rodada + 2) % 3 }),
+      ]);
+
+      const gravadas = await readOffers(saleRequestId);
+      for (const linha of gravadas) {
+        expect(Number(linha.amount)).toBeGreaterThanOrEqual(62500);
+      }
+
+      const valores = gravadas.map((row) => Number(row.amount));
+      for (let i = 1; i < valores.length; i += 1) {
+        expect(valores[i]).toBeGreaterThan(valores[i - 1]);
+      }
+    }
+  });
+
+  it("LEGADO (piso NULL): nada é inventado — a regra histórica continua valendo", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: null });
+
+    // Um valor que qualquer piso derivado (85% da FIPE, maior proposta, etc.)
+    // teria recusado.
+    const primeira = await propose(0, saleRequestId, "1000.00");
+    expect(primeira.ok).toBe(true);
+
+    // E a barreira seguinte continua sendo a maior atual.
+    const empate = await propose(1, saleRequestId, "1000.00");
+    expect(empate.ok).toBe(false);
+    expect(empate.code).toBe("SALE_OPPORTUNITY_OFFER_NOT_LEADING");
+  });
+
+  /*
+    A TROCA DE BARREIRA, com os valores exatos do gate, em SEQUÊNCIA e contra o
+    banco real.
+
+    Os mesmos casos existem no teste unitário (fake-db). Aqui eles valem por
+    outra coisa: o fake compara strings num array, enquanto isto compara NUMERIC
+    do PostgreSQL lido de dentro da transação travada. Um erro de tipo, de
+    arredondamento ou de conversão centavo↔decimal só aparece deste lado.
+  */
+  it("depois da primeira, empatar com o PISO é recusado; um centavo acima entra", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    expect((await propose(0, saleRequestId, "62500.00")).ok).toBe(true);
+
+    // Alcançar o piso já não basta: existe líder, e ele precisa ser superado.
+    const empate = await propose(1, saleRequestId, "62500.00");
+    expect(empate.ok).toBe(false);
+    expect(empate.code).toBe("SALE_OPPORTUNITY_OFFER_NOT_LEADING");
+
+    expect((await propose(1, saleRequestId, "62500.01")).ok).toBe(true);
+
+    expect((await readOffers(saleRequestId)).map((row) => row.amount)).toEqual([
+      "62500.00",
+      "62500.01",
+    ]);
+  });
+
+  it("com líder em 64.000: 63.000 e 64.000 recusados; 64.000,01 entra", async () => {
+    const saleRequestId = await insertSaleRequest({ minimumAcceptedPrice: "62500.00" });
+
+    expect((await propose(0, saleRequestId, "64000.00")).ok).toBe(true);
+
+    // Acima do piso, mas abaixo do líder.
+    const abaixoDoLider = await propose(1, saleRequestId, "63000.00");
+    expect(abaixoDoLider.ok).toBe(false);
+    expect(abaixoDoLider.code).toBe("SALE_OPPORTUNITY_OFFER_NOT_LEADING");
+
+    // Empate com o líder.
+    expect((await propose(1, saleRequestId, "64000.00")).ok).toBe(false);
+
+    // Um centavo acima.
+    expect((await propose(1, saleRequestId, "64000.01")).ok).toBe(true);
+
+    expect((await readOffers(saleRequestId)).map((row) => row.amount)).toEqual([
+      "64000.00",
+      "64000.01",
+    ]);
   });
 });
 

@@ -137,16 +137,36 @@ function buildFixture() {
             body_paint_issues: [],
             body_paint_notes: null,
           },
-      // A linha legada também não tem referência: o snapshot só é gravado com
-      // confiança alta, então uma solicitação publicada com o provedor FIPE fora
-      // do ar chega ao card com NULL. É o caso que precisa dizer "não
-      // disponível" em vez de sumir — e nunca "R$ 0,00".
+      // A LINHA LEGADA não tem piso NEM referência FIPE.
+      //
+      // As duas ausências têm a mesma origem: a solicitação foi publicada antes
+      // da regra existir (piso), ou com o provedor FIPE fora do ar (referência).
+      // É o caso em que a região de preço do card fica NEUTRA — sem valor
+      // inventado, sem R$ 0,00 e sem converter outro campo em preço.
+      //
+      // O piso é o ÚNICO valor que o card mostra; FIPE e disputa vão junto na
+      // fixture para que a ausência delas na tela seja provada com dado presente.
+      // Base distinta das outras séries (FIPE 72.000+, disputa 61.000+/58.000+)
+      // de propósito: se o piso compartilhasse número com qualquer uma delas, a
+      // asserção de ausência ficaria ambígua e passaria por coincidência.
+      minimum_accepted_price: legacy ? null : `${44000 + index * 2600}.00`,
       fipe_reference_value: legacy ? null : `${72000 + index * 3100}.00`,
       fipe_reference_at: legacy ? null : "2026-08-01T00:00:00.000Z",
       image: null,
       city: { name: "Atibaia", state: "SP", slug: "atibaia-sp" },
       status: "receiving_offers",
       created_at: new Date(Date.now() - index * 5 * 3600_000).toISOString(),
+
+      // ESTADO DA DISPUTA presente na resposta e AUSENTE da tela.
+      //
+      // O backend continua mandando os três valores por card — o contrato não
+      // mudou. Quem parou de renderizá-los foi o card, e é por isso que a
+      // fixture precisa carregá-los: a prova de "nenhum valor monetário no
+      // feed" só vale se houver valor para vazar.
+      current_highest_offer: index % 2 === 0 ? `${61000 + index * 500}.00` : null,
+      my_offer: index % 4 === 0 ? `${58000 + index * 500}.00` : null,
+      is_leading: false,
+      offers_count: index % 2 === 0 ? 3 : 0,
     };
   });
 
@@ -284,66 +304,155 @@ test.describe("@dealer-sale-feed feed do lojista — visual e responsivo", () =>
 
   /*
     ──────────────────────────────────────────────────────────────────────────
-    FASE 4.3.2 — A REFERÊNCIA FIPE PRECISA SER ENCONTRÁVEL NO CARD
+    O CARD É TRIAGEM — NENHUM VALOR MONETÁRIO NELE
     ──────────────────────────────────────────────────────────────────────────
-    O defeito relatado não era ausência de dado: banco, API e DTO sempre
-    entregaram `fipe_reference_value`. Era HIERARQUIA — o número era a menor e
-    mais apagada linha do cartão (11,5px em #98A2B3), abaixo dos chips de risco,
-    e ao lado de "Maior proposta" em 15px negrito desaparecia. Em uso real isso
-    é indistinguível de campo vazio.
+    Referência FIPE, maior proposta e a proposta desta loja saíram do card e
+    vivem no DETALHE, ao lado do formulário que os usa. A fixture do feed TEM os
+    três valores; se algum voltasse a ser renderizado, apareceria aqui.
 
-    Esta prova é da RENDERIZAÇÃO real, não do DOM: lê o tamanho e a cor
-    computados. Um retorno ao rodapé apagado reprovaria aqui mesmo que o texto
-    continuasse presente — que é o único jeito de travar a correção, já que
-    "está no DOM" era verdade o tempo todo.
+    A prova é na página real (e não só no DOM de teste) porque a regressão que
+    se quer impedir é visual: alguém reintroduzir um bloco de dinheiro "só para
+    dar contexto" e a grade voltar a competir consigo mesma.
   */
-  for (const width of [390, 1440]) {
-    test(`${width}px: a referência FIPE é um valor legível, não uma nota de rodapé`, async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+  test("o único dinheiro do feed é o piso do proprietário", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await prepare(page);
+    await page.goto(PAGE_PATH);
+    await expect(page.getByTestId("dealer-sale-opportunity-card").first()).toBeVisible();
+
+    const cards = page.getByTestId("dealer-sale-opportunity-card");
+    const texto = (await cards.allTextContents()).join(" | ");
+
+    // O piso do primeiro card da fixture: 44.000.
+    await expect(page.getByTestId("dealer-card-price").first()).toHaveText(/44\.000/);
+
+    // Nenhum rótulo de valor comparativo, e nenhum dos números da FIPE nem da
+    // disputa (72.000+ e 61.000+ na fixture).
+    for (const proibido of ["Referência FIPE", "Maior proposta", "Sua proposta", "FIPE"]) {
+      expect(texto, `card não pode carregar "${proibido}"`).not.toContain(proibido);
+    }
+    for (const numero of ["72.000", "75.100", "61.000", "62.000"]) {
+      expect(texto, `card não pode mostrar ${numero}`).not.toContain(numero);
+    }
+
+    // E a ficha declarada não voltou junto: o card é triagem.
+    for (const chip of ["Leilão", "Laudo", "Particular"]) {
+      expect(texto).not.toContain(chip);
+    }
+  });
+
+  test("linha legada sem piso: região de preço neutra, nunca R$ 0,00", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await prepare(page);
+    await page.goto(PAGE_PATH);
+
+    // O índice 3 da fixture é a linha legada (sem piso e sem FIPE).
+    const legado = page.getByTestId("dealer-sale-opportunity-card").nth(3);
+    await expect(legado.getByTestId("dealer-card-price")).toHaveText("—");
+    expect(await legado.textContent()).not.toContain("R$ 0");
+  });
+
+  /*
+    ──────────────────────────────────────────────────────────────────────────
+    NO CELULAR É UMA LISTA, NÃO UM CARTÃO ESPREMIDO
+    ──────────────────────────────────────────────────────────────────────────
+    A medida observável de "item de lista horizontal" é geométrica: a foto fica
+    À ESQUERDA do texto (mesma faixa vertical, não empilhada) e o item é mais
+    LARGO do que alto. Um cartão vertical reprova nas duas.
+
+    O teto de altura não é estética. O item mede ~198px em 390px de largura, e o
+    limite de 200 é o valor MEDIDO com folga de dois pixels para arredondamento
+    de fonte. Vale contra o que ele impede: o cartão vertical anterior (foto 4:3
+    + sete linhas) passava de 380px, e o feed do celular mostrava dois veículos
+    por tela em vez de quatro.
+
+    Não foi espremido além disso porque o que sobrou é o que decide abrir: a
+    versão FIPE separa um EX de um LX, e a linha de km/combustível/câmbio é a
+    comparação entre cards. Ganhar mais 20px apagando uma das duas trocaria
+    altura por cegueira.
+  */
+  for (const width of [360, 390, 412]) {
+    test(`${width}px: o item é horizontal e compacto, com a foto à esquerda`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
       await prepare(page);
       await page.goto(PAGE_PATH);
 
-      const cards = page.getByTestId("dealer-sale-opportunity-card");
-      await expect(cards.first()).toBeVisible();
+      const card = page.getByTestId("dealer-sale-opportunity-card").first();
+      await expect(card).toBeVisible();
 
-      // TODO card tem a linha — inclusive o legado sem snapshot.
-      const total = await cards.count();
-      const values = page.getByTestId("dealer-card-fipe-value");
-      expect(await values.count()).toBe(total);
+      const box = await card.boundingBox();
+      const photo = await card.locator("img, [data-testid='dealer-sale-opportunity-no-photo']")
+        .first()
+        .boundingBox();
+      const titulo = await card.getByRole("heading").first().boundingBox();
 
-      const first = values.first();
-      await expect(first).toBeVisible();
-      await expect(first).toHaveText(/R\$\s?72\.000,00/);
+      expect(box!.width).toBeGreaterThan(box!.height);
+      expect(box!.height).toBeLessThanOrEqual(200);
 
-      const style = await first.evaluate((node) => {
-        const computed = getComputedStyle(node);
-        return { fontSize: parseFloat(computed.fontSize), color: computed.color };
-      });
+      // Foto à ESQUERDA do título, e não acima dele.
+      expect(photo!.x + photo!.width).toBeLessThanOrEqual(titulo!.x + 1);
 
-      // 15px negrito é o posto dos valores de proposta; qualquer coisa abaixo de
-      // 14 recoloca a âncora no rodapé.
-      expect(style.fontSize).toBeGreaterThanOrEqual(14);
-
-      // E em tom de TEXTO, não de legenda: #1D2440 tem luminância baixa; o
-      // #98A2B3 anterior não passaria deste corte.
-      const [r, g, b] = style.color.match(/\d+/g)!.map(Number);
-      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      expect(luminance).toBeLessThan(110);
-
-      // O card LEGADO (índice 3, sem snapshot) diz o que houve, em vez de sumir
-      // com a linha — e não inventa zero.
-      const legacy = cards.nth(3);
-      await expect(legacy.getByTestId("dealer-card-fipe-value")).toHaveText("Não disponível");
-      expect(await legacy.textContent()).not.toContain("R$ 0");
+      // O CTA principal cabe inteiro dentro do card — nada de botão escapando.
+      const cta = await card.getByTestId("dealer-sale-opportunity-offer").boundingBox();
+      expect(cta!.x).toBeGreaterThanOrEqual(box!.x - 1);
+      expect(cta!.x + cta!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
 
       await page.screenshot({
-        path: `test-results/dealer-sale-feed-fipe-${width}.png`,
+        path: `test-results/dealer-sale-feed-lista-${width}.png`,
         fullPage: false,
       });
     });
   }
+
+  test("desktop: o cartão é vertical, com a foto no topo", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await prepare(page);
+    await page.goto(PAGE_PATH);
+
+    const card = page.getByTestId("dealer-sale-opportunity-card").first();
+    await expect(card).toBeVisible();
+
+    const photo = await card.locator("img, [data-testid='dealer-sale-opportunity-no-photo']")
+      .first()
+      .boundingBox();
+    const titulo = await card.getByRole("heading").first().boundingBox();
+
+    // A partir de `sm` o layout inverte: a foto passa a ficar ACIMA do título.
+    expect(photo!.y + photo!.height).toBeLessThanOrEqual(titulo!.y + 1);
+
+    // Altura consistente entre os cards da mesma linha: a grade não pode ficar
+    // serrilhada por causa de uma etiqueta a mais num veículo.
+    const alturas = await page
+      .getByTestId("dealer-sale-opportunity-card")
+      .evaluateAll((nodes) =>
+        nodes.slice(0, 4).map((node) => Math.round(node.getBoundingClientRect().height))
+      );
+    expect(Math.max(...alturas) - Math.min(...alturas)).toBeLessThanOrEqual(2);
+  });
+
+  test("o CTA do card: 'Fazer oferta' abre o detalhe no formulário", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await prepare(page);
+    await page.goto(PAGE_PATH);
+
+    const card = page.getByTestId("dealer-sale-opportunity-card").first();
+    await expect(card.getByTestId("dealer-sale-opportunity-offer")).toHaveAttribute(
+      "href",
+      /\/oportunidades\/veiculos\/1(\?[^#]*)?#proposta$/
+    );
+
+    expect(await card.getByTestId("dealer-sale-opportunity-offer").textContent()).toContain(
+      "Fazer oferta"
+    );
+
+    // O clique precisa chegar ao CTA: a camada que torna o cartão inteiro
+    // clicável (`after:inset-0`, agora no link do TÍTULO) cobre o botão
+    // inteiro, e sem o `z-10` o lojista cairia no topo da página em vez do
+    // formulário. Este é o teste que a §15 manda preservar.
+    await card.getByTestId("dealer-sale-opportunity-offer").click();
+    await expect(page).toHaveURL(/\/oportunidades\/veiculos\/1.*#proposta$/);
+    await expect(page.locator("#proposta")).toBeVisible();
+  });
 
   test("mobile: os filtros ficam atrás de um botão, não empilhados no topo", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

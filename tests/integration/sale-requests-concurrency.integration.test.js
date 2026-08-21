@@ -182,6 +182,11 @@ function bodyFor(ownerId, tag, overrides = {}) {
     transmission: "Automático",
     fuel_type: "Flex",
     declared_condition: "bom",
+    // O PISO do proprietário (4.3.3) é obrigatório em publicação nova, pelo
+    // mesmo motivo da ficha abaixo: sem ele o service recusa ANTES da
+    // transação, e todo teste de concorrência deste arquivo "passaria" sem
+    // nunca ter exercitado o lock.
+    minimum_accepted_price: "62500.00",
     // A ficha de avaliação é obrigatória para solicitação NOVA. Sem ela o
     // service recusa antes de chegar à transação — e todo teste de concorrência
     // deste arquivo "passaria" sem nunca ter exercitado o lock.

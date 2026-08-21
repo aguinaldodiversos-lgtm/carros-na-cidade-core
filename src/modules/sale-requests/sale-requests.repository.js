@@ -57,6 +57,9 @@ const OWNER_COLUMNS = `
   sr.declared_condition,
   sr.known_issues,
 
+  -- O PISO declarado pelo proprietario (4.3.3). NULL em linha anterior a regra.
+  sr.minimum_accepted_price,
+
   -- Ficha de avaliação. Listadas UMA a UMA, como o resto: a allowlist é o
   -- contrato que a Fase 4.2 vai espelhar num DEALER_COLUMNS separado, e um
   -- SELECT estrela entregaria de graça aos dois públicos qualquer coluna nova.
@@ -174,6 +177,7 @@ export async function insertSaleRequest(input, exec) {
       gearbox_condition, gearbox_notes,
       suspension_condition, suspension_notes,
       body_paint_status, body_paint_issues, body_paint_notes,
+      minimum_accepted_price,
       status
     )
     VALUES (
@@ -192,6 +196,7 @@ export async function insertSaleRequest(input, exec) {
       $30, $31,
       $32, $33,
       $34, $35::jsonb, $36,
+      $37,
       'receiving_offers'
     )
     RETURNING id
@@ -237,6 +242,12 @@ export async function insertSaleRequest(input, exec) {
       // banco, longe de onde o valor foi montado.
       JSON.stringify(input.bodyPaintIssues ?? []),
       input.bodyPaintNotes,
+      // O PISO do proprietário (4.3.3). Chega como TEXTO com duas casas, pelo
+      // mesmo motivo de `fipeReferenceValue`: o driver devolve NUMERIC como
+      // string, e manter o formato nas duas direções impede que "62500" na ida
+      // e "62500.00" na volta pareçam valores diferentes na comparação com a
+      // proposta.
+      input.minimumAcceptedPrice,
     ]
   );
 

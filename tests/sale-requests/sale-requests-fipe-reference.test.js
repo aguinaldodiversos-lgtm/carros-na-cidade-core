@@ -94,6 +94,10 @@ function bodyFor(overrides = {}) {
     fuel_type: "Flex",
     declared_condition: "bom",
     known_issues: null,
+    // O PISO do proprietario (4.3.3) e OBRIGATORIO em toda publicacao nova:
+    // sem ele o corpo nem passa da validacao. Os testes que exercitam a REGRA do
+    // piso sobrescrevem este valor.
+    minimum_accepted_price: "62500.00",
     ...EVALUATION_BODY,
     images: Array.from(
       { length: 4 },

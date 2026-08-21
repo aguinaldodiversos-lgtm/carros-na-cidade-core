@@ -287,6 +287,11 @@ export type SaleRequest = {
   fipe_code: string | null;
   fipe_reference_value: string | null;
   fipe_reference_at: string | null;
+  /**
+   * O PISO declarado na publicação (4.3.3). Obrigatório para publicar; 
+   * apenas em solicitação anterior à regra — e  não é zero.
+   */
+  minimum_accepted_price: string | null;
   year: number;
   mileage: number;
   transmission: string;
@@ -382,6 +387,19 @@ export type CreateSaleRequestInput = {
   body_paint_notes?: string | null;
 
   images: string[];
+
+  /**
+   * O PISO do proprietário, em decimal ("62500.00").
+   *
+   * Obrigatório — e obrigatório de verdade, não `?`: o servidor recusa a
+   * publicação sem ele, e um campo opcional no tipo deixaria a tela compilar
+   * enquanto manda um corpo que a API rejeita.
+   *
+   * A faixa recomendada (FIPE − 15%) NÃO é enviada: ela é orientação de tela, e
+   * o servidor não a valida.
+   */
+  minimum_accepted_price: string;
+
   /**
    * Códigos FIPE. O servidor os usa para COTAR o valor; ele nunca aceita um
    * valor pronto do cliente.

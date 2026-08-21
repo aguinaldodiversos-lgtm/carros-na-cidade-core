@@ -70,6 +70,10 @@ const DEALER_COLUMNS = `
   sr.declared_condition,
   sr.known_issues,
 
+  -- O PISO do proprietario. E o UNICO valor financeiro que o card mostra, e a
+  -- primeira barreira que uma proposta precisa vencer.
+  sr.minimum_accepted_price,
+
   sr.tire_condition,
   sr.financing_status,
   sr.financing_balance,

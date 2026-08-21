@@ -149,9 +149,19 @@ function serializeSummary(row, { image = null } = {}) {
 
     evaluation: evaluationOf(row),
 
+    // ────────────────────────────────────────────────────────────────────────
+    // O PISO DO PROPRIETÁRIO (4.3.3) — o único valor que o CARD mostra
+    // ────────────────────────────────────────────────────────────────────────
+    // É um número declarado pela pessoa, não uma derivação: nunca vem da FIPE,
+    // nunca da maior proposta, nunca de um cálculo. Vale `null` quando a
+    // solicitação é anterior à regra — e `null` NÃO é zero: a tela precisa
+    // distinguir "sem piso declarado" de "aceita qualquer coisa".
+    minimum_accepted_price: row.minimum_accepted_price,
+
     // Referência de MERCADO, com a data do snapshot. Nunca "valor do veículo" e
-    // nunca preço pedido — a solicitação não tem preço, e a fase inteira existe
-    // para descobri-lo.
+    // nunca preço pedido — a solicitação não tem preço pedido, e a disputa
+    // existe para descobri-lo. Segue no contrato porque o DETALHE a usa; o card
+    // deixou de renderizá-la na 4.3.3.
     fipe_reference_value: row.fipe_reference_value,
     fipe_reference_at: row.fipe_reference_at,
 

@@ -528,6 +528,60 @@ export function validateMoney(raw, field, label) {
 }
 
 /**
+ * O PISO do proprietário — obrigatório em toda publicação nova (Fase 4.3.3).
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * OBRIGATÓRIO AQUI, NULLABLE NO BANCO
+ * ────────────────────────────────────────────────────────────────────────────
+ * A migration 056 aceita NULL porque as solicitações anteriores à regra não têm
+ * como declarar um piso que ninguém perguntou. Publicação NOVA é outra coisa: a
+ * pergunta é feita, e não responder não pode virar "sem piso". É esta função
+ * que segura essa diferença — o banco não consegue distinguir "linha antiga" de
+ * "campo esquecido no INSERT de hoje".
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ZERO É RECUSADO, E NÃO É PREZIOSISMO
+ * ────────────────────────────────────────────────────────────────────────────
+ * `validateMoney` aceita zero (é um número válido para saldo devedor, multa e
+ * IPVA — "devo zero" é uma resposta). Como PISO, zero significa "aceito
+ * qualquer proposta" escrito com aparência de declaração de valor, e apareceria
+ * no card do lojista como R$ 0,00. Quem não quer piso não tem essa opção neste
+ * produto: a pergunta é obrigatória.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE ESTA FUNÇÃO NÃO FAZ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Não compara o valor com a FIPE. Os 15% recomendados
+ * (`SALE_REQUEST_DEALER_DISCOUNT`) são orientação comercial da tela, não regra
+ * de servidor: publicar um piso colado na FIPE é um caminho legítimo — o que a
+ * tela faz é avisar que as chances caem e oferecer o anúncio convencional.
+ * Recusar aqui transformaria conselho em proibição.
+ */
+export function validateMinimumAcceptedPrice(raw) {
+  const value = validateMoney(
+    raw,
+    "minimum_accepted_price",
+    "Valor mínimo que você aceita"
+  );
+
+  if (value == null) {
+    throw invalid(
+      "Informe o valor mínimo que você aceita pelo veículo.",
+      "minimum_accepted_price"
+    );
+  }
+
+  if (Number(value) <= 0) {
+    throw invalid(
+      "O valor mínimo precisa ser maior que zero.",
+      "minimum_accepted_price"
+    );
+  }
+
+  return value;
+}
+
+/**
  * Um conjunto mecânico → `{ condition, notes }`.
  *
  * A REGRA CRUZADA vive aqui, e não no chamador: "possui problema" sem descrição
@@ -731,6 +785,7 @@ export function validateNewSaleRequest(input = {}, { ownerUserId, now = new Date
     fuelType: validateFuelType(input.fuel_type),
     declaredCondition: validateDeclaredCondition(input.declared_condition),
     knownIssues: validateKnownIssues(input.known_issues),
+    minimumAcceptedPrice: validateMinimumAcceptedPrice(input.minimum_accepted_price),
     ...validateEvaluation(input),
     photos: validatePhotoKeys(input.images, { ownerUserId }),
   };

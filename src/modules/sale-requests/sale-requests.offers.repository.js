@@ -58,12 +58,22 @@ function runner(exec) {
  * duas respostas pedem reações diferentes do lojista. Filtrar por status no lock
  * colapsaria as duas num 404 só.
  *
- * @returns {Promise<{ id: string, status: string }|null>}
+ * ────────────────────────────────────────────────────────────────────────────
+ * O PISO VEM NA MESMA LEITURA (4.3.3)
+ * ────────────────────────────────────────────────────────────────────────────
+ * `minimum_accepted_price` é selecionado AQUI, e não numa segunda query, porque
+ * ele é critério de aceitação da proposta: lido fora do lock, seria um valor de
+ * antes da trava — e ainda que hoje o piso seja imutável após a publicação
+ * (§7 da 4.3.3), o dia em que uma fase futura permitir alterá-lo, esta função
+ * já estará lendo a versão travada. Uma leitura de critério fora do mutex que
+ * decide é uma corrida esperando o writer aparecer.
+ *
+ * @returns {Promise<{ id: string, status: string, minimum_accepted_price: string|null }|null>}
  */
 export async function lockSaleRequestForOffer(saleRequestId, cityId, exec) {
   const result = await runner(exec)(
     `
-    SELECT id, status
+    SELECT id, status, minimum_accepted_price
     FROM sale_requests
     WHERE id = $1
       AND city_id = $2

@@ -322,8 +322,14 @@ export default function DealerSaleOpportunitiesList({
 
             Não vai a cinco: o card carrega marca+modelo em uma linha, e abaixo
             de ~250px o título passa a truncar em quase todo veículo.
+
+            O ESPAÇAMENTO É MENOR NO CELULAR (10px contra 16px) porque ali o card
+            é um item de LISTA horizontal, não um cartão: com 16px entre itens a
+            tela vira uma pilha de blocos soltos e cabem três veículos por rolagem
+            em vez de cinco. No desktop o respiro maior separa cartões que
+            competem visualmente entre si.
           */}
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {items.map((opportunity) => (
               <DealerSaleOpportunityCard
                 key={String(opportunity.id)}

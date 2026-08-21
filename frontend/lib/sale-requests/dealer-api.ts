@@ -138,6 +138,17 @@ export type DealerSaleOpportunitySummary = DealerOfferState & {
   fipe_reference_value: string | null;
   fipe_reference_at: string | null;
 
+  /**
+   * O PISO do proprietário — o ÚNICO valor financeiro que o CARD mostra, e a
+   * primeira barreira que uma proposta precisa vencer.
+   *
+   * Nunca derivado: não vem da FIPE, não vem da maior proposta, não é
+   * calculado. Vale `null` em solicitação anterior à 4.3.3 — e `null` não é
+   * zero: a tela precisa distinguir "sem piso declarado" de "aceita qualquer
+   * valor".
+   */
+  minimum_accepted_price: string | null;
+
   /** Capa (`sort_order = 0`). `null` quando a solicitação não tem foto. */
   image: string | null;
   city: SaleRequestCity;

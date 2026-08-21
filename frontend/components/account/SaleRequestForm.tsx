@@ -6,6 +6,7 @@ import PurchaseIntentCityField, {
   type SelectedCity,
 } from "@/components/account/PurchaseIntentCityField";
 import SaleRequestPhotos from "@/components/account/SaleRequestPhotos";
+import SaleRequestPriceSection from "@/components/account/SaleRequestPriceSection";
 import SaleRequestSectionCard from "@/components/account/SaleRequestSectionCard";
 import SaleRequestChoiceGroup from "@/components/account/SaleRequestChoiceGroup";
 import SaleRequestFinancialSection from "@/components/account/SaleRequestFinancialSection";
@@ -33,6 +34,7 @@ import {
   type SaleRequestAnswers,
   type SaleRequestFormState,
 } from "@/lib/sale-requests/evaluation";
+import { parseFipePrice } from "@/lib/sale-requests/pricing";
 
 /**
  * Ficha preliminar de avaliação — "Enviar meu carro para as lojas".
@@ -87,6 +89,43 @@ async function fetchFipe(path: string): Promise<FipeOption[]> {
       typeof (item as FipeOption).code === "string" &&
       typeof (item as FipeOption).name === "string"
   );
+}
+
+/**
+ * A COTAÇÃO FIPE do veículo escolhido — só para orientar o piso (4.3.3).
+ *
+ * O provedor devolve o valor FORMATADO ("R$ 75.000,00"); `parseFipePrice` o
+ * transforma em número para a tela calcular a faixa recomendada.
+ *
+ * Este número NÃO é enviado no corpo da publicação, e nem poderia ser: o
+ * servidor resolve o próprio snapshot FIPE a partir dos códigos, e ignora
+ * qualquer valor vindo do cliente (`resolveFipeSnapshot` não passa
+ * `client_hint_value`). Se um dia esta função devolvesse lixo, o efeito máximo
+ * seria uma faixa recomendada errada na tela — nunca um valor errado no banco.
+ *
+ * `null` em qualquer falha: sem cotação a seção diz que a referência está
+ * indisponível, e a publicação continua possível.
+ */
+async function fetchFipeQuote(
+  brandCode: string,
+  modelCode: string,
+  yearCode: string
+): Promise<number | null> {
+  try {
+    const response = await fetch(
+      `/api/fipe/quote/${encodeURIComponent(brandCode)}/${encodeURIComponent(
+        modelCode
+      )}/${encodeURIComponent(yearCode)}?vehicleType=carros`,
+      { cache: "no-store" }
+    );
+    const json = (await response.json().catch(() => null)) as {
+      data?: { price?: string };
+    } | null;
+    if (!response.ok) return null;
+    return parseFipePrice(json?.data?.price ?? null);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -150,6 +189,11 @@ export default function SaleRequestForm({ basePath = "/dashboard" }: { basePath?
   const [modelCode, setModelCode] = useState("");
   const [years, setYears] = useState<FipeOption[]>([]);
   const [yearCode, setYearCode] = useState("");
+
+  // Referência FIPE do veículo escolhido, em reais. Alimenta APENAS a faixa
+  // recomendada da seção de valor — nunca viaja no corpo da publicação.
+  const [fipeValue, setFipeValue] = useState<number | null>(null);
+  const [loadingFipe, setLoadingFipe] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadingYears, setLoadingYears] = useState(false);
 
@@ -222,6 +266,33 @@ export default function SaleRequestForm({ basePath = "/dashboard" }: { basePath?
       alive = false;
     };
   }, [brandCode, modelCode]);
+
+  /**
+   * A referência FIPE do veículo escolhido — orientação da seção de valor.
+   *
+   * Só dispara com os TRÊS códigos: uma cotação sem ano não descreve veículo
+   * nenhum. Zerar o valor no início do efeito evita o pior estado possível desta
+   * tela — a faixa recomendada do carro ANTERIOR ao lado do carro novo, com
+   * aparência de estar certa.
+   */
+  useEffect(() => {
+    setFipeValue(null);
+    if (!brandCode || !modelCode || !yearCode) return;
+
+    let alive = true;
+    setLoadingFipe(true);
+    void fetchFipeQuote(brandCode, modelCode, yearCode)
+      .then((value) => {
+        if (alive) setFipeValue(value);
+      })
+      .finally(() => {
+        if (alive) setLoadingFipe(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [brandCode, modelCode, yearCode]);
 
   const brandName = useMemo(
     () => brands.find((item) => item.code === brandCode)?.name ?? "",
@@ -678,9 +749,34 @@ export default function SaleRequestForm({ basePath = "/dashboard" }: { basePath?
             </div>
           </SaleRequestSectionCard>
 
-          {/* ── 9. Observações adicionais (OPCIONAL) ────────────────────── */}
+          {/*
+            ── 9. VALOR MÍNIMO ───────────────────────────────────────────────
+            Fica no FIM da ficha, e não no começo, por uma razão de decisão: o
+            piso é a única declaração econômica desta tela, e a pessoa decide
+            melhor depois de ter descrito o estado real do carro — pneus, laudo,
+            leilão, mecânica. Perguntar o valor antes disso convida um número
+            escolhido no otimismo.
+          */}
           <SaleRequestSectionCard
             index={9}
+            title="Defina um valor competitivo para as lojas"
+            icon="note"
+            anchorId="section-price"
+            complete={validation.sections[8].complete}
+            showStatus={attempted}
+          >
+            <SaleRequestPriceSection
+              state={state}
+              update={update}
+              errorFor={errorFor}
+              fipeValue={fipeValue}
+              fipeLoading={loadingFipe}
+            />
+          </SaleRequestSectionCard>
+
+          {/* ── 10. Observações adicionais (OPCIONAL) ───────────────────── */}
+          <SaleRequestSectionCard
+            index={10}
             title="Observações adicionais"
             icon="note"
             anchorId="section-notes"

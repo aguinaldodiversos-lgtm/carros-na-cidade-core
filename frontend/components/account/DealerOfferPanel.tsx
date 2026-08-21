@@ -12,6 +12,24 @@ import {
 import { formatMoneyInput, moneyDigits } from "@/lib/sale-requests/api";
 
 /**
+ * Decimal do backend ("62500.00") → CENTAVOS inteiros.
+ *
+ * A comparação de dinheiro é feita em inteiros, e não em `Number(...)`, pelo
+ * mesmo motivo do backend: `62500.10 - 62500.05` em ponto flutuante binário não
+ * dá o que o olho espera, e aqui a diferença de um centavo é exatamente o que
+ * separa uma proposta aceita de uma recusada.
+ *
+ * `null` para ausente — que NÃO é zero: "não há piso" e "o piso é zero" levariam
+ * a comparações opostas.
+ */
+function toCents(raw: string | null): number | null {
+  if (raw == null || raw === "") return null;
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(raw).trim());
+  if (!match) return null;
+  return Number(match[1]) * 100 + Number(String(match[2] ?? "").padEnd(2, "0"));
+}
+
+/**
  * O painel de proposta.
  *
  * ────────────────────────────────────────────────────────────────────────────
@@ -70,6 +88,7 @@ export default function DealerOfferPanel({
   saleRequestId,
   state,
   fipeReferenceValue,
+  minimumAcceptedPrice,
   onSubmitted,
   /** A loja em nome da qual a proposta é feita, quando a conta tem mais de uma. */
   advertiserId = null,
@@ -77,6 +96,8 @@ export default function DealerOfferPanel({
   saleRequestId: string | number;
   state: DealerOfferState;
   fipeReferenceValue: string | null;
+  /** Piso do proprietario (4.3.3). null em solicitacao anterior a regra. */
+  minimumAcceptedPrice: string | null;
   onSubmitted: (next: DealerOfferState) => void;
   advertiserId?: string | number | null;
 }) {
@@ -113,6 +134,40 @@ export default function DealerOfferPanel({
     const amount = offerDigitsToDecimal(digits);
     if (!amount) {
       setError("Informe o valor da proposta.");
+      return;
+    }
+
+    /*
+      AS DUAS BARREIRAS, conferidas aqui ANTES do POST.
+
+      Esta checagem NÃO substitui o servidor — lá elas acontecem dentro da
+      transação que trava a solicitação, que é o único lugar onde a leitura do
+      líder é confiável. Aqui ela existe para transformar um 409 previsível em
+      resposta imediata, com o alvo na tela.
+
+      A ordem espelha a do backend: enquanto não há proposta, a barreira é o PISO
+      e o operador é `>=`; a partir da primeira, é a maior atual e o operador
+      vira `>`. Inverter aqui faria a tela recusar um valor que a API aceita.
+    */
+    const cents = Number(digits);
+    const minimumCents = toCents(minimumAcceptedPrice);
+    const highestCents = toCents(state.current_highest_offer);
+
+    if (highestCents == null && minimumCents != null && cents < minimumCents) {
+      setError(
+        `A proposta precisa alcançar o valor mínimo do proprietário (${formatMoneyValue(
+          minimumAcceptedPrice
+        )}).`
+      );
+      return;
+    }
+
+    if (highestCents != null && cents <= highestCents) {
+      setError(
+        `A proposta precisa superar a maior proposta atual (${formatMoneyValue(
+          state.current_highest_offer
+        )}).`
+      );
       return;
     }
 
@@ -170,6 +225,26 @@ export default function DealerOfferPanel({
         A ordem "maior primeiro" também mudou: é o número que decide quanto ele
         precisa oferecer, e vinha em segundo.
       */}
+      {/*
+        O PISO DO PROPRIETÁRIO (4.3.3) — acima da disputa, porque é a primeira
+        barreira e a única que já existe antes de qualquer proposta.
+
+        Fica FORA da faixa cinza dos valores de disputa de propósito: os dois de
+        lá mudam a cada lance; este não muda mais depois da publicação. Colocá-lo
+        na mesma faixa sugeriria que ele também sobe.
+      */}
+      {minimumAcceptedPrice ? (
+        <p
+          className="mt-3 rounded-xl border border-[#E5E9F2] bg-white px-3 py-2.5 text-[12px] text-[#667085]"
+          data-testid="dealer-offer-minimum"
+        >
+          Valor mínimo do proprietário:{" "}
+          <span className="text-[14px] font-bold text-[#1D2440]">
+            {formatMoneyValue(minimumAcceptedPrice)}
+          </span>
+        </p>
+      ) : null}
+
       <div className="mt-3 rounded-xl bg-[#F7F9FC] p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <Figure

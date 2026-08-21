@@ -49,6 +49,9 @@ const COMPLETE: SaleRequestFormState = {
   bodyPaintStatus: "none",
 
   photoCount: 4,
+
+  // O PISO (4.3.3) — nona seção essencial. Dígitos: R$ 62.500,00.
+  minimumPrice: "6250000",
 };
 
 const PAYLOAD_EXTRAS = {
@@ -59,21 +62,21 @@ const PAYLOAD_EXTRAS = {
 };
 
 describe("progresso", () => {
-  it("formulário vazio começa em 0% e com as 8 seções pendentes", () => {
+  it("formulário vazio começa em 0% e com as 9 seções pendentes", () => {
     const result = buildValidationState(EMPTY_FORM_STATE);
 
     expect(result.progress).toBe(0);
     expect(result.completedSections).toBe(0);
-    expect(result.totalSections).toBe(8);
+    expect(result.totalSections).toBe(9);
     expect(result.isComplete).toBe(false);
-    expect(result.missingSections).toHaveLength(8);
+    expect(result.missingSections).toHaveLength(9);
   });
 
   it("ficha completa chega a 100%", () => {
     const result = buildValidationState(COMPLETE);
 
     expect(result.progress).toBe(100);
-    expect(result.completedSections).toBe(8);
+    expect(result.completedSections).toBe(9);
     expect(result.isComplete).toBe(true);
     expect(result.missing).toHaveLength(0);
   });
@@ -89,7 +92,8 @@ describe("progresso", () => {
       condition: "bom",
     });
     expect(plusCondition.completedSections).toBe(2);
-    expect(plusCondition.progress).toBe(25);
+    // 2 de 9 seções (o piso entrou como nona na 4.3.3).
+    expect(plusCondition.progress).toBe(22);
   });
 
   it("observações adicionais NÃO entram na contagem", () => {
@@ -100,7 +104,7 @@ describe("progresso", () => {
 
     expect(semNota.progress).toBe(100);
     expect(comNota.progress).toBe(100);
-    expect(comNota.totalSections).toBe(8);
+    expect(comNota.totalSections).toBe(9);
   });
 });
 
@@ -261,8 +265,9 @@ describe("mensagem de campos faltantes", () => {
 
   it("corta a lista longa mantendo a contagem honesta", () => {
     const message = buildMissingMessage(buildValidationState(EMPTY_FORM_STATE).missing);
-    expect(message).toMatch(/^Revise 21 informações/);
-    expect(message).toContain("e mais 17");
+    // 22 requisitos: os 21 anteriores mais o valor mínimo.
+    expect(message).toMatch(/^Revise 22 informações/);
+    expect(message).toContain("e mais 18");
   });
 
   it("string vazia quando não falta nada", () => {

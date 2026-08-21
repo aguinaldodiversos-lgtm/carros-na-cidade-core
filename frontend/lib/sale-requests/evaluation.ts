@@ -47,7 +47,14 @@ import {
   type YesNoUnknown,
 } from "@/lib/sale-requests/api";
 
-/** As oito seções ESSENCIAIS, na ordem em que a ficha as apresenta. */
+/**
+ * As NOVE seções ESSENCIAIS, na ordem em que a ficha as apresenta.
+ *
+ * `price` (o valor mínimo, Fase 4.3.3) entrou por último e fica por último: é a
+ * única declaração ECONÔMICA da ficha, e quem acabou de descrever pneus, laudo,
+ * leilão e mecânica decide melhor o próprio piso do que quem ainda não olhou
+ * para nada disso.
+ */
 export const SECTION_KEYS = [
   "vehicle",
   "condition",
@@ -57,6 +64,7 @@ export const SECTION_KEYS = [
   "mechanics",
   "bodyPaint",
   "photos",
+  "price",
 ] as const;
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
@@ -70,6 +78,7 @@ export const SECTION_LABEL: Record<SectionKey, string> = {
   mechanics: "Mecânica",
   bodyPaint: "Lataria e pintura",
   photos: "Fotos do veículo",
+  price: "Valor mínimo",
 };
 
 /**
@@ -132,7 +141,10 @@ export type SaleRequestFormState = {
   // Seção 8
   photoCount: number;
 
-  // Seção 9 — OPCIONAL, e por isso fora da contagem de completude.
+  // Seção 9 — o PISO. Dígitos (centavos), como todo dinheiro deste formulário.
+  minimumPrice: string;
+
+  // Seção 10 — OPCIONAL, e por isso fora da contagem de completude.
   notes: string;
 };
 
@@ -174,6 +186,7 @@ export const EMPTY_FORM_STATE: SaleRequestFormState = {
   bodyPaintNotes: "",
 
   photoCount: 0,
+  minimumPrice: "",
   notes: "",
 };
 
@@ -225,6 +238,8 @@ export const EMPTY_ANSWERS: SaleRequestAnswers = {
   bodyPaintStatus: "",
   bodyPaintIssues: [],
   bodyPaintNotes: "",
+
+  minimumPrice: "",
 
   notes: "",
 };
@@ -279,6 +294,21 @@ function mileageIsValid(raw: string): boolean {
   if (digits === "") return false;
   const value = Number(digits);
   return Number.isSafeInteger(value) && value >= 0 && value <= SALE_REQUEST_LIMITS.MILEAGE_MAX;
+}
+
+/**
+ * O PISO digitado é válido?
+ *
+ * Guarda DÍGITOS (centavos), como todo dinheiro deste formulário. Vazio não
+ * vale, e zero não vale: como piso, zero seria "aceito qualquer proposta"
+ * escrito com aparência de valor declarado. É a mesma regra que
+ * `validateMinimumAcceptedPrice` aplica no servidor — aqui ela existe para dar
+ * mensagem de campo antes do POST, não para substituir aquela.
+ */
+function minimumPriceIsValid(raw: string): boolean {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (digits === "") return false;
+  return Number(digits) > 0;
 }
 
 /**
@@ -524,8 +554,26 @@ export function buildValidationState(state: SaleRequestFormState): ValidationSta
   );
   push("photos", photos);
 
+  // ── 9. Valor mínimo ───────────────────────────────────────────────────────
+  //
+  // O PISO é obrigatório, e a validação é a MESMA do servidor: precisa existir e
+  // ser maior que zero. Não há checagem contra a FIPE aqui — os 15% recomendados
+  // são orientação, e transformá-los em bloqueio de formulário impediria uma
+  // publicação que a API aceita.
+  //
+  // "0" digitado NÃO completa a seção. Zero é um número válido para saldo
+  // devedor ("devo zero"), mas como piso significaria "aceito qualquer
+  // proposta" — e ninguém declara isso digitando um valor mínimo.
+  const price: MissingItem[] = [];
+  require_(price, minimumPriceIsValid(state.minimumPrice), {
+    field: "minimum_price",
+    label: "Valor mínimo",
+    message: "Informe o valor mínimo que você aceita pelo veículo.",
+  }, "price");
+  push("price", price);
+
   // Observações adicionais NÃO entram: são opcionais, e contá-las faria a ficha
-  // parar em 7/8 para quem não tem nada a acrescentar.
+  // parar em 8/9 para quem não tem nada a acrescentar.
   const missing = sections.flatMap((section) => section.missing);
   const completedSections = sections.filter((section) => section.complete).length;
 
@@ -597,7 +645,11 @@ export function toCreatePayload(
     state.cautionReportResult
   );
 
+  const minimumAcceptedPrice = moneyToDecimal(state.minimumPrice);
+
   if (
+    minimumAcceptedPrice == null ||
+    Number(minimumAcceptedPrice) <= 0 ||
     state.cityId == null ||
     !state.condition ||
     !state.tireCondition ||
@@ -659,6 +711,12 @@ export function toCreatePayload(
     body_paint_notes: hasIssues && state.bodyPaintNotes.trim() ? state.bodyPaintNotes.trim() : null,
 
     images: extras.photoKeys,
+
+    // O PISO. Vai como decimal ("62500.00"), igual aos outros valores
+    // monetários; a faixa recomendada (FIPE − 15%) NÃO viaja: ela é orientação
+    // de tela, e o servidor não a valida nem a guarda.
+    minimum_accepted_price: minimumAcceptedPrice,
+
     fipe_brand_code: extras.fipeBrandCode,
     fipe_model_code: extras.fipeModelCode,
     fipe_year_code: extras.fipeYearCode,
