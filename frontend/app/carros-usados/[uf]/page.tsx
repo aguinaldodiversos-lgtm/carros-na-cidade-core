@@ -5,13 +5,7 @@ import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient"
 import { StateRegionsBlock } from "@/components/territorial/StateRegionsBlock";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadStateCatalogData } from "@/lib/buy/state-catalog-loader";
-import {
-  hasRestrictiveFilters,
-  normalizeStateFilters,
-  normalizeUf,
-  stateNameFromUf,
-  type SearchParams,
-} from "@/lib/buy/territory-variant";
+import { normalizeUf, stateNameFromUf, type SearchParams } from "@/lib/buy/territory-variant";
 import { fetchStateRegions } from "@/lib/territory/fetch-state-regions";
 import { toAbsoluteUrl } from "@/lib/seo/site";
 
@@ -62,7 +56,6 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
-  searchParams = {},
 }: CarrosUsadosUfPageProps): Promise<Metadata> {
   const uf = normalizeUf(params.uf);
   if (!uf) {
@@ -90,18 +83,21 @@ export async function generateMetadata({
   // mesmo com filtros aplicados, para não fragmentar sinal SEO.
   const canonicalPath = `/carros-usados/${uf.toLowerCase()}`;
 
-  // Filtros restritivos (brand/model/q/...) → noindex. URLs filtradas
-  // existem para o usuário mas não para o crawler — canonical já aponta
-  // para a URL limpa. `normalizeStateFilters` é puro (sem fetch),
-  // então a checagem aqui não duplica chamada de backend.
-  const filters = normalizeStateFilters(uf, searchParams);
-  const noindex = hasRestrictiveFilters(filters);
+  // Estratégia hiperlocal (2026-07-05): a Página Estadual é SEMPRE
+  // `noindex,follow` — pelada OU filtrada. Decisão de produto: não competir em
+  // buscas genéricas de estado ("carros usados são paulo" é território dos
+  // gigantes; a estadual rankearia lá embaixo, sem tráfego, diluindo o foco
+  // hiperlocal do domínio). A autoridade fica concentrada nas páginas de CIDADE
+  // (/carros-em/[slug]), que realmente rankeiam. `follow: true` preserva o fluxo
+  // de link desta página-hub para as cidades/regiões. A estadual continua
+  // existindo para o USUÁRIO (porta de entrada, CTAs, blocos curados) — só não
+  // para o crawler. Antes: noindex só quando havia filtro restritivo.
 
   return {
     title,
     description,
     alternates: { canonical: canonicalPath },
-    ...(noindex && { robots: { index: false, follow: true } }),
+    robots: { index: false, follow: true },
     openGraph: {
       title,
       description,
