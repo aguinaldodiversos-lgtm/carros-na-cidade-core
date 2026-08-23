@@ -46,6 +46,27 @@ export const SALE_REQUEST_STATUS = Object.freeze({
   /** A loja avaliou presencialmente e decidiu NÃO apresentar proposta. */
   FINAL_OFFER_DECLINED: "final_offer_declined",
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // FASE 4.6 — a decisão do PROPRIETÁRIO sobre a proposta final
+  // ──────────────────────────────────────────────────────────────────────────
+  // `final_offer_submitted` deixou de ser espera indefinida: agora tem as duas
+  // saídas que faltavam.
+  //
+  // `FINAL_OFFER_ACCEPTED` significa UMA coisa — o proprietário aceitou a
+  // proposta comercial final. NÃO significa veículo vendido, pagamento
+  // realizado, transferência concluída, contrato assinado nem negócio
+  // liquidado. Nenhuma dessas coisas existe neste produto.
+  //
+  // O nome carrega essa disciplina de propósito. `sold`, `completed` e
+  // `deal_closed` não estão aqui, e não é omissão: o NOME do estado é a
+  // primeira coisa que alguém lê ao escrever a fase seguinte, e um nome que
+  // promete conclusão faz a fase seguinte herdar uma promessa que o produto
+  // nunca fez. Os rótulos de tela seguem a mesma regra, e há teste travando as
+  // frases proibidas.
+  FINAL_OFFER_ACCEPTED: "final_offer_accepted",
+  /** O proprietário recusou a proposta final. TERMINAL — não reabre a disputa. */
+  FINAL_OFFER_REJECTED: "final_offer_rejected",
+
   CANCELLED: "cancelled",
 });
 
@@ -69,19 +90,54 @@ export const SALE_REQUEST_SELECTED_STATUSES = Object.freeze([
   SALE_REQUEST_STATUS.INSPECTION_COMPLETED,
   SALE_REQUEST_STATUS.FINAL_OFFER_SUBMITTED,
   SALE_REQUEST_STATUS.FINAL_OFFER_DECLINED,
+
+  // Fase 4.6. Entram aqui porque chegar a qualquer um dos dois EXIGE ter
+  // passado pela seleção — e o CHECK da 059 enumera exatamente esta lista.
+  //
+  // Esquecê-los aqui não daria erro de compilação em lugar nenhum: daria três
+  // defeitos silenciosos e independentes, todos já vistos neste domínio. O
+  // cancelamento voltaria a responder 200 falso depois do aceite; a tela do
+  // proprietário pararia de carregar a proposta selecionada e a inspeção; e a
+  // loja escolhida receberia 404 na própria oportunidade no instante em que a
+  // decisão fosse registrada.
+  SALE_REQUEST_STATUS.FINAL_OFFER_ACCEPTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_REJECTED,
 ]);
 
 /**
- * Estados TERMINAIS nesta fase — a loja já disse o que tinha a dizer.
+ * Estados em que a LOJA já disse o que tinha a dizer depois da avaliação.
  *
- * `final_offer_submitted` espera a decisão do proprietário (Fase 4.6);
- * `final_offer_declined` encerrou sem proposta. Nenhum dos dois reabre a disputa
- * nem volta para `receiving_offers` — essa é uma decisão de produto da 4.6, e
- * tomá-la aqui por omissão seria decidi-la sem ninguém perceber.
+ * Os quatro descendem de uma decisão pós-inspeção registrada: `final_offer_*`
+ * porque houve proposta final (e o proprietário respondeu ou não), e
+ * `final_offer_declined` porque a loja encerrou sem propor.
+ *
+ * NÃO tem consumidor em tempo de execução — herdado assim da 4.5. Está
+ * registrado como dívida no relatório da fase em vez de removido em silêncio:
+ * o que decide o comportamento hoje é `SALE_REQUEST_SELECTED_STATUSES` (a
+ * partição do CHECK) e `SALE_REQUEST_OWNER_DECIDED_STATUSES` (abaixo).
  */
 export const SALE_REQUEST_POST_DECISION_STATUSES = Object.freeze([
   SALE_REQUEST_STATUS.FINAL_OFFER_SUBMITTED,
   SALE_REQUEST_STATUS.FINAL_OFFER_DECLINED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_ACCEPTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_REJECTED,
+]);
+
+/**
+ * Os estados em que o PROPRIETÁRIO já respondeu à proposta final (Fase 4.6).
+ *
+ * Lista própria, e não uma igualdade, pelo mesmo motivo de todas as outras
+ * daqui: quem pergunta "já decidiu?" não quer saber QUAL foi a decisão, e uma
+ * comparação com um dos dois valores acertaria metade dos casos — o pior tipo
+ * de defeito, porque o caminho testado passa.
+ *
+ * Consumida pelo guard de idempotência/409 da transação de decisão e pelo
+ * mapeamento decisão → status, que é o que impede o estado de discordar da
+ * trilha (§17).
+ */
+export const SALE_REQUEST_OWNER_DECIDED_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.FINAL_OFFER_ACCEPTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_REJECTED,
 ]);
 
 /**

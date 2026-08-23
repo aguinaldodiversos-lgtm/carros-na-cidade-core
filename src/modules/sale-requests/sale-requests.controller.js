@@ -9,6 +9,7 @@
 // QUE se vende; QUEM vende é do servidor.
 
 import * as photosService from "./sale-requests.photos.service.js";
+import * as finalDecisionService from "./sale-requests.final-decision.service.js";
 import * as inspectionService from "./sale-requests.inspection.service.js";
 import * as selectionService from "./sale-requests.selection.service.js";
 import * as service from "./sale-requests.service.js";
@@ -132,6 +133,34 @@ export async function requestNewInspectionSlots(req, res) {
   const result = await inspectionService.requestNewInspectionSlots(
     req.user.id,
     req.params.id
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * Aceita ou recusa a proposta final (Fase 4.6).
+ *
+ * O corpo carrega `decision` — `"accepted"` ou `"rejected"` — e NADA MAIS é
+ * lido dele. `final_amount`, `preliminary_amount`, `advertiser_id` e
+ * `owner_user_id` enviados pelo cliente não são apenas ignorados: não existe
+ * código neste caminho que os leia. O valor gravado na trilha é copiado da
+ * proposta final persistida, dentro da transação, e a FK composta da migration
+ * 059 confere essa cópia no banco.
+ *
+ * POST e não PATCH: a decisão é um FATO novo (uma linha em
+ * `sale_request_owner_final_decisions`), não a edição de um campo da
+ * solicitação. Um PATCH sugeriria que a resposta pode ser corrigida depois — e
+ * ela não pode, por desenho.
+ *
+ * Sempre 200. `changed: false` no retry da MESMA decisão; a decisão OPOSTA é
+ * 409, porque aí a diferença não é de repetição, é de intenção.
+ */
+export async function decideFinalOffer(req, res) {
+  const result = await finalDecisionService.decideFinalOffer(
+    req.user.id,
+    req.params.id,
+    req.body || {}
   );
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });

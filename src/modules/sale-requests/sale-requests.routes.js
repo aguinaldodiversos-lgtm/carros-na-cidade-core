@@ -100,6 +100,30 @@ router.post(
 );
 
 /**
+ * Fase 4.6 — a resposta do proprietário à proposta final.
+ *
+ * UM endpoint para as duas respostas, e não `/accept` + `/reject`: aceitar e
+ * recusar são o MESMO fato de domínio (o proprietário respondeu) com valores
+ * opostos, gravado na mesma linha da mesma trilha, com a mesma transação e o
+ * mesmo UNIQUE. Duas rotas duplicariam guard, lock e idempotência — e a segunda
+ * cópia é onde o `fromStatus` acaba esquecido.
+ *
+ * É o oposto da escolha feita logo acima, em `inspection/confirm` ×
+ * `inspection/request-slots`, e a diferença é real: lá são dois FATOS distintos
+ * (um avança o negócio, o outro devolve a bola sem mudar o estado). Aqui é um
+ * fato com duas faces.
+ *
+ * POST e não PATCH: fato novo e auditável, não edição livre da solicitação.
+ *
+ * Sem rate limit próprio, pela mesma razão do `select-offer`: a transição é
+ * única, e a partir do segundo request a resposta é 200 idempotente (mesma
+ * decisão) ou 409 (a oposta) — sem escrita, sem notificação e sem trabalho além
+ * de um `SELECT ... FOR UPDATE` numa linha que o próprio usuário possui. Um
+ * limitador aqui recusaria o retry legítimo de quem perdeu a resposta na rede.
+ */
+router.post("/:id/final-offer-decision", asyncHandler(controller.decideFinalOffer));
+
+/**
  * Cache-Control nos caminhos de ERRO deste router.
  *
  * ────────────────────────────────────────────────────────────────────────────

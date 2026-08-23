@@ -44,6 +44,8 @@ export const db = {
   saleRequestInspectionSlots: [],
   /** A decisao comercial pos-inspecao. UMA por solicitacao. */
   saleRequestDecisions: [],
+  /** Fase 4.6 — a resposta do proprietario. UMA por solicitacao, append-only. */
+  saleRequestOwnerDecisions: [],
   nextRequestId: 1,
   nextImageId: 1,
   nextOfferId: 1,
@@ -52,6 +54,7 @@ export const db = {
   nextInspectionId: 1,
   nextSlotId: 1,
   nextDecisionId: 1,
+  nextOwnerDecisionId: 1,
   /** Todas as chaves já usadas — espelha o UNIQUE GLOBAL da migration 053. */
   usedStorageKeys: new Set(),
 };
@@ -68,6 +71,7 @@ export function resetDb(seed = {}) {
   db.saleRequestInspections = seed.saleRequestInspections ?? [];
   db.saleRequestInspectionSlots = seed.saleRequestInspectionSlots ?? [];
   db.saleRequestDecisions = seed.saleRequestDecisions ?? [];
+  db.saleRequestOwnerDecisions = seed.saleRequestOwnerDecisions ?? [];
   db.nextRequestId = seed.nextRequestId ?? 1;
   db.nextImageId = seed.nextImageId ?? 1;
   db.nextOfferId = seed.nextOfferId ?? 1;
@@ -76,6 +80,7 @@ export function resetDb(seed = {}) {
   db.nextInspectionId = seed.nextInspectionId ?? 1;
   db.nextSlotId = seed.nextSlotId ?? 1;
   db.nextDecisionId = seed.nextDecisionId ?? 1;
+  db.nextOwnerDecisionId = seed.nextOwnerDecisionId ?? 1;
   db.usedStorageKeys = new Set(
     (seed.saleRequestImages ?? []).map((image) => image.storage_key)
   );
@@ -415,6 +420,176 @@ function projectInspection(inspection) {
 }
 
 function handle(text, params, now) {
+
+  // ==========================================================================
+  // FASE 4.6 — A DECISAO DO PROPRIETARIO SOBRE A PROPOSTA FINAL
+  // ==========================================================================
+  // ANTES da 4.5 pelo mesmo motivo que a 4.5 vem antes da 4.4: a leitura da
+  // proposta final desta fase pede colunas a MAIS (advertiser_id, inspection_id)
+  // e o padrao mais generico da 4.5 tambem casaria o SQL — devolvendo um objeto
+  // sem advertiser_id, e o INSERT gravaria `undefined` numa coluna NOT NULL.
+  //
+  // O primeiro ramo a casar responde. Ordem aqui e comportamento, nao estilo.
+
+  // --- LOCK do proprietario (4.6) ------------------------------------------
+  //
+  // `FOR UPDATE` puro, SEM `OF sr`: a query da 4.6 nao tem JOIN nenhum, e e essa
+  // diferenca de forma que a distingue do lock da 4.5 logo abaixo. Se um dia o
+  // repository ganhar um JOIN aqui, este ramo deixa de casar e o teste quebra —
+  // que e o alarme certo, porque um JOIN nesse lock traria dado de snapshot
+  // anterior ao commit concorrente (a licao registrada em `readInspectionRow`).
+  if (
+    /^SELECT sr\.id, sr\.status, sr\.selected_offer_id FROM sale_requests sr WHERE sr\.id = \$1 AND sr\.owner_user_id = \$2 FOR UPDATE/i.test(
+      text
+    )
+  ) {
+    const [saleRequestId, ownerUserId] = params;
+    const row = db.saleRequests.find(
+      (r) => sameId(r.id, saleRequestId) && sameId(r.owner_user_id, ownerUserId)
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          status: row.status,
+          selected_offer_id: row.selected_offer_id ?? null,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: a proposta final, com as colunas que a trilha vai copiar -----
+  if (
+    /^SELECT id, advertiser_id, inspection_id, selected_offer_id, decision_type, final_amount FROM sale_request_post_inspection_decisions/i.test(
+      text
+    )
+  ) {
+    const row = db.saleRequestDecisions.find((d) => sameId(d.sale_request_id, params[0]));
+    if (!row) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          advertiser_id: row.advertiser_id,
+          inspection_id: row.inspection_id,
+          selected_offer_id: row.selected_offer_id,
+          decision_type: row.decision_type,
+          final_amount: row.final_amount,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: o destinatario do aviso (a conta da proposta selecionada) ----
+  //
+  // As DUAS condicoes do WHERE sao reproduzidas. `o.sale_request_id = $2` nao e
+  // decoracao: sem ela, um offer_id de OUTRA solicitacao casaria, e o teste que
+  // prova o escopo passaria por acidente.
+  if (
+    /^SELECT o\.id, o\.advertiser_id, o\.dealer_user_id FROM sale_request_offers o WHERE o\.id = \$1 AND o\.sale_request_id = \$2/i.test(
+      text
+    )
+  ) {
+    const [offerId, saleRequestId] = params;
+    const offer = db.saleRequestOffers.find(
+      (o) => sameId(o.id, offerId) && sameId(o.sale_request_id, saleRequestId)
+    );
+    if (!offer) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          id: offer.id,
+          advertiser_id: offer.advertiser_id,
+          dealer_user_id: offer.dealer_user_id,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: a decisao do proprietario ------------------------------------
+  //
+  // Projeta SO as quatro colunas que a query real pede. `advertiser_id`,
+  // `decided_by_user_id` e `post_inspection_decision_id` ficam de fora aqui
+  // porque ficam de fora la — e o teste de privacidade depende de o fake
+  // respeitar isso, e nao de o DTO lembrar de omitir.
+  if (
+    /FROM sale_request_owner_final_decisions WHERE sale_request_id = \$1/i.test(text)
+  ) {
+    const row = db.saleRequestOwnerDecisions.find((d) =>
+      sameId(d.sale_request_id, params[0])
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          decision_type: row.decision_type,
+          final_amount_snapshot: row.final_amount_snapshot,
+          created_at: row.created_at,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- INSERT da decisao do proprietario ------------------------------------
+  //
+  // O UNIQUE por solicitacao e re-implementado de verdade: e ele que faz o teste
+  // do §16 falhar se alguem remover o `ON CONFLICT DO NOTHING` do repository.
+  //
+  // A FK composta de 5 colunas da 059 NAO e reproduzida aqui, e isso e
+  // deliberado: um fake que a imitasse estaria concordando consigo mesmo. Quem
+  // prova que o banco recusa um snapshot divergente e o teste de PostgreSQL
+  // real, com `raw SQL` (§35).
+  if (/^INSERT INTO sale_request_owner_final_decisions/i.test(text)) {
+    const [
+      saleRequestId,
+      postInspectionDecisionId,
+      advertiserId,
+      sourceType,
+      decisionType,
+      finalAmount,
+      decidedByUserId,
+    ] = params;
+
+    const already = db.saleRequestOwnerDecisions.find((d) =>
+      sameId(d.sale_request_id, saleRequestId)
+    );
+    if (already) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextOwnerDecisionId++,
+      sale_request_id: saleRequestId,
+      post_inspection_decision_id: postInspectionDecisionId,
+      advertiser_id: advertiserId,
+      post_inspection_decision_type: sourceType,
+      decision_type: decisionType,
+      final_amount_snapshot: finalAmount,
+      decided_by_user_id: decidedByUserId,
+      created_at: new Date(now).toISOString(),
+    };
+    db.saleRequestOwnerDecisions.push(row);
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          decision_type: row.decision_type,
+          final_amount_snapshot: row.final_amount_snapshot,
+          created_at: row.created_at,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
 
   // ==========================================================================
   // FASE 4.5 — AVALIACAO PRESENCIAL E PROPOSTA FINAL

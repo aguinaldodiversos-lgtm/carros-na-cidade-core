@@ -45,6 +45,7 @@ import {
   SALE_REQUEST_STATUS,
 } from "./sale-requests.constants.js";
 import { readDealerInspectionState } from "./sale-requests.inspection.service.js";
+import { readOwnerFinalDecisionForDealer } from "./sale-requests.final-decision.service.js";
 import { SALE_OPPORTUNITY_PAGE } from "./sale-requests.dealer.constants.js";
 import {
   decodeCursor,
@@ -373,7 +374,7 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
     throw new AppError("Oportunidade não encontrada.", 404);
   }
 
-  const [images, offerState, inspectionState] = await Promise.all([
+  const [images, offerState, inspectionState, ownerDecision] = await Promise.all([
     repo.listImagesByRequestId(saleRequestId),
     getOfferStateForAdvertiser(saleRequestId, advertiserId),
     // Fase 4.5. Só faz sentido depois da seleção — antes dela não existe
@@ -382,6 +383,14 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
     row.status === SALE_REQUEST_STATUS.RECEIVING_OFFERS
       ? Promise.resolve({ inspection: null, final_decision: null })
       : readDealerInspectionState(saleRequestId),
+
+    // Fase 4.6. Mesma guarda, mesmo motivo. Chegar aqui já significa que ESTA
+    // loja é a selecionada — a query de visibilidade não casa para nenhuma
+    // outra —, então não há verificação de dono a repetir: a loja perdedora nem
+    // chega neste ponto, ela recebeu 404 lá em cima.
+    row.status === SALE_REQUEST_STATUS.RECEIVING_OFFERS
+      ? Promise.resolve(null)
+      : readOwnerFinalDecisionForDealer(saleRequestId),
   ]);
 
   return {
@@ -406,6 +415,15 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
       // presença dos campos.
       inspection: inspectionState.inspection,
       final_decision: inspectionState.final_decision,
+
+      // O bloco da 4.6: a resposta do proprietário. `null` enquanto ele não
+      // respondeu — a tela distingue "aguardando" de "respondido" pela presença
+      // do bloco, não por adivinhar a partir do status.
+      //
+      // SEM o valor: a loja já o conhece (está em `final_decision.final_amount`,
+      // que ela mesma preencheu), e duas fontes para o mesmo número na mesma
+      // tela é como uma divergência silenciosa nasce.
+      owner_final_decision: ownerDecision,
     },
   };
 }

@@ -75,6 +75,26 @@ export const NOTIFICATION_EVENT_TYPE = Object.freeze({
   SALE_REQUEST_FINAL_OFFER_SUBMITTED: "sale_request.final_offer_submitted",
   SALE_REQUEST_FINAL_OFFER_DECLINED: "sale_request.final_offer_declined",
 
+  /**
+   * Fase 4.6 — a resposta do PROPRIETÁRIO à proposta final. Vão para a loja
+   * selecionada; nenhuma outra loja é notificada.
+   *
+   * Dois eventos e não um com flag no payload: o sino mostra título e corpo, e
+   * "o proprietário respondeu" obrigaria a pessoa a abrir a tela para descobrir
+   * O QUE foi respondido — que é a única informação que importa.
+   *
+   * Nenhum evento existente serve. `sale_request.bid_selected` é a escolha
+   * PRELIMINAR da 4.4 (outro fato, outro momento, outro destinatário-alvo), e
+   * reaproveitá-lo faria duas transições distintas dividirem histórico e chave
+   * de idempotência.
+   *
+   * `final_offer_accepted` NÃO é "venda concluída". O título e o corpo emitidos
+   * com este evento dizem que a proposta foi aceita, e há teste travando as
+   * frases que afirmariam conclusão.
+   */
+  SALE_REQUEST_FINAL_OFFER_ACCEPTED: "sale_request.final_offer_accepted",
+  SALE_REQUEST_FINAL_OFFER_REJECTED: "sale_request.final_offer_rejected",
+
   /** Reutilizado pela 4.5: o horário da avaliação presencial foi confirmado. */
   APPOINTMENT_CONFIRMED: "appointment.confirmed",
 });
