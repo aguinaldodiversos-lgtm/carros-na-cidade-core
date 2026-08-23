@@ -357,7 +357,8 @@ Nenhum teste foi excluído para ficar verde. Cada um foi classificado:
 | `SaleRequestFinalDecision.test.tsx` (4.6 UI) | 24 | `SaleRequestHandoff.test.tsx` | 24 |
 | `sale-request-inspection-final-offer.spec.ts` (E2E) | 1 | `sale-request-handoff-rounds.spec.ts` | 1 |
 | `sale-request-owner-final-decision.spec.ts` (E2E) | 1 | (idem) | |
-| **TOTAL** | **185** | | **64** |
+| `sale-request-offer-selection.spec.ts` (4.4, E2E) | 1 | `sale-request-handoff-rounds.spec.ts` + §23.3 | 2 |
+| **TOTAL** | **186** | | **66** |
 
 **A soma é 185, e não 184.** Conferido no Git, contando as declarações de teste
 na revisão anterior à remoção (`3e9d68b4^`), arquivo por arquivo:
@@ -366,7 +367,9 @@ na revisão anterior à remoção (`3e9d68b4^`), arquivo por arquivo:
 git show '3e9d68b4^:<arquivo>' | grep -cE '^s*(it|test)(.(only|skip|todo|concurrent))?('
 ```
 
-54 + 46 + 27 + 32 + 24 + 1 + 1 = **185**. A contagem estática vale como contagem
+54 + 46 + 27 + 32 + 24 + 1 + 1 = **185** nas sete primeiras linhas; com a oitava
+(o E2E da 4.4, aposentado no fechamento do gate — §23) o total é **186**. A
+contagem estática vale como contagem
 de execução porque nenhuma das suítes usa `it.each`/`describe.each`, nenhuma
 declara teste dentro de laço (todas as declarações estão em indentação 2, dentro
 de um único `describe`) e nenhuma tem `it.skip`/`it.only`.
@@ -390,6 +393,14 @@ proposta final; `internal_note` continua sem atravessar.
 
 **C. comportamento removido** → substituído pela prova de que cada writer
 **recusa** com 409 e código próprio, e de que nenhum deles escreve linha nenhuma.
+
+**A 4.4 (`sale-request-offer-selection.spec.ts`) entra na mesma grade**, e cai
+inteira em **A + B** — nada dela é "comportamento removido" sem substituto. A
+máquina de produto que ela exercitava (seleção preliminar → avaliação no portal)
+deixou de existir; as invariantes que sobreviveram estão mapeadas uma a uma no
+§23.3, e as duas que não tinham equivalente explícito ganharam asserção nova
+antes da remoção. Nenhuma asserção de privacidade foi afrouxada — duas foram
+**acrescentadas**.
 
 ### Testes ADAPTADOS (não removidos)
 
@@ -464,10 +475,11 @@ selecionada" para "Oferta aceita", alinhado ao CTA do §3.
 ## 21. Dívidas
 
 1. ~~**`frontend/e2e/sale-request-offer-selection.spec.ts` precisa de um ajuste
-   que NÃO foi feito.**~~ **PARCIALMENTE RESOLVIDO** — ver §23. O passo 7 foi
-   adaptado exatamente como previsto aqui. Mas a auditoria do gate revelou que
-   **aquele bloco não era a única incompatibilidade** do arquivo com a 4.7, e o
-   spec continua vermelho. O detalhamento está no §23.
+   que NÃO foi feito.**~~ **RESOLVIDO** — o spec foi **aposentado** (§23.3). O
+   passo 7 chegou a ser adaptado, mas a auditoria do gate mostrou que ele não era
+   a única incompatibilidade: alinhar o passo 5 exigiria afrouxar uma asserção de
+   privacidade. As 16 invariantes do arquivo estão mapeadas no §23.3.1, e as duas
+   sem equivalente ganharam teste novo antes da remoção.
 
 2. **`WHATSAPP_BASE_URL` está duplicado** entre
    `purchase-intent-offers.constants.js` (Produto 1) e
@@ -483,7 +495,10 @@ selecionada" para "Oferta aceita", alinhado ao CTA do §3.
    em memória) ou aguardar a janela.
 
 5. **`npm run build` no diretório `frontend` derruba um dev server ativo** (ambos
-   escrevem em `.next`). Não é da fase; custou uma execução de E2E.
+   escrevem em `.next`). Não é da fase; custou uma execução de E2E. **E um
+   `next dev` recém-subido é frio**: a primeira execução do E2E paga os compiles
+   e pode estourar os timeouts de 60 s — gastando o seed sem provar nada
+   (observado no fechamento do gate, §23.5).
 
 ---
 
@@ -533,10 +548,12 @@ selecionada" para "Oferta aceita", alinhado ao CTA do §3.
 | 40 | zero regressão nova | ✅ pré-existentes provadas |
 | 41 | monetização não implementada | ✅ |
 
-## **GO** — com a ressalva do §23
+## **GO**
 
-Com a dívida nº 1 agora **parcialmente** resolvida: o ajuste de três linhas foi
-feito, mas o §23 mostra que ele não bastava.
+Dívida nº 1 encerrada. O E2E da 4.4 exercitava uma máquina de produto que a 4.7
+substituiu de propósito; foi aposentado com a cobertura conferida invariante a
+invariante (§23.3.1), e as duas lacunas reais foram fechadas com teste antes da
+remoção. Nenhuma asserção de privacidade foi afrouxada — duas foram acrescentadas.
 
 **NÃO MERGEADO. NÃO DEPLOYADO.** Aguardando revisão.
 
@@ -583,9 +600,8 @@ da 4.4 alcança.
 
 ### 23.3 ACHADO — o passo 7 não era a única incompatibilidade
 
-Com o passo 7 corrigido, **o spec da 4.4 continua vermelho**, e falha ANTES
-dele, no passo 4 (linha 204). A dívida nº 1 subestimou o problema. Levantamento
-completo:
+Com o passo 7 corrigido, **o spec da 4.4 continuava vermelho**, e falhava ANTES
+dele, no passo 4 (linha 204). Levantamento completo:
 
 | Passo | Asserção da 4.4 | Estado na 4.7 |
 |---|---|---|
@@ -594,29 +610,77 @@ completo:
 | 4 | `"Esta seleção é preliminar"` | **proibida** — a 4.7 exige que "preliminar" não volte |
 | 5 | `"Aguardando próxima etapa"` | some no modo `compact`; há teste exigindo a ausência |
 | 5 | status `"Proposta selecionada"` | virou **"Oferta aceita"** (`lib/sale-requests/api.ts:318`) |
-| 5 | `expectNoContactLeak` | **conflita** — o handoff mostra `handoff-whatsapp` na tela do proprietário |
-| 7 | painel da loja escolhida | ✅ corrigido |
+| 5 | `expectNoContactLeak` (lista estrita) | **conflita** — o handoff mostra `handoff-whatsapp` de propósito |
+| 7 | painel da loja escolhida | testid removido pela 4.7 |
 
-A última linha é a que **não é mecânica**. O `FORBIDDEN_CONTACT` da 4.4 inclui
-`"whatsapp"`, `"telefone"`, `"e-mail"`; o da 4.7 foi **deliberadamente reduzido**
-aos dois e-mails semeados, porque o canal de contato agora aparece de propósito.
-Alinhar o spec da 4.4 significa afrouxar uma asserção de privacidade — decisão de
-produto, fora do escopo autorizado deste fechamento. **Não foi feita.**
+Alinhar o passo 5 exigiria afrouxar uma asserção de privacidade. **Não foi
+feito.** O spec foi **aposentado** — é a 8ª remoção do §16.
 
-Note que a lista estrita continua correta no passo 2 (antes da aceitação) e no
-passo 7 (tela da loja): só o passo 5 abre o canal.
+### 23.3.1 A tabela de cobertura — invariante a invariante
 
-**Opções**, para decisão:
+Nada foi removido sem substituto. Cada invariante ainda válida do spec antigo,
+com onde ela é provada agora:
 
-1. Adaptar os passos 4 e 5 também, mantendo a lista estrita onde ela ainda vale e
-   usando a lista curta só no passo 5.
-2. **Aposentar o spec da 4.4** — o da 4.7 já cobre o mesmo ciclo ponta a ponta,
-   incluindo a prova do passo 7. Seria a 8ª remoção do §16.
-3. Deixar vermelho e registrar como dívida.
+| # | Invariante da 4.4 | Cobertura equivalente | Camada |
+|---|---|---|---|
+| 1 | duas lojas propõem no mesmo carro | `sale-request-handoff-rounds.spec.ts:200-201` | E2E |
+| 2 | o dono vê as DUAS propostas atuais | `…rounds.spec.ts:206` (`toHaveCount(2)`) | E2E |
+| 3 | a maior é marcada **uma vez** e a ordem vem do servidor | `SaleRequestProposals.test.tsx:176-177` | tela |
+| 4 | **nenhum contato antes do match** | `SaleRequestProposals.test.tsx` — **teste NOVO** (§23.3.2) | tela |
+| 5 | **a MENOR pode ser escolhida** (§28) | `SaleRequestProposals.test.tsx:390` (tela) · `sale-requests-offer-selection.test.js:381` · `sale-requests-handoff-rounds.test.js:254` · `sale-request-offer-selection.integration.test.js:825` e `:1654` | tela + serviço + 2× integração |
+| 6 | o clique não decide sozinho — o diálogo vem antes | `SaleRequestProposals.test.tsx:222` | tela |
+| 7 | o diálogo não promete conclusão | `…rounds.spec.ts:230-234` + `SaleRequestProposals.test.tsx:249` (copy **invertida** pela 4.7) | E2E + tela |
+| 8 | as perdedoras somem depois da decisão | `SaleRequestProposals.test.tsx:411` | tela |
+| 9 | o estado vem do BANCO (reload) | `…rounds.spec.ts:250, 344, 361` | E2E |
+| 10 | responsivo nas 6 larguras, sem overflow | `…rounds.spec.ts` `VIEWPORTS` = as mesmas 6 | E2E |
+| 11 | a loja escolhida sabe que ganhou, em leitura | `…rounds.spec.ts:287-292` | E2E |
+| 12 | **o formulário de proposta não existe** para a escolhida | `SaleRequestHandoff.test.tsx` — **teste NOVO** (§23.3.2) | tela |
+| 13 | nenhum dado do dono chega à loja | `…rounds.spec.ts:312-314` + `SaleRequestHandoff.test.tsx:658` | E2E + tela |
+| 14 | a solicitação decidida sai do feed | `sale-request-offer-selection.integration.test.js:1292` | integração |
+| 15 | a perdedora leva **404**, sem saber que perdeu | `…rounds.spec.ts:385` + `sale-requests-legacy-flow` | E2E + serviço |
+| 16 | a perdedora **não consegue propor** (409/404) | `sale-requests-offer-selection.test.js:623-645` (§15: nem a perdedora nem a própria escolhida; 409 + código + **nenhuma linha gravada**) | serviço |
+
+As linhas 4 e 12 eram as únicas **sem equivalente explícito**. Foram fechadas
+antes da remoção, e só então o spec saiu.
+
+### 23.3.2 As duas asserções novas — e a prova de que elas mordem
+
+```
+SaleRequestHandoff.test.tsx
+  + "o formulário de proposta NÃO existe — não está desabilitado"
+    queryByTestId("dealer-offer-panel")  → null
+    queryByTestId("dealer-offer-amount") → null
+
+SaleRequestProposals.test.tsx
+  + "a lista de propostas não entrega contato NENHUM antes do match"
+    ["whatsapp", "telefone", "e-mail", "email"] ausentes do container
+    queryByTestId("handoff-whatsapp") → null
+```
+
+A #12 era **estruturalmente** garantida — `DealerSaleOpportunityDetail.tsx:480`
+escolhe com um ternário ENTRE o painel de handoff e o de proposta, nunca os dois
+— mas garantia estrutural não avisa ninguém quando alguém troca o ternário por
+dois blocos independentes.
+
+A #4 é a que importa para privacidade: a 4.7 reduziu o `FORBIDDEN_CONTACT` do
+E2E aos dois e-mails semeados, porque depois do match o WhatsApp da loja aparece
+de propósito. **A lista estrita continua valendo antes do match**, e agora tem
+teste dizendo isso — o que o spec aposentado provava no passo 2.
+
+**Prova de que as duas mordem** (teste por mutação; as duas foram revertidas):
+
+| Mutação | Resultado |
+|---|---|
+| `queryByTestId("dealer-offer-panel")` → `"dealer-handoff-accepted"` (testid que EXISTE) | ❌ vermelho |
+| `store_name: "Prime Veículos"` → `"Prime Veículos telefone"` | ❌ vermelho |
+
+Sem isto as duas seriam asserções que passam sem nunca poder falhar.
 
 ### 23.4 Contagem
 
-185, confirmado pelo Git — método e origem do 184 no §16.
+**186.** A tabela do §16 somava 185 nas sete linhas originais — confirmado pelo
+Git, com método e origem do 184 no §16 — e a aposentadoria do E2E da 4.4 é a
+oitava remoção, +1 teste. Substituídos: 66 (64 + as duas asserções novas).
 
 ### 23.5 Gates re-executados
 
@@ -630,7 +694,15 @@ passo 7 (tela da loja): só o passo 5 abre o canal.
 | `next lint` | ✅ sem warnings |
 | `npm run build` | ✅ standalone verificado |
 | E2E 4.7 (`sale-request-handoff-rounds.spec.ts`) | ✅ passou |
-| E2E 4.4 (`sale-request-offer-selection.spec.ts`) | ❌ **falha no passo 4** (§23.3) |
+| `SaleRequestHandoff` + `SaleRequestProposals` (asserções novas) | ✅ 48 |
+| Teste por mutação das duas asserções novas | ✅ as duas ficam vermelhas (§23.3.2) |
+| E2E 4.4 (`sale-request-offer-selection.spec.ts`) | ⊘ **aposentado** (§23.3) |
+
+O E2E da 4.7 foi rodado **três vezes**, cada uma com seed novo: 20,7 s / 20,2 s
+verdes. A execução vermelha do meio foi **servidor `next dev` frio** — 52,3 s, os
+primeiros compiles estourando timeouts de 60 s. Não é defeito de produto, mas
+custa uma execução: **aqueça o dev server antes do primeiro E2E**, ou a primeira
+rodada some com o seed sem provar nada. Some-se isto à dívida nº 5.
 
 **Por que não repetir os 3446.** As duas correções tocam **dois arquivos**: um
 spec de Playwright (que o `vitest` não coleta) e um `.md`. Nenhum código de

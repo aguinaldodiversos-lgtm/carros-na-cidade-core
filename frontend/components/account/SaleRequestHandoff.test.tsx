@@ -654,6 +654,25 @@ describe("§8 — o card 'Registrar avaliação' NÃO EXISTE na tela do lojista"
     }
   });
 
+  /**
+   * §15 — a disputa acabou: o formulário de PROPOSTA não existe, e não está
+   * apenas desabilitado.
+   *
+   * Herdado do E2E da 4.4 (passo 7), aposentado pela 4.7. Lá isto rodava contra
+   * o backend real; aqui roda contra o ternário de `DealerSaleOpportunityDetail`,
+   * que é onde a exclusão de fato mora — `is_selected` escolhe ENTRE o painel de
+   * handoff e o de proposta, nunca os dois. A garantia é estrutural, mas sem
+   * asserção ninguém percebe se alguém trocar o ternário por dois blocos
+   * independentes.
+   */
+  it("o formulário de proposta NÃO existe — não está desabilitado", async () => {
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-handoff-accepted");
+
+    expect(screen.queryByTestId("dealer-offer-panel")).toBeNull();
+    expect(screen.queryByTestId("dealer-offer-amount")).toBeNull();
+  });
+
   /** §16 — nada do proprietário chega à loja pelo portal. */
   it("a tela do lojista não mostra contato do proprietário", async () => {
     const { container } = render(<DealerSaleOpportunityDetail id="1" />);

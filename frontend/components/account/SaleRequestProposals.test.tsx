@@ -204,6 +204,32 @@ describe("a lista de propostas", () => {
     expect(screen.queryByTestId("sale-request-proposal-select")).toBeNull();
   });
 
+  /**
+   * §16 — ANTES do match, nenhum contato da loja aparece.
+   *
+   * Herdado do E2E da 4.4 (passo 2), aposentado pela 4.7. A 4.7 entrega o
+   * WhatsApp COMERCIAL da loja aceita — mas só DEPOIS de aceitar. Enquanto a
+   * disputa está aberta, a lista mostra nome, cidade e valor, e mais nada: o
+   * proprietário não pode contornar a plataforma ligando para os concorrentes
+   * antes de decidir.
+   *
+   * A lista estrita ("whatsapp", "telefone", "e-mail") continua valendo AQUI —
+   * é o `FORBIDDEN_CONTACT` reduzido da 4.7 que vale só depois do handoff.
+   */
+  it("a lista de propostas não entrega contato NENHUM antes do match", async () => {
+    mockDispute();
+    const { container } = render(<SaleRequestDetail id="42" />);
+
+    await screen.findByTestId("sale-request-proposals");
+    const text = (container.textContent ?? "").toLowerCase();
+
+    for (const term of ["whatsapp", "telefone", "e-mail", "email"]) {
+      expect(text, `a tela vazou "${term}" antes do match`).not.toContain(term);
+    }
+    // E nenhum botão de contato disfarçado de ação.
+    expect(screen.queryByTestId("handoff-whatsapp")).toBeNull();
+  });
+
   it("a seção NÃO aparece numa solicitação cancelada", async () => {
     getSaleRequest.mockResolvedValue({
       sale_request: makeRequest({ status: "cancelled" }),
