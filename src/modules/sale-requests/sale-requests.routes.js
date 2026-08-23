@@ -124,6 +124,30 @@ router.post(
 router.post("/:id/final-offer-decision", asyncHandler(controller.decideFinalOffer));
 
 /**
+ * Fase 4.7 — o HANDOFF DIRETO.
+ *
+ * TRÊS rotas para três fatos distintos, e não um endpoint com um verbo no
+ * corpo: pedir o contato da loja é LEITURA, encerrar o handoff é um evento
+ * auditável, e abrir uma rodada é outro evento, com payload próprio. Colapsá-los
+ * num só faria o guard de estado de um valer para os três — e o de "não houve
+ * acordo" (`offer_selected`) é o oposto do de nova rodada (`handoff_failed`).
+ *
+ * `/rounds` no plural e sem id: o cliente CRIA uma rodada, e qual é o número
+ * dela é decisão do servidor, derivada do ponteiro travado.
+ *
+ * Sem rate limit próprio, pela mesma razão do `select-offer`: as duas escritas
+ * são idempotentes ou 409 a partir do segundo request, sem trabalho além de um
+ * `SELECT ... FOR UPDATE` numa linha que o próprio usuário possui.
+ *
+ * As rotas do fluxo APOSENTADO (inspection/*, final-offer-decision) continuam
+ * montadas acima de propósito — elas respondem 409 com
+ * `SALE_REQUEST_LEGACY_FLOW_RETIRED`. Ver `sale-requests.legacy-flow.js`.
+ */
+router.get("/:id/handoff/whatsapp", asyncHandler(controller.getHandoffWhatsapp));
+router.post("/:id/handoff/no-agreement", asyncHandler(controller.reportNoAgreement));
+router.post("/:id/rounds", asyncHandler(controller.openNewRound));
+
+/**
  * Cache-Control nos caminhos de ERRO deste router.
  *
  * ────────────────────────────────────────────────────────────────────────────

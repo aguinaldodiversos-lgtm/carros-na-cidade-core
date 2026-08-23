@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  DEALER_OFFER_COMMITMENT_NOTICE,
+  DEALER_OFFER_INSPECTION_NOTICE,
+} from "@/lib/sale-requests/handoff";
+
 import { useState } from "react";
 import {
   fipeDistance,
@@ -379,11 +384,37 @@ export default function DealerOfferPanel({
           className="mt-4 h-12 w-full rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.25)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           data-testid="dealer-offer-submit"
         >
-          {submitting ? "Enviando…" : "Enviar proposta"}
+          {submitting ? "Enviando…" : "Enviar oferta"}
         </button>
 
-        <p className="mt-2 text-[11px] leading-relaxed text-[#98A2B3]">
-          A proposta é preliminar e precisa superar a maior proposta atual.
+        {/*
+          §6 — A REGRA PRECISA ESTAR VISÍVEL ANTES DO SUBMIT.
+          ────────────────────────────────────────────────────
+          A copy anterior dizia "a proposta é preliminar". A 4.7 removeu essa
+          leitura: o lojista envia uma oferta porque tem intenção REAL de comprar
+          pelo valor informado. "Preliminar" convidava a ofertar alto para ganhar
+          a disputa e renegociar na visita — exatamente o comportamento que
+          desgasta o produto dos dois lados.
+
+          Sem checkbox: o padrão "ao enviar, você declara" já é o do projeto, e um
+          aceite explícito aqui viraria mais um clique numa tela que já tem o
+          essencial. O que importa é que a regra seja LIDA, e ela está no caminho
+          do olho entre o campo e o botão.
+        */}
+        <p
+          className="mt-3 text-[11.5px] leading-relaxed text-[#667085]"
+          data-testid="dealer-offer-commitment"
+        >
+          {DEALER_OFFER_COMMITMENT_NOTICE}
+        </p>
+        <p
+          className="mt-1.5 text-[11.5px] leading-relaxed text-[#98A2B3]"
+          data-testid="dealer-offer-inspection-notice"
+        >
+          {DEALER_OFFER_INSPECTION_NOTICE}
+        </p>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-[#98A2B3]">
+          A oferta precisa superar a maior proposta atual.
         </p>
       </form>
     </section>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DealerOfferPanel from "@/components/account/DealerOfferPanel";
-import DealerInspectionPanel from "@/components/account/DealerInspectionPanel";
+import DealerHandoffPanel from "@/components/account/DealerHandoffPanel";
 import VehicleEvaluationSheet from "@/components/account/VehicleEvaluationSheet";
 import {
   DECLARED_CONDITION_LABEL,
@@ -327,8 +327,11 @@ export default function DealerSaleOpportunityDetail({
               ? "O proprietário aceitou a sua proposta final. A decisão comercial está registrada."
               : "O proprietário não aceitou a proposta final. Esta avaliação está encerrada."
             : opportunity.is_selected
-              ? "O proprietário selecionou a proposta da sua loja. As próximas etapas serão informadas por aqui."
-              : "Analise as informações declaradas e envie sua proposta preliminar."}
+              ? // FASE 4.7 — "as próximas etapas serão informadas por aqui" prometia um
+                // seguimento DENTRO do portal. Não há: o proprietário recebeu os
+                // dados da loja e vai procurá-la pelo WhatsApp.
+                "O proprietário aceitou a oferta da sua loja e recebeu os dados de contato."
+              : "Analise as informações declaradas e envie sua oferta."}
         </p>
       </header>
 
@@ -476,22 +479,19 @@ export default function DealerSaleOpportunityDetail({
         >
           {opportunity.is_selected ? (
             /*
-              FASE 4.5 — a loja selecionada deixou de apenas "aguardar".
-              O painel decide sozinho qual das três ações mostrar (propor
-              horários, registrar a avaliação, decidir o valor final) a partir do
-              status e do sub-estado da inspeção. Concentrar essa decisão nele
-              mantém esta tela sem uma cadeia de ternários que precisaria ser
-              mantida em sincronia com a de lá.
+              FASE 4.7 — o painel de AVALIAÇÃO foi removido.
+
+              A 4.5 mostrava aqui três formulários: propor horários, REGISTRAR
+              AVALIAÇÃO (km lida, motor, câmbio, suspensão, pneus, lataria) e
+              apresentar proposta final. Os três saíram do produto — a avaliação
+              pertence ao lojista e acontece fora da plataforma.
+
+              O que ficou é o valor aceito e a informação de que o proprietário
+              recebeu os dados da loja para combinar a visita. Read-only.
             */
-            <DealerInspectionPanel
-              saleRequestId={opportunity.id}
-              advertiserId={advertiserId}
-              inspection={opportunity.inspection}
-              decision={opportunity.final_decision}
-              ownerDecision={opportunity.owner_final_decision}
+            <DealerHandoffPanel
               selectedAmount={opportunity.selected_amount}
-              status={opportunity.status}
-              onChanged={() => void load()}
+              legacyDecision={opportunity.final_decision}
             />
           ) : (
             <DealerOfferPanel

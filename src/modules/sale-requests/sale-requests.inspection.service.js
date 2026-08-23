@@ -50,6 +50,7 @@ import { createUserNotification } from "../notifications/notifications.service.j
 import { NOTIFICATION_EVENT_TYPE } from "../notifications/notifications.constants.js";
 import * as repo from "./sale-requests.inspection.repository.js";
 import { requireDealerStore } from "./sale-requests.dealer.store.js";
+import { assertLegacyFlowRetired } from "./sale-requests.legacy-flow.js";
 import { SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import {
   INSPECTION_CODE,
@@ -351,6 +352,7 @@ function raise(outcome, { action, userId, saleRequestId }) {
  * escolher um horário. Enviar opções não é um marco do negócio (§5).
  */
 export async function offerInspectionSlots(userId, rawId, body = {}, context = {}) {
+  assertLegacyFlowRetired("sale_request.inspection_slots", { userId, saleRequestId: rawId });
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
   const slots = validateSlotRound(body?.slots, { now: new Date() });
@@ -514,6 +516,7 @@ export async function offerInspectionSlots(userId, rawId, body = {}, context = {
  * ponto de vista dele, deu certo.
  */
 export async function confirmInspectionSlot(userId, rawId, body = {}) {
+  assertLegacyFlowRetired("sale_request.inspection_confirm", { userId, saleRequestId: rawId });
   const ownerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
   const slotId = parseSlotId(body?.slot_id);
@@ -644,6 +647,7 @@ export async function confirmInspectionSlot(userId, rawId, body = {}) {
  * entregaria o contato que todo o desenho evita.
  */
 export async function requestNewInspectionSlots(userId, rawId) {
+  assertLegacyFlowRetired("sale_request.inspection_request_slots", { userId, saleRequestId: rawId });
   const ownerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 
@@ -745,6 +749,7 @@ export async function requestNewInspectionSlots(userId, rawId) {
  * só ele que é verificado.
  */
 export async function completeInspection(userId, rawId, body = {}, context = {}) {
+  assertLegacyFlowRetired("sale_request.inspection_complete", { userId, saleRequestId: rawId });
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
   const form = validateInspectionForm(body);
@@ -847,6 +852,7 @@ export async function completeInspection(userId, rawId, body = {}, context = {})
  * tabela de decisões é a rede: mesmo sem lock, duas decisões são impossíveis.
  */
 export async function submitPostInspectionDecision(userId, rawId, body = {}, context = {}) {
+  assertLegacyFlowRetired("sale_request.post_inspection_decision", { userId, saleRequestId: rawId });
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 

@@ -10,6 +10,7 @@
 
 import * as photosService from "./sale-requests.photos.service.js";
 import * as finalDecisionService from "./sale-requests.final-decision.service.js";
+import * as handoffService from "./sale-requests.handoff.service.js";
 import * as inspectionService from "./sale-requests.inspection.service.js";
 import * as selectionService from "./sale-requests.selection.service.js";
 import * as service from "./sale-requests.service.js";
@@ -158,6 +159,62 @@ export async function requestNewInspectionSlots(req, res) {
  */
 export async function decideFinalOffer(req, res) {
   const result = await finalDecisionService.decideFinalOffer(
+    req.user.id,
+    req.params.id,
+    req.body || {}
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * O link de WhatsApp da loja cuja oferta foi aceita (Fase 4.7).
+ *
+ * GET e não POST: é leitura. Não muda estado, não registra decisão e pode ser
+ * repetido à vontade — a pessoa pode clicar em "falar com a loja" hoje e de novo
+ * amanhã, e as duas vezes são o mesmo fato.
+ *
+ * A resposta é MÍNIMA: só a URL. Sem telefone em campo separado, sem dados da
+ * loja além do que o card já mostra, sem eco de nada que o cliente mandou.
+ */
+export async function getHandoffWhatsapp(req, res) {
+  const result = await handoffService.getSelectedStoreWhatsapp(req.user.id, req.params.id);
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * "Não houve acordo com esta loja" (Fase 4.7, §17).
+ *
+ * NÃO lê corpo nenhum — e a ausência é a regra. Nem motivo, nem valor
+ * renegociado, nem quem desistiu. Um campo aqui viraria o canal de reclamação
+ * que o produto decidiu não ter, e a primeira pessoa a escrever o nome de um
+ * funcionário transformaria a plataforma em parte de um conflito que ela não
+ * presenciou.
+ *
+ * Sempre 200. `changed: false` no retry, porque informar duas vezes o mesmo
+ * desfecho é o mesmo fato — não um erro.
+ */
+export async function reportNoAgreement(req, res) {
+  const result = await handoffService.reportNoAgreement(req.user.id, req.params.id);
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * "Receber novas ofertas" — abre uma rodada nova (Fase 4.7, §22).
+ *
+ * O corpo carrega `minimum_accepted_price` e NADA MAIS é lido dele. O número da
+ * rodada é derivado do ponteiro TRAVADO (`current_round_number + 1`), nunca
+ * enviado pelo cliente: aceitá-lo permitiria pular para a rodada 9 ou reescrever
+ * a rodada 1.
+ *
+ * POST e não PATCH: a rodada é um FATO novo (uma linha em
+ * `sale_request_rounds`), não a edição do piso da solicitação. O piso ANTIGO
+ * permanece na rodada antiga, e é isso que torna o histórico legível.
+ */
+export async function openNewRound(req, res) {
+  const result = await handoffService.openNewRound(
     req.user.id,
     req.params.id,
     req.body || {}

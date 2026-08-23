@@ -43,6 +43,7 @@ import { createUserNotification } from "../notifications/notifications.service.j
 import { NOTIFICATION_EVENT_TYPE } from "../notifications/notifications.constants.js";
 import * as selectionRepo from "./sale-requests.selection.repository.js";
 import { findCurrentOfferForAdvertiser } from "./sale-requests.offers.repository.js";
+import * as roundsRepo from "./sale-requests.rounds.repository.js";
 import { SALE_REQUEST_CODE, SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import {
   parseSaleOfferId,
@@ -126,10 +127,15 @@ function serializeProposal(row, { isHighest = false } = {}) {
  * uma comparação que só serviria para questionar a escolha de quem já escolheu.
  */
 function serializeSelected(row) {
+  const address = String(row?.store_address ?? "").trim();
+
   return {
     id: row.id,
     store_name: storeNameOf(row),
     store_city: storeCityOf(row),
+    // FASE 4.7 — o endereco comercial, para o handoff. `null` quando a loja nao
+    // cadastrou: a tela mostra o resto e nao inventa um endereco vazio.
+    store_address: address === "" ? null : address,
     amount: row.amount,
     selected_at: row.selected_offer_at,
   };
@@ -297,6 +303,15 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
     }
 
     // 4 — o retry idempotente e o conflito real, nesta ordem.
+    //
+    // FASE 4.7 — a igualdade continua sendo com `OFFER_SELECTED` E ISSO É
+    // DELIBERADO. Ela agora significa "existe um handoff ATIVO": há uma loja
+    // escolhida e as duas partes podem estar conversando neste instante. Trocar
+    // de loja por baixo disso seria desfazer um match que já saiu da
+    // plataforma — para escolher outra é preciso passar por "não houve acordo".
+    //
+    // `handoff_failed` NÃO entra aqui: lá a resseleção é o caminho normal, e
+    // cair neste ramo devolveria 409 para a ação principal daquela tela.
     if (saleRequest.status === SALE_REQUEST_STATUS.OFFER_SELECTED) {
       if (String(saleRequest.selected_offer_id) === String(offerId)) {
         // A MESMA seleção, de novo. 200 sem escrever nada: nem segunda linha na
@@ -314,7 +329,28 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
 
     // 5 — a oferta apontada É desta solicitação? A prova está no `WHERE`, não
     //     num `if` comparando ids depois de ler.
-    const offer = await selectionRepo.findOfferForSelection(saleRequestId, offerId, exec);
+    // FASE 4.7 — a RODADA ABERTA, lida DEPOIS do lock.
+    //
+    // Só ofertas dela são selecionáveis. Uma proposta da rodada 1 não pode ser
+    // aceita depois que a rodada 2 abriu: ela foi feita sob outro piso, e a loja
+    // não a sustenta mais. O `round_id` no `WHERE` da busca é o que torna isso
+    // estrutural em vez de uma checagem que alguém pode esquecer.
+    const round = await roundsRepo.getCurrentRound(saleRequestId, exec);
+    if (!round) {
+      return {
+        ok: false,
+        status: 409,
+        message: "Esta solicitação não está recebendo propostas.",
+        code: SALE_REQUEST_CODE.SELECTION_CLOSED,
+      };
+    }
+
+    const offer = await selectionRepo.findOfferForSelection(
+      saleRequestId,
+      offerId,
+      round.id,
+      exec
+    );
     if (!offer) {
       return {
         ok: false,
@@ -334,6 +370,7 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
     const current = await findCurrentOfferForAdvertiser(
       saleRequestId,
       offer.advertiser_id,
+      round.id,
       exec
     );
 
@@ -359,6 +396,7 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
     const selection = await selectionRepo.insertOfferSelection(
       {
         saleRequestId,
+        roundId: round.id,
         offerId,
         advertiserId: offer.advertiser_id,
         selectedByUserId: ownerUserId,

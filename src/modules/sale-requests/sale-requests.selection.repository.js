@@ -25,7 +25,10 @@
  * estado ANTERIOR ao lance concorrente, que é exatamente a corrida do §13.
  */
 import { query } from "../../infrastructure/database/db.js";
-import { SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
+import {
+  SALE_REQUEST_SELECTABLE_STATUSES,
+  SALE_REQUEST_STATUS,
+} from "./sale-requests.constants.js";
 
 /** Pool por omissão; cliente da transação quando fornecido. */
 function runner(exec) {
@@ -76,7 +79,7 @@ function runner(exec) {
 export async function lockSaleRequestForSelection(saleRequestId, ownerUserId, exec) {
   const result = await runner(exec)(
     `
-    SELECT id, status, selected_offer_id
+    SELECT id, status, selected_offer_id, current_round_number
     FROM sale_requests
     WHERE id = $1
       AND owner_user_id = $2
@@ -100,16 +103,17 @@ export async function lockSaleRequestForSelection(saleRequestId, ownerUserId, ex
  * (migration 055) e não tem por que trafegar num caminho que termina em resposta
  * ao proprietário.
  */
-export async function findOfferForSelection(saleRequestId, offerId, exec) {
+export async function findOfferForSelection(saleRequestId, offerId, roundId, exec) {
   const result = await runner(exec)(
     `
-    SELECT id, advertiser_id, dealer_user_id, amount
+    SELECT id, advertiser_id, dealer_user_id, amount, round_id
     FROM sale_request_offers
     WHERE id = $1
       AND sale_request_id = $2
+      AND round_id = $3
     LIMIT 1
     `,
-    [offerId, saleRequestId]
+    [offerId, saleRequestId, roundId]
   );
   return result.rows[0] ?? null;
 }
@@ -190,8 +194,16 @@ export async function listCurrentOffersForOwner(saleRequestId, ownerUserId, exec
         o.id, o.advertiser_id, o.amount, o.created_at
       FROM sale_request_offers o
       JOIN sale_requests sr ON sr.id = o.sale_request_id
+      JOIN sale_request_rounds r
+        ON r.sale_request_id = sr.id
+       AND r.round_number = sr.current_round_number
       WHERE o.sale_request_id = $1
         AND sr.owner_user_id = $2
+        -- FASE 4.7: só a rodada ABERTA. As ofertas das rodadas anteriores ficam
+        -- no histórico e NÃO voltam a ser selecionáveis — foram feitas sob outro
+        -- piso, e oferecê-las como atuais convidaria a aceitar um valor que a
+        -- loja já não sustenta.
+        AND o.round_id = r.id
       ORDER BY o.advertiser_id, o.created_at DESC, o.id DESC
     ) AS current_offers
     JOIN advertisers adv ON adv.id = current_offers.advertiser_id
@@ -227,19 +239,23 @@ export async function listCurrentOffersForOwner(saleRequestId, ownerUserId, exec
  * @returns {Promise<object|null>} a linha criada, ou `null` quando já existia
  */
 export async function insertOfferSelection(
-  { saleRequestId, offerId, advertiserId, selectedByUserId, amountSnapshot },
+  { saleRequestId, roundId, offerId, advertiserId, selectedByUserId, amountSnapshot },
   exec
 ) {
   const result = await runner(exec)(
     `
     INSERT INTO sale_request_offer_selections (
-      sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot
+      sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot
     )
-    VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (sale_request_id) DO NOTHING
-    RETURNING id, sale_request_id, offer_id, advertiser_id, amount_snapshot, selected_at
+    VALUES ($1, $2, $3, $4, $5, $6)
+    -- FASE 4.7 — a chave mudou de (sale_request_id) para (sale_request_id,
+    -- offer_id). A trilha deixou de ser única por solicitação: depois de "não
+    -- houve acordo" o proprietário aceita OUTRA oferta, e a seleção anterior
+    -- permanece. O que continua impossível é aceitar DUAS VEZES a mesma oferta.
+    ON CONFLICT (sale_request_id, offer_id) DO NOTHING
+    RETURNING id, sale_request_id, round_id, offer_id, advertiser_id, amount_snapshot, selected_at
     `,
-    [saleRequestId, offerId, advertiserId, selectedByUserId, amountSnapshot]
+    [saleRequestId, roundId, offerId, advertiserId, selectedByUserId, amountSnapshot]
   );
   return result.rows[0] ?? null;
 }
@@ -277,20 +293,36 @@ export async function markOfferSelected(
   const result = await runner(exec)(
     `
     UPDATE sale_requests
-    SET status = $4,
-        selected_offer_id = $3,
+    SET status = $3,
+        selected_offer_id = $4,
         selected_offer_at = NOW(),
         updated_at = NOW()
     WHERE id = $1
       AND owner_user_id = $2
-      AND status = $5
+      AND status = ANY($5::text[])
     `,
     [
       saleRequestId,
       ownerUserId,
-      offerId,
       SALE_REQUEST_STATUS.OFFER_SELECTED,
-      SALE_REQUEST_STATUS.RECEIVING_OFFERS,
+      offerId,
+      // ────────────────────────────────────────────────────────────────────
+      // A LISTA, E NÃO A IGUALDADE (Fase 4.7)
+      // ────────────────────────────────────────────────────────────────────
+      // Até aqui era `AND status = 'receiving_offers'`, e estava certo: só
+      // existia uma escolha possível por solicitação, e a igualdade era o que
+      // tornava a transição única.
+      //
+      // A 4.7 criou a RESSELEÇÃO. Depois de "não houve acordo" a solicitação
+      // está em `handoff_failed`, e a igualdade antiga recusaria o `UPDATE`
+      // silenciosamente — `rowCount = 0`, `changed: false`, e o service
+      // responderia um 409 sobre uma ação perfeitamente legítima.
+      //
+      // Continua sendo lista FECHADA, e nunca `<> 'cancelled'`: um estado novo
+      // criado por uma fase futura não entra por omissão. `offer_selected` NÃO
+      // está aqui, e é o que impede trocar de loja durante um handoff em
+      // andamento — para isso é preciso passar por "não houve acordo".
+      SALE_REQUEST_SELECTABLE_STATUSES,
     ]
   );
   return (result.rowCount ?? 0) > 0;
@@ -321,9 +353,13 @@ export async function getSelectedOfferForOwner(saleRequestId, ownerUserId, exec)
       o.advertiser_id,
       o.amount,
       sr.selected_offer_at,
-      adv.name  AS store_name,
-      c.name    AS store_city_name,
-      c.state   AS store_city_state
+      adv.name    AS store_name,
+      -- FASE 4.7 — o ENDERECO COMERCIAL. Entra aqui, e so aqui, porque depois do
+      -- aceite o proprietario precisa saber ONDE comparecer. Nao e canal de
+      -- contato: email, telefone e documento continuam nao sendo selecionados.
+      adv.address AS store_address,
+      c.name      AS store_city_name,
+      c.state     AS store_city_state
     FROM sale_requests sr
     JOIN sale_request_offers o ON o.id = sr.selected_offer_id
     JOIN advertisers adv ON adv.id = o.advertiser_id

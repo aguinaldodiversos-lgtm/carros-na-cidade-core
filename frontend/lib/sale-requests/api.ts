@@ -14,6 +14,7 @@ import type {
   PostInspectionDecision,
 } from "./inspection";
 import type { OwnerFinalDecision, OwnerFinalDecisionType } from "./final-decision";
+import type { SaleRequestRound, SelectionHistoryEntry } from "./handoff";
 /**
  * Estados da solicitação. Espelha `SALE_REQUEST_STATUS` do backend e o CHECK da
  * migration 058.
@@ -38,6 +39,10 @@ export type SaleRequestStatus =
   // pode dizer que é.
   | "final_offer_accepted"
   | "final_offer_rejected"
+  // Fase 4.7. `handoff_failed` significa que houve match e o proprietário
+  // informou que a negociação direta não prosseguiu — NÃO significa culpa de
+  // ninguém, e a plataforma não pergunta o motivo.
+  | "handoff_failed"
   | "cancelled";
 
 export type DeclaredCondition = "excelente" | "bom" | "regular" | "precisa_reparos";
@@ -310,7 +315,13 @@ export function formatMoneyValue(value: string | null): string | null {
  */
 export const STATUS_LABEL: Record<SaleRequestStatus, string> = {
   receiving_offers: "Recebendo ofertas",
-  offer_selected: "Proposta selecionada",
+  // Fase 4.7 — "Oferta aceita" e nao mais "Proposta selecionada".
+  //
+  // O CTA virou "Aceitar oferta" (§3) e o card do handoff diz "Oferta aceita";
+  // manter "selecionada" no cabecalho faria a mesma acao ter dois nomes na
+  // mesma tela. Continua NAO dizendo venda concluida: aceitar e o comeco da
+  // conversa, nao o fim da transacao.
+  offer_selected: "Oferta aceita",
 
   // Fase 4.5. Nenhum destes rótulos diz ou sugere venda concluída.
   //
@@ -337,6 +348,11 @@ export const STATUS_LABEL: Record<SaleRequestStatus, string> = {
   // estado dá erro em vez de renderizar vazio.
   final_offer_accepted: "Proposta final aceita",
   final_offer_rejected: "Proposta final recusada",
+
+  // Fase 4.7. Neutro de propósito: o portal não sabe — e não pergunta — por que
+  // a negociação não prosseguiu, e um rótulo que insinuasse culpa transformaria
+  // a plataforma em parte de um conflito que ela não presenciou.
+  handoff_failed: "Negociação não concluída",
 
   cancelled: "Cancelada",
 };
@@ -456,6 +472,14 @@ export type SaleRequestSelectedOffer = {
   id: number | string;
   store_name: string;
   store_city: string | null;
+  /**
+   * Fase 4.7 — o endereço COMERCIAL da loja, para o handoff.
+   *
+   * Existe por uma finalidade única: a pessoa precisa saber onde comparecer.
+   * NÃO é canal de contato, e não vem acompanhado de nenhum — telefone, e-mail e
+   * documento não são sequer selecionados pela query.
+   */
+  store_address: string | null;
   amount: string;
   selected_at: string;
 };
@@ -490,6 +514,25 @@ export type SaleRequestDetailResponse = {
    * pergunta, e a que vem do banco em uma leitura só é a que não pode divergir.
    */
   owner_final_decision: OwnerFinalDecision | null;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FASE 4.7
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * A rodada ABERTA. Toda solicitação tem uma — a rodada 1 nasce junto com a
+   * publicação, e o backfill da migration 060 cobriu o legado.
+   */
+  round: SaleRequestRound | null;
+
+  /**
+   * O histórico de matches, do mais recente ao mais antigo.
+   *
+   * É o que sustenta "Não houve acordo com a Loja A" na tela de resseleção — e a
+   * prova de que a seleção anterior NÃO foi apagada quando outra tomou o lugar
+   * dela. Sem ids internos: a tela não precisa de nenhum para renderizar.
+   */
+  selection_history: SelectionHistoryEntry[];
 };
 
 export type UploadedPhoto = { storage_key: string; url: string };

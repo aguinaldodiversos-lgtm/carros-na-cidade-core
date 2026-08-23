@@ -33,6 +33,7 @@ import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import { withTransaction } from "../../infrastructure/database/db.js";
 import * as offersRepo from "./sale-requests.offers.repository.js";
+import * as roundsRepo from "./sale-requests.rounds.repository.js";
 import { SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import { SALE_OPPORTUNITY_CODE } from "./sale-requests.dealer.constants.js";
 import { parseSaleRequestId, requireUserId } from "./sale-requests.validation.js";
@@ -151,7 +152,30 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
       };
     }
 
-    const highest = await offersRepo.findHighestAmount(saleRequestId, exec);
+    // FASE 4.7 — a RODADA ABERTA, lida DEPOIS do lock.
+    //
+    // Tudo o que decide a aceitação da proposta é escopado por ela: o piso vem
+    // da rodada (e não mais da solicitação), e a maior proposta atual é a maior
+    // DESTA rodada. Sem isso, uma disputa nova herdaria o líder da anterior e a
+    // primeira oferta da rodada 2 precisaria superar um valor que já não vale.
+    //
+    // Lida dentro do lock pelo mesmo motivo que o piso sempre foi: é critério de
+    // decisão, e critério lido fora do mutex é uma corrida esperando o writer.
+    const round = await roundsRepo.getCurrentRound(saleRequestId, exec);
+    if (!round) {
+      // Inexprimível pelo schema (toda solicitação nasce com a rodada 1 na mesma
+      // transação, e o backfill da 060 cobriu o legado). O ramo existe para que
+      // a impossibilidade apareça como erro legível em vez de violação de FK no
+      // INSERT logo abaixo.
+      return {
+        ok: false,
+        status: 409,
+        message: "Esta solicitação não está mais recebendo propostas.",
+        code: SALE_OPPORTUNITY_CODE.OFFER_CLOSED,
+      };
+    }
+
+    const highest = await offersRepo.findHighestAmount(saleRequestId, round.id, exec);
     const highestCents = toCents(highest);
 
     // ────────────────────────────────────────────────────────────────────────
@@ -178,7 +202,12 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
     // precisa ser positiva, o que `validateOfferInput` já garantiu. Inventar um
     // piso para elas (85% da FIPE, a maior proposta, qualquer coisa) faria o
     // sistema recusar propostas em nome de alguém que nunca declarou piso algum.
-    const minimumCents = toCents(saleRequest.minimum_accepted_price);
+    // FASE 4.7 — o piso vem da RODADA, não da solicitação.
+    //
+    // `sale_requests.minimum_accepted_price` continua existindo e guarda o piso
+    // da rodada 1; ler dali agora seria aplicar o piso ANTIGO a uma disputa que
+    // a pessoa reabriu justamente para baixá-lo.
+    const minimumCents = toCents(round.minimum_accepted_price);
 
     if (highestCents == null && minimumCents != null && amountCents < minimumCents) {
       return {
@@ -188,7 +217,7 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
         code: SALE_OPPORTUNITY_CODE.OFFER_BELOW_MINIMUM,
         // O piso viaja junto pelo mesmo motivo do líder: mandar corrigir sem
         // dizer o alvo obriga a recarregar a página para descobrir quanto falta.
-        minimumAcceptedPrice: saleRequest.minimum_accepted_price,
+        minimumAcceptedPrice: round.minimum_accepted_price,
       };
     }
 
@@ -209,7 +238,7 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
     }
 
     const offer = await offersRepo.insertOffer(
-      { saleRequestId, dealerUserId, advertiserId, amount, note },
+      { saleRequestId, roundId: round.id, dealerUserId, advertiserId, amount, note },
       exec
     );
 
@@ -291,9 +320,17 @@ export async function createSaleOffer(userId, rawId, body = {}, context = {}) {
  * e ela relê com o lock na mão.
  */
 export async function getOfferStateForAdvertiser(saleRequestId, advertiserId) {
+  // A rodada ABERTA primeiro: as duas leituras seguintes são escopadas por ela.
+  // Sem rodada (impossível pelo schema) a tela mostra disputa vazia em vez de
+  // misturar valores de rodadas diferentes.
+  const round = await roundsRepo.getCurrentRound(saleRequestId);
+  if (!round) {
+    return serializeOfferState({ highest: null, mine: null, total: 0 });
+  }
+
   const [highest, mine, total] = await Promise.all([
-    offersRepo.findHighestAmount(saleRequestId),
-    offersRepo.findCurrentOfferForAdvertiser(saleRequestId, advertiserId),
+    offersRepo.findHighestAmount(saleRequestId, round.id),
+    offersRepo.findCurrentOfferForAdvertiser(saleRequestId, advertiserId, round.id),
     offersRepo.countOffers(saleRequestId),
   ]);
 

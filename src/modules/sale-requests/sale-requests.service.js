@@ -30,10 +30,13 @@ import {
 } from "./sale-requests.selection.service.js";
 import { readOwnerInspectionState } from "./sale-requests.inspection.service.js";
 import { readOwnerFinalDecision } from "./sale-requests.final-decision.service.js";
+import * as roundsRepo from "./sale-requests.rounds.repository.js";
+import { readSelectionHistory } from "./sale-requests.handoff.service.js";
 import {
   SALE_REQUEST_ACTIVE_LIMIT,
   SALE_REQUEST_CODE,
   SALE_REQUEST_PAGE,
+  SALE_REQUEST_SELECTABLE_STATUSES,
   SALE_REQUEST_SELECTED_STATUSES,
   SALE_REQUEST_STATUS,
 } from "./sale-requests.constants.js";
@@ -429,6 +432,28 @@ export async function createSaleRequest(user, input, deps = {}) {
       tx
     );
 
+    // FASE 4.7 — a RODADA 1, na MESMA transação que criou a solicitação.
+    //
+    // Não é opcional e não pode ser preguiçosa: toda oferta carrega `round_id`
+    // com `NOT NULL` e FK composta, então uma solicitação sem rodada seria uma
+    // solicitação que não consegue receber proposta nenhuma — publicada, visível
+    // no feed do lojista, e recusando todo lance com erro de constraint.
+    //
+    // `current_round_number` já nasce 1 pelo `DEFAULT` da coluna; o que falta é
+    // a LINHA da rodada, com o piso que a pessoa acabou de declarar.
+    const round = await roundsRepo.insertRound(
+      {
+        saleRequestId,
+        roundNumber: 1,
+        minimumAcceptedPrice: normalized.minimumAcceptedPrice ?? null,
+      },
+      tx
+    );
+
+    if (!round) {
+      throw new AppError("Não foi possível publicar a solicitação.", 500, false);
+    }
+
     return saleRequestId;
   });
 
@@ -518,14 +543,29 @@ export async function getMySaleRequest(userId, rawId) {
     throw new AppError("Solicitação não encontrada.", 404);
   }
 
-  const [imagesByRequest, proposals, selectedOffer, inspectionState, ownerDecision] = await Promise.all([
+  const [
+    imagesByRequest,
+    proposals,
+    selectedOffer,
+    inspectionState,
+    ownerDecision,
+    currentRound,
+    selectionHistory,
+  ] = await Promise.all([
     repo.listImagesByRequestIds([saleRequestId]),
-    // Enquanto a disputa está aberta, as propostas ATUAIS — uma por loja.
-    // Depois da escolha a lista deixa de ser oferecida: mostrar as perdedoras ao
-    // lado da vencedora convidaria a uma comparação sobre uma decisão que já não
-    // pode ser mudada (§8), e o §18 pede a tela do estado escolhido, não um
-    // placar.
-    row.status === SALE_REQUEST_STATUS.RECEIVING_OFFERS
+    // As propostas ATUAIS da rodada aberta — uma por loja.
+    //
+    // FASE 4.7 — A LISTA VOLTA EM `handoff_failed`.
+    //
+    // Enquanto a disputa está aberta é o placar; depois da escolha some, porque
+    // mostrar as perdedoras ao lado da vencedora convidaria a comparar uma
+    // decisão que já saiu da plataforma.
+    //
+    // Mas em `handoff_failed` a decisão VOLTOU a ser possível: a negociação com
+    // a loja escolhida não prosseguiu, e as outras ofertas DA MESMA RODADA são
+    // exatamente a saída que o §19 oferece. Manter a igualdade com
+    // `RECEIVING_OFFERS` deixaria a tela de resseleção sem nada para resselecionar.
+    SALE_REQUEST_SELECTABLE_STATUSES.includes(row.status)
       ? listOwnerProposals(saleRequestId, ownerUserId)
       : Promise.resolve([]),
     // A proposta escolhida acompanha TODOS os estados posteriores à seleção, e
@@ -551,6 +591,16 @@ export async function getMySaleRequest(userId, rawId) {
     SALE_REQUEST_SELECTED_STATUSES.includes(row.status)
       ? readOwnerFinalDecision(saleRequestId)
       : Promise.resolve(null),
+
+    // Fase 4.7 — a rodada ABERTA. Sem guarda de status: toda solicitação tem
+    // uma, inclusive as canceladas, e a tela usa o piso dela para preencher o
+    // modal de nova rodada com o valor vigente.
+    roundsRepo.getCurrentRound(saleRequestId),
+
+    // Fase 4.7 — o histórico de matches. É o que sustenta "Não houve acordo com
+    // a Loja A" na tela de resseleção, e o que prova que a seleção anterior NÃO
+    // foi apagada quando outra tomou o lugar dela.
+    readSelectionHistory(saleRequestId),
   ]);
 
   return {
@@ -559,9 +609,23 @@ export async function getMySaleRequest(userId, rawId) {
     }),
     proposals,
     selected_offer: selectedOffer,
+    // Blocos LEGADOS (4.5/4.6). Continuam sendo servidos para que as
+    // solicitações que viveram aquele fluxo permaneçam legíveis — em modo
+    // somente-leitura. Para toda solicitação da experiência 4.7 eles são `null`,
+    // e a tela não renderiza nada.
     inspection: inspectionState.inspection,
     final_decision: inspectionState.final_decision,
     owner_final_decision: ownerDecision,
+
+    // Fase 4.7.
+    round: currentRound
+      ? {
+          number: currentRound.round_number,
+          minimum_accepted_price: currentRound.minimum_accepted_price,
+        }
+      : null,
+    /** Um item por aceite, do mais recente ao mais antigo. Sem ids internos. */
+    selection_history: selectionHistory,
   };
 }
 
