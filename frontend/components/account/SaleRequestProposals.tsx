@@ -9,6 +9,11 @@ import {
   type SaleRequestProposal,
   type SaleRequestSelectedOffer,
 } from "@/lib/sale-requests/api";
+import {
+  ACCEPT_DIALOG_NOTICE,
+  OWNER_ACCEPT_CONFIRMATION_NOTICE,
+  OWNER_OFFER_COMMITMENT_NOTICE,
+} from "@/lib/sale-requests/handoff";
 
 /**
  * "Propostas recebidas" — a mesa de decisão do proprietário (Fase 4.4).
@@ -108,7 +113,7 @@ function ProposalCard({
         className="mt-4 h-12 w-full rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50 sm:w-auto sm:min-w-[200px]"
         data-testid="sale-request-proposal-select"
       >
-        Selecionar proposta
+        Aceitar oferta
       </button>
     </li>
   );
@@ -126,17 +131,22 @@ function ProposalCard({
  * celular.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * A COPY DIZ EXATAMENTE O QUE ACONTECE, E EXATAMENTE O QUE NÃO ACONTECE
+ * A COPY DIZ EXATAMENTE O QUE ACONTECE — E MUDOU NA FASE 4.7
  * ────────────────────────────────────────────────────────────────────────────
- * "Novas propostas serão encerradas" é a consequência real. "Esta seleção é
- * preliminar" e "o valor ainda poderá ser revisto" impedem a leitura mais
- * perigosa possível — a de que o negócio está fechado por aquele número. Quem
- * acredita ter vendido para de considerar outras saídas para um carro que ainda
- * tem, e descobre a diferença na avaliação presencial, quando já recusou tudo o
- * mais.
+ * A versão da 4.4 dizia que a seleção era "preliminar" e que o valor "ainda
+ * poderá ser revisto". Fazia sentido enquanto a plataforma ia registrar uma
+ * avaliação e uma proposta final: a escolha era mesmo um passo intermediário.
  *
- * Por isso não existe aqui, e não pode passar a existir: "Venda concluída",
- * "Oferta aceita", "Negócio fechado", "Pagamento garantido" ou "Parabéns".
+ * A 4.7 tirou tudo isso do produto. Aceitar uma oferta virou o COMPROMISSO das
+ * duas partes — o lojista ofertou porque quer comprar por aquele valor, e quem
+ * aceita confirma que quer vender nas condições declaradas. Chamar isso de
+ * "preliminar" enfraqueceria a oferta de propósito e convidaria a renegociar por
+ * esporte, que é o que o §4 recusa.
+ *
+ * O que a copy diz agora: a avaliação presencial CONFIRMA as informações, e
+ * divergências relevantes podem levar a loja a revisar o valor ou desistir.
+ * Continua não existindo aqui, e não pode passar a existir: "Venda concluída",
+ * "Negócio fechado", "Pagamento garantido" ou "Parabéns".
  *
  * ────────────────────────────────────────────────────────────────────────────
  * ACESSIBILIDADE
@@ -149,7 +159,7 @@ function ProposalCard({
  *
  * O foco é MANTIDO dentro do diálogo por um ciclo de Tab explícito. Sem isso o
  * teclado sai por trás do overlay e passeia pelos cartões que o diálogo está
- * cobrindo — inclusive pelos outros botões "Selecionar proposta".
+ * cobrindo — inclusive pelos outros botões "Aceitar oferta".
  */
 function ConfirmDialog({
   proposal,
@@ -217,7 +227,7 @@ function ConfirmDialog({
         aria-labelledby="sale-request-select-title"
         aria-describedby="sale-request-select-description"
         // Sem isto, o clique DENTRO do painel borbulharia até o overlay e
-        // fecharia o diálogo — inclusive o clique em "Selecionar proposta".
+        // fecharia o diálogo — inclusive o clique em "Aceitar oferta".
         onClick={(event) => event.stopPropagation()}
         className="w-full max-w-[440px] rounded-t-2xl bg-white p-5 shadow-[0_20px_40px_rgba(16,24,40,0.16)] sm:rounded-2xl sm:p-6"
         data-testid="sale-request-select-dialog"
@@ -226,22 +236,38 @@ function ConfirmDialog({
           id="sale-request-select-title"
           className="text-[17px] font-bold leading-tight text-[#161f34]"
         >
-          Selecionar esta proposta?
+          Aceitar oferta
         </h2>
 
         <div
           id="sale-request-select-description"
           className="mt-3 space-y-3 text-[13.5px] leading-relaxed text-[#475467]"
         >
+          {/*
+            FASE 4.7 — a COPY MUDOU, e a mudança é de produto, não de estilo.
+            ────────────────────────────────────────────────────────────────
+            A versão da 4.4 dizia "Esta seleção é preliminar. O valor ainda
+            poderá ser revisto". Estava certa naquele produto: a plataforma ia
+            registrar uma avaliação e uma proposta final, e a seleção era mesmo
+            um passo intermediário.
+
+            Agora não é. Aceitar uma oferta é o COMPROMISSO das duas partes — o
+            lojista ofertou porque quer comprar por aquele valor, e quem aceita
+            confirma que quer vender nas condições que declarou. Chamar isso de
+            "preliminar" enfraqueceria artificialmente a oferta e convidaria a
+            renegociar por esporte, que é exatamente o que o §4 recusa.
+
+            O que continua verdadeiro — e está logo abaixo — é que a avaliação
+            presencial CONFIRMA as informações, e que divergências relevantes
+            podem levar a loja a revisar ou desistir.
+          */}
           <p>
-            Você está escolhendo{" "}
-            <span className="font-semibold text-[#161f34]">{proposal.store_name}</span> para
-            avançar com a negociação. Após a seleção, novas propostas serão encerradas.
+            Você está aceitando a oferta de{" "}
+            <span className="font-semibold text-[#161f34]">{proposal.store_name}</span> e vai
+            seguir para a avaliação presencial com esta loja.
           </p>
-          <p>
-            Esta seleção é preliminar. O valor ainda poderá ser revisto posteriormente após a
-            avaliação presencial do veículo.
-          </p>
+          <p>{ACCEPT_DIALOG_NOTICE}</p>
+          <p>{OWNER_ACCEPT_CONFIRMATION_NOTICE}</p>
         </div>
 
         {/*
@@ -278,7 +304,7 @@ function ConfirmDialog({
             className="h-12 rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50 sm:min-w-[190px]"
             data-testid="sale-request-select-confirm"
           >
-            {submitting ? "Selecionando…" : "Selecionar proposta"}
+            {submitting ? "Aceitando…" : "Aceitar oferta"}
           </button>
           <button
             ref={cancelRef}
@@ -452,18 +478,54 @@ export default function SaleRequestProposals({
     }
   }
 
-  if (selected) {
+  // ────────────────────────────────────────────────────────────────────────
+  // A ORDEM DESTES DOIS RAMOS É O COMPORTAMENTO (Fase 4.7)
+  // ────────────────────────────────────────────────────────────────────────
+  // Em `handoff_failed` a solicitação AINDA TEM `selected_offer` — o ponteiro
+  // continua apontando para a loja com quem não houve acordo, porque é ela que o
+  // card de handoff mostra.
+  //
+  // Se o ramo do painel de selecionada viesse primeiro, a tela de resseleção
+  // exibiria a loja que acabou de falhar e NENHUMA das outras ofertas — deixando
+  // a saída A do §19 sem interface. Por isso o estado é testado antes.
+  // E em `offer_selected` o painel também NÃO aparece: quem ocupa esse espaço
+  // agora é o card de HANDOFF, que mostra a mesma loja e o mesmo valor MAIS o
+  // endereço e o botão de WhatsApp.
+  //
+  // Renderizar os dois empilharia dois cartões dizendo "Loja Atibaia — R$
+  // 65.000,00" um sobre o outro, e o de cima ainda prometeria "as próximas
+  // etapas de avaliação serão disponibilizadas aqui" — uma frase que a 4.7
+  // tornou falsa.
+  //
+  // O painel sobrevive para os estados LEGADOS (4.5/4.6): lá o card de handoff
+  // não é montado, e ele continua sendo a única âncora da comparação.
+  if (status === "handoff_failed" || status === "offer_selected") {
+    // Cai direto na lista abaixo (vazia em `offer_selected`, com as outras
+    // ofertas em `handoff_failed`).
+  } else if (selected) {
     return <SelectedOfferPanel selected={selected} compact={inspectionStarted} />;
   }
 
-  // Cancelada: a seção some inteira. Não há disputa a mostrar, e um estado vazio
-  // dizendo "nenhuma proposta" seria falso — pode ter havido várias antes do
-  // cancelamento.
-  if (status !== "receiving_offers") return null;
+  // ────────────────────────────────────────────────────────────────────────
+  // FASE 4.7 — A LISTA VOLTA EM `handoff_failed` (§38)
+  // ────────────────────────────────────────────────────────────────────────
+  // Era `status !== "receiving_offers"`, e estava certo: depois da escolha não
+  // havia segunda decisão a tomar.
+  //
+  // Agora há. Quando a negociação com a loja aceita não prossegue, as OUTRAS
+  // ofertas da mesma rodada voltam a ser aceitáveis — é a saída A do §19, e
+  // manter a igualdade antiga deixaria a tela de resseleção sem nada para
+  // resselecionar.
+  //
+  // Cancelada continua sumindo inteira: não há disputa a mostrar, e um estado
+  // vazio dizendo "nenhuma proposta" seria falso — pode ter havido várias antes.
+  if (status !== "receiving_offers" && status !== "handoff_failed") return null;
 
   return (
     <section data-testid="sale-request-proposals">
-      <h2 className="text-[15px] font-bold text-[#161f34]">Propostas recebidas</h2>
+      <h2 className="text-[15px] font-bold text-[#161f34]">
+        {status === "handoff_failed" ? "Outras ofertas recebidas" : "Propostas recebidas"}
+      </h2>
 
       {proposals.length === 0 ? (
         <p
@@ -479,6 +541,25 @@ export default function SaleRequestProposals({
               ? "1 loja enviou proposta."
               : `${proposals.length} lojas enviaram proposta.`}{" "}
             Você pode escolher qualquer uma delas.
+          </p>
+
+          {/*
+            §5 — o aviso de compromisso, VISÍVEL antes de qualquer clique.
+            ─────────────────────────────────────────────────────────────
+            Fica acima dos cartões e não dentro do diálogo por um motivo: o
+            diálogo é lido por quem já decidiu, e este texto existe para
+            informar a decisão — que a oferta é uma intenção REAL de compra, e
+            que o valor está sujeito à confirmação das condições.
+
+            Discreto no peso visual, mas presente: um alerta chamativo aqui
+            faria a tela parecer um aviso de risco, e não há risco nenhum em
+            aceitar uma oferta legítima.
+          */}
+          <p
+            className="mt-3 rounded-xl bg-[#F9FBFF] px-4 py-3 text-[12.5px] leading-relaxed text-[#667085]"
+            data-testid="sale-request-offer-commitment"
+          >
+            {OWNER_OFFER_COMMITMENT_NOTICE}
           </p>
 
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">

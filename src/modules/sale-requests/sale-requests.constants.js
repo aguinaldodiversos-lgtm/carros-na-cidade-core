@@ -30,8 +30,32 @@ export const SALE_REQUEST_STATUS = Object.freeze({
   OFFER_SELECTED: "offer_selected",
 
   // ──────────────────────────────────────────────────────────────────────────
-  // FASE 4.5 — a avaliação presencial e a proposta final
+  // FASE 4.7 — o handoff direto
   // ──────────────────────────────────────────────────────────────────────────
+  // `offer_selected` volta a ser o fim da participação da plataforma: aceita a
+  // oferta, o portal entrega os dados comerciais da loja e as duas partes
+  // combinam a avaliação presencial fora daqui.
+  //
+  // `HANDOFF_FAILED` significa UMA coisa: houve match, e o proprietário informou
+  // que a negociação direta não prosseguiu. NÃO significa lojista culpado,
+  // vendedor culpado, fraude, oferta inválida nem veículo com defeito — o portal
+  // não sabe nada disso, não pergunta e não arbitra.
+  //
+  // Não existe estado de SUCESSO, e a ausência é deliberada (§31): a plataforma
+  // não tem como saber se a venda aconteceu, e um `sold` sem writer seria a
+  // lista morta que a migration 030 documenta em `ads.status`. Uma solicitação
+  // que deu certo simplesmente permanece em `offer_selected`, sem atividade.
+  HANDOFF_FAILED: "handoff_failed",
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FASE 4.5 — LEGADO. Nenhum writer novo alcança estes estados.
+  // ──────────────────────────────────────────────────────────────────────────
+  // A avaliação presencial dentro do portal foi APOSENTADA na 4.7: a plataforma
+  // não registra inspeção, não agenda visita e não conhece proposta final.
+  //
+  // Os valores continuam aqui — e no CHECK do banco — porque linhas que já estão
+  // neles precisam continuar válidas e legíveis. Removê-los invalidaria dados
+  // reais, que é exatamente o que o §11 e o §12 proíbem.
   // `offer_selected` deixou de ser terminal: agora é o começo desta etapa.
   //
   // Os estados do AGENDAMENTO (a loja ainda não mandou horários; mandou e o
@@ -47,10 +71,8 @@ export const SALE_REQUEST_STATUS = Object.freeze({
   FINAL_OFFER_DECLINED: "final_offer_declined",
 
   // ──────────────────────────────────────────────────────────────────────────
-  // FASE 4.6 — a decisão do PROPRIETÁRIO sobre a proposta final
+  // FASE 4.6 — LEGADO, pelo mesmo motivo da 4.5.
   // ──────────────────────────────────────────────────────────────────────────
-  // `final_offer_submitted` deixou de ser espera indefinida: agora tem as duas
-  // saídas que faltavam.
   //
   // `FINAL_OFFER_ACCEPTED` significa UMA coisa — o proprietário aceitou a
   // proposta comercial final. NÃO significa veículo vendido, pagamento
@@ -86,22 +108,65 @@ export const SALE_REQUEST_STATUSES = Object.freeze(Object.values(SALE_REQUEST_ST
  */
 export const SALE_REQUEST_SELECTED_STATUSES = Object.freeze([
   SALE_REQUEST_STATUS.OFFER_SELECTED,
+
+  // Fase 4.7. `handoff_failed` mantém o ponteiro da seleção: é a oferta que
+  // falhou que a tela mostra ("Não houve acordo com a Loja A") enquanto o
+  // proprietário decide entre aceitar outra e abrir nova rodada.
+  SALE_REQUEST_STATUS.HANDOFF_FAILED,
+
+  // Legado 4.5/4.6. Continuam na lista porque as linhas que estão neles
+  // continuam tendo seleção — e o CHECK da 060 enumera exatamente esta lista.
+  //
+  // Esquecer qualquer um aqui não daria erro de compilação em lugar nenhum:
+  // daria três defeitos silenciosos e independentes, todos já vistos neste
+  // domínio. O cancelamento voltaria a responder 200 falso; a tela do
+  // proprietário pararia de carregar a proposta selecionada; e a loja escolhida
+  // receberia 404 na própria oportunidade.
   SALE_REQUEST_STATUS.INSPECTION_SCHEDULED,
   SALE_REQUEST_STATUS.INSPECTION_COMPLETED,
   SALE_REQUEST_STATUS.FINAL_OFFER_SUBMITTED,
   SALE_REQUEST_STATUS.FINAL_OFFER_DECLINED,
-
-  // Fase 4.6. Entram aqui porque chegar a qualquer um dos dois EXIGE ter
-  // passado pela seleção — e o CHECK da 059 enumera exatamente esta lista.
-  //
-  // Esquecê-los aqui não daria erro de compilação em lugar nenhum: daria três
-  // defeitos silenciosos e independentes, todos já vistos neste domínio. O
-  // cancelamento voltaria a responder 200 falso depois do aceite; a tela do
-  // proprietário pararia de carregar a proposta selecionada e a inspeção; e a
-  // loja escolhida receberia 404 na própria oportunidade no instante em que a
-  // decisão fosse registrada.
   SALE_REQUEST_STATUS.FINAL_OFFER_ACCEPTED,
   SALE_REQUEST_STATUS.FINAL_OFFER_REJECTED,
+]);
+
+/**
+ * Os estados LEGADOS das Fases 4.5 e 4.6.
+ *
+ * Existem para uma única pergunta, feita em dois lugares reais: "esta
+ * solicitação está presa na máquina aposentada?". A tela do proprietário usa a
+ * resposta para renderizar o bloco antigo em modo somente-leitura, e o guard do
+ * §32 a usa para recusar qualquer writer daquele fluxo.
+ *
+ * Lista PRÓPRIA e não "tudo menos os ativos", pelo mesmo motivo de todas as
+ * outras deste arquivo: um estado novo criado por uma fase futura não entra em
+ * nenhuma das duas listas, e o erro aparece na hora — em vez de o estado ser
+ * silenciosamente classificado como legado.
+ */
+export const SALE_REQUEST_LEGACY_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.INSPECTION_SCHEDULED,
+  SALE_REQUEST_STATUS.INSPECTION_COMPLETED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_SUBMITTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_DECLINED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_ACCEPTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_REJECTED,
+]);
+
+/**
+ * Os estados em que o proprietário pode ACEITAR uma oferta (Fase 4.7).
+ *
+ * `receiving_offers` é a primeira escolha da rodada. `handoff_failed` é a
+ * RESSELEÇÃO: a negociação com a loja anterior não prosseguiu, e as outras
+ * ofertas daquela rodada voltam a estar disponíveis.
+ *
+ * A lista existe porque a 4.4 escreveu `status === RECEIVING_OFFERS` no `WHERE`
+ * do `UPDATE` de seleção — uma igualdade que estava certa quando só havia uma
+ * escolha possível por solicitação, e que recusaria silenciosamente toda
+ * resseleção desta fase.
+ */
+export const SALE_REQUEST_SELECTABLE_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.RECEIVING_OFFERS,
+  SALE_REQUEST_STATUS.HANDOFF_FAILED,
 ]);
 
 /**
@@ -333,7 +398,57 @@ export const SALE_REQUEST_CODE = Object.freeze({
    * existe nada: a tela precisa dizer coisas diferentes.
    */
   SELECTION_CLOSED: "SALE_REQUEST_SELECTION_CLOSED",
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // HANDOFF E RODADAS (Fase 4.7)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * A solicitação não está num estado que permita informar "não houve acordo".
+   *
+   * Cobre "ainda não tem loja escolhida", "já foi informado" e "cancelada" com
+   * o mesmo código: em todos, a tela de quem clicou está desatualizada e a
+   * correção é a mesma — recarregar. A mensagem diferencia; o código não precisa.
+   */
+  HANDOFF_NOT_ACTIVE: "SALE_REQUEST_HANDOFF_NOT_ACTIVE",
+
+  /**
+   * A loja escolhida não tem WhatsApp comercial utilizável.
+   *
+   * Estado de DADO, não falha do sistema: a loja não preencheu um número que dê
+   * para discar. Código próprio porque a tela precisa dizer isso em vez de
+   * mostrar um botão que abre uma conversa inexistente — e porque a reação
+   * (procurar o endereço, que está logo ali) é diferente de qualquer outro erro.
+   */
+  STORE_WHATSAPP_UNAVAILABLE: "SALE_REQUEST_STORE_WHATSAPP_UNAVAILABLE",
+
+  /**
+   * A solicitação não está num estado que permita abrir nova rodada.
+   *
+   * Só `handoff_failed` permite: abrir rodada durante uma disputa em andamento
+   * apagaria propostas que estão valendo, e abrir depois de um match ativo
+   * atropelaria uma negociação que pode estar acontecendo agora.
+   */
+  ROUND_NOT_ALLOWED: "SALE_REQUEST_ROUND_NOT_ALLOWED",
+
+  /**
+   * O fluxo de avaliação presencial dentro do portal foi APOSENTADO (§32).
+   *
+   * Distinto de `INVALID_STATE` de propósito: não é "o estado não permite
+   * agora", é "este caminho não existe mais para ninguém". A tela que receber
+   * isto está desatualizada em relação ao produto, não em relação ao dado.
+   */
+  LEGACY_FLOW_RETIRED: "SALE_REQUEST_LEGACY_FLOW_RETIRED",
 });
+
+/**
+ * Mensagem única do fluxo aposentado.
+ *
+ * Constante compartilhada porque cinco endpoints a devolvem, e cinco literais
+ * divergiriam na primeira melhoria de redação.
+ */
+export const SALE_REQUEST_LEGACY_FLOW_MESSAGE =
+  "A avaliação presencial deixou de ser registrada na plataforma. Combine diretamente com a outra parte pelo WhatsApp.";
 
 /**
  * Mensagem pública de indisponibilidade de storage.

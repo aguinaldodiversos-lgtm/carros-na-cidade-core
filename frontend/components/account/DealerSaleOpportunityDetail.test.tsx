@@ -127,7 +127,7 @@ describe("cabeçalho e ficha", () => {
 
     expect(await screen.findByText("Avaliação de veículo para compra")).toBeTruthy();
     expect(
-      screen.getByText("Analise as informações declaradas e envie sua proposta preliminar.")
+      screen.getByText("Analise as informações declaradas e envie sua oferta.")
     ).toBeTruthy();
   });
 
@@ -577,18 +577,28 @@ describe("o que esta fase decidiu NÃO ter", () => {
     }
   });
 
-  it("nenhum stepper de fases futuras", async () => {
+  /**
+   * FASE 4.7 — "avaliação presencial" SAIU desta lista.
+   *
+   * O teste proibia a expressão porque, na 4.3, ela só poderia aparecer como
+   * PROMESSA: um stepper anunciando uma etapa que nenhum código escrevia.
+   *
+   * Agora ela aparece por outro motivo — o oposto. O texto diz que a avaliação
+   * acontece DIRETAMENTE entre as partes, fora da plataforma. Continuar
+   * proibindo a expressão obrigaria a explicar o handoff sem nomear a coisa que
+   * está sendo combinada.
+   *
+   * O que a lista ainda proíbe é o que continua sendo promessa vazia:
+   * documentação, transferência e checklist. Nenhum deles tem writer, e nenhum
+   * vai ganhar um nesta fase.
+   */
+  it("nenhum stepper de fases que a plataforma não executa", async () => {
     const { container } = render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-sale-opportunity-detail");
 
     const text = container.textContent?.toLowerCase() ?? "";
-    for (const term of [
-      "avaliação presencial",
-      "documentação e transferência",
-      "negociação",
-      "checklist",
-    ]) {
-      expect(text).not.toContain(term);
+    for (const term of ["documentação e transferência", "checklist", "pagamento"]) {
+      expect(text, term).not.toContain(term);
     }
   });
 

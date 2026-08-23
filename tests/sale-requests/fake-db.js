@@ -46,6 +46,10 @@ export const db = {
   saleRequestDecisions: [],
   /** Fase 4.6 — a resposta do proprietario. UMA por solicitacao, append-only. */
   saleRequestOwnerDecisions: [],
+  /** Fase 4.7 — as rodadas de ofertas. Uma solicitacao comeca na rodada 1. */
+  saleRequestRounds: [],
+  /** Fase 4.7 — o desfecho do handoff. APPEND-ONLY, um por selecao. */
+  saleRequestHandoffOutcomes: [],
   nextRequestId: 1,
   nextImageId: 1,
   nextOfferId: 1,
@@ -55,6 +59,8 @@ export const db = {
   nextSlotId: 1,
   nextDecisionId: 1,
   nextOwnerDecisionId: 1,
+  nextRoundId: 1,
+  nextOutcomeId: 1,
   /** Todas as chaves já usadas — espelha o UNIQUE GLOBAL da migration 053. */
   usedStorageKeys: new Set(),
 };
@@ -72,6 +78,8 @@ export function resetDb(seed = {}) {
   db.saleRequestInspectionSlots = seed.saleRequestInspectionSlots ?? [];
   db.saleRequestDecisions = seed.saleRequestDecisions ?? [];
   db.saleRequestOwnerDecisions = seed.saleRequestOwnerDecisions ?? [];
+  db.saleRequestRounds = seed.saleRequestRounds ?? [];
+  db.saleRequestHandoffOutcomes = seed.saleRequestHandoffOutcomes ?? [];
   db.nextRequestId = seed.nextRequestId ?? 1;
   db.nextImageId = seed.nextImageId ?? 1;
   db.nextOfferId = seed.nextOfferId ?? 1;
@@ -81,6 +89,8 @@ export function resetDb(seed = {}) {
   db.nextSlotId = seed.nextSlotId ?? 1;
   db.nextDecisionId = seed.nextDecisionId ?? 1;
   db.nextOwnerDecisionId = seed.nextOwnerDecisionId ?? 1;
+  db.nextRoundId = seed.nextRoundId ?? 1;
+  db.nextOutcomeId = seed.nextOutcomeId ?? 1;
   db.usedStorageKeys = new Set(
     (seed.saleRequestImages ?? []).map((image) => image.storage_key)
   );
@@ -353,10 +363,15 @@ function storeColumnsOf(advertiserId) {
  * teste de "uma linha por loja" passar mesmo se alguém apagasse o `DISTINCT ON`.
  */
 function currentOffersOf(saleRequestId) {
+  // FASE 4.7 — so a rodada ABERTA. Depois de uma rodada nova, as ofertas da
+  // anterior ficam no historico e NAO voltam a ser selecionaveis.
+  const round = currentRoundOf(saleRequestId);
+  if (!round) return [];
   const byAdvertiser = new Map();
 
   for (const offer of db.saleRequestOffers) {
     if (!sameId(offer.sale_request_id, saleRequestId)) continue;
+    if (!offerInRound(offer, round.id, saleRequestId)) continue;
 
     const key = String(offer.advertiser_id);
     const current = byAdvertiser.get(key);
@@ -373,6 +388,72 @@ function currentOffersOf(saleRequestId) {
 }
 
 /** A inspecao de uma solicitacao, ou null. */
+/**
+ * A rodada ABERTA de uma solicitacao.
+ *
+ * Casa o par (sale_request_id, current_round_number), como a query real — e nao
+ * "a de maior numero". A diferenca importa: um teste que semeasse a rodada 2 sem
+ * mover o ponteiro passaria com MAX e falha aqui, que e o alarme certo.
+ */
+/**
+ * A oferta pertence a esta rodada?
+ *
+ * `round_id` ausente conta como RODADA 1 — a mesma tradução que o backfill da
+ * migration 060 fez com as ofertas que já existiam: elas foram feitas antes de
+ * a coluna existir, e todas pertencem à primeira disputa.
+ *
+ * Os fixtures deste diretório empurram ofertas direto em `db.saleRequestOffers`
+ * sem `round_id`, e é isso que os mantém válidos sem reescrever quarenta seeds.
+ * Uma oferta gravada pelo SERVICE sempre tem `round_id` — é `NOT NULL` no banco
+ * e parâmetro obrigatório no INSERT do repositório.
+ */
+function offerInRound(offer, roundId, saleRequestId) {
+  if (offer.round_id != null) return sameId(offer.round_id, roundId);
+
+  const round = db.saleRequestRounds.find((r) => sameId(r.id, roundId));
+  return Boolean(round) && Number(round.round_number) === 1 && sameId(round.sale_request_id, saleRequestId);
+}
+
+function currentRoundOf(saleRequestId) {
+  const request = db.saleRequests.find((r) => sameId(r.id, saleRequestId));
+  if (!request) return null;
+
+  const number = request.current_round_number ?? 1;
+  const found = db.saleRequestRounds.find(
+    (r) => sameId(r.sale_request_id, saleRequestId) && Number(r.round_number) === Number(number)
+  );
+  if (found) return found;
+
+  // ────────────────────────────────────────────────────────────────────────
+  // A RODADA 1 NASCE SOZINHA — E ISSO ENCODA UM INVARIANTE REAL
+  // ────────────────────────────────────────────────────────────────────────
+  // "Toda solicitação tem rodada" é VERDADE no sistema real, por dois caminhos
+  // independentes: a transação de publicação cria a rodada 1 junto da linha, e
+  // o backfill da migration 060 criou a rodada 1 de todo registro que já
+  // existia. Uma solicitação sem rodada é inexprimível em produção.
+  //
+  // Os fixtures deste diretório, porém, empurram linhas direto em
+  // `db.saleRequests` — eles nasceram antes das rodadas existirem. Criar a
+  // rodada 1 sob demanda aqui reproduz o invariante em vez de obrigar quarenta
+  // fixtures a repetir o mesmo boilerplate.
+  //
+  // O que isto NÃO esconde: a rodada 2 nunca é criada sozinha. Só o
+  // `INSERT INTO sale_request_rounds` do service a cria, e o UNIQUE está
+  // re-implementado lá — então os testes de nova rodada continuam provando o
+  // caminho real.
+  if (Number(number) !== 1) return null;
+
+  const created = {
+    id: db.nextRoundId++,
+    sale_request_id: request.id,
+    round_number: 1,
+    minimum_accepted_price: request.minimum_accepted_price ?? null,
+    created_at: request.created_at ?? new Date(fakeClock.now()).toISOString(),
+  };
+  db.saleRequestRounds.push(created);
+  return created;
+}
+
 function inspectionOf(saleRequestId) {
   return (
     db.saleRequestInspections.find((i) => sameId(i.sale_request_id, saleRequestId)) ?? null
@@ -420,6 +501,279 @@ function projectInspection(inspection) {
 }
 
 function handle(text, params, now) {
+
+  // ==========================================================================
+  // FASE 4.7 — RODADAS E HANDOFF
+  // ==========================================================================
+  // Primeiro de todos: o SQL desta fase acrescentou colunas e JOINs a queries
+  // que os padroes das fases anteriores ainda casariam — e o primeiro ramo a
+  // casar responde.
+
+  // --- INSERT de rodada -----------------------------------------------------
+  //
+  // O UNIQUE (sale_request_id, round_number) e re-implementado de verdade: e ele
+  // que faz o teste do §43 falhar se alguem remover o ON CONFLICT do repository.
+  if (/^INSERT INTO sale_request_rounds/i.test(text)) {
+    const [saleRequestId, roundNumber, minimum] = params;
+
+    const already = db.saleRequestRounds.find(
+      (r) => sameId(r.sale_request_id, saleRequestId) && Number(r.round_number) === Number(roundNumber)
+    );
+    if (already) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextRoundId++,
+      sale_request_id: saleRequestId,
+      round_number: Number(roundNumber),
+      minimum_accepted_price: minimum ?? null,
+      created_at: new Date(now).toISOString(),
+    };
+    db.saleRequestRounds.push(row);
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          round_number: row.round_number,
+          minimum_accepted_price: row.minimum_accepted_price,
+          created_at: row.created_at,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: a rodada ABERTA ---------------------------------------------
+  if (/FROM sale_request_rounds r JOIN sale_requests sr/i.test(text)) {
+    const round = currentRoundOf(params[0]);
+    return round
+      ? {
+          rows: [
+            {
+              id: round.id,
+              round_number: round.round_number,
+              minimum_accepted_price: round.minimum_accepted_price ?? null,
+              created_at: round.created_at,
+            },
+          ],
+          rowCount: 1,
+        }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- UPDATE: abre a rodada e reabre a disputa, num comando so -------------
+  if (/^UPDATE sale_requests SET current_round_number = \$3/i.test(text)) {
+    const [saleRequestId, ownerUserId, roundNumber, fromStatus, toStatus] = params;
+
+    const row = db.saleRequests.find(
+      (r) =>
+        sameId(r.id, saleRequestId) &&
+        sameId(r.owner_user_id, ownerUserId) &&
+        r.status === fromStatus &&
+        Number(r.current_round_number ?? 1) === Number(roundNumber) - 1
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    row.current_round_number = Number(roundNumber);
+    row.status = toStatus;
+    // O ponteiro volta a NULL: o CHECK de coerencia da 060 exige, e o historico
+    // fica na trilha de selecoes.
+    row.selected_offer_id = null;
+    row.selected_offer_at = null;
+    row.updated_at = new Date(now).toISOString();
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- SELECT: lista de rodadas --------------------------------------------
+  if (/^SELECT id, round_number, minimum_accepted_price, created_at FROM sale_request_rounds WHERE sale_request_id = \$1/i.test(text)) {
+    const rows = db.saleRequestRounds
+      .filter((r) => sameId(r.sale_request_id, params[0]))
+      .sort((a, b) => Number(a.round_number) - Number(b.round_number))
+      .map((r) => ({
+        id: r.id,
+        round_number: r.round_number,
+        minimum_accepted_price: r.minimum_accepted_price ?? null,
+        created_at: r.created_at,
+      }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- LOCK do proprietario para o handoff ----------------------------------
+  //
+  // FOR UPDATE puro e SEM JOIN, como a 4.6 — o que distingue os dois e a coluna
+  // current_round_number na projecao.
+  if (
+    /^SELECT id, status, selected_offer_id, current_round_number FROM sale_requests WHERE id = \$1 AND owner_user_id = \$2 FOR UPDATE/i.test(
+      text
+    )
+  ) {
+    const [saleRequestId, ownerUserId] = params;
+    const row = db.saleRequests.find(
+      (r) => sameId(r.id, saleRequestId) && sameId(r.owner_user_id, ownerUserId)
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          status: row.status,
+          selected_offer_id: row.selected_offer_id ?? null,
+          current_round_number: row.current_round_number ?? 1,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: a selecao ATUAL (casada pelo ponteiro) -----------------------
+  if (
+    /^SELECT id, round_id, offer_id, advertiser_id, amount_snapshot, selected_at FROM sale_request_offer_selections WHERE sale_request_id = \$1 AND offer_id = \$2/i.test(
+      text
+    )
+  ) {
+    const [saleRequestId, offerId] = params;
+    const row = db.saleRequestOfferSelections.find(
+      (sel) => sameId(sel.sale_request_id, saleRequestId) && sameId(sel.offer_id, offerId)
+    );
+    return row
+      ? {
+          rows: [
+            {
+              id: row.id,
+              round_id: row.round_id ?? null,
+              offer_id: row.offer_id,
+              advertiser_id: row.advertiser_id,
+              amount_snapshot: row.amount_snapshot,
+              selected_at: row.selected_at,
+            },
+          ],
+          rowCount: 1,
+        }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- SELECT: desfecho ja registrado --------------------------------------
+  if (/FROM sale_request_handoff_outcomes WHERE selection_id = \$1/i.test(text)) {
+    const row = db.saleRequestHandoffOutcomes.find((o) => sameId(o.selection_id, params[0]));
+    return row
+      ? { rows: [{ id: row.id, outcome: row.outcome, created_at: row.created_at }], rowCount: 1 }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- INSERT do desfecho ---------------------------------------------------
+  //
+  // O UNIQUE (selection_id) e re-implementado: e ele que torna o retry de "nao
+  // houve acordo" idempotente mesmo sem lock.
+  if (/^INSERT INTO sale_request_handoff_outcomes/i.test(text)) {
+    const [saleRequestId, selectionId, outcome, recordedBy] = params;
+
+    const already = db.saleRequestHandoffOutcomes.find((o) => sameId(o.selection_id, selectionId));
+    if (already) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextOutcomeId++,
+      sale_request_id: saleRequestId,
+      selection_id: selectionId,
+      outcome,
+      recorded_by_user_id: recordedBy,
+      created_at: new Date(now).toISOString(),
+    };
+    db.saleRequestHandoffOutcomes.push(row);
+    return {
+      rows: [{ id: row.id, outcome: row.outcome, created_at: row.created_at }],
+      rowCount: 1,
+    };
+  }
+
+  // --- UPDATE: move o status no handoff (sem mexer no ponteiro) -------------
+  if (
+    /^UPDATE sale_requests SET status = \$4, updated_at = NOW\(\) WHERE id = \$1 AND owner_user_id = \$2 AND status = \$3/i.test(
+      text
+    )
+  ) {
+    const [saleRequestId, ownerUserId, fromStatus, toStatus] = params;
+    const row = db.saleRequests.find(
+      (r) =>
+        sameId(r.id, saleRequestId) &&
+        sameId(r.owner_user_id, ownerUserId) &&
+        r.status === fromStatus
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+    row.status = toStatus;
+    row.updated_at = new Date(now).toISOString();
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- SELECT: contato COMERCIAL da loja escolhida --------------------------
+  //
+  // A unica query do dominio que projeta um canal de contato. O fake respeita a
+  // allowlist da query real: nada de email, phone, mobile_phone, telephone nem
+  // telefone — o teste de privacidade depende disso, e nao de o DTO lembrar de
+  // omitir.
+  if (/adv\.whatsapp\s+AS store_whatsapp/i.test(text)) {
+    const [saleRequestId, ownerUserId] = params;
+    const request = db.saleRequests.find(
+      (r) => sameId(r.id, saleRequestId) && sameId(r.owner_user_id, ownerUserId)
+    );
+    if (!request || request.selected_offer_id == null) return { rows: [], rowCount: 0 };
+
+    const offer = db.saleRequestOffers.find(
+      (o) => sameId(o.id, request.selected_offer_id) && sameId(o.sale_request_id, request.id)
+    );
+    if (!offer) return { rows: [], rowCount: 0 };
+
+    const advertiser = db.advertisers.find((a) => sameId(a.id, offer.advertiser_id));
+    if (!advertiser) return { rows: [], rowCount: 0 };
+
+    const city = cityOf(advertiser.city_id);
+
+    return {
+      rows: [
+        {
+          advertiser_id: advertiser.id,
+          store_name: advertiser.name ?? null,
+          store_address: advertiser.address ?? null,
+          store_whatsapp: advertiser.whatsapp ?? null,
+          store_city_name: city?.name ?? null,
+          store_city_state: city?.state ?? null,
+          offer_amount: offer.amount,
+          vehicle_brand: request.brand,
+          vehicle_model: request.model,
+          vehicle_year: request.year,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: historico de selecoes ---------------------------------------
+  if (/LEFT JOIN sale_request_handoff_outcomes out/i.test(text)) {
+    const rows = db.saleRequestOfferSelections
+      .filter((sel) => sameId(sel.sale_request_id, params[0]))
+      .sort((a, b) => {
+        const byDate = new Date(b.selected_at).getTime() - new Date(a.selected_at).getTime();
+        if (byDate !== 0) return byDate;
+        return Number(b.id) - Number(a.id);
+      })
+      .map((sel) => {
+        const advertiser = db.advertisers.find((a) => sameId(a.id, sel.advertiser_id));
+        const round = db.saleRequestRounds.find((r) => sameId(r.id, sel.round_id));
+        const outcome = db.saleRequestHandoffOutcomes.find((o) => sameId(o.selection_id, sel.id));
+        return {
+          id: sel.id,
+          round_id: sel.round_id ?? null,
+          offer_id: sel.offer_id,
+          amount_snapshot: sel.amount_snapshot,
+          selected_at: sel.selected_at,
+          store_name: advertiser?.name ?? null,
+          round_number: round?.round_number ?? 1,
+          outcome: outcome?.outcome ?? null,
+          outcome_at: outcome?.created_at ?? null,
+        };
+      });
+    return { rows, rowCount: rows.length };
+  }
 
   // ==========================================================================
   // FASE 4.6 — A DECISAO DO PROPRIETARIO SOBRE A PROPOSTA FINAL
@@ -1026,7 +1380,7 @@ function handle(text, params, now) {
   // mutex), este ramo deixa de casar e os testes de seleção caem — que é o
   // alarme certo.
   if (
-    /^SELECT id, status, selected_offer_id FROM sale_requests WHERE id = \$1 AND owner_user_id = \$2 FOR UPDATE/i.test(
+    /^SELECT id, status, selected_offer_id, current_round_number FROM sale_requests WHERE id = \$1 AND owner_user_id = \$2 FOR UPDATE/i.test(
       text
     )
   ) {
@@ -1057,13 +1411,18 @@ function handle(text, params, now) {
   // o teste "oferta de outra solicitação é recusada" falhar — que é o ponto
   // deste fake existir.
   if (
-    /^SELECT id, advertiser_id, dealer_user_id, amount FROM sale_request_offers WHERE id = \$1 AND sale_request_id = \$2/i.test(
+    /^SELECT id, advertiser_id, dealer_user_id, amount, round_id FROM sale_request_offers WHERE id = \$1 AND sale_request_id = \$2 AND round_id = \$3/i.test(
       text
     )
   ) {
-    const [offerId, saleRequestId] = params;
+    const [offerId, saleRequestId, roundId] = params;
+    // O round_id no WHERE e o que impede aceitar, na rodada 2, uma oferta feita
+    // na rodada 1 — ela foi feita sob outro piso.
     const offer = db.saleRequestOffers.find(
-      (item) => sameId(item.id, offerId) && sameId(item.sale_request_id, saleRequestId)
+      (item) =>
+        sameId(item.id, offerId) &&
+        sameId(item.sale_request_id, saleRequestId) &&
+        offerInRound(item, roundId, saleRequestId)
     );
     return {
       rows: offer
@@ -1081,7 +1440,16 @@ function handle(text, params, now) {
   }
 
   // --- sale_request_offers: as propostas ATUAIS do proprietário -------------
-  if (/FROM sale_request_offers o JOIN sale_requests sr ON sr\.id = o\.sale_request_id/i.test(text)) {
+  // O `DISTINCT ON (o.advertiser_id)` faz parte do padrão de propósito.
+  //
+  // Sem ele, este ramo passou a casar TAMBÉM a query em lote do feed (Fase 4.7),
+  // que ganhou o mesmo `FROM sale_request_offers o JOIN sale_requests sr` ao ser
+  // escopada por rodada — e como o primeiro ramo a casar responde, o feed
+  // recebia a lista do proprietário e mostrava `null` em todo card.
+  if (
+    /DISTINCT ON \(o\.advertiser_id\)/i.test(text) &&
+    /FROM sale_request_offers o JOIN sale_requests sr ON sr\.id = o\.sale_request_id/i.test(text)
+  ) {
     const [saleRequestId, ownerUserId] = params;
 
     const saleRequest = db.saleRequests.find(
@@ -1115,16 +1483,22 @@ function handle(text, params, now) {
   // de segurança do §12 está no SQL, e não numa checagem em JS que o fake
   // pudesse estar simulando por conta própria.
   if (/^INSERT INTO sale_request_offer_selections/i.test(text)) {
-    const [saleRequestId, offerId, advertiserId, selectedByUserId, amountSnapshot] = params;
+    const [saleRequestId, roundId, offerId, advertiserId, selectedByUserId, amountSnapshot] =
+      params;
 
-    const exists = db.saleRequestOfferSelections.some((item) =>
-      sameId(item.sale_request_id, saleRequestId)
+    // FASE 4.7 — a chave é (sale_request_id, offer_id), não mais só a
+    // solicitação. A trilha deixou de ser única por solicitação: depois de "não
+    // houve acordo" o proprietário aceita OUTRA oferta, e a anterior permanece.
+    // O que continua impossível é aceitar DUAS VEZES a mesma oferta.
+    const exists = db.saleRequestOfferSelections.some(
+      (item) => sameId(item.sale_request_id, saleRequestId) && sameId(item.offer_id, offerId)
     );
     if (exists) return { rows: [], rowCount: 0 };
 
     const row = {
       id: db.nextSelectionId,
       sale_request_id: saleRequestId,
+      round_id: roundId,
       offer_id: offerId,
       advertiser_id: advertiserId,
       selected_by_user_id: selectedByUserId,
@@ -1142,14 +1516,22 @@ function handle(text, params, now) {
   // As TRÊS cláusulas do `WHERE` são reproduzidas — id, dono e status. Apagar
   // qualquer uma delas do repository faz um teste diferente falhar: a posse, a
   // transição única, ou as duas.
-  if (/^UPDATE sale_requests SET status = \$4, selected_offer_id = \$3/i.test(text)) {
-    const [id, ownerUserId, offerId, selectedStatus, receivingStatus] = params;
+  // FASE 4.7 — a lista de estados selecionáveis entra como `= ANY($5)`.
+  //
+  // Era `AND status = $5` com um valor só (`receiving_offers`). A resseleção
+  // depois de "não houve acordo" parte de `handoff_failed`, e a igualdade antiga
+  // recusaria o UPDATE em silêncio. O fake reproduz a LISTA, e não um segundo
+  // valor fixo: um estado novo esquecido no service faz este ramo não casar, que
+  // é o alarme certo.
+  if (/^UPDATE sale_requests SET status = \$3, selected_offer_id = \$4/i.test(text)) {
+    const [id, ownerUserId, selectedStatus, offerId, selectableStatuses] = params;
+    const allowed = Array.isArray(selectableStatuses) ? selectableStatuses : [selectableStatuses];
 
     const row = db.saleRequests.find(
       (item) =>
         sameId(item.id, id) &&
         sameId(item.owner_user_id, ownerUserId) &&
-        item.status === receivingStatus
+        allowed.includes(item.status)
     );
     if (!row) return { rows: [], rowCount: 0 };
 
@@ -1271,7 +1653,7 @@ function handle(text, params, now) {
   // query do lock. Se alguém movê-lo para uma segunda leitura (fora do mutex),
   // este ramo deixa de casar e os testes de oferta caem — que é o alarme certo.
   if (
-    /^SELECT id, status, minimum_accepted_price FROM sale_requests WHERE id = \$1 AND city_id = \$2 FOR UPDATE/i.test(
+    /^SELECT sr\.id, sr\.status, sr\.minimum_accepted_price, sr\.current_round_number FROM sale_requests sr WHERE sr\.id = \$1 AND sr\.city_id = \$2 FOR UPDATE/i.test(
       text
     )
   ) {
@@ -1290,6 +1672,7 @@ function handle(text, params, now) {
               // `null` — nunca como `undefined`, que passaria despercebido numa
               // comparação e nunca como 0, que seria um piso inventado.
               minimum_accepted_price: row.minimum_accepted_price ?? null,
+              current_round_number: row.current_round_number ?? 1,
             },
           ]
         : [],
@@ -1298,9 +1681,13 @@ function handle(text, params, now) {
   }
 
   // --- sale_request_offers: a MAIOR proposta --------------------------------
-  if (/^SELECT amount FROM sale_request_offers WHERE sale_request_id = \$1 ORDER BY amount DESC/i.test(text)) {
+  if (/^SELECT amount FROM sale_request_offers WHERE sale_request_id = \$1 AND round_id = \$2 ORDER BY amount DESC/i.test(text)) {
     const rows = db.saleRequestOffers
-      .filter((offer) => sameId(offer.sale_request_id, params[0]))
+      .filter(
+        (offer) =>
+          sameId(offer.sale_request_id, params[0]) &&
+          offerInRound(offer, params[1], params[0])
+      )
       .sort((a, b) => {
         const byAmount = Number(b.amount) - Number(a.amount);
         if (byAmount !== 0) return byAmount;
@@ -1314,13 +1701,14 @@ function handle(text, params, now) {
   // --- sale_request_offers: a proposta VIGENTE de uma loja ------------------
   //
   // A mais RECENTE, não a maior — é a diferença que o repository documenta.
-  if (/FROM sale_request_offers WHERE sale_request_id = \$1 AND advertiser_id = \$2 ORDER BY created_at DESC/i.test(text)) {
-    const [saleRequestId, advertiserId] = params;
+  if (/FROM sale_request_offers WHERE sale_request_id = \$1 AND advertiser_id = \$2 AND round_id = \$3 ORDER BY created_at DESC/i.test(text)) {
+    const [saleRequestId, advertiserId, roundId] = params;
     const rows = db.saleRequestOffers
       .filter(
         (offer) =>
           sameId(offer.sale_request_id, saleRequestId) &&
-          sameId(offer.advertiser_id, advertiserId)
+          sameId(offer.advertiser_id, advertiserId) &&
+          offerInRound(offer, roundId, saleRequestId)
       )
       .sort((a, b) => {
         const byDate = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -1344,10 +1732,11 @@ function handle(text, params, now) {
 
   // --- sale_request_offers: INSERT (append-only) ----------------------------
   if (/^INSERT INTO sale_request_offers/i.test(text)) {
-    const [saleRequestId, dealerUserId, advertiserId, amount, note] = params;
+    const [saleRequestId, roundId, dealerUserId, advertiserId, amount, note] = params;
     const row = {
       id: db.nextOfferId++,
       sale_request_id: saleRequestId,
+      round_id: roundId,
       dealer_user_id: dealerUserId,
       advertiser_id: advertiserId,
       amount,
@@ -1370,13 +1759,19 @@ function handle(text, params, now) {
   }
 
   // --- sale_request_offers: estado de disputa EM LOTE -----------------------
-  if (/MAX\(amount\) FILTER \(WHERE advertiser_id = \$2\)/i.test(text)) {
+  if (/MAX\(o\.amount\) FILTER \(WHERE o\.advertiser_id = \$2\)/i.test(text)) {
     const ids = Array.isArray(params[0]) ? params[0] : [];
     const advertiserId = params[1];
 
     const grouped = new Map();
     for (const offer of db.saleRequestOffers) {
       if (!ids.some((id) => sameId(id, offer.sale_request_id))) continue;
+
+      // FASE 4.7 — só a rodada ABERTA, como a query real. Uma oferta da rodada
+      // anterior não pode aparecer como "minha proposta" no card.
+      const round = currentRoundOf(offer.sale_request_id);
+      if (!round || !offerInRound(offer, round.id, offer.sale_request_id)) continue;
+
       const key = String(offer.sale_request_id);
       const current = grouped.get(key) || { highest: null, mine: null, total: 0 };
       current.total += 1;

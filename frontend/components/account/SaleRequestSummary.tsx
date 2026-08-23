@@ -1,5 +1,7 @@
 "use client";
 
+import { PUBLISH_ACCURACY_NOTICE } from "@/lib/sale-requests/handoff";
+
 import {
   SALE_REQUEST_PHOTOS,
   formatMoneyValue,
@@ -312,6 +314,24 @@ export default function SaleRequestSummary({
           )}
           {submitting ? "Enviando…" : "Enviar meu carro para as lojas"}
         </button>
+
+        {/*
+          §7 — a responsabilidade de DECLARAR CORRETAMENTE, dita antes de publicar.
+          ─────────────────────────────────────────────────────────────────────
+          Não é um termo de aceite e não vira formulário técnico: a pessoa
+          declara o que conhece do próprio carro. O que este texto adiciona é a
+          CONSEQUÊNCIA — uma divergência relevante na avaliação presencial pode
+          fazer a loja revisar ou retirar a oferta.
+
+          Fica junto do botão porque é aqui que a decisão acontece. No topo do
+          formulário, vinte campos antes, ninguém lembraria dele.
+        */}
+        <p
+          className="mt-3 text-[11.5px] leading-relaxed text-[#667085]"
+          data-testid="sale-request-accuracy-notice"
+        >
+          {PUBLISH_ACCURACY_NOTICE}
+        </p>
       </div>
 
       {/* ── Progresso e checklist ────────────────────────────────────────── */}

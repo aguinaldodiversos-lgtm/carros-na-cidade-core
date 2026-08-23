@@ -8,7 +8,8 @@ import VehicleEvaluationSheet, {
   DataRow,
 } from "@/components/account/VehicleEvaluationSheet";
 import SaleRequestProposals from "@/components/account/SaleRequestProposals";
-import SaleRequestInspection from "@/components/account/SaleRequestInspection";
+import SaleRequestHandoff from "@/components/account/SaleRequestHandoff";
+import SaleRequestLegacyFlow from "@/components/account/SaleRequestLegacyFlow";
 import {
   DECLARED_CONDITION_OPTIONS,
   NOT_INFORMED,
@@ -35,6 +36,7 @@ import type {
   PostInspectionDecision,
 } from "@/lib/sale-requests/inspection";
 import type { OwnerFinalDecision } from "@/lib/sale-requests/final-decision";
+import type { SaleRequestRound, SelectionHistoryEntry } from "@/lib/sale-requests/handoff";
 
 /**
  * Detalhe de UMA solicitação, para o dono.
@@ -117,6 +119,9 @@ export default function SaleRequestDetail({ id }: { id: string }) {
   const [finalDecision, setFinalDecision] = useState<PostInspectionDecision | null>(null);
   /** Fase 4.6 — a resposta do proprietário à proposta final. */
   const [ownerDecision, setOwnerDecision] = useState<OwnerFinalDecision | null>(null);
+  /** Fase 4.7 — a rodada aberta e o histórico de matches. */
+  const [round, setRound] = useState<SaleRequestRound | null>(null);
+  const [selectionHistory, setSelectionHistory] = useState<SelectionHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -146,6 +151,12 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         setInspection(response.inspection ?? null);
         setFinalDecision(response.final_decision ?? null);
         setOwnerDecision(response.owner_final_decision ?? null);
+        setRound(response.round ?? null);
+        // Coerção defensiva, como a de `proposals`: uma resposta inesperada não
+        // pode derrubar a tela inteira por causa do histórico.
+        setSelectionHistory(
+          Array.isArray(response.selection_history) ? response.selection_history : []
+        );
       })
       .catch((failure) => {
         if (alive) {
@@ -315,25 +326,50 @@ export default function SaleRequestDetail({ id }: { id: string }) {
       </div>
 
       {/*
-        FASE 4.5 — a avaliação presencial.
+        FASE 4.7 — o HANDOFF DIRETO.
+
+        Substituiu o painel de avaliação presencial da 4.5. A plataforma deixou
+        de agendar visita, registrar inspeção e intermediar proposta final: ela
+        entrega o contato comercial da loja aceita, e a negociação acontece entre
+        as duas partes.
 
         Fica logo abaixo do bloco de propostas porque é a CONTINUAÇÃO dele: a
-        pessoa escolheu uma loja ali em cima, e o que acontece a seguir é isto.
-        O componente decide sozinho qual dos cinco momentos mostrar.
+        pessoa aceitou uma oferta ali em cima, e o que acontece a seguir é isto.
+        O componente decide sozinho entre o match ativo e o "não houve acordo".
 
-        Só é montado depois de existir uma seleção — antes disso não há
-        avaliação nenhuma, e um card de espera no meio da disputa faria a
-        pessoa achar que precisa fazer algo.
+        `hasOtherOffers` alimenta o separador "ou" do §38: em `handoff_failed`
+        com outras propostas na tela, a nova rodada é a SEGUNDA saída; sem elas,
+        é a única.
       */}
-      {selectedOffer ? (
+      <div className="mt-4">
+        <SaleRequestHandoff
+          saleRequestId={request.id}
+          request={request}
+          selected={selectedOffer}
+          round={round}
+          history={selectionHistory}
+          hasOtherOffers={proposals.length > 0}
+          onChanged={() => setReloadToken((value) => value + 1)}
+        />
+      </div>
+
+      {/*
+        LEGADO 4.5/4.6 — somente leitura.
+
+        As solicitações que viveram o fluxo antigo continuam mostrando a
+        avaliação registrada e a proposta final. Nenhuma delas tem ação: os
+        writers foram aposentados e os formulários não existem mais.
+
+        Para toda solicitação da experiência 4.7 os dois blocos são `null` e nada
+        é renderizado.
+      */}
+      {inspection || finalDecision ? (
         <div className="mt-4">
-          <SaleRequestInspection
-            saleRequestId={request.id}
+          <SaleRequestLegacyFlow
             request={request}
             inspection={inspection}
             decision={finalDecision}
             ownerDecision={ownerDecision}
-            onChanged={() => setReloadToken((value) => value + 1)}
           />
         </div>
       ) : null}

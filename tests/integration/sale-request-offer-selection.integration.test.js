@@ -231,6 +231,19 @@ async function insertSaleRequest({
      RETURNING id`,
     [ownerId ?? world.ownerId, cityId ?? world.cityId, minimumAcceptedPrice, status]
   );
+
+  // FASE 4.7 — a RODADA 1.
+  //
+  // A publicacao real cria a rodada na mesma transacao da solicitacao, e toda
+  // oferta carrega `round_id` NOT NULL com FK composta. Um fixture que insere a
+  // solicitacao a mao precisa criar a rodada tambem, senao a solicitacao nasce
+  // incapaz de receber proposta — um estado que producao nao produz.
+  await pool.query(
+    `INSERT INTO sale_request_rounds (sale_request_id, round_number, minimum_accepted_price)
+     VALUES ($1, 1, $2)`,
+    [rows[0].id, minimumAcceptedPrice]
+  );
+
   return String(rows[0].id);
 }
 
@@ -388,7 +401,22 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
        ORDER BY conname`
     );
 
-    expect(fks.map((row) => row.references_table).sort()).toEqual(
+    // ────────────────────────────────────────────────────────────────────
+    // FASE 4.7 — a rodada NÃO ganhou FK própria aqui, e isso é deliberado
+    // ────────────────────────────────────────────────────────────────────
+    // `sale_request_offer_selections.round_id` existe, mas não aponta para
+    // `sale_request_rounds` diretamente. Ele é provado por TRANSITIVIDADE: a FK
+    // de 4 colunas exige que a rodada da seleção seja a mesma da OFERTA, e a
+    // oferta já tem FK composta provando que a rodada dela é uma rodada daquela
+    // solicitação.
+    //
+    // Uma FK direta seria redundante — e o §9 da fase anterior é explícito:
+    // índice sem consumidor é custo de escrita permanente em troca de nada.
+    //
+    // São CINCO constraints sobre QUATRO tabelas: `sale_request_offers` aparece
+    // duas vezes (a tripla da 4.4.1 e a de 4 colunas da 4.7).
+    expect(fks).toHaveLength(5);
+    expect([...new Set(fks.map((row) => row.references_table))].sort()).toEqual(
       ["advertisers", "sale_request_offers", "sale_requests", "users"].sort()
     );
 
@@ -397,13 +425,33 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
       expect(fk.confdeltype, `${fk.conname} não é NO ACTION`).toBe("a");
     }
 
-    const { rows: unique } = await pool.query(
+    // ────────────────────────────────────────────────────────────────────
+    // A UNIQUE MUDOU DE CHAVE NA FASE 4.7 — e a asserção mudou junto
+    // ────────────────────────────────────────────────────────────────────
+    // Era `UNIQUE (sale_request_id)`: UMA seleção por solicitação, para sempre.
+    // Estava certo enquanto a escolha era irreversível.
+    //
+    // A 4.7 criou a RESSELEÇÃO: depois de "não houve acordo" o proprietário
+    // aceita outra oferta, e a seleção anterior PERMANECE como prova do match
+    // que houve. A invariante que sobra é `UNIQUE (sale_request_id, offer_id)`
+    // — a mesma oferta é aceita no máximo uma vez.
+    //
+    // "No máximo um match ATUAL" não vive mais aqui: vive em
+    // `sale_requests.selected_offer_id`, que é uma coluna e portanto
+    // estruturalmente única.
+    const { rows: oldUnique } = await pool.query(
       `SELECT indexdef FROM pg_indexes
        WHERE tablename = 'sale_request_offer_selections'
          AND indexname = 'sale_request_offer_selections_request_uidx'`
     );
+    expect(oldUnique).toHaveLength(0);
+
+    const { rows: unique } = await pool.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname = 'sale_request_offer_selections_request_offer_unique'`
+    );
     expect(unique).toHaveLength(1);
-    expect(unique[0].indexdef).toMatch(/UNIQUE/i);
+    expect(unique[0].def).toContain("UNIQUE (sale_request_id, offer_id)");
   });
 
   /**
@@ -432,9 +480,17 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
       "UNIQUE (id, sale_request_id, advertiser_id)"
     );
 
-    // Exatamente DUAS — nem uma a menos (invariante sem alvo), nem uma a mais
+    // FASE 4.7 — a TERCEIRA chave candidata, com a rodada.
+    //
+    // É o alvo da FK de 4 colunas da seleção: sem ela, uma seleção poderia
+    // declarar a rodada 2 apontando para uma oferta da rodada 1.
+    expect(byName.sale_request_offers_id_request_advertiser_round_unique).toBe(
+      "UNIQUE (id, sale_request_id, advertiser_id, round_id)"
+    );
+
+    // Exatamente TRÊS — nem uma a menos (invariante sem alvo), nem uma a mais
     // (índice único sem FK que o use é custo de escrita sem contrapartida).
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
   });
 
   it("a FK de sale_requests é COMPOSTA, e sem MATCH FULL", async () => {
@@ -463,7 +519,7 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
    * tripla já verifica — custo de escrita sem invariante nova. Este teste impede
    * que ela volte "por segurança".
    */
-  it("a trilha NÃO tem FK simples de offer_id além da tripla", async () => {
+  it("a trilha só referencia offers pelas FKs COMPOSTAS", async () => {
     const { rows } = await pool.query(
       `SELECT conname, pg_get_constraintdef(oid) AS def
          FROM pg_constraint
@@ -472,8 +528,21 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
           AND confrelid = 'sale_request_offers'::regclass`
     );
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].def).toContain("(offer_id, sale_request_id, advertiser_id)");
+    // FASE 4.7 — DUAS FKs compostas agora, e nenhuma simples.
+    //
+    // A tripla da 4.4.1 prova solicitação + loja; a de 4 colunas acrescenta a
+    // RODADA. As duas convivem porque provam coisas diferentes, e nenhuma delas
+    // é `offer_id -> offers(id)` solta — que aceitaria a oferta de outro negócio.
+    expect(rows).toHaveLength(2);
+
+    const defs = rows.map((row) => row.def).join(" | ");
+    expect(defs).toContain("(offer_id, sale_request_id, advertiser_id)");
+    expect(defs).toContain("(offer_id, sale_request_id, advertiser_id, round_id)");
+
+    // Nenhuma FK de coluna única sobre `offer_id`.
+    for (const row of rows) {
+      expect(row.def, row.conname).not.toMatch(/FOREIGN KEY \(offer_id\) REFERENCES/);
+    }
   });
 
   it("o CHECK de status aceita offer_selected e recusa vocabulário inventado", async () => {
@@ -622,10 +691,20 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
            RETURNING id`,
           [userRows[0].id, cityRows[0].id, status]
         );
+        // FASE 4.7 — o banco deste cenário já está na 060, então a coluna
+        // `round_id` existe e é NOT NULL. A rodada 1 desta solicitação foi
+        // criada pelo backfill? Não: a solicitação acabou de ser inserida À MÃO,
+        // depois da migration. O fixture cria a rodada como a publicação real
+        // faria.
+        const { rows: roundRows } = await upgradePool.query(
+          `INSERT INTO sale_request_rounds (sale_request_id, round_number, minimum_accepted_price)
+           VALUES ($1, 1, NULL) RETURNING id`,
+          [rows[0].id]
+        );
         await upgradePool.query(
-          `INSERT INTO sale_request_offers (sale_request_id, dealer_user_id, advertiser_id, amount)
-           VALUES ($1, $2, $3, 48000.00)`,
-          [rows[0].id, userRows[0].id, advRows[0].id]
+          `INSERT INTO sale_request_offers (sale_request_id, round_id, dealer_user_id, advertiser_id, amount)
+           VALUES ($1, $2, $3, $4, 48000.00)`,
+          [rows[0].id, roundRows[0].id, userRows[0].id, advRows[0].id]
         );
       }
 
@@ -1294,11 +1373,29 @@ async function pgErrorCode(sql, params = []) {
 }
 
 /** Uma solicitação com uma proposta, pelos caminhos reais. Devolve os dois ids. */
+/**
+ * A rodada 1 da solicitação.
+ *
+ * FASE 4.7 — `sale_request_offer_selections.round_id` é NOT NULL. Os INSERTs
+ * CRUS deste arquivo (que existem para provar o que o BANCO recusa) precisam
+ * dela, senão morrem com 23502 (not-null) antes de a FK composta ser avaliada —
+ * e o teste passaria pelo motivo errado.
+ */
+async function roundIdOf(saleRequestId) {
+  const { rows } = await pool.query(
+    `SELECT id::text AS id FROM sale_request_rounds
+      WHERE sale_request_id = $1 AND round_number = 1`,
+    [saleRequestId]
+  );
+  return rows[0]?.id ?? null;
+}
+
 async function seedRequestWithOffer(dealerIndex = 0, amount = "62000") {
   const saleRequestId = await insertSaleRequest();
   await propose(dealerIndex, saleRequestId, amount);
   const offerId = await currentOfferId(saleRequestId, dealerIndex);
-  return { saleRequestId, offerId };
+  const roundId = await roundIdOf(saleRequestId);
+  return { saleRequestId, offerId, roundId };
 }
 
 describe.sequential("integração — 4.4.1: a oferta selecionada PERTENCE à solicitação", () => {
@@ -1344,9 +1441,9 @@ describe.sequential("integração — 4.4.1: a oferta selecionada PERTENCE à so
 
     const code = await pgErrorCode(
       `INSERT INTO sale_request_offer_selections
-         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
-       VALUES ($1, $2, $3, $4, 70000.00)`,
-      [a.saleRequestId, b.offerId, world.advertiserIds[1], world.ownerId]
+         (sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, $5, 70000.00)`,
+      [a.saleRequestId, a.roundId, b.offerId, world.advertiserIds[1], world.ownerId]
     );
 
     expect(code).toBe("23503");
@@ -1355,13 +1452,13 @@ describe.sequential("integração — 4.4.1: a oferta selecionada PERTENCE à so
 
   /** §13 CASO C — a combinação correta continua passando. */
   it("CASO C: a combinação COERENTE é aceita nas duas tabelas", async () => {
-    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+    const { saleRequestId, offerId, roundId } = await seedRequestWithOffer(0, "62000");
 
     const insertCode = await pgErrorCode(
       `INSERT INTO sale_request_offer_selections
-         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
-       VALUES ($1, $2, $3, $4, 62000.00)`,
-      [saleRequestId, offerId, world.advertiserIds[0], world.ownerId]
+         (sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, $5, 62000.00)`,
+      [saleRequestId, roundId, offerId, world.advertiserIds[0], world.ownerId]
     );
     expect(insertCode).toBeNull();
 
@@ -1414,14 +1511,14 @@ describe.sequential("integração — 4.4.1: o advertiser da trilha bate com a o
    * improvável.
    */
   it("advertiser DIFERENTE do da oferta é recusado", async () => {
-    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+    const { saleRequestId, offerId, roundId } = await seedRequestWithOffer(0, "62000");
 
     const code = await pgErrorCode(
       `INSERT INTO sale_request_offer_selections
-         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
-       VALUES ($1, $2, $3, $4, 62000.00)`,
+         (sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, $5, 62000.00)`,
       // A oferta é da loja 0; a trilha tentaria registrar a loja 1.
-      [saleRequestId, offerId, world.advertiserIds[1], world.ownerId]
+      [saleRequestId, roundId, offerId, world.advertiserIds[1], world.ownerId]
     );
 
     expect(code).toBe("23503");
@@ -1429,13 +1526,13 @@ describe.sequential("integração — 4.4.1: o advertiser da trilha bate com a o
   });
 
   it("advertiser CORRETO é aceito", async () => {
-    const { saleRequestId, offerId } = await seedRequestWithOffer(0, "62000");
+    const { saleRequestId, offerId, roundId } = await seedRequestWithOffer(0, "62000");
 
     const code = await pgErrorCode(
       `INSERT INTO sale_request_offer_selections
-         (sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
-       VALUES ($1, $2, $3, $4, 62000.00)`,
-      [saleRequestId, offerId, world.advertiserIds[0], world.ownerId]
+         (sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
+       VALUES ($1, $2, $3, $4, $5, 62000.00)`,
+      [saleRequestId, roundId, offerId, world.advertiserIds[0], world.ownerId]
     );
 
     expect(code).toBeNull();
@@ -1621,10 +1718,26 @@ describe.sequential("integração — TESTE POR MUTAÇÃO do lock", () => {
    * sorte de escalonamento — e continuariam passando no dia em que alguém
    * removesse o lock do repositório.
    *
-   * O UNIQUE de `sale_request_offer_selections` continua ativo aqui, e é isso
-   * que a violação expõe: sem lock, a segunda transação não é recusada com um
-   * 409 legível pelo service — ela ESTOURA no banco, com erro de constraint.
-   * Duas coisas diferentes, e a segunda é a que o usuário veria como 500.
+   * ────────────────────────────────────────────────────────────────────────
+   * A REDE DE SEGURANÇA MUDOU DE LUGAR NA FASE 4.7
+   * ────────────────────────────────────────────────────────────────────────
+   * Até a 4.6, quem expunha a violação era `UNIQUE (sale_request_id)` na trilha:
+   * sem lock, a segunda transação estourava com erro de constraint.
+   *
+   * A 4.7 removeu essa UNIQUE — e teve de remover. Depois de "não houve acordo"
+   * o proprietário aceita OUTRA oferta, e uma segunda seleção na mesma
+   * solicitação passou a ser o caminho NORMAL do produto. Manter a constraint
+   * seria proibir a funcionalidade central da fase.
+   *
+   * O que protege agora é o `WHERE status = ANY(selecionáveis)` do próprio
+   * `UPDATE`, e este teste passou a mutar exatamente isso: remove o
+   * `FOR UPDATE` e MANTÉM o guard de status, como o service real faz. A prova
+   * que ele produz é mais forte que a anterior — não é "o banco arbitra com um
+   * 500", é "exatamente uma transição vence, mesmo sem lock, porque o próprio
+   * UPDATE re-avalia o estado".
+   *
+   * As duas transações ainda passam da LEITURA (é a corrida), e é isso que
+   * mantém o cenário discriminante.
    */
   it("SEM o lock, as duas transações passam da leitura e o banco precisa arbitrar", async () => {
     const id = await insertSaleRequest();
@@ -1652,23 +1765,46 @@ describe.sequential("integração — TESTE POR MUTAÇÃO do lock", () => {
 
         await new Promise((resolve) => setTimeout(resolve, 25));
 
+        // FASE 4.7 — `round_id` entra aqui porque a coluna e NOT NULL. Vem da
+        // PROPRIA oferta: e assim que o service o resolve, e copia-lo daqui
+        // mantem a mutacao fiel ao caminho real (o que esta sendo removido e o
+        // LOCK, nao a rodada).
         const { rows: offerRows } = await client.query(
-          `SELECT advertiser_id, amount FROM sale_request_offers WHERE id = $1`,
+          `SELECT advertiser_id, amount, round_id FROM sale_request_offers WHERE id = $1`,
           [offerId]
         );
 
         await client.query(
           `INSERT INTO sale_request_offer_selections (
-             sale_request_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot
-           ) VALUES ($1, $2, $3, $4, $5)`,
-          [id, offerId, offerRows[0].advertiser_id, world.ownerId, offerRows[0].amount]
+             sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot
+           ) VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            id,
+            offerRows[0].round_id,
+            offerId,
+            offerRows[0].advertiser_id,
+            world.ownerId,
+            offerRows[0].amount,
+          ]
         );
-        await client.query(
+        // O GUARD DE ESTADO PERMANECE — o que esta mutação remove é o LOCK.
+        //
+        // Em READ COMMITTED a segunda transação BLOQUEIA aqui (a primeira já
+        // travou a linha ao atualizá-la), e ao acordar RE-AVALIA o `WHERE`:
+        // encontra `offer_selected`, que não está na lista de selecionáveis, e
+        // não casa linha nenhuma.
+        const updated = await client.query(
           `UPDATE sale_requests
            SET status = 'offer_selected', selected_offer_id = $2, selected_offer_at = NOW()
-           WHERE id = $1`,
+           WHERE id = $1
+             AND status = ANY(ARRAY['receiving_offers', 'handoff_failed']::text[])`,
           [id, offerId]
         );
+
+        if ((updated.rowCount ?? 0) === 0) {
+          await client.query("ROLLBACK");
+          return { passedTheCheck: true, committed: false, lostTheRace: true };
+        }
 
         await client.query("COMMIT");
         return { passedTheCheck: true, committed: true };
@@ -1691,12 +1827,21 @@ describe.sequential("integração — TESTE POR MUTAÇÃO do lock", () => {
     expect(a.passedTheCheck).toBe(true);
     expect(b.passedTheCheck).toBe(true);
 
-    // E a arbitragem coube ao banco, não à aplicação: exatamente uma commitou, e
-    // a outra morreu com erro de constraint em vez de um 409 legível.
+    // E EXATAMENTE UMA venceu — mesmo sem lock. O `WHERE` do UPDATE é a
+    // barreira final, e ele sozinho serializa a transição.
     const committed = [a, b].filter((outcome) => outcome.committed);
     expect(committed).toHaveLength(1);
 
-    const failed = [a, b].find((outcome) => !outcome.committed);
-    expect(failed.error).toBeTruthy();
+    // A perdedora não estourou: ela simplesmente não casou linha. É a diferença
+    // entre um 409 legível e um 500 de constraint — e é o comportamento certo.
+    const lost = [a, b].find((outcome) => !outcome.committed);
+    expect(lost.lostTheRace).toBe(true);
+
+    // O estado final é coerente: UMA seleção, e o ponteiro apontando para ela.
+    const selections = await readSelections(id);
+    expect(selections).toHaveLength(1);
+    const request = await readRequest(id);
+    expect(request.status).toBe("offer_selected");
+    expect(String(request.selected_offer_id)).toBe(String(selections[0].offer_id));
   });
 });

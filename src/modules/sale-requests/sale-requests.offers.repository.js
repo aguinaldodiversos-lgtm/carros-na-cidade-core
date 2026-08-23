@@ -73,10 +73,10 @@ function runner(exec) {
 export async function lockSaleRequestForOffer(saleRequestId, cityId, exec) {
   const result = await runner(exec)(
     `
-    SELECT id, status, minimum_accepted_price
-    FROM sale_requests
-    WHERE id = $1
-      AND city_id = $2
+    SELECT sr.id, sr.status, sr.minimum_accepted_price, sr.current_round_number
+    FROM sale_requests sr
+    WHERE sr.id = $1
+      AND sr.city_id = $2
     FOR UPDATE
     `,
     [saleRequestId, cityId]
@@ -98,16 +98,17 @@ export async function lockSaleRequestForOffer(saleRequestId, cityId, exec) {
  *
  * @returns {Promise<string|null>} NUMERIC como string (é como o driver devolve)
  */
-export async function findHighestAmount(saleRequestId, exec) {
+export async function findHighestAmount(saleRequestId, roundId, exec) {
   const result = await runner(exec)(
     `
     SELECT amount
     FROM sale_request_offers
     WHERE sale_request_id = $1
+      AND round_id = $2
     ORDER BY amount DESC, id DESC
     LIMIT 1
     `,
-    [saleRequestId]
+    [saleRequestId, roundId]
   );
   return result.rows[0]?.amount ?? null;
 }
@@ -123,17 +124,18 @@ export async function findHighestAmount(saleRequestId, exec) {
  * Escopo por LOJA e não por conta: dois operadores da mesma loja precisam ver a
  * mesma proposta corrente.
  */
-export async function findCurrentOfferForAdvertiser(saleRequestId, advertiserId, exec) {
+export async function findCurrentOfferForAdvertiser(saleRequestId, advertiserId, roundId, exec) {
   const result = await runner(exec)(
     `
     SELECT id, amount, note, created_at
     FROM sale_request_offers
     WHERE sale_request_id = $1
       AND advertiser_id = $2
+      AND round_id = $3
     ORDER BY created_at DESC, id DESC
     LIMIT 1
     `,
-    [saleRequestId, advertiserId]
+    [saleRequestId, advertiserId, roundId]
   );
   return result.rows[0] ?? null;
 }
@@ -148,18 +150,18 @@ export async function findCurrentOfferForAdvertiser(saleRequestId, advertiserId,
  * valor, e o segundo perde para o primeiro.
  */
 export async function insertOffer(
-  { saleRequestId, dealerUserId, advertiserId, amount, note },
+  { saleRequestId, roundId, dealerUserId, advertiserId, amount, note },
   exec
 ) {
   const result = await runner(exec)(
     `
     INSERT INTO sale_request_offers (
-      sale_request_id, dealer_user_id, advertiser_id, amount, note
+      sale_request_id, round_id, dealer_user_id, advertiser_id, amount, note
     )
-    VALUES ($1, $2, $3, $4, $5)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING id, amount, note, created_at
     `,
-    [saleRequestId, dealerUserId, advertiserId, amount, note]
+    [saleRequestId, roundId, dealerUserId, advertiserId, amount, note]
   );
   return result.rows[0] ?? null;
 }
@@ -208,14 +210,29 @@ export async function listOfferStateByRequestIds(saleRequestIds, advertiserId) {
 
   const result = await query(
     `
+    -- FASE 4.7 — SÓ A RODADA ABERTA.
+    --
+    -- O JOIN com sale_request_rounds pela rodada CORRENTE e o que impede uma
+    -- oferta da rodada 1 de aparecer como proposta atual na rodada 2. Sem ele, a
+    -- loja veria um valor que ofereceu sob outro piso, e o feed diria que ela ja
+    -- esta na disputa quando ela nao esta.
+    --
+    -- (Sem crases neste comentario: ele esta DENTRO de um template literal, e
+    -- uma crase aqui fecharia a string no meio do SQL.)
     SELECT
-      sale_request_id,
-      MAX(amount)                                        AS highest_amount,
-      MAX(amount) FILTER (WHERE advertiser_id = $2)      AS my_amount,
-      COUNT(*)::int                                      AS total
-    FROM sale_request_offers
-    WHERE sale_request_id = ANY($1::bigint[])
-    GROUP BY sale_request_id
+      o.sale_request_id,
+      MAX(o.amount)                                        AS highest_amount,
+      MAX(o.amount) FILTER (WHERE o.advertiser_id = $2)    AS my_amount,
+      COUNT(*)::int                                        AS total
+    FROM sale_request_offers o
+    JOIN sale_requests sr
+      ON sr.id = o.sale_request_id
+    JOIN sale_request_rounds r
+      ON r.sale_request_id = sr.id
+     AND r.round_number = sr.current_round_number
+    WHERE o.sale_request_id = ANY($1::bigint[])
+      AND o.round_id = r.id
+    GROUP BY o.sale_request_id
     `,
     [ids, advertiserId]
   );
@@ -255,8 +272,14 @@ export async function countCityOffersForAdvertiser({ cityId, advertiserId }) {
     LEFT JOIN LATERAL (
       SELECT o.id
       FROM sale_request_offers o
+      JOIN sale_request_rounds r
+        ON r.sale_request_id = sr.id
+       AND r.round_number = sr.current_round_number
       WHERE o.sale_request_id = sr.id
         AND o.advertiser_id = $2
+        -- FASE 4.7: "ja propus nesta" e sobre a rodada ABERTA. Uma proposta da
+        -- rodada anterior nao conta: a loja precisa ofertar de novo.
+        AND o.round_id = r.id
       LIMIT 1
     ) mine ON TRUE
     WHERE sr.city_id = $1

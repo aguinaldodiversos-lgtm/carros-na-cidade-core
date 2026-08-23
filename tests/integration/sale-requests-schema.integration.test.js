@@ -471,7 +471,10 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
    *   4.5  `sale_request_inspections`, `sale_request_inspection_slots` e
    *        `sale_request_post_inspection_decisions` (migration 058);
    *   4.6  `sale_request_owner_final_decisions` — a resposta do proprietário à
-   *        proposta final (migration 059).
+   *        proposta final (migration 059);
+   *   4.7  `sale_request_rounds` — as rodadas de ofertas, e
+   *        `sale_request_handoff_outcomes` — o desfecho informado pelo
+   *        proprietário depois do handoff (migration 060).
    *
    * Continua NÃO existindo — e a igualdade acima é o que garante: venda
    * concluída, pagamento, comissão, escrow, contrato, transferência e prazo.
@@ -498,6 +501,9 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
         "sale_request_post_inspection_decisions",
         // Fase 4.6 — a resposta do proprietário à proposta final.
         "sale_request_owner_final_decisions",
+        // Fase 4.7 — rodadas e desfecho do handoff.
+        "sale_request_rounds",
+        "sale_request_handoff_outcomes",
       ])
     );
   });

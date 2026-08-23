@@ -429,6 +429,18 @@ await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`
 // Todos escopados ao MESMO `owner_user_id` — nunca a tabela inteira.
 const ownedRequests = `SELECT id FROM sale_requests WHERE owner_user_id = $1::bigint`;
 
+// 4.7 — o DESFECHO do handoff. Primeiro de todos: ele aponta para a trilha de
+// seleções, que aponta para as ofertas.
+//
+// Também sem `ON DELETE CASCADE`, pelo mesmo motivo das outras trilhas. As
+// RODADAS, ao contrário, cascateiam — elas são contêiner de ofertas, não
+// registro de decisão — e por isso não aparecem aqui.
+await pool.query(
+  `DELETE FROM sale_request_handoff_outcomes
+    WHERE sale_request_id IN (${ownedRequests})`,
+  [userId]
+);
+
 // 4.6 — a decisão do PROPRIETÁRIO. Primeira da fila porque é a última da cadeia:
 // ela aponta para a decisão pós-inspeção, que aponta para a inspeção, que aponta
 // para a seleção.
@@ -549,6 +561,26 @@ const { rows: saleRows } = await pool.query(
 );
 
 const saleRequestId = saleRows[0].id;
+
+// ────────────────────────────────────────────────────────────────────────────
+// FASE 4.7 — A RODADA 1
+// ────────────────────────────────────────────────────────────────────────────
+// A publicação REAL cria a rodada na mesma transação da solicitação. Este script
+// insere a linha por SQL direto, então precisa criá-la também.
+//
+// Sem ela a solicitação nasce incapaz de receber proposta: `round_id` é NOT NULL
+// em `sale_request_offers`, e o service devolve OFFER_CLOSED por não encontrar
+// rodada aberta. O sintoma é cruel — a oportunidade aparece no feed do lojista e
+// recusa todo lance com "não está mais recebendo propostas".
+//
+// `minimum_accepted_price` acompanha o da solicitação (aqui, NULL: o seed simula
+// uma publicação anterior à regra da 4.3.3).
+await pool.query(
+  `INSERT INTO sale_request_rounds (sale_request_id, round_number, minimum_accepted_price)
+   VALUES ($1, 1, (SELECT minimum_accepted_price FROM sale_requests WHERE id = $1))
+   ON CONFLICT (sale_request_id, round_number) DO NOTHING`,
+  [saleRequestId]
+);
 
 await pool.query(
   `

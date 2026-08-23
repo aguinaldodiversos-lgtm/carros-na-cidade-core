@@ -46,6 +46,7 @@ import { withTransaction } from "../../infrastructure/database/db.js";
 import { createUserNotification } from "../notifications/notifications.service.js";
 import { NOTIFICATION_EVENT_TYPE } from "../notifications/notifications.constants.js";
 import * as repo from "./sale-requests.final-decision.repository.js";
+import { assertLegacyFlowRetired } from "./sale-requests.legacy-flow.js";
 import {
   SALE_REQUEST_OWNER_DECIDED_STATUSES,
   SALE_REQUEST_STATUS,
@@ -226,6 +227,7 @@ function invalidState(message) {
  * bastaria; as três existem porque a que falha é sempre a que ninguém previu.
  */
 export async function decideFinalOffer(userId, rawId, body = {}) {
+  assertLegacyFlowRetired("sale_request.owner_final_decision", { userId, saleRequestId: rawId });
   const ownerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
   const decision = parseDecision(body);

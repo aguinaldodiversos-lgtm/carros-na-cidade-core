@@ -127,6 +127,8 @@ const SELECTED: SaleRequestSelectedOffer = {
   id: 11,
   store_name: "Auto Center Atibaia",
   store_city: "Atibaia - SP",
+  // Fase 4.7 — o endereço comercial, entregue no handoff.
+  store_address: "Rua das Lojas, 120",
   amount: "65000.00",
   selected_at: "2026-08-21T11:00:00.000Z",
 };
@@ -202,6 +204,32 @@ describe("a lista de propostas", () => {
     expect(screen.queryByTestId("sale-request-proposal-select")).toBeNull();
   });
 
+  /**
+   * §16 — ANTES do match, nenhum contato da loja aparece.
+   *
+   * Herdado do E2E da 4.4 (passo 2), aposentado pela 4.7. A 4.7 entrega o
+   * WhatsApp COMERCIAL da loja aceita — mas só DEPOIS de aceitar. Enquanto a
+   * disputa está aberta, a lista mostra nome, cidade e valor, e mais nada: o
+   * proprietário não pode contornar a plataforma ligando para os concorrentes
+   * antes de decidir.
+   *
+   * A lista estrita ("whatsapp", "telefone", "e-mail") continua valendo AQUI —
+   * é o `FORBIDDEN_CONTACT` reduzido da 4.7 que vale só depois do handoff.
+   */
+  it("a lista de propostas não entrega contato NENHUM antes do match", async () => {
+    mockDispute();
+    const { container } = render(<SaleRequestDetail id="42" />);
+
+    await screen.findByTestId("sale-request-proposals");
+    const text = (container.textContent ?? "").toLowerCase();
+
+    for (const term of ["whatsapp", "telefone", "e-mail", "email"]) {
+      expect(text, `a tela vazou "${term}" antes do match`).not.toContain(term);
+    }
+    // E nenhum botão de contato disfarçado de ação.
+    expect(screen.queryByTestId("handoff-whatsapp")).toBeNull();
+  });
+
   it("a seção NÃO aparece numa solicitação cancelada", async () => {
     getSaleRequest.mockResolvedValue({
       sale_request: makeRequest({ status: "cancelled" }),
@@ -230,7 +258,22 @@ describe("o diálogo de confirmação", () => {
     expect(selectSaleRequestOffer).not.toHaveBeenCalled();
   });
 
-  it("diz que a seleção é PRELIMINAR e que o valor pode ser revisto", async () => {
+  /**
+   * FASE 4.7 — A COPY INVERTEU, E A ASSERÇÃO INVERTEU COM ELA.
+   *
+   * Este teste exigia "Esta seleção é preliminar" e "o valor ainda poderá ser
+   * revisto". Fazia sentido enquanto a plataforma ia registrar avaliação e
+   * proposta final: a escolha era mesmo um passo intermediário.
+   *
+   * A 4.7 tirou isso do produto. Aceitar é o COMPROMISSO das duas partes, e o
+   * §4 é explícito de que a oferta não pode ser enfraquecida por linguagem —
+   * "preliminar" e "sem compromisso" convidam a renegociar por esporte.
+   *
+   * A asserção foi INVERTIDA, e não removida: o diálogo continua tendo de
+   * explicar a ressalva real (divergências relevantes permitem revisar ou
+   * desistir) e o compromisso de quem aceita.
+   */
+  it("diz que a oferta é um COMPROMISSO, com a ressalva da avaliação presencial", async () => {
     mockDispute();
     const user = userEvent.setup();
     render(<SaleRequestDetail id="42" />);
@@ -241,9 +284,16 @@ describe("o diálogo de confirmação", () => {
     const dialog = await screen.findByTestId("sale-request-select-dialog");
     const text = dialog.textContent ?? "";
 
-    expect(text).toContain("novas propostas serão encerradas");
-    expect(text).toContain("Esta seleção é preliminar");
+    expect(text).toContain("Você está aceitando a oferta de");
     expect(text).toContain("avaliação presencial");
+    // A ressalva REAL: divergências permitem revisar ou desistir.
+    expect(text).toMatch(/divergências relevantes/i);
+    expect(text).toMatch(/revisar o valor ou desistir da compra/i);
+    // E o compromisso de quem aceita.
+    expect(text).toMatch(/confirma sua intenção de vender/i);
+
+    // A linguagem que ENFRAQUECERIA a oferta não pode voltar.
+    expect(text).not.toMatch(/preliminar|sem compromisso|estimativa|simulação/i);
   });
 
   /**
@@ -379,7 +429,8 @@ describe("a seleção", () => {
     expect((dialog.textContent ?? "").toLowerCase()).not.toContain("maior proposta");
 
     await user.click(screen.getByTestId("sale-request-select-confirm"));
-    await waitFor(() => expect(screen.getByTestId("sale-request-selected-offer")).toBeTruthy());
+    // FASE 4.7 — quem ocupa este espaço agora é o card de HANDOFF.
+    await waitFor(() => expect(screen.getByTestId("owner-handoff")).toBeTruthy());
   });
 
   it("depois de selecionar, a tela mostra a escolhida e SOME com as perdedoras", async () => {
@@ -392,55 +443,96 @@ describe("a seleção", () => {
     await user.click(screen.getAllByTestId("sale-request-proposal-select")[1]);
     await user.click(await screen.findByTestId("sale-request-select-confirm"));
 
-    const panel = await screen.findByTestId("sale-request-selected-offer");
-    expect(within(panel).getByText("Auto Center Atibaia")).toBeTruthy();
-    expect(within(panel).getByText("R$ 65.000,00")).toBeTruthy();
-    expect(within(panel).getByText("Aguardando próxima etapa")).toBeTruthy();
+    // FASE 4.7 — "Aguardando próxima etapa" SAIU.
+    //
+    // O painel da 4.4 prometia que "as próximas etapas de avaliação serão
+    // disponibilizadas aqui". Elas não serão: a avaliação é combinada fora da
+    // plataforma. O card de handoff diz o que de fato acontece agora — com quem
+    // falar, por quanto, e onde a loja fica.
+    const panel = await screen.findByTestId("owner-handoff");
+    expect(within(panel).getByTestId("handoff-store-name").textContent).toBe(
+      "Auto Center Atibaia"
+    );
+    expect(within(panel).getByTestId("handoff-amount").textContent).toMatch(/65\.000,00/);
+    expect(panel.textContent).not.toContain("Aguardando próxima etapa");
 
     expect(screen.queryByText("Prime Veículos")).toBeNull();
     expect(screen.queryByTestId("sale-request-proposal-select")).toBeNull();
   });
 
-  it("o estado escolhido NÃO oferece contato nem promete conclusão", async () => {
-    getSaleRequest.mockResolvedValue({
-      sale_request: makeRequest({ status: "offer_selected" }),
-      proposals: [],
-      selected_offer: SELECTED,
-    });
-    render(<SaleRequestDetail id="42" />);
-
-    const panel = await screen.findByTestId("sale-request-selected-offer");
-    const text = (panel.textContent ?? "").toLowerCase();
-
-    for (const forbidden of ["whatsapp", "telefone", "e-mail", "contato", "venda concluída"]) {
-      expect(text).not.toContain(forbidden);
-    }
-    expect(screen.queryByRole("link", { name: /contato|whatsapp/i })).toBeNull();
-  });
-
   /**
-   * §10 da Fase 4.5 — o painel da seleção não pode contradizer o estado atual.
+   * FASE 4.7 — A REGRA DE CONTATO INVERTEU, E A ASSERÇÃO INVERTEU COM ELA.
    *
-   * Enquanto a avaliação não começou, ele anuncia "Aguardando próxima etapa" —
-   * e está certo: não há nada acontecendo ainda.
+   * Até a 4.6 o estado escolhido não podia oferecer contato NENHUM: a
+   * plataforma orquestrava a avaliação, e abrir um canal teria sido furar o
+   * próprio desenho.
    *
-   * Depois que a avaliação começa, esse texto vira mentira: ele pede à pessoa
-   * que espere por algo que está renderizado logo abaixo. O painel encolhe para
-   * o CABEÇALHO do negócio (quem, por quanto) e deixa a etapa atual ser contada
-   * pelo bloco da 4.5.
+   * A 4.7 fez o oposto por decisão de produto: o papel da plataforma termina no
+   * match, e entregar o WhatsApp COMERCIAL da loja aceita é o produto. O que
+   * continua proibido — e é o que este teste guarda — é PROMETER CONCLUSÃO e
+   * vazar dado do outro lado.
    */
-  it("antes da avaliação, o painel anuncia a espera", async () => {
+  it("o estado escolhido entrega o contato da loja, sem prometer conclusão", async () => {
     getSaleRequest.mockResolvedValue({
       sale_request: makeRequest({ status: "offer_selected" }),
       proposals: [],
       selected_offer: SELECTED,
       inspection: null,
       final_decision: null,
+      owner_final_decision: null,
+      round: { number: 1, minimum_accepted_price: "60000.00" },
+      selection_history: [],
     });
     render(<SaleRequestDetail id="42" />);
 
-    const panel = await screen.findByTestId("sale-request-selected-offer");
-    expect(panel.textContent).toContain("Aguardando próxima etapa");
+    const panel = await screen.findByTestId("owner-handoff");
+
+    // O contato da LOJA é o produto desta fase.
+    expect(within(panel).getByTestId("handoff-whatsapp")).toBeTruthy();
+
+    // O que continua proibido.
+    const text = (panel.textContent ?? "").toLowerCase();
+    for (const forbidden of [
+      "venda concluída",
+      "veículo vendido",
+      "negócio fechado",
+      "pagamento",
+    ]) {
+      expect(text, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  /**
+   * FASE 4.7 — "AGUARDANDO PRÓXIMA ETAPA" DEIXOU DE EXISTIR.
+   *
+   * O teste anterior exigia essa frase em `offer_selected`, e o seguinte exigia
+   * que ela sumisse quando a avaliação começava. Os dois descreviam um painel
+   * que orquestrava etapas.
+   *
+   * Não há mais etapa a aguardar: aceitar a oferta ENTREGA o contato, e o que
+   * acontece depois é entre as duas partes. A asserção que sobra é a que
+   * importa — a tela não pede que a pessoa espere por algo que não vem.
+   */
+  it("não pede que a pessoa aguarde uma etapa que a plataforma não executa", async () => {
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest({ status: "offer_selected" }),
+      proposals: [],
+      selected_offer: SELECTED,
+      inspection: null,
+      final_decision: null,
+      owner_final_decision: null,
+      round: { number: 1, minimum_accepted_price: "60000.00" },
+      selection_history: [],
+    });
+    const { container } = render(<SaleRequestDetail id="42" />);
+
+    await screen.findByTestId("owner-handoff");
+
+    const text = (container.textContent ?? "").toLowerCase();
+    expect(text).not.toContain("aguardando próxima etapa");
+    expect(text).not.toContain("próximas etapas de avaliação");
+    // E diz o que a pessoa deve fazer AGORA.
+    expect(text).toContain("entre em contato com a loja");
   });
 
   it("depois que a avaliação começa, o painel PARA de dizer 'aguardando'", async () => {
@@ -496,7 +588,7 @@ describe("a seleção", () => {
     expect(screen.getByTestId("sale-request-selected-note")).toBeTruthy();
   });
 
-  it("o cabeçalho passa a dizer 'Proposta selecionada', nunca 'Vendido'", async () => {
+  it("o cabeçalho passa a dizer 'Oferta aceita', nunca 'Vendido'", async () => {
     getSaleRequest.mockResolvedValue({
       sale_request: makeRequest({ status: "offer_selected" }),
       proposals: [],
@@ -505,7 +597,7 @@ describe("a seleção", () => {
     render(<SaleRequestDetail id="42" />);
 
     const status = await screen.findByTestId("sale-request-detail-status");
-    expect(status.textContent).toBe("Proposta selecionada");
+    expect(status.textContent).toBe("Oferta aceita");
   });
 });
 
