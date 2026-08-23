@@ -68,6 +68,11 @@ export type {
   YesNoUnknown,
 };
 
+import type {
+  DealerInspection,
+  PostInspectionDecision,
+} from "./inspection";
+
 const BASE = "/api/account/opportunities/sale-requests";
 
 /**
@@ -184,12 +189,28 @@ export type DealerSelectionState = {
 export type DealerSaleOpportunityDetail = Omit<DealerSaleOpportunitySummary, "status"> &
   DealerSelectionState & {
     /**
-     * `offer_selected` só é alcançável pela loja escolhida — a query de
-     * visibilidade não casa a linha para nenhuma outra.
+     * Os estados posteriores à seleção só são alcançáveis pela loja ESCOLHIDA —
+     * a query de visibilidade não casa a linha para nenhuma outra, e as demais
+     * continuam recebendo 404.
      */
-    status: "receiving_offers" | "offer_selected";
+    status:
+      | "receiving_offers"
+      | "offer_selected"
+      | "inspection_scheduled"
+      | "inspection_completed"
+      | "final_offer_submitted"
+      | "final_offer_declined";
     images: string[];
     known_issues: string | null;
+
+    /**
+     * A avaliação presencial (Fase 4.5). `null` antes da seleção e enquanto a
+     * loja não enviou a primeira rodada de horários.
+     */
+    inspection: DealerInspection | null;
+
+    /** A decisão da própria loja depois de ver o carro. `null` até ela decidir. */
+    final_decision: PostInspectionDecision | null;
   };
 
 /**
@@ -634,4 +655,105 @@ export function fipeDistance(
 
   const diff = fipe - offer;
   return { amount: Math.abs(diff).toFixed(2), belowFipe: diff >= 0 };
+}
+
+// ============================================================================
+// AVALIAÇÃO PRESENCIAL E PROPOSTA FINAL (Fase 4.5)
+// ============================================================================
+
+/**
+ * Envia de 1 a 3 horários para a avaliação.
+ *
+ * Os instantes viajam em ISO 8601 COM offset explícito. A conversão do
+ * `datetime-local` (que não tem fuso) acontece em `localInputToIso`, usando o
+ * offset do próprio navegador — o único fuso que se conhece com certeza.
+ */
+export async function offerInspectionSlots(
+  saleRequestId: string | number,
+  slots: string[],
+  advertiserId?: number | string | null
+): Promise<{ inspection: DealerInspection }> {
+  const suffix =
+    advertiserId != null && String(advertiserId) !== ""
+      ? `?advertiser_id=${encodeURIComponent(String(advertiserId))}`
+      : "";
+
+  const response = await fetch(`${BASE}/${saleRequestId}/inspection/slots${suffix}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slots }),
+  });
+  return readJson<{ inspection: DealerInspection }>(response);
+}
+
+/**
+ * Registra a avaliação presencial.
+ *
+ * Não existe função de EDIÇÃO correspondente, e não pode passar a existir: a
+ * ficha é imutável depois de registrada. Um `updateInspection` aqui sugeriria
+ * que dá para corrigir.
+ */
+export async function completeInspection(
+  saleRequestId: string | number,
+  form: {
+    observed_mileage: string;
+    observed_condition: string;
+    observed_tire_condition: string;
+    observed_engine_condition: string;
+    observed_gearbox_condition: string;
+    observed_suspension_condition: string;
+    observed_body_paint_status: string;
+    observed_body_paint_issues?: string[];
+    inspection_notes?: string | null;
+  },
+  advertiserId?: number | string | null
+): Promise<{ inspection: DealerInspection }> {
+  const suffix =
+    advertiserId != null && String(advertiserId) !== ""
+      ? `?advertiser_id=${encodeURIComponent(String(advertiserId))}`
+      : "";
+
+  const response = await fetch(`${BASE}/${saleRequestId}/inspection/complete${suffix}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(form),
+  });
+  return readJson<{ inspection: DealerInspection }>(response);
+}
+
+/**
+ * A decisão comercial: proposta final ou desistência.
+ *
+ * UMA função para as duas saídas porque elas gravam a MESMA linha e são
+ * mutuamente exclusivas. Duas funções precisariam coordenar essa exclusividade
+ * entre si, e a corrida "proposta × desistência" passaria a depender de dois
+ * caminhos lembrarem um do outro.
+ *
+ * `final_amount` vai em reais com duas casas ("60000.00"), como o banco guarda.
+ * O valor PRELIMINAR não é enviado: o servidor o lê da própria seleção, dentro
+ * da transação — é ele que decide se a justificativa é obrigatória, e aceitá-lo
+ * do cliente permitiria escapar da exigência.
+ */
+export async function submitPostInspectionDecision(
+  saleRequestId: string | number,
+  input: {
+    decision_type: "final_offer" | "no_offer";
+    final_amount?: string | null;
+    adjustment_reason?: string | null;
+    adjustment_note?: string | null;
+    internal_note?: string | null;
+  },
+  advertiserId?: number | string | null
+): Promise<{ decision: PostInspectionDecision; changed: boolean }> {
+  const suffix =
+    advertiserId != null && String(advertiserId) !== ""
+      ? `?advertiser_id=${encodeURIComponent(String(advertiserId))}`
+      : "";
+
+  const response = await fetch(`${BASE}/${saleRequestId}/decision${suffix}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return readJson<{ decision: PostInspectionDecision; changed: boolean }>(response);
 }

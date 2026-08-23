@@ -28,10 +28,12 @@ import {
   getOwnerSelectedOffer,
   listOwnerProposals,
 } from "./sale-requests.selection.service.js";
+import { readOwnerInspectionState } from "./sale-requests.inspection.service.js";
 import {
   SALE_REQUEST_ACTIVE_LIMIT,
   SALE_REQUEST_CODE,
   SALE_REQUEST_PAGE,
+  SALE_REQUEST_SELECTED_STATUSES,
   SALE_REQUEST_STATUS,
 } from "./sale-requests.constants.js";
 import {
@@ -515,7 +517,7 @@ export async function getMySaleRequest(userId, rawId) {
     throw new AppError("Solicitação não encontrada.", 404);
   }
 
-  const [imagesByRequest, proposals, selectedOffer] = await Promise.all([
+  const [imagesByRequest, proposals, selectedOffer, inspectionState] = await Promise.all([
     repo.listImagesByRequestIds([saleRequestId]),
     // Enquanto a disputa está aberta, as propostas ATUAIS — uma por loja.
     // Depois da escolha a lista deixa de ser oferecida: mostrar as perdedoras ao
@@ -525,9 +527,20 @@ export async function getMySaleRequest(userId, rawId) {
     row.status === SALE_REQUEST_STATUS.RECEIVING_OFFERS
       ? listOwnerProposals(saleRequestId, ownerUserId)
       : Promise.resolve([]),
-    row.status === SALE_REQUEST_STATUS.OFFER_SELECTED
+    // A proposta escolhida acompanha TODOS os estados posteriores à seleção, e
+    // não só `offer_selected`: durante a avaliação e depois da proposta final,
+    // ela continua sendo a âncora da comparação que o proprietário vê.
+    SALE_REQUEST_SELECTED_STATUSES.includes(row.status)
       ? getOwnerSelectedOffer(saleRequestId, ownerUserId)
       : Promise.resolve(null),
+
+    // Fase 4.5. A leitura é feita para qualquer estado com seleção porque a
+    // inspeção pode não existir ainda (`offer_selected` sem horários enviados) —
+    // e nesse caso o service devolve `null` para os dois blocos, que é
+    // exatamente o que a tela precisa para decidir o que mostrar.
+    SALE_REQUEST_SELECTED_STATUSES.includes(row.status)
+      ? readOwnerInspectionState(saleRequestId)
+      : Promise.resolve({ inspection: null, final_decision: null }),
   ]);
 
   return {
@@ -536,6 +549,8 @@ export async function getMySaleRequest(userId, rawId) {
     }),
     proposals,
     selected_offer: selectedOffer,
+    inspection: inspectionState.inspection,
+    final_decision: inspectionState.final_decision,
   };
 }
 
@@ -586,7 +601,19 @@ export async function cancelMySaleRequest(userId, rawId) {
     throw new AppError("Solicitação não encontrada.", 404);
   }
 
-  if (row.status === SALE_REQUEST_STATUS.OFFER_SELECTED) {
+  // ────────────────────────────────────────────────────────────────────────
+  // A LISTA, E NÃO A IGUALDADE (generalizado na Fase 4.5)
+  // ────────────────────────────────────────────────────────────────────────
+  // Este guard nasceu na 4.4.1 comparando com `OFFER_SELECTED` — o único estado
+  // com seleção que existia. A 4.5 criou mais quatro, e a igualdade voltaria a
+  // produzir EXATAMENTE o defeito que a 4.4.1 consertou: cancelar durante a
+  // avaliação cairia no ramo idempotente do `cancelForOwner` (o `UPDATE` não
+  // casa, `changed` volta `false`) e a tela diria "cancelada" sobre uma
+  // solicitação com visita agendada, com a loja do outro lado esperando.
+  //
+  // `SALE_REQUEST_SELECTED_STATUSES` é a mesma lista que o CHECK da 058 enumera,
+  // e usá-la aqui é o que faz o guard crescer junto com a máquina de estados.
+  if (SALE_REQUEST_SELECTED_STATUSES.includes(row.status)) {
     logger.info(
       {
         ...buildDomainFields({

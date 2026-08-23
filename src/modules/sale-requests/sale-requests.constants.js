@@ -28,10 +28,61 @@
 export const SALE_REQUEST_STATUS = Object.freeze({
   RECEIVING_OFFERS: "receiving_offers",
   OFFER_SELECTED: "offer_selected",
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FASE 4.5 — a avaliação presencial e a proposta final
+  // ──────────────────────────────────────────────────────────────────────────
+  // `offer_selected` deixou de ser terminal: agora é o começo desta etapa.
+  //
+  // Os estados do AGENDAMENTO (a loja ainda não mandou horários; mandou e o
+  // proprietário ainda não escolheu) NÃO estão aqui de propósito — eles vivem em
+  // `sale_request_inspections.schedule_status`. Do ponto de vista de quem está
+  // vendendo o carro, os dois casos são a mesma coisa: a visita ainda não foi
+  // marcada. Promovê-los a status da oportunidade obrigaria todo filtro, feed e
+  // DTO do domínio a conhecer quatro valores que não mudam nada para eles.
+  INSPECTION_SCHEDULED: "inspection_scheduled",
+  INSPECTION_COMPLETED: "inspection_completed",
+  FINAL_OFFER_SUBMITTED: "final_offer_submitted",
+  /** A loja avaliou presencialmente e decidiu NÃO apresentar proposta. */
+  FINAL_OFFER_DECLINED: "final_offer_declined",
+
   CANCELLED: "cancelled",
 });
 
 export const SALE_REQUEST_STATUSES = Object.freeze(Object.values(SALE_REQUEST_STATUS));
+
+/**
+ * Os estados em que a solicitação TEM uma proposta preliminar selecionada.
+ *
+ * Espelha, em JavaScript, a partição do CHECK
+ * `sale_requests_selected_offer_coherence_check` (migration 058). Existe como
+ * lista PRÓPRIA — e não como "tudo menos receiving_offers e cancelled" — pelo
+ * mesmo motivo que o CHECK enumera os dois lados: um estado novo criado por uma
+ * fase futura não entra em nenhuma das listas, e o erro aparece na hora em vez
+ * de o estado ser silenciosamente colocado do lado errado.
+ *
+ * Foi exatamente esse o defeito que a 058 precisou consertar na 057.
+ */
+export const SALE_REQUEST_SELECTED_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.OFFER_SELECTED,
+  SALE_REQUEST_STATUS.INSPECTION_SCHEDULED,
+  SALE_REQUEST_STATUS.INSPECTION_COMPLETED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_SUBMITTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_DECLINED,
+]);
+
+/**
+ * Estados TERMINAIS nesta fase — a loja já disse o que tinha a dizer.
+ *
+ * `final_offer_submitted` espera a decisão do proprietário (Fase 4.6);
+ * `final_offer_declined` encerrou sem proposta. Nenhum dos dois reabre a disputa
+ * nem volta para `receiving_offers` — essa é uma decisão de produto da 4.6, e
+ * tomá-la aqui por omissão seria decidi-la sem ninguém perceber.
+ */
+export const SALE_REQUEST_POST_DECISION_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.FINAL_OFFER_SUBMITTED,
+  SALE_REQUEST_STATUS.FINAL_OFFER_DECLINED,
+]);
 
 /**
  * Condição declarada pelo dono. Lista curta e fechada de propósito: campo livre

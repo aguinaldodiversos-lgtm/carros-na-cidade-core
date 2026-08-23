@@ -38,11 +38,20 @@ export const db = {
    * uma".
    */
   userNotifications: [],
+  /** Fase 4.5 — a avaliacao presencial. Uma linha por solicitacao. */
+  saleRequestInspections: [],
+  /** Horarios propostos, APPEND-ONLY e por rodada. */
+  saleRequestInspectionSlots: [],
+  /** A decisao comercial pos-inspecao. UMA por solicitacao. */
+  saleRequestDecisions: [],
   nextRequestId: 1,
   nextImageId: 1,
   nextOfferId: 1,
   nextSelectionId: 1,
   nextNotificationId: 1,
+  nextInspectionId: 1,
+  nextSlotId: 1,
+  nextDecisionId: 1,
   /** Todas as chaves já usadas — espelha o UNIQUE GLOBAL da migration 053. */
   usedStorageKeys: new Set(),
 };
@@ -56,11 +65,17 @@ export function resetDb(seed = {}) {
   db.saleRequestOffers = seed.saleRequestOffers ?? [];
   db.saleRequestOfferSelections = seed.saleRequestOfferSelections ?? [];
   db.userNotifications = seed.userNotifications ?? [];
+  db.saleRequestInspections = seed.saleRequestInspections ?? [];
+  db.saleRequestInspectionSlots = seed.saleRequestInspectionSlots ?? [];
+  db.saleRequestDecisions = seed.saleRequestDecisions ?? [];
   db.nextRequestId = seed.nextRequestId ?? 1;
   db.nextImageId = seed.nextImageId ?? 1;
   db.nextOfferId = seed.nextOfferId ?? 1;
   db.nextSelectionId = seed.nextSelectionId ?? 1;
   db.nextNotificationId = seed.nextNotificationId ?? 1;
+  db.nextInspectionId = seed.nextInspectionId ?? 1;
+  db.nextSlotId = seed.nextSlotId ?? 1;
+  db.nextDecisionId = seed.nextDecisionId ?? 1;
   db.usedStorageKeys = new Set(
     (seed.saleRequestImages ?? []).map((image) => image.storage_key)
   );
@@ -352,7 +367,474 @@ function currentOffersOf(saleRequestId) {
   return [...byAdvertiser.values()];
 }
 
+/** A inspecao de uma solicitacao, ou null. */
+function inspectionOf(saleRequestId) {
+  return (
+    db.saleRequestInspections.find((i) => sameId(i.sale_request_id, saleRequestId)) ?? null
+  );
+}
+
+/** A oferta SELECIONADA de uma solicitacao, ou null. */
+function selectedOfferOf(row) {
+  if (!row?.selected_offer_id) return null;
+  return db.saleRequestOffers.find((o) => sameId(o.id, row.selected_offer_id)) ?? null;
+}
+
+/**
+ * Projecao da inspecao para leitura de tela, com o endereco COMERCIAL da loja.
+ *
+ * Nome, endereco e cidade sao as UNICAS colunas de advertisers que a query real
+ * seleciona. Acrescentar email ou telefone aqui faria o teste de privacidade
+ * passar a ver um dado que o repository nunca pede — provando o oposto do que se
+ * quer provar.
+ */
+function projectInspection(inspection) {
+  const advertiser = db.advertisers.find((a) => sameId(a.id, inspection.advertiser_id));
+  const city = advertiser ? cityOf(advertiser.city_id) : null;
+  return {
+    id: inspection.id,
+    schedule_status: inspection.schedule_status,
+    schedule_round: inspection.schedule_round,
+    confirmed_slot_id: inspection.confirmed_slot_id ?? null,
+    scheduled_at: inspection.scheduled_at ?? null,
+    completed_at: inspection.completed_at ?? null,
+    observed_mileage: inspection.observed_mileage ?? null,
+    observed_condition: inspection.observed_condition ?? null,
+    observed_tire_condition: inspection.observed_tire_condition ?? null,
+    observed_engine_condition: inspection.observed_engine_condition ?? null,
+    observed_gearbox_condition: inspection.observed_gearbox_condition ?? null,
+    observed_suspension_condition: inspection.observed_suspension_condition ?? null,
+    observed_body_paint_status: inspection.observed_body_paint_status ?? null,
+    observed_body_paint_issues: parseJsonbArray(inspection.observed_body_paint_issues),
+    inspection_notes: inspection.inspection_notes ?? null,
+    store_name: advertiser?.name ?? null,
+    store_address: advertiser?.address ?? null,
+    store_city_name: city?.name ?? null,
+    store_city_state: city?.state ?? null,
+  };
+}
+
 function handle(text, params, now) {
+
+  // ==========================================================================
+  // FASE 4.5 — AVALIACAO PRESENCIAL E PROPOSTA FINAL
+  // ==========================================================================
+  // Antes de tudo, pelo mesmo motivo dos ramos da 4.4: o SQL desta fase contem
+  // trechos que padroes mais genericos abaixo tambem casariam.
+
+  // --- SELECT: a INSPECAO relida DEPOIS do lock ----------------------------
+  //
+  // O repository faz esta leitura em comando PROPRIO, e nao por JOIN na query do
+  // lock. O motivo esta documentado la: em READ COMMITTED o FOR UPDATE re-avalia
+  // apenas a linha travada, e as demais tabelas do JOIN continuam vindo do
+  // snapshot anterior ao commit concorrente.
+  //
+  // O fake nao tem isolamento, entao ele nao consegue reproduzir esse defeito —
+  // quem o pega e o teste de retry concorrente contra PostgreSQL real. O que
+  // este ramo garante e ALCANCE: que a leitura separada existe e devolve os
+  // campos que o service espera.
+  if (
+    /^SELECT id, advertiser_id, schedule_status, schedule_round, confirmed_slot_id, scheduled_at FROM sale_request_inspections WHERE sale_request_id = \$1/i.test(
+      text
+    )
+  ) {
+    const inspection = inspectionOf(params[0]);
+    return inspection
+      ? {
+          rows: [
+            {
+              id: inspection.id,
+              advertiser_id: inspection.advertiser_id,
+              schedule_status: inspection.schedule_status,
+              schedule_round: inspection.schedule_round,
+              confirmed_slot_id: inspection.confirmed_slot_id ?? null,
+              scheduled_at: inspection.scheduled_at ?? null,
+            },
+          ],
+          rowCount: 1,
+        }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- SELECT: o id da DECISAO, relido depois do lock ----------------------
+  if (
+    /^SELECT id FROM sale_request_post_inspection_decisions WHERE sale_request_id = \$1/i.test(
+      text
+    )
+  ) {
+    const row = db.saleRequestDecisions.find((d) => sameId(d.sale_request_id, params[0]));
+    return row ? { rows: [{ id: row.id }], rowCount: 1 } : { rows: [], rowCount: 0 };
+  }
+
+  // --- LOCK do lojista: solicitacao + oferta selecionada + inspecao ---------
+  if (/FOR UPDATE OF sr/i.test(text) && /o\.advertiser_id = \$2/i.test(text)) {
+    const [saleRequestId, advertiserId] = params;
+    const row = db.saleRequests.find((r) => sameId(r.id, saleRequestId));
+    if (!row) return { rows: [], rowCount: 0 };
+
+    // O JOIN pelo selected_offer_id e a comparacao de advertiser SAO a
+    // autorizacao. Apagar qualquer um deles do repository faz o teste da loja
+    // perdedora falhar — que e o alarme certo.
+    const offer = selectedOfferOf(row);
+    if (!offer || !sameId(offer.advertiser_id, advertiserId)) {
+      return { rows: [], rowCount: 0 };
+    }
+
+    const inspection = inspectionOf(saleRequestId);
+    const decision = db.saleRequestDecisions.find((d) =>
+      sameId(d.sale_request_id, saleRequestId)
+    );
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          status: row.status,
+          selected_offer_id: row.selected_offer_id ?? null,
+          owner_user_id: row.owner_user_id,
+          selected_amount: offer.amount,
+          selected_dealer_user_id: offer.dealer_user_id,
+          inspection_id: inspection?.id ?? null,
+          schedule_status: inspection?.schedule_status ?? null,
+          schedule_round: inspection?.schedule_round ?? null,
+          confirmed_slot_id: inspection?.confirmed_slot_id ?? null,
+          scheduled_at: inspection?.scheduled_at ?? null,
+          decision_id: decision?.id ?? null,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- LOCK do proprietario ------------------------------------------------
+  if (/FOR UPDATE OF sr/i.test(text) && /sr\.owner_user_id = \$2/i.test(text)) {
+    const [saleRequestId, ownerUserId] = params;
+    const row = db.saleRequests.find(
+      (r) => sameId(r.id, saleRequestId) && sameId(r.owner_user_id, ownerUserId)
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    const offer = selectedOfferOf(row);
+    const inspection = inspectionOf(saleRequestId);
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          status: row.status,
+          selected_offer_id: row.selected_offer_id ?? null,
+          selected_dealer_user_id: offer?.dealer_user_id ?? null,
+          inspection_id: inspection?.id ?? null,
+          advertiser_id: inspection?.advertiser_id ?? null,
+          schedule_status: inspection?.schedule_status ?? null,
+          schedule_round: inspection?.schedule_round ?? null,
+          confirmed_slot_id: inspection?.confirmed_slot_id ?? null,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- INSERT da inspecao ---------------------------------------------------
+  if (/^INSERT INTO sale_request_inspections/i.test(text)) {
+    const [saleRequestId, advertiserId, scheduleStatus, createdBy] = params;
+
+    // ON CONFLICT (sale_request_id) DO NOTHING, re-implementado de verdade.
+    if (inspectionOf(saleRequestId)) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextInspectionId,
+      sale_request_id: saleRequestId,
+      advertiser_id: advertiserId,
+      schedule_status: scheduleStatus,
+      schedule_round: 0,
+      confirmed_slot_id: null,
+      scheduled_at: null,
+      completed_at: null,
+      completed_by_user_id: null,
+      created_by_user_id: createdBy,
+      created_at: new Date(now).toISOString(),
+    };
+    db.nextInspectionId += 1;
+    db.saleRequestInspections.push(row);
+    return {
+      rows: [{ id: row.id, schedule_status: row.schedule_status, schedule_round: 0 }],
+      rowCount: 1,
+    };
+  }
+
+  // --- INSERT dos horarios (uma rodada inteira, via unnest) -----------------
+  if (/^INSERT INTO sale_request_inspection_slots/i.test(text)) {
+    const [inspectionId, roundNo, startsAt, createdBy] = params;
+    const list = Array.isArray(startsAt) ? startsAt : [startsAt];
+    const rows = [];
+
+    for (const value of list) {
+      const row = {
+        id: db.nextSlotId,
+        inspection_id: inspectionId,
+        round_no: roundNo,
+        starts_at: value instanceof Date ? value.toISOString() : String(value),
+        created_by_user_id: createdBy,
+        created_at: new Date(now).toISOString(),
+      };
+      db.nextSlotId += 1;
+      db.saleRequestInspectionSlots.push(row);
+      rows.push({ id: row.id, round_no: row.round_no, starts_at: row.starts_at });
+    }
+
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- UPDATE: publica a rodada --------------------------------------------
+  if (/^UPDATE sale_request_inspections SET schedule_status = \$3, schedule_round = \$2/i.test(text)) {
+    const [inspectionId, roundNo, next, fromA, fromB] = params;
+    const row = db.saleRequestInspections.find(
+      (i) => sameId(i.id, inspectionId) && [fromA, fromB].includes(i.schedule_status)
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+    row.schedule_status = next;
+    row.schedule_round = roundNo;
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- SELECT: horarios da rodada VIGENTE ----------------------------------
+  if (
+    /FROM sale_request_inspection_slots s JOIN sale_request_inspections i/i.test(text) &&
+    /ORDER BY s\.starts_at/i.test(text)
+  ) {
+    const [inspectionId] = params;
+    const inspection = db.saleRequestInspections.find((i) => sameId(i.id, inspectionId));
+    if (!inspection) return { rows: [], rowCount: 0 };
+
+    // round_no = i.schedule_round E o filtro do paragrafo 11: so a rodada atual
+    // sai daqui. Apagar essa comparacao do repository faz o teste de horario
+    // obsoleto deixar de discriminar.
+    const rows = db.saleRequestInspectionSlots
+      .filter(
+        (s) =>
+          sameId(s.inspection_id, inspectionId) &&
+          Number(s.round_no) === Number(inspection.schedule_round)
+      )
+      .sort((a, b) => {
+        const byTime = new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+        return byTime !== 0 ? byTime : Number(a.id) - Number(b.id);
+      })
+      .map((s) => ({ id: s.id, round_no: s.round_no, starts_at: s.starts_at }));
+
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- SELECT: UM horario, provado como da rodada vigente -------------------
+  if (
+    /WHERE s\.id = \$1 AND s\.inspection_id = \$2 AND s\.round_no = i\.schedule_round/i.test(text)
+  ) {
+    const [slotId, inspectionId] = params;
+    const inspection = db.saleRequestInspections.find((i) => sameId(i.id, inspectionId));
+    if (!inspection) return { rows: [], rowCount: 0 };
+
+    const slot = db.saleRequestInspectionSlots.find(
+      (s) =>
+        sameId(s.id, slotId) &&
+        sameId(s.inspection_id, inspectionId) &&
+        Number(s.round_no) === Number(inspection.schedule_round)
+    );
+
+    return slot
+      ? {
+          rows: [{ id: slot.id, round_no: slot.round_no, starts_at: slot.starts_at }],
+          rowCount: 1,
+        }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- UPDATE: confirma o horario ------------------------------------------
+  if (
+    /^UPDATE sale_request_inspections SET schedule_status = \$4, confirmed_slot_id = \$2/i.test(text)
+  ) {
+    const [inspectionId, slotId, startsAt, next, from] = params;
+    const row = db.saleRequestInspections.find(
+      (i) => sameId(i.id, inspectionId) && i.schedule_status === from
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+    row.schedule_status = next;
+    row.confirmed_slot_id = slotId;
+    row.scheduled_at = startsAt instanceof Date ? startsAt.toISOString() : String(startsAt);
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- UPDATE: pede novos horarios -----------------------------------------
+  if (/^UPDATE sale_request_inspections SET schedule_status = \$2 WHERE id = \$1/i.test(text)) {
+    const [inspectionId, next, from] = params;
+    const row = db.saleRequestInspections.find(
+      (i) => sameId(i.id, inspectionId) && i.schedule_status === from
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+    row.schedule_status = next;
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- UPDATE: conclui a inspecao com a ficha ------------------------------
+  if (
+    /^UPDATE sale_request_inspections SET schedule_status = \$2, completed_at = NOW\(\)/i.test(text)
+  ) {
+    const [
+      inspectionId,
+      next,
+      completedBy,
+      mileage,
+      condition,
+      tires,
+      engine,
+      gearbox,
+      suspension,
+      bodyPaint,
+      issues,
+      notes,
+      from,
+    ] = params;
+
+    const row = db.saleRequestInspections.find(
+      (i) => sameId(i.id, inspectionId) && i.schedule_status === from
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+
+    row.schedule_status = next;
+    row.completed_at = new Date(now).toISOString();
+    row.completed_by_user_id = completedBy;
+    row.observed_mileage = mileage;
+    row.observed_condition = condition;
+    row.observed_tire_condition = tires;
+    row.observed_engine_condition = engine;
+    row.observed_gearbox_condition = gearbox;
+    row.observed_suspension_condition = suspension;
+    row.observed_body_paint_status = bodyPaint;
+    row.observed_body_paint_issues = issues;
+    row.inspection_notes = notes;
+    return { rows: [], rowCount: 1 };
+  }
+
+  // --- INSERT da decisao comercial -----------------------------------------
+  if (/^INSERT INTO sale_request_post_inspection_decisions/i.test(text)) {
+    const [
+      saleRequestId,
+      inspectionId,
+      advertiserId,
+      selectedOfferId,
+      decisionType,
+      preliminary,
+      finalAmount,
+      reason,
+      note,
+      internalNote,
+      decidedBy,
+    ] = params;
+
+    // ON CONFLICT (sale_request_id) DO NOTHING — a rede do paragrafo 37.
+    const exists = db.saleRequestDecisions.some((d) =>
+      sameId(d.sale_request_id, saleRequestId)
+    );
+    if (exists) return { rows: [], rowCount: 0 };
+
+    const row = {
+      id: db.nextDecisionId,
+      sale_request_id: saleRequestId,
+      inspection_id: inspectionId,
+      advertiser_id: advertiserId,
+      selected_offer_id: selectedOfferId,
+      decision_type: decisionType,
+      preliminary_amount_snapshot: preliminary,
+      final_amount: finalAmount,
+      adjustment_reason: reason,
+      adjustment_note: note,
+      internal_note: internalNote,
+      decided_by_user_id: decidedBy,
+      created_at: new Date(now).toISOString(),
+    };
+    db.nextDecisionId += 1;
+    db.saleRequestDecisions.push(row);
+
+    return {
+      rows: [
+        {
+          id: row.id,
+          decision_type: row.decision_type,
+          final_amount: row.final_amount,
+          preliminary_amount_snapshot: row.preliminary_amount_snapshot,
+          adjustment_reason: row.adjustment_reason,
+          adjustment_note: row.adjustment_note,
+          created_at: row.created_at,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: a decisao (SEM internal_note) -------------------------------
+  if (/FROM sale_request_post_inspection_decisions WHERE sale_request_id = \$1/i.test(text)) {
+    const row = db.saleRequestDecisions.find((d) => sameId(d.sale_request_id, params[0]));
+    if (!row) return { rows: [], rowCount: 0 };
+
+    // internal_note NAO e projetada — a query real nao a seleciona, e o teste de
+    // privacidade depende de o fake respeitar isso.
+    return {
+      rows: [
+        {
+          id: row.id,
+          decision_type: row.decision_type,
+          preliminary_amount_snapshot: row.preliminary_amount_snapshot,
+          final_amount: row.final_amount,
+          adjustment_reason: row.adjustment_reason,
+          adjustment_note: row.adjustment_note,
+          created_at: row.created_at,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- SELECT: a inspecao para leitura de tela -----------------------------
+  if (/FROM sale_request_inspections i JOIN advertisers adv/i.test(text)) {
+    const inspection = inspectionOf(params[0]);
+    return inspection
+      ? { rows: [projectInspection(inspection)], rowCount: 1 }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- SELECT: endereco comercial da loja ----------------------------------
+  if (/^SELECT adv\.name, adv\.address, c\.name AS city_name/i.test(text)) {
+    const advertiser = db.advertisers.find((a) => sameId(a.id, params[0]));
+    if (!advertiser) return { rows: [], rowCount: 0 };
+    const city = cityOf(advertiser.city_id);
+    return {
+      rows: [
+        {
+          name: advertiser.name ?? null,
+          address: advertiser.address ?? null,
+          city_name: city?.name ?? null,
+          city_state: city?.state ?? null,
+        },
+      ],
+      rowCount: 1,
+    };
+  }
+
+  // --- UPDATE: move o status da SOLICITACAO --------------------------------
+  if (
+    /^UPDATE sale_requests SET status = \$3, updated_at = NOW\(\) WHERE id = \$1 AND status = \$2/i.test(
+      text
+    )
+  ) {
+    const [saleRequestId, fromStatus, toStatus] = params;
+    const row = db.saleRequests.find(
+      (r) => sameId(r.id, saleRequestId) && r.status === fromStatus
+    );
+    if (!row) return { rows: [], rowCount: 0 };
+    row.status = toStatus;
+    row.updated_at = new Date(now).toISOString();
+    return { rows: [], rowCount: 1 };
+  }
+
   // ==========================================================================
   // SELEÇÃO DE PROPOSTA (Fase 4.4)
   // ==========================================================================
@@ -872,21 +1354,26 @@ function handle(text, params, now) {
 
   // --- sale_requests: DETALHE do lojista ------------------------------------
   //
-  // As DUAS condições de visibilidade da Fase 4.4, re-implementadas de verdade:
+  // As DUAS condições de visibilidade, re-implementadas de verdade:
   //
-  //   `receiving_offers` → qualquer loja da cidade;
-  //   `offer_selected`   → SÓ a loja cuja proposta foi a escolhida.
+  //   `receiving_offers`     → qualquer loja da cidade;
+  //   estados COM seleção     → SÓ a loja cuja proposta foi a escolhida.
   //
-  // A segunda comparação (`sel.advertiser_id = $5`) é o que faz o teste de
-  // "lojista perdedor recebe 404" falhar se alguém a apagar do repository. Um
-  // fake que ignorasse o advertiser devolveria a ficha para todo mundo e o teste
-  // passaria enquanto a privacidade estivesse quebrada.
+  // A segunda lista cresceu na Fase 4.5 (`inspection_scheduled`,
+  // `inspection_completed`, `final_offer_submitted`, `final_offer_declined`) e
+  // chega como ARRAY no parâmetro 4 — o repository usa `= ANY($4::text[])`, e
+  // não mais uma igualdade com um único estado.
+  //
+  // A comparação de advertiser é o que faz o teste de "lojista perdedor recebe
+  // 404" falhar se alguém a apagar do repository. Um fake que a ignorasse
+  // devolveria a ficha para todo mundo e o teste passaria enquanto a privacidade
+  // estivesse quebrada.
   if (
-    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( sr\.status = \$3 OR \(sr\.status = \$4 AND sel\.advertiser_id = \$5\) \)/i.test(
+    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( sr\.status = \$3 OR \(sr\.status = ANY\(\$4::text\[\]\) AND sel\.advertiser_id = \$5\) \)/i.test(
       text
     )
   ) {
-    const [id, cityId, openStatus, selectedStatus, advertiserId] = params;
+    const [id, cityId, openStatus, selectedStatuses, advertiserId] = params;
 
     const row = db.saleRequests.find(
       (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
@@ -901,7 +1388,9 @@ function handle(text, params, now) {
 
     const visible =
       row.status === openStatus ||
-      (row.status === selectedStatus &&
+      ((Array.isArray(selectedStatuses) ? selectedStatuses : [selectedStatuses]).includes(
+        row.status
+      ) &&
         selectedOffer != null &&
         sameId(selectedOffer.advertiser_id, advertiserId));
 

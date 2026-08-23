@@ -103,6 +103,10 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
     is_selected: false,
     selected_amount: null,
     selected_at: null,
+    // Fase 4.5. `null` é o estado normal antes da seleção: a inspeção só nasce
+    // quando a loja escolhida envia a primeira rodada de horários.
+    inspection: null,
+    final_decision: null,
     ...overrides,
   };
 }

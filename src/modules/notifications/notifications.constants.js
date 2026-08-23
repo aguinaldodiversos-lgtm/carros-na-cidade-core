@@ -61,5 +61,20 @@ export const NOTIFICATION_EVENT_TYPE = Object.freeze({
   SALE_REQUEST_BID_RECEIVED: "sale_request.bid_received",
   SALE_REQUEST_OUTBID: "sale_request.outbid",
   SALE_REQUEST_BID_SELECTED: "sale_request.bid_selected",
+
+  /**
+   * Fase 4.5 — a avaliação presencial e a proposta final.
+   *
+   * `APPOINTMENT_CONFIRMED` (logo abaixo) JÁ EXISTIA e cobre "o proprietário
+   * escolheu o horário" — reutilizado em vez de criar um
+   * `sale_request.inspection_confirmed` que diria a mesma coisa com outro nome.
+   * Os quatro daqui são os que não tinham equivalente.
+   */
+  SALE_REQUEST_INSPECTION_SLOTS_OFFERED: "sale_request.inspection_slots_offered",
+  SALE_REQUEST_INSPECTION_SLOTS_REQUESTED: "sale_request.inspection_slots_requested",
+  SALE_REQUEST_FINAL_OFFER_SUBMITTED: "sale_request.final_offer_submitted",
+  SALE_REQUEST_FINAL_OFFER_DECLINED: "sale_request.final_offer_declined",
+
+  /** Reutilizado pela 4.5: o horário da avaliação presencial foi confirmado. */
   APPOINTMENT_CONFIRMED: "appointment.confirmed",
 });

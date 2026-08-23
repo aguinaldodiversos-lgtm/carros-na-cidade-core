@@ -9,6 +9,7 @@
 // QUE se vende; QUEM vende é do servidor.
 
 import * as photosService from "./sale-requests.photos.service.js";
+import * as inspectionService from "./sale-requests.inspection.service.js";
 import * as selectionService from "./sale-requests.selection.service.js";
 import * as service from "./sale-requests.service.js";
 
@@ -93,6 +94,44 @@ export async function selectSaleRequestOffer(req, res) {
     req.user.id,
     req.params.id,
     req.body || {}
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * Confirma o horário da avaliação presencial (Fase 4.5).
+ *
+ * O corpo carrega `slot_id` e nada mais é lido dele. O instante NÃO vem do
+ * cliente: ele é copiado da própria linha do horário, dentro da transação —
+ * aceitá-lo do corpo permitiria confirmar um horário e gravar outro.
+ *
+ * Sempre 200. `changed: false` no retry do mesmo horário; escolher um horário
+ * DIFERENTE depois de confirmado é 409, porque não existe reagendamento nesta
+ * fase.
+ */
+export async function confirmInspectionSlot(req, res) {
+  const result = await inspectionService.confirmInspectionSlot(
+    req.user.id,
+    req.params.id,
+    req.body || {}
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * "Não consigo nesses horários" (§12).
+ *
+ * NÃO lê corpo nenhum — nem precisa. A ação é um sinal, não uma mensagem: um
+ * campo de texto aqui viraria o canal de conversa que o produto decidiu não ter,
+ * e a primeira pessoa a escrever um telefone nele entregaria o contato que todo
+ * o desenho evita.
+ */
+export async function requestNewInspectionSlots(req, res) {
+  const result = await inspectionService.requestNewInspectionSlots(
+    req.user.id,
+    req.params.id
   );
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });

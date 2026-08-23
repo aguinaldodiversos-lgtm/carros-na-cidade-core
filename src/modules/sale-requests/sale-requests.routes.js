@@ -80,6 +80,26 @@ router.post("/:id/cancel", asyncHandler(controller.cancelMySaleRequest));
 router.post("/:id/select-offer", asyncHandler(controller.selectSaleRequestOffer));
 
 /**
+ * Fase 4.5 — a escolha do horário da avaliação presencial.
+ *
+ * Duas rotas para duas intenções OPOSTAS do proprietário: confirmar um horário
+ * ou dizer que nenhum serve. Um endpoint só, com um flag no corpo, faria a
+ * segunda parecer um caso particular da primeira — e ela não é: uma avança o
+ * negócio (`offer_selected → inspection_scheduled`), a outra devolve a bola para
+ * a loja sem mudar o estado da oportunidade.
+ *
+ * Sem rate limit próprio, pela mesma razão do `select-offer`: as duas transições
+ * são idempotentes ou 409 a partir do segundo request, sem escrita e sem
+ * notificação. Um limitador protegeria contra uma pressão que não existe e
+ * recusaria o retry legítimo de quem perdeu a resposta na rede.
+ */
+router.post("/:id/inspection/confirm", asyncHandler(controller.confirmInspectionSlot));
+router.post(
+  "/:id/inspection/request-slots",
+  asyncHandler(controller.requestNewInspectionSlots)
+);
+
+/**
  * Cache-Control nos caminhos de ERRO deste router.
  *
  * ────────────────────────────────────────────────────────────────────────────

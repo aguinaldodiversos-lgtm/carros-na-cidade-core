@@ -40,7 +40,11 @@ import * as offersRepo from "./sale-requests.offers.repository.js";
 import { buildCanonicalImageUrlFromStorageKey } from "../ads/ads.public-images.js";
 import * as repo from "./sale-requests.dealer.repository.js";
 import { parseSaleRequestId, requireUserId } from "./sale-requests.validation.js";
-import { SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
+import {
+  SALE_REQUEST_SELECTED_STATUSES,
+  SALE_REQUEST_STATUS,
+} from "./sale-requests.constants.js";
+import { readDealerInspectionState } from "./sale-requests.inspection.service.js";
 import { SALE_OPPORTUNITY_PAGE } from "./sale-requests.dealer.constants.js";
 import {
   decodeCursor,
@@ -208,7 +212,22 @@ function serializeDetail(row, { images = [] } = {}) {
  * escolheu. O contato não existe nesta fase para ninguém.
  */
 function serializeSelection(row) {
-  const isSelected = row.status === SALE_REQUEST_STATUS.OFFER_SELECTED;
+  // ────────────────────────────────────────────────────────────────────────
+  // A LISTA, E NÃO A IGUALDADE (generalizado na Fase 4.5)
+  // ────────────────────────────────────────────────────────────────────────
+  // Isto nasceu na 4.4 comparando com `OFFER_SELECTED` — o único estado com
+  // seleção que existia. A 4.5 criou mais quatro, e a igualdade passou a
+  // devolver `is_selected: false` assim que a avaliação era agendada.
+  //
+  // O efeito era grave e silencioso: a tela da loja ESCOLHIDA voltava a exibir
+  // o formulário de PROPOSTA, como se a disputa continuasse aberta — a loja
+  // veria "Recebendo propostas" e um campo para cobrir um lance que já não
+  // existe. Nenhum teste de unidade pegou; o E2E pegou, na tela.
+  //
+  // `SALE_REQUEST_SELECTED_STATUSES` é a mesma lista que o CHECK da 058
+  // enumera, e usá-la aqui é o que faz este DTO crescer junto com a máquina de
+  // estados.
+  const isSelected = SALE_REQUEST_SELECTED_STATUSES.includes(row.status);
 
   return {
     is_selected: isSelected,
@@ -354,9 +373,15 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
     throw new AppError("Oportunidade não encontrada.", 404);
   }
 
-  const [images, offerState] = await Promise.all([
+  const [images, offerState, inspectionState] = await Promise.all([
     repo.listImagesByRequestId(saleRequestId),
     getOfferStateForAdvertiser(saleRequestId, advertiserId),
+    // Fase 4.5. Só faz sentido depois da seleção — antes dela não existe
+    // inspeção, e a leitura devolveria dois `null` de qualquer forma. A guarda
+    // evita duas queries por card de oportunidade ainda em disputa.
+    row.status === SALE_REQUEST_STATUS.RECEIVING_OFFERS
+      ? Promise.resolve({ inspection: null, final_decision: null })
+      : readDealerInspectionState(saleRequestId),
   ]);
 
   return {
@@ -374,6 +399,13 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
       // mesma escolha que `serializeOfferState` faz com a solicitação sem
       // proposta nenhuma.
       ...serializeSelection(row),
+
+      // Os dois blocos da 4.5. `null` quando ainda não existem — a loja acabou de
+      // ser selecionada e não mandou horários, ou a decisão ainda não foi
+      // tomada. A tela distingue os estados por `inspection.state`, não pela
+      // presença dos campos.
+      inspection: inspectionState.inspection,
+      final_decision: inspectionState.final_decision,
     },
   };
 }

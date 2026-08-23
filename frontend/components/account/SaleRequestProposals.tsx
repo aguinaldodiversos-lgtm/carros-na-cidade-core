@@ -311,7 +311,26 @@ function ConfirmDialog({
  * da vencedora convidaria a uma comparação sobre algo que já não pode ser
  * mudado.
  */
-function SelectedOfferPanel({ selected }: { selected: SaleRequestSelectedOffer }) {
+function SelectedOfferPanel({
+  selected,
+  compact,
+}: {
+  selected: SaleRequestSelectedOffer;
+  /**
+   * `true` quando a avaliação presencial JÁ COMEÇOU (Fase 4.5).
+   *
+   * Sem isto, o painel continuava anunciando "Aguardando próxima etapa" e "as
+   * próximas etapas serão disponibilizadas aqui" com a próxima etapa
+   * renderizada logo abaixo — pedindo à pessoa que esperasse por algo que já
+   * estava na tela, e empurrando a informação nova para baixo de um bloco que
+   * não tinha mais o que dizer.
+   *
+   * No modo compacto ele volta a ser o que passou a ser: o CABEÇALHO do
+   * negócio — com quem, por quanto — enquanto o estado atual é contado pelo
+   * bloco da avaliação.
+   */
+  compact: boolean;
+}) {
   return (
     <section
       className="rounded-2xl border border-[#ABEFC6] bg-[#F6FEF9] p-4 sm:p-5"
@@ -335,14 +354,18 @@ function SelectedOfferPanel({ selected }: { selected: SaleRequestSelectedOffer }
         {formatMoneyValue(selected.amount)}
       </p>
 
-      <p className="mt-4 inline-flex items-center rounded-full bg-white px-3 py-1.5 text-[12px] font-bold text-[#027A48] ring-1 ring-[#ABEFC6]">
-        Aguardando próxima etapa
-      </p>
+      {compact ? null : (
+        <>
+          <p className="mt-4 inline-flex items-center rounded-full bg-white px-3 py-1.5 text-[12px] font-bold text-[#027A48] ring-1 ring-[#ABEFC6]">
+            Aguardando próxima etapa
+          </p>
 
-      <p className="mt-3 text-[13px] leading-relaxed text-[#475467]">
-        A proposta foi selecionada. As próximas etapas de avaliação serão disponibilizadas
-        aqui.
-      </p>
+          <p className="mt-3 text-[13px] leading-relaxed text-[#475467]">
+            A proposta foi selecionada. As próximas etapas de avaliação serão
+            disponibilizadas aqui.
+          </p>
+        </>
+      )}
     </section>
   );
 }
@@ -364,6 +387,7 @@ export default function SaleRequestProposals({
   proposals,
   selected,
   status,
+  inspectionStarted,
   onSelected,
   onStale,
 }: {
@@ -371,6 +395,13 @@ export default function SaleRequestProposals({
   proposals: SaleRequestProposal[];
   selected: SaleRequestSelectedOffer | null;
   status: string;
+  /**
+   * A avaliação presencial já começou (Fase 4.5)?
+   *
+   * Quando sim, este bloco vira o CABEÇALHO do negócio e para de anunciar
+   * "aguardando próxima etapa" — a próxima etapa está renderizada logo abaixo.
+   */
+  inspectionStarted: boolean;
   onSelected: (selected: SaleRequestSelectedOffer) => void;
   onStale: () => void;
 }) {
@@ -422,7 +453,7 @@ export default function SaleRequestProposals({
   }
 
   if (selected) {
-    return <SelectedOfferPanel selected={selected} />;
+    return <SelectedOfferPanel selected={selected} compact={inspectionStarted} />;
   }
 
   // Cancelada: a seção some inteira. Não há disputa a mostrar, e um estado vazio

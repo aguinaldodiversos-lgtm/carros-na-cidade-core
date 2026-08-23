@@ -217,9 +217,24 @@ for (const dealer of DEALERS) {
     cityId: Number(dealerCityId),
     source: "e2e-seed",
   });
+  // `address` entrou na Fase 4.5: sem endereço comercial cadastrado, a loja não
+  // consegue propor horários para a avaliação presencial — o servidor recusa com
+  // `INSPECTION_STORE_LOCATION_REQUIRED`, porque mandar o proprietário comparecer
+  // num lugar que o sistema não sabe dizer qual é seria pior que não agendar.
+  //
+  // O E2E da 4.5 encontrou exatamente isso: a UI preencheu os três horários e o
+  // backend recusou, corretamente. O seed é que estava incompleto.
   await pool.query(
-    `UPDATE advertisers SET city_id = $2, status = $3, whatsapp = $4 WHERE user_id = $1`,
-    [dealerUserId, dealerCityId, dealer.status, dealer.whatsapp]
+    `UPDATE advertisers
+        SET city_id = $2, status = $3, whatsapp = $4, address = $5
+      WHERE user_id = $1`,
+    [
+      dealerUserId,
+      dealerCityId,
+      dealer.status,
+      dealer.whatsapp,
+      "Av. Jerônimo de Camargo, 1200 — Alvinópolis",
+    ]
   );
 }
 
@@ -394,11 +409,81 @@ await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`
 // política de LGPD/anonimização, ela será um fluxo próprio com as mesmas
 // características: explícita, escopada e legível — nunca um `ON DELETE`
 // herdado de uma FK.
+// A ORDEM abaixo é a ordem inversa das dependências, e cada DELETE existe
+// porque a fase correspondente decidiu NÃO usar `ON DELETE CASCADE`:
+//
+//   4.5  decisões  → inspeções → horários  (trilha da avaliação)
+//   4.4  seleções                          (trilha da escolha)
+//
+// A Fase 4.5 acrescentou três tabelas que dependem de `sale_request_offer_selections`
+// (a inspeção prova contra ela que é a loja selecionada) e de `sale_requests`.
+// Sem estes DELETEs, reexecutar o seed falha com:
+//
+//   violates foreign key constraint "sale_request_inspections_selected_store_fk"
+//
+// Isso não é um obstáculo a contornar — é o endurecimento funcionando. O que ele
+// exige é que a destruição de histórico seja EXPLÍCITA, e estes DELETEs são essa
+// declaração: um script de RESET DE AMBIENTE DE TESTE dizendo, por escrito, que
+// está descartando a trilha das solicitações que ele mesmo semeou.
+//
+// Todos escopados ao MESMO `owner_user_id` — nunca a tabela inteira.
+const ownedRequests = `SELECT id FROM sale_requests WHERE owner_user_id = $1::bigint`;
+
+await pool.query(
+  `DELETE FROM sale_request_post_inspection_decisions
+    WHERE sale_request_id IN (${ownedRequests})`,
+  [userId]
+);
+
+// A INSPEÇÃO E OS HORÁRIOS SE REFERENCIAM MUTUAMENTE:
+//
+//   slots.inspection_id        → inspections   (todo horário é de uma inspeção)
+//   inspections.confirmed_slot_id → slots      (o horário escolhido)
+//
+// Nenhuma ordem de DELETE resolve um ciclo. É preciso SOLTAR a referência
+// primeiro — e soltá-la sozinha violaria o CHECK de coerência, que exige
+// `confirmed_slot_id` preenchido em `scheduled`/`completed`. Por isso o UPDATE
+// devolve a inspeção ao estado inicial INTEIRO, inclusive a ficha observada:
+// os CHECKs da 058 tornam qualquer meio-termo inexprimível, e isso é a garantia
+// funcionando, não um obstáculo.
+await pool.query(
+  `UPDATE sale_request_inspections
+      SET schedule_status = 'awaiting_slots',
+          confirmed_slot_id = NULL,
+          scheduled_at = NULL,
+          completed_at = NULL,
+          completed_by_user_id = NULL,
+          observed_mileage = NULL,
+          observed_condition = NULL,
+          observed_tire_condition = NULL,
+          observed_engine_condition = NULL,
+          observed_gearbox_condition = NULL,
+          observed_suspension_condition = NULL,
+          observed_body_paint_status = NULL,
+          observed_body_paint_issues = NULL,
+          inspection_notes = NULL
+    WHERE sale_request_id IN (${ownedRequests})`,
+  [userId]
+);
+
+await pool.query(
+  `DELETE FROM sale_request_inspection_slots
+    WHERE inspection_id IN (
+      SELECT id FROM sale_request_inspections
+       WHERE sale_request_id IN (${ownedRequests})
+    )`,
+  [userId]
+);
+
+await pool.query(
+  `DELETE FROM sale_request_inspections
+    WHERE sale_request_id IN (${ownedRequests})`,
+  [userId]
+);
+
 await pool.query(
   `DELETE FROM sale_request_offer_selections
-    WHERE sale_request_id IN (
-      SELECT id FROM sale_requests WHERE owner_user_id = $1::bigint
-    )`,
+    WHERE sale_request_id IN (${ownedRequests})`,
   [userId]
 );
 

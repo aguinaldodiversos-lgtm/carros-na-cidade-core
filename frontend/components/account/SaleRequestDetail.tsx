@@ -8,6 +8,7 @@ import VehicleEvaluationSheet, {
   DataRow,
 } from "@/components/account/VehicleEvaluationSheet";
 import SaleRequestProposals from "@/components/account/SaleRequestProposals";
+import SaleRequestInspection from "@/components/account/SaleRequestInspection";
 import {
   DECLARED_CONDITION_OPTIONS,
   NOT_INFORMED,
@@ -29,6 +30,10 @@ import {
   type SaleRequestProposal,
   type SaleRequestSelectedOffer,
 } from "@/lib/sale-requests/api";
+import type {
+  OwnerInspection,
+  PostInspectionDecision,
+} from "@/lib/sale-requests/inspection";
 
 /**
  * Detalhe de UMA solicitação, para o dono.
@@ -61,19 +66,23 @@ import {
  * ────────────────────────────────────────────────────────────────────────────
  * SEM EDIÇÃO, SEM PLACEHOLDER DE FUTURO
  * ────────────────────────────────────────────────────────────────────────────
- * Continua não havendo "aguardando avaliação", "prazo" ou "próxima etapa em X
- * dias": a 4.5 não existe, e anunciá-la faria a pessoa esperar por algo que o
- * produto não entrega. O que a tela mostra depois da seleção é o estado real —
- * "Aguardando próxima etapa" — sem data e sem promessa.
+ * A avaliação presencial agora EXISTE (Fase 4.5), e a tela deixou de dizer
+ * "aguardando próxima etapa" para mostrar a etapa real: escolher o horário,
+ * comparecer, e ver a proposta final.
+ *
+ * Continua não havendo PRAZO, cronômetro ou "próxima etapa em X dias". Não há
+ * relógio nesta fase, e anunciar um faria a pessoa cobrar uma data que o sistema
+ * não garante.
  *
  * Publicou, não edita campo economicamente relevante: mudar a quilometragem
  * debaixo de uma proposta já feita seria alterar o objeto do negócio depois da
- * oferta.
+ * oferta. E a quilometragem que a LOJA observa não sobrescreve a declarada — as
+ * duas aparecem lado a lado, que é o que torna uma eventual redução de valor
+ * compreensível.
  *
- * O cancelamento deixou de ser a única ação (agora há a seleção) e passou a ter
- * um limite: depois de escolher uma proposta, cancelar não é mais possível — a
- * decisão é irreversível nesta fase, e o botão desaparece em vez de devolver um
- * erro a quem clicasse.
+ * O cancelamento passou a ter um limite: depois de escolher uma proposta,
+ * cancelar não é mais possível — nem durante a avaliação. O botão desaparece em
+ * vez de devolver um erro a quem clicasse.
  */
 
 const CONDITION_LABEL = new Map(DECLARED_CONDITION_OPTIONS.map((item) => [item.value, item.label]));
@@ -103,6 +112,8 @@ export default function SaleRequestDetail({ id }: { id: string }) {
   const [request, setRequest] = useState<SaleRequest | null>(null);
   const [proposals, setProposals] = useState<SaleRequestProposal[]>([]);
   const [selectedOffer, setSelectedOffer] = useState<SaleRequestSelectedOffer | null>(null);
+  const [inspection, setInspection] = useState<OwnerInspection | null>(null);
+  const [finalDecision, setFinalDecision] = useState<PostInspectionDecision | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -129,6 +140,8 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         // inteira do detalhe por causa da seção de propostas.
         setProposals(Array.isArray(response.proposals) ? response.proposals : []);
         setSelectedOffer(response.selected_offer ?? null);
+        setInspection(response.inspection ?? null);
+        setFinalDecision(response.final_decision ?? null);
       })
       .catch((failure) => {
         if (alive) {
@@ -280,6 +293,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
           proposals={proposals}
           selected={selectedOffer}
           status={request.status}
+          inspectionStarted={Boolean(inspection || finalDecision)}
           onSelected={(selected) => {
             // A resposta do POST veio de dentro da transação que travou a
             // solicitação — é autoritativa. Aplicá-la aqui evita um GET extra e,
@@ -295,6 +309,29 @@ export default function SaleRequestDetail({ id }: { id: string }) {
           onStale={() => setReloadToken((value) => value + 1)}
         />
       </div>
+
+      {/*
+        FASE 4.5 — a avaliação presencial.
+
+        Fica logo abaixo do bloco de propostas porque é a CONTINUAÇÃO dele: a
+        pessoa escolheu uma loja ali em cima, e o que acontece a seguir é isto.
+        O componente decide sozinho qual dos cinco momentos mostrar.
+
+        Só é montado depois de existir uma seleção — antes disso não há
+        avaliação nenhuma, e um card de espera no meio da disputa faria a
+        pessoa achar que precisa fazer algo.
+      */}
+      {selectedOffer ? (
+        <div className="mt-4">
+          <SaleRequestInspection
+            saleRequestId={request.id}
+            request={request}
+            inspection={inspection}
+            decision={finalDecision}
+            onChanged={() => setReloadToken((value) => value + 1)}
+          />
+        </div>
+      ) : null}
 
       {/*
         Duas colunas a partir de `md`, uma no mobile. Os cartões são
@@ -418,15 +455,20 @@ export default function SaleRequestDetail({ id }: { id: string }) {
             </button>
           )}
         </div>
-      ) : request.status === "offer_selected" ? (
+      ) : request.status !== "cancelled" ? (
         /*
           Depois da seleção NÃO há botão de cancelar, e a ausência é a mensagem.
           Renderizá-lo desabilitado, ou renderizá-lo para receber um 409, diria
           que a reversão existe e está indisponível — quando ela simplesmente não
           existe nesta fase.
 
-          O painel verde acima já diz o que está acontecendo; esta linha só
-          fecha o assunto do cancelamento para quem procurava o botão.
+          A condição é `!== "cancelled"` e não uma igualdade com `offer_selected`
+          porque os quatro estados da 4.5 têm exatamente o mesmo comportamento:
+          nenhum deles aceita cancelamento. Uma igualdade faria o botão REAPARECER
+          quando a avaliação fosse agendada — e ele levaria a um 409.
+
+          Os blocos acima já dizem o que está acontecendo; esta linha só fecha o
+          assunto do cancelamento para quem procurava o botão.
         */
         <p className="mt-6 text-sm text-[#64748b]" data-testid="sale-request-selected-note">
           Você já selecionou uma proposta. Esta solicitação não recebe mais propostas e não
