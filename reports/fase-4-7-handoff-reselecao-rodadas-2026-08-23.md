@@ -357,6 +357,29 @@ Nenhum teste foi excluído para ficar verde. Cada um foi classificado:
 | `SaleRequestFinalDecision.test.tsx` (4.6 UI) | 24 | `SaleRequestHandoff.test.tsx` | 24 |
 | `sale-request-inspection-final-offer.spec.ts` (E2E) | 1 | `sale-request-handoff-rounds.spec.ts` | 1 |
 | `sale-request-owner-final-decision.spec.ts` (E2E) | 1 | (idem) | |
+| **TOTAL** | **185** | | **64** |
+
+**A soma é 185, e não 184.** Conferido no Git, contando as declarações de teste
+na revisão anterior à remoção (`3e9d68b4^`), arquivo por arquivo:
+
+```bash
+git show '3e9d68b4^:<arquivo>' | grep -cE '^s*(it|test)(.(only|skip|todo|concurrent))?('
+```
+
+54 + 46 + 27 + 32 + 24 + 1 + 1 = **185**. A contagem estática vale como contagem
+de execução porque nenhuma das suítes usa `it.each`/`describe.each`, nenhuma
+declara teste dentro de laço (todas as declarações estão em indentação 2, dentro
+de um único `describe`) e nenhuma tem `it.skip`/`it.only`.
+
+**De onde saía 184.** Os dois E2E aposentados valem **1 teste cada**, e a segunda
+linha traz `(idem)` na coluna "Substituída por" — somar a tabela tratando as duas
+linhas de E2E como uma só dá exatamente 184. As duas são remoções distintas:
+`sale-request-inspection-final-offer.spec.ts` e
+`sale-request-owner-final-decision.spec.ts` são arquivos diferentes, ambos
+deletados por `3e9d68b4`. (Cada um tem 3 ocorrências de `test…(` no fonte, mas
+duas são `test.skip(…)` de guarda de ambiente — não são testes.)
+
+A classificação A/B/C abaixo não muda.
 
 **A. invariantes ainda válidos** → PORTADOS: as tabelas e FKs das 058/059
 continuam existindo (teste dedicado), os estados legados continuam satisfazendo o
@@ -440,17 +463,11 @@ selecionada" para "Oferta aceita", alinhado ao CTA do §3.
 
 ## 21. Dívidas
 
-1. **`frontend/e2e/sale-request-offer-selection.spec.ts` precisa de um ajuste que
-   NÃO foi feito.** O arquivo tem modificação local não commitada do usuário, e o
-   §0 proíbe tocá-lo. Ele assere `dealer-inspection-slot-form`, testid retirado
-   por esta fase — vai falhar até ser atualizado. A mudança necessária é trocar
-   aquele bloco por:
-
-   ```ts
-   const selectedPanel = page.getByTestId("dealer-handoff-accepted");
-   await expect(selectedPanel).toBeVisible({ timeout: 60_000 });
-   await expect(selectedPanel).toContainText("Sua oferta foi aceita");
-   ```
+1. ~~**`frontend/e2e/sale-request-offer-selection.spec.ts` precisa de um ajuste
+   que NÃO foi feito.**~~ **PARCIALMENTE RESOLVIDO** — ver §23. O passo 7 foi
+   adaptado exatamente como previsto aqui. Mas a auditoria do gate revelou que
+   **aquele bloco não era a única incompatibilidade** do arquivo com a 4.7, e o
+   spec continua vermelho. O detalhamento está no §23.
 
 2. **`WHATSAPP_BASE_URL` está duplicado** entre
    `purchase-intent-offers.constants.js` (Produto 1) e
@@ -516,10 +533,113 @@ selecionada" para "Oferta aceita", alinhado ao CTA do §3.
 | 40 | zero regressão nova | ✅ pré-existentes provadas |
 | 41 | monetização não implementada | ✅ |
 
-## **GO**
+## **GO** — com a ressalva do §23
 
-Com a dívida nº 1 explícita: o E2E da 4.4 precisa de um ajuste de três linhas que
-**deliberadamente não foi feito** porque o arquivo carrega modificação local não
-commitada do usuário.
+Com a dívida nº 1 agora **parcialmente** resolvida: o ajuste de três linhas foi
+feito, mas o §23 mostra que ele não bastava.
 
 **NÃO MERGEADO. NÃO DEPLOYADO.** Aguardando revisão.
+
+---
+
+## 23. Fechamento do gate — E2E da 4.4 e contagem
+
+### 23.1 Preservação do arquivo local do usuário
+
+`frontend/e2e/sale-request-offer-selection.spec.ts` tinha modificação local não
+commitada. **Antes de qualquer escrita**, a versão local foi salva três vezes:
+
+| Cópia | Endereço | Prova |
+|---|---|---|
+| Arquivo byte-a-byte, fora do repo | `…/scratchpad/backup-4-7/…LOCAL` | `sha256 603cac7f…b714e` (idêntico ao original) |
+| `git diff` da versão local | `…/scratchpad/backup-4-7/local.diff` | 2.560 bytes |
+| Blob no object DB do Git | `7a577bbba1a1b60c6e7723b8ac70b4e071d0725c` | `git cat-file -p` devolve o mesmo sha256 |
+
+Recuperação: `git cat-file -p 7a577bbb > <destino>`.
+
+Nenhum comando proibido foi usado (`git clean`, `git add .`, `git add -A`,
+`git stash -u`, `git reset --hard`).
+
+### 23.2 O que foi registrado no commit
+
+O commit **não descarta** a alteração privada: ela é a BASE. A mudança do usuário
+(o comentário reescrito explicando que a troca é de PRODUTO, e a remoção da
+asserção de valor) foi preservada; só mudou o que a 4.7 tornou impossível —
+o testid, a copy, e a parte do comentário que descrevia o painel da 4.5 como
+estado atual.
+
+```
+- const selectedPanel = page.getByTestId("dealer-inspection-slot-form");
++ const selectedPanel = page.getByTestId("dealer-handoff-accepted");
+  await expect(selectedPanel).toBeVisible({ timeout: 60_000 });
+- await expect(selectedPanel).toContainText("Sua proposta foi selecionada");
++ await expect(selectedPanel).toContainText("Sua oferta foi aceita");
+```
+
+A asserção nova está **certa**: é literalmente a que o spec da 4.7 já faz
+(`sale-request-handoff-rounds.spec.ts:287-290`), e aquele spec passa. O painel
+renderiza sob `opportunity.is_selected`, que é exatamente o estado que o teste
+da 4.4 alcança.
+
+### 23.3 ACHADO — o passo 7 não era a única incompatibilidade
+
+Com o passo 7 corrigido, **o spec da 4.4 continua vermelho**, e falha ANTES
+dele, no passo 4 (linha 204). A dívida nº 1 subestimou o problema. Levantamento
+completo:
+
+| Passo | Asserção da 4.4 | Estado na 4.7 |
+|---|---|---|
+| 4 | `"Selecionar esta proposta?"` | copy virou **"Aceitar oferta"** |
+| 4 | `"novas propostas serão encerradas"` | reescrita |
+| 4 | `"Esta seleção é preliminar"` | **proibida** — a 4.7 exige que "preliminar" não volte |
+| 5 | `"Aguardando próxima etapa"` | some no modo `compact`; há teste exigindo a ausência |
+| 5 | status `"Proposta selecionada"` | virou **"Oferta aceita"** (`lib/sale-requests/api.ts:318`) |
+| 5 | `expectNoContactLeak` | **conflita** — o handoff mostra `handoff-whatsapp` na tela do proprietário |
+| 7 | painel da loja escolhida | ✅ corrigido |
+
+A última linha é a que **não é mecânica**. O `FORBIDDEN_CONTACT` da 4.4 inclui
+`"whatsapp"`, `"telefone"`, `"e-mail"`; o da 4.7 foi **deliberadamente reduzido**
+aos dois e-mails semeados, porque o canal de contato agora aparece de propósito.
+Alinhar o spec da 4.4 significa afrouxar uma asserção de privacidade — decisão de
+produto, fora do escopo autorizado deste fechamento. **Não foi feita.**
+
+Note que a lista estrita continua correta no passo 2 (antes da aceitação) e no
+passo 7 (tela da loja): só o passo 5 abre o canal.
+
+**Opções**, para decisão:
+
+1. Adaptar os passos 4 e 5 também, mantendo a lista estrita onde ela ainda vale e
+   usando a lista curta só no passo 5.
+2. **Aposentar o spec da 4.4** — o da 4.7 já cobre o mesmo ciclo ponta a ponta,
+   incluindo a prova do passo 7. Seria a 8ª remoção do §16.
+3. Deixar vermelho e registrar como dívida.
+
+### 23.4 Contagem
+
+185, confirmado pelo Git — método e origem do 184 no §16.
+
+### 23.5 Gates re-executados
+
+| Gate | Resultado |
+|---|---|
+| `tests/sale-requests` | ✅ 468 (13 arquivos) |
+| `sale-request-offer-selection.integration` | ✅ 50 |
+| `sale-request-handoff-rounds.integration` + `legacy-flow` | ✅ 37 (25 + 12) |
+| `vitest run components/account` (frontend) | ✅ 340 (17 arquivos) |
+| `tsc --noEmit` | ✅ limpo |
+| `next lint` | ✅ sem warnings |
+| `npm run build` | ✅ standalone verificado |
+| E2E 4.7 (`sale-request-handoff-rounds.spec.ts`) | ✅ passou |
+| E2E 4.4 (`sale-request-offer-selection.spec.ts`) | ❌ **falha no passo 4** (§23.3) |
+
+**Por que não repetir os 3446.** As duas correções tocam **dois arquivos**: um
+spec de Playwright (que o `vitest` não coleta) e um `.md`. Nenhum código de
+produção mudou — `git diff --stat` confirma. As suítes acima cobrem toda a
+superfície adjacente e foram re-executadas mesmo assim; repetir a suíte completa
+não exercitaria nenhuma linha diferente.
+
+**`loginRateLimit` não foi enfraquecido.** Rodar E2E em série estoura os
+10 logins/15 min por IP e o spec **pula** (não falha) com 429 — foi o que
+aconteceu em duas execuções intermediárias. A saída foi **reiniciar o backend**
+entre os specs, o que limpa o store em memória sem tocar em `windowMs`/`max`.
+A primeira falha do E2E da 4.4 foi reproduzida com orçamento limpo: é real.

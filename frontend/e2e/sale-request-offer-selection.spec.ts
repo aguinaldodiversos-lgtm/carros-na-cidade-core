@@ -249,16 +249,34 @@ test.describe("@sale-request-selection a escolha preliminar do proprietário", (
     }
     await page.setViewportSize({ width: 1280, height: 900 });
 
-    // ── 7. A loja ESCOLHIDA vê que ganhou, em leitura ───────────────────────
+    // ── 7. A loja ESCOLHIDA vê que ganhou ───────────────────────────────────
+    //
+    // ATUALIZADO PELA FASE 4.7, e a mudança é de PRODUTO, não de teste.
+    //
+    // Até a 4.4 este estado era um painel de espera ("Sua proposta foi
+    // selecionada / Aguarde as próximas etapas"), com `data-testid`
+    // `dealer-detail-selected`. A 4.5 criou as próximas etapas — então aquele
+    // painel foi REMOVIDO e substituído pelo `DealerInspectionPanel`
+    // (`dealer-inspection-slot-form`), que cobria o mesmo momento com a AÇÃO
+    // correspondente: enviar horários para a avaliação presencial.
+    //
+    // A 4.7 removeu TAMBÉM esse formulário: a avaliação pertence ao lojista e
+    // acontece fora da plataforma. No lugar ficou o `DealerHandoffPanel`
+    // (`dealer-handoff-accepted`), read-only e sem ação nenhuma.
+    //
+    // Manter qualquer das asserções antigas aqui exigiria manter uma tela morta
+    // que ninguém alcança. O que a 4.4 precisa continuar provando é o que este
+    // bloco prova: a loja escolhida SABE que ganhou, e a disputa acabou de
+    // verdade.
     await login(page, DEALER_A);
     await page.goto(`${DEALER_FEED}/${saleRequestId}`);
-    await expect(page.getByTestId("dealer-detail-selected")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId("dealer-detail-selected")).toContainText(
-      "Sua proposta foi selecionada"
-    );
-    await expect(page.getByTestId("dealer-detail-selected-amount")).toContainText("65.000,00");
 
-    // O formulário NÃO existe — não está desabilitado. A disputa acabou.
+    const selectedPanel = page.getByTestId("dealer-handoff-accepted");
+    await expect(selectedPanel).toBeVisible({ timeout: 60_000 });
+    await expect(selectedPanel).toContainText("Sua oferta foi aceita");
+
+    // O formulário de PROPOSTA não existe — não está desabilitado. A disputa
+    // acabou, e é isto que a 4.4 garantiu.
     await expect(page.getByTestId("dealer-offer-panel")).toHaveCount(0);
     await expect(page.getByTestId("dealer-offer-amount")).toHaveCount(0);
     await expectNoContactLeak(page);
