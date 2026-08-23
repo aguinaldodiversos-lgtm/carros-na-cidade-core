@@ -12,6 +12,7 @@
 
 import * as service from "./sale-requests.dealer.service.js";
 import * as offersService from "./sale-requests.offers.service.js";
+import * as inspectionService from "./sale-requests.inspection.service.js";
 
 /**
  * Toda resposta é privada e não cacheável.
@@ -72,4 +73,78 @@ export async function createSaleOffer(req, res) {
   );
   applyPrivateHeaders(res);
   return res.status(201).json({ success: true, ...result });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// FASE 4.5 — AVALIAÇÃO PRESENCIAL E PROPOSTA FINAL
+// ────────────────────────────────────────────────────────────────────────────
+// Os três handlers abaixo seguem a MESMA regra dos anteriores: a loja em nome
+// da qual se age viaja na QUERY (`advertiser_id`), nunca no corpo, e o servidor
+// a reconfirma contra as lojas do usuário autenticado a cada chamada.
+//
+// O corpo carrega SÓ dado de negócio — horários, ficha, valor. Nenhum ator,
+// nenhum id de entidade, nenhum status. Não é uma checagem que alguém possa
+// esquecer: é a ausência do código que leria.
+
+/**
+ * Envia de 1 a 3 horários para a avaliação presencial.
+ *
+ * 201: cada rodada é um conjunto NOVO de horários (a tabela de slots é
+ * append-only, e a rodada anterior permanece), não a edição da rodada anterior.
+ */
+export async function offerInspectionSlots(req, res) {
+  const result = await inspectionService.offerInspectionSlots(
+    req.user.id,
+    req.params.id,
+    req.body || {},
+    { advertiserId: (req.query || {}).advertiser_id }
+  );
+  applyPrivateHeaders(res);
+  return res.status(201).json({ success: true, ...result });
+}
+
+/**
+ * Registra a avaliação presencial.
+ *
+ * 200 e não 201: a ficha preenche uma linha que já existe (a inspeção nasceu
+ * quando a loja mandou os horários), e o recurso que o cliente conhece — a
+ * oportunidade — continua sendo o mesmo.
+ *
+ * Não existe PATCH nem PUT correspondente: a ficha é IMUTÁVEL depois de
+ * registrada (§21). Um verbo de edição aqui sugeriria que dá para corrigir.
+ */
+export async function completeInspection(req, res) {
+  const result = await inspectionService.completeInspection(
+    req.user.id,
+    req.params.id,
+    req.body || {},
+    { advertiserId: (req.query || {}).advertiser_id }
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
+}
+
+/**
+ * A decisão comercial pós-avaliação: proposta final ou desistência.
+ *
+ * UM endpoint para as duas saídas, e não dois. Elas são mutuamente exclusivas e
+ * gravam a MESMA linha (`UNIQUE (sale_request_id)`): endpoints separados
+ * precisariam coordenar essa exclusividade entre si, e a corrida
+ * "proposta × desistência" do §37 passaria a depender de dois caminhos
+ * lembrarem um do outro.
+ *
+ * Sempre 200, inclusive no retry da mesma decisão. `changed: false` distingue os
+ * dois casos sem transformar um retry em erro; mandar uma decisão DIFERENTE é
+ * 409, porque aí não é repetição — é tentativa de corrigir um valor já
+ * apresentado ao proprietário.
+ */
+export async function submitPostInspectionDecision(req, res) {
+  const result = await inspectionService.submitPostInspectionDecision(
+    req.user.id,
+    req.params.id,
+    req.body || {},
+    { advertiserId: (req.query || {}).advertiser_id }
+  );
+  applyPrivateHeaders(res);
+  return res.json({ success: true, ...result });
 }

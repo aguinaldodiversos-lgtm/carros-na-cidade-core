@@ -479,9 +479,14 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
   it("o CHECK de status aceita offer_selected e recusa vocabulário inventado", async () => {
     const id = await insertSaleRequest();
 
+    // Casa QUALQUER UM dos dois CHECKs: um status inventado viola o de status e
+    // o de coerência (não entra em nenhuma lista da partição da 058), e a ordem
+    // de avaliação entre CHECKs da mesma tabela não é garantida.
     await expect(
       pool.query(`UPDATE sale_requests SET status = 'sold' WHERE id = $1`, [id])
-    ).rejects.toThrow(/sale_requests_status_check/);
+    ).rejects.toThrow(
+      /sale_requests_status_check|sale_requests_selected_offer_coherence_check/
+    );
   });
 
   /**
@@ -559,7 +564,20 @@ describe.sequential("integração — o SCHEMA da migration 057", () => {
 
     try {
       // 1. Desfaz a 057 — o banco volta ao estado da 4.3.3.
-      await upgradePool.query(`DROP TABLE IF EXISTS sale_request_offer_selections`);
+      //
+      // A 058 criou tabelas que DEPENDEM de `sale_request_offer_selections`
+      // (a inspeção prova contra ela que é a loja selecionada), então elas caem
+      // junto. CASCADE porque `inspections` e `inspection_slots` se
+      // referenciam mutuamente — nenhuma ordem de DROP simples resolve.
+      await upgradePool.query(
+        `DROP TABLE IF EXISTS sale_request_post_inspection_decisions,
+                              sale_request_inspection_slots,
+                              sale_request_inspections CASCADE`
+      );
+      await upgradePool.query(
+        `DROP TABLE IF EXISTS sale_request_offer_selections CASCADE`
+      );
+      await upgradePool.query(`DELETE FROM schema_migrations WHERE filename LIKE '058%'`);
       await upgradePool.query(
         `ALTER TABLE sale_requests
            DROP CONSTRAINT IF EXISTS sale_requests_selected_offer_coherence_check,

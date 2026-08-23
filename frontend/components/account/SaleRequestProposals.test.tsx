@@ -418,6 +418,68 @@ describe("a seleção", () => {
     expect(screen.queryByRole("link", { name: /contato|whatsapp/i })).toBeNull();
   });
 
+  /**
+   * §10 da Fase 4.5 — o painel da seleção não pode contradizer o estado atual.
+   *
+   * Enquanto a avaliação não começou, ele anuncia "Aguardando próxima etapa" —
+   * e está certo: não há nada acontecendo ainda.
+   *
+   * Depois que a avaliação começa, esse texto vira mentira: ele pede à pessoa
+   * que espere por algo que está renderizado logo abaixo. O painel encolhe para
+   * o CABEÇALHO do negócio (quem, por quanto) e deixa a etapa atual ser contada
+   * pelo bloco da 4.5.
+   */
+  it("antes da avaliação, o painel anuncia a espera", async () => {
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest({ status: "offer_selected" }),
+      proposals: [],
+      selected_offer: SELECTED,
+      inspection: null,
+      final_decision: null,
+    });
+    render(<SaleRequestDetail id="42" />);
+
+    const panel = await screen.findByTestId("sale-request-selected-offer");
+    expect(panel.textContent).toContain("Aguardando próxima etapa");
+  });
+
+  it("depois que a avaliação começa, o painel PARA de dizer 'aguardando'", async () => {
+    getSaleRequest.mockResolvedValue({
+      sale_request: makeRequest({ status: "inspection_scheduled" }),
+      proposals: [],
+      selected_offer: SELECTED,
+      inspection: {
+        state: "scheduled",
+        slots: [],
+        scheduled_at: "2026-08-25T14:30:00-03:00",
+        completed_at: null,
+        store: { name: "Auto Center Atibaia", address: "Rua X, 1", city: "Atibaia - SP" },
+        observed: null,
+      },
+      final_decision: null,
+    });
+    render(<SaleRequestDetail id="42" />);
+
+    const panel = await screen.findByTestId("sale-request-selected-offer");
+
+    // O resumo do negócio permanece — é o que a pessoa precisa para lembrar
+    // com quem e por quanto.
+    //
+    // O VALOR é conferido pelo testid, e não por `textContent`:
+    // `formatMoneyValue` usa `Intl` com `style: "currency"`, que separa "R$" do
+    // número com NBSP (U+00A0). O testing-library normaliza espaços nos seus
+    // matchers, mas `textContent` cru não — comparar a string literal aqui
+    // falharia por um caractere invisível.
+    expect(panel.textContent).toContain("Auto Center Atibaia");
+    expect(within(panel).getByTestId("sale-request-selected-amount").textContent).toContain(
+      "65.000,00"
+    );
+
+    // O texto de espera, não: a etapa atual está logo abaixo.
+    expect(panel.textContent).not.toContain("Aguardando próxima etapa");
+    expect(panel.textContent).not.toContain("serão disponibilizadas");
+  });
+
   it("depois da seleção, o botão de CANCELAR desaparece", async () => {
     getSaleRequest.mockResolvedValue({
       sale_request: makeRequest({ status: "offer_selected" }),

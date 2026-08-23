@@ -8,15 +8,31 @@
 // formulário: o botão habilita, a pessoa envia, e o servidor recusa com uma
 // mensagem que a tela não sabia prever.
 
+
+import type {
+  OwnerInspection,
+  PostInspectionDecision,
+} from "./inspection";
 /**
  * Estados da solicitação. Espelha `SALE_REQUEST_STATUS` do backend e o CHECK da
- * migration 057.
+ * migration 058.
  *
  * `offer_selected` é a Fase 4.4: o proprietário escolheu uma proposta e a
- * disputa encerrou. NÃO significa venda concluída, e nenhum texto desta tela
+ * disputa encerrou. NÃO significa venda concluída, e nenhum texto destas telas
  * pode dizer que significa.
+ *
+ * Os quatro estados da Fase 4.5 descrevem a avaliação presencial. Nenhum deles
+ * conclui venda: `final_offer_submitted` significa que a loja apresentou um
+ * valor e o proprietário ainda vai decidir (Fase 4.6).
  */
-export type SaleRequestStatus = "receiving_offers" | "offer_selected" | "cancelled";
+export type SaleRequestStatus =
+  | "receiving_offers"
+  | "offer_selected"
+  | "inspection_scheduled"
+  | "inspection_completed"
+  | "final_offer_submitted"
+  | "final_offer_declined"
+  | "cancelled";
 
 export type DeclaredCondition = "excelente" | "bom" | "regular" | "precisa_reparos";
 
@@ -289,6 +305,18 @@ export function formatMoneyValue(value: string | null): string | null {
 export const STATUS_LABEL: Record<SaleRequestStatus, string> = {
   receiving_offers: "Recebendo ofertas",
   offer_selected: "Proposta selecionada",
+
+  // Fase 4.5. Nenhum destes rótulos diz ou sugere venda concluída.
+  //
+  // "Proposta final recebida" (e não "Proposta final aceita", "Negócio fechado"
+  // ou "Vendido") porque o proprietário ainda não decidiu nada: a decisão dele é
+  // a Fase 4.6, e um rótulo que sugira conclusão faria a pessoa parar de
+  // considerar outras saídas para um carro que ela ainda tem.
+  inspection_scheduled: "Avaliação agendada",
+  inspection_completed: "Avaliação concluída",
+  final_offer_submitted: "Proposta final recebida",
+  final_offer_declined: "Encerrada sem proposta",
+
   cancelled: "Cancelada",
 };
 
@@ -417,6 +445,20 @@ export type SaleRequestDetailResponse = {
   proposals: SaleRequestProposal[];
   /** A escolha, quando já houve uma. `null` enquanto a disputa está aberta. */
   selected_offer: SaleRequestSelectedOffer | null;
+
+  /**
+   * A avaliação presencial (Fase 4.5). `null` enquanto a loja não enviou
+   * horários — o que inclui todo o período anterior à seleção.
+   */
+  inspection: OwnerInspection | null;
+
+  /**
+   * A decisão da loja depois de ver o carro. `null` até ela decidir.
+   *
+   * Não carrega `internal_note`: a nota operacional da loja é coluna separada no
+   * banco e nenhuma query do proprietário a seleciona.
+   */
+  final_decision: PostInspectionDecision | null;
 };
 
 export type UploadedPhoto = { storage_key: string; url: string };
@@ -631,4 +673,70 @@ export function formatFipe(value: string | null): string | null {
 
 export function formatMileage(value: number): string {
   return `${Number(value || 0).toLocaleString("pt-BR")} km`;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AVALIAÇÃO PRESENCIAL E PROPOSTA FINAL (Fase 4.5)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Códigos de recusa das ações de avaliação.
+ *
+ * O frontend discrimina por `code`, nunca por texto da mensagem — que muda na
+ * primeira melhoria de redação.
+ */
+export const INSPECTION_CODE = {
+  /** A loja substituiu os horários enquanto a tela mostrava os antigos. */
+  SLOT_STALE: "INSPECTION_SLOT_STALE",
+  /** Já existe horário confirmado — não há reagendamento nesta fase. */
+  ALREADY_SCHEDULED: "INSPECTION_ALREADY_SCHEDULED",
+  /** A ação não cabe no estado atual; a tela está desatualizada. */
+  INVALID_STATE: "INSPECTION_INVALID_STATE",
+  /** A loja não cadastrou endereço comercial. */
+  STORE_LOCATION_REQUIRED: "INSPECTION_STORE_LOCATION_REQUIRED",
+  /** Redução de valor sem motivo registrado. */
+  ADJUSTMENT_REASON_REQUIRED: "INSPECTION_ADJUSTMENT_REASON_REQUIRED",
+  /** `other` sem descrição. */
+  ADJUSTMENT_NOTE_REQUIRED: "INSPECTION_ADJUSTMENT_NOTE_REQUIRED",
+  /** Já existe decisão e é diferente — não dá para "corrigir" o valor. */
+  FINAL_DECISION_ALREADY_RECORDED: "INSPECTION_FINAL_DECISION_ALREADY_RECORDED",
+} as const;
+
+/**
+ * Confirma um horário da avaliação.
+ *
+ * O corpo carrega SÓ o `slot_id`. O instante não viaja: o servidor o lê da
+ * própria linha do horário, dentro da transação que trava a solicitação.
+ *
+ * Retry do MESMO horário é seguro (200, `changed: false`). Escolher um horário
+ * diferente depois de confirmado é 409 — não existe reagendamento nesta fase.
+ */
+export async function confirmInspectionSlot(
+  id: string | number,
+  slotId: string | number
+) {
+  const response = await fetch(`/api/account/sale-requests/${id}/inspection/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slot_id: String(slotId) }),
+  });
+  return readJson<{ inspection: unknown; changed: boolean }>(response);
+}
+
+/**
+ * "Não consigo nesses horários".
+ *
+ * Sem corpo, e a ausência é a regra: a ação sinaliza que a rodada não serve, e
+ * não abre espaço para uma mensagem. Um campo de texto aqui viraria o canal de
+ * conversa que o produto decidiu não ter — e a primeira pessoa a escrever um
+ * telefone nele entregaria o contato que todo o desenho evita.
+ *
+ * NÃO cancela a seleção da loja e NÃO reabre a disputa.
+ */
+export async function requestNewInspectionSlots(id: string | number) {
+  const response = await fetch(
+    `/api/account/sale-requests/${id}/inspection/request-slots`,
+    { method: "POST" }
+  );
+  return readJson<{ inspection: unknown; changed: boolean }>(response);
 }

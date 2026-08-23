@@ -249,13 +249,26 @@ describe.sequential("migration 052 — sale_requests", () => {
     expect(row.status).toBe("receiving_offers");
   });
 
-  it("aceita apenas os DOIS status desta fase", async () => {
+  it("recusa vocabulário de status inventado", async () => {
     await expect(insertRequest({ status: "cancelled" })).resolves.toBeTruthy();
 
-    // Estado sem writer não existe: `selected` e `completed` entram nas fases
-    // 4.4/4.5, com migration própria.
+    // Estado sem writer não existe. `selected` e `completed` continuam sem
+    // existir — a 4.4 criou `offer_selected` e a 4.5 criou os quatro da
+    // avaliação, nenhum com esses nomes.
+    //
+    // A asserção casa QUALQUER UM dos dois CHECKs, e não um nome fixo. Dois
+    // motivos:
+    //
+    //   1. um status inventado viola o CHECK de status E o de coerência (ele não
+    //      entra em nenhuma das duas listas da partição — que é exatamente o
+    //      alarme que a 058 quis ter);
+    //   2. a ordem de avaliação entre CHECKs da mesma tabela NÃO é garantida
+    //      pelo PostgreSQL, então prender o nome de um deles é prender uma
+    //      coincidência.
     for (const status of ["selected", "completed", "receiving", "qualquer"]) {
-      await expect(insertRequest({ status })).rejects.toThrow(/sale_requests_status_check/);
+      await expect(insertRequest({ status })).rejects.toThrow(
+        /sale_requests_status_check|sale_requests_selected_offer_coherence_check/
+      );
     }
   });
 
@@ -454,11 +467,14 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
    *        (migration 055). A asserção não foi atualizada naquela fase e este
    *        teste ficou vermelho desde então;
    *   4.4  `sale_request_offer_selections` — a trilha da escolha preliminar
-   *        (migration 057).
+   *        (migration 057);
+   *   4.5  `sale_request_inspections`, `sale_request_inspection_slots` e
+   *        `sale_request_post_inspection_decisions` (migration 058).
    *
-   * Continua NÃO existindo — e a igualdade acima é o que garante: agendamento,
-   * inspeção, laudo, proposta final, aceite, venda concluída, pagamento,
-   * comissão, escrow e prazo. Nenhum deles tem endpoint que os escreva.
+   * Continua NÃO existindo — e a igualdade acima é o que garante: aceite da
+   * proposta final, venda concluída, pagamento, comissão, escrow, contrato e
+   * prazo. Nenhum deles tem endpoint que os escreva. (Agendamento, inspeção e
+   * proposta final passaram a existir na 4.5, com writer real.)
    */
   it("o domínio tem exatamente as tabelas das fases entregues — nenhuma de fase futura", async () => {
     const { rows } = await pool.query(
@@ -473,6 +489,10 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
         "sale_request_images",
         "sale_request_offers",
         "sale_request_offer_selections",
+        // Fase 4.5 — a avaliação presencial e a decisão comercial.
+        "sale_request_inspections",
+        "sale_request_inspection_slots",
+        "sale_request_post_inspection_decisions",
       ])
     );
   });

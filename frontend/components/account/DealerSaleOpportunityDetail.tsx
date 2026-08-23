@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DealerOfferPanel from "@/components/account/DealerOfferPanel";
+import DealerInspectionPanel from "@/components/account/DealerInspectionPanel";
 import VehicleEvaluationSheet from "@/components/account/VehicleEvaluationSheet";
 import {
   DECLARED_CONDITION_LABEL,
@@ -127,61 +128,14 @@ function Gallery({ images, alt }: { images: string[]; alt: string }) {
   );
 }
 
-/**
- * O painel que substitui o formulário de proposta quando ESTA loja foi a
- * escolhida (Fase 4.4, §19).
+/*
+ * O SelectedPanel da Fase 4.4 foi REMOVIDO na 4.5.
  *
- * ────────────────────────────────────────────────────────────────────────────
- * READ-ONLY, E O FORMULÁRIO NÃO EXISTE — NÃO ESTÁ DESABILITADO
- * ────────────────────────────────────────────────────────────────────────────
- * A disputa acabou. Um campo de valor desabilitado sugeriria que aumentar
- * continua sendo uma jogada possível, só que temporariamente bloqueada — e o
- * lojista tentaria de novo mais tarde. Não há mais lance a dar: nem desta loja,
- * nem de nenhuma outra (§15).
- *
- * ────────────────────────────────────────────────────────────────────────────
- * O QUE ELE NÃO DIZ
- * ────────────────────────────────────────────────────────────────────────────
- * Não diz "venda fechada", "negócio concluído" nem "compra confirmada": a
- * seleção é preliminar e o valor ainda será revisto na avaliação presencial. Uma
- * loja que leia "fechado" aqui vai reservar o dinheiro e a vaga no pátio.
- *
- * E não mostra contato do proprietário — sem nome, telefone, e-mail ou WhatsApp.
- * Ser escolhida dá a esta loja o direito de saber que foi escolhida, não os
- * dados de quem escolheu. A API não devolve nenhum deles; não há o que esconder.
+ * Ele dizia "Sua proposta foi selecionada / Aguarde as próximas etapas" — e as
+ * próximas etapas agora existem. DealerInspectionPanel cobre aquele mesmo
+ * momento com a AÇÃO correspondente (propor horários), em vez de uma frase de
+ * espera. Manter os dois deixaria uma tela morta que ninguém alcança.
  */
-function SelectedPanel({ amount }: { amount: string | null }) {
-  const value = formatMoneyValue(amount);
-
-  return (
-    <section
-      className="rounded-2xl border border-[#ABEFC6] bg-[#F6FEF9] p-4 sm:p-5"
-      data-testid="dealer-detail-selected"
-    >
-      <h2 className="text-[16px] font-bold leading-tight text-[#161f34]">
-        Sua proposta foi selecionada
-      </h2>
-
-      {value ? (
-        <>
-          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-[#667085]">
-            Valor selecionado
-          </p>
-          <p
-            className="mt-1 text-[26px] font-bold leading-none tracking-[-0.01em] text-[#161f34]"
-            data-testid="dealer-detail-selected-amount"
-          >
-            {value}
-          </p>
-        </>
-      ) : null}
-
-      <p className="mt-4 text-[13px] leading-relaxed text-[#475467]">
-        Aguarde as próximas etapas pela plataforma.
-      </p>
-    </section>
-  );
-}
 
 /** Um dado do resumo: ícone + rótulo + valor, na grade do card único. */
 function SummaryItem({
@@ -507,7 +461,23 @@ export default function DealerSaleOpportunityDetail({
           className="order-3 min-w-0 scroll-mt-20 lg:col-start-2 lg:row-start-1"
         >
           {opportunity.is_selected ? (
-            <SelectedPanel amount={opportunity.selected_amount} />
+            /*
+              FASE 4.5 — a loja selecionada deixou de apenas "aguardar".
+              O painel decide sozinho qual das três ações mostrar (propor
+              horários, registrar a avaliação, decidir o valor final) a partir do
+              status e do sub-estado da inspeção. Concentrar essa decisão nele
+              mantém esta tela sem uma cadeia de ternários que precisaria ser
+              mantida em sincronia com a de lá.
+            */
+            <DealerInspectionPanel
+              saleRequestId={opportunity.id}
+              advertiserId={advertiserId}
+              inspection={opportunity.inspection}
+              decision={opportunity.final_decision}
+              selectedAmount={opportunity.selected_amount}
+              status={opportunity.status}
+              onChanged={() => void load()}
+            />
           ) : (
             <DealerOfferPanel
               saleRequestId={opportunity.id}

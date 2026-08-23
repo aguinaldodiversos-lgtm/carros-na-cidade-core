@@ -41,7 +41,10 @@
  * onde o FROM possa ficar para trás.
  */
 import { query } from "../../infrastructure/database/db.js";
-import { SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
+import {
+  SALE_REQUEST_SELECTED_STATUSES,
+  SALE_REQUEST_STATUS,
+} from "./sale-requests.constants.js";
 import { SALE_OPPORTUNITY_SORT_SPEC } from "./sale-requests.dealer.constants.js";
 
 /**
@@ -321,7 +324,7 @@ export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId)
       AND sr.city_id = $2
       AND (
         sr.status = $3
-        OR (sr.status = $4 AND sel.advertiser_id = $5)
+        OR (sr.status = ANY($4::text[]) AND sel.advertiser_id = $5)
       )
     LIMIT 1
     `,
@@ -329,7 +332,18 @@ export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId)
       saleRequestId,
       cityId,
       SALE_REQUEST_STATUS.RECEIVING_OFFERS,
-      SALE_REQUEST_STATUS.OFFER_SELECTED,
+      // FASE 4.5 — a lista cresceu, e a forma continua sendo uma IGUALDADE.
+      //
+      // A loja escolhida acompanha a oportunidade dela por toda a avaliação e
+      // até depois da proposta final: `offer_selected` (agendando),
+      // `inspection_scheduled`, `inspection_completed`, `final_offer_submitted`
+      // e `final_offer_declined`.
+      //
+      // Continua sendo `= ANY(lista)` e nunca `<> 'cancelled'`: a forma negativa
+      // passaria a mostrar automaticamente todo estado novo que uma fase
+      // seguinte criasse — inclusive um que ainda não tivesse tela. O custo é
+      // ter de vir aqui a cada estado novo, e esse custo é o ponto.
+      SALE_REQUEST_SELECTED_STATUSES,
       advertiserId,
     ]
   );
