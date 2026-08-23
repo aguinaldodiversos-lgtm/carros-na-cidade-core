@@ -34,6 +34,7 @@ import type {
   OwnerInspection,
   PostInspectionDecision,
 } from "@/lib/sale-requests/inspection";
+import type { OwnerFinalDecision } from "@/lib/sale-requests/final-decision";
 
 /**
  * Detalhe de UMA solicitação, para o dono.
@@ -114,6 +115,8 @@ export default function SaleRequestDetail({ id }: { id: string }) {
   const [selectedOffer, setSelectedOffer] = useState<SaleRequestSelectedOffer | null>(null);
   const [inspection, setInspection] = useState<OwnerInspection | null>(null);
   const [finalDecision, setFinalDecision] = useState<PostInspectionDecision | null>(null);
+  /** Fase 4.6 — a resposta do proprietário à proposta final. */
+  const [ownerDecision, setOwnerDecision] = useState<OwnerFinalDecision | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -142,6 +145,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         setSelectedOffer(response.selected_offer ?? null);
         setInspection(response.inspection ?? null);
         setFinalDecision(response.final_decision ?? null);
+        setOwnerDecision(response.owner_final_decision ?? null);
       })
       .catch((failure) => {
         if (alive) {
@@ -328,6 +332,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
             request={request}
             inspection={inspection}
             decision={finalDecision}
+            ownerDecision={ownerDecision}
             onChanged={() => setReloadToken((value) => value + 1)}
           />
         </div>

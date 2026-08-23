@@ -310,11 +310,25 @@ export default function DealerSaleOpportunityDetail({
           proposta preliminar" é uma instrução impossível: não há mais proposta a
           enviar, e o formulário nem está na tela. Manter a frase fixa faria a
           página pedir uma ação que ela mesma removeu.
+
+          FASE 4.6 — o mesmo argumento, um passo adiante. Depois de o
+          proprietário responder, "as próximas etapas serão informadas por aqui"
+          promete um seguimento que não existe: no aceite a decisão comercial já
+          está registrada, e na recusa o fluxo encerrou. A frase antiga faria a
+          loja ficar esperando um aviso que nunca vem.
+
+          A ordem dos testes importa: `owner_final_decision` é checado ANTES de
+          `is_selected`, porque os dois são verdadeiros ao mesmo tempo — quem
+          respondeu também está selecionado.
         */}
         <p className="mt-1 max-w-2xl text-[13.5px] leading-relaxed text-[#667085]">
-          {opportunity.is_selected
-            ? "O proprietário selecionou a proposta da sua loja. As próximas etapas serão informadas por aqui."
-            : "Analise as informações declaradas e envie sua proposta preliminar."}
+          {opportunity.owner_final_decision
+            ? opportunity.owner_final_decision.type === "accepted"
+              ? "O proprietário aceitou a sua proposta final. A decisão comercial está registrada."
+              : "O proprietário não aceitou a proposta final. Esta avaliação está encerrada."
+            : opportunity.is_selected
+              ? "O proprietário selecionou a proposta da sua loja. As próximas etapas serão informadas por aqui."
+              : "Analise as informações declaradas e envie sua proposta preliminar."}
         </p>
       </header>
 
@@ -474,6 +488,7 @@ export default function DealerSaleOpportunityDetail({
               advertiserId={advertiserId}
               inspection={opportunity.inspection}
               decision={opportunity.final_decision}
+              ownerDecision={opportunity.owner_final_decision}
               selectedAmount={opportunity.selected_amount}
               status={opportunity.status}
               onChanged={() => void load()}

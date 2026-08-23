@@ -107,6 +107,7 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
     // quando a loja escolhida envia a primeira rodada de horários.
     inspection: null,
     final_decision: null,
+    owner_final_decision: null,
     ...overrides,
   };
 }

@@ -72,6 +72,7 @@ import type {
   DealerInspection,
   PostInspectionDecision,
 } from "./inspection";
+import type { DealerOwnerFinalDecision } from "./final-decision";
 
 const BASE = "/api/account/opportunities/sale-requests";
 
@@ -199,7 +200,12 @@ export type DealerSaleOpportunityDetail = Omit<DealerSaleOpportunitySummary, "st
       | "inspection_scheduled"
       | "inspection_completed"
       | "final_offer_submitted"
-      | "final_offer_declined";
+      | "final_offer_declined"
+      // Fase 4.6. `final_offer_accepted` é o aceite da proposta COMERCIAL — não é
+      // compra concluída, pagamento nem transferência, e nenhum texto da tela
+      // do lojista pode dizer que é.
+      | "final_offer_accepted"
+      | "final_offer_rejected";
     images: string[];
     known_issues: string | null;
 
@@ -211,6 +217,15 @@ export type DealerSaleOpportunityDetail = Omit<DealerSaleOpportunitySummary, "st
 
     /** A decisão da própria loja depois de ver o carro. `null` até ela decidir. */
     final_decision: PostInspectionDecision | null;
+
+    /**
+     * A resposta do PROPRIETÁRIO (Fase 4.6). `null` enquanto ele não respondeu.
+     *
+     * SEM o valor: a loja já o conhece por `final_decision.final_amount`, que
+     * ela mesma preencheu. Duas fontes para o mesmo número na mesma tela é como
+     * uma divergência silenciosa nasce.
+     */
+    owner_final_decision: DealerOwnerFinalDecision | null;
   };
 
 /**

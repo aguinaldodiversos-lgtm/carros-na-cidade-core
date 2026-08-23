@@ -13,7 +13,8 @@ import { expect, test } from "@playwright/test";
  *        -> a loja registra a avaliação, com quilometragem MAIOR que a declarada
  *        -> a loja apresenta proposta final MENOR (60.000), com justificativa
  *        -> a PF vê preliminar x final x diferença x motivo
- *        -> NÃO existe botão Aceitar nem Recusar (isso é a Fase 4.6)
+ *        -> os botões Aceitar/Recusar EXISTEM desde a 4.6, e continuam SEM uso
+ *           aqui — o desfecho de cada um é o E2E da 4.6
  *        -> a loja vê "Aguardando decisão do proprietário"
  *        -> a loja B continua com 404
  *        -> nenhum contato entre PF e lojista aparece em lugar nenhum
@@ -321,15 +322,23 @@ test.describe("@sale-request-inspection a avaliação presencial e a proposta fi
     await expect(observed).toContainText(declaredKm.toLocaleString("pt-BR"));
     await expect(observed).toContainText(OBSERVED_KM.toLocaleString("pt-BR"));
 
-    // ── 7. NÃO existe Aceitar nem Recusar — isso é a Fase 4.6 ──────────────
+    // ── 7. Os botões da 4.6 estão lá, e a decisão AINDA NÃO foi tomada ─────
+    //
+    // Até a Fase 4.6 este bloco afirmava o CONTRÁRIO: que "aceitar" e "recusar"
+    // não podiam aparecer em lugar nenhum da tela. Era verdade enquanto o
+    // desfecho não existia, e virou falso no dia em que ele passou a existir —
+    // o mesmo tipo de asserção que envelhece junto com a máquina de estados.
+    //
+    // Foi INVERTIDA, e não removida: o que este arquivo continua provando é que
+    // a 4.5 termina AGUARDANDO — com a decisão disponível e não tomada. O que
+    // acontece depois do clique é o E2E da 4.6.
+    await expect(page.getByTestId("owner-final-decision-accept-cta")).toBeVisible();
+    await expect(page.getByTestId("owner-final-decision-reject-cta")).toBeVisible();
+    await expect(page.getByTestId("owner-final-decision-accepted")).toHaveCount(0);
+    await expect(page.getByTestId("owner-final-decision-rejected")).toHaveCount(0);
+
+    // E nada sugere venda concluída — esta parte NÃO mudou, e não pode mudar.
     const body = ((await page.locator("body").innerText()) || "").toLowerCase();
-    expect(body, "a tela ofereceu ACEITAR, que é da Fase 4.6").not.toMatch(
-      /\baceitar\b/
-    );
-    expect(body, "a tela ofereceu RECUSAR, que é da Fase 4.6").not.toMatch(
-      /\brecusar\b/
-    );
-    // E nada sugere venda concluída.
     for (const forbidden of ["venda concluída", "negócio fechado", "vendido"]) {
       expect(body, `a tela disse "${forbidden}"`).not.toContain(forbidden);
     }

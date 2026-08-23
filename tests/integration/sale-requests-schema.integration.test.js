@@ -469,12 +469,15 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
    *   4.4  `sale_request_offer_selections` — a trilha da escolha preliminar
    *        (migration 057);
    *   4.5  `sale_request_inspections`, `sale_request_inspection_slots` e
-   *        `sale_request_post_inspection_decisions` (migration 058).
+   *        `sale_request_post_inspection_decisions` (migration 058);
+   *   4.6  `sale_request_owner_final_decisions` — a resposta do proprietário à
+   *        proposta final (migration 059).
    *
-   * Continua NÃO existindo — e a igualdade acima é o que garante: aceite da
-   * proposta final, venda concluída, pagamento, comissão, escrow, contrato e
-   * prazo. Nenhum deles tem endpoint que os escreva. (Agendamento, inspeção e
-   * proposta final passaram a existir na 4.5, com writer real.)
+   * Continua NÃO existindo — e a igualdade acima é o que garante: venda
+   * concluída, pagamento, comissão, escrow, contrato, transferência e prazo.
+   * Nenhum deles tem endpoint que os escreva. (Agendamento, inspeção e proposta
+   * final passaram a existir na 4.5; o ACEITE e a RECUSA da proposta final, na
+   * 4.6 — todos com writer real. Nada disso conclui venda.)
    */
   it("o domínio tem exatamente as tabelas das fases entregues — nenhuma de fase futura", async () => {
     const { rows } = await pool.query(
@@ -493,6 +496,8 @@ describe.sequential("isolamento — o Produto 2 não toca o Produto 1 nem os an�
         "sale_request_inspections",
         "sale_request_inspection_slots",
         "sale_request_post_inspection_decisions",
+        // Fase 4.6 — a resposta do proprietário à proposta final.
+        "sale_request_owner_final_decisions",
       ])
     );
   });

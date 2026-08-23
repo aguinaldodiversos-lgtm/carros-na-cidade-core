@@ -29,6 +29,7 @@ import {
   listOwnerProposals,
 } from "./sale-requests.selection.service.js";
 import { readOwnerInspectionState } from "./sale-requests.inspection.service.js";
+import { readOwnerFinalDecision } from "./sale-requests.final-decision.service.js";
 import {
   SALE_REQUEST_ACTIVE_LIMIT,
   SALE_REQUEST_CODE,
@@ -517,7 +518,7 @@ export async function getMySaleRequest(userId, rawId) {
     throw new AppError("Solicitação não encontrada.", 404);
   }
 
-  const [imagesByRequest, proposals, selectedOffer, inspectionState] = await Promise.all([
+  const [imagesByRequest, proposals, selectedOffer, inspectionState, ownerDecision] = await Promise.all([
     repo.listImagesByRequestIds([saleRequestId]),
     // Enquanto a disputa está aberta, as propostas ATUAIS — uma por loja.
     // Depois da escolha a lista deixa de ser oferecida: mostrar as perdedoras ao
@@ -541,6 +542,15 @@ export async function getMySaleRequest(userId, rawId) {
     SALE_REQUEST_SELECTED_STATUSES.includes(row.status)
       ? readOwnerInspectionState(saleRequestId)
       : Promise.resolve({ inspection: null, final_decision: null }),
+
+    // Fase 4.6. Mesma guarda pelo mesmo motivo: sem seleção não há proposta
+    // final, e sem proposta final não há decisão a ler. A leitura é feita para
+    // TODOS os estados com seleção — e não só para os dois decididos — porque a
+    // tela precisa distinguir "ainda pode decidir" de "já decidiu", e um `null`
+    // é a resposta correta para o primeiro caso.
+    SALE_REQUEST_SELECTED_STATUSES.includes(row.status)
+      ? readOwnerFinalDecision(saleRequestId)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -551,6 +561,7 @@ export async function getMySaleRequest(userId, rawId) {
     selected_offer: selectedOffer,
     inspection: inspectionState.inspection,
     final_decision: inspectionState.final_decision,
+    owner_final_decision: ownerDecision,
   };
 }
 

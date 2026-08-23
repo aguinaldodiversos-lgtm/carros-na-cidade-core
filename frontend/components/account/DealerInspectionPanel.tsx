@@ -16,6 +16,10 @@ import {
   type PostInspectionDecision,
 } from "@/lib/sale-requests/inspection";
 import {
+  DEALER_FINAL_DECISION_LABEL,
+  type DealerOwnerFinalDecision,
+} from "@/lib/sale-requests/final-decision";
+import {
   BODY_PAINT_ISSUE_OPTIONS,
   BODY_PAINT_STATUS_OPTIONS,
   DECLARED_CONDITION_OPTIONS,
@@ -47,6 +51,8 @@ type Props = {
   advertiserId: string | null;
   inspection: DealerInspection | null;
   decision: PostInspectionDecision | null;
+  /** Fase 4.6 — a resposta do proprietário. `null` enquanto ele não respondeu. */
+  ownerDecision: DealerOwnerFinalDecision | null;
   selectedAmount: string | null;
   status: string;
   onChanged: () => void;
@@ -685,16 +691,60 @@ function WaitingOwner({ slots }: { slots: DealerInspection["slots"] }) {
   );
 }
 
-function DecisionSent({ decision }: { decision: PostInspectionDecision }) {
+/**
+ * O que a loja vê depois de enviar a decisão — e, desde a 4.6, depois de o
+ * proprietário responder (§25, §26).
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * READ-ONLY, NOS TRÊS DESFECHOS
+ * ────────────────────────────────────────────────────────────────────────────
+ * Nenhum botão de nova proposta, edição, contraproposta, chat, contato ou nova
+ * avaliação. Nenhuma dessas transições existe, e um botão que levasse a lugar
+ * nenhum seria pior que a ausência dele.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE O TEXTO DO ACEITE NÃO DIZ
+ * ────────────────────────────────────────────────────────────────────────────
+ * "Você comprou o veículo", "Negócio concluído", "Pagamento pendente". O que a
+ * plataforma registrou foi uma DECISÃO COMERCIAL — pagamento, transferência e
+ * documentação não existem neste produto, e uma loja que lesse o contrário
+ * trataria o carro como estoque próprio antes de qualquer uma dessas coisas
+ * acontecer.
+ *
+ * E nada do proprietário aparece: nem nome, nem telefone, nem e-mail. A API não
+ * devolve nenhum deles — a seleção deu à loja o direito de avaliar o carro e de
+ * saber o desfecho, não o contato de quem estava do outro lado.
+ */
+function DecisionSent({
+  decision,
+  ownerDecision,
+}: {
+  decision: PostInspectionDecision;
+  ownerDecision: DealerOwnerFinalDecision | null;
+}) {
   const isOffer = decision.type === "final_offer";
+  const accepted = ownerDecision?.type === "accepted";
+
+  // Verde continua sendo o aceite. A recusa é NEUTRA, e não vermelha: a loja
+  // não errou nada, e pintar de alerta um desfecho comercial normal trataria a
+  // decisão de outra pessoa como uma falha da loja.
+  const tone = ownerDecision
+    ? accepted
+      ? "border-[#ABEFC6] bg-[#F6FEF9]"
+      : "border-[#E5E9F2] bg-white"
+    : "border-[#ABEFC6] bg-[#F6FEF9]";
 
   return (
     <section
-      className="rounded-2xl border border-[#ABEFC6] bg-[#F6FEF9] p-4 sm:p-5"
+      className={`rounded-2xl border p-4 sm:p-5 ${tone}`}
       data-testid="dealer-decision-sent"
     >
       <h2 className="text-[16px] font-bold leading-tight text-[#161f34]">
-        {isOffer ? "Proposta final enviada" : "Avaliação encerrada sem proposta"}
+        {ownerDecision
+          ? DEALER_FINAL_DECISION_LABEL[ownerDecision.type]
+          : isOffer
+            ? "Proposta final enviada"
+            : "Avaliação encerrada sem proposta"}
       </h2>
 
       {isOffer && decision.final_amount ? (
@@ -711,8 +761,17 @@ function DecisionSent({ decision }: { decision: PostInspectionDecision }) {
         </>
       ) : null}
 
-      <p className="mt-4 text-[13px] leading-relaxed text-[#475467]">
-        Aguardando decisão do proprietário.
+      <p
+        className="mt-4 text-[13px] leading-relaxed text-[#475467]"
+        data-testid={
+          ownerDecision ? `dealer-owner-decision-${ownerDecision.type}` : "dealer-decision-waiting"
+        }
+      >
+        {ownerDecision
+          ? accepted
+            ? "A decisão comercial foi registrada pela plataforma."
+            : "O proprietário não seguiu adiante com esta proposta."
+          : "Aguardando decisão do proprietário."}
       </p>
     </section>
   );
@@ -725,12 +784,14 @@ export default function DealerInspectionPanel({
   advertiserId,
   inspection,
   decision,
+  ownerDecision,
   selectedAmount,
   status,
   onChanged,
 }: Props) {
-  // Decisão tomada: nada mais a fazer, nenhum formulário de edição.
-  if (decision) return <DecisionSent decision={decision} />;
+  // Decisão tomada: nada mais a fazer, nenhum formulário de edição — e, quando
+  // o proprietário já respondeu, o desfecho no lugar do "aguardando".
+  if (decision) return <DecisionSent decision={decision} ownerDecision={ownerDecision} />;
 
   if (status === "inspection_completed") {
     return (

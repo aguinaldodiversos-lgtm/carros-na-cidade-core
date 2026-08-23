@@ -13,6 +13,7 @@ import type {
   OwnerInspection,
   PostInspectionDecision,
 } from "./inspection";
+import type { OwnerFinalDecision, OwnerFinalDecisionType } from "./final-decision";
 /**
  * Estados da solicitação. Espelha `SALE_REQUEST_STATUS` do backend e o CHECK da
  * migration 058.
@@ -32,6 +33,11 @@ export type SaleRequestStatus =
   | "inspection_completed"
   | "final_offer_submitted"
   | "final_offer_declined"
+  // Fase 4.6. `final_offer_accepted` é o ACEITE DA PROPOSTA COMERCIAL — não é
+  // venda concluída, pagamento nem transferência, e nenhum texto destas telas
+  // pode dizer que é.
+  | "final_offer_accepted"
+  | "final_offer_rejected"
   | "cancelled";
 
 export type DeclaredCondition = "excelente" | "bom" | "regular" | "precisa_reparos";
@@ -317,6 +323,21 @@ export const STATUS_LABEL: Record<SaleRequestStatus, string> = {
   final_offer_submitted: "Proposta final recebida",
   final_offer_declined: "Encerrada sem proposta",
 
+  // Fase 4.6. "Proposta final aceita" — e NUNCA "Vendido", "Negócio fechado",
+  // "Concluída" ou "Pagamento confirmado".
+  //
+  // O que foi aceito é a proposta COMERCIAL. Pagamento, transferência,
+  // documentação e entrega não existem neste produto, e um rótulo que os
+  // sugerisse faria a pessoa parar de considerar outras saídas para um carro
+  // que ela ainda tem — e só descobrir a diferença depois de ter recusado tudo
+  // o mais.
+  //
+  // Este `Record` é tipado por `SaleRequestStatus`: um estado novo sem rótulo
+  // não compila. É de propósito — é o único lugar da tela onde esquecer um
+  // estado dá erro em vez de renderizar vazio.
+  final_offer_accepted: "Proposta final aceita",
+  final_offer_rejected: "Proposta final recusada",
+
   cancelled: "Cancelada",
 };
 
@@ -459,6 +480,16 @@ export type SaleRequestDetailResponse = {
    * banco e nenhuma query do proprietário a seleciona.
    */
   final_decision: PostInspectionDecision | null;
+
+  /**
+   * A resposta do PROPRIETÁRIO à proposta final (Fase 4.6). `null` enquanto ele
+   * não respondeu.
+   *
+   * A tela distingue "ainda pode decidir" de "já decidiu" pela PRESENÇA deste
+   * bloco, e não deduzindo a partir do status. São duas fontes para a mesma
+   * pergunta, e a que vem do banco em uma leitura só é a que não pode divergir.
+   */
+  owner_final_decision: OwnerFinalDecision | null;
 };
 
 export type UploadedPhoto = { storage_key: string; url: string };
@@ -739,4 +770,29 @@ export async function requestNewInspectionSlots(id: string | number) {
     { method: "POST" }
   );
   return readJson<{ inspection: unknown; changed: boolean }>(response);
+}
+
+/**
+ * Aceita ou recusa a proposta final (Fase 4.6).
+ *
+ * O corpo carrega `decision` e NADA ALÉM DISSO — em especial, NÃO carrega o
+ * valor. Mandá-lo faria a tela parecer confirmar um número que ela mesma
+ * escolheu, e o servidor o ignora de qualquer forma: o valor gravado é copiado
+ * da proposta final persistida, dentro da transação, com a FK composta da
+ * migration 059 conferindo a cópia no banco.
+ *
+ * Sempre 200 no caminho feliz, inclusive no retry da MESMA decisão — `changed`
+ * distingue os dois casos. A decisão OPOSTA é 409 com
+ * `OWNER_FINAL_DECISION_ALREADY_DECIDED`, e a tela recarrega em vez de insistir.
+ */
+export async function decideFinalOffer(
+  id: string | number,
+  decision: OwnerFinalDecisionType
+) {
+  const response = await fetch(`/api/account/sale-requests/${id}/final-offer-decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+  return readJson<{ owner_final_decision: OwnerFinalDecision; changed: boolean }>(response);
 }

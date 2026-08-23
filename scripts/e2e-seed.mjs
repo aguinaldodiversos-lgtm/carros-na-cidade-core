@@ -429,6 +429,23 @@ await pool.query(`DELETE FROM purchase_intents WHERE buyer_user_id = $1::bigint`
 // Todos escopados ao MESMO `owner_user_id` — nunca a tabela inteira.
 const ownedRequests = `SELECT id FROM sale_requests WHERE owner_user_id = $1::bigint`;
 
+// 4.6 — a decisão do PROPRIETÁRIO. Primeira da fila porque é a última da cadeia:
+// ela aponta para a decisão pós-inspeção, que aponta para a inspeção, que aponta
+// para a seleção.
+//
+// Também sem `ON DELETE CASCADE`, e pelo mesmo motivo das anteriores: uma trilha
+// auditável que sumisse junto com o objeto sumiria exatamente quando fosse
+// consultada. Sem este DELETE, reexecutar o seed depois de uma decisão falha com
+//
+//   violates foreign key constraint "sale_request_owner_final_decisions_request_fk"
+//
+// que é o endurecimento funcionando, e não um obstáculo a contornar.
+await pool.query(
+  `DELETE FROM sale_request_owner_final_decisions
+    WHERE sale_request_id IN (${ownedRequests})`,
+  [userId]
+);
+
 await pool.query(
   `DELETE FROM sale_request_post_inspection_decisions
     WHERE sale_request_id IN (${ownedRequests})`,
