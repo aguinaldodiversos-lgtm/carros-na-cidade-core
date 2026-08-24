@@ -957,23 +957,18 @@ describe.sequential("integração — match encerrado NÃO escreve agenda (§2, 
   });
 
   /**
-   * ACHADO DA CHECAGEM — o beco que a 4.9A reabre.
+   * O BECO, CORRIGIDO — e este é o teste principal da correção (§6).
    *
-   * `reportNoAgreement` (4.7) exige `offer_selected`. Confirmar um horário leva
-   * a solicitação a `inspection_scheduled` — e de lá o proprietário NÃO consegue
-   * mais informar que não houve acordo, nem aceitar outra oferta, nem abrir
-   * rodada nova.
+   * `reportNoAgreement` da 4.7 exigia `offer_selected`. Com a agenda de volta,
+   * confirmar um horário leva a solicitação a `inspection_scheduled` — e a
+   * igualdade antiga prendia o proprietário exatamente aí: a avaliação
+   * acontecia, não havia acordo, e ele não conseguia sair do match.
    *
-   * Enquanto os três writers da agenda estavam aposentados, `inspection_scheduled`
-   * era inalcançável e o beco não existia na prática. A 4.9A devolve a agenda e,
-   * com ela, o caminho até esse estado.
-   *
-   * NÃO corrigido aqui: o §16 desta checagem proíbe alterar `no_agreement`, e a
-   * decisão de quais estados encerram um handoff é de produto. Este teste FIXA o
-   * comportamento para que a decisão seja tomada de olhos abertos — e falha no
-   * dia em que alguém mudar a regra sem querer.
+   * A 4.9A passou a aceitar os DOIS estados ativos de handoff. O que este teste
+   * garante, além da transição, é que encerrar NÃO destrói a agenda: ela
+   * pertence à seleção histórica e continua auditável (§2 da correção).
    */
-  it("ACHADO — com horário confirmado, o handoff não pode mais ser encerrado", async () => {
+  it("§6 — com horário confirmado, encerrar o handoff funciona e PRESERVA a agenda", async () => {
     const saleRequestId = await publishRequest();
     const offerA = await offerFrom(0, saleRequestId, "65000");
     expect((await accept(saleRequestId, offerA)).ok).toBe(true);
@@ -982,15 +977,80 @@ describe.sequential("integração — match encerrado NÃO escreve agenda (§2, 
     const slots = await readSlots(saleRequestId);
     expect((await confirmSlot(saleRequestId, slots[0].id)).ok).toBe(true);
 
-    const { rows } = await pool.query(
+    const antesDoEncerramento = await snapshotAgenda(saleRequestId);
+    const { rows: antes } = await pool.query(
       `SELECT status FROM sale_requests WHERE id = $1`,
       [saleRequestId]
     );
-    expect(rows[0].status).toBe("inspection_scheduled");
+    expect(antes[0].status).toBe("inspection_scheduled");
 
     const encerrar = await noAgreement(saleRequestId);
-    expect(encerrar.ok, "hoje NÃO é possível — é o achado").toBe(false);
-    expect(encerrar.code).toBe("SALE_REQUEST_HANDOFF_NOT_ACTIVE");
+    expect(encerrar.ok, "agora É possível").toBe(true);
+
+    const { rows: depois } = await pool.query(
+      `SELECT status FROM sale_requests WHERE id = $1`,
+      [saleRequestId]
+    );
+    expect(depois[0].status).toBe("handoff_failed");
+
+    // O desfecho foi registrado, uma vez só.
+    const { rows: outcomes } = await pool.query(
+      `SELECT outcome FROM sale_request_handoff_outcomes WHERE sale_request_id = $1`,
+      [saleRequestId]
+    );
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("no_agreement");
+
+    // E NADA da agenda foi tocado: nem a inspeção, nem os slots, nem o
+    // `confirmed_slot_id`, nem `schedule_round`, nem `selection_id`.
+    expect(await snapshotAgenda(saleRequestId), "a agenda é histórico, não lixo").toBe(
+      antesDoEncerramento
+    );
+
+    const { rows: insp } = await pool.query(
+      `SELECT confirmed_slot_id::text AS confirmed, schedule_status, schedule_round,
+              selection_id::text AS selection_id, advertiser_id::text AS advertiser_id
+         FROM sale_request_inspections WHERE sale_request_id = $1`,
+      [saleRequestId]
+    );
+    expect(insp).toHaveLength(1);
+    expect(insp[0].confirmed, "o horário confirmado permanece").not.toBeNull();
+    expect(insp[0].schedule_status).toBe("scheduled");
+
+    // A seleção continua lá, e a agenda continua presa a ela.
+    const selecoes = await readSelections(saleRequestId);
+    expect(selecoes).toHaveLength(1);
+    expect(insp[0].selection_id).toBe(selecoes[0].id);
+  });
+
+  /**
+   * §3 da correção — idempotência preservada.
+   *
+   * O retry não pode criar um segundo `sale_request_handoff_outcome` nem mexer
+   * no histórico. O `UNIQUE(selection_id)` da 060 é a rede; o guard de
+   * `handoff_failed`, que roda ANTES do de estado, é a porta.
+   */
+  it("retry de no_agreement em handoff_failed é 200/changed:false, sem segundo outcome", async () => {
+    const saleRequestId = await publishRequest();
+    const offerA = await offerFrom(0, saleRequestId, "65000");
+    expect((await accept(saleRequestId, offerA)).ok).toBe(true);
+    expect((await offerSlots(0, saleRequestId, futureSlots())).ok).toBe(true);
+    const slots = await readSlots(saleRequestId);
+    expect((await confirmSlot(saleRequestId, slots[0].id)).ok).toBe(true);
+    expect((await noAgreement(saleRequestId)).ok).toBe(true);
+
+    const antes = await snapshotAgenda(saleRequestId);
+
+    const retry = await noAgreement(saleRequestId);
+    expect(retry.ok).toBe(true);
+    expect(retry.result?.changed, "é retry, não novo encerramento").toBe(false);
+
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS n FROM sale_request_handoff_outcomes WHERE sale_request_id = $1`,
+      [saleRequestId]
+    );
+    expect(rows[0].n, "um outcome só").toBe(1);
+    expect(await snapshotAgenda(saleRequestId)).toBe(antes);
   });
 
   it("§6 — a agenda encerrada continua presa à seleção que falhou", async () => {
@@ -1103,5 +1163,256 @@ describe.sequential("integração — A → rodada 2 → A de novo (§5)", () =>
     expect(rows).toHaveLength(1);
     expect(rows[0].id, "a agenda vigente é a da rodada 2").toBe(agendaA2.id);
     expect(rows[0].id).not.toBe(agendaA1.id);
+  });
+});
+
+// ============================================================================
+// FASE 4.9A — A CORREÇÃO DO BECO: encerrar handoff DEPOIS de agendar.
+// ============================================================================
+
+describe.sequential("integração — recuperação a partir de agenda confirmada (§7)", () => {
+  /** Leva até `handoff_failed` passando por um horário CONFIRMADO. */
+  async function encerrarComAgendaConfirmada(saleRequestId, offerId, dealerIndex = 0) {
+    expect((await accept(saleRequestId, offerId)).ok).toBe(true);
+    expect((await offerSlots(dealerIndex, saleRequestId, futureSlots())).ok).toBe(true);
+
+    const slots = await readSlots(saleRequestId);
+    const meus = slots.filter(
+      (s) => s.advertiser_id === String(world.advertiserIds[dealerIndex])
+    );
+    expect((await confirmSlot(saleRequestId, meus[0].id)).ok).toBe(true);
+    expect((await noAgreement(saleRequestId)).ok).toBe(true);
+    return meus;
+  }
+
+  it("A com agenda confirmada → encerrada → B aceita e cria a PRÓPRIA agenda", async () => {
+    const saleRequestId = await publishRequest();
+    const offerB = await offerFrom(1, saleRequestId, "63500");
+    const offerA = await offerFrom(0, saleRequestId, "65000");
+
+    const slotsDeA = await encerrarComAgendaConfirmada(saleRequestId, offerA, 0);
+    const agendaDeA = (await readInspections(saleRequestId))[0];
+
+    // A PF aceita a Loja B — a recuperação continua disponível.
+    expect((await accept(saleRequestId, offerB)).ok).toBe(true);
+    expect((await offerSlots(1, saleRequestId, futureSlots())).ok).toBe(true);
+
+    const selecoes = await readSelections(saleRequestId);
+    expect(selecoes, "as duas seleções coexistem").toHaveLength(2);
+
+    const inspecoes = await readInspections(saleRequestId);
+    expect(inspecoes, "duas agendas independentes").toHaveLength(2);
+
+    // A agenda histórica da Loja A ficou intacta, inclusive o horário confirmado.
+    const relidaA = inspecoes.find((i) => i.id === agendaDeA.id);
+    expect(relidaA.selection_id).toBe(selecoes[0].id);
+    const { rows } = await pool.query(
+      `SELECT confirmed_slot_id::text AS confirmed FROM sale_request_inspections WHERE id = $1`,
+      [agendaDeA.id]
+    );
+    expect(rows[0].confirmed, "o horário da Loja A permanece").toBe(String(slotsDeA[0].id));
+
+    // E a leitura vigente é a da Loja B — nunca a de A.
+    const dto = await ownerService.getMySaleRequest(world.ownerId, saleRequestId);
+    expect(dto.inspection?.store?.name).toBe("Prime Veículos");
+  });
+
+  it("A com agenda confirmada → encerrada → nova RODADA continua possível", async () => {
+    const saleRequestId = await publishRequest({ minimum: "62500" });
+    const offerA = await offerFrom(0, saleRequestId, "65000");
+
+    await encerrarComAgendaConfirmada(saleRequestId, offerA, 0);
+
+    expect((await openRound(saleRequestId, "58000")).ok).toBe(true);
+
+    const { rows } = await pool.query(
+      `SELECT status, current_round_number FROM sale_requests WHERE id = $1`,
+      [saleRequestId]
+    );
+    expect(rows[0].status).toBe("receiving_offers");
+    expect(rows[0].current_round_number).toBe(2);
+
+    // A agenda da rodada 1 continua no banco, presa à seleção dela.
+    expect(await readInspections(saleRequestId)).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+describe.sequential("integração — A → rodada 2 → A, agora via agenda confirmada (§8)", () => {
+  it("A1 intacta, A2 independente, leitura vigente = A2", async () => {
+    const saleRequestId = await publishRequest({ minimum: "62500" });
+    const offerA1 = await offerFrom(0, saleRequestId, "65000");
+
+    expect((await accept(saleRequestId, offerA1)).ok).toBe(true);
+    expect((await offerSlots(0, saleRequestId, futureSlots())).ok).toBe(true);
+    const slots1 = await readSlots(saleRequestId);
+    expect((await confirmSlot(saleRequestId, slots1[0].id)).ok).toBe(true);
+    expect((await noAgreement(saleRequestId)).ok).toBe(true);
+
+    const agendaA1 = (await readInspections(saleRequestId))[0];
+    const a1Snapshot = JSON.stringify(agendaA1);
+
+    expect((await openRound(saleRequestId, "58000")).ok).toBe(true);
+
+    // A MESMA loja oferta e é aceita de novo, na rodada 2.
+    const offerA2 = await offerFrom(0, saleRequestId, "58000");
+    expect((await accept(saleRequestId, offerA2)).ok).toBe(true);
+    expect((await offerSlots(0, saleRequestId, futureSlots())).ok).toBe(true);
+
+    const selecoes = await readSelections(saleRequestId);
+    expect(selecoes).toHaveLength(2);
+    expect(new Set(selecoes.map((s) => s.advertiser_id)).size, "mesma loja").toBe(1);
+
+    const inspecoes = await readInspections(saleRequestId);
+    expect(inspecoes).toHaveLength(2);
+
+    // A1 não foi tocada por nada disso.
+    const relidaA1 = inspecoes.find((i) => i.id === agendaA1.id);
+    expect(JSON.stringify(relidaA1), "A1 intacta").toBe(a1Snapshot);
+
+    const agendaA2 = inspecoes.find((i) => i.id !== agendaA1.id);
+    expect(agendaA2.selection_id).toBe(selecoes[1].id);
+
+    // A agenda vigente é A2, e o discriminador é o id.
+    const { rows } = await pool.query(
+      `SELECT i.id::text AS id
+         FROM sale_requests sr
+         JOIN sale_request_offer_selections s
+           ON s.sale_request_id = sr.id AND s.offer_id = sr.selected_offer_id
+         JOIN sale_request_inspections i ON i.selection_id = s.id
+        WHERE sr.id = $1`,
+      [saleRequestId]
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(agendaA2.id);
+    expect(rows[0].id).not.toBe(agendaA1.id);
+  });
+});
+
+// ============================================================================
+describe.sequential("integração — confirmar × encerrar, concorrentes (§9)", () => {
+  /**
+   * As duas transições travam a MESMA linha de `sale_requests`, então elas
+   * serializam. O que este teste garante não é qual vence — as duas ordens são
+   * legítimas —, mas o INVARIANTE:
+   *
+   *   se `reportNoAgreement` concluiu com sucesso, o estado final é
+   *   `handoff_failed`, e nenhum writer de agenda venceu DEPOIS dele.
+   *
+   * Com jitter, para que a ordem varie entre execuções em vez de ficar presa a
+   * um único entrelaçamento.
+   */
+  for (const jitterMs of [0, 3, 9, 17, 25]) {
+    it(`invariante mantido com jitter de ${jitterMs}ms`, async () => {
+      const saleRequestId = await publishRequest();
+      const offerA = await offerFrom(0, saleRequestId, "65000");
+      expect((await accept(saleRequestId, offerA)).ok).toBe(true);
+      expect((await offerSlots(0, saleRequestId, futureSlots())).ok).toBe(true);
+
+      const slots = await readSlots(saleRequestId);
+
+      const comAtraso = async (fn) => {
+        if (jitterMs > 0) await new Promise((r) => setTimeout(r, jitterMs));
+        return fn();
+      };
+
+      const [confirmacao, encerramento] = await Promise.all([
+        comAtraso(() => confirmSlot(saleRequestId, slots[0].id)),
+        noAgreement(saleRequestId),
+      ]);
+
+      const { rows } = await pool.query(
+        `SELECT status FROM sale_requests WHERE id = $1`,
+        [saleRequestId]
+      );
+      const statusFinal = rows[0].status;
+
+      // O invariante do §9.
+      if (encerramento.ok) {
+        expect(statusFinal, `jitter ${jitterMs}`).toBe("handoff_failed");
+      }
+
+      // Os dois casos aceitáveis, e nenhum terceiro.
+      expect(["handoff_failed", "inspection_scheduled"]).toContain(statusFinal);
+
+      // Se terminou encerrado, nenhum writer de agenda consegue mais nada.
+      if (statusFinal === "handoff_failed") {
+        const antes = await snapshotAgenda(saleRequestId);
+        const posterior = await offerSlots(0, saleRequestId, futureSlots(3));
+        expect(posterior.ok, "writer posterior ao encerramento").toBe(false);
+        expect(await snapshotAgenda(saleRequestId)).toBe(antes);
+      }
+
+      // Exatamente um outcome, nunca dois.
+      const { rows: outcomes } = await pool.query(
+        `SELECT count(*)::int AS n FROM sale_request_handoff_outcomes WHERE sale_request_id = $1`,
+        [saleRequestId]
+      );
+      expect(outcomes[0].n).toBeLessThanOrEqual(1);
+    });
+  }
+});
+
+// ============================================================================
+describe.sequential("integração — a allowlist não foi ampliada demais (§10)", () => {
+  /**
+   * A correção da 4.9A abriu UM estado. Este teste prova que abriu só ele.
+   *
+   * `receiving_offers` e `cancelled` nunca tiveram match a encerrar. Os cinco
+   * legados descendem de avaliação registrada ou proposta final — o fluxo que a
+   * 4.7 aposentou e que a 4.9A não reabre.
+   */
+  const PROIBIDOS = [
+    "receiving_offers",
+    "cancelled",
+    "inspection_completed",
+    "final_offer_submitted",
+    "final_offer_declined",
+    "final_offer_accepted",
+    "final_offer_rejected",
+  ];
+
+  it("os sete estados proibidos continuam recusando o encerramento", async () => {
+    for (const status of PROIBIDOS) {
+      const saleRequestId = await publishRequest();
+
+      if (status !== "receiving_offers") {
+        const offerA = await offerFrom(0, saleRequestId, "65000");
+        if (status === "cancelled") {
+          await pool.query(`UPDATE sale_requests SET status = 'cancelled' WHERE id = $1`, [
+            saleRequestId,
+          ]);
+        } else {
+          // Os cinco legados exigem seleção (CHECK de coerência da 060), então
+          // o caminho é aceitar de verdade e só então mover o status à mão.
+          expect((await accept(saleRequestId, offerA)).ok).toBe(true);
+          await pool.query(`UPDATE sale_requests SET status = $2 WHERE id = $1`, [
+            saleRequestId,
+            status,
+          ]);
+        }
+      }
+
+      const resultado = await noAgreement(saleRequestId);
+      expect(resultado.ok, `estado ${status} NÃO pode encerrar`).toBe(false);
+      expect(resultado.status, status).toBe(409);
+      expect(resultado.code, status).toBe("SALE_REQUEST_HANDOFF_NOT_ACTIVE");
+
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n FROM sale_request_handoff_outcomes WHERE sale_request_id = $1`,
+        [saleRequestId]
+      );
+      expect(rows[0].n, `estado ${status} não pode gravar desfecho`).toBe(0);
+    }
+  });
+
+  it("a allowlist tem exatamente DOIS estados", async () => {
+    const { SALE_REQUEST_ACTIVE_HANDOFF_STATUSES } = await import(
+      "../../src/modules/sale-requests/sale-requests.constants.js"
+    );
+    expect([...SALE_REQUEST_ACTIVE_HANDOFF_STATUSES].sort()).toEqual([
+      "inspection_scheduled",
+      "offer_selected",
+    ]);
   });
 });

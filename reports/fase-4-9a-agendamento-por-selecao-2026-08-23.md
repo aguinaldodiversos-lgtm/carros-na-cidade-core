@@ -500,3 +500,226 @@ precisa de decisão sua — porque com a agenda de volta, um proprietário que
 confirma horário e não fecha negócio hoje não tem saída pelo portal.
 
 **NÃO PUSHADO. NÃO MERGEADO. NÃO DEPLOYADO.**
+
+---
+---
+
+# Correção do beco após agendamento
+
+O achado da checagem anterior, corrigido. Com a agenda de volta, encerrar o
+handoff **depois** de marcar a visita passou a ser o caso normal — e a igualdade
+`status === offer_selected` prendia o proprietário exatamente aí.
+
+| | |
+|---|---|
+| Arquivos de produção alterados | **2** |
+| Migration | **intacta** (061 não foi tocada) |
+| Agendamento (validação, slots, repositories) | **intacto** |
+| Frontend | **intacto** |
+
+---
+
+## 1. Auditoria antes de implementar (§11)
+
+Não existia `ACTIVE_HANDOFF_STATUSES`. As listas próximas não servem:
+
+| Lista | Por que não |
+|---|---|
+| `SALE_REQUEST_SELECTED_STATUSES` | ampla demais — inclui os seis legados |
+| `SALE_REQUEST_SELECTABLE_STATUSES` | responde outra pergunta (onde se pode *aceitar*) |
+| `SALE_REQUEST_LEGACY_STATUSES` | é o oposto, e alimenta a mensagem de recusa |
+
+Criada a menor abstração correta, como allowlist explícita:
+
+```js
+export const SALE_REQUEST_ACTIVE_HANDOFF_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.OFFER_SELECTED,
+  SALE_REQUEST_STATUS.INSPECTION_SCHEDULED,
+]);
+```
+
+**Allowlist, e não `status !== 'cancelled'`.** Uma regra aberta reabriria de
+brinde os seis estados do fluxo aposentado. Enumerar é o mesmo princípio de
+todas as listas do arquivo: um estado novo criado por uma fase futura não entra
+em nenhuma, e o erro aparece na hora.
+
+> **`inspection_scheduled` está TAMBÉM em `SALE_REQUEST_LEGACY_STATUSES`.** Não é
+> contradição: o estado passou a ter duas origens. Linhas anteriores à 4.7
+> chegaram nele pela máquina antiga; linhas novas chegam pelo agendamento
+> restaurado. Para *encerrar* o handoff as duas se comportam igual — e a lista
+> legada continua servindo à mensagem dos outros estados e à tela somente-leitura.
+
+---
+
+## 2. O diff de produção
+
+**`sale-requests.constants.js`** — a allowlist nova (+41 linhas, quase todas
+comentário explicando por que a igualdade antiga estava certa e deixou de estar).
+
+**`sale-requests.handoff.service.js`** — três linhas efetivas:
+
+```diff
++  SALE_REQUEST_ACTIVE_HANDOFF_STATUSES,          // import
+
+-  if (request.status !== SALE_REQUEST_STATUS.OFFER_SELECTED) {
++  if (!SALE_REQUEST_ACTIVE_HANDOFF_STATUSES.includes(request.status)) {
+
+-      fromStatus: SALE_REQUEST_STATUS.OFFER_SELECTED,
++      fromStatus: request.status,
+```
+
+### Por que `fromStatus: request.status`
+
+O `fromStatus` vai no `WHERE` do `UPDATE` — é ele que torna a transição única e
+verificável. Trocá-lo por uma lista enfraqueceria a garantia; trocá-lo pelo
+**estado lido sob o lock** mantém a disciplina intacta, agora sobre o valor que
+de fato estava lá. Zero alteração no repositório.
+
+---
+
+## 3. Encerrar preserva a agenda (§2, §6)
+
+O teste principal segue o roteiro: A oferta → PF aceita → A envia horários → PF
+**confirma** um → `inspection_scheduled` → `reportNoAgreement`.
+
+| Prova | |
+|---|---|
+| status final = `handoff_failed` | ✅ |
+| outcome `no_agreement`, exatamente **1** | ✅ |
+| `sale_request_inspections` inalterada | ✅ |
+| slots inalterados | ✅ |
+| `confirmed_slot_id` permanece | ✅ |
+| `schedule_round` / `schedule_status` permanecem | ✅ |
+| `selection_id` / `advertiser_id` permanecem | ✅ |
+| a agenda continua presa à seleção histórica | ✅ |
+
+A asserção de "nada mudou" não conta linhas: compara a **fotografia completa** de
+inspeções + slots. Contagem não pegaria um `UPDATE` que altera uma linha sem
+criar outra — e `confirmed_slot_id` e `schedule_round` são exatamente esses
+campos.
+
+**A agenda não é lixo: é histórico.** Só o match deixa de ser ativo.
+
+---
+
+## 4. Idempotência (§3)
+
+Retry de `reportNoAgreement` em `handoff_failed` → **200 / `changed:false`**,
+**um único** `sale_request_handoff_outcome`, snapshot idêntico. O guard de
+idempotência roda antes do de estado, como já rodava — não foi tocado.
+
+---
+
+## 5. Recuperação depois do encerramento (§7)
+
+Partindo de agenda **confirmada** e encerrada:
+
+| Caminho | |
+|---|---|
+| **A.** PF aceita a Loja B | ✅ e B cria a **própria** agenda |
+| **B.** PF abre nova rodada | ✅ `receiving_offers`, `current_round_number = 2` |
+
+E no caminho A: a seleção de A permanece, a agenda de A permanece **com o
+horário confirmado intacto**, a leitura vigente devolve a Loja B — nunca a A.
+
+---
+
+## 6. A → rodada 2 → A, via agenda confirmada (§8)
+
+O cenário crítico, agora percorrendo o caminho novo:
+
+- A1 **intacta** — comparação do JSON da linha inteira, antes e depois;
+- A2 independente, com o `selection_id` da seleção nova;
+- leitura vigente = **A2**, discriminada por **id** (não por sub-estado, que
+  pode coincidir e mascarar o defeito);
+- a agenda antiga nunca ressurge.
+
+---
+
+## 7. Concorrência: confirmar × encerrar (§9)
+
+Cinco execuções com jitter de **0, 3, 9, 17 e 25 ms**. As duas transações travam
+a mesma linha de `sale_requests`, então serializam — e os dois entrelaçamentos
+são legítimos.
+
+O que o teste garante é o **invariante**, não o vencedor:
+
+- se `reportNoAgreement` concluiu com sucesso → estado final **é**
+  `handoff_failed`;
+- o estado final é sempre um dos dois esperados, nunca um terceiro;
+- terminando em `handoff_failed`, **nenhum writer de agenda posterior vence** —
+  e o snapshot prova que não escreveu;
+- **no máximo um** outcome, nunca dois.
+
+---
+
+## 8. A allowlist não foi ampliada demais (§10)
+
+Os sete estados proibidos continuam recusando com **409
+`SALE_REQUEST_HANDOFF_NOT_ACTIVE`**, e nenhum grava desfecho:
+
+```
+receiving_offers · cancelled · inspection_completed
+final_offer_submitted · final_offer_declined
+final_offer_accepted · final_offer_rejected
+```
+
+Mais uma asserção direta sobre a constante: a allowlist tem **exatamente dois**
+estados. É ela que falha se alguém acrescentar um terceiro sem pensar.
+
+---
+
+## 9. Mutações (§12)
+
+| Mutação | Vermelhos | |
+|---|---|---|
+| **A** — remove `inspection_scheduled` da allowlist | **6**, incluindo o teste principal do §6, os dois de recuperação e o de rodada 2 | ✅ |
+| **B** — admite `inspection_completed` | **2** — os dois do §10 | ✅ |
+
+Ambas revertidas na mesma execução; nenhuma commitada. `git diff` da constante
+mostra só as +41 linhas legítimas.
+
+---
+
+## 10. Regressão (§13)
+
+| Gate | Resultado |
+|---|---|
+| Suíte da 4.9A (`inspection-per-selection`) | ✅ **30** (era 19) |
+| Integração do domínio, total | ✅ **162** (era 151) |
+| `tests/sale-requests` | ✅ **469** (era 468) |
+| **`npm test` completo** | ✅ **3447 passed**, 1 skipped (212 arquivos) |
+| Concorrência da 4.7 | ✅ intacta |
+| `tsc --noEmit` / `next lint` | ✅ / ✅ |
+| Os 3 writers de agenda em `handoff_failed` | ✅ continuam bloqueados |
+
+Este último merece ênfase: **corrigir a saída não abriu a entrada**. Depois do
+`no_agreement`, `offerInspectionSlots`, `confirmInspectionSlot` e
+`requestNewInspectionSlots` continuam recusando com 409, e o snapshot do banco
+continua idêntico.
+
+---
+
+## Dívida atualizada
+
+**D1 — RESOLVIDA.** Era o beco. A 4.9B não precisa mais tratá-lo como bloqueio;
+continua precisando decidir o que a tela renderiza em `handoff_failed` quando
+existe uma agenda histórica (**não pode** mostrar "avaliação agendada" ao lado de
+"não houve acordo").
+
+**D2** (dois vocabulários de "rodada") e **D3** (`getInspectionForSelection` sem
+consumidor) seguem abertas, inalteradas.
+
+---
+
+## GO FINAL — 4.9A
+
+O beco fechou com a menor alteração possível: uma allowlist e duas linhas de
+guard. A agenda sobrevive ao encerramento como histórico auditável, a
+recuperação (outra oferta / nova rodada) funciona a partir de agenda confirmada,
+a concorrência mantém o invariante sob jitter, e nenhum estado legado foi
+reaberto.
+
+Backend da 4.9A fechado. **Pronto para a 4.9B.**
+
+**NÃO PUSHADO. NÃO MERGEADO. NÃO DEPLOYADO.**

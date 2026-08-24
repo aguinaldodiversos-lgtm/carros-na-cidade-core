@@ -540,14 +540,31 @@ describe("a máquina de estados não deixou ninguém para trás (§1)", () => {
   /**
    * §32 — o handoff da 4.7 NÃO alcança uma solicitação presa no fluxo antigo.
    *
-   * "Não houve acordo" exige `offer_selected`. Um estado legado não é isso, e a
-   * mensagem diz por quê em vez de devolver um genérico que mandaria a pessoa
+   * A mensagem diz por quê, em vez de devolver um genérico que mandaria a pessoa
    * procurar um botão que não existe.
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * `inspection_scheduled` SAIU DESTA LISTA NA 4.9A
+   * ────────────────────────────────────────────────────────────────────────
+   * Ele continua sendo um estado legado — linhas anteriores à 4.7 chegaram nele
+   * pela máquina antiga —, mas deixou de ser SÓ isso: com o agendamento
+   * restaurado, é para lá que vai toda solicitação em que o proprietário
+   * confirma um horário.
+   *
+   * Encerrar o handoff a partir dele é o caso NORMAL da 4.9A, e está provado no
+   * teste seguinte. Os outros cinco continuam recusados: eles descendem de
+   * avaliação registrada ou proposta final, que continuam fora do produto.
    */
-  it("não houve acordo é recusado em estado legado, com mensagem própria", async () => {
+  const LEGACY_SEM_HANDOFF_ATIVO = SALE_REQUEST_LEGACY_STATUSES.filter(
+    (status) => status !== "inspection_scheduled"
+  );
+
+  it("não houve acordo é recusado nos estados legados de FICHA/PROPOSTA FINAL", async () => {
     const app = buildApp();
 
-    for (const status of SALE_REQUEST_LEGACY_STATUSES) {
+    expect(LEGACY_SEM_HANDOFF_ATIVO, "a lista não pode esvaziar sozinha").toHaveLength(5);
+
+    for (const status of LEGACY_SEM_HANDOFF_ATIVO) {
       const { row } = seedLegacy({ status });
 
       const response = await request(app)
@@ -559,5 +576,25 @@ describe("a máquina de estados não deixou ninguém para trás (§1)", () => {
       expect(response.body.details?.code).toBe("SALE_REQUEST_HANDOFF_NOT_ACTIVE");
       expect(response.body.message).toMatch(/fluxo antigo/i);
     }
+  });
+
+  /**
+   * O CONTRÁRIO, para o estado que a 4.9A tornou encerrável.
+   *
+   * Sem este teste, remover `inspection_scheduled` da allowlist não seria
+   * observado por asserção nenhuma: o teste acima passaria igual, porque não
+   * fala mais desse estado.
+   */
+  it("com avaliação agendada, o handoff PODE ser encerrado (4.9A)", async () => {
+    const app = buildApp();
+    const { row } = seedLegacy({ status: "inspection_scheduled" });
+
+    const response = await request(app)
+      .post(`${OWNER_BASE}/${row.id}/handoff/no-agreement`)
+      .set("x-test-user", OWNER_ID)
+      .send();
+
+    expect(response.status).toBe(200);
+    expect(db.saleRequests.find((r) => r.id === row.id).status).toBe("handoff_failed");
   });
 });
