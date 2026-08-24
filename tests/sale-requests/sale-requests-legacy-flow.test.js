@@ -189,6 +189,11 @@ function seedLegacy({ status, decisionType = "final_offer", ownerDecision = null
   const inspection = {
     id: db.nextInspectionId++,
     sale_request_id: id,
+    // Fase 4.9A — a agenda passa a pertencer à SELEÇÃO. Toda linha legada
+    // recebeu este vínculo no backfill da migration 061, resolvido pelo par
+    // (sale_request_id, advertiser_id), que era único antes da 4.7. A fixture
+    // reflete o banco depois da migration, e não antes dela.
+    selection_id: selection.id,
     advertiser_id: STORE_A,
     schedule_status: "completed",
     schedule_round: 1,
@@ -268,22 +273,29 @@ beforeEach(() => {
 });
 
 // ============================================================================
-describe("os SEIS writers do fluxo aposentado recusam (§32)", () => {
+describe("os TRÊS writers da FICHA e da PROPOSTA FINAL continuam recusando (§32)", () => {
   /**
    * A tabela é a asserção.
    *
    * Cada linha é um caminho de escrita que existia e deixou de existir. Um
    * writer novo que alguém acrescentasse ao módulo antigo NÃO apareceria aqui —
    * e é por isso que o teste seguinte varre as rotas montadas.
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * ERAM SEIS. A FASE 4.9A DEVOLVEU TRÊS — E SÓ TRÊS.
+   * ────────────────────────────────────────────────────────────────────────
+   * `inspection/slots`, `inspection/confirm` e `inspection/request-slots`
+   * voltaram a funcionar: o AGENDAMENTO é produto de novo, agora pendurado na
+   * seleção (migration 061). Eles são cobertos por
+   * `SCHEDULING_WRITERS_BACK`, logo abaixo, que prova o oposto disto — que
+   * NÃO respondem mais 409.
+   *
+   * Os três que sobraram aqui são os da AVALIAÇÃO e da PROPOSTA FINAL. Eles
+   * continuam aposentados, e a fronteira entre as duas listas é exatamente a
+   * decisão de produto da 4.7: a plataforma marca a visita, e não registra o
+   * que aconteceu nela.
    */
   const WRITERS = [
-    {
-      name: "loja propõe horários",
-      run: (app, id) =>
-        asDealer(request(app).post(`${DEALER_BASE}/${id}/inspection/slots`), DEALER_A).send({
-          slots: ["2026-09-01T10:00:00-03:00"],
-        }),
-    },
     {
       name: "loja registra a avaliação",
       run: (app, id) =>
@@ -298,22 +310,6 @@ describe("os SEIS writers do fluxo aposentado recusam (§32)", () => {
           decision_type: "final_offer",
           final_amount: "60000",
         }),
-    },
-    {
-      name: "proprietário confirma horário",
-      run: (app, id) =>
-        request(app)
-          .post(`${OWNER_BASE}/${id}/inspection/confirm`)
-          .set("x-test-user", OWNER_ID)
-          .send({ slot_id: "1" }),
-    },
-    {
-      name: "proprietário pede novos horários",
-      run: (app, id) =>
-        request(app)
-          .post(`${OWNER_BASE}/${id}/inspection/request-slots`)
-          .set("x-test-user", OWNER_ID)
-          .send(),
     },
     {
       name: "proprietário decide a proposta final",
@@ -350,15 +346,73 @@ describe("os SEIS writers do fluxo aposentado recusam (§32)", () => {
     const app = buildApp();
     const { row } = seedLegacy({ status: "offer_selected" });
 
+    // Snapshot ANTES: a fixture já traz uma ficha preenchida, então "está vazia"
+    // não serviria de asserção. O que precisa ser provado é que a chamada não
+    // MUDOU nada — e para isso o antes tem de ser lido, não presumido.
+    const antes = JSON.stringify(db.saleRequestInspections);
+
     const response = await asDealer(
-      request(app).post(`${DEALER_BASE}/${row.id}/inspection/slots`),
+      request(app).post(`${DEALER_BASE}/${row.id}/inspection/complete`),
       DEALER_A
-    ).send({ slots: ["2026-09-01T10:00:00-03:00"] });
+    ).send({ observed_mileage: "99999" });
 
     expect(response.status).toBe(409);
     expect(response.body.details?.code).toBe(LEGACY_CODE);
-    expect(db.saleRequestInspectionSlots).toHaveLength(0);
+    expect(JSON.stringify(db.saleRequestInspections)).toBe(antes);
   });
+
+  /**
+   * O CONTRÁRIO, para os três que voltaram (Fase 4.9A).
+   *
+   * Sem este teste, remover os guards do agendamento seria uma mudança que
+   * nenhuma asserção observa: os testes acima passariam igual, porque não falam
+   * desses três caminhos. E "o guard sumiu" e "o guard nunca foi alcançado"
+   * produzem o mesmo verde.
+   *
+   * A asserção é estreita de propósito: NÃO é 409 com `LEGACY_FLOW_RETIRED`.
+   * Qualquer outra resposta serve — 400 por horário malformado, 409 por estado,
+   * 404 por escopo. O que este teste protege é a APOSENTADORIA ter sido
+   * levantada, e não o caminho feliz, que é assunto das suítes de agendamento.
+   */
+  const SCHEDULING_WRITERS_BACK = [
+    {
+      name: "loja propõe horários",
+      run: (app, id) =>
+        asDealer(request(app).post(`${DEALER_BASE}/${id}/inspection/slots`), DEALER_A).send({
+          slots: ["2026-09-01T10:00:00-03:00"],
+        }),
+    },
+    {
+      name: "proprietário confirma horário",
+      run: (app, id) =>
+        request(app)
+          .post(`${OWNER_BASE}/${id}/inspection/confirm`)
+          .set("x-test-user", OWNER_ID)
+          .send({ slot_id: "1" }),
+    },
+    {
+      name: "proprietário pede novos horários",
+      run: (app, id) =>
+        request(app)
+          .post(`${OWNER_BASE}/${id}/inspection/request-slots`)
+          .set("x-test-user", OWNER_ID)
+          .send(),
+    },
+  ];
+
+  for (const writer of SCHEDULING_WRITERS_BACK) {
+    it(`NÃO está mais aposentado: ${writer.name}`, async () => {
+      const app = buildApp();
+      const { row } = seedLegacy({ status: "offer_selected" });
+
+      const response = await writer.run(app, row.id);
+
+      expect(response.body.details?.code).not.toBe(LEGACY_CODE);
+      expect(response.body.message ?? "").not.toMatch(
+        /deixou de ser registrada na plataforma/i
+      );
+    });
+  }
 
   it("nenhum writer escreve nada — nem inspeção, nem decisão, nem status", async () => {
     const app = buildApp();

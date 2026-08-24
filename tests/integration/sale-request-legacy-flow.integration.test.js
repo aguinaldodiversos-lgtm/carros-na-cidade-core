@@ -201,10 +201,10 @@ async function seedLegacyRequest(status, { decisionType = "final_offer" } = {}) 
     [saleRequestId, round[0].id, world.dealerIds[0], world.advertiserIds[0]]
   );
 
-  await pool.query(
+  const { rows: selection } = await pool.query(
     `INSERT INTO sale_request_offer_selections
        (sale_request_id, round_id, offer_id, advertiser_id, selected_by_user_id, amount_snapshot)
-     VALUES ($1, $2, $3, $4, $5, 65000.00)`,
+     VALUES ($1, $2, $3, $4, $5, 65000.00) RETURNING id`,
     [saleRequestId, round[0].id, offer[0].id, world.advertiserIds[0], world.ownerId]
   );
 
@@ -216,17 +216,19 @@ async function seedLegacyRequest(status, { decisionType = "final_offer" } = {}) 
   );
 
   const { rows: inspection } = await pool.query(
+    // `selection_id` é da migration 061: a agenda pertence à SELEÇÃO, e a FK de
+    // três colunas exige que a seleção seja desta solicitação E desta loja.
     `INSERT INTO sale_request_inspections (
-       sale_request_id, advertiser_id, schedule_status, schedule_round,
+       sale_request_id, selection_id, advertiser_id, schedule_status, schedule_round,
        observed_mileage, observed_condition, observed_tire_condition,
        observed_engine_condition, observed_gearbox_condition,
        observed_suspension_condition, observed_body_paint_status,
        completed_at, completed_by_user_id, created_by_user_id
      )
-     VALUES ($1, $2, 'awaiting_slots', 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-             NULL, NULL, $3)
+     VALUES ($1, $2, $3, 'awaiting_slots', 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+             NULL, NULL, $4)
      RETURNING id`,
-    [saleRequestId, world.advertiserIds[0], world.dealerIds[0]]
+    [saleRequestId, selection[0].id, world.advertiserIds[0], world.dealerIds[0]]
   );
 
   await pool.query(
@@ -428,29 +430,24 @@ describe.sequential("integração — os estados legados continuam VÁLIDOS (§1
 });
 
 // ============================================================================
-describe.sequential("integração — os SEIS writers recusam (§32)", () => {
+describe.sequential("integração — os TRÊS writers da ficha recusam (§32)", () => {
   const LEGACY_CODE = "SALE_REQUEST_LEGACY_FLOW_RETIRED";
 
-  it("recusa os quatro writers da 4.5 e os dois da 4.6", async () => {
+  /**
+   * FASE 4.9A — a lista encolheu de seis para três, e isso é produto.
+   *
+   * `offerInspectionSlots`, `confirmInspectionSlot` e `requestNewInspectionSlots`
+   * saíram da aposentadoria: o AGENDAMENTO voltou, agora pendurado na seleção.
+   * O teste logo abaixo prova o outro lado — que os três não respondem mais
+   * `LEGACY_FLOW_RETIRED`.
+   *
+   * Os que ficam são os da AVALIAÇÃO e da PROPOSTA FINAL. A plataforma marca a
+   * visita; não registra o que aconteceu nela.
+   */
+  it("recusa os dois writers da ficha (4.5) e o da decisão final (4.6)", async () => {
     const { saleRequestId } = await seedLegacyRequest("final_offer_submitted");
 
     const writers = [
-      [
-        "offerInspectionSlots",
-        () =>
-          inspectionService.offerInspectionSlots(world.dealerIds[0], saleRequestId, {
-            slots: ["2026-09-01T10:00:00-03:00"],
-          }),
-      ],
-      [
-        "confirmInspectionSlot",
-        () =>
-          inspectionService.confirmInspectionSlot(world.ownerId, saleRequestId, { slot_id: "1" }),
-      ],
-      [
-        "requestNewInspectionSlots",
-        () => inspectionService.requestNewInspectionSlots(world.ownerId, saleRequestId),
-      ],
       [
         "completeInspection",
         () =>
@@ -480,6 +477,42 @@ describe.sequential("integração — os SEIS writers recusam (§32)", () => {
       expect(result.ok, name).toBe(false);
       expect(result.status, name).toBe(409);
       expect(result.code, name).toBe(LEGACY_CODE);
+    }
+  });
+
+  /**
+   * O OPOSTO, para os três que voltaram (Fase 4.9A).
+   *
+   * A asserção é estreita: o que precisa ser provado é que a APOSENTADORIA foi
+   * levantada, não que o caminho feliz funciona — isso é assunto da suíte de
+   * agendamento por seleção. Qualquer recusa de DOMÍNIO (estado, escopo, forma)
+   * é resposta legítima aqui; `LEGACY_FLOW_RETIRED` não é mais.
+   */
+  it("os três writers do AGENDAMENTO não estão mais aposentados", async () => {
+    const { saleRequestId } = await seedLegacyRequest("offer_selected");
+
+    const writers = [
+      [
+        "offerInspectionSlots",
+        () =>
+          inspectionService.offerInspectionSlots(world.dealerIds[0], saleRequestId, {
+            slots: ["2026-09-01T10:00:00-03:00"],
+          }),
+      ],
+      [
+        "confirmInspectionSlot",
+        () =>
+          inspectionService.confirmInspectionSlot(world.ownerId, saleRequestId, { slot_id: "1" }),
+      ],
+      [
+        "requestNewInspectionSlots",
+        () => inspectionService.requestNewInspectionSlots(world.ownerId, saleRequestId),
+      ],
+    ];
+
+    for (const [name, run] of writers) {
+      const result = await attempt(run);
+      expect(result.code, name).not.toBe(LEGACY_CODE);
     }
   });
 
@@ -522,12 +555,22 @@ describe.sequential("integração — os SEIS writers recusam (§32)", () => {
    *
    * É o que garante que nenhuma solicitação NOVA entra na máquina aposentada.
    */
+  /**
+   * A recusa acontece ANTES de qualquer leitura de estado.
+   *
+   * É o que garante que ela vale para TODA solicitação — inclusive as que nunca
+   * entraram no fluxo antigo. Um guard depois do lock recusaria só as legadas.
+   *
+   * O writer usado aqui era `offerInspectionSlots` até a 4.9A; agora é
+   * `completeInspection`, porque o primeiro deixou de ser aposentado. A
+   * propriedade sob teste é a mesma.
+   */
   it("recusa também numa solicitação 4.7, em offer_selected", async () => {
     const { saleRequestId } = await seedLegacyRequest("offer_selected");
 
     const result = await attempt(() =>
-      inspectionService.offerInspectionSlots(world.dealerIds[0], saleRequestId, {
-        slots: ["2026-09-01T10:00:00-03:00"],
+      inspectionService.completeInspection(world.dealerIds[0], saleRequestId, {
+        observed_mileage: "64230",
       })
     );
 
