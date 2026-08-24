@@ -292,3 +292,211 @@ Nada de frontend, nenhuma migration além da 061, nenhuma monetização, e a fic
 de avaliação e a proposta final continuam fora do produto.
 
 **NÃO PUSHADO. NÃO MERGEADO. NÃO DEPLOYADO.** Aguardando revisão antes da 4.9B.
+
+---
+---
+
+# Checagem final de autorização do agendamento
+
+Pergunta: **um match encerrado por `no_agreement` consegue continuar alterando a
+agenda?**
+
+Resposta: **não.** E o backend já bloqueava — nenhuma linha de produção foi
+alterada nesta checagem.
+
+| | |
+|---|---|
+| Código de produção alterado | **nenhum** (`git status -- src/` vazio) |
+| Testes adicionados | **5** |
+| Migration | intacta |
+| `no_agreement`, rounds, WhatsApp, ficha, proposta final | intactos |
+
+---
+
+## 1. Auditoria antes de mexer (§3)
+
+O padrão para "o estado não permite" já existia, e foi **reutilizado** — nenhum
+código de erro novo foi inventado:
+
+| Writer | Guard existente | Resposta em `handoff_failed` |
+|---|---|---|
+| `offerInspectionSlots` | `status !== OFFER_SELECTED` | **409** `INSPECTION_INVALID_STATE` |
+| `requestNewInspectionSlots` | `status !== OFFER_SELECTED` | **409** `INSPECTION_INVALID_STATE` |
+| `confirmInspectionSlot` | `status !== OFFER_SELECTED` | **409** `INSPECTION_ALREADY_SCHEDULED` |
+
+Para a loja que deixou de ser o match, a recusa vem antes e é mais forte: o
+`WHERE` de `lockRequestForDealer` junta por `selected_offer_id` **e**
+`o.advertiser_id`, então a linha não casa e a resposta é **404** — o mesmo 404
+indistinguível que a perdedora recebe desde a 4.4.
+
+Os três guards estavam ali desde a 4.5. O que faltava era **prova**.
+
+---
+
+## 2. `handoff_failed` × os três writers (§2, §6)
+
+Cenário: A oferta → PF aceita → A envia horários → PF informa `no_agreement` →
+`handoff_failed`, com `selected_offer_id` **ainda apontando para a oferta de A**
+(a premissa do §1).
+
+| Tentativa | Resultado |
+|---|---|
+| `offerInspectionSlots` | ❌ 409 `INSPECTION_INVALID_STATE` |
+| `requestNewInspectionSlots` | ❌ 409 `INSPECTION_INVALID_STATE` |
+| `confirmInspectionSlot` | ❌ 409 `INSPECTION_ALREADY_SCHEDULED` |
+| Nenhum erro de constraint vazando (`23xxx`) | ✅ |
+
+E nada mudou no banco. A asserção não conta linhas — compara uma **fotografia
+completa** de `sale_request_inspections` + `sale_request_inspection_slots`
+(`snapshotAgenda`), porque `schedule_round`, `confirmed_slot_id` e
+`schedule_status` são exatamente os campos que um writer indevido alteraria
+**sem mudar contagem nenhuma**.
+
+A agenda encerrada continua no banco e continua presa à seleção que falhou —
+aposentar um match não apaga histórico.
+
+---
+
+## 3. ACHADO — o beco que a 4.9A reabre
+
+**`reportNoAgreement` exige `status === OFFER_SELECTED`.**
+
+Confirmar um horário leva a solicitação a `inspection_scheduled`. De lá, o
+proprietário **não consegue mais** informar que não houve acordo — e portanto não
+consegue aceitar outra oferta nem abrir rodada nova. Fica preso.
+
+Enquanto os três writers estavam aposentados, `inspection_scheduled` era
+inalcançável e o beco não existia na prática. **A 4.9A devolve a agenda e, com
+ela, o caminho até esse estado.**
+
+Não corrigido aqui, por três razões: o §16 desta checagem proíbe alterar
+`no_agreement`; decidir quais estados encerram um handoff é decisão de produto; e
+a correção mínima (aceitar `inspection_scheduled` como estado encerrável) muda a
+máquina de estados da 4.7, o que exige aprovação sua.
+
+Há teste fixando o comportamento — `ACHADO — com horário confirmado, o handoff
+não pode mais ser encerrado` — para que a decisão seja tomada de olhos abertos e
+para que a regra não mude em silêncio.
+
+> **Efeito colateral bom:** o ramo idempotente de `confirmInspectionSlot` (que
+> responde `ok` antes do guard de status, para o duplo clique) é **inalcançável**
+> em `handoff_failed` — ter um horário confirmado implica `inspection_scheduled`,
+> e de lá não se chega a `handoff_failed`. A exceção que eu suspeitava não
+> existe.
+
+---
+
+## 4. A → B (§4)
+
+| Ator | Ação | Resultado |
+|---|---|---|
+| Loja A (encerrada) | `offerInspectionSlots` | ❌ **404** — a oportunidade deixou de existir para ela |
+| Loja A | efeito no banco | **nenhum** (snapshot idêntico) |
+| Loja B (aceita) | `offerInspectionSlots` | ✅ permitido |
+| PF | `confirmInspectionSlot` | ✅ confirma — e o horário é **da Loja B** |
+
+Provado no banco: os horários de cada loja ficam presos à **sua** seleção.
+
+```
+slots da Loja A  →  selection A
+slots da Loja B  →  selection B
+```
+
+Nunca `agenda A → selection B`, nunca `agenda B → selection A`. E a única agenda
+com `confirmed_slot_id` é a da Loja B.
+
+---
+
+## 5. A → rodada 2 → A (§5)
+
+O cenário que motivou toda a fase.
+
+```
+selection A1 — rodada 1 — histórica  →  agenda A1
+selection A2 — rodada 2 — atual      →  agenda A2
+```
+
+| Prova | |
+|---|---|
+| Duas seleções, **mesma loja** | ✅ |
+| Sem aceite na rodada 2, A não agenda | ✅ recusado |
+| `UNIQUE(selection_id)` permite as duas agendas | ✅ |
+| A2 recebe o `selection_id` da selection A2 | ✅ |
+| A1 continua presa à selection A1 | ✅ |
+| A leitura da agenda vigente devolve **só A2** | ✅ |
+
+O discriminador da última asserção é o **id** da agenda, e não o sub-estado —
+que pode coincidir entre as duas e mascarar o defeito.
+
+---
+
+## 6. Leitura da agenda atual (§6, §15)
+
+A leitura vigente parte de `selected_offer_id` → seleção atual → agenda daquela
+seleção. Casos cobertos:
+
+- match com agenda → devolve a agenda **daquele** match;
+- match novo **sem** agenda → devolve `null`, e **não** a agenda da loja
+  anterior (o caso determinístico, ver §7);
+- `handoff_failed` → devolve a agenda da seleção que falhou, porque o ponteiro
+  continua nela. Fixado em teste, e é a armadilha nº 1 da 4.9B: **a tela não
+  pode renderizar "avaliação agendada" ao lado de "não houve acordo"**.
+
+Nenhum DTO foi alterado para deixar teste bonito (§6). A 4.9B decide o que
+renderizar.
+
+---
+
+## 7. Mutações (§8)
+
+| Mutação | Testes vermelhos | |
+|---|---|---|
+| Guard de status aceita `HANDOFF_FAILED` | `os TRÊS writers da agenda são recusados` | ✅ |
+| `readInspectionRow` busca por `sale_request_id` | **5 testes**, incluindo `A → rodada 2 → A` e `A encerrada × B ativa` | ✅ |
+
+A segunda mutação é a que o §8 exige explicitamente, e ela derruba o cenário §5
+como previsto. Ambas foram revertidas na mesma execução; nenhuma foi commitada.
+
+> Uma armadilha já registrada na 4.9A vale repetir: com **duas** agendas na
+> tabela, um `LIMIT 1` sem `ORDER BY` acerta por sorte. O teste que garante
+> detecção é o determinístico — Loja B aceita e **não** agenda, então existe uma
+> linha só.
+
+---
+
+## 8. Regressões (§11)
+
+| Suíte | Resultado |
+|---|---|
+| `sale-request-inspection-per-selection.integration` | ✅ **19** (era 14) |
+| `sale-request-handoff-rounds.integration` | ✅ |
+| `sale-request-offer-selection.integration` | ✅ |
+| `sale-request-legacy-flow.integration` | ✅ |
+| `sale-requests-schema.integration` | ✅ |
+| **Integração do domínio, total** | ✅ **151** (era 146) |
+| `tests/sale-requests` | ✅ **468** |
+| Concorrência da 4.7 | ✅ intacta |
+
+**`npm test` completo não foi repetido**, e o §11 permite: nenhum arquivo de
+produção mudou — `git status -- src/` está vazio. As 3446 já haviam rodado
+verdes no commit `241febda`, sobre exatamente o mesmo código de produção. Rodar
+de novo exercitaria as mesmas linhas.
+
+---
+
+## GO FINAL — 4.9A
+
+Todos os writers da agenda são bloqueados depois do `no_agreement`, com recusa
+de domínio e sem tocar no banco. A loja anterior não escreve nada; a loja nova
+opera normalmente; a mesma loja reaceita numa rodada seguinte ganha agenda
+própria e não herda a antiga.
+
+O backend já estava correto — esta checagem só provou, e o que faltava era
+prova. **Nenhuma linha de produção foi alterada.**
+
+Fica **uma pendência de produto** para decidir antes da 4.9B: o beco do §3.
+Ela não viola o invariante do §1 e não bloqueia o schema/backend da 4.9A, mas
+precisa de decisão sua — porque com a agenda de volta, um proprietário que
+confirma horário e não fecha negócio hoje não tem saída pelo portal.
+
+**NÃO PUSHADO. NÃO MERGEADO. NÃO DEPLOYADO.**
