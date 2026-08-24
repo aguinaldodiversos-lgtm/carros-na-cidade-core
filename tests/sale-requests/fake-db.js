@@ -454,9 +454,38 @@ function currentRoundOf(saleRequestId) {
   return created;
 }
 
-function inspectionOf(saleRequestId) {
+/**
+ * A SELECAO ATUAL de uma solicitacao — o match vigente.
+ *
+ * Espelha `readCurrentSelectionId` do repositorio: parte de
+ * `selected_offer_id`, e nao da selecao mais recente. Depois de um
+ * "nao houve acordo" a trilha continua cheia mas nao ha match, e o par
+ * (sale_request_id, offer_id) e unico — entao isto resolve, nao escolhe.
+ */
+function currentSelectionOf(saleRequestId) {
+  const request = db.saleRequests.find((r) => sameId(r.id, saleRequestId));
+  if (!request?.selected_offer_id) return null;
   return (
-    db.saleRequestInspections.find((i) => sameId(i.sale_request_id, saleRequestId)) ?? null
+    db.saleRequestOfferSelections.find(
+      (s) =>
+        sameId(s.sale_request_id, saleRequestId) &&
+        sameId(s.offer_id, request.selected_offer_id)
+    ) ?? null
+  );
+}
+
+/**
+ * A agenda do match VIGENTE (Fase 4.9A).
+ *
+ * Antes era "a inspecao desta solicitacao", porque so podia existir uma. Com a
+ * resselecao da 4.7 podem existir varias — uma por selecao —, e devolver
+ * qualquer uma entregaria a agenda de um negocio morto para a tela do vivo.
+ */
+function inspectionOf(saleRequestId) {
+  const selection = currentSelectionOf(saleRequestId);
+  if (!selection) return null;
+  return (
+    db.saleRequestInspections.find((i) => sameId(i.selection_id, selection.id)) ?? null
   );
 }
 
@@ -963,7 +992,7 @@ function handle(text, params, now) {
   // este ramo garante e ALCANCE: que a leitura separada existe e devolve os
   // campos que o service espera.
   if (
-    /^SELECT id, advertiser_id, schedule_status, schedule_round, confirmed_slot_id, scheduled_at FROM sale_request_inspections WHERE sale_request_id = \$1/i.test(
+    /^SELECT i\.id, i\.advertiser_id, i\.schedule_status, i\.schedule_round, i\.confirmed_slot_id, i\.scheduled_at, i\.selection_id FROM sale_requests sr/i.test(
       text
     )
   ) {
@@ -978,10 +1007,21 @@ function handle(text, params, now) {
               schedule_round: inspection.schedule_round,
               confirmed_slot_id: inspection.confirmed_slot_id ?? null,
               scheduled_at: inspection.scheduled_at ?? null,
+              selection_id: inspection.selection_id,
             },
           ],
           rowCount: 1,
         }
+      : { rows: [], rowCount: 0 };
+  }
+
+  // --- SELECT: o id da SELECAO ATUAL (Fase 4.9A) ---------------------------
+  // Espelha `readCurrentSelectionId`. Sem match vigente devolve zero linhas, e
+  // o service para antes de tentar criar uma agenda sem dono.
+  if (/^SELECT s\.id FROM sale_requests sr JOIN sale_request_offer_selections s/i.test(text)) {
+    const selection = currentSelectionOf(params[0]);
+    return selection
+      ? { rows: [{ id: selection.id }], rowCount: 1 }
       : { rows: [], rowCount: 0 };
   }
 
@@ -1066,14 +1106,21 @@ function handle(text, params, now) {
 
   // --- INSERT da inspecao ---------------------------------------------------
   if (/^INSERT INTO sale_request_inspections/i.test(text)) {
-    const [saleRequestId, advertiserId, scheduleStatus, createdBy] = params;
+    const [saleRequestId, selectionId, advertiserId, scheduleStatus, createdBy] = params;
 
-    // ON CONFLICT (sale_request_id) DO NOTHING, re-implementado de verdade.
-    if (inspectionOf(saleRequestId)) return { rows: [], rowCount: 0 };
+    // ON CONFLICT (selection_id) DO NOTHING, re-implementado de verdade.
+    //
+    // O conflito e por SELECAO, e nao mais por solicitacao: e o que permite a
+    // Loja B ter agenda propria depois do "nao houve acordo" da Loja A, e o que
+    // impede a mesma selecao de ganhar duas.
+    if (db.saleRequestInspections.some((i) => sameId(i.selection_id, selectionId))) {
+      return { rows: [], rowCount: 0 };
+    }
 
     const row = {
       id: db.nextInspectionId,
       sale_request_id: saleRequestId,
+      selection_id: selectionId,
       advertiser_id: advertiserId,
       schedule_status: scheduleStatus,
       schedule_round: 0,
@@ -1323,7 +1370,7 @@ function handle(text, params, now) {
   }
 
   // --- SELECT: a inspecao para leitura de tela -----------------------------
-  if (/FROM sale_request_inspections i JOIN advertisers adv/i.test(text)) {
+  if (/JOIN sale_request_inspections i ON i\.selection_id = s\.id JOIN advertisers adv/i.test(text)) {
     const inspection = inspectionOf(params[0]);
     return inspection
       ? { rows: [projectInspection(inspection)], rowCount: 1 }

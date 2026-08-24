@@ -352,7 +352,6 @@ function raise(outcome, { action, userId, saleRequestId }) {
  * escolher um horário. Enviar opções não é um marco do negócio (§5).
  */
 export async function offerInspectionSlots(userId, rawId, body = {}, context = {}) {
-  assertLegacyFlowRetired("sale_request.inspection_slots", { userId, saleRequestId: rawId });
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
   const slots = validateSlotRound(body?.slots, { now: new Date() });
@@ -395,9 +394,17 @@ export async function offerInspectionSlots(userId, rawId, body = {}, context = {
     let currentRound = request.schedule_round ?? 0;
 
     if (!inspectionId) {
+      // Sem match vigente não há a quem pendurar a agenda. Não deveria acontecer
+      // — o status já foi conferido acima —, mas o INSERT falharia na FK, e uma
+      // violação de constraint é a pior forma de contar isto.
+      if (!request.current_selection_id) {
+        return invalidState("Esta oportunidade não está na etapa de agendamento.");
+      }
+
       const created = await repo.createInspection(
         {
           saleRequestId,
+          selectionId: request.current_selection_id,
           advertiserId: store.advertiserId,
           createdByUserId: dealerUserId,
         },
@@ -516,7 +523,6 @@ export async function offerInspectionSlots(userId, rawId, body = {}, context = {
  * ponto de vista dele, deu certo.
  */
 export async function confirmInspectionSlot(userId, rawId, body = {}) {
-  assertLegacyFlowRetired("sale_request.inspection_confirm", { userId, saleRequestId: rawId });
   const ownerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
   const slotId = parseSlotId(body?.slot_id);
@@ -647,7 +653,6 @@ export async function confirmInspectionSlot(userId, rawId, body = {}) {
  * entregaria o contato que todo o desenho evita.
  */
 export async function requestNewInspectionSlots(userId, rawId) {
-  assertLegacyFlowRetired("sale_request.inspection_request_slots", { userId, saleRequestId: rawId });
   const ownerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 

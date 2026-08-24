@@ -131,6 +131,47 @@ export const SALE_REQUEST_SELECTED_STATUSES = Object.freeze([
 ]);
 
 /**
+ * Os estados em que o handoff está ATIVO — em que ainda há um match a encerrar.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * POR QUE ESTA LISTA PRECISOU EXISTIR (Fase 4.9A)
+ * ────────────────────────────────────────────────────────────────────────────
+ * A 4.7 escreveu `status === OFFER_SELECTED` no guard de `reportNoAgreement`.
+ * Estava certo enquanto era: com os três writers da agenda aposentados,
+ * `inspection_scheduled` era inalcançável, e "match ativo" e "oferta aceita"
+ * descreviam o mesmo conjunto.
+ *
+ * A 4.9A devolveu o agendamento. Agora o proprietário aceita, a loja envia
+ * horários, ele confirma um — e a solicitação entra em `inspection_scheduled`.
+ * Com a igualdade antiga, é exatamente aí que ele fica preso: a avaliação
+ * acontece, não há acordo, e ele não consegue nem encerrar, nem aceitar outra
+ * oferta, nem abrir rodada nova.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ALLOWLIST, E NÃO "TUDO MENOS CANCELLED"
+ * ────────────────────────────────────────────────────────────────────────────
+ * Uma regra aberta (`status !== 'cancelled'`) reabriria de brinde os seis
+ * estados do fluxo aposentado — `inspection_completed`, `final_offer_*` — que a
+ * 4.7 tirou do produto de propósito.
+ *
+ * Enumerar os dois é o mesmo princípio de todas as listas deste arquivo: um
+ * estado novo criado por uma fase futura não entra em nenhuma delas, e o erro
+ * aparece na hora, em vez de o estado ser silenciosamente classificado como
+ * encerrável.
+ *
+ * ATENÇÃO: `inspection_scheduled` está TAMBÉM em `SALE_REQUEST_LEGACY_STATUSES`.
+ * Não é contradição — o estado passou a ter duas origens. Linhas anteriores à
+ * 4.7 chegaram nele pela máquina antiga; linhas novas chegam pelo agendamento
+ * restaurado. Para encerrar o handoff, as duas se comportam igual; a lista
+ * legada continua servindo à mensagem de recusa dos OUTROS estados e à tela
+ * somente-leitura.
+ */
+export const SALE_REQUEST_ACTIVE_HANDOFF_STATUSES = Object.freeze([
+  SALE_REQUEST_STATUS.OFFER_SELECTED,
+  SALE_REQUEST_STATUS.INSPECTION_SCHEDULED,
+]);
+
+/**
  * Os estados LEGADOS das Fases 4.5 e 4.6.
  *
  * Existem para uma única pergunta, feita em dois lugares reais: "esta

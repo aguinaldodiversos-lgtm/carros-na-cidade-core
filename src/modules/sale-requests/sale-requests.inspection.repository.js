@@ -69,15 +69,55 @@ function runner(exec) {
 async function readInspectionRow(saleRequestId, exec) {
   const result = await runner(exec)(
     `
-    SELECT id, advertiser_id, schedule_status, schedule_round,
-           confirmed_slot_id, scheduled_at
-    FROM sale_request_inspections
-    WHERE sale_request_id = $1
+    SELECT i.id, i.advertiser_id, i.schedule_status, i.schedule_round,
+           i.confirmed_slot_id, i.scheduled_at, i.selection_id
+    FROM sale_requests sr
+    JOIN sale_request_offer_selections s
+      ON s.sale_request_id = sr.id
+     AND s.offer_id        = sr.selected_offer_id
+    JOIN sale_request_inspections i
+      ON i.selection_id = s.id
+    WHERE sr.id = $1
     LIMIT 1
     `,
     [saleRequestId]
   );
   return result.rows[0] ?? null;
+}
+
+/**
+ * O id da seleção ATUAL — o match vigente.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * POR QUE `selected_offer_id`, E NÃO "a seleção mais recente"
+ * ────────────────────────────────────────────────────────────────────────────
+ * Desde a 4.7 uma solicitação tem VÁRIAS seleções ao longo da vida, e a trilha é
+ * append-only. "A mais recente por `selected_at`" pareceria equivalente e não é:
+ * depois de um "não houve acordo" a última linha da trilha existe, mas não há
+ * match nenhum — `selected_offer_id` é NULL e o negócio está encerrado. Ordenar
+ * por data devolveria a seleção morta como se fosse a viva.
+ *
+ * `sale_requests.selected_offer_id` é o ESTADO, e é ele que manda. O par
+ * (sale_request_id, offer_id) casa UMA linha por causa de
+ * `sale_request_offer_selections_request_offer_unique` — então isto não é uma
+ * escolha entre candidatas, é uma resolução exata.
+ *
+ * Sem match ativo, devolve `null`, e todo caminho de escrita da agenda para.
+ */
+async function readCurrentSelectionId(saleRequestId, exec) {
+  const result = await runner(exec)(
+    `
+    SELECT s.id
+    FROM sale_requests sr
+    JOIN sale_request_offer_selections s
+      ON s.sale_request_id = sr.id
+     AND s.offer_id        = sr.selected_offer_id
+    WHERE sr.id = $1
+    LIMIT 1
+    `,
+    [saleRequestId]
+  );
+  return result.rows[0]?.id ?? null;
 }
 
 /** A decisão comercial, relida depois do lock — mesma razão de `readInspectionRow`. */
@@ -150,9 +190,11 @@ export async function lockRequestForDealer(saleRequestId, advertiserId, exec) {
   // lock devolveria dados de um snapshot anterior ao commit concorrente.
   const inspection = await readInspectionRow(saleRequestId, exec);
   const decisionId = await readDecisionId(saleRequestId, exec);
+  const currentSelectionId = await readCurrentSelectionId(saleRequestId, exec);
 
   return {
     ...row,
+    current_selection_id: currentSelectionId,
     inspection_id: inspection?.id ?? null,
     schedule_status: inspection?.schedule_status ?? null,
     schedule_round: inspection?.schedule_round ?? null,
@@ -203,9 +245,11 @@ export async function lockRequestForOwner(saleRequestId, ownerUserId, exec) {
 
   // DEPOIS do lock, em comando proprio — ver `readInspectionRow`.
   const inspection = await readInspectionRow(saleRequestId, exec);
+  const currentSelectionId = await readCurrentSelectionId(saleRequestId, exec);
 
   return {
     ...row,
+    current_selection_id: currentSelectionId,
     inspection_id: inspection?.id ?? null,
     advertiser_id: inspection?.advertiser_id ?? null,
     schedule_status: inspection?.schedule_status ?? null,
@@ -222,25 +266,44 @@ export async function lockRequestForOwner(saleRequestId, ownerUserId, exec) {
  * solicitação selecionada, inclusive as que a loja nunca vai agendar, e o "o que
  * está pendente?" passaria a exigir distinguir linha vazia de linha ausente.
  *
- * `ON CONFLICT DO NOTHING` sobre o UNIQUE de `sale_request_id`: chegar aqui com
- * a solicitação travada torna a corrida impossível, e o ramo existe pela mesma
+ * `ON CONFLICT DO NOTHING` sobre o UNIQUE de `selection_id`: chegar aqui com a
+ * solicitação travada torna a corrida impossível, e o ramo existe pela mesma
  * razão do `insertOfferSelection` da 4.4 — transformar "alguém removeu o lock"
  * em resultado tratável em vez de erro de constraint.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * A AGENDA PERTENCE À SELEÇÃO (Fase 4.9A)
+ * ────────────────────────────────────────────────────────────────────────────
+ * Até a 4.9 o conflito era em `sale_request_id`: UMA agenda por solicitação,
+ * para sempre. Com a resseleção e as rodadas da 4.7 isso passou a impedir o
+ * caso normal — Loja A não fecha, Loja B é aceita, e a agenda de B não entrava.
+ *
+ * Agora o dono é `selection_id`. Duas seleções, duas agendas independentes; e
+ * quando a MESMA loja é aceita de novo numa rodada seguinte, a seleção é outra,
+ * então a agenda velha não é reaproveitada nem alcançada — ela pertence a um
+ * match que já morreu.
  */
 export async function createInspection(
-  { saleRequestId, advertiserId, createdByUserId },
+  { saleRequestId, selectionId, advertiserId, createdByUserId },
   exec
 ) {
   const result = await runner(exec)(
     `
     INSERT INTO sale_request_inspections (
-      sale_request_id, advertiser_id, schedule_status, schedule_round, created_by_user_id
+      sale_request_id, selection_id, advertiser_id,
+      schedule_status, schedule_round, created_by_user_id
     )
-    VALUES ($1, $2, $3, 0, $4)
-    ON CONFLICT (sale_request_id) DO NOTHING
+    VALUES ($1, $2, $3, $4, 0, $5)
+    ON CONFLICT (selection_id) DO NOTHING
     RETURNING id, schedule_status, schedule_round
     `,
-    [saleRequestId, advertiserId, INSPECTION_SCHEDULE_STATUS.AWAITING_SLOTS, createdByUserId]
+    [
+      saleRequestId,
+      selectionId,
+      advertiserId,
+      INSPECTION_SCHEDULE_STATUS.AWAITING_SLOTS,
+      createdByUserId,
+    ]
   );
   return result.rows[0] ?? null;
 }
@@ -580,13 +643,51 @@ export async function getInspectionForRequest(saleRequestId, exec) {
       adv.address AS store_address,
       c.name      AS store_city_name,
       c.state     AS store_city_state
-    FROM sale_request_inspections i
+    FROM sale_requests sr
+    JOIN sale_request_offer_selections s
+      ON s.sale_request_id = sr.id
+     AND s.offer_id        = sr.selected_offer_id
+    JOIN sale_request_inspections i
+      ON i.selection_id = s.id
     JOIN advertisers adv ON adv.id = i.advertiser_id
     LEFT JOIN cities c ON c.id = adv.city_id
-    WHERE i.sale_request_id = $1
+    WHERE sr.id = $1
     LIMIT 1
     `,
     [saleRequestId]
+  );
+  return result.rows[0] ?? null;
+}
+
+/**
+ * A agenda de UMA seleção específica — inclusive de uma já encerrada.
+ *
+ * `getInspectionForRequest` responde "qual é a agenda VIGENTE?" e por isso passa
+ * por `selected_offer_id`. Esta responde "qual foi a agenda daquele match?", que
+ * é a pergunta do histórico: depois de um "não houve acordo" a seleção continua
+ * na trilha, e a agenda que existiu sob ela continua sendo o que de fato
+ * aconteceu.
+ *
+ * Separadas de propósito. Uma única função com um `if` decidiria entre "vigente"
+ * e "histórica" a partir de um parâmetro, e é exatamente esse tipo de função que
+ * um dia devolve a agenda de um match morto para a tela do match vivo.
+ */
+export async function getInspectionForSelection(selectionId, exec) {
+  const result = await runner(exec)(
+    `
+    SELECT
+      i.id,
+      i.selection_id,
+      i.advertiser_id,
+      i.schedule_status,
+      i.schedule_round,
+      i.confirmed_slot_id,
+      i.scheduled_at
+    FROM sale_request_inspections i
+    WHERE i.selection_id = $1
+    LIMIT 1
+    `,
+    [selectionId]
   );
   return result.rows[0] ?? null;
 }

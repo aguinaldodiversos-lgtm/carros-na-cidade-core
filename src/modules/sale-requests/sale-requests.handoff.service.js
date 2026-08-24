@@ -34,6 +34,7 @@ import * as repo from "./sale-requests.handoff.repository.js";
 import * as roundsRepo from "./sale-requests.rounds.repository.js";
 import {
   SALE_REQUEST_CODE,
+  SALE_REQUEST_ACTIVE_HANDOFF_STATUSES,
   SALE_REQUEST_LEGACY_STATUSES,
   SALE_REQUEST_STATUS,
 } from "./sale-requests.constants.js";
@@ -250,7 +251,13 @@ export async function reportNoAgreement(userId, rawId) {
       return { ok: true, changed: false };
     }
 
-    if (request.status !== SALE_REQUEST_STATUS.OFFER_SELECTED) {
+    // Fase 4.9A — `inspection_scheduled` entrou na lista.
+    //
+    // Com a agenda de volta, encerrar o handoff DEPOIS de marcar a visita é o
+    // caso normal, e não a exceção: a avaliação presencial acontece, não há
+    // acordo, e o proprietário precisa de saída. A igualdade que estava aqui
+    // (`!== OFFER_SELECTED`) o deixava preso exatamente nesse ponto.
+    if (!SALE_REQUEST_ACTIVE_HANDOFF_STATUSES.includes(request.status)) {
       return conflict(
         messageForState(request.status),
         SALE_REQUEST_CODE.HANDOFF_NOT_ACTIVE
@@ -290,7 +297,11 @@ export async function reportNoAgreement(userId, rawId) {
       {
         saleRequestId,
         ownerUserId,
-        fromStatus: SALE_REQUEST_STATUS.OFFER_SELECTED,
+        // O estado LIDO sob o lock, e não um literal. Os dois estados ativos
+        // chegam aqui, e o `fromStatus` no `WHERE` continua tornando a
+        // transição única e verificável — a mesma disciplina de sempre, agora
+        // sobre o valor que de fato estava lá.
+        fromStatus: request.status,
         toStatus: SALE_REQUEST_STATUS.HANDOFF_FAILED,
       },
       exec
