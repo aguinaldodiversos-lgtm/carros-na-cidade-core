@@ -319,6 +319,29 @@ export default function SaleRequestDetail({ id }: { id: string }) {
             setRequest((current) =>
               current ? { ...current, status: "offer_selected" } : current
             );
+
+            /*
+              §17 — A AGENDA NÃO ATRAVESSA A RESSELEÇÃO.
+
+              Aceitar outra oferta cria uma SELEÇÃO nova, e desde a migration 061
+              a agenda pertence à seleção: o match novo nasce sem agenda nenhuma.
+              O backend já responde assim (`getInspectionForRequest` parte de
+              `selected_offer_id` → seleção atual → inspeção daquela seleção).
+
+              Quem não sabia disso era este estado local. Vindo de
+              `handoff_failed`, `inspection` ainda guarda a agenda da loja A — o
+              DTO a devolve, porque o ponteiro da seleção encerrada é preservado
+              de propósito. Sem esta limpeza, os dados da loja A sobreviveriam à
+              troca até a próxima recarga, e o painel da loja B leria o
+              `scheduled_at` de um negócio que já acabou.
+
+              Zerar os três é o mesmo argumento do `setProposals([])` logo acima:
+              o que era verdade sobre o match anterior não é verdade sobre este.
+            */
+            setInspection(null);
+            setFinalDecision(null);
+            setOwnerDecision(null);
+
             router.refresh();
           }}
           onStale={() => setReloadToken((value) => value + 1)}
@@ -346,6 +369,7 @@ export default function SaleRequestDetail({ id }: { id: string }) {
           saleRequestId={request.id}
           request={request}
           selected={selectedOffer}
+          inspection={inspection}
           round={round}
           history={selectionHistory}
           hasOtherOffers={proposals.length > 0}
@@ -360,10 +384,25 @@ export default function SaleRequestDetail({ id }: { id: string }) {
         avaliação registrada e a proposta final. Nenhuma delas tem ação: os
         writers foram aposentados e os formulários não existem mais.
 
-        Para toda solicitação da experiência 4.7 os dois blocos são `null` e nada
-        é renderizado.
+        ────────────────────────────────────────────────────────────────────────
+        A CONDIÇÃO MUDOU NA 4.9B, E TINHA DE MUDAR
+        ────────────────────────────────────────────────────────────────────────
+        Era `inspection || finalDecision`. Fazia sentido enquanto NENHUMA
+        inspeção nova podia nascer: entre a 4.7 e a 4.9A os três writers da
+        agenda respondiam 409, então a mera existência de uma inspeção provava
+        que a linha era antiga.
+
+        A 4.9B reabriu o agendamento. Agora toda solicitação que marca um horário
+        tem `inspection` preenchida — e com a condição antiga cada uma delas
+        ganharia, logo abaixo do painel de agendamento VIVO, um cartão anunciando
+        "Histórico — esta solicitação passou pelo fluxo anterior da plataforma".
+        Duas leituras opostas do mesmo agendamento, na mesma tela.
+
+        O que distingue de verdade uma linha do fluxo antigo é o que só ele
+        produzia: a ficha OBSERVADA e a proposta final. Nenhum writer vivo escreve
+        qualquer um dos dois.
       */}
-      {inspection || finalDecision ? (
+      {inspection?.observed || finalDecision || ownerDecision ? (
         <div className="mt-4">
           <SaleRequestLegacyFlow
             request={request}

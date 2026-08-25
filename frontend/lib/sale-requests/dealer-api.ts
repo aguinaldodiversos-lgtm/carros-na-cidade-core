@@ -197,6 +197,18 @@ export type DealerSaleOpportunityDetail = Omit<DealerSaleOpportunitySummary, "st
     status:
       | "receiving_offers"
       | "offer_selected"
+      /**
+       * Fase 4.7. Faltava nesta união, e a falta era real: `handoff_failed` está
+       * em `SALE_REQUEST_SELECTED_STATUSES`, então a loja escolhida CONTINUA
+       * enxergando a oportunidade depois de um "não houve acordo" — com
+       * `is_selected: true`. O tipo dizia que esse estado não chegava aqui, e ele
+       * chega.
+       *
+       * Declará-lo é o que permite ao painel de agendamento (4.9B) desligar o
+       * formulário nesse caso em vez de oferecer horários para um negócio
+       * encerrado.
+       */
+      | "handoff_failed"
       | "inspection_scheduled"
       | "inspection_completed"
       | "final_offer_submitted"

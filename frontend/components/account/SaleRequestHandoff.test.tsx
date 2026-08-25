@@ -250,8 +250,25 @@ describe("o handoff depois do aceite (§13, §36)", () => {
     render(<SaleRequestDetail id="42" />);
     await userEvent.click(await screen.findByTestId("handoff-whatsapp"));
 
-    const error = await screen.findByTestId("handoff-whatsapp-error");
-    expect(error.textContent).toMatch(/não possui WhatsApp/i);
+    /*
+      A 4.9B mudou o TRATAMENTO deste caso, e a mudança é do §8.
+
+      Aqui era `handoff-whatsapp-error`: caixa vermelha, `role="alert"`. Fazia
+      sentido enquanto o WhatsApp era o ÚNICO caminho depois do aceite — não
+      conseguir abri-lo era, de fato, o fim da linha.
+
+      Agora não é: o agendamento pelo portal é a outra metade da tela, e continua
+      funcionando inteiro. Um alarme vermelho diria à pessoa que algo precisa ser
+      resolvido antes de seguir, quando não precisa.
+
+      O que NÃO mudou, e continua conferido abaixo: a mensagem exibida é a do
+      SERVIDOR (ela explica o que fazer em seguida), e o endereço continua na
+      tela como saída alternativa.
+    */
+    const aviso = await screen.findByTestId("handoff-whatsapp-unavailable");
+    expect(aviso.textContent).toMatch(/não possui WhatsApp/i);
+    expect(screen.queryByTestId("handoff-whatsapp-error")).toBeNull();
+
     // O endereço continua na tela — é a saída alternativa.
     expect(screen.getByTestId("handoff-address")).toBeTruthy();
   });
