@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DealerOfferPanel from "@/components/account/DealerOfferPanel";
 import DealerHandoffPanel from "@/components/account/DealerHandoffPanel";
+import DealerSchedulingPanel from "@/components/account/DealerSchedulingPanel";
 import VehicleEvaluationSheet from "@/components/account/VehicleEvaluationSheet";
 import {
   DECLARED_CONDITION_LABEL,
@@ -479,20 +480,34 @@ export default function DealerSaleOpportunityDetail({
         >
           {opportunity.is_selected ? (
             /*
-              FASE 4.7 — o painel de AVALIAÇÃO foi removido.
+              FASE 4.7 + 4.9B — o aceite, e SÓ o agendamento de volta.
 
               A 4.5 mostrava aqui três formulários: propor horários, REGISTRAR
               AVALIAÇÃO (km lida, motor, câmbio, suspensão, pneus, lataria) e
-              apresentar proposta final. Os três saíram do produto — a avaliação
-              pertence ao lojista e acontece fora da plataforma.
+              apresentar proposta final. A 4.7 removeu os três.
 
-              O que ficou é o valor aceito e a informação de que o proprietário
-              recebeu os dados da loja para combinar a visita. Read-only.
+              A 4.9B devolve o PRIMEIRO — e apenas ele. Os outros dois continuam
+              fora do produto, e não por omissão da tela: `completeInspection` e
+              `submitPostInspectionDecision` seguem respondendo 409
+              `LEGACY_FLOW_RETIRED`. Não há formulário porque não há escrita.
+
+              `DealerHandoffPanel` continua sendo o card do aceite (valor e
+              contexto); o agendamento é um componente separado logo abaixo, que
+              só sabe agendar.
             */
-            <DealerHandoffPanel
-              selectedAmount={opportunity.selected_amount}
-              legacyDecision={opportunity.final_decision}
-            />
+            <>
+              <DealerHandoffPanel
+                selectedAmount={opportunity.selected_amount}
+                legacyDecision={opportunity.final_decision}
+              />
+              <DealerSchedulingPanel
+                saleRequestId={opportunity.id}
+                advertiserId={advertiserId}
+                inspection={opportunity.inspection}
+                status={opportunity.status}
+                onChanged={() => void load()}
+              />
+            </>
           ) : (
             <DealerOfferPanel
               saleRequestId={opportunity.id}

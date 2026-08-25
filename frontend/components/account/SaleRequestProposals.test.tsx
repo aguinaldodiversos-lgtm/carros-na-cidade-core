@@ -552,7 +552,25 @@ describe("a seleção", () => {
     });
     render(<SaleRequestDetail id="42" />);
 
-    const panel = await screen.findByTestId("sale-request-selected-offer");
+    /*
+      A ÂNCORA MUDOU NA 4.9B — o que se afirma, não.
+
+      Era `sale-request-selected-offer`, o painel compacto da 4.4. Ele existia em
+      `inspection_scheduled` porque, entre a 4.7 e a 4.9A, o card de handoff NÃO
+      cobria esse estado: `SaleRequestHandoff` devolvia `null` para ele, e sem o
+      painel compacto a pessoa ficava sem nenhum resumo do negócio na tela.
+
+      A 4.9B estendeu o card de handoff a `inspection_scheduled` — é onde ele
+      mostra "Avaliação agendada" — e ele já traz loja, valor e endereço. Manter
+      os dois empilharia dois cartões dizendo "Auto Center Atibaia — R$
+      65.000,00", que é exatamente o defeito descrito no comentário do §38 em
+      `SaleRequestProposals.tsx`.
+
+      As três asserções seguem as mesmas: o resumo do negócio permanece, e o
+      texto de espera não volta.
+    */
+    const panel = await screen.findByTestId("owner-handoff");
+    expect(screen.queryByTestId("sale-request-selected-offer")).toBeNull();
 
     // O resumo do negócio permanece — é o que a pessoa precisa para lembrar
     // com quem e por quanto.
@@ -563,9 +581,7 @@ describe("a seleção", () => {
     // matchers, mas `textContent` cru não — comparar a string literal aqui
     // falharia por um caractere invisível.
     expect(panel.textContent).toContain("Auto Center Atibaia");
-    expect(within(panel).getByTestId("sale-request-selected-amount").textContent).toContain(
-      "65.000,00"
-    );
+    expect(within(panel).getByTestId("handoff-amount").textContent).toContain("65.000,00");
 
     // O texto de espera, não: a etapa atual está logo abaixo.
     expect(panel.textContent).not.toContain("Aguardando próxima etapa");

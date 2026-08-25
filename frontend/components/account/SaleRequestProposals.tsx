@@ -499,9 +499,20 @@ export default function SaleRequestProposals({
   //
   // O painel sobrevive para os estados LEGADOS (4.5/4.6): lá o card de handoff
   // não é montado, e ele continua sendo a única âncora da comparação.
-  if (status === "handoff_failed" || status === "offer_selected") {
-    // Cai direto na lista abaixo (vazia em `offer_selected`, com as outras
-    // ofertas em `handoff_failed`).
+  //
+  // A 4.9B acrescentou `inspection_scheduled` à lista, pelo MESMO motivo que
+  // criou os outros dois: o card de handoff passou a cobrir também esse estado
+  // (é onde ele mostra "Avaliação agendada"), e ele já traz loja, valor e
+  // endereço. Sem isto a tela voltaria a empilhar dois cartões sobre a mesma
+  // loja assim que o proprietário confirmasse um horário — exatamente o defeito
+  // que o parágrafo acima descreve, reintroduzido pela porta do estado novo.
+  if (
+    status === "handoff_failed" ||
+    status === "offer_selected" ||
+    status === "inspection_scheduled"
+  ) {
+    // Cai direto na lista abaixo (vazia em `offer_selected` e em
+    // `inspection_scheduled`, com as outras ofertas em `handoff_failed`).
   } else if (selected) {
     return <SelectedOfferPanel selected={selected} compact={inspectionStarted} />;
   }

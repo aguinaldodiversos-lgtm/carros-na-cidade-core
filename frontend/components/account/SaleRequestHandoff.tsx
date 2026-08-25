@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  HANDOFF_CODE,
   HANDOFF_CONTACT_INSTRUCTION,
   HANDOFF_SCOPE_NOTICE,
   NEW_ROUND_DIALOG_NOTICE,
@@ -14,8 +15,17 @@ import {
   openNewRound,
   reportNoAgreement,
 } from "@/lib/sale-requests/handoff-api";
-import { formatMoneyValue } from "@/lib/sale-requests/inspection";
-import type { SaleRequest, SaleRequestSelectedOffer } from "@/lib/sale-requests/api";
+import {
+  HANDOFF_TWO_PATHS_NOTICE,
+  WHATSAPP_UNAVAILABLE_NOTICE,
+} from "@/lib/sale-requests/scheduling";
+import { formatMoneyValue, type OwnerInspection } from "@/lib/sale-requests/inspection";
+import OwnerSchedulingPanel from "./OwnerSchedulingPanel";
+import {
+  SaleRequestError,
+  type SaleRequest,
+  type SaleRequestSelectedOffer,
+} from "@/lib/sale-requests/api";
 
 /**
  * O HANDOFF DIRETO na tela do proprietário (Fase 4.7).
@@ -249,17 +259,36 @@ function ActiveHandoff({
   saleRequestId,
   request,
   selected,
+  inspection,
+  scheduled,
   history,
   onChanged,
 }: {
   saleRequestId: string | number;
   request: SaleRequest;
   selected: SaleRequestSelectedOffer;
+  inspection: OwnerInspection | null;
+  /** A solicitação está em `inspection_scheduled`. */
+  scheduled: boolean;
   history: SelectionHistoryEntry[];
   onChanged: () => void;
 }) {
   const [opening, setOpening] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
+  /**
+   * §8 — a loja não tem WhatsApp comercial válido.
+   *
+   * Estado SEPARADO de `contactError`, e a separação é o ponto: um erro pinta a
+   * caixa de vermelho e pede uma ação. Isto não é um erro — é a ausência de um
+   * canal opcional, e o agendamento pelo portal continua inteiro ao lado. Tratar
+   * os dois como a mesma coisa faria a pessoa achar que precisa consertar algo
+   * antes de conseguir marcar a avaliação.
+   *
+   * Guarda a MENSAGEM, e não um booleano: a do servidor é mais útil que a
+   * genérica ("...Use o endereço para procurá-la" diz o que fazer em seguida), e
+   * a constante fica de reserva para o caso de ela vir vazia.
+   */
+  const [contactUnavailable, setContactUnavailable] = useState<string | null>(null);
 
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -269,12 +298,23 @@ function ActiveHandoff({
   async function handleWhatsapp() {
     setOpening(true);
     setContactError(null);
+    setContactUnavailable(null);
     try {
       const { url } = await fetchHandoffWhatsapp(saleRequestId);
       // `noopener` obrigatório: sem ele a aba aberta recebe `window.opener` e
       // pode navegar esta página para onde quiser.
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (failure) {
+      // §8 — discriminado por CÓDIGO, nunca por texto da mensagem. A frase pode
+      // ser reescrita amanhã; o código é contrato.
+      if (
+        failure instanceof SaleRequestError &&
+        failure.code === HANDOFF_CODE.WHATSAPP_UNAVAILABLE
+      ) {
+        setContactUnavailable(failure.message?.trim() || WHATSAPP_UNAVAILABLE_NOTICE);
+        return;
+      }
+
       setContactError(
         failure instanceof Error
           ? failure.message
@@ -340,6 +380,22 @@ function ActiveHandoff({
       </p>
 
       {/*
+        §1, §6 — as DUAS opções, anunciadas antes de qualquer botão.
+
+        A frase vem acima do painel de agendamento e do botão de WhatsApp porque
+        é ela que explica por que existem dois caminhos. Sem ela, a pessoa que vê
+        primeiro o bloco "aguardando horários" conclui que precisa esperar antes
+        de poder falar com a loja — e o WhatsApp, logo abaixo, parece um plano B
+        para quando o portal falhar. São complementares, não alternativos.
+      */}
+      <p
+        className="mt-2 text-[13.5px] leading-relaxed text-[#475467]"
+        data-testid="handoff-two-paths"
+      >
+        {HANDOFF_TWO_PATHS_NOTICE}
+      </p>
+
+      {/*
         O ENDEREÇO COMERCIAL. É o segundo dado da loja que atravessa a fronteira
         (o primeiro é o nome), e existe por uma finalidade única: a pessoa precisa
         saber onde comparecer.
@@ -360,15 +416,52 @@ function ActiveHandoff({
         </div>
       ) : null}
 
+      {/*
+        OPÇÃO A — AGENDAR PELO PORTAL (§1).
+
+        O painel decide sozinho entre esperar a loja, escolher um horário e
+        mostrar o que foi confirmado. Ele vem ANTES do WhatsApp porque é o caminho
+        que a plataforma oferece; o WhatsApp é a saída para tudo o que o portal
+        não modela — e continua disponível em todos os estados, inclusive depois
+        de o horário estar marcado.
+      */}
+      <OwnerSchedulingPanel
+        saleRequestId={saleRequestId}
+        inspection={inspection}
+        scheduled={scheduled}
+        onChanged={onChanged}
+      />
+
+      <p
+        className="mt-4 text-center text-[11px] font-semibold uppercase tracking-wide text-[#98a2b3]"
+        data-testid="handoff-paths-separator"
+      >
+        ou
+      </p>
+
+      {/* OPÇÃO B — WHATSAPP. Nunca desaparece: §1 e §13. */}
       <button
         type="button"
         onClick={handleWhatsapp}
         disabled={opening}
-        className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+        className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-[#0e62d8] bg-white px-5 text-sm font-bold text-[#0e62d8] transition hover:bg-[#F5F9FF] disabled:opacity-50"
         data-testid="handoff-whatsapp"
       >
         {opening ? "Abrindo…" : "Falar com a loja pelo WhatsApp"}
       </button>
+
+      {/*
+        §8 — a loja sem WhatsApp. Discreto, cinza, sem `role="alert"`: não é uma
+        falha da pessoa nem do sistema, e o agendamento acima segue funcionando.
+      */}
+      {contactUnavailable ? (
+        <p
+          className="mt-2 text-center text-[12.5px] leading-relaxed text-[#667085]"
+          data-testid="handoff-whatsapp-unavailable"
+        >
+          {contactUnavailable}
+        </p>
+      ) : null}
 
       {contactError ? (
         <p
@@ -571,10 +664,25 @@ function FailedHandoff({
 
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * O ROTEADOR — e por que ele é o guard do §15.
+ *
+ * `handoff_failed` é testado PRIMEIRO, antes de qualquer coisa olhar para
+ * `inspection`. A ordem é o mecanismo: a 4.9A preserva a agenda no banco e o
+ * ponteiro `selected_offer_id` continua apontando para a seleção encerrada, então
+ * o DTO de uma solicitação sem acordo PODE trazer `inspection.state === "scheduled"`
+ * com `scheduled_at` preenchido. Se a condição do match ativo viesse antes — ou
+ * se fosse escrita sobre a existência da inspeção em vez do STATUS —, a tela
+ * anunciaria "Avaliação agendada" para uma visita que ninguém vai fazer.
+ *
+ * É por isso que nenhuma decisão desta árvore consulta `inspection`: quem manda é
+ * o status da solicitação, que é o que a máquina de estados garante.
+ */
 export default function SaleRequestHandoff({
   saleRequestId,
   request,
   selected,
+  inspection,
   round,
   history,
   hasOtherOffers,
@@ -583,6 +691,7 @@ export default function SaleRequestHandoff({
   saleRequestId: string | number;
   request: SaleRequest;
   selected: SaleRequestSelectedOffer | null;
+  inspection: OwnerInspection | null;
   round: SaleRequestRound | null;
   history: SelectionHistoryEntry[];
   hasOtherOffers: boolean;
@@ -600,12 +709,20 @@ export default function SaleRequestHandoff({
     );
   }
 
-  if (request.status === "offer_selected" && selected) {
+  // Os DOIS estados vivos do match compartilham o mesmo card: mesma loja, mesmo
+  // valor, mesmo endereço, mesmo WhatsApp e a mesma saída de "não houve acordo"
+  // (§36 — ela não some quando o horário é confirmado). O que muda entre eles é
+  // o painel de agendamento, e essa diferença é resolvida lá dentro.
+  const scheduled = request.status === "inspection_scheduled";
+
+  if ((request.status === "offer_selected" || scheduled) && selected) {
     return (
       <ActiveHandoff
         saleRequestId={saleRequestId}
         request={request}
         selected={selected}
+        inspection={inspection}
+        scheduled={scheduled}
         history={history}
         onChanged={onChanged}
       />
