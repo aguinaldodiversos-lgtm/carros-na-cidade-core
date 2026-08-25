@@ -103,7 +103,18 @@ export default function AdCard({ ad, busy = false, onToggleStatus, onDelete }: A
                 <strong className="font-bold">Motivo:</strong> {blockedReasonMessage}
               </p>
             )}
-            {isBlocked && <p>Entre em contato com o suporte caso precise de mais informações.</p>}
+            {isBlocked && (
+              <>
+                {/* Fase 4.10A (correção): dizer que ele PODE corrigir, sem
+                    prometer reativação automática. O botão "Editar" ao lado é
+                    o caminho; quem reativa continua sendo a administração. */}
+                <p>
+                  Você pode corrigir as informações do anúncio. Ele continuará bloqueado até ser
+                  reativado pela administração.
+                </p>
+                <p>Entre em contato com o suporte caso precise de mais informações.</p>
+              </>
+            )}
           </div>
         )}
 

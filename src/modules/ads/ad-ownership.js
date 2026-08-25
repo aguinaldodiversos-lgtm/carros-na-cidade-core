@@ -23,13 +23,35 @@ import { AD_STATUS } from "./ads.canonical.constants.js";
 /**
  * Status em que o DONO pode editar o conteúdo do próprio anúncio.
  *
- *   draft / pending_review / active / paused / rejected → editável
+ *   draft / pending_review / active / paused / rejected / blocked → editável
  *
  * Bloqueados para o dono (somente leitura ou caminho administrativo):
- *   sold / expired / archived / blocked / deleted
+ *   sold / expired / archived / deleted
  *
  * `reserved` não existe como status no domínio (ver shared/constants/status.js),
  * por isso não aparece aqui.
+ *
+ * POR QUE `blocked` É EDITÁVEL (Fase 4.10A)
+ * -----------------------------------------
+ * Motivos como "Informação incorreta", "Fotos inadequadas" e "Preço ou condição
+ * enganosa" pedem uma correção — e travar a edição deixava o anunciante sem
+ * caminho nenhum para atendê-la. Editar é justamente o que a moderação está
+ * pedindo que ele faça.
+ *
+ * Isso NÃO afrouxa o bloqueio, e a razão é que editar e publicar são portas
+ * diferentes:
+ *
+ *   - `status` no corpo da edição continua recusado com 400
+ *     (guard em ads.panel.service.updateAd);
+ *   - nenhum campo `blocked_*` está em `UPDATE_FIELDS`
+ *     (ads.repository), então a edição não tem como tocá-los;
+ *   - `AD_STATUS_OWNER_OPERABLE` (activate/pause) e
+ *     `AD_STATUS_CAN_RECEIVE_BOOST` seguem SEM `blocked`;
+ *   - o pipeline de edição não recalcula status — não existe transição
+ *     automática que pudesse trocar `blocked` por `pending_review`.
+ *
+ * O anúncio corrigido só volta ao ar quando o admin reativa, e a reativação
+ * restaura `blocked_previous_status` — que a edição também não altera.
  */
 export const AD_STATUS_OWNER_EDITABLE = Object.freeze([
   AD_STATUS.DRAFT,
@@ -37,6 +59,7 @@ export const AD_STATUS_OWNER_EDITABLE = Object.freeze([
   AD_STATUS.ACTIVE,
   AD_STATUS.PAUSED,
   AD_STATUS.REJECTED,
+  AD_STATUS.BLOCKED,
 ]);
 
 export function isAdminUser(user) {

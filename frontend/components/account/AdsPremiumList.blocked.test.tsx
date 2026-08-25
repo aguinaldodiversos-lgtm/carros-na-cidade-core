@@ -78,18 +78,29 @@ describe("anúncio bloqueado na lista do dono", () => {
     );
   });
 
-  it("aponta o suporte no lugar das ações", () => {
+  it("explica que corrigir não reativa", () => {
     renderList([BLOCKED]);
-    expect(screen.getByTestId("ad-blocked-support-42")).toBeTruthy();
+    expect(screen.getByTestId("ad-blocked-support-42").textContent).toMatch(
+      /continuará bloqueado até ser reativado pela administração/i
+    );
   });
 
-  it("não oferece Impulsionar, Editar nem o menu de Ativar", () => {
+  it("oferece Editar — é a correção que a moderação está pedindo", () => {
     renderList([BLOCKED]);
 
+    const edit = screen.getByTestId("ad-blocked-edit-42");
+    expect(edit).toBeTruthy();
+    expect(edit.getAttribute("href")).toBe("/painel/anuncios/42/editar");
+  });
+
+  it("NÃO oferece Impulsionar nem o menu de Ativar/Pausar", () => {
+    renderList([BLOCKED]);
+
+    // Editar corrige; Impulsionar e Ativar PUBLICAM. Só o admin publica.
     expect(screen.queryByRole("button", { name: /impulsionar/i })).toBeNull();
-    expect(screen.queryByRole("link", { name: /editar/i })).toBeNull();
     expect(screen.queryByTestId("ad-kebab-42")).toBeNull();
     expect(screen.queryByRole("button", { name: /ativar anúncio/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /pausar anúncio/i })).toBeNull();
   });
 
   it("não mostra selo de destaque em anúncio bloqueado", () => {

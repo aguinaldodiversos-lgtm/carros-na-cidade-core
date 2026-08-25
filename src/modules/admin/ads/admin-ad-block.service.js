@@ -31,8 +31,26 @@ import {
   requiresNote,
 } from "../../../shared/moderation/ad-block-reasons.js";
 import { invalidateAdsCachesAfterMutation } from "../../ads/ads.mutation-cache.js";
+import { revalidatePublicAdsOnNext } from "../../../shared/cache/next-revalidate.js";
 import { recordAdminAction } from "../admin.audit.js";
 import { MODERATION_EVENT } from "../../ads/risk/ad-risk.thresholds.js";
+
+/**
+ * Limpa as DUAS camadas de cache, nesta ordem e só depois do COMMIT.
+ *
+ * Chamar antes do commit faria o Next revalidar contra o estado anterior e
+ * reaquecer o cache com o dado velho — o oposto do efeito desejado.
+ *
+ * Redis primeiro: o Next vai reler do backend, e reler de um Redis ainda
+ * quente traria de volta exatamente a resposta que estamos tentando derrubar.
+ *
+ * Nenhuma das duas etapas pode desfazer o bloqueio: ambas são falha-soft, e a
+ * fonte de verdade continua sendo o banco.
+ */
+async function invalidatePublicCaches() {
+  await invalidateAdsCachesAfterMutation().catch(() => {});
+  return revalidatePublicAdsOnNext();
+}
 
 /**
  * Estados a partir dos quais o bloqueio administrativo NÃO faz sentido.
@@ -217,9 +235,9 @@ export async function blockAd(adminUserId, adId, { reasonCode, note = null } = {
 
   // Sem isto o anúncio bloqueado continua servido de cache (busca, facetas,
   // cidade, home) até o TTL expirar. A moderação já invalidava; o bloqueio não.
-  await invalidateAdsCachesAfterMutation().catch(() => {});
+  const revalidated = await invalidatePublicCaches();
 
-  return { changed: true, ad: outcome.ad };
+  return { changed: true, ad: outcome.ad, revalidated };
 }
 
 /**
@@ -301,9 +319,12 @@ export async function unblockAd(adminUserId, adId, { note = null } = {}) {
     reason: normalizedNote,
   });
 
-  await invalidateAdsCachesAfterMutation().catch(() => {});
+  // Vale nos dois sentidos. Revalidar não significa "tornar público": significa
+  // "releia a fonte de verdade". Se o estado restaurado for `paused` ou
+  // `pending_review`, a releitura confirma que o anúncio continua fora do ar.
+  const revalidated = await invalidatePublicCaches();
 
-  return { changed: true, ad: outcome.ad };
+  return { changed: true, ad: outcome.ad, revalidated };
 }
 
 /**

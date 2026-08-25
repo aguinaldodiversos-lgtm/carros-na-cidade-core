@@ -22,10 +22,11 @@ import {
 } from "./new-ad-wizard/currency";
 
 /**
- * Status em que o dono pode editar — espelha
- * `src/modules/ads/ad-ownership.AD_STATUS_OWNER_EDITABLE`. Mantido aqui só
- * para desabilitar o formulário e dar feedback antecipado; o backend é a
- * autoridade final (PUT /api/ads/:id valida de novo).
+ * Espelho de `AD_STATUS_OWNER_EDITABLE` (src/modules/ads/ad-ownership.js).
+ *
+ * `blocked` entrou na Fase 4.10A: o dono precisa poder corrigir o que a
+ * moderação apontou. Editar não reativa — o backend recusa `status` no corpo,
+ * nenhum campo `blocked_*` é editável, e só o admin reativa.
  */
 const OWNER_EDITABLE_STATUSES = new Set([
   "draft",
@@ -33,6 +34,7 @@ const OWNER_EDITABLE_STATUSES = new Set([
   "active",
   "paused",
   "rejected",
+  "blocked",
 ]);
 
 // Slugs persistidos → rótulos dos <select> (Fase B: câmbio/carroceria editáveis).
@@ -81,6 +83,7 @@ export default function EditAdForm({
   const router = useRouter();
 
   const canEdit = OWNER_EDITABLE_STATUSES.has(status);
+  const isBlocked = status === "blocked";
 
   const [title, setTitle] = useState(editable?.title ?? "");
   const [description, setDescription] = useState(editable?.description ?? "");
@@ -230,7 +233,7 @@ export default function EditAdForm({
           <div className="p-6">
             <p className="rounded-xl border border-cnc-warning/40 bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a08]">
               Este anúncio está <strong>{STATUS_LABEL[status] ?? status}</strong> e não pode ser
-              editado. Anúncios vendidos, expirados, arquivados ou bloqueados não aceitam edição.
+              editado. Anúncios vendidos, expirados, arquivados ou removidos não aceitam edição.
               Para anunciar novamente, crie um novo anúncio.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
@@ -250,21 +253,51 @@ export default function EditAdForm({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5 p-6" noValidate>
+            {/* Fase 4.10A (correção) — o dono está corrigindo um anúncio que
+                continua fora do ar. Dizer isso ANTES de ele editar evita a
+                leitura de que salvar vai republicar. */}
+            {isBlocked ? (
+              <div
+                role="status"
+                data-testid="edit-blocked-notice"
+                className="rounded-xl border border-[#f4ced6] bg-[#fff4f6] px-4 py-3 text-sm text-[#8a2036]"
+              >
+                <p className="font-semibold">Anúncio bloqueado pela administração.</p>
+                <p className="mt-1">
+                  Você pode corrigir as informações. O anúncio continuará bloqueado até ser
+                  reativado pela administração.
+                </p>
+              </div>
+            ) : null}
+
             {success ? (
               <div
                 role="status"
-                className="rounded-xl border border-cnc-success/40 bg-[#ecfdf5] px-4 py-3 text-sm font-semibold text-[#0a7a52]"
+                data-testid="edit-success-notice"
+                className={
+                  isBlocked
+                    ? "rounded-xl border border-[#f4dca8] bg-[#fff8e6] px-4 py-3 text-sm font-semibold text-[#7c5b00]"
+                    : "rounded-xl border border-cnc-success/40 bg-[#ecfdf5] px-4 py-3 text-sm font-semibold text-[#0a7a52]"
+                }
               >
-                Alterações salvas com sucesso.
-                {publicHref ? (
+                {isBlocked ? (
+                  // Nada de "publicado" ou "alterações publicadas": o anúncio
+                  // não voltou ao ar, e o texto não pode sugerir que voltou.
+                  <>Alterações salvas. O anúncio continua bloqueado até revisão da administração.</>
+                ) : (
                   <>
-                    {" "}
-                    <Link href={publicHref} className="underline underline-offset-2">
-                      Ver anúncio público
-                    </Link>
-                    .
+                    Alterações salvas com sucesso.
+                    {publicHref ? (
+                      <>
+                        {" "}
+                        <Link href={publicHref} className="underline underline-offset-2">
+                          Ver anúncio público
+                        </Link>
+                        .
+                      </>
+                    ) : null}
                   </>
-                ) : null}
+                )}
               </div>
             ) : null}
 

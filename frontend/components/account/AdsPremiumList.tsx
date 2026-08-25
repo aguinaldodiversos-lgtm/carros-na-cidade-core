@@ -251,12 +251,29 @@ export default function AdsPremiumList({
                     </td>
                     <td className="px-4 py-3 align-middle">
                       {isBlocked ? (
-                        <div className="flex items-center justify-end">
+                        <div className="flex flex-col items-end gap-1.5">
+                          {/* Fase 4.10A (correção): editar é a ÚNICA ação aqui.
+                              Motivos como "Fotos inadequadas" pedem correção —
+                              sem este botão o dono lia o que precisava mudar e
+                              não tinha por onde mudar. Impulsionar, Ativar e
+                              Pausar seguem ausentes: publicam, e publicar é do
+                              admin. */}
+                          <Link
+                            href={`/painel/anuncios/${ad.id}/editar`}
+                            data-testid={`ad-blocked-edit-${ad.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#e2e7f1] px-3 py-1.5 text-xs font-bold text-[#37425d] transition hover:bg-[#f8fafc]"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                              <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+                            </svg>
+                            Editar anúncio
+                          </Link>
                           <p
                             data-testid={`ad-blocked-support-${ad.id}`}
                             className="max-w-[260px] text-right text-[11px] leading-snug text-[#6b7280]"
                           >
-                            Entre em contato com o suporte caso precise de mais informações.
+                            Você pode corrigir as informações. O anúncio continuará bloqueado até
+                            ser reativado pela administração.
                           </p>
                         </div>
                       ) : (

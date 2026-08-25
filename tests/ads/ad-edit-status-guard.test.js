@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * Complementa ad-panel-status-guard.test.js (ownership + payload) e
  * ads-structural-fields-locked.test.js (campos estruturais). Aqui o foco é:
  * o dono PODE editar campos simples (preço) em active/paused, e NÃO pode em
- * sold/archived/blocked/expired.
+ * sold/archived/expired. `blocked` saiu desta lista na Fase 4.10A: o dono
+ * precisa poder corrigir o que a moderação apontou, e editar não reativa.
  */
 vi.mock("../../src/modules/ads/ads.repository.js", () => ({
   findOwnerContextById: vi.fn(),
@@ -57,7 +58,7 @@ describe("updateAd — guard de status editável", () => {
     }
   );
 
-  it.each(["sold", "archived", "blocked", "expired"])(
+  it.each(["sold", "archived", "expired"])(
     "dono NÃO pode editar em status '%s' → 409 e não executa update",
     async (status) => {
       adsRepository.findOwnerContextById.mockResolvedValue({

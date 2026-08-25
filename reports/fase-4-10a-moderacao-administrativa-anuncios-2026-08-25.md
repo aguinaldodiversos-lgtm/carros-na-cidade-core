@@ -32,7 +32,11 @@ Todas foram fechadas. A modelagem **reutiliza `ads.status`** (não cria flag
 paralela) e acrescenta três colunas aditivas para preservar o estado anterior, o
 código do motivo e a autoria.
 
-**GO/NO-GO: GO**, com duas dívidas registradas (§18) — nenhuma bloqueante.
+Uma **correção pré-merge** (§21) fechou dois pontos que a primeira revisão
+apontou: a janela de ~60s do cache do Next foi eliminada, e o anunciante passou
+a poder **corrigir** o anúncio bloqueado sem que isso o reative.
+
+**GO/NO-GO: GO.** Dívidas em §18 — nenhuma bloqueante.
 
 ---
 
@@ -41,10 +45,10 @@ código do motivo e a autoria.
 ```
 Branch .......... codex/admin-ad-moderation
 Base ............ 3ade27a603258fed6b46e4bd70ccba510b60cb28
-Arquivos ........ 40 (24 modificados/criados de código, 6 de teste, 10 screenshots)
-Diff ............ +3778 / -42
-Ahead/behind .... ver §19
+Commits ......... 2 (implementação + correção pré-merge §21)
 ```
+
+Números exatos de arquivos e diff na entrega da sessão.
 
 Arquivos protegidos do usuário **não foram tocados** (permanecem untracked):
 `frontend/public/images/lojista-detalhe-veiculo-referencia.png`,
@@ -337,10 +341,15 @@ também omite `actor_user_id`.
 
 Todos os caminhos do dono foram exercitados (`tests/ads/blocked-ad-owner-cannot-bypass.test.js`):
 
+> **Atualizado na correção pré-merge:** editar CONTEÚDO passou a ser permitido.
+> Publicar continua proibido. Ver §21.3.
+
 | Ação do dono | Resultado |
 | --- | --- |
-| Editar preço / descrição / fotos | **409** — nada é gravado |
+| Editar preço / descrição / ficha | **200** — grava, e o bloqueio sobrevive |
 | Enviar `status` no corpo da edição | **400** — antes de qualquer leitura |
+| Editar marca / modelo / ano / cidade | **400** — campo estrutural travado |
+| Trocar `advertiser_id` | **400** |
 | `activate` | **410** |
 | `pause` | **410** |
 | Opções de publicação / renovar | **410** |
@@ -360,24 +369,22 @@ Fila de moderação (`approve`/`reject`/`request-correction`) exige
 moderação já fazia isso; o bloqueio não fazia. Isso limpa o cache do **backend**
 (busca, facetas, autocomplete, cidade, home) imediatamente.
 
-**Janela medida em ambiente real:**
+> **Atualizado na correção pré-merge:** a janela de ~60s foi ELIMINADA. Ver §21.2.
+
+**Medido em ambiente production-like (`next build` + `next start`):**
 
 | Superfície | Some em |
 | --- | --- |
 | Detalhe `/veiculo/[slug]` | **imediato** (404) |
 | API pública do anúncio | **imediato** |
-| Catálogo de cidade | ~60s (`revalidate: 60` do fetch cache do Next) |
+| Catálogo de cidade | **primeira leitura** (~1,2s, tempo de render) |
 
 O detalhe é o que importa mais: é a URL indexada e a que alguém pode ter salvo,
-e ela não depende de expiração de cache nenhuma.
+e ela nunca dependeu de expiração de cache.
 
-Os ~60s do catálogo são o `revalidate` do Next, que vive no processo do frontend
-— não há hoje webhook de `revalidateTag` ligando backend e ISR (o próprio
-`ads.mutation-cache.js` já registrava isso como pendência). **Não são horas**, e
-a janela se limpa sozinha. Ver dívida em §18.
-
-O E2E assere essa janela com teto de 90s: se alguém elevar o `revalidate` para
-300 ou 3600, o teste quebra em vez de deixar passar.
+O catálogo passou a sair na primeira leitura porque `blockAd`/`unblockAd`
+disparam `revalidateTag(PUBLIC_ADS_CACHE_TAG)` no Next, além de limpar o Redis.
+O E2E assere **leitura única, sem tolerância de TTL**.
 
 ---
 
@@ -464,21 +471,37 @@ alterei é importado por essas suítes.
 
 ### Dívidas desta fase
 
-1. **Cache ISR do Next não é invalidado no bloqueio** (janela de ~60s no
-   catálogo de cidade). O cache do backend já é. Ligar os dois exige um webhook
-   de `revalidateTag` (rota de revalidação no frontend + segredo compartilhado +
-   chamada do backend) — decisão estrutural que **não** foi improvisada aqui.
-   *Recomendação:* implementar como fase própria, reaproveitando para todas as
-   mutações (bloqueio, arquivamento, soft-delete), não só para esta.
-   *Impacto atual:* baixo — o detalhe indexável cai na hora; a janela é curta e
-   se limpa sozinha; o E2E alarma se alguém aumentá-la.
+1. ~~**Cache ISR do Next não é invalidado no bloqueio**~~ — **RESOLVIDA** na
+   correção pré-merge (§21.2). Bloqueio e reativação disparam
+   `revalidateTag(public-ads)`; o catálogo sai na primeira leitura.
 
-2. **`ads_blocked_requires_reason_code` está `NOT VALID`.** Promover a `VALID`
-   depois de confirmar zero violações em produção.
+2. **`REVALIDATE_TOKEN` precisa estar configurada no Render**, com o mesmo valor
+   no backend e no frontend. Sem ela o endpoint devolve 503 e o cache volta a
+   depender do TTL — uma degradação que só apareceria como "o anúncio bloqueado
+   demorou a sumir". Alinha-se à dívida já registrada de config não versionada
+   no `render.yaml`.
+
+3. **`ads_blocked_requires_reason_code` está `NOT VALID`.** O preflight mostrou
+   `blocked_count = 0` em produção, então promover a `VALID` é seguro assim que
+   a 062 for deployada. Ficou fora desta correção de propósito, para não
+   misturar mudança de schema com o objetivo principal.
+
+4. **`images` não é editável pelo PUT do painel.** A coluna está em
+   `UPDATE_FIELDS` sem o cast `::jsonb` que `vehicle_options` tem, então mandar
+   um array por ali dá `invalid input syntax for type json`. Não bloqueia nada:
+   o formulário não envia fotos por essa rota (têm caminho próprio em
+   `/api/vehicle-images`). Encontrada ao escrever o teste de edição de anúncio
+   bloqueado. *Recomendação:* remover `images` de `UPDATE_FIELDS` ou adicionar
+   o cast, em tarefa separada.
+
+5. **ESLint não roda neste ambiente.** `frontend/eslint.config.mjs` importa
+   `eslint/config`, subpath que a versão instalada não exporta — a config falha
+   ao carregar, para qualquer arquivo. Preexistente e independente desta fase;
+   `tsc --noEmit`, Prettier e `next build` cobriram a verificação estática.
 
 ### Achados preexistentes (NÃO corrigidos, fora de escopo)
 
-3. **`getAnunciosNaRegiao` está quebrada e é código morto.**
+6. **`getAnunciosNaRegiao` está quebrada e é código morto.**
    `regions.service.js:497` chama `commercialLayerExpr("sp", "u", "plans")`, mas
    `commercialLayerExpr` é uma **const string** (`ads-ranking.sql.js:78`), não
    uma função — lança `TypeError` ao ser alcançada. A função não tem **nenhum**
@@ -487,8 +510,12 @@ alterei é importado por essas suítes.
    lugar dela. *Recomendação:* remover a função ou corrigir a chamada, em tarefa
    separada.
 
-4. **Falhas preexistentes confirmadas:** `/seguranca` copy e SEO regional config
+7. **Falhas preexistentes confirmadas:** `/seguranca` copy e SEO regional config
    (frontend); fixtures legadas de `users.plan` (integração).
+
+8. **Suítes `SaleRequest*` / `PurchaseIntent*` são flaky sob carga.** Levam
+   17–36s cada e falham por timeout quando a suíte inteira roda em paralelo;
+   isoladas, passam 128/128. Não foram tocadas nesta fase.
 
 ---
 
@@ -509,30 +536,45 @@ alterei é importado por essas suítes.
 | admin pode reativar | OK |
 | reativação não ignora outros gates | OK — restaura, não força `active` |
 | usuário comum não remove bloqueio | OK |
-| editar não remove bloqueio | OK — 409 / 400 |
-| publicar/renovar não remove bloqueio | OK — 410 |
+| owner consegue EDITAR blocked | OK — 200, provado em banco real |
+| editar não remove bloqueio | OK — estado administrativo byte a byte igual |
+| editar não muda `blocked_previous_status` | OK — 5 edições seguidas |
+| editar não cria evento de unblock | OK — trilha inalterada |
+| campos estruturais travados em blocked | OK — 400 |
+| publicar/renovar/boost não removem bloqueio | OK — 410 |
 | home / comprar / cidade / região / loja não vazam | OK |
 | detalhe não vaza | OK — 404 imediato |
 | busca / autocomplete / facetas não vazam | OK |
 | sitemap não vaza | OK |
 | structured data não vaza | OK — detalhe 404 antes de renderizar |
-| cache não mantém público indevidamente | **Parcial** — backend imediato; ISR ~60s (dívida 1) |
+| cache não mantém público indevidamente | **OK** — backend E Next; primeira leitura já correta |
+| bloqueio invalida o cache do Next | OK — `revalidateTag(public-ads)` |
+| reativação também invalida | OK — nos dois sentidos |
+| `previous_status=paused/pending_review` não fica público | OK — revalidar ≠ publicar |
+| rota de revalidação é interna e autenticada | OK — POST + Bearer + allowlist |
+| browser não conhece o segredo | OK — server-to-server, nunca `NEXT_PUBLIC_*` |
+| sem purge arbitrário por path | OK — allowlist fixa de paths e tags |
 | anunciante vê status de bloqueio | OK |
 | público não vê motivo nem histórico | OK |
 | identidade do admin não vaza | OK |
 | idempotência correta | OK |
 | concorrência correta | OK — `FOR UPDATE`, testado em DB real |
-| testes backend verdes | OK — 3545 |
+| preflight de produção read-only | OK — `blocked_count = 0` |
+| nenhum legado ambíguo adivinhado | OK — não há linha `blocked` em produção |
+| migration 062 continua deploy-safe | OK — inalterada; nenhuma 063 criada |
+| mutation tests eficazes | OK — 3 mutações, todas pegas |
+| testes backend verdes | OK — 3568 |
 | testes frontend afetados verdes | OK |
-| E2E verde | OK |
+| E2E verde | OK — 3 specs, incluindo owner-edit |
 | responsive verde | OK |
+| bug regional preexistente não foi misturado | OK — intacto, registrado em §18 |
 | zero regressão nova | OK — baseline idêntico |
 | nenhuma denúncia implementada | OK — 4.10B |
 | nenhuma monetização implementada | OK |
 
-**Veredito: GO.** O único item parcial é a janela de ~60s do cache ISR, que é
-menor que o TTL normal do produto, se resolve sozinha, não afeta a URL indexável
-e tem um teste que alarma se piorar.
+**Veredito: GO.** Nenhum item parcial. A janela de cache que era a única
+ressalva da primeira entrega foi fechada e medida; as dívidas restantes (§18)
+são de configuração de deploy e de limpeza preexistente, nenhuma bloqueante.
 
 ---
 
@@ -545,3 +587,184 @@ e tem um teste que alarma se piorar.
   o dono é informado **no painel**
 - Alterações em Compradores Ativos, Venda para lojas, agendamento, WhatsApp,
   rounds, offers ou `sale_requests`
+
+---
+
+## 21. Correção final pré-merge
+
+Três objetivos, nenhum deles reabrindo decisão já fechada: eliminar a janela de
+cache, deixar o anunciante corrigir o anúncio bloqueado, e verificar o legado em
+produção antes de dar a migration por definitiva.
+
+### 21.1 Preflight de produção (read-only)
+
+Sessão aberta em `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` contra
+`DATABASE_URL1` — a URL de produção. (`DATABASE_URL` aponta para o banco de
+teste local; confundir as duas é o footgun conhecido do projeto.)
+
+```
+total de anúncios ......... 48
+active .................... 27
+deleted ................... 20
+paused .................... 1
+
+>>> blocked_count = 0
+
+colunas blocked* já presentes ..... blocked_at, blocked_reason  (migration 014)
+constraints blocked* .............. (nenhuma)
+última migration aplicada ......... 061_sale_request_inspection_per_selection.sql
+ads_status_check .................. os 7 valores canônicos, com 'blocked'
+```
+
+**Não existem anúncios `blocked` legados em produção.** O backfill
+`blocked_previous_status = 'active'` não toca nenhuma linha real, portanto não
+introduz ambiguidade em lugar nenhum e nada foi adivinhado.
+
+**Decisão: a migration 062 fica como está.** Nenhuma 063 foi criada. As colunas
+da 062 confirmadamente ainda não existem em produção — a migration não foi
+deployada, como esperado.
+
+### 21.2 Invalidação imediata do cache do Next
+
+#### Auditoria de cache
+
+A infraestrutura **já existia** desde a Fase 4.1 e foi reutilizada: o endpoint
+`POST /api/revalidate` no Next, com Bearer `REVALIDATE_TOKEN` e **allowlist** de
+paths e tags. O que faltava era o remetente — o backend Express nunca tinha
+falado com ele. Nada de fila, outbox ou event bus foi criado.
+
+| Superfície | Fetch/helper | TTL | Tag antes | Estratégia |
+| --- | --- | --- | --- | --- |
+| Busca / `/comprar` | `search/ads-search.ts` | 60s | — | + `public-ads` |
+| Facetas | `search/ads-search.ts` | 60s | — | + `public-ads` |
+| Catálogo territorial | `search/territorial-public.ts` | 60s | — | + `public-ads` |
+| Fallback de catálogo | `search/catalog-ads-territory-fallback.ts` | 60s | — | + `public-ads` |
+| Cidade (raio) | `buy/city-radius-catalog.ts` | 300s | — | + `public-ads` |
+| Cidade (SEO) | `seo/city-seo-overview.ts` | 60s | — | + `public-ads` |
+| Home | `home/public-home.ts` | 60s | `public-home` | `withPublicAdsTag` (preserva) |
+| Home (discovery) | `home/home-discovery.ts` | 60s | `public-home:{uf}` | `withPublicAdsTag` (preserva) |
+| Loja | `dealers/fetch-public-dealer.ts` | 60s | — | + `public-ads` |
+| Região | `regions/fetch-region.ts` | 900s | `regions:{slug}` | `withPublicAdsTag` (preserva) |
+| Sitemap | `seo/sitemap-client.ts` | 3600s | — | + `public-ads` |
+| Detalhe `/veiculo` | gate de middleware | — | — | já era 404 imediato |
+
+Uma tag só, `public-ads`, centralizada em `frontend/lib/cache/public-ads-tag.ts`.
+O custo é invalidar um pouco mais que o necessário; é o custo certo, porque
+moderação é rara e o preço de revalidar **a menos** é um anúncio bloqueado
+continuar público. `withPublicAdsTag` acrescenta sem sobrescrever as tags que já
+existiam — apagá-las quebraria as invalidações da Fase 4.1.
+
+#### Segurança do canal
+
+`src/shared/cache/next-revalidate.js` faz `POST` para
+`${FRONTEND_URL}/api/revalidate` com `Authorization: Bearer $REVALIDATE_TOKEN`.
+
+- segredo **só no header** — nunca em URL, corpo ou log (testado);
+- corpo mínimo: `{ tags, paths }`, nada do anúncio nem do admin (testado);
+- paths **fixos no código**, não derivados de dado do anúncio (testado);
+- allowlist na rota: path ou tag fora dela é ignorado, mesmo com token válido;
+- sem token → 401; sem token configurado em produção → 503 (fail-closed);
+- não existe `GET` — leitura não invalida nada;
+- `REVALIDATE_TOKEN` é server-side; nunca `NEXT_PUBLIC_*`.
+
+#### Momento e falha
+
+A invalidação roda **depois do COMMIT**, e nesta ordem: Redis do backend
+primeiro, Next depois — invertido, o Next releria um Redis ainda quente e
+reaqueceria o cache com o dado velho. Há teste travando a ordem.
+
+Falha do canal **não desfaz o bloqueio**: o anúncio segue `blocked`, o detalhe
+segue 404, e o TTL volta a ser a última linha de defesa. `blockAd`/`unblockAd`
+devolvem `revalidated: { ok, reason }` para observabilidade. Testado com erro de
+rede, 401 do frontend e URL ausente.
+
+#### Medição (production-like: `next build` + `next start`)
+
+| Cenário | Resultado |
+| --- | --- |
+| A. bloqueio → catálogo | fora na **primeira leitura**, 1193ms |
+| A. bloqueio → detalhe | 404 imediato |
+| B. reativação (`previous=active`) → catálogo | de volta na **primeira leitura**, 1160ms |
+| C. reativação (`previous=paused`) → catálogo | continua ausente |
+
+Os ~1,2s são o tempo de render da página, não espera de TTL. Repetível por
+`scripts/smoke/ad-moderation-cache-smoke.mjs`.
+
+> Nota honesta sobre o ambiente: sob `NODE_ENV=production` o cookie de sessão é
+> `Secure` e não persiste em HTTP puro, o que impede o Playwright de autenticar
+> como admin contra `next start`. Por isso a prova de CACHE é o smoke acima
+> (chama o service direto, lê o catálogo por HTTP, sem cookie) e o E2E de UI
+> roda em `next dev`. As duas coisas juntas cobrem o que cada uma pode provar.
+
+### 21.3 Edição corretiva de anúncio bloqueado
+
+Motivos como "Informação incorreta", "Fotos inadequadas" e "Preço enganoso"
+pedem uma correção — e travar a edição deixava o anunciante lendo o que precisava
+mudar sem ter por onde mudar. `blocked` entrou em `AD_STATUS_OWNER_EDITABLE`.
+
+**Isso não afrouxa o bloqueio porque editar e publicar são portas diferentes:**
+
+| Garantia | Mecanismo |
+| --- | --- |
+| `status` no corpo → 400 | guard existente em `ads.panel.service.updateAd` |
+| campos `blocked_*` intocáveis | não estão em `UPDATE_FIELDS` (por construção) |
+| marca/modelo/ano/cidade travados | `blocked` entrou em `protectedStatuses` |
+| activate/pause → 410 | `AD_STATUS_OWNER_OPERABLE` segue sem `blocked` |
+| boost recusado | `AD_STATUS_CAN_RECEIVE_BOOST` segue só `active` |
+| sem transição automática | o pipeline de edição não recalcula status |
+
+Provado contra banco real: depois de editar preço, descrição e ficha, o snapshot
+administrativo (`status`, `blocked_reason_code`, `blocked_reason`,
+`blocked_previous_status`, `blocked_by_user_id`, `blocked_at`) é **byte a byte o
+mesmo**. Cinco edições seguidas não deslocam `blocked_previous_status`. A trilha
+não ganha evento de unblock.
+
+**UI:** o card do dono ganhou **um** botão — "Editar anúncio" — e a copy "Você
+pode corrigir as informações. O anúncio continuará bloqueado até ser reativado
+pela administração." O formulário mostra o aviso antes de editar, e ao salvar
+responde "Alterações salvas. O anúncio continua bloqueado até revisão da
+administração." — nunca "publicado". Impulsionar, Ativar e Pausar seguem
+ausentes. O admin continua vendo motivo, data, histórico e o botão Reativar.
+
+### 21.4 Testes da correção
+
+| Arquivo | Testes | Cobre |
+| --- | --- | --- |
+| `tests/admin/next-revalidate-channel.test.js` | 16 | disparo, ordem pós-commit, segredo no header, corpo mínimo, falha-soft |
+| `tests/admin/public-ads-cache-tag-sync.test.js` | 3 | a tag bate nas três pontas; toda vitrine a carrega |
+| `frontend/app/api/revalidate/route.test.ts` | +6 | tag aceita, sem token 401, path arbitrário ignorado, sem GET |
+| `tests/ads/blocked-ad-owner-cannot-bypass.test.js` | 18 | edição permitida, estrutural travado, publicação proibida |
+| `tests/integration/ad-admin-moderation.integration.test.js` | +8 | edição em banco real, snapshot administrativo, previous_status |
+| `frontend/e2e/admin-ad-moderation.spec.ts` | +1 | fluxo owner-edit completo |
+| `scripts/smoke/ad-moderation-cache-smoke.mjs` | — | medição production-like repetível |
+
+Testes atualizados por mudança de contrato (a edição em `blocked` deixou de ser
+recusada): `tests/ads/ad-ownership.test.js`, `tests/ads/ad-edit-status-guard.test.js`,
+`frontend/lib/regions/fetch-region.test.ts`,
+`frontend/components/account/AdsPremiumList.blocked.test.tsx`.
+
+### 21.5 Mutation tests
+
+| Mutação | Resultado |
+| --- | --- |
+| Permitir `status` no corpo da edição | **2 testes vermelhos** |
+| Não disparar revalidação no Next | **10 testes vermelhos** |
+| Alterar `blocked_previous_status` na edição | **3 testes vermelhos** (inclusive o cenário em que o anúncio voltaria público indevidamente) |
+
+Todas revertidas; nenhuma commitada.
+
+### 21.6 Resultado final dos testes
+
+```
+Backend (exceto integração) ....... 219 arquivos, 3568 testes — VERDE
+Integração (moderação, DB real) ... 27 testes — VERDE (3 execuções seguidas)
+Frontend .......................... 211 de 213 arquivos
+E2E ............................... 3 specs — VERDE
+Smoke de cache (production-like) .. VERDE
+tsc --noEmit (frontend) ........... limpo
+next build ........................ sucesso
+```
+
+As 2 suítes de frontend que falham são o baseline preexistente (`/seguranca`
+copy e SEO regional config). As suítes `SaleRequest*`/`PurchaseIntent*` variam
+sob carga paralela; isoladas passam 128/128.

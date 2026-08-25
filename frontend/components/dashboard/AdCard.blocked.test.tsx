@@ -71,6 +71,25 @@ describe("anúncio bloqueado — o que o dono lê", () => {
     expect(screen.getByText(/Entre em contato com o suporte/i)).toBeTruthy();
   });
 
+  it("diz que pode corrigir, sem prometer reativação automática", () => {
+    const { container } = renderCard(BLOCKED);
+
+    expect(
+      screen.getByText(/Você pode corrigir as informações do anúncio/i)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/continuará bloqueado até ser reativado pela administração/i)
+    ).toBeTruthy();
+    // Nada que sugira que salvar republica sozinho.
+    expect(container.textContent).not.toMatch(/será reativado automaticamente/i);
+  });
+
+  it("mantém o caminho de edição disponível", () => {
+    renderCard(BLOCKED);
+    // Editar é a ação que a moderação está pedindo; ela não publica nada.
+    expect(screen.getByRole("link", { name: /editar/i })).toBeTruthy();
+  });
+
   it("o badge diz Bloqueado, não Pausado", () => {
     const { container } = renderCard(BLOCKED);
     expect(container.textContent).toMatch(/Bloqueado/);

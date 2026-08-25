@@ -61,34 +61,86 @@ beforeEach(() => {
   vi.mocked(persistence.executeAdUpdate).mockClear();
 });
 
+describe("edição de conteúdo é PERMITIDA em blocked (correção pré-merge)", () => {
+  // Motivos como "Fotos inadequadas" pedem uma correção. Travar a edição
+  // deixava o anunciante sem caminho para atender ao que a moderação pediu.
+  it("editar preço de anúncio bloqueado grava o conteúdo", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    await updateAd("ad-1", { price: 49900 }, OWNER);
+
+    expect(persistence.executeAdUpdate).toHaveBeenCalledTimes(1);
+    const [, payload] = vi.mocked(persistence.executeAdUpdate).mock.calls[0];
+    expect(payload).toMatchObject({ price: 49900 });
+  });
+
+  it("editar descrição de anúncio bloqueado grava o conteúdo", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    await updateAd("ad-1", { description: "carro impecável" }, OWNER);
+
+    expect(persistence.executeAdUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("trocar as fotos de anúncio bloqueado grava o conteúdo", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    await updateAd("ad-1", { images: ["https://cdn/x.jpg"] }, OWNER);
+
+    expect(persistence.executeAdUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("a edição NUNCA carrega status nem campos administrativos no payload", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    await updateAd("ad-1", { price: 1234, description: "corrigido" }, OWNER);
+
+    const [, payload] = vi.mocked(persistence.executeAdUpdate).mock.calls[0];
+    // Esta é a invariante: o UPDATE que sai da edição não pode ter como tocar
+    // o estado administrativo, nem por descuido nem por payload malicioso.
+    for (const forbidden of [
+      "status",
+      "blocked_reason",
+      "blocked_reason_code",
+      "blocked_previous_status",
+      "blocked_by_user_id",
+      "blocked_at",
+    ]) {
+      expect(payload, `edição não pode enviar ${forbidden}`).not.toHaveProperty(forbidden);
+    }
+  });
+
+  it("campos ESTRUTURAIS continuam travados em blocked (não se troca de veículo)", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    // Corrigir um anúncio é mexer em preço/fotos/descrição. Trocar marca ou
+    // ano seria transformá-lo noutro veículo — ainda mais grave sob suspeita.
+    await expect(updateAd("ad-1", { brand: "Toyota" }, OWNER)).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
+  });
+
+  it("trocar de anunciante continua proibido", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    await expect(updateAd("ad-1", { advertiser_id: "adv-9" }, OWNER)).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
+  });
+
+  it("terceiro que não é dono continua sem editar anúncio bloqueado", async () => {
+    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
+
+    await expect(
+      updateAd("ad-1", { price: 1 }, { id: "outro-user", role: "user" })
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe("edição não reativa", () => {
-  it("editar preço de anúncio bloqueado → 409, e nada é gravado", async () => {
-    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
-
-    await expect(updateAd("ad-1", { price: 49900 }, OWNER)).rejects.toMatchObject({
-      statusCode: 409,
-    });
-    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
-  });
-
-  it("editar descrição de anúncio bloqueado → 409", async () => {
-    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
-
-    await expect(updateAd("ad-1", { description: "carro impecável" }, OWNER)).rejects.toMatchObject(
-      { statusCode: 409 }
-    );
-    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
-  });
-
-  it("trocar as fotos de anúncio bloqueado → 409", async () => {
-    vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
-
-    await expect(updateAd("ad-1", { images: ["https://cdn/x.jpg"] }, OWNER)).rejects.toMatchObject({
-      statusCode: 409,
-    });
-    expect(persistence.executeAdUpdate).not.toHaveBeenCalled();
-  });
-
   it("mandar status='active' no corpo da edição → 400 antes de qualquer leitura", async () => {
     vi.mocked(adsRepository.findOwnerContextById).mockResolvedValue(blockedAd());
 
@@ -157,9 +209,18 @@ describe("opções de publicação e impulsionamento", () => {
 });
 
 describe("a allowlist de status editáveis exclui blocked", () => {
-  it("blocked não está entre os status que o dono pode editar", async () => {
+  it("blocked É editável pelo dono — mas só o CONTEÚDO", async () => {
     const { AD_STATUS_OWNER_EDITABLE } = await import("../../src/modules/ads/ad-ownership.js");
-    expect(AD_STATUS_OWNER_EDITABLE).not.toContain("blocked");
+    // Editar e publicar são portas diferentes: esta lista libera a correção,
+    // e as três asserções abaixo provam que nenhuma delas libera publicação.
+    expect(AD_STATUS_OWNER_EDITABLE).toContain("blocked");
+  });
+
+  it("estados terminais continuam sem edição", async () => {
+    const { AD_STATUS_OWNER_EDITABLE } = await import("../../src/modules/ads/ad-ownership.js");
+    for (const terminal of ["sold", "expired", "archived", "deleted"]) {
+      expect(AD_STATUS_OWNER_EDITABLE).not.toContain(terminal);
+    }
   });
 
   it("blocked não está entre os status publicamente visíveis", async () => {

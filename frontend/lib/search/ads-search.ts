@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { canonicalTerritoryForApi, clampPublicAdsSearchLimit } from "@/lib/search/ads-search-url";
 import { collectVehicleImageCandidates } from "@/lib/vehicle/detail-utils";
@@ -599,7 +600,7 @@ export async function fetchAdsSearch(
       },
       signal,
       logTag: "ads-search",
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [PUBLIC_ADS_CACHE_TAG] },
     });
 
     if (!response.ok) {
@@ -650,7 +651,7 @@ export async function fetchAdsFacets(
       },
       signal,
       logTag: "ads-facets",
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [PUBLIC_ADS_CACHE_TAG] },
     });
 
     if (!response.ok) {

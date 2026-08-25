@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Browser, type BrowserContext } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -58,9 +58,49 @@ async function loginVia(page: Page, creds: { email: string; password: string }) 
   expect(res.ok(), `login falhou para ${creds.email}: ${res.status()}`).toBe(true);
 }
 
-/** Reativa via API para deixar o ambiente limpo mesmo se o teste falhar no meio. */
-async function forceUnblock(page: Page) {
-  await page.request.patch(`/api/admin/ads/${AD_ID}/unblock`, { data: {} }).catch(() => null);
+/**
+ * UM login por conta no arquivo inteiro.
+ *
+ * `loginRateLimit` no backend é de 5 tentativas por 15 minutos. Com três
+ * testes logando admin e dono a cada um, a suíte estourava a cota no meio da
+ * execução e falhava com 429 — um erro que parece bug de produto e não é.
+ * Logamos uma vez, guardamos os cookies e criamos cada contexto já autenticado.
+ */
+const sessionState = new Map<string, Awaited<ReturnType<BrowserContext["storageState"]>>>();
+
+async function authenticatedContext(
+  browser: Browser,
+  creds: { email: string; password: string },
+  viewport = { width: 1440, height: 900 }
+) {
+  if (!sessionState.has(creds.email)) {
+    const bootstrap = await browser.newContext();
+    const page = await bootstrap.newPage();
+    await loginVia(page, creds);
+    sessionState.set(creds.email, await bootstrap.storageState());
+    await bootstrap.close();
+  }
+  return browser.newContext({ viewport, storageState: sessionState.get(creds.email) });
+}
+
+/**
+ * Reativa via API para deixar o ambiente limpo mesmo se o teste falhar no meio.
+ *
+ * No teardown os erros são engolidos (o teste já falhou por outro motivo); no
+ * SETUP eles não podem ser — um `.catch()` silencioso ali deixava o anúncio
+ * bloqueado de uma execução anterior e a rodada seguinte falhava no
+ * aquecimento, apontando para o lugar errado.
+ */
+async function forceUnblock(page: Page, { assert = false } = {}) {
+  const res = await page.request
+    .patch(`/api/admin/ads/${AD_ID}/unblock`, { data: {} })
+    .catch(() => null);
+  if (assert) {
+    expect(res?.ok(), "não foi possível restaurar o anúncio para o estado inicial").toBe(true);
+    const state = await page.request.get(`/api/admin/ads/${AD_ID}`);
+    const body = await state.json();
+    expect(body?.data?.status, "anúncio precisa começar ativo").toBe("active");
+  }
 }
 
 test.describe.configure({ mode: "serial" });
@@ -69,8 +109,8 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
   test("ciclo completo: ativo → bloqueado → reativado", async ({ browser }) => {
     test.setTimeout(300_000);
 
-    const adminCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const ownerCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const adminCtx = await authenticatedContext(browser, ADMIN);
+    const ownerCtx = await authenticatedContext(browser, OWNER);
     const publicCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 
     const admin = await adminCtx.newPage();
@@ -78,19 +118,19 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
     const anon = await publicCtx.newPage();
 
     try {
-      await loginVia(admin, ADMIN);
-      await forceUnblock(admin);
+      await forceUnblock(admin, { assert: true });
 
-      // ── 1. o anúncio está público ──────────────────────────────────────
+      // ── 1. o anúncio está público (AQUECIMENTO, não é a prova) ─────────
       //
-      // A mesma janela de `revalidate: 60` vale nos dois sentidos: uma execução
-      // anterior pode ter deixado no cache a versão SEM o card. Esperar aqui é
-      // o que torna a suíte repetível — sem isto ela passa na primeira rodada
-      // e falha na segunda, o pior tipo de teste.
+      // Este passo prepara o cenário: garante que o catálogo está quente COM o
+      // anúncio antes de bloquear — senão o teste seguinte veria a ausência do
+      // card e não saberia dizer se foi a invalidação ou se ele nunca esteve
+      // lá. A tolerância aqui é do setup; a asserção que prova a invalidação,
+      // mais abaixo, é de leitura única e sem espera.
       await expect(async () => {
         await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
         await expect(anon.locator(CARD_SELECTOR).first()).toBeVisible({ timeout: 5_000 });
-      }).toPass({ timeout: 90_000, intervals: [5_000] });
+      }).toPass({ timeout: 30_000, intervals: [2_000] });
 
       const detailBefore = await anon.request.get(`/veiculo/${AD_SLUG}`);
       expect(detailBefore.status(), "detalhe público deve responder 200 antes do bloqueio").toBe(
@@ -152,22 +192,21 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
       const apiAfter = await anon.request.get(`/api/ads/${AD_SLUG}`);
       expect(apiAfter.status(), "API pública não pode devolver anúncio bloqueado").not.toBe(200);
 
-      // O CATÁLOGO tem uma janela de atraso, e ela é medida aqui de propósito.
+      // O CATÁLOGO sai na PRIMEIRA leitura, não por expiração.
       //
-      // A página de cidade é servida pelo fetch cache do Next com
-      // `revalidate: 60` (frontend/lib/search/*). O bloqueio invalida na hora o
-      // cache do BACKEND, mas o cache do Next vive no processo do frontend e
-      // só se renova ao expirar — não há hoje um webhook de revalidateTag
-      // ligando os dois (ver a dívida registrada no relatório da fase).
+      // O bloqueio dispara `revalidateTag('public-ads')` no Next através do
+      // canal interno, além de limpar o Redis do backend. Por isso aqui não há
+      // `toPass` nem tolerância de TTL: uma única navegação, feita logo após a
+      // resposta administrativa, já tem de vir sem o anúncio.
       //
-      // O teto de 90s não é folga arbitrária: é o que transforma este teste num
-      // alarme. Se alguém elevar o `revalidate` para 300 ou 3600, o anúncio
-      // bloqueado passaria a ficar visível por minutos ou horas — e o teste
-      // quebra em vez de deixar passar.
-      await expect(async () => {
-        await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
-        await expect(anon.locator(CARD_SELECTOR)).toHaveCount(0);
-      }).toPass({ timeout: 90_000, intervals: [5_000] });
+      // Se alguém remover o disparo de revalidação, este teste falha em vez de
+      // esperar 60 segundos e passar assim mesmo — que era exatamente o buraco
+      // que a tolerância antiga escondia.
+      await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await expect(
+        anon.locator(CARD_SELECTOR),
+        "anúncio bloqueado ainda no catálogo na primeira leitura — a invalidação do Next não aconteceu"
+      ).toHaveCount(0);
 
       await anon.screenshot({
         path: shotPath("06-publico-anuncio-ausente-catalogo.png"),
@@ -183,7 +222,6 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
       }
 
       // ── 6. o dono vê o bloqueio e não consegue reverter ────────────────
-      await loginVia(owner, OWNER);
       await owner.goto("/dashboard-loja", { waitUntil: "domcontentloaded", timeout: 120_000 });
       await owner.waitForTimeout(2000);
 
@@ -197,26 +235,48 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
         fullPage: true,
       });
 
-      // Tentativa direta pela API do dono: ativar e editar.
+      // Tentativas diretas pela API do dono. Depois da correção pré-merge,
+      // EDITAR passou a ser permitido; tudo que PUBLICA continua barrado.
       const tryActivate = await owner.request.patch(`/api/account/ads/${AD_ID}/status`, {
         data: { action: "activate" },
       });
       expect(tryActivate.status(), "o dono não pode reativar sozinho").not.toBe(200);
 
-      const tryEdit = await owner.request.put(`/api/ads/${AD_ID}`, {
-        data: { price: 12345 },
+      const tryPause = await owner.request.patch(`/api/account/ads/${AD_ID}/status`, {
+        data: { action: "pause" },
       });
-      expect(tryEdit.status(), "editar não pode passar em anúncio bloqueado").not.toBe(200);
+      expect(tryPause.status(), "pausar também não é do dono aqui").not.toBe(200);
+
+      const tryPublishOptions = await owner.request.get(
+        `/api/ads/${AD_ID}/publication-options`
+      );
+      expect(
+        tryPublishOptions.status(),
+        "publicar/renovar/impulsionar continuam fora de alcance"
+      ).not.toBe(200);
 
       const tryEditStatus = await owner.request.put(`/api/ads/${AD_ID}`, {
         data: { status: "active" },
       });
       expect(tryEditStatus.status(), "mandar status na edição não pode reativar").not.toBe(200);
 
-      // O bloqueio sobreviveu às tentativas.
+      const tryStructural = await owner.request.put(`/api/ads/${AD_ID}`, {
+        data: { brand: "Toyota" },
+      });
+      expect(tryStructural.status(), "trocar de veículo continua proibido").not.toBe(200);
+
+      // Editar CONTEÚDO funciona — é o que a moderação está pedindo.
+      const editContent = await owner.request.put(`/api/ads/${AD_ID}`, {
+        data: { price: 12345 },
+      });
+      expect(editContent.status(), "o dono precisa poder corrigir o conteúdo").toBe(200);
+
+      // E o bloqueio sobreviveu a tudo isso.
       const stillBlocked = await admin.request.get(`/api/admin/ads/${AD_ID}`);
       const stillBlockedBody = await stillBlocked.json();
       expect(stillBlockedBody?.data?.status).toBe("blocked");
+      expect(stillBlockedBody?.data?.blocked_reason_code).toBe("suspected_fraud");
+      expect(stillBlockedBody?.data?.blocked_previous_status).toBe("active");
 
       // ── 7. reativação ──────────────────────────────────────────────────
       await admin.reload({ waitUntil: "domcontentloaded" });
@@ -243,10 +303,12 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
       const detailBack = await anon.request.get(`/veiculo/${AD_SLUG}`);
       expect(detailBack.status(), "reativado deve voltar a responder 200").toBe(200);
 
-      await expect(async () => {
-        await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
-        await expect(anon.locator(CARD_SELECTOR).first()).toBeVisible({ timeout: 5_000 });
-      }).toPass({ timeout: 90_000, intervals: [5_000] });
+      // A reativação também invalida — a volta é na primeira leitura.
+      await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await expect(
+        anon.locator(CARD_SELECTOR).first(),
+        "anúncio reativado não voltou na primeira leitura — a invalidação do Next não aconteceu"
+      ).toBeVisible({ timeout: 10_000 });
 
       await anon.screenshot({
         path: shotPath("09-publico-anuncio-reativado.png"),
@@ -263,11 +325,10 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
   test("o modal de bloqueio cabe em 390px", async ({ browser }) => {
     test.setTimeout(180_000);
 
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const ctx = await authenticatedContext(browser, ADMIN, { width: 390, height: 844 });
     const page = await ctx.newPage();
 
     try {
-      await loginVia(page, ADMIN);
       await page.goto(`/admin/anuncios/${AD_ID}`, {
         waitUntil: "domcontentloaded",
         timeout: 120_000,
@@ -286,6 +347,136 @@ test.describe("Fase 4.10A — moderação administrativa de anúncio", () => {
       expect(overflow, "modal de bloqueio causa scroll horizontal em 390px").toBeLessThanOrEqual(1);
     } finally {
       await ctx.close();
+    }
+  });
+});
+
+/**
+ * Fase 4.10A (correção) — o dono corrige o anúncio bloqueado.
+ *
+ * O fluxo inteiro numa sessão: o admin bloqueia por "Informação incorreta", o
+ * dono vê o motivo E o caminho para corrigir, edita, lê que continua
+ * bloqueado, o público segue sem ver, e só a reativação do admin publica o
+ * conteúdo novo.
+ */
+test.describe("Fase 4.10A — correção pelo anunciante", () => {
+  test("bloqueado → dono edita → continua bloqueado → admin reativa com o conteúdo novo", async ({
+    browser,
+  }) => {
+    test.setTimeout(300_000);
+
+    const adminCtx = await authenticatedContext(browser, ADMIN);
+    const ownerCtx = await authenticatedContext(browser, OWNER);
+    const publicCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+
+    const admin = await adminCtx.newPage();
+    const owner = await ownerCtx.newPage();
+    const anon = await publicCtx.newPage();
+
+    const NEW_DESCRIPTION = `Descrição corrigida pelo dono ${Date.now()}`;
+
+    try {
+      await forceUnblock(admin, { assert: true });
+
+      // ── admin bloqueia por "Informação incorreta" ──────────────────────
+      const blockRes = await admin.request.patch(`/api/admin/ads/${AD_ID}/block`, {
+        data: { reason_code: "incorrect_information" },
+      });
+      expect(blockRes.ok()).toBe(true);
+
+      // O catálogo já reflete o bloqueio na primeira leitura.
+      await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await expect(anon.locator(CARD_SELECTOR)).toHaveCount(0);
+
+      // ── o dono vê BLOQUEADO e o caminho para corrigir ──────────────────
+      await owner.goto("/dashboard-loja", { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await owner.waitForTimeout(1500);
+
+      const ownerText = await owner.locator("body").innerText();
+      expect(ownerText).toMatch(/Bloqueado/i);
+      expect(ownerText).toMatch(/continuará bloqueado até ser reativado pela administração/i);
+      await expect(owner.getByTestId(`ad-blocked-edit-${AD_ID}`)).toBeVisible();
+      await owner.screenshot({
+        path: shotPath("11-owner-bloqueado-pode-editar.png"),
+        fullPage: true,
+      });
+
+      // Fotografa o tamanho da trilha ANTES da edição, para medir o delta.
+      const historyBeforeEdit = await admin.request.get(
+        `/api/admin/ads/${AD_ID}/moderation-history`
+      );
+      const historyBeforeEditCount = ((await historyBeforeEdit.json())?.data ?? []).length;
+
+      // ── o dono entra na edição ─────────────────────────────────────────
+      await owner.getByTestId(`ad-blocked-edit-${AD_ID}`).click();
+      await owner.waitForURL(/\/painel\/anuncios\/.+\/editar/, { timeout: 60_000 });
+      await expect(owner.getByTestId("edit-blocked-notice")).toBeVisible({ timeout: 30_000 });
+      await owner.screenshot({ path: shotPath("12-owner-edicao-bloqueada.png"), fullPage: true });
+
+      // ── corrige a descrição e salva ────────────────────────────────────
+      const descricao = owner.locator("textarea").first();
+      await descricao.fill(NEW_DESCRIPTION);
+      await owner.getByRole("button", { name: /salvar/i }).first().click();
+
+      const successNotice = owner.getByTestId("edit-success-notice");
+      await expect(successNotice).toBeVisible({ timeout: 60_000 });
+      await expect(successNotice).toContainText(/continua bloqueado até revisão da administração/i);
+      // O texto NÃO pode sugerir que o anúncio voltou ao ar.
+      await expect(successNotice).not.toContainText(/publicad/i);
+      await owner.screenshot({
+        path: shotPath("13-owner-edicao-salva-continua-bloqueado.png"),
+        fullPage: true,
+      });
+
+      // ── o bloqueio sobreviveu à edição ─────────────────────────────────
+      const afterEdit = await admin.request.get(`/api/admin/ads/${AD_ID}`);
+      const afterEditBody = await afterEdit.json();
+      expect(afterEditBody?.data?.status).toBe("blocked");
+      expect(afterEditBody?.data?.blocked_reason_code).toBe("incorrect_information");
+      expect(afterEditBody?.data?.blocked_previous_status).toBe("active");
+      expect(afterEditBody?.data?.description).toBe(NEW_DESCRIPTION);
+
+      // ── o público continua sem ver ─────────────────────────────────────
+      const detailAfterEdit = await anon.request.get(`/veiculo/${AD_SLUG}`);
+      expect(detailAfterEdit.status()).toBe(404);
+
+      await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await expect(anon.locator(CARD_SELECTOR)).toHaveCount(0);
+
+      // ── a trilha NÃO ganhou um unblock falso ───────────────────────────
+      //
+      // O anúncio é reaproveitado pelos testes do arquivo (modo serial), então
+      // a trilha já traz ciclos anteriores. O que importa é o DELTA: a edição
+      // do dono não pode ter acrescentado evento nenhum ao que existia logo
+      // após o bloqueio.
+      const historyAfterEdit = await admin.request.get(
+        `/api/admin/ads/${AD_ID}/moderation-history`
+      );
+      const typesAfterEdit = ((await historyAfterEdit.json())?.data ?? []).map(
+        (e: { event_type: string }) => e.event_type
+      );
+      expect(
+        typesAfterEdit.length,
+        "editar acrescentou evento à trilha de moderação"
+      ).toBe(historyBeforeEditCount);
+      // O evento mais recente continua sendo o bloqueio — nenhuma reativação
+      // falsa foi registrada pela edição.
+      expect(typesAfterEdit[0]).toBe("admin_blocked");
+
+      // ── o admin reativa: o conteúdo CORRIGIDO vira público ─────────────
+      const unblockRes = await admin.request.patch(`/api/admin/ads/${AD_ID}/unblock`, { data: {} });
+      expect(unblockRes.ok()).toBe(true);
+
+      await anon.goto(CATALOG_URL, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await expect(anon.locator(CARD_SELECTOR).first()).toBeVisible({ timeout: 10_000 });
+
+      await anon.goto(`/veiculo/${AD_SLUG}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      await expect(anon.locator("body")).toContainText(NEW_DESCRIPTION, { timeout: 30_000 });
+    } finally {
+      await forceUnblock(admin).catch(() => null);
+      await adminCtx.close();
+      await ownerCtx.close();
+      await publicCtx.close();
     }
   });
 });

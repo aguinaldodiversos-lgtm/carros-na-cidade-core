@@ -1,4 +1,5 @@
 import "server-only";
+import { withPublicAdsTag } from "@/lib/cache/public-ads-tag";
 import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
@@ -272,7 +273,7 @@ async function fetchFromPublicEndpoint(safeSlug: string): Promise<RegionPayload 
       logTag: "regions:bff:public",
       next: {
         revalidate: PUBLIC_REVALIDATE_SECONDS,
-        tags: ["regions", `regions:${safeSlug}`],
+        tags: withPublicAdsTag(["regions", `regions:${safeSlug}`]),
       },
     });
   } catch (err) {
@@ -342,7 +343,7 @@ async function fetchFromInternalEndpoint(safeSlug: string): Promise<RegionPayloa
       logTag: "regions:bff",
       next: {
         revalidate: INTERNAL_REVALIDATE_SECONDS,
-        tags: ["internal:regions", `internal:regions:${safeSlug}`],
+        tags: withPublicAdsTag(["internal:regions", `internal:regions:${safeSlug}`]),
       },
     });
   } catch (err) {

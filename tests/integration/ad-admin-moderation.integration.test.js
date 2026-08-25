@@ -106,6 +106,7 @@ process.env.DISABLE_REDIS = "true";
 const blockService = await import("../../src/modules/admin/ads/admin-ad-block.service.js");
 const adsRepository = await import("../../src/modules/ads/ads.repository.js");
 const { buildAdsSearchQuery } = await import("../../src/modules/ads/filters/ads-filter.builder.js");
+const panelService = await import("../../src/modules/ads/ads.panel.service.js");
 const { closeDatabasePool } = await import("../../src/infrastructure/database/db.js");
 
 const pool = new Pool(buildPoolConfig(dbUrl));
@@ -159,9 +160,21 @@ async function readAd(id) {
   return rows[0] || null;
 }
 
+/**
+ * Ordena por `id`, NÃO por `created_at`.
+ *
+ * `created_at` é `NOW()`, que no PostgreSQL é o instante em que a TRANSAÇÃO
+ * começou — não o instante do INSERT nem o do commit. Sob concorrência, duas
+ * transações que disputam o mesmo anúncio podem ter `created_at` empatado ou
+ * até invertido em relação à ordem em que o lock as deixou passar, e ordenar
+ * por ele produzia um teste que passava ou falhava conforme o escalonamento.
+ *
+ * O `id` é da sequence, atribuído no INSERT — que só acontece depois do
+ * `FOR UPDATE`. É, portanto, a ordem real de aplicação.
+ */
 async function moderationEvents(adId) {
   const { rows } = await pool.query(
-    `SELECT * FROM ad_moderation_events WHERE ad_id = $1 ORDER BY created_at ASC, id ASC`,
+    `SELECT * FROM ad_moderation_events WHERE ad_id = $1 ORDER BY id ASC`,
     [adId]
   );
   return rows;
@@ -500,5 +513,189 @@ describe("bloqueio a partir de estados terminais", () => {
     await blockService.unblockAd("admin-1", ad.id, {});
     expect((await readAd(ad.id)).status).toBe("archived");
     expect(await publicSearchIds()).not.toContain(String(ad.id));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fase 4.10A (correção) — edição corretiva de anúncio bloqueado
+// ---------------------------------------------------------------------------
+
+describe("o dono corrige o anúncio bloqueado sem destravá-lo", () => {
+  /**
+   * Captura o estado administrativo inteiro para comparar depois. A invariante
+   * não é só "status continua blocked": é que NENHUM campo administrativo
+   * mudou. Um teste que olhasse apenas o status passaria mesmo se a edição
+   * apagasse o motivo ou o estado anterior a restaurar.
+   */
+  async function adminSnapshot(id) {
+    const row = await readAd(id);
+    return {
+      status: row.status,
+      blocked_reason_code: row.blocked_reason_code,
+      blocked_reason: row.blocked_reason,
+      blocked_previous_status: row.blocked_previous_status,
+      blocked_by_user_id: row.blocked_by_user_id,
+      blocked_at: row.blocked_at?.toISOString?.() ?? row.blocked_at,
+    };
+  }
+
+  /**
+   * Os campos exercitados aqui são exatamente os que `EditAdForm` envia no PUT
+   * (preço, descrição, câmbio, carroceria, opcionais, km).
+   *
+   * `images` fica de fora de propósito: o formulário não manda fotos por esta
+   * rota — elas têm caminho próprio (`/api/vehicle-images`) — e passar um array
+   * por aqui esbarra num defeito PREEXISTENTE de serialização (`images` está em
+   * `UPDATE_FIELDS` sem o cast `::jsonb` que `vehicle_options` tem). Testar
+   * esse caminho seria testar código que a UI não usa, e "consertá-lo" seria
+   * expandir esta correção para um defeito que ela não veio resolver.
+   */
+  it("edita preço, descrição e ficha — e todo o estado administrativo sobrevive", async () => {
+    const { ad } = await seedAd({ slug: nextSlug() });
+
+    await blockService.blockAd("admin-77", ad.id, {
+      reasonCode: "incorrect_information",
+      note: "quilometragem divergente",
+    });
+    const before = await adminSnapshot(ad.id);
+    expect(before.status).toBe("blocked");
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    await panelService.updateAd(String(ad.id), { price: 77700 }, owner);
+    await panelService.updateAd(String(ad.id), { description: "descrição corrigida" }, owner);
+    await panelService.updateAd(String(ad.id), { mileage: 51000, body_type: "SUV" }, owner);
+
+    const after = await readAd(ad.id);
+
+    // O conteúdo mudou de verdade.
+    expect(Number(after.price)).toBe(77700);
+    expect(after.description).toBe("descrição corrigida");
+    expect(after.mileage).toBe(51000);
+    expect(after.body_type).toBe("suv");
+
+    // As fotos originais continuam lá — a edição não as tocou.
+    expect(after.images).toEqual(IMAGES);
+
+    // E o estado administrativo é byte a byte o mesmo.
+    expect(await adminSnapshot(ad.id)).toEqual(before);
+  });
+
+  it("cinco edições seguidas não deslocam blocked_previous_status", async () => {
+    const { ad } = await seedAd({ status: "paused", slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "invalid_photos" });
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    for (let i = 1; i <= 5; i += 1) {
+      await panelService.updateAd(String(ad.id), { price: 50000 + i }, owner);
+      const row = await readAd(ad.id);
+      expect(row.status, `edição ${i} mudou o status`).toBe("blocked");
+      expect(row.blocked_previous_status, `edição ${i} mexeu no estado anterior`).toBe("paused");
+    }
+  });
+
+  it("editar NÃO cria evento de moderação — a trilha registra só decisões do admin", async () => {
+    const { ad } = await seedAd({ slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "misleading_price_or_condition" });
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    await panelService.updateAd(String(ad.id), { price: 61000 }, owner);
+
+    const events = await moderationEvents(ad.id);
+    expect(events).toHaveLength(1);
+    expect(events[0].event_type).toBe("admin_blocked");
+    // Um evento de unblock aqui seria uma reativação falsa na auditoria.
+    expect(events.some((e) => e.event_type === "admin_unblocked")).toBe(false);
+  });
+
+  it("o anúncio editado continua invisível na busca pública", async () => {
+    const { ad } = await seedAd({ slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "suspected_fraud" });
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    await panelService.updateAd(String(ad.id), { price: 1000 }, owner);
+
+    expect(await publicSearchIds()).not.toContain(String(ad.id));
+    expect(await adsRepository.findAdByIdentifier(ad.slug)).toBeNull();
+  });
+
+  it("depois de corrigido, o admin reativa e o CONTEÚDO NOVO fica público", async () => {
+    const { ad } = await seedAd({ slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "incorrect_information" });
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    await panelService.updateAd(String(ad.id), { price: 88800 }, owner);
+    await blockService.unblockAd("admin-1", ad.id, {});
+
+    const published = await adsRepository.findAdByIdentifier(ad.slug);
+    expect(published).toBeTruthy();
+    expect(Number(published.price)).toBe(88800);
+    expect(await publicSearchIds()).toContain(String(ad.id));
+
+    const events = await moderationEvents(ad.id);
+    expect(events.map((e) => e.event_type)).toEqual(["admin_blocked", "admin_unblocked"]);
+  });
+
+  it("previous_status=paused: corrigir e reativar NÃO publica", async () => {
+    const { ad } = await seedAd({ status: "paused", slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "invalid_photos" });
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    await panelService.updateAd(String(ad.id), { price: 45000 }, owner);
+    await blockService.unblockAd("admin-1", ad.id, {});
+
+    expect((await readAd(ad.id)).status).toBe("paused");
+    expect(await publicSearchIds()).not.toContain(String(ad.id));
+  });
+
+  it("previous_status=pending_review: corrigir e reativar NÃO pula a fila", async () => {
+    const { ad } = await seedAd({ status: "pending_review", slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "suspected_fraud" });
+
+    const owner = { id: String((await pool.query(
+      `SELECT u.id FROM users u JOIN advertisers a ON a.user_id = u.id WHERE a.id = $1`,
+      [ad.advertiser_id]
+    )).rows[0].id), role: "user" };
+
+    await panelService.updateAd(String(ad.id), { price: 45000 }, owner);
+    await blockService.unblockAd("admin-1", ad.id, {});
+
+    expect((await readAd(ad.id)).status).toBe("pending_review");
+    expect(await publicSearchIds()).not.toContain(String(ad.id));
+  });
+
+  it("nem o CHECK do banco aceita blocked sem motivo depois da edição", async () => {
+    const { ad } = await seedAd({ slug: nextSlug() });
+    await blockService.blockAd("admin-1", ad.id, { reasonCode: "terms_violation" });
+
+    // Simula o pior caso: alguém tenta limpar o motivo por SQL cru mantendo
+    // o status. A constraint recusa — o estado "bloqueado sem motivo" não é
+    // representável, nem por caminho fora do service.
+    await expect(
+      pool.query(`UPDATE ads SET blocked_reason_code = NULL WHERE id = $1`, [ad.id])
+    ).rejects.toThrow(/ads_blocked_requires_reason_code/);
   });
 });

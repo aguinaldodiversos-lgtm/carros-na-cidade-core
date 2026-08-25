@@ -17,6 +17,7 @@
 //     faz retry/backoff para cold-start e 429.
 
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { readSitemapSnapshot, writeSitemapSnapshot } from "@/lib/seo/sitemap-snapshot";
 
@@ -274,7 +275,7 @@ async function fetchSitemapEntries(
       method: "GET",
       headers: { Accept: "application/json" },
       logTag: LOG_TAG,
-      next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
+      next: { revalidate: SITEMAP_REVALIDATE_SECONDS, tags: [PUBLIC_ADS_CACHE_TAG] },
     });
 
     if (!res.ok) {
