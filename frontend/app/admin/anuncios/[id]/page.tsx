@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { adminApi, type AdDetail, type AdMetrics, type AdEvent } from "@/lib/admin/api";
+import {
+  adminApi,
+  type AdDetail,
+  type AdMetrics,
+  type AdEvent,
+  type AdModerationEvent,
+} from "@/lib/admin/api";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
 import { isHighlightActive } from "@/lib/admin/ads-display";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
@@ -10,6 +16,9 @@ import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminActionDialog } from "@/components/admin/AdminActionDialog";
+import { AdBlockDialog } from "@/components/admin/AdBlockDialog";
+import { AdModerationHistory } from "@/components/admin/AdModerationHistory";
+import { adminLabelForReasonCode, type AdBlockReasonCode } from "@/lib/moderation/ad-block-reasons";
 
 function money(n: number | string | undefined | null) {
   const v = typeof n === "string" ? parseFloat(n) : n;
@@ -32,7 +41,14 @@ function fmtDate(d: string | undefined | null) {
   }
 }
 
-type StatusTarget = "active" | "paused" | "blocked";
+/**
+ * Fase 4.10A: `blocked` saiu daqui.
+ *
+ * Bloquear e reativar deixaram de ser "mais uma troca de status" — cada um tem
+ * modal próprio, motivo obrigatório e endpoint dedicado. Manter `blocked` neste
+ * seletor genérico reabriria o caminho que o backend passou a recusar.
+ */
+type StatusTarget = "active" | "paused";
 
 type DialogState =
   | { type: "none" }
@@ -41,9 +57,11 @@ type DialogState =
   | { type: "clearHighlight" }
   | { type: "priority" }
   | { type: "archive" }
-  | { type: "restore" };
+  | { type: "restore" }
+  | { type: "block" }
+  | { type: "unblock" };
 
-const SENSITIVE_STATUS: ReadonlyArray<StatusTarget> = ["blocked", "paused"];
+const SENSITIVE_STATUS: ReadonlyArray<StatusTarget> = ["paused"];
 
 const STATUS_DIALOG_CONFIG: Record<
   StatusTarget,
@@ -59,11 +77,6 @@ const STATUS_DIALOG_CONFIG: Record<
     confirmLabel: "Pausar",
     confirmColor: "warning",
   },
-  blocked: {
-    title: "Bloquear anúncio?",
-    confirmLabel: "Bloquear",
-    confirmColor: "danger",
-  },
 };
 
 export default function AdminAnuncioDetalhe() {
@@ -77,6 +90,10 @@ export default function AdminAnuncioDetalhe() {
   );
   const events = useAdminFetch<{ ok: boolean; data: AdEvent[] }>(
     () => adminApi.ads.events(id, 30),
+    [id]
+  );
+  const moderationHistory = useAdminFetch<{ ok: boolean; data: AdModerationEvent[] }>(
+    () => adminApi.ads.moderationHistory(id, 50),
     [id]
   );
 
@@ -103,7 +120,12 @@ export default function AdminAnuncioDetalhe() {
   }
 
   async function refreshAll() {
-    await Promise.all([ad.reload(), metrics.reload(), events.reload()]);
+    await Promise.all([
+      ad.reload(),
+      metrics.reload(),
+      events.reload(),
+      moderationHistory.reload(),
+    ]);
   }
 
   async function handleStatusChange(target: StatusTarget, reason: string) {
@@ -111,6 +133,30 @@ export default function AdminAnuncioDetalhe() {
     setDialog({ type: "none" });
     await refreshAll();
     showFlash("success", `Status atualizado para "${target}".`);
+  }
+
+  async function handleBlock(reasonCode: AdBlockReasonCode, note: string) {
+    const result = await adminApi.ads.block(d!.id, reasonCode, note || undefined);
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash(
+      "success",
+      result.changed
+        ? "Anúncio bloqueado. Ele não aparece mais nas áreas públicas."
+        : "Este anúncio já estava bloqueado."
+    );
+  }
+
+  async function handleUnblock(note: string) {
+    const result = await adminApi.ads.unblock(d!.id, note || undefined);
+    setDialog({ type: "none" });
+    await refreshAll();
+    showFlash(
+      "success",
+      result.changed
+        ? `Anúncio reativado (status: ${result.data?.status ?? "restaurado"}).`
+        : "Este anúncio não estava bloqueado."
+    );
   }
 
   async function handleSetHighlight(reason: string) {
@@ -192,6 +238,28 @@ export default function AdminAnuncioDetalhe() {
         </div>
       )}
 
+      {/* Faixa de bloqueio — some assim que o anúncio é reativado. */}
+      {d.status === "blocked" && (
+        <div
+          data-testid="admin-blocked-banner"
+          className="rounded-xl border border-cnc-danger/40 bg-cnc-danger/10 p-4"
+        >
+          <p className="text-sm font-bold text-cnc-danger">Anúncio bloqueado</p>
+          <p className="mt-1 text-xs text-cnc-text">
+            Motivo: {adminLabelForReasonCode(d.blocked_reason_code)}
+            {d.blocked_at ? ` · Bloqueado em ${fmtDate(d.blocked_at)}` : ""}
+          </p>
+          {d.blocked_reason && (
+            <p className="mt-1 break-words text-xs text-cnc-muted">
+              Observação interna: {d.blocked_reason}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-cnc-muted">
+            Ele não aparece em nenhuma área pública do portal enquanto estiver bloqueado.
+          </p>
+        </div>
+      )}
+
       {/* Info + Actions Grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Main Info */}
@@ -253,7 +321,9 @@ export default function AdminAnuncioDetalhe() {
           <div className="rounded-xl border border-cnc-line bg-white p-5 shadow-card">
             <h2 className="text-sm font-bold text-cnc-text mb-3">Ações</h2>
             <div className="flex flex-wrap gap-2">
-              {d.status !== "active" && (
+              {/* Bloqueado sai pela reativação, não por "Ativar" — o backend
+                  recusa a via genérica, então o botão só levaria a um erro. */}
+              {d.status !== "active" && d.status !== "blocked" && (
                 <ActionBtn
                   label="Ativar"
                   color="bg-cnc-success text-white"
@@ -267,18 +337,18 @@ export default function AdminAnuncioDetalhe() {
                   onClick={() => setDialog({ type: "status", target: "paused" })}
                 />
               )}
-              {d.status !== "blocked" && (
+              {d.status !== "blocked" && d.status !== "deleted" && (
                 <ActionBtn
-                  label="Bloquear"
+                  label="Bloquear anúncio"
                   color="bg-cnc-danger text-white"
-                  onClick={() => setDialog({ type: "status", target: "blocked" })}
+                  onClick={() => setDialog({ type: "block" })}
                 />
               )}
               {d.status === "blocked" && (
                 <ActionBtn
-                  label="Desbloquear"
+                  label="Reativar anúncio"
                   color="bg-cnc-success text-white"
-                  onClick={() => setDialog({ type: "status", target: "active" })}
+                  onClick={() => setDialog({ type: "unblock" })}
                 />
               )}
               <ActionBtn
@@ -354,6 +424,11 @@ export default function AdminAnuncioDetalhe() {
               </div>
             )}
           </div>
+
+          <AdModerationHistory
+            events={moderationHistory.data?.data ?? []}
+            loading={moderationHistory.loading}
+          />
         </div>
       </div>
 
@@ -484,6 +559,33 @@ export default function AdminAnuncioDetalhe() {
           requireReason
           reasonPlaceholder="Motivo (obrigatório — registrado em admin_actions)"
           onConfirm={handleRestore}
+          onCancel={() => setDialog({ type: "none" })}
+        />
+      )}
+
+      {/* Fase 4.10A — moderação administrativa */}
+      {dialog.type === "block" && (
+        <AdBlockDialog
+          adId={d.id}
+          adTitle={d.title}
+          onConfirm={handleBlock}
+          onCancel={() => setDialog({ type: "none" })}
+        />
+      )}
+
+      {dialog.type === "unblock" && (
+        <AdminActionDialog
+          open
+          title="Reativar anúncio?"
+          description={
+            "O anúncio voltará a ficar disponível publicamente, desde que continue " +
+            "atendendo às demais regras de publicação."
+          }
+          confirmLabel="Reativar anúncio"
+          confirmColor="primary"
+          showReason
+          reasonPlaceholder="Observação administrativa (opcional, uso interno)"
+          onConfirm={handleUnblock}
           onCancel={() => setDialog({ type: "none" })}
         />
       )}

@@ -122,4 +122,9 @@ export const MODERATION_EVENT = Object.freeze({
   CORRECTION_REQUESTED: "correction_requested",
   BOOST_BLOCKED_DUE_TO_STATUS: "boost_blocked_due_to_status",
   STRUCTURAL_FIELD_CHANGE_DETECTED: "structural_field_change_detected",
+  // Fase 4.10A — moderação administrativa. São DOIS eventos distintos de
+  // propósito: a trilha é append-only, então reativar NÃO atualiza o evento de
+  // bloqueio, acrescenta um novo. O histórico preserva as duas decisões.
+  ADMIN_BLOCKED: "admin_blocked",
+  ADMIN_UNBLOCKED: "admin_unblocked",
 });

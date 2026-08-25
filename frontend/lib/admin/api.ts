@@ -1,3 +1,5 @@
+import type { AdBlockReasonCode } from "@/lib/moderation/ad-block-reasons";
+
 type FetchOpts = { method?: string; body?: unknown; params?: Record<string, string | number> };
 
 /**
@@ -113,6 +115,26 @@ export const adminApi = {
     metrics: (id: string | number) => adminFetch<ApiOne<AdMetrics>>(`ads/${id}/metrics`),
     events: (id: string | number, limit = 50) =>
       adminFetch<ApiOne<AdEvent[]>>(`ads/${id}/events`, { params: { limit } }),
+
+    // Fase 4.10A — moderação administrativa.
+    //
+    // `reasonCode` é obrigatório no tipo para que nenhum caller TypeScript
+    // consiga bloquear sem motivo; o backend valida de novo, porque uma
+    // chamada direta (curl, integração) não passa por este arquivo.
+    block: (id: string | number, reasonCode: AdBlockReasonCode, note?: string) =>
+      adminFetch<AdModerationResult>(`ads/${id}/block`, {
+        method: "PATCH",
+        body: { reason_code: reasonCode, note },
+      }),
+    unblock: (id: string | number, note?: string) =>
+      adminFetch<AdModerationResult>(`ads/${id}/unblock`, {
+        method: "PATCH",
+        body: { note },
+      }),
+    moderationHistory: (id: string | number, limit = 50) =>
+      adminFetch<ApiOne<AdModerationEvent[]>>(`ads/${id}/moderation-history`, {
+        params: { limit },
+      }),
   },
   advertisers: {
     list: (p: Record<string, string | number> = {}) =>
@@ -923,7 +945,11 @@ export type AdRow = {
   highlight_until: string | null;
   created_at: string;
   updated_at: string;
-  blocked_reason?: string;
+  /** Observação administrativa do bloqueio (nota interna — nunca vai ao dono). */
+  blocked_reason?: string | null;
+  /** Fase 4.10A — código estável do motivo do bloqueio. */
+  blocked_reason_code?: AdBlockReasonCode | null;
+  blocked_at?: string | null;
   advertiser_id: number;
   advertiser_name: string;
 };
@@ -962,6 +988,29 @@ export type AdMetrics = {
   ctr: number;
 };
 export type AdEvent = { id: number; ad_id: number; event_type: string; created_at: string };
+
+/**
+ * Fase 4.10A — uma entrada do histórico de moderação.
+ *
+ * Repare no que NÃO está aqui: nenhum campo identifica o administrador. O
+ * backend já monta o DTO sem `actor_user_id`; o tipo reflete isso para que
+ * nenhum componente tente renderizar algo que não vem.
+ */
+export type AdModerationEvent = {
+  id: number;
+  event_type: "admin_blocked" | "admin_unblocked";
+  from_status: string | null;
+  to_status: string | null;
+  reason_code: AdBlockReasonCode | null;
+  note: string | null;
+  created_at: string;
+};
+
+/**
+ * Resposta de bloquear/reativar. `changed: false` = o estado já era o
+ * desejado (retry idempotente), não um erro.
+ */
+export type AdModerationResult = { ok: boolean; changed: boolean; data: AdRow };
 
 export type AdvRow = {
   id: number;

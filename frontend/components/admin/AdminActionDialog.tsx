@@ -14,6 +14,16 @@ type Props = {
   reasonPlaceholder?: string;
   /** Slot opcional para inputs adicionais (ex.: dias de destaque, prioridade). */
   extra?: ReactNode;
+  /**
+   * Trava o confirm por uma condição do PRÓPRIO caller, sem passar por
+   * `requireReason`.
+   *
+   * Existe porque um diálogo com campo próprio no slot `extra` (o seletor de
+   * motivo do bloqueio) precisa travar o botão por causa DESSE campo — e usar
+   * `requireReason` para isso exibiria "Motivo obrigatório." logo abaixo de um
+   * campo rotulado "(opcional)", dizendo ao admin o contrário do que vale.
+   */
+  confirmDisabled?: boolean;
   onConfirm: (reason: string) => Promise<unknown> | unknown;
   onCancel: () => void;
 };
@@ -34,6 +44,7 @@ export function AdminActionDialog({
   requireReason = false,
   reasonPlaceholder = "Motivo (opcional)",
   extra,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: Props) {
@@ -54,7 +65,7 @@ export function AdminActionDialog({
 
   const trimmedReason = reason.trim();
   const reasonBlocked = requireReason && trimmedReason.length === 0;
-  const disabled = busy || reasonBlocked;
+  const disabled = busy || reasonBlocked || confirmDisabled;
 
   async function handle() {
     if (disabled) return;
