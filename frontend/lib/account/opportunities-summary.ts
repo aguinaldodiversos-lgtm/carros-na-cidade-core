@@ -77,13 +77,42 @@ export async function fetchOpportunitiesSummary(
 }
 
 /**
- * "+18% nos últimos 7 dias" — ou a frase neutra, quando não há base.
+ * A explicação da tendência, para `title` / leitor de tela.
  *
- * A frase de fallback NÃO é "0%" nem "—": ela diz por que não há número. Um
+ * Uma frase, e a mesma para os quatro cartões: o que muda entre eles é O QUE
+ * entrou, não COMO a comparação é feita.
+ */
+export const TREND_EXPLANATION =
+  "Compara as novas oportunidades recebidas nos últimos 7 dias com os 7 dias anteriores.";
+
+/**
+ * "+18% novas entradas" — ou a frase neutra, quando não há base.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * POR QUE NÃO "+18% NOS ÚLTIMOS 7 DIAS"
+ * ════════════════════════════════════════════════════════════════════════════
+ * Era a redação anterior, e ela dizia algo falso ao lado do número principal.
+ *
+ * "Compradores ativos / 128 / +18% nos últimos 7 dias" se lê como "há 18% mais
+ * compradores ativos do que havia há 7 dias". Não é isso que a conta faz: 128 é
+ * o ESTOQUE atual (procuras ativas e não vencidas), e os 18% comparam quantas
+ * procuras ENTRARAM nesta janela contra a janela anterior. As duas coisas podem
+ * andar em direções opostas — o estoque cai enquanto a entrada acelera, se
+ * muitas vencerem no mesmo período.
+ *
+ * `entriesLabel` diz explicitamente que a variação é de FLUXO, não de estoque. E
+ * é parâmetro, e não constante, porque o que entra é diferente em cada cartão:
+ * procuras e solicitações são "novas entradas"; negócios fechados são "novas
+ * compras". Um rótulo único obrigaria o de compras a mentir por generalidade.
+ *
+ * A frase de ausência NÃO é "0%" nem "—": ela diz por que não há número. Um
  * traço obrigaria o lojista a adivinhar se a métrica caiu a zero ou se o
  * sistema não conseguiu calcular, e as duas leituras levam a decisões opostas.
  */
-export function describeTrend(trend: OpportunityTrend | null): {
+export function describeTrend(
+  trend: OpportunityTrend | null,
+  entriesLabel = "novas entradas"
+): {
   label: string;
   tone: "positive" | "negative" | "neutral";
 } {
@@ -92,7 +121,7 @@ export function describeTrend(trend: OpportunityTrend | null): {
   }
 
   if (trend.direction === "flat") {
-    return { label: "estável nos últimos 7 dias", tone: "neutral" };
+    return { label: `${entriesLabel} estáveis`, tone: "neutral" };
   }
 
   // O "%" é concatenado à mão em vez de `style: "percent"`: o formatador do Intl
@@ -104,7 +133,7 @@ export function describeTrend(trend: OpportunityTrend | null): {
   });
 
   return {
-    label: `${trend.direction === "up" ? "+" : "−"}${value}% nos últimos 7 dias`,
+    label: `${trend.direction === "up" ? "+" : "−"}${value}% ${entriesLabel}`,
     tone: trend.direction === "up" ? "positive" : "negative",
   };
 }

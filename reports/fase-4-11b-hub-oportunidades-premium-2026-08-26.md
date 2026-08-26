@@ -55,7 +55,7 @@ diferentes de cada lado. Azul = vender; verde-água = comprar.
 ## 4. A decisão mais importante desta fase: os números são contados
 
 A referência visual mostra `128`, `76`, `34`, `22` e quatro etiquetas verdes
-("+18% nos últimos 7 dias").
+("+18% nos últimos 7 dias" — redação que a §13 depois corrigiu; ver lá o porquê).
 
 **Auditoria: nenhum dos oito existia.**
 
@@ -64,7 +64,7 @@ A referência visual mostra `128`, `76`, `34`, `22` e quatro etiquetas verdes
 | contagem de compradores ativos | **não** — o feed de procuras não tem `COUNT` nenhum |
 | contagem de veículos para avaliação | sim (`summary.total` do feed) |
 | novas oportunidades hoje | parcial (só do lado das solicitações) |
-| negócios em andamento | **não** |
+| compras em andamento | **não** |
 | as quatro variações de 7 dias | **não** — não há tabela de histórico |
 
 Havia dois caminhos: preencher com números ilustrativos, ou construir a fonte.
@@ -87,7 +87,7 @@ frontend/app/api/account/opportunities/summary/route.ts          ← BFF
 | Compradores ativos | `purchase_intents` `status='active' AND expires_at > NOW()` na cidade da loja — **o mesmo predicado de `listActiveByCity`** |
 | Veículos para avaliação | `sale_requests` `status='receiving_offers'` na cidade — **o mesmo predicado do feed** |
 | Novas oportunidades hoje | soma das entradas de hoje nos dois produtos |
-| Negócios em andamento | `sale_requests` em `SALE_REQUEST_SELECTED_STATUSES` cuja **oferta selecionada é desta loja** |
+| Compras em andamento | `sale_requests` em `SALE_REQUEST_SELECTED_STATUSES` cuja **oferta selecionada é desta loja** |
 
 **As variações são computáveis sem histórico**: comparam o que entrou nos
 últimos 7 dias com o que entrou nos 7 dias anteriores, lido de `created_at` (e
@@ -179,8 +179,9 @@ documento se algum pai tiver `overflow`).
 | suíte | resultado |
 |---|---|
 | `tests/dealers/` (novo) | **17 passando** |
-| `components/account/opportunities/` (novo) | **11 passando** |
-| E2E `dealer-opportunities-hub.spec.ts` (novo) | **17 passando** |
+| `components/account/opportunities/` (novo) | **17 passando** |
+| `app/dashboard-loja/oportunidades/page.copy.test.ts` (novo) | **4 passando** |
+| E2E `dealer-opportunities-hub.spec.ts` (novo) | **18 passando** |
 | typecheck + lint | limpos |
 
 O fake do teste de backend **re-implementa as janelas e o escopo**, não devolve
@@ -212,7 +213,7 @@ que ninguém precise prever o nome dele.
 1. **`purchase_intents` não tem índice para as janelas de data.** Com uma cidade
    e dezenas de linhas isso é irrelevante; com milhares, `created_at` por cidade
    pede índice. Medir antes de criar.
-2. **"Negócios em andamento" conta só o lado das solicitações de venda.** Ofertas
+2. **"Compras em andamento" cobre só o lado COMPRA — e o rótulo agora diz isso.** Ofertas
    enviadas pelo lojista em procuras ativas (`purchase_intent_offers`) também são
    negócio em andamento, mas a tabela não tem status — não há como distinguir
    "viva" de "abandonada" sem inventar critério.
@@ -233,3 +234,109 @@ que ninguém precise prever o nome dele.
 - [x] responsivo em 7 larguras, sem overflow
 - [x] sem migration
 - [x] navegação funcional inalterada (os dois destinos são os mesmos)
+
+---
+
+## 13. Correção semântica pré-push
+
+A arquitetura visual e técnica desta fase foi aprovada como estava. Esta rodada
+não redesenhou nada: corrigiu **três textos que descreviam mais (ou outra coisa)
+do que os dados entregam**.
+
+### 13.1 "Negócios em andamento" → **"Compras em andamento"**
+
+A fonte conta UMA coisa: solicitações de venda cuja oferta selecionada é desta
+loja. Isso é o lado **compra** — veículos que a loja está adquirindo para repor
+estoque.
+
+"Negócios" abrange os dois produtos, e o outro lado **não está ali**: as ofertas
+que a loja envia a compradores ativos vivem em `purchase_intent_offers`, que não
+tem ciclo de vida capaz de distinguir uma oferta viva de uma abandonada. Contar
+todas inflaria o número com negócio que já morreu; não contar nenhuma é a decisão
+atual — e o rótulo precisa dizer isso.
+
+Descartadas por sugerirem os dois produtos: "Negociações em andamento", "Vendas
+em andamento". Há teste negativo para as três redações.
+
+### 13.2 O número é ESTOQUE; a tendência é FLUXO
+
+Era a divergência mais séria, e ela não tinha sintoma visível:
+
+```
+Compradores ativos
+128                        ← estoque: procuras ativas e não vencidas AGORA
++18% nos últimos 7 dias    ← fluxo: entradas nesta janela vs. a anterior
+```
+
+Lido junto, aquilo afirmava "há 18% mais compradores ativos do que há 7 dias".
+A conta não faz isso. As duas medidas podem inclusive andar em **direções
+opostas** — o estoque cai enquanto a entrada acelera, se muitas procuras vencerem
+no mesmo período.
+
+A copy passou a nomear o que entrou:
+
+| cartão | tendência | por quê |
+|---|---|---|
+| Compradores ativos | `+18% novas entradas` | procuras que chegaram na janela |
+| Veículos para avaliação | `+12% novas entradas` | solicitações que chegaram |
+| Novas oportunidades hoje | `+9% novas entradas em 7 dias` | **declara a janela** |
+| Compras em andamento | `+5% novas compras` | o que entra ali é negócio fechado |
+
+**Por que só um declara a janela (§8):** é o único cartão em que número e
+tendência falam de períodos diferentes — o número conta HOJE, a tendência compara
+semanas. Sem "em 7 dias", "+9% novas entradas" embaixo de um número diário se
+leria como "9% a mais que ontem", e o backend não faz essa conta. Nos outros três
+o número é estoque atual e não sugere janela nenhuma, então repetir o sufixo
+quatro vezes só encheria a régua.
+
+**Por que "novas compras" e não "novas entradas" no quarto:** o que entra ali é
+negócio fechado, não oportunidade recebida. E não "+5% compras em andamento",
+que pareceria variação do estoque — exatamente o erro que esta correção desfaz.
+
+A explicação da janela vai em `title` + `aria-label` (§6), com o atributo nativo:
+`"Compara as novas oportunidades recebidas nos últimos 7 dias com os 7 dias
+anteriores."` Sem biblioteca de tooltip nova.
+
+`trend: null` continua virando **"sem base de comparação"** — inalterado.
+
+### 13.3 "sua região" → **"sua cidade"**
+
+`listActiveByCity` filtra por `pi.city_id = <cidade da loja>`. Igualdade — sem
+raio, sem `region_memberships`, sem vizinhança.
+
+"Receba demandas reais da sua região" prometia abrangência que a consulta não
+entrega, e a promessa quebrada apareceria do pior jeito: o lojista de Atibaia
+esperando ver procuras de Bragança, não vendo nenhuma, e concluindo que **não há
+compradores**.
+
+O conserto é a copy refletir o backend, **não o contrário** (§12): expandir o
+escopo para região é decisão de produto, com custo de consulta e de precificação
+territorial. Varredura completa no escopo desta fase: uma única ocorrência, já
+corrigida; os componentes vizinhos (listas de compradores e de veículos) não
+usam o termo.
+
+### 13.4 O custo de layout que a correção trouxe — e como apareceu
+
+"novas entradas em 7 dias" é o texto mais longo dos quatro e quebra em duas
+linhas na largura de quatro colunas. Com `items-center` no cartão, um bloco de
+texto mais alto **sobe o número dele em ~7px**, e a régua horizontal dos quatro
+números deixa de existir.
+
+Nenhum teste de texto veria isso. Quem acusou foi a asserção de geometria
+acrescentada ao E2E nesta mesma rodada:
+
+```
+Error: números em 2 alturas diferentes: 306, 306, 299, 306
+```
+
+Corrigido reservando a segunda linha da tendência a partir de `xl` — a mesma
+técnica (e a mesma justificativa) já usada no rótulo. O esqueleto acompanha.
+
+### 13.5 O que NÃO mudou
+
+Endpoint, SQL, janelas, escopo por cidade, regra do `trend: null`, contagens,
+privacidade estrutural, layout, ilustrações, responsividade, sidebar. Nenhuma
+migration. Os testes de backend seguem os mesmos 17, sem enfraquecimento.
+
+A dívida de `purchase_intent_offers` **permanece registrada e não foi tocada**:
+não há status, não foi inventado timeout e nada foi inferido como "abandonada".

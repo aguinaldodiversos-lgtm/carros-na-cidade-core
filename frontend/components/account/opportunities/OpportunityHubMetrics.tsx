@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  TREND_EXPLANATION,
   describeTrend,
   fetchOpportunitiesSummary,
   type DealerOpportunitiesSummary,
@@ -77,8 +78,14 @@ const ICON = {
   ),
 } as const;
 
-function TrendLine({ metric }: { metric: OpportunityMetric }) {
-  const trend = describeTrend(metric.trend);
+function TrendLine({
+  metric,
+  entriesLabel,
+}: {
+  metric: OpportunityMetric;
+  entriesLabel: string;
+}) {
+  const trend = describeTrend(metric.trend, entriesLabel);
 
   const toneClass =
     trend.tone === "positive"
@@ -88,7 +95,34 @@ function TrendLine({ metric }: { metric: OpportunityMetric }) {
         : "text-[#98A2B3]";
 
   return (
-    <p className={`mt-1 text-[11.5px] font-semibold leading-tight ${toneClass}`}>
+    /*
+      `title` carrega a explicação da janela (§6). É o atributo nativo, e não um
+      componente de tooltip novo: o projeto não tem um, e criar biblioteca para
+      uma frase seria trocar um problema de texto por um de manutenção.
+
+      O mesmo texto vai em `aria-label`, porque `title` não é anunciado de forma
+      confiável por leitor de tela. A frase começa pelo rótulo visível para que a
+      leitura não perca o número.
+    */
+    /*
+      `xl:min-h-[29px]` — DUAS LINHAS RESERVADAS, pelo mesmo motivo do rótulo.
+
+      "novas entradas em 7 dias" é o texto mais longo dos quatro e quebra em duas
+      linhas na largura de quatro colunas. Com `items-center` no cartão, um bloco
+      de texto mais alto sobe o número dele em ~7px — e a régua horizontal dos
+      quatro números, que é o que faz a faixa ser lida de relance, deixa de
+      existir.
+
+      Isso não foi previsto: foi a asserção de altura no E2E que acusou
+      (`números em 2 alturas diferentes: 306, 306, 299, 306`). A correção de copy
+      tinha um custo de layout que nenhum teste de texto veria.
+    */
+    <p
+      className={`mt-1 text-[11.5px] font-semibold leading-tight xl:min-h-[29px] ${toneClass}`}
+      title={TREND_EXPLANATION}
+      aria-label={`${trend.label}. ${TREND_EXPLANATION}`}
+      data-testid="dealer-hub-trend"
+    >
       {/*
         O glifo acompanha a cor (§ acessibilidade): quem não distingue verde de
         vermelho continua lendo a direção. A seta é `aria-hidden` porque o texto
@@ -105,12 +139,18 @@ function TrendLine({ metric }: { metric: OpportunityMetric }) {
 
 function MetricCard({
   label,
+  hint,
+  entriesLabel,
   metric,
   tone,
   icon,
   testId,
 }: {
   label: string;
+  /** O que o NÚMERO conta, quando o rótulo sozinho não deixa claro. */
+  hint?: string;
+  /** O que ENTROU na janela — completa a frase da tendência. */
+  entriesLabel: string;
   metric: OpportunityMetric;
   tone: MetricTone;
   icon: React.ReactNode;
@@ -145,13 +185,21 @@ function MetricCard({
           que quebra) é o que mantém o alinhamento mesmo se um rótulo mudar de
           tamanho depois.
         */}
-        <p className="flex items-start text-[12.5px] leading-tight text-[#667085] xl:min-h-[31px]">
+        <p
+          className="flex items-start text-[12.5px] leading-tight text-[#667085] xl:min-h-[31px]"
+          /*
+            `hint` explica o que o NÚMERO conta, quando o rótulo curto não basta.
+            Vai em `title` porque é desambiguação, não conteúdo: quem já entendeu
+            o cartão não precisa de mais uma linha de texto na régua.
+          */
+          title={hint}
+        >
           {label}
         </p>
         <p className="text-[26px] font-bold leading-none tabular-nums text-[#161f34]">
           {metric.total.toLocaleString("pt-BR")}
         </p>
-        <TrendLine metric={metric} />
+        <TrendLine metric={metric} entriesLabel={entriesLabel} />
       </div>
     </li>
   );
@@ -176,7 +224,9 @@ function MetricSkeleton() {
           <span className="block h-[13px] w-24 animate-pulse rounded bg-[#EEF2F8]" />
         </span>
         <span className="block h-[26px] w-14 animate-pulse rounded bg-[#EEF2F8]" />
-        <span className="mt-1 block h-[14px] w-28 animate-pulse rounded bg-[#F4F6FA]" />
+        <span className="mt-1 flex xl:min-h-[29px]">
+          <span className="block h-[14px] w-28 animate-pulse rounded bg-[#F4F6FA]" />
+        </span>
       </div>
     </li>
   );
@@ -243,8 +293,26 @@ export default function OpportunityHubMetrics() {
       className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4"
       data-testid="dealer-hub-metrics"
     >
+      {/*
+        ────────────────────────────────────────────────────────────────────────
+        CADA CARTÃO DIZ O QUE ENTROU — E SÓ UM PRECISA DIZER A JANELA
+        ────────────────────────────────────────────────────────────────────────
+        Nos três primeiros, o `entriesLabel` é "novas entradas": procuras e
+        solicitações que chegaram na janela. No quarto é "novas compras", porque
+        o que entra ali é negócio fechado, não oportunidade recebida — e
+        "entradas" ali seria generalidade a ponto de mentir.
+
+        "Novas oportunidades hoje" é o ÚNICO que declara a janela no rótulo
+        ("em 7 dias"). O motivo é a divergência entre número e tendência: o
+        número conta HOJE, a tendência compara semanas. Nos outros três o número
+        é estoque atual e não sugere janela nenhuma, então repetir "em 7 dias"
+        quatro vezes só encheria a régua. Aqui, sem isso, "+9% novas entradas"
+        embaixo de um número diário se leria como "9% a mais que ontem".
+      */}
       <MetricCard
         label="Compradores ativos"
+        hint="Procuras de compra ativas e não vencidas na cidade da sua loja."
+        entriesLabel="novas entradas"
         metric={summary.active_buyers}
         tone="blue"
         icon={ICON.buyers}
@@ -252,6 +320,8 @@ export default function OpportunityHubMetrics() {
       />
       <MetricCard
         label="Veículos para avaliação"
+        hint="Veículos recebendo propostas na cidade da sua loja."
+        entriesLabel="novas entradas"
         metric={summary.sale_requests}
         tone="teal"
         icon={ICON.car}
@@ -259,13 +329,30 @@ export default function OpportunityHubMetrics() {
       />
       <MetricCard
         label="Novas oportunidades hoje"
+        hint="Procuras e veículos publicados hoje na cidade da sua loja."
+        entriesLabel="novas entradas em 7 dias"
         metric={summary.new_today}
         tone="indigo"
         icon={ICON.chart}
         testId="dealer-hub-metric-new-today"
       />
+      {/*
+        "COMPRAS em andamento", e não "negócios".
+
+        A fonte conta UMA coisa: solicitações de venda cuja oferta selecionada é
+        desta loja. Isso é o lado COMPRA do produto — veículos que a loja está
+        adquirindo para repor estoque. "Negócios" abrangeria também o lado venda
+        (ofertas enviadas a compradores ativos), e esse lado NÃO está aqui:
+        `purchase_intent_offers` não tem ciclo de vida que permita distinguir uma
+        oferta viva de uma abandonada, e contá-las todas inflaria o número com
+        negócio que não existe mais.
+
+        O rótulo amplo era o defeito: prometia os dois produtos e entregava um.
+      */}
       <MetricCard
-        label="Negócios em andamento"
+        label="Compras em andamento"
+        hint="Veículos em processo de compra pela sua loja."
+        entriesLabel="novas compras"
         metric={summary.deals_in_progress}
         tone="amber"
         icon={ICON.deal}

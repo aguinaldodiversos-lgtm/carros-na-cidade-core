@@ -117,12 +117,32 @@ test.describe("@dealer-hub desktop", () => {
     await expect(strip).toBeVisible();
 
     await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText("128");
-    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
-      "+18% nos últimos 7 dias"
-    );
     await expect(page.getByTestId("dealer-hub-metric-vehicles")).toContainText("76");
     await expect(page.getByTestId("dealer-hub-metric-new-today")).toContainText("34");
     await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText("22");
+
+    /*
+      §5 — A TENDÊNCIA DIZ QUE MEDE FLUXO.
+
+      "128 / +18% nos últimos 7 dias" se lia como "há 18% mais compradores
+      ativos do que há 7 dias". Falso: 128 é o ESTOQUE atual e os 18% comparam
+      quantas procuras ENTRARAM na janela contra a janela anterior.
+    */
+    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
+      "+18% novas entradas"
+    );
+    await expect(page.getByTestId("dealer-hub-metric-vehicles")).toContainText(
+      "+12% novas entradas"
+    );
+    // §8 — o cartão diário declara a janela, porque número e tendência divergem.
+    await expect(page.getByTestId("dealer-hub-metric-new-today")).toContainText(
+      "+9% novas entradas em 7 dias"
+    );
+    // §9 — o que entra em compras são COMPRAS.
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
+      "+5% novas compras"
+    );
+    await expect(strip).not.toContainText("nos últimos 7 dias");
 
     // Quatro cartões numa linha só em 1440 — é a faixa da referência.
     const tops = await page.evaluate(() => {
@@ -131,8 +151,68 @@ test.describe("@dealer-hub desktop", () => {
     });
     expect(new Set(tops).size, `cartões em ${new Set(tops).size} linha(s)`).toBe(1);
 
+    /*
+      §16 — A RÉGUA DOS NÚMEROS RESISTE À COPY NOVA.
+
+      "novas entradas em 7 dias" é o rótulo mais longo dos quatro e quebra em
+      duas linhas na largura de quatro colunas. A quebra é aceita: o §8 pede a
+      janela declarada nesse cartão, e ela vale mais que uma linha economizada.
+
+      O que NÃO pode ceder é a altura dos quatro números — é ela que faz a faixa
+      ser lida de relance, e uma quebra abaixo do número não a afeta. Esta
+      asserção é a prova de que a troca de texto não empurrou nada: sem ela, o
+      próximo rótulo mais longo poderia desalinhar a régua sem que ninguém visse.
+    */
+    const numberTops = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('[data-testid^="dealer-hub-metric-"]')];
+      return cards.map((card) => {
+        // O número é o único elemento com `tabular-nums` dentro do cartão.
+        const value = card.querySelector<HTMLElement>(".tabular-nums")!;
+        return Math.round(value.getBoundingClientRect().top);
+      });
+    });
+    expect(
+      new Set(numberTops).size,
+      `números em ${new Set(numberTops).size} alturas diferentes: ${numberTops.join(", ")}`
+    ).toBe(1);
+
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: `${SHOTS}/01-hub-desktop-1440.png` });
+  });
+
+  /**
+   * §2 e §10 — as duas correções de semântica, no render real.
+   *
+   * Componente e teste de copy já as travam isoladamente. Aqui prova-se que a
+   * PÁGINA MONTADA não traz nenhuma das duas redações antigas por outro caminho
+   * — um texto herdado do shell, uma sobra de outro componente, qualquer coisa
+   * que uma asserção por `data-testid` não veria.
+   */
+  test("§2/§10 — 'Compras em andamento' e 'sua cidade', sem os termos antigos", async ({
+    page,
+  }) => {
+    await prepare(page);
+    await page.goto(HUB_PATH);
+    await expect(page.getByTestId("dealer-hub-metrics")).toBeVisible();
+
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
+      "Compras em andamento"
+    );
+    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText(
+      "Receba demandas reais da sua cidade"
+    );
+
+    // A varredura é no texto VISÍVEL da página inteira.
+    const visible = await page.locator("main").innerText();
+    for (const term of [
+      "Negócios em andamento",
+      "Negociações em andamento",
+      "Vendas em andamento",
+      "sua região",
+      "da região",
+    ]) {
+      expect(visible, `redação antiga na tela: ${term}`).not.toContain(term);
+    }
   });
 
   test("os dois caminhos ficam lado a lado, com botões alinhados", async ({ page }) => {
@@ -330,6 +410,20 @@ test.describe("@dealer-hub responsivo", () => {
     const buyers = (await boxOf(page, "dealer-hub-card-buyers"))!;
     const vehicles = (await boxOf(page, "dealer-hub-card-vehicles"))!;
     expect(vehicles.y).toBeGreaterThan(buyers.y + buyers.height - 1);
+
+    // §15 — as mesmas garantias semânticas do desktop valem no celular. Os
+    // rótulos são os que mais mudam de forma aqui (uma coluna, texto inteiro),
+    // e é a largura em que uma quebra ruim passaria despercebida no desktop.
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
+      "Compras em andamento"
+    );
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
+      "+5% novas compras"
+    );
+    const visible = await page.locator("main").innerText();
+    expect(visible).not.toContain("Negócios em andamento");
+    expect(visible).not.toContain("sua região");
+    expect(visible).toContain("Receba demandas reais da sua cidade");
 
     await page.screenshot({ path: `${SHOTS}/04-hub-mobile-390.png` });
   });

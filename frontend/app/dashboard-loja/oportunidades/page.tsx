@@ -53,8 +53,21 @@ export const dynamic = "force-dynamic";
  * EXISTE, e nada de card desabilitado anunciando o que ainda não foi construído.
  */
 
+/*
+  "SUA CIDADE", E NÃO "SUA REGIÃO".
+
+  A consulta que alimenta este caminho é `pi.city_id = <cidade da loja>` — uma
+  igualdade, sem raio, sem `region_memberships`, sem vizinhança. "Região"
+  prometia uma abrangência que a query não entrega, e a promessa quebrada
+  apareceria do pior jeito possível: o lojista de Atibaia esperando ver procuras
+  de Bragança, não vendo nenhuma, e concluindo que não há compradores.
+
+  O conserto é a copy refletir o backend — não o contrário. Expandir o escopo
+  para região é decisão de produto, com custo de consulta e de precificação
+  territorial, e não cabe numa correção de texto.
+*/
 const BUYERS_BENEFITS = [
-  "Receba demandas reais da sua região",
+  "Receba demandas reais da sua cidade",
   "Ofereça veículos do seu estoque",
   "Aumente suas chances de venda",
 ] as const;
