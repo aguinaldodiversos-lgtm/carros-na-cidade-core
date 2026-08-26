@@ -17,8 +17,14 @@ antes de criar a branch, e `git pull --ff-only origin main` respondeu
 
 ## 3. HEAD
 
-Ver a seção **20. Entrega / Git** ao final — o commit é o último passo e o hash
-está registrado lá.
+Commit de implementação: **`71040c5e473d3215160cf9566194541d550de1ba`**
+(`feat(compradores-ativos): a grade que o lojista lê antes de ler`).
+
+27 arquivos, +4066 / −162. Este relatório é fechado por um commit `docs`
+seguinte — um arquivo não pode conter o hash do commit que o cria.
+
+`git rev-list --left-right --count origin/main...HEAD` → `0 1` no momento do
+commit de implementação (nenhum commit atrás da main).
 
 Os quatro arquivos locais protegidos do usuário
 (`frontend/public/images/lojista-detalhe-veiculo-referencia.png`,
