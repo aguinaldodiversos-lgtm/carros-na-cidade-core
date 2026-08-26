@@ -25,7 +25,17 @@ Os quatro arquivos locais protegidos do usuário (3 imagens de referência em
 
 ## 3. HEAD
 
-Ver §20 (Entrega) — preenchido no commit final.
+Dois commits, **2 à frente de `origin/main` e 0 atrás**:
+
+| commit | conteúdo |
+|---|---|
+| `cdfd368ba0f4a6b159f7175c416b01c8e455cc75` | a fase inteira (código, testes, E2E, screenshots) |
+| HEAD | este relatório |
+
+O hash do HEAD não é fixado aqui de propósito: um documento que cita o próprio
+commit muda o commit ao ser corrigido. Leia com `git rev-parse HEAD`.
+
+**Não pushado, sem PR, sem merge, sem deploy.**
 
 ---
 
