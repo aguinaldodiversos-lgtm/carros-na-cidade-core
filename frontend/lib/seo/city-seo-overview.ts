@@ -1,4 +1,5 @@
 import "server-only";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
@@ -135,7 +136,7 @@ export async function loadCitySeoOverview(slug: string): Promise<CitySeoOverview
         method: "GET",
         headers: { "Content-Type": "application/json" },
         logTag: "city-seo-overview",
-        next: { revalidate: 60 },
+        next: { revalidate: 60, tags: [PUBLIC_ADS_CACHE_TAG] },
       }
     );
 

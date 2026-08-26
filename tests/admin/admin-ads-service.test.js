@@ -59,11 +59,11 @@ describe("admin ads service", () => {
 
     it("successfully changes status and records audit", async () => {
       vi.mocked(repo.findById).mockResolvedValue({ id: "1", status: "active" });
-      vi.mocked(repo.updateStatus).mockResolvedValue({ id: "1", status: "blocked" });
+      vi.mocked(repo.updateStatus).mockResolvedValue({ id: "1", status: "paused" });
 
-      const result = await changeAdStatus("admin1", "1", "blocked", "policy violation");
+      const result = await changeAdStatus("admin1", "1", "paused", "ajuste operacional");
 
-      expect(repo.updateStatus).toHaveBeenCalledWith("1", "blocked");
+      expect(repo.updateStatus).toHaveBeenCalledWith("1", "paused");
       expect(recordAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({
           adminUserId: "admin1",
@@ -72,7 +72,32 @@ describe("admin ads service", () => {
           targetId: "1",
         })
       );
-      expect(result.status).toBe("blocked");
+      expect(result.status).toBe("paused");
+    });
+
+    // Fase 4.10A — a via genérica não bloqueia nem desbloqueia mais.
+    //
+    // Estes dois testes são o que impede a garantia de "motivo obrigatório"
+    // de virar decorativa: enquanto esta rota aceitasse 'blocked', bastaria
+    // chamá-la para bloquear sem motivo e sem guardar o estado anterior.
+    it("recusa bloquear por esta via (exige o endpoint dedicado com motivo)", async () => {
+      vi.mocked(repo.findById).mockResolvedValue({ id: "1", status: "active" });
+
+      await expect(changeAdStatus("admin1", "1", "blocked")).rejects.toThrow(
+        /PATCH \/api\/admin\/ads\/:id\/block/
+      );
+      expect(repo.updateStatus).not.toHaveBeenCalled();
+      expect(recordAdminAction).not.toHaveBeenCalled();
+    });
+
+    it("recusa tirar um anúncio de blocked por esta via", async () => {
+      vi.mocked(repo.findById).mockResolvedValue({ id: "1", status: "blocked" });
+
+      await expect(changeAdStatus("admin1", "1", "active")).rejects.toThrow(
+        /PATCH \/api\/admin\/ads\/:id\/unblock/
+      );
+      expect(repo.updateStatus).not.toHaveBeenCalled();
+      expect(recordAdminAction).not.toHaveBeenCalled();
     });
   });
 

@@ -173,6 +173,11 @@ export default function AdsPremiumList({
                   .join(" • ");
                 const location = [ad.city, ad.state].filter(Boolean).join(" - ");
                 const isActive = ad.status === "active";
+                // Fase 4.10A — bloqueio administrativo. O dono vê o anúncio e o
+                // motivo, mas nenhuma ação dele reverte o bloqueio, então as
+                // ações somem: um botão que só devolve erro é pior que a
+                // ausência dele.
+                const isBlocked = ad.status === "blocked";
                 const busy = busyAdId === ad.id;
                 return (
                   <tr
@@ -208,7 +213,14 @@ export default function AdsPremiumList({
                       {formatMoney(ad.price)}
                     </td>
                     <td className="px-4 py-3 align-middle">
-                      {isActive ? (
+                      {isBlocked ? (
+                        <span
+                          data-testid={`ad-status-blocked-${ad.id}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-800"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-600" /> Bloqueado
+                        </span>
+                      ) : isActive ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ativo
                         </span>
@@ -217,7 +229,15 @@ export default function AdsPremiumList({
                           Pausado
                         </span>
                       )}
-                      {ad.is_featured ? (
+                      {isBlocked && ad.moderation?.blocked_message ? (
+                        <p
+                          data-testid={`ad-blocked-message-${ad.id}`}
+                          className="mt-1 max-w-[220px] text-[11px] leading-snug text-[#6b7280]"
+                        >
+                          {ad.moderation.blocked_message}
+                        </p>
+                      ) : null}
+                      {ad.is_featured && !isBlocked ? (
                         <span className="ml-1 inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">
                           Destaque
                         </span>
@@ -230,6 +250,33 @@ export default function AdsPremiumList({
                       {(ad.leads ?? 0).toLocaleString("pt-BR")}
                     </td>
                     <td className="px-4 py-3 align-middle">
+                      {isBlocked ? (
+                        <div className="flex flex-col items-end gap-1.5">
+                          {/* Fase 4.10A (correção): editar é a ÚNICA ação aqui.
+                              Motivos como "Fotos inadequadas" pedem correção —
+                              sem este botão o dono lia o que precisava mudar e
+                              não tinha por onde mudar. Impulsionar, Ativar e
+                              Pausar seguem ausentes: publicam, e publicar é do
+                              admin. */}
+                          <Link
+                            href={`/painel/anuncios/${ad.id}/editar`}
+                            data-testid={`ad-blocked-edit-${ad.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#e2e7f1] px-3 py-1.5 text-xs font-bold text-[#37425d] transition hover:bg-[#f8fafc]"
+                          >
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                              <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+                            </svg>
+                            Editar anúncio
+                          </Link>
+                          <p
+                            data-testid={`ad-blocked-support-${ad.id}`}
+                            className="max-w-[260px] text-right text-[11px] leading-snug text-[#6b7280]"
+                          >
+                            Você pode corrigir as informações. O anúncio continuará bloqueado até
+                            ser reativado pela administração.
+                          </p>
+                        </div>
+                      ) : (
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
@@ -307,6 +354,7 @@ export default function AdsPremiumList({
                           ) : null}
                         </div>
                       </div>
+                      )}
                     </td>
                   </tr>
                 );

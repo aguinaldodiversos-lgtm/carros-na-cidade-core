@@ -247,6 +247,13 @@ export async function updateAd(id, data, user, ctx = {}) {
         AD_STATUS.PENDING_REVIEW,
         AD_STATUS.PAUSED,
         AD_STATUS.SOLD,
+        // Fase 4.10A: `blocked` passou a aceitar edição de CONTEÚDO, e por isso
+        // precisa entrar aqui. Sem esta linha, liberar a edição teria aberto,
+        // de carona, a troca de marca/modelo/ano/cidade — exatamente o que o
+        // guard estrutural existe para impedir, e justamente num anúncio sob
+        // suspeita. Corrigir o anúncio é trocar preço, fotos e descrição; não
+        // é trocar de veículo.
+        AD_STATUS.BLOCKED,
       ];
       if (protectedStatuses.includes(String(ownerContext?.status))) {
         // Auditoria: registra a TENTATIVA antes de rejeitar — admin

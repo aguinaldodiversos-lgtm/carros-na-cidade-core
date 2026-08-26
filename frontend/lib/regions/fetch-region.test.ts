@@ -140,7 +140,9 @@ describe("fetchRegionByCitySlug — propagação de cache + headers", () => {
 
     expect(calledOpts?.next).toEqual({
       revalidate: 300,
-      tags: ["internal:regions", "internal:regions:atibaia-sp"],
+      // Fase 4.10A: `public-ads` entra junto para que o bloqueio administrativo
+      // invalide também a região, sem apagar as tags que já existiam.
+      tags: ["internal:regions", "internal:regions:atibaia-sp", "public-ads"],
     });
 
     expect(calledOpts?.logTag).toBe("regions:bff");

@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl, resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 
 export type CatalogAdsTerritoryFallback = {
@@ -32,7 +33,7 @@ export async function fetchCatalogAdsTerritoryFallback(
     const res = await ssrResilientFetch(url, {
       headers: { Accept: "application/json" },
       logTag: "territory-fallback",
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [PUBLIC_ADS_CACHE_TAG] },
     });
     const json = (await res.json()) as {
       success?: boolean;

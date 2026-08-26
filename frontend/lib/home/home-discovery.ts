@@ -1,4 +1,5 @@
 import "server-only";
+import { withPublicAdsTag } from "@/lib/cache/public-ads-tag";
 
 import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
@@ -82,7 +83,7 @@ async function fetchStateSample(uf: string): Promise<SampleAd[]> {
       method: "GET",
       headers: { Accept: "application/json" },
       logTag: "home-discovery",
-      next: { revalidate: 60, tags: ["public-home", `public-home:${uf}`] },
+      next: { revalidate: 60, tags: withPublicAdsTag(["public-home", `public-home:${uf}`]) },
     });
     if (!res.ok) return [];
     const json = (await res.json()) as { data?: unknown };

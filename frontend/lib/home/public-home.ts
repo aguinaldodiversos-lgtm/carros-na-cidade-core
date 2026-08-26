@@ -1,4 +1,5 @@
 import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { withPublicAdsTag } from "@/lib/cache/public-ads-tag";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import type { AdItem } from "@/lib/search/ads-search";
 
@@ -53,7 +54,7 @@ async function fetchJson<T>(url: string, tags: string[]): Promise<T | null> {
       // 60s — alinhado a `fetchTerritorialPage` (frontend/lib/search/territorial-public.ts)
       // para evitar janela de 5min em que a Home diz "sem oportunidade" e a página
       // territorial da cidade mostra anúncio recém-publicado.
-      next: { revalidate: 60, tags },
+      next: { revalidate: 60, tags: withPublicAdsTag(tags) },
     });
 
     if (!response.ok) {

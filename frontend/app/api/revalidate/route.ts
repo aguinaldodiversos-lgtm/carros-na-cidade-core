@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,8 +39,17 @@ export const dynamic = "force-dynamic";
  * Bearer constante compartilhada é suficiente e mais simples que CSRF.
  */
 
-const ALLOWED_PATHS = new Set<string>(["/", "/blog"]);
-const ALLOWED_TAGS = new Set<string>(["public-home-hero", "public-home", "public-blog"]);
+const ALLOWED_PATHS = new Set<string>(["/", "/blog", "/comprar"]);
+const ALLOWED_TAGS = new Set<string>([
+  "public-home-hero",
+  "public-home",
+  "public-blog",
+  // Fase 4.10A — vitrines de anúncios. O backend dispara esta tag ao bloquear
+  // ou reativar um anúncio, para que a próxima leitura pública não dependa do
+  // TTL de 60s para descobrir a moderação. A allowlist é o que impede a rota
+  // de virar um purge arbitrário: só estes valores passam.
+  PUBLIC_ADS_CACHE_TAG,
+]);
 
 function getExpectedToken(): { token: string | null; allowDev: boolean } {
   const token = (process.env.REVALIDATE_TOKEN || "").trim();

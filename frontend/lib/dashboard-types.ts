@@ -57,6 +57,18 @@ export type DashboardAd = {
   moderation?: {
     rejection_reason: string | null;
     correction_requested_reason: string | null;
+    /**
+     * Fase 4.10A — bloqueio administrativo.
+     *
+     * `blocked_message` já vem PRONTO do backend, no rótulo destinado ao
+     * anunciante. O cliente não traduz código nenhum: o catálogo tem um rótulo
+     * interno e outro para o dono, e traduzir aqui arriscaria mostrar o
+     * interno. A nota administrativa e a identidade de quem bloqueou não
+     * existem neste payload.
+     */
+    blocked_reason_code?: string | null;
+    blocked_at?: string | null;
+    blocked_message?: string | null;
   };
 };
 
@@ -106,5 +118,13 @@ export type DashboardPayload = {
   publish_eligibility?: PublishEligibility;
   active_ads: DashboardAd[];
   paused_ads: DashboardAd[];
+  /**
+   * Fase 4.10A — anúncios bloqueados pela administração.
+   *
+   * Opcional porque payloads antigos (cache do BFF, mocks, testes existentes)
+   * não têm o campo; quem consome usa `?? []`. Lista à parte de propósito:
+   * bloqueado não conta para o limite do plano.
+   */
+  blocked_ads?: DashboardAd[];
   boost_options: BoostOption[];
 };

@@ -1,4 +1,5 @@
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 
 import type { AdItem, AdsFacetsResponse, AdsPagination } from "./ads-search";
 
@@ -271,7 +272,7 @@ async function fetchTerritorialPage(
     method: "GET",
     headers: { "Content-Type": "application/json" },
     logTag: "territorial",
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [PUBLIC_ADS_CACHE_TAG] },
   });
 
   if (!response.ok) {

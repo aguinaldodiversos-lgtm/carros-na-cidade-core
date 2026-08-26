@@ -54,8 +54,8 @@ describe("ad-ownership.canUserEditAd", () => {
     }
   );
 
-  it.each(["sold", "expired", "archived", "blocked", "deleted"])(
-    "dono em status bloqueado '%s': 409",
+  it.each(["sold", "expired", "archived", "deleted"])(
+    "dono em status encerrado '%s': 409",
     (status) => {
       const verdict = canUserEditAd(OWNER, { advertiser_user_id: "user-1", status });
       expect(verdict.allowed).toBe(false);
@@ -64,6 +64,12 @@ describe("ad-ownership.canUserEditAd", () => {
       expect(verdict.status).toBe(status);
     }
   );
+
+  it("dono de anúncio BLOQUEADO pode editar o conteúdo (Fase 4.10A)", () => {
+    const verdict = canUserEditAd(OWNER, { advertiser_user_id: "user-1", status: "blocked" });
+    expect(verdict.allowed).toBe(true);
+    expect(verdict.reason).toBe("owner");
+  });
 
   it("terceiro (não dono): 403", () => {
     const verdict = canUserEditAd(OWNER, {
@@ -165,10 +171,13 @@ describe("ad-ownership helpers", () => {
     expect(isAdminUser(null)).toBe(false);
   });
 
-  it("AD_STATUS_OWNER_EDITABLE não inclui estados encerrados/punição", () => {
+  it("AD_STATUS_OWNER_EDITABLE exclui encerrados e inclui blocked (corrigível)", () => {
     expect(AD_STATUS_OWNER_EDITABLE).not.toContain("sold");
     expect(AD_STATUS_OWNER_EDITABLE).not.toContain("archived");
-    expect(AD_STATUS_OWNER_EDITABLE).not.toContain("blocked");
+    // Fase 4.10A: `blocked` PASSOU a ser editável — o dono precisa poder
+    // corrigir o que a moderação apontou. Editar não reativa: `status` no
+    // corpo continua recusado e só o admin remove o bloqueio.
+    expect(AD_STATUS_OWNER_EDITABLE).toContain("blocked");
     expect(AD_STATUS_OWNER_EDITABLE).toContain("active");
   });
 });

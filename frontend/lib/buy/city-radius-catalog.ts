@@ -1,4 +1,5 @@
 import "server-only";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
@@ -89,7 +90,7 @@ async function fetchCityRadiusCoverage(
       method: "GET",
       headers: { Accept: "application/json" },
       logTag: "city-radius",
-      next: { revalidate: 300 },
+      next: { revalidate: 300, tags: [PUBLIC_ADS_CACHE_TAG] },
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { success?: boolean; data?: RadiusCoverage };

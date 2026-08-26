@@ -5,6 +5,7 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 import * as dashboardService from "./dashboard/admin-dashboard.service.js";
 import * as adsService from "./ads/admin-ads.service.js";
+import * as adBlockService from "./ads/admin-ad-block.service.js";
 import * as advertisersService from "./advertisers/admin-advertisers.service.js";
 import * as adminUsersService from "./users/admin-users.service.js";
 import * as paymentsService from "./payments/admin-payments.service.js";
@@ -181,6 +182,64 @@ router.get(
     const limit = parseIntParam(req.query.limit, 50);
     const events = await adsService.getAdEvents(req.params.id, { limit });
     res.json({ ok: true, data: events });
+  })
+);
+
+// =========================================================================
+// Fase 4.10A — Moderação administrativa: bloquear / reativar anúncio
+//
+// Autorização herdada do router inteiro (authMiddleware + requireAdmin):
+// sem JWT → 401, autenticado sem role admin → 403. Não existe verificação
+// paralela aqui de propósito — um segundo caminho de autenticação é um
+// segundo caminho para errar.
+// =========================================================================
+
+router.patch(
+  "/ads/:id/block",
+  asyncHandler(async (req, res) => {
+    const { reason_code: reasonCode, note } = req.body || {};
+    if (!reasonCode) throw new AppError("Campo reason_code é obrigatório", 400);
+
+    const result = await adBlockService.blockAd(req.user.id, req.params.id, {
+      reasonCode,
+      note,
+    });
+
+    // `changed: false` = já estava bloqueado. 200 (e não erro) porque um retry
+    // de rede não é falha do cliente: o estado desejado está lá.
+    res.json({ ok: true, changed: result.changed, data: result.ad });
+  })
+);
+
+router.patch(
+  "/ads/:id/unblock",
+  asyncHandler(async (req, res) => {
+    const { note } = req.body || {};
+    const result = await adBlockService.unblockAd(req.user.id, req.params.id, { note });
+    res.json({ ok: true, changed: result.changed, data: result.ad });
+  })
+);
+
+router.get(
+  "/ads/:id/moderation-history",
+  asyncHandler(async (req, res) => {
+    const limit = parseIntParam(req.query.limit, 50);
+    const events = await adBlockService.listModerationHistory(req.params.id, { limit });
+
+    // DTO explícito: `actor_user_id` fica de fora. O histórico responde "o que
+    // aconteceu e quando", não "qual administrador decidiu".
+    res.json({
+      ok: true,
+      data: events.map((evt) => ({
+        id: evt.id,
+        event_type: evt.event_type,
+        from_status: evt.from_status,
+        to_status: evt.to_status,
+        reason_code: evt.metadata?.reason_code ?? null,
+        note: evt.metadata?.note ?? null,
+        created_at: evt.created_at,
+      })),
+    });
   })
 );
 

@@ -148,7 +148,17 @@ function normalizeAd(raw: unknown): DashboardAd | null {
   if (!isRecord(raw)) return null;
   const id = toStr(raw.id);
   if (!id) return null;
-  const status = raw.status === "paused" ? "paused" : "active";
+  // Fase 4.10A — `blocked` precisa SOBREVIVER à normalização.
+  //
+  // A regra anterior era binária (`paused` ou, para todo o resto, `active`),
+  // então um anúncio bloqueado chegaria ao card rotulado como ativo — pior do
+  // que não aparecer: o dono leria "Ativo" num anúncio fora do ar. A allowlist
+  // abaixo preserva os estados que a UI sabe renderizar e mantém o fallback
+  // `active` para qualquer valor desconhecido, como antes.
+  const KNOWN_STATUSES = ["paused", "blocked", "pending_review", "rejected", "sold", "expired"];
+  const status = (
+    typeof raw.status === "string" && KNOWN_STATUSES.includes(raw.status) ? raw.status : "active"
+  ) as DashboardAd["status"];
   const pl = raw.priority_level === "high" ? "high" : "normal";
   return {
     id,
@@ -168,6 +178,30 @@ function normalizeAd(raw: unknown): DashboardAd | null {
     transmission: typeof raw.transmission === "string" ? raw.transmission : null,
     city: typeof raw.city === "string" ? raw.city : null,
     state: typeof raw.state === "string" ? raw.state : null,
+    moderation: normalizeModeration(raw.moderation),
+  };
+}
+
+/**
+ * Bloco de moderação do anúncio (Fase 4.10A).
+ *
+ * `blocked_message` chega PRONTO do backend, no rótulo destinado ao
+ * anunciante — este normalizador copia, nunca traduz. O catálogo tem um rótulo
+ * interno e outro para o dono, e resolver o texto aqui abriria a porta para
+ * exibir o interno ("Possível fraude") a quem ainda não foi apurado.
+ */
+function normalizeModeration(raw: unknown): DashboardAd["moderation"] {
+  if (!isRecord(raw)) return undefined;
+  return {
+    rejection_reason: typeof raw.rejection_reason === "string" ? raw.rejection_reason : null,
+    correction_requested_reason:
+      typeof raw.correction_requested_reason === "string"
+        ? raw.correction_requested_reason
+        : null,
+    blocked_reason_code:
+      typeof raw.blocked_reason_code === "string" ? raw.blocked_reason_code : null,
+    blocked_at: typeof raw.blocked_at === "string" ? raw.blocked_at : null,
+    blocked_message: typeof raw.blocked_message === "string" ? raw.blocked_message : null,
   };
 }
 
@@ -235,6 +269,10 @@ export function normalizeDashboardPayload(raw: unknown): DashboardPayload | null
     publish_eligibility: normalizePublishEligibility(root.publish_eligibility),
     active_ads: normalizeAds(root.active_ads),
     paused_ads: normalizeAds(root.paused_ads),
+    // Fase 4.10A — anúncios bloqueados pela administração. Lista separada
+    // porque `stats.active_ads` conta limite de plano e um bloqueado não
+    // consome vaga; misturá-lo em active/paused falsearia o contador.
+    blocked_ads: normalizeAds(root.blocked_ads),
     boost_options: normalizeBoostOptions(root.boost_options),
   };
 }

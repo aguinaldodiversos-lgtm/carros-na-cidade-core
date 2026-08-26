@@ -6,6 +6,7 @@ import * as adsRepository from "../ads/ads.repository.js";
 import * as adsPanelService from "../ads/ads.panel.service.js";
 import { AD_STATUS } from "../ads/ads.canonical.constants.js";
 import { normalizeVehicleOptions } from "../ads/ad-options.catalog.js";
+import { ownerLabelForReasonCode } from "../../shared/moderation/ad-block-reasons.js";
 import { getAccountUser } from "./account.user.read.js";
 
 /**
@@ -749,6 +750,20 @@ function normalizeDashboardAd(row) {
     moderation: {
       rejection_reason: row.rejection_reason || null,
       correction_requested_reason: row.correction_requested_reason || null,
+      // Fase 4.10A — bloqueio administrativo.
+      //
+      // A MENSAGEM é resolvida aqui, no servidor, e não no frontend. O
+      // catálogo tem dois rótulos por motivo (um para o admin, outro para o
+      // dono) e traduzir no cliente significaria que qualquer descuido
+      // renderizaria o rótulo interno — "Possível fraude" — na tela de quem
+      // ainda não foi apurado. Enviando o texto pronto, esse erro não tem
+      // como acontecer.
+      blocked_reason_code: row.blocked_reason_code || null,
+      blocked_at: toIsoStringOrNull(row.blocked_at),
+      blocked_message:
+        dashboardStatus === AD_STATUS.BLOCKED
+          ? ownerLabelForReasonCode(row.blocked_reason_code)
+          : null,
     },
   };
 }
@@ -769,6 +784,12 @@ export async function listOwnedAds(userId) {
         a.images,
         a.rejection_reason,
         a.correction_requested_reason,
+        -- Fase 4.10A: o CODIGO do motivo (chave de dominio) e a data. NUNCA
+        -- selecionar blocked_reason (nota administrativa interna) nem
+        -- blocked_by_user_id (identidade do admin) - o dono precisa saber o
+        -- que revisar, nao quem decidiu nem o que foi anotado internamente.
+        a.blocked_reason_code,
+        a.blocked_at,
         a.year,
         a.city,
         a.state,
@@ -784,7 +805,11 @@ export async function listOwnedAds(userId) {
         '${AD_STATUS.PENDING_REVIEW}',
         '${AD_STATUS.REJECTED}',
         '${AD_STATUS.SOLD}',
-        '${AD_STATUS.EXPIRED}'
+        '${AD_STATUS.EXPIRED}',
+        -- Fase 4.10A: o anúncio bloqueado APARECE para o dono. Antes ele
+        -- sumia das duas listas (esta e o histórico), então o anunciante via
+        -- o anúncio simplesmente desaparecer sem explicação nenhuma.
+        '${AD_STATUS.BLOCKED}'
       )
         AND adv.user_id = $1
       ORDER BY
@@ -988,6 +1013,10 @@ export async function getDashboardPayload(userId, options = {}) {
 
     const activeAds = ads.filter((ad) => ad.status === "active");
     const pausedAds = ads.filter((ad) => ad.status === "paused");
+    // Fase 4.10A — bloqueados ficam FORA de activeAds/pausedAds de propósito:
+    // as estatísticas de plano e limite contam anúncios operáveis, e um
+    // bloqueado não é nem um nem outro. Ele entra só na lista exibida.
+    const blockedAds = ads.filter((ad) => ad.status === AD_STATUS.BLOCKED);
     const currentPlan = await resolveCurrentPlan(user);
     const freeLimit = getFreeLimit(user.type, user.cnpj_verified);
     const planLimit = currentPlan?.ad_limit ?? freeLimit;
@@ -1046,7 +1075,17 @@ export async function getDashboardPayload(userId, options = {}) {
       },
       active_ads: activeAds,
       paused_ads: pausedAds,
-      recentAds: [...activeAds, ...pausedAds].slice(0, 12),
+      // Fase 4.10A — lista própria, não misturada em active/paused.
+      //
+      // Incluir `blocked` na query de `listOwnedAds` não bastava: o payload é
+      // recomposto A PARTIR de activeAds/pausedAds, e o bloqueado era
+      // descartado aqui, depois de ter sido corretamente lido do banco. A
+      // lista precisa existir em todas as pontas da cadeia — query, payload,
+      // normalizador do BFF e componente — ou o dono continua sem ver nada.
+      blocked_ads: blockedAds,
+      // Bloqueados PRIMEIRO: é a única situação da lista que exige uma ação do
+      // dono (falar com o suporte) e que ele não provocou.
+      recentAds: [...blockedAds, ...activeAds, ...pausedAds].slice(0, 12),
       alerts: [],
       boost_options: emptyBoost,
     };

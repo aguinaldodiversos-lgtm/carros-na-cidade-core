@@ -86,8 +86,25 @@ export async function changeAdStatus(adminUserId, adId, newStatus, reason = null
     throw new AppError("Anúncios deletados não podem ser restaurados por esta via", 400);
   }
 
-  if (newStatus === AD_STATUS.BLOCKED && reason) {
-    await repo.updateBlockedReason(adId, reason);
+  // Fase 4.10A — o bloqueio administrativo saiu desta via genérica.
+  //
+  // Aqui `reason` é opcional e o alvo é livre, então esta rota permitia
+  // bloquear SEM motivo e "desbloquear" forçando `active` — o que publicaria
+  // um anúncio que estava apenas pausado ou retido em análise antes do
+  // bloqueio. Os endpoints dedicados exigem motivo e restauram o estado
+  // anterior. Fechar a porta antiga é o que torna essas garantias reais: uma
+  // regra que um segundo caminho contorna não é uma regra.
+  if (newStatus === AD_STATUS.BLOCKED) {
+    throw new AppError(
+      "Bloqueio administrativo não é feito por esta via. Use PATCH /api/admin/ads/:id/block (exige motivo).",
+      400
+    );
+  }
+  if (oldStatus === AD_STATUS.BLOCKED) {
+    throw new AppError(
+      "Anúncio bloqueado só volta pela reativação administrativa. Use PATCH /api/admin/ads/:id/unblock.",
+      400
+    );
   }
 
   const updated = await repo.updateStatus(adId, newStatus);

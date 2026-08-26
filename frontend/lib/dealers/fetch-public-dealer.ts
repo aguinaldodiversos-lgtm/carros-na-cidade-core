@@ -10,6 +10,7 @@
 // shape público seja inválido (sem slug, R$ 0, dirty data).
 
 import { getBackendApiBaseUrl, getInternalBackendApiBaseUrl } from "@/lib/env/backend-api";
+import { PUBLIC_ADS_CACHE_TAG } from "@/lib/cache/public-ads-tag";
 import { ssrResilientFetch } from "@/lib/net/ssr-resilient-fetch";
 import { normalizePublicAd, type PublicAd } from "@/lib/public-contracts";
 import type { AdItem } from "@/lib/search/ads-search";
@@ -144,7 +145,7 @@ export async function fetchPublicDealer(slug: string): Promise<PublicDealerPaylo
         Accept: "application/json",
       },
       logTag: "public-dealer",
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [PUBLIC_ADS_CACHE_TAG] },
     });
   } catch {
     return null;

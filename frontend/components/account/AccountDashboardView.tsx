@@ -27,9 +27,14 @@ export default function AccountDashboardView({
   const [boostAd, setBoostAd] = useState<DashboardAd | null>(null);
 
   // Lista completa; a busca/filtro/ordenação vivem dentro de AdsPremiumList.
+  //
+  // Fase 4.10A: bloqueados primeiro. É o único estado da lista que o dono não
+  // provocou e que exige uma ação dele (falar com o suporte) — deixá-lo no fim
+  // repetiria o problema que a fase resolve, que era o anúncio sumir sem
+  // explicação nenhuma.
   const allAds = useMemo(
-    () => [...data.active_ads, ...data.paused_ads],
-    [data.active_ads, data.paused_ads]
+    () => [...(data.blocked_ads ?? []), ...data.active_ads, ...data.paused_ads],
+    [data.blocked_ads, data.active_ads, data.paused_ads]
   );
 
   const refreshDashboard = async () => {
@@ -39,6 +44,10 @@ export default function AccountDashboardView({
 
   const updateStatus = async (ad: DashboardAd) => {
     if (busyAdId) return;
+    // Fase 4.10A — nenhuma ação do dono reverte um bloqueio administrativo.
+    // A lista já não oferece o botão nesse estado; este guard cobre o caminho
+    // programático (teste, atalho, mudança futura na lista).
+    if (ad.status === "blocked") return;
     setBusyAdId(ad.id);
     try {
       await fetch(`/api/ads/${ad.id}`, {
