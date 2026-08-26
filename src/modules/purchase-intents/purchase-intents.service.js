@@ -35,6 +35,12 @@ import {
   parsePurchaseIntentId,
   validateNewPurchaseIntent,
 } from "./purchase-intents.validation.js";
+import {
+  decodeDealerCursor,
+  encodeDealerCursor,
+  parseDealerFeedFilters,
+  parseDealerSort,
+} from "./purchase-intents.dealer.validation.js";
 
 /**
  * Normaliza o id do usuário autenticado.
@@ -448,17 +454,35 @@ export async function resolveDealerCityId(userId) {
  * advertiser do usuário autenticado — é isso que impede um lojista de Bragança
  * de listar Atibaia trocando um parâmetro.
  */
-export async function listDealerOpportunities(userId, { limit: rawLimit, cursor: rawCursor } = {}) {
+export async function listDealerOpportunities(userId, query = {}) {
   const dealerUserId = requireUserId(userId);
-  const limit = parseLimit(rawLimit);
-  const cursor = decodeCursor(rawCursor);
+  const limit = parseLimit(query.limit);
+
+  // Filtros e ordenação são validados ANTES de resolver a cidade: um filtro
+  // inválido é 400 mesmo para o lojista sem loja, e resolver a cidade primeiro
+  // faria a mesma URL responder 400 ou 200 dependendo do cadastro de quem pede.
+  const sort = parseDealerSort(query.sort);
+  const filters = parseDealerFeedFilters(query);
+  const cursor = decodeDealerCursor(query.cursor, sort);
 
   const cityId = await resolveDealerCityId(dealerUserId);
   if (cityId == null) {
-    return { purchase_intents: [], next_cursor: null, limit };
+    return {
+      purchase_intents: [],
+      next_cursor: null,
+      limit,
+      sort,
+      summary: { total: 0 },
+    };
   }
 
-  const { rows, hasMore } = await repo.listActiveByCity({ cityId, limit, cursor });
+  // A contagem acompanha a listagem em vez de ter endpoint próprio: são a mesma
+  // pergunta com os mesmos filtros, e duas requests poderiam responder números
+  // diferentes se uma procura fosse publicada entre elas.
+  const [{ rows, hasMore }, total] = await Promise.all([
+    repo.listActiveByCity({ cityId, filters, sort, limit, cursor }),
+    repo.countActiveByCity({ cityId, filters }),
+  ]);
 
   logger.info(
     {
@@ -469,14 +493,18 @@ export async function listDealerOpportunities(userId, { limit: rawLimit, cursor:
       }),
       cityId,
       returned: rows.length,
+      total,
+      sort,
     },
     "[purchase-intents] oportunidades listadas para lojista"
   );
 
   return {
     purchase_intents: rows.map(serializeForDealer),
-    next_cursor: hasMore ? encodeCursor(rows[rows.length - 1]) : null,
+    next_cursor: hasMore ? encodeDealerCursor(rows[rows.length - 1], sort) : null,
     limit,
+    sort,
+    summary: { total },
   };
 }
 

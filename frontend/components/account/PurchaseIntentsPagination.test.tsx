@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DealerOpportunitiesList from "./DealerOpportunitiesList";
 import PurchaseIntentsList from "./PurchaseIntentsList";
-import type { DealerOpportunity, PurchaseIntent } from "@/lib/purchase-intents/api";
+import {
+  EMPTY_DEALER_FILTERS,
+  type DealerOpportunity,
+  type PurchaseIntent,
+} from "@/lib/purchase-intents/api";
 
 /**
  * Paginação "Carregar mais" nas duas listas (Fase 2.1).
@@ -81,10 +85,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 /**
- * Os dois cenários são idênticos em comportamento — só mudam o componente, o
+ * Os dois cenários são idênticos em COMPORTAMENTO — só mudam o componente, o
  * fetcher e o testid do card. Rodar a MESMA bateria nos dois é o ponto: PF e PJ
  * compartilham o hook, e um `it.each` prova que a partilha não quebrou nenhum
  * dos lados.
+ *
+ * O que deixou de ser idêntico na Fase 4.11C é a ASSINATURA do fetcher, e o
+ * cenário carrega essa diferença em `callWith` em vez de escondê-la.
+ *
+ * A lista do comprador continua recebendo o cursor solto (`fetch(cursor)`) — ela
+ * tem uma ordem só e nenhum filtro. A do lojista passou a receber um objeto com
+ * filtros e ordenação, porque as duas coisas são resolvidas no servidor.
+ *
+ * Uniformizar as duas aqui (aceitando `expect.anything()`, por exemplo) faria o
+ * teste parar de provar que a página 1 vai SEM cursor — que é justamente o que
+ * distingue paginação de "recarrega tudo".
  */
 const SCENARIOS = [
   {
@@ -93,22 +108,36 @@ const SCENARIOS = [
     fetcher: fetchMyPurchaseIntents,
     cardTestId: "purchase-intent-card",
     makeItem: (id: number) => makeIntent(id) as PurchaseIntent | DealerOpportunity,
+    isDealer: false,
+    callWith: (cursor: string | null) => cursor,
   },
   {
     name: "PJ — Compradores ativos",
     render: () => render(<DealerOpportunitiesList />),
     fetcher: fetchDealerOpportunities,
-    cardTestId: "dealer-opportunity-card",
+    cardTestId: "active-buyer-card",
     makeItem: (id: number) => makeOpportunity(id) as PurchaseIntent | DealerOpportunity,
+    isDealer: true,
+    callWith: (cursor: string | null) => ({
+      filters: EMPTY_DEALER_FILTERS,
+      sort: "recent",
+      cursor,
+    }),
   },
 ] as const;
 
 describe.each(SCENARIOS)("$name — paginação", (scenario) => {
   function page(ids: number[], nextCursor: string | null) {
+    const items = ids.map(scenario.makeItem);
     return {
-      items: ids.map(scenario.makeItem),
+      items,
       next_cursor: nextCursor,
       limit: 20,
+      // Campos que só o feed do lojista devolve. Mandá-los nos dois seria
+      // inofensivo, mas faria a fixture mentir sobre o contrato do comprador.
+      ...(scenario.isDealer
+        ? { sort: "recent" as const, summary: { total: items.length } }
+        : {}),
     };
   }
 
@@ -119,7 +148,7 @@ describe.each(SCENARIOS)("$name — paginação", (scenario) => {
     expect(await screen.findByTestId("load-more")).toBeVisible();
     expect(await screen.findAllByTestId(scenario.cardTestId)).toHaveLength(20);
     // Primeira página vai sem cursor.
-    expect(scenario.fetcher).toHaveBeenCalledWith(null);
+    expect(scenario.fetcher).toHaveBeenCalledWith(scenario.callWith(null));
   });
 
   it("clicar acrescenta a página 2 e remove o botão no fim (20 + 5 = 25)", async () => {
@@ -137,7 +166,7 @@ describe.each(SCENARIOS)("$name — paginação", (scenario) => {
       expect(await screen.findAllByTestId(scenario.cardTestId)).toHaveLength(25)
     );
     // O cursor da página 1 é repassado opaco.
-    expect(scenario.fetcher).toHaveBeenLastCalledWith("cursor-p2");
+    expect(scenario.fetcher).toHaveBeenLastCalledWith(scenario.callWith("cursor-p2"));
     // next_cursor null → o botão some, não fica desabilitado para sempre.
     await waitFor(() => expect(screen.queryByTestId("load-more")).not.toBeInTheDocument());
   });

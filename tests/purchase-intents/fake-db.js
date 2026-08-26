@@ -133,6 +133,102 @@ function beforeCursor(row, createdAt, id) {
   return Number(row.id) < Number(id);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// FEED DO LOJISTA — FILTROS, ORDENAÇÃO E CURSOR (Fase 4.11C)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Estes três helpers LEEM O SQL. Não é preciosismo: é a única forma de o teste
+// provar que o REPOSITORY emitiu a cláusula.
+//
+// Um fake que aplicasse os filtros a partir de um objeto `filters` recebido de
+// fora continuaria verde depois de alguém apagar `add("pi.transmission = $?")`
+// do repository — o feed voltaria a ignorar o câmbio em produção e a suíte não
+// diria nada. Aqui, apagar a linha do repository apaga o fragmento do SQL, o
+// fake para de filtrar e o teste de filtro falha.
+//
+// A leitura é sempre "acha o fragmento, extrai o número do placeholder, lê
+// `params[n - 1]`" — a mesma correspondência que o PostgreSQL faria.
+
+/** Valor do parâmetro citado por um fragmento, ou `undefined` se ele não existe. */
+function paramFor(text, fragmentRegex, params) {
+  const match = text.match(fragmentRegex);
+  if (!match) return undefined;
+  return params[Number(match[1]) - 1];
+}
+
+const NUMERIC = (value) => Number(String(value));
+
+/**
+ * As linhas que o `WHERE` do feed selecionaria.
+ *
+ * Cidade, status e validade são incondicionais (estão sempre no SQL); os demais
+ * só entram quando o fragmento correspondente aparece.
+ */
+function dealerFeedRows(text, params, now) {
+  const cityId = params[0];
+
+  const intentType = paramFor(text, /pi\.intent_type = \$(\d+)/i, params);
+  const brandSlug = paramFor(text, /pi\.brand_slug = \$(\d+)/i, params);
+  const bodyType = paramFor(text, /pi\.body_type = \$(\d+)/i, params);
+  const transmission = paramFor(text, /pi\.transmission = \$(\d+)/i, params);
+  const timeframe = paramFor(text, /pi\.purchase_timeframe = \$(\d+)/i, params);
+  const budgetMin = paramFor(text, /pi\.max_price >= \$(\d+)/i, params);
+  const budgetMax = paramFor(text, /pi\.max_price <= \$(\d+)/i, params);
+
+  return db.purchaseIntents.filter((item) => {
+    if (!sameId(item.city_id, cityId)) return false;
+    if (item.status !== "active") return false;
+    if (new Date(item.expires_at).getTime() <= now) return false;
+
+    if (intentType !== undefined && item.intent_type !== intentType) return false;
+    // Igualdade estrita contra NULL: uma procura `open_category` não tem
+    // `brand_slug`, e `NULL = 'volkswagen'` não casa no Postgres. O fake precisa
+    // concordar, senão o teste de exclusão mútua passaria por engano.
+    if (brandSlug !== undefined && item.brand_slug !== brandSlug) return false;
+    if (bodyType !== undefined && item.body_type !== bodyType) return false;
+    if (transmission !== undefined && item.transmission !== transmission) return false;
+    if (timeframe !== undefined && item.purchase_timeframe !== timeframe) return false;
+    if (budgetMin !== undefined && NUMERIC(item.max_price) < NUMERIC(budgetMin)) return false;
+    if (budgetMax !== undefined && NUMERIC(item.max_price) > NUMERIC(budgetMax)) return false;
+
+    return true;
+  });
+}
+
+/** Lê `ORDER BY pi.<coluna> <DIR>, pi.id <DIR>` e ordena igual. */
+function sortDealerFeed(rows, text) {
+  const match = text.match(/ORDER BY pi\.(\w+) (ASC|DESC), pi\.id (ASC|DESC)/i);
+  if (!match) return sortDesc(rows);
+
+  const column = match[1];
+  const sign = match[2].toUpperCase() === "ASC" ? 1 : -1;
+  const read = (row) =>
+    column === "created_at" ? new Date(row.created_at).getTime() : NUMERIC(row[column]);
+
+  return [...rows].sort((a, b) => {
+    const byKey = read(a) - read(b);
+    if (byKey !== 0) return byKey * sign;
+    return (Number(a.id) - Number(b.id)) * sign;
+  });
+}
+
+/** Lê `AND (pi.<coluna>, pi.id) <op> ($n::<tipo>, $m)` e aplica a mesma tupla. */
+function afterDealerCursor(row, text, params) {
+  const match = text.match(/\(pi\.(\w+), pi\.id\) ([<>]) \(\$(\d+)::\w+, \$(\d+)\)/i);
+  if (!match) return true;
+
+  const [, column, operator, keyIndex, idIndex] = match;
+  const read = (value) =>
+    column === "created_at" ? new Date(value).getTime() : NUMERIC(value);
+
+  const rowKey = read(row[column]);
+  const cursorKey = read(params[Number(keyIndex) - 1]);
+  const cursorId = Number(params[Number(idIndex) - 1]);
+
+  if (rowKey !== cursorKey) return operator === "<" ? rowKey < cursorKey : rowKey > cursorKey;
+  return operator === "<" ? Number(row.id) < cursorId : Number(row.id) > cursorId;
+}
+
 /**
  * Anúncio do estoque, com os campos que o card e o casamento usam.
  *
@@ -508,22 +604,21 @@ function handle(text, params, now) {
     return { rows: row ? [projectDealer(row)] : [], rowCount: row ? 1 : 0 };
   }
 
-  if (/WHERE pi\.city_id = \$1 AND pi\.status = 'active'/i.test(text)) {
-    const [cityId] = params;
-    const hasCursor = /\(pi\.created_at, pi\.id\) </i.test(text);
-    const limit = Number(params[params.length - 1]);
+  // Contagem do cabeçalho (Fase 4.11C). Vem ANTES da listagem porque as duas
+  // partem do mesmo `WHERE`; o que distingue é o `SELECT COUNT(*)`.
+  if (
+    /^SELECT COUNT\(\*\)::int AS total FROM purchase_intents pi/i.test(text) &&
+    /WHERE pi\.city_id = \$1 AND pi\.status = 'active'/i.test(text)
+  ) {
+    const rows = dealerFeedRows(text, params, now);
+    return { rows: [{ total: rows.length }], rowCount: 1 };
+  }
 
-    let rows = sortDesc(
-      db.purchaseIntents.filter(
-        (item) =>
-          sameId(item.city_id, cityId) &&
-          item.status === "active" &&
-          new Date(item.expires_at).getTime() > now
-      )
+  if (/WHERE pi\.city_id = \$1 AND pi\.status = 'active'/i.test(text)) {
+    const limit = Number(params[params.length - 1]);
+    const rows = sortDealerFeed(dealerFeedRows(text, params, now), text).filter((row) =>
+      afterDealerCursor(row, text, params)
     );
-    if (hasCursor) {
-      rows = rows.filter((row) => beforeCursor(row, params[1], params[2]));
-    }
     return { rows: rows.slice(0, limit).map(projectDealer), rowCount: rows.length };
   }
 
